@@ -10,8 +10,13 @@
 - [x] ProjectStore: dispatch→追記→再導出の単方向フロー、2者マージ収束テスト済み
 - [x] プロジェクトZIP往復（export/inspect/import/merge/差分ZIP、captions.csv・snapshot.json同梱）
 - [x] CSV入出力（BOM・完全精度・formulaガード往復・座標コピペ・modelName付替え・新セット生成）
-- [ ] ViewerCore: three.jsシーン + GLB/OBJ/STL/PLYローダ + ピン
+- [x] ViewerCore: three.jsシーン + GLB/OBJ/STL/PLYローダ + ピン（ブラウザ実機で4形式の描画・ピック・ZIP往復を確認）
 - [ ] xlsxインポート（SheetJS。Drive ZIP移行ウィザードの一部）
+- [ ] マテリアル調整のViewerCore実装（unlit・クロマキーシェーダパッチ移植）
+- [ ] 平行投影・±XYZカメラ・ビュープリセット適用
+
+### 検証環境メモ
+- Claude Codeのブラウザペインでは rAF が発火せず screenshot も不可。検証は renderOnce() + ピクセルサンプリングで行う（viewer.tsのupdateMatrixWorld防御はこの環境で発見した実バグ由来）
 - [ ] **UI/UXモック提示 → 人間とコンセンサス（実UI実装はその後）**
 - [ ] PWA化、iOS実機検証（P0-2はユーザー協力が必要）
 
