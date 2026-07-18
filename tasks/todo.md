@@ -18,7 +18,14 @@
 ### 検証環境メモ
 - Claude Codeのブラウザペインでは rAF が発火せず screenshot も不可。検証は renderOnce() + ピクセルサンプリングで行う（viewer.tsのupdateMatrixWorld防御はこの環境で発見した実バグ由来）
 - [x] UI/UXモック作成・提示（docs/mockups/ui-mock-v1.html、Artifact公開済み）
-- [ ] **UI/UXコンセンサス（Q1〜Q6の回答待ち）→ 製品UI実装**
+- [x] UI/UXコンセンサス確定（docs/05冒頭に記録: 5タブ・データタブ分離・長押しピン・ダーク継承）
+- [x] **製品UI v1実装** — ホーム/ビューア画面/5タブ/Undo・Redo/検索/セット切替/マージレポート/
+      ボトムシート3段階/長押しピン追加。ブラウザ実機で作成→編集→Undo→リロード復元(OPFS)→
+      モバイルシート→長押し追加まで検証済み
+- [ ] xlsx取込（Drive ZIP移行ウィザード）、LociMyu移行
+- [ ] PWA化（Service Worker・manifest・file_handlers）
+- [ ] Material拡張（unlit・クロマキー移植）、平行投影
+- [ ] iOS実機検証（P0-2。ユーザー協力）→ MVP完了判定（docs/01成功基準1〜3）
 - [ ] PWA化、iOS実機検証（P0-2はユーザー協力が必要）
 
 # LociView 設計フェーズ

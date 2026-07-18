@@ -33,6 +33,12 @@ const ENTITY_PREFIX: Record<string, IdPrefix> = {
   profile: 'usr',
 };
 
+/** エンティティ種別に対応する新規IDを発行する（Undo等、store外からのID事前確保用） */
+export function entityIdFor(kind: string): string {
+  const prefix = ENTITY_PREFIX[kind];
+  return prefix !== undefined ? newId(prefix) : `${kind}_${newId('ast').slice(4)}`;
+}
+
 export class ProjectStore {
   private ops: Op[] = [];
   private stateCache: ProjectState;

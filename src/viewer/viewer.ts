@@ -51,8 +51,23 @@ export class ViewerCore {
 
   private pickHandlers = new Set<(hit: PickHit) => void>();
   private pinSelectHandlers = new Set<(id: string) => void>();
-  /** trueの間、通常クリックでピンを打てる（タッチ対応。docs/05 §3.3） */
+  private tapMissHandlers = new Set<() => void>();
+  /** trueの間、通常クリックでピンを打てる（開発ハーネス用。製品UIは長押し/Shift+Click） */
   pinMode = false;
+
+  // 長押し=ピン追加（コンセンサスQ3。指が動いたらキャンセル=回転優先）
+  private longPressTimer: ReturnType<typeof setTimeout> | null = null;
+  private longPressStart: { x: number; y: number } | null = null;
+  static readonly LONG_PRESS_MS = 500;
+  static readonly LONG_PRESS_MOVE_PX = 10;
+
+  // マテリアル既定値（リセット・セット切替用）
+  private matDefaults = new Map<
+    THREE.Material,
+    { opacity: number; transparent: boolean; side: THREE.Side; depthWrite: boolean }
+  >();
+  private basePointSize = 1;
+  private backgroundHex: string | null = null;
 
   init(canvas: HTMLCanvasElement): void {
     this.canvas = canvas;
@@ -84,6 +99,11 @@ export class ViewerCore {
     this.scene.add(dir);
 
     canvas.addEventListener('pointerdown', this.onPointerDown);
+    canvas.addEventListener('pointermove', this.onPointerMove);
+    canvas.addEventListener('pointerup', this.onPointerUp);
+    canvas.addEventListener('pointercancel', this.onPointerUp);
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    canvas.style.touchAction = 'none';
     canvas.addEventListener('webglcontextlost', this.onContextLost, false);
     canvas.addEventListener('webglcontextrestored', this.onContextRestored, false);
     globalThis.addEventListener('resize', this.onResize);
@@ -102,11 +122,24 @@ export class ViewerCore {
     const box = new THREE.Box3().setFromObject(model.root);
     const diag = box.getSize(new THREE.Vector3()).length();
     this.pinRadius = Math.max(diag * 0.006, 1e-6);
+    this.basePointSize = diag * 0.002;
     model.root.traverse((o) => {
       if (o instanceof THREE.Points) {
-        (o.material as THREE.PointsMaterial).size = diag * 0.002;
+        (o.material as THREE.PointsMaterial).size = this.basePointSize;
       }
     });
+    // 既定値を記録（リセット・表示セット切替に使用）
+    this.matDefaults.clear();
+    for (const entry of model.materials) {
+      for (const m of entry.materials) {
+        this.matDefaults.set(m, {
+          opacity: m.opacity,
+          transparent: m.transparent,
+          side: m.side,
+          depthWrite: m.depthWrite,
+        });
+      }
+    }
     this.fitCamera();
   }
 
@@ -204,8 +237,80 @@ export class ViewerCore {
   // ---- 表示調整 ----------------------------------------------------------------
 
   setBackground(hex: string | null): void {
+    this.backgroundHex = hex;
     this.scene.background = new THREE.Color(hex ?? DEFAULT_BG);
     this.renderOnce();
+  }
+
+  getBackground(): string | null {
+    return this.backgroundHex;
+  }
+
+  /** 全マテリアルを読込直後の状態へ戻す（表示セット切替の前段で使用） */
+  resetAllMaterials(): void {
+    for (const [m, d] of this.matDefaults) {
+      m.opacity = d.opacity;
+      m.transparent = d.transparent;
+      m.side = d.side;
+      m.depthWrite = d.depthWrite;
+      m.needsUpdate = true;
+    }
+    this.renderOnce();
+  }
+
+  /** 点群の点サイズ倍率（Modelタブ） */
+  setPointScale(mult: number): void {
+    if (this.currentModel === null) return;
+    this.currentModel.root.traverse((o) => {
+      if (o instanceof THREE.Points) {
+        (o.material as THREE.PointsMaterial).size = this.basePointSize * mult;
+      }
+    });
+    this.renderOnce();
+  }
+
+  /** アセットtransformの適用（docs/04 §3。原本は無改変、表示レイヤーのみ） */
+  setModelTransform(t: { scale?: number; upAxis?: 'Y' | 'Z' }): void {
+    const scale = t.scale ?? 1;
+    this.modelRoot.scale.setScalar(Number.isFinite(scale) && scale > 0 ? scale : 1);
+    this.modelRoot.rotation.set(t.upAxis === 'Z' ? -Math.PI / 2 : 0, 0, 0);
+    this.modelRoot.updateWorldMatrix(true, true);
+    this.fitCamera();
+  }
+
+  /** ±XYZ軸ビュー（LociMyu Views継承） */
+  viewAxis(axis: '+x' | '-x' | '+y' | '-y' | '+z' | '-z'): void {
+    if (this.currentModel === null) return;
+    const box = new THREE.Box3().setFromObject(this.currentModel.root);
+    if (box.isEmpty()) return;
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const dist = (maxDim / 2 / Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) * 1.6;
+    const dirs: Record<typeof axis, [number, number, number]> = {
+      '+x': [1, 0, 0], '-x': [-1, 0, 0],
+      '+y': [0, 1, 0], '-y': [0, -1, 0],
+      '+z': [0, 0, 1], '-z': [0, 0, -1],
+    };
+    const dir = dirs[axis];
+    // 真上/真下ビューではupをZ軸に逃がす
+    if (axis === '+y') this.camera.up.set(0, 0, -1);
+    else if (axis === '-y') this.camera.up.set(0, 0, 1);
+    else this.camera.up.set(0, 1, 0);
+    this.camera.position.set(
+      center.x + dir[0] * dist,
+      center.y + dir[1] * dist,
+      center.z + dir[2] * dist,
+    );
+    this.controls.target.copy(center);
+    this.controls.update();
+    this.camera.updateMatrixWorld(true);
+    this.renderOnce();
+  }
+
+  onTapMiss(fn: () => void): () => void {
+    this.tapMissHandlers.add(fn);
+    return () => this.tapMissHandlers.delete(fn);
   }
 
   applyMaterialProps(key: string, props: { opacity?: number; doubleSided?: boolean }): void {
@@ -249,7 +354,11 @@ export class ViewerCore {
   dispose(): void {
     this.disposed = true;
     cancelAnimationFrame(this.rafId);
+    this.clearLongPress();
     this.canvas.removeEventListener('pointerdown', this.onPointerDown);
+    this.canvas.removeEventListener('pointermove', this.onPointerMove);
+    this.canvas.removeEventListener('pointerup', this.onPointerUp);
+    this.canvas.removeEventListener('pointercancel', this.onPointerUp);
     this.canvas.removeEventListener('webglcontextlost', this.onContextLost);
     this.canvas.removeEventListener('webglcontextrestored', this.onContextRestored);
     globalThis.removeEventListener('resize', this.onResize);
@@ -311,7 +420,7 @@ export class ViewerCore {
     // タッチはピック半径を広げる (docs/04 §6)
     this.raycaster.params.Points.threshold = this.pinRadius * (ev.pointerType === 'touch' ? 4 : 2);
 
-    // 1) ピン選択（常時有効）
+    // 1) ピン選択（タップ/クリック常時有効。コンセンサスQ3）
     const pinHits = this.raycaster.intersectObjects([...this.pins.values()], false);
     const firstPin = pinHits[0];
     if (firstPin !== undefined) {
@@ -321,9 +430,49 @@ export class ViewerCore {
       return;
     }
 
-    // 2) ピン追加（Shift+Click または ピン追加モード）
-    if (!ev.shiftKey && !this.pinMode) return;
+    // 2) タッチは長押しでピン追加（指が動いたらキャンセル=回転優先）
+    if (ev.pointerType === 'touch') {
+      this.longPressStart = { x: ev.clientX, y: ev.clientY };
+      const ndc = this.ndc.clone();
+      this.clearLongPress();
+      this.longPressTimer = setTimeout(() => {
+        this.longPressTimer = null;
+        this.performPinAdd(ndc);
+      }, ViewerCore.LONG_PRESS_MS);
+      return;
+    }
+
+    // 3) マウスは Shift+Click（LociMyu継承）/ pinMode（ハーネス用）
+    if (ev.shiftKey || this.pinMode) {
+      this.performPinAdd(this.ndc.clone());
+      return;
+    }
+    for (const fn of this.tapMissHandlers) fn();
+  };
+
+  private readonly onPointerMove = (ev: PointerEvent): void => {
+    if (this.longPressTimer === null || this.longPressStart === null) return;
+    const dx = ev.clientX - this.longPressStart.x;
+    const dy = ev.clientY - this.longPressStart.y;
+    if (dx * dx + dy * dy > ViewerCore.LONG_PRESS_MOVE_PX ** 2) this.clearLongPress();
+  };
+
+  private readonly onPointerUp = (): void => {
+    this.clearLongPress();
+  };
+
+  private clearLongPress(): void {
+    if (this.longPressTimer !== null) {
+      clearTimeout(this.longPressTimer);
+      this.longPressTimer = null;
+    }
+  }
+
+  private performPinAdd(ndc: THREE.Vector2): void {
     if (this.currentModel === null) return;
+    this.camera.updateMatrixWorld(true);
+    this.modelRoot.updateWorldMatrix(true, true);
+    this.raycaster.setFromCamera(ndc, this.camera);
     const hits = this.raycaster.intersectObject(this.currentModel.root, true);
     const hit = hits[0];
     if (hit === undefined) return;
@@ -336,7 +485,7 @@ export class ViewerCore {
     }
     const pick: PickHit = { position: [local.x, local.y, local.z], normal };
     for (const fn of this.pickHandlers) fn(pick);
-  };
+  }
 }
 
 /** three.jsリソースの再帰破棄 */

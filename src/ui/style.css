@@ -1,0 +1,186 @@
+/* LociView 製品UI — コンセンサスQ4: ダーク継承（LociMyu αトーン）。
+   トークンは最初からライト差し替え可能な構造（値の実装はPhase 2） */
+
+:root {
+  --bg: #0f1115;
+  --panel: #0b0d11;
+  --line: #1f2937;
+  --text: #cbd5e1;
+  --dim: #7c8794;
+  --sel: #60a5fa;
+  --accent: #1d4ed8;
+  --accent-line: #3b82f6;
+  --danger: #b91c1c;
+  --warn: #b45309;
+  --pin: #eab308;
+  --input-bg: #111827;
+  --input-bg2: #0f1317;
+  color-scheme: dark;
+}
+/* :root[data-theme="light"] { … Phase 2 } */
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Yu Gothic UI", Meiryo, sans-serif;
+  overscroll-behavior: none;
+}
+#app { height: 100%; }
+
+button, input, select, textarea {
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font: inherit;
+}
+button { cursor: pointer; white-space: nowrap; }
+button:hover { border-color: #334155; }
+button:disabled { opacity: 0.4; cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--sel);
+  outline-offset: 1px;
+}
+button.primary { background: var(--accent); border-color: var(--accent-line); color: #fff; }
+button.danger { border-color: var(--danger); color: #fca5a5; }
+button.mini { padding: 3px 8px; font-size: 12px; }
+input[type="search"], input[type="text"], textarea { width: 100%; background: var(--input-bg2); }
+textarea { min-height: 72px; resize: vertical; }
+
+/* ---------- 汎用 ---------- */
+.lv-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.lv-space { justify-content: space-between; }
+.lv-flex1 { flex: 1; }
+.lv-hint { font-size: 12px; opacity: 0.85; }
+.lv-dim { color: var(--dim); font-size: 12px; }
+.lv-warn { color: #fbbf24; font-size: 12px; }
+.lv-pad { padding: 10px; }
+.lv-grp { margin: 10px 0; display: grid; gap: 6px; }
+.lv-grow { flex: 1; min-height: 0; }
+.lv-badge { font-size: 10px; font-weight: 700; color: #052e16; background: #4ade80; border-radius: 4px; padding: 1px 6px; }
+
+/* ---------- ホーム ---------- */
+.lv-home { max-width: 680px; margin: 0 auto; padding: 28px 16px; }
+.lv-home-head { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; font-size: 16px; }
+.lv-drop {
+  border: 2px dashed #2a3441; border-radius: 12px; padding: 34px 16px;
+  text-align: center; cursor: pointer; background: rgba(96, 165, 250, 0.03);
+}
+.lv-drop.over { border-color: var(--sel); background: rgba(96, 165, 250, 0.1); }
+.lv-drop-title { font-weight: 600; }
+.lv-home-list { margin-top: 8px; display: grid; gap: 8px; }
+.lv-home-item {
+  display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+}
+
+/* ---------- ビューアレイアウト ---------- */
+.lv-viewer-layout { height: 100%; display: flex; flex-direction: column; }
+.lv-topbar {
+  display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+  border-bottom: 1px solid var(--line); background: var(--panel);
+}
+.lv-projname { max-width: 30vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-savestatus { white-space: nowrap; }
+.lv-main { flex: 1; display: flex; min-height: 0; position: relative; }
+.lv-stage { flex: 1; position: relative; min-width: 0; background: var(--panel); }
+.lv-gl { width: 100%; height: 100%; display: block; }
+
+.lv-panel {
+  width: 340px; border-left: 1px solid var(--line); background: var(--panel);
+  display: flex; flex-direction: column; min-height: 0;
+}
+.lv-sheet-handle { display: none; }
+.lv-set-row { display: flex; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.lv-set-select { flex: 1; min-width: 0; }
+.lv-tabs { display: flex; border-bottom: 1px solid var(--line); }
+.lv-tabs button {
+  flex: 1; border: 0; border-radius: 0; background: transparent; color: var(--dim);
+  border-bottom: 2px solid transparent; padding: 8px 4px; font-size: 13px;
+}
+.lv-tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: #64748b; font-weight: 600; }
+.lv-tab-body { flex: 1; overflow-y: auto; min-height: 0; }
+.lv-tab-inner { padding: 10px; display: flex; flex-direction: column; min-height: 100%; }
+
+/* ---------- Captionタブ ---------- */
+.lv-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.lv-chip {
+  width: 20px; height: 20px; border-radius: 50%; padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.4); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+.lv-chip.on { outline: 2px solid #fff; outline-offset: 1px; }
+.lv-cap-list {
+  border: 1px solid var(--line); border-radius: 8px; overflow-y: auto;
+  max-height: 200px; min-height: 60px;
+}
+.lv-cap-row {
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px; cursor: pointer;
+  border-radius: 6px; font-size: 13px;
+}
+.lv-cap-row:hover { background: rgba(255, 255, 255, 0.05); }
+.lv-cap-row.sel { background: rgba(59, 130, 246, 0.25); box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.6); }
+.lv-cap-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+.lv-cap-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-editor { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
+.lv-thumbs { display: flex; gap: 6px; flex-wrap: wrap; }
+.lv-thumb {
+  width: 48px; height: 48px; border-radius: 6px; border: 1px solid var(--line);
+  object-fit: cover; cursor: pointer; background: var(--input-bg2);
+}
+
+/* ---------- Viewsタブ ---------- */
+.lv-axis-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+
+/* ---------- モーダル ---------- */
+.lv-modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); z-index: 100;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.lv-modal-card {
+  width: min(520px, 94vw); max-height: 84vh; overflow-y: auto;
+  background: #14181f; border: 1px solid var(--line); border-radius: 12px; padding: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.lv-modal-title { font-weight: 700; margin-bottom: 10px; }
+.lv-modal-body { display: grid; gap: 8px; font-size: 13px; }
+.lv-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.lv-mr-row { display: flex; gap: 8px; align-items: baseline; }
+.lv-mr-ico { width: 18px; text-align: center; font-weight: 700; }
+.lv-mr-ico.ok { color: #4ade80; }
+.lv-mr-ico.info { color: #60a5fa; }
+.lv-mr-ico.bad { color: #f87171; }
+.lv-mr-ico.warn { color: var(--pin); }
+.lv-mr-detail { margin-left: 26px; color: var(--dim); font-size: 12px; }
+.lv-mr-detail.warn { color: #fbbf24; }
+
+/* ---------- モバイル: ボトムシート3段階（コンセンサスQ1） ---------- */
+@media (max-width: 899px) {
+  .lv-main { flex-direction: column; }
+  .lv-panel {
+    position: absolute; left: 0; right: 0; bottom: 0; width: auto;
+    border-left: none; border-top: 1px solid var(--line);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.45);
+    transition: height 0.18s ease-out;
+    z-index: 10;
+  }
+  .lv-panel[data-sheet="collapsed"] { height: 92px; }
+  .lv-panel[data-sheet="half"] { height: 46%; }
+  .lv-panel[data-sheet="full"] { height: 88%; }
+  .lv-panel[data-sheet="collapsed"] .lv-tab-body,
+  .lv-panel[data-sheet="collapsed"] .lv-set-row { display: none; }
+  .lv-sheet-handle { display: block; padding: 6px 0 2px; cursor: pointer; }
+  .lv-handle-bar { width: 38px; height: 4px; border-radius: 2px; background: #3b4552; margin: 0 auto; }
+  .lv-projname { max-width: 24vw; }
+  .lv-savestatus { display: none; }
+  button, select { min-height: 40px; } /* タップターゲット44px相当 */
+  .lv-tabs button { min-height: 40px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lv-panel { transition: none; }
+}
