@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>
+<title>LociView UI設計案 v1</title>
+<style>
+  :root {
+    --paper: #f2f4f7;
+    --ink: #1a2028;
+    --ink-soft: #4c5866;
+    --line: #d5dbe3;
+    --card: #ffffff;
+    --accent: #d97706;
+    --accent-soft: #fdf3e3;
+    --mock-shadow: 0 8px 28px rgba(26, 32, 40, 0.14);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #14181e;
+      --ink: #dde3ea;
+      --ink-soft: #8b96a3;
+      --line: #2a323c;
+      --card: #1a2028;
+      --accent: #eab308;
+      --accent-soft: #2a2410;
+      --mock-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #f2f4f7; --ink: #1a2028; --ink-soft: #4c5866; --line: #d5dbe3;
+    --card: #ffffff; --accent: #d97706; --accent-soft: #fdf3e3;
+    --mock-shadow: 0 8px 28px rgba(26, 32, 40, 0.14);
+  }
+  :root[data-theme="dark"] {
+    --paper: #14181e; --ink: #dde3ea; --ink-soft: #8b96a3; --line: #2a323c;
+    --card: #1a2028; --accent: #eab308; --accent-soft: #2a2410;
+    --mock-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+    font-size: 15px; line-height: 1.85;
+  }
+  main { max-width: 1080px; margin: 0 auto; padding: 48px 20px 96px; }
+
+  .eyebrow {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 12px; letter-spacing: 0.14em; color: var(--accent);
+    text-transform: uppercase; margin: 0 0 4px;
+  }
+  h1 { font-size: 30px; margin: 0 0 8px; line-height: 1.35; text-wrap: balance; }
+  h2 { font-size: 21px; margin: 64px 0 4px; text-wrap: balance; }
+  p.lead { color: var(--ink-soft); max-width: 42em; margin: 8px 0 0; }
+  .note { color: var(--ink-soft); font-size: 13px; }
+
+  /* ---- 番号キャロット & 凡例 ---- */
+  .tag {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px;
+    background: var(--accent); color: #fff; font-size: 12px; font-weight: 700;
+    font-family: ui-monospace, monospace; line-height: 1;
+  }
+  :root[data-theme="dark"] .tag, [data-mock] .tag { color: #1a1204; }
+  .callout { position: absolute; z-index: 5; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+  .legend { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 7px; }
+  .legend li { display: flex; gap: 10px; align-items: baseline; }
+  .legend .tag { flex: 0 0 auto; transform: translateY(2px); }
+  .legend b { font-weight: 600; }
+  .keep {
+    font-size: 11px; font-family: ui-monospace, monospace; letter-spacing: .05em;
+    border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px;
+    color: var(--ink-soft); white-space: nowrap;
+  }
+
+  /* =====================================================================
+     製品モック内部（LociMyu α のダークトーンを意図的に継承・単一テーマ）
+     ===================================================================== */
+  [data-mock] {
+    --m-bg: #0f1115; --m-panel: #0b0d11; --m-line: #1f2937;
+    --m-text: #cbd5e1; --m-dim: #7c8794; --m-sel: #60a5fa; --m-pin: #eab308;
+    background: var(--m-bg); color: var(--m-text);
+    font-size: 12px; line-height: 1.55; border-radius: 10px;
+    border: 1px solid #000; box-shadow: var(--mock-shadow);
+    overflow: hidden; position: relative;
+  }
+  [data-mock] .mbtn {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #111827; border: 1px solid var(--m-line); color: var(--m-text);
+    border-radius: 7px; padding: 4px 9px; font-size: 12px; white-space: nowrap;
+  }
+  [data-mock] .mbtn.primary { background: #1d4ed8; border-color: #3b82f6; color: #fff; }
+  [data-mock] .minput {
+    background: #0f1317; border: 1px solid var(--m-line); border-radius: 7px;
+    padding: 4px 9px; color: var(--m-text); font-size: 12px;
+  }
+  [data-mock] .dim { color: var(--m-dim); }
+
+  /* 疑似3Dステージ */
+  .stage {
+    position: relative; overflow: hidden;
+    background:
+      radial-gradient(120% 90% at 35% 80%, #161c26 0%, #0b0d11 60%);
+  }
+  .mound {
+    position: absolute; left: 8%; right: 30%; top: 26%; bottom: 18%;
+    background: linear-gradient(160deg, #3a4453 0%, #232a35 46%, #161b23 100%);
+    clip-path: polygon(0% 78%, 12% 42%, 30% 30%, 47% 8%, 68% 22%, 84% 48%, 100% 72%, 100% 100%, 0% 100%);
+    border-radius: 6px;
+  }
+  .grid-floor {
+    position: absolute; inset: auto 0 0 0; height: 26%;
+    background:
+      repeating-linear-gradient(90deg, rgba(96,165,250,.07) 0 1px, transparent 1px 34px),
+      repeating-linear-gradient(0deg, rgba(96,165,250,.07) 0 1px, transparent 1px 22px);
+    mask-image: linear-gradient(to top, rgba(0,0,0,.8), transparent);
+  }
+  .pin { position: absolute; width: 12px; height: 12px; border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(0,0,0,.55); }
+  .pin.sel { outline: 2px solid #fff; outline-offset: 2px; }
+  .pin-pop {
+    position: absolute; background: rgba(13, 17, 23, .94);
+    border: 1px solid var(--m-line); border-radius: 8px; padding: 7px 10px;
+    max-width: 190px; box-shadow: 0 6px 18px rgba(0,0,0,.5); font-size: 11px;
+  }
+  .pin-pop b { display: block; font-size: 12px; }
+  .fab {
+    position: absolute; left: 14px; bottom: 14px; z-index: 3;
+    display: flex; align-items: center; gap: 6px;
+    background: #1d4ed8; color: #fff; border: 1px solid #3b82f6;
+    border-radius: 999px; padding: 8px 14px; font-weight: 700; font-size: 12px;
+    box-shadow: 0 4px 14px rgba(29,78,216,.45);
+  }
+  .statusline {
+    position: absolute; right: 10px; bottom: 10px; z-index: 3;
+    font-size: 10px; color: var(--m-dim);
+    background: rgba(11,13,17,.7); border-radius: 6px; padding: 2px 8px;
+  }
+
+  /* パネル部品 */
+  .mtabs { display: flex; border-bottom: 1px solid var(--m-line); }
+  .mtabs span { flex: 1; text-align: center; padding: 7px 0; color: var(--m-dim);
+    border-bottom: 2px solid transparent; font-size: 12px; }
+  .mtabs span.on { color: var(--m-text); border-bottom-color: #64748b; font-weight: 600; }
+  .chip-row { display: flex; gap: 5px; flex-wrap: wrap; }
+  .cchip { width: 15px; height: 15px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); }
+  .caprow { display: flex; align-items: center; gap: 7px; padding: 4px 7px; border-radius: 6px; }
+  .caprow.sel { background: rgba(59,130,246,.22); box-shadow: 0 0 0 1px rgba(59,130,246,.6); }
+  .capdot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+  .badge-new {
+    font-size: 9px; font-weight: 700; color: #052e16; background: #4ade80;
+    border-radius: 4px; padding: 0 4px; letter-spacing: .05em;
+  }
+  .thumb { width: 44px; height: 44px; border-radius: 6px; border: 1px solid var(--m-line);
+    background: linear-gradient(135deg, #2c3542, #1a212b); }
+
+  /* デスクトップモック構造 */
+  .desk { display: grid; grid-template-columns: 1fr 300px; height: 560px; }
+  .desk .topbar {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; border-bottom: 1px solid var(--m-line); background: var(--m-panel);
+  }
+  .desk .panel { border-left: 1px solid var(--m-line); background: var(--m-panel);
+    display: flex; flex-direction: column; overflow: hidden; }
+  .panel .pbody { padding: 10px; display: grid; gap: 10px; overflow: hidden; }
+
+  .mock-wrap { position: relative; margin-top: 20px; }
+  .mock-scroller { overflow-x: auto; }
+
+  /* モバイルフレーム */
+  .phones { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 20px; }
+  .phone-col { flex: 1 1 240px; max-width: 265px; }
+  .phone {
+    width: 100%; aspect-ratio: 375 / 740; border-radius: 26px;
+    border: 6px solid #000; display: flex; flex-direction: column;
+  }
+  .phone .stage { flex: 1; }
+  .sheet { background: var(--m-panel); border-top: 1px solid var(--m-line);
+    border-radius: 14px 14px 0 0; position: relative; z-index: 2; }
+  .handle { width: 38px; height: 4px; border-radius: 2px; background: #3b4552; margin: 7px auto 2px; }
+  .phone-cap { font-size: 13px; font-weight: 600; margin-top: 10px; }
+  .phone-note { font-size: 12px; color: var(--ink-soft); }
+
+  /* マージレポートモック */
+  .modal-mock { max-width: 470px; padding: 16px; border-radius: 12px;
+    background: #14181f; border: 1px solid var(--m-line); }
+  .mr-row { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; font-size: 12px; }
+  .mr-ico { width: 18px; text-align: center; flex: 0 0 auto; font-weight: 700; }
+
+  /* 質問セクション */
+  .qa { list-style: none; padding: 0; margin: 20px 0 0; display: grid; gap: 14px; }
+  .qa li { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .qa .q { font-weight: 700; }
+  .qa .a { color: var(--ink-soft); font-size: 13.5px; margin-top: 3px; }
+  .qa .qn { font-family: ui-monospace, monospace; color: var(--accent); font-weight: 700; margin-right: 8px; }
+
+  .principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-top: 20px; }
+  .principles div { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 13.5px; }
+  .principles b { display: block; margin-bottom: 2px; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main>
+  <p class="eyebrow">LociView — UI Proposal v1 / 2026-07-18</p>
+  <h1>製品UI設計案：コンセンサス用モック</h1>
+  <p class="lead">
+    コア（データ層・ビューア）は実装・検証済みです。製品UIの実装前に、この案でレイアウトと操作の合意を取ります。
+    方針は docs/05 の通り「<b>ビューイング体験はLociMyuを継承し、データ入出力まわりだけを置き換える</b>」。
+    モック内の配色・部品はLociMyu αの実トーンをそのまま使っています。
+  </p>
+
+  <div class="principles">
+    <div><b>継承</b>右パネル+タブ構成、ピン色チップ、Shift+Clickピン、ダークトーン。既存ユーザーが迷わないこと。<span class="keep">LociMyu α準拠</span></div>
+    <div><b>置換</b>「GLB URL+Load」「Sign in」→ ZIPドロップ・プロファイル・書き出しメニューへ。ネット要素は消滅。</div>
+    <div><b>追加</b>表示セット切替 / 検索 / Undo / Modelタブ / マージレポート / 保存状態の常時表示。</div>
+  </div>
+
+  <!-- ============================================================ 画面01 -->
+  <h2>画面01 — ホーム（起動画面）</h2>
+  <p class="note">起動時のみの薄い画面。「放り込めば開く」を1つの大きな受け口で表現します。</p>
+
+  <div class="mock-wrap">
+    <div data-mock style="max-width:640px; padding:26px 28px 22px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <b style="font-size:15px; letter-spacing:.03em;">LociView</b>
+        <span class="mbtn"><span style="width:8px;height:8px;border-radius:50%;background:var(--m-pin);display:inline-block"></span>田中（あなた）</span>
+      </div>
+      <div style="position:relative; margin-top:14px; border:2px dashed #2a3441; border-radius:12px; padding:34px 20px; text-align:center; background:rgba(96,165,250,.03);">
+        <span class="tag callout" style="top:-10px; left:-10px;">1</span>
+        <div style="font-size:14px; font-weight:600;">プロジェクト（ZIP）をここにドロップ</div>
+        <div class="dim" style="margin-top:2px;">.lociview / DriveのフォルダZIP / モデル単体（glb・obj・stl・ply）— タップして選択もできます</div>
+      </div>
+      <div style="margin-top:16px;">
+        <div class="dim" style="font-size:11px; letter-spacing:.06em; margin-bottom:6px;">最近のプロジェクト（この端末に自動保存済み）</div>
+        <div style="position:relative; display:flex; align-items:center; gap:8px; border:1px solid var(--m-line); border-radius:9px; padding:9px 12px;">
+          <span class="tag callout" style="top:-9px; right:-9px;">2</span>
+          <b>○○遺構 実測記録</b>
+          <span class="dim">キャプション214件 ・ 未書き出しの変更あり</span>
+          <span style="flex:1"></span>
+          <span class="mbtn primary">開く</span><span class="mbtn">書き出し</span>
+        </div>
+      </div>
+      <div style="margin-top:14px; display:flex; gap:8px;">
+        <span class="mbtn">新規プロジェクト</span><span class="mbtn">プロファイル設定</span>
+      </div>
+    </div>
+    <ul class="legend">
+      <li><span class="tag">1</span><span><b>唯一の受け口。</b>投入物は自動判別（開く / マージ / インポートウィザード / 新規作成）。「開いているプロジェクトがある状態での投入=マージ」の一貫ルール。</span></li>
+      <li><span class="tag">2</span><span><b>「未書き出しの変更あり」を常時表示。</b>スマホのストレージ削除対策として、書き出し忘れを見えるようにする安心設計（docs/06 §4）。</span></li>
+    </ul>
+  </div>
+
+  <!-- ============================================================ 画面02 -->
+  <h2>画面02 — ビューア（PC / 幅900px以上）</h2>
+  <p class="note">LociMyuと同じ「左ステージ+右パネル」。パネル幅300〜360px。横スクロールでモック全体を確認できます。</p>
+
+  <div class="mock-wrap mock-scroller">
+    <div data-mock style="min-width:880px;">
+      <div class="desk">
+        <div class="topbar" style="position:relative;">
+          <span class="tag callout" style="top:-9px; left:8px;">1</span>
+          <b>○○遺構 実測記録</b>
+          <span class="dim" style="font-size:10px;">✓ 自動保存済み ・ 最終書き出し 2時間前</span>
+          <span style="flex:1"></span>
+          <span class="mbtn" title="元に戻す">↺</span><span class="mbtn" title="やり直す">↻</span>
+          <span class="tag callout" style="top:-9px; right:196px;">2</span>
+          <span class="mbtn">取込 / マージ</span>
+          <span class="mbtn primary">書き出し ▾</span>
+          <span class="mbtn"><span style="width:8px;height:8px;border-radius:50%;background:var(--m-pin);display:inline-block"></span>田中</span>
+        </div>
+
+        <div class="stage">
+          <div class="mound"></div>
+          <div class="grid-floor"></div>
+          <span class="pin sel" style="left:38%; top:38%; background:#eab308;"></span>
+          <span class="pin" style="left:24%; top:58%; background:#f87171;"></span>
+          <span class="pin" style="left:55%; top:47%; background:#4ade80;"></span>
+          <span class="pin" style="left:47%; top:66%; background:#eab308;"></span>
+          <div class="pin-pop" style="left:41%; top:24%;">
+            <b>北壁の亀裂</b>
+            <span class="dim">幅約3mm、上方へ伸長。 📷2</span>
+          </div>
+          <div class="fab">◎ ピン追加</div>
+          <span class="tag callout" style="left:110px; bottom:22px;">3</span>
+          <div class="statusline">site_scan_v3.glb ・ 42.1万△ ・ 60fps</div>
+        </div>
+
+        <div class="panel">
+          <div style="position:relative; display:flex; gap:6px; padding:10px 10px 8px; border-bottom:1px solid var(--m-line);">
+            <span class="tag callout" style="top:2px; left:-10px;">4</span>
+            <span class="minput" style="flex:1;">表示セット: 半透明・内部指摘用 ▾</span>
+            <span class="mbtn">＋</span>
+          </div>
+          <div class="mtabs" style="position:relative;">
+            <span class="tag callout" style="top:-9px; right:56px;">5</span>
+            <span class="on">Caption</span><span>Material</span><span>Model</span><span>Views</span>
+          </div>
+          <div class="pbody">
+            <div style="position:relative; display:flex; gap:6px;">
+              <span class="tag callout" style="top:-8px; right:-8px;">6</span>
+              <span class="minput" style="flex:1;" >🔍 検索（タイトル・本文）</span>
+              <span class="mbtn">絞込 ▾</span>
+            </div>
+            <div>
+              <div class="dim" style="margin-bottom:4px;">ピン色 <span class="keep" style="border-color:#2a3441;color:#7c8794;">継承</span></div>
+              <div class="chip-row">
+                <span class="cchip" style="background:#eab308;"></span><span class="cchip" style="background:#f87171;"></span>
+                <span class="cchip" style="background:#4ade80;"></span><span class="cchip" style="background:#60a5fa;"></span>
+                <span class="cchip" style="background:#c084fc;"></span><span class="cchip" style="background:#f9fafb;"></span>
+              </div>
+            </div>
+            <div>
+              <div class="dim" style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>キャプション 214件</span><span>フィルタ: OFF</span></div>
+              <div style="border:1px solid var(--m-line); border-radius:8px; padding:3px;">
+                <div class="caprow sel"><span class="capdot" style="background:#eab308"></span>北壁の亀裂 <span class="dim">📷2</span></div>
+                <div class="caprow"><span class="capdot" style="background:#f87171"></span>排水溝の欠損 <span class="badge-new">新着</span></div>
+                <div class="caprow"><span class="capdot" style="background:#4ade80"></span>銘板（大正拾年）</div>
+                <div class="caprow"><span class="capdot" style="background:#eab308"></span>基礎の露出部</div>
+                <div class="caprow dim" style="justify-content:center;">…</div>
+              </div>
+            </div>
+            <div style="display:grid; gap:6px;">
+              <span class="minput">北壁の亀裂</span>
+              <span class="minput" style="min-height:44px;">幅約3mm、上方へ伸長。前回記録（5月）より+0.4mm。</span>
+              <div style="position:relative; display:flex; gap:6px; align-items:center;">
+                <span class="tag callout" style="top:-8px; right:-8px;">7</span>
+                <span class="thumb"></span><span class="thumb"></span>
+                <span class="mbtn">＋ 添付</span><span class="mbtn dim">📷 撮影</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <ul class="legend">
+    <li><span class="tag">1</span><span><b>保存状態の常時表示。</b>「自動保存済み / 最終書き出しn時間前」。書き出しボタンはメニュー化（フルZIP / 差分ZIP / CSV・xlsx / 画像 / 閲覧用HTML）。</span></li>
+    <li><span class="tag">2</span><span><b>Undo / Redo</b>（Ctrl+Z / Y対応）。op-log裏打ちなのでマージしても履歴が壊れない。</span></li>
+    <li><span class="tag">3</span><span><b>ピン追加モードFAB。</b>PCでは従来のShift+Clickも併存 <span class="keep">継承</span>。追加後は自動OFF、長押しで連続追加。</span></li>
+    <li><span class="tag">4</span><span><b>表示セット切替。</b>LociMyuの「Select sheet… + Create」と同位置・同作法。切替でキャプション・マテリアル設定・ビューが一括で変わる。</span></li>
+    <li><span class="tag">5</span><span><b>Modelタブ新設</b>（4タブ目）。スケール・上軸・センタリング、点群の点サイズ/サブサンプル、統計。Caption/Material/Viewsの中身はLociMyu同等 <span class="keep">継承</span>。</span></li>
+    <li><span class="tag">6</span><span><b>検索+絞込。</b>本文全文検索、絞込メニューにタグ・編集者・日付。既存の色チップフィルタは下に維持 <span class="keep">継承</span>。</span></li>
+    <li><span class="tag">7</span><span><b>添付欄。</b>複数画像。「📷撮影」はスマホで活き（Phase 2）、PCではファイル選択。</span></li>
+  </ul>
+
+  <!-- ============================================================ 画面03 -->
+  <h2>画面03 — ビューア（スマホ / ボトムシート3段階）</h2>
+  <p class="note">右パネルの中身を<b>そのまま</b>ボトムシートに移す構成。タブ・部品はPCと同一で、置き場所だけが変わります。</p>
+
+  <div class="phones">
+    <div class="phone-col">
+      <div class="phone" data-mock>
+        <div class="stage">
+          <div class="mound" style="left:4%; right:8%;"></div>
+          <span class="pin" style="left:30%; top:40%; background:#eab308;"></span>
+          <span class="pin" style="left:58%; top:52%; background:#f87171;"></span>
+          <div class="fab" style="padding:10px 16px;">◎</div>
+        </div>
+        <div class="sheet">
+          <div class="handle"></div>
+          <div class="mtabs"><span class="on">Caption</span><span>Material</span><span>Model</span><span>Views</span></div>
+        </div>
+      </div>
+      <div class="phone-cap">A. 折りたたみ（既定）</div>
+      <div class="phone-note">ステージ全面。シートはタブバーのみ。ピン追加はFAB（タップ=追加、長押し=連続）。</div>
+    </div>
+
+    <div class="phone-col">
+      <div class="phone" data-mock>
+        <div class="stage">
+          <div class="mound" style="left:4%; right:8%; bottom:4%;"></div>
+          <span class="pin sel" style="left:30%; top:30%; background:#eab308;"></span>
+        </div>
+        <div class="sheet" style="height:46%; display:flex; flex-direction:column;">
+          <div class="handle"></div>
+          <div class="mtabs"><span class="on">Caption</span><span>Material</span><span>Model</span><span>Views</span></div>
+          <div style="padding:8px; display:grid; gap:7px; overflow:hidden;">
+            <span class="minput">🔍 検索</span>
+            <div style="border:1px solid var(--m-line); border-radius:8px; padding:3px;">
+              <div class="caprow sel"><span class="capdot" style="background:#eab308"></span>北壁の亀裂</div>
+              <div class="caprow"><span class="capdot" style="background:#f87171"></span>排水溝の欠損</div>
+              <div class="caprow"><span class="capdot" style="background:#4ade80"></span>銘板（大正拾年）</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-cap">B. 半開き（リスト操作）</div>
+      <div class="phone-note">ピン選択でここまで自動展開。上のステージで選択ピンを確認しながらリストを送れる。</div>
+    </div>
+
+    <div class="phone-col">
+      <div class="phone" data-mock>
+        <div class="stage" style="max-height:18%;">
+          <span class="pin sel" style="left:46%; top:40%; background:#eab308;"></span>
+        </div>
+        <div class="sheet" style="flex:1; display:flex; flex-direction:column;">
+          <div class="handle"></div>
+          <div style="padding:10px; display:grid; gap:8px;">
+            <span class="minput">北壁の亀裂</span>
+            <span class="minput" style="min-height:74px;">幅約3mm、上方へ伸長。前回記録（5月）より+0.4mm。</span>
+            <div style="display:flex; gap:6px;"><span class="thumb"></span><span class="thumb"></span><span class="mbtn">📷 撮影</span></div>
+            <div style="display:flex; gap:6px;"><span class="mbtn primary" style="flex:1; justify-content:center;">完了</span><span class="mbtn">削除</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-cap">C. 全開き（編集）</div>
+      <div class="phone-note">編集開始で全展開。ソフトキーボードにはvisualViewportで追従。現場では「ピン打ち→撮影→2行メモ→完了」が最短動線。</div>
+    </div>
+  </div>
+
+  <!-- ============================================================ 画面04 -->
+  <h2>画面04 — マージレポート（ZIP取込時に必ず表示）</h2>
+  <div class="mock-wrap">
+    <div data-mock class="modal-mock">
+      <b style="font-size:13px;">統合結果 — 鈴木さんのデータ（7/15版）</b>
+      <div style="margin-top:8px; border-top:1px solid var(--m-line); padding-top:8px;">
+        <div class="mr-row"><span class="mr-ico" style="color:#4ade80;">＋</span>新規キャプション 12件</div>
+        <div class="mr-row"><span class="mr-ico" style="color:#60a5fa;">~</span>更新 3件</div>
+        <div class="mr-row"><span class="mr-ico" style="color:#f87171;">−</span>削除 1件</div>
+        <div class="mr-row" style="align-items:flex-start;"><span class="mr-ico" style="color:#eab308;">⚠</span>
+          <div>自動解決 1件<br>
+            <span class="dim">「北壁の亀裂」本文：あなたの7/14の変更は鈴木さんの7/15の変更で上書きされました</span><br>
+            <span class="mbtn" style="margin-top:4px;">内容を比較</span> <span class="mbtn" style="margin-top:4px;">自分の値に戻す</span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:6px; margin-top:10px;">
+        <span class="mbtn primary">OK</span>
+      </div>
+    </div>
+    <ul class="legend" style="max-width:640px;">
+      <li><span class="tag">＊</span><span>「自分の値に戻す」は新しい編集を積むだけで履歴は消えない。gitの難解さ（conflict/rebase等の概念）はユーザーに一切見せない。新着・更新はリスト上の<span class="badge-new" style="transform:translateY(-1px); display:inline-block;">新着</span>バッジとしても残る。</span></li>
+    </ul>
+  </div>
+
+  <!-- ============================================================ 質問 -->
+  <h2>判断していただきたいこと</h2>
+  <ol class="qa">
+    <li><span class="qn">Q1</span><span class="q">全体レイアウト：この継承方針（PC=右パネル、スマホ=ボトムシート3段階）でよいか。</span>
+      <div class="a">代替案はスマホでも常時分割（上下2分割固定）ですが、画面の狭さから非推奨です。</div></li>
+    <li><span class="qn">Q2</span><span class="q">タブ構成：Caption / Material / Model / Views の4タブでよいか。</span>
+      <div class="a">Modelタブ新設が変更点。LociMyuの3タブに戻し、モデル調整を書き出しメニュー側に置く案もあります。</div></li>
+    <li><span class="qn">Q3</span><span class="q">スマホのピン追加：FAB方式（タップ=1本、長押し=連続モード）でよいか。</span>
+      <div class="a">誤タップ防止として「追加後自動OFF」を既定にしています。常時ONが好みなら設定化します。</div></li>
+    <li><span class="qn">Q4</span><span class="q">配色：LociMyuのダークトーン継承のみでよいか、屋外・現場向けにライトテーマも用意するか。</span>
+      <div class="a">直射日光下ではダークUIは視認性が落ちます。Phase 2でライトを足す前提なら、実装初期からトークン設計だけ両対応にしておきます（後付けより安い）。</div></li>
+    <li><span class="qn">Q5</span><span class="q">書き出しメニューの並び：フルZIP / 差分ZIP（軽量） / CSV・xlsx / ビューPNG / 閲覧用HTML で過不足ないか。</span>
+      <div class="a">最頻出を1タップ目に置きます。現運用で最も多い書き出しはどれになりそうですか。</div></li>
+    <li><span class="qn">Q6</span><span class="q">LociMyuから「これだけは変えるな」という操作・見た目が他にあれば教えてください。</span>
+      <div class="a">例：ピン色チップの並び、Materialタブのスライダー配置、Viewsの±XYZボタン等。指定がなければ現行準拠で実装します。</div></li>
+  </ol>
+
+  <p class="note" style="margin-top:40px;">
+    ソース: <code>docs/mockups/ui-mock-v1.html</code>（リポジトリ管理）。合意後、この構成で製品UIを実装します。
+    モックは静的です — 実装はコア（実装済み）に結線するだけで、データ構造には一切影響しません。
+  </p>
+</main>
+</body></html>

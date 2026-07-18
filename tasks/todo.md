@@ -17,7 +17,8 @@
 
 ### 検証環境メモ
 - Claude Codeのブラウザペインでは rAF が発火せず screenshot も不可。検証は renderOnce() + ピクセルサンプリングで行う（viewer.tsのupdateMatrixWorld防御はこの環境で発見した実バグ由来）
-- [ ] **UI/UXモック提示 → 人間とコンセンサス（実UI実装はその後）**
+- [x] UI/UXモック作成・提示（docs/mockups/ui-mock-v1.html、Artifact公開済み）
+- [ ] **UI/UXコンセンサス（Q1〜Q6の回答待ち）→ 製品UI実装**
 - [ ] PWA化、iOS実機検証（P0-2はユーザー協力が必要）
 
 # LociView 設計フェーズ
