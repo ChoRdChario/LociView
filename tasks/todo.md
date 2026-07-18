@@ -1,3 +1,20 @@
+# LociView 開発
+
+## 実装フェーズ（2026-07-18 開始）
+
+- [x] バリアフリー要件（CSV/座標コピペ）とFR-32/33を資料反映
+- [x] プロジェクト土台（Vite + TypeScript + Vitest、依存lock、git初期化）
+- [x] **P0-1: op-logコアエンジン** — ids/hlc/schema/reduce/merge/jsonl + テスト37件全通過（決定性をシャッフル/重複/分割のプロパティテストで証明）
+- [x] Platform層: WorkspaceFS抽象 + MemoryFS + OPFS実装（OPFS実機検証は後続）
+- [x] AssetPipeline: ZIP入出力（zip.js）+ 健全性ガード（トラバーサル/zip bomb/ネスト拒否）
+- [x] ProjectStore: dispatch→追記→再導出の単方向フロー、2者マージ収束テスト済み
+- [x] プロジェクトZIP往復（export/inspect/import/merge/差分ZIP、captions.csv・snapshot.json同梱）
+- [x] CSV入出力（BOM・完全精度・formulaガード往復・座標コピペ・modelName付替え・新セット生成）
+- [ ] ViewerCore: three.jsシーン + GLB/OBJ/STL/PLYローダ + ピン
+- [ ] xlsxインポート（SheetJS。Drive ZIP移行ウィザードの一部）
+- [ ] **UI/UXモック提示 → 人間とコンセンサス（実UI実装はその後）**
+- [ ] PWA化、iOS実機検証（P0-2はユーザー協力が必要）
+
 # LociView 設計フェーズ
 
 ## Plan
