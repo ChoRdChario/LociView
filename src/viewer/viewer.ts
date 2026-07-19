@@ -52,6 +52,8 @@ export class ViewerCore {
   private pickHandlers = new Set<(hit: PickHit) => void>();
   private pinSelectHandlers = new Set<(id: string) => void>();
   private tapMissHandlers = new Set<() => void>();
+  private tickHandlers = new Set<() => void>();
+  private pinScale = 1;
   /** trueの間、通常クリックでピンを打てる（開発ハーネス用。製品UIは長押し/Shift+Click） */
   pinMode = false;
 
@@ -182,6 +184,7 @@ export class ViewerCore {
     this.camera.aspect = width / Math.max(height, 1);
     this.camera.updateProjectionMatrix();
     this.renderer.render(this.scene, this.camera);
+    for (const fn of this.tickHandlers) fn();
   }
 
   // ---- ピン（モデルローカル座標） -------------------------------------------------
@@ -196,6 +199,7 @@ export class ViewerCore {
     mesh.renderOrder = 999;
     this.pinLayer.add(mesh);
     this.pins.set(pin.id, mesh);
+    this.applyPinScales();
     this.renderOnce();
   }
 
@@ -214,9 +218,19 @@ export class ViewerCore {
 
   setPinSelected(id: string | null): void {
     this.selectedPinId = id;
+    this.applyPinScales();
+  }
+
+  /** 全ピンの表示倍率（Viewsタブのスライダー） */
+  setPinScale(mult: number): void {
+    this.pinScale = Number.isFinite(mult) && mult > 0 ? mult : 1;
+    this.applyPinScales();
+    this.renderOnce();
+  }
+
+  private applyPinScales(): void {
     for (const [pinId, mesh] of this.pins) {
-      const scale = pinId === id ? 1.6 : 1.0;
-      mesh.scale.setScalar(scale);
+      mesh.scale.setScalar(this.pinScale * (pinId === this.selectedPinId ? 1.6 : 1.0));
     }
   }
 
@@ -313,6 +327,35 @@ export class ViewerCore {
     return () => this.tapMissHandlers.delete(fn);
   }
 
+  /** 描画ごとに呼ばれるフック（キャプションオーバーレイの追従用） */
+  onRenderTick(fn: () => void): () => void {
+    this.tickHandlers.add(fn);
+    return () => this.tickHandlers.delete(fn);
+  }
+
+  /** モデルローカル座標 → ステージCSSピクセル座標（オーバーレイ・結線用） */
+  projectModelPoint(pos: [number, number, number]): { x: number; y: number; visible: boolean } {
+    const v = new THREE.Vector3(pos[0], pos[1], pos[2]);
+    this.modelRoot.updateWorldMatrix(true, false);
+    v.applyMatrix4(this.modelRoot.matrixWorld);
+    this.camera.updateMatrixWorld(true);
+    v.project(this.camera);
+    const { width, height } = this.canvasSize();
+    return {
+      x: ((v.x + 1) / 2) * width,
+      y: ((-v.y + 1) / 2) * height,
+      visible: v.z > -1 && v.z < 1,
+    };
+  }
+
+  /** モデルの対角長（UIのステップ幅算出用） */
+  modelDiag(): number | null {
+    if (this.currentModel === null) return null;
+    const box = new THREE.Box3().setFromObject(this.currentModel.root);
+    if (box.isEmpty()) return null;
+    return box.getSize(new THREE.Vector3()).length();
+  }
+
   applyMaterialProps(key: string, props: { opacity?: number; doubleSided?: boolean }): void {
     const entry = this.currentModel?.materials.find((m) => m.key === key);
     if (entry === undefined) return;
@@ -389,6 +432,7 @@ export class ViewerCore {
       }
       this.controls.update();
       this.renderer.render(this.scene, this.camera);
+      for (const fn of this.tickHandlers) fn();
     };
     loop();
   }
@@ -458,7 +502,12 @@ export class ViewerCore {
   };
 
   private readonly onPointerUp = (): void => {
+    // 長押し発火前の離し = タッチの素早いタップ（ピンにも当たっていない）→ 選択解除通知
+    const wasPendingTap = this.longPressTimer !== null;
     this.clearLongPress();
+    if (wasPendingTap) {
+      for (const fn of this.tapMissHandlers) fn();
+    }
   };
 
   private clearLongPress(): void {

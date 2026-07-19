@@ -1,7 +1,7 @@
 // Captionタブ — 検索/絞込(FR-15)、ピン色チップ・フィルタ・リスト(LociMyu継承)、編集、添付
 
 import { el, clear } from '../dom';
-import { fAnchor, fStr, fStrArr } from '../fields';
+import { fAnchor, fStr, fStrArr, type AnchorData } from '../fields';
 import { entityIdFor } from '../../core/store';
 import type { AppContext } from '../context';
 import { confirmDialog } from '../dialogs';
@@ -172,11 +172,41 @@ export function mountCaptionTab(container: HTMLElement, ctx: AppContext): () => 
     fileInput.addEventListener('change', () => void attach(fileInput.files));
     cameraInput.addEventListener('change', () => void attach(cameraInput.files));
 
+    // ピン位置の3軸調整（モデル内部への配置用。モデルローカル座標）
+    const posEditor = el('div', { class: 'lv-grp' });
+    const anchor = fAnchor(sel);
+    if (anchor?.position !== undefined) {
+      const diag = ctx.viewer.modelDiag() ?? 1;
+      const step = Number((diag / 200).toPrecision(2));
+      const axisInput = (axis: 0 | 1 | 2, label: string): HTMLElement => {
+        const input = el('input', {
+          type: 'number',
+          step: String(step),
+          value: String(anchor.position![axis]),
+          onchange: (ev) => {
+            const v = Number((ev.target as HTMLInputElement).value);
+            if (!Number.isFinite(v)) return;
+            const cur = fAnchor(ctx.selectedCaption() ?? sel) ?? anchor;
+            const pos = [...(cur.position ?? anchor.position!)] as [number, number, number];
+            pos[axis] = v;
+            const next: AnchorData = { ...cur, position: pos };
+            ctx.undo.update('caption', sel.id, { anchor: next });
+          },
+        });
+        return el('label', { class: 'lv-axis-input' }, label, input);
+      };
+      posEditor.append(
+        el('div', { class: 'lv-hint' }, `ピン位置（モデル座標。矢印キーで±${step}）`),
+        el('div', { class: 'lv-row lv-xyz' }, axisInput(0, 'X'), axisInput(1, 'Y'), axisInput(2, 'Z')),
+      );
+    }
+
     editor.append(
       el('div', { class: 'lv-hint' }, `作成: ${ctx.displayName(sel.createdBy)} / 選択中`),
       title,
       body,
       tags,
+      posEditor,
       el('div', { class: 'lv-row' },
         thumbs,
         el('button', { onclick: () => fileInput.click() }, '＋ 添付'),

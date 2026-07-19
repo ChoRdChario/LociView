@@ -11,6 +11,7 @@ import { mountDataTab } from './tabs/data';
 import { mountMaterialTab } from './tabs/material';
 import { mountModelTab } from './tabs/model';
 import { applyViewRecordToViewer, mountViewsTab } from './tabs/views';
+import { mountCaptionOverlay } from './overlay';
 
 export interface ViewerScreenDeps {
   goHome: () => void;
@@ -55,6 +56,9 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
   const canvas = el('canvas', { class: 'lv-gl' }) as HTMLCanvasElement;
   const stage = el('div', { class: 'lv-stage' }, canvas);
   ctx.viewer.init(canvas);
+  const unmountOverlay = mountCaptionOverlay(stage, ctx);
+  // 保存済みのピンサイズ設定を適用（Viewsタブのスライダーと連動）
+  ctx.viewer.setPinScale(Number(localStorage.getItem('lv-pin-scale') ?? '1'));
 
   // ---- パネル（セット切替 + タブ） ------------------------------------------------
 
@@ -220,6 +224,14 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
     ctx.notify();
   });
 
+  // 何もない場所のタップ/クリック = 選択解除（オーバーレイを閉じる）
+  const offMiss = ctx.viewer.onTapMiss(() => {
+    if (ctx.ui.selectedCaptionId === null) return;
+    ctx.ui.selectedCaptionId = null;
+    ctx.viewer.setPinSelected(null);
+    ctx.notify();
+  });
+
   function panelIsSheet(): boolean {
     return globalThis.matchMedia('(max-width: 899px)').matches;
   }
@@ -260,6 +272,8 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
   return () => {
     offPick();
     offSelect();
+    offMiss();
     offChange();
+    unmountOverlay();
   };
 }

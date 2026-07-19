@@ -57,6 +57,18 @@ export function mountViewsTab(container: HTMLElement, ctx: AppContext): () => vo
         el('button', { onclick: () => ctx.viewer.setBackground(null) }, 'リセット'),
       ),
     ),
+    el('div', { class: 'lv-grp' },
+      el('div', { class: 'lv-hint' }, 'ピンの大きさ（この端末の表示設定）'),
+      el('input', {
+        type: 'range', min: '0.3', max: '3', step: '0.1',
+        value: localStorage.getItem('lv-pin-scale') ?? '1',
+        oninput: (ev) => {
+          const v = (ev.target as HTMLInputElement).value;
+          localStorage.setItem('lv-pin-scale', v);
+          ctx.viewer.setPinScale(Number(v));
+        },
+      }),
+    ),
     el('div', { class: 'lv-hint lv-dim' }, '平行投影（Orthographic）はPhase 2で追加予定'),
   );
 

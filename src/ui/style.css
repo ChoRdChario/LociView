@@ -132,6 +132,33 @@ textarea { min-height: 72px; resize: vertical; }
   object-fit: cover; cursor: pointer; background: var(--input-bg2);
 }
 
+/* ---------- キャプションオーバーレイ（ピン⇄ウィンドウ結線） ---------- */
+.lv-overlay-svg {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 5;
+}
+.lv-cap-overlay {
+  position: absolute; left: 0; top: 0; width: 220px; z-index: 6;
+  background: rgba(13, 17, 23, 0.92);
+  border: 1px solid var(--line); border-left-width: 3px;
+  border-radius: 8px; padding: 8px 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  font-size: 12px; pointer-events: none;
+  display: grid; gap: 4px;
+  will-change: transform;
+}
+.lv-cap-overlay b { font-size: 13px; }
+.lv-cap-overlay-body {
+  color: var(--dim); white-space: pre-wrap; word-break: break-word;
+  max-height: 5.5em; overflow: hidden;
+}
+.lv-thumb.sm { width: 36px; height: 36px; }
+
+/* ---------- ピン位置3軸調整 ---------- */
+.lv-xyz { flex-wrap: nowrap; }
+.lv-axis-input { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; font-size: 12px; }
+.lv-axis-input input { width: 100%; min-width: 0; padding: 5px 6px; }
+
 /* ---------- Viewsタブ ---------- */
 .lv-axis-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 
