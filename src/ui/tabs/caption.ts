@@ -194,8 +194,18 @@ export function mountCaptionTab(container: HTMLElement, ctx: AppContext): () => 
         });
         return el('label', { class: 'lv-axis-input' }, label, input);
       };
+      const moveBtn = el('button', {
+        class: ctx.ui.pinMoveMode ? 'active' : '',
+        onclick: () => {
+          ctx.ui.pinMoveMode = !ctx.ui.pinMoveMode;
+          ctx.notify();
+        },
+      }, ctx.ui.pinMoveMode ? '✛ 移動中（3軸ドラッグ）' : '✛ ピンを移動');
       posEditor.append(
-        el('div', { class: 'lv-hint' }, `ピン位置（モデル座標。矢印キーで±${step}）`),
+        el('div', { class: 'lv-row lv-space' },
+          el('div', { class: 'lv-hint' }, `ピン位置（モデル座標。矢印キーで±${step}）`),
+          moveBtn,
+        ),
         el('div', { class: 'lv-row lv-xyz' }, axisInput(0, 'X'), axisInput(1, 'Y'), axisInput(2, 'Z')),
       );
     }

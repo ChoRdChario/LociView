@@ -124,7 +124,16 @@ export class ViewerCore {
     this.gizmo.addEventListener('objectChange', () => this.renderOnce());
     // three r169以降はgetHelper()の戻りをシーンに入れる（旧APIは本体を直接addする）
     const g = this.gizmo as unknown as { getHelper?: () => THREE.Object3D };
-    this.scene.add(g.getHelper !== undefined ? g.getHelper() : (this.gizmo as unknown as THREE.Object3D));
+    const gizmoRoot = g.getHelper !== undefined ? g.getHelper() : (this.gizmo as unknown as THREE.Object3D);
+    this.scene.add(gizmoRoot);
+    // 3軸それぞれ個別のドラッグのみ許可する:
+    // 平面ハンドル(XY/YZ/XZ)と中央の自由移動(XYZ)を、表示・ピッカーの両方から除去する
+    const multiAxis = new Set(['XY', 'YZ', 'XZ', 'XYZ', 'E']);
+    const toRemove: THREE.Object3D[] = [];
+    gizmoRoot.traverse((o) => {
+      if (multiAxis.has(o.name)) toRemove.push(o);
+    });
+    for (const o of toRemove) o.parent?.remove(o);
 
     canvas.addEventListener('pointerdown', this.onPointerDown);
     canvas.addEventListener('pointermove', this.onPointerMove);

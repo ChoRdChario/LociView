@@ -13,6 +13,8 @@ export interface UiState {
   activeSetId: string | null;
   activeModelAssetId: string | null;
   selectedCaptionId: string | null;
+  /** 「ピンを移動」ボタンで切り替える移動ギズモ表示（選択変更でOFFに戻る） */
+  pinMoveMode: boolean;
   search: string;
   colorFilter: Set<string>;
 }
@@ -23,6 +25,7 @@ export class AppContext {
     activeSetId: null,
     activeModelAssetId: null,
     selectedCaptionId: null,
+    pinMoveMode: false,
     search: '',
     colorFilter: new Set(),
   };

@@ -260,6 +260,7 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
     redoBtn.disabled = !ctx.undo.canRedo;
   }
 
+  let lastSelectedForMove: string | null = null;
   const offChange = ctx.onChange(() => {
     renderSetSelect();
     renderStatus();
@@ -267,8 +268,12 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
     // ピンサイズはモデルassetのpinScaleに保存され、マージで全員に共有される
     const activeAsset = ctx.asset(ctx.ui.activeModelAssetId);
     if (activeAsset !== null) ctx.viewer.setPinScale(fNum(activeAsset, 'pinScale', 1));
-    // 選択中ピンに移動ギズモを表示
-    ctx.viewer.showPinGizmo(ctx.ui.selectedCaptionId);
+    // 移動ギズモは「ピンを移動」ボタンONの間だけ表示。選択が変わったらOFFへ戻す
+    if (ctx.ui.selectedCaptionId !== lastSelectedForMove) {
+      lastSelectedForMove = ctx.ui.selectedCaptionId;
+      ctx.ui.pinMoveMode = false;
+    }
+    ctx.viewer.showPinGizmo(ctx.ui.pinMoveMode ? ctx.ui.selectedCaptionId : null);
     const refresh = refreshers.get(activeTab);
     if (refresh !== undefined) refresh();
   });
