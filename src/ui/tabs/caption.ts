@@ -5,6 +5,7 @@ import { fAnchor, fStr, fStrArr, type AnchorData } from '../fields';
 import { entityIdFor } from '../../core/store';
 import type { AppContext } from '../context';
 import { confirmDialog } from '../dialogs';
+import { openLightbox } from '../lightbox';
 
 export const PIN_COLORS = ['#eab308', '#f87171', '#4ade80', '#60a5fa', '#c084fc', '#f9fafb', '#fb923c', '#2dd4bf'];
 
@@ -130,19 +131,17 @@ export function mountCaptionTab(container: HTMLElement, ctx: AppContext): () => 
     });
 
     // 添付（画像・映像。データ構造は汎用attachments — docs/02 §5）
+    // クリック/タップでライトボックス（全画面・ズーム・前後送り）
+    const attachmentIds = fStrArr(sel, 'attachments');
     const thumbs = el('div', { class: 'lv-thumbs' });
-    for (const astId of fStrArr(sel, 'attachments')) {
+    attachmentIds.forEach((astId, i) => {
       const img = el('img', { class: 'lv-thumb', alt: '添付' }) as HTMLImageElement;
       void ctx.mediaUrl(astId).then((url) => {
         if (url !== null) img.src = url;
       });
-      img.addEventListener('click', () => {
-        void ctx.mediaUrl(astId).then((url) => {
-          if (url !== null) window.open(url, '_blank');
-        });
-      });
+      img.addEventListener('click', () => openLightbox(ctx, attachmentIds, i));
       thumbs.append(img);
-    }
+    });
 
     const fileInput = el('input', { type: 'file', accept: 'image/*,video/*', multiple: true, style: 'display:none' }) as HTMLInputElement;
     const cameraInput = el('input', { type: 'file', accept: 'image/*', capture: 'environment', style: 'display:none' }) as HTMLInputElement;

@@ -1,7 +1,7 @@
 // Viewsタブ — ビュープリセット・±XYZ・背景色（LociMyu継承。平行投影はPhase 2）
 
 import { el, clear } from '../dom';
-import { fStr } from '../fields';
+import { fNum, fStr } from '../fields';
 import type { AppContext } from '../context';
 import type { CameraState } from '../../viewer/viewer';
 
@@ -22,6 +22,18 @@ export function mountViewsTab(container: HTMLElement, ctx: AppContext): () => vo
   const bgInput = el('input', {
     type: 'color', value: '#0b0d11',
     oninput: (ev) => ctx.viewer.setBackground((ev.target as HTMLInputElement).value),
+  }) as HTMLInputElement;
+
+  // ピンサイズ: 即時反映はinput、opとしての保存はchange（ドラッグ完了時に1op）
+  const pinScaleSlider = el('input', {
+    type: 'range', min: '0.3', max: '3', step: '0.1', value: '1',
+    'aria-label': 'ピンの大きさ',
+    oninput: (ev) => ctx.viewer.setPinScale(Number((ev.target as HTMLInputElement).value)),
+    onchange: (ev) => {
+      const assetId = ctx.ui.activeModelAssetId;
+      if (assetId === null) return;
+      ctx.undo.update('asset', assetId, { pinScale: Number((ev.target as HTMLInputElement).value) });
+    },
   }) as HTMLInputElement;
 
   const axes: Array<'+x' | '-x' | '+y' | '-y' | '+z' | '-z'> = ['+x', '-x', '+y', '-y', '+z', '-z'];
@@ -58,21 +70,17 @@ export function mountViewsTab(container: HTMLElement, ctx: AppContext): () => vo
       ),
     ),
     el('div', { class: 'lv-grp' },
-      el('div', { class: 'lv-hint' }, 'ピンの大きさ（この端末の表示設定）'),
-      el('input', {
-        type: 'range', min: '0.3', max: '3', step: '0.1',
-        value: localStorage.getItem('lv-pin-scale') ?? '1',
-        oninput: (ev) => {
-          const v = (ev.target as HTMLInputElement).value;
-          localStorage.setItem('lv-pin-scale', v);
-          ctx.viewer.setPinScale(Number(v));
-        },
-      }),
+      el('div', { class: 'lv-hint' }, 'ピンの大きさ（モデルごとにプロジェクトへ保存・全員に共有）'),
+      pinScaleSlider,
     ),
     el('div', { class: 'lv-hint lv-dim' }, '平行投影（Orthographic）はPhase 2で追加予定'),
   );
 
   function render(): void {
+    const asset = ctx.asset(ctx.ui.activeModelAssetId);
+    if (asset !== null && document.activeElement !== pinScaleSlider) {
+      pinScaleSlider.value = String(fNum(asset, 'pinScale', 1));
+    }
     clear(presetList);
     const views = ctx.views();
     if (views.length === 0) {

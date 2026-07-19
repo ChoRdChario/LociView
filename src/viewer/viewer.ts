@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import type { LoadedModel } from './loaders';
 
 export interface PickHit {
@@ -54,6 +55,11 @@ export class ViewerCore {
   private tapMissHandlers = new Set<() => void>();
   private tickHandlers = new Set<() => void>();
   private pinScale = 1;
+
+  // ピン移動ギズモ（3軸ドラッグ。ピン選択中に表示）
+  private gizmo: TransformControls | null = null;
+  private gizmoPinId: string | null = null;
+  private pinMoveHandlers = new Set<(id: string, position: [number, number, number]) => void>();
   /** trueの間、通常クリックでピンを打てる（開発ハーネス用。製品UIは長押し/Shift+Click） */
   pinMode = false;
 
@@ -99,6 +105,26 @@ export class ViewerCore {
     const dir = new THREE.DirectionalLight(0xffffff, 1.5);
     dir.position.set(3, 5, 2);
     this.scene.add(dir);
+
+    // ピン移動ギズモ
+    this.gizmo = new TransformControls(this.camera, canvas);
+    this.gizmo.setMode('translate');
+    this.gizmo.setSize(0.8);
+    this.gizmo.addEventListener('dragging-changed', (ev) => {
+      const dragging = (ev as unknown as { value: boolean }).value;
+      this.controls.enabled = !dragging; // ドラッグ中はカメラ回転を止める
+      if (!dragging && this.gizmoPinId !== null) {
+        const mesh = this.pins.get(this.gizmoPinId);
+        if (mesh !== undefined) {
+          const p = mesh.position;
+          for (const fn of this.pinMoveHandlers) fn(this.gizmoPinId, [p.x, p.y, p.z]);
+        }
+      }
+    });
+    this.gizmo.addEventListener('objectChange', () => this.renderOnce());
+    // three r169以降はgetHelper()の戻りをシーンに入れる（旧APIは本体を直接addする）
+    const g = this.gizmo as unknown as { getHelper?: () => THREE.Object3D };
+    this.scene.add(g.getHelper !== undefined ? g.getHelper() : (this.gizmo as unknown as THREE.Object3D));
 
     canvas.addEventListener('pointerdown', this.onPointerDown);
     canvas.addEventListener('pointermove', this.onPointerMove);
@@ -206,6 +232,10 @@ export class ViewerCore {
   removePin(id: string): void {
     const mesh = this.pins.get(id);
     if (mesh === undefined) return;
+    if (this.gizmoPinId === id && this.gizmo !== null) {
+      this.gizmo.detach();
+      this.gizmoPinId = null;
+    }
     this.pinLayer.remove(mesh);
     disposeObject(mesh);
     this.pins.delete(id);
@@ -236,6 +266,30 @@ export class ViewerCore {
 
   get selectedPin(): string | null {
     return this.selectedPinId;
+  }
+
+  /** 選択ピンに3軸移動ギズモを表示する。nullで解除 */
+  showPinGizmo(pinId: string | null): void {
+    if (this.gizmo === null) return;
+    const mesh = pinId !== null ? this.pins.get(pinId) : undefined;
+    if (mesh === undefined) {
+      if (this.gizmoPinId !== null) {
+        this.gizmo.detach();
+        this.gizmoPinId = null;
+        this.renderOnce();
+      }
+      return;
+    }
+    if (this.gizmoPinId === pinId && this.gizmo.object === mesh) return;
+    this.gizmo.attach(mesh);
+    this.gizmoPinId = pinId;
+    this.renderOnce();
+  }
+
+  /** ギズモドラッグ確定時（モデルローカル座標） */
+  onPinMove(fn: (id: string, position: [number, number, number]) => void): () => void {
+    this.pinMoveHandlers.add(fn);
+    return () => this.pinMoveHandlers.delete(fn);
   }
 
   onPick(fn: (hit: PickHit) => void): () => void {
@@ -406,6 +460,11 @@ export class ViewerCore {
     this.canvas.removeEventListener('webglcontextrestored', this.onContextRestored);
     globalThis.removeEventListener('resize', this.onResize);
     this.clearModel();
+    if (this.gizmo !== null) {
+      this.gizmo.detach();
+      this.gizmo.dispose();
+      this.gizmo = null;
+    }
     this.controls.dispose();
     this.renderer.dispose();
   }
@@ -451,6 +510,8 @@ export class ViewerCore {
 
   private readonly onPointerDown = (ev: PointerEvent): void => {
     if (ev.button !== 0) return;
+    // ギズモ操作中・ギズモの軸に触れている間は選択/追加ロジックを動かさない
+    if (this.gizmo !== null && (this.gizmo.dragging || this.gizmo.axis !== null)) return;
     const rect = this.canvas.getBoundingClientRect();
     this.ndc.set(
       ((ev.clientX - rect.left) / rect.width) * 2 - 1,

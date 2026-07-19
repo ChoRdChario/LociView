@@ -3,7 +3,7 @@
 
 import { compareHlc } from '../core/hlc';
 import { el, clear } from './dom';
-import { fStr } from './fields';
+import { fAnchor, fNum, fStr } from './fields';
 import type { AppContext } from './context';
 import { confirmDialog, promptDialog } from './dialogs';
 import { currentPinColor, mountCaptionTab } from './tabs/caption';
@@ -57,8 +57,6 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
   const stage = el('div', { class: 'lv-stage' }, canvas);
   ctx.viewer.init(canvas);
   const unmountOverlay = mountCaptionOverlay(stage, ctx);
-  // 保存済みのピンサイズ設定を適用（Viewsタブのスライダーと連動）
-  ctx.viewer.setPinScale(Number(localStorage.getItem('lv-pin-scale') ?? '1'));
 
   // ---- パネル（セット切替 + タブ） ------------------------------------------------
 
@@ -232,6 +230,14 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
     ctx.notify();
   });
 
+  // ギズモドラッグ確定 → アンカー位置を通常編集として記録（Undo可・マージ可）
+  const offMove = ctx.viewer.onPinMove((id, position) => {
+    const rec = ctx.state.byKind.caption?.[id];
+    if (rec === undefined) return;
+    const anchor = fAnchor(rec) ?? {};
+    ctx.undo.update('caption', id, { anchor: { ...anchor, position } });
+  });
+
   function panelIsSheet(): boolean {
     return globalThis.matchMedia('(max-width: 899px)').matches;
   }
@@ -258,6 +264,11 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
     renderSetSelect();
     renderStatus();
     ctx.syncPins();
+    // ピンサイズはモデルassetのpinScaleに保存され、マージで全員に共有される
+    const activeAsset = ctx.asset(ctx.ui.activeModelAssetId);
+    if (activeAsset !== null) ctx.viewer.setPinScale(fNum(activeAsset, 'pinScale', 1));
+    // 選択中ピンに移動ギズモを表示
+    ctx.viewer.showPinGizmo(ctx.ui.selectedCaptionId);
     const refresh = refreshers.get(activeTab);
     if (refresh !== undefined) refresh();
   });
@@ -273,6 +284,7 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
     offPick();
     offSelect();
     offMiss();
+    offMove();
     offChange();
     unmountOverlay();
   };

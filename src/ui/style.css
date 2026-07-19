@@ -126,11 +126,12 @@ textarea { min-height: 72px; resize: vertical; }
 .lv-cap-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
 .lv-cap-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lv-editor { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
-.lv-thumbs { display: flex; gap: 6px; flex-wrap: wrap; }
+.lv-thumbs { display: flex; gap: 8px; flex-wrap: wrap; }
 .lv-thumb {
-  width: 48px; height: 48px; border-radius: 6px; border: 1px solid var(--line);
+  width: 96px; height: 96px; border-radius: 8px; border: 1px solid var(--line);
   object-fit: cover; cursor: pointer; background: var(--input-bg2);
 }
+.lv-thumb:hover { border-color: var(--sel); }
 
 /* ---------- キャプションオーバーレイ（ピン⇄ウィンドウ結線） ---------- */
 .lv-overlay-svg {
@@ -153,6 +154,35 @@ textarea { min-height: 72px; resize: vertical; }
   max-height: 5.5em; overflow: hidden;
 }
 .lv-thumb.sm { width: 36px; height: 36px; }
+
+/* ---------- ライトボックス ---------- */
+.lv-lightbox {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(5, 7, 10, 0.96);
+  display: flex; flex-direction: column;
+}
+.lv-lb-toolbar {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  background: rgba(11, 13, 17, 0.9); border-bottom: 1px solid var(--line);
+}
+.lv-lb-name { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40vw; }
+.lv-lb-zoom { min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
+.lv-lb-media {
+  flex: 1; overflow: hidden; display: flex; align-items: center; justify-content: center;
+  cursor: grab; touch-action: none;
+}
+.lv-lb-media:active { cursor: grabbing; }
+.lv-lb-item {
+  max-width: 96%; max-height: 96%; user-select: none;
+  transition: none; will-change: transform;
+}
+.lv-lb-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  font-size: 26px; line-height: 1; padding: 10px 14px; border-radius: 10px;
+  background: rgba(17, 24, 39, 0.7);
+}
+.lv-lb-nav.prev { left: 10px; }
+.lv-lb-nav.next { right: 10px; }
 
 /* ---------- ピン位置3軸調整 ---------- */
 .lv-xyz { flex-wrap: nowrap; }
