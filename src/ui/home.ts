@@ -2,12 +2,15 @@
 // 投入物の自動判別（docs/02 §6.2）: lociview.json有 → 開く or 取込 / モデル単体 → 新規作成
 
 import { importNewProject, inspectZip } from '../assets/package';
+import { applyImportPlan, buildImportPlan } from '../assets/importWizard';
+import { readZipEntries } from '../assets/zipio';
 import { parseManifest } from '../core/manifest';
 import { entityIdFor, ProjectStore, type Identity } from '../core/store';
 import type { WorkspaceFS } from '../platform/fs';
 import { detectFormat } from '../viewer/loaders';
 import { el, clear } from './dom';
 import { confirmDialog, infoDialog, promptDialog } from './dialogs';
+import { importWizardDialog } from './importDialog';
 
 export interface HomeDeps {
   fs: WorkspaceFS;
@@ -135,7 +138,8 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
     try {
       const insp = await inspectZip(bytes);
       if (insp.kind !== 'lociview' || insp.manifest === null) {
-        await infoDialog('取込', 'LociViewプロジェクトではないZIPです。（Drive ZIP移行ウィザードは次段で実装予定）');
+        // LociViewプロジェクトでないZIP → インポートウィザード（Drive フォルダZIP等）
+        await runImportWizard(bytes, file.name);
         return;
       }
       const existing = (await listProjects(deps.fs)).find((p) => p.projectId === insp.manifest!.projectId);
@@ -158,6 +162,33 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
     } catch (e) {
       await infoDialog('取込失敗', e instanceof Error ? e.message : String(e));
     }
+  }
+
+  /** Drive フォルダZIP等の取り込み（FR-02） */
+  async function runImportWizard(bytes: Uint8Array, fileName: string): Promise<void> {
+    const plan = await buildImportPlan(await readZipEntries(bytes));
+    if (plan.models.length === 0 && plan.images.length === 0 && plan.migration === null) {
+      await infoDialog(
+        '取込',
+        'このZIPにはLociViewが扱えるデータ（3Dモデル・画像・LociMyuのスプレッドシート）が見つかりませんでした。',
+      );
+      return;
+    }
+    const defaultName = fileName.replace(/\.(zip|lociview)$/i, '');
+    const answer = await importWizardDialog(plan, defaultName);
+    if (answer === null) return;
+    const result = await applyImportPlan(deps.fs, deps.identity, plan, {
+      projectName: answer.projectName,
+      imageLinks: answer.imageLinks,
+    });
+    if (result.unlinkedImages > 0) {
+      await infoDialog(
+        '取込完了',
+        `キャプション${result.captionCount}件・表示セット${result.setCount}件を取り込みました。` +
+          `画像${result.unlinkedImages}件は対応付けされていません（キャプションを選んで添付できます）。`,
+      );
+    }
+    await deps.openProject(result.dir);
   }
 
   async function renderList(): Promise<void> {

@@ -22,7 +22,9 @@
 - [x] **製品UI v1実装** — ホーム/ビューア画面/5タブ/Undo・Redo/検索/セット切替/マージレポート/
       ボトムシート3段階/長押しピン追加。ブラウザ実機で作成→編集→Undo→リロード復元(OPFS)→
       モバイルシート→長押し追加まで検証済み
-- [ ] xlsx取込（Drive ZIP移行ウィザード）、LociMyu移行
+- [x] **Drive ZIP移行ウィザード + LociMyu移行**（FR-02） — 自前xlsxリーダー、シート→表示セット変換、
+      __LM_VIEWS/__LM_MATERIALS移行、決定的captionId、画像手動リンク+fileId対応表CSV。
+      ブラウザ実機でZIP投入→ウィザード→2セット/3キャプション/ビュー/マテリアル/画像リンクまで検証済み
 - [ ] PWA化（Service Worker・manifest・file_handlers）
 - [ ] Material拡張（unlit・クロマキー移植）、平行投影
 - [ ] iOS実機検証（P0-2。ユーザー協力）→ MVP完了判定（docs/01成功基準1〜3）

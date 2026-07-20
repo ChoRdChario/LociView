@@ -29,7 +29,10 @@ export function mountDataTab(container: HTMLElement, ctx: AppContext, deps: Data
     try {
       const insp = await inspectZip(new Uint8Array(await file.arrayBuffer()));
       if (insp.kind !== 'lociview' || insp.manifest === null) {
-        await infoDialog('取込', 'LociViewプロジェクトではありません。（Drive ZIP移行ウィザードは次段で実装予定）');
+        await infoDialog(
+          '取込',
+          'LociViewプロジェクトではありません。Drive のフォルダZIP等を新規プロジェクトとして取り込むには、ホーム画面（左上の☰）から投入してください。',
+        );
         return;
       }
       if (insp.manifest.projectId !== ctx.store.manifest.projectId) {
