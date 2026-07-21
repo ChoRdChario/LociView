@@ -24,6 +24,11 @@ export function mountViewsTab(container: HTMLElement, ctx: AppContext): () => vo
     oninput: (ev) => ctx.viewer.setBackground((ev.target as HTMLInputElement).value),
   }) as HTMLInputElement;
 
+  const orthoCheck = el('input', {
+    type: 'checkbox',
+    onchange: (ev) => ctx.viewer.setOrthographic((ev.target as HTMLInputElement).checked),
+  }) as HTMLInputElement;
+
   // ピンサイズ: 即時反映はinput、opとしての保存はchange（ドラッグ完了時に1op）
   const pinScaleSlider = el('input', {
     type: 'range', min: '0.3', max: '3', step: '0.1', value: '1',
@@ -56,6 +61,11 @@ export function mountViewsTab(container: HTMLElement, ctx: AppContext): () => vo
     ),
     presetList,
     el('div', { class: 'lv-grp' },
+      el('div', { class: 'lv-hint' }, '投影方法'),
+      el('label', { class: 'lv-row' }, orthoCheck, ' 平行投影（Orthographic）'),
+      el('div', { class: 'lv-dim' }, '遠近感をなくし、寸法比較や図面的な確認に向いた表示になります'),
+    ),
+    el('div', { class: 'lv-grp' },
       el('div', { class: 'lv-hint' }, 'カメラ方向'),
       el('div', { class: 'lv-axis-grid' },
         ...axes.map((a) => el('button', { onclick: () => ctx.viewer.viewAxis(a) }, a.toUpperCase())),
@@ -73,7 +83,6 @@ export function mountViewsTab(container: HTMLElement, ctx: AppContext): () => vo
       el('div', { class: 'lv-hint' }, 'ピンの大きさ（モデルごとにプロジェクトへ保存・全員に共有）'),
       pinScaleSlider,
     ),
-    el('div', { class: 'lv-hint lv-dim' }, '平行投影（Orthographic）はPhase 2で追加予定'),
   );
 
   function render(): void {
@@ -81,6 +90,7 @@ export function mountViewsTab(container: HTMLElement, ctx: AppContext): () => vo
     if (asset !== null && document.activeElement !== pinScaleSlider) {
       pinScaleSlider.value = String(fNum(asset, 'pinScale', 1));
     }
+    orthoCheck.checked = ctx.viewer.isOrtho();
     clear(presetList);
     const views = ctx.views();
     if (views.length === 0) {

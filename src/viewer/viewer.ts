@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import type { LoadedModel } from './loaders';
+import { getChroma, getUnlit, patchMaterial, setChroma, setUnlit, type ChromaSettings } from './shaderPatch';
 
 export interface PickHit {
   /** モデルローカル座標 */
@@ -33,7 +34,11 @@ const DEFAULT_BG = 0x0b0d11;
 export class ViewerCore {
   private renderer!: THREE.WebGLRenderer;
   private scene!: THREE.Scene;
-  private camera!: THREE.PerspectiveCamera;
+  private camera!: THREE.PerspectiveCamera | THREE.OrthographicCamera;
+  private perspCamera!: THREE.PerspectiveCamera;
+  private orthoCamera: THREE.OrthographicCamera | null = null;
+  /** 平行投影の基準となる視野角（透視投影と見え方を揃えるため保持） */
+  private baseFov = 45;
   private controls!: OrbitControls;
   private canvas!: HTMLCanvasElement;
 
@@ -94,7 +99,8 @@ export class ViewerCore {
     this.modelRoot.add(this.pinLayer);
 
     const { width, height } = this.canvasSize();
-    this.camera = new THREE.PerspectiveCamera(45, width / Math.max(height, 1), 0.001, 1e7);
+    this.perspCamera = new THREE.PerspectiveCamera(45, width / Math.max(height, 1), 0.001, 1e7);
+    this.camera = this.perspCamera;
     this.camera.position.set(0, 1, 3);
 
     this.controls = new OrbitControls(this.camera, canvas);
@@ -165,7 +171,7 @@ export class ViewerCore {
         (o.material as THREE.PointsMaterial).size = this.basePointSize;
       }
     });
-    // 既定値を記録（リセット・表示セット切替に使用）
+    // 既定値を記録（リセット・表示セット切替に使用）＋ unlit/クロマキー拡張を注入
     this.matDefaults.clear();
     for (const entry of model.materials) {
       for (const m of entry.materials) {
@@ -175,6 +181,7 @@ export class ViewerCore {
           side: m.side,
           depthWrite: m.depthWrite,
         });
+        patchMaterial(m);
       }
     }
     this.fitCamera();
@@ -200,12 +207,21 @@ export class ViewerCore {
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z);
-    const dist = (maxDim / 2 / Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) * 1.6;
-    this.camera.near = Math.max(maxDim / 1000, 1e-4);
+    const dist = (maxDim / 2 / Math.tan(THREE.MathUtils.degToRad(this.baseFov / 2))) * 1.6;
+    this.camera.near = this.isOrtho() ? -maxDim * 100 : Math.max(maxDim / 1000, 1e-4);
     this.camera.far = Math.max(maxDim * 100, 10);
     this.camera.position.copy(center).add(new THREE.Vector3(dist * 0.6, dist * 0.4, dist));
-    this.camera.updateProjectionMatrix();
+    if (this.camera instanceof THREE.OrthographicCamera) {
+      const { width, height } = this.canvasSize();
+      const halfH = Math.tan(THREE.MathUtils.degToRad(this.baseFov / 2)) * dist;
+      const halfW = halfH * (width / Math.max(height, 1));
+      this.camera.top = halfH;
+      this.camera.bottom = -halfH;
+      this.camera.left = -halfW;
+      this.camera.right = halfW;
+    }
     this.controls.target.copy(center);
+    this.updateProjection();
     this.controls.update();
     this.camera.updateMatrixWorld(true);
     this.renderOnce();
@@ -216,8 +232,7 @@ export class ViewerCore {
     if (this.disposed) return;
     const { width, height } = this.canvasSize();
     this.renderer.setSize(width, height, false);
-    this.camera.aspect = width / Math.max(height, 1);
-    this.camera.updateProjectionMatrix();
+    this.updateProjection();
     this.renderer.render(this.scene, this.camera);
     for (const fn of this.tickHandlers) fn();
   }
@@ -330,6 +345,8 @@ export class ViewerCore {
       m.transparent = d.transparent;
       m.side = d.side;
       m.depthWrite = d.depthWrite;
+      setUnlit(m, false);
+      setChroma(m, null);
       m.needsUpdate = true;
     }
     this.renderOnce();
@@ -363,7 +380,7 @@ export class ViewerCore {
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z);
-    const dist = (maxDim / 2 / Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) * 1.6;
+    const dist = (maxDim / 2 / Math.tan(THREE.MathUtils.degToRad(this.baseFov / 2))) * 1.6;
     const dirs: Record<typeof axis, [number, number, number]> = {
       '+x': [1, 0, 0], '-x': [-1, 0, 0],
       '+y': [0, 1, 0], '-y': [0, -1, 0],
@@ -419,20 +436,51 @@ export class ViewerCore {
     return box.getSize(new THREE.Vector3()).length();
   }
 
-  applyMaterialProps(key: string, props: { opacity?: number; doubleSided?: boolean }): void {
+  applyMaterialProps(
+    key: string,
+    props: {
+      opacity?: number;
+      doubleSided?: boolean;
+      unlit?: boolean;
+      chroma?: ChromaSettings | null;
+    },
+  ): void {
     const entry = this.currentModel?.materials.find((m) => m.key === key);
     if (entry === undefined) return;
     for (const m of entry.materials) {
       if (props.opacity !== undefined) {
-        m.transparent = props.opacity < 1;
         m.opacity = props.opacity;
-        m.depthWrite = props.opacity >= 1;
+        // クロマキー有効時は透過が必要なので transparent を落とさない
+        const chromaOn = getChroma(m) !== null;
+        m.transparent = props.opacity < 1 || chromaOn;
+        m.depthWrite = props.opacity >= 1 && !chromaOn;
       }
       if (props.doubleSided !== undefined) {
         m.side = props.doubleSided ? THREE.DoubleSide : THREE.FrontSide;
       }
+      if (props.unlit !== undefined) setUnlit(m, props.unlit);
+      if (props.chroma !== undefined) setChroma(m, props.chroma);
       m.needsUpdate = true;
     }
+    this.renderOnce();
+  }
+
+  /** マテリアルの現在値（UIの初期表示用） */
+  getMaterialProps(key: string): {
+    opacity: number;
+    doubleSided: boolean;
+    unlit: boolean;
+    chroma: ChromaSettings | null;
+  } | null {
+    const entry = this.currentModel?.materials.find((m) => m.key === key);
+    const m = entry?.materials[0];
+    if (m === undefined) return null;
+    return {
+      opacity: m.opacity,
+      doubleSided: m.side === THREE.DoubleSide,
+      unlit: getUnlit(m),
+      chroma: getChroma(m),
+    };
   }
 
   getCameraState(): CameraState {
@@ -443,18 +491,82 @@ export class ViewerCore {
       eye: [eye.x, eye.y, eye.z],
       target: [target.x, target.y, target.z],
       up: [up.x, up.y, up.z],
-      fov: this.camera.fov,
-      ortho: false, // 平行投影はMVP後半で実装（docs/01 FR-06）
+      fov: this.baseFov,
+      ortho: this.isOrtho(),
     };
   }
 
   setCameraState(s: CameraState): void {
+    this.baseFov = s.fov;
+    this.setOrthographic(s.ortho);
     this.camera.position.set(...s.eye);
     this.camera.up.set(...s.up);
-    this.camera.fov = s.fov;
-    this.camera.updateProjectionMatrix();
+    if (this.camera instanceof THREE.PerspectiveCamera) this.camera.fov = s.fov;
     this.controls.target.set(...s.target);
+    this.updateProjection();
     this.controls.update();
+    this.camera.updateMatrixWorld(true);
+    this.renderOnce();
+  }
+
+  isOrtho(): boolean {
+    return this.camera instanceof THREE.OrthographicCamera;
+  }
+
+  /** 透視投影 ⇄ 平行投影の切替（位置・注視点・見かけの大きさを保つ） */
+  setOrthographic(on: boolean): void {
+    if (on === this.isOrtho()) return;
+    const prev = this.camera;
+    const target = this.controls.target.clone();
+    const dist = prev.position.distanceTo(target);
+
+    if (on) {
+      const { width, height } = this.canvasSize();
+      const aspect = width / Math.max(height, 1);
+      // 透視投影と同じ見かけの大きさになるフラスタムを求める
+      const halfH = Math.tan(THREE.MathUtils.degToRad(this.baseFov / 2)) * dist;
+      const halfW = halfH * aspect;
+      const ortho = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, -dist * 100, dist * 100);
+      ortho.position.copy(prev.position);
+      ortho.up.copy(prev.up);
+      ortho.lookAt(target);
+      this.orthoCamera = ortho;
+      this.camera = ortho;
+    } else {
+      this.perspCamera.position.copy(prev.position);
+      this.perspCamera.up.copy(prev.up);
+      this.perspCamera.fov = this.baseFov;
+      this.perspCamera.lookAt(target);
+      this.camera = this.perspCamera;
+    }
+
+    // OrbitControlsとギズモを新しいカメラへ繋ぎ直す
+    this.controls.dispose();
+    this.controls = new OrbitControls(this.camera, this.canvas);
+    this.controls.enableDamping = true;
+    this.controls.target.copy(target);
+    if (this.gizmo !== null) this.gizmo.camera = this.camera;
+
+    this.updateProjection();
+    this.controls.update();
+    this.camera.updateMatrixWorld(true);
+    this.renderOnce();
+  }
+
+  /** キャンバスサイズに応じて投影行列を更新する（両カメラ共通） */
+  private updateProjection(): void {
+    const { width, height } = this.canvasSize();
+    const aspect = width / Math.max(height, 1);
+    if (this.camera instanceof THREE.PerspectiveCamera) {
+      this.camera.aspect = aspect;
+    } else {
+      const cam = this.camera;
+      const halfH = (cam.top - cam.bottom) / 2;
+      const halfW = halfH * aspect;
+      cam.left = -halfW;
+      cam.right = halfW;
+    }
+    this.camera.updateProjectionMatrix();
   }
 
   dispose(): void {
@@ -495,8 +607,7 @@ export class ViewerCore {
       const h = Math.floor(height * pr);
       if (this.canvas.width !== w || this.canvas.height !== h) {
         this.renderer.setSize(width, height, false);
-        this.camera.aspect = width / Math.max(height, 1);
-        this.camera.updateProjectionMatrix();
+        this.updateProjection();
       }
       this.controls.update();
       this.renderer.render(this.scene, this.camera);

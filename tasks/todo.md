@@ -28,7 +28,9 @@
 - [x] **PWA化**（NFR-01, FR-12） — vite-plugin-pwa、アプリシェル全precache（three.js含む11エントリ/841KB）、
       manifest（standalone・file_handlers・share_target）、自前生成アイコン、更新はトースト通知、
       ホーム画面インストール導線。**サーバー停止状態での起動→プロジェクト作成→STL読込→3D描画を実証**
-- [ ] Material拡張（unlit・クロマキー移植）、平行投影
+- [x] **Material拡張（Unlit・クロマキー）と平行投影** — LociMyuシェーダパッチをTS移植。
+      移植時に元実装のバグ（dithering_fragment後にdiffuseColor.aを変更しており透過が効かない）を修正。
+      平行投影はカメラ切替+OrbitControls/ギズモ再接続。**表示セットごとの見え方切替をピクセル実測で検証**
 - [ ] iOS実機検証（P0-2。ユーザー協力）→ MVP完了判定（docs/01成功基準1〜3）
 - [ ] PWA化、iOS実機検証（P0-2はユーザー協力が必要）
 

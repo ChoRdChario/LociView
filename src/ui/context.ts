@@ -6,6 +6,7 @@ import { isVisible, visibleEntities } from '../core/reduce';
 import type { Identity, ProjectStore } from '../core/store';
 import type { WorkspaceFS } from '../platform/fs';
 import type { ViewerCore } from '../viewer/viewer';
+import type { ChromaSettings } from '../viewer/shaderPatch';
 import { fAnchor, fStr } from './fields';
 import { UndoManager } from './undo';
 
@@ -143,10 +144,31 @@ export class AppContext {
     for (const m of this.materialSettings()) {
       const key = fStr(m, 'materialKey');
       if (key === '') continue;
+      const chromaRaw = m.fields.chroma;
+      let chroma: ChromaSettings | null | undefined;
+      if (typeof chromaRaw === 'object' && chromaRaw !== null && !Array.isArray(chromaRaw)) {
+        const o = chromaRaw as Record<string, unknown>;
+        chroma = o.enable === true
+          ? {
+              enable: true,
+              color: typeof o.color === 'string' ? o.color : '#000000',
+              tolerance: typeof o.tolerance === 'number' ? o.tolerance : 0.1,
+              feather: typeof o.feather === 'number' ? o.feather : 0,
+            }
+          : null;
+      }
       this.viewer.applyMaterialProps(key, {
         opacity: typeof m.fields.opacity === 'number' ? (m.fields.opacity as number) : undefined,
         doubleSided:
           typeof m.fields.doubleSided === 'boolean' ? (m.fields.doubleSided as boolean) : undefined,
+        // LociMyu由来は unlitLike、LociView新規は unlit
+        unlit:
+          m.fields.unlit === true || m.fields.unlitLike === true
+            ? true
+            : m.fields.unlit === false || m.fields.unlitLike === false
+              ? false
+              : undefined,
+        chroma,
       });
     }
   }

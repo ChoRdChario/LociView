@@ -80,6 +80,19 @@ docs/02 §5 のanchor構造の運用:
 - 本格LOD（octree / Potree方式）は需要と実データ規模を見て判断。当面サブサンプルで運用する
 - ピッキング: raycastのPoints閾値をカメラ距離で調整。タップ半径はタッチ時に拡大
 
+## 6.5 マテリアル拡張（実装済み 2026-07-21）
+
+`src/viewer/shaderPatch.ts` — LociMyu `viewer.module.cdn.js` の `patchMaterialShader` を移植。
+
+- **Unlit**: ライティングを無視し、素の拡散色を出力する。図面的な確認・テクスチャ色の確認用
+- **クロマキー**: 指定色との距離を `smoothstep(tolerance, tolerance+feather, dist)` で評価し透過させる
+
+**移植時に修正した元実装のバグ**: LociMyuは `#include <dithering_fragment>` の直後で `diffuseColor.a` を
+変更していたが、その時点では `opaque_fragment` により `gl_FragColor` が確定済みのため透過が反映されない。
+LociViewでは (1) `color_fragment` 直後にライティング前の色を `lvBaseColor` へ退避し、
+(2) `tonemapping_fragment` の直前で `gl_FragColor.a` を直接操作する形に変更した。
+これにより「指定色が実際に透明になる」ことをピクセル実測で確認済み。
+
 ## 7. レンダリングパイプライン共通
 
 - LociMyuから移植: HemisphereLight+DirectionalLight、SRGBColorSpace、OrbitControls、ピンのSphere+パルスRing、クロマキーonBeforeCompileパッチ
