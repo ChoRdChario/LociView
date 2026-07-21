@@ -69,7 +69,9 @@ export async function registerPwa(callbacks: {
   if (import.meta.env.DEV) return; // devサーバーではSWを使わない
 
   try {
-    const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+    // GitHub Pages等のサブパス配信に対応（BASE_URLはビルド時に埋め込まれる）
+    const base = import.meta.env.BASE_URL;
+    const reg = await navigator.serviceWorker.register(`${base}sw.js`, { scope: base });
 
     if (reg.active !== null && reg.waiting === null) callbacks.onOfflineReady?.();
 
