@@ -199,11 +199,20 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
       projectName: answer.projectName,
       imageLinks: answer.imageLinks,
     });
+    const notes: string[] = [];
     if (result.unlinkedImages > 0) {
+      notes.push(`画像${result.unlinkedImages}件は対応付けされていません（キャプションを選んで添付できます）。`);
+    }
+    if (result.chromaDisabledCount > 0) {
+      notes.push(
+        `クロマキー設定${result.chromaDisabledCount}件は、LociMyuでは実際には描画に反映されていなかったため、` +
+          `当時の見え方を保つ目的で「無効」の状態で取り込みました。設定値は残っているので、Materialタブから有効にできます。`,
+      );
+    }
+    if (notes.length > 0) {
       await infoDialog(
         '取込完了',
-        `キャプション${result.captionCount}件・表示セット${result.setCount}件を取り込みました。` +
-          `画像${result.unlinkedImages}件は対応付けされていません（キャプションを選んで添付できます）。`,
+        `キャプション${result.captionCount}件・表示セット${result.setCount}件を取り込みました。\n\n${notes.join('\n\n')}`,
       );
     }
     await deps.openProject(result.dir);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyImportPlan, buildImportPlan } from '../../src/assets/importWizard';
+import { applyImportPlan, buildImportPlan, selectSource } from '../../src/assets/importWizard';
 import { writeZipEntries, readZipEntries } from '../../src/assets/zipio';
 import { legacyCaptionId } from '../../src/io/locimyu';
 import { isVisible, visibleEntities } from '../../src/core/reduce';
@@ -96,6 +96,122 @@ describe('buildImportPlan', () => {
     const plan = await buildImportPlan(await readZipEntries(zip));
     expect(plan.images).toHaveLength(1);
     expect(plan.tables).toHaveLength(0);
+  });
+});
+
+describe('複数スプレッドシート（実データで判明した問題の回帰テスト）', () => {
+  /** 本体とバックアップの2つのxlsxを含むZIP */
+  async function makeZipWithBackup(): Promise<Uint8Array> {
+    const main = await makeXlsx([
+      { name: 'シート1', rows: [CAP_HEADER, ['c_1', '本体の記録', '', '', '1', '1', '1', '', '', '']] },
+    ]);
+    const backup = await makeXlsx([
+      { name: 'シート1', rows: [CAP_HEADER, ['c_1', '古い記録', '', '', '9', '9', '9', '', '', '']] },
+    ]);
+    return writeZipEntries([
+      { path: 'LociMyu Save.xlsx', data: main },
+      { path: 'LociMyu Save backup.xlsx', data: backup },
+    ]);
+  }
+
+  it('複数ある場合は1つだけを採用する（両方取り込むとIDが衝突して所属セットが壊れる）', async () => {
+    const plan = await buildImportPlan(await readZipEntries(await makeZipWithBackup()));
+    expect(plan.sources).toHaveLength(2);
+    expect(plan.sources[plan.selectedSourceIndex]!.fileName).toBe('LociMyu Save.xlsx');
+    expect(plan.migration!.sets).toHaveLength(1);
+    expect(plan.migration!.sets[0]!.captions[0]!.title).toBe('本体の記録');
+    expect(plan.warnings.some((w) => w.includes('2個見つかりました'))).toBe(true);
+  });
+
+  it('採用するスプレッドシートを切り替えられる', async () => {
+    const plan = await buildImportPlan(await readZipEntries(await makeZipWithBackup()));
+    const backupIndex = plan.sources.findIndex((s) => s.looksLikeBackup);
+    selectSource(plan, backupIndex);
+    expect(plan.migration!.sets[0]!.captions[0]!.title).toBe('古い記録');
+  });
+});
+
+describe('gid突合（実データで判明した問題の回帰テスト）', () => {
+  it('指数表記のgidでもマテリアルが正しいセットへ割り当てられる', async () => {
+    // Google Sheetsのgidはxlsxで指数表記になる（6.17884617E8）。
+    // 数値正規化とlegacyGid解決の両方が効かないと、全マテリアルが先頭セットに寄る
+    const xlsx = await makeXlsx([
+      { name: 'シート1', rows: [CAP_HEADER, ['c_1', 'A', '', '', '0', '0', '0', '', '', '']] },
+      { name: '透過用', rows: [CAP_HEADER, ['c_2', 'B', '', '', '1', '1', '1', '', '', '']] },
+      {
+        name: '__LM_SHEET_NAMES',
+        rows: [['sheetGid', 'displayName', 'sheetTitle', 'updatedAt'], ['0', '写真', 'シート1', '']],
+      },
+      {
+        name: '__LM_MATERIALS',
+        rows: [
+          MAT_HEADER,
+          ['Outside', '1', 'false', 'true', 'false', '', '', '', '', '', '', '', '', '0'],
+          ['Outside', '0.2', 'false', 'true', 'false', '', '', '', '', '', '', '', '', '617884617'],
+        ],
+      },
+    ]);
+    const zip = await writeZipEntries([
+      { path: 'save.xlsx', data: xlsx },
+      { path: 'model.stl', data: enc.encode('solid s\nendsolid s\n') },
+    ]);
+    const plan = await buildImportPlan(await readZipEntries(zip));
+    expect(plan.migration!.sets[0]!.legacyGid).toBe('0');
+    expect(plan.migration!.sets[1]!.legacyGid).toBe('617884617');
+
+    const fs = new MemoryFS();
+    const result = await applyImportPlan(fs, USER, plan, { projectName: 'p' });
+    const store = await ProjectStore.open(fs, result.dir, USER);
+    const sets = visibleEntities(store.state, 'set');
+    const mats = visibleEntities(store.state, 'material');
+    expect(mats).toHaveLength(2);
+    const setA = sets.find((s) => s.fields.name === 'シート1')!;
+    const setB = sets.find((s) => s.fields.name === '透過用')!;
+    expect(mats.find((m) => m.fields.setId === setA.id)!.fields.opacity).toBe(1);
+    expect(mats.find((m) => m.fields.setId === setB.id)!.fields.opacity).toBe(0.2);
+  });
+
+  it('クロマキーは設定値を保持したまま無効で取り込む（LociMyuでは効いていなかったため）', async () => {
+    const xlsx = await makeXlsx([
+      { name: 'S', rows: [CAP_HEADER, ['c_1', 'A', '', '', '0', '0', '0', '', '', '']] },
+      {
+        name: '__LM_MATERIALS',
+        rows: [
+          MAT_HEADER,
+          ['Wall', '1', 'false', 'false', 'TRUE', '#ffffff', '1', '0', '', '', '', '', '', '0'],
+        ],
+      },
+    ]);
+    const zip = await writeZipEntries([
+      { path: 'save.xlsx', data: xlsx },
+      { path: 'model.stl', data: enc.encode('solid s\nendsolid s\n') },
+    ]);
+    const plan = await buildImportPlan(await readZipEntries(zip));
+    const fs = new MemoryFS();
+    const result = await applyImportPlan(fs, USER, plan, { projectName: 'p' });
+    expect(result.chromaDisabledCount).toBe(1);
+
+    const store = await ProjectStore.open(fs, result.dir, USER);
+    const chroma = visibleEntities(store.state, 'material')[0]!.fields.chroma as Record<string, unknown>;
+    expect(chroma.enable).toBe(false); // 当時の見え方を保つ
+    expect(chroma.color).toBe('#ffffff'); // 値は捨てない
+    expect(chroma.tolerance).toBe(1);
+  });
+
+  it('unlitLikeはunlitフィールドとして移行される', async () => {
+    const xlsx = await makeXlsx([
+      { name: 'S', rows: [CAP_HEADER, ['c_1', 'A', '', '', '0', '0', '0', '', '', '']] },
+      {
+        name: '__LM_MATERIALS',
+        rows: [MAT_HEADER, ['Wall', '1', 'false', 'TRUE', 'false', '', '', '', '', '', '', '', '', '0']],
+      },
+    ]);
+    const zip = await writeZipEntries([{ path: 'save.xlsx', data: xlsx }]);
+    const plan = await buildImportPlan(await readZipEntries(zip));
+    const fs = new MemoryFS();
+    const result = await applyImportPlan(fs, USER, plan, { projectName: 'p' });
+    const store = await ProjectStore.open(fs, result.dir, USER);
+    expect(visibleEntities(store.state, 'material')[0]!.fields.unlit).toBe(true);
   });
 });
 

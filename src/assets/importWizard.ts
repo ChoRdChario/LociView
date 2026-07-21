@@ -7,7 +7,12 @@
 // 表示セット・ビュー・マテリアル設定まで引き継ぐ。
 
 import { entityIdFor, ProjectStore, type Identity } from '../core/store';
-import { analyzeLociMyuSheets, type LociMyuMigration, type SheetTable } from '../io/locimyu';
+import {
+  analyzeLociMyuSheets,
+  isLociMyuCaptionSheet,
+  type LociMyuMigration,
+  type SheetTable,
+} from '../io/locimyu';
 import { parseCsv } from '../io/csv';
 import { looksLikeXlsx, readXlsx } from '../io/xlsx';
 import type { WorkspaceFS } from '../platform/fs';
@@ -23,16 +28,44 @@ export interface ForeignFile {
   data: Uint8Array;
 }
 
+/** 1つのスプレッドシート（xlsx/csv）ファイル由来のシート群 */
+export interface SpreadsheetSource {
+  /** ZIP内のファイル名 */
+  fileName: string;
+  tables: SheetTable[];
+  /** バックアップと推定されるか（ファイル名に backup/コピー 等を含む） */
+  looksLikeBackup: boolean;
+  captionCount: number;
+}
+
 export interface ImportPlan {
   models: ForeignFile[];
   images: ForeignFile[];
   videos: ForeignFile[];
+  /** 採用中のシート群（= selectedSource のもの） */
   tables: SheetTable[];
+  /** 見つかったスプレッドシート一覧（複数ある場合はユーザーが選ぶ） */
+  sources: SpreadsheetSource[];
+  selectedSourceIndex: number;
   /** LociMyu形式が検出された場合の移行内容 */
   migration: LociMyuMigration | null;
   /** fileId→filename 対応表（あれば未リンク画像を自動解決できる） */
   fileIdMap: Map<string, string>;
   warnings: string[];
+}
+
+const BACKUP_HINT = /(backup|バックアップ|コピー|copy|_old|旧)/i;
+
+/** 採用するスプレッドシートを切り替える（ウィザードのUIから呼ぶ） */
+export function selectSource(plan: ImportPlan, index: number): void {
+  const source = plan.sources[index];
+  if (source === undefined) return;
+  plan.selectedSourceIndex = index;
+  plan.tables = source.tables;
+  plan.warnings = plan.warnings.filter((w) => !w.startsWith('シート「'));
+  const migration = analyzeLociMyuSheets(plan.tables);
+  plan.migration = migration.sets.length > 0 ? migration : null;
+  if (plan.migration !== null) plan.warnings.push(...migration.warnings);
 }
 
 function baseName(path: string): string {
@@ -47,6 +80,8 @@ export async function buildImportPlan(entries: readonly ZipEntryData[]): Promise
     images: [],
     videos: [],
     tables: [],
+    sources: [],
+    selectedSourceIndex: 0,
     migration: null,
     fileIdMap: new Map(),
     warnings: [],
@@ -70,7 +105,13 @@ export async function buildImportPlan(entries: readonly ZipEntryData[]): Promise
     }
     if (looksLikeXlsx(name, e.data)) {
       try {
-        plan.tables.push(...(await readXlsx(e.data)));
+        const tables = await readXlsx(e.data);
+        plan.sources.push({
+          fileName: name,
+          tables,
+          looksLikeBackup: BACKUP_HINT.test(name),
+          captionCount: countCaptions(tables),
+        });
       } catch (err) {
         plan.warnings.push(`${name} を読めませんでした: ${err instanceof Error ? err.message : String(err)}`);
       }
@@ -87,19 +128,44 @@ export async function buildImportPlan(entries: readonly ZipEntryData[]): Promise
           if (id !== '' && fname !== '') plan.fileIdMap.set(id, fname);
         }
       } else {
-        plan.tables.push({ name: name.replace(/\.csv$/i, ''), rows });
+        plan.sources.push({
+          fileName: name,
+          tables: [{ name: name.replace(/\.csv$/i, ''), rows }],
+          looksLikeBackup: BACKUP_HINT.test(name),
+          captionCount: countCaptions([{ name, rows }]),
+        });
       }
     }
   }
 
-  if (plan.tables.length > 0) {
-    const migration = analyzeLociMyuSheets(plan.tables);
-    if (migration.sets.length > 0) {
-      plan.migration = migration;
-      plan.warnings.push(...migration.warnings);
+  if (plan.sources.length > 0) {
+    // 既定は「バックアップでない・キャプションが多い」もの。
+    // 複数のスプレッドシートを同時に取り込むと、同じ旧IDのキャプションが
+    // 二重に生成されて後勝ちで所属セットが壊れるため、必ず1つだけを採用する。
+    let best = 0;
+    plan.sources.forEach((s, i) => {
+      const cur = plan.sources[best]!;
+      const better =
+        (cur.looksLikeBackup && !s.looksLikeBackup) ||
+        (cur.looksLikeBackup === s.looksLikeBackup && s.captionCount > cur.captionCount);
+      if (better) best = i;
+    });
+    selectSource(plan, best);
+    if (plan.sources.length > 1) {
+      plan.warnings.push(
+        `スプレッドシートが${plan.sources.length}個見つかりました。「${plan.sources[best]!.fileName}」を使用します（取込前に切り替えられます）`,
+      );
     }
   }
   return plan;
+}
+
+function countCaptions(tables: readonly SheetTable[]): number {
+  let n = 0;
+  for (const t of tables) {
+    if (isLociMyuCaptionSheet(t.rows)) n += Math.max(0, t.rows.length - 1);
+  }
+  return n;
 }
 
 export interface ImportOptions {
@@ -115,6 +181,8 @@ export interface ImportResult {
   setCount: number;
   linkedImages: number;
   unlinkedImages: number;
+  /** 無効化して取り込んだクロマキー設定の数（理由は下記コメント参照） */
+  chromaDisabledCount: number;
 }
 
 /**
@@ -166,6 +234,7 @@ export async function applyImportPlan(
   let captionCount = 0;
   let linkedImages = 0;
   let unlinkedImages = 0;
+  let chromaDisabledCount = 0;
   const setIdByGid = new Map<string, string>();
 
   if (plan.migration !== null) {
@@ -175,7 +244,8 @@ export async function applyImportPlan(
 
     plan.migration.sets.forEach((lmSet, order) => {
       const setId = entityIdFor('set');
-      setIdByGid.set(lmSet.gid, setId);
+      // ビュー・マテリアルはGoogle Sheetsのgidで参照するため、解決済みのlegacyGidで引く
+      if (lmSet.legacyGid !== null) setIdByGid.set(lmSet.legacyGid, setId);
       store.dispatch({ t: 'create', e: 'set', id: setId, v: { name: lmSet.name, order: order + 1 } });
 
       for (const cap of lmSet.captions) {
@@ -236,7 +306,9 @@ export async function applyImportPlan(
     // ---- マテリアル設定 ----
     for (const m of plan.migration.materials) {
       const setId = setIdByGid.get(m.sheetGid) ?? [...setIdByGid.values()][0];
-      if (setId === undefined || firstModelId === null) continue;
+      // モデルが同梱されていなくても設定は捨てず、modelAssetId=null で保持する
+      // （後からモデルを追加したときに再割り当てできる）
+      if (setId === undefined) continue;
       store.dispatch({
         t: 'create',
         e: 'material',
@@ -244,16 +316,21 @@ export async function applyImportPlan(
         v: {
           setId,
           modelAssetId: firstModelId,
+          // LociMyuのキーはマテリアル表示名。LociViewの決定的キー（m/<nodePath>/<slot>）
+          // とは形式が違うため、ビューア側が表示名でも解決できるようにしている（docs/04 §4）
           materialKey: m.materialKey,
           opacity: m.opacity,
           doubleSided: m.doubleSided,
-          unlitLike: m.unlitLike,
-          ...(m.chroma !== null ? { chroma: m.chroma } : {}),
-          // LociMyuのキーは表示名ベース。LociViewの決定的キーとは異なるため、
-          // 適用は「名前一致」で試み、外れたら再割り当てUIで解決する（docs/04 §4）
+          unlit: m.unlitLike,
+          // クロマキーはLociMyuでは実際には描画に反映されていなかった（シェーダの
+          // 適用位置の誤りで透過が効かなかった。docs/04 §6.5）。LociViewでは正しく
+          // 効くため、そのまま有効化すると当時の見え方と変わってしまう。
+          // 設定値は保持したうえで無効の状態で取り込み、UIから有効化できるようにする。
+          ...(m.chroma !== null ? { chroma: { ...m.chroma, enable: false } } : {}),
           legacyKey: true,
         },
       });
+      if (m.chroma !== null) chromaDisabledCount++;
     }
   }
 
@@ -265,5 +342,6 @@ export async function applyImportPlan(
     setCount: plan.migration?.sets.length ?? 1,
     linkedImages,
     unlinkedImages,
+    chromaDisabledCount,
   };
 }

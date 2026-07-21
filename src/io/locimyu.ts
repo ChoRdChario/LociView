@@ -21,6 +21,12 @@ export const LOCIMYU_CAPTION_HEADER = [
 
 export const LM_VIEWS_SHEET = '__LM_VIEWS';
 export const LM_MATERIALS_SHEET = '__LM_MATERIALS';
+export const LM_SHEET_NAMES_SHEET = '__LM_SHEET_NAMES';
+export const LM_META_SHEET = '__LM_META';
+const INTERNAL_SHEETS = new Set([LM_VIEWS_SHEET, LM_MATERIALS_SHEET, LM_SHEET_NAMES_SHEET, LM_META_SHEET]);
+
+/** LociMyuが「そのシートで最後に見ていた視点」を記録する予約名 */
+export const LAST_VIEW_NAME = '__last';
 
 /** 表形式データ（xlsx/csvパーサからの入力を共通化） */
 export interface SheetTable {
@@ -66,7 +72,10 @@ export interface LociMyuMaterial {
 
 export interface LociMyuSet {
   name: string;
+  /** xlsx上のシート順（1始まり）。Google Sheetsのgidとは別物 */
   gid: string;
+  /** 突合に成功したGoogle SheetsのgidR（不明ならnull） */
+  legacyGid: string | null;
   captions: LociMyuCaption[];
 }
 
@@ -76,6 +85,10 @@ export interface LociMyuMigration {
   materials: LociMyuMaterial[];
   /** 未リンクの画像参照（旧Drive fileId → それを参照するcaptionId群） */
   unlinkedImages: Map<string, string[]>;
+  /** legacyGid → セット名。__LM_SHEET_NAMESと出現順から推定した対応 */
+  gidToSetName: Map<string, string>;
+  /** 対応が推定（=確証がない）かどうか。UIで確認を促すために使う */
+  gidMappingIsGuess: boolean;
   warnings: string[];
 }
 
@@ -86,6 +99,9 @@ function cell(row: string[] | undefined, i: number): string {
 }
 
 function num(v: string, fallback: number): number {
+  // Number('') は 0 を返し isFinite も通るため、空欄は明示的に既定値へ倒す。
+  // （実データのfov列が空欄で、fov=0 → 平行投影のfrustumが潰れる不具合があった）
+  if (v.trim() === '') return fallback;
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 }
@@ -141,6 +157,8 @@ export function analyzeLociMyuSheets(tables: readonly SheetTable[]): LociMyuMigr
     views: [],
     materials: [],
     unlinkedImages: new Map(),
+    gidToSetName: new Map(),
+    gidMappingIsGuess: false,
     warnings: [],
   };
 
@@ -156,6 +174,7 @@ export function analyzeLociMyuSheets(tables: readonly SheetTable[]): LociMyuMigr
       parseMaterials(table, result);
       continue;
     }
+    if (INTERNAL_SHEETS.has(name)) continue; // 対応表等は後段で使う（警告は出さない）
     if (!isLociMyuCaptionSheet(table.rows)) {
       if (table.rows.length > 1) {
         result.warnings.push(`シート「${name}」はLociMyu形式ではないためスキップしました`);
@@ -204,8 +223,15 @@ export function analyzeLociMyuSheets(tables: readonly SheetTable[]): LociMyuMigr
         updatedAt: cell(row, 9),
       });
     }
-    result.sets.push({ name: name !== '' ? name : `セット${result.sets.length + 1}`, gid, captions });
+    result.sets.push({
+      name: name !== '' ? name : `セット${result.sets.length + 1}`,
+      gid,
+      legacyGid: null,
+      captions,
+    });
   }
+
+  resolveLegacyGids(tables, result);
 
   if (result.sets.length === 0) {
     result.warnings.push('LociMyu形式のキャプションシートが見つかりませんでした');
@@ -213,15 +239,79 @@ export function analyzeLociMyuSheets(tables: readonly SheetTable[]): LociMyuMigr
   return result;
 }
 
+/**
+ * Google Sheetsのgid（__LM_VIEWS/__LM_MATERIALSが参照）と、xlsx上のシートを対応付ける。
+ *
+ * xlsxエクスポートではgidが失われるため直接の対応が取れない。次の順で解決する:
+ *   1. __LM_SHEET_NAMES（gid ↔ シート名の対応表。LociMyuが記録している）— 確実
+ *   2. 残りは「gidの初出順」と「キャプションシートの並び順」を突き合わせて推定 — 要確認
+ *
+ * 推定を含む場合は gidMappingIsGuess を立て、UIで対応の確認・修正を促す。
+ */
+function resolveLegacyGids(tables: readonly SheetTable[], result: LociMyuMigration): void {
+  // gidの初出順（__LM_VIEWS → __LM_MATERIALS の順に走査）
+  const gidOrder: string[] = [];
+  const pushGid = (g: string): void => {
+    if (g !== '' && !gidOrder.includes(g)) gidOrder.push(g);
+  };
+  for (const v of result.views) pushGid(v.sheetGid);
+  for (const m of result.materials) pushGid(m.sheetGid);
+  if (gidOrder.length === 0) return;
+
+  // 1) 対応表による確定
+  const nameByGid = new Map<string, string>();
+  for (const table of tables) {
+    if (table.name.trim() !== LM_SHEET_NAMES_SHEET) continue;
+    for (const row of table.rows.slice(1)) {
+      const gid = cell(row, 0);
+      // sheetTitle（実シート名）を優先、無ければdisplayName
+      const title = cell(row, 2) !== '' ? cell(row, 2) : cell(row, 1);
+      if (gid !== '' && title !== '') nameByGid.set(gid, title);
+    }
+  }
+
+  const setsByName = new Map<string, LociMyuSet>();
+  for (const s of result.sets) if (!setsByName.has(s.name)) setsByName.set(s.name, s);
+
+  const assignedGids = new Set<string>();
+  for (const [gid, title] of nameByGid) {
+    const set = setsByName.get(title);
+    if (set !== undefined && set.legacyGid === null) {
+      set.legacyGid = gid;
+      assignedGids.add(gid);
+      result.gidToSetName.set(gid, set.name);
+    }
+  }
+
+  // 2) 残りを出現順で推定（LociMyuはシート作成順にgidを記録するため概ね一致する）
+  const remainingGids = gidOrder.filter((g) => !assignedGids.has(g));
+  const remainingSets = result.sets.filter((s) => s.legacyGid === null);
+  const pairs = Math.min(remainingGids.length, remainingSets.length);
+  if (pairs > 0) result.gidMappingIsGuess = true;
+  for (let i = 0; i < pairs; i++) {
+    const gid = remainingGids[i]!;
+    const set = remainingSets[i]!;
+    set.legacyGid = gid;
+    result.gidToSetName.set(gid, set.name);
+  }
+}
+
 function parseViews(table: SheetTable, result: LociMyuMigration): void {
   for (let r = 1; r < table.rows.length; r++) {
     const row = table.rows[r];
     const id = cell(row, 0);
     if (id === '') continue;
-    const name = cell(row, 2);
-    if (name === '__last') continue; // 内部用の最終ビュー行は移行しない
+    const rawName = cell(row, 2);
+    // __last は「そのシートで最後に見ていた視点」。名前付きビューを保存していない
+    // 運用が実際に存在するため、これも「前回の視点」として移行する
+    const name =
+      rawName === LAST_VIEW_NAME
+        ? '前回の視点'
+        : rawName !== ''
+          ? rawName
+          : `ビュー${result.views.length + 1}`;
     result.views.push({
-      name: name !== '' ? name : `ビュー${result.views.length + 1}`,
+      name,
       sheetGid: cell(row, 1),
       bgColor: normHex(cell(row, 3)),
       cameraState: {

@@ -93,6 +93,11 @@ LociViewでは (1) `color_fragment` 直後にライティング前の色を `lvB
 (2) `tonemapping_fragment` の直前で `gl_FragColor.a` を直接操作する形に変更した。
 これにより「指定色が実際に透明になる」ことをピクセル実測で確認済み。
 
+**移行時の扱い**: LociMyu時代のクロマキー設定は「設定しても効かなかった」ため、当時の見え方は
+クロマキーOFFの状態である。修正版でそのまま有効化すると移行後に見た目が激変してしまうので、
+**設定値は保持したまま `enable: false` で取り込み**、取込完了ダイアログでその旨を伝える。
+ユーザーはMaterialタブから任意に有効化できる。
+
 ## 7. レンダリングパイプライン共通
 
 - LociMyuから移植: HemisphereLight+DirectionalLight、SRGBColorSpace、OrbitControls、ピンのSphere+パルスRing、クロマキーonBeforeCompileパッチ

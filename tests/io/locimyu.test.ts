@@ -72,7 +72,7 @@ describe('analyzeLociMyuSheets', () => {
     expect(m.sets[0]!.captions.map((c) => c.title)).toEqual(['A', 'C']);
   });
 
-  it('__LM_VIEWS を解析し、__last行を除外する', () => {
+  it('__LM_VIEWS を解析し、__last行は「前回の視点」として移行する', () => {
     const viewsHeader = ['id', 'captionSheetGid', 'name', 'bgColor', 'cameraType', 'eyeX', 'eyeY', 'eyeZ', 'targetX', 'targetY', 'targetZ', 'upX', 'upY', 'upZ', 'fov', 'createdAt', 'updatedAt'];
     const m = analyzeLociMyuSheets([
       captionSheet('S', '77', [['c_1', 'A', '', '', '0', '0', '0', '', '', '']]),
@@ -87,12 +87,72 @@ describe('analyzeLociMyuSheets', () => {
         ],
       },
     ]);
-    expect(m.views.map((v) => v.name)).toEqual(['全景', '正面']);
+    // 実データ（ki84）では名前付きビューが存在せず __last のみだった。
+    // __last は「そのシートで最後に見ていた視点」であり、移行する価値がある
+    expect(m.views.map((v) => v.name)).toEqual(['全景', '前回の視点', '正面']);
     expect(m.views[0]!.cameraState.eye).toEqual([1, 2, 3]);
     expect(m.views[0]!.cameraState.fov).toBe(50);
     expect(m.views[0]!.bgColor).toBe('#202124');
-    expect(m.views[1]!.cameraState.ortho).toBe(true);
+    expect(m.views[2]!.cameraState.ortho).toBe(true);
     expect(m.views[0]!.sheetGid).toBe('77');
+  });
+
+  it('__LM_SHEET_NAMES があればgid対応を確定できる', () => {
+    const viewsHeader = ['id', 'captionSheetGid', 'name', 'bgColor', 'cameraType', 'eyeX', 'eyeY', 'eyeZ', 'targetX', 'targetY', 'targetZ', 'upX', 'upY', 'upZ', 'fov', 'createdAt', 'updatedAt'];
+    const m = analyzeLociMyuSheets([
+      captionSheet('シート1', '1', [['c_1', 'A', '', '', '0', '0', '0', '', '', '']]),
+      captionSheet('透過用', '2', [['c_2', 'B', '', '', '1', '1', '1', '', '', '']]),
+      {
+        name: '__LM_SHEET_NAMES',
+        gid: '3',
+        rows: [
+          ['sheetGid', 'displayName', 'sheetTitle', 'updatedAt'],
+          ['0', '写真確認', 'シート1', ''],
+        ],
+      },
+      {
+        name: '__LM_VIEWS',
+        gid: '4',
+        rows: [
+          viewsHeader,
+          ['v_1', '0', '__last', '', 'perspective', '1', '1', '1', '0', '0', '0', '0', '1', '0', '45', '', ''],
+          ['v_2', '999888', '__last', '', 'perspective', '2', '2', '2', '0', '0', '0', '0', '1', '0', '45', '', ''],
+        ],
+      },
+    ]);
+    // gid=0 は対応表から確定、999888 は残ったセットへ推定割り当て
+    expect(m.sets[0]!.legacyGid).toBe('0');
+    expect(m.sets[1]!.legacyGid).toBe('999888');
+    expect(m.gidMappingIsGuess).toBe(true);
+    expect(m.gidToSetName.get('0')).toBe('シート1');
+    expect(m.gidToSetName.get('999888')).toBe('透過用');
+  });
+
+  it('空欄の数値列は既定値になる（Number("")=0 で潰れないこと）', () => {
+    // 実データではfov列が空欄で、これが0になると平行投影のfrustumが潰れて何も映らなくなった
+    const viewsHeader = ['id', 'captionSheetGid', 'name', 'bgColor', 'cameraType', 'eyeX', 'eyeY', 'eyeZ', 'targetX', 'targetY', 'targetZ', 'upX', 'upY', 'upZ', 'fov', 'createdAt', 'updatedAt'];
+    const m = analyzeLociMyuSheets([
+      captionSheet('S', '1', [['c_1', 'A', '', '', '0', '0', '0', '', '', '']]),
+      {
+        name: '__LM_VIEWS',
+        gid: '2',
+        rows: [
+          viewsHeader,
+          ['v_1', '0', '__last', '', 'orthographic', '1', '2', '3', '0', '0', '0', '', '', '', '', '', ''],
+        ],
+      },
+    ]);
+    expect(m.views[0]!.cameraState.fov).toBe(45); // 空欄 → 既定値
+    expect(m.views[0]!.cameraState.up).toEqual([0, 1, 0]); // 空欄 → Y-up
+  });
+
+  it('__LM_SHEET_NAMES / __LM_META は警告対象にしない', () => {
+    const m = analyzeLociMyuSheets([
+      captionSheet('S', '1', [['c_1', 'A', '', '', '0', '0', '0', '', '', '']]),
+      { name: '__LM_SHEET_NAMES', gid: '2', rows: [['sheetGid', 'displayName']] },
+      { name: '__LM_META', gid: '3', rows: [['key', 'value'], ['glbFileId', 'xyz']] },
+    ]);
+    expect(m.warnings).toHaveLength(0);
   });
 
   it('__LM_MATERIALS はappend-onlyの最終行が有効', () => {

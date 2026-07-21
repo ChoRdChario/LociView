@@ -119,7 +119,11 @@ function parseSheet(xml: string, shared: readonly string[]): string[][] {
           } else if (type === 'b') {
             value = raw === '1' ? 'TRUE' : 'FALSE';
           } else {
-            value = raw; // 数値・日付シリアル値は文字列のまま渡す
+            // 数値セル。xlsxは大きな整数を指数表記で保存する（Google Sheetsのgidが
+            // "6.17884617E8" になる）ため、通常表記へ正規化しないと突合できない。
+            // Number→String は往復可能な最短表現を返すので小数の精度は失われない。
+            const n = Number(raw);
+            value = raw !== '' && Number.isFinite(n) ? String(n) : raw;
           }
         }
       }

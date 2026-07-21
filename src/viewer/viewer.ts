@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
-import type { LoadedModel } from './loaders';
+import type { LoadedModel, MaterialEntry } from './loaders';
 import { getChroma, getUnlit, patchMaterial, setChroma, setUnlit, type ChromaSettings } from './shaderPatch';
 
 export interface PickHit {
@@ -436,6 +436,23 @@ export class ViewerCore {
     return box.getSize(new THREE.Vector3()).length();
   }
 
+  /**
+   * マテリアルキーを解決する。
+   * LociMyuからの移行データはキーが「マテリアル表示名」なので、
+   * 決定的キー（m/<nodePath>/<slot>）で見つからない場合は表示名でも探す（docs/04 §4）。
+   */
+  private resolveMaterialEntries(key: string): MaterialEntry[] {
+    const model = this.currentModel;
+    if (model === null) return [];
+    const exact = model.materials.filter((m) => m.key === key);
+    if (exact.length > 0) return exact;
+    // 表示名一致（同名が複数あれば全てに適用する。LociMyuも名前単位の設定だった）
+    const byName = model.materials.filter((m) => m.name === key || stripSuffix(m.name) === key);
+    if (byName.length > 0) return byName;
+    // three.js側のマテリアル名でも照合（表示名は重複時に連番が付くため）
+    return model.materials.filter((m) => m.materials.some((mat) => mat.name === key));
+  }
+
   applyMaterialProps(
     key: string,
     props: {
@@ -445,9 +462,9 @@ export class ViewerCore {
       chroma?: ChromaSettings | null;
     },
   ): void {
-    const entry = this.currentModel?.materials.find((m) => m.key === key);
-    if (entry === undefined) return;
-    for (const m of entry.materials) {
+    const entries = this.resolveMaterialEntries(key);
+    if (entries.length === 0) return;
+    for (const m of entries.flatMap((e) => e.materials)) {
       if (props.opacity !== undefined) {
         m.opacity = props.opacity;
         // クロマキー有効時は透過が必要なので transparent を落とさない
@@ -465,6 +482,11 @@ export class ViewerCore {
     this.renderOnce();
   }
 
+  /** キーが実際のマテリアルに解決できるか（移行データの検証用） */
+  canResolveMaterialKey(key: string): boolean {
+    return this.resolveMaterialEntries(key).length > 0;
+  }
+
   /** マテリアルの現在値（UIの初期表示用） */
   getMaterialProps(key: string): {
     opacity: number;
@@ -472,8 +494,7 @@ export class ViewerCore {
     unlit: boolean;
     chroma: ChromaSettings | null;
   } | null {
-    const entry = this.currentModel?.materials.find((m) => m.key === key);
-    const m = entry?.materials[0];
+    const m = this.resolveMaterialEntries(key)[0]?.materials[0];
     if (m === undefined) return null;
     return {
       opacity: m.opacity,
@@ -497,7 +518,8 @@ export class ViewerCore {
   }
 
   setCameraState(s: CameraState): void {
-    this.baseFov = s.fov;
+    // 壊れた保存値（0や欠損）でカメラを潰さない
+    this.baseFov = Number.isFinite(s.fov) && s.fov > 1 && s.fov < 179 ? s.fov : 45;
     this.setOrthographic(s.ortho);
     this.camera.position.set(...s.eye);
     this.camera.up.set(...s.up);
@@ -523,10 +545,13 @@ export class ViewerCore {
     if (on) {
       const { width, height } = this.canvasSize();
       const aspect = width / Math.max(height, 1);
-      // 透視投影と同じ見かけの大きさになるフラスタムを求める
-      const halfH = Math.tan(THREE.MathUtils.degToRad(this.baseFov / 2)) * dist;
+      // 透視投影と同じ見かけの大きさになるフラスタムを求める。
+      // distが0（カメラが注視点と同位置）でも潰れないよう下限を設ける
+      const span = Math.max(dist, this.modelDiag() ?? 1, 1e-3);
+      const halfH = Math.tan(THREE.MathUtils.degToRad(this.baseFov / 2)) * span;
       const halfW = halfH * aspect;
-      const ortho = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, -dist * 100, dist * 100);
+      const depth = Math.max(dist, this.modelDiag() ?? 1, 1) * 100;
+      const ortho = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, -depth, depth);
       ortho.position.copy(prev.position);
       ortho.up.copy(prev.up);
       ortho.lookAt(target);
@@ -716,6 +741,11 @@ export class ViewerCore {
     const pick: PickHit = { position: [local.x, local.y, local.z], normal };
     for (const fn of this.pickHandlers) fn(pick);
   }
+}
+
+/** 重複名に付く連番サフィックス " (2)" を除去する */
+function stripSuffix(name: string): string {
+  return name.replace(/\s\(\d+\)$/, '');
 }
 
 /** three.jsリソースの再帰破棄 */
