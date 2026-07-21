@@ -2,7 +2,10 @@
 
 LociMyu（Google Drive/Sheets依存の3Dキャプションビューア）の後継。**ネット環境なしで3DCGを用いた記録を作り、複数人の記録を労少なく統合する**ためのローカルファーストHTMLアプリ。
 
-> 状態: 設計フェーズ。実装未着手。初版2026-07-16 → ヒアリング反映・改善7項目採用済み（2026-07-18）。残る未決事項は docs/07 の U-01/02/04 のみ。
+> 状態: **MVP実装完了・公開中**（2026-07-21）。iOS実機検証（P0-2）が残る最終項目。
+>
+> **▶ 公開URL: https://chordchario.github.io/LociView/**
+> （初回アクセス後はオフラインで起動できます。ホーム画面に追加すると、アプリとして使えます）
 
 ## 一言でいうと
 
@@ -24,6 +27,7 @@ LociMyu（Google Drive/Sheets依存の3Dキャプションビューア）の後�
 | [05-ui-ux.md](docs/05-ui-ux.md) | LociMyu UI継承方針、画面設計、モバイル対応（ボトムシート/タッチピン）、マージレポートUI |
 | [06-device-offline.md](docs/06-device-offline.md) | ワークスペースモデル、プラットフォーム対応マトリクス、スマホでのセーブデータ取り回し、PWA構成 |
 | [07-roadmap.md](docs/07-roadmap.md) | Phase 0(PoC)〜3、未決事項リスト（U-01〜07）、LociMyu資産マップ |
+| [08-ios-test-guide.md](docs/08-ios-test-guide.md) | **iOS実機検証の手順書**（P0-2。所要15〜20分） |
 
 ## 設計の前提となった調査
 
