@@ -56,6 +56,12 @@ iOS実例フロー（最も制約が厳しい環境）:
 
 ## 5. PWA構成
 
+> **実装済み（2026-07-21）**: vite-plugin-pwa（generateSW）。precache 11エントリ/841KB。
+> 検証: preview サーバーを**停止した状態**でリロード→ホーム表示→プロジェクト作成→STL読込→
+> 3D描画までを確認（three.jsを含むviewer chunkがキャッシュから動作）。
+> 更新は `registerType: 'prompt'` + トースト通知（作業中に勝手に切り替わらない）。
+> アイコンは依存を増やさず `scripts/gen-icons.mjs` で自前生成（PNG手書きエンコーダ）。
+
 - Service Worker: アプリシェル全precache（three.js・全ローダ・WASM含む）。更新はstale-while-revalidate + 「新バージョンあり」トースト
 - スコープ: アプリコードのみをキャッシュ対象にする。プロジェクトデータはSWのキャッシュに入れない（OPFSが担当。責務分離）
 - manifest: standalone表示、ダークテーマカラー、`file_handlers`、`share_target`（Android: 共有シートからLociViewへZIPを受ける — Phase 2）

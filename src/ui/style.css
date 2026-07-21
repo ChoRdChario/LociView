@@ -155,6 +155,20 @@ textarea { min-height: 72px; resize: vertical; }
 }
 .lv-thumb.sm { width: 36px; height: 36px; }
 
+/* ---------- インストール案内・トースト ---------- */
+.lv-install:not(:empty) {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+  margin-bottom: 14px; font-size: 12px; background: rgba(96, 165, 250, 0.06);
+}
+.lv-toast {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+  z-index: 300; display: flex; align-items: center; gap: 10px;
+  background: #14181f; border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 14px; font-size: 13px; box-shadow: 0 8px 26px rgba(0, 0, 0, 0.5);
+  max-width: calc(100vw - 32px);
+}
+
 /* ---------- ライトボックス ---------- */
 .lv-lightbox {
   position: fixed; inset: 0; z-index: 200;

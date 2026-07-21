@@ -11,6 +11,7 @@ import { detectFormat } from '../viewer/loaders';
 import { el, clear } from './dom';
 import { confirmDialog, infoDialog, promptDialog } from './dialogs';
 import { importWizardDialog } from './importDialog';
+import { isStandalone, onInstallAvailability, promptInstall } from '../platform/pwa';
 
 export interface HomeDeps {
   fs: WorkspaceFS;
@@ -81,6 +82,22 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
     el('div', { class: 'lv-dim' }, '.lociview / モデル単体（glb・obj・stl・ply）— クリックして選択もできます'),
   );
 
+  // ホーム画面インストールの案内（インストール済み・非対応環境では出さない）
+  const installBar = el('div', { class: 'lv-install' });
+  if (!isStandalone()) {
+    onInstallAvailability((available) => {
+      clear(installBar);
+      if (!available) return;
+      installBar.append(
+        el('span', {}, '📲 ホーム画面に追加すると、ネットのない場所でも起動でき、データが消えにくくなります'),
+        el('button', {
+          class: 'primary mini',
+          onclick: () => void promptInstall(),
+        }, '追加'),
+      );
+    });
+  }
+
   root.append(
     el('div', { class: 'lv-home' },
       el('header', { class: 'lv-home-head' },
@@ -88,6 +105,7 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
         el('span', { class: 'lv-flex1' }),
         el('button', { onclick: deps.openProfile }, 'プロファイル'),
       ),
+      installBar,
       deps.storageWarning !== null
         ? el('div', { class: 'lv-warn lv-pad' }, `⚠ ${deps.storageWarning}`)
         : null,

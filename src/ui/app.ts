@@ -4,6 +4,12 @@ import { ProjectStore, type Identity } from '../core/store';
 import { newId } from '../core/ids';
 import { MemoryFS, type WorkspaceFS } from '../platform/fs';
 import { OpfsFS } from '../platform/opfs';
+import {
+  initFileHandlers,
+  initInstallPrompt,
+  onExternalFileOpen,
+  registerPwa,
+} from '../platform/pwa';
 import { detectFormat, loadModel } from '../viewer/loaders';
 import { ViewerCore } from '../viewer/viewer';
 import { AppContext } from './context';
@@ -14,6 +20,13 @@ import { mountHome } from './home';
 import { mountViewerScreen } from './viewerScreen';
 
 export async function bootApp(root: HTMLElement): Promise<void> {
+  // ---- PWA（オフライン起動・インストール・ファイル関連付け）------------------------
+  initFileHandlers();
+  initInstallPrompt();
+  void registerPwa({
+    onUpdate: (applyUpdate) => showToast('新しいバージョンがあります', '更新', applyUpdate),
+  });
+
   // ---- ワークスペース ----------------------------------------------------------
   let fs: WorkspaceFS;
   let storageWarning: string | null = null;
@@ -174,5 +187,36 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     }
   });
 
+  // ---- OSから開かれたファイル（関連付け・共有シート） -------------------------------
+  onExternalFileOpen(async (file) => {
+    // ビューアを開いている場合はホームへ戻してから投入する（ホームが受け口の一貫ルール）
+    showHome();
+    await new Promise((r) => setTimeout(r, 0));
+    const dropTarget = root.querySelector('.lv-drop');
+    if (dropTarget === null) return;
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    dropTarget.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+  });
+
   showHome();
+}
+
+/** 画面下部の一時通知（更新案内など） */
+function showToast(message: string, actionLabel?: string, action?: () => void): void {
+  const toast = el('div', { class: 'lv-toast', role: 'status' }, message);
+  if (actionLabel !== undefined && action !== undefined) {
+    toast.append(
+      el('button', {
+        class: 'primary mini',
+        onclick: () => {
+          toast.remove();
+          action();
+        },
+      }, actionLabel),
+    );
+  }
+  toast.append(el('button', { class: 'mini', onclick: () => toast.remove() }, '×'));
+  document.body.append(toast);
+  setTimeout(() => toast.remove(), 30_000);
 }
