@@ -204,7 +204,11 @@ export async function applyImportPlan(
     const astId = entityIdFor('asset');
     const ext = (f.name.split('.').pop() ?? 'bin').toLowerCase();
     const path = `${kind === 'model' ? 'models' : 'media'}/${astId}.${ext}`;
+    const size = f.data.length;
     await fs.writeBytes(`${dir}/${path}`, f.data);
+    // OPFSへ書いたら元データは手放す。iOSでは全アセットを同時に保持すると
+    // メモリ上限を超えるため、書き込み済みのものから解放していく
+    (f as { data: Uint8Array }).data = new Uint8Array(0);
     store.dispatch({
       t: 'create',
       e: 'asset',
@@ -214,7 +218,7 @@ export async function applyImportPlan(
         path,
         originalName: f.name,
         mime: '',
-        size: f.data.length,
+        size,
         ...(kind === 'model' ? { transform: { scale: 1, upAxis: 'Y' }, pinScale: 1 } : {}),
       },
     });

@@ -4,6 +4,10 @@
 import { el, clear, fmtBytes } from '../dom';
 import { fNum, fStr } from '../fields';
 import type { AppContext } from '../context';
+import { confirmDialog } from '../dialogs';
+
+/** これを超えるモデルは表示前に確認する（iOSのメモリ不足でタブが落ちるのを防ぐ） */
+const LARGE_MODEL_BYTES = 25 * 1024 * 1024;
 
 export interface ModelTabDeps {
   /** アセットをビューアへ読み込む（app層が実装。activeModelAssetId更新も担当） */
@@ -11,6 +15,18 @@ export interface ModelTabDeps {
 }
 
 export function mountModelTab(container: HTMLElement, ctx: AppContext, deps: ModelTabDeps): () => void {
+  async function loadWithGuard(assetId: string, size: number): Promise<void> {
+    if (size > LARGE_MODEL_BYTES) {
+      const ok = await confirmDialog(
+        'モデルを表示しますか？',
+        `このモデルは ${fmtBytes(size)} と大きめです。端末のメモリが不足すると、` +
+          '表示中に画面が再読み込みされることがあります。表示しますか？',
+      );
+      if (!ok) return;
+    }
+    await deps.loadModelAsset(assetId);
+  }
+
   const listEl = el('div', { class: 'lv-grp' });
   const detailEl = el('div', { class: 'lv-grp' });
   container.append(
@@ -46,7 +62,7 @@ export function mountModelTab(container: HTMLElement, ctx: AppContext, deps: Mod
           el('span', { class: 'lv-dim' }, fmtBytes(fNum(m, 'size', 0))),
           active
             ? el('span', { class: 'lv-badge' }, '表示中')
-            : el('button', { class: 'mini', onclick: () => void deps.loadModelAsset(m.id) }, '表示'),
+            : el('button', { class: 'mini', onclick: () => void loadWithGuard(m.id, fNum(m, 'size', 0)) }, '表示'),
         ),
       );
     }

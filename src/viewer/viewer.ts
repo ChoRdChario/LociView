@@ -59,6 +59,7 @@ export class ViewerCore {
   private pinSelectHandlers = new Set<(id: string) => void>();
   private tapMissHandlers = new Set<() => void>();
   private tickHandlers = new Set<() => void>();
+  private contextLostHandlers = new Set<() => void>();
   private pinScale = 1;
 
   // ピン移動ギズモ（3軸ドラッグ。ピン選択中に表示）
@@ -147,7 +148,7 @@ export class ViewerCore {
     canvas.addEventListener('pointercancel', this.onPointerUp);
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     canvas.style.touchAction = 'none';
-    canvas.addEventListener('webglcontextlost', this.onContextLost, false);
+    canvas.addEventListener('webglcontextlost', this.handleContextLost, false);
     canvas.addEventListener('webglcontextrestored', this.onContextRestored, false);
     globalThis.addEventListener('resize', this.onResize);
 
@@ -602,7 +603,7 @@ export class ViewerCore {
     this.canvas.removeEventListener('pointermove', this.onPointerMove);
     this.canvas.removeEventListener('pointerup', this.onPointerUp);
     this.canvas.removeEventListener('pointercancel', this.onPointerUp);
-    this.canvas.removeEventListener('webglcontextlost', this.onContextLost);
+    this.canvas.removeEventListener("webglcontextlost", this.handleContextLost);
     this.canvas.removeEventListener('webglcontextrestored', this.onContextRestored);
     globalThis.removeEventListener('resize', this.onResize);
     this.clearModel();
@@ -645,9 +646,16 @@ export class ViewerCore {
     // サイズ反映はループ内で行う
   };
 
-  private readonly onContextLost = (ev: Event): void => {
+  private readonly handleContextLost = (ev: Event): void => {
     ev.preventDefault(); // restoredを待つ（スマホで頻発。docs/04 §7）
+    for (const fn of this.contextLostHandlers) fn();
   };
+
+  /** WebGLコンテキスト喪失（多くは端末のメモリ不足）の通知 */
+  onContextLost(fn: () => void): () => void {
+    this.contextLostHandlers.add(fn);
+    return () => this.contextLostHandlers.delete(fn);
+  }
 
   private readonly onContextRestored = (): void => {
     // three r150+ は自動で再アップロードする

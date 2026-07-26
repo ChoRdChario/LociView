@@ -13,11 +13,14 @@ import {
 import { detectFormat, loadModel } from '../viewer/loaders';
 import { ViewerCore } from '../viewer/viewer';
 import { AppContext } from './context';
-import { el, clear } from './dom';
+import { el, clear, fmtBytes } from './dom';
 import { infoDialog, promptDialog } from './dialogs';
-import { fStr } from './fields';
+import { fNum, fStr } from './fields';
 import { mountHome } from './home';
 import { mountViewerScreen } from './viewerScreen';
+
+/** これを超えるモデルは開いた時点で自動読み込みせず、手動表示に委ねる（iOSメモリ対策） */
+const AUTO_LOAD_LIMIT = 25 * 1024 * 1024;
 
 export async function bootApp(root: HTMLElement): Promise<void> {
   // ---- PWA（オフライン起動・インストール・ファイル関連付け）------------------------
@@ -156,6 +159,18 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     clear(root);
     const viewer = new ViewerCore();
     ctx = new AppContext(fs, dir, store, viewer, identity);
+    // メモリ不足でGLが落ちたら、白画面のままにせず状況を伝える
+    let contextLostShown = false;
+    viewer.onContextLost(() => {
+      if (contextLostShown) return;
+      contextLostShown = true;
+      void infoDialog(
+        '表示を停止しました',
+        '端末のメモリが不足したため、3D表示を停止しました。' +
+          'より軽いモデルでお試しいただくか、他のアプリを閉じてから開き直してください。' +
+          '（キャプションや記録は失われていません）',
+      );
+    });
     unmountViewer = mountViewerScreen(root, ctx, {
       goHome: showHome,
       loadModelAsset,
@@ -163,9 +178,22 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       unsavedCount,
       openProfile: () => void openProfile(),
     });
-    // 最初のモデルを自動表示
+    // 最初のモデルを自動表示。ただし大きいモデルは自動で読まない。
+    // （iOSはタブのメモリ上限が厳しく、開くたびに巨大モデルを読むとクラッシュが繰り返す。
+    //  自動表示を外すことで、開く操作自体は必ず成功し、ユーザーが表示可否を選べる）
     if (ctx.ui.activeModelAssetId !== null) {
-      await loadModelAsset(ctx.ui.activeModelAssetId);
+      const asset = ctx.asset(ctx.ui.activeModelAssetId);
+      const size = asset !== null ? fNum(asset, 'size', 0) : 0;
+      if (size > AUTO_LOAD_LIMIT) {
+        await infoDialog(
+          'モデルの表示',
+          `モデル（${fmtBytes(size)}）が大きいため、自動では表示していません。\n\n` +
+            'Modelタブの「表示」から読み込めます。端末のメモリに余裕がないと表示できないことがあります' +
+            '（その場合は画面が再読み込みされます）。まずは軽い操作で問題がないか確かめてください。',
+        );
+      } else {
+        await loadModelAsset(ctx.ui.activeModelAssetId);
+      }
     }
     // 開発検証用フック（devビルドのみ）
     if (import.meta.env.DEV) {

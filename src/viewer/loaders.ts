@@ -100,10 +100,15 @@ function loadGltf(bytes: Uint8Array, warnings: string[]): Promise<THREE.Object3D
     return 'data:application/octet-stream;base64,';
   });
   const loader = new GLTFLoader(manager);
-  const buf = new Uint8Array(bytes).buffer;
+  // バッファをコピーせずそのまま渡す（38MBのGLBで38MBの無駄なコピーが発生していた。
+  // iOSのメモリ上限に直結するため重要）。GLTFLoaderはバッファを破棄しない。
+  const buf =
+    bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength
+      ? bytes.buffer
+      : bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
   return new Promise((resolve, reject) => {
     loader.parse(
-      buf,
+      buf as ArrayBuffer,
       '',
       (gltf) => resolve(gltf.scene),
       (err) => reject(err instanceof Error ? err : new Error('GLTF parse error')),
