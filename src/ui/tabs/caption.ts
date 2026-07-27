@@ -6,6 +6,7 @@ import { entityIdFor } from '../../core/store';
 import type { AppContext } from '../context';
 import { confirmDialog } from '../dialogs';
 import { openLightbox } from '../lightbox';
+import { openImagePicker } from '../imagePicker';
 
 export const PIN_COLORS = ['#eab308', '#f87171', '#4ade80', '#60a5fa', '#c084fc', '#f9fafb', '#fb923c', '#2dd4bf'];
 
@@ -136,11 +137,27 @@ export function mountCaptionTab(container: HTMLElement, ctx: AppContext): () => 
     const thumbs = el('div', { class: 'lv-thumbs' });
     attachmentIds.forEach((astId, i) => {
       const img = el('img', { class: 'lv-thumb', alt: '添付' }) as HTMLImageElement;
+      img.addEventListener('error', () => {
+        img.replaceWith(el('div', { class: 'lv-thumb lv-thumb-noimg', title: '表示できない形式（HEIC等）' }, '🖼'));
+      });
       void ctx.mediaUrl(astId).then((url) => {
         if (url !== null) img.src = url;
       });
       img.addEventListener('click', () => openLightbox(ctx, attachmentIds, i));
-      thumbs.append(img);
+      // 添付を外す（× ボタン）
+      const del = el('button', {
+        class: 'lv-thumb-del',
+        title: '添付を外す',
+        onclick: (ev) => {
+          ev.stopPropagation();
+          const current = ctx.selectedCaption();
+          if (current === null) return;
+          ctx.undo.update('caption', current.id, {
+            attachments: fStrArr(current, 'attachments').filter((x) => x !== astId),
+          });
+        },
+      }, '×');
+      thumbs.append(el('div', { class: 'lv-thumb-wrap' }, img, del));
     });
 
     const fileInput = el('input', { type: 'file', accept: 'image/*,video/*', multiple: true, style: 'display:none' }) as HTMLInputElement;
@@ -210,6 +227,17 @@ export function mountCaptionTab(container: HTMLElement, ctx: AppContext): () => 
       );
     }
 
+    // プロジェクトに取り込み済みの画像から選んで添付（ZIP画像・LociMyu画像の結び付け）
+    const pickFromProject = async (): Promise<void> => {
+      const current = ctx.selectedCaption();
+      if (current === null) return;
+      const existing = fStrArr(current, 'attachments');
+      const picked = await openImagePicker(ctx, existing);
+      if (picked === null || picked.length === 0) return;
+      const merged = [...existing, ...picked.filter((id) => !existing.includes(id))];
+      ctx.undo.update('caption', current.id, { attachments: merged });
+    };
+
     editor.append(
       el('div', { class: 'lv-hint' }, `作成: ${ctx.displayName(sel.createdBy)} / 選択中`),
       title,
@@ -218,7 +246,8 @@ export function mountCaptionTab(container: HTMLElement, ctx: AppContext): () => 
       posEditor,
       el('div', { class: 'lv-row' },
         thumbs,
-        el('button', { onclick: () => fileInput.click() }, '＋ 添付'),
+        el('button', { onclick: () => void pickFromProject() }, '🖼 プロジェクト画像'),
+        el('button', { onclick: () => fileInput.click() }, '＋ 端末から'),
         el('button', { onclick: () => cameraInput.click() }, '📷 撮影'),
         fileInput, cameraInput,
       ),

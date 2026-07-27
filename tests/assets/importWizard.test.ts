@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyImportPlan, buildImportPlan, selectSource } from '../../src/assets/importWizard';
+import { applyImportPlan, buildImportPlan, selectSource, sniffImageExt } from '../../src/assets/importWizard';
 import { writeZipEntries, readZipEntries } from '../../src/assets/zipio';
 import { legacyCaptionId } from '../../src/io/locimyu';
 import { isVisible, visibleEntities } from '../../src/core/reduce';
@@ -85,6 +85,30 @@ describe('buildImportPlan', () => {
     const plan = await buildImportPlan(await readZipEntries(zip));
     expect(plan.fileIdMap.get('DRIVEID_A')).toBe('kiretsu_01.jpg');
     expect(plan.tables.some((t) => t.name === 'fileid-map')).toBe(false);
+  });
+
+  it('拡張子のない画像をマジックバイトで取り込む（Drive由来のHEIC等）', async () => {
+    // 先頭がJPEGマジックの拡張子なしファイル
+    const jpeg = new Uint8Array(16);
+    jpeg.set([0xff, 0xd8, 0xff, 0xe0], 0);
+    // HEIC (ftyp heic)
+    const heic = new Uint8Array(16);
+    heic.set([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63], 0);
+    const zip = await writeZipEntries([
+      { path: '202506-16-17', data: jpeg },
+      { path: 'IMG_9592', data: heic },
+      { path: 'notes.txt', data: enc.encode('hello') },
+    ]);
+    const plan = await buildImportPlan(await readZipEntries(zip));
+    expect(plan.images.map((i) => i.name).sort()).toEqual(['202506-16-17', 'IMG_9592']);
+  });
+
+  it('sniffImageExt: マジックバイトから拡張子を判定', () => {
+    expect(sniffImageExt(new Uint8Array([0xff, 0xd8, 0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0]))).toBe('jpg');
+    expect(sniffImageExt(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0, 0, 0, 0, 0]))).toBe('png');
+    const heic = new Uint8Array([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63]);
+    expect(sniffImageExt(heic)).toBe('heic');
+    expect(sniffImageExt(new TextEncoder().encode('plain text!!'))).toBeNull();
   });
 
   it('Excelロックファイル・隠しファイルを無視する', async () => {

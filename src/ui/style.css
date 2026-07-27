@@ -107,9 +107,10 @@ textarea { min-height: 72px; resize: vertical; }
 .lv-tab-inner { padding: 10px; display: flex; flex-direction: column; min-height: 100%; }
 
 /* ---------- Captionタブ ---------- */
-.lv-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.lv-chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .lv-chip {
-  width: 20px; height: 20px; border-radius: 50%; padding: 0;
+  flex: 0 0 auto; width: 24px; height: 24px; min-width: 24px; min-height: 24px;
+  border-radius: 50%; padding: 0; box-sizing: border-box;
   border: 1px solid rgba(0, 0, 0, 0.4); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
 }
 .lv-chip.on { outline: 2px solid #fff; outline-offset: 1px; }
@@ -127,11 +128,43 @@ textarea { min-height: 72px; resize: vertical; }
 .lv-cap-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lv-editor { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
 .lv-thumbs { display: flex; gap: 8px; flex-wrap: wrap; }
+.lv-thumb-wrap { position: relative; width: 96px; height: 96px; }
 .lv-thumb {
   width: 96px; height: 96px; border-radius: 8px; border: 1px solid var(--line);
   object-fit: cover; cursor: pointer; background: var(--input-bg2);
 }
 .lv-thumb:hover { border-color: var(--sel); }
+.lv-thumb-noimg {
+  display: flex; align-items: center; justify-content: center; font-size: 28px;
+  color: var(--dim);
+}
+.lv-thumb-del {
+  position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; min-height: 22px;
+  border-radius: 50%; padding: 0; line-height: 1; font-size: 14px;
+  background: #1a2028; border: 1px solid var(--line); color: var(--text);
+}
+
+/* ---------- 画像ピッカー ---------- */
+.lv-picker-card { width: min(720px, 96vw); }
+.lv-picker-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 8px; max-height: 60vh; overflow-y: auto; padding: 4px;
+}
+.lv-picker-cell {
+  position: relative; padding: 0; border: 2px solid var(--line); border-radius: 8px;
+  background: var(--input-bg2); overflow: hidden; cursor: pointer;
+  display: flex; flex-direction: column; text-align: left;
+}
+.lv-picker-cell.sel { border-color: var(--sel); box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.4); }
+.lv-picker-cell.sel::after {
+  content: '✓'; position: absolute; top: 4px; right: 6px; color: #fff; font-weight: 800;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+.lv-picker-cell.attached { opacity: 0.6; }
+.lv-picker-thumb { width: 100%; height: 90px; object-fit: cover; display: block; background: #0d1117; }
+.lv-picker-noimg { width: 100%; height: 90px; display: flex; align-items: center; justify-content: center; font-size: 30px; color: var(--dim); }
+.lv-picker-name { font-size: 11px; padding: 3px 5px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-picker-size { font-size: 10px; color: var(--dim); padding: 0 5px 4px; }
 
 /* ---------- キャプションオーバーレイ（ピン⇄ウィンドウ結線） ---------- */
 .lv-overlay-svg {

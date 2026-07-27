@@ -74,6 +74,13 @@ export class AppContext {
     return visibleEntities(this.state, 'asset').filter((a) => fStr(a, 'kind') === 'model');
   }
 
+  /** プロジェクト内の画像・映像アセット（添付ピッカー用、名前順） */
+  mediaAssets(): EntityRecord[] {
+    return visibleEntities(this.state, 'asset')
+      .filter((a) => fStr(a, 'kind') === 'image' || fStr(a, 'kind') === 'video')
+      .sort((a, b) => fStr(a, 'originalName').localeCompare(fStr(b, 'originalName'), 'ja'));
+  }
+
   asset(id: string | null): EntityRecord | null {
     if (id === null) return null;
     const rec = this.state.byKind.asset?.[id];

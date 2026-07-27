@@ -56,6 +56,26 @@ export interface ImportPlan {
 
 const BACKUP_HINT = /(backup|バックアップ|コピー|copy|_old|旧)/i;
 
+/**
+ * マジックバイトから画像形式を判定する（拡張子なし対策）。
+ * Google DriveのZIPでは HEIC 等が拡張子なしで入ることがあり、拡張子だけでは取りこぼす。
+ * 返り値は補う拡張子（jpg/png/gif/webp/heic）またはnull。
+ */
+export function sniffImageExt(b: Uint8Array): string | null {
+  if (b.length < 12) return null;
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'jpg';
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'png';
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return 'gif';
+  // RIFF....WEBP
+  if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'webp';
+  // ISO-BMFF: ....ftyp[heic|heif|heix|hevc|mif1|msf1]
+  if (b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) {
+    const brand = String.fromCharCode(b[8]!, b[9]!, b[10]!, b[11]!);
+    if (/hei|hev|mif1|msf1/.test(brand)) return 'heic';
+  }
+  return null;
+}
+
 /** 採用するスプレッドシートを切り替える（ウィザードのUIから呼ぶ） */
 export function selectSource(plan: ImportPlan, index: number): void {
   const source = plan.sources[index];
@@ -101,6 +121,12 @@ export async function buildImportPlan(entries: readonly ZipEntryData[]): Promise
     }
     if (VIDEO_EXT.test(name)) {
       plan.videos.push({ path: e.path, name, data: e.data });
+      continue;
+    }
+    // 拡張子で判定できないものはマジックバイトで画像かを見る（拡張子なしHEIC等）。
+    // ファイル名は変えない（fileId対応表CSVのDrive名=拡張子なしと突合するため）
+    if (!/\.(xlsx|csv|txt|json|glb|gltf|obj|stl|ply)$/i.test(name) && sniffImageExt(e.data) !== null) {
+      plan.images.push({ path: e.path, name, data: e.data });
       continue;
     }
     if (looksLikeXlsx(name, e.data)) {
@@ -207,7 +233,9 @@ export async function applyImportPlan(
   const assetIdByName = new Map<string, string>();
   const writeAsset = async (f: ForeignFile, kind: 'model' | 'image' | 'video'): Promise<string> => {
     const astId = entityIdFor('asset');
-    const ext = (f.name.split('.').pop() ?? 'bin').toLowerCase();
+    // 拡張子が無い/不明な画像はマジックバイトで補う（保存パスと表示に拡張子が要るため）
+    const nameExt = f.name.includes('.') ? f.name.split('.').pop()!.toLowerCase() : '';
+    const ext = nameExt !== '' ? nameExt : (kind === 'image' ? sniffImageExt(f.data) ?? 'bin' : 'bin');
     const path = `${kind === 'model' ? 'models' : 'media'}/${astId}.${ext}`;
     const size = f.data.length;
     await fs.writeBytes(`${dir}/${path}`, f.data);
