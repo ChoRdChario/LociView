@@ -12,7 +12,10 @@ import { UndoManager } from './undo';
 
 export interface UiState {
   activeSetId: string | null;
+  /** 現在の文脈モデル（ピン・マテリアルの帰属先）。描画中とは限らない */
   activeModelAssetId: string | null;
+  /** 実際にビューアへ描画されているモデル。未描画ならnull（大モデルの自動読込抑止時など） */
+  loadedModelAssetId: string | null;
   selectedCaptionId: string | null;
   /** 「ピンを移動」ボタンで切り替える移動ギズモ表示（選択変更でOFFに戻る） */
   pinMoveMode: boolean;
@@ -25,6 +28,7 @@ export class AppContext {
   readonly ui: UiState = {
     activeSetId: null,
     activeModelAssetId: null,
+    loadedModelAssetId: null,
     selectedCaptionId: null,
     pinMoveMode: false,
     search: '',

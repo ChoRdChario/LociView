@@ -112,6 +112,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       const model = await loadModel(fmt, bytes);
       ctx.viewer.setModel(model);
       ctx.ui.activeModelAssetId = assetId;
+      ctx.ui.loadedModelAssetId = assetId; // 実際に描画された（「表示中」判定の根拠）
       // transformの適用
       const t = asset.fields.transform;
       if (typeof t === 'object' && t !== null && !Array.isArray(t)) {
@@ -162,6 +163,11 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     // メモリ不足でGLが落ちたら、白画面のままにせず状況を伝える
     let contextLostShown = false;
     viewer.onContextLost(() => {
+      // 描画は失われたので「表示中」を解除し、再表示できる状態に戻す
+      if (ctx !== null) {
+        ctx.ui.loadedModelAssetId = null;
+        ctx.notify();
+      }
       if (contextLostShown) return;
       contextLostShown = true;
       void infoDialog(

@@ -55,12 +55,12 @@ export function mountModelTab(container: HTMLElement, ctx: AppContext, deps: Mod
       listEl.append(el('div', { class: 'lv-dim lv-pad' }, 'モデルがありません。データタブの「モデル追加」から読み込んでください。'));
     }
     for (const m of models) {
-      const active = m.id === ctx.ui.activeModelAssetId;
+      const loaded = m.id === ctx.ui.loadedModelAssetId;
       listEl.append(
-        el('div', { class: `lv-cap-row${active ? ' sel' : ''}` },
+        el('div', { class: `lv-cap-row${loaded ? ' sel' : ''}` },
           el('span', { class: 'lv-cap-title' }, fStr(m, 'originalName', '(名称不明)')),
           el('span', { class: 'lv-dim' }, fmtBytes(fNum(m, 'size', 0))),
-          active
+          loaded
             ? el('span', { class: 'lv-badge' }, '表示中')
             : el('button', { class: 'mini', onclick: () => void loadWithGuard(m.id, fNum(m, 'size', 0)) }, '表示'),
         ),
@@ -68,7 +68,8 @@ export function mountModelTab(container: HTMLElement, ctx: AppContext, deps: Mod
     }
 
     clear(detailEl);
-    const activeId = ctx.ui.activeModelAssetId;
+    // 調整対象は「実際に描画中」のモデル（transformの反映先と一致させる）
+    const activeId = ctx.ui.loadedModelAssetId;
     const model = ctx.viewer.model;
     if (activeId === null || model === null) return;
     const t = transformOf(activeId);
