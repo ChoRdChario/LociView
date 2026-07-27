@@ -172,6 +172,11 @@ export interface ImportOptions {
   projectName: string;
   /** 画像リンク: captionId → 画像ファイル名（手動リンクUIの結果） */
   imageLinks?: Map<string, string>;
+  /**
+   * GLBの軽量版を生成する（ブラウザのみ）。原本は保持し、軽量版を別ファイルで保存する。
+   * 縮小できなければnullを返す。テスト（Node）では未指定=軽量化しない。
+   */
+  optimizeModel?: (bytes: Uint8Array) => Promise<Uint8Array | null>;
 }
 
 export interface ImportResult {
@@ -206,6 +211,23 @@ export async function applyImportPlan(
     const path = `${kind === 'model' ? 'models' : 'media'}/${astId}.${ext}`;
     const size = f.data.length;
     await fs.writeBytes(`${dir}/${path}`, f.data);
+
+    // GLBは軽量版を生成（原本は上で保存済み。表示は軽量版を使う=原本主義）
+    let optimizedPath: string | undefined;
+    let optimizedSize: number | undefined;
+    if (kind === 'model' && opts.optimizeModel !== undefined && ext === 'glb') {
+      try {
+        const opt = await opts.optimizeModel(f.data);
+        if (opt !== null) {
+          optimizedPath = `models/${astId}.opt.glb`;
+          optimizedSize = opt.length;
+          await fs.writeBytes(`${dir}/${optimizedPath}`, opt);
+        }
+      } catch {
+        // 軽量化に失敗しても原本で続行する
+      }
+    }
+
     // OPFSへ書いたら元データは手放す。iOSでは全アセットを同時に保持すると
     // メモリ上限を超えるため、書き込み済みのものから解放していく
     (f as { data: Uint8Array }).data = new Uint8Array(0);
@@ -219,6 +241,7 @@ export async function applyImportPlan(
         originalName: f.name,
         mime: '',
         size,
+        ...(optimizedPath !== undefined ? { optimizedPath, optimizedSize } : {}),
         ...(kind === 'model' ? { transform: { scale: 1, upAxis: 'Y' }, pinScale: 1 } : {}),
       },
     });

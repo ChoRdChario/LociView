@@ -56,13 +56,19 @@ export function mountModelTab(container: HTMLElement, ctx: AppContext, deps: Mod
     }
     for (const m of models) {
       const loaded = m.id === ctx.ui.loadedModelAssetId;
+      const optSize = fNum(m, 'optimizedSize', 0);
+      // 軽量版があれば、それを表示に使う（サイズ表示も軽量版の大きさで判定）
+      const sizeText = optSize > 0
+        ? `${fmtBytes(optSize)}（軽量版・原本${fmtBytes(fNum(m, 'size', 0))}）`
+        : fmtBytes(fNum(m, 'size', 0));
+      const effSize = optSize > 0 ? optSize : fNum(m, 'size', 0);
       listEl.append(
         el('div', { class: `lv-cap-row${loaded ? ' sel' : ''}` },
           el('span', { class: 'lv-cap-title' }, fStr(m, 'originalName', '(名称不明)')),
-          el('span', { class: 'lv-dim' }, fmtBytes(fNum(m, 'size', 0))),
+          el('span', { class: 'lv-dim' }, sizeText),
           loaded
             ? el('span', { class: 'lv-badge' }, '表示中')
-            : el('button', { class: 'mini', onclick: () => void loadWithGuard(m.id, fNum(m, 'size', 0)) }, '表示'),
+            : el('button', { class: 'mini', onclick: () => void loadWithGuard(m.id, effSize) }, '表示'),
         ),
       );
     }

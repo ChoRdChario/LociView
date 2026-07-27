@@ -97,13 +97,18 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     if (ctx === null) return;
     const asset = ctx.asset(assetId);
     if (asset === null) return;
-    const path = fStr(asset, 'path');
-    const bytes = await fs.readBytes(`${ctx.dir}/${path}`);
+    // 軽量版があればそれを表示に使う（原本は書き出し用に保持）。iOSメモリ対策
+    const optPath = fStr(asset, 'optimizedPath');
+    const displayPath = optPath !== '' ? optPath : fStr(asset, 'path');
+    let bytes = await fs.readBytes(`${ctx.dir}/${displayPath}`);
+    if (bytes === null && optPath !== '') {
+      bytes = await fs.readBytes(`${ctx.dir}/${fStr(asset, 'path')}`); // 軽量版が無ければ原本
+    }
     if (bytes === null) {
-      await infoDialog('モデル読込', `ファイルが見つかりません: ${path}（差分ZIPで受け取った場合はフルZIPの取込が必要です）`);
+      await infoDialog('モデル読込', `ファイルが見つかりません（差分ZIPで受け取った場合はフルZIPの取込が必要です）`);
       return;
     }
-    const fmt = detectFormat(fStr(asset, 'originalName', path), bytes);
+    const fmt = detectFormat(displayPath, bytes);
     if (fmt === null) {
       await infoDialog('モデル読込', '対応していない形式です');
       return;
@@ -189,7 +194,9 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     //  自動表示を外すことで、開く操作自体は必ず成功し、ユーザーが表示可否を選べる）
     if (ctx.ui.activeModelAssetId !== null) {
       const asset = ctx.asset(ctx.ui.activeModelAssetId);
-      const size = asset !== null ? fNum(asset, 'size', 0) : 0;
+      // 軽量版があればその大きさで判定する（軽量化により自動表示できる場合が増える）
+      const optSize = asset !== null ? fNum(asset, 'optimizedSize', 0) : 0;
+      const size = optSize > 0 ? optSize : asset !== null ? fNum(asset, 'size', 0) : 0;
       if (size > AUTO_LOAD_LIMIT) {
         await infoDialog(
           'モデルの表示',

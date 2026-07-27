@@ -2,8 +2,8 @@
 // 取込/マージ・書き出し（フルZIP/差分ZIP/CSV）・CSV取込・モデル追加
 
 import { exportOpsOnlyZip, exportProjectZip, inspectZip, mergeFromInspection } from '../../assets/package';
+import { addModelAsset } from '../../assets/modelAsset';
 import { detectFormat } from '../../viewer/loaders';
-import { entityIdFor } from '../../core/store';
 import { applyCsvPlan, buildCaptionsCsv, planCaptionsCsvImport } from '../../io/csv';
 import { el, downloadBlob, fmtBytes } from '../dom';
 import type { AppContext } from '../context';
@@ -98,17 +98,8 @@ export function mountDataTab(container: HTMLElement, ctx: AppContext, deps: Data
       await infoDialog('モデル追加', `対応していない形式です: ${file.name}（GLB/OBJ/STL/PLY）`);
       return;
     }
-    const astId = entityIdFor('asset');
-    const ext = (file.name.split('.').pop() ?? 'bin').toLowerCase();
-    const path = `models/${astId}.${ext}`;
-    await ctx.fs.writeBytes(`${ctx.dir}/${path}`, bytes);
-    ctx.store.dispatch({
-      t: 'create', e: 'asset', id: astId,
-      v: {
-        kind: 'model', path, originalName: file.name, mime: '', size: bytes.length,
-        transform: { scale: 1, upAxis: 'Y' },
-      },
-    });
+    // 原本保存 + GLBは軽量版も生成（iOSメモリ対策）
+    const astId = await addModelAsset(ctx.fs, ctx.dir, ctx.store, file.name, bytes);
     await deps.loadModelAsset(astId);
   }
 

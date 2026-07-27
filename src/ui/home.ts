@@ -3,6 +3,8 @@
 
 import { importNewProject, inspectZip } from '../assets/package';
 import { applyImportPlan, buildImportPlan } from '../assets/importWizard';
+import { optimizeGlbBytes } from '../assets/glbOptimize';
+import { addModelAsset } from '../assets/modelAsset';
 import { readZipEntries } from '../assets/zipio';
 import { parseManifest } from '../core/manifest';
 import { entityIdFor, ProjectStore, type Identity } from '../core/store';
@@ -140,13 +142,7 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
       const name = file.name.replace(/\.[^.]+$/, '');
       const dir = `projects/${entityIdFor('meta')}`;
       const store = await ProjectStore.create(deps.fs, dir, name, deps.identity);
-      const astId = entityIdFor('asset');
-      const ext = lower.split('.').pop() ?? 'bin';
-      await deps.fs.writeBytes(`${dir}/models/${astId}.${ext}`, bytes);
-      store.dispatch({
-        t: 'create', e: 'asset', id: astId,
-        v: { kind: 'model', path: `models/${astId}.${ext}`, originalName: file.name, mime: '', size: bytes.length, transform: { scale: 1, upAxis: 'Y' } },
-      });
+      await addModelAsset(deps.fs, dir, store, file.name, bytes);
       await store.flush();
       await deps.openProject(dir);
       return;
@@ -198,6 +194,7 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
     const result = await applyImportPlan(deps.fs, deps.identity, plan, {
       projectName: answer.projectName,
       imageLinks: answer.imageLinks,
+      optimizeModel: (b) => optimizeGlbBytes(b),
     });
     const notes: string[] = [];
     if (result.unlinkedImages > 0) {
