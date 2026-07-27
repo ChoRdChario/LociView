@@ -5,7 +5,7 @@ import { fAnchor, fStr, fStrArr, type AnchorData } from '../fields';
 import { entityIdFor } from '../../core/store';
 import type { AppContext } from '../context';
 import { confirmDialog } from '../dialogs';
-import { openLightbox } from '../lightbox';
+import { openImageWindow } from '../imageWindow';
 import { openImagePicker } from '../imagePicker';
 
 export const PIN_COLORS = ['#eab308', '#f87171', '#4ade80', '#60a5fa', '#c084fc', '#f9fafb', '#fb923c', '#2dd4bf'];
@@ -143,7 +143,7 @@ export function mountCaptionTab(container: HTMLElement, ctx: AppContext): () => 
       void ctx.mediaUrl(astId).then((url) => {
         if (url !== null) img.src = url;
       });
-      img.addEventListener('click', () => openLightbox(ctx, attachmentIds, i));
+      img.addEventListener('click', () => openImageWindow(ctx, attachmentIds, i));
       // 添付を外す（× ボタン）
       const del = el('button', {
         class: 'lv-thumb-del',

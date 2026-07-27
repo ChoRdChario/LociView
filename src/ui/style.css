@@ -187,6 +187,14 @@ textarea { min-height: 72px; resize: vertical; }
   max-height: 5.5em; overflow: hidden;
 }
 .lv-thumb.sm { width: 36px; height: 36px; }
+/* キャプション窓の添付サムネイル（幅を活かして大きめ・タップで拡大） */
+.lv-cap-overlay .lv-thumb.md { width: 66px; height: 66px; pointer-events: auto; cursor: pointer; }
+.lv-cap-overlay .lv-thumbs { pointer-events: auto; }
+.lv-thumb.md { width: 66px; height: 66px; border-radius: 8px; border: 1px solid var(--line); object-fit: cover; background: var(--input-bg2); }
+.lv-thumb-more {
+  display: flex; align-items: center; justify-content: center; padding: 0;
+  color: var(--text); font-size: 13px; cursor: pointer;
+}
 
 /* ---------- インストール案内・トースト ---------- */
 .lv-install:not(:empty) {
@@ -202,34 +210,45 @@ textarea { min-height: 72px; resize: vertical; }
   max-width: calc(100vw - 32px);
 }
 
-/* ---------- ライトボックス ---------- */
-.lv-lightbox {
-  position: fixed; inset: 0; z-index: 200;
-  background: rgba(5, 7, 10, 0.96);
-  display: flex; flex-direction: column;
+/* ---------- 連結画像ウィンドウ ---------- */
+.lv-imgwin-line { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 14; }
+.lv-imgwin {
+  position: absolute; z-index: 15; display: flex; flex-direction: column;
+  background: rgba(13, 17, 23, 0.97); border: 1px solid var(--line);
+  border-radius: 12px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6); overflow: hidden;
+  /* 既定はステージのほぼ全面（スマホ優先）。デスクトップは下で絞る */
+  inset: 10px;
 }
-.lv-lb-toolbar {
-  display: flex; align-items: center; gap: 8px; padding: 8px 12px;
-  background: rgba(11, 13, 17, 0.9); border-bottom: 1px solid var(--line);
+@media (min-width: 900px) {
+  .lv-imgwin { inset: auto; left: 50%; top: 50%; transform: translate(-40%, -50%);
+    width: min(680px, 66%); height: min(80%, 640px); }
 }
-.lv-lb-name { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40vw; }
-.lv-lb-zoom { min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
-.lv-lb-media {
+.lv-imgwin.fullscreen { position: fixed; inset: 0; transform: none; width: auto; height: auto; border-radius: 0; z-index: 210; }
+.lv-imgwin-toolbar {
+  display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+  background: rgba(11, 13, 17, 0.92); border-bottom: 1px solid var(--line); flex: 0 0 auto;
+}
+.lv-imgwin-name { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 45%; }
+.lv-imgwin-zoom { font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lv-imgwin-viewport {
   flex: 1; overflow: hidden; display: flex; align-items: center; justify-content: center;
-  cursor: grab; touch-action: none;
+  min-height: 0; touch-action: none; cursor: grab; background: #05070a;
 }
-.lv-lb-media:active { cursor: grabbing; }
-.lv-lb-item {
-  max-width: 96%; max-height: 96%; user-select: none;
-  transition: none; will-change: transform;
+.lv-imgwin-viewport:active { cursor: grabbing; }
+.lv-imgwin-img { user-select: none; will-change: transform, filter; transform-origin: center; max-width: none; }
+.lv-imgwin-noimg { flex: 1; display: none; align-items: center; justify-content: center; color: var(--dim); font-size: 13px; }
+.lv-imgwin-controls {
+  display: flex; align-items: center; gap: 6px; padding: 7px 8px; flex-wrap: wrap;
+  border-top: 1px solid var(--line); background: rgba(11, 13, 17, 0.92); flex: 0 0 auto;
 }
-.lv-lb-nav {
-  position: absolute; top: 50%; transform: translateY(-50%);
-  font-size: 26px; line-height: 1; padding: 10px 14px; border-radius: 10px;
-  background: rgba(17, 24, 39, 0.7);
+.lv-imgwin-adjust {
+  padding: 8px 10px; border-top: 1px solid var(--line); background: rgba(16, 20, 27, 0.96);
+  display: grid; gap: 8px; flex: 0 0 auto;
 }
-.lv-lb-nav.prev { left: 10px; }
-.lv-lb-nav.next { right: 10px; }
+.lv-imgwin-adjust button.active { background: var(--accent); border-color: var(--accent-line); color: #fff; }
+.lv-imgwin-adjlabel { min-width: 5.5em; font-size: 12px; }
+.lv-imgwin-adjust input[type="range"] { flex: 1; min-width: 80px; }
+.lv-imgwin-adjust output { min-width: 3em; text-align: right; font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
 
 /* ---------- ピン位置3軸調整 ---------- */
 .lv-xyz { flex-wrap: nowrap; }

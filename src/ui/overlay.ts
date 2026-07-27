@@ -5,8 +5,9 @@
 import { el, clear } from './dom';
 import { fAnchor, fStr, fStrArr } from './fields';
 import type { AppContext } from './context';
+import { openImageWindow } from './imageWindow';
 
-const WIN_W = 220;
+const WIN_W = 240;
 const GAP = 14; // ピンからウィンドウまでの余白
 
 export function mountCaptionOverlay(stage: HTMLElement, ctx: AppContext): () => void {
@@ -46,14 +47,23 @@ export function mountCaptionOverlay(stage: HTMLElement, ctx: AppContext): () => 
     const atts = fStrArr(cap, 'attachments');
     if (atts.length > 0) {
       const thumbs = el('div', { class: 'lv-thumbs' });
-      for (const astId of atts.slice(0, 3)) {
-        const img = el('img', { class: 'lv-thumb sm', alt: '添付' }) as HTMLImageElement;
+      atts.slice(0, 3).forEach((astId, i) => {
+        const img = el('img', { class: 'lv-thumb md', alt: '添付', title: 'タップで拡大' }) as HTMLImageElement;
+        img.addEventListener('error', () => {
+          img.replaceWith(el('div', { class: 'lv-thumb md lv-thumb-noimg' }, '🖼'));
+        });
         void ctx.mediaUrl(astId).then((url) => {
           if (url !== null) img.src = url;
         });
+        img.addEventListener('click', () => openImageWindow(ctx, atts, i));
         thumbs.append(img);
+      });
+      if (atts.length > 3) {
+        thumbs.append(el('button', {
+          class: 'lv-thumb md lv-thumb-more',
+          onclick: () => openImageWindow(ctx, atts, 3),
+        }, `+${atts.length - 3}`));
       }
-      if (atts.length > 3) thumbs.append(el('span', { class: 'lv-dim' }, `+${atts.length - 3}`));
       win.append(thumbs);
     }
   }
