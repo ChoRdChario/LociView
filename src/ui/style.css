@@ -241,6 +241,8 @@ textarea { min-height: 72px; resize: vertical; }
   display: flex; align-items: center; gap: 6px; padding: 7px 8px; flex-wrap: wrap;
   border-top: 1px solid var(--line); background: rgba(11, 13, 17, 0.92); flex: 0 0 auto;
 }
+.lv-imgwin-zoomwrap { display: flex; align-items: center; gap: 6px; flex: 1 1 130px; min-width: 110px; }
+.lv-imgwin-zoomrange { flex: 1; min-width: 0; }
 .lv-imgwin-adjust {
   padding: 8px 10px; border-top: 1px solid var(--line); background: rgba(16, 20, 27, 0.96);
   display: grid; gap: 8px; flex: 0 0 auto;

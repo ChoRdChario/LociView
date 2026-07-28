@@ -52,10 +52,30 @@ export function openImageWindow(ctx: AppContext, attachmentIds: string[], startI
 
   const root = el('div', { class: 'lv-imgwin', role: 'dialog', 'aria-label': '画像' });
 
+  // 倍率スライダー（log スケール: 低倍率側にも解像度を残す）。0–1000 → scale
+  const zoomSlider = el('input', {
+    type: 'range', min: '0', max: '1000', step: '1', value: '0', class: 'lv-imgwin-zoomrange',
+    'aria-label': '倍率',
+    oninput: (ev) => {
+      const rect = viewport.getBoundingClientRect();
+      setScale(sliderToScale(Number((ev.target as HTMLInputElement).value) / 1000), rect.left + rect.width / 2, rect.top + rect.height / 2);
+    },
+  }) as HTMLInputElement;
+
   // ---- 変換・フィルタ適用 --------------------------------------------------------
+  function scaleToSlider(s: number): number {
+    return Math.log(Math.max(s, MIN_SCALE) / MIN_SCALE) / Math.log(MAX_SCALE / MIN_SCALE);
+  }
+  function sliderToScale(t: number): number {
+    return MIN_SCALE * Math.pow(MAX_SCALE / MIN_SCALE, t);
+  }
   function applyTransform(): void {
     img.style.transform = `translate(${tx}px, ${ty}px) scale(${scale}) rotate(${rotation}deg)`;
     zoomLabel.textContent = naturalW > 0 ? `${naturalW}×${naturalH} · ${Math.round(scale * 100)}%` : '';
+    // スライダー操作中は上書きしない
+    if (document.activeElement !== zoomSlider) {
+      zoomSlider.value = String(Math.round(scaleToSlider(scale) * 1000));
+    }
   }
   function applyFilter(): void {
     const parts: string[] = [];
@@ -83,12 +103,6 @@ export function openImageWindow(ctx: AppContext, attachmentIds: string[], startI
 
   function fit(): void {
     scale = containScale();
-    tx = 0;
-    ty = 0;
-    applyTransform();
-  }
-  function setNativeZoom(mult: number): void {
-    scale = mult;
     tx = 0;
     ty = 0;
     applyTransform();
@@ -268,9 +282,8 @@ export function openImageWindow(ctx: AppContext, attachmentIds: string[], startI
   );
 
   const controls = el('div', { class: 'lv-imgwin-controls' },
-    btn('フィット', () => fit()),
-    btn('原寸', () => setNativeZoom(1)),
-    btn('2倍', () => setNativeZoom(2)),
+    btn('フィット', () => fit(), '全体表示に戻す'),
+    el('span', { class: 'lv-imgwin-zoomwrap' }, el('span', { class: 'lv-dim' }, '−'), zoomSlider, el('span', { class: 'lv-dim' }, '＋')),
     btn('⟳', () => { rotation = (rotation + 90) % 360; fit(); }, '90°回転'),
     btn('加工', () => { adjustOpen = !adjustOpen; renderAdjust(); }, '白黒・反転・明るさ・コントラスト'),
     btn('⛶', () => toggleFullscreen(), '全画面'),
