@@ -22,6 +22,7 @@ export function mountCaptionOverlay(stage: HTMLElement, ctx: AppContext): () => 
   stage.append(svg, win);
 
   let shownCaptionId: string | null = null;
+  let bodyEl: HTMLDivElement | null = null;
 
   /** 内容の再構築（選択・内容が変わった時だけ） */
   function renderContent(): void {
@@ -43,7 +44,11 @@ export function mountCaptionOverlay(stage: HTMLElement, ctx: AppContext): () => 
     const title = fStr(cap, 'title');
     win.append(el('b', {}, title !== '' ? title : '(無題)'));
     const body = fStr(cap, 'body');
-    if (body !== '') win.append(el('div', { class: 'lv-cap-overlay-body' }, body));
+    bodyEl = null;
+    if (body !== '') {
+      bodyEl = el('div', { class: 'lv-cap-overlay-body' }, body) as HTMLDivElement;
+      win.append(bodyEl);
+    }
     const atts = fStrArr(cap, 'attachments');
     if (atts.length > 0) {
       const thumbs = el('div', { class: 'lv-thumbs' });
@@ -89,6 +94,11 @@ export function mountCaptionOverlay(stage: HTMLElement, ctx: AppContext): () => 
     }
     win.style.display = '';
     svg.style.display = '';
+
+    // 本文が切れているか（レイアウト確定後に判定してフェードを切り替え）
+    if (bodyEl !== null) {
+      bodyEl.classList.toggle('clipped', bodyEl.scrollHeight > bodyEl.clientHeight + 2);
+    }
 
     // ウィンドウはピンの右上を基本に、はみ出すなら左・下へ反転
     const winH = win.offsetHeight;

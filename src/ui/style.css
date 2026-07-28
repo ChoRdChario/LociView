@@ -172,20 +172,27 @@ textarea { min-height: 72px; resize: vertical; }
   pointer-events: none; z-index: 5;
 }
 .lv-cap-overlay {
-  position: absolute; left: 0; top: 0; width: 220px; z-index: 6;
+  position: absolute; left: 0; top: 0; width: 240px; z-index: 6;
   background: rgba(13, 17, 23, 0.92);
   border: 1px solid var(--line); border-left-width: 3px;
   border-radius: 8px; padding: 8px 10px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
   font-size: 12px; pointer-events: none;
-  display: grid; gap: 4px;
+  display: flex; flex-direction: column; gap: 4px;
+  max-height: 60%; /* ステージ基準。長い本文でも写真が下に必ず残る */
   will-change: transform;
 }
-.lv-cap-overlay b { font-size: 13px; }
+.lv-cap-overlay b { font-size: 13px; flex: 0 0 auto; }
 .lv-cap-overlay-body {
   color: var(--dim); white-space: pre-wrap; word-break: break-word;
-  max-height: 5.5em; overflow: hidden;
+  flex: 0 1 auto; min-height: 0; overflow: hidden;
 }
+/* 本文が長くて切れる時だけ下端をフェードして「続きあり」を示す */
+.lv-cap-overlay-body.clipped {
+  -webkit-mask-image: linear-gradient(to bottom, #000 74%, transparent);
+          mask-image: linear-gradient(to bottom, #000 74%, transparent);
+}
+.lv-cap-overlay .lv-thumbs { flex: 0 0 auto; }
 .lv-thumb.sm { width: 36px; height: 36px; }
 /* キャプション窓の添付サムネイル（幅を活かして大きめ・タップで拡大） */
 .lv-cap-overlay .lv-thumb.md { width: 66px; height: 66px; pointer-events: auto; cursor: pointer; }
