@@ -53,3 +53,55 @@ export async function addModelAsset(
   });
   return astId;
 }
+
+/**
+ * 既存モデルアセットの実体GLBだけを差し替える。アセットID・キャプション紐付け・
+ * transform・pinScale は保持し、ファイル実体と軽量版・サイズ・名前のみ更新する。
+ * キャプションやマテリアル設定は modelAssetId で紐づくため、そのまま追従する。
+ */
+export async function replaceModelAsset(
+  fs: WorkspaceFS,
+  dir: string,
+  store: ProjectStore,
+  assetId: string,
+  name: string,
+  bytes: Uint8Array,
+): Promise<void> {
+  const asset = store.state.byKind.asset?.[assetId];
+  if (asset === undefined) throw new Error(`replaceModelAsset: asset not found: ${assetId}`);
+  const oldPath = typeof asset.fields.path === 'string' ? asset.fields.path : '';
+  const oldOpt = typeof asset.fields.optimizedPath === 'string' ? asset.fields.optimizedPath : '';
+
+  const ext = (name.split('.').pop() ?? 'bin').toLowerCase();
+  // 実体は毎回ユニーク名で書く（旧ファイルとの取り違え・キャッシュを避ける）
+  const stamp = Date.now().toString(36);
+  const path = `models/${assetId}.${stamp}.${ext}`;
+  await fs.writeBytes(`${dir}/${path}`, bytes);
+
+  let optimizedPath = '';
+  let optimizedSize = 0;
+  if (ext === 'glb') {
+    try {
+      const opt = await optimizeGlbBytes(bytes);
+      if (opt !== null) {
+        optimizedPath = `models/${assetId}.${stamp}.opt.glb`;
+        optimizedSize = opt.length;
+        await fs.writeBytes(`${dir}/${optimizedPath}`, opt);
+      }
+    } catch {
+      // 軽量化に失敗しても原本で続行する
+    }
+  }
+
+  // 更新op: 実体・名前・サイズ・軽量版のみ。transform/pinScaleは保持（見た目調整を維持）
+  store.dispatch({
+    t: 'update',
+    e: 'asset',
+    id: assetId,
+    v: { path, originalName: name, size: bytes.length, optimizedPath, optimizedSize },
+  });
+
+  // 旧ファイルは削除（差し替えなので原本は残さない）
+  if (oldPath !== '' && oldPath !== path) await fs.remove(`${dir}/${oldPath}`);
+  if (oldOpt !== '' && oldOpt !== optimizedPath) await fs.remove(`${dir}/${oldOpt}`);
+}

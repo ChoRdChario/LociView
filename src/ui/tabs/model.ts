@@ -4,7 +4,13 @@
 import { el, clear, fmtBytes } from '../dom';
 import { fNum, fStr } from '../fields';
 import type { AppContext } from '../context';
-import { confirmDialog } from '../dialogs';
+import { confirmDialog, infoDialog } from '../dialogs';
+import { replaceModelAsset } from '../../assets/modelAsset';
+import { detectFormat } from '../../viewer/loaders';
+
+function detectFormatSafe(name: string, bytes: Uint8Array): boolean {
+  return detectFormat(name, bytes) !== null;
+}
 
 /** これを超えるモデルは表示前に確認する（iOSのメモリ不足でタブが落ちるのを防ぐ） */
 const LARGE_MODEL_BYTES = 25 * 1024 * 1024;
@@ -118,6 +124,52 @@ export function mountModelTab(container: HTMLElement, ctx: AppContext, deps: Mod
     );
     if (model.warnings.length > 0) {
       detailEl.append(el('div', { class: 'lv-warn' }, `⚠ ${model.warnings.join(' / ')}`));
+    }
+
+    // ---- モデル差し替え ----
+    const replaceInput = el('input', {
+      type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply', style: 'display:none',
+    }) as HTMLInputElement;
+    replaceInput.addEventListener('change', () => {
+      const file = replaceInput.files?.[0];
+      if (file !== undefined) void doReplace(activeId, file);
+      replaceInput.value = '';
+    });
+    detailEl.append(
+      el('div', { class: 'lv-grp' },
+        el('div', { class: 'lv-hint' }, 'モデルの差し替え'),
+        el('div', { class: 'lv-row' },
+          el('button', { onclick: () => replaceInput.click() }, '別のモデルに差し替え'),
+          replaceInput,
+        ),
+        el('div', { class: 'lv-dim' }, 'ピン・キャプションは同じ位置に残ります。マテリアルの見え方は差し替え後に確認してください。'),
+      ),
+    );
+  }
+
+  async function doReplace(assetId: string, file: File): Promise<void> {
+    const ok = await confirmDialog(
+      'モデルを差し替え',
+      `現在のモデルを「${file.name}」に差し替えます。ピン・キャプションはそのまま残り、` +
+        '3Dモデルだけが新しくなります（マテリアルの見え方は差し替え後に再確認してください）。よろしいですか？',
+    );
+    if (!ok) return;
+    const busy = el('div', { class: 'lv-dim lv-pad' }, '差し替え中…（軽量版の生成に少し時間がかかります）');
+    detailEl.append(busy);
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (detectFormatSafe(file.name, bytes) === false) {
+        await infoDialog('差し替え', `対応していない形式です: ${file.name}（GLB/OBJ/STL/PLY）`);
+        return;
+      }
+      await replaceModelAsset(ctx.fs, ctx.dir, ctx.store, assetId, file.name, bytes);
+      await deps.loadModelAsset(assetId); // 新しいGLBを描画し直す
+      ctx.syncMaterials();
+      ctx.notify();
+    } catch (e) {
+      await infoDialog('差し替え失敗', e instanceof Error ? e.message : String(e));
+    } finally {
+      busy.remove();
     }
   }
 
