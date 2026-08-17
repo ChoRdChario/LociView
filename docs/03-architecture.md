@@ -1,5 +1,7 @@
 # 03. アプリケーションアーキテクチャ
 
+> Status: `HISTORICAL DESIGN`. Several statements differ from current code. Use `PROJECT_MAP.md`, code, and tests for current behavior. See `docs/README.md`.
+
 ## 1. 全体像
 
 ```

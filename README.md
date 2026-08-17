@@ -1,43 +1,40 @@
-# LociView 設計資料
+# LociView
 
-LociMyu（Google Drive/Sheets依存の3Dキャプションビューア）の後継。**ネット環境なしで3DCGを用いた記録を作り、複数人の記録を労少なく統合する**ためのローカルファーストHTMLアプリ。
+LociView is the local-first successor to LociMyu: an offline browser application for viewing 3D data, attaching captions, and exchanging mergeable project packages.
 
-> 状態: **MVP実装完了・公開中**（2026-07-21）。iOS実機検証（P0-2）が残る最終項目。
+> Current status (2026-08-18): a v1 build is implemented and deployed, but several documented v1 targets, physical-iOS acceptance, and public-release hardening remain incomplete. Gaussian Splatting and the proposed v2 storage/renderer architecture are not implemented yet.
 >
-> **▶ 公開URL: https://chordchario.github.io/LociView/**
-> （初回アクセス後はオフラインで起動できます。ホーム画面に追加すると、アプリとして使えます）
+> Public build: https://chordchario.github.io/LociView/
 
-## 一言でいうと
+## Current v1
 
-- プロジェクト = 1個のZIP（`.lociview`）。モデル・画像・キャプションが全部入り。Drive/LINE/USBで受け渡し
-- セーブデータ = 編集者ごとの追記専用ログ（JSONL）。**マージ = ファイルの和集合**なので、複数人の編集が衝突せず決定的に統合できる
-- アプリ = PWA。PC・スマホ・タブレットで同一。オフラインで全機能が動く
-- 対応形式 = GLB/OBJ/STL/PLY（MVP）→ FBX/PCD（Phase 2）→ LAS/LAZ（需要確認後）
-- **表示セット** = LociMyuのシート切替の継承。マテリアルの見え方（半透明/Unlit等）とキャプション位置とビューを束ねて切り替える
+- `.lociview` ZIP packages contain models, images, and project records for exchange and backup.
+- Active work uses an OPFS workspace when available; the fallback `MemoryFS` is non-durable.
+- Project state is derived from per-actor JSONL operations using the current HLC/LWW implementation.
+- GLB, OBJ, STL, and ordinary PLY mesh/point data are supported.
+- Display sets group captions, material appearance, and saved views.
+- The product is a Vite/TypeScript PWA with no runtime Google API dependency.
 
-## 資料構成
+The current operation log has known concurrency and durability limitations. Treat it as a v1 compatibility format, not as the approved v2 persistence choice.
 
-| ドキュメント | 内容 |
-|---|---|
-| [00-design-philosophy.md](docs/00-design-philosophy.md) | 設計思想。4+1層構造、依存の一方通行、データが幹、機能追加チェックリスト |
-| [01-vision-requirements.md](docs/01-vision-requirements.md) | 背景（LociMyuの限界）、ビジョン、ユースケース、機能/非機能要件、非目標 |
-| [02-data-format.md](docs/02-data-format.md) | ★核心。プロジェクトパッケージ仕様、ID体系、op-logマージ仕様、競合ポリシー、スプレッドシート往復、移行 |
-| [03-architecture.md](docs/03-architecture.md) | レイヤ構成、技術スタック選定、ビルドターゲット（PWA+シングルファイル）、セキュリティ |
-| [04-formats-rendering.md](docs/04-formats-rendering.md) | 3Dフォーマット対応表、原本主義、単位/座標正規化、マテリアルキー、点群描画 |
-| [05-ui-ux.md](docs/05-ui-ux.md) | LociMyu UI継承方針、画面設計、モバイル対応（ボトムシート/タッチピン）、マージレポートUI |
-| [06-device-offline.md](docs/06-device-offline.md) | ワークスペースモデル、プラットフォーム対応マトリクス、スマホでのセーブデータ取り回し、PWA構成 |
-| [07-roadmap.md](docs/07-roadmap.md) | Phase 0(PoC)〜3、未決事項リスト（U-01〜07）、LociMyu資産マップ |
-| [08-ios-test-guide.md](docs/08-ios-test-guide.md) | **iOS実機検証の手順書**（P0-2。所要15〜20分） |
+## Start development
 
-## 設計の前提となった調査
+```powershell
+npm ci
+npm run typecheck
+npm test
+npm run dev
+```
 
-- `G:\00_AI_dev\Locimyu2\tasks\locimyu-public-release-review.md` — LociMyu構造監査（P0/P1問題、event log方式・assetId間接参照の提案はここが起点）
-- `G:\00_AI_dev\Locimyu2\audit_source\` — LociMyu α 全ソース
+`index.html` is the product entry point. `dev.html` is a manual viewer harness.
 
-## キーとなる設計判断（サマリ）
+## Read in this order
 
-1. **Google API全廃**（コアから）: ネット必須・同時編集破壊・OAuth審査の3問題を一挙に解消
-2. **op-log方式**（CRDTライブラリ不採用）: 1編集者1ファイル追記専用 + HLC + フィールド単位LWW + update-wins。人間可読・決定的・依存ゼロ
-3. **原本主義**: 3Dモデル/画像は無改変で格納。調整はすべて別レイヤー（transform/material設定）に記録
-4. **ワークスペース分離**: 作業はOPFS自動保存、ZIPは受け渡し時のみ。これがスマホ横展開を成立させる
-5. **UIはLociMyu継承**: Caption/Material/Viewsタブ+ステージ構成+シート切替（→表示セット）を維持し、Modelタブとマージレポートを追加
+1. [AGENTS.md](AGENTS.md) — project working rules and exclusions
+2. [PROJECT_MAP.md](PROJECT_MAP.md) — current code entry points and responsibilities
+3. [docs/README.md](docs/README.md) — authority/status of every document
+4. [tasks/todo.md](tasks/todo.md) — active work only
+
+Read [docs/v2/00-approved-direction.md](docs/v2/00-approved-direction.md) only for G0+, renderer, storage, migration, GS, or v2 specification work. It is approved direction, not current implementation.
+
+Legacy alpha source and raw research are intentionally kept outside the active repository. Their hashes and provenance are recorded in [docs/history/legacy-locimyu-alpha.md](docs/history/legacy-locimyu-alpha.md).

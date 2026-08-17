@@ -1,5 +1,7 @@
 # 02. データフォーマット仕様（プロジェクトパッケージとマージ）
 
+> Status: `FROZEN V1 FORMAT`. Use for v1 compatibility and migration only. Do not extend this document as the v2 write schema. See `docs/README.md`.
+
 LociViewの核心。「git的にマージ可能なセーブデータ」をどう実現するかを定義する。
 
 ## 1. 設計方針

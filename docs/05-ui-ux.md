@@ -1,5 +1,7 @@
 # 05. UI/UX設計
 
+> Status: `V1 PRODUCT + SUPERSEDED DRAFTS`. This file contains both implemented consensus and earlier alternatives. Current code wins on conflict. See `docs/README.md`.
+
 > **2026-07-18 コンセンサス確定（UI設計案v1への回答）**
 > - Q1 レイアウト: 承認（PC=右パネル、スマホ=ボトムシート3段階）
 > - Q2 タブ: **入出力を「データ」タブへ分離**。Caption / Material / Model / Views / データ の5タブ。
@@ -59,6 +61,8 @@
 
 ### 3.2 ビューア（メイン画面）
 
+> `SUPERSEDED DRAFT`: 以下の4タブ/FAB案は採用前の案。現行はCaption / Material / Model / Views / Dataの5タブで、モバイルのピン追加は長押し、デスクトップはShift+Click。実挙動は`src/ui/viewerScreen.ts`を参照。
+
 デスクトップ（>= 900px）: LociMyu同等の右パネル固定。
 モバイル: 右パネルを**ボトムシート**化する。
 
@@ -80,6 +84,8 @@
 - Materialタブ: メッシュ選択時は従来UI、点群選択時は点サイズ・色モードUIに切り替え（docs/04 §6）
 
 ### 3.3 ピン追加のタッチ対応
+
+> `SUPERSEDED DRAFT`: 以下のFAB方式は不採用。現行は長押しで追加し、通常タップは選択・操作に使う。
 
 Shift+Clickはスマホに存在しないため:
 

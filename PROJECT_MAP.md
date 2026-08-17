@@ -1,0 +1,134 @@
+# LociView project map
+
+> Status: `CURRENT` map for baseline commit `4f6e481` (2026-07-29).
+> Gaussian Splatting, multiple simultaneous models, Automerge, content-addressed storage, and renderer backends are `PROPOSED`, not current behavior.
+
+## Start here
+
+```text
+index.html
+  -> src/main.ts
+    -> src/ui/app.ts
+      -> Home / ViewerScreen
+      -> ProjectStore / WorkspaceFS / ViewerCore
+
+dev.html
+  -> src/devharness.ts   # manual harness; not the product entry point
+```
+
+For a normal task, read only the target file, its matching tests, and direct imports first.
+
+## Current directories
+
+| Path | Current responsibility |
+|---|---|
+| `src/core` | IDs, HLC, operation validation, JSONL, reduction, merge, manifest, and `ProjectStore` |
+| `src/platform` | `WorkspaceFS`, OPFS, memory filesystem, PWA and browser integration |
+| `src/assets` | ZIP/package handling, model asset registration/replacement, GLB optimization, import wizard |
+| `src/io` | CSV, minimal XLSX reader, and legacy LociMyu conversion |
+| `src/viewer` | Three.js loaders, material shader patch, single-model `ViewerCore` |
+| `src/ui` | App shell, home, viewer screen, dialogs, tabs, and UI-only state |
+| `tests` | Executable contracts for core, assets, I/O, and UI logic |
+| `public/samples` | Small deterministic files used by the manual viewer and iOS runbook |
+
+## Actual dependency direction
+
+```text
+main -> ui
+ui -> assets / io / core / platform / viewer
+assets -> core / io / platform / viewer-loaders
+io -> core / assets-zipio
+core-store -> core-pure / platform-fs
+viewer -> three
+platform-opfs -> platform-fs
+```
+
+There is an existing directory-level `assets`/`io` cycle. Do not expand it. New v2 boundaries must remove rather than normalize this coupling.
+
+## Main data flows
+
+```text
+interactive entity edit
+  -> UI
+  -> ProjectStore.dispatch
+  -> per-actor JSONL operations
+  -> reduce
+  -> AppContext
+  -> UI and ViewerCore
+
+.lociview package import as a new workspace
+  -> inspect and validate package
+  -> package/project service writes manifest, raw operations, and binaries through WorkspaceFS
+  -> ProjectStore.open
+  -> reduce
+  -> AppContext
+  -> UI and ViewerCore
+
+.lociview merge into an opened workspace
+  -> inspect and validate external package
+  -> ProjectStore.mergeExternal immediately reduces/notifies and enqueues per-actor log appends
+  -> package service copies accepted binaries
+  -> ProjectStore.flush
+  -> AppContext
+  -> UI and ViewerCore
+```
+
+For v1, distinguish:
+
+- logical truth: validated operation log;
+- active durable workspace: OPFS through `WorkspaceFS`;
+- exchange/backup container: `.lociview` ZIP.
+
+## Current constraints and known risks
+
+- One model is active in `ViewerCore` at a time.
+- PLY means ordinary mesh/point rendering, not Gaussian Splatting.
+- ZIP import/export and OPFS reads can materialize complete buffers in memory.
+- Viewer, OPFS, PWA, and physical-iOS behavior are not fully covered by automated tests.
+- Some 2026-07 documents describe intended behavior that the code never implemented. Consult `docs/README.md` before treating prose as current.
+
+The following risks are observed in the current code and are not fixed by G-1:
+
+| Risk | Reproduction condition / impact | Evidence area |
+|---|---|---|
+| Same actor/sequence in multiple tabs | Tabs share browser identity but initialize sequence independently; distinct operations can collide and one can disappear during deduplication | `src/ui/app.ts`, `src/core/store.ts`, `src/core/merge.ts`, `src/core/reduce.ts` |
+| Non-atomic cross-tab append | OPFS append obtains size then writes at that position without a cross-tab lock | `src/platform/opfs.ts` |
+| Poisoned write queue | One rejected queued append can prevent later queued writes while memory/UI continues changing | `src/core/store.ts` |
+| Unsafe imported map keys | Imported operation entity/id values are used with ordinary objects; reserved prototype keys require stricter validation or `Map`/null-prototype storage | `src/core/schema.ts`, `src/core/reduce.ts` |
+| Non-transactional binary/document update | Package/model replacement can update operations and blobs in separate steps; interruption or concurrent replacement can leave missing/stale references | `src/assets/package.ts`, `src/assets/modelAsset.ts` |
+| Whole-buffer large-file path | Package and asset paths can hold full ZIP/entry buffers, conflicting with large GS and iOS memory goals | `src/assets/zipio.ts`, `src/assets/package.ts`, `src/platform/fs.ts` |
+
+These are G0 regression inputs and blocking items for the `G0-S` v1 safety-stabilization gate in `tasks/todo.md`. Do not claim conflict-free multi-tab durability from the current v1 implementation.
+
+## Verification matrix
+
+| Change | Required evidence |
+|---|---|
+| Pure core/I/O logic | typecheck + relevant unit tests + full test suite |
+| Package/storage | above + round trip + interruption/quota/error path |
+| Migration | above + anonymized real fixture + idempotence + original preserved |
+| Viewer/material | above + browser/manual visual evidence |
+| Mobile-sensitive render/storage/PWA | above + physical iOS smoke/stress result |
+| Dependency | above + lockfile review + `npm audit` |
+
+Default commands:
+
+```powershell
+npm run typecheck
+npm test
+npm run build
+```
+
+## Proposed v2 boundary
+
+The approved direction is summarized in `docs/v2/00-approved-direction.md`. The eventual flow is:
+
+```text
+ProjectDocV2 + BlobStore + ResourceManager
+  -> SceneDocument resolver
+  -> ViewerController
+  -> RenderCoordinator + InteractionIndex
+  -> RenderBackend
+```
+
+No proposed dependency or type may leak into current UI/storage code before its gate passes.

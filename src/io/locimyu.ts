@@ -1,7 +1,7 @@
 // LociMyu からの移行 (docs/02 §6.2)
 // Drive フォルダZIP（xlsx + 画像 + モデル）を LociView プロジェクトへ変換する。
 //
-// LociMyu のシート構造（audit_source から確認済み）:
+// LociMyu のシート構造（archived alpha sourceと実データから確認済み。由来はdocs/history/legacy-locimyu-alpha.md）:
 //   キャプションシート（任意名、複数可）: id,title,body,color,posX,posY,posZ,imageFileId,createdAt,updatedAt
 //   __LM_VIEWS   : id,captionSheetGid,name,bgColor,cameraType,eyeXYZ,targetXYZ,upXYZ,fov,createdAt,updatedAt
 //   __LM_MATERIALS: materialKey,opacity,doubleSided,unlitLike,chromaEnable,chromaColor,

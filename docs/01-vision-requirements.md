@@ -1,12 +1,14 @@
 # 01. ビジョンと要件定義
 
+> Status: `V1 BASELINE / PARTLY SUPERSEDED`. This records the original LociView vision and v1 requirements; it is not the current v2 specification. See `docs/README.md`.
+
 LociView — ローカルファーストの3Dキャプションビューア（LociMyu後継）
 
 ## 1. 背景：LociMyuの到達点と限界
 
 LociMyu αは「Google Drive上のGLBをブラウザで表示し、ピン+キャプションをGoogle Sheetsに保存する」ビューアとして機能している。UI/UX（3Dステージ + Caption/Material/Viewsタブ、Shift+Clickピン打ち、ピン色フィルタ、ビュープリセット）は実運用で練られており、これは資産である。
 
-一方で構造監査（`Locimyu2/tasks/locimyu-public-release-review.md`）で以下が確認されている。
+一方で旧LociMyu構造監査（要約と原本の由来は`docs/history/legacy-locimyu-alpha.md`）で以下が確認されている。
 
 | 問題 | 内容 |
 |---|---|

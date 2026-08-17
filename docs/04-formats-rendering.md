@@ -1,5 +1,7 @@
 # 04. 3Dフォーマット対応と描画設計
 
+> Status: `V1 RENDERING BASELINE`. PLY here means ordinary mesh/points; Gaussian Splatting is not implemented. See `docs/README.md` and `docs/v2/00-approved-direction.md`.
+
 ## 1. 対応フォーマット計画
 
 | フォーマット | ローダ | Phase | 備考・制約 |

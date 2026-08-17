@@ -1,8 +1,12 @@
 # 06. デバイス展開・オフライン・セーブデータ取り回し
 
+> Status: `V1 PRODUCT + UNVERIFIED TARGETS`. OPFS/PWA intent is useful, but size, streaming, sharing, and single-file claims are not current guarantees. See `docs/README.md`.
+
 「HTMLベースならデバイス横展開が楽」という前提を、**保存**の観点で成立させるための設計。表示はどのブラウザでも動くが、ファイル保存はブラウザ差が大きい領域であり、ここが本ドキュメントの主題。
 
 ## 1. 基本モデル: ワークスペース + 明示的書き出し
+
+> `PARTLY IMPLEMENTED`: OPFS workspaceと明示的download exportは実装済み。ただしmulti-tab append、write failure、durability表示には既知リスクがあるため、「1opごとに安全」「直前操作だけが消える」とは保証しない。`PROJECT_MAP.md`のknown risksを参照。
 
 ```
 [ZIP] ──取込──▶ [ワークスペース(ブラウザ内OPFS)] ──編集(自動保存)──▶ [書き出し/共有でZIP化]
@@ -13,6 +17,8 @@
 - これにより「開く→編集→閉じる」だけならファイル操作ゼロ。ZIPに触るのは受け渡しの時だけ
 
 ## 2. プラットフォーム対応マトリクス
+
+> `TARGET MATRIX, NOT CURRENT GUARANTEE`: 元ZIP上書き、Web Share送信、share target受信の一部は未実装。現行の書出しはdownload経路を基準にする。
 
 | 能力 | Win/Mac Chrome・Edge | Mac Safari | iOS Safari/PWA | Android Chrome/PWA |
 |---|---|---|---|---|
@@ -34,6 +40,8 @@
 **答え: 取り回せる。ただし「ファイルを直接編集する」のではなく「受信→取込→編集→共有で送り返す」という往復モデルになる。**
 
 iOS実例フロー（最も制約が厳しい環境）:
+
+> `TARGET UX`: 「共有→LociView」受信と共有シートからの送信は端末・実装状況に依存し、現行v1の保証経路ではない。Filesから選択し、downloadしたZIPを共有する経路を基準に検証する。
 
 1. LINEやDriveで `.lociview` を受け取る → 「LociViewで開く」またはFilesに保存してLociViewのホームから選択
 2. 編集はワークスペースで自動保存。アプリを閉じても次回続きから
@@ -104,6 +112,8 @@ iOS SafariはタブのメモリがおおむねRAMの一部（機種により200�
 残る制約: 点群やジオメトリ自体が巨大なモデルは別途対策が必要（テクスチャ縮小では減らない）。
 
 ## 6. 性能予算（デバイス横展開の現実線）
+
+> `UNVERIFIED TARGETS`: 下表は現行保証値ではない。特にpackage全体/entryのbuffer化があるため、ZIPサイズ上限はG0/G1実測後に確定する。
 
 | 項目 | デスクトップ | スマホ（中位機） |
 |---|---|---|

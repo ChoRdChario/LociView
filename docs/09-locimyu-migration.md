@@ -1,5 +1,7 @@
 # 09. LociMyu 移行ガイド（画像の確実な結び付け）
 
+> Status: `V1 LEGACY RUNBOOK`. Preserve source data and review ambiguous duplicate filenames; this guide is not an unconditional correctness guarantee.
+
 LociMyuのキャプションは画像を **Google Drive のファイルID**（例 `1l1vZn40tg5xIo6r4-…`）で参照している。
 Driveフォルダを丸ごとZIPダウンロードしても、この**ファイルID→ファイル名の対応表はZIPに含まれない**ため、
 オフラインのLociViewだけでは「どのキャプションがどの画像か」を自動判定できない。

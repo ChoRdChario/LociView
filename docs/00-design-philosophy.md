@@ -1,5 +1,7 @@
 # 00. 設計思想 — LociViewという木の形
 
+> Status: `CURRENT PRINCIPLES / V1 EXAMPLES`. Long-lived principles remain useful; persistence examples based on the custom operation log are v1-specific. See `docs/README.md`.
+
 本資料は、個別仕様（docs/01〜07）の背後にある考え方を説明する。新しい機能を追加するとき・迷ったときに立ち返る場所。
 
 ## 1. アプリは4+1の層でできている

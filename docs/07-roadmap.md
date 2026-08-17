@@ -1,5 +1,7 @@
 # 07. ロードマップと未決事項
 
+> Status: `SUPERSEDED 2026-07 ROADMAP`. Historical only. Do not use this as the active task plan or as the current v2 scope.
+
 ## Phase 0 — 技術PoC（設計の裏取り。作り込まない）
 
 リスクの高い仮説だけを最小コードで検証する。

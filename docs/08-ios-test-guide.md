@@ -1,5 +1,7 @@
 # 08. iOS実機検証ガイド（P0-2）
 
+> Status: `V1 QA RUNBOOK`. This is not a GS/mobile-memory acceptance specification for v2.
+
 **公開URL: https://chordchario.github.io/LociView/**
 
 設計時から「最重要検証」としてきた項目です。iOSはブラウザ制約が最も厳しく、ここが通れば
