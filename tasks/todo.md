@@ -57,6 +57,24 @@ Completed v1 implementation history remains available in Git before the G-1 clea
 
 Start only after G-1 passes and the product owner approves S0.
 
+### G0 baseline slice 1 — authorized 2026-08-19
+
+- [x] Add a machine-readable fixture registry and verifier for the existing deterministic smoke samples
+- [x] Separate Git fixtures, generated stress artifacts, and external hash-addressed evidence without adding large data to the repository
+- [x] Add the initial executable `it.fails` characterizations for multi-tab, durable-write, untrusted-operation, and blob-ordering defects
+- [x] Add empty, privacy-safe device/run evidence schemas and a repeatable runbook; do not invent measurements
+- [x] Run fixture verification, typecheck, focused tests, the full test suite, and the production build
+- [x] Obtain an independent read-only review of the slice before commit
+
+### G0 baseline slice 1 review record
+
+- The registry pins 4 small Git fixtures (651,630 bytes total); ordinary-point `points.ply` is explicitly not treated as Gaussian splatting data, and generated/external fixture tiers remain empty until their bytes and provenance exist
+- Evidence templates cover the physical iPhone 14 Pro, Windows desktop, and Windows tablet-PC classes without invented measurements; there are 0 completed run, environment, or external-artifact records
+- Seven initial `it.fails` characterizations preserve the desired multi-tab, durable-write, untrusted-operation, package/merge, and model-replacement safety invariants while keeping the unfixed v1 baseline green; they are the first slice, not the complete G0-S matrix
+- Verification passed: fixture/evidence verification, TypeScript typecheck, 15 test files / 128 tests, and the production build (92 modules, 11 PWA precache entries)
+- The existing minified `viewer` chunk remains about 789.61 kB and above Vite's 500 kB warning threshold; it is retained as G0 performance evidence rather than hidden by changing the warning threshold
+- Three independent read-only reviews reported no unresolved P0/P1. Before accepting the first real measured run, harden the evidence command with direct schema validation, duplicate-record rejection, all-record privacy scanning, Git/generated trace verification, and an explicit local-versus-deployed completion rule; generated/external fixtures must also become verifiable before either tier is populated
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes

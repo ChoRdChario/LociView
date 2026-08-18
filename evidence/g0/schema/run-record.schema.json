@@ -1,0 +1,376 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lociview.example/schemas/g0-device-run-1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "status", "runId", "environmentId", "deviceClass", "startedAtUtc", "build", "fixture", "traceRef", "conditions", "metrics", "v1GsSupport", "provisionalThresholds", "completion", "artifactManifestId", "notes"],
+  "properties": {
+    "schemaVersion": { "const": "g0-device-run-1" },
+    "status": { "enum": ["pending", "measured"] },
+    "runId": { "type": ["string", "null"], "pattern": "^run_[a-z0-9][a-z0-9._-]{2,95}$" },
+    "environmentId": { "type": ["string", "null"], "pattern": "^env_[a-z0-9][a-z0-9._-]{2,95}$" },
+    "deviceClass": { "enum": ["iphone-14-pro", "windows-desktop", "windows-tablet-pc", null] },
+    "startedAtUtc": { "type": ["string", "null"], "format": "date-time" },
+    "build": { "$ref": "#/$defs/build" },
+    "fixture": { "$ref": "#/$defs/fixture" },
+    "traceRef": { "$ref": "#/$defs/traceRef" },
+    "conditions": { "$ref": "#/$defs/conditions" },
+    "metrics": { "$ref": "#/$defs/metrics" },
+    "v1GsSupport": { "const": "unsupported" },
+    "provisionalThresholds": { "$ref": "#/$defs/provisional" },
+    "completion": { "enum": ["pending", "complete", "incomplete", "invalid"] },
+    "artifactManifestId": { "type": ["string", "null"], "pattern": "^art_[a-z0-9][a-z0-9._-]{2,95}$" },
+    "notes": { "type": "array", "items": { "type": "string", "maxLength": 512 } }
+  },
+  "$defs": {
+    "nullableNumber": { "type": ["number", "null"], "minimum": 0 },
+    "nullableInteger": { "type": ["integer", "null"], "minimum": 0 },
+    "shaOrNull": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+    "size": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "sizeOrNull": { "oneOf": [{ "$ref": "#/$defs/size" }, { "type": "null" }] },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gitCommit", "gitDirty", "packageLockSha256", "workflowRunId", "deployUrl", "indexSha256", "serviceWorkerSha256"],
+      "properties": {
+        "gitCommit": { "type": ["string", "null"], "pattern": "^[0-9a-f]{7,64}$" },
+        "gitDirty": { "type": ["boolean", "null"] },
+        "packageLockSha256": { "$ref": "#/$defs/shaOrNull" },
+        "workflowRunId": { "type": ["string", "null"], "maxLength": 128 },
+        "deployUrl": { "type": ["string", "null"], "format": "uri", "maxLength": 2048 },
+        "indexSha256": { "$ref": "#/$defs/shaOrNull" },
+        "serviceWorkerSha256": { "$ref": "#/$defs/shaOrNull" }
+      }
+    },
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixtureId", "sha256", "sourceBytes", "format", "triangles", "ordinaryPoints", "splats", "packageBytes", "sourceLocation"],
+      "properties": {
+        "fixtureId": { "type": ["string", "null"], "maxLength": 96 },
+        "sha256": { "$ref": "#/$defs/shaOrNull" },
+        "sourceBytes": { "$ref": "#/$defs/nullableInteger" },
+        "format": { "type": ["string", "null"], "maxLength": 128 },
+        "triangles": { "$ref": "#/$defs/nullableInteger" },
+        "ordinaryPoints": { "$ref": "#/$defs/nullableInteger" },
+        "splats": { "$ref": "#/$defs/nullableInteger" },
+        "packageBytes": { "$ref": "#/$defs/nullableInteger" },
+        "sourceLocation": { "enum": ["git", "generated", "external", null] }
+      }
+    },
+    "traceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["traceId", "sha256", "bytes", "version", "sourceLocation", "restoreLocator"],
+      "properties": {
+        "traceId": { "type": ["string", "null"], "pattern": "^trace_[a-z0-9][a-z0-9._-]{2,95}$" },
+        "sha256": { "$ref": "#/$defs/shaOrNull" },
+        "bytes": { "$ref": "#/$defs/nullableInteger" },
+        "version": { "type": ["string", "null"], "maxLength": 128 },
+        "sourceLocation": { "enum": ["git", "generated", "external", null] },
+        "restoreLocator": { "type": ["string", "null"], "maxLength": 2048 }
+      }
+    },
+    "conditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["network", "cacheState", "launchMode", "viewportCss", "devicePixelRatio", "drawingBufferPx"],
+      "properties": {
+        "network": { "enum": ["online", "offline", null] },
+        "cacheState": { "enum": ["service-worker-warm", "browser-cache-warm", "cold", "unknown", null] },
+        "launchMode": { "enum": ["pwa", "browser-tab", null] },
+        "viewportCss": { "$ref": "#/$defs/sizeOrNull" },
+        "devicePixelRatio": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "drawingBufferPx": { "$ref": "#/$defs/sizeOrNull" }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["offlineLaunch", "project", "frame", "pick", "lifecycle", "resources", "storage", "packageIo"],
+      "properties": {
+        "offlineLaunch": {
+          "type": "object", "additionalProperties": false,
+          "required": ["attempts", "successes", "samplesMs"],
+          "properties": {
+            "attempts": { "$ref": "#/$defs/nullableInteger" },
+            "successes": { "$ref": "#/$defs/nullableInteger" },
+            "samplesMs": { "type": "array", "items": { "type": "number", "minimum": 0 } }
+          }
+        },
+        "project": {
+          "type": "object", "additionalProperties": false,
+          "required": ["openMs", "firstPreviewMs", "fullyUsableMs"],
+          "properties": {
+            "openMs": { "$ref": "#/$defs/nullableNumber" },
+            "firstPreviewMs": { "$ref": "#/$defs/nullableNumber" },
+            "fullyUsableMs": { "$ref": "#/$defs/nullableNumber" }
+          }
+        },
+        "frame": {
+          "type": "object", "additionalProperties": false,
+          "required": ["durationSeconds", "sampleCount", "p50Ms", "p95Ms", "maxMs", "over66_7MsCount", "hiddenIntervalsExcluded"],
+          "properties": {
+            "durationSeconds": { "$ref": "#/$defs/nullableNumber" },
+            "sampleCount": { "$ref": "#/$defs/nullableInteger" },
+            "p50Ms": { "$ref": "#/$defs/nullableNumber" },
+            "p95Ms": { "$ref": "#/$defs/nullableNumber" },
+            "maxMs": { "$ref": "#/$defs/nullableNumber" },
+            "over66_7MsCount": { "$ref": "#/$defs/nullableInteger" },
+            "hiddenIntervalsExcluded": { "type": ["boolean", "null"] }
+          }
+        },
+        "pick": {
+          "type": "object", "additionalProperties": false,
+          "required": ["sampleCount", "computeP50Ms", "computeP95Ms", "gestureP50Ms", "gestureP95Ms", "maxErrorPx"],
+          "properties": {
+            "sampleCount": { "$ref": "#/$defs/nullableInteger" },
+            "computeP50Ms": { "$ref": "#/$defs/nullableNumber" },
+            "computeP95Ms": { "$ref": "#/$defs/nullableNumber" },
+            "gestureP50Ms": { "$ref": "#/$defs/nullableNumber" },
+            "gestureP95Ms": { "$ref": "#/$defs/nullableNumber" },
+            "maxErrorPx": { "$ref": "#/$defs/nullableNumber" }
+          }
+        },
+        "lifecycle": {
+          "type": "object", "additionalProperties": false,
+          "required": ["backgroundCycles", "successfulRestores", "continuousUseSeconds", "loadUnloadCycles", "unexpectedReloads", "contextLosses"],
+          "properties": {
+            "backgroundCycles": { "$ref": "#/$defs/nullableInteger" },
+            "successfulRestores": { "$ref": "#/$defs/nullableInteger" },
+            "continuousUseSeconds": { "$ref": "#/$defs/nullableNumber" },
+            "loadUnloadCycles": { "$ref": "#/$defs/nullableInteger" },
+            "unexpectedReloads": { "$ref": "#/$defs/nullableInteger" },
+            "contextLosses": { "$ref": "#/$defs/nullableInteger" }
+          }
+        },
+        "resources": {
+          "type": "object", "additionalProperties": false,
+          "required": ["managedBytesBefore", "managedBytesAfter", "managedHandlesBefore", "managedHandlesAfter", "jsHeapStatus", "firstStableFiveMedianBytes", "finalFiveMedianBytes"],
+          "properties": {
+            "managedBytesBefore": { "$ref": "#/$defs/nullableInteger" },
+            "managedBytesAfter": { "$ref": "#/$defs/nullableInteger" },
+            "managedHandlesBefore": { "$ref": "#/$defs/nullableInteger" },
+            "managedHandlesAfter": { "$ref": "#/$defs/nullableInteger" },
+            "jsHeapStatus": { "enum": ["measured", "unavailable", "not-collected"] },
+            "firstStableFiveMedianBytes": { "$ref": "#/$defs/nullableNumber" },
+            "finalFiveMedianBytes": { "$ref": "#/$defs/nullableNumber" }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "jsHeapStatus": { "const": "measured" } }, "required": ["jsHeapStatus"] },
+              "then": {
+                "properties": {
+                  "firstStableFiveMedianBytes": { "type": "number", "minimum": 0 },
+                  "finalFiveMedianBytes": { "type": "number", "minimum": 0 }
+                }
+              }
+            },
+            {
+              "if": { "properties": { "jsHeapStatus": { "const": "unavailable" } }, "required": ["jsHeapStatus"] },
+              "then": {
+                "properties": {
+                  "firstStableFiveMedianBytes": { "type": "null" },
+                  "finalFiveMedianBytes": { "type": "null" }
+                }
+              }
+            }
+          ]
+        },
+        "storage": {
+          "type": "object", "additionalProperties": false,
+          "required": ["beforeBytes", "afterBytes", "afterCleanupBytes"],
+          "properties": {
+            "beforeBytes": { "$ref": "#/$defs/nullableInteger" },
+            "afterBytes": { "$ref": "#/$defs/nullableInteger" },
+            "afterCleanupBytes": { "$ref": "#/$defs/nullableInteger" }
+          }
+        },
+        "packageIo": {
+          "type": "object", "additionalProperties": false,
+          "required": ["inspectMs", "importMs", "exportMs"],
+          "properties": {
+            "inspectMs": { "$ref": "#/$defs/nullableNumber" },
+            "importMs": { "$ref": "#/$defs/nullableNumber" },
+            "exportMs": { "$ref": "#/$defs/nullableNumber" }
+          }
+        }
+      }
+    },
+    "provisional": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profileId", "approvalState", "observations"],
+      "properties": {
+        "profileId": { "const": "g0-provisional-unapproved-2026-08-19" },
+        "approvalState": { "const": "unapproved" },
+        "observations": {
+          "type": "object", "additionalProperties": false,
+          "required": ["offlineLaunch", "frame", "pick", "lifecycle", "resourcePlateau", "storageCleanup"],
+          "properties": {
+            "offlineLaunch": { "$ref": "#/$defs/observation" },
+            "frame": { "$ref": "#/$defs/observation" },
+            "pick": { "$ref": "#/$defs/observation" },
+            "lifecycle": { "$ref": "#/$defs/observation" },
+            "resourcePlateau": { "$ref": "#/$defs/observation" },
+            "storageCleanup": { "$ref": "#/$defs/observation" }
+          }
+        }
+      }
+    },
+    "observation": { "enum": ["not-evaluated", "within-provisional", "outside-provisional"] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "measured" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "runId": { "type": "string" },
+          "environmentId": { "type": "string" },
+          "deviceClass": { "enum": ["iphone-14-pro", "windows-desktop", "windows-tablet-pc"] },
+          "startedAtUtc": { "type": "string", "format": "date-time" },
+          "build": { "type": "object", "properties": { "gitCommit": { "type": "string" }, "gitDirty": { "const": false }, "packageLockSha256": { "type": "string" } } },
+          "fixture": { "type": "object", "properties": { "fixtureId": { "type": "string" }, "sha256": { "type": "string" }, "sourceBytes": { "type": "integer" }, "sourceLocation": { "enum": ["git", "generated", "external"] } } }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "completion": { "const": "complete" } }, "required": ["completion"] },
+      "then": {
+        "properties": {
+          "status": { "const": "measured" },
+          "build": {
+            "type": "object",
+            "properties": {
+              "workflowRunId": { "type": "string", "minLength": 1 },
+              "deployUrl": { "type": "string" },
+              "indexSha256": { "type": "string" },
+              "serviceWorkerSha256": { "type": "string" }
+            }
+          },
+          "fixture": {
+            "type": "object",
+            "properties": {
+              "format": { "type": "string", "minLength": 1 },
+              "triangles": { "type": "integer", "minimum": 0 },
+              "ordinaryPoints": { "type": "integer", "minimum": 0 },
+              "splats": { "type": "integer", "minimum": 0 },
+              "packageBytes": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "traceRef": {
+            "type": "object",
+            "properties": {
+              "traceId": { "type": "string" },
+              "sha256": { "type": "string" },
+              "bytes": { "type": "integer", "minimum": 1 },
+              "version": { "type": "string", "minLength": 1 },
+              "sourceLocation": { "enum": ["git", "generated", "external"] },
+              "restoreLocator": { "type": "string", "minLength": 1 }
+            }
+          },
+          "conditions": {
+            "type": "object",
+            "properties": {
+              "network": { "enum": ["online", "offline"] },
+              "cacheState": { "enum": ["service-worker-warm", "browser-cache-warm", "cold", "unknown"] },
+              "launchMode": { "enum": ["pwa", "browser-tab"] },
+              "viewportCss": { "$ref": "#/$defs/size" },
+              "devicePixelRatio": { "type": "number", "exclusiveMinimum": 0 },
+              "drawingBufferPx": { "$ref": "#/$defs/size" }
+            }
+          },
+          "metrics": {
+            "type": "object",
+            "properties": {
+              "offlineLaunch": {
+                "type": "object",
+                "properties": {
+                  "attempts": { "type": "integer", "minimum": 5 },
+                  "successes": { "type": "integer", "minimum": 5 },
+                  "samplesMs": { "type": "array", "minItems": 5 }
+                }
+              },
+              "project": {
+                "type": "object",
+                "properties": {
+                  "openMs": { "type": "number", "minimum": 0 },
+                  "firstPreviewMs": { "type": "number", "minimum": 0 },
+                  "fullyUsableMs": { "type": "number", "minimum": 0 }
+                }
+              },
+              "frame": {
+                "type": "object",
+                "properties": {
+                  "durationSeconds": { "type": "number", "minimum": 120 },
+                  "sampleCount": { "type": "integer", "minimum": 20 },
+                  "p50Ms": { "type": "number", "minimum": 0 },
+                  "p95Ms": { "type": "number", "minimum": 0 },
+                  "maxMs": { "type": "number", "minimum": 0 },
+                  "over66_7MsCount": { "type": "integer", "minimum": 0 },
+                  "hiddenIntervalsExcluded": { "const": true }
+                }
+              },
+              "pick": {
+                "type": "object",
+                "properties": {
+                  "sampleCount": { "type": "integer", "minimum": 30 },
+                  "computeP50Ms": { "type": "number", "minimum": 0 },
+                  "computeP95Ms": { "type": "number", "minimum": 0 },
+                  "gestureP50Ms": { "type": "number", "minimum": 0 },
+                  "gestureP95Ms": { "type": "number", "minimum": 0 },
+                  "maxErrorPx": { "type": "number", "minimum": 0 }
+                }
+              },
+              "lifecycle": {
+                "type": "object",
+                "properties": {
+                  "backgroundCycles": { "type": "integer", "minimum": 3 },
+                  "successfulRestores": { "type": "integer", "minimum": 3 },
+                  "continuousUseSeconds": { "type": "number", "minimum": 600 },
+                  "loadUnloadCycles": { "type": "integer", "minimum": 20 },
+                  "unexpectedReloads": { "type": "integer", "minimum": 0 },
+                  "contextLosses": { "type": "integer", "minimum": 0 }
+                }
+              },
+              "resources": {
+                "type": "object",
+                "properties": {
+                  "managedBytesBefore": { "type": "integer", "minimum": 0 },
+                  "managedBytesAfter": { "type": "integer", "minimum": 0 },
+                  "managedHandlesBefore": { "type": "integer", "minimum": 0 },
+                  "managedHandlesAfter": { "type": "integer", "minimum": 0 },
+                  "jsHeapStatus": { "enum": ["measured", "unavailable"] }
+                }
+              },
+              "storage": {
+                "type": "object",
+                "properties": {
+                  "beforeBytes": { "type": "integer", "minimum": 0 },
+                  "afterBytes": { "type": "integer", "minimum": 0 },
+                  "afterCleanupBytes": { "type": "integer", "minimum": 0 }
+                }
+              },
+              "packageIo": {
+                "type": "object",
+                "properties": {
+                  "inspectMs": { "type": "number", "minimum": 0 },
+                  "importMs": { "type": "number", "minimum": 0 },
+                  "exportMs": { "type": "number", "minimum": 0 }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

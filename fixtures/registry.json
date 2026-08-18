@@ -1,0 +1,66 @@
+{
+  "$schema": "./registry.schema.json",
+  "registryVersion": 1,
+  "fixtures": [
+    {
+      "id": "smoke-cube-obj-v1",
+      "storage": { "tier": "git", "path": "public/samples/cube.obj" },
+      "byteSize": 190,
+      "sha256": "c425cf4ea06178e8068f4cd896cd342b32bf586a8b24bd3dfc7f6dd6fd94810d",
+      "mediaType": "model/obj",
+      "classification": "mesh",
+      "geometry": { "triangleCount": 12, "ordinaryPointCount": 0, "splatCount": 0, "textureCount": 0, "bounds": { "min": [0, 0, 0], "max": [1, 1, 1] } },
+      "coordinates": { "handedness": "unspecified", "upAxis": "unspecified", "unit": "source-unit" },
+      "provenance": { "kind": "generated", "source": "scripts/gen-samples.mjs", "reproducibility": "pinned-output-only" },
+      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed" },
+      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable" },
+      "restore": { "method": "repository", "instructions": "Restore this path from the same Git revision as fixtures/registry.json." },
+      "expected": { "classification": "mesh", "warnings": [] }
+    },
+    {
+      "id": "smoke-cube-stl-v1",
+      "storage": { "tier": "git", "path": "public/samples/cube.stl" },
+      "byteSize": 1159,
+      "sha256": "a34121fb40244345f8a1b346ade7e2ca9652210920b8cb98746d1303e062bec8",
+      "mediaType": "model/stl",
+      "classification": "mesh",
+      "geometry": { "triangleCount": 12, "ordinaryPointCount": 0, "splatCount": 0, "textureCount": 0, "bounds": { "min": [0, 0, 0], "max": [1, 1, 1] } },
+      "coordinates": { "handedness": "unspecified", "upAxis": "unspecified", "unit": "source-unit" },
+      "provenance": { "kind": "generated", "source": "scripts/gen-samples.mjs", "reproducibility": "pinned-output-only" },
+      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed" },
+      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable" },
+      "restore": { "method": "repository", "instructions": "Restore this path from the same Git revision as fixtures/registry.json." },
+      "expected": { "classification": "mesh", "warnings": [] }
+    },
+    {
+      "id": "smoke-points-ply-v1",
+      "storage": { "tier": "git", "path": "public/samples/points.ply" },
+      "byteSize": 649541,
+      "sha256": "83f38525175f626d627ca520ffa8f5d5168d532ede14633482b6576a140436f7",
+      "mediaType": "application/octet-stream",
+      "classification": "ordinary-point-cloud",
+      "geometry": { "triangleCount": 0, "ordinaryPointCount": 20000, "splatCount": 0, "textureCount": 0, "bounds": { "min": [-1.3401, 0, -1.3701], "max": [1.3999, 2.4999, 1.3101] } },
+      "coordinates": { "handedness": "unspecified", "upAxis": "unspecified", "unit": "source-unit" },
+      "provenance": { "kind": "generated", "source": "scripts/gen-samples.mjs", "reproducibility": "pinned-output-only" },
+      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed" },
+      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable" },
+      "restore": { "method": "repository", "instructions": "Restore this path from the same Git revision as fixtures/registry.json." },
+      "expected": { "classification": "ordinary-point-cloud", "warnings": ["This is ordinary PLY point data, not Gaussian Splatting data."] }
+    },
+    {
+      "id": "smoke-triangle-glb-v1",
+      "storage": { "tier": "git", "path": "public/samples/tri.glb" },
+      "byteSize": 740,
+      "sha256": "6c97b1a689e5661907bb24555c94bf11feffaa7a19f1dd0f042c86d06a432117",
+      "mediaType": "model/gltf-binary",
+      "classification": "mesh",
+      "geometry": { "triangleCount": 1, "ordinaryPointCount": 0, "splatCount": 0, "textureCount": 0, "bounds": { "min": [0, 0, 0], "max": [1, 1, 0] } },
+      "coordinates": { "handedness": "right", "upAxis": "+Y", "unit": "source-unit" },
+      "provenance": { "kind": "generated", "source": "scripts/gen-samples.mjs", "reproducibility": "pinned-output-only" },
+      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed" },
+      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable" },
+      "restore": { "method": "repository", "instructions": "Restore this path from the same Git revision as fixtures/registry.json." },
+      "expected": { "classification": "mesh", "warnings": [] }
+    }
+  ]
+}

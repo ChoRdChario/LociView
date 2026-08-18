@@ -1,0 +1,70 @@
+{
+  "schemaVersion": "g0-device-run-1",
+  "status": "pending",
+  "runId": null,
+  "environmentId": null,
+  "deviceClass": null,
+  "startedAtUtc": null,
+  "build": {
+    "gitCommit": null,
+    "gitDirty": null,
+    "packageLockSha256": null,
+    "workflowRunId": null,
+    "deployUrl": null,
+    "indexSha256": null,
+    "serviceWorkerSha256": null
+  },
+  "fixture": {
+    "fixtureId": null,
+    "sha256": null,
+    "sourceBytes": null,
+    "format": null,
+    "triangles": null,
+    "ordinaryPoints": null,
+    "splats": null,
+    "packageBytes": null,
+    "sourceLocation": null
+  },
+  "traceRef": {
+    "traceId": null,
+    "sha256": null,
+    "bytes": null,
+    "version": null,
+    "sourceLocation": null,
+    "restoreLocator": null
+  },
+  "conditions": {
+    "network": null,
+    "cacheState": null,
+    "launchMode": null,
+    "viewportCss": null,
+    "devicePixelRatio": null,
+    "drawingBufferPx": null
+  },
+  "metrics": {
+    "offlineLaunch": { "attempts": null, "successes": null, "samplesMs": [] },
+    "project": { "openMs": null, "firstPreviewMs": null, "fullyUsableMs": null },
+    "frame": { "durationSeconds": null, "sampleCount": null, "p50Ms": null, "p95Ms": null, "maxMs": null, "over66_7MsCount": null, "hiddenIntervalsExcluded": null },
+    "pick": { "sampleCount": null, "computeP50Ms": null, "computeP95Ms": null, "gestureP50Ms": null, "gestureP95Ms": null, "maxErrorPx": null },
+    "lifecycle": { "backgroundCycles": null, "successfulRestores": null, "continuousUseSeconds": null, "loadUnloadCycles": null, "unexpectedReloads": null, "contextLosses": null },
+    "resources": { "managedBytesBefore": null, "managedBytesAfter": null, "managedHandlesBefore": null, "managedHandlesAfter": null, "jsHeapStatus": "unavailable", "firstStableFiveMedianBytes": null, "finalFiveMedianBytes": null },
+    "storage": { "beforeBytes": null, "afterBytes": null, "afterCleanupBytes": null },
+    "packageIo": { "inspectMs": null, "importMs": null, "exportMs": null }
+  },
+  "v1GsSupport": "unsupported",
+  "provisionalThresholds": {
+    "profileId": "g0-provisional-unapproved-2026-08-19",
+    "approvalState": "unapproved",
+    "observations": {
+      "offlineLaunch": "not-evaluated",
+      "frame": "not-evaluated",
+      "pick": "not-evaluated",
+      "lifecycle": "not-evaluated",
+      "resourcePlateau": "not-evaluated",
+      "storageCleanup": "not-evaluated"
+    }
+  },
+  "completion": "pending",
+  "artifactManifestId": null,
+  "notes": []
+}

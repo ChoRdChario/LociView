@@ -1,14 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { addModelAsset, replaceModelAsset } from '../../src/assets/modelAsset';
 import { ProjectStore, type Identity } from '../../src/core/store';
 import { MemoryFS } from '../../src/platform/fs';
+import { FaultInjectingMemoryFS } from '../helpers/faultFs';
 
 const USER: Identity = { userId: 'usr_R', deviceId: 'dev_R', displayName: 'r' };
 const STL_A = new TextEncoder().encode('solid a\nendsolid a\n');
 const STL_B = new TextEncoder().encode('solid b\nfacet normal 0 0 1\nendfacet\nendsolid b\n');
 
-async function setup(): Promise<{ fs: MemoryFS; store: ProjectStore; dir: string; assetId: string; capId: string }> {
-  const fs = new MemoryFS();
+function bytesEqual(actual: Uint8Array, expected: Uint8Array): boolean {
+  return actual.length === expected.length && actual.every((value, index) => value === expected[index]);
+}
+
+async function setup(fs: MemoryFS = new MemoryFS()): Promise<{ fs: MemoryFS; store: ProjectStore; dir: string; assetId: string; capId: string }> {
   const dir = 'projects/p';
   const store = await ProjectStore.create(fs, dir, 'p', USER);
   const assetId = await addModelAsset(fs, dir, store, 'model-a.stl', STL_A);
@@ -66,5 +70,38 @@ describe('replaceModelAsset', () => {
   it('存在しないアセットIDは失敗する', async () => {
     const { fs, store, dir } = await setup();
     await expect(replaceModelAsset(fs, dir, store, 'ast_missing', 'x.stl', STL_B)).rejects.toThrow(/not found/);
+  });
+
+  describe('G0S-BLOB/replace precondition', () => {
+    let safe: boolean;
+
+    beforeAll(async () => {
+      const faultFs = new FaultInjectingMemoryFS();
+      const { fs, store, dir, assetId } = await setup(faultFs);
+      faultFs.failNext('appendText', `${dir}/ops/${store.actorId}.jsonl`);
+
+      await replaceModelAsset(fs, dir, store, assetId, 'model-b.stl', STL_B).catch(() => undefined);
+      faultFs.assertAllConsumed();
+      await store.flush().catch(() => undefined);
+
+      const reopened = await ProjectStore.open(fs, dir, USER);
+      const fields = reopened.state.byKind.asset![assetId]!.fields;
+      const reopenedPath = fields.path;
+      const expected = fields.originalName === 'model-a.stl' ? STL_A : fields.originalName === 'model-b.stl' ? STL_B : null;
+      const actual = typeof reopenedPath === 'string' ? await fs.readBytes(`${dir}/${reopenedPath}`) : null;
+      const optimizedPath = fields.optimizedPath;
+      const optimizedSafe =
+        typeof optimizedPath !== 'string' || optimizedPath === '' || (await fs.readBytes(`${dir}/${optimizedPath}`)) !== null;
+      safe =
+        expected !== null &&
+        actual !== null &&
+        bytesEqual(actual, expected) &&
+        fields.size === expected.length &&
+        optimizedSafe;
+    });
+
+    it.fails('G0S-BLOB/replace: interrupted replacement reopens with a binding whose blob still exists', () => {
+      expect(safe).toBe(true);
+    });
   });
 });

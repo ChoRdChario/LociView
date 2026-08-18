@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lociview.example/schemas/g0-device-environment-1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "status", "environmentId", "deviceClass", "deviceModel", "osName", "osVersion", "browserName", "browserVersion", "launchMode", "viewportCss", "devicePixelRatio", "drawingBufferPx", "ramGiB", "gpu", "freeStorageBytes", "power", "notes"],
+  "properties": {
+    "schemaVersion": { "const": "g0-device-environment-1" },
+    "status": { "enum": ["pending", "measured"] },
+    "environmentId": { "type": ["string", "null"], "pattern": "^env_[a-z0-9][a-z0-9._-]{2,95}$" },
+    "deviceClass": { "enum": ["iphone-14-pro", "windows-desktop", "windows-tablet-pc"] },
+    "deviceModel": { "type": ["string", "null"], "minLength": 1, "maxLength": 128 },
+    "osName": { "type": ["string", "null"], "minLength": 1, "maxLength": 64 },
+    "osVersion": { "type": ["string", "null"], "minLength": 1, "maxLength": 128 },
+    "browserName": { "type": ["string", "null"], "minLength": 1, "maxLength": 64 },
+    "browserVersion": { "type": ["string", "null"], "minLength": 1, "maxLength": 128 },
+    "launchMode": { "enum": ["pwa", "browser-tab", null] },
+    "viewportCss": { "$ref": "#/$defs/sizeOrNull" },
+    "devicePixelRatio": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+    "drawingBufferPx": { "$ref": "#/$defs/sizeOrNull" },
+    "ramGiB": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+    "gpu": { "type": ["string", "null"], "minLength": 1, "maxLength": 256 },
+    "freeStorageBytes": { "type": ["integer", "null"], "minimum": 0 },
+    "power": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "chargePercent", "lowPowerMode", "thermalCondition"],
+      "properties": {
+        "source": { "enum": ["battery", "ac", "unknown"] },
+        "chargePercent": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+        "lowPowerMode": { "type": ["boolean", "null"] },
+        "thermalCondition": { "enum": ["cool", "warm", "hot", "unknown"] }
+      }
+    },
+    "notes": { "type": "array", "items": { "type": "string", "maxLength": 512 } }
+  },
+  "$defs": {
+    "size": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "sizeOrNull": { "oneOf": [{ "$ref": "#/$defs/size" }, { "type": "null" }] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "measured" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "environmentId": { "type": "string" },
+          "deviceModel": { "type": "string" },
+          "osName": { "type": "string" },
+          "osVersion": { "type": "string" },
+          "browserName": { "type": "string" },
+          "browserVersion": { "type": "string" },
+          "launchMode": { "enum": ["pwa", "browser-tab"] },
+          "viewportCss": { "$ref": "#/$defs/size" },
+          "devicePixelRatio": { "type": "number", "exclusiveMinimum": 0 },
+          "drawingBufferPx": { "$ref": "#/$defs/size" },
+          "ramGiB": { "type": "number", "exclusiveMinimum": 0 },
+          "gpu": { "type": "string" },
+          "freeStorageBytes": { "type": "integer", "minimum": 0 },
+          "power": {
+            "type": "object",
+            "properties": {
+              "source": { "enum": ["battery", "ac"] },
+              "chargePercent": { "type": "number", "minimum": 0, "maximum": 100 },
+              "lowPowerMode": { "type": "boolean" },
+              "thermalCondition": { "enum": ["cool", "warm", "hot"] }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

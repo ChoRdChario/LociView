@@ -1,6 +1,6 @@
 # LociView project map
 
-> Status: `CURRENT` map for normalized baseline commit `fc7054f` (2026-08-18).
+> Status: `CURRENT` map; repository-normalization baseline `fc7054f` (2026-08-18).
 > Gaussian Splatting, multiple simultaneous models, Automerge, content-addressed storage, and renderer backends are `PROPOSED`, not current behavior.
 
 ## Start here
@@ -30,6 +30,8 @@ For a normal task, read only the target file, its matching tests, and direct imp
 | `src/ui` | App shell, home, viewer screen, dialogs, tabs, and UI-only state |
 | `tests` | Executable contracts for core, assets, I/O, and UI logic |
 | `public/samples` | Small deterministic files used by the manual viewer and iOS runbook |
+| `fixtures` | G0 fixture registry, provenance, hashes and small committed fixture metadata |
+| `evidence/g0` | Pending device/run schemas and small evidence manifests; large artifacts remain external |
 
 ## Actual dependency direction
 
@@ -99,6 +101,10 @@ The following risks are observed in the current code and are not fixed by G-1:
 | Whole-buffer large-file path | Package and asset paths can hold full ZIP/entry buffers, conflicting with large GS and iOS memory goals | `src/assets/zipio.ts`, `src/assets/package.ts`, `src/platform/fs.ts` |
 
 These are G0 regression inputs and blocking items for the `G0-S` v1 safety-stabilization gate in `tasks/todo.md`. Do not claim conflict-free multi-tab durability from the current v1 implementation.
+
+The executable `G0S-*` cases use Vitest `it.fails` while the defects remain in
+v1. They assert the desired safe invariant: an unexpected pass makes the suite
+fail and requires the G0-S fix to convert that case to an ordinary test.
 
 ## Verification matrix
 

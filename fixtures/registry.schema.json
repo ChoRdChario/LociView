@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lociview.example/schemas/g0-fixture-registry-v1.json",
+  "title": "LociView G0 fixture registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "registryVersion", "fixtures"],
+  "properties": {
+    "$schema": { "const": "./registry.schema.json" },
+    "registryVersion": { "const": 1 },
+    "fixtures": { "type": "array", "items": { "$ref": "#/$defs/fixture" } }
+  },
+  "$defs": {
+    "vec3": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "prefixItems": [{ "type": "number" }, { "type": "number" }, { "type": "number" }],
+      "items": false
+    },
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "storage", "byteSize", "sha256", "mediaType", "classification", "geometry", "coordinates", "provenance", "license", "privacy", "restore", "expected"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,95}$" },
+        "storage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tier", "path"],
+          "properties": {
+            "tier": { "enum": ["git", "generated", "external"] },
+            "path": { "type": "string", "minLength": 1, "maxLength": 512 }
+          }
+        },
+        "byteSize": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "mediaType": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "classification": { "enum": ["mesh", "ordinary-point-cloud", "gaussian-splat", "package", "evidence"] },
+        "geometry": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["triangleCount", "ordinaryPointCount", "splatCount", "textureCount", "bounds"],
+          "properties": {
+            "triangleCount": { "type": "integer", "minimum": 0 },
+            "ordinaryPointCount": { "type": "integer", "minimum": 0 },
+            "splatCount": { "type": "integer", "minimum": 0 },
+            "textureCount": { "type": "integer", "minimum": 0 },
+            "bounds": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["min", "max"],
+              "properties": { "min": { "$ref": "#/$defs/vec3" }, "max": { "$ref": "#/$defs/vec3" } }
+            }
+          }
+        },
+        "coordinates": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["handedness", "upAxis", "unit"],
+          "properties": {
+            "handedness": { "enum": ["right", "left", "unspecified"] },
+            "upAxis": { "enum": ["+X", "+Y", "+Z", "unspecified"] },
+            "unit": { "type": "string", "minLength": 1, "maxLength": 64 }
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "source", "reproducibility"],
+          "properties": {
+            "kind": { "enum": ["generated", "anonymized-derived", "third-party"] },
+            "source": { "type": "string", "minLength": 1, "maxLength": 1024 },
+            "reproducibility": { "enum": ["pinned-output-only", "byte-reproducible", "external-restore"] }
+          }
+        },
+        "license": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["spdx", "reviewStatus"],
+          "properties": {
+            "spdx": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "reviewStatus": { "enum": ["unreviewed", "approved"] }
+          }
+        },
+        "privacy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["content", "personalData", "anonymization"],
+          "properties": {
+            "content": { "enum": ["synthetic", "anonymized-derived", "operational"] },
+            "personalData": { "type": "boolean" },
+            "anonymization": { "type": "string", "minLength": 1, "maxLength": 256 }
+          }
+        },
+        "restore": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["method", "instructions"],
+          "properties": {
+            "method": { "enum": ["repository", "generate", "external"] },
+            "instructions": { "type": "string", "minLength": 1, "maxLength": 1024 }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["classification", "warnings"],
+          "properties": {
+            "classification": { "enum": ["mesh", "ordinary-point-cloud", "gaussian-splat", "package", "evidence"] },
+            "warnings": { "type": "array", "items": { "type": "string", "maxLength": 256 } }
+          }
+        }
+      }
+    }
+  }
+}

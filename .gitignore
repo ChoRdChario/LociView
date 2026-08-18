@@ -4,3 +4,4 @@ coverage/
 *.local
 .DS_Store
 dev-dist/
+.artifacts/fixtures/

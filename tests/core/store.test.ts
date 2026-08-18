@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { ProjectStore, type Identity } from '../../src/core/store';
 import { visibleEntities } from '../../src/core/reduce';
 import { MemoryFS } from '../../src/platform/fs';
+import { FaultInjectingMemoryFS } from '../helpers/faultFs';
 
 const USER_A: Identity = { userId: 'usr_AAA', deviceId: 'dev_A1', displayName: '田中' };
 const USER_B: Identity = { userId: 'usr_BBB', deviceId: 'dev_B1', displayName: '鈴木' };
@@ -137,5 +138,58 @@ describe('ProjectStore 2者マージ（UC2）', () => {
     expect(ownLogAfter).toBe(ownLogBefore);
     const files = await fsB.list('p/ops/');
     expect(files).toHaveLength(2);
+  });
+});
+
+describe('G0-S characterization: actor/sequence と durable write queue', () => {
+  describe('G0S-TAB precondition', () => {
+    let captionIds: string[];
+    let expectedIds: string[];
+
+    beforeAll(async () => {
+    const fs = new MemoryFS();
+    await ProjectStore.create(fs, 'projects/tabs', 'tabs', USER_A);
+
+    const [tabA, tabB] = await Promise.all([
+      ProjectStore.open(fs, 'projects/tabs', USER_A),
+      ProjectStore.open(fs, 'projects/tabs', USER_A),
+    ]);
+    const capA = tabA.createEntity('caption', { title: 'tab A' });
+    const capB = tabB.createEntity('caption', { title: 'tab B' });
+    await Promise.all([tabA.flush(), tabB.flush()]);
+
+    const reopened = await ProjectStore.open(fs, 'projects/tabs', USER_A);
+      captionIds = visibleEntities(reopened.state, 'caption').map((record) => record.id);
+      expectedIds = [capA, capB];
+    });
+
+    it.fails('G0S-TAB: 同一identityで同時に開いた2 storeの異なる操作がreload後も両方残る', () => {
+      expect(captionIds).toEqual(expect.arrayContaining(expectedIds));
+    });
+  });
+
+  describe('G0S-WRITE precondition', () => {
+    let captionIds: string[];
+    let expectedIds: string[];
+
+    beforeAll(async () => {
+      const fs = new FaultInjectingMemoryFS();
+      const store = await ProjectStore.create(fs, 'projects/write', 'write', USER_A);
+      fs.failNext('appendText', `projects/write/ops/${store.actorId}.jsonl`);
+
+      const capA = store.createEntity('caption', { title: 'first queued write' });
+      await store.flush().catch(() => undefined);
+      fs.assertAllConsumed();
+      const capB = store.createEntity('caption', { title: 'write after transient failure' });
+      await store.flush().catch(() => undefined);
+
+      const reopened = await ProjectStore.open(fs, 'projects/write', USER_A);
+      captionIds = visibleEntities(reopened.state, 'caption').map((record) => record.id);
+      expectedIds = [capA, capB];
+    });
+
+    it.fails('G0S-WRITE: 一度だけ失敗したappendを再試行し、後続操作まで順序どおりdurableになる', () => {
+      expect(captionIds).toEqual(expect.arrayContaining(expectedIds));
+    });
   });
 });

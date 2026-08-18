@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "g0-external-artifact-manifest-1",
+  "status": "pending",
+  "manifestId": null,
+  "runId": null,
+  "artifacts": [],
+  "notes": [
+    "Large artifacts remain outside Git. Add SHA-256, byte size, a restorable locator, capture time, sensitivity and retention metadata."
+  ]
+}

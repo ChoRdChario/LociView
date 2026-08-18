@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import {
   exportOpsOnlyZip,
   exportProjectZip,
@@ -6,18 +6,19 @@ import {
   inspectZip,
   mergeFromInspection,
 } from '../../src/assets/package';
+import { addModelAsset } from '../../src/assets/modelAsset';
 import { readZipEntries, sanitizeZipPath, writeZipEntries, ZipGuardError } from '../../src/assets/zipio';
 import { visibleEntities } from '../../src/core/reduce';
 import { ProjectStore, type Identity } from '../../src/core/store';
 import { MemoryFS } from '../../src/platform/fs';
+import { FaultInjectingMemoryFS } from '../helpers/faultFs';
 
 const USER_A: Identity = { userId: 'usr_AAA', deviceId: 'dev_A1', displayName: '田中' };
 const USER_B: Identity = { userId: 'usr_BBB', deviceId: 'dev_B1', displayName: '鈴木' };
 
 const encoder = new TextEncoder();
 
-async function makeProject(): Promise<{ fs: MemoryFS; store: ProjectStore; dir: string }> {
-  const fs = new MemoryFS();
+async function makeProject(fs: MemoryFS = new MemoryFS()): Promise<{ fs: MemoryFS; store: ProjectStore; dir: string }> {
   const dir = 'projects/p1';
   const store = await ProjectStore.create(fs, dir, '現場A', USER_A);
   const astId = store.createEntity('asset', {
@@ -37,6 +38,43 @@ async function makeProject(): Promise<{ fs: MemoryFS; store: ProjectStore; dir: 
   });
   await store.flush();
   return { fs, store, dir };
+}
+
+function bytesEqual(actual: Uint8Array, expected: Uint8Array): boolean {
+  return actual.length === expected.length && actual.every((value, index) => value === expected[index]);
+}
+
+async function visibleAssetBlobsMatch(
+  fs: MemoryFS,
+  dir: string,
+  store: ProjectStore,
+  expectedByPath: ReadonlyMap<string, Uint8Array>,
+): Promise<boolean> {
+  for (const asset of visibleEntities(store.state, 'asset')) {
+    const path = asset.fields.path;
+    if (typeof path !== 'string') return false;
+    const expected = expectedByPath.get(path);
+    const actual = await fs.readBytes(`${dir}/${path}`);
+    if (expected === undefined || actual === null || !bytesEqual(actual, expected)) return false;
+    if (typeof asset.fields.size === 'number' && asset.fields.size !== actual.length) return false;
+
+    const optimizedPath = asset.fields.optimizedPath;
+    if (typeof optimizedPath === 'string' && optimizedPath !== '') {
+      const expectedOptimized = expectedByPath.get(optimizedPath);
+      const actualOptimized = await fs.readBytes(`${dir}/${optimizedPath}`);
+      if (
+        expectedOptimized === undefined ||
+        actualOptimized === null ||
+        !bytesEqual(actualOptimized, expectedOptimized)
+      ) return false;
+      if (typeof asset.fields.optimizedSize === 'number' && asset.fields.optimizedSize !== actualOptimized.length) return false;
+    }
+  }
+  return true;
+}
+
+function expectedBinaries(inspection: Awaited<ReturnType<typeof inspectZip>>): Map<string, Uint8Array> {
+  return new Map(inspection.binaries.map(({ path, data }) => [path, data]));
 }
 
 describe('sanitizeZipPath', () => {
@@ -187,5 +225,81 @@ describe('ZIPマージ（UC2: 回覧統合）', () => {
     const diffZip = await exportOpsOnlyZip(fsB, 'p', storeB);
     const report = await mergeFromInspection(fs, dir, store, await inspectZip(diffZip));
     expect(report.created).toHaveLength(1);
+  });
+});
+
+describe('G0-S characterization: package interruption', () => {
+  describe('G0S-BLOB/import precondition', () => {
+    let safe: boolean;
+
+    beforeAll(async () => {
+      const source = await makeProject();
+      const inspection = await inspectZip(await exportProjectZip(source.fs, source.dir, source.store));
+      const target = new FaultInjectingMemoryFS();
+      const targetDir = 'projects/interrupted-import';
+      const failedBinary = inspection.binaries[0]!;
+      target.failNext('writeBytes', `${targetDir}/${failedBinary.path}`);
+
+      await importNewProject(target, targetDir, inspection).catch(() => undefined);
+      target.assertAllConsumed();
+      const active = await target.exists(`${targetDir}/lociview.json`);
+      let opened = false;
+      let blobsMatch = false;
+      if (active) {
+        try {
+          const reopened = await ProjectStore.open(target, targetDir, USER_B);
+          opened = true;
+          blobsMatch = await visibleAssetBlobsMatch(target, targetDir, reopened, expectedBinaries(inspection));
+        } catch {
+          // An active marker plus an unopenable project is unsafe, not inactive staging.
+        }
+      }
+      safe = !active || (opened && blobsMatch);
+    });
+
+    it.fails('G0S-BLOB/import: interrupted new-project import is either inactive or has every referenced blob', () => {
+      expect(safe).toBe(true);
+    });
+  });
+
+  describe('G0S-BLOB/merge precondition', () => {
+    let safe: boolean;
+
+    beforeAll(async () => {
+      const targetFs = new FaultInjectingMemoryFS();
+      const target = await makeProject(targetFs);
+      const baseZip = await exportProjectZip(target.fs, target.dir, target.store);
+
+      const peerFs = new MemoryFS();
+      await importNewProject(peerFs, 'projects/peer', await inspectZip(baseZip));
+      const peerStore = await ProjectStore.open(peerFs, 'projects/peer', USER_B);
+      const incomingAssetId = await addModelAsset(
+        peerFs,
+        'projects/peer',
+        peerStore,
+        'incoming.stl',
+        encoder.encode('solid incoming\nendsolid incoming\n'),
+      );
+      await peerStore.flush();
+      const incomingPath = peerStore.state.byKind.asset![incomingAssetId]!.fields.path as string;
+      const incoming = await inspectZip(await exportProjectZip(peerFs, 'projects/peer', peerStore));
+
+      targetFs.failNext('writeBytes', `${target.dir}/${incomingPath}`);
+      await mergeFromInspection(targetFs, target.dir, target.store, incoming).catch(() => undefined);
+      targetFs.assertAllConsumed();
+      await target.store.flush().catch(() => undefined);
+
+      safe = false;
+      try {
+        const reopened = await ProjectStore.open(targetFs, target.dir, USER_A);
+        safe = await visibleAssetBlobsMatch(targetFs, target.dir, reopened, expectedBinaries(incoming));
+      } catch {
+        // A merge must not make an existing project unopenable.
+      }
+    });
+
+    it.fails('G0S-BLOB/merge: interrupted package merge never leaves visible metadata pointing to a missing blob', () => {
+      expect(safe).toBe(true);
+    });
   });
 });
