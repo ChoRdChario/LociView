@@ -32,7 +32,7 @@ Completed v1 implementation history remains available in Git before the G-1 clea
 - [x] Draft the metadata, CAS, package-purpose, transaction-recovery, conflict, and v1 conversion contract
 - [x] Draft G0, blocking G0-S, G1 PoCs, feature flags, rollback, evidence, and delivery sequence
 - [x] Complete independent adversarial review with no unresolved P0/P1
-- [ ] Obtain product-owner approval before production implementation
+- [x] Obtain product-owner approval before production implementation
 
 ### S0 review record
 
@@ -41,7 +41,7 @@ Completed v1 implementation history remains available in Git before the G-1 clea
 - Mechanical evidence: `git diff --check` passed, all Markdown relative links resolved, and 120 requirement/acceptance IDs were unique
 - Regression evidence: typecheck passed, 14 test files / 121 tests passed, and the production build passed
 - The production build still reports the existing `viewer` chunk above Vite's 500 kB warning threshold; this is performance evidence for G0/G1 rather than an S0 documentation failure
-- No production implementation is authorized by this record; the product-owner approval checkbox remains open
+- Product owner formally approved S0 on 2026-08-19 and authorized G0 to begin; later production work remains gated by G0/G0-S/G1 evidence
 
 ### Product-owner decisions recorded 2026-08-19
 

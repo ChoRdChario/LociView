@@ -1,6 +1,6 @@
 # Product and release contract
 
-> Status: `PROPOSED FOR PRODUCT-OWNER APPROVAL / NOT IMPLEMENTED`
+> Status: `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED`
 
 ## 1. Product outcome
 

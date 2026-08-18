@@ -1,6 +1,6 @@
 # Storage, package and migration specification
 
-> Status: `PROPOSED FOR PRODUCT-OWNER APPROVAL / NOT IMPLEMENTED`
+> Status: `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED`
 
 ## 1. Scope and candidate status
 

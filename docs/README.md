@@ -34,11 +34,11 @@ If observed code conflicts with the applicable compatibility or accepted future 
 | `v2/00-approved-direction.md` | `ACCEPTED DIRECTION SUMMARY / NON-NORMATIVE / NOT IMPLEMENTED` | Navigation summary; ADR and approved specifications are authoritative |
 | `adr/0001-v2-foundation.md` | `ACCEPTED DIRECTION / CONDITIONAL TECHNOLOGY` | Rationale, rejected alternatives, and reconsideration triggers |
 | `history/legacy-locimyu-alpha.md` | `PROVENANCE` | Location and hashes of archived legacy evidence |
-| `specs/README.md` | `PROPOSED IMPLEMENTATION CONTRACT / NOT IMPLEMENTED` | Index and authority for the review-ready v2 specification package |
-| `specs/00-product-contract.md` | `PROPOSED FOR APPROVAL` | Product guarantees, MVP boundary, privacy and mobile behavior |
-| `specs/01-domain-rendering.md` | `PROPOSED FOR APPROVAL` | Frames, revisions, SceneDocument, modes, picking and renderer gates |
-| `specs/02-storage-package-migration.md` | `PROPOSED FOR APPROVAL` | Metadata/CAS candidate boundaries, transactions, package purposes and conversion |
-| `specs/03-gates-and-delivery.md` | `PROPOSED FOR APPROVAL` | G0/G0-S/G1 evidence, thresholds, feature flags, rollback and schedule |
+| `specs/README.md` | `PRODUCT-OWNER APPROVED CONTRACT / NOT IMPLEMENTED` | Index and authority for the gated v2 implementation contract |
+| `specs/00-product-contract.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | Product guarantees, MVP boundary, privacy and mobile behavior |
+| `specs/01-domain-rendering.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | Frames, revisions, SceneDocument, modes, picking and renderer gates |
+| `specs/02-storage-package-migration.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | Metadata/CAS candidate boundaries, transactions, package purposes and conversion |
+| `specs/03-gates-and-delivery.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | G0/G0-S/G1 evidence, thresholds, feature flags, rollback and schedule |
 
 ## Known implementation drift
 

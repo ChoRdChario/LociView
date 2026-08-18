@@ -1,8 +1,8 @@
 # LociView v2 implementation specifications
 
-> Status: `PROPOSED FOR PRODUCT-OWNER APPROVAL / NOT IMPLEMENTED`
+> Status: `PRODUCT-OWNER APPROVED IMPLEMENTATION CONTRACT / NOT IMPLEMENTED`
 > Baseline implementation: normalized v1 commit `fc7054f`; this specification revision is identified by its own Git commit
-> Updated: 2026-08-18
+> Approved: 2026-08-19
 
 These documents turn ADR-0001 and the approved v2 direction into testable implementation contracts. They intentionally separate fixed product and domain rules from technologies that may still fail a proof-of-concept gate.
 
@@ -18,7 +18,7 @@ The authority order for v2 work is:
 
 `docs/v2/00-approved-direction.md` is a non-normative navigation summary of the ADR and, after approval, these specifications. It cannot override either. Its MVP and gate summaries MUST be updated in the same change when a normative source changes.
 
-Until the product owner approves this package, it constrains experimentation but does not authorize production implementation. Nothing here means that GS, multiple models, Automerge, CAS, or renderer backends already exist.
+The product owner approved this package on 2026-08-19 and authorized work to proceed through its gates in order. Approval authorizes G0 now; it does not bypass G0-S/G1 evidence or mean that GS, multiple models, Automerge, CAS, or renderer backends already exist.
 
 The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metric marked **provisional** is a gate input to be confirmed in G0, not a released product guarantee.
 
