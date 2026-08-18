@@ -22,7 +22,7 @@ The current application remains the migration base. v2 replaces storage and rend
 | `PROD-08` | Review/share export excludes edit history by construction; clean editable copy starts a new lineage. |
 | `PROD-09` | Large GS and package paths degrade quality or refuse safely before browser memory pressure kills the page. |
 | `PROD-10` | Unsupported schema, renderer capability, material policy or missing blob produces an actionable diagnosis, not a blank viewer. |
-| `PROD-11` | The same validated static source produces the same pose, logical bounds, material class, canonical pick anchor/method and approximation label across supported backends; candidate-local weak provenance may differ or be absent, and a decoder upgrade cannot reinterpret an existing Representation silently. |
+| `PROD-11` | The same validated static source produces the same pose, logical bounds, material class and canonical pick anchor/method across supported backends; candidate-local weak provenance may differ or be absent, and a decoder upgrade cannot reinterpret an existing Representation silently. |
 
 ## 3. Product modes and support levels
 
@@ -41,7 +41,7 @@ Support labels MUST appear in UI and diagnostics:
 - **Experimental**: opt-in, may be disabled automatically under resource pressure, and never changes saved intent silently.
 - **Unsupported**: blocked with a route to Mesh, GS, Compare or an explicit material conversion.
 
-Smooth alpha blend, transmission/refraction and arbitrary multi-layer intersection between closed mesh and GS are not **Supported** in the MVP. A backend MAY offer an experimental approximation, but MUST identify it as approximate and MUST preserve the requested semantic material policy in data.
+Smooth alpha blend, transmission/refraction and arbitrary multi-layer intersection between closed mesh and GS are not **Supported** in the MVP. After G1-D, a backend MAY offer an explicitly experimental smooth-alpha approximation while preserving the requested semantic material policy. Transmission/refraction remains **Unsupported** and redirected until a separate later material/research gate; G1-D does not authorize it.
 
 Display sets remain distinct from product modes. Existing workflows use a set to combine caption membership, material appearance and a saved view; v2 MUST preserve caption tags, portable set ordering and an explicit per-set default view rather than removing that concept merely because mode selection exists.
 
@@ -67,11 +67,19 @@ Display sets remain distinct from product modes. Existing workflows use a set to
 
 The user selects a reference asset and adjusts another asset non-destructively. The MVP MUST provide numeric and gizmo translation, quaternion-backed rotation, positive uniform scale, reset/undo, bounds-based coarse alignment, and a saved alignment revision. Point-correspondence fitting MAY follow after the manual path is stable; ICP is not an MVP requirement.
 
-### 4.4 Caption a GS
+### 4.4 Add a visual repair pair
 
-The app first attempts direct GS picking. If the backend cannot meet the accepted latency or quality threshold, it offers GPU ID/depth picking or a precomputed interaction proxy. A proxy-derived hit MUST be labelled approximate and MUST NOT be presented as survey-grade measurement.
+1. Select the existing logical asset and target GS families.
+2. Import a human-authored repair mesh while preserving its source bytes.
+3. Align its RepresentationFrame into the target AssetFrame with a temporary Sim(3) repair gizmo; this does not create a second logical asset or change the asset's ProjectFrame alignment.
+4. Optionally author/import the paired hard exclusion in AssetFrame and preview patch plus mask together.
+5. Commit the patch, optional exclusion, new immutable asset revision and binding atomically after every required blob is durable; the binding copies the prior `assetToProject`. Unchanged base-surface pin classes remain valid, while the repair family receives its own class so later patch replacement/removal reviews only repair-authored pins.
 
-### 4.5 Exchange work
+### 4.5 Caption a GS
+
+The app first attempts direct GS picking. If the backend cannot meet the accepted latency or quality threshold, it offers GPU ID/depth picking or a precomputed interaction proxy. The stored anchor retains its current internal hit method/confidence for validation and diagnostics, but the ordinary pin UI does not add a persistent “approximate” badge: every created pin is movable with the same gizmo correction flow. A manual gizmo correction preserves a still-active compatibility class; if the old class is no longer active, the user explicitly targets one active visual family and rebinds to its current class. In either case the command records the active revision, changes the current method to `manual`, and removes stale normal/source/confidence evidence. LociView does not present any GS- or proxy-derived anchor as survey-grade measurement.
+
+### 4.6 Exchange work
 
 Users choose one of three explicit outputs:
 
@@ -120,7 +128,7 @@ Excluded:
 
 ## 7. Mobile behavior
 
-iOS is a supported runtime target, not a raw-processing target. Runtime MUST use paged derivatives, explicit CPU/GPU/render-target budgets, cancellation and progressive restore. Under pressure it SHOULD degrade in this order:
+iOS is a required release-candidate target, not yet a released support guarantee and not a raw-processing target. iPhone 14 Pro is the current physical-alpha baseline; support wording and limits require G0 evidence and product-owner approval. Runtime MUST use paged derivatives, explicit CPU/GPU/render-target budgets, cancellation and progressive restore. Under pressure it SHOULD degrade in this order:
 
 1. evict invisible derived resources;
 2. reduce GS draw/resident budgets;
@@ -145,11 +153,22 @@ For one developer working with AI, the current public-candidate envelope is **28
 
 Productionizing an acceptable WBOIT approximation may add roughly 3–7 focused weeks. A general exact mesh/GS rasterizer is a separate research programme and cannot be scheduled as an MVP task from the current evidence.
 
-## 10. Product-owner decisions still required
+## 10. Product-owner decisions and remaining approvals
 
-- oldest physical iPhone/iPad and desktop classes to support;
-- G0 performance and package-size guarantees after baseline measurement;
-- wording and default behavior for experimental smooth transparency;
-- whether direct-GS approximate pins are acceptable for the first alpha;
-- final merge conflict UX and privacy labels;
-- approval of the v1-to-v2 conversion report and public release.
+Recorded on 2026-08-19:
+
+- the oldest physical iOS target available for repeated alpha testing is iPhone 14 Pro; no iPad/iPadOS support claim is made without a repeatedly testable iPad, while a tablet PC is a separate desktop/touch test class;
+- GS/proxy picks create ordinary editable pins without a persistent approximation badge; internal hit method/confidence remains portable metadata and the product makes no measurement-grade claim;
+- smooth-alpha Integrated implementation is deferred to optional G1-D after a base renderer passes and does not block the MVP; transmission/refraction remains Unsupported until a later explicit material/research scope because G1-D alone cannot validate it;
+- ordinary-point profiles and the current binary default may proceed to G0 visual/device validation;
+- `visualPatch + splatExclusion` is the rendering pair for a human-authored/imported repair model, with the MVP hard-mask contract accepted;
+- runtime animation playback remains outside the MVP;
+- semantic collaboration conflicts fail closed for the affected unit rather than silently selecting a winner.
+
+Still required later:
+
+- tablet-PC hardware/OS/browser details and any additional repeatedly testable release classes;
+- G0 performance, memory, package-size, support-class and degradation guarantees after baseline measurement;
+- adoption, wording and default behavior for experimental smooth transparency only if G1-D passes, and a separate future decision before any transmission/refraction claim;
+- final merge-conflict interaction design and privacy labels; the fail-closed behavior itself is accepted;
+- approval of the v1-to-v2 conversion report, stabilized-v1 release and public release.

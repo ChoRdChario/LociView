@@ -38,10 +38,20 @@ Completed v1 implementation history remains available in Git before the G-1 clea
 
 - Normative package: `docs/specs/00-product-contract.md` through `03-gates-and-delivery.md`, with ADR/navigation summaries updated in the same change
 - Independent read-only reviews covered storage/package/migration, renderer/profile/transform, and material/compositing boundaries; the final frozen working tree has no unresolved P0/P1
-- Mechanical evidence: `git diff --check` passed, all Markdown relative links resolved, and 110 requirement/acceptance IDs were unique
+- Mechanical evidence: `git diff --check` passed, all Markdown relative links resolved, and 120 requirement/acceptance IDs were unique
 - Regression evidence: typecheck passed, 14 test files / 121 tests passed, and the production build passed
 - The production build still reports the existing `viewer` chunk above Vite's 500 kB warning threshold; this is performance evidence for G0/G1 rather than an S0 documentation failure
 - No production implementation is authorized by this record; the product-owner approval checkbox remains open
+
+### Product-owner decisions recorded 2026-08-19
+
+- iPhone 14 Pro is the oldest physical iOS alpha target available for repeated testing; no iPad/iPadOS support claim is made yet, and the tablet PC is recorded separately after its OS/browser/RAM/GPU are supplied
+- GS/proxy picks use the ordinary editable pin UI without a persistent approximation badge; method/confidence remains internal metadata and no measurement-grade claim is made
+- smooth-alpha Integrated work is deferred to optional G1-D after the base renderer gate; transmission/refraction needs a later separate material/research decision, and neither blocks MVP delivery
+- ordinary-point handling and the current binary default proceed to G0 visual/device validation
+- hard `splatExclusion` is accepted as the rendering counterpart of a human-authored/imported `visualPatch`
+- animation playback remains outside MVP
+- semantic conflicts fail closed only for the affected unit and never silently choose a winner
 
 ## G0 — Baseline fixtures and acceptance contracts
 
@@ -50,7 +60,7 @@ Start only after G-1 passes and the product owner approves S0.
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
-- [ ] Record target desktop and physical-iOS devices
+- [ ] Complete target-device record: iPhone 14 Pro is fixed as the oldest physical-iOS alpha target; add desktop and tablet-PC OS/browser/RAM/GPU details
 - [ ] Measure current load, memory, frame-time, picking, and package baselines
 - [ ] Add and confirm failing G0-S characterization tests on the unfixed v1 baseline
 - [ ] Approve support guarantees, degradation behavior, and Go/No-Go thresholds

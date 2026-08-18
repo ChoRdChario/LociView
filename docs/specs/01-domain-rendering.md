@@ -129,12 +129,17 @@ interface AssetBindingRevision {
   payloadDigest: string;
 }
 
+interface AnchorCompatibilityClass {
+  id: AnchorCompatibilityId;
+  targetVariantFamilyIds: readonly [VariantFamilyId, ...VariantFamilyId[]];
+}
+
 interface AssetRevision {
   id: AssetRevisionId;
   assetId: AssetId;
   parentRevisionId?: AssetRevisionId;
   representationIds: readonly RepresentationId[];
-  anchorCompatibilityId: AnchorCompatibilityId;
+  anchorCompatibilityClasses: readonly AnchorCompatibilityClass[];
   materialCompatibilityMaps?: readonly MaterialCompatibilityMap[];
   provenance: Provenance;
   payloadDigest: string;
@@ -258,14 +263,14 @@ type BackgroundIntent =
 - `Representation`, `AssetRevision` and `AssetBindingRevision` are immutable and carry canonical payload digests.
 - Their metadata maps are append-only within a collaboration lineage. “Retired” means no active/conflicting strong reference reaches the record; the record and ID are not deleted or reused, although an unreferenced blob may later be collected under the storage rules.
 - Creating a new derivative, proxy or preview creates a new `Representation`, a new `AssetRevision`, and a new `AssetBindingRevision` that copies the previous `assetToProject`; activation changes the one binding pointer only after all new bytes are durable.
-- Adding a surface-equivalent derivative MAY preserve `anchorCompatibilityId`.
-- A changed origin, scale, topology or uncertain correspondence gets a new compatibility ID.
+- `anchorCompatibilityClasses` is sorted by class ID. Its immutable partition domain is the distinct VariantFamily IDs appearing among this revision's `representationIds` whose role is `meshPrimary`, `pointPrimary`, `gsPrimary` or `visualPatch`; it does not depend on current purpose, visibility, LOD, backend eligibility or RenderPlan. Each class has a non-empty, deduplicated, lexicographically sorted target-family list, and those lists partition that domain exactly once. Proxy and exclusion families never own a class; a proxy uses the class containing its declared GS target. New v2 import/authoring creates one singleton class per pickable family; only a pinned migration/compatibility procedure may conservatively group families whose prior anchors cannot be distinguished. A `visualPatch` family always has its own singleton class and never shares one with the base mesh/point/GS families.
+- Adding a surface-equivalent candidate inside an unchanged VariantFamily MAY preserve that family's class ID even when its encoded RepresentationFrame differs but the validated transform maps it to the same AssetFrame contribution. Carrying a class ID into a new revision requires the exact same target-family list and verified surface equivalence for every member. An AssetFrame surface/topology change or uncertain correspondence creates a new VariantFamily and a new compatibility class; any class-membership change also requires a new class ID. Adding or removing an unrelated class does not invalidate retained classes; removing or surface-changing a patch drops/replaces only its singleton class.
 - Replacement creates a new asset revision and a new binding, verifies every required blob, then changes only `activeBindingId`.
 - The old revision and binding metadata remain available in the collaboration lineage. Their bytes remain available only while a current/conflict/retention root requires them.
 - Concurrent `activeBindingId` changes are a user-visible conflict. The asset is absent from every authoritative mode and cannot be edited or exported as resolved state until the conflict is resolved. The UI MAY offer labelled read-only previews of each candidate, selected explicitly rather than through a CRDT materialized winner.
 - An unresolved asset has no binding and no fabricated `BlobRef`. It remains a valid container for migrated captions and diagnosis. `pendingAssetToProject`, when present, is canonical portable placement intent only and does not activate scene content. Assigning real content stages and verifies representations, creates a revision/binding whose `assetToProject` equals that pending value unless the user explicitly chooses another transform in the same reviewed command, then replaces the complete atomic `Asset.status` with `ready`. If no pending value exists, assignment requires an explicit alignment choice rather than silently assuming identity. Concurrent status replacements retain whole-status candidates rather than mixing kind/reason/binding fields.
 - Ownership is closed over immutable records. For every `AssetBindingRevision B`, `B.assetRevisionId` resolves to an `AssetRevision R` and `B.assetId === R.assetId`. When present, `B.parentBindingId` resolves to a binding for the same asset, and `R.parentRevisionId` resolves to a revision for the same asset. A ready `Asset A` may name `B` through `activeBindingId` only when `A.id === B.assetId`. A missing or cross-asset owner/reference invalidates the affected binding/revision closure before SceneDocument; no resolver follows a foreign record by guessing.
-- Frame and compatibility ownership is also closed. `Project.frame.id` is distinct from every Asset/Representation frame, and each `Asset.assetFrameId` belongs to exactly one asset. Representations may share a `representationFrameId` only within that asset and only when their canonical persisted `representationToAsset` values have byte-identical `LociCanonicalJsonV1`; if `representationFrameId === assetFrameId`, the transform is canonical identity. An `AnchorCompatibilityId` may occur only on revisions and anchors for one asset. When an anchor's optional `authoredAssetRevisionId` resolves, that revision has the same asset. Validators derive these ownership indexes from the document and reject collisions; no general frame graph or compatibility registry is introduced.
+- Frame and compatibility ownership is also closed. `Project.frame.id` is distinct from every Asset/Representation frame, and each `Asset.assetFrameId` belongs to exactly one asset. Representations may share a `representationFrameId` only within that asset and only when their canonical persisted `representationToAsset` values have byte-identical `LociCanonicalJsonV1`; if `representationFrameId === assetFrameId`, the transform is canonical identity. An `AnchorCompatibilityId` may occur only on revision classes and anchors for one asset and at most once inside one revision. When an anchor's optional `authoredAssetRevisionId` resolves, that revision has the same asset and contains exactly one class whose ID equals `authoredAnchorCompatibilityId`; when source provenance also resolves, the class/source-family rule below applies. Validators derive these ownership/partition indexes from the document and reject collisions; no general frame graph or compatibility registry is introduced.
 - SceneResolver derives an asset's fit/union bound as the exact component-wise minimum/maximum union of each distinct visual VariantFamily's `logicalBoundsAsset`, counting one family once in lexicographic family-ID order and excluding `interactionProxy` and `splatExclusion`. It rejects an empty visual set, non-finite/inverted input and canonicalizes every zero result to positive zero. The result is stable across source/display/preview candidate switching and is never persisted as a second potentially divergent copy. A missing or mismatched family envelope invalidates the revision before SceneDocument.
 - To derive a ProjectFrame AABB, SceneResolver transforms all eight AssetFrame corners through the active binding's `assetToProject`, then takes component-wise minima/maxima and canonicalizes zero. Transforming only stored min/max endpoints or using a backend object's bounding box is invalid. Multi-asset fit is the same lexicographic-asset-ID union of those ProjectFrame boxes.
 
@@ -273,7 +278,7 @@ type BackgroundIntent =
 
 - A representation has exactly one role. If one blob serves two roles, create two immutable Representation records that share the BlobRef.
 - For a model container that contains both triangle and ordinary-point primitives, `contentKind` is also the subset selector: the `mesh` Representation exposes only triangle/cutout mesh primitives and the `pointCloud` Representation exposes only ordinary point primitives. A backend must not decode/draw the other contribution through that record. Unsupported primitive modes are diagnosed, never folded into either contribution by guess.
-- `meshPrimary`, `pointPrimary`, `gsPrimary`, and `visualPatch` are visual roles. `splatExclusion` is an Integrated control role. `interactionProxy` is interaction-only.
+- `meshPrimary`, `pointPrimary`, `gsPrimary`, and `visualPatch` are visual roles. A `visualPatch` is a human-authored or explicitly imported visual repair mesh; it is not inferred from, or silently replaced by, collision/proxy geometry. `splatExclusion` is its optional Integrated rendering control. `interactionProxy` is interaction-only.
 - `interactionProxy` requires `contentKind: 'mesh'` and purposes exactly `['interaction']`; it cannot be a visual or preview candidate.
 - `interactionProxy` names exactly one `proxyForGsVariantFamilyId` present in the same asset revision.
 - Relationship fields are role-closed. `proxyForGsVariantFamilyId` is required only for `interactionProxy`; `targetGsVariantFamilyIds` is required only for `splatExclusion`; and `compositeGroupId` is allowed only on `visualPatch` or `splatExclusion`. Every other role omits those members. A field on the wrong role is invalid rather than ignored.
@@ -328,23 +333,33 @@ type BackgroundIntent =
 ### 4.1 Caption anchor
 
 ```ts
-interface AssetAnchor {
+interface AssetAnchorBase {
   kind: 'asset';
   assetId: AssetId;
   assetFrameId: FrameId;
   positionAsset: Vec3;
-  normalAsset?: Vec3;
   authoredAssetRevisionId?: AssetRevisionId;
   authoredAnchorCompatibilityId: AnchorCompatibilityId;
-  hitEvidence?: {
-    method: 'mesh' | 'point-cloud' | 'direct-splat' | 'gpu-id-depth' | 'proxy';
-    confidence?: number;
-    source?: {
-      representationId: RepresentationId;
-      surfaceRef?: SurfaceRef;
-    };
-  };
 }
+
+type AssetAnchor =
+  | (AssetAnchorBase & {
+      normalAsset?: never;
+      hitEvidence: {
+        method: 'manual';
+      };
+    })
+  | (AssetAnchorBase & {
+      normalAsset?: Vec3;
+      hitEvidence?: {
+        method: 'mesh' | 'point-cloud' | 'direct-splat' | 'gpu-id-depth' | 'proxy';
+        confidence?: number;
+        source?: {
+          representationId: RepresentationId;
+          surfaceRef?: SurfaceRef;
+        };
+      };
+    });
 
 interface ProjectAnchor {
   kind: 'project';
@@ -354,11 +369,13 @@ interface ProjectAnchor {
 }
 ```
 
-The AssetFrame position is canonical. `authoredAnchorCompatibilityId` is the retained compatibility evidence. `authoredAssetRevisionId` is optional, non-resolving provenance: it MAY name a revision omitted from a history-free package and MUST NOT by itself add that revision or its blobs to package reachability. `hitEvidence.method` and `confidence` are safety semantics and survive history-free export, so a proxy-derived point remains labelled approximate. Only `hitEvidence.source.representationId/surfaceRef` are weak revision-scoped provenance and may be omitted when outside closure. A missing normal MUST NOT prevent caption creation. If the active revision has an incompatible or unknown `anchorCompatibilityId`, the caption becomes `needsReview`; it is never silently projected to a nearest surface. `Caption.anchor` is one atomic semantic field: a move/pick replaces the complete validated anchor in one change, and concurrent replacements surface whole-anchor candidates rather than mixing vector components.
+The AssetFrame position is canonical. `authoredAnchorCompatibilityId` is the retained surface-class evidence. A structurally valid ready anchor is compatible exactly when its ID occurs in the validated active revision's class set; absence yields `needsReview`. A duplicate/overlapping/otherwise ambiguous class partition instead invalidates the active revision closure and excludes the affected asset—it is not downgraded to ordinary pin review. `authoredAssetRevisionId` is normally optional, non-resolving provenance: it MAY name a revision omitted from a history-free package and MUST NOT by itself add that revision or its blobs to package reachability. `hitEvidence.method` and nonmanual `confidence` are internal safety/provenance semantics and survive history-free export; they do not require a persistent badge in the ordinary pin UI. Mesh-, point-, GS- and proxy-derived pins use the same visible pin and gizmo correction flow.
+
+A manual gizmo correction requires an unconflicted active binding. If the anchor's current class still occurs exactly once on the active revision, an ordinary move preserves that class without another family prompt. If it is `needsReview`, the user must explicitly select one active, pickable visual family and the command uses the unique class containing that family; missing/ambiguous selection refuses the command. The command replaces the complete anchor, sets `authoredAssetRevisionId` to the active revision, sets or preserves the resulting current `authoredAnchorCompatibilityId`, writes `hitEvidence:{method:'manual'}`, and omits `normalAsset`, `source` and `confidence`. An explicit rebind clears `needsReview`; merely changing coordinates without a target never does. Keeping an old surface normal, inactive compatibility ID or pick method on the new coordinate is invalid. The prior pick remains only in collaboration history where retained, not as current anchor provenance. `authoredAssetRevisionId` remains weak history: Review omits it, while Clean rewrites a compatible manual anchor to the rebuilt active revision and omits it from a still-`needsReview` manual anchor. Only nonmanual `hitEvidence.source.representationId/surfaceRef` are weak revision-scoped provenance and may be omitted when outside closure. A missing normal MUST NOT prevent caption creation. `Caption.anchor` is one atomic semantic field: a move/pick replaces the complete validated anchor in one change, and concurrent replacements surface whole-anchor candidates rather than mixing vector components.
 
 Frame IDs are validated assertions, not alternate routing choices. An `AssetAnchor` resolves its `assetId` to exactly one Asset and requires `assetFrameId === Asset.assetFrameId`. A `ProjectAnchor.projectFrameId` and every `SavedView.projectFrameId` require equality with `Project.frame.id`. A mismatch excludes the affected pin or view and produces an invalid-reference diagnostic; the resolver never chooses between the entity ID and frame ID.
 
-When `hitEvidence.source` is present, `authoredAssetRevisionId` is also present, resolves to the same asset and includes that Representation. The source method/content/role/surface matrix is closed:
+Every new nonmanual pick writes the class containing its selected source VariantFamily even when weak source provenance cannot be retained. When `hitEvidence.source` is present, `authoredAssetRevisionId` is also present, resolves to the same asset and includes that Representation. The anchor class contains the source Representation's VariantFamily, except that a proxy uses the class containing its declared `proxyForGsVariantFamilyId`. The source method/content/role/surface matrix is closed:
 
 | Method | Source Representation | Optional `surfaceRef` |
 |---|---|---|
@@ -366,6 +383,7 @@ When `hitEvidence.source` is present, `authoredAssetRevisionId` is also present,
 | `point-cloud` | `contentKind: 'pointCloud'`, role `pointPrimary` | `pointSample` only |
 | `direct-splat` or `gpu-id-depth` | `contentKind: 'gaussianSplat'`, role `gsPrimary` | `splatSample` only |
 | `proxy` | `contentKind: 'mesh'`, role `interactionProxy` | `meshTriangle` only |
+| `manual` | no source Representation | no `normalAsset`, `surfaceRef`, source or confidence |
 
 A `surfaceRef` cannot exist without its source. New pick commands record only a Representation that the current RenderPlan made visible/pickable, validate source indices against its loaded verified bytes, and for a proxy require its declared GS family to be visible. Package/open validation always checks resolvable owner/method/content/role/surface-kind metadata; it range-checks an index when the weak source bytes are already in the validated closure. If those non-protecting bytes are absent, the source remains non-dereferenceable/unverified provenance and never invalidates the canonical anchor. A history-free package may omit the complete weak `source` while retaining method/confidence and the canonical anchor.
 
@@ -403,7 +421,7 @@ Geometry coverage composes before the final class. Triangles have binary geometr
 
 The optics resolver maps `inherit` to source optics, `surface` explicitly disables source transmission, and `transmission` is valid only when source optics is already `transmission`; material intent cannot invent missing transmission parameters. Coverage and optics remain independent, so a source transmission material may retain mask coverage.
 
-RenderPlan carries the resolved coverage class/evaluator inputs, optics, lighting and sidedness. Appearance `lighting:'inherit'`/absence and absent `doubleSided` resolve from `SourceMaterialSemantics`; explicit values replace them. Integrated is Supported only for `optics:'surface'` with `opaque`, `mask` or `ditherCoverage`; surface smooth blend and every transmission result are Experimental or redirected. Backend results such as `transparent`, `depthWrite`, render queue/order, shader name or effective fallback are not persisted and may not reclassify the resolved material. Mapping an override to a new revision requires an explicit compatibility map; ambiguity creates review work.
+RenderPlan carries the resolved coverage class/evaluator inputs, optics, lighting and sidedness. Appearance `lighting:'inherit'`/absence and absent `doubleSided` resolve from `SourceMaterialSemantics`; explicit values replace them. Integrated is Supported only for `optics:'surface'` with `opaque`, `mask` or `ditherCoverage`; surface smooth blend is Experimental only after G1-D or otherwise redirected, while every transmission result is Unsupported and redirected until a separate later material/research gate. Backend results such as `transparent`, `depthWrite`, render queue/order, shader name or effective fallback are not persisted and may not reclassify the resolved material. Mapping an override to a new revision requires an explicit compatibility map; ambiguity creates review work.
 
 The semantic override key is `(scope, assetId, variantFamilyId, materialLayoutId, logicalMaterialSlotId)`. At most one active MaterialOverride may own a key. Concurrent/different IDs for the same key form an explicit duplicate-key conflict; SceneResolver applies neither and resolution must tombstone/retarget all but one. For a selected display set, an exact set-scope record replaces the complete project-scope `appearance` and `compositing` records for that target; it is not a shallow/field merge. If no set record exists, the project record applies; if neither exists, source semantics apply. This precedence never orders duplicate records by ID or creation time.
 
@@ -648,11 +666,11 @@ Every asynchronous load has a generation ID and `AbortSignal`. Completion from a
 | Mesh | one selected candidate from each visible `meshPrimary`, `pointPrimary`, or enabled `visualPatch` family | Correct ordinary mesh/point rendering and source material semantics within backend support |
 | GS | one selected candidate from each visible `gsPrimary` family | Full GS without Integrated-only exclusion; progressive LOD is allowed |
 | Compare | independently rendered Mesh and GS outputs | Same camera, viewport, exposure and background; wipe/split/flicker/side-by-side; no cross-depth promise |
-| Integrated | `gsPrimary`, selected `meshPrimary`/`pointPrimary`, and valid patch/exclusion groups | Opaque/mask/dither coverage is supported; smooth/transmission are experimental or redirected |
+| Integrated | `gsPrimary`, selected `meshPrimary`/`pointPrimary`, and valid patch/exclusion groups | Opaque/mask/dither coverage is Supported; smooth is Experimental only after G1-D or redirected, and transmission is Unsupported/redirected pending a separate gate |
 
 In Integrated, Supported material results are exactly `surface × (opaque | mask | ditherCoverage)`. Every accepted opaque, mask or dither mesh/ordinary-point sample performs the normal depth test and writes its depth; every rejected sample writes neither color, ID nor depth. Dither trades smoothness for stable order. A non-depth-writing or differently ordered variant is Experimental and cannot claim this Supported contract. Intersections MUST be tested for z-fighting, halos, visible holes and duplicate surfaces.
 
-For `smoothBlend` or `transmission`, the UI presents supported alternatives: Mesh only, Compare, explicit dither conversion, or an opt-in experimental compositor. It MUST NOT silently label a queue-order approximation as correct.
+For `smoothBlend`, the UI presents supported alternatives: Mesh only, Compare, explicit dither conversion, or—only after G1-D—an opt-in experimental compositor. For `transmission`, it presents Mesh, Compare or an explicit supported material conversion; it does not offer G1-D as transmission support. It MUST NOT silently label a queue-order approximation as correct.
 
 WBOIT, if its optional gate passes, remains an approximation. A future exact unified triangle/GS rasterizer would replace or extend `RenderBackend` and `RenderCoordinator`; it must not require a persistent-schema change.
 
@@ -687,6 +705,8 @@ The MVP alignment tool MUST provide:
 - undo/redo, reset to identity, reset to imported default and restore previous binding;
 - residual and method metadata when a fitted method is used;
 - Mesh, GS and Compare switching without losing the pending transform.
+
+Repair alignment is representation-local, not a second Asset alignment. “Add visual repair” preserves the imported source, lets the user place its RepresentationFrame into the selected target AssetFrame with the same translation/quaternion/positive-uniform-scale controls, then freezes that `representationToAsset` in the new `visualPatch`. An optional hard exclusion is generated/imported already in the target AssetFrame with identity `representationToAsset`. Accepting the preview stages both resources and atomically creates one new AssetRevision/AssetBindingRevision that copies the prior `assetToProject`; cancellation changes no active revision. The new patch family receives its own singleton anchor-compatibility class, while byte- and surface-unchanged base-family classes retain their IDs. A surface-equivalent candidate added inside the same patch family may retain its class; a surface-changing patch replacement creates a new patch VariantFamily and singleton class but replaces only the old patch class within the revision partition. Deleting the patch removes only that class, so base-family pins remain compatible while affected patch-authored pins become `needsReview`. The workflow cannot group a separately aligned Asset, reuse an interaction proxy as color geometry, or commit a mask without its patch.
 
 Three non-collinear point pairs are the mathematical minimum for correspondence fitting; production UI SHOULD accept 4–8 pairs and report residuals. PCA and ICP are later assistants only because symmetry, missing GS regions and floaters can produce plausible but wrong alignment.
 
@@ -760,7 +780,7 @@ Useful current candidate evidence:
 - `RND-DOM-16`: v1 caption tags migrate to tag and membership entities, round-trip through packages/CSV, and merge independent membership changes.
 - `RND-DOM-17`: set switching applies one default view without recursion; ordering is deterministic, a deleted/missing default leaves camera unchanged with a diagnosis, and the last/default set cannot be deleted.
 - `RND-DOM-18`: parent delete versus concurrent child add produces an orphan review item in both merge orders; explicit reassign/tombstone and restore paths preserve all candidates and required media.
-- `RND-DOM-19`: an unresolved migrated asset has no binding or `BlobRef`, preserves captions under one deterministic missing-source compatibility class and retains any valid imported `pendingAssetToProject`. It becomes ready only after verified content and one atomic status replacement; absent an explicit override, the new binding uses the pending placement exactly. The new content-derived class differs by default, so preserved captions become `needsReview` until explicitly resolved while their ProjectFrame placement remains stable.
+- `RND-DOM-19`: an unresolved migrated asset has no binding or `BlobRef`, preserves captions under one deterministic missing-source compatibility class and retains any valid imported `pendingAssetToProject`. It becomes ready only after verified content and one atomic status replacement; absent an explicit override, the new binding uses the pending placement exactly. None of the new content-derived classes reuses the missing-source ID, so preserved captions become `needsReview` until explicitly resolved while their ProjectFrame placement remains stable.
 - `RND-DOM-20`: missing/cross-asset `derivedFrom`, duplicate/unsorted edges, self-reference and two-/three-node cycles are rejected before SceneDocument; a valid depth-32 DAG resolves and a depth-33 graph is rejected.
 - `RND-DOM-21`: one source blob containing mesh and ordinary points resolves as two Representation records with distinct roles/families and one shared BlobRef/frame transform; Mesh mode draws both contributions once and material targets never cross families implicitly.
 - `RND-DOM-22`: syntactically valid fixtures with a ready Asset pointing to a foreign binding/revision, cross-asset binding/revision parents, reused AssetFrame/compatibility IDs across assets, one shared RepresentationFrame with unequal transforms, a nonidentity AssetFrame alias, an AssetAnchor naming another asset's frame/revision, or a ProjectAnchor/SavedView naming a foreign project frame are rejected before SceneDocument in every mode; no foreign closure is rendered or activated.
@@ -773,6 +793,9 @@ Useful current candidate evidence:
 - `RND-DOM-29`: the exact three-entry point-profile registry has one distinct ID/digest for binary, dither and smooth with binary as default; all three share the ratified numeric/disc rules and differ only in edge policy. Each profile plus finite intent and ViewportSnapshot deterministically produces one constant-CSS effective disc across DPR/render scale; the value is absent from SavedView/project bytes, invalid/non-finite input follows the diagnosed default path rather than a backend clamp, and fractional/dither edge coverage promotes the contribution class exactly as specified.
 - `RND-DOM-30`: source opaque/mask/blend, opacity, hard/soft chroma, every requested coverage and surface/transmission optics resolve through the closed matrix and final alpha convention. Mask+transmission remains representable, surface-to-transmission invention and opaque-with-alpha/chroma are invalid, material-less visual primitives receive the synthetic slot, catalogs are sorted one-to-one tables, candidates differing only in source semantics cannot share a family, and duplicate semantic override keys apply neither record until resolved.
 - `RND-DOM-31`: ungrouped, cross-asset, missing-patch, outside-revision, nonidentity/non-AssetFrame mask and wrong-role relationship-field exclusions fail closed. A valid same-asset patch/exclusion group enables atomically, its hard AssetFrame predicates union in every order, and raw/paged/preview GS candidates exclude identical means and color/depth/ID/direct/proxy picks. GS mode remains unexcluded; source-index, page-index, soft or partially applied masks are Unsupported.
+- `RND-DOM-32`: an ordinary gizmo move preserves a still-active class without another prompt. A C1 anchor that becomes `needsReview` under active revision C2 can be corrected only against one explicit active family; the atomic replacement binds to C2 and that family's unique current class, becomes source-less/confidence-less/normal-less `manual`, never retains stale mesh/point/GS/proxy evidence, and round-trips through collaboration/review/clean with the same visible ordinary pin UI. Coordinate-only, missing/ambiguous class and active-binding conflict fixtures refuse to clear review.
+- `RND-DOM-33`: a differently oriented/scaled external repair mesh is aligned into an existing AssetFrame, preserves its source bytes, commits its frozen `representationToAsset` plus optional identity-AssetFrame hard mask in one new revision/binding, copies prior `assetToProject`, and leaves no active half-group under cancellation or injected failure. Adding a patch preserves every unchanged base compatibility class and creates one singleton patch class; a surface-equivalent derivative preserves its family/class, while surface-changing replacement creates a new patch family/class and removal reviews only affected patch-authored pins. Class overlap, duplicate ownership and changed-family ID reuse fail closed.
+- `RND-DOM-34`: every active revision's sorted compatibility classes form an exact partition of its pickable visual families; empty/duplicate/outside-revision targets, proxy/exclusion ownership, cross-asset IDs, same-ID/different-target reuse and source/proxy-to-class mismatches are invalid. An absent historical anchor class is valid `needsReview`, never corrupted data or an invitation to choose a nearby class.
 
 ### Backend and browser
 

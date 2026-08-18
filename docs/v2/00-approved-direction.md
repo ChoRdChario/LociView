@@ -60,7 +60,7 @@ An asset may carry:
 
 No mesh is required for the first caption attempt. Ordinary points use visible point picking; GS uses direct splat picking first. Introduce GPU ID/depth picking or an interaction proxy when latency or normal quality fails the agreed threshold.
 
-Automatic proxy generation is a desktop/local preprocessing option, not an iOS runtime requirement. A proxy is derived collision evidence, not a visual or measurement-quality mesh.
+Automatic proxy generation is a desktop/local preprocessing option, not an iOS runtime requirement. A proxy is derived collision evidence, not a visual or measurement-quality mesh. Its hit method/confidence remains internal portable provenance, but the resulting caption uses the same visible pin and gizmo correction flow without a persistent approximation badge.
 
 ## Persistence candidate
 
@@ -117,14 +117,15 @@ Package purposes remain distinct:
 3. `G0-S` current-v1 safety stabilization for multi-tab collisions, durable-write failure, untrusted keys, and operation/blob consistency.
 4. Bounded-memory streaming/CAS package PoC.
 5. Spark/Three versus PlayCanvas renderer bakeoff.
-6. Automerge multi-tab/package/privacy/durability PoC.
-7. Renderer/storage-neutral ports inserted with unchanged v1 behavior.
-8. v2 binary storage and metadata productionization.
-9. Ratified byte-exact v1 migration recipe, then canonical v1 migration.
-10. GS vertical slice: import -> display -> pick -> caption -> save -> reload.
-11. Multiple assets, alignment, Compare, and opaque/mask/dither Integrated.
-12. Optional smooth-transparency research.
+6. Optional time-boxed smooth-transparency feasibility after the renderer decision; it records evidence only and may be deferred without blocking the MVP.
+7. Automerge multi-tab/package/privacy/durability PoC.
+8. Renderer/storage-neutral ports inserted with unchanged v1 behavior.
+9. v2 binary storage and metadata productionization.
+10. Ratified byte-exact v1 migration recipe, then canonical v1 migration.
+11. GS vertical slice: import -> display -> pick -> caption -> save -> reload.
+12. Multiple assets, alignment, Compare, and opaque/mask/dither Integrated.
 13. iOS, migration, corruption, privacy, and security hardening.
+14. Productionize an adopted smooth result only after core hardening and a separate production review; otherwise leave it off. Exact-renderer/transmission research remains later and separate.
 
 ## MVP boundary
 

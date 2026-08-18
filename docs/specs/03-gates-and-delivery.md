@@ -39,7 +39,7 @@ Required fixtures:
 - v1 captions with absent normals and with stored normals under Y-up, Z-up and transformed child nodes; migration output always omits `normalAsset` and emits the exact issue only when a source normal is present;
 - 500 MiB incompressible streaming stress data, labelled non-product-guarantee;
 - mesh/GS intersection, ordinary-point/GS Integrated overlap, and GS gap repaired by a visual patch;
-- visual patch plus same-asset atomic splat-exclusion group, ungrouped/cross-asset/missing-patch, nonidentity-mask and wrong-role relationship-field failures, raw/paged/preview target switching, overlapping hard-mask union and excluded-region direct/proxy picks;
+- visual patch plus same-asset atomic splat-exclusion group, a differently oriented/scaled external repair import and cancel/failure path, unchanged-base versus singleton-patch anchor compatibility across patch add/update/remove, manual C1-to-C2 rebind and ambiguous-target refusal, ungrouped/cross-asset/missing-patch, nonidentity-mask and wrong-role relationship-field failures, raw/paged/preview target switching, overlapping hard-mask union and excluded-region direct/proxy picks;
 - a closed translucent aircraft with at least six mesh surfaces on representative view rays;
 - direct-GS pick ground truth and an external interaction proxy;
 - multiple assets with different origins, axes, units and Sim(3) alignment;
@@ -53,7 +53,7 @@ G0 owns the failing characterization tests for every known G0-S defect. G0-S beg
 
 ### 2.2 Target environments
 
-Record desktop baseline, oldest physical iPhone/iPad candidate, and a newer comparison iOS device. Record hardware, OS/Safari version, PWA versus tab, viewport, device pixel ratio, free storage and power/thermal conditions. A device class the project cannot repeatedly test is not a supported release class.
+Record the desktop baseline and iPhone 14 Pro as the current oldest repeatedly testable physical-iOS alpha target. Record hardware, OS/Safari version, PWA versus tab, viewport, device pixel ratio, free storage and power/thermal conditions. A newer iOS comparison device is desirable evidence but not an alpha prerequisite; iPad/iPadOS is not a supported release class until a physical iPad can be tested repeatedly. Record the tablet PC separately as a desktop/touch class with its OS, browser, RAM and GPU. A device class the project cannot repeatedly test is not a supported release class.
 
 ### 2.3 Baseline measurements
 
@@ -187,7 +187,7 @@ Failure stops CAS production work and triggers a format/sink/desktop-packer ADR 
 
 Spark/Three and PlayCanvas use identical source fixtures, camera traces, render scale, exposure/background and hard requirements. Engine-native derivatives are allowed only when preprocessing time, output size and provenance are included.
 
-Required scenes: GS, mesh, one-container mixed mesh+ordinary-points, reflected-raw/identity-baked candidates in one family, profile-defined static pose and explicit static-pose bake/reject inputs, anisotropic/view-dependent GS transformed against mesh axes, missing-blob metadata-only bounds parity, Compare, opaque/mask/dither Integrated, the source-semantics/opacity/chroma/final-alpha matrix, mesh/GS and ordinary-point/GS intersection, atomic same-asset patch/exclusion plus ungrouped/cross-asset/missing-patch/nonidentity-mask/wrong-role negatives, raw/paged/preview GS under one hard AssetFrame mask, overlapping-mask union and excluded direct/proxy picks, multiple aligned assets, point-only/mixed ordinary-point rendering/picks at identical CSS diameter/DPR/render scale across the three ratified binary/dither/smooth profile IDs including symmetric index-present/index-absent ties, two-node indexed/reflected mesh picks, paged/reordered splat picks, direct-GS/proxy picks, closed translucent aircraft, context loss and twenty load/unload cycles.
+Required scenes: GS, mesh, one-container mixed mesh+ordinary-points, reflected-raw/identity-baked candidates in one family, profile-defined static pose and explicit static-pose bake/reject inputs, anisotropic/view-dependent GS transformed against mesh axes, missing-blob metadata-only bounds parity, Compare, opaque/mask/dither Integrated, the source-semantics/opacity/chroma/final-alpha matrix, mesh/GS and ordinary-point/GS intersection, atomic same-asset patch/exclusion including external repair alignment/cancel/failure and base-versus-patch compatibility partition through add/update/remove plus ungrouped/cross-asset/missing-patch/nonidentity-mask/wrong-role negatives, raw/paged/preview GS under one hard AssetFrame mask, overlapping-mask union and excluded direct/proxy picks, multiple aligned assets, point-only/mixed ordinary-point rendering/picks at identical CSS diameter/DPR/render scale across the three ratified binary/dither/smooth profile IDs including symmetric index-present/index-absent ties, two-node indexed/reflected mesh picks, paged/reordered splat picks, direct-GS/proxy/manual-gizmo C1-to-C2 rebind picks, closed translucent aircraft, context loss and twenty load/unload cycles.
 
 Provisional physical-iOS hard floor, confirmed in G0:
 
@@ -201,7 +201,7 @@ Provisional physical-iOS hard floor, confirmed in G0:
 - pick error within two screen pixels or one projected ordinary-point/splat footprint for the applicable ground-truth fixture;
 - resource usage reaches a stable plateau after twenty load/unload cycles.
 
-A picking fallback passes only if it meets the latency/error/availability threshold assigned to that fallback in G0; merely having a proxy or GPU path is insufficient. Approximate proxy thresholds and labels are evaluated separately from direct surface hits.
+A picking fallback passes only if it meets the latency/error/availability threshold assigned to that fallback in G0; merely having a proxy or GPU path is insufficient. Proxy and direct paths are evaluated separately through internal method/confidence telemetry, while the normal pin UI remains one editable gizmo-correctable presentation without a persistent approximation badge.
 
 Hard functional requirements:
 
@@ -257,7 +257,7 @@ Hard privacy pass:
 - review/share is built from a validated snapshot without Automerge bytes;
 - clean copy blocks until every included semantic conflict is explicitly resolved, then creates a new project and history epoch;
 - clean copy topologically re-keys every included record/reference and contains no source lineage/parent/provenance sentinel;
-- review/clean re-keying includes anchor-compatibility and composite-group equality classes, while proxy-derived anchors retain their approximate method/confidence without retaining out-of-closure source provenance;
+- review/clean re-keying includes anchor-compatibility and composite-group equality classes, while proxy-derived anchors retain internal method/confidence without retaining out-of-closure source provenance or requiring a persistent approximation badge;
 - deleted secret, old actor/profile values and unreferenced blobs are absent by semantic parse and raw sentinel scan;
 - an unknown-minor-only blob remains protected through old-writer edit, GC attempt and collaboration re-export; unrecognized minor fields block history-free export until a pinned explicit field policy exists;
 - non-resolving caption revision provenance does not pull omitted historical blobs into a history-free package;
@@ -269,6 +269,8 @@ If the candidate fails, record a replacement ADR. Do not automatically extend th
 ## 7. Optional G1-D — smooth transparency feasibility
 
 This starts only after a base renderer passes and is time-boxed to ten focused workdays. It evaluates a shared-context WBOIT-style compositor, not two completed canvases overlaid by CSS.
+
+The feasibility spike may run immediately after G1-B (before or alongside G1-C) so it can inform scope without changing the base product. Passing evidence records only `ADOPT`/`REJECT` for later use; productionization and any default/feature-flag change wait until the core MVP has passed iOS, migration, corruption, privacy and security hardening plus a separate production review.
 
 Fixtures include the closed aircraft, six-plus layers on a ray, intersecting mesh/GS, a 360-degree camera sweep, draw-order permutations and physical-iOS context restore.
 
@@ -312,7 +314,7 @@ integratedTransparencyExperimental
 | `proxyGeneration` | adopted desktop packer path | Prepared external proxies may still be consumed. Generation is unavailable on iOS. |
 | `compareV2` | `rendererV2`, Mesh and GS capability | Offer independent Mesh or GS modes without comparison. |
 | `integratedOpaque` | `rendererV2`, supported Mesh and GS | Offer Mesh, GS and Compare; never approximate Integrated silently. |
-| `integratedTransparencyExperimental` | `integratedOpaque`, optional G1-D and production review | Preserve smooth intent and offer supported fallback; experimental compositor stays off. |
+| `integratedTransparencyExperimental` | `integratedOpaque`, optional G1-D and production review | Preserve smooth intent and offer supported fallback; experimental smooth compositor stays off. Transmission/refraction remains Unsupported pending a separate future gate. |
 
 `v2WorkspaceCreation` is a migration-cohort control, not a runtime `storageV2` toggle. An existing workspace selects its repository/writer by validated schema major. A build without the required v2 implementation can only diagnose/read safely; a v2-written workspace MUST NOT be opened by a v1 writer.
 
@@ -334,7 +336,7 @@ Rollback means preserving the source v1 package/workspace, opening conversion in
 10. multiple assets, alignment and Compare.
 11. opaque/mask/dither Integrated and patch/exclusion.
 12. iOS, migration, corruption, privacy and security hardening.
-13. optional transparency or exact-renderer research only through its own gate.
+13. after core iOS/migration/corruption/privacy/security hardening, productionize a previously adopted G1-D result only through production review; if the feasibility spike was deferred, it may instead run now. Exact-renderer research remains a separate later gate.
 
 ## 11. Solo developer plus AI workflow
 
