@@ -31,9 +31,14 @@ If observed code conflicts with the applicable compatibility or accepted future 
 | `07-roadmap.md` | `SUPERSEDED 2026-07 ROADMAP` | Historical only; never use as the active plan |
 | `08-ios-test-guide.md` | `V1 QA RUNBOOK` | Current manual v1 check, not a v2 GS performance specification |
 | `09-locimyu-migration.md` | `V1 LEGACY RUNBOOK` | Existing legacy import guidance; ambiguous filename cases remain possible |
-| `v2/00-approved-direction.md` | `APPROVED DIRECTION / NOT IMPLEMENTED` | Constraints and gates for the next architecture |
+| `v2/00-approved-direction.md` | `ACCEPTED DIRECTION SUMMARY / NON-NORMATIVE / NOT IMPLEMENTED` | Navigation summary; ADR and approved specifications are authoritative |
 | `adr/0001-v2-foundation.md` | `ACCEPTED DIRECTION / CONDITIONAL TECHNOLOGY` | Rationale, rejected alternatives, and reconsideration triggers |
 | `history/legacy-locimyu-alpha.md` | `PROVENANCE` | Location and hashes of archived legacy evidence |
+| `specs/README.md` | `PROPOSED IMPLEMENTATION CONTRACT / NOT IMPLEMENTED` | Index and authority for the review-ready v2 specification package |
+| `specs/00-product-contract.md` | `PROPOSED FOR APPROVAL` | Product guarantees, MVP boundary, privacy and mobile behavior |
+| `specs/01-domain-rendering.md` | `PROPOSED FOR APPROVAL` | Frames, revisions, SceneDocument, modes, picking and renderer gates |
+| `specs/02-storage-package-migration.md` | `PROPOSED FOR APPROVAL` | Metadata/CAS candidate boundaries, transactions, package purposes and conversion |
+| `specs/03-gates-and-delivery.md` | `PROPOSED FOR APPROVAL` | G0/G0-S/G1 evidence, thresholds, feature flags, rollback and schedule |
 
 ## Known implementation drift
 

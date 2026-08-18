@@ -15,26 +15,52 @@ Completed v1 implementation history remains available in Git before the G-1 clea
 - [x] Merge curated lessons from the retired research workspace
 - [x] Remove generated `dist`, verify one production rebuild, then remove the generated output again
 - [x] Complete consolidated typecheck, full tests, build, archive verification, and independent Git review
-- [ ] Switch Codex and Claude workspace roots to `G:/00_AI_dev/LociView`
-- [ ] Keep the old `Locimyu2` directory read-only until the workspace switch is confirmed; do not permanently delete it in G-1
+- [x] Switch Codex and Claude workspace roots to `G:/00_AI_dev/LociView`
+- [x] Move the old `Locimyu2` directory intact to the external archive after the workspace switch; do not permanently delete it in G-1
+
+### G-1 review record
+
+- Normalized local main baseline: `fc7054f` (one local commit ahead of remote; not pushed by this task)
+- Legacy alpha, raw research workspace, and full Git history were archived externally with SHA-256 manifests before removal from active search
+- Consolidated evidence before the switch: typecheck passed, 14 test files / 121 tests passed, production build passed, Markdown links passed, and two read-only reviewers reported no unresolved P0/P1
+- Workspace switch was confirmed by the product owner on 2026-08-18; subsequent work uses `G:/00_AI_dev/LociView` as the explicit repository root
+
+## S0 — v2 implementation contract
+
+- [x] Draft the product/release contract
+- [x] Draft the domain, frame, asset-revision, renderer-port, mode, picking, and iOS resource contract
+- [x] Draft the metadata, CAS, package-purpose, transaction-recovery, conflict, and v1 conversion contract
+- [x] Draft G0, blocking G0-S, G1 PoCs, feature flags, rollback, evidence, and delivery sequence
+- [x] Complete independent adversarial review with no unresolved P0/P1
+- [ ] Obtain product-owner approval before production implementation
+
+### S0 review record
+
+- Normative package: `docs/specs/00-product-contract.md` through `03-gates-and-delivery.md`, with ADR/navigation summaries updated in the same change
+- Independent read-only reviews covered storage/package/migration, renderer/profile/transform, and material/compositing boundaries; the final frozen working tree has no unresolved P0/P1
+- Mechanical evidence: `git diff --check` passed, all Markdown relative links resolved, and 110 requirement/acceptance IDs were unique
+- Regression evidence: typecheck passed, 14 test files / 121 tests passed, and the production build passed
+- The production build still reports the existing `viewer` chunk above Vite's 500 kB warning threshold; this is performance evidence for G0/G1 rather than an S0 documentation failure
+- No production implementation is authorized by this record; the product-owner approval checkbox remains open
 
 ## G0 — Baseline fixtures and acceptance contracts
 
-Start only after G-1 passes.
+Start only after G-1 passes and the product owner approves S0.
 
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
 - [ ] Record target desktop and physical-iOS devices
 - [ ] Measure current load, memory, frame-time, picking, and package baselines
+- [ ] Add and confirm failing G0-S characterization tests on the unfixed v1 baseline
 - [ ] Approve support guarantees, degradation behavior, and Go/No-Go thresholds
 
 ## G0-S — v1 safety stabilization (blocking before G1 feature work)
 
-- [ ] Add deterministic reproductions for same-browser multi-tab actor/sequence collision
-- [ ] Add a failure-injection test for a rejected append followed by later writes and durable-state/UI divergence
-- [ ] Add untrusted-operation tests for reserved/prototype keys and canonical HLC/ID validation
-- [ ] Add interruption/concurrency tests for package/model operation-to-blob updates
+- [ ] Make the G0 multi-tab actor/sequence characterization pass without silent operation loss
+- [ ] Make the G0 rejected-append characterization pass with recovery and accurate durable-state UI
+- [ ] Make the G0 untrusted-operation characterization pass with reserved-key and canonical HLC/ID defenses
+- [ ] Make the G0 package/model interruption characterization pass without dangling blob references
 - [ ] Implement the smallest root fixes without coupling them to the v2 storage rewrite
 - [ ] Distinguish queued, durably saved, and exported state in user-visible status
 - [ ] Run malicious-package and regression tests, then update the deployed v1 build before G1

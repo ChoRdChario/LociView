@@ -19,10 +19,11 @@ A full rewrite would discard working UI, legacy import, package behavior, and pr
 5. Resolve persisted state into a renderer-neutral `SceneDocument`; keep renderer, storage paths, package structure, and Automerge types outside it.
 6. Separate `ViewerController`, `RenderCoordinator`, `InteractionIndex`, `ResourceManager`, and replaceable `RenderBackend` responsibilities.
 7. Support Mesh, GS, and Compare as formal product paths. Integrated initially guarantees opaque, mask/cutout, and dithered coverage. Smooth-alpha mesh/GS intersection is optional research and cannot block the base product.
-8. Preserve original source data and store paged display derivatives and interaction proxies as derived representations with provenance.
-9. Evaluate Automerge metadata plus OPFS SHA-256 content-addressed blobs as the leading persistence candidate. Adoption is conditional on streaming, multi-tab, durability, privacy-export, and migration PoCs.
-10. Keep collaboration-history packages, history-free review/share packages, and clean editable copies as distinct purposes.
-11. Migrate with dual-read/v2-only-write after explicit conversion. Preserve original v1 packages and create one canonical history epoch from known copies.
+8. Bind every immutable Representation to one versioned semantic FormatProfile and profile-derived bounds/material summary. A backend must reproduce the profile or reject it; extensions and loader defaults are not portable interpretation. The MVP uses a deterministic static pose rather than runtime animation.
+9. Preserve original source data and store paged display derivatives, static-pose bakes and interaction proxies as derived representations with provenance.
+10. Evaluate Automerge metadata plus OPFS SHA-256 content-addressed blobs as the leading persistence candidate. Adoption is conditional on streaming, multi-tab, durability, privacy-export, and migration PoCs.
+11. Keep collaboration-history packages, history-free review/share packages, and clean editable copies as distinct purposes.
+12. Migrate with dual-read/v2-only-write after explicit conversion. Preserve original v1 packages and create one canonical history epoch from known copies.
 
 ## Rejected as the default path
 
@@ -51,4 +52,4 @@ Reopen the relevant part of this ADR only when evidence shows one of the followi
 - a local packer and web application require a genuinely shared schema/build package, making a small monorepo beneficial;
 - the fixed three-frame/Sim(3) model cannot represent validated target data.
 
-Gate details and the MVP boundary are maintained in `docs/v2/00-approved-direction.md` until the implementation specification is written.
+The concise accepted direction remains in `docs/v2/00-approved-direction.md`. Review-ready gate details and the MVP contract are now expanded under `docs/specs/`; they remain proposed until product-owner approval.

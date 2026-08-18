@@ -1,10 +1,10 @@
 # LociView v2 approved direction
 
-> Status: `APPROVED DIRECTION / NOT IMPLEMENTED`
+> Status: `ACCEPTED DIRECTION SUMMARY / NON-NORMATIVE / NOT IMPLEMENTED`
 > Updated: 2026-08-18
 > Technology choices marked as candidates remain subject to the listed PoC gates.
 
-Rationale, rejected defaults, and reconsideration triggers are recorded in `docs/adr/0001-v2-foundation.md`.
+This is a navigation summary, not an independent requirements source. Rationale, decisions, rejected defaults and reconsideration triggers are normative in `docs/adr/0001-v2-foundation.md`. Review-ready implementation contracts are indexed in `docs/specs/README.md`; after product-owner approval they provide the detailed normative contract. Until then they remain proposed and do not authorize implementation.
 
 ## Objective
 
@@ -23,11 +23,13 @@ The current UI and useful v1 behavior remain available while renderer and storag
 
 - Coordinate hierarchy: `RepresentationFrame -> AssetFrame -> ProjectFrame`.
 - User alignment is non-destructive Sim(3): translation, quaternion rotation, and positive uniform scale.
-- A logical `Asset` points to one immutable `AssetBindingRevision`.
+- A ready logical `Asset` points to one immutable `AssetBindingRevision`; a migrated missing-source placeholder is explicitly unresolved, has no fabricated binding/blob, and may retain portable pending alignment for later verified assignment.
 - A binding atomically combines an immutable `AssetRevision` with `assetToProject`; do not keep independent active asset/alignment pointers.
-- An asset revision can contain mesh, GS, visual patch, and interaction-proxy representations with explicit roles.
-- Caption position is authored in `AssetFrame`, records its authored revision, and is never silently rebound after incompatible replacement.
-- Material overrides target revision-scoped representation/material-slot identities and store semantic intent, not Three.js flags.
+- An asset revision can contain mesh, ordinary-point, GS, visual-patch, and interaction-proxy representations with explicit roles.
+- Caption position is authored in `AssetFrame`, retains compatibility evidence and optional non-resolving authored-revision provenance, and is never silently rebound after incompatible replacement.
+- Material overrides target asset/variant-family/material-layout/logical-slot identities and store renderer-neutral appearance plus independent coverage/optics intent, not Three.js flags. Source material semantics are profile-derived immutable metadata; revision-to-revision remapping is explicit.
+- Every immutable Representation names a versioned semantic FormatProfile and carries a profile-derived family bounds envelope/material summary; a backend either reproduces that profile or reports Unsupported. SceneResolver derives fit bounds from those envelopes without loading the blobs.
+- The MVP is a deterministic static-scene viewer. Animation clips never autoplay; unsupported skin/morph state is explicitly baked to a derived static representation or rejected.
 - `SceneDocument` is a derived renderer-neutral read model. It is never the persisted source of truth.
 
 ## Rendering scope
@@ -40,6 +42,8 @@ Formal product modes:
 4. Integrated
 
 Guaranteed Integrated coverage for the first release is opaque, mask/cutout, and dithered coverage. Arbitrarily intersecting smooth-alpha mesh and GS fragments are not guaranteed by separate conventional renderers.
+
+GS alignment transforms means, covariance and view-dependent basis consistently; mean-only transforms are forbidden. Ordinary-point size is CSS-pixel intent resolved once into a RenderPlan, and drawing and picking use the same effective footprint.
 
 Spark/Three and PlayCanvas must be evaluated with the same disposable fixture harness. If both pass with comparable results, prefer the lower migration cost. Do not commit the persisted domain to either engine.
 
@@ -54,7 +58,7 @@ An asset may carry:
 - optional preview representation;
 - optional invisible interaction proxy.
 
-No mesh is required for the first caption attempt. Use direct GS picking first; introduce GPU ID/depth picking or an interaction proxy when latency or normal quality fails the agreed threshold.
+No mesh is required for the first caption attempt. Ordinary points use visible point picking; GS uses direct splat picking first. Introduce GPU ID/depth picking or an interaction proxy when latency or normal quality fails the agreed threshold.
 
 Automatic proxy generation is a desktop/local preprocessing option, not an iOS runtime requirement. A proxy is derived collision evidence, not a visual or measurement-quality mesh.
 
@@ -66,22 +70,24 @@ The leading candidate is:
 - Automerge Repo with browser storage for document durability and multi-tab coordination;
 - OPFS content-addressed blobs keyed by verified SHA-256;
 - bounded-memory package import/export;
-- blob-first staging journal followed by metadata commit.
+- blob-first staging plus exact-change recovery, preserving remote Automerge history rather than squashing it.
 
 This candidate is not adopted until the Automerge and streaming gates pass. Persisted metadata must not contain OPFS paths, renderer objects, or backend-specific material state.
 
 Package purposes remain distinct:
 
 - collaboration package: mergeable history;
-- review/share package: current snapshot without private edit history;
-- clean editable copy: new project/history epoch.
+- review/share package: separately keyed nonmergeable current snapshot with no source lineage identity;
+- clean editable copy: topologically re-keyed new project/history epoch after conflicts and orphans are resolved.
 
 ## Migration
 
 - Read v1 and v2; write only v2 after explicit conversion.
 - Never overwrite the source v1 package.
 - Convert known copies to one canonical genesis/history epoch.
+- Keep deterministic v1 ID/decision/mapping continuity in collaboration packages so a reviewed later v1 copy can migrate on another device; review/share and clean copies intentionally omit that lineage.
 - Represent imported v1 assets as synthetic legacy revisions.
+- Preserve caption tags, display-set ordering and explicit per-set default views.
 - Preserve ambiguous anchors/material mappings for review instead of guessing.
 - Unknown future major schemas open read-only or fail clearly; they are not auto-migrated.
 
@@ -114,7 +120,7 @@ Package purposes remain distinct:
 6. Automerge multi-tab/package/privacy/durability PoC.
 7. Renderer/storage-neutral ports inserted with unchanged v1 behavior.
 8. v2 binary storage and metadata productionization.
-9. Canonical v1 migration.
+9. Ratified byte-exact v1 migration recipe, then canonical v1 migration.
 10. GS vertical slice: import -> display -> pick -> caption -> save -> reload.
 11. Multiple assets, alignment, Compare, and opaque/mask/dither Integrated.
 12. Optional smooth-transparency research.
@@ -129,6 +135,7 @@ Included:
 - Mesh, GS, and Compare;
 - multiple assets and coordinate alignment;
 - direct GS picking and external interaction-proxy support;
+- ordinary-point display and caption picking for v1-compatible point data;
 - captions, collaboration merge, and clean share export;
 - opaque/mask/dither Integrated rendering;
 - mobile LOD and resident-budget degradation.

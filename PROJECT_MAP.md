@@ -1,6 +1,6 @@
 # LociView project map
 
-> Status: `CURRENT` map for baseline commit `4f6e481` (2026-07-29).
+> Status: `CURRENT` map for normalized baseline commit `fc7054f` (2026-08-18).
 > Gaussian Splatting, multiple simultaneous models, Automerge, content-addressed storage, and renderer backends are `PROPOSED`, not current behavior.
 
 ## Start here
@@ -121,7 +121,7 @@ npm run build
 
 ## Proposed v2 boundary
 
-The approved direction is summarized in `docs/v2/00-approved-direction.md`. The eventual flow is:
+The approved direction is summarized in `docs/v2/00-approved-direction.md`; the proposed implementation contracts are indexed by `docs/specs/README.md`. The eventual flow is:
 
 ```text
 ProjectDocV2 + BlobStore + ResourceManager
