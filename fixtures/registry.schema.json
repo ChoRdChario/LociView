@@ -69,7 +69,7 @@
           "additionalProperties": false,
           "required": ["kind", "source", "reproducibility"],
           "properties": {
-            "kind": { "enum": ["generated", "anonymized-derived", "third-party"] },
+            "kind": { "enum": ["authored", "generated", "anonymized-derived", "third-party"] },
             "source": { "type": "string", "minLength": 1, "maxLength": 1024 },
             "reproducibility": { "enum": ["pinned-output-only", "byte-reproducible", "external-restore"] }
           }

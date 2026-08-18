@@ -75,6 +75,23 @@ Start only after G-1 passes and the product owner approves S0.
 - The existing minified `viewer` chunk remains about 789.61 kB and above Vite's 500 kB warning threshold; it is retained as G0 performance evidence rather than hidden by changing the warning threshold
 - Three independent read-only reviews reported no unresolved P0/P1. Before accepting the first real measured run, harden the evidence command with direct schema validation, duplicate-record rejection, all-record privacy scanning, Git/generated trace verification, and an explicit local-versus-deployed completion rule; generated/external fixtures must also become verifiable before either tier is populated
 
+### G0 characterization slice 2 — shared v1 operation corpus
+
+- [x] Freeze a small raw-JSON corpus for approved `V1CanonicalOperation` accept/quarantine decisions without inventing migration digests
+- [x] Run the same corpus through local dispatch, JSONL open, and package inspect/merge where each input is representable
+- [x] Separate already-safe assertions from one-case/one-ingress `it.fails` characterizations on baseline `5791413`
+- [x] Characterize canonical-equal and divergent same-key pairs in both input orders without inventing a collision-report API
+- [x] Verify registry/hash, typecheck, focused/full tests, production build, and independent read-only review before commit
+
+### G0 characterization slice 2 review record
+
+- The authored ASCII corpus contains 19 single-operation cases and 2 same-key relation cases, is pinned at 14,756 bytes / SHA-256 `5f095ff089e32141a5c685d4ce1be39bffa7655e05e73ebb1c08a745fba0f2e4`, and deliberately contains no unratified canonical bytes or operation digests
+- Local dispatch, JSONL open, package inspection/merge, same-incoming-log order, and existing-target-versus-incoming-package order are characterized without changing production code; already-safe reopen, raw-source, base-candidate, queue, and intrinsic invariants are not hidden inside broad expected failures
+- Focused evidence is 219 passing tests plus 2 explicit todos. The todos are the typed canonical-evidence stage before known-field quarantine and a storage-location-neutral query for durable package quarantine evidence; neither is counted as completed `G0S-OP`
+- A future non-throwing typed collision/paused-unit report must replace the current rejection-only local-versus-incoming characterization before full `G0S-OP` can pass
+- Consolidated verification passed: fixture/evidence verification, TypeScript typecheck, 16 test files / 347 passing tests plus 2 todos, and the production build (92 modules, 11 PWA precache entries). The existing approximately 789.61 kB minified viewer-chunk warning remains unchanged
+- Independent read-only reviews reported no unresolved P0/P1 after the accepted/field-quarantine distinction, append/reopen isolation, prototype restoration, relation self-validation, and local-versus-incoming collision boundary were corrected
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes

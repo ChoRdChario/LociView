@@ -18,6 +18,21 @@
       "expected": { "classification": "mesh", "warnings": [] }
     },
     {
+      "id": "g0s-v1-operation-corpus-v1",
+      "storage": { "tier": "git", "path": "fixtures/g0s/operations/corpus.v1.json" },
+        "byteSize": 14756,
+        "sha256": "5f095ff089e32141a5c685d4ce1be39bffa7655e05e73ebb1c08a745fba0f2e4",
+      "mediaType": "application/vnd.lociview.g0s-operation-corpus+json",
+      "classification": "evidence",
+      "geometry": { "triangleCount": 0, "ordinaryPointCount": 0, "splatCount": 0, "textureCount": 0, "bounds": { "min": [0, 0, 0], "max": [0, 0, 0] } },
+      "coordinates": { "handedness": "unspecified", "upAxis": "unspecified", "unit": "not-applicable" },
+      "provenance": { "kind": "authored", "source": "docs/specs/02-storage-package-migration.md", "reproducibility": "pinned-output-only" },
+      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed" },
+      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable" },
+      "restore": { "method": "repository", "instructions": "Restore the corpus and its README from the same Git revision as fixtures/registry.json." },
+      "expected": { "classification": "evidence", "warnings": ["This corpus fixes accept/quarantine decisions only; canonical digest goldens are intentionally deferred."] }
+    },
+    {
       "id": "smoke-cube-stl-v1",
       "storage": { "tier": "git", "path": "public/samples/cube.stl" },
       "byteSize": 1159,

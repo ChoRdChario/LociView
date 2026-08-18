@@ -123,7 +123,7 @@ for (const [index, fixture] of registry.fixtures.entries()) {
   string(fixture.coordinates.unit, `${label}.coordinates.unit`, 64);
 
   exactKeys(fixture.provenance, ['kind', 'source', 'reproducibility'], `${label}.provenance`);
-  choice(fixture.provenance.kind, ['generated', 'anonymized-derived', 'third-party'], `${label}.provenance.kind`);
+  choice(fixture.provenance.kind, ['authored', 'generated', 'anonymized-derived', 'third-party'], `${label}.provenance.kind`);
   string(fixture.provenance.source, `${label}.provenance.source`);
   choice(fixture.provenance.reproducibility, ['pinned-output-only', 'byte-reproducible', 'external-restore'], `${label}.provenance.reproducibility`);
 
@@ -144,6 +144,10 @@ for (const [index, fixture] of registry.fixtures.entries()) {
     fixture.provenance.kind === 'third-party' &&
     (fixture.license.reviewStatus !== 'approved' || ['NOASSERTION', 'NONE'].includes(fixture.license.spdx))
   ) fail(`${label} third-party Git data requires an approved redistribution license`);
+  if (
+    fixture.provenance.kind === 'authored' &&
+    (fixture.storage.tier !== 'git' || fixture.provenance.reproducibility !== 'pinned-output-only')
+  ) fail(`${label} authored evidence must be a pinned Git fixture`);
 
   exactKeys(fixture.restore, ['method', 'instructions'], `${label}.restore`);
   choice(fixture.restore.method, ['repository', 'generate', 'external'], `${label}.restore.method`);
@@ -155,7 +159,7 @@ for (const [index, fixture] of registry.fixtures.entries()) {
   if (fixture.storage.tier === 'git') {
     if (fixture.restore.method !== 'repository') fail(`${label} Git storage requires repository restore`);
     const bytes = await readRepositoryFile(fixture.storage.path, `${label}.storage.path`);
-    if (fixture.provenance.kind === 'generated') {
+    if (fixture.provenance.kind === 'generated' || fixture.provenance.kind === 'authored') {
       await readRepositoryFile(fixture.provenance.source, `${label}.provenance.source`);
     }
     if (bytes.byteLength !== fixture.byteSize) fail(`${label} byte size mismatch: ${bytes.byteLength} != ${fixture.byteSize}`);
