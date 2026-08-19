@@ -6,6 +6,7 @@
   "deviceClass": null,
   "startedAtUtc": null,
   "build": {
+    "deliveryMode": null,
     "gitCommit": null,
     "gitDirty": null,
     "packageLockSha256": null,
@@ -47,7 +48,7 @@
     "frame": { "durationSeconds": null, "sampleCount": null, "p50Ms": null, "p95Ms": null, "maxMs": null, "over66_7MsCount": null, "hiddenIntervalsExcluded": null },
     "pick": { "sampleCount": null, "computeP50Ms": null, "computeP95Ms": null, "gestureP50Ms": null, "gestureP95Ms": null, "maxErrorPx": null },
     "lifecycle": { "backgroundCycles": null, "successfulRestores": null, "continuousUseSeconds": null, "loadUnloadCycles": null, "unexpectedReloads": null, "contextLosses": null },
-    "resources": { "managedBytesBefore": null, "managedBytesAfter": null, "managedHandlesBefore": null, "managedHandlesAfter": null, "jsHeapStatus": "unavailable", "firstStableFiveMedianBytes": null, "finalFiveMedianBytes": null },
+    "resources": { "managedBytesBefore": null, "managedBytesAfter": null, "managedHandlesBefore": null, "managedHandlesAfter": null, "jsHeapStatus": "not-collected", "firstStableFiveMedianBytes": null, "finalFiveMedianBytes": null },
     "storage": { "beforeBytes": null, "afterBytes": null, "afterCleanupBytes": null },
     "packageIo": { "inspectMs": null, "importMs": null, "exportMs": null }
   },

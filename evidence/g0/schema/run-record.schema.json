@@ -10,7 +10,7 @@
     "runId": { "type": ["string", "null"], "pattern": "^run_[a-z0-9][a-z0-9._-]{2,95}$" },
     "environmentId": { "type": ["string", "null"], "pattern": "^env_[a-z0-9][a-z0-9._-]{2,95}$" },
     "deviceClass": { "enum": ["iphone-14-pro", "windows-desktop", "windows-tablet-pc", null] },
-    "startedAtUtc": { "type": ["string", "null"], "format": "date-time" },
+    "startedAtUtc": { "type": ["string", "null"], "format": "utc-date-time" },
     "build": { "$ref": "#/$defs/build" },
     "fixture": { "$ref": "#/$defs/fixture" },
     "traceRef": { "$ref": "#/$defs/traceRef" },
@@ -39,13 +39,14 @@
     "build": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["gitCommit", "gitDirty", "packageLockSha256", "workflowRunId", "deployUrl", "indexSha256", "serviceWorkerSha256"],
+      "required": ["deliveryMode", "gitCommit", "gitDirty", "packageLockSha256", "workflowRunId", "deployUrl", "indexSha256", "serviceWorkerSha256"],
       "properties": {
-        "gitCommit": { "type": ["string", "null"], "pattern": "^[0-9a-f]{7,64}$" },
+        "deliveryMode": { "enum": ["local", "deployed", null] },
+        "gitCommit": { "type": ["string", "null"], "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
         "gitDirty": { "type": ["boolean", "null"] },
         "packageLockSha256": { "$ref": "#/$defs/shaOrNull" },
         "workflowRunId": { "type": ["string", "null"], "maxLength": 128 },
-        "deployUrl": { "type": ["string", "null"], "format": "uri", "maxLength": 2048 },
+        "deployUrl": { "type": ["string", "null"], "format": "https-url", "maxLength": 2048 },
         "indexSha256": { "$ref": "#/$defs/shaOrNull" },
         "serviceWorkerSha256": { "$ref": "#/$defs/shaOrNull" }
       }
@@ -230,14 +231,24 @@
   },
   "allOf": [
     {
+      "if": { "properties": { "status": { "const": "pending" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "completion": { "const": "pending" },
+          "build": { "type": "object", "properties": { "deliveryMode": { "type": "null" } } }
+        }
+      }
+    },
+    {
       "if": { "properties": { "status": { "const": "measured" } }, "required": ["status"] },
       "then": {
         "properties": {
           "runId": { "type": "string" },
           "environmentId": { "type": "string" },
           "deviceClass": { "enum": ["iphone-14-pro", "windows-desktop", "windows-tablet-pc"] },
-          "startedAtUtc": { "type": "string", "format": "date-time" },
-          "build": { "type": "object", "properties": { "gitCommit": { "type": "string" }, "gitDirty": { "const": false }, "packageLockSha256": { "type": "string" } } },
+          "startedAtUtc": { "type": "string", "format": "utc-date-time" },
+          "completion": { "enum": ["complete", "incomplete", "invalid"] },
+          "build": { "type": "object", "properties": { "deliveryMode": { "enum": ["local", "deployed"] }, "gitCommit": { "type": "string" }, "gitDirty": { "const": false }, "packageLockSha256": { "type": "string" } } },
           "fixture": { "type": "object", "properties": { "fixtureId": { "type": "string" }, "sha256": { "type": "string" }, "sourceBytes": { "type": "integer" }, "sourceLocation": { "enum": ["git", "generated", "external"] } } }
         }
       }
@@ -250,8 +261,6 @@
           "build": {
             "type": "object",
             "properties": {
-              "workflowRunId": { "type": "string", "minLength": 1 },
-              "deployUrl": { "type": "string" },
               "indexSha256": { "type": "string" },
               "serviceWorkerSha256": { "type": "string" }
             }
@@ -367,6 +376,39 @@
                   "exportMs": { "type": "number", "minimum": 0 }
                 }
               }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "build": { "type": "object", "properties": { "deliveryMode": { "const": "local" } }, "required": ["deliveryMode"] }
+        },
+        "required": ["build"]
+      },
+      "then": {
+        "properties": {
+          "build": { "type": "object", "properties": { "workflowRunId": { "type": "null" }, "deployUrl": { "type": "null" } } }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "completion": { "const": "complete" },
+          "build": { "type": "object", "properties": { "deliveryMode": { "const": "deployed" } }, "required": ["deliveryMode"] }
+        },
+        "required": ["completion", "build"]
+      },
+      "then": {
+        "properties": {
+          "build": {
+            "type": "object",
+            "properties": {
+              "workflowRunId": { "type": "string", "minLength": 1 },
+              "deployUrl": { "type": "string", "format": "https-url" }
             }
           }
         }

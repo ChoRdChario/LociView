@@ -92,6 +92,23 @@ Start only after G-1 passes and the product owner approves S0.
 - Consolidated verification passed: fixture/evidence verification, TypeScript typecheck, 16 test files / 347 passing tests plus 2 todos, and the production build (92 modules, 11 PWA precache entries). The existing approximately 789.61 kB minified viewer-chunk warning remains unchanged
 - Independent read-only reviews reported no unresolved P0/P1 after the accepted/field-quarantine distinction, append/reopen isolation, prototype restoration, relation self-validation, and local-versus-incoming collision boundary were corrected
 
+### G0 baseline slice 3 — evidence verifier hardening
+
+- [x] Validate every template and record against the trusted bundled Draft 2020-12 schemas with a direct, test-only Ajv dependency and bounded input handling
+- [x] Distinguish complete local and deployed runs without requiring deployment metadata for a local production build
+- [x] Reject duplicate record/artifact/fixture identities and privacy-sensitive strings before cross-record indexing
+- [x] Verify Git/external trace evidence, reject recipe-less generated traces, and verify complete-run fixture metadata instead of trusting hash/size claims alone
+- [x] Add focused verifier tests, run the full regression/build matrix, and obtain independent read-only review before accepting measured evidence
+
+### G0 baseline slice 3 review record
+
+- Ajv 8.20.0 is a direct dev-only dependency; schemas, templates, and records are validated strictly with bounded input handling and explicit local/deployed completion semantics
+- The verifier rejects duplicate JSON keys and duplicate IDs, scans privacy-sensitive strings, verifies Git/external trace evidence and Git/generated/external fixture sources, and rejects complete generated traces until a durable recipe contract exists; generated fixtures are confined to `.artifacts/fixtures`
+- Verification passed: 17 test files / 409 passing tests plus 2 todos, including 62/62 focused verifier tests; 5 Git fixtures total 666,386 bytes, while evidence remains 3 pending templates and 0 records
+- The production build passed with 92 modules and 11 PWA precache entries; the existing approximately 789.61 kB viewer-chunk warning remains unchanged
+- Production and full `npm audit` both report 0 vulnerabilities after safe transitive lock updates to fast-uri 3.1.5, brace-expansion 5.0.9 / 2.1.4, nanoid 3.3.18, and postcss 8.5.26
+- Independent security review reported no unresolved P0/P1, and no measured evidence was created
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes

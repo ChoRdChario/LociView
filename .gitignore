@@ -5,3 +5,4 @@ coverage/
 .DS_Store
 dev-dist/
 .artifacts/fixtures/
+.artifacts/traces/

@@ -22,7 +22,7 @@
           "bytes": { "type": "integer", "minimum": 0 },
           "storageLocator": { "type": "string", "minLength": 1, "maxLength": 2048 },
           "restoreInstructions": { "type": "string", "minLength": 1, "maxLength": 2048 },
-          "capturedAtUtc": { "type": "string", "format": "date-time" },
+          "capturedAtUtc": { "type": "string", "format": "utc-date-time" },
           "containsSensitiveData": { "type": "boolean" },
           "retentionNote": { "type": "string", "minLength": 1, "maxLength": 1024 }
         }

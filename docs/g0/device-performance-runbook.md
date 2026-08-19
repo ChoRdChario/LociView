@@ -23,15 +23,19 @@ estimated.
 
 1. Use a clean Git commit. Run dependency install, typecheck, full tests and a
    production build.
-2. Record commit and lockfile SHA-256. For a deployed run, also record workflow
-   run, deploy URL and hashes of served `index.html` and `sw.js`.
+2. Set `build.deliveryMode` explicitly. Record the full commit hash, lockfile
+   SHA-256 and the served `index.html`/`sw.js` hashes for either mode. A local
+   run keeps workflow/deploy fields null; a deployed run also records workflow
+   run and an HTTPS deploy URL.
 3. Confirm the installed PWA has updated. A run against an unidentifiable or
    stale service worker is `invalid`.
 4. Verify the fixture against `fixtures/registry.json`. Save mobile fixtures to
    "On My iPhone" before going offline; do not rely on an undownloaded iCloud
    placeholder.
 5. Register the fixed camera/input trace ID, SHA-256, bytes, version and restore
-   locator. A run without the same restorable trace cannot be marked complete.
+   locator. A complete run uses a Git trace or a same-run recorded external
+   artifact; generated traces remain incomplete until a durable recipe contract
+   exists. A run without the same restorable trace cannot be marked complete.
 6. Fix viewport, DPR, drawing-buffer size, power mode and thermal condition.
    Performance video capture is a separate run because recording changes load.
 
@@ -91,5 +95,16 @@ product-owner decision can turn measured values into support guarantees.
   labelled as such.
 - Raw JSON, screenshots, exclusions and external artifact hashes are reviewed
   by a non-implementing reviewer before a gate decision.
-- Run `npm run evidence:verify` to check pending templates and cross-record IDs;
-  schema validation remains an additional verification step.
+- Run `npm run evidence:verify` to apply the bundled schemas and check bounded
+  input, duplicate IDs, privacy-sensitive strings, source bytes and
+  cross-record references. Git inputs are verified at the recorded build
+  commit, which must be an ancestor of the evidence checkout's `HEAD`.
+  Generated fixtures must be byte-reproducible regular non-link files under
+  `.artifacts/fixtures/`; generated traces cannot complete a run until a durable
+  recipe contract exists. External inputs resolve through the same run's
+  manifest. One Git source blob is limited to 64 MiB
+  and one verification run to 8 GiB of unique local source bytes. The command
+  does not execute restore instructions or fetch remote artifacts.
+- The current schema has no locator for served `index.html` or `sw.js` bytes.
+  Their digest fields are required and shape-checked, but a reviewer must still
+  compare them with the actual local/deployed response before accepting a run.
