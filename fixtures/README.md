@@ -42,6 +42,17 @@ hashes, and normalized state. These fixtures reproduce shapes learned from
 earlier operational migration work, but they are not an anonymized real-project
 fixture and do not complete `STO-MIG-01` by themselves.
 
+`gs/` contains one eight-splat, project-authored source-profile
+characterization. Its registry binding is deliberately `candidate`: the
+verifier checks the PLY bytes, structural classification, mean bounds, and the
+hashes of the candidate specification and generated diagnostic output, but
+this does not ratify a `FormatProfile`, renderer support, finite Gaussian
+bounds, device performance, or the generated diagnostics as a normative
+semantic oracle. Ordinary PLY results from this preflight inspector are
+header-only routing decisions and still require the existing ordinary-format
+validator before use. Representative small/medium/large GS inputs and G1-B
+evidence remain future work.
+
 Run `npm run fixtures:verify` to validate the registry and checked-in bytes.
 
 The repository has no adopted top-level license declaration yet, so the current

@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "output": "fixtures/gs/profile-golden-sh3-v1.ply",
+  "description": "Synthetic, manually auditable SH3 Gaussian PLY source values. Missing shRest indices expand to positive float32 zero.",
+  "splats": [
+    {
+      "label": "origin-neutral",
+      "mean": [0, 0, 0],
+      "normal": [0, 0, 0],
+      "shDc": [0, 0, 0],
+      "shRest": {},
+      "opacityLogit": 0,
+      "logScale": [-2, -2, -2],
+      "rotationWxyz": [1, 0, 0, 0]
+    },
+    {
+      "label": "positive-x-red-anisotropic",
+      "mean": [1, 0, 0],
+      "normal": [0, 0, 0],
+      "shDc": [1, -1, -1],
+      "shRest": { "0": 0.25, "3": -0.125, "8": 0.0625 },
+      "opacityLogit": 2,
+      "logScale": [-1, -2, -3],
+      "rotationWxyz": [0.9238795325112867, 0, 0.3826834323650898, 0]
+    },
+    {
+      "label": "negative-x-green-anisotropic",
+      "mean": [-1, 0, 0],
+      "normal": [0, 0, 0],
+      "shDc": [-1, 1, -1],
+      "shRest": { "1": -0.25, "4": 0.125, "9": -0.0625 },
+      "opacityLogit": -2,
+      "logScale": [-3, -1, -2],
+      "rotationWxyz": [0.7071067811865476, 0.7071067811865476, 0, 0]
+    },
+    {
+      "label": "positive-y-blue-anisotropic",
+      "mean": [0, 1, 0],
+      "normal": [0, 0, 0],
+      "shDc": [-1, -1, 1],
+      "shRest": { "2": 0.5, "5": -0.25, "10": 0.125 },
+      "opacityLogit": 4,
+      "logScale": [-2, -3, -1],
+      "rotationWxyz": [0.7071067811865476, 0, 0, 0.7071067811865476]
+    },
+    {
+      "label": "negative-y-signed-identity",
+      "mean": [0, -1, 0],
+      "normal": [0, 0, 0],
+      "shDc": [0.5, -0.5, 0.25],
+      "shRest": { "6": -0.375, "11": 0.1875, "20": -0.09375 },
+      "opacityLogit": -4,
+      "logScale": [-1.5, -2.5, -3.5],
+      "rotationWxyz": [-1, 0, 0, 0]
+    },
+    {
+      "label": "positive-z-symmetric-rotation",
+      "mean": [0, 0, 1],
+      "normal": [0, 0, 0],
+      "shDc": [-0.25, 0.75, -0.5],
+      "shRest": { "7": 0.25, "21": -0.125, "44": 0.0625 },
+      "opacityLogit": 1,
+      "logScale": [-2.25, -1.25, -3.25],
+      "rotationWxyz": [0.5, 0.5, 0.5, 0.5]
+    },
+    {
+      "label": "negative-z-nonunit-rotation",
+      "mean": [0, 0, -1],
+      "normal": [0, 0, 0],
+      "shDc": [0.75, 0.25, -0.75],
+      "shRest": { "12": -0.5, "22": 0.25, "43": -0.125 },
+      "opacityLogit": -1,
+      "logScale": [-0.5, -4, -2],
+      "rotationWxyz": [2, 0, 0, 0]
+    },
+    {
+      "label": "interior-mixed",
+      "mean": [0.25, -0.5, 0.75],
+      "normal": [0, 1, 0],
+      "shDc": [-0.75, 0.5, 0.75],
+      "shRest": { "13": 0.3125, "23": -0.15625, "33": 0.078125, "42": -0.0390625 },
+      "opacityLogit": 0.5,
+      "logScale": [-2.75, -1.75, -0.75],
+      "rotationWxyz": [0, 1, 0, 0]
+    }
+  ]
+}

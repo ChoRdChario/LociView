@@ -127,6 +127,25 @@ Start only after G-1 passes and the product owner approves S0.
 - Independent semantic and filesystem-security reviews reported no unresolved P0/P1. The generator is intentionally scoped to a trusted local developer CLI with four fixed outputs, one approved source file, repository containment, and non-link parent/target checks
 - These are privacy-safe synthetic characterizations, not anonymized real projects. The broader fixture gate and `STO-MIG-01` remain incomplete until an anonymized real v1 fixture is obtained and reviewed
 
+### G0-GSF-A — GS source-profile preflight
+
+- [x] Record a proposed, non-ratified Gaussian PLY source envelope without changing the approved specifications or current v1 behavior
+- [x] Generate one deterministic eight-splat transport artifact and generator-produced diagnostic characterization
+- [x] Fix the ordinary mesh/point, exact candidate, partial GS-like, and malformed PLY boundaries with fail-closed executable tests
+- [x] Bind the candidate specification, diagnostic characterization, and PLY bytes into the fixture registry without permitting self-declared ratification
+- [x] Run focused/full tests, fixture/evidence verification, typecheck, production build, and independent read-only review
+
+### G0-GSF-A review record
+
+- The candidate fixes one strict binary-little-endian PLY envelope with 62 float32 values / 248 bytes per splat. Its eight synthetic splats occupy 3,573 bytes and are pinned at SHA-256 `d62becb6b21de9e2f7b24e51f05e2327ae261439b0b4af3c90bc4e75acf3cf5f`
+- The preflight inspector routes ordinary mesh/point-shaped PLY headers without using the filename extension and fully validates exact candidate GS payloads, partial/ambiguous GS-like input, malformed headers, non-finite values, invalid quaternions, truncation, trailing bytes and bounded-count failures. Ordinary payload acceptance remains the responsibility of its existing format validator
+- The registry now verifies 10 Git fixtures / 704,199 bytes. Its version-1 `semanticContract` is candidate-only, hashes the proposed specification and generated diagnostic characterization, checks the actual PLY classification/count/mean bounds, and rejects self-declared ratification
+- Transport identity and the future manually authored, independently reviewed normative semantic oracle remain separate; the generator-produced `expected.v1.json` cannot certify its own complete meaning
+- Support cutoff, finite bounds, covariance and transformed SH/color semantics, budgets, immutable upstream source/license references and normative profile/golden digests remain product-owner ratification inputs
+- Large/generated/external fixtures, runtime derivatives, iPhone 14 Pro measurements and G1-B remain out of scope. Current v1 still treats GS as unsupported, `src/**` is unchanged, and the broad small/medium/large GS fixture task below remains open
+- Verification passed: 2 focused files / 26 tests, 21 full-suite files / 449 passing tests plus 3 todos, fixture and zero-measurement evidence verification, typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
+- Independent core and registry reviews reported no unresolved P0/P1. Generator write mode remains a trusted local developer operation; atomic multi-output replacement is deferred as non-blocking hardening
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes

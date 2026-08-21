@@ -18,6 +18,26 @@
       "prefixItems": [{ "type": "number" }, { "type": "number" }, { "type": "number" }],
       "items": false
     },
+    "semanticContractFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "semanticContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "profileId", "specification", "oracle"],
+      "properties": {
+        "status": { "const": "candidate" },
+        "profileId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,95}$" },
+        "specification": { "$ref": "#/$defs/semanticContractFile" },
+        "oracle": { "$ref": "#/$defs/semanticContractFile" }
+      }
+    },
     "fixture": {
       "type": "object",
       "additionalProperties": false,
@@ -110,8 +130,60 @@
             "classification": { "enum": ["mesh", "ordinary-point-cloud", "gaussian-splat", "package", "evidence"] },
             "warnings": { "type": "array", "items": { "type": "string", "maxLength": 256 } }
           }
+        },
+        "semanticContract": { "$ref": "#/$defs/semanticContract" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["classification"],
+            "properties": { "classification": { "const": "gaussian-splat" } }
+          },
+          "then": {
+            "required": ["semanticContract"],
+            "properties": {
+              "semanticContract": { "$ref": "#/$defs/semanticContract" },
+              "storage": {
+                "type": "object",
+                "properties": { "tier": { "const": "git" } }
+              },
+              "geometry": {
+                "type": "object",
+                "properties": {
+                  "triangleCount": { "const": 0 },
+                  "ordinaryPointCount": { "const": 0 },
+                  "splatCount": { "type": "integer", "minimum": 1 }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["semanticContract"],
+            "properties": {
+              "semanticContract": {
+                "type": "object",
+                "required": ["status"],
+                "properties": { "status": { "const": "candidate" } }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "expected": {
+                "type": "object",
+                "properties": {
+                  "warnings": {
+                    "type": "array",
+                    "contains": { "const": "Candidate semantic contract is not ratified renderer or device evidence." }
+                  }
+                }
+              }
+            }
+          }
         }
-      }
+      ]
     }
   }
 }

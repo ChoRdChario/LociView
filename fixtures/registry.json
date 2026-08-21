@@ -63,6 +63,40 @@
       "expected": { "classification": "ordinary-point-cloud", "warnings": ["This is ordinary PLY point data, not Gaussian Splatting data."] }
     },
     {
+      "id": "g0-gs-ply-f32le-sh3-candidate-v1",
+      "storage": { "tier": "git", "path": "fixtures/gs/profile-golden-sh3-v1.ply" },
+      "byteSize": 3573,
+      "sha256": "d62becb6b21de9e2f7b24e51f05e2327ae261439b0b4af3c90bc4e75acf3cf5f",
+      "mediaType": "application/octet-stream",
+      "classification": "gaussian-splat",
+      "geometry": { "triangleCount": 0, "ordinaryPointCount": 0, "splatCount": 8, "textureCount": 0, "bounds": { "min": [-1, -1, -1], "max": [1, 1, 1] } },
+      "coordinates": { "handedness": "unspecified", "upAxis": "unspecified", "unit": "source-unit" },
+      "provenance": { "kind": "generated", "source": "scripts/fixtures/generate-gs-profile-fixtures.mjs", "reproducibility": "byte-reproducible" },
+      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed" },
+      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable" },
+      "restore": { "method": "repository", "instructions": "Restore the PLY, source recipe, candidate specification, diagnostic oracle, and generator from the same Git revision." },
+      "expected": {
+        "classification": "gaussian-splat",
+        "warnings": [
+          "Candidate semantic contract is not ratified renderer or device evidence.",
+          "These bounds cover means only; finite Gaussian support bounds are not ratified or computed.",
+          "Synthetic eight-splat characterization only; not a representative GS load or performance fixture."
+        ]
+      },
+      "semanticContract": {
+        "status": "candidate",
+        "profileId": "lociview-gs-ply-f32le-sh3-1",
+        "specification": {
+          "path": "docs/g0/gs-source-profile-candidate.md",
+          "sha256": "410bd5edee1c52791e6684aaa335ea7e5b2910851f2b02c0c869f3e0179e886b"
+        },
+        "oracle": {
+          "path": "fixtures/gs/expected.v1.json",
+          "sha256": "dfc68109a1b10bfb826b0ab4111de2152bd64e5184d20165004c771f7bd64cee"
+        }
+      }
+    },
+    {
       "id": "smoke-triangle-glb-v1",
       "storage": { "tier": "git", "path": "public/samples/tri.glb" },
       "byteSize": 740,
