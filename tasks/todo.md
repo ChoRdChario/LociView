@@ -222,6 +222,24 @@ Start only after G-1 passes and the product owner approves S0.
 - Verification passed: 2 focused files / 128 passing tests plus 6 todos, 26 full-suite files / 682 passing tests plus 18 todos, fixture verification (10 Git entries / 704,199 bytes), zero-measurement evidence verification, typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
 - Independent false-green and security/spec reviews reported no unresolved P0/P1. `src/**` is unchanged; this is characterization, not a parser/import fix or G0-S completion
 
+### G0 characterization slice 9 — archive structural ambiguity
+
+- [x] Add ordinary portable-path, explicit-directory, fixed-writer integrity and nested-suffix controls without freezing zip.js internal layout
+- [x] Characterize C0/DEL/C1 and file/directory prefix ambiguity, including directory entries that currently bypass path/count checks
+- [x] Characterize false size/CRC/flag and content-disguised nested-archive boundaries that current zip.js can reproduce safely
+- [x] Keep valid RTL names and already-safe guards separate from narrow expected failures, and leave device-derived size/ratio and ZIP64 support policy unclaimed
+- [x] Run focused/full tests, fixture/evidence verification, typecheck, build and independent false-green/security review before a separate commit
+
+### G0 characterization slice 9 review record
+
+- A tests-only fixed-date writer and raw ZIP32 descriptor verify deterministic valid archives without freezing numeric timestamps, CRC values, entry order beyond the fixture contract, or zip.js internal layout. Header mutation helpers are limited to small non-ZIP64 fixtures
+- Ordinary controls cover portable path rejection, an NFC RTL filename through the production reader, explicit directories with one child, strict signature/payload verification, benign suffix-like names, and actual nested-archive bytes under every prohibited suffix. Matching false uncompressed sizes are already rejected
+- Eleven narrow expected-failure cases preserve the current gaps for C0, DEL and C1 file paths, a C1 directory, exact and ASCII-case file/directory prefix collisions in both orders, a signature-valid archive hidden under a neutral filename, a bad CRC, and local/central encryption-flag disagreement
+- The existing slice-8 directory-count fixture complements this slice by proving that directory entries currently bypass `maxEntries`; its raw shape and expected rejection remain independently fixed
+- Valid RTL text is not conflated with Bidi Control policy. Device-derived byte/ratio budgets, Bidi Control interpretation and ZIP64 support or rejection remain unclaimed and outside this slice
+- Verification passed: 3 focused files / 151 passing tests plus 6 todos, 27 full-suite files / 705 passing tests plus 18 todos, fixture verification (10 Git entries / 704,199 bytes), zero-measurement evidence verification, typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
+- Independent helper-layout and false-green reviews reported no unresolved P0/P1. `src/**` is unchanged; this is characterization, not an archive-reader fix or G0-S completion
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
