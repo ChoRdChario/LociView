@@ -184,6 +184,25 @@ Start only after G-1 passes and the product owner approves S0.
 - Independent false-green, specification and runtime reviews reported no unresolved P0/P1. The new 28-test file was stable across 11 repeated runtime runs
 - This remains characterization, not a fix or G0-S completion. Blob-before-metadata publication, replacement cleanup ordering, UI durability status and physical iPhone evidence remain open
 
+### G0 characterization slice 7 — blob publication and cleanup order
+
+- [x] Add a deterministic event/fault helper for text, binary, operation-log and cleanup mutations without fixing a production transaction API
+- [x] Freeze native `.lociview` new-project import as inactive until both actors, both blobs and raw operation files are complete, with the manifest/completion marker last
+- [x] Characterize existing-project merge across two incoming actors and two exclusive blobs, including partial prefixes and same-path/different-bytes collisions
+- [x] Characterize model replacement at new-blob, metadata, durable-barrier and old-blob-cleanup boundaries while allowing safe temporary orphans
+- [x] Keep unavailable verification/concurrency observations as explicit todos, then run focused/full tests, typecheck, build and independent false-green review
+
+### G0 characterization slice 7 review record
+
+- The shared helper now records method-neutral durable-write starts/commits, throw-before, exact prefix-write and commit-then-throw faults, cleanup boundaries, operation-log text at cleanup start, and point-in-time copied multi-file snapshots at the fault or publication instant
+- Native `.lociview` import uses a two-actor/two-blob fixture. It checks semantic manifest identity, both raw actor logs, exact blob bytes and reopened state; expected-failure rows preserve the current marker-first, marker-prefix, actor-prefix and blob-prefix gaps while permitting inactive or complete recovery
+- Existing-project merge starts with one incoming actor log already present and one new actor log. It separately observes durable log publication, every state/allOps notification, a paused blob write, prefix/commit-after crash snapshots, and both orphan-path and actively referenced same-path/different-bytes collisions
+- Model replacement preserves exact asset identity, transform, pin scale and caption binding while checking old/new metadata-byte pairs, partial or unreadable logs, resolved-but-corrupt bytes, durable metadata before cleanup, and a second asset sharing the old blob. Deferred cleanup and temporary unreferenced bytes remain valid outcomes
+- Seven todos keep unimplemented boundaries explicit: wizard/`applyImportPlan` marker-last behavior, verified size/hash read-back, cross-context package locking, typed binary-collision reporting, optimized GLB failure, restartable cleanup, and typed concurrent replacement resolution
+- Verification passed: 5 focused files / 104 passing tests plus 7 todos, 25 full-suite files / 567 passing tests plus 12 todos, fixture verification (10 Git entries / 704,199 bytes), zero-measurement evidence verification, typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
+- Three independent package, model and false-green reviews reported no unresolved P0/P1. `src/**` is unchanged
+- This remains tests-only characterization, not a transaction fix or G0-S completion. The seven todos above, malicious-package coverage, production ordering fixes, physical iPhone evidence and the broad G0/G0-S gates below remain open
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
