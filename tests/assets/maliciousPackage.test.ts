@@ -46,28 +46,35 @@ const UNIX_FIFO_MODE = 0o010644;
 
 class CountingMemoryFS extends MemoryFS {
   mutationCalls = 0;
+  readonly mutationPaths: string[] = [];
 
   resetMutationCalls(): void {
     this.mutationCalls = 0;
+    this.mutationPaths.length = 0;
+  }
+
+  private recordMutation(path: string): void {
+    this.mutationCalls += 1;
+    this.mutationPaths.push(path);
   }
 
   override async writeText(path: string, text: string): Promise<void> {
-    this.mutationCalls += 1;
+    this.recordMutation(path);
     await super.writeText(path, text);
   }
 
   override async appendText(path: string, text: string): Promise<void> {
-    this.mutationCalls += 1;
+    this.recordMutation(path);
     await super.appendText(path, text);
   }
 
   override async writeBytes(path: string, data: Uint8Array): Promise<void> {
-    this.mutationCalls += 1;
+    this.recordMutation(path);
     await super.writeBytes(path, data);
   }
 
   override async remove(path: string): Promise<void> {
-    this.mutationCalls += 1;
+    this.recordMutation(path);
     await super.remove(path);
   }
 }
@@ -95,8 +102,18 @@ type FixtureId =
   | 'special-mode-entry'
   | 'unsafe-directory-path'
   | 'directory-count-bypass'
-  | 'duplicate-json-member'
   | 'local-central-name-mismatch';
+
+type ManifestAmbiguityId =
+  | 'duplicate-json-member'
+  | 'manifest-decoded-duplicate-top-forward'
+  | 'manifest-decoded-duplicate-top-reverse'
+  | 'manifest-decoded-duplicate-nested-forward'
+  | 'manifest-decoded-duplicate-nested-reverse'
+  | 'manifest-nfc-collision-top-forward'
+  | 'manifest-nfc-collision-top-reverse'
+  | 'manifest-nfc-collision-nested-forward'
+  | 'manifest-nfc-collision-nested-reverse';
 
 interface ImportAttempt {
   inspectionRejected: boolean;
@@ -105,6 +122,7 @@ interface ImportAttempt {
   active: boolean;
   candidateFiles: string[];
   mutationCalls: number;
+  completionMarkerMutationCount: number;
   controlUnchanged: boolean;
   mixedValidCaptionVisible: boolean;
 }
@@ -121,6 +139,28 @@ interface ExistingMergeAttempt {
   stateUnchanged: boolean;
   reopenedStateUnchanged: boolean;
   internalClockAndSequenceUnchanged: boolean;
+  authoritativeUnchanged: boolean;
+}
+
+interface RawManifestMember {
+  rawKey: string;
+  value: string;
+}
+
+interface ManifestAmbiguityCase {
+  id: ManifestAmbiguityId;
+  relation: 'exact-duplicate' | 'decoded-equivalent' | 'nfc-collision';
+  depth: 'top-level' | 'nested';
+  members: readonly [RawManifestMember, RawManifestMember];
+  manifestText: string;
+}
+
+interface ManifestAmbiguityResult {
+  initialized: boolean;
+  controlUnchanged: boolean;
+  completionMarkerNeverPublished: boolean;
+  sentinelNeverActive: boolean;
+  existingAuthorityUnchanged: boolean;
 }
 
 function bytesEqual(left: Uint8Array | null, right: Uint8Array): boolean {
@@ -209,7 +249,7 @@ function containsBytes(source: Uint8Array | null, needle: Uint8Array): boolean {
 }
 
 async function attemptNewProject(
-  id: FixtureId,
+  id: FixtureId | ManifestAmbiguityId,
   zip: Uint8Array,
   limits?: ZipLimits,
 ): Promise<ImportAttempt> {
@@ -257,6 +297,8 @@ async function attemptNewProject(
     active,
     candidateFiles: await fs.list(`${dir}/`),
     mutationCalls: fs.mutationCalls,
+    completionMarkerMutationCount: fs.mutationPaths
+      .filter((path) => path === `${dir}/lociview.json`).length,
     controlUnchanged:
       JSON.stringify(controlInventoryAfter) === JSON.stringify(controlInventoryBefore) &&
       bytesEqual(await fs.readBytes(CONTROL_PATH), CONTROL_BYTES),
@@ -293,6 +335,155 @@ function duplicateJsonMemberManifestBytes(): Uint8Array {
   return encoder.encode(manifest.replace(marker, duplicate));
 }
 
+function rawManifestWithExtra(extraMembers: string): string {
+  const manifest = new TextDecoder('utf-8', { fatal: true }).decode(manifestBytes());
+  if (!manifest.endsWith('}')) throw new Error('manifest ambiguity fixture is not an object');
+  return `${manifest.slice(0, -1)},${extraMembers}}`;
+}
+
+function rawMemberText(member: RawManifestMember): string {
+  return `${member.rawKey}:${JSON.stringify(member.value)}`;
+}
+
+function jsonObjectDepthAt(text: string, end: number): number {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = 0; index < end; index += 1) {
+    const char = text[index]!;
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+    } else if (char === '"') {
+      inString = true;
+    } else if (char === '{') {
+      depth += 1;
+    } else if (char === '}') {
+      depth -= 1;
+    }
+  }
+  return depth;
+}
+
+function makeManifestAmbiguityCase(
+  id: ManifestAmbiguityId,
+  relation: ManifestAmbiguityCase['relation'],
+  depth: ManifestAmbiguityCase['depth'],
+  forwardMembers: readonly [RawManifestMember, RawManifestMember],
+  reversed = false,
+): ManifestAmbiguityCase {
+  const members: [RawManifestMember, RawManifestMember] = reversed
+    ? [forwardMembers[1], forwardMembers[0]]
+    : [forwardMembers[0], forwardMembers[1]];
+  const pairText = members.map(rawMemberText).join(',');
+  const extra = depth === 'nested' ? `"future":{${pairText}}` : pairText;
+  return { id, relation, depth, members, manifestText: rawManifestWithExtra(extra) };
+}
+
+const DECODED_TOP_MEMBERS = [
+  { rawKey: '"future"', value: 'literal top member' },
+  { rawKey: '"fut\\u0075re"', value: 'escaped top member' },
+] as const satisfies readonly [RawManifestMember, RawManifestMember];
+const DECODED_NESTED_MEMBERS = [
+  { rawKey: '"label"', value: 'literal nested member' },
+  { rawKey: '"la\\u0062el"', value: 'escaped nested member' },
+] as const satisfies readonly [RawManifestMember, RawManifestMember];
+const NFC_MEMBERS = [
+  { rawKey: '"\\u00e9"', value: 'NFC member' },
+  { rawKey: '"e\\u0301"', value: 'NFD member' },
+] as const satisfies readonly [RawManifestMember, RawManifestMember];
+
+const MANIFEST_AMBIGUITY_CASES: readonly ManifestAmbiguityCase[] = [
+  {
+    id: 'duplicate-json-member',
+    relation: 'exact-duplicate',
+    depth: 'top-level',
+    members: [
+      { rawKey: '"name"', value: 'malicious envelope fixture' },
+      { rawKey: '"name"', value: 'duplicate member' },
+    ],
+    manifestText: new TextDecoder('utf-8', { fatal: true })
+      .decode(duplicateJsonMemberManifestBytes()),
+  },
+  makeManifestAmbiguityCase(
+    'manifest-decoded-duplicate-top-forward',
+    'decoded-equivalent',
+    'top-level',
+    DECODED_TOP_MEMBERS,
+  ),
+  makeManifestAmbiguityCase(
+    'manifest-decoded-duplicate-top-reverse',
+    'decoded-equivalent',
+    'top-level',
+    DECODED_TOP_MEMBERS,
+    true,
+  ),
+  makeManifestAmbiguityCase(
+    'manifest-decoded-duplicate-nested-forward',
+    'decoded-equivalent',
+    'nested',
+    DECODED_NESTED_MEMBERS,
+  ),
+  makeManifestAmbiguityCase(
+    'manifest-decoded-duplicate-nested-reverse',
+    'decoded-equivalent',
+    'nested',
+    DECODED_NESTED_MEMBERS,
+    true,
+  ),
+  makeManifestAmbiguityCase(
+    'manifest-nfc-collision-top-forward',
+    'nfc-collision',
+    'top-level',
+    NFC_MEMBERS,
+  ),
+  makeManifestAmbiguityCase(
+    'manifest-nfc-collision-top-reverse',
+    'nfc-collision',
+    'top-level',
+    NFC_MEMBERS,
+    true,
+  ),
+  makeManifestAmbiguityCase(
+    'manifest-nfc-collision-nested-forward',
+    'nfc-collision',
+    'nested',
+    NFC_MEMBERS,
+  ),
+  makeManifestAmbiguityCase(
+    'manifest-nfc-collision-nested-reverse',
+    'nfc-collision',
+    'nested',
+    NFC_MEMBERS,
+    true,
+  ),
+];
+
+const MANIFEST_AMBIGUITY_REVERSE_PAIRS = [
+  [
+    'manifest-decoded-duplicate-top-forward',
+    'manifest-decoded-duplicate-top-reverse',
+  ],
+  [
+    'manifest-decoded-duplicate-nested-forward',
+    'manifest-decoded-duplicate-nested-reverse',
+  ],
+  ['manifest-nfc-collision-top-forward', 'manifest-nfc-collision-top-reverse'],
+  ['manifest-nfc-collision-nested-forward', 'manifest-nfc-collision-nested-reverse'],
+] as const satisfies readonly (readonly [ManifestAmbiguityId, ManifestAmbiguityId])[];
+
+const MANIFEST_AMBIGUITY_CONTROL_TEXT = rawManifestWithExtra(
+  '"\\u00e9":"top NFC singleton",' +
+  '"future":{"la\\u0062el":"nested escaped singleton",' +
+  '"\\u00e9":"nested NFC singleton"}',
+);
+const MANIFEST_AMBIGUITY_OPS_TEXT = `${baseTargetOpLine()}\n${validMixedOpLine()}\n`;
+
 async function attemptForeignNormalizedCollision(zip: Uint8Array): Promise<ForeignImportAttempt> {
   const fs = new CountingMemoryFS();
   let inspectionRejected = false;
@@ -314,8 +505,21 @@ async function attemptForeignNormalizedCollision(zip: Uint8Array): Promise<Forei
   };
 }
 
+async function activeManifestAndLogSnapshot(fs: MemoryFS, dir: string): Promise<string> {
+  const manifestPath = `${dir}/lociview.json`;
+  const activeLogPaths = (await fs.list(`${dir}/ops/`))
+    .filter((path) => path.endsWith('.jsonl'));
+  const paths = [manifestPath, ...activeLogPaths];
+  const entries = await Promise.all(paths.map(async (path) => {
+    const bytes = await fs.readBytes(path);
+    if (bytes === null) throw new Error(`active authority disappeared while snapshotting: ${path}`);
+    return [path.slice(dir.length + 1), Array.from(bytes)] as const;
+  }));
+  return JSON.stringify(entries);
+}
+
 async function attemptExistingProjectMerge(zip: Uint8Array): Promise<ExistingMergeAttempt> {
-  const fs = new MemoryFS();
+  const fs = new CountingMemoryFS();
   const twinFs = new MemoryFS();
   const dir = 'projects/malicious-existing-merge';
   const twinDir = 'projects/malicious-existing-merge-control';
@@ -332,6 +536,10 @@ async function attemptExistingProjectMerge(zip: Uint8Array): Promise<ExistingMer
   if (rawBefore === null) throw new Error('mixed merge target log setup failed');
   const allOpsBefore = JSON.stringify(store.allOps);
   const stateBefore = JSON.stringify(store.state);
+  const authorityBefore = await activeManifestAndLogSnapshot(fs, dir);
+  const publishedStates: string[] = [];
+  const unsubscribe = store.subscribe((state) => publishedStates.push(JSON.stringify(state)));
+  fs.resetMutationCalls();
   let inspection: Awaited<ReturnType<typeof inspectZip>> | null = null;
   try {
     inspection = await inspectZip(zip);
@@ -345,10 +553,17 @@ async function attemptExistingProjectMerge(zip: Uint8Array): Promise<ExistingMer
       // The active-state assertions below are the contract, not the error shape.
     }
   }
+  unsubscribe();
 
   const rawLogUnchanged = bytesEqual(await fs.readBytes(logPath), rawBefore);
   const allOpsUnchanged = JSON.stringify(store.allOps) === allOpsBefore;
   const stateUnchanged = JSON.stringify(store.state) === stateBefore;
+  const authorityBytesUnchanged =
+    await activeManifestAndLogSnapshot(fs, dir) === authorityBefore;
+  const authorityPathsUnmutated = fs.mutationPaths.every((path) =>
+    path !== `${dir}/lociview.json` &&
+    !(path.startsWith(`${dir}/ops/`) && path.endsWith('.jsonl')));
+  const publishedStatesUnchanged = publishedStates.every((state) => state === stateBefore);
   let reopenedStateUnchanged = false;
   try {
     const reopened = await ProjectStore.open(fs, dir, USER);
@@ -365,16 +580,34 @@ async function attemptExistingProjectMerge(zip: Uint8Array): Promise<ExistingMer
     id: 'cap_00000000000000000000000093',
     v: { title: 'post-rejection clock probe' },
   };
-  const targetProbe = store.dispatch(probeInput);
-  const controlProbe = twinStore.dispatch(probeInput);
+  const now = vi.spyOn(Date, 'now').mockReturnValue(Date.parse(FIXED_CREATED_AT));
+  let targetProbe: ReturnType<ProjectStore['dispatch']>;
+  let controlProbe: ReturnType<ProjectStore['dispatch']>;
+  try {
+    targetProbe = store.dispatch(probeInput);
+    controlProbe = twinStore.dispatch(probeInput);
+  } finally {
+    now.mockRestore();
+  }
   await Promise.all([store.flush(), twinStore.flush()]);
+  const internalClockAndSequenceUnchanged =
+    JSON.stringify(targetProbe) === JSON.stringify(controlProbe);
 
   return {
     rawLogUnchanged,
     allOpsUnchanged,
     stateUnchanged,
     reopenedStateUnchanged,
-    internalClockAndSequenceUnchanged: JSON.stringify(targetProbe) === JSON.stringify(controlProbe),
+    internalClockAndSequenceUnchanged,
+    authoritativeUnchanged:
+      rawLogUnchanged &&
+      allOpsUnchanged &&
+      stateUnchanged &&
+      authorityBytesUnchanged &&
+      authorityPathsUnmutated &&
+      publishedStatesUnchanged &&
+      reopenedStateUnchanged &&
+      internalClockAndSequenceUnchanged,
   };
 }
 
@@ -383,6 +616,19 @@ describe('G0 characterization: malicious ZIP envelope', () => {
   let existingMergeOutcome: ExistingMergeAttempt;
   let foreignCollisionOutcome: ForeignImportAttempt;
   let fixtureShapes: Record<string, RawZipEntryShape[]>;
+  let manifestAmbiguityShapes: Record<ManifestAmbiguityId, RawZipEntryShape[]>;
+  let manifestAmbiguityDeterministic: Record<ManifestAmbiguityId, boolean>;
+  let manifestAmbiguityControlShape: RawZipEntryShape[];
+  let manifestAmbiguityControlAccepted = false;
+  let manifestAmbiguityResults = Object.fromEntries(
+    MANIFEST_AMBIGUITY_CASES.map(({ id }) => [id, {
+      initialized: false,
+      controlUnchanged: false,
+      completionMarkerNeverPublished: false,
+      sentinelNeverActive: false,
+      existingAuthorityUnchanged: false,
+    }]),
+  ) as Record<ManifestAmbiguityId, ManifestAmbiguityResult>;
   let limitErrors: Record<'entries' | 'entryBytes' | 'totalBytes', unknown>;
   let representativeFixtureIsDeterministic: boolean;
 
@@ -537,9 +783,31 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       { path: 'directory-a', options: { directory: true } },
       { path: 'directory-b', options: { directory: true } },
     ]);
-    const duplicateJsonMemberZip = await writeDirectZip([
-      { path: 'lociview.json', data: duplicateJsonMemberManifestBytes() },
+    const manifestAmbiguityZips = {} as Record<ManifestAmbiguityId, Uint8Array>;
+    manifestAmbiguityShapes = {} as Record<ManifestAmbiguityId, RawZipEntryShape[]>;
+    manifestAmbiguityDeterministic = {} as Record<ManifestAmbiguityId, boolean>;
+    for (const ambiguityCase of MANIFEST_AMBIGUITY_CASES) {
+      const entries = [
+        { path: 'lociview.json', data: encoder.encode(ambiguityCase.manifestText) },
+        {
+          path: `ops/${MIXED_ACTOR}.jsonl`,
+          data: encoder.encode(MANIFEST_AMBIGUITY_OPS_TEXT),
+        },
+      ];
+      const zip = await writeDirectZip(entries);
+      const repeatedZip = await writeDirectZip(entries);
+      manifestAmbiguityZips[ambiguityCase.id] = zip;
+      manifestAmbiguityShapes[ambiguityCase.id] = await rawZipEntryShapes(zip);
+      manifestAmbiguityDeterministic[ambiguityCase.id] = bytesEqual(repeatedZip, zip);
+    }
+    const manifestAmbiguityControlZip = await writeDirectZip([
+      { path: 'lociview.json', data: encoder.encode(MANIFEST_AMBIGUITY_CONTROL_TEXT) },
+      {
+        path: `ops/${MIXED_ACTOR}.jsonl`,
+        data: encoder.encode(MANIFEST_AMBIGUITY_OPS_TEXT),
+      },
     ]);
+    manifestAmbiguityControlShape = await rawZipEntryShapes(manifestAmbiguityControlZip);
     const centralName = 'models/central.glb';
     const localName = 'models/locally.glb';
     const localCentralMismatchZip = await writeZipWithMismatchedLocalName([
@@ -604,7 +872,7 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       specialMode: await rawZipEntryShapes(specialModeZip),
       unsafeDirectory: await rawZipEntryShapes(unsafeDirectoryZip),
       directoryCount: await rawZipEntryShapes(directoryCountZip),
-      duplicateJsonMember: await rawZipEntryShapes(duplicateJsonMemberZip),
+      duplicateJsonMember: manifestAmbiguityShapes['duplicate-json-member'],
       localCentralMismatch: await rawZipEntryShapes(localCentralMismatchZip),
       foreignNormalizedCollision: await rawZipEntryShapes(foreignNormalizedCollisionZip),
     };
@@ -666,10 +934,6 @@ describe('G0 characterization: malicious ZIP envelope', () => {
             maxTotalBytes: manifestBytes().length,
           },
         ),
-        'duplicate-json-member': await attemptNewProject(
-          'duplicate-json-member',
-          duplicateJsonMemberZip,
-        ),
         'local-central-name-mismatch': await attemptNewProject(
           'local-central-name-mismatch',
           localCentralMismatchZip,
@@ -679,6 +943,31 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       foreignCollisionOutcome = await attemptForeignNormalizedCollision(
         foreignNormalizedCollisionZip,
       );
+      try {
+        const controlInspection = await inspectZip(manifestAmbiguityControlZip);
+        manifestAmbiguityControlAccepted =
+          controlInspection.kind === 'lociview' &&
+          controlInspection.manifest?.projectId === PROJECT_ID &&
+          controlInspection.opsErrorCount === 0 &&
+          controlInspection.opsFiles.length === 1 &&
+          controlInspection.opsFiles[0]?.text === MANIFEST_AMBIGUITY_OPS_TEXT &&
+          controlInspection.ops.length === 2;
+      } catch {
+        manifestAmbiguityControlAccepted = false;
+      }
+      for (const ambiguityCase of MANIFEST_AMBIGUITY_CASES) {
+        const zip = manifestAmbiguityZips[ambiguityCase.id];
+        const importOutcome = await attemptNewProject(ambiguityCase.id, zip);
+        const mergeOutcome = await attemptExistingProjectMerge(zip);
+        manifestAmbiguityResults[ambiguityCase.id] = {
+          initialized: true,
+          controlUnchanged: importOutcome.controlUnchanged,
+          completionMarkerNeverPublished:
+            !importOutcome.active && importOutcome.completionMarkerMutationCount === 0,
+          sentinelNeverActive: !importOutcome.mixedValidCaptionVisible,
+          existingAuthorityUnchanged: mergeOutcome.authoritativeUnchanged,
+        };
+      }
     } finally {
       warn.mockRestore();
     }
@@ -694,6 +983,118 @@ describe('G0 characterization: malicious ZIP envelope', () => {
 
     it('builds byte-identical archives twice with the fixed writer configuration', () => {
       expect(representativeFixtureIsDeterministic).toBe(true);
+    });
+
+    it('registers every manifest ambiguity case once and reproduces every ZIP byte-for-byte', () => {
+      expect(MANIFEST_AMBIGUITY_CASES.map(({ id, relation, depth }) =>
+        [id, relation, depth])).toEqual([
+        ['duplicate-json-member', 'exact-duplicate', 'top-level'],
+        ['manifest-decoded-duplicate-top-forward', 'decoded-equivalent', 'top-level'],
+        ['manifest-decoded-duplicate-top-reverse', 'decoded-equivalent', 'top-level'],
+        ['manifest-decoded-duplicate-nested-forward', 'decoded-equivalent', 'nested'],
+        ['manifest-decoded-duplicate-nested-reverse', 'decoded-equivalent', 'nested'],
+        ['manifest-nfc-collision-top-forward', 'nfc-collision', 'top-level'],
+        ['manifest-nfc-collision-top-reverse', 'nfc-collision', 'top-level'],
+        ['manifest-nfc-collision-nested-forward', 'nfc-collision', 'nested'],
+        ['manifest-nfc-collision-nested-reverse', 'nfc-collision', 'nested'],
+      ]);
+      expect(Object.values(manifestAmbiguityDeterministic)).toEqual(
+        MANIFEST_AMBIGUITY_CASES.map(() => true),
+      );
+      const opLines = MANIFEST_AMBIGUITY_OPS_TEXT.trimEnd().split('\n');
+      expect(opLines).toHaveLength(2);
+      expect(JSON.parse(opLines[0]!)).toMatchObject({
+        op: 1,
+        actor: MIXED_ACTOR,
+        id: BASE_CAPTION_ID,
+      });
+      expect(JSON.parse(opLines[1]!)).toMatchObject({
+        op: 2,
+        actor: MIXED_ACTOR,
+        id: MIXED_CAPTION_ID,
+      });
+    });
+
+    for (const ambiguityCase of MANIFEST_AMBIGUITY_CASES) {
+      it(`${ambiguityCase.id}: freezes raw member depth, order, values and key relation`, () => {
+        const shapes = manifestAmbiguityShapes[ambiguityCase.id];
+        expect(shapes.map(({ filename }) => filename)).toEqual([
+          'lociview.json',
+          `ops/${MIXED_ACTOR}.jsonl`,
+        ]);
+        const manifestPayload = shapes[0]?.payload;
+        const opsPayload = shapes[1]?.payload;
+        if (manifestPayload === null || manifestPayload === undefined ||
+            opsPayload === null || opsPayload === undefined) {
+          throw new Error(`missing manifest ambiguity payload: ${ambiguityCase.id}`);
+        }
+        const manifestText = new TextDecoder('utf-8', { fatal: true }).decode(manifestPayload);
+        expect(manifestText).toBe(ambiguityCase.manifestText);
+        expect([...manifestPayload].every((byte) => byte <= 0x7f)).toBe(true);
+        expect(new TextDecoder('utf-8', { fatal: true }).decode(opsPayload))
+          .toBe(MANIFEST_AMBIGUITY_OPS_TEXT);
+
+        const pairText = ambiguityCase.members.map(rawMemberText).join(',');
+        const scopedPair = ambiguityCase.depth === 'nested'
+          ? `"future":{${pairText}}`
+          : pairText;
+        expect(manifestText.split(scopedPair)).toHaveLength(2);
+        const actualDepths = ambiguityCase.members.map((member) => {
+          const token = rawMemberText(member);
+          const offset = manifestText.indexOf(token);
+          expect(offset).toBeGreaterThanOrEqual(0);
+          expect(manifestText.indexOf(token, offset + token.length)).toBe(-1);
+          return jsonObjectDepthAt(manifestText, offset);
+        });
+        expect(actualDepths).toEqual(
+          ambiguityCase.members.map(() => ambiguityCase.depth === 'top-level' ? 1 : 2),
+        );
+        const decodedKeys = ambiguityCase.members.map(({ rawKey }) => JSON.parse(rawKey) as string);
+        expect(ambiguityCase.members[0].value).not.toBe(ambiguityCase.members[1].value);
+        if (ambiguityCase.relation === 'nfc-collision') {
+          expect(decodedKeys[0]).not.toBe(decodedKeys[1]);
+          expect(decodedKeys[0]!.normalize('NFC')).toBe(decodedKeys[1]!.normalize('NFC'));
+        } else {
+          expect(decodedKeys[0]).toBe(decodedKeys[1]);
+          expect(ambiguityCase.members[0].rawKey === ambiguityCase.members[1].rawKey)
+            .toBe(ambiguityCase.relation === 'exact-duplicate');
+        }
+
+        const parsed = JSON.parse(manifestText) as Record<string, unknown>;
+        expect(parsed.schemaVersion).toBe(SCHEMA_VERSION);
+        expect(parsed.projectId).toBe(PROJECT_ID);
+      });
+    }
+
+    it('reverses only the two ambiguous members in every paired fixture', () => {
+      const byId = new Map(MANIFEST_AMBIGUITY_CASES.map((entry) => [entry.id, entry]));
+      for (const [forwardId, reverseId] of MANIFEST_AMBIGUITY_REVERSE_PAIRS) {
+        const forward = byId.get(forwardId);
+        const reverse = byId.get(reverseId);
+        expect(forward).toBeDefined();
+        expect(reverse).toBeDefined();
+        expect(reverse?.relation).toBe(forward?.relation);
+        expect(reverse?.depth).toBe(forward?.depth);
+        expect(reverse?.members).toEqual([forward?.members[1], forward?.members[0]]);
+      }
+    });
+
+    it('constructs one non-ambiguous unknown-member control at both object depths', () => {
+      expect(manifestAmbiguityControlShape.map(({ filename }) => filename)).toEqual([
+        'lociview.json',
+        `ops/${MIXED_ACTOR}.jsonl`,
+      ]);
+      const payload = manifestAmbiguityControlShape[0]?.payload;
+      if (payload === null || payload === undefined) throw new Error('missing ambiguity control manifest');
+      const text = new TextDecoder('utf-8', { fatal: true }).decode(payload);
+      expect(text).toBe(MANIFEST_AMBIGUITY_CONTROL_TEXT);
+      expect([...payload].every((byte) => byte <= 0x7f)).toBe(true);
+      const parsed = JSON.parse(text) as Record<string, unknown>;
+      expect(parsed['\u00e9']).toBe('top NFC singleton');
+      expect(parsed.future).toEqual({
+        label: 'nested escaped singleton',
+        '\u00e9': 'nested NFC singleton',
+      });
     });
 
     it('constructs raw duplicate paths in both input orders with both payloads intact', () => {
@@ -888,7 +1289,6 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       'special-mode-entry',
       'unsafe-directory-path',
       'directory-count-bypass',
-      'duplicate-json-member',
       'local-central-name-mismatch',
     ] as const;
 
@@ -971,12 +1371,41 @@ describe('G0 characterization: malicious ZIP envelope', () => {
     });
   });
 
+  describe('ambiguous manifest members stay outside active authority', () => {
+    it('accepts the non-ambiguous unknown-member control through inspection', () => {
+      expect(manifestAmbiguityControlAccepted).toBe(true);
+    });
+
+    it('initializes every case and leaves the unrelated control project byte-exact', () => {
+      expect(MANIFEST_AMBIGUITY_CASES.map(({ id }) => manifestAmbiguityResults[id].initialized))
+        .toEqual(MANIFEST_AMBIGUITY_CASES.map(() => true));
+      expect(MANIFEST_AMBIGUITY_CASES.map(({ id }) => manifestAmbiguityResults[id].controlUnchanged))
+        .toEqual(MANIFEST_AMBIGUITY_CASES.map(() => true));
+    });
+
+    for (const ambiguityCase of MANIFEST_AMBIGUITY_CASES) {
+      it.fails(`${ambiguityCase.id}: never publishes a candidate completion marker`, () => {
+        expect(manifestAmbiguityResults[ambiguityCase.id].completionMarkerNeverPublished)
+          .toBe(true);
+      });
+
+      it.fails(`${ambiguityCase.id}: never activates the valid sentinel operation`, () => {
+        expect(manifestAmbiguityResults[ambiguityCase.id].sentinelNeverActive).toBe(true);
+      });
+
+      it.fails(`${ambiguityCase.id}: leaves existing active authority unchanged`, () => {
+        expect(manifestAmbiguityResults[ambiguityCase.id].existingAuthorityUnchanged).toBe(true);
+      });
+    }
+  });
+
   describe('observable policy still deferred from this initial slice', () => {
     it.todo('reports a typed blocked/quarantined issue for mixed valid/malformed operations without depending on throw versus return');
     it.todo('reports typed encrypted, unsupported-compression, symlink, and special-mode issues');
     it.todo('enforces a ratified compression-ratio and device-budget policy without inventing numeric limits');
     it.todo('checks declared manifest size/digest and required-blob closure once the envelope declares them');
     it.todo('distinguishes a future major from a compatible minor once schemaVersion has a major discriminator');
-    it.todo('rejects non-NFC persisted strings and NFC-colliding metadata keys before object construction');
+    it.todo('rejects non-NFC persisted string values before canonical object construction');
+    it.todo('reports a typed blocked/quarantined manifest-ambiguity issue without depending on throw versus return or evidence location');
   });
 });

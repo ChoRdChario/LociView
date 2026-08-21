@@ -259,6 +259,24 @@ Start only after G-1 passes and the product owner approves S0.
 - Verification passed: 1 focused file / 297 passing tests plus 2 todos, 27 full-suite files / 783 passing tests plus 18 todos, fixture verification (10 Git entries / 708,867 bytes), zero-measurement evidence verification, typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
 - Independent specification and false-green reviews reported no unresolved P0/P1. `src/**` is unchanged; this is additional characterization coverage, not an exhaustive parser, typed issue implementation, canonical digest gate or G0-S completion
 
+### G0 characterization slice 11 — manifest JSON member ambiguity
+
+- [x] Add decoded-equivalent duplicate and NFC/NFD-colliding manifest keys at both the top level and inside an unknown nested object, in both source orders
+- [x] Freeze each raw ASCII manifest, member order, decoded-key relation, current schema, valid sentinel operation and deterministic ZIP shape without using the production manifest parser as the fixture oracle
+- [x] Characterize new-project import without requiring throw-shaped rejection, zero private staging or a particular quarantine location; no candidate completion marker or valid sentinel may become active
+- [x] Characterize existing-project merge with exact active manifest/log inventory and bytes, in-memory/reopened state, and HLC/own-sequence preservation while allowing non-authoritative evidence or orphan staging
+- [x] Keep typed issue/reporting and non-NFC persisted value policy explicit, then run focused/full verification and independent false-green/spec review before a separate commit
+
+### G0 characterization slice 11 review record
+
+- The existing exact duplicate-member fixture is now joined by eight cases covering decoded-equivalent and NFC/NFD-colliding keys at top-level and nested-object depth in both source orders. A separate NFC/escaped-key singleton control prevents a blanket unknown-member rejection from appearing correct
+- Every small fixed-date ZIP is byte-reproducible and carries the current v1 manifest plus exact canonical op1/op2 evidence. Ordinary fixture tests fatal-decode the ASCII payload, freeze the complete raw member tokens and values, independently measure their actual object depth, verify decoded equality or NFC collision, and keep the production manifest parser out of the raw-shape oracle
+- New-project characterization records every completion-marker mutation and separately checks sentinel visibility. It permits private staging and quarantine bytes, but the expected-failure contract requires that an ambiguous manifest never publish the candidate marker or activate its otherwise-valid operation
+- Existing-project characterization compares the exact manifest and every active `.jsonl` path/byte, in-memory operations and reduced state, every published state, reopened operations/state, and a fixed-time twin HLC/own-sequence probe. Non-`.jsonl` staging, journals, quarantine evidence and unreferenced orphans remain unconstrained
+- Twenty-seven narrow expected-failure assertions preserve the current unsafe activation/merge behavior for the nine cases. Typed blocked/quarantined issue reporting and non-NFC persisted value policy remain explicit todos; no parser fix, evidence-location contract, canonical digest or G0-S completion is claimed
+- Verification passed: 2 focused files / 165 passing tests plus 7 todos, 27 full-suite files / 820 passing tests plus 19 todos, fixture verification (10 Git entries / 708,867 bytes), zero-measurement evidence verification, typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
+- Independent specification, false-green and runtime/oracle reviews reported no unresolved P0/P1. `src/**` is unchanged; this remains tests-only characterization and the broad malicious-package and G0/G0-S gates below remain open
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
