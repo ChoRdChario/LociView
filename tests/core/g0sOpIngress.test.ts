@@ -103,6 +103,10 @@ const OPEN_KNOWN_DEFECTS = new Set([
   'opaque-reserved-entity-kind',
   'opaque-reserved-entity-id',
   'opaque-direct-reserved-value-key',
+  'opaque-uppercase-hlc-counter',
+  'opaque-noncanonical-actor',
+  'opaque-noncanonical-user',
+  'opaque-known-kind-malformed-ulid',
 ]);
 
 const INTRINSIC_KNOWN_DEFECTS = new Set([
@@ -578,6 +582,60 @@ interface RelationOutcome {
   bothReported: boolean;
   bothVisible: boolean;
   orderIndependent: boolean;
+  candidatesIndividuallyAccepted: boolean;
+  sourceRawPreserved: boolean;
+}
+
+async function relationCandidateAcceptedThroughOpen(
+  relation: OpCorpusRelation,
+  wireJson: string,
+  suffix: string,
+): Promise<boolean> {
+  const fs = new MemoryFS();
+  const dir = `projects/relation-candidate-open-${relation.id}-${suffix}`;
+  await ProjectStore.create(fs, dir, relation.id, USER);
+  const logPath = `${dir}/ops/${relation.subject.actor}.jsonl`;
+  await fs.writeText(logPath, `${wireJson}\n`);
+  const store = await ProjectStore.open(fs, dir, USER);
+  return (
+    (await fs.readText(logPath)) === `${wireJson}\n` &&
+    !store.loadErrors.some(({ file }) => file === logPath) &&
+    subjectVisible(store, relation.subject) &&
+    isDeepStrictEqual(matchingSubjectOp(store, relation.subject), JSON.parse(wireJson))
+  );
+}
+
+async function relationCandidateAcceptedThroughPackage(
+  relation: OpCorpusRelation,
+  wireJson: string,
+  suffix: string,
+): Promise<boolean> {
+  const fs = new MemoryFS();
+  const dir = `projects/relation-candidate-package-${relation.id}-${suffix}`;
+  const target = await ProjectStore.create(fs, dir, relation.id, USER);
+  const manifestText = await fs.readText(`${dir}/lociview.json`);
+  if (manifestText === null) throw new Error('relation candidate manifest setup failed');
+  const path = `ops/${relation.subject.actor}.jsonl`;
+  const text = `${wireJson}\n`;
+  const zip = await writeZipEntries([
+    { path: 'lociview.json', data: encoder.encode(manifestText) },
+    { path, data: encoder.encode(text) },
+  ]);
+  const inspection = await inspectZip(zip);
+  const sourceExact =
+    inspection.opsErrorCount === 0 &&
+    inspection.opsFiles.length === 1 &&
+    inspection.opsFiles[0]?.path === path &&
+    inspection.opsFiles[0]?.text === text &&
+    inspection.ops.length === 1 &&
+    isDeepStrictEqual(inspection.ops[0], JSON.parse(wireJson));
+  await mergeFromInspection(fs, dir, target, inspection);
+  const reopened = await ProjectStore.open(fs, dir, USER);
+  return (
+    sourceExact &&
+    subjectVisible(reopened, relation.subject) &&
+    isDeepStrictEqual(matchingSubjectOp(reopened, relation.subject), JSON.parse(wireJson))
+  );
 }
 
 async function characterizeOpenRelation(
@@ -585,7 +643,13 @@ async function characterizeOpenRelation(
   first: string,
   second: string,
   suffix: string,
-): Promise<{ opened: boolean; reported: boolean; visible: boolean; fields: unknown }> {
+): Promise<{
+  opened: boolean;
+  reported: boolean;
+  visible: boolean;
+  fields: unknown;
+  sourceRawPreserved: boolean;
+}> {
   const fs = new MemoryFS();
   const dir = `projects/relation-open-${relation.id}-${suffix}`;
   await ProjectStore.create(fs, dir, relation.id, USER);
@@ -612,6 +676,7 @@ async function characterizeOpenRelation(
     reported: store !== null && store.loadErrors.some(({ file }) => file === logPath),
     visible: subjectVisible(store, relation.subject),
     fields,
+    sourceRawPreserved: (await fs.readText(logPath)) === `${first}\n${second}\n`,
   };
 }
 
@@ -628,11 +693,17 @@ async function openRelationOutcome(relation: OpCorpusRelation): Promise<Relation
     relation.firstWireJson,
     'reverse',
   );
+  const candidateResults = await Promise.all([
+    relationCandidateAcceptedThroughOpen(relation, relation.firstWireJson, 'first'),
+    relationCandidateAcceptedThroughOpen(relation, relation.secondWireJson, 'second'),
+  ]);
   return {
     bothOpened: forward.opened && reverse.opened,
     bothReported: forward.reported && reverse.reported,
     bothVisible: forward.visible && reverse.visible,
     orderIndependent: isDeepStrictEqual(forward.fields, reverse.fields),
+    candidatesIndividuallyAccepted: candidateResults.every(Boolean),
+    sourceRawPreserved: forward.sourceRawPreserved && reverse.sourceRawPreserved,
   };
 }
 
@@ -641,7 +712,13 @@ async function characterizePackageRelationOrder(
   first: string,
   second: string,
   suffix: string,
-): Promise<{ targetReopened: boolean; reported: boolean; visible: boolean; fields: unknown }> {
+): Promise<{
+  targetReopened: boolean;
+  reported: boolean;
+  visible: boolean;
+  fields: unknown;
+  sourceRawPreserved: boolean;
+}> {
   const fs = new MemoryFS();
   const dir = `projects/relation-package-${relation.id}-${suffix}`;
   const target = await ProjectStore.create(fs, dir, relation.id, USER);
@@ -683,6 +760,10 @@ async function characterizePackageRelationOrder(
     reported: inspection.opsErrorCount > 0 || mergeRejected,
     visible: subjectVisible(reopened, relation.subject),
     fields,
+    sourceRawPreserved:
+      inspection.opsFiles.length === 1 &&
+      inspection.opsFiles[0]?.path === `ops/${relation.subject.actor}.jsonl` &&
+      inspection.opsFiles[0]?.text === `${first}\n${second}\n`,
   };
 }
 
@@ -690,6 +771,7 @@ interface LocalIncomingRelationOutcome {
   bothTargetsReopened: boolean;
   bothBaseCandidatesPreserved: boolean;
   bothMergesRejected: boolean;
+  bothSourceRawPreserved: boolean;
 }
 
 async function characterizeLocalIncomingRelationOrder(
@@ -697,14 +779,17 @@ async function characterizeLocalIncomingRelationOrder(
   baseWireJson: string,
   incomingWireJson: string,
   suffix: string,
-): Promise<{ targetReopened: boolean; baseCandidatePreserved: boolean; mergeRejected: boolean }> {
+): Promise<{
+  targetReopened: boolean;
+  baseCandidatePreserved: boolean;
+  mergeRejected: boolean;
+  sourceRawPreserved: boolean;
+}> {
   const fs = new MemoryFS();
   const dir = `projects/relation-local-incoming-${relation.id}-${suffix}`;
   await ProjectStore.create(fs, dir, relation.id, USER);
-  await fs.writeText(
-    `${dir}/ops/${relation.subject.actor}.jsonl`,
-    `${baseWireJson}\n`,
-  );
+  const logPath = `${dir}/ops/${relation.subject.actor}.jsonl`;
+  await fs.writeText(logPath, `${baseWireJson}\n`);
   const target = await ProjectStore.open(fs, dir, USER);
   const manifestText = await fs.readText(`${dir}/lociview.json`);
   if (manifestText === null) throw new Error('local/incoming relation manifest setup failed');
@@ -716,6 +801,10 @@ async function characterizeLocalIncomingRelationOrder(
     },
   ]);
   const inspection = await inspectZip(zip);
+  const incomingSourcePreserved =
+    inspection.opsFiles.length === 1 &&
+    inspection.opsFiles[0]?.path === `ops/${relation.subject.actor}.jsonl` &&
+    inspection.opsFiles[0]?.text === `${incomingWireJson}\n`;
   let mergeRejected = false;
   try {
     await mergeFromInspection(fs, dir, target, inspection);
@@ -739,6 +828,8 @@ async function characterizeLocalIncomingRelationOrder(
     baseCandidatePreserved:
       sameKeyOps.length === 1 && isDeepStrictEqual(sameKeyOps[0], JSON.parse(baseWireJson)),
     mergeRejected,
+    sourceRawPreserved:
+      incomingSourcePreserved && (await fs.readText(logPath)) === `${baseWireJson}\n`,
   };
 }
 
@@ -762,6 +853,7 @@ async function localIncomingRelationOutcome(
     bothBaseCandidatesPreserved:
       forward.baseCandidatePreserved && reverse.baseCandidatePreserved,
     bothMergesRejected: forward.mergeRejected && reverse.mergeRejected,
+    bothSourceRawPreserved: forward.sourceRawPreserved && reverse.sourceRawPreserved,
   };
 }
 
@@ -778,16 +870,32 @@ async function packageRelationOutcome(relation: OpCorpusRelation): Promise<Relat
     relation.firstWireJson,
     'reverse',
   );
+  const candidateResults = await Promise.all([
+    relationCandidateAcceptedThroughPackage(relation, relation.firstWireJson, 'first'),
+    relationCandidateAcceptedThroughPackage(relation, relation.secondWireJson, 'second'),
+  ]);
   return {
     bothOpened: forward.targetReopened && reverse.targetReopened,
     bothReported: forward.reported && reverse.reported,
     bothVisible: forward.visible && reverse.visible,
     orderIndependent: isDeepStrictEqual(forward.fields, reverse.fields),
+    candidatesIndividuallyAccepted: candidateResults.every(Boolean),
+    sourceRawPreserved: forward.sourceRawPreserved && reverse.sourceRawPreserved,
   };
 }
 
-function relationDecision(outcome: RelationOutcome): Omit<RelationOutcome, 'bothOpened'> {
-  const { bothOpened: _opened, ...decision } = outcome;
+function relationDecision(
+  outcome: RelationOutcome,
+): Omit<
+  RelationOutcome,
+  'bothOpened' | 'candidatesIndividuallyAccepted' | 'sourceRawPreserved'
+> {
+  const {
+    bothOpened: _opened,
+    candidatesIndividuallyAccepted: _individual,
+    sourceRawPreserved: _raw,
+    ...decision
+  } = outcome;
   return decision;
 }
 
@@ -798,6 +906,8 @@ function expectedRelation(relation: OpCorpusRelation): RelationOutcome {
     bothReported: collision,
     bothVisible: !collision,
     orderIndependent: true,
+    candidatesIndividuallyAccepted: true,
+    sourceRawPreserved: true,
   };
 }
 
@@ -820,6 +930,18 @@ describe.sequential('G0S-OP same-key relations', () => {
         () => outcome.bothOpened,
         true,
       );
+      defineFinalAssertion(
+        'pass',
+        'accepts both relation candidates individually before comparing their shared key',
+        () => outcome.candidatesIndividuallyAccepted,
+        true,
+      );
+      defineFinalAssertion(
+        'pass',
+        'preserves both ordered raw source lines exactly',
+        () => outcome.sourceRawPreserved,
+        true,
+      );
     });
 
     describe('package inspect/merge order', () => {
@@ -839,6 +961,18 @@ describe.sequential('G0S-OP same-key relations', () => {
         () => outcome.bothOpened,
         true,
       );
+      defineFinalAssertion(
+        'pass',
+        'accepts both package candidates individually before comparing their shared key',
+        () => outcome.candidatesIndividuallyAccepted,
+        true,
+      );
+      defineFinalAssertion(
+        'pass',
+        'inspects both ordered package source lines exactly',
+        () => outcome.sourceRawPreserved,
+        true,
+      );
     });
 
     describe('existing target versus incoming package', () => {
@@ -856,6 +990,12 @@ describe.sequential('G0S-OP same-key relations', () => {
         'pass',
         'never appends the incoming same-key candidate without resolution',
         () => outcome.bothBaseCandidatesPreserved,
+        true,
+      );
+      defineFinalAssertion(
+        'pass',
+        'preserves the exact active base and inspected incoming source in both orders',
+        () => outcome.bothSourceRawPreserved,
         true,
       );
       defineFinalAssertion(

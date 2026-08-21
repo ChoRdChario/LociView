@@ -153,6 +153,54 @@
       "dispatchInputJson": "{\"t\":\"create\",\"e\":\"caption\",\"id\":\"cap_00000000000000000000000019\",\"v\":{\"__proto__\":{\"polluted\":true}}}",
       "subject": { "actor": "a_0000000000000", "op": 19, "kind": "caption", "id": "cap_00000000000000000000000019" },
       "expected": { "canonicalEvidence": "opaque", "reducer": "none", "rawEvidence": "preserved" }
+    },
+    {
+      "id": "opaque-missing-user",
+      "logActor": "a_0000000000000",
+      "wireJson": "{\"op\":20,\"hlc\":\"2026-08-19T00:00:00.000Z-0000-a_0000000000000\",\"actor\":\"a_0000000000000\",\"t\":\"create\",\"e\":\"caption\",\"id\":\"cap_00000000000000000000000020\",\"v\":{\"title\":\"missing user\"}}",
+      "dispatchInputJson": null,
+      "subject": { "actor": "a_0000000000000", "op": 20, "kind": "caption", "id": "cap_00000000000000000000000020" },
+      "expected": { "canonicalEvidence": "opaque", "reducer": "none", "rawEvidence": "preserved" }
+    },
+    {
+      "id": "opaque-create-without-value",
+      "logActor": "a_0000000000000",
+      "wireJson": "{\"op\":21,\"hlc\":\"2026-08-19T00:00:00.000Z-0000-a_0000000000000\",\"actor\":\"a_0000000000000\",\"user\":\"usr_00000000000000000000000000\",\"t\":\"create\",\"e\":\"caption\",\"id\":\"cap_00000000000000000000000021\"}",
+      "dispatchInputJson": "{\"t\":\"create\",\"e\":\"caption\",\"id\":\"cap_00000000000000000000000021\"}",
+      "subject": { "actor": "a_0000000000000", "op": 21, "kind": "caption", "id": "cap_00000000000000000000000021" },
+      "expected": { "canonicalEvidence": "opaque", "reducer": "none", "rawEvidence": "preserved" }
+    },
+    {
+      "id": "opaque-uppercase-hlc-counter",
+      "logActor": "a_0000000000000",
+      "wireJson": "{\"op\":22,\"hlc\":\"2026-08-19T00:00:00.000Z-00AF-a_0000000000000\",\"actor\":\"a_0000000000000\",\"user\":\"usr_00000000000000000000000000\",\"t\":\"create\",\"e\":\"caption\",\"id\":\"cap_00000000000000000000000022\",\"v\":{\"title\":\"uppercase counter\"}}",
+      "dispatchInputJson": null,
+      "subject": { "actor": "a_0000000000000", "op": 22, "kind": "caption", "id": "cap_00000000000000000000000022" },
+      "expected": { "canonicalEvidence": "opaque", "reducer": "none", "rawEvidence": "preserved" }
+    },
+    {
+      "id": "opaque-noncanonical-actor",
+      "logActor": "a_000000000000I",
+      "wireJson": "{\"op\":23,\"hlc\":\"2026-08-19T00:00:00.000Z-0000-a_000000000000I\",\"actor\":\"a_000000000000I\",\"user\":\"usr_00000000000000000000000000\",\"t\":\"create\",\"e\":\"caption\",\"id\":\"cap_00000000000000000000000023\",\"v\":{\"title\":\"noncanonical actor\"}}",
+      "dispatchInputJson": null,
+      "subject": { "actor": "a_000000000000I", "op": 23, "kind": "caption", "id": "cap_00000000000000000000000023" },
+      "expected": { "canonicalEvidence": "opaque", "reducer": "none", "rawEvidence": "preserved" }
+    },
+    {
+      "id": "opaque-noncanonical-user",
+      "logActor": "a_0000000000000",
+      "wireJson": "{\"op\":24,\"hlc\":\"2026-08-19T00:00:00.000Z-0000-a_0000000000000\",\"actor\":\"a_0000000000000\",\"user\":\"usr_80000000000000000000000000\",\"t\":\"create\",\"e\":\"caption\",\"id\":\"cap_00000000000000000000000024\",\"v\":{\"title\":\"noncanonical user\"}}",
+      "dispatchInputJson": null,
+      "subject": { "actor": "a_0000000000000", "op": 24, "kind": "caption", "id": "cap_00000000000000000000000024" },
+      "expected": { "canonicalEvidence": "opaque", "reducer": "none", "rawEvidence": "preserved" }
+    },
+    {
+      "id": "opaque-known-kind-malformed-ulid",
+      "logActor": "a_0000000000000",
+      "wireJson": "{\"op\":25,\"hlc\":\"2026-08-19T00:00:00.000Z-0000-a_0000000000000\",\"actor\":\"a_0000000000000\",\"user\":\"usr_00000000000000000000000000\",\"t\":\"create\",\"e\":\"caption\",\"id\":\"cap_80000000000000000000000000\",\"v\":{\"title\":\"malformed ULID\"}}",
+      "dispatchInputJson": "{\"t\":\"create\",\"e\":\"caption\",\"id\":\"cap_80000000000000000000000000\",\"v\":{\"title\":\"malformed ULID\"}}",
+      "subject": { "actor": "a_0000000000000", "op": 25, "kind": "caption", "id": "cap_80000000000000000000000000" },
+      "expected": { "canonicalEvidence": "opaque", "reducer": "none", "rawEvidence": "preserved" }
     }
   ],
   "relations": [
@@ -168,6 +216,13 @@
       "firstWireJson": "{\"op\":51,\"hlc\":\"2026-08-19T00:00:00.000Z-0000-a_0000000000000\",\"actor\":\"a_0000000000000\",\"user\":\"usr_00000000000000000000000000\",\"t\":\"create\",\"e\":\"caption\",\"id\":\"cap_00000000000000000000000051\",\"v\":{\"title\":\"A\"}}",
       "secondWireJson": "{\"op\":51,\"hlc\":\"2026-08-19T00:00:00.000Z-0000-a_0000000000000\",\"actor\":\"a_0000000000000\",\"user\":\"usr_00000000000000000000000000\",\"t\":\"create\",\"e\":\"caption\",\"id\":\"cap_00000000000000000000000051\",\"v\":{\"title\":\"B\"}}",
       "subject": { "actor": "a_0000000000000", "op": 51, "kind": "caption", "id": "cap_00000000000000000000000051" },
+      "expected": { "decision": "collision", "orderIndependent": true }
+    },
+    {
+      "id": "same-key-nfc-nfd-divergent",
+      "firstWireJson": "{\"op\":52,\"hlc\":\"2026-08-19T00:00:00.000Z-0000-a_0000000000000\",\"actor\":\"a_0000000000000\",\"user\":\"usr_00000000000000000000000000\",\"t\":\"create\",\"e\":\"caption\",\"id\":\"cap_00000000000000000000000052\",\"v\":{\"future\":{\"label\":\"\\u00e9\"}}}",
+      "secondWireJson": "{\"op\":52,\"hlc\":\"2026-08-19T00:00:00.000Z-0000-a_0000000000000\",\"actor\":\"a_0000000000000\",\"user\":\"usr_00000000000000000000000000\",\"t\":\"create\",\"e\":\"caption\",\"id\":\"cap_00000000000000000000000052\",\"v\":{\"future\":{\"label\":\"e\\u0301\"}}}",
+      "subject": { "actor": "a_0000000000000", "op": 52, "kind": "caption", "id": "cap_00000000000000000000000052" },
       "expected": { "decision": "collision", "orderIndependent": true }
     }
   ]

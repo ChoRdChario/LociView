@@ -240,6 +240,25 @@ Start only after G-1 passes and the product owner approves S0.
 - Verification passed: 3 focused files / 151 passing tests plus 6 todos, 27 full-suite files / 705 passing tests plus 18 todos, fixture verification (10 Git entries / 704,199 bytes), zero-measurement evidence verification, typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
 - Independent helper-layout and false-green reviews reported no unresolved P0/P1. `src/**` is unchanged; this is characterization, not an archive-reader fix or G0-S completion
 
+### G0 characterization slice 10 — additional v1 operation wire-shape boundaries
+
+- [x] Extend the shared operation corpus with missing `user`/`v`, noncanonical HLC/actor/user and malformed known-kind ULID boundaries already required by the approved v1 wire contract
+- [x] Add a same-key NFC/NFD relation whose candidates differ only by Unicode scalar sequence and remain individually valid canonical evidence
+- [x] Strengthen corpus self-validation so subject, log actor, dispatch projection and normalization-specific relation shape cannot drift from the raw wire fixtures
+- [x] Exercise each added case through its applicable ingress and the NFC/NFD pair through all three relation paths, without claiming exhaustive parser, canonical digest, typed issue or G0-S completion
+- [x] Update the pinned fixture size/hash, run focused/full verification and independent false-green/spec review, then commit the tests-only slice separately
+
+### G0 characterization slice 10 review record
+
+- Six additional opaque-evidence cases isolate one approved wire defect each: missing `user`, create without `v`, uppercase HLC counter, prohibited Crockford actor character with matching log/HLC suffix, noncanonical nonempty user ULID, and a correct caption prefix with malformed ULID suffix
+- Corpus loading now requires every new fixture ID, the exact applicable-dispatch set, subject/log/wire agreement, wire-derived `t/e/id/v` dispatch projection, canonical surrounding fields, exact HLC reconstruction and `opaque`/`none`/`preserved` expectations. Fixture drift fails before any expected-failure assertion runs
+- The NFC/NFD relation differs only at `v.future.label`: decoded scalar sequences differ while NFC forms match. Both candidates must succeed individually through JSONL open and package merge before the shared-key collision matrix runs
+- Every relation path keeps raw evidence ordinary and separate from collision disposition: open preserves both ordered lines, package inspection preserves both ordered lines, and existing-target merge preserves the exact active base plus exact inspected incoming line. Quarantine/journal location and throw-shaped rejection remain unconstrained
+- Missing-user and external create-without-`v` rejection are already-safe ordinary controls. Fifteen narrow expected-failure assertions retain the current HLC/actor/user/ID, invalid local-dispatch and NFC/NFD collision gaps; two existing todos still defer typed canonical-evidence-stage and durable quarantine-evidence queries
+- The corpus registry binding is updated from real bytes to 19,424 bytes and SHA-256 `abbf4d4f2c3e214f315c4c58041a9eac431c530721d7ed9f1acf6938eafdd997`. Per-operation canonical digest goldens remain deliberately absent
+- Verification passed: 1 focused file / 297 passing tests plus 2 todos, 27 full-suite files / 783 passing tests plus 18 todos, fixture verification (10 Git entries / 708,867 bytes), zero-measurement evidence verification, typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
+- Independent specification and false-green reviews reported no unresolved P0/P1. `src/**` is unchanged; this is additional characterization coverage, not an exhaustive parser, typed issue implementation, canonical digest gate or G0-S completion
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
