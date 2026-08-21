@@ -34,12 +34,20 @@ cross-runtime byte-for-byte regeneration.
 These are smoke inputs, not representative G0 loads. In particular,
 `points.ply` is an ordinary colored point cloud and records `splatCount: 0`.
 
+`v1-migration/` contains four small, deterministic synthetic package fixtures.
+Their source recipe and manually authored, independently reviewed semantic oracle are separate: a whole ZIP
+hash identifies the checked transport bytes, while migration correctness is
+checked against logical entries, workbook cells, raw operation text, binary
+hashes, and normalized state. These fixtures reproduce shapes learned from
+earlier operational migration work, but they are not an anonymized real-project
+fixture and do not complete `STO-MIG-01` by themselves.
+
 Run `npm run fixtures:verify` to validate the registry and checked-in bytes.
 
 The repository has no adopted top-level license declaration yet, so the current
 fixture license state is deliberately `NOASSERTION`. Do not assume an SPDX
 license without product-owner review.
 
-ZIP byte hashes are not golden evidence until entry order, timestamps and other
-container metadata are deterministic. Until then, verify canonical logical
-entries and semantic snapshots instead.
+ZIP byte hashes are transport evidence only. Even when entry order, timestamps,
+and writer options are deterministic, verify logical entries and semantic
+snapshots separately.

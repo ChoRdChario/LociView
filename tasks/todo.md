@@ -109,6 +109,24 @@ Start only after G-1 passes and the product owner approves S0.
 - Production and full `npm audit` both report 0 vulnerabilities after safe transitive lock updates to fast-uri 3.1.5, brace-expansion 5.0.9 / 2.1.4, nanoid 3.3.18, and postcss 8.5.26
 - Independent security review reported no unresolved P0/P1, and no measured evidence was created
 
+### G0 baseline slice 4 — representative v1 migration fixtures
+
+- [x] Add a deterministic synthetic LociMyu Drive project and a native v1 base/branch lineage as small Git fixtures
+- [x] Freeze logical ZIP entries, workbook cells, raw ops, binary hashes, and manually authored, independently reviewed semantic projections without treating container metadata or random migration IDs as semantic truth
+- [x] Add LociMyu import/round-trip and native v1 open/import/export/two-order merge golden tests
+- [x] Keep migration-specific known defects as narrow `it.fails` characterizations instead of changing production behavior in the fixture slice
+- [x] Run registry verification, focused/full tests, typecheck, production build, and independent read-only review before accepting the fixtures
+
+### G0 baseline slice 4 review record
+
+- Four deterministic synthetic artifacts cover a LociMyu Drive import and a native v1 base/A/B lineage. They add 34,240 bytes; the registry now pins 9 Git fixtures totaling 700,626 bytes
+- The LociMyu oracle freezes logical ZIP and workbook content, numeric-GID evidence, normalized sets/captions/views/materials/assets, model transform and pin scale, and blob hashes across apply, export, and reimport
+- The native oracle freezes base/A/B states and vectors, noncanonical raw JSON spelling, stale-cache rejection, tombstones, branch-exclusive blob union, idempotent remerge, and same-field LWW with actor order deliberately opposite timestamp order
+- Six narrow `it.fails` cases preserve migration defects, including the current noncanonical generated `cap_LM...` IDs, while one explicit todo reserves a storage-location-neutral assertion for durable original-source evidence. None is counted as completed G0-S behavior
+- Verification passed: fixture/evidence verification, TypeScript typecheck, 14 focused passing tests plus 1 todo, 19 test files / 423 passing tests plus 3 todos, and the production build (92 modules, 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
+- Independent semantic and filesystem-security reviews reported no unresolved P0/P1. The generator is intentionally scoped to a trusted local developer CLI with four fixed outputs, one approved source file, repository containment, and non-link parent/target checks
+- These are privacy-safe synthetic characterizations, not anonymized real projects. The broader fixture gate and `STO-MIG-01` remain incomplete until an anonymized real v1 fixture is obtained and reviewed
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes

@@ -1,0 +1,130 @@
+{
+  "$schema": "lociview.synthetic-v1-migration-source",
+  "version": 1,
+  "limits": {
+    "maxOuterBytes": 2097152,
+    "maxExpandedBytes": 8388608,
+    "maxEntryBytes": 4194304,
+    "maxEntries": 64
+  },
+  "locimyu": {
+    "output": "fixtures/v1-migration/locimyu-drive-exact-v1.zip",
+    "primary": {
+      "path": "LociMyu Save.xlsx",
+      "sheets": [
+        {
+          "name": "通常表示",
+          "rows": [
+            ["id", "title", "body", "color", "posX", "posY", "posZ", "imageFileId", "createdAt", "updatedAt"],
+            ["c_SYNTH_A", "合成・外壁ピン", "実運用データではない", "#eab308", "1.5", "2", "-3", "DRIVE_SYNTH_LINKED", "2026-08-01T00:00:00Z", "2026-08-02T00:00:00Z"]
+          ]
+        },
+        {
+          "name": "半透明・内部",
+          "rows": [
+            ["id", "title", "body", "color", "posX", "posY", "posZ", "imageFileId", "createdAt", "updatedAt"],
+            ["c_SYNTH_B", "合成・内部ピン", "未リンク参照を保持", "#4ade80", "0", "1", "0", "DRIVE_SYNTH_MISSING", "2026-08-03T00:00:00Z", "2026-08-04T00:00:00Z"]
+          ]
+        },
+        {
+          "name": "__LM_SHEET_NAMES",
+          "rows": [
+            ["sheetGid", "displayName", "sheetTitle", "updatedAt"],
+            [{ "number": "0" }, "通常", "通常表示", "2026-08-04T00:00:00Z"],
+            [{ "number": "6.17884617E8" }, "内部", "半透明・内部", "2026-08-04T00:00:00Z"]
+          ]
+        },
+        {
+          "name": "__LM_VIEWS",
+          "rows": [
+            ["id", "captionSheetGid", "name", "bgColor", "cameraType", "eyeX", "eyeY", "eyeZ", "targetX", "targetY", "targetZ", "upX", "upY", "upZ", "fov", "createdAt", "updatedAt"],
+            ["v_SYNTH_LAST", { "number": "6.17884617E8" }, "__last", "#202124", "orthographic", "3", "4", "5", "0", "0", "0", "", "", "", "", "2026-08-04T00:00:00Z", "2026-08-04T00:00:00Z"]
+          ]
+        },
+        {
+          "name": "__LM_MATERIALS",
+          "rows": [
+            ["materialKey", "opacity", "doubleSided", "unlitLike", "chromaEnable", "chromaColor", "chromaTolerance", "chromaFeather", "roughness", "metalness", "emissiveHex", "updatedAt", "updatedBy", "sheetGid"],
+            ["SyntheticWall", "0.8", "false", "false", "false", "", "", "", "", "", "", "2026-08-03T00:00:00Z", "synthetic", { "number": "6.17884617E8" }],
+            ["SyntheticWall", "0.35", "true", "true", "TRUE", "#00ff00", "0.2", "0.05", "", "", "", "2026-08-04T00:00:00Z", "synthetic", { "number": "6.17884617E8" }]
+          ]
+        },
+        {
+          "name": "__LM_META",
+          "rows": [
+            ["key", "value"],
+            ["fixture", "synthetic-exact-v1"]
+          ]
+        }
+      ]
+    },
+    "backup": {
+      "path": "LociMyu Save backup.xlsx",
+      "sheets": [
+        {
+          "name": "通常表示",
+          "rows": [
+            ["id", "title", "body", "color", "posX", "posY", "posZ", "imageFileId", "createdAt", "updatedAt"],
+            ["c_SYNTH_OLD", "合成・古いバックアップ", "選択されてはいけない", "#f87171", "9", "9", "9", "", "2026-07-01T00:00:00Z", "2026-07-02T00:00:00Z"]
+          ]
+        }
+      ]
+    },
+    "entries": [
+      { "path": "models/site.glb", "sourcePath": "public/samples/tri.glb" },
+      { "path": "images/linked.png", "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=" },
+      { "path": "images/unlinked.png", "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=" },
+      { "path": "fileid-map.csv", "utf8": "fileId,filename\nDRIVE_SYNTH_LINKED,linked.png\n" },
+      { "path": "~$LociMyu Save.xlsx", "utf8": "synthetic lock marker\n" }
+    ]
+  },
+  "native": {
+    "outputs": {
+      "base": "fixtures/v1-migration/native-v1-base.lociview",
+      "branchA": "fixtures/v1-migration/native-v1-branch-a.lociview",
+      "branchB": "fixtures/v1-migration/native-v1-branch-b.lociview"
+    },
+    "manifest": {
+      "format": "lociview-project",
+      "schemaVersion": 1,
+      "projectId": "prj_01J00000000000000000000000",
+      "name": "Synthetic v1 migration lineage",
+      "createdAt": "2026-08-19T00:00:00.000Z",
+      "generator": "LociView/G0-fixture"
+    },
+    "baseLog": [
+      { "op": 1, "hlc": "2026-08-19T00:00:01.000Z-0000-a_000000000000A", "actor": "a_000000000000A", "user": "usr_01J00000000000000000000001", "t": "create", "e": "profile", "id": "usr_01J00000000000000000000001", "v": { "displayName": "Synthetic A", "defaultPinColor": "#eab308" } },
+      { "op": 2, "hlc": "2026-08-19T00:00:02.000Z-0000-a_000000000000A", "actor": "a_000000000000A", "user": "usr_01J00000000000000000000001", "t": "create", "e": "set", "id": "set_01J00000000000000000000010", "v": { "name": "Surface", "order": 1 } },
+      { "op": 3, "hlc": "2026-08-19T00:00:03.000Z-0000-a_000000000000A", "actor": "a_000000000000A", "user": "usr_01J00000000000000000000001", "t": "create", "e": "set", "id": "set_01J00000000000000000000011", "v": { "name": "Internal", "order": 2 } },
+      { "op": 4, "hlc": "2026-08-19T00:00:04.000Z-0000-a_000000000000A", "actor": "a_000000000000A", "user": "usr_01J00000000000000000000001", "t": "create", "e": "asset", "id": "ast_01J00000000000000000000020", "v": { "kind": "model", "path": "models/ast_01J00000000000000000000020.glb", "originalName": "synthetic-site.glb", "mime": "model/gltf-binary", "size": 740, "transform": { "scale": 1, "upAxis": "Y" }, "pinScale": 1 } },
+      { "op": 5, "hlc": "2026-08-19T00:00:05.000Z-0000-a_000000000000A", "actor": "a_000000000000A", "user": "usr_01J00000000000000000000001", "t": "create", "e": "asset", "id": "ast_01J00000000000000000000021", "v": { "kind": "image", "path": "media/ast_01J00000000000000000000021.png", "originalName": "synthetic-pin.png", "mime": "image/png", "size": 68 } },
+      { "op": 6, "hlc": "2026-08-19T00:00:06.000Z-0000-a_000000000000A", "actor": "a_000000000000A", "user": "usr_01J00000000000000000000001", "t": "create", "e": "caption", "id": "cap_01J00000000000000000000030", "v": { "setId": "set_01J00000000000000000000010", "title": "Synthetic surface pin", "body": "base body", "color": "#eab308", "tags": ["synthetic"], "attachments": ["ast_01J00000000000000000000021"], "anchor": { "modelAssetId": "ast_01J00000000000000000000020", "position": [0.25, 0.5, 0] } } },
+      { "rawLine": "{  \"v\" : { \"futureSafe\" : { \"nested\" : true }, \"attachments\" : [ ], \"tags\" : [ ], \"color\" : \"#4ade80\", \"body\" : \"raw spacing probe\", \"title\" : \"Synthetic unplaced\", \"setId\" : \"set_01J00000000000000000000011\" }, \"id\" : \"cap_01J00000000000000000000031\", \"e\" : \"caption\", \"t\" : \"create\", \"user\" : \"usr_01J00000000000000000000001\", \"actor\" : \"a_000000000000A\", \"hlc\" : \"2026-08-19T00:00:07.000Z-0000-a_000000000000A\", \"op\" : 7 }" },
+      { "op": 8, "hlc": "2026-08-19T00:00:08.000Z-0000-a_000000000000A", "actor": "a_000000000000A", "user": "usr_01J00000000000000000000001", "t": "create", "e": "view", "id": "view_01J00000000000000000000040", "v": { "setId": "set_01J00000000000000000000010", "name": "Perspective", "cameraState": { "eye": [1, 2, 3], "target": [0, 0, 0], "up": [0, 1, 0], "fov": 45, "ortho": false }, "background": "#202124" } },
+      { "op": 9, "hlc": "2026-08-19T00:00:09.000Z-0000-a_000000000000A", "actor": "a_000000000000A", "user": "usr_01J00000000000000000000001", "t": "create", "e": "view", "id": "view_01J00000000000000000000041", "v": { "setId": "set_01J00000000000000000000011", "name": "Orthographic", "cameraState": { "eye": [3, 4, 5], "target": [0, 0, 0], "up": [0, 1, 0], "fov": 45, "ortho": true }, "background": "#101010" } },
+      { "op": 10, "hlc": "2026-08-19T00:00:10.000Z-0000-a_000000000000A", "actor": "a_000000000000A", "user": "usr_01J00000000000000000000001", "t": "create", "e": "material", "id": "mat_01J00000000000000000000050", "v": { "setId": "set_01J00000000000000000000011", "modelAssetId": "ast_01J00000000000000000000020", "materialKey": "SyntheticWall", "opacity": 0.35, "doubleSided": true, "unlit": true, "chroma": { "enable": false, "color": "#00ff00", "tolerance": 0.2, "feather": 0.05 } } },
+      { "op": 11, "hlc": "2026-08-19T00:00:11.000Z-0000-a_000000000000A", "actor": "a_000000000000A", "user": "usr_01J00000000000000000000001", "t": "create", "e": "caption", "id": "cap_01J00000000000000000000060", "v": { "setId": "set_01J00000000000000000000010", "title": "Synthetic tombstone", "body": "deleted", "color": "#f87171", "tags": [], "attachments": [] } },
+      { "op": 12, "hlc": "2026-08-19T00:00:12.000Z-0000-a_000000000000A", "actor": "a_000000000000A", "user": "usr_01J00000000000000000000001", "t": "delete", "e": "caption", "id": "cap_01J00000000000000000000060" }
+    ],
+    "branchALog": [
+      { "op": 1, "hlc": "2026-08-19T01:00:00.000Z-0000-a_000000000000C", "actor": "a_000000000000C", "user": "usr_01J00000000000000000000002", "t": "update", "e": "caption", "id": "cap_01J00000000000000000000030", "v": { "body": "branch A body" } },
+      { "op": 2, "hlc": "2026-08-19T01:00:01.000Z-0000-a_000000000000C", "actor": "a_000000000000C", "user": "usr_01J00000000000000000000002", "t": "create", "e": "asset", "id": "ast_01J00000000000000000000080", "v": { "kind": "other", "path": "media/ast_01J00000000000000000000080.bin", "originalName": "branch-a.bin", "mime": "application/octet-stream", "size": 25 } },
+      { "op": 3, "hlc": "2026-08-19T01:00:02.000Z-0000-a_000000000000C", "actor": "a_000000000000C", "user": "usr_01J00000000000000000000002", "t": "update", "e": "caption", "id": "cap_01J00000000000000000000031", "v": { "title": "Branch A conflict loser" } }
+    ],
+    "branchBLog": [
+      { "op": 1, "hlc": "2026-08-19T02:00:00.000Z-0000-a_000000000000B", "actor": "a_000000000000B", "user": "usr_01J00000000000000000000003", "t": "update", "e": "caption", "id": "cap_01J00000000000000000000030", "v": { "color": "#38bdf8" } },
+      { "op": 2, "hlc": "2026-08-19T02:00:01.000Z-0000-a_000000000000B", "actor": "a_000000000000B", "user": "usr_01J00000000000000000000003", "t": "create", "e": "asset", "id": "ast_01J00000000000000000000081", "v": { "kind": "other", "path": "media/ast_01J00000000000000000000081.bin", "originalName": "branch-b.bin", "mime": "application/octet-stream", "size": 25 } },
+      { "op": 3, "hlc": "2026-08-19T02:00:02.000Z-0000-a_000000000000B", "actor": "a_000000000000B", "user": "usr_01J00000000000000000000003", "t": "update", "e": "caption", "id": "cap_01J00000000000000000000031", "v": { "title": "Branch B conflict winner" } }
+    ],
+    "sharedBinaries": [
+      { "path": "models/ast_01J00000000000000000000020.glb", "sourcePath": "public/samples/tri.glb" },
+      { "path": "media/ast_01J00000000000000000000021.png", "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=" }
+    ],
+    "branchABinaries": [
+      { "path": "media/ast_01J00000000000000000000080.bin", "utf8": "synthetic branch A bytes\n" }
+    ],
+    "branchBBinaries": [
+      { "path": "media/ast_01J00000000000000000000081.bin", "utf8": "synthetic branch B bytes\n" }
+    ]
+  }
+}

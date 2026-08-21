@@ -76,6 +76,66 @@
       "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable" },
       "restore": { "method": "repository", "instructions": "Restore this path from the same Git revision as fixtures/registry.json." },
       "expected": { "classification": "mesh", "warnings": [] }
+    },
+    {
+      "id": "v1-migration-locimyu-drive-exact-v1",
+      "storage": { "tier": "git", "path": "fixtures/v1-migration/locimyu-drive-exact-v1.zip" },
+      "byteSize": 14102,
+      "sha256": "17f0bca42f157641fc0bd4feea23c2d7872ede56593e78a8fe51174f27ee9b05",
+      "mediaType": "application/zip",
+      "classification": "package",
+      "geometry": { "triangleCount": 1, "ordinaryPointCount": 0, "splatCount": 0, "textureCount": 2, "bounds": { "min": [0, 0, 0], "max": [1, 1, 0] } },
+      "coordinates": { "handedness": "right", "upAxis": "+Y", "unit": "source-unit" },
+      "provenance": { "kind": "generated", "source": "scripts/fixtures/generate-v1-migration-fixtures.mjs", "reproducibility": "byte-reproducible" },
+      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed" },
+      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable" },
+      "restore": { "method": "repository", "instructions": "Restore the package, source recipe, semantic oracle, and generator from the same Git revision." },
+      "expected": { "classification": "package", "warnings": ["Synthetic characterization only; this is not an anonymized real-project fixture."] }
+    },
+    {
+      "id": "v1-migration-native-base-v1",
+      "storage": { "tier": "git", "path": "fixtures/v1-migration/native-v1-base.lociview" },
+      "byteSize": 5980,
+      "sha256": "ea75eecd420b823118916e830c15d9f19bb5d81046af26cfcb923a4c9bccf216",
+      "mediaType": "application/vnd.lociview.project+zip",
+      "classification": "package",
+      "geometry": { "triangleCount": 1, "ordinaryPointCount": 0, "splatCount": 0, "textureCount": 1, "bounds": { "min": [0, 0, 0], "max": [1, 1, 0] } },
+      "coordinates": { "handedness": "right", "upAxis": "+Y", "unit": "source-unit" },
+      "provenance": { "kind": "generated", "source": "scripts/fixtures/generate-v1-migration-fixtures.mjs", "reproducibility": "byte-reproducible" },
+      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed" },
+      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable" },
+      "restore": { "method": "repository", "instructions": "Restore the package, source recipe, semantic oracle, and generator from the same Git revision." },
+      "expected": { "classification": "package", "warnings": ["Derived snapshot and CSV are deliberately stale; the operation log is authoritative."] }
+    },
+    {
+      "id": "v1-migration-native-branch-a-v1",
+      "storage": { "tier": "git", "path": "fixtures/v1-migration/native-v1-branch-a.lociview" },
+      "byteSize": 7081,
+      "sha256": "b535116232f17b5e727e3ff1d5d2be19b0e01bd2a54a264fe3f479e7e04a4095",
+      "mediaType": "application/vnd.lociview.project+zip",
+      "classification": "package",
+      "geometry": { "triangleCount": 1, "ordinaryPointCount": 0, "splatCount": 0, "textureCount": 1, "bounds": { "min": [0, 0, 0], "max": [1, 1, 0] } },
+      "coordinates": { "handedness": "right", "upAxis": "+Y", "unit": "source-unit" },
+      "provenance": { "kind": "generated", "source": "scripts/fixtures/generate-v1-migration-fixtures.mjs", "reproducibility": "byte-reproducible" },
+      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed" },
+      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable" },
+      "restore": { "method": "repository", "instructions": "Restore the package, source recipe, semantic oracle, and generator from the same Git revision." },
+      "expected": { "classification": "package", "warnings": ["This branch is meaningful only with the base and branch-B fixtures from the same Git revision."] }
+    },
+    {
+      "id": "v1-migration-native-branch-b-v1",
+      "storage": { "tier": "git", "path": "fixtures/v1-migration/native-v1-branch-b.lociview" },
+      "byteSize": 7077,
+      "sha256": "8e65e5e807230a3f1b86c22d4d419a9254569d9faafdd501aa886bcdf5d2c2b3",
+      "mediaType": "application/vnd.lociview.project+zip",
+      "classification": "package",
+      "geometry": { "triangleCount": 1, "ordinaryPointCount": 0, "splatCount": 0, "textureCount": 1, "bounds": { "min": [0, 0, 0], "max": [1, 1, 0] } },
+      "coordinates": { "handedness": "right", "upAxis": "+Y", "unit": "source-unit" },
+      "provenance": { "kind": "generated", "source": "scripts/fixtures/generate-v1-migration-fixtures.mjs", "reproducibility": "byte-reproducible" },
+      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed" },
+      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable" },
+      "restore": { "method": "repository", "instructions": "Restore the package, source recipe, semantic oracle, and generator from the same Git revision." },
+      "expected": { "classification": "package", "warnings": ["This branch is meaningful only with the base and branch-A fixtures from the same Git revision."] }
     }
   ]
 }

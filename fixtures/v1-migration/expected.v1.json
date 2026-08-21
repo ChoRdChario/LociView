@@ -1,0 +1,445 @@
+{
+  "$schema": "lociview.synthetic-v1-migration-expected",
+  "version": 1,
+  "transport": {
+    "artifacts": [
+      {
+        "path": "fixtures/v1-migration/locimyu-drive-exact-v1.zip",
+        "byteSize": 14102,
+        "sha256": "17f0bca42f157641fc0bd4feea23c2d7872ede56593e78a8fe51174f27ee9b05",
+        "entries": [
+          { "path": "LociMyu Save backup.xlsx", "byteSize": 2658, "sha256": "a7016ce0be6b2ebaa1fdc13507abfa15ef75172f23f6ff1b80b599ad65083c63" },
+          { "path": "LociMyu Save.xlsx", "byteSize": 9696, "sha256": "f286db2b1ae82dd1ace26cb545a83b1afc1abea9c56ccc22df39dc1c1a7c7a1f" },
+          { "path": "fileid-map.csv", "byteSize": 46, "sha256": "27646867394dce7e6470577730994c57562bbde96aad1b78afbc26cbb3f2617d" },
+          { "path": "images/linked.png", "byteSize": 68, "sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460" },
+          { "path": "images/unlinked.png", "byteSize": 68, "sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460" },
+          { "path": "models/site.glb", "byteSize": 740, "sha256": "6c97b1a689e5661907bb24555c94bf11feffaa7a19f1dd0f042c86d06a432117" },
+          { "path": "~$LociMyu Save.xlsx", "byteSize": 22, "sha256": "cde279b81380d3f17306a3249a2ca1a46425a44f64ccb896021973f13b8d2a82" }
+        ]
+      },
+      {
+        "path": "fixtures/v1-migration/native-v1-base.lociview",
+        "byteSize": 5980,
+        "sha256": "ea75eecd420b823118916e830c15d9f19bb5d81046af26cfcb923a4c9bccf216",
+        "entries": [
+          { "path": "captions.csv", "byteSize": 77, "sha256": "24ce70153f13c6b4eae880ecdcffa778f6a38d5866ce2dc6226dae1d21d34067" },
+          { "path": "lociview.json", "byteSize": 230, "sha256": "79ca722d28a00854a1448537e81384cbca45e31e1cf146c8bee40293f47f7ea3" },
+          { "path": "media/ast_01J00000000000000000000021.png", "byteSize": 68, "sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460" },
+          { "path": "models/ast_01J00000000000000000000020.glb", "byteSize": 740, "sha256": "6c97b1a689e5661907bb24555c94bf11feffaa7a19f1dd0f042c86d06a432117" },
+          { "path": "ops/a_000000000000A.jsonl", "byteSize": 4010, "sha256": "a8626843eb18843b45664b7068581b37e9b0210017b942ff4778f15dfc687e71" },
+          { "path": "snapshot.json", "byteSize": 89, "sha256": "6a096c427a20938800eaae6ad6379dff921d9f08cf1972fa8e0bbfe027df5516" }
+        ]
+      },
+      {
+        "path": "fixtures/v1-migration/native-v1-branch-a.lociview",
+        "byteSize": 7081,
+        "sha256": "b535116232f17b5e727e3ff1d5d2be19b0e01bd2a54a264fe3f479e7e04a4095",
+        "entries": [
+          { "path": "captions.csv", "byteSize": 77, "sha256": "24ce70153f13c6b4eae880ecdcffa778f6a38d5866ce2dc6226dae1d21d34067" },
+          { "path": "lociview.json", "byteSize": 230, "sha256": "79ca722d28a00854a1448537e81384cbca45e31e1cf146c8bee40293f47f7ea3" },
+          { "path": "media/ast_01J00000000000000000000021.png", "byteSize": 68, "sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460" },
+          { "path": "media/ast_01J00000000000000000000080.bin", "byteSize": 25, "sha256": "a1968d93f6b9a9cb1a60eb9f85c85690661a19c3bbce486d8c079599132f8d1c" },
+          { "path": "models/ast_01J00000000000000000000020.glb", "byteSize": 740, "sha256": "6c97b1a689e5661907bb24555c94bf11feffaa7a19f1dd0f042c86d06a432117" },
+          { "path": "ops/a_000000000000A.jsonl", "byteSize": 4010, "sha256": "a8626843eb18843b45664b7068581b37e9b0210017b942ff4778f15dfc687e71" },
+          { "path": "ops/a_000000000000C.jsonl", "byteSize": 794, "sha256": "163f1b4e6b2176dd8a132dfde09aecc743356444d978c30e3e4eaf354f7b1d63" },
+          { "path": "snapshot.json", "byteSize": 89, "sha256": "6a096c427a20938800eaae6ad6379dff921d9f08cf1972fa8e0bbfe027df5516" }
+        ]
+      },
+      {
+        "path": "fixtures/v1-migration/native-v1-branch-b.lociview",
+        "byteSize": 7077,
+        "sha256": "8e65e5e807230a3f1b86c22d4d419a9254569d9faafdd501aa886bcdf5d2c2b3",
+        "entries": [
+          { "path": "captions.csv", "byteSize": 77, "sha256": "24ce70153f13c6b4eae880ecdcffa778f6a38d5866ce2dc6226dae1d21d34067" },
+          { "path": "lociview.json", "byteSize": 230, "sha256": "79ca722d28a00854a1448537e81384cbca45e31e1cf146c8bee40293f47f7ea3" },
+          { "path": "media/ast_01J00000000000000000000021.png", "byteSize": 68, "sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460" },
+          { "path": "media/ast_01J00000000000000000000081.bin", "byteSize": 25, "sha256": "f3167bfb6aa9f604fac30250da248c25782a5514a1ae1af1ad09a8a4fc1d8352" },
+          { "path": "models/ast_01J00000000000000000000020.glb", "byteSize": 740, "sha256": "6c97b1a689e5661907bb24555c94bf11feffaa7a19f1dd0f042c86d06a432117" },
+          { "path": "ops/a_000000000000A.jsonl", "byteSize": 4010, "sha256": "a8626843eb18843b45664b7068581b37e9b0210017b942ff4778f15dfc687e71" },
+          { "path": "ops/a_000000000000B.jsonl", "byteSize": 790, "sha256": "4f3d56331ef21fbf0a40f7ce8bbc34202de59a0be58bf95667bfdf2c697f5441" },
+          { "path": "snapshot.json", "byteSize": 89, "sha256": "6a096c427a20938800eaae6ad6379dff921d9f08cf1972fa8e0bbfe027df5516" }
+        ]
+      }
+    ]
+  },
+  "locimyu": {
+    "sources": [
+      { "fileName": "LociMyu Save backup.xlsx", "looksLikeBackup": true, "captionCount": 1 },
+      { "fileName": "LociMyu Save.xlsx", "looksLikeBackup": false, "captionCount": 2 }
+    ],
+    "selectedSource": "LociMyu Save.xlsx",
+    "modelNames": ["site.glb"],
+    "imageNames": ["linked.png", "unlinked.png"],
+    "fileIdMap": [["DRIVE_SYNTH_LINKED", "linked.png"]],
+    "numericGidEvidence": { "raw": "6.17884617E8", "normalized": "617884617" },
+    "gidMappingIsGuess": false,
+    "sets": [
+      {
+        "name": "通常表示",
+        "legacyGid": "0",
+        "captions": [
+          { "legacyId": "c_SYNTH_A", "captionId": "cap_LMV6Q4BG13K9QT53TGY1DA7777", "title": "合成・外壁ピン", "body": "実運用データではない", "color": "#eab308", "position": [1.5, 2, -3], "legacyImageFileId": "DRIVE_SYNTH_LINKED" }
+        ]
+      },
+      {
+        "name": "半透明・内部",
+        "legacyGid": "617884617",
+        "captions": [
+          { "legacyId": "c_SYNTH_B", "captionId": "cap_LMEKQ4VG1E6WES8ED3P0G87777", "title": "合成・内部ピン", "body": "未リンク参照を保持", "color": "#4ade80", "position": [0, 1, 0], "legacyImageFileId": "DRIVE_SYNTH_MISSING" }
+        ]
+      }
+    ],
+    "views": [
+      { "name": "前回の視点", "sheetGid": "617884617", "background": "#202124", "eye": [3, 4, 5], "target": [0, 0, 0], "up": [0, 1, 0], "fov": 45, "ortho": true }
+    ],
+    "materials": [
+      { "sheetGid": "617884617", "materialKey": "SyntheticWall", "opacity": 0.35, "doubleSided": true, "unlitLike": true, "chroma": { "enable": true, "color": "#00ff00", "tolerance": 0.2, "feather": 0.05 } }
+    ],
+    "unlinkedImageReferences": [
+      ["DRIVE_SYNTH_LINKED", ["cap_LMV6Q4BG13K9QT53TGY1DA7777"]],
+      ["DRIVE_SYNTH_MISSING", ["cap_LMEKQ4VG1E6WES8ED3P0G87777"]]
+    ],
+    "apply": {
+      "captionCount": 2,
+      "setCount": 2,
+      "linkedImages": 1,
+      "unlinkedImages": 1,
+      "chromaDisabledCount": 1,
+      "selectedTitles": ["合成・外壁ピン", "合成・内部ピン"],
+      "rejectedBackupTitle": "合成・古いバックアップ"
+    },
+    "migratedState": {
+      "assets": [
+        { "kind": "image", "mime": "", "originalName": "linked.png", "size": 68 },
+        { "kind": "model", "mime": "", "originalName": "site.glb", "pinScale": 1, "size": 740, "transform": { "scale": 1, "upAxis": "Y" } },
+        { "kind": "image", "mime": "", "originalName": "unlinked.png", "size": 68 }
+      ],
+      "captions": [
+        {
+          "anchor": { "modelAssetId": "site.glb", "position": [0, 1, 0] },
+          "attachments": [],
+          "body": "未リンク参照を保持",
+          "color": "#4ade80",
+          "id": "cap_LMEKQ4VG1E6WES8ED3P0G87777",
+          "legacyImageFileId": "DRIVE_SYNTH_MISSING",
+          "setName": "半透明・内部",
+          "tags": [],
+          "title": "合成・内部ピン"
+        },
+        {
+          "anchor": { "modelAssetId": "site.glb", "position": [1.5, 2, -3] },
+          "attachments": ["linked.png"],
+          "body": "実運用データではない",
+          "color": "#eab308",
+          "id": "cap_LMV6Q4BG13K9QT53TGY1DA7777",
+          "legacyImageFileId": null,
+          "setName": "通常表示",
+          "tags": [],
+          "title": "合成・外壁ピン"
+        }
+      ],
+      "materials": [
+        {
+          "chroma": { "color": "#00ff00", "enable": false, "feather": 0.05, "tolerance": 0.2 },
+          "doubleSided": true,
+          "legacyKey": true,
+          "materialKey": "SyntheticWall",
+          "modelName": "site.glb",
+          "opacity": 0.35,
+          "setName": "半透明・内部",
+          "unlit": true
+        }
+      ],
+      "sets": [
+        { "name": "通常表示", "order": 1 },
+        { "name": "半透明・内部", "order": 2 }
+      ],
+      "views": [
+        {
+          "background": "#202124",
+          "cameraState": { "eye": [3, 4, 5], "fov": 45, "ortho": true, "target": [0, 0, 0], "up": [0, 1, 0] },
+          "name": "前回の視点",
+          "setName": "半透明・内部"
+        }
+      ]
+    }
+  },
+  "native": {
+    "projectId": "prj_01J00000000000000000000000",
+    "rawProbe": {
+      "path": "ops/a_000000000000A.jsonl",
+      "line": "{  \"v\" : { \"futureSafe\" : { \"nested\" : true }, \"attachments\" : [ ], \"tags\" : [ ], \"color\" : \"#4ade80\", \"body\" : \"raw spacing probe\", \"title\" : \"Synthetic unplaced\", \"setId\" : \"set_01J00000000000000000000011\" }, \"id\" : \"cap_01J00000000000000000000031\", \"e\" : \"caption\", \"t\" : \"create\", \"user\" : \"usr_01J00000000000000000000001\", \"actor\" : \"a_000000000000A\", \"hlc\" : \"2026-08-19T00:00:07.000Z-0000-a_000000000000A\", \"op\" : 7 }"
+    },
+    "baseVector": { "a_000000000000A": 12 },
+    "branchAVector": { "a_000000000000A": 12, "a_000000000000C": 3 },
+    "branchBVector": { "a_000000000000A": 12, "a_000000000000B": 3 },
+    "mergedVector": { "a_000000000000A": 12, "a_000000000000B": 3, "a_000000000000C": 3 },
+    "visibleCounts": { "profile": 1, "set": 2, "asset": 4, "caption": 2, "view": 2, "material": 1 },
+    "surfaceCaption": { "id": "cap_01J00000000000000000000030", "body": "branch A body", "color": "#38bdf8" },
+    "unplacedCaption": { "id": "cap_01J00000000000000000000031", "title": "Branch B conflict winner", "futureSafe": { "nested": true }, "hasAnchor": false },
+    "tombstoneCaptionId": "cap_01J00000000000000000000060",
+    "baseState": [
+      {
+        "fields": { "kind": "model", "mime": "model/gltf-binary", "originalName": "synthetic-site.glb", "path": "models/ast_01J00000000000000000000020.glb", "pinScale": 1, "size": 740, "transform": { "scale": 1, "upAxis": "Y" } },
+        "id": "ast_01J00000000000000000000020",
+        "kind": "asset"
+      },
+      {
+        "fields": { "kind": "image", "mime": "image/png", "originalName": "synthetic-pin.png", "path": "media/ast_01J00000000000000000000021.png", "size": 68 },
+        "id": "ast_01J00000000000000000000021",
+        "kind": "asset"
+      },
+      {
+        "fields": { "anchor": { "modelAssetId": "ast_01J00000000000000000000020", "position": [0.25, 0.5, 0] }, "attachments": ["ast_01J00000000000000000000021"], "body": "base body", "color": "#eab308", "setId": "set_01J00000000000000000000010", "tags": ["synthetic"], "title": "Synthetic surface pin" },
+        "id": "cap_01J00000000000000000000030",
+        "kind": "caption"
+      },
+      {
+        "fields": { "attachments": [], "body": "raw spacing probe", "color": "#4ade80", "futureSafe": { "nested": true }, "setId": "set_01J00000000000000000000011", "tags": [], "title": "Synthetic unplaced" },
+        "id": "cap_01J00000000000000000000031",
+        "kind": "caption"
+      },
+      {
+        "deletedAt": "2026-08-19T00:00:12.000Z-0000-a_000000000000A",
+        "fields": { "attachments": [], "body": "deleted", "color": "#f87171", "setId": "set_01J00000000000000000000010", "tags": [], "title": "Synthetic tombstone" },
+        "id": "cap_01J00000000000000000000060",
+        "kind": "caption",
+        "lastWrite": "2026-08-19T00:00:11.000Z-0000-a_000000000000A"
+      },
+      {
+        "fields": { "chroma": { "color": "#00ff00", "enable": false, "feather": 0.05, "tolerance": 0.2 }, "doubleSided": true, "materialKey": "SyntheticWall", "modelAssetId": "ast_01J00000000000000000000020", "opacity": 0.35, "setId": "set_01J00000000000000000000011", "unlit": true },
+        "id": "mat_01J00000000000000000000050",
+        "kind": "material"
+      },
+      {
+        "fields": { "defaultPinColor": "#eab308", "displayName": "Synthetic A" },
+        "id": "usr_01J00000000000000000000001",
+        "kind": "profile"
+      },
+      {
+        "fields": { "name": "Surface", "order": 1 },
+        "id": "set_01J00000000000000000000010",
+        "kind": "set"
+      },
+      {
+        "fields": { "name": "Internal", "order": 2 },
+        "id": "set_01J00000000000000000000011",
+        "kind": "set"
+      },
+      {
+        "fields": { "background": "#202124", "cameraState": { "eye": [1, 2, 3], "fov": 45, "ortho": false, "target": [0, 0, 0], "up": [0, 1, 0] }, "name": "Perspective", "setId": "set_01J00000000000000000000010" },
+        "id": "view_01J00000000000000000000040",
+        "kind": "view"
+      },
+      {
+        "fields": { "background": "#101010", "cameraState": { "eye": [3, 4, 5], "fov": 45, "ortho": true, "target": [0, 0, 0], "up": [0, 1, 0] }, "name": "Orthographic", "setId": "set_01J00000000000000000000011" },
+        "id": "view_01J00000000000000000000041",
+        "kind": "view"
+      }
+    ],
+    "branchAState": [
+      {
+        "fields": { "kind": "model", "mime": "model/gltf-binary", "originalName": "synthetic-site.glb", "path": "models/ast_01J00000000000000000000020.glb", "pinScale": 1, "size": 740, "transform": { "scale": 1, "upAxis": "Y" } },
+        "id": "ast_01J00000000000000000000020",
+        "kind": "asset"
+      },
+      {
+        "fields": { "kind": "image", "mime": "image/png", "originalName": "synthetic-pin.png", "path": "media/ast_01J00000000000000000000021.png", "size": 68 },
+        "id": "ast_01J00000000000000000000021",
+        "kind": "asset"
+      },
+      {
+        "fields": { "kind": "other", "mime": "application/octet-stream", "originalName": "branch-a.bin", "path": "media/ast_01J00000000000000000000080.bin", "size": 25 },
+        "id": "ast_01J00000000000000000000080",
+        "kind": "asset"
+      },
+      {
+        "fields": { "anchor": { "modelAssetId": "ast_01J00000000000000000000020", "position": [0.25, 0.5, 0] }, "attachments": ["ast_01J00000000000000000000021"], "body": "branch A body", "color": "#eab308", "setId": "set_01J00000000000000000000010", "tags": ["synthetic"], "title": "Synthetic surface pin" },
+        "id": "cap_01J00000000000000000000030",
+        "kind": "caption"
+      },
+      {
+        "fields": { "attachments": [], "body": "raw spacing probe", "color": "#4ade80", "futureSafe": { "nested": true }, "setId": "set_01J00000000000000000000011", "tags": [], "title": "Branch A conflict loser" },
+        "id": "cap_01J00000000000000000000031",
+        "kind": "caption"
+      },
+      {
+        "deletedAt": "2026-08-19T00:00:12.000Z-0000-a_000000000000A",
+        "fields": { "attachments": [], "body": "deleted", "color": "#f87171", "setId": "set_01J00000000000000000000010", "tags": [], "title": "Synthetic tombstone" },
+        "id": "cap_01J00000000000000000000060",
+        "kind": "caption",
+        "lastWrite": "2026-08-19T00:00:11.000Z-0000-a_000000000000A"
+      },
+      {
+        "fields": { "chroma": { "color": "#00ff00", "enable": false, "feather": 0.05, "tolerance": 0.2 }, "doubleSided": true, "materialKey": "SyntheticWall", "modelAssetId": "ast_01J00000000000000000000020", "opacity": 0.35, "setId": "set_01J00000000000000000000011", "unlit": true },
+        "id": "mat_01J00000000000000000000050",
+        "kind": "material"
+      },
+      {
+        "fields": { "defaultPinColor": "#eab308", "displayName": "Synthetic A" },
+        "id": "usr_01J00000000000000000000001",
+        "kind": "profile"
+      },
+      {
+        "fields": { "name": "Surface", "order": 1 },
+        "id": "set_01J00000000000000000000010",
+        "kind": "set"
+      },
+      {
+        "fields": { "name": "Internal", "order": 2 },
+        "id": "set_01J00000000000000000000011",
+        "kind": "set"
+      },
+      {
+        "fields": { "background": "#202124", "cameraState": { "eye": [1, 2, 3], "fov": 45, "ortho": false, "target": [0, 0, 0], "up": [0, 1, 0] }, "name": "Perspective", "setId": "set_01J00000000000000000000010" },
+        "id": "view_01J00000000000000000000040",
+        "kind": "view"
+      },
+      {
+        "fields": { "background": "#101010", "cameraState": { "eye": [3, 4, 5], "fov": 45, "ortho": true, "target": [0, 0, 0], "up": [0, 1, 0] }, "name": "Orthographic", "setId": "set_01J00000000000000000000011" },
+        "id": "view_01J00000000000000000000041",
+        "kind": "view"
+      }
+    ],
+    "branchBState": [
+      {
+        "fields": { "kind": "model", "mime": "model/gltf-binary", "originalName": "synthetic-site.glb", "path": "models/ast_01J00000000000000000000020.glb", "pinScale": 1, "size": 740, "transform": { "scale": 1, "upAxis": "Y" } },
+        "id": "ast_01J00000000000000000000020",
+        "kind": "asset"
+      },
+      {
+        "fields": { "kind": "image", "mime": "image/png", "originalName": "synthetic-pin.png", "path": "media/ast_01J00000000000000000000021.png", "size": 68 },
+        "id": "ast_01J00000000000000000000021",
+        "kind": "asset"
+      },
+      {
+        "fields": { "kind": "other", "mime": "application/octet-stream", "originalName": "branch-b.bin", "path": "media/ast_01J00000000000000000000081.bin", "size": 25 },
+        "id": "ast_01J00000000000000000000081",
+        "kind": "asset"
+      },
+      {
+        "fields": { "anchor": { "modelAssetId": "ast_01J00000000000000000000020", "position": [0.25, 0.5, 0] }, "attachments": ["ast_01J00000000000000000000021"], "body": "base body", "color": "#38bdf8", "setId": "set_01J00000000000000000000010", "tags": ["synthetic"], "title": "Synthetic surface pin" },
+        "id": "cap_01J00000000000000000000030",
+        "kind": "caption"
+      },
+      {
+        "fields": { "attachments": [], "body": "raw spacing probe", "color": "#4ade80", "futureSafe": { "nested": true }, "setId": "set_01J00000000000000000000011", "tags": [], "title": "Branch B conflict winner" },
+        "id": "cap_01J00000000000000000000031",
+        "kind": "caption"
+      },
+      {
+        "deletedAt": "2026-08-19T00:00:12.000Z-0000-a_000000000000A",
+        "fields": { "attachments": [], "body": "deleted", "color": "#f87171", "setId": "set_01J00000000000000000000010", "tags": [], "title": "Synthetic tombstone" },
+        "id": "cap_01J00000000000000000000060",
+        "kind": "caption",
+        "lastWrite": "2026-08-19T00:00:11.000Z-0000-a_000000000000A"
+      },
+      {
+        "fields": { "chroma": { "color": "#00ff00", "enable": false, "feather": 0.05, "tolerance": 0.2 }, "doubleSided": true, "materialKey": "SyntheticWall", "modelAssetId": "ast_01J00000000000000000000020", "opacity": 0.35, "setId": "set_01J00000000000000000000011", "unlit": true },
+        "id": "mat_01J00000000000000000000050",
+        "kind": "material"
+      },
+      {
+        "fields": { "defaultPinColor": "#eab308", "displayName": "Synthetic A" },
+        "id": "usr_01J00000000000000000000001",
+        "kind": "profile"
+      },
+      {
+        "fields": { "name": "Surface", "order": 1 },
+        "id": "set_01J00000000000000000000010",
+        "kind": "set"
+      },
+      {
+        "fields": { "name": "Internal", "order": 2 },
+        "id": "set_01J00000000000000000000011",
+        "kind": "set"
+      },
+      {
+        "fields": { "background": "#202124", "cameraState": { "eye": [1, 2, 3], "fov": 45, "ortho": false, "target": [0, 0, 0], "up": [0, 1, 0] }, "name": "Perspective", "setId": "set_01J00000000000000000000010" },
+        "id": "view_01J00000000000000000000040",
+        "kind": "view"
+      },
+      {
+        "fields": { "background": "#101010", "cameraState": { "eye": [3, 4, 5], "fov": 45, "ortho": true, "target": [0, 0, 0], "up": [0, 1, 0] }, "name": "Orthographic", "setId": "set_01J00000000000000000000011" },
+        "id": "view_01J00000000000000000000041",
+        "kind": "view"
+      }
+    ],
+    "convergedState": [
+      {
+        "fields": { "kind": "model", "mime": "model/gltf-binary", "originalName": "synthetic-site.glb", "path": "models/ast_01J00000000000000000000020.glb", "pinScale": 1, "size": 740, "transform": { "scale": 1, "upAxis": "Y" } },
+        "id": "ast_01J00000000000000000000020",
+        "kind": "asset"
+      },
+      {
+        "fields": { "kind": "image", "mime": "image/png", "originalName": "synthetic-pin.png", "path": "media/ast_01J00000000000000000000021.png", "size": 68 },
+        "id": "ast_01J00000000000000000000021",
+        "kind": "asset"
+      },
+      {
+        "fields": { "kind": "other", "mime": "application/octet-stream", "originalName": "branch-a.bin", "path": "media/ast_01J00000000000000000000080.bin", "size": 25 },
+        "id": "ast_01J00000000000000000000080",
+        "kind": "asset"
+      },
+      {
+        "fields": { "kind": "other", "mime": "application/octet-stream", "originalName": "branch-b.bin", "path": "media/ast_01J00000000000000000000081.bin", "size": 25 },
+        "id": "ast_01J00000000000000000000081",
+        "kind": "asset"
+      },
+      {
+        "fields": { "anchor": { "modelAssetId": "ast_01J00000000000000000000020", "position": [0.25, 0.5, 0] }, "attachments": ["ast_01J00000000000000000000021"], "body": "branch A body", "color": "#38bdf8", "setId": "set_01J00000000000000000000010", "tags": ["synthetic"], "title": "Synthetic surface pin" },
+        "id": "cap_01J00000000000000000000030",
+        "kind": "caption"
+      },
+      {
+        "fields": { "attachments": [], "body": "raw spacing probe", "color": "#4ade80", "futureSafe": { "nested": true }, "setId": "set_01J00000000000000000000011", "tags": [], "title": "Branch B conflict winner" },
+        "id": "cap_01J00000000000000000000031",
+        "kind": "caption"
+      },
+      {
+        "deletedAt": "2026-08-19T00:00:12.000Z-0000-a_000000000000A",
+        "fields": { "attachments": [], "body": "deleted", "color": "#f87171", "setId": "set_01J00000000000000000000010", "tags": [], "title": "Synthetic tombstone" },
+        "id": "cap_01J00000000000000000000060",
+        "kind": "caption",
+        "lastWrite": "2026-08-19T00:00:11.000Z-0000-a_000000000000A"
+      },
+      {
+        "fields": { "chroma": { "color": "#00ff00", "enable": false, "feather": 0.05, "tolerance": 0.2 }, "doubleSided": true, "materialKey": "SyntheticWall", "modelAssetId": "ast_01J00000000000000000000020", "opacity": 0.35, "setId": "set_01J00000000000000000000011", "unlit": true },
+        "id": "mat_01J00000000000000000000050",
+        "kind": "material"
+      },
+      {
+        "fields": { "defaultPinColor": "#eab308", "displayName": "Synthetic A" },
+        "id": "usr_01J00000000000000000000001",
+        "kind": "profile"
+      },
+      {
+        "fields": { "name": "Surface", "order": 1 },
+        "id": "set_01J00000000000000000000010",
+        "kind": "set"
+      },
+      {
+        "fields": { "name": "Internal", "order": 2 },
+        "id": "set_01J00000000000000000000011",
+        "kind": "set"
+      },
+      {
+        "fields": { "background": "#202124", "cameraState": { "eye": [1, 2, 3], "fov": 45, "ortho": false, "target": [0, 0, 0], "up": [0, 1, 0] }, "name": "Perspective", "setId": "set_01J00000000000000000000010" },
+        "id": "view_01J00000000000000000000040",
+        "kind": "view"
+      },
+      {
+        "fields": { "background": "#101010", "cameraState": { "eye": [3, 4, 5], "fov": 45, "ortho": true, "target": [0, 0, 0], "up": [0, 1, 0] }, "name": "Orthographic", "setId": "set_01J00000000000000000000011" },
+        "id": "view_01J00000000000000000000041",
+        "kind": "view"
+      }
+    ],
+    "binaryUnion": [
+      { "path": "media/ast_01J00000000000000000000021.png", "byteSize": 68, "sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460" },
+      { "path": "media/ast_01J00000000000000000000080.bin", "byteSize": 25, "sha256": "a1968d93f6b9a9cb1a60eb9f85c85690661a19c3bbce486d8c079599132f8d1c" },
+      { "path": "media/ast_01J00000000000000000000081.bin", "byteSize": 25, "sha256": "f3167bfb6aa9f604fac30250da248c25782a5514a1ae1af1ad09a8a4fc1d8352" },
+      { "path": "models/ast_01J00000000000000000000020.glb", "byteSize": 740, "sha256": "6c97b1a689e5661907bb24555c94bf11feffaa7a19f1dd0f042c86d06a432117" }
+    ],
+    "staleMarker": "STALE CACHE MUST NOT WIN"
+  }
+}

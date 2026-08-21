@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { lstat, readFile, realpath } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { verifyV1MigrationFixtures } from './generate-v1-migration-fixtures.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const rootReal = await realpath(root);
@@ -175,4 +176,5 @@ for (const [index, fixture] of registry.fixtures.entries()) {
   }
 }
 
-console.log(`fixture registry verified: ${registry.fixtures.length - pendingEntries} Git entries, ${checkedBytes} Git bytes; ${pendingEntries} generated/external entries pending local byte verification`);
+await verifyV1MigrationFixtures();
+console.log(`fixture registry verified: ${registry.fixtures.length - pendingEntries} Git entries, ${checkedBytes} Git bytes; ${pendingEntries} generated/external entries pending local byte verification; v1 migration artifacts verified`);
