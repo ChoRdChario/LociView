@@ -164,6 +164,26 @@ Start only after G-1 passes and the product owner approves S0.
 - Independent false-green, specification and runtime reviews reported no unresolved P0/P1. The new 15-test file was stable across six repeated runs, and `src/**` remains unchanged
 - This is a tests-only characterization slice, not G0-S completion. Browser cross-context locking/read-only fallback, simultaneous package merge/replacement, typed collision resolution and physical iPhone evidence remain open
 
+### G0 characterization slice 6 — recoverable durable-write queue
+
+- [x] Add a deterministic durable-mutation fault helper for healthy, throw-before, partial-write, commit-then-throw and persistent-failure stages
+- [x] Freeze healthy FIFO and identical-duplicate reducer behavior as ordinary controls
+- [x] Characterize retry ordering after transient, repeated-quota, partial-write and commit-then-throw failures with exact raw and reopened-state oracles
+- [x] Confirm failed queues block full/diff package generation, while leaving UI persistence phases explicit as an unimplemented API boundary
+- [x] Run focused/full tests, typecheck, production build and independent false-green review before commit
+
+### G0 characterization slice 6 review record
+
+- The byte-level helper applies one deterministic fault plan to `appendText`, `writeText` and `writeBytes`, so a future batch or atomic-rewrite repair cannot bypass throw-before, prefix-write, real `QuotaExceededError`, commit-then-throw or persistent-failure stages
+- Every recovery case first makes operation P durably acknowledged, then queues A/B under fault. All rejected checkpoints retain the exact P prefix; any resolved `flush()` must already expose the complete P/A/B durable form
+- Expected-failure raw and reopen oracles require exact P/A/B. Commit-then-throw alone permits the byte-identical idempotent form P/A/A/B; the oracles reject loss, reordering, unrelated duplication and stale-P replacement
+- Healthy FIFO and duplicate-reducer controls are ordinary tests. Sixteen narrow expected-failure cases preserve the current poisoned-queue behavior. A separate oracle requires future recovery to traverse the planned second quota failure, which the current baseline does not reach
+- Persistent failure is observed before B is queued. Full and diff package generation remain blocked, P cannot be overwritten before release, and post-release recovery is checked independently at request, raw and reopened-state boundaries
+- UI/API support for queued, writing, durable, failed/retryable, device-durable, package-generated and download-started phases remains explicitly deferred in two todos; `src/**` is unchanged
+- Verification passed: 3 focused files / 49 passing tests plus 2 todos, 23 full-suite files / 490 passing tests plus 5 todos, fixture and zero-measurement evidence verification, typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
+- Independent false-green, specification and runtime reviews reported no unresolved P0/P1. The new 28-test file was stable across 11 repeated runtime runs
+- This remains characterization, not a fix or G0-S completion. Blob-before-metadata publication, replacement cleanup ordering, UI durability status and physical iPhone evidence remain open
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
