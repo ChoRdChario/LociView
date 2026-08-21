@@ -115,6 +115,10 @@ type ManifestAmbiguityId =
   | 'manifest-nfc-collision-nested-forward'
   | 'manifest-nfc-collision-nested-reverse';
 
+type ManifestScalarId =
+  | 'manifest-lone-high-surrogate-name'
+  | 'manifest-lone-low-surrogate-nested-key';
+
 interface ImportAttempt {
   inspectionRejected: boolean;
   inspectionError: unknown;
@@ -162,6 +166,15 @@ interface ManifestAmbiguityResult {
   sentinelNeverActive: boolean;
   existingAuthorityUnchanged: boolean;
 }
+
+interface ManifestScalarCase {
+  id: ManifestScalarId;
+  location: 'known-name-value' | 'unknown-nested-key';
+  escapedScalar: '\\uD83D' | '\\uDE00';
+  manifestText: string;
+}
+
+type ManifestScalarResult = ManifestAmbiguityResult;
 
 function bytesEqual(left: Uint8Array | null, right: Uint8Array): boolean {
   return left !== null && left.length === right.length && left.every((byte, index) => byte === right[index]);
@@ -249,7 +262,7 @@ function containsBytes(source: Uint8Array | null, needle: Uint8Array): boolean {
 }
 
 async function attemptNewProject(
-  id: FixtureId | ManifestAmbiguityId,
+  id: FixtureId | ManifestAmbiguityId | ManifestScalarId,
   zip: Uint8Array,
   limits?: ZipLimits,
 ): Promise<ImportAttempt> {
@@ -339,6 +352,29 @@ function rawManifestWithExtra(extraMembers: string): string {
   const manifest = new TextDecoder('utf-8', { fatal: true }).decode(manifestBytes());
   if (!manifest.endsWith('}')) throw new Error('manifest ambiguity fixture is not an object');
   return `${manifest.slice(0, -1)},${extraMembers}}`;
+}
+
+function replaceTextOnce(source: string, marker: string, replacement: string): string {
+  const first = source.indexOf(marker);
+  if (first < 0 || source.indexOf(marker, first + marker.length) >= 0) {
+    throw new Error(`manifest fixture marker must occur exactly once: ${marker}`);
+  }
+  return `${source.slice(0, first)}${replacement}${source.slice(first + marker.length)}`;
+}
+
+function isUnicodeScalarText(text: string): boolean {
+  for (let index = 0; index < text.length; index += 1) {
+    const unit = text.charCodeAt(index);
+    if (unit >= 0xd800 && unit <= 0xdbff) {
+      if (index + 1 >= text.length) return false;
+      const next = text.charCodeAt(index + 1);
+      if (next < 0xdc00 || next > 0xdfff) return false;
+      index += 1;
+    } else if (unit >= 0xdc00 && unit <= 0xdfff) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function rawMemberText(member: RawManifestMember): string {
@@ -483,6 +519,34 @@ const MANIFEST_AMBIGUITY_CONTROL_TEXT = rawManifestWithExtra(
   '"\\u00e9":"nested NFC singleton"}',
 );
 const MANIFEST_AMBIGUITY_OPS_TEXT = `${baseTargetOpLine()}\n${validMixedOpLine()}\n`;
+const MANIFEST_NAME_MEMBER = '"name":"malicious envelope fixture"';
+const VALID_ASTRAL_ESCAPE = '\\uD83D\\uDE00';
+const VALID_ASTRAL_SCALAR = String.fromCodePoint(0x1f600);
+const MANIFEST_SCALAR_CASES: readonly ManifestScalarCase[] = [
+  {
+    id: 'manifest-lone-high-surrogate-name',
+    location: 'known-name-value',
+    escapedScalar: '\\uD83D',
+    manifestText: replaceTextOnce(
+      new TextDecoder('utf-8', { fatal: true }).decode(manifestBytes()),
+      MANIFEST_NAME_MEMBER,
+      '"name":"\\uD83D"',
+    ),
+  },
+  {
+    id: 'manifest-lone-low-surrogate-nested-key',
+    location: 'unknown-nested-key',
+    escapedScalar: '\\uDE00',
+    manifestText: rawManifestWithExtra('"future":{"\\uDE00":"invalid scalar key"}'),
+  },
+];
+const MANIFEST_SCALAR_CONTROL_TEXT = replaceTextOnce(
+  rawManifestWithExtra(
+    '"future":{"\\uD83D\\uDE00":"valid astral scalar key"}',
+  ),
+  MANIFEST_NAME_MEMBER,
+  '"name":"\\uD83D\\uDE00"',
+);
 
 async function attemptForeignNormalizedCollision(zip: Uint8Array): Promise<ForeignImportAttempt> {
   const fs = new CountingMemoryFS();
@@ -611,6 +675,61 @@ async function attemptExistingProjectMerge(zip: Uint8Array): Promise<ExistingMer
   };
 }
 
+function hasVisibleCaption(store: ProjectStore, captionId: string): boolean {
+  return visibleEntities(store.state, 'caption').some(({ id }) => id === captionId);
+}
+
+async function validManifestScalarControlRoundTrips(zip: Uint8Array): Promise<boolean> {
+  try {
+    const inspection = await inspectZip(zip);
+    const inspectionIsExact =
+      inspection.kind === 'lociview' &&
+      inspection.manifest?.projectId === PROJECT_ID &&
+      inspection.manifest.name === VALID_ASTRAL_SCALAR &&
+      inspection.opsErrorCount === 0 &&
+      inspection.opsFiles.length === 1 &&
+      inspection.opsFiles[0]?.text === MANIFEST_AMBIGUITY_OPS_TEXT &&
+      inspection.ops.length === 2;
+    if (!inspectionIsExact) return false;
+
+    const importedFs = new MemoryFS();
+    const importedDir = 'projects/valid-manifest-scalar-control';
+    await importNewProject(importedFs, importedDir, inspection);
+    const imported = await ProjectStore.open(importedFs, importedDir, USER);
+    const importedOkay =
+      imported.manifest.name === VALID_ASTRAL_SCALAR &&
+      hasVisibleCaption(imported, BASE_CAPTION_ID) &&
+      hasVisibleCaption(imported, MIXED_CAPTION_ID);
+    const importedReopened = await ProjectStore.open(importedFs, importedDir, USER);
+    const importedReopenedOkay =
+      importedReopened.manifest.name === VALID_ASTRAL_SCALAR &&
+      hasVisibleCaption(importedReopened, BASE_CAPTION_ID) &&
+      hasVisibleCaption(importedReopened, MIXED_CAPTION_ID);
+
+    const mergedFs = new MemoryFS();
+    const mergedDir = 'projects/valid-manifest-scalar-merge-control';
+    await mergedFs.writeBytes(`${mergedDir}/lociview.json`, manifestBytes());
+    await mergedFs.writeText(
+      `${mergedDir}/ops/${MIXED_ACTOR}.jsonl`,
+      `${baseTargetOpLine()}\n`,
+    );
+    const merged = await ProjectStore.open(mergedFs, mergedDir, USER);
+    await mergeFromInspection(mergedFs, mergedDir, merged, inspection);
+    await merged.flush();
+    const mergedOkay =
+      hasVisibleCaption(merged, BASE_CAPTION_ID) &&
+      hasVisibleCaption(merged, MIXED_CAPTION_ID);
+    const mergedReopened = await ProjectStore.open(mergedFs, mergedDir, USER);
+    const mergedReopenedOkay =
+      hasVisibleCaption(mergedReopened, BASE_CAPTION_ID) &&
+      hasVisibleCaption(mergedReopened, MIXED_CAPTION_ID);
+
+    return importedOkay && importedReopenedOkay && mergedOkay && mergedReopenedOkay;
+  } catch {
+    return false;
+  }
+}
+
 describe('G0 characterization: malicious ZIP envelope', () => {
   let outcomes: Record<FixtureId, ImportAttempt>;
   let existingMergeOutcome: ExistingMergeAttempt;
@@ -629,6 +748,20 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       existingAuthorityUnchanged: false,
     }]),
   ) as Record<ManifestAmbiguityId, ManifestAmbiguityResult>;
+  let manifestScalarShapes: Record<ManifestScalarId, RawZipEntryShape[]>;
+  let manifestScalarDeterministic: Record<ManifestScalarId, boolean>;
+  let manifestScalarControlShape: RawZipEntryShape[];
+  let manifestScalarControlDeterministic = false;
+  let manifestScalarControlRoundTrips = false;
+  let manifestScalarResults = Object.fromEntries(
+    MANIFEST_SCALAR_CASES.map(({ id }) => [id, {
+      initialized: false,
+      controlUnchanged: false,
+      completionMarkerNeverPublished: false,
+      sentinelNeverActive: false,
+      existingAuthorityUnchanged: false,
+    }]),
+  ) as Record<ManifestScalarId, ManifestScalarResult>;
   let limitErrors: Record<'entries' | 'entryBytes' | 'totalBytes', unknown>;
   let representativeFixtureIsDeterministic: boolean;
 
@@ -808,6 +941,37 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       },
     ]);
     manifestAmbiguityControlShape = await rawZipEntryShapes(manifestAmbiguityControlZip);
+    const manifestScalarZips = {} as Record<ManifestScalarId, Uint8Array>;
+    manifestScalarShapes = {} as Record<ManifestScalarId, RawZipEntryShape[]>;
+    manifestScalarDeterministic = {} as Record<ManifestScalarId, boolean>;
+    for (const scalarCase of MANIFEST_SCALAR_CASES) {
+      const entries = [
+        { path: 'lociview.json', data: encoder.encode(scalarCase.manifestText) },
+        {
+          path: `ops/${MIXED_ACTOR}.jsonl`,
+          data: encoder.encode(MANIFEST_AMBIGUITY_OPS_TEXT),
+        },
+      ];
+      const zip = await writeDirectZip(entries);
+      const repeatedZip = await writeDirectZip(entries);
+      manifestScalarZips[scalarCase.id] = zip;
+      manifestScalarShapes[scalarCase.id] = await rawZipEntryShapes(zip);
+      manifestScalarDeterministic[scalarCase.id] = bytesEqual(repeatedZip, zip);
+    }
+    const manifestScalarControlEntries = [
+      { path: 'lociview.json', data: encoder.encode(MANIFEST_SCALAR_CONTROL_TEXT) },
+      {
+        path: `ops/${MIXED_ACTOR}.jsonl`,
+        data: encoder.encode(MANIFEST_AMBIGUITY_OPS_TEXT),
+      },
+    ];
+    const manifestScalarControlZip = await writeDirectZip(manifestScalarControlEntries);
+    const repeatedManifestScalarControlZip = await writeDirectZip(manifestScalarControlEntries);
+    manifestScalarControlShape = await rawZipEntryShapes(manifestScalarControlZip);
+    manifestScalarControlDeterministic = bytesEqual(
+      repeatedManifestScalarControlZip,
+      manifestScalarControlZip,
+    );
     const centralName = 'models/central.glb';
     const localName = 'models/locally.glb';
     const localCentralMismatchZip = await writeZipWithMismatchedLocalName([
@@ -955,11 +1119,27 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       } catch {
         manifestAmbiguityControlAccepted = false;
       }
+      manifestScalarControlRoundTrips = await validManifestScalarControlRoundTrips(
+        manifestScalarControlZip,
+      );
       for (const ambiguityCase of MANIFEST_AMBIGUITY_CASES) {
         const zip = manifestAmbiguityZips[ambiguityCase.id];
         const importOutcome = await attemptNewProject(ambiguityCase.id, zip);
         const mergeOutcome = await attemptExistingProjectMerge(zip);
         manifestAmbiguityResults[ambiguityCase.id] = {
+          initialized: true,
+          controlUnchanged: importOutcome.controlUnchanged,
+          completionMarkerNeverPublished:
+            !importOutcome.active && importOutcome.completionMarkerMutationCount === 0,
+          sentinelNeverActive: !importOutcome.mixedValidCaptionVisible,
+          existingAuthorityUnchanged: mergeOutcome.authoritativeUnchanged,
+        };
+      }
+      for (const scalarCase of MANIFEST_SCALAR_CASES) {
+        const zip = manifestScalarZips[scalarCase.id];
+        const importOutcome = await attemptNewProject(scalarCase.id, zip);
+        const mergeOutcome = await attemptExistingProjectMerge(zip);
+        manifestScalarResults[scalarCase.id] = {
           initialized: true,
           controlUnchanged: importOutcome.controlUnchanged,
           completionMarkerNeverPublished:
@@ -1095,6 +1275,98 @@ describe('G0 characterization: malicious ZIP envelope', () => {
         label: 'nested escaped singleton',
         '\u00e9': 'nested NFC singleton',
       });
+    });
+
+    it('registers both isolated invalid-scalar cases and reproduces every ZIP byte-for-byte', () => {
+      expect(MANIFEST_SCALAR_CASES.map(({ id, location, escapedScalar }) =>
+        [id, location, escapedScalar])).toEqual([
+        ['manifest-lone-high-surrogate-name', 'known-name-value', '\\uD83D'],
+        ['manifest-lone-low-surrogate-nested-key', 'unknown-nested-key', '\\uDE00'],
+      ]);
+      expect(Object.values(manifestScalarDeterministic)).toEqual([true, true]);
+    });
+
+    for (const scalarCase of MANIFEST_SCALAR_CASES) {
+      it(`${scalarCase.id}: freezes the raw ASCII escape and decoded non-scalar at its exact depth`, () => {
+        const shapes = manifestScalarShapes[scalarCase.id];
+        expect(shapes.map(({ filename }) => filename)).toEqual([
+          'lociview.json',
+          `ops/${MIXED_ACTOR}.jsonl`,
+        ]);
+        const manifestPayload = shapes[0]?.payload;
+        const opsPayload = shapes[1]?.payload;
+        if (manifestPayload === null || manifestPayload === undefined ||
+            opsPayload === null || opsPayload === undefined) {
+          throw new Error(`missing manifest scalar payload: ${scalarCase.id}`);
+        }
+        const manifestText = new TextDecoder('utf-8', { fatal: true }).decode(manifestPayload);
+        expect(manifestText).toBe(scalarCase.manifestText);
+        expect([...manifestPayload].every((byte) => byte <= 0x7f)).toBe(true);
+        expect(manifestText.split(scalarCase.escapedScalar)).toHaveLength(2);
+        expect(new TextDecoder('utf-8', { fatal: true }).decode(opsPayload))
+          .toBe(MANIFEST_AMBIGUITY_OPS_TEXT);
+
+        const parsed = JSON.parse(manifestText) as Record<string, unknown>;
+        expect(parsed.schemaVersion).toBe(SCHEMA_VERSION);
+        expect(parsed.projectId).toBe(PROJECT_ID);
+        let decoded: unknown;
+        let rawToken: string;
+        if (scalarCase.location === 'known-name-value') {
+          decoded = parsed.name;
+          rawToken = `"name":"${scalarCase.escapedScalar}"`;
+        } else {
+          const future = parsed.future as Record<string, unknown>;
+          decoded = Object.keys(future)[0];
+          rawToken = `"${scalarCase.escapedScalar}":"invalid scalar key"`;
+        }
+        if (typeof decoded !== 'string') throw new Error(`missing decoded scalar: ${scalarCase.id}`);
+        const tokenOffset = manifestText.indexOf(rawToken);
+        expect(tokenOffset).toBeGreaterThanOrEqual(0);
+        expect(jsonObjectDepthAt(manifestText, tokenOffset))
+          .toBe(scalarCase.location === 'known-name-value' ? 1 : 2);
+        expect(decoded).toHaveLength(1);
+        expect(decoded.charCodeAt(0)).toBe(
+          scalarCase.location === 'known-name-value' ? 0xd83d : 0xde00,
+        );
+        expect(isUnicodeScalarText(decoded)).toBe(false);
+        expect(decoded.includes('\ufffd')).toBe(false);
+      });
+    }
+
+    it('pairs the same surrogate code units into one valid astral scalar at both locations', () => {
+      expect(manifestScalarControlShape.map(({ filename }) => filename)).toEqual([
+        'lociview.json',
+        `ops/${MIXED_ACTOR}.jsonl`,
+      ]);
+      const manifestPayload = manifestScalarControlShape[0]?.payload;
+      const opsPayload = manifestScalarControlShape[1]?.payload;
+      if (manifestPayload === null || manifestPayload === undefined ||
+          opsPayload === null || opsPayload === undefined) {
+        throw new Error('missing valid manifest scalar control payload');
+      }
+      const manifestText = new TextDecoder('utf-8', { fatal: true }).decode(manifestPayload);
+      expect(manifestText).toBe(MANIFEST_SCALAR_CONTROL_TEXT);
+      expect([...manifestPayload].every((byte) => byte <= 0x7f)).toBe(true);
+      expect(manifestText.split(VALID_ASTRAL_ESCAPE)).toHaveLength(3);
+      expect(new TextDecoder('utf-8', { fatal: true }).decode(opsPayload))
+        .toBe(MANIFEST_AMBIGUITY_OPS_TEXT);
+      expect(manifestScalarControlDeterministic).toBe(true);
+
+      const parsed = JSON.parse(manifestText) as Record<string, unknown>;
+      const future = parsed.future as Record<string, unknown>;
+      const nestedKey = Object.keys(future)[0];
+      expect(parsed.schemaVersion).toBe(SCHEMA_VERSION);
+      expect(parsed.projectId).toBe(PROJECT_ID);
+      expect(parsed.name).toBe(VALID_ASTRAL_SCALAR);
+      expect(nestedKey).toBe(VALID_ASTRAL_SCALAR);
+      for (const scalar of [parsed.name, nestedKey]) {
+        if (typeof scalar !== 'string') throw new Error('missing valid astral scalar control');
+        expect(scalar).toHaveLength(2);
+        expect(Array.from(scalar)).toHaveLength(1);
+        expect(scalar.codePointAt(0)).toBe(0x1f600);
+        expect(isUnicodeScalarText(scalar)).toBe(true);
+        expect(scalar.includes('\ufffd')).toBe(false);
+      }
     });
 
     it('constructs raw duplicate paths in both input orders with both payloads intact', () => {
@@ -1399,6 +1671,33 @@ describe('G0 characterization: malicious ZIP envelope', () => {
     }
   });
 
+  describe('invalid Unicode scalar escapes stay outside active authority', () => {
+    it('accepts and round-trips the paired astral-scalar control through import and merge', () => {
+      expect(manifestScalarControlRoundTrips).toBe(true);
+    });
+
+    it('initializes every invalid case and leaves the unrelated control project byte-exact', () => {
+      expect(MANIFEST_SCALAR_CASES.map(({ id }) => manifestScalarResults[id].initialized))
+        .toEqual(MANIFEST_SCALAR_CASES.map(() => true));
+      expect(MANIFEST_SCALAR_CASES.map(({ id }) => manifestScalarResults[id].controlUnchanged))
+        .toEqual(MANIFEST_SCALAR_CASES.map(() => true));
+    });
+
+    for (const scalarCase of MANIFEST_SCALAR_CASES) {
+      it.fails(`${scalarCase.id}: never publishes a candidate completion marker`, () => {
+        expect(manifestScalarResults[scalarCase.id].completionMarkerNeverPublished).toBe(true);
+      });
+
+      it.fails(`${scalarCase.id}: never activates the valid sentinel operation`, () => {
+        expect(manifestScalarResults[scalarCase.id].sentinelNeverActive).toBe(true);
+      });
+
+      it.fails(`${scalarCase.id}: leaves existing active authority unchanged`, () => {
+        expect(manifestScalarResults[scalarCase.id].existingAuthorityUnchanged).toBe(true);
+      });
+    }
+  });
+
   describe('observable policy still deferred from this initial slice', () => {
     it.todo('reports a typed blocked/quarantined issue for mixed valid/malformed operations without depending on throw versus return');
     it.todo('reports typed encrypted, unsupported-compression, symlink, and special-mode issues');
@@ -1406,6 +1705,8 @@ describe('G0 characterization: malicious ZIP envelope', () => {
     it.todo('checks declared manifest size/digest and required-blob closure once the envelope declares them');
     it.todo('distinguishes a future major from a compatible minor once schemaVersion has a major discriminator');
     it.todo('rejects non-NFC persisted string values before canonical object construction');
-    it.todo('reports a typed blocked/quarantined manifest-ambiguity issue without depending on throw versus return or evidence location');
+    it.todo('reports a typed blocked/quarantined manifest ambiguity or invalid-scalar issue without depending on throw versus return or evidence location');
+    it.todo('ratifies injectable v1 JSON depth, node, field, array and string budgets instead of reusing v2 semantic ceilings');
+    it.todo('defines evidence access without requiring valid astral JSON escapes to retain their original raw spelling after import');
   });
 });

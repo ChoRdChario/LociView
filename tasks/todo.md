@@ -277,6 +277,24 @@ Start only after G-1 passes and the product owner approves S0.
 - Verification passed: 2 focused files / 165 passing tests plus 7 todos, 27 full-suite files / 820 passing tests plus 19 todos, fixture verification (10 Git entries / 708,867 bytes), zero-measurement evidence verification, typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
 - Independent specification, false-green and runtime/oracle reviews reported no unresolved P0/P1. `src/**` is unchanged; this remains tests-only characterization and the broad malicious-package and G0/G0-S gates below remain open
 
+### G0 characterization slice 12 — manifest Unicode scalar validity
+
+- [x] Add isolated escaped lone-high and lone-low surrogate manifests plus a valid astral-pair control at the same known-value and unknown-key boundaries
+- [x] Freeze raw ASCII escapes, decoded scalar shape, current manifest identity, exact sentinel operations and deterministic ZIP bytes without using the production manifest parser as the fixture oracle
+- [x] Characterize new-project import so an invalid scalar never publishes the candidate completion marker or activates its otherwise-valid sentinel, while permitting private staging or quarantine
+- [x] Characterize existing-project merge with the existing authoritative manifest/log/state/reopen/HLC/sequence oracle, without requiring throw-shaped rejection or a particular evidence location
+- [x] Keep raw-spelling retention, typed issue reporting and unratified JSON resource budgets explicit, then run focused/full verification and independent false-green/spec review before a separate commit
+
+### G0 characterization slice 12 review record
+
+- Two raw-ASCII manifests isolate a lone high surrogate in the known top-level `name` value and a lone low surrogate in an unknown nested key. Both fatal-decode as UTF-8 and remain syntactically valid JSON, so they exercise scalar validity rather than the existing malformed-byte boundary
+- A paired `\\uD83D\\uDE00` control places the same code units at both locations. Ordinary tests require UTF-16 length two, one Unicode scalar, code point U+1F600, no replacement character, exact current manifest/sentinel inputs and byte-identical fixed-date ZIP generation
+- The positive control succeeds through inspection, new-project import, reopen, existing-project merge and merge reopen. Semantic `name` preservation is required, but post-import retention of the original JSON escape spelling and unknown-member persistence are not claimed
+- Six narrow expected-failure assertions preserve the current unsafe behavior for the two lone-surrogate inputs: the desired contract requires no candidate completion-marker publication, no otherwise-valid sentinel activation and no mutation of existing authoritative manifest/log/state/reopen/HLC/sequence state
+- Private staging, quarantine, journals, unreferenced orphans, throw-versus-return shape and evidence location remain unconstrained. Typed issue access and injectable v1 depth/node/field/array/string budgets remain explicit todos rather than borrowing v2 semantic ceilings
+- Verification passed: 2 focused files / 177 passing tests plus 9 todos, 27 full-suite files / 832 passing tests plus 21 todos, fixture verification (10 Git entries / 708,867 bytes), zero-measurement evidence verification, typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
+- Independent false-green and specification/security reviews reported no unresolved P0/P1. `src/**` is unchanged; this remains tests-only characterization, not a parser fix, raw-evidence API, resource-budget ratification or G0-S completion
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
