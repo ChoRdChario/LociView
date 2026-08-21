@@ -334,6 +334,24 @@ Start only after G-1 passes and the product owner approves S0.
 - Verification passed: 2 focused files / 247 passing tests plus 11 todos, 27 full-suite files / 902 passing tests plus 23 todos, fixture verification (10 Git entries / 708,867 bytes), zero-measurement evidence verification, typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
 - Independent false-green and runtime/oracle reviews reported no unresolved P0/P1 after exponent-diversity and signed-control findings were fixed. `src/**` is unchanged; this remains tests-only characterization, not a parser fix, numeric-policy ratification or G0-S completion
 
+### G0 characterization slice 15 — operation reload-limit ingress parity
+
+- [x] Add two otherwise-canonical rejection-only inputs derived from the current exported limits: one compact ASCII serialized line above `MAX_LINE_CHARS`, and one operation with too many direct `v` members
+- [x] Independently freeze each input's canonical structural fields, exact ASCII/trimmed line shape, direct field count and lack of cross-budget confounding without treating the current numbers as product/device guarantees
+- [x] Keep direct JSONL, project open and package inspection/merge safe exclusion plus exact source inspection as ordinary assertions without fixing error text, reject stage or durable evidence location
+- [x] Characterize local dispatch with separate memory/listener, append/durable-log and reopen/next-operation consistency expected failures, while keeping a modest valid control ordinary across every ingress
+- [x] Leave physical whitespace padding, UTF-8 byte/scalar accounting, total-operation count and recursive depth/node/field/array/string budgets as explicit unratified follow-up work
+- [x] Run focused/full verification and independent false-green/spec/runtime review before staging and a separate commit
+
+Review record:
+
+- Added `tests/core/g0sOpBudgets.test.ts` only; `src/**` remains unchanged. The two rejection-only cases are derived dynamically from the current exported configuration: a compact ASCII serialized operation at `MAX_LINE_CHARS + 1`, and `LIMITS.maxFieldsPerOp + 1` direct `v` members while remaining below the line limit
+- Direct JSONL, workspace open and package inspection/import/merge ordinary assertions preserve exact source bytes and exclude each invalid operation from active authority. They allow safe whole-package rejection, private diagnostics/quarantine and any diagnostic cardinality or error/result shape
+- Ten ordinary cases, six narrow expected-failure cases and two todos characterize the current gap. Each invalid local dispatch has separate memory/listener, active-log mutation plus byte-exact, and reopen/next-operation queue/sequence/HLC oracles; active manifest/log mutation histories and transient non-baseline publication are also observed
+- This slice does not ratify exact-limit acceptance, the exported numbers as product/device guarantees, physical whitespace accounting, UTF-8 byte/scalar accounting, total operation count, recursive depth/node/field/array/string budgets, v2 migration parity, a parser fix or G0-S completion
+- Verification passed: 4 focused files / 45 passing tests plus 2 todos, 28 full-suite files / 918 passing tests plus 25 todos, fixture verification (10 Git entries / 708,867 bytes), evidence verification (3 pending device templates / 0 records), typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
+- Independent false-green and runtime/spec reviews reported no unresolved P0/P1 after active-authority history, byte-exactness, private-evidence freedom and async rejection isolation were corrected
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
