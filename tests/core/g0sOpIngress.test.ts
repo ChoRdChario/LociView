@@ -11,6 +11,11 @@ import {
   type OpCorpusRelation,
   type OpCorpusSubject,
 } from '../helpers/g0sOpCorpus';
+import {
+  objectIntrinsicsMatch,
+  restoreObjectIntrinsics,
+  snapshotObjectIntrinsics,
+} from '../helpers/objectIntrinsics';
 
 const CORPUS = loadOpCorpus();
 const USER: Identity = {
@@ -31,60 +36,6 @@ class RecordingMemoryFS extends MemoryFS {
     this.appendCalls += 1;
     await super.appendText(path, text);
   }
-}
-
-type DescriptorSnapshot = Map<PropertyKey, PropertyDescriptor>;
-
-interface ObjectIntrinsicSnapshot {
-  constructor: DescriptorSnapshot;
-  prototype: DescriptorSnapshot;
-}
-
-function snapshotDescriptors(target: object): DescriptorSnapshot {
-  return new Map(
-    Reflect.ownKeys(target).map((key) => [
-      key,
-      Object.getOwnPropertyDescriptor(target, key)!,
-    ]),
-  );
-}
-
-function descriptorsMatch(target: object, snapshot: DescriptorSnapshot): boolean {
-  const currentKeys = Reflect.ownKeys(target);
-  if (currentKeys.length !== snapshot.size) return false;
-  return currentKeys.every((key) => {
-    const expected = snapshot.get(key);
-    const actual = Object.getOwnPropertyDescriptor(target, key);
-    return expected !== undefined && actual !== undefined && isDeepStrictEqual(actual, expected);
-  });
-}
-
-function restoreDescriptors(target: object, snapshot: DescriptorSnapshot): void {
-  for (const key of Reflect.ownKeys(target)) {
-    if (!snapshot.has(key)) Reflect.deleteProperty(target, key);
-  }
-  for (const [key, descriptor] of snapshot) {
-    Object.defineProperty(target, key, descriptor);
-  }
-}
-
-function snapshotObjectIntrinsics(): ObjectIntrinsicSnapshot {
-  return {
-    constructor: snapshotDescriptors(Object),
-    prototype: snapshotDescriptors(Object.prototype),
-  };
-}
-
-function objectIntrinsicsMatch(snapshot: ObjectIntrinsicSnapshot): boolean {
-  return (
-    descriptorsMatch(Object, snapshot.constructor) &&
-    descriptorsMatch(Object.prototype, snapshot.prototype)
-  );
-}
-
-function restoreObjectIntrinsics(snapshot: ObjectIntrinsicSnapshot): void {
-  restoreDescriptors(Object, snapshot.constructor);
-  restoreDescriptors(Object.prototype, snapshot.prototype);
 }
 
 type TestMode = 'pass' | 'xfail';

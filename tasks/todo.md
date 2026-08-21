@@ -295,6 +295,26 @@ Start only after G-1 passes and the product owner approves S0.
 - Verification passed: 2 focused files / 177 passing tests plus 9 todos, 27 full-suite files / 832 passing tests plus 21 todos, fixture verification (10 Git entries / 708,867 bytes), zero-measurement evidence verification, typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
 - Independent false-green and specification/security reviews reported no unresolved P0/P1. `src/**` is unchanged; this remains tests-only characterization, not a parser fix, raw-evidence API, resource-budget ratification or G0-S completion
 
+### G0 characterization slice 13 — recursive manifest reserved keys
+
+- [x] Add an isolated 3 reserved keys × 3 object-depth matrix with representative literal and escaped spellings, one dangerous decoded key per manifest
+- [x] Freeze raw ASCII key spelling, decoded own-key identity, lexical depth, current manifest identity, exact sentinel operations and deterministic ZIP bytes without object-literal fixture construction
+- [x] Keep `Object` and `Object.prototype` descriptor/prototype integrity as an ordinary invariant around both new import and existing merge, restoring any mutation between cases
+- [x] Characterize invalid new import and existing merge with the completion-marker, sentinel and full active-authority oracles while allowing private staging, quarantine and non-authoritative evidence
+- [x] Add a near-miss/value-only positive control at the same three depths, then run focused/full verification and independent false-green/spec review before a separate commit
+- [x] Keep reject stage, typed issue/evidence location, unknown/raw retention, v2-wide prototype defense, manifest-specific G0S-OP wording and G0-S completion explicitly outside this tests-only slice
+
+### G0 characterization slice 13 review record
+
+- Nine isolated raw manifests cross `__proto__`, `prototype` and `constructor` with root, unknown nested-object and array-traversed deep-object topology. Six spellings are literal and three diagonal cells use decoded-equivalent escapes, so every semantic key and depth sees both forms without expanding to an 18-case lexical product
+- Each fixed-date ZIP contains exactly one dangerous decoded own key plus the canonical op1/op2 sentinel. Ordinary fixture oracles require fatal ASCII decoding, exact raw spelling, independently decoded key identity, object depth 1/2/3, one dangerous key in the entire tree, the case-specific pollution marker, current manifest identity and byte-identical regeneration
+- A shared tests-only helper now snapshots own descriptors and prototype links for both `Object` and `Object.prototype`. New import and existing merge use separate snapshots, verify fresh-object marker invisibility, and restore between cases; an unremovable unexpected property fails the setup instead of contaminating later baselines. Existing operation-ingress coverage now imports the same helper without changing its contract
+- The positive control uses safe near-miss keys at all three depths, including escaped nested/deep spellings, exact reserved words only as values and known `name: "__proto__"`. It succeeds through inspection, new import/reopen and existing merge/reopen, preventing blanket escape, prefix, unknown-member or string-value rejection from appearing correct
+- Twenty-seven narrow expected-failure assertions preserve the current unsafe activation behavior. For each isolated case, the desired contract requires no root completion-marker publication, no valid-sentinel activation and no change to existing authoritative manifest/log bytes, mutation paths, in-memory/published/reopened state or HLC/own sequence
+- This is tests-only characterization of the approved general JSON/package safety boundary. It does not claim a v1-manifest-specific G0S-OP clause, observable pre-construction rejection stage, typed issue/evidence location, unknown-field/raw-spelling retention, exhaustive v2 prototype defense, resource budgets or G0-S completion; private staging, quarantine, journals and non-authoritative evidence remain allowed
+- Verification passed: 3 focused files / 515 passing tests plus 11 todos, 27 full-suite files / 873 passing tests plus 21 todos, fixture verification (10 Git entries / 708,867 bytes), zero-measurement evidence verification, typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
+- Independent false-green and specification/security reviews reported no unresolved P0/P1 after their restore and wording findings were fixed. `src/**` is unchanged; the shared helper refactor and manifest characterization remain tests-only
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes

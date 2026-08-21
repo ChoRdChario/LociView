@@ -18,6 +18,11 @@ import {
   writeZipWithAliasedEntryName,
   type RawZipEntryShape,
 } from '../helpers/maliciousZip';
+import {
+  objectIntrinsicsMatch,
+  restoreObjectIntrinsics,
+  snapshotObjectIntrinsics,
+} from '../helpers/objectIntrinsics';
 
 const encoder = new TextEncoder();
 const USER: Identity = {
@@ -119,6 +124,17 @@ type ManifestScalarId =
   | 'manifest-lone-high-surrogate-name'
   | 'manifest-lone-low-surrogate-nested-key';
 
+type ManifestReservedId =
+  | 'manifest-reserved-dunder-proto-root'
+  | 'manifest-reserved-dunder-proto-nested'
+  | 'manifest-reserved-dunder-proto-deep'
+  | 'manifest-reserved-prototype-root'
+  | 'manifest-reserved-prototype-nested'
+  | 'manifest-reserved-prototype-deep'
+  | 'manifest-reserved-constructor-root'
+  | 'manifest-reserved-constructor-nested'
+  | 'manifest-reserved-constructor-deep';
+
 interface ImportAttempt {
   inspectionRejected: boolean;
   inspectionError: unknown;
@@ -175,6 +191,19 @@ interface ManifestScalarCase {
 }
 
 type ManifestScalarResult = ManifestAmbiguityResult;
+
+interface ManifestReservedCase {
+  id: ManifestReservedId;
+  decodedKey: '__proto__' | 'prototype' | 'constructor';
+  depth: 'root' | 'nested' | 'deep';
+  rawKey: string;
+  pollutionProperty: string;
+  manifestText: string;
+}
+
+interface ManifestReservedResult extends ManifestAmbiguityResult {
+  objectIntrinsicsIntact: boolean;
+}
 
 function bytesEqual(left: Uint8Array | null, right: Uint8Array): boolean {
   return left !== null && left.length === right.length && left.every((byte, index) => byte === right[index]);
@@ -262,7 +291,7 @@ function containsBytes(source: Uint8Array | null, needle: Uint8Array): boolean {
 }
 
 async function attemptNewProject(
-  id: FixtureId | ManifestAmbiguityId | ManifestScalarId,
+  id: FixtureId | ManifestAmbiguityId | ManifestScalarId | ManifestReservedId,
   zip: Uint8Array,
   limits?: ZipLimits,
 ): Promise<ImportAttempt> {
@@ -406,6 +435,45 @@ function jsonObjectDepthAt(text: string, end: number): number {
   return depth;
 }
 
+function ownJsonValue(object: Record<string, unknown>, key: string): unknown {
+  const descriptor = Reflect.getOwnPropertyDescriptor(object, key);
+  if (descriptor === undefined || !('value' in descriptor)) {
+    throw new Error(`missing own JSON member: ${key}`);
+  }
+  return descriptor.value;
+}
+
+function manifestReservedContainer(
+  root: Record<string, unknown>,
+  depth: ManifestReservedCase['depth'],
+): Record<string, unknown> {
+  if (depth === 'root') return root;
+  const future = ownJsonValue(root, 'future');
+  if (typeof future !== 'object' || future === null || Array.isArray(future)) {
+    throw new Error('reserved manifest future container is invalid');
+  }
+  if (depth === 'nested') return future as Record<string, unknown>;
+  const items = ownJsonValue(future as Record<string, unknown>, 'items');
+  if (!Array.isArray(items) || typeof items[0] !== 'object' || items[0] === null ||
+      Array.isArray(items[0])) {
+    throw new Error('reserved manifest deep container is invalid');
+  }
+  return items[0] as Record<string, unknown>;
+}
+
+function countDangerousOwnKeys(value: unknown): number {
+  if (Array.isArray(value)) {
+    return value.reduce((count, item) => count + countDangerousOwnKeys(item), 0);
+  }
+  if (typeof value !== 'object' || value === null) return 0;
+  const record = value as Record<string, unknown>;
+  return Reflect.ownKeys(record).reduce((count, key) => {
+    if (typeof key !== 'string') return count;
+    const dangerous = key === '__proto__' || key === 'prototype' || key === 'constructor';
+    return count + (dangerous ? 1 : 0) + countDangerousOwnKeys(ownJsonValue(record, key));
+  }, 0);
+}
+
 function makeManifestAmbiguityCase(
   id: ManifestAmbiguityId,
   relation: ManifestAmbiguityCase['relation'],
@@ -547,6 +615,51 @@ const MANIFEST_SCALAR_CONTROL_TEXT = replaceTextOnce(
   MANIFEST_NAME_MEMBER,
   '"name":"\\uD83D\\uDE00"',
 );
+const RESERVED_KEY_SPECS = [
+  { decodedKey: '__proto__', idPart: 'dunder-proto', escapedKey: '__pr\\u006fto__' },
+  { decodedKey: 'prototype', idPart: 'prototype', escapedKey: 'pr\\u006ftotype' },
+  { decodedKey: 'constructor', idPart: 'constructor', escapedKey: 'constr\\u0075ctor' },
+] as const;
+const RESERVED_DEPTHS = ['root', 'nested', 'deep'] as const;
+
+function makeManifestReservedCase(
+  keyIndex: number,
+  depthIndex: number,
+): ManifestReservedCase {
+  const keySpec = RESERVED_KEY_SPECS[keyIndex]!;
+  const depth = RESERVED_DEPTHS[depthIndex]!;
+  const rawKey = keyIndex === depthIndex ? keySpec.escapedKey : keySpec.decodedKey;
+  const pollutionProperty = `polluted_${keySpec.idPart.replace('-', '_')}_${depth}`;
+  const dangerousMember = `"${rawKey}":{"${pollutionProperty}":true}`;
+  const extra = depth === 'root'
+    ? dangerousMember
+    : depth === 'nested'
+      ? `"future":{${dangerousMember}}`
+      : `"future":{"items":[{${dangerousMember}}]}`;
+  return {
+    id: `manifest-reserved-${keySpec.idPart}-${depth}` as ManifestReservedId,
+    decodedKey: keySpec.decodedKey,
+    depth,
+    rawKey,
+    pollutionProperty,
+    manifestText: rawManifestWithExtra(extra),
+  };
+}
+
+const MANIFEST_RESERVED_CASES: readonly ManifestReservedCase[] = RESERVED_KEY_SPECS.flatMap(
+  (_key, keyIndex) => RESERVED_DEPTHS.map((_depth, depthIndex) =>
+    makeManifestReservedCase(keyIndex, depthIndex)),
+);
+const MANIFEST_RESERVED_CONTROL_NAME = '__proto__';
+const MANIFEST_RESERVED_CONTROL_TEXT = replaceTextOnce(
+  rawManifestWithExtra(
+    '"__proto__Safe":"__proto__",' +
+    '"future":{"protot\\u0079peSafe":"prototype",' +
+    '"items":[{"constr\\u0075ctorSafe":"constructor"}]}',
+  ),
+  MANIFEST_NAME_MEMBER,
+  `"name":"${MANIFEST_RESERVED_CONTROL_NAME}"`,
+);
 
 async function attemptForeignNormalizedCollision(zip: Uint8Array): Promise<ForeignImportAttempt> {
   const fs = new CountingMemoryFS();
@@ -679,13 +792,24 @@ function hasVisibleCaption(store: ProjectStore, captionId: string): boolean {
   return visibleEntities(store.state, 'caption').some(({ id }) => id === captionId);
 }
 
-async function validManifestScalarControlRoundTrips(zip: Uint8Array): Promise<boolean> {
+function pollutionPropertiesInvisible(properties: readonly string[]): boolean {
+  const fresh = {};
+  return properties.every((property) =>
+    !Reflect.has(fresh, property) && !Reflect.has(Object, property));
+}
+
+async function validManifestControlRoundTrips(
+  zip: Uint8Array,
+  expectedName: string,
+  pollutionProperties: readonly string[] = [],
+): Promise<boolean> {
+  const intrinsicSnapshot = snapshotObjectIntrinsics();
   try {
     const inspection = await inspectZip(zip);
     const inspectionIsExact =
       inspection.kind === 'lociview' &&
       inspection.manifest?.projectId === PROJECT_ID &&
-      inspection.manifest.name === VALID_ASTRAL_SCALAR &&
+      inspection.manifest.name === expectedName &&
       inspection.opsErrorCount === 0 &&
       inspection.opsFiles.length === 1 &&
       inspection.opsFiles[0]?.text === MANIFEST_AMBIGUITY_OPS_TEXT &&
@@ -693,21 +817,21 @@ async function validManifestScalarControlRoundTrips(zip: Uint8Array): Promise<bo
     if (!inspectionIsExact) return false;
 
     const importedFs = new MemoryFS();
-    const importedDir = 'projects/valid-manifest-scalar-control';
+    const importedDir = 'projects/valid-manifest-control';
     await importNewProject(importedFs, importedDir, inspection);
     const imported = await ProjectStore.open(importedFs, importedDir, USER);
     const importedOkay =
-      imported.manifest.name === VALID_ASTRAL_SCALAR &&
+      imported.manifest.name === expectedName &&
       hasVisibleCaption(imported, BASE_CAPTION_ID) &&
       hasVisibleCaption(imported, MIXED_CAPTION_ID);
     const importedReopened = await ProjectStore.open(importedFs, importedDir, USER);
     const importedReopenedOkay =
-      importedReopened.manifest.name === VALID_ASTRAL_SCALAR &&
+      importedReopened.manifest.name === expectedName &&
       hasVisibleCaption(importedReopened, BASE_CAPTION_ID) &&
       hasVisibleCaption(importedReopened, MIXED_CAPTION_ID);
 
     const mergedFs = new MemoryFS();
-    const mergedDir = 'projects/valid-manifest-scalar-merge-control';
+    const mergedDir = 'projects/valid-manifest-merge-control';
     await mergedFs.writeBytes(`${mergedDir}/lociview.json`, manifestBytes());
     await mergedFs.writeText(
       `${mergedDir}/ops/${MIXED_ACTOR}.jsonl`,
@@ -724,10 +848,60 @@ async function validManifestScalarControlRoundTrips(zip: Uint8Array): Promise<bo
       hasVisibleCaption(mergedReopened, BASE_CAPTION_ID) &&
       hasVisibleCaption(mergedReopened, MIXED_CAPTION_ID);
 
-    return importedOkay && importedReopenedOkay && mergedOkay && mergedReopenedOkay;
+    return (
+      importedOkay &&
+      importedReopenedOkay &&
+      mergedOkay &&
+      mergedReopenedOkay &&
+      objectIntrinsicsMatch(intrinsicSnapshot) &&
+      pollutionPropertiesInvisible(pollutionProperties)
+    );
   } catch {
     return false;
+  } finally {
+    restoreObjectIntrinsics(intrinsicSnapshot);
   }
+}
+
+async function attemptManifestReservedCase(
+  reservedCase: ManifestReservedCase,
+  zip: Uint8Array,
+): Promise<ManifestReservedResult> {
+  let importOutcome: ImportAttempt | null = null;
+  let importIntrinsicsIntact = false;
+  const importSnapshot = snapshotObjectIntrinsics();
+  try {
+    importOutcome = await attemptNewProject(reservedCase.id, zip);
+    importIntrinsicsIntact =
+      objectIntrinsicsMatch(importSnapshot) &&
+      pollutionPropertiesInvisible([reservedCase.pollutionProperty]);
+  } finally {
+    restoreObjectIntrinsics(importSnapshot);
+  }
+  if (importOutcome === null) throw new Error(`reserved manifest import did not complete: ${reservedCase.id}`);
+
+  let mergeOutcome: ExistingMergeAttempt | null = null;
+  let mergeIntrinsicsIntact = false;
+  const mergeSnapshot = snapshotObjectIntrinsics();
+  try {
+    mergeOutcome = await attemptExistingProjectMerge(zip);
+    mergeIntrinsicsIntact =
+      objectIntrinsicsMatch(mergeSnapshot) &&
+      pollutionPropertiesInvisible([reservedCase.pollutionProperty]);
+  } finally {
+    restoreObjectIntrinsics(mergeSnapshot);
+  }
+  if (mergeOutcome === null) throw new Error(`reserved manifest merge did not complete: ${reservedCase.id}`);
+
+  return {
+    initialized: true,
+    controlUnchanged: importOutcome.controlUnchanged,
+    completionMarkerNeverPublished:
+      !importOutcome.active && importOutcome.completionMarkerMutationCount === 0,
+    sentinelNeverActive: !importOutcome.mixedValidCaptionVisible,
+    existingAuthorityUnchanged: mergeOutcome.authoritativeUnchanged,
+    objectIntrinsicsIntact: importIntrinsicsIntact && mergeIntrinsicsIntact,
+  };
 }
 
 describe('G0 characterization: malicious ZIP envelope', () => {
@@ -762,6 +936,21 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       existingAuthorityUnchanged: false,
     }]),
   ) as Record<ManifestScalarId, ManifestScalarResult>;
+  let manifestReservedShapes: Record<ManifestReservedId, RawZipEntryShape[]>;
+  let manifestReservedDeterministic: Record<ManifestReservedId, boolean>;
+  let manifestReservedControlShape: RawZipEntryShape[];
+  let manifestReservedControlDeterministic = false;
+  let manifestReservedControlRoundTrips = false;
+  let manifestReservedResults = Object.fromEntries(
+    MANIFEST_RESERVED_CASES.map(({ id }) => [id, {
+      initialized: false,
+      controlUnchanged: false,
+      completionMarkerNeverPublished: false,
+      sentinelNeverActive: false,
+      existingAuthorityUnchanged: false,
+      objectIntrinsicsIntact: false,
+    }]),
+  ) as Record<ManifestReservedId, ManifestReservedResult>;
   let limitErrors: Record<'entries' | 'entryBytes' | 'totalBytes', unknown>;
   let representativeFixtureIsDeterministic: boolean;
 
@@ -972,6 +1161,39 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       repeatedManifestScalarControlZip,
       manifestScalarControlZip,
     );
+    const manifestReservedZips = {} as Record<ManifestReservedId, Uint8Array>;
+    manifestReservedShapes = {} as Record<ManifestReservedId, RawZipEntryShape[]>;
+    manifestReservedDeterministic = {} as Record<ManifestReservedId, boolean>;
+    for (const reservedCase of MANIFEST_RESERVED_CASES) {
+      const entries = [
+        { path: 'lociview.json', data: encoder.encode(reservedCase.manifestText) },
+        {
+          path: `ops/${MIXED_ACTOR}.jsonl`,
+          data: encoder.encode(MANIFEST_AMBIGUITY_OPS_TEXT),
+        },
+      ];
+      const zip = await writeDirectZip(entries);
+      const repeatedZip = await writeDirectZip(entries);
+      manifestReservedZips[reservedCase.id] = zip;
+      manifestReservedShapes[reservedCase.id] = await rawZipEntryShapes(zip);
+      manifestReservedDeterministic[reservedCase.id] = bytesEqual(repeatedZip, zip);
+    }
+    const manifestReservedControlEntries = [
+      { path: 'lociview.json', data: encoder.encode(MANIFEST_RESERVED_CONTROL_TEXT) },
+      {
+        path: `ops/${MIXED_ACTOR}.jsonl`,
+        data: encoder.encode(MANIFEST_AMBIGUITY_OPS_TEXT),
+      },
+    ];
+    const manifestReservedControlZip = await writeDirectZip(manifestReservedControlEntries);
+    const repeatedManifestReservedControlZip = await writeDirectZip(
+      manifestReservedControlEntries,
+    );
+    manifestReservedControlShape = await rawZipEntryShapes(manifestReservedControlZip);
+    manifestReservedControlDeterministic = bytesEqual(
+      repeatedManifestReservedControlZip,
+      manifestReservedControlZip,
+    );
     const centralName = 'models/central.glb';
     const localName = 'models/locally.glb';
     const localCentralMismatchZip = await writeZipWithMismatchedLocalName([
@@ -1119,8 +1341,9 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       } catch {
         manifestAmbiguityControlAccepted = false;
       }
-      manifestScalarControlRoundTrips = await validManifestScalarControlRoundTrips(
+      manifestScalarControlRoundTrips = await validManifestControlRoundTrips(
         manifestScalarControlZip,
+        VALID_ASTRAL_SCALAR,
       );
       for (const ambiguityCase of MANIFEST_AMBIGUITY_CASES) {
         const zip = manifestAmbiguityZips[ambiguityCase.id];
@@ -1148,6 +1371,17 @@ describe('G0 characterization: malicious ZIP envelope', () => {
           existingAuthorityUnchanged: mergeOutcome.authoritativeUnchanged,
         };
       }
+      for (const reservedCase of MANIFEST_RESERVED_CASES) {
+        manifestReservedResults[reservedCase.id] = await attemptManifestReservedCase(
+          reservedCase,
+          manifestReservedZips[reservedCase.id],
+        );
+      }
+      manifestReservedControlRoundTrips = await validManifestControlRoundTrips(
+        manifestReservedControlZip,
+        MANIFEST_RESERVED_CONTROL_NAME,
+        MANIFEST_RESERVED_CASES.map(({ pollutionProperty }) => pollutionProperty),
+      );
     } finally {
       warn.mockRestore();
     }
@@ -1367,6 +1601,105 @@ describe('G0 characterization: malicious ZIP envelope', () => {
         expect(isUnicodeScalarText(scalar)).toBe(true);
         expect(scalar.includes('\ufffd')).toBe(false);
       }
+    });
+
+    it('registers every reserved key at every isolated depth with balanced raw spellings', () => {
+      expect(MANIFEST_RESERVED_CASES.map(({ id, decodedKey, depth, rawKey }) =>
+        [id, decodedKey, depth, rawKey])).toEqual([
+        ['manifest-reserved-dunder-proto-root', '__proto__', 'root', '__pr\\u006fto__'],
+        ['manifest-reserved-dunder-proto-nested', '__proto__', 'nested', '__proto__'],
+        ['manifest-reserved-dunder-proto-deep', '__proto__', 'deep', '__proto__'],
+        ['manifest-reserved-prototype-root', 'prototype', 'root', 'prototype'],
+        ['manifest-reserved-prototype-nested', 'prototype', 'nested', 'pr\\u006ftotype'],
+        ['manifest-reserved-prototype-deep', 'prototype', 'deep', 'prototype'],
+        ['manifest-reserved-constructor-root', 'constructor', 'root', 'constructor'],
+        ['manifest-reserved-constructor-nested', 'constructor', 'nested', 'constructor'],
+        ['manifest-reserved-constructor-deep', 'constructor', 'deep', 'constr\\u0075ctor'],
+      ]);
+      expect(Object.values(manifestReservedDeterministic))
+        .toEqual(MANIFEST_RESERVED_CASES.map(() => true));
+    });
+
+    for (const reservedCase of MANIFEST_RESERVED_CASES) {
+      it(`${reservedCase.id}: freezes one decoded dangerous own key at the exact object depth`, () => {
+        const shapes = manifestReservedShapes[reservedCase.id];
+        expect(shapes.map(({ filename }) => filename)).toEqual([
+          'lociview.json',
+          `ops/${MIXED_ACTOR}.jsonl`,
+        ]);
+        const manifestPayload = shapes[0]?.payload;
+        const opsPayload = shapes[1]?.payload;
+        if (manifestPayload === null || manifestPayload === undefined ||
+            opsPayload === null || opsPayload === undefined) {
+          throw new Error(`missing manifest reserved-key payload: ${reservedCase.id}`);
+        }
+        const manifestText = new TextDecoder('utf-8', { fatal: true }).decode(manifestPayload);
+        expect(manifestText).toBe(reservedCase.manifestText);
+        expect([...manifestPayload].every((byte) => byte <= 0x7f)).toBe(true);
+        expect(new TextDecoder('utf-8', { fatal: true }).decode(opsPayload))
+          .toBe(MANIFEST_AMBIGUITY_OPS_TEXT);
+        const rawKeyToken = `"${reservedCase.rawKey}"`;
+        expect(manifestText.split(rawKeyToken)).toHaveLength(2);
+        const tokenOffset = manifestText.indexOf(rawKeyToken);
+        expect(jsonObjectDepthAt(manifestText, tokenOffset)).toBe(
+          reservedCase.depth === 'root' ? 1 : reservedCase.depth === 'nested' ? 2 : 3,
+        );
+        expect(JSON.parse(rawKeyToken)).toBe(reservedCase.decodedKey);
+
+        const parsed = JSON.parse(manifestText) as Record<string, unknown>;
+        expect(parsed.schemaVersion).toBe(SCHEMA_VERSION);
+        expect(parsed.projectId).toBe(PROJECT_ID);
+        expect(countDangerousOwnKeys(parsed)).toBe(1);
+        const container = manifestReservedContainer(parsed, reservedCase.depth);
+        const dangerousDescriptor = Reflect.getOwnPropertyDescriptor(
+          container,
+          reservedCase.decodedKey,
+        );
+        expect(dangerousDescriptor).toMatchObject({
+          configurable: true,
+          enumerable: true,
+          writable: true,
+        });
+        if (dangerousDescriptor === undefined || !('value' in dangerousDescriptor) ||
+            typeof dangerousDescriptor.value !== 'object' || dangerousDescriptor.value === null) {
+          throw new Error(`missing dangerous own-key value: ${reservedCase.id}`);
+        }
+        expect(Reflect.getOwnPropertyDescriptor(
+          dangerousDescriptor.value,
+          reservedCase.pollutionProperty,
+        )?.value).toBe(true);
+      });
+    }
+
+    it('builds a deterministic three-depth control with only safe near-miss keys and reserved values', () => {
+      expect(manifestReservedControlShape.map(({ filename }) => filename)).toEqual([
+        'lociview.json',
+        `ops/${MIXED_ACTOR}.jsonl`,
+      ]);
+      const manifestPayload = manifestReservedControlShape[0]?.payload;
+      const opsPayload = manifestReservedControlShape[1]?.payload;
+      if (manifestPayload === null || manifestPayload === undefined ||
+          opsPayload === null || opsPayload === undefined) {
+        throw new Error('missing manifest reserved-key control payload');
+      }
+      const manifestText = new TextDecoder('utf-8', { fatal: true }).decode(manifestPayload);
+      expect(manifestText).toBe(MANIFEST_RESERVED_CONTROL_TEXT);
+      expect([...manifestPayload].every((byte) => byte <= 0x7f)).toBe(true);
+      expect(new TextDecoder('utf-8', { fatal: true }).decode(opsPayload))
+        .toBe(MANIFEST_AMBIGUITY_OPS_TEXT);
+      expect(manifestReservedControlDeterministic).toBe(true);
+
+      const parsed = JSON.parse(manifestText) as Record<string, unknown>;
+      expect(parsed.schemaVersion).toBe(SCHEMA_VERSION);
+      expect(parsed.projectId).toBe(PROJECT_ID);
+      expect(parsed.name).toBe(MANIFEST_RESERVED_CONTROL_NAME);
+      expect(countDangerousOwnKeys(parsed)).toBe(0);
+      expect(ownJsonValue(parsed, '__proto__Safe')).toBe('__proto__');
+      const future = ownJsonValue(parsed, 'future') as Record<string, unknown>;
+      expect(ownJsonValue(future, 'prototypeSafe')).toBe('prototype');
+      const items = ownJsonValue(future, 'items') as unknown[];
+      expect(ownJsonValue(items[0] as Record<string, unknown>, 'constructorSafe'))
+        .toBe('constructor');
     });
 
     it('constructs raw duplicate paths in both input orders with both payloads intact', () => {
@@ -1698,6 +2031,39 @@ describe('G0 characterization: malicious ZIP envelope', () => {
     }
   });
 
+  describe('recursive manifest reserved keys stay outside active authority', () => {
+    it('accepts the safe near-miss/value-only control through import, reopen and merge', () => {
+      expect(manifestReservedControlRoundTrips).toBe(true);
+    });
+
+    it('initializes every isolated key/depth case and leaves the unrelated control byte-exact', () => {
+      expect(MANIFEST_RESERVED_CASES.map(({ id }) => manifestReservedResults[id].initialized))
+        .toEqual(MANIFEST_RESERVED_CASES.map(() => true));
+      expect(MANIFEST_RESERVED_CASES.map(({ id }) => manifestReservedResults[id].controlUnchanged))
+        .toEqual(MANIFEST_RESERVED_CASES.map(() => true));
+    });
+
+    it('preserves Object/Object.prototype own descriptors and prototype links across each attempt', () => {
+      expect(MANIFEST_RESERVED_CASES.map(({ id }) =>
+        manifestReservedResults[id].objectIntrinsicsIntact))
+        .toEqual(MANIFEST_RESERVED_CASES.map(() => true));
+    });
+
+    for (const reservedCase of MANIFEST_RESERVED_CASES) {
+      it.fails(`${reservedCase.id}: never publishes a candidate completion marker`, () => {
+        expect(manifestReservedResults[reservedCase.id].completionMarkerNeverPublished).toBe(true);
+      });
+
+      it.fails(`${reservedCase.id}: never activates the valid sentinel operation`, () => {
+        expect(manifestReservedResults[reservedCase.id].sentinelNeverActive).toBe(true);
+      });
+
+      it.fails(`${reservedCase.id}: leaves existing active authority unchanged`, () => {
+        expect(manifestReservedResults[reservedCase.id].existingAuthorityUnchanged).toBe(true);
+      });
+    }
+  });
+
   describe('observable policy still deferred from this initial slice', () => {
     it.todo('reports a typed blocked/quarantined issue for mixed valid/malformed operations without depending on throw versus return');
     it.todo('reports typed encrypted, unsupported-compression, symlink, and special-mode issues');
@@ -1705,7 +2071,7 @@ describe('G0 characterization: malicious ZIP envelope', () => {
     it.todo('checks declared manifest size/digest and required-blob closure once the envelope declares them');
     it.todo('distinguishes a future major from a compatible minor once schemaVersion has a major discriminator');
     it.todo('rejects non-NFC persisted string values before canonical object construction');
-    it.todo('reports a typed blocked/quarantined manifest ambiguity or invalid-scalar issue without depending on throw versus return or evidence location');
+    it.todo('reports a typed blocked/quarantined manifest ambiguity, invalid-scalar or reserved-key issue without depending on throw versus return or evidence location');
     it.todo('ratifies injectable v1 JSON depth, node, field, array and string budgets instead of reusing v2 semantic ceilings');
     it.todo('defines evidence access without requiring valid astral JSON escapes to retain their original raw spelling after import');
   });
