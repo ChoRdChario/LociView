@@ -315,6 +315,25 @@ Start only after G-1 passes and the product owner approves S0.
 - Verification passed: 3 focused files / 515 passing tests plus 11 todos, 27 full-suite files / 873 passing tests plus 21 todos, fixture verification (10 Git entries / 708,867 bytes), zero-measurement evidence verification, typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
 - Independent false-green and specification/security reviews reported no unresolved P0/P1 after their restore and wording findings were fixed. `src/**` is unchanged; the shared helper refactor and manifest characterization remain tests-only
 
+### G0 characterization slice 14 — manifest finite-number validity
+
+- [x] Add an isolated sign-by-location matrix for JSON exponent overflow at the known `schemaVersion`, unknown nested-object and array-traversed deep-object boundaries
+- [x] Freeze each raw ASCII number token, decoded non-finite sign, exact lexical path/depth, current manifest identity, canonical sentinel operations and deterministic ZIP bytes without using the production manifest parser as the fixture oracle
+- [x] Preserve the already-safe negative `schemaVersion` rejection as ordinary coverage, and characterize only the five unsafe cases with completion-marker, sentinel-applicability and existing-authority assertions appropriate to each current outcome
+- [x] Add modest positive/negative finite-exponent controls at the same three locations and require inspection, new import/reopen and existing merge/reopen success without claiming unknown-field or raw-exponent retention
+- [x] Keep typed issue/stage, evidence location, maximum finite magnitude, precision/subnormal/underflow/negative-zero policy and unratified v1 JSON resource budgets outside this tests-only slice
+- [x] Run focused/full verification and independent false-green/spec/runtime review before staging and a separate commit
+
+### G0 characterization slice 14 review record
+
+- Six isolated raw manifests cross positive/negative overflow with the known root `schemaVersion`, an unknown nested-object number and an array-traversed deep-object number. The spellings are deliberately distributed across `1e400`, `1e309` and `2e308`, reducing dependence on one overflow spelling and preventing a one-token denylist from appearing sufficient
+- Every fixed-date ZIP carries the current manifest identity and exact canonical op1/op2 sentinel. Ordinary fixture oracles require fatal ASCII decoding, exact raw token and path, object depth 1/2/3, the intended `Infinity` sign with exactly one non-finite decoded number, and byte-identical regeneration without using the production manifest parser as the shape oracle
+- Two finite controls use known `schemaVersion:1e0` and unknown nested/deep `+2e0/+3e0` or `-2e0/-3e0`. Both succeed through inspection, new import/reopen and existing merge/reopen, while unknown-field retention and the original exponent spelling after import remain outside the contract
+- Negative overflow in known `schemaVersion` is already rejected and remains three ordinary safety assertions. Fifteen narrow expected-failure assertions cover the other five cases: no completion-marker publication, no sentinel in active `.jsonl` authority under that marker, and no existing manifest/log/state/reopen/HLC/own-sequence mutation
+- The active-log sentinel oracle is completion-marker-gated, so markerless staging, quarantine, journals and other non-authoritative evidence remain allowed. Throw versus return, exact reject stage, typed issue/evidence location, maximum finite magnitude, precision, subnormal/underflow/negative-zero behavior and v1 JSON resource budgets are not claimed
+- Verification passed: 2 focused files / 247 passing tests plus 11 todos, 27 full-suite files / 902 passing tests plus 23 todos, fixture verification (10 Git entries / 708,867 bytes), zero-measurement evidence verification, typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
+- Independent false-green and runtime/oracle reviews reported no unresolved P0/P1 after exponent-diversity and signed-control findings were fixed. `src/**` is unchanged; this remains tests-only characterization, not a parser fix, numeric-policy ratification or G0-S completion
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes

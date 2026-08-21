@@ -135,6 +135,14 @@ type ManifestReservedId =
   | 'manifest-reserved-constructor-nested'
   | 'manifest-reserved-constructor-deep';
 
+type ManifestNumberId =
+  | 'manifest-number-overflow-known-positive'
+  | 'manifest-number-overflow-known-negative'
+  | 'manifest-number-overflow-nested-positive'
+  | 'manifest-number-overflow-nested-negative'
+  | 'manifest-number-overflow-deep-positive'
+  | 'manifest-number-overflow-deep-negative';
+
 interface ImportAttempt {
   inspectionRejected: boolean;
   inspectionError: unknown;
@@ -145,6 +153,7 @@ interface ImportAttempt {
   completionMarkerMutationCount: number;
   controlUnchanged: boolean;
   mixedValidCaptionVisible: boolean;
+  sentinelPublishedUnderCompletionMarker: boolean;
 }
 
 interface ForeignImportAttempt {
@@ -203,6 +212,22 @@ interface ManifestReservedCase {
 
 interface ManifestReservedResult extends ManifestAmbiguityResult {
   objectIntrinsicsIntact: boolean;
+}
+
+interface ManifestNumberCase {
+  id: ManifestNumberId;
+  location: 'known' | 'nested' | 'deep';
+  sign: 'positive' | 'negative';
+  rawNumber: string;
+  manifestText: string;
+}
+
+interface ManifestNumberResult {
+  initialized: boolean;
+  controlUnchanged: boolean;
+  completionMarkerNeverPublished: boolean;
+  sentinelNeverPublishedUnderCompletionMarker: boolean;
+  existingAuthorityUnchanged: boolean;
 }
 
 function bytesEqual(left: Uint8Array | null, right: Uint8Array): boolean {
@@ -290,8 +315,37 @@ function containsBytes(source: Uint8Array | null, needle: Uint8Array): boolean {
   return false;
 }
 
+function isMixedSentinelOperation(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const operation = value as Record<string, unknown>;
+  return operation.op === 2 &&
+    operation.actor === MIXED_ACTOR &&
+    operation.user === MIXED_USER_ID &&
+    operation.t === 'create' &&
+    operation.e === 'caption' &&
+    operation.id === MIXED_CAPTION_ID;
+}
+
+async function activeLogContainsMixedSentinel(fs: MemoryFS, dir: string): Promise<boolean> {
+  if (!(await fs.exists(`${dir}/lociview.json`))) return false;
+  const logPaths = (await fs.list(`${dir}/ops/`)).filter((path) => path.endsWith('.jsonl'));
+  for (const path of logPaths) {
+    const text = await fs.readText(path);
+    if (text === null) continue;
+    for (const line of text.split('\n')) {
+      if (line.trim() === '') continue;
+      try {
+        if (isMixedSentinelOperation(JSON.parse(line))) return true;
+      } catch {
+        // A malformed sibling line cannot hide a separately parseable active sentinel.
+      }
+    }
+  }
+  return false;
+}
+
 async function attemptNewProject(
-  id: FixtureId | ManifestAmbiguityId | ManifestScalarId | ManifestReservedId,
+  id: FixtureId | ManifestAmbiguityId | ManifestScalarId | ManifestReservedId | ManifestNumberId,
   zip: Uint8Array,
   limits?: ZipLimits,
 ): Promise<ImportAttempt> {
@@ -345,6 +399,7 @@ async function attemptNewProject(
       JSON.stringify(controlInventoryAfter) === JSON.stringify(controlInventoryBefore) &&
       bytesEqual(await fs.readBytes(CONTROL_PATH), CONTROL_BYTES),
     mixedValidCaptionVisible,
+    sentinelPublishedUnderCompletionMarker: await activeLogContainsMixedSentinel(fs, dir),
   };
 }
 
@@ -472,6 +527,36 @@ function countDangerousOwnKeys(value: unknown): number {
     const dangerous = key === '__proto__' || key === 'prototype' || key === 'constructor';
     return count + (dangerous ? 1 : 0) + countDangerousOwnKeys(ownJsonValue(record, key));
   }, 0);
+}
+
+function manifestNumberValue(
+  root: Record<string, unknown>,
+  location: ManifestNumberCase['location'],
+): unknown {
+  if (location === 'known') return ownJsonValue(root, 'schemaVersion');
+  const future = ownJsonValue(root, 'future');
+  if (typeof future !== 'object' || future === null || Array.isArray(future)) {
+    throw new Error('manifest number future container is invalid');
+  }
+  const futureRecord = future as Record<string, unknown>;
+  if (location === 'nested') return ownJsonValue(futureRecord, 'score');
+  const items = ownJsonValue(futureRecord, 'items');
+  if (!Array.isArray(items) || typeof items[0] !== 'object' || items[0] === null ||
+      Array.isArray(items[0])) {
+    throw new Error('manifest number deep container is invalid');
+  }
+  return ownJsonValue(items[0] as Record<string, unknown>, 'score');
+}
+
+function countNonFiniteNumbers(value: unknown): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? 0 : 1;
+  if (Array.isArray(value)) {
+    return value.reduce((count, item) => count + countNonFiniteNumbers(item), 0);
+  }
+  if (typeof value !== 'object' || value === null) return 0;
+  const record = value as Record<string, unknown>;
+  return Reflect.ownKeys(record).reduce((count, key) =>
+    count + (typeof key === 'string' ? countNonFiniteNumbers(ownJsonValue(record, key)) : 0), 0);
 }
 
 function makeManifestAmbiguityCase(
@@ -661,6 +746,48 @@ const MANIFEST_RESERVED_CONTROL_TEXT = replaceTextOnce(
   `"name":"${MANIFEST_RESERVED_CONTROL_NAME}"`,
 );
 
+const MANIFEST_SCHEMA_MEMBER = `"schemaVersion":${SCHEMA_VERSION}`;
+const MANIFEST_NUMBER_LOCATIONS = ['known', 'nested', 'deep'] as const;
+const MANIFEST_NUMBER_SIGNS = ['positive', 'negative'] as const;
+
+function makeManifestNumberCase(
+  location: ManifestNumberCase['location'],
+  sign: ManifestNumberCase['sign'],
+): ManifestNumberCase {
+  const magnitude = location === 'known' ? '1e400' : location === 'nested' ? '1e309' : '2e308';
+  const rawNumber = sign === 'positive' ? magnitude : `-${magnitude}`;
+  const manifestText = location === 'known'
+    ? replaceTextOnce(
+      new TextDecoder('utf-8', { fatal: true }).decode(manifestBytes()),
+      MANIFEST_SCHEMA_MEMBER,
+      `"schemaVersion":${rawNumber}`,
+    )
+    : rawManifestWithExtra(location === 'nested'
+      ? `"future":{"score":${rawNumber}}`
+      : `"future":{"items":[{"score":${rawNumber}}]}`);
+  return {
+    id: `manifest-number-overflow-${location}-${sign}` as ManifestNumberId,
+    location,
+    sign,
+    rawNumber,
+    manifestText,
+  };
+}
+
+const MANIFEST_NUMBER_CASES: readonly ManifestNumberCase[] = MANIFEST_NUMBER_LOCATIONS.flatMap(
+  (location) => MANIFEST_NUMBER_SIGNS.map((sign) => makeManifestNumberCase(location, sign)),
+);
+const MANIFEST_NUMBER_CONTROL_TEXTS = Object.fromEntries(MANIFEST_NUMBER_SIGNS.map((sign) => {
+  const prefix = sign === 'positive' ? '' : '-';
+  return [sign, replaceTextOnce(
+    rawManifestWithExtra(
+      `"future":{"score":${prefix}2e0,"items":[{"score":${prefix}3e0}]}`,
+    ),
+    MANIFEST_SCHEMA_MEMBER,
+    '"schemaVersion":1e0',
+  )];
+})) as Record<ManifestNumberCase['sign'], string>;
+
 async function attemptForeignNormalizedCollision(zip: Uint8Array): Promise<ForeignImportAttempt> {
   const fs = new CountingMemoryFS();
   let inspectionRejected = false;
@@ -809,6 +936,7 @@ async function validManifestControlRoundTrips(
     const inspectionIsExact =
       inspection.kind === 'lociview' &&
       inspection.manifest?.projectId === PROJECT_ID &&
+      inspection.manifest.schemaVersion === SCHEMA_VERSION &&
       inspection.manifest.name === expectedName &&
       inspection.opsErrorCount === 0 &&
       inspection.opsFiles.length === 1 &&
@@ -821,11 +949,13 @@ async function validManifestControlRoundTrips(
     await importNewProject(importedFs, importedDir, inspection);
     const imported = await ProjectStore.open(importedFs, importedDir, USER);
     const importedOkay =
+      imported.manifest.schemaVersion === SCHEMA_VERSION &&
       imported.manifest.name === expectedName &&
       hasVisibleCaption(imported, BASE_CAPTION_ID) &&
       hasVisibleCaption(imported, MIXED_CAPTION_ID);
     const importedReopened = await ProjectStore.open(importedFs, importedDir, USER);
     const importedReopenedOkay =
+      importedReopened.manifest.schemaVersion === SCHEMA_VERSION &&
       importedReopened.manifest.name === expectedName &&
       hasVisibleCaption(importedReopened, BASE_CAPTION_ID) &&
       hasVisibleCaption(importedReopened, MIXED_CAPTION_ID);
@@ -951,6 +1081,20 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       objectIntrinsicsIntact: false,
     }]),
   ) as Record<ManifestReservedId, ManifestReservedResult>;
+  let manifestNumberShapes: Record<ManifestNumberId, RawZipEntryShape[]>;
+  let manifestNumberDeterministic: Record<ManifestNumberId, boolean>;
+  let manifestNumberControlShapes: Record<ManifestNumberCase['sign'], RawZipEntryShape[]>;
+  let manifestNumberControlDeterministic: Record<ManifestNumberCase['sign'], boolean>;
+  let manifestNumberControlRoundTrips: Record<ManifestNumberCase['sign'], boolean>;
+  let manifestNumberResults = Object.fromEntries(
+    MANIFEST_NUMBER_CASES.map(({ id }) => [id, {
+      initialized: false,
+      controlUnchanged: false,
+      completionMarkerNeverPublished: false,
+      sentinelNeverPublishedUnderCompletionMarker: false,
+      existingAuthorityUnchanged: false,
+    }]),
+  ) as Record<ManifestNumberId, ManifestNumberResult>;
   let limitErrors: Record<'entries' | 'entryBytes' | 'totalBytes', unknown>;
   let representativeFixtureIsDeterministic: boolean;
 
@@ -1194,6 +1338,40 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       repeatedManifestReservedControlZip,
       manifestReservedControlZip,
     );
+    const manifestNumberZips = {} as Record<ManifestNumberId, Uint8Array>;
+    manifestNumberShapes = {} as Record<ManifestNumberId, RawZipEntryShape[]>;
+    manifestNumberDeterministic = {} as Record<ManifestNumberId, boolean>;
+    for (const numberCase of MANIFEST_NUMBER_CASES) {
+      const entries = [
+        { path: 'lociview.json', data: encoder.encode(numberCase.manifestText) },
+        {
+          path: `ops/${MIXED_ACTOR}.jsonl`,
+          data: encoder.encode(MANIFEST_AMBIGUITY_OPS_TEXT),
+        },
+      ];
+      const zip = await writeDirectZip(entries);
+      const repeatedZip = await writeDirectZip(entries);
+      manifestNumberZips[numberCase.id] = zip;
+      manifestNumberShapes[numberCase.id] = await rawZipEntryShapes(zip);
+      manifestNumberDeterministic[numberCase.id] = bytesEqual(repeatedZip, zip);
+    }
+    const manifestNumberControlZips = {} as Record<ManifestNumberCase['sign'], Uint8Array>;
+    manifestNumberControlShapes = {} as Record<ManifestNumberCase['sign'], RawZipEntryShape[]>;
+    manifestNumberControlDeterministic = {} as Record<ManifestNumberCase['sign'], boolean>;
+    for (const sign of MANIFEST_NUMBER_SIGNS) {
+      const entries = [
+        { path: 'lociview.json', data: encoder.encode(MANIFEST_NUMBER_CONTROL_TEXTS[sign]) },
+        {
+          path: `ops/${MIXED_ACTOR}.jsonl`,
+          data: encoder.encode(MANIFEST_AMBIGUITY_OPS_TEXT),
+        },
+      ];
+      const zip = await writeDirectZip(entries);
+      const repeatedZip = await writeDirectZip(entries);
+      manifestNumberControlZips[sign] = zip;
+      manifestNumberControlShapes[sign] = await rawZipEntryShapes(zip);
+      manifestNumberControlDeterministic[sign] = bytesEqual(repeatedZip, zip);
+    }
     const centralName = 'models/central.glb';
     const localName = 'models/locally.glb';
     const localCentralMismatchZip = await writeZipWithMismatchedLocalName([
@@ -1382,6 +1560,27 @@ describe('G0 characterization: malicious ZIP envelope', () => {
         MANIFEST_RESERVED_CONTROL_NAME,
         MANIFEST_RESERVED_CASES.map(({ pollutionProperty }) => pollutionProperty),
       );
+      manifestNumberControlRoundTrips = {} as Record<ManifestNumberCase['sign'], boolean>;
+      for (const sign of MANIFEST_NUMBER_SIGNS) {
+        manifestNumberControlRoundTrips[sign] = await validManifestControlRoundTrips(
+          manifestNumberControlZips[sign],
+          'malicious envelope fixture',
+        );
+      }
+      for (const numberCase of MANIFEST_NUMBER_CASES) {
+        const zip = manifestNumberZips[numberCase.id];
+        const importOutcome = await attemptNewProject(numberCase.id, zip);
+        const mergeOutcome = await attemptExistingProjectMerge(zip);
+        manifestNumberResults[numberCase.id] = {
+          initialized: true,
+          controlUnchanged: importOutcome.controlUnchanged,
+          completionMarkerNeverPublished:
+            !importOutcome.active && importOutcome.completionMarkerMutationCount === 0,
+          sentinelNeverPublishedUnderCompletionMarker:
+            !importOutcome.sentinelPublishedUnderCompletionMarker,
+          existingAuthorityUnchanged: mergeOutcome.authoritativeUnchanged,
+        };
+      }
     } finally {
       warn.mockRestore();
     }
@@ -1701,6 +1900,97 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       expect(ownJsonValue(items[0] as Record<string, unknown>, 'constructorSafe'))
         .toBe('constructor');
     });
+
+    it('registers both overflow signs at every isolated numeric location', () => {
+      expect(MANIFEST_NUMBER_CASES.map(({ id, location, sign, rawNumber }) =>
+        [id, location, sign, rawNumber])).toEqual([
+        ['manifest-number-overflow-known-positive', 'known', 'positive', '1e400'],
+        ['manifest-number-overflow-known-negative', 'known', 'negative', '-1e400'],
+        ['manifest-number-overflow-nested-positive', 'nested', 'positive', '1e309'],
+        ['manifest-number-overflow-nested-negative', 'nested', 'negative', '-1e309'],
+        ['manifest-number-overflow-deep-positive', 'deep', 'positive', '2e308'],
+        ['manifest-number-overflow-deep-negative', 'deep', 'negative', '-2e308'],
+      ]);
+      expect(Object.values(manifestNumberDeterministic))
+        .toEqual(MANIFEST_NUMBER_CASES.map(() => true));
+    });
+
+    for (const numberCase of MANIFEST_NUMBER_CASES) {
+      it(`${numberCase.id}: freezes one raw overflow token and decoded sign at the exact path`, () => {
+        const shapes = manifestNumberShapes[numberCase.id];
+        expect(shapes.map(({ filename }) => filename)).toEqual([
+          'lociview.json',
+          `ops/${MIXED_ACTOR}.jsonl`,
+        ]);
+        const manifestPayload = shapes[0]?.payload;
+        const opsPayload = shapes[1]?.payload;
+        if (manifestPayload === null || manifestPayload === undefined ||
+            opsPayload === null || opsPayload === undefined) {
+          throw new Error(`missing manifest number payload: ${numberCase.id}`);
+        }
+        const manifestText = new TextDecoder('utf-8', { fatal: true }).decode(manifestPayload);
+        expect(manifestText).toBe(numberCase.manifestText);
+        expect([...manifestPayload].every((byte) => byte <= 0x7f)).toBe(true);
+        expect(manifestText.split(numberCase.rawNumber)).toHaveLength(2);
+        expect(new TextDecoder('utf-8', { fatal: true }).decode(opsPayload))
+          .toBe(MANIFEST_AMBIGUITY_OPS_TEXT);
+
+        const exactFragment = numberCase.location === 'known'
+          ? `"schemaVersion":${numberCase.rawNumber}`
+          : numberCase.location === 'nested'
+            ? `"future":{"score":${numberCase.rawNumber}}`
+            : `"future":{"items":[{"score":${numberCase.rawNumber}}]}`;
+        expect(manifestText.includes(exactFragment)).toBe(true);
+        const tokenOffset = manifestText.indexOf(numberCase.rawNumber);
+        expect(tokenOffset).toBeGreaterThanOrEqual(0);
+        expect(jsonObjectDepthAt(manifestText, tokenOffset)).toBe(
+          numberCase.location === 'known' ? 1 : numberCase.location === 'nested' ? 2 : 3,
+        );
+
+        const parsed = JSON.parse(manifestText) as Record<string, unknown>;
+        expect(parsed.projectId).toBe(PROJECT_ID);
+        if (numberCase.location !== 'known') expect(parsed.schemaVersion).toBe(SCHEMA_VERSION);
+        const decoded = manifestNumberValue(parsed, numberCase.location);
+        expect(typeof decoded).toBe('number');
+        expect(decoded).toBe(numberCase.sign === 'positive' ? Infinity : -Infinity);
+        expect(Number.isFinite(decoded)).toBe(false);
+        expect(countNonFiniteNumbers(parsed)).toBe(1);
+      });
+    }
+
+    for (const sign of MANIFEST_NUMBER_SIGNS) {
+      it(`builds a deterministic modest finite-${sign} exponent control at all three locations`, () => {
+        const shapes = manifestNumberControlShapes[sign];
+        expect(shapes.map(({ filename }) => filename)).toEqual([
+          'lociview.json',
+          `ops/${MIXED_ACTOR}.jsonl`,
+        ]);
+        const manifestPayload = shapes[0]?.payload;
+        const opsPayload = shapes[1]?.payload;
+        if (manifestPayload === null || manifestPayload === undefined ||
+            opsPayload === null || opsPayload === undefined) {
+          throw new Error(`missing finite-${sign} manifest number control payload`);
+        }
+        const manifestText = new TextDecoder('utf-8', { fatal: true }).decode(manifestPayload);
+        expect(manifestText).toBe(MANIFEST_NUMBER_CONTROL_TEXTS[sign]);
+        expect([...manifestPayload].every((byte) => byte <= 0x7f)).toBe(true);
+        expect(new TextDecoder('utf-8', { fatal: true }).decode(opsPayload))
+          .toBe(MANIFEST_AMBIGUITY_OPS_TEXT);
+        expect(manifestNumberControlDeterministic[sign]).toBe(true);
+        const prefix = sign === 'positive' ? '' : '-';
+        expect(manifestText).toContain('"schemaVersion":1e0');
+        expect(manifestText).toContain(
+          `"future":{"score":${prefix}2e0,"items":[{"score":${prefix}3e0}]}`,
+        );
+
+        const parsed = JSON.parse(manifestText) as Record<string, unknown>;
+        expect(parsed.projectId).toBe(PROJECT_ID);
+        expect(manifestNumberValue(parsed, 'known')).toBe(SCHEMA_VERSION);
+        expect(manifestNumberValue(parsed, 'nested')).toBe(sign === 'positive' ? 2 : -2);
+        expect(manifestNumberValue(parsed, 'deep')).toBe(sign === 'positive' ? 3 : -3);
+        expect(countNonFiniteNumbers(parsed)).toBe(0);
+      });
+    }
 
     it('constructs raw duplicate paths in both input orders with both payloads intact', () => {
       for (const key of ['rawDuplicate', 'rawDuplicateReversed']) {
@@ -2064,6 +2354,51 @@ describe('G0 characterization: malicious ZIP envelope', () => {
     }
   });
 
+  describe('decoded non-finite manifest numbers stay outside active authority', () => {
+    const alreadySafeId: ManifestNumberId = 'manifest-number-overflow-known-negative';
+    const unsafeCases = MANIFEST_NUMBER_CASES.filter(({ id }) => id !== alreadySafeId);
+
+    it('accepts both modest finite-exponent controls through inspection, import, reopen and merge', () => {
+      expect(MANIFEST_NUMBER_SIGNS.map((sign) => manifestNumberControlRoundTrips[sign]))
+        .toEqual([true, true]);
+    });
+
+    it('initializes every sign/location case and leaves the unrelated control project byte-exact', () => {
+      expect(MANIFEST_NUMBER_CASES.map(({ id }) => manifestNumberResults[id].initialized))
+        .toEqual(MANIFEST_NUMBER_CASES.map(() => true));
+      expect(MANIFEST_NUMBER_CASES.map(({ id }) => manifestNumberResults[id].controlUnchanged))
+        .toEqual(MANIFEST_NUMBER_CASES.map(() => true));
+    });
+
+    it('already rejects negative overflow in known schemaVersion before publishing a marker', () => {
+      expect(manifestNumberResults[alreadySafeId].completionMarkerNeverPublished).toBe(true);
+    });
+
+    it('does not publish the sentinel under a completion marker for rejected negative schemaVersion', () => {
+      expect(manifestNumberResults[alreadySafeId].sentinelNeverPublishedUnderCompletionMarker)
+        .toBe(true);
+    });
+
+    it('leaves existing authority unchanged for rejected negative schemaVersion', () => {
+      expect(manifestNumberResults[alreadySafeId].existingAuthorityUnchanged).toBe(true);
+    });
+
+    for (const numberCase of unsafeCases) {
+      it.fails(`${numberCase.id}: never publishes a candidate completion marker`, () => {
+        expect(manifestNumberResults[numberCase.id].completionMarkerNeverPublished).toBe(true);
+      });
+
+      it.fails(`${numberCase.id}: never publishes the sentinel under a completion marker`, () => {
+        expect(manifestNumberResults[numberCase.id].sentinelNeverPublishedUnderCompletionMarker)
+          .toBe(true);
+      });
+
+      it.fails(`${numberCase.id}: leaves existing active authority unchanged`, () => {
+        expect(manifestNumberResults[numberCase.id].existingAuthorityUnchanged).toBe(true);
+      });
+    }
+  });
+
   describe('observable policy still deferred from this initial slice', () => {
     it.todo('reports a typed blocked/quarantined issue for mixed valid/malformed operations without depending on throw versus return');
     it.todo('reports typed encrypted, unsupported-compression, symlink, and special-mode issues');
@@ -2074,5 +2409,7 @@ describe('G0 characterization: malicious ZIP envelope', () => {
     it.todo('reports a typed blocked/quarantined manifest ambiguity, invalid-scalar or reserved-key issue without depending on throw versus return or evidence location');
     it.todo('ratifies injectable v1 JSON depth, node, field, array and string budgets instead of reusing v2 semantic ceilings');
     it.todo('defines evidence access without requiring valid astral JSON escapes to retain their original raw spelling after import');
+    it.todo('reports a typed blocked/quarantined manifest non-finite-number issue without fixing reject stage or evidence location');
+    it.todo('ratifies manifest numeric magnitude, precision, subnormal, underflow and negative-zero policy separately from finite-value rejection');
   });
 });
