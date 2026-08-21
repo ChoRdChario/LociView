@@ -203,6 +203,25 @@ Start only after G-1 passes and the product owner approves S0.
 - Three independent package, model and false-green reviews reported no unresolved P0/P1. `src/**` is unchanged
 - This remains tests-only characterization, not a transaction fix or G0-S completion. The seven todos above, malicious-package coverage, production ordering fixes, physical iPhone evidence and the broad G0/G0-S gates below remain open
 
+### G0 characterization slice 8 — malicious package envelope
+
+- [x] Build a deterministic, small ZIP-envelope corpus without adopting the unsafe 2 GiB / 1 GiB implementation defaults as product promises
+- [x] Characterize duplicate, normalized/case/Unicode-colliding, invalid-text, duplicate-manifest and future-schema inspection boundaries that current dependencies can reproduce exactly
+- [x] Prove mixed valid/invalid native import and existing-project merge either reject without mutation or remain entirely inactive, never partially activate a valid subset
+- [x] Exercise currently observable encrypted, unsupported-compression, special-entry and recursive-archive boundaries while leaving device-derived budgets and typed durable issues explicit
+- [x] Run focused/full tests, fixture/evidence verification, typecheck, build and independent false-green/security review before a separate commit
+
+### G0 characterization slice 8 review record
+
+- A tests-only fixed-date ZIP writer and raw central/local descriptor produce byte-identical small archives and freeze entry order, payloads, raw malformed UTF-8 names, Unix modes, exact duplicates and local/central filename disagreement without using production parsing as the fixture oracle
+- The corpus covers native traversal/schema/nested/encrypted/unsupported controls; duplicate raw and normalized names; both orders of duplicate manifests, platform-case and NFC/NFD collisions; malformed manifest/name UTF-8; symlink/FIFO modes; unsafe/count-bypassing directories; duplicate JSON members; an unknown higher schema; and one foreign normalized-collision route
+- Already-safe traversal, invalid schema, nested archive, encrypted and unsupported-compression rejection plus injected small entry/count/total limits are ordinary tests. Device-derived defaults and compression-ratio policy are not inferred from the unsafe current 2 GiB / 1 GiB implementation constants
+- Expected-failure rows require structural rejection during side-effect-free inspection, zero workspace mutation and no completion marker, while allowing unpublished staging in a future transaction design. Reversed-order fixtures prevent a first-wins or last-wins-only repair from passing
+- The mixed valid/malformed operation package is exercised through new-project import and existing-project merge. Merge rejection independently preserves exact raw log bytes, `allOps`, reduced state, every target file, notifications, the HLC clock and the local actor sequence
+- Five todos retain the remaining API/policy boundaries: typed archive issues, ratified compression/device budgets, declared manifest size/digest/blob closure, major/minor schema discrimination, and non-NFC/NFC-colliding metadata keys. The broader section-10 malicious media/model and deep-budget corpus remains open
+- Verification passed: 2 focused files / 132 passing tests plus 5 todos, 26 full-suite files / 686 passing tests plus 17 todos, fixture verification (10 Git entries / 704,199 bytes), zero-measurement evidence verification, typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
+- Independent false-green and security/spec reviews reported no unresolved P0/P1. `src/**` is unchanged; this is characterization, not a parser/import fix or G0-S completion
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
