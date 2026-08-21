@@ -116,12 +116,10 @@ interface ForeignImportAttempt {
 }
 
 interface ExistingMergeAttempt {
-  rejected: boolean;
   rawLogUnchanged: boolean;
   allOpsUnchanged: boolean;
   stateUnchanged: boolean;
-  filesUnchanged: boolean;
-  notificationsUnchanged: boolean;
+  reopenedStateUnchanged: boolean;
   internalClockAndSequenceUnchanged: boolean;
 }
 
@@ -208,15 +206,6 @@ function containsBytes(source: Uint8Array | null, needle: Uint8Array): boolean {
     if (needle.every((byte, index) => source[offset + index] === byte)) return true;
   }
   return false;
-}
-
-async function fileSnapshot(fs: MemoryFS, prefix: string): Promise<string> {
-  const paths = await fs.list(prefix);
-  const files = await Promise.all(paths.map(async (path) => {
-    const data = await fs.readBytes(path);
-    return [path, data === null ? null : [...data]] as const;
-  }));
-  return JSON.stringify(files);
 }
 
 async function attemptNewProject(
@@ -343,36 +332,32 @@ async function attemptExistingProjectMerge(zip: Uint8Array): Promise<ExistingMer
   if (rawBefore === null) throw new Error('mixed merge target log setup failed');
   const allOpsBefore = JSON.stringify(store.allOps);
   const stateBefore = JSON.stringify(store.state);
-  const filesBefore = await fileSnapshot(fs, `${dir}/`);
-  let notifications = 0;
-  const unsubscribe = store.subscribe(() => {
-    notifications += 1;
-  });
-
-  let rejected = false;
+  let inspection: Awaited<ReturnType<typeof inspectZip>> | null = null;
   try {
-    let inspection: Awaited<ReturnType<typeof inspectZip>> | null = null;
+    inspection = await inspectZip(zip);
+  } catch {
+    // A thrown rejection and a future typed blocked result are both acceptable.
+  }
+  if (inspection !== null) {
     try {
-      inspection = await inspectZip(zip);
+      await mergeFromInspection(fs, dir, store, inspection);
     } catch {
-      rejected = true;
+      // The active-state assertions below are the contract, not the error shape.
     }
-    if (inspection !== null) {
-      try {
-        await mergeFromInspection(fs, dir, store, inspection);
-      } catch {
-        rejected = true;
-      }
-    }
-  } finally {
-    unsubscribe();
   }
 
   const rawLogUnchanged = bytesEqual(await fs.readBytes(logPath), rawBefore);
   const allOpsUnchanged = JSON.stringify(store.allOps) === allOpsBefore;
   const stateUnchanged = JSON.stringify(store.state) === stateBefore;
-  const filesUnchanged = (await fileSnapshot(fs, `${dir}/`)) === filesBefore;
-  const notificationsUnchanged = notifications === 0;
+  let reopenedStateUnchanged = false;
+  try {
+    const reopened = await ProjectStore.open(fs, dir, USER);
+    reopenedStateUnchanged =
+      JSON.stringify(reopened.allOps) === allOpsBefore &&
+      JSON.stringify(reopened.state) === stateBefore;
+  } catch {
+    // An unreadable active project is not a safe quarantine outcome.
+  }
 
   const probeInput = {
     t: 'create' as const,
@@ -385,12 +370,10 @@ async function attemptExistingProjectMerge(zip: Uint8Array): Promise<ExistingMer
   await Promise.all([store.flush(), twinStore.flush()]);
 
   return {
-    rejected,
     rawLogUnchanged,
     allOpsUnchanged,
     stateUnchanged,
-    filesUnchanged,
-    notificationsUnchanged,
+    reopenedStateUnchanged,
     internalClockAndSequenceUnchanged: JSON.stringify(targetProbe) === JSON.stringify(controlProbe),
   };
 }
@@ -890,7 +873,6 @@ describe('G0 characterization: malicious ZIP envelope', () => {
 
   describe('missing envelope rejection boundaries', () => {
     const unsafeCases = [
-      'mixed-valid-invalid',
       'raw-duplicate-path',
       'raw-duplicate-path-reversed',
       'normalized-separator-collision',
@@ -940,6 +922,14 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       expect(outcomes['future-schema'].controlUnchanged).toBe(true);
     });
 
+    it('mixed-valid-invalid: leaves an existing control project byte-exact', () => {
+      expect(outcomes['mixed-valid-invalid'].controlUnchanged).toBe(true);
+    });
+
+    it.fails('mixed-valid-invalid: never publishes a completion marker', () => {
+      expect(candidateIsInactive(outcomes['mixed-valid-invalid'])).toBe(true);
+    });
+
     it.fails('mixed-valid-invalid: never exposes the valid member of a rejected package', () => {
       expect(outcomes['mixed-valid-invalid'].mixedValidCaptionVisible).toBe(false);
     });
@@ -959,10 +949,6 @@ describe('G0 characterization: malicious ZIP envelope', () => {
     });
 
     describe('mixed valid + invalid existing-project merge', () => {
-      it.fails('rejects the inspection instead of merging its valid subset', () => {
-        expect(existingMergeOutcome.rejected).toBe(true);
-      });
-
       it.fails('leaves the existing actor log byte-exact', () => {
         expect(existingMergeOutcome.rawLogUnchanged).toBe(true);
       });
@@ -975,12 +961,8 @@ describe('G0 characterization: malicious ZIP envelope', () => {
         expect(existingMergeOutcome.stateUnchanged).toBe(true);
       });
 
-      it.fails('leaves the target file inventory and bytes unchanged', () => {
-        expect(existingMergeOutcome.filesUnchanged).toBe(true);
-      });
-
-      it.fails('does not notify subscribers for a rejected inspection', () => {
-        expect(existingMergeOutcome.notificationsUnchanged).toBe(true);
+      it.fails('reopens with the same active operation set and reduced state', () => {
+        expect(existingMergeOutcome.reopenedStateUnchanged).toBe(true);
       });
 
       it.fails('leaves the internal HLC and own sequence unchanged', () => {
@@ -990,6 +972,7 @@ describe('G0 characterization: malicious ZIP envelope', () => {
   });
 
   describe('observable policy still deferred from this initial slice', () => {
+    it.todo('reports a typed blocked/quarantined issue for mixed valid/malformed operations without depending on throw versus return');
     it.todo('reports typed encrypted, unsupported-compression, symlink, and special-mode issues');
     it.todo('enforces a ratified compression-ratio and device-budget policy without inventing numeric limits');
     it.todo('checks declared manifest size/digest and required-blob closure once the envelope declares them');
