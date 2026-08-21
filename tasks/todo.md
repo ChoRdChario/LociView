@@ -146,6 +146,24 @@ Start only after G-1 passes and the product owner approves S0.
 - Verification passed: 2 focused files / 26 tests, 21 full-suite files / 449 passing tests plus 3 todos, fixture and zero-measurement evidence verification, typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
 - Independent core and registry reviews reported no unresolved P0/P1. Generator write mode remains a trusted local developer operation; atomic multi-output replacement is deferred as non-blocking hardening
 
+### G0 characterization slice 5 — multi-tab actor and shared append
+
+- [x] Characterize per-tab actor-instance uniqueness separately from aggregate data retention
+- [x] Run two stores through 1,000 deterministic operations each over multiple seeds and verify raw operation keys plus reopened state
+- [x] Reproduce OPFS-style lost updates when two stores append different operations for one shared external actor
+- [x] Keep setup, reopenability and already-safe invariants outside narrow one-invariant `it.fails` assertions
+- [x] Run focused/full tests, typecheck, production build and independent false-green review before commit
+
+### G0 characterization slice 5 review record
+
+- The tests separate the current deterministic same-identity actor reuse from durable retention, then exercise two stores with 1,000 fixed canonical caption operations each over two deterministic schedules
+- Every planned payload is present exactly once in raw JSONL and after reopen, while narrow `it.fails` assertions preserve the current duplicate `(actor, sequence)` keys and resulting reduced-state loss without treating the defect as fixed
+- An OPFS-style snapshot-before-write helper reproduces two different external operations racing on one actor log. A normal test also proves its timeout path remains valid if a future project-scoped lock serializes the writers
+- Setup, append attempts, exact raw payloads, parsing, reopenability and helper event counts are ordinary assertions; the 10 expected-failure test instances perform no I/O or catch and assert only already-captured outcomes
+- Verification passed: 3 focused files / 244 passing tests plus 2 todos, 22 full-suite files / 464 passing tests plus 3 todos, fixture and zero-measurement evidence verification, typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
+- Independent false-green, specification and runtime reviews reported no unresolved P0/P1. The new 15-test file was stable across six repeated runs, and `src/**` remains unchanged
+- This is a tests-only characterization slice, not G0-S completion. Browser cross-context locking/read-only fallback, simultaneous package merge/replacement, typed collision resolution and physical iPhone evidence remain open
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
