@@ -24,8 +24,8 @@ gitのマージが難しいのは、2つの完成状態から共通祖先を探�
 example.lociview (ZIP)
 ├─ lociview.json              # マニフェスト（必須・これがあればLociViewプロジェクト）
 ├─ ops/                       # 追記専用ログ群（セーブデータ本体）
-│   ├─ a_7f3k2m9q.jsonl       #   actorId ごとに1ファイル
-│   └─ a_x81p0c4d.jsonl
+│   ├─ a_7F3K2M9Q0WXYZ.jsonl  #   actorId ごとに1ファイル
+│   └─ a_X81P0C4D5E6F7.jsonl
 ├─ snapshot.json              # 任意: ログ畳み込み済みの状態キャッシュ（高速起動用）
 ├─ captions.csv               # 任意: 人間閲覧用のキャプション一覧（派生キャッシュ。正本はops。エクスポート時に自動生成）
 ├─ models/                    # 3Dモデル原本（無改変で格納）
@@ -59,31 +59,32 @@ example.lociview (ZIP)
 | `projectId` | `prj_` + ULID | プロジェクト作成時 | プロジェクト同一性。マージ判定キー |
 | `userId` | `usr_` + ULID | アプリ初回起動時に端末で自己発行 | 編集者の恒久ID。表示名・ピン既定色と紐づく |
 | `deviceId` | `dev_` + ULID | 端末×ブラウザごとに発行 | 同一ユーザーの複数端末を区別 |
-| `actorId` | `a_` + hash(userId, deviceId) 短縮 | 導出 | op-logファイル名。「この筆の主」 |
+| `actorId` | `a_` + 13文字 Crockford Base32 | `ProjectStore`開始時にCSPRNGで自己発行 | op-logファイル名。このwriter instanceを識別 |
 | `captionId` 等 entityId | `cap_` / `view_` / `ast_` + ULID | エンティティ作成時 | エンティティの恒久ID |
 | `opId` | `(actorId, seq)` の組 | 操作ごと | 操作の一意性。seqはactor内で単調増加する整数 |
 
 - ULIDは128bit・時刻順ソート可能・衝突確率は実用上ゼロ。サーバなしの自己発行で成立する
-- **actorIdをファイル名にする**ことで「1ファイル1書き手」を強制し、和集合マージを保証する
+- local dispatchは、各`ProjectStore`がstore lifetime中固定した固有actorのファイルだけへ書く。同じuser/deviceでも別storeは別actorとなり、独立したseqが同じopIdを自己発行しない
+- package mergeはimport元actorを保持してそのactorのログへ追記するため、shared-pathのcross-context lockは別途必要であり、session actorだけで多タブ安全全体が完了するわけではない
 - userIdは認証ではなく「署名欄」。なりすまし防止は目的にしない（信頼できる仲間内での統合が前提。非目標参照）
 
 ## 4. op-log 仕様
 
 ### 4.1 ファイル形式
 
-`ops/<actorId>.jsonl` — 1行1操作のJSON Lines。**自分のactorIdのファイルにしか書かない。既存行は絶対に書き換えない。**
+`ops/<actorId>.jsonl` — 1行1操作のJSON Lines。local dispatchは**現在のstore actorのファイルだけ**へ追記する。import/mergeは操作に記録済みのactorを保持する。既存行は絶対に書き換えない。
 
 ```jsonl
-{"op":1,"hlc":"2026-07-16T09:12:33.120Z-0003-a_7f3k2m9q","actor":"a_7f3k2m9q","user":"usr_01J8...","t":"create","e":"caption","id":"cap_01J8XR5T...","v":{"title":"北壁の亀裂","body":"","color":"#eab308","anchor":{...}}}
-{"op":2,"hlc":"2026-07-16T09:13:05.876Z-0000-a_7f3k2m9q","actor":"a_7f3k2m9q","user":"usr_01J8...","t":"update","e":"caption","id":"cap_01J8XR5T...","v":{"body":"幅約3mm、上方へ伸長"}}
-{"op":3,"hlc":"2026-07-16T09:20:11.002Z-0000-a_7f3k2m9q","actor":"a_7f3k2m9q","user":"usr_01J8...","t":"delete","e":"caption","id":"cap_01J8XQAA..."}
+{"op":1,"hlc":"2026-07-16T09:12:33.120Z-0003-a_7F3K2M9Q0WXYZ","actor":"a_7F3K2M9Q0WXYZ","user":"usr_01J8...","t":"create","e":"caption","id":"cap_01J8XR5T...","v":{"title":"北壁の亀裂","body":"","color":"#eab308","anchor":{...}}}
+{"op":2,"hlc":"2026-07-16T09:13:05.876Z-0000-a_7F3K2M9Q0WXYZ","actor":"a_7F3K2M9Q0WXYZ","user":"usr_01J8...","t":"update","e":"caption","id":"cap_01J8XR5T...","v":{"body":"幅約3mm、上方へ伸長"}}
+{"op":3,"hlc":"2026-07-16T09:20:11.002Z-0000-a_7F3K2M9Q0WXYZ","actor":"a_7F3K2M9Q0WXYZ","user":"usr_01J8...","t":"delete","e":"caption","id":"cap_01J8XQAA..."}
 ```
 
 | フィールド | 内容 |
 |---|---|
 | `op` | actor内シーケンス番号（1始まり単調増加）。`(actor, op)` が opId |
 | `hlc` | Hybrid Logical Clock（後述）。全操作の全順序を決める |
-| `actor` / `user` | 書き手。userは表示・集計用 |
+| `actor` / `user` | actorはwriter instance、userは恒久的な表示・集計上の帰属 |
 | `t` | 操作種別: `create` / `update` / `delete` |
 | `e` | エンティティ種別: `set` / `caption` / `view` / `material` / `asset` / `meta` / `profile` |
 | `id` | 対象エンティティID |

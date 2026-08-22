@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { importNewProject, inspectZip, mergeFromInspection } from '../../src/assets/package';
 import { applyImportPlan, buildImportPlan } from '../../src/assets/importWizard';
@@ -6,9 +7,12 @@ import {
   ZipGuardError,
   type ZipLimits,
 } from '../../src/assets/zipio';
+import { parseHlc } from '../../src/core/hlc';
+import { parseOpsJsonl } from '../../src/core/jsonl';
 import { SCHEMA_VERSION } from '../../src/core/manifest';
 import { actorIdFrom } from '../../src/core/ids';
-import { visibleEntities } from '../../src/core/reduce';
+import { reduce, versionVector, visibleEntities } from '../../src/core/reduce';
+import type { Op } from '../../src/core/schema';
 import { ProjectStore, type Identity } from '../../src/core/store';
 import { MemoryFS } from '../../src/platform/fs';
 import {
@@ -163,6 +167,9 @@ interface ForeignImportAttempt {
 }
 
 interface ExistingMergeAttempt {
+  ownActorMixedInputExact: boolean;
+  ownActorIngressDispositionExact: boolean;
+  explicitlyRejected: boolean;
   rawLogUnchanged: boolean;
   allOpsUnchanged: boolean;
   stateUnchanged: boolean;
@@ -277,34 +284,80 @@ function invalidUtf8ManifestBytes(): Uint8Array {
   return replaceBytesOnce(valid, encoder.encode(marker), new Uint8Array([0xc3, 0x28]));
 }
 
-function validMixedOpLine(): string {
-  return JSON.stringify({
+function validMixedOp(actor: string = MIXED_ACTOR): Op {
+  return {
     op: 2,
-    hlc: `2099-01-02T03:04:05.000Z-0000-${MIXED_ACTOR}`,
-    actor: MIXED_ACTOR,
+    hlc: `2099-01-02T03:04:05.000Z-0000-${actor}`,
+    actor,
     user: MIXED_USER_ID,
     t: 'create',
     e: 'caption',
     id: MIXED_CAPTION_ID,
     v: { title: 'valid member must not activate alone' },
-  });
+  };
 }
 
-function baseTargetOpLine(): string {
-  return JSON.stringify({
+function validMixedOpLine(actor: string = MIXED_ACTOR): string {
+  return JSON.stringify(validMixedOp(actor));
+}
+
+function baseTargetOp(actor: string = MIXED_ACTOR): Op {
+  return {
     op: 1,
-    hlc: `2098-01-02T03:04:04.000Z-0000-${MIXED_ACTOR}`,
-    actor: MIXED_ACTOR,
+    hlc: `2098-01-02T03:04:04.000Z-0000-${actor}`,
+    actor,
     user: MIXED_USER_ID,
     t: 'create',
     e: 'caption',
     id: BASE_CAPTION_ID,
     v: { title: 'existing target member' },
-  });
+  };
 }
 
-function mixedOpsWireText(): string {
-  return `${baseTargetOpLine()}\n${validMixedOpLine()}\n{"op":\n`;
+function baseTargetOpLine(actor: string = MIXED_ACTOR): string {
+  return JSON.stringify(baseTargetOp(actor));
+}
+
+function mixedOpsWireText(actor: string = MIXED_ACTOR): string {
+  return `${baseTargetOpLine(actor)}\n${validMixedOpLine(actor)}\n{"op":\n`;
+}
+
+async function mixedPackageForActor(actor: string): Promise<Uint8Array> {
+  return writeDirectZip([
+    { path: 'lociview.json', data: manifestBytes() },
+    { path: `ops/${actor}.jsonl`, data: encoder.encode(mixedOpsWireText(actor)) },
+    { path: MIXED_BINARY_PATH, data: encoder.encode('valid binary member of mixed package') },
+  ]);
+}
+
+function mixedInspectionMatchesActor(
+  inspection: Awaited<ReturnType<typeof inspectZip>>,
+  actor: string,
+): boolean {
+  try {
+    return (
+      inspection.kind === 'lociview' &&
+      inspection.manifest?.projectId === PROJECT_ID &&
+      inspection.opsErrorCount === 1 &&
+      inspection.opsFiles.length === 1 &&
+      inspection.opsFiles[0]?.path === `ops/${actor}.jsonl` &&
+      inspection.opsFiles[0].text === mixedOpsWireText(actor) &&
+      JSON.stringify(inspection.ops) === JSON.stringify([
+        baseTargetOp(actor),
+        validMixedOp(actor),
+      ]) &&
+      inspection.ops.every((op) => op.actor === actor && parseHlc(op.hlc).actor === actor) &&
+      inspection.binaries.length === 1 &&
+      inspection.binaries[0]?.path === MIXED_BINARY_PATH &&
+      bytesEqual(
+        inspection.binaries[0].data,
+        encoder.encode('valid binary member of mixed package'),
+      ) &&
+      inspection.others.length === 0
+    );
+  } catch {
+    return false;
+  }
 }
 
 function containsBytes(source: Uint8Array | null, needle: Uint8Array): boolean {
@@ -822,19 +875,101 @@ async function activeManifestAndLogSnapshot(fs: MemoryFS, dir: string): Promise<
   return JSON.stringify(entries);
 }
 
-async function attemptExistingProjectMerge(zip: Uint8Array): Promise<ExistingMergeAttempt> {
+async function postProbeAuthorityIsExact(
+  fs: MemoryFS,
+  dir: string,
+  store: ProjectStore,
+  expectedOps: readonly Op[],
+): Promise<boolean> {
+  const expectedLogPath = `${dir}/ops/${store.actorId}.jsonl`;
+  const activeLogPaths = (await fs.list(`${dir}/ops/`))
+    .filter((path) => path.endsWith('.jsonl'))
+    .sort();
+  const logText = await fs.readText(expectedLogPath);
+  const marker = await fs.readBytes(`${dir}/lociview.json`);
+  if (
+    activeLogPaths.length !== 1 ||
+    activeLogPaths[0] !== expectedLogPath ||
+    logText === null ||
+    !bytesEqual(marker, manifestBytes())
+  ) {
+    return false;
+  }
+
+  const parsed = parseOpsJsonl(logText);
+  if (parsed.errors.length > 0 || !isDeepStrictEqual(parsed.ops, expectedOps)) return false;
+
+  let reopened: ProjectStore;
+  try {
+    reopened = await ProjectStore.open(fs, dir, USER);
+  } catch {
+    return false;
+  }
+  const expectedState = reduce(expectedOps);
+  const expectedVector = versionVector(expectedOps);
+  return (
+    store.loadErrors.length === 0 &&
+    reopened.loadErrors.length === 0 &&
+    isDeepStrictEqual(store.allOps, expectedOps) &&
+    isDeepStrictEqual(store.state, expectedState) &&
+    isDeepStrictEqual(store.vector, expectedVector) &&
+    isDeepStrictEqual(reopened.allOps, expectedOps) &&
+    isDeepStrictEqual(reopened.state, expectedState) &&
+    isDeepStrictEqual(reopened.vector, expectedVector)
+  );
+}
+
+async function attemptExistingProjectMerge(
+  zip: Uint8Array,
+  bindMixedInputToStoreActor = false,
+): Promise<ExistingMergeAttempt> {
   const fs = new CountingMemoryFS();
   const twinFs = new MemoryFS();
   const dir = 'projects/malicious-existing-merge';
   const twinDir = 'projects/malicious-existing-merge-control';
-  const logPath = `${dir}/ops/${MIXED_ACTOR}.jsonl`;
-  const twinLogPath = `${twinDir}/ops/${MIXED_ACTOR}.jsonl`;
   await fs.writeBytes(`${dir}/lociview.json`, manifestBytes());
-  await fs.writeText(logPath, `${baseTargetOpLine()}\n`);
   await twinFs.writeBytes(`${twinDir}/lociview.json`, manifestBytes());
-  await twinFs.writeText(twinLogPath, `${baseTargetOpLine()}\n`);
   const store = await ProjectStore.open(fs, dir, USER);
   const twinStore = await ProjectStore.open(twinFs, twinDir, USER);
+  const targetBaseline = baseTargetOp(store.actorId);
+  const twinBaseline = baseTargetOp(twinStore.actorId);
+  store.mergeExternal([targetBaseline]);
+  twinStore.mergeExternal([twinBaseline]);
+  await Promise.all([store.flush(), twinStore.flush()]);
+  const logPath = `${dir}/ops/${store.actorId}.jsonl`;
+  const actionZip = bindMixedInputToStoreActor
+    ? await mixedPackageForActor(store.actorId)
+    : zip;
+  let ownActorMixedInputExact = !bindMixedInputToStoreActor;
+  if (bindMixedInputToStoreActor) {
+    const rawEntries = await rawZipEntryShapes(actionZip);
+    const rawByPath = new Map(rawEntries.map((entry) => [entry.filename, entry]));
+    const operationsEntry = rawByPath.get(`ops/${store.actorId}.jsonl`);
+    const operationsText = operationsEntry?.payload === null || operationsEntry?.payload === undefined
+      ? null
+      : new TextDecoder('utf-8', { fatal: true }).decode(operationsEntry.payload);
+    const lines = operationsText?.trimEnd().split('\n') ?? [];
+    let malformedTailRejected = false;
+    try {
+      JSON.parse(lines[2] ?? '');
+    } catch {
+      malformedTailRejected = true;
+    }
+    ownActorMixedInputExact =
+      rawEntries.length === 3 &&
+      rawByPath.size === 3 &&
+      rawEntries.every((entry) => !entry.directory && entry.payload !== null) &&
+      bytesEqual(rawByPath.get('lociview.json')?.payload ?? null, manifestBytes()) &&
+      operationsText === mixedOpsWireText(store.actorId) &&
+      bytesEqual(
+        rawByPath.get(MIXED_BINARY_PATH)?.payload ?? null,
+        encoder.encode('valid binary member of mixed package'),
+      ) &&
+      lines.length === 3 &&
+      JSON.stringify(JSON.parse(lines[0]!)) === JSON.stringify(baseTargetOp(store.actorId)) &&
+      JSON.stringify(JSON.parse(lines[1]!)) === JSON.stringify(validMixedOp(store.actorId)) &&
+      malformedTailRejected;
+  }
 
   const rawBefore = await fs.readBytes(logPath);
   if (rawBefore === null) throw new Error('mixed merge target log setup failed');
@@ -845,15 +980,19 @@ async function attemptExistingProjectMerge(zip: Uint8Array): Promise<ExistingMer
   const unsubscribe = store.subscribe((state) => publishedStates.push(JSON.stringify(state)));
   fs.resetMutationCalls();
   let inspection: Awaited<ReturnType<typeof inspectZip>> | null = null;
+  let inspectionRejected = false;
   try {
-    inspection = await inspectZip(zip);
+    inspection = await inspectZip(actionZip);
   } catch {
+    inspectionRejected = true;
     // A thrown rejection and a future typed blocked result are both acceptable.
   }
+  let mergeRejected = false;
   if (inspection !== null) {
     try {
       await mergeFromInspection(fs, dir, store, inspection);
     } catch {
+      mergeRejected = true;
       // The active-state assertions below are the contract, not the error shape.
     }
   }
@@ -894,10 +1033,60 @@ async function attemptExistingProjectMerge(zip: Uint8Array): Promise<ExistingMer
     now.mockRestore();
   }
   await Promise.all([store.flush(), twinStore.flush()]);
-  const internalClockAndSequenceUnchanged =
-    JSON.stringify(targetProbe) === JSON.stringify(controlProbe);
+  let internalClockAndSequenceUnchanged = false;
+  try {
+    const targetHlc = parseHlc(targetProbe.hlc);
+    const controlHlc = parseHlc(controlProbe.hlc);
+    const expectedPayload = {
+      user: USER.userId,
+      t: probeInput.t,
+      e: probeInput.e,
+      id: probeInput.id,
+      v: probeInput.v,
+    };
+    const targetPayload = {
+      user: targetProbe.user,
+      t: targetProbe.t,
+      e: targetProbe.e,
+      id: targetProbe.id,
+      v: targetProbe.v,
+    };
+    const controlPayload = {
+      user: controlProbe.user,
+      t: controlProbe.t,
+      e: controlProbe.e,
+      id: controlProbe.id,
+      v: controlProbe.v,
+    };
+    internalClockAndSequenceUnchanged =
+      targetProbe.actor === store.actorId &&
+      controlProbe.actor === twinStore.actorId &&
+      targetHlc.actor === store.actorId &&
+      controlHlc.actor === twinStore.actorId &&
+      targetProbe.op === controlProbe.op &&
+      targetHlc.physical === controlHlc.physical &&
+      targetHlc.counter === controlHlc.counter &&
+      JSON.stringify(targetPayload) === JSON.stringify(expectedPayload) &&
+      JSON.stringify(controlPayload) === JSON.stringify(expectedPayload) &&
+      await postProbeAuthorityIsExact(fs, dir, store, [targetBaseline, targetProbe]) &&
+      await postProbeAuthorityIsExact(
+        twinFs,
+        twinDir,
+        twinStore,
+        [twinBaseline, controlProbe],
+      );
+  } catch {
+    // A malformed or unbound probe HLC is not an unchanged internal clock.
+  }
 
   return {
+    ownActorMixedInputExact,
+    ownActorIngressDispositionExact:
+      !bindMixedInputToStoreActor ||
+      inspectionRejected ||
+      mergeRejected ||
+      (inspection !== null && mixedInspectionMatchesActor(inspection, store.actorId)),
+    explicitlyRejected: inspectionRejected || mergeRejected,
     rawLogUnchanged,
     allOpsUnchanged,
     stateUnchanged,
@@ -1503,7 +1692,7 @@ describe('G0 characterization: malicious ZIP envelope', () => {
           localCentralMismatchZip,
         ),
       };
-      existingMergeOutcome = await attemptExistingProjectMerge(mixedZip);
+      existingMergeOutcome = await attemptExistingProjectMerge(mixedZip, true);
       foreignCollisionOutcome = await attemptForeignNormalizedCollision(
         foreignNormalizedCollisionZip,
       );
@@ -2244,6 +2433,16 @@ describe('G0 characterization: malicious ZIP envelope', () => {
     });
 
     describe('mixed valid + invalid existing-project merge', () => {
+      it('binds the raw valid op1/op2 members to the actual target store actor before the merge attempt', () => {
+        expect({
+          rawInputExact: existingMergeOutcome.ownActorMixedInputExact,
+          ingressDispositionExact: existingMergeOutcome.ownActorIngressDispositionExact,
+        }).toEqual({
+          rawInputExact: true,
+          ingressDispositionExact: true,
+        });
+      });
+
       it.fails('leaves the existing actor log byte-exact', () => {
         expect(existingMergeOutcome.rawLogUnchanged).toBe(true);
       });
@@ -2260,8 +2459,11 @@ describe('G0 characterization: malicious ZIP envelope', () => {
         expect(existingMergeOutcome.reopenedStateUnchanged).toBe(true);
       });
 
-      it.fails('leaves the internal HLC and own sequence unchanged', () => {
-        expect(existingMergeOutcome.internalClockAndSequenceUnchanged).toBe(true);
+      it.fails('explicitly rejects without advancing the internal HLC or own sequence', () => {
+        expect(
+          existingMergeOutcome.explicitlyRejected &&
+          existingMergeOutcome.internalClockAndSequenceUnchanged,
+        ).toBe(true);
       });
     });
   });

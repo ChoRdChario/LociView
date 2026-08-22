@@ -92,7 +92,7 @@ G0-S protects current users and MUST ship before GS feature work. It is not a v2
 
 ### 3.1 Multi-tab actor/sequence and append safety
 
-Current tabs can share an actor and initialize the same next sequence; deduplication can silently keep one of two different operations. OPFS append also lacks a cross-tab atomic boundary.
+Before the per-store actor fix, tabs could share an actor and initialize the same next sequence, so deduplication could silently keep one of two different operations. Each live `ProjectStore` now self-issues a distinct actor, but imported/shared actor logs and OPFS append still lack a cross-tab atomic boundary.
 
 Required behavior:
 

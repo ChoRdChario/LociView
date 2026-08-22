@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { importNewProject, inspectZip, mergeFromInspection } from '../../src/assets/package';
+import { parseHlc } from '../../src/core/hlc';
 import { MAX_LINE_CHARS, parseOpsJsonl, serializeOps } from '../../src/core/jsonl';
 import { actorIdFrom } from '../../src/core/ids';
 import { MANIFEST_FORMAT, SCHEMA_VERSION } from '../../src/core/manifest';
@@ -163,6 +164,47 @@ function hasActiveAuthorityMutation(fs: RecordingMemoryFS): boolean {
   return fs.mutations.some(({ path }) =>
     path === manifestPath || (path.startsWith(opsPrefix) && path.endsWith('.jsonl')),
   );
+}
+
+async function activeLogInventory(fs: MemoryFS): Promise<Map<string, number[]>> {
+  const inventory = new Map<string, number[]>();
+  const paths = (await fs.list(`${PROJECT_DIR}/ops/`))
+    .filter((path) => path.endsWith('.jsonl'))
+    .sort();
+  for (const path of paths) {
+    const bytes = await fs.readBytes(path);
+    if (bytes === null) throw new Error(`listed active log disappeared: ${path}`);
+    inventory.set(path, Array.from(bytes));
+  }
+  return inventory;
+}
+
+function actorBoundProbesEquivalent(
+  target: Op | null,
+  targetActor: string,
+  twin: Op | null,
+  twinActor: string,
+): boolean {
+  if (target === null || twin === null) return false;
+  let targetHlc: ReturnType<typeof parseHlc>;
+  let twinHlc: ReturnType<typeof parseHlc>;
+  try {
+    targetHlc = parseHlc(target.hlc);
+    twinHlc = parseHlc(twin.hlc);
+  } catch {
+    return false;
+  }
+  return target.actor === targetActor && targetHlc.actor === targetActor &&
+    twin.actor === twinActor && twinHlc.actor === twinActor &&
+    targetActor !== twinActor &&
+    target.op === twin.op &&
+    targetHlc.physical === twinHlc.physical &&
+    targetHlc.counter === twinHlc.counter &&
+    target.user === twin.user &&
+    target.t === twin.t &&
+    target.e === twin.e &&
+    target.id === twin.id &&
+    isDeepStrictEqual(target.v, twin.v);
 }
 
 function invalidOpWithValue(value: Record<string, unknown>): Op {
@@ -341,9 +383,9 @@ async function characterizeLocal(fixture: BudgetCase): Promise<LocalOutcome> {
     const target = await ProjectStore.open(targetFs, PROJECT_DIR, USER);
     const twin = await ProjectStore.open(twinFs, PROJECT_DIR, USER);
     const intendedLocalOp: Op = {
-      op: 2,
-      hlc: `${FIXED_ISO}-0001-${ACTOR}`,
-      actor: ACTOR,
+      op: 1,
+      hlc: `${FIXED_ISO}-0001-${target.actorId}`,
+      actor: target.actorId,
       user: USER.userId,
       ...fixture.dispatchInput,
     };
@@ -365,9 +407,11 @@ async function characterizeLocal(fixture: BudgetCase): Promise<LocalOutcome> {
         Object.keys(intendedLocalOp).sort(),
         ['actor', 'e', 'hlc', 'id', 'op', 't', 'user', 'v'],
       ),
-      opExact: intendedLocalOp.op === 2,
-      hlcExact: intendedLocalOp.hlc === `${FIXED_ISO}-0001-${ACTOR}`,
-      actorExact: intendedLocalOp.actor === ACTOR,
+      opExact: intendedLocalOp.op === 1,
+      hlcExact: intendedLocalOp.hlc === `${FIXED_ISO}-0001-${target.actorId}`,
+      actorExact:
+        intendedLocalOp.actor === target.actorId &&
+        /^a_[0-9A-HJKMNP-TV-Z]{13}$/u.test(target.actorId),
       userExact: intendedLocalOp.user === USER.userId,
       tExact: intendedLocalOp.t === 'create',
       eExact: intendedLocalOp.e === 'caption',
@@ -379,7 +423,7 @@ async function characterizeLocal(fixture: BudgetCase): Promise<LocalOutcome> {
         v: fixture.op.v,
       }),
       sourceExact: fixture.sourceLog === `${BASE_LINE}\n${fixture.wire}\n`,
-      serializedSemanticExact: isDeepStrictEqual(serializedLocalValue, fixture.op),
+      serializedSemanticExact: isDeepStrictEqual(serializedLocalValue, intendedLocalOp),
       serializedPhysicalBudgetExact:
         serializedLocal === `${serializedLocalLine}\n` &&
         !serializedLocalLine.includes('\n') &&
@@ -399,6 +443,7 @@ async function characterizeLocal(fixture: BudgetCase): Promise<LocalOutcome> {
       target.loadErrors.length === 0 && twin.loadErrors.length === 0 &&
       await targetFs.readText(LOG_PATH) === BASE_LOG &&
       await twinFs.readText(LOG_PATH) === BASE_LOG;
+    const targetLogsBefore = await activeLogInventory(targetFs);
 
     let listenerCalls = 0;
     const unsubscribe = target.subscribe(() => {
@@ -425,8 +470,8 @@ async function characterizeLocal(fixture: BudgetCase): Promise<LocalOutcome> {
       isDeepStrictEqual(target.state, BASE_STATE) &&
       listenerCalls === 0;
     const activeLogMutationZeroAndByteExact =
-      targetFs.mutationCountAt(LOG_PATH) === 0 &&
-      bytesEqual(await targetFs.readBytes(LOG_PATH), encoder.encode(BASE_LOG));
+      !hasActiveAuthorityMutation(targetFs) &&
+      isDeepStrictEqual(await activeLogInventory(targetFs), targetLogsBefore);
 
     const targetReopened = await openOrNull(targetFs);
     const twinReopened = await openOrNull(twinFs);
@@ -477,8 +522,12 @@ async function characterizeLocal(fixture: BudgetCase): Promise<LocalOutcome> {
     const nextOperationTwinEqual =
       targetProbeDispatched && twinProbeDispatched &&
       targetProbeFlushed && twinProbeFlushed &&
-      targetProbe !== null && twinProbe !== null &&
-      isDeepStrictEqual(targetProbe, twinProbe);
+      actorBoundProbesEquivalent(
+        targetProbe,
+        target.actorId,
+        twinProbe,
+        twin.actorId,
+      );
 
     return {
       initialized,
@@ -507,23 +556,35 @@ async function modestValidDispatchRoundTrips(): Promise<boolean> {
       v: { title: 'modest valid dispatch' },
     };
     const expected: Op = {
-      op: 2,
-      hlc: `${FIXED_ISO}-0001-${ACTOR}`,
-      actor: ACTOR,
+      op: 1,
+      hlc: `${FIXED_ISO}-0001-${store.actorId}`,
+      actor: store.actorId,
       user: USER.userId,
       ...input,
     };
     const actual = store.dispatch(input);
     await store.flush();
     const reopened = await ProjectStore.open(fs, PROJECT_DIR, USER);
-    const rawLog = await fs.readText(LOG_PATH);
-    const parsedLog = rawLog === null ? null : parseOpsJsonl(rawLog);
+    const localLogPath = `${PROJECT_DIR}/ops/${store.actorId}.jsonl`;
+    const baselineLog = await fs.readText(LOG_PATH);
+    const localLog = await fs.readText(localLogPath);
+    const parsedBaseline = baselineLog === null ? null : parseOpsJsonl(baselineLog);
+    const parsedLocal = localLog === null ? null : parseOpsJsonl(localLog);
+    const reopenedHasExactOps =
+      reopened.allOps.length === 2 &&
+      reopened.allOps.some((op) => isDeepStrictEqual(op, BASE_OP)) &&
+      reopened.allOps.some((op) => isDeepStrictEqual(op, expected));
     return (
       isDeepStrictEqual(actual, expected) &&
-      rawLog !== null && rawLog.startsWith(BASE_LOG) && rawLog.endsWith('\n') &&
-      parsedLog !== null && parsedLog.errors.length === 0 &&
-      isDeepStrictEqual(parsedLog.ops, [BASE_OP, expected]) &&
-      isDeepStrictEqual(reopened.allOps, [BASE_OP, expected]) &&
+      store.actorId !== ACTOR &&
+      /^a_[0-9A-HJKMNP-TV-Z]{13}$/u.test(store.actorId) &&
+      isDeepStrictEqual((await fs.list(`${PROJECT_DIR}/ops/`)).sort(), [LOG_PATH, localLogPath].sort()) &&
+      baselineLog === BASE_LOG && localLog === serializeOps([expected]) &&
+      parsedBaseline !== null && parsedBaseline.errors.length === 0 &&
+      isDeepStrictEqual(parsedBaseline.ops, [BASE_OP]) &&
+      parsedLocal !== null && parsedLocal.errors.length === 0 &&
+      isDeepStrictEqual(parsedLocal.ops, [expected]) &&
+      reopenedHasExactOps &&
       isDeepStrictEqual(reopened.state, reduce([BASE_OP, expected])) &&
       reopened.loadErrors.length === 0
     );

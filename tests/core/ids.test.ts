@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { actorIdFrom, newId, ulid } from '../../src/core/ids';
+import { actorIdFrom, newActorId, newId, ulid } from '../../src/core/ids';
 
 describe('ulid', () => {
   it('26文字のCrockford Base32を生成する', () => {
@@ -41,5 +41,13 @@ describe('actorIdFrom', () => {
     const c = actorIdFrom('usr_DEF', 'dev_XYZ');
     expect(a).not.toBe(b);
     expect(a).not.toBe(c);
+  });
+});
+
+describe('newActorId', () => {
+  it('ProjectStore lifetime用のcanonical actorをCSPRNGで自己発行する', () => {
+    const actors = Array.from({ length: 128 }, () => newActorId());
+    expect(actors.every((actor) => /^a_[0-9ABCDEFGHJKMNPQRSTVWXYZ]{13}$/u.test(actor))).toBe(true);
+    expect(new Set(actors).size).toBe(actors.length);
   });
 });

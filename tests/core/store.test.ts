@@ -42,7 +42,7 @@ describe('ProjectStore 基本フロー', () => {
     expect(store2.loadErrors).toHaveLength(0);
   });
 
-  it('再オープン後もseqが継続し、opIdが重複しない', async () => {
+  it('再オープン後は新しいactor内seqを開始し、既存opIdと重複しない', async () => {
     const fs = new MemoryFS();
     const store1 = await ProjectStore.create(fs, 'projects/p1', 'p', USER_A);
     store1.createEntity('caption', { title: 'x' });
@@ -51,7 +51,20 @@ describe('ProjectStore 基本フロー', () => {
 
     const store2 = await ProjectStore.open(fs, 'projects/p1', USER_A);
     const op = store2.dispatch({ t: 'create', e: 'caption', id: 'cap_NEW', v: { title: 'y' } });
-    expect(op.op).toBe(maxSeq1 + 1);
+    await store2.flush();
+    const reopened = await ProjectStore.open(fs, 'projects/p1', USER_A);
+    const operationKeys = reopened.allOps.map((candidate) => `${candidate.actor}#${candidate.op}`);
+    expect(store2.actorId).not.toBe(store1.actorId);
+    expect(op).toMatchObject({ actor: store2.actorId, op: 1 });
+    expect(op.hlc.endsWith(`-${store2.actorId}`)).toBe(true);
+    expect(reopened.vector[store1.actorId]).toBe(maxSeq1);
+    expect(reopened.vector[store2.actorId]).toBe(1);
+    expect(new Set(operationKeys).size).toBe(operationKeys.length);
+    expect(reopened.allOps).toContainEqual(op);
+    expect((await fs.list('projects/p1/ops/')).sort()).toEqual([
+      `projects/p1/ops/${store1.actorId}.jsonl`,
+      `projects/p1/ops/${store2.actorId}.jsonl`,
+    ].sort());
   });
 
   it('subscribe → dispatchごとに通知される', async () => {
@@ -145,26 +158,32 @@ describe('G0-S characterization: actor/sequence と durable write queue', () => 
   describe('G0S-TAB precondition', () => {
     let captionIds: string[];
     let expectedIds: string[];
+    let bothTabsDurable: boolean;
 
     beforeAll(async () => {
-    const fs = new MemoryFS();
-    await ProjectStore.create(fs, 'projects/tabs', 'tabs', USER_A);
+      const fs = new MemoryFS();
+      await ProjectStore.create(fs, 'projects/tabs', 'tabs', USER_A);
+      const [tabA, tabB] = await Promise.all([
+        ProjectStore.open(fs, 'projects/tabs', USER_A),
+        ProjectStore.open(fs, 'projects/tabs', USER_A),
+      ]);
+      const capA = tabA.createEntity('caption', { title: 'tab A' });
+      const capB = tabB.createEntity('caption', { title: 'tab B' });
+      const outcomes = await Promise.allSettled([tabA.flush(), tabB.flush()]);
+      bothTabsDurable =
+        outcomes.every((outcome) => outcome.status === 'fulfilled') &&
+        [tabA, tabB].every(
+          (store) => store.durabilityStatus.phase === 'durable' && store.durabilityStatus.pending === 0,
+        );
 
-    const [tabA, tabB] = await Promise.all([
-      ProjectStore.open(fs, 'projects/tabs', USER_A),
-      ProjectStore.open(fs, 'projects/tabs', USER_A),
-    ]);
-    const capA = tabA.createEntity('caption', { title: 'tab A' });
-    const capB = tabB.createEntity('caption', { title: 'tab B' });
-    await Promise.allSettled([tabA.flush(), tabB.flush()]);
-
-    const reopened = await ProjectStore.open(fs, 'projects/tabs', USER_A);
-      captionIds = visibleEntities(reopened.state, 'caption').map((record) => record.id);
-      expectedIds = [capA, capB];
+      const reopened = await ProjectStore.open(fs, 'projects/tabs', USER_A);
+      captionIds = visibleEntities(reopened.state, 'caption').map((record) => record.id).sort();
+      expectedIds = [capA, capB].sort();
     });
 
-    it.fails('G0S-TAB: 同一identityで同時に開いた2 storeの異なる操作がreload後も両方残る', () => {
-      expect(captionIds).toEqual(expect.arrayContaining(expectedIds));
+    it('G0S-TAB: 同一identityで同時に開いた2 storeの異なる操作がreload後も両方残る', () => {
+      expect(bothTabsDurable).toBe(true);
+      expect(captionIds).toEqual(expectedIds);
     });
   });
 

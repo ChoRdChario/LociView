@@ -485,6 +485,32 @@ Review record:
 - Verification passed as part of the same 8-file / 213-pass integration run and 31-file / 1,004-pass full suite, with the same fixture, evidence, typecheck and 95-module production-build results recorded above
 - Typed collision evidence, declared digests for ops-only identity, unknown future reference fields, locking, actor-log atomic recovery, new-project/wizard/caption marker-last parity, cleanup/GC, streaming/device budgets and crash/power-loss durability remain open; this is not full G0-S completion
 
+### G0 stabilization slice 23 — unique actor per ProjectStore lifetime
+
+- [x] Replace the deterministic user/device actor used by `ProjectStore` with one canonical CSPRNG actor fixed for that store lifetime
+- [x] Keep operation actor, HLC suffix and active JSONL filename bound to the same session actor while retaining read compatibility with every existing actor log
+- [x] Promote only the existing distinct-actor, two-seed 2 x 1,000 exact-operation and same-identity simultaneous-store expectations that this root fix satisfies
+- [x] Require both healthy lanes to fulfill durably with all 2,000 exact raw/reopened operations and visible entities; do not accept fail-closed rejection as completion evidence
+- [x] Adapt deterministic actor assumptions in exact publication fixtures to observed canonical actors without weakening manifest, operation, log-inventory or blob authority checks
+- [x] Keep shared-external-actor append serialization, package/replacement transaction locking, `navigator.locks`, lock-unavailable read-only mode and physical-iOS evidence explicitly open
+- [x] Run focused/full verification and independent implementation/false-green review, then record a short gate/churn meta-audit before choosing another slice
+
+### G0 stabilization slice 23 review record
+
+- Added a canonical 65-bit CSPRNG actor generator and made each live `ProjectStore` issue one actor for its lifetime. Local operation actor, HLC suffix and active JSONL filename remain bound, while reopening reads every legacy actor log and starts a fresh local writer actor
+- Promoted five static expected-failure declarations, expanding to eight runtime cases: distinct simultaneous-store actors, two seeds times raw/reopened/visible exact 2,000-operation stress checks, and the same-identity simultaneous-store smoke. Healthy lanes must fulfill with durable zero-pending status; fail-closed rejection is not counted as completion
+- Rebound wizard, package-publication, malicious-ingress and operation-budget fixtures to each observed store actor. Native package bytes, semantic operation multisets, manifest/state/vector, exact active-log inventory and referenced blobs remain checked rather than weakening authority to accommodate random actors
+- The malicious own-actor case independently proves its raw ZIP shape and permits explicit inspection or merge rejection. A post-rejection probe now verifies each side's marker, sole actor log, exact semantic `[baseline, probe]` raw operations and live/reopened state/vector, so a delayed malicious append cannot hide behind rolled-back memory, sequence or clock state
+- Focused verification passed 9 files / 418 tests plus 15 todos; the full suite passed 31 files / 1,006 tests plus 21 todos. Fixture verification reported 10 Git entries / 708,867 bytes and one unratified GS candidate; evidence verification reported 3 pending device templates and 0 run/environment/artifact records. Typecheck and the production build passed at 95 modules / 11 PWA precache entries, with the existing 795.94 kB viewer-chunk warning
+- Three independent implementation/runtime, exact-closure and false-green reviews reported no unresolved P0/P1 after native reinspection, actor-order freedom, reopened-store rebinding, explicit rejection and post-probe durable-authority findings were corrected
+- Shared external-actor append serialization, package/replacement transaction locks, real `navigator.locks`/OPFS two-tab proof, project-scoped locking, lock-unavailable read-only behavior and physical-iOS evidence remain open; this is a bounded local opId fix, not G0S-TAB completion
+
+### Post-slice-23 gate/churn checkpoint
+
+- S23 closes one high-severity, immediately implementable opId-collision root defect, but G0-S remains partial: 58 direct expected-failure declarations and 21 todos remain, with shared-actor/cross-context locking, untrusted ingress, new-project publication and external evidence still blocking the gate
+- The slice changes only 11 production lines but requires substantial exact-fixture adaptation because earlier tests encoded deterministic actor identity. That one-time compatibility cost is justified by preserving closure strength, but another actor-only characterization slice is not: the next slice must remove a production blocker
+- The best ready risk/size tradeoff is native `importNewProject` verified private publication with activation marker last. Its existing acceptance already covers resolved corruption, omitted required blobs, interruption history and marker/listing closure. Wizard activation, actor-log partial recovery and browser locking remain separate dependencies rather than expanding that slice
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes

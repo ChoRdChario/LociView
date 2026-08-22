@@ -422,14 +422,28 @@ describe.sequential('G0S-WRITE healthy and idempotent controls', () => {
     const path = `${dir}/ops/${store.actorId}.jsonl`;
     await fs.appendText(path, serializeOps([opA]));
     const refreshed = await ProjectStore.open(fs, dir, USER);
+    expect(refreshed.actorId).not.toBe(store.actorId);
     const opB = refreshed.dispatch({
       t: 'create', e: 'caption', id: fixedCaptionId(5, 1), v: { title: 'after duplicate B' },
     });
     await refreshed.flush();
-    const parsed = parseOpsJsonl((await fs.readText(path))!);
-    expect(parsed.errors).toHaveLength(0);
-    expect(parsed.ops).toEqual([opA, opA, opB]);
+    const refreshedPath = `${dir}/ops/${refreshed.actorId}.jsonl`;
+    const oldParsed = parseOpsJsonl((await fs.readText(path))!);
+    const newParsed = parseOpsJsonl((await fs.readText(refreshedPath))!);
+    expect(oldParsed.errors).toHaveLength(0);
+    expect(newParsed.errors).toHaveLength(0);
+    expect(oldParsed.ops).toEqual([opA, opA]);
+    expect(newParsed.ops).toEqual([opB]);
+    expect((await fs.list(`${dir}/ops/`)).sort()).toEqual([path, refreshedPath].sort());
     const reopened = await ProjectStore.open(fs, dir, USER);
+    const expectedPhysicalOps = [opA, opA, opB].sort((left, right) =>
+      `${left.actor}#${left.op}`.localeCompare(`${right.actor}#${right.op}`));
+    const reopenedPhysicalOps = [...reopened.allOps].sort((left, right) =>
+      `${left.actor}#${left.op}`.localeCompare(`${right.actor}#${right.op}`));
+    expect(reopened.loadErrors).toHaveLength(0);
+    expect(reopenedPhysicalOps).toEqual(expectedPhysicalOps);
+    expect(reopened.vector).toEqual(versionVector(expectedPhysicalOps));
+    expect(reopened.state).toEqual(reduce(expectedPhysicalOps));
     expect(exactVisibleIds(reopened, [opA, opB])).toEqual([opA.id, opB.id].sort());
   });
 

@@ -93,14 +93,13 @@ The following risks are observed in the current code and are not fixed by G-1:
 
 | Risk | Reproduction condition / impact | Evidence area |
 |---|---|---|
-| Same actor/sequence in multiple tabs | Tabs share browser identity but initialize sequence independently; distinct operations can collide and one can disappear during deduplication | `src/ui/app.ts`, `src/core/store.ts`, `src/core/merge.ts`, `src/core/reduce.ts` |
 | Non-atomic cross-tab append | OPFS append obtains size then writes at that position without a cross-tab lock | `src/platform/opfs.ts` |
 | Poisoned write queue | One rejected queued append can prevent later queued writes while memory/UI continues changing | `src/core/store.ts` |
 | Unsafe imported map keys | Imported operation entity/id values are used with ordinary objects; reserved prototype keys require stricter validation or `Map`/null-prototype storage | `src/core/schema.ts`, `src/core/reduce.ts` |
 | Non-transactional binary/document update | Package/model replacement can update operations and blobs in separate steps; interruption or concurrent replacement can leave missing/stale references | `src/assets/package.ts`, `src/assets/modelAsset.ts` |
 | Whole-buffer large-file path | Package and asset paths can hold full ZIP/entry buffers, conflicting with large GS and iOS memory goals | `src/assets/zipio.ts`, `src/assets/package.ts`, `src/platform/fs.ts` |
 
-These are G0 regression inputs and blocking items for the `G0-S` v1 safety-stabilization gate in `tasks/todo.md`. Do not claim conflict-free multi-tab durability from the current v1 implementation.
+These are G0 regression inputs and blocking items for the `G0-S` v1 safety-stabilization gate in `tasks/todo.md`. Local stores now self-issue distinct writer actors, but shared external-actor paths and multi-file transactions still lack a browser-proven lock; do not claim conflict-free multi-tab durability from the current v1 implementation.
 
 The executable `G0S-*` cases use Vitest `it.fails` while the defects remain in
 v1. They assert the desired safe invariant: an unexpected pass makes the suite

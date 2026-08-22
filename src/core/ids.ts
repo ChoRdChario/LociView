@@ -1,6 +1,6 @@
 // ID体系 (docs/02 §3)
 // - エンティティID: <prefix>_<ULID>。時刻順ソート可能・自己発行・衝突確率は実用上ゼロ
-// - actorId: userId×deviceId から導出し、op-logのファイル名と書き手識別に使う
+// - actorId: ProjectStore lifetime ごとに自己発行し、op-logのファイル名と書き手識別に使う
 
 const B32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'; // Crockford Base32
 
@@ -34,7 +34,14 @@ export function newId(prefix: IdPrefix, now?: number): string {
   return `${prefix}_${ulid(now)}`;
 }
 
-/** userId×deviceId → actorId（決定的。同一ユーザー同一端末なら常に同じ値になる） */
+/** ProjectStore lifetime ごとのactorId。65 bitをCSPRNGから直接自己発行する。 */
+export function newActorId(): string {
+  const random = new Uint8Array(13);
+  crypto.getRandomValues(random);
+  return `a_${Array.from(random, (byte) => B32[byte & 31]).join('')}`;
+}
+
+/** legacy fixture/interop用の決定的actorId短縮。新しいProjectStoreのactor発行には使わない。 */
 export function actorIdFrom(userId: string, deviceId: string): string {
   // FNV-1a 64bit（暗号用途ではなく識別子の短縮のみ）
   let h = 0xcbf29ce484222325n;

@@ -143,10 +143,15 @@ describe.sequential('G0S-TAB actor instance characterization', () => {
     operationMetadataIsConsistent =
       tabA.actorId === actorIds[0] &&
       tabB.actorId === actorIds[1] &&
+      actorIds.every((actor) => /^a_[0-9A-HJKMNP-TV-Z]{13}$/u.test(actor)) &&
       opA.actor === actorIds[0] &&
       opB.actor === actorIds[1] &&
       opA.hlc.endsWith(`-${actorIds[0]}`) &&
       opB.hlc.endsWith(`-${actorIds[1]}`) &&
+      isDeepStrictEqual(
+        [...logs.files].sort(),
+        actorIds.map((actor) => `${dir}/ops/${actor}.jsonl`).sort(),
+      ) &&
       logs.parseErrorCount === 0 &&
       logs.fileActorMatches;
     const reopened = await ProjectStore.open(fs, dir, USER_A);
@@ -155,6 +160,10 @@ describe.sequential('G0S-TAB actor instance characterization', () => {
     const rawOps = byId(logs.ops);
     const reopenedOps = byId(reopened.allOps);
     durableAuthorityIsTruthful =
+      flushOutcomes.every((outcome) => outcome.status === 'fulfilled') &&
+      [tabA, tabB].every(
+        (store) => store.durabilityStatus.phase === 'durable' && store.durabilityStatus.pending === 0,
+      ) &&
       logs.ops.length === rawOps.size &&
       mapIsOperationSubset(rawOps, expectedOps) &&
       mapsHaveSameOperations(reopenedOps, rawOps) &&
@@ -173,7 +182,7 @@ describe.sequential('G0S-TAB actor instance characterization', () => {
     expect(durableAuthorityIsTruthful).toBe(true);
   });
 
-  it.fails('G0S-TAB: two simultaneous stores for one identity use distinct actor instances', () => {
+  it('G0S-TAB: two simultaneous stores for one identity use distinct actor instances', () => {
     expect(new Set(actorIds).size).toBe(2);
   });
 });
@@ -226,6 +235,7 @@ for (const scenario of STRESS_SCENARIOS) {
     let fileActorMatches: boolean;
     let reopenLoadErrorCount: number;
     let flushDispositionsAreTruthful: boolean;
+    let bothHealthyLanesAreDurable: boolean;
 
     beforeAll(async () => {
       const fs = new MemoryFS();
@@ -282,6 +292,11 @@ for (const scenario of STRESS_SCENARIOS) {
         flushDispositionIsTruthful(
           flushOutcomes[1]!, tabB.durabilityStatus, dispatchedByLane[1], rawOps, reopenedOps,
         );
+      bothHealthyLanesAreDurable =
+        flushOutcomes.every((outcome) => outcome.status === 'fulfilled') &&
+        [tabA, tabB].every(
+          (store) => store.durabilityStatus.phase === 'durable' && store.durabilityStatus.pending === 0,
+        );
     }, 60_000);
 
     it('plans exactly 2,000 payloads and keeps any fail-closed durable subset parseable and reopenable', () => {
@@ -296,17 +311,18 @@ for (const scenario of STRESS_SCENARIOS) {
       expect(reopenedOps.size).toBe(reopenedOperationCount);
       expect(mapsHaveSameOperations(reopenedOps, rawOps)).toBe(true);
       expect(flushDispositionsAreTruthful).toBe(true);
+      expect(bothHealthyLanesAreDurable).toBe(true);
     });
 
-    it.fails('G0S-TAB: all 2,000 durable raw operations have distinct operation keys', () => {
+    it('G0S-TAB: all 2,000 durable raw operations have distinct operation keys', () => {
       expect(rawOperationCount === 2_000 && rawUniqueKeyCount === 2_000).toBe(true);
     });
 
-    it.fails('G0S-TAB: all 2,000 reopened operations have distinct operation keys', () => {
+    it('G0S-TAB: all 2,000 reopened operations have distinct operation keys', () => {
       expect(reopenedOperationCount === 2_000 && reopenedUniqueKeyCount === 2_000).toBe(true);
     });
 
-    it.fails('G0S-TAB: reload reduces to the exact 2,000 visible captions', () => {
+    it('G0S-TAB: reload reduces to the exact 2,000 visible captions', () => {
       expect(visibleIds).toEqual([...expectedIds].sort());
     });
   });

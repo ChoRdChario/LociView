@@ -6,7 +6,6 @@ import {
   type ImportResult,
 } from '../../src/assets/importWizard';
 import { formatHlc, parseHlc } from '../../src/core/hlc';
-import { actorIdFrom } from '../../src/core/ids';
 import { parseOpsJsonl } from '../../src/core/jsonl';
 import {
   GENERATOR,
@@ -29,7 +28,6 @@ const USER: Readonly<Identity> = Object.freeze({
   deviceId: 'dev_00000000000000000000000080',
   displayName: 'wizard publication characterization',
 });
-const ACTOR = actorIdFrom(USER.userId, USER.deviceId);
 const PROJECT_NAME = 'wizard publication characterization';
 const MODEL_NAME = 'wizard-model.glb';
 const IMAGE_NAME = 'wizard-image.png';
@@ -136,12 +134,17 @@ function hasExactKeys(value: Record<string, unknown>, expected: readonly string[
   return isDeepStrictEqual(Object.keys(value).sort(), [...expected].sort());
 }
 
-function isCanonicalWizardOp(value: unknown, kind: 'set' | 'image'): value is Op {
+function isCanonicalWizardOp(
+  value: unknown,
+  kind: 'set' | 'image',
+  expectedActor: string,
+): value is Op {
   if (!isRecord(value) || !isRecord(value.v)) return false;
   if (
     !hasExactKeys(value, ['op', 'hlc', 'actor', 'user', 't', 'e', 'id', 'v']) ||
     !Number.isSafeInteger(value.op) || Number(value.op) < 1 ||
-    value.actor !== ACTOR ||
+    value.actor !== expectedActor ||
+    !/^a_[0-9A-HJKMNP-TV-Z]{13}$/u.test(expectedActor) ||
     value.user !== USER.userId ||
     value.t !== 'create' ||
     typeof value.hlc !== 'string'
@@ -151,7 +154,7 @@ function isCanonicalWizardOp(value: unknown, kind: 'set' | 'image'): value is Op
   try {
     const parsed = parseHlc(value.hlc);
     if (
-      parsed.actor !== ACTOR ||
+      parsed.actor !== expectedActor ||
       formatHlc(parsed.physical, parsed.counter, parsed.actor) !== value.hlc
     ) {
       return false;
@@ -184,13 +187,14 @@ function isCanonicalWizardOp(value: unknown, kind: 'set' | 'image'): value is Op
 function containsWizardOperation(
   payload: string | Uint8Array,
   kind: 'set' | 'image',
+  expectedActor: string,
 ): boolean {
-  return payloadOps(payload).some((value) => isCanonicalWizardOp(value, kind));
+  return payloadOps(payload).some((value) => isCanonicalWizardOp(value, kind, expectedActor));
 }
 
-function isWizardLogPath(path: string): boolean {
+function wizardLogActor(path: string): string | null {
   const match = /^projects\/meta_[0-7][0-9A-HJKMNP-TV-Z]{25}\/ops\/(a_[0-9A-HJKMNP-TV-Z]{13})\.jsonl$/.exec(path);
-  return match?.[1] === ACTOR;
+  return match?.[1] ?? null;
 }
 
 function isOptimizedModelPath(path: string): boolean {
@@ -222,14 +226,15 @@ class WizardFaultFS extends FaultInjectingMemoryFS {
     if (this.armed || this.boundary === null) return;
 
     let outcome: FaultOutcome | null = null;
+    const logActor = wizardLogActor(path);
     if (this.boundary === 'root-marker-after' && isRootMarkerPath(path)) {
       outcome = 'commit-then-throw';
     } else if (this.boundary === 'root-marker-prefix' && isRootMarkerPath(path)) {
       outcome = 'write-prefix-then-throw';
     } else if (
       this.boundary === 'initial-log-prefix' &&
-      isWizardLogPath(path) &&
-      containsWizardOperation(payload, 'set')
+      logActor !== null &&
+      containsWizardOperation(payload, 'set', logActor)
     ) {
       outcome = 'write-prefix-then-throw';
     } else if (
@@ -246,8 +251,8 @@ class WizardFaultFS extends FaultInjectingMemoryFS {
       outcome = 'write-prefix-then-throw';
     } else if (
       this.boundary === 'final-asset-log-prefix' &&
-      isWizardLogPath(path) &&
-      containsWizardOperation(payload, 'image')
+      logActor !== null &&
+      containsWizardOperation(payload, 'image', logActor)
     ) {
       outcome = 'write-prefix-then-throw';
     }
@@ -439,7 +444,12 @@ async function inspectWizardClosure(
         { e: 'asset', id: image.id, v: expectedImageFields },
       ]
     : [];
+  const operationActors = [...new Set(store.allOps.map((op) => op.actor))];
+  const actor = operationActors.length === 1 && /^a_[0-9A-HJKMNP-TV-Z]{13}$/u.test(operationActors[0]!)
+    ? operationActors[0]!
+    : null;
   const operationsExact =
+    actor !== null &&
     store.allOps.length === plannedEntities.length &&
     plannedEntities.length === 4 &&
     store.allOps.every((op, index) => {
@@ -456,7 +466,7 @@ async function inspectWizardClosure(
           'v',
         ]) ||
         op.op !== index + 1 ||
-        op.actor !== ACTOR ||
+        op.actor !== actor ||
         op.user !== USER.userId ||
         op.t !== 'create' ||
         op.e !== planned.e ||
@@ -468,7 +478,7 @@ async function inspectWizardClosure(
       }
       try {
         const parsed = parseHlc(op.hlc);
-        return parsed.actor === ACTOR &&
+        return parsed.actor === actor &&
           formatHlc(parsed.physical, parsed.counter, parsed.actor) === op.hlc;
       } catch {
         return false;
@@ -481,7 +491,8 @@ async function inspectWizardClosure(
   const logText = activeLogPaths.length === 1 ? await fs.readText(activeLogPaths[0]!) : null;
   const parsedLog = logText === null ? null : parseOpsJsonl(logText);
   const activeLogExact =
-    isDeepStrictEqual(activeLogPaths, [`${dir}/ops/${ACTOR}.jsonl`]) &&
+    actor !== null &&
+    isDeepStrictEqual(activeLogPaths, [`${dir}/ops/${actor}.jsonl`]) &&
     parsedLog !== null &&
     parsedLog.errors.length === 0 &&
     isDeepStrictEqual(parsedLog.ops, store.allOps);

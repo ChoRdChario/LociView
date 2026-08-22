@@ -3,7 +3,7 @@
 // 書き込みは自分のactorIdのファイルのみ。他人のログはマージ時に追加保存されるだけ。
 
 import { HlcClock } from './hlc';
-import { actorIdFrom, newId, type IdPrefix } from './ids';
+import { newActorId, newId, type IdPrefix } from './ids';
 import { parseOpsJsonl, serializeOps, type JsonlParseError } from './jsonl';
 import { createManifest, parseManifest, type ProjectManifest } from './manifest';
 import { mergeOps, type MergeReport } from './merge';
@@ -92,7 +92,7 @@ export class ProjectStore {
     readonly manifest: ProjectManifest,
     readonly identity: Identity,
   ) {
-    this.actorId = actorIdFrom(identity.userId, identity.deviceId);
+    this.actorId = newActorId();
     this.clock = new HlcClock(this.actorId);
     this.stateCache = reduce([]);
   }
