@@ -5,6 +5,10 @@
 
 import type { WorkspaceFS } from './fs';
 
+function isNotFoundError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'NotFoundError';
+}
+
 async function getDir(root: FileSystemDirectoryHandle, path: string, create: boolean): Promise<{ dir: FileSystemDirectoryHandle; name: string } | null> {
   const parts = path.split('/').filter((p) => p.length > 0);
   if (parts.length === 0) return null;
@@ -12,8 +16,9 @@ async function getDir(root: FileSystemDirectoryHandle, path: string, create: boo
   for (let i = 0; i < parts.length - 1; i++) {
     try {
       dir = await dir.getDirectoryHandle(parts[i]!, { create });
-    } catch {
-      return null;
+    } catch (error) {
+      if (!create && isNotFoundError(error)) return null;
+      throw error;
     }
   }
   return { dir, name: parts[parts.length - 1]! };
@@ -40,8 +45,9 @@ export class OpfsFS implements WorkspaceFS {
     if (!loc) return null;
     try {
       return await loc.dir.getFileHandle(loc.name, { create });
-    } catch {
-      return null;
+    } catch (error) {
+      if (!create && isNotFoundError(error)) return null;
+      throw error;
     }
   }
 
@@ -60,11 +66,27 @@ export class OpfsFS implements WorkspaceFS {
   }
 
   async appendText(path: string, text: string): Promise<void> {
+    await this.appendData(path, text);
+  }
+
+  async appendBytes(path: string, data: Uint8Array): Promise<void> {
+    await this.appendData(path, new Uint8Array(data));
+  }
+
+  private async appendData(path: string, data: string | Uint8Array): Promise<void> {
     const h = await this.fileHandle(path, true);
     if (!h) throw new Error(`opfs: cannot open ${path}`);
     const size = (await h.getFile()).size;
     const w = await h.createWritable({ keepExistingData: true });
-    await w.write({ type: 'write', position: size, data: text });
+    let chunk: string | ArrayBuffer;
+    if (typeof data === 'string') {
+      chunk = data;
+    } else {
+      const copy = new Uint8Array(data.length);
+      copy.set(data);
+      chunk = copy.buffer;
+    }
+    await w.write({ type: 'write', position: size, data: chunk });
     await w.close();
   }
 
@@ -72,6 +94,17 @@ export class OpfsFS implements WorkspaceFS {
     const h = await this.fileHandle(path, false);
     if (!h) return null;
     return new Uint8Array(await (await h.getFile()).arrayBuffer());
+  }
+
+  async readBytesFrom(path: string, offset: number): Promise<{ size: number; data: Uint8Array } | null> {
+    if (!Number.isSafeInteger(offset) || offset < 0) throw new Error('opfs: invalid byte offset');
+    const h = await this.fileHandle(path, false);
+    if (!h) return null;
+    const file = await h.getFile();
+    return {
+      size: file.size,
+      data: new Uint8Array(await file.slice(Math.min(offset, file.size)).arrayBuffer()),
+    };
   }
 
   async writeBytes(path: string, data: Uint8Array): Promise<void> {
@@ -112,7 +145,8 @@ export class OpfsFS implements WorkspaceFS {
     if (!loc) return;
     try {
       await loc.dir.removeEntry(loc.name);
-    } catch {
+    } catch (error) {
+      if (!isNotFoundError(error)) throw error;
       // 存在しない場合は無視
     }
   }

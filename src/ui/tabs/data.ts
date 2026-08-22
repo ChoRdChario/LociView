@@ -8,11 +8,12 @@ import { applyCsvPlan, buildCaptionsCsv, planCaptionsCsvImport } from '../../io/
 import { el, downloadBlob, fmtBytes } from '../dom';
 import type { AppContext } from '../context';
 import { csvPlanDialog, infoDialog, mergeReportDialog } from '../dialogs';
+import { generateAndStartPackageDownload } from '../packageExport';
+import type { PackageExportStatus } from '../saveStatus';
 
 export interface DataTabDeps {
   loadModelAsset: (assetId: string) => Promise<void>;
-  /** 書き出し完了の記録（保存状態表示の更新） */
-  markExported: () => void;
+  setPackageExportStatus: (status: PackageExportStatus) => void;
 }
 
 export function mountDataTab(container: HTMLElement, ctx: AppContext, deps: DataTabDeps): () => void {
@@ -111,13 +112,27 @@ export function mountDataTab(container: HTMLElement, ctx: AppContext, deps: Data
       downloadBlob(buildCaptionsCsv(ctx.state), `${name}-captions.csv`, 'text/csv');
       return;
     }
-    const bytes =
-      kind === 'full'
-        ? await exportProjectZip(ctx.fs, ctx.dir, ctx.store)
-        : await exportOpsOnlyZip(ctx.fs, ctx.dir, ctx.store);
-    downloadBlob(bytes, `${name}${kind === 'diff' ? '-diff' : ''}.lociview`, 'application/zip');
-    deps.markExported();
-    await infoDialog('書き出し完了', `${fmtBytes(bytes.length)} を書き出しました。${kind === 'diff' ? '（opsのみの軽量差分。相手がモデル・画像を持っている場合の受け渡し用）' : ''}`);
+    try {
+      const { bytes } = await generateAndStartPackageDownload(
+        kind,
+        ctx.store.allOps.length,
+        () => kind === 'full'
+          ? exportProjectZip(ctx.fs, ctx.dir, ctx.store)
+          : exportOpsOnlyZip(ctx.fs, ctx.dir, ctx.store),
+        (data) => downloadBlob(
+          data,
+          `${name}${kind === 'diff' ? '-diff' : ''}.lociview`,
+          'application/zip',
+        ),
+        deps.setPackageExportStatus,
+      );
+      await infoDialog(
+        'ダウンロード開始',
+        `${fmtBytes(bytes.length)} のダウンロードを開始しました（ブラウザでの保存完了は未確認です）。${kind === 'diff' ? '（opsのみの軽量差分。相手がモデル・画像を持っている場合の受け渡し用）' : ''}`,
+      );
+    } catch (error) {
+      await infoDialog('書き出し失敗', error instanceof Error ? error.message : String(error));
+    }
   }
 
   // ---- 画面 -------------------------------------------------------------------

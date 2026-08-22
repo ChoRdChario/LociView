@@ -11,6 +11,7 @@ import { addModelAsset } from '../../src/assets/modelAsset';
 import { parseHlc } from '../../src/core/hlc';
 import { parseOpsJsonl, serializeOps } from '../../src/core/jsonl';
 import { parseManifest, type ProjectManifest } from '../../src/core/manifest';
+import { mergeOps } from '../../src/core/merge';
 import { reduce, versionVector, visibleEntities } from '../../src/core/reduce';
 import type { Op } from '../../src/core/schema';
 import { ProjectStore, type Identity } from '../../src/core/store';
@@ -45,6 +46,7 @@ const USER_C: Readonly<Identity> = Object.freeze({
 });
 
 const encoder = new TextEncoder();
+const decoder = new TextDecoder();
 const BASE_BYTES = encoder.encode('solid base\nendsolid base\n');
 const PEER_B_BYTES = encoder.encode('solid peer-b\nendsolid peer-b\n');
 const PEER_C_BYTES = encoder.encode('solid peer-c\nendsolid peer-c\n');
@@ -474,11 +476,27 @@ function expectedMergedOpsFiles(
 async function makeMergeFixture(
   targetFs = new FaultInjectingMemoryFS(),
   targetIdentity: Readonly<Identity> = USER_A,
+  baselineAssetOmitsSize = false,
 ): Promise<MergeFixture> {
   const targetDir = 'projects/merge-target';
   const createdStore = await ProjectStore.create(targetFs, targetDir, 'two-actor merge target', USER_A);
   const baselineAssetId = await addModelAsset(targetFs, targetDir, createdStore, 'base.stl', BASE_BYTES);
   await createdStore.flush();
+  if (baselineAssetOmitsSize) {
+    const baselineAssetOp = createdStore.allOps.find(
+      (op) => op.e === 'asset' && op.id === baselineAssetId && op.v !== undefined,
+    );
+    if (baselineAssetOp?.v === undefined) throw new Error('merge fixture lacks its baseline asset op');
+    const logPath = `${targetDir}/ops/${baselineAssetOp.actor}.jsonl`;
+    const parsed = parseOpsJsonl((await targetFs.readText(logPath)) ?? '');
+    if (parsed.errors.length !== 0) throw new Error('merge fixture baseline log is not parseable');
+    await targetFs.writeText(logPath, serializeOps(parsed.ops.map((op): Op => {
+      if (operationKey(op) !== operationKey(baselineAssetOp) || op.v === undefined) return op;
+      const v = { ...op.v };
+      delete v.size;
+      return { ...op, v };
+    })));
+  }
 
   const seedB = await ProjectStore.open(targetFs, targetDir, USER_B);
   seedB.createEntity('caption', { title: 'existing actor-B log seed' });
@@ -560,47 +578,103 @@ async function makeMergeFixture(
   };
 }
 
-interface MergeClosure {
-  oldState: boolean;
-  completeState: boolean;
-  blobsMatch: boolean;
-  safe: boolean;
+interface ExpectedBlobReference {
+  path: string;
+  bytes: Uint8Array;
 }
 
-async function inspectMergeState(
-  fixture: MergeFixture,
-  fs: MemoryFS,
+function expectedVisibleBlobReferences(
   state: ProjectStore['state'],
-  readable: boolean,
-): Promise<MergeClosure> {
-  const visibleAssets = visibleEntities(state, 'asset');
-  const visibleIds = visibleAssets.map((asset) => asset.id).sort();
-  const completeIds = [...fixture.baselineAssetIds, ...fixture.incomingAssetIds].sort();
-  const oldState = readable && isDeepStrictEqual(visibleIds, fixture.baselineAssetIds);
-  const completeState = readable && isDeepStrictEqual(visibleIds, completeIds);
-  let blobsMatch = true;
-  for (const asset of visibleAssets) {
-    const path = asset.fields.path;
-    if (typeof path !== 'string') {
-      blobsMatch = false;
-      break;
-    }
-    const expected = fixture.expectedBinaries.get(path);
-    const actual = await fs.readBytes(`${fixture.targetDir}/${path}`);
-    if (expected === undefined || !bytesEqual(actual, expected) || asset.fields.size !== expected.length) {
-      blobsMatch = false;
-      break;
+  fixture: MergeFixture,
+): ExpectedBlobReference[] | null {
+  const references = new Map<string, Uint8Array>();
+  for (const asset of visibleEntities(state, 'asset')) {
+    for (const [pathKey, sizeKey] of [
+      ['path', 'size'],
+      ['optimizedPath', 'optimizedSize'],
+    ] as const) {
+      const path = asset.fields[pathKey];
+      if (pathKey === 'optimizedPath' && (path === undefined || path === '')) continue;
+      const expected = typeof path === 'string' ? fixture.expectedBinaries.get(path) : undefined;
+      const actualSize = asset.fields[sizeKey];
+      if (
+        typeof path !== 'string' ||
+        expected === undefined ||
+        (actualSize !== undefined && actualSize !== expected.length)
+      ) {
+        return null;
+      }
+      const previous = references.get(path);
+      if (previous !== undefined && !bytesEqual(previous, expected)) return null;
+      references.set(path, expected);
     }
   }
-  return { oldState, completeState, blobsMatch, safe: blobsMatch && (oldState || completeState) };
+  return [...references].map(([path, bytes]) => ({ path, bytes }));
 }
 
-async function inspectMergedClosure(
+async function visibleBlobReferencesAreExact(
+  fs: MemoryFS,
+  state: ProjectStore['state'],
   fixture: MergeFixture,
-  fs: MemoryFS = fixture.targetFs,
-): Promise<MergeClosure> {
-  const reopened = await ProjectStore.open(fs, fixture.targetDir, USER_A);
-  return inspectMergeState(fixture, fs, reopened.state, reopened.loadErrors.length === 0);
+): Promise<boolean> {
+  const references = expectedVisibleBlobReferences(state, fixture);
+  if (references === null) return false;
+  return (await Promise.all(references.map(async ({ path, bytes }) =>
+    bytesEqual(await fs.readBytes(`${fixture.targetDir}/${path}`), bytes)))).every(Boolean);
+}
+
+function mergeSnapshotPathsForAuthority(fixture: MergeFixture): string[] {
+  return [
+    `${fixture.targetDir}/lociview.json`,
+    ...fixture.completeOpsFiles.keys(),
+    ...[...fixture.expectedBinaries.keys()].map((path) => `${fixture.targetDir}/${path}`),
+  ];
+}
+
+function snapshotHasExactOpsFiles(
+  snapshot: FaultFileSnapshot,
+  fixture: MergeFixture,
+  expected: ReadonlyMap<string, string>,
+): boolean {
+  const actualFiles = new Map<string, string>();
+  for (const path of fixture.completeOpsFiles.keys()) {
+    const actualBytes = snapshot.files.get(path);
+    const expectedText = expected.get(path);
+    if (expectedText === undefined) {
+      if (actualBytes !== null) return false;
+      continue;
+    }
+    if (actualBytes === undefined || actualBytes === null) return false;
+    actualFiles.set(path, decoder.decode(actualBytes));
+  }
+  return opsFilesMatchAuthority(actualFiles, expected, fixture.baselineOpsFiles);
+}
+
+function snapshotHasExactVisibleAuthority(
+  snapshot: FaultFileSnapshot | undefined,
+  state: ProjectStore['state'],
+  fixture: MergeFixture,
+): boolean {
+  if (snapshot === undefined) return false;
+  const marker = snapshot.files.get(`${fixture.targetDir}/lociview.json`);
+  if (marker === undefined || marker === null) return false;
+  try {
+    if (!isDeepStrictEqual(
+      parseManifest(decoder.decode(marker)),
+      parseManifest(fixture.baselineManifestText),
+    )) return false;
+  } catch {
+    return false;
+  }
+  if (
+    !snapshotHasExactOpsFiles(snapshot, fixture, fixture.baselineOpsFiles) &&
+    !snapshotHasExactOpsFiles(snapshot, fixture, fixture.completeOpsFiles)
+  ) {
+    return false;
+  }
+  const references = expectedVisibleBlobReferences(state, fixture);
+  return references !== null && references.every(({ path, bytes }) =>
+    bytesEqual(snapshot.files.get(`${fixture.targetDir}/${path}`) ?? null, bytes));
 }
 
 interface ExactMergeAuthority {
@@ -727,6 +801,51 @@ function mapsAreDeepEqual<V>(
   return isDeepStrictEqual(entries(actual), entries(expected));
 }
 
+function opsFilesMatchAuthority(
+  actual: ReadonlyMap<string, string>,
+  expected: ReadonlyMap<string, string>,
+  baseline: ReadonlyMap<string, string>,
+): boolean {
+  const actualPaths = [...actual.keys()].sort();
+  const expectedPaths = [...expected.keys()].sort();
+  if (!isDeepStrictEqual(actualPaths, expectedPaths)) return false;
+  for (const path of expectedPaths) {
+    const actualText = actual.get(path);
+    const expectedText = expected.get(path);
+    if (actualText === undefined || expectedText === undefined) return false;
+    const baselineText = baseline.get(path);
+    if (baselineText !== undefined && !actualText.startsWith(baselineText)) return false;
+    const actualParsed = parseOpsJsonl(actualText);
+    const expectedParsed = parseOpsJsonl(expectedText);
+    if (actualParsed.errors.length !== 0 || expectedParsed.errors.length !== 0) return false;
+    const fileActor = path.slice(path.lastIndexOf('/') + 1, -'.jsonl'.length);
+    if (
+      actualParsed.ops.some((op) => op.actor !== fileActor) ||
+      expectedParsed.ops.some((op) => op.actor !== fileActor) ||
+      !isDeepStrictEqual(actualParsed.ops, expectedParsed.ops)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function semanticallyReformatJsonl(text: string): string {
+  if (text === '') return '';
+  const parsed = parseOpsJsonl(text);
+  if (parsed.errors.length !== 0) throw new Error('cannot reformat malformed JSONL control');
+  return `${parsed.ops.map((op) => JSON.stringify({
+    ...(op.v === undefined ? {} : { v: op.v }),
+    id: op.id,
+    e: op.e,
+    t: op.t,
+    user: op.user,
+    actor: op.actor,
+    hlc: op.hlc,
+    op: op.op,
+  })).join('\n')}\n`;
+}
+
 async function inspectExactMergeAuthority(
   fixture: MergeFixture,
   fs: MemoryFS = fixture.targetFs,
@@ -741,9 +860,19 @@ async function inspectExactMergeAuthority(
     .filter((path) => path.endsWith('/lociview.json'))
     .sort();
   const manifestPath = `${fixture.targetDir}/lociview.json`;
-  const manifestExact =
-    isDeepStrictEqual(markerPaths, [manifestPath]) &&
-    (await fs.readText(manifestPath)) === fixture.baselineManifestText;
+  const manifestText = await fs.readText(manifestPath);
+  let manifestExact = false;
+  try {
+    manifestExact =
+      isDeepStrictEqual(markerPaths, [manifestPath]) &&
+      manifestText !== null &&
+      isDeepStrictEqual(
+        parseManifest(manifestText),
+        parseManifest(fixture.baselineManifestText),
+      );
+  } catch {
+    manifestExact = false;
+  }
   const activeOpsFiles = await readActiveOpsFiles(fs, fixture.targetDir);
   const reopenedOps = operationsByKey(reopened.allOps);
   const oldAuthority =
@@ -752,29 +881,16 @@ async function inspectExactMergeAuthority(
     isDeepStrictEqual(reopened.state, fixture.baselineState) &&
     isDeepStrictEqual(reopenedOps, fixture.baselineOps) &&
     isDeepStrictEqual(reopened.vector, fixture.baselineVector) &&
-    mapsAreDeepEqual(activeOpsFiles, fixture.baselineOpsFiles);
+    opsFilesMatchAuthority(activeOpsFiles, fixture.baselineOpsFiles, fixture.baselineOpsFiles);
   const completeAuthority =
     manifestExact &&
     reopened.loadErrors.length === 0 &&
     isDeepStrictEqual(reopened.state, fixture.completeState) &&
     isDeepStrictEqual(reopenedOps, fixture.completeOps) &&
     isDeepStrictEqual(reopened.vector, fixture.completeVector) &&
-    mapsAreDeepEqual(activeOpsFiles, fixture.completeOpsFiles);
+    opsFilesMatchAuthority(activeOpsFiles, fixture.completeOpsFiles, fixture.baselineOpsFiles);
 
-  let blobsMatch = true;
-  for (const asset of visibleEntities(reopened.state, 'asset')) {
-    const path = asset.fields.path;
-    const expected = typeof path === 'string' ? fixture.expectedBinaries.get(path) : undefined;
-    if (
-      typeof path !== 'string' ||
-      expected === undefined ||
-      asset.fields.size !== expected.length ||
-      !bytesEqual(await fs.readBytes(`${fixture.targetDir}/${path}`), expected)
-    ) {
-      blobsMatch = false;
-      break;
-    }
-  }
+  const blobsMatch = await visibleBlobReferencesAreExact(fs, reopened.state, fixture);
   return {
     oldAuthority,
     completeAuthority,
@@ -785,6 +901,29 @@ async function inspectExactMergeAuthority(
 
 interface MergeAuthorityHistoryWatch {
   tokenByPath: ReadonlyMap<string, string>;
+}
+
+function mergeAuthorityMutationPathsAreKnown(
+  fixture: MergeFixture,
+  scenarioEvents: readonly FaultEvent[],
+): boolean {
+  const targetMarker = `${fixture.targetDir}/lociview.json`;
+  const knownLogs = new Set(fixture.completeOpsFiles.keys());
+  for (const event of scenarioEvents) {
+    if (event.commitIndex === null || event.method === 'remove') continue;
+    if (event.path.startsWith('projects/') && event.path.endsWith('/lociview.json')) {
+      if (event.path !== targetMarker) return false;
+      continue;
+    }
+    if (
+      event.path.startsWith(`${fixture.targetDir}/ops/`) &&
+      event.path.endsWith('.jsonl') &&
+      !knownLogs.has(event.path)
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function armMergeAuthorityHistory(
@@ -815,6 +954,7 @@ async function mergeAuthorityHistoryIsSafe(
   scenarioEvents: readonly FaultEvent[],
   watch: MergeAuthorityHistoryWatch,
 ): Promise<boolean> {
+  if (!mergeAuthorityMutationPathsAreKnown(fixture, scenarioEvents)) return false;
   const targetMarker = `${fixture.targetDir}/lociview.json`;
   for (const event of scenarioEvents) {
     if (event.commitIndex === null) continue;
@@ -867,22 +1007,9 @@ async function mergeSnapshotPaths(fixture: MergeFixture): Promise<string[]> {
   return [...paths].sort();
 }
 
-function snapshotHasExactIncomingBinaries(
-  snapshot: FaultFileSnapshot,
-  fixture: MergeFixture,
-): boolean {
-  return fixture.incomingBinaries.every((binary) =>
-    bytesEqual(snapshot.files.get(`${fixture.targetDir}/${binary.path}`) ?? null, binary.data));
-}
-
-interface ObservedMergeState {
-  token: string;
-  assetIds: string[];
-  opKeys: string[];
-}
-
 interface ExactObservedMergeState {
   token: string;
+  manifest: ProjectStore['manifest'];
   state: ProjectStore['state'];
   ops: readonly Op[];
   vector: Readonly<Record<string, number>>;
@@ -895,6 +1022,7 @@ function observeExactMergeState(
 ): ExactObservedMergeState {
   return {
     token,
+    manifest: structuredClone(store.manifest),
     state: structuredClone(state),
     ops: operationsByKey(structuredClone([...store.allOps])),
     vector: { ...store.vector },
@@ -906,67 +1034,30 @@ function exactObservedMergePublicationIsSafe(
   snapshot: FaultFileSnapshot | undefined,
   fixture: MergeFixture,
 ): boolean {
+  let manifestExact = false;
+  try {
+    manifestExact = isDeepStrictEqual(
+      observed.manifest,
+      parseManifest(fixture.baselineManifestText),
+    );
+  } catch {
+    manifestExact = false;
+  }
+  if (!manifestExact) return false;
   const oldAuthority =
     isDeepStrictEqual(observed.state, fixture.baselineState) &&
     isDeepStrictEqual(observed.ops, fixture.baselineOps) &&
     isDeepStrictEqual(observed.vector, fixture.baselineVector);
-  if (oldAuthority) return true;
   const completeAuthority =
     isDeepStrictEqual(observed.state, fixture.completeState) &&
     isDeepStrictEqual(observed.ops, fixture.completeOps) &&
     isDeepStrictEqual(observed.vector, fixture.completeVector);
-  return completeAuthority &&
-    snapshot !== undefined &&
-    fixture.incomingBinaries.every((binary) =>
-      bytesEqual(
-        snapshot.files.get(`${fixture.targetDir}/${binary.path}`) ?? null,
-        binary.data,
-      ));
-}
-
-function observeMergeState(
-  token: string,
-  state: ProjectStore['state'],
-  store: ProjectStore,
-): ObservedMergeState {
-  return {
-    token,
-    assetIds: visibleEntities(state, 'asset').map((asset) => asset.id).sort(),
-    opKeys: store.allOps.map(operationKey).sort(),
-  };
-}
-
-function observedOldState(observed: ObservedMergeState, fixture: MergeFixture): boolean {
-  return (
-    isDeepStrictEqual(observed.assetIds, fixture.baselineAssetIds) &&
-    isDeepStrictEqual(observed.opKeys, fixture.baselineOpKeys)
-  );
-}
-
-function observedCompleteState(observed: ObservedMergeState, fixture: MergeFixture): boolean {
-  return (
-    isDeepStrictEqual(
-      observed.assetIds,
-      [...fixture.baselineAssetIds, ...fixture.incomingAssetIds].sort(),
-    ) &&
-    isDeepStrictEqual(
-      observed.opKeys,
-      [...fixture.baselineOpKeys, ...fixture.incomingOpKeys].sort(),
-    )
-  );
-}
-
-function observedPublicationIsSafe(
-  observed: ObservedMergeState,
-  snapshot: FaultFileSnapshot | undefined,
-  fixture: MergeFixture,
-): boolean {
-  if (observedOldState(observed, fixture)) return true;
-  return (
-    observedCompleteState(observed, fixture) &&
-    snapshot !== undefined &&
-    snapshotHasExactIncomingBinaries(snapshot, fixture)
-  );
+  const expectedState = oldAuthority
+    ? fixture.baselineState
+    : completeAuthority
+      ? fixture.completeState
+      : null;
+  return expectedState !== null && snapshotHasExactVisibleAuthority(snapshot, expectedState, fixture);
 }
 
 describe.sequential('FaultInjectingMemoryFS publication controls', () => {
@@ -1564,14 +1655,12 @@ describe.sequential('G0S-BLOB existing-project merge publication', () => {
         fixture.targetFs.exists(`${fixture.targetDir}/ops/${actor}.jsonl`)))).filter(Boolean).length === 1;
     const eventOffset = fixture.targetFs.events.length;
     let notificationCount = 0;
-    const notificationStates: ObservedMergeState[] = [];
-    const binaryPaths = fixture.incomingBinaries.map(
-      (binary) => `${fixture.targetDir}/${binary.path}`,
-    );
+    const notificationStates: ExactObservedMergeState[] = [];
+    const authorityPaths = mergeSnapshotPathsForAuthority(fixture);
     const unsubscribe = fixture.targetStore.subscribe((state) => {
       const token = `incoming-state-notified-${notificationCount++}`;
-      notificationStates.push(observeMergeState(token, state, fixture.targetStore));
-      fixture.targetFs.markFiles(token, binaryPaths);
+      notificationStates.push(observeExactMergeState(token, state, fixture.targetStore));
+      fixture.targetFs.markFiles(token, authorityPaths);
     });
     await mergeFromInspection(
       fixture.targetFs,
@@ -1581,8 +1670,11 @@ describe.sequential('G0S-BLOB existing-project merge publication', () => {
     );
     unsubscribe();
     await fixture.targetFs.settleProbes();
-    const closure = await inspectMergedClosure(fixture);
-    mergeComplete = closure.completeState && closure.blobsMatch;
+    const authority = await inspectExactMergeAuthority(fixture);
+    mergeComplete =
+      authority.safe &&
+      exactMergeAuthorityKind(authority) === 'complete' &&
+      currentMergeAuthorityKind(fixture) === 'complete';
 
     const scenarioEvents = fixture.targetFs.events.slice(eventOffset);
     const blobEvents = fixture.incomingBinaries.map((binary) =>
@@ -1607,9 +1699,10 @@ describe.sequential('G0S-BLOB existing-project merge publication', () => {
       (snapshot) => snapshot.token.startsWith('incoming-state-notified-'),
     );
     notificationSawExactBlobs =
+      mergeAuthorityMutationPathsAreKnown(fixture, scenarioEvents) &&
       notificationStates.length === notificationSnapshots.length &&
       notificationStates.every((observed) =>
-        observedPublicationIsSafe(
+        exactObservedMergePublicationIsSafe(
           observed,
           notificationSnapshots.find((snapshot) => snapshot.token === observed.token),
           fixture,
@@ -1621,11 +1714,11 @@ describe.sequential('G0S-BLOB existing-project merge publication', () => {
     expect(mergeComplete).toBe(true);
   });
 
-  it.fails('durably places both new blobs before either actor log is mutated', () => {
+  it('durably places both new blobs before either actor log is mutated', () => {
     expect(blobsBeforeDurableMetadata).toBe(true);
   });
 
-  it.fails('publishes in-memory state only when both newly referenced blobs are exact', () => {
+  it('publishes in-memory state only when both newly referenced blobs are exact', () => {
     expect(notificationSawExactBlobs).toBe(true);
   });
 });
@@ -1641,24 +1734,25 @@ describe.sequential('G0S-BLOB in-memory merge publication while blob I/O is pend
     const pause = fs.pauseNextWrite(`${fixture.targetDir}/${pausedBinary.path}`);
     const mergePromise = mergeFromInspection(fs, fixture.targetDir, fixture.targetStore, fixture.inspection);
     await pause.reached;
-    const pausedClosure = await inspectMergeState(fixture, fs, fixture.targetStore.state, true);
-    const currentOpKeys = fixture.targetStore.allOps.map(operationKey).sort();
-    const completeOpKeys = [...fixture.baselineOpKeys, ...fixture.incomingOpKeys].sort();
-    const opsMatchState =
-      (pausedClosure.oldState && isDeepStrictEqual(currentOpKeys, fixture.baselineOpKeys)) ||
-      (pausedClosure.completeState && isDeepStrictEqual(currentOpKeys, completeOpKeys));
-    stateWasSafeWhilePaused = pausedClosure.safe && opsMatchState;
+    const pausedAuthority = await inspectExactMergeAuthority(fixture, fs);
+    stateWasSafeWhilePaused =
+      currentMergeAuthorityKind(fixture) === 'old' &&
+      pausedAuthority.safe &&
+      exactMergeAuthorityKind(pausedAuthority) === 'old';
     pause.release();
     await mergePromise;
-    const finalClosure = await inspectMergedClosure(fixture);
-    completedAfterRelease = finalClosure.completeState && finalClosure.blobsMatch;
+    const finalAuthority = await inspectExactMergeAuthority(fixture);
+    completedAfterRelease =
+      finalAuthority.safe &&
+      exactMergeAuthorityKind(finalAuthority) === 'complete' &&
+      currentMergeAuthorityKind(fixture) === 'complete';
   });
 
   it('completes normally after the paused blob write is released', () => {
     expect(completedAfterRelease).toBe(true);
   });
 
-  it.fails('keeps synchronous state/allOps old until every newly referenced blob is durable', () => {
+  it('keeps synchronous state/allOps old until every newly referenced blob is durable', () => {
     expect(stateWasSafeWhilePaused).toBe(true);
   });
 });
@@ -1715,9 +1809,7 @@ describe.sequential('G0S-BLOB resolved merge corruption verification', () => {
         'resolved-merge-authority',
       );
       const eventOffset = fs.events.length;
-      const binaryPaths = fixture.incomingBinaries.map(
-        (candidate) => `${fixture.targetDir}/${candidate.path}`,
-      );
+      const binaryPaths = mergeSnapshotPathsForAuthority(fixture);
       const observed: ExactObservedMergeState[] = [];
       const unsubscribe = fixture.targetStore.subscribe((state) => {
         const token = `resolved-merge-notification-${observed.length}`;
@@ -1795,15 +1887,15 @@ describe.sequential('G0S-BLOB resolved merge corruption verification', () => {
     });
   });
 
-  it.fails('reads and observes the wrong bytes before accepting or retrying the incoming blob', () => {
+  it('reads and observes the wrong bytes before accepting or retrying the incoming blob', () => {
     expect(verificationReadObserved).toBe(true);
   });
 
-  it.fails('never notifies complete incoming authority against corrupt required bytes', () => {
+  it('never notifies complete incoming authority against corrupt required bytes', () => {
     expect(notificationPublicationSafe).toBe(true);
   });
 
-  it.fails('reopens as the exact old authority or the fully verified merged authority', () => {
+  it('reopens as the exact old authority or the fully verified merged authority', () => {
     expect(finalAuthoritySafe).toBe(true);
   });
 });
@@ -1964,9 +2056,7 @@ describe.sequential('G0S-BLOB native package with one omitted required binary', 
         'missing-required-merge-authority',
       );
       const eventOffset = fixture.targetFs.events.length;
-      const binaryPaths = fixture.incomingBinaries.map(
-        (binary) => `${fixture.targetDir}/${binary.path}`,
-      );
+      const binaryPaths = mergeSnapshotPathsForAuthority(fixture);
       const observed: ExactObservedMergeState[] = [];
       const unsubscribe = fixture.targetStore.subscribe((state) => {
         const token = `missing-required-merge-notification-${observed.length}`;
@@ -2030,7 +2120,7 @@ describe.sequential('G0S-BLOB native package with one omitted required binary', 
     expect(newImportSafe).toBe(true);
   });
 
-  it.fails('existing merge preserves exact old authority or completes with every required blob', () => {
+  it('existing merge preserves exact old authority or completes with every required blob', () => {
     expect(mergeSafe).toBe(true);
   });
 });
@@ -2039,23 +2129,19 @@ type MergeFaultBoundary =
   | 'first-blob-prefix'
   | 'second-blob-prefix'
   | 'existing-actor-prefix'
-  | 'existing-actor-after'
   | 'new-actor-prefix'
-  | 'second-blob-after'
-  | 'new-actor-after';
+  | 'second-blob-after';
 
 const MERGE_FAULT_ROWS: Array<{
   boundary: MergeFaultBoundary;
   baselineSafe: boolean;
   expectedOutcome: FaultOutcome;
 }> = [
-  { boundary: 'first-blob-prefix', baselineSafe: false, expectedOutcome: 'write-prefix-then-throw' },
-  { boundary: 'second-blob-prefix', baselineSafe: false, expectedOutcome: 'write-prefix-then-throw' },
+  { boundary: 'first-blob-prefix', baselineSafe: true, expectedOutcome: 'write-prefix-then-throw' },
+  { boundary: 'second-blob-prefix', baselineSafe: true, expectedOutcome: 'write-prefix-then-throw' },
   { boundary: 'existing-actor-prefix', baselineSafe: false, expectedOutcome: 'write-prefix-then-throw' },
-  { boundary: 'existing-actor-after', baselineSafe: false, expectedOutcome: 'commit-then-throw' },
   { boundary: 'new-actor-prefix', baselineSafe: false, expectedOutcome: 'write-prefix-then-throw' },
   { boundary: 'second-blob-after', baselineSafe: true, expectedOutcome: 'commit-then-throw' },
-  { boundary: 'new-actor-after', baselineSafe: false, expectedOutcome: 'commit-then-throw' },
 ];
 
 function armMergeFault(
@@ -2065,18 +2151,13 @@ function armMergeFault(
 ): { path: string } {
   if (
     boundary === 'existing-actor-prefix' ||
-    boundary === 'existing-actor-after' ||
-    boundary === 'new-actor-prefix' ||
-    boundary === 'new-actor-after'
+    boundary === 'new-actor-prefix'
   ) {
-    const actor = boundary === 'existing-actor-prefix' || boundary === 'existing-actor-after'
+    const actor = boundary === 'existing-actor-prefix'
       ? fixture.existingIncomingActor
       : fixture.newIncomingActor;
     const path = `${fixture.targetDir}/ops/${actor}.jsonl`;
-    if (boundary === 'new-actor-after' || boundary === 'existing-actor-after') {
-      fixture.targetFs.failNextWriteAfterCommit(path, message);
-    }
-    else fixture.targetFs.failNextWriteAfterPrefix(path, 8, message);
+    fixture.targetFs.failNextWriteAfterPrefix(path, 8, message);
     return { path };
   }
   const binaryIndex = boundary === 'first-blob-prefix' ? 0 : 1;
@@ -2089,6 +2170,55 @@ function armMergeFault(
   return { path };
 }
 
+type ActorAfterBoundary = 'existing-actor-after' | 'new-actor-after';
+
+interface ActorAfterResult {
+  boundary: ActorAfterBoundary;
+  faultObserved: boolean;
+  safe: boolean;
+}
+
+async function runActorAfterBoundary(boundary: ActorAfterBoundary): Promise<ActorAfterResult> {
+  const fixture = await makeMergeFixture();
+  const actor = boundary === 'existing-actor-after'
+    ? fixture.existingIncomingActor
+    : fixture.newIncomingActor;
+  const path = `${fixture.targetDir}/ops/${actor}.jsonl`;
+  const message = `injected merge ${boundary}`;
+  const snapshotToken = `merge-crash-${boundary}`;
+  const eventOffset = fixture.targetFs.events.length;
+  fixture.targetFs.failNextWriteAfterCommit(path, message);
+  fixture.targetFs.watchFilesAfterCommit(
+    snapshotToken,
+    path,
+    await mergeSnapshotPaths(fixture),
+  );
+  await settle(
+    mergeFromInspection(fixture.targetFs, fixture.targetDir, fixture.targetStore, fixture.inspection),
+  );
+  await fixture.targetFs.settleProbes();
+  fixture.targetFs.assertAllConsumed();
+  const faultEvent = fixture.targetFs.events.find(
+    (event) => event.path === path && event.outcome !== 'pass',
+  );
+  const crashSnapshot = fixture.targetFs.fileSnapshots.find(
+    (snapshot) => snapshot.token === snapshotToken,
+  );
+  if (crashSnapshot === undefined) throw new Error('actor after-commit did not capture its crash snapshot');
+  const authorityPathsKnown = mergeAuthorityMutationPathsAreKnown(
+    fixture,
+    fixture.targetFs.events.slice(eventOffset),
+  );
+  return {
+    boundary,
+    faultObserved: faultEvent?.outcome === 'commit-then-throw',
+    safe: authorityPathsKnown && (await inspectExactMergeAuthority(
+      fixture,
+      await materializeSnapshot(crashSnapshot),
+    )).safe,
+  };
+}
+
 for (const row of MERGE_FAULT_ROWS) {
   describe.sequential(`G0S-BLOB merge interruption: ${row.boundary}`, () => {
     let safe: boolean;
@@ -2097,6 +2227,7 @@ for (const row of MERGE_FAULT_ROWS) {
     beforeAll(async () => {
       const fixture = await makeMergeFixture();
       const message = `injected merge ${row.boundary}`;
+      const eventOffset = fixture.targetFs.events.length;
       const armed = armMergeFault(fixture, row.boundary, message);
       const snapshotToken = `merge-crash-${row.boundary}`;
       fixture.targetFs.watchFilesAfterCommit(
@@ -2104,7 +2235,7 @@ for (const row of MERGE_FAULT_ROWS) {
         armed.path,
         await mergeSnapshotPaths(fixture),
       );
-      await settle(
+      const actionOutcome = await settle(
         mergeFromInspection(fixture.targetFs, fixture.targetDir, fixture.targetStore, fixture.inspection),
       );
       await fixture.targetFs.settleProbes();
@@ -2117,7 +2248,22 @@ for (const row of MERGE_FAULT_ROWS) {
         (snapshot) => snapshot.token === snapshotToken,
       );
       if (crashSnapshot === undefined) throw new Error('merge fault did not capture its crash snapshot');
-      safe = (await inspectMergedClosure(fixture, await materializeSnapshot(crashSnapshot))).safe;
+      const crashAuthoritySafe = (await inspectExactMergeAuthority(
+        fixture,
+        await materializeSnapshot(crashSnapshot),
+      )).safe;
+      const finalAuthority = await inspectExactMergeAuthority(fixture);
+      const finalKind = exactMergeAuthorityKind(finalAuthority);
+      safe =
+        mergeAuthorityMutationPathsAreKnown(
+          fixture,
+          fixture.targetFs.events.slice(eventOffset),
+        ) &&
+        crashAuthoritySafe &&
+        finalAuthority.safe &&
+        finalKind !== null &&
+        currentMergeAuthorityKind(fixture) === finalKind &&
+        (actionOutcome.rejected || finalKind === 'complete');
     });
 
     it('reaches the requested blob or actor-log durable prefix outside the safety assertion', () => {
@@ -2136,6 +2282,31 @@ for (const row of MERGE_FAULT_ROWS) {
   });
 }
 
+describe.sequential('G0S-BLOB actor-log after-commit publication boundary', () => {
+  let results: ActorAfterResult[];
+
+  beforeAll(async () => {
+    results = await Promise.all([
+      runActorAfterBoundary('existing-actor-after'),
+      runActorAfterBoundary('new-actor-after'),
+    ]);
+  });
+
+  for (const boundary of ['existing-actor-after', 'new-actor-after'] as const) {
+    it(`reaches ${boundary} independently of physical actor write order`, () => {
+      expect(results.find((result) => result.boundary === boundary)?.faultObserved).toBe(true);
+    });
+  }
+
+  it('has one exact final actor-log commit snapshot regardless of which actor is written last', () => {
+    expect(results.some((result) => result.safe)).toBe(true);
+  });
+
+  it.fails('makes every actor-log commit atomic as an exact old-or-complete authority', () => {
+    expect(results.every((result) => result.safe)).toBe(true);
+  });
+});
+
 describe.sequential('G0S-BLOB same-path binary identity', () => {
   it('accepts an already-present byte-identical incoming blob', async () => {
     const fixture = await makeMergeFixture();
@@ -2147,9 +2318,9 @@ describe.sequential('G0S-BLOB same-path binary identity', () => {
       fixture.targetStore,
       fixture.inspection,
     );
-    const closure = await inspectMergedClosure(fixture);
-    expect(closure.completeState).toBe(true);
-    expect(closure.blobsMatch).toBe(true);
+    const authority = await inspectExactMergeAuthority(fixture);
+    expect(exactMergeAuthorityKind(authority)).toBe('complete');
+    expect(authority.safe).toBe(true);
   });
 
   describe('different bytes under the same path', () => {
@@ -2164,20 +2335,19 @@ describe.sequential('G0S-BLOB same-path binary identity', () => {
       const evil = Uint8Array.from(binary.data, (value) => value ^ 0xff);
       fixtureValid = evil.length === binary.data.length && !bytesEqual(evil, binary.data);
       await fixture.targetFs.writeBytes(`${fixture.targetDir}/${binary.path}`, evil);
-      const binaryPaths = fixture.incomingBinaries.map(
-        (candidate) => `${fixture.targetDir}/${candidate.path}`,
-      );
+      const eventOffset = fixture.targetFs.events.length;
+      const authorityPaths = mergeSnapshotPathsForAuthority(fixture);
       let notificationCount = 0;
-      const notificationStates: ObservedMergeState[] = [];
+      const notificationStates: ExactObservedMergeState[] = [];
       let mergeCallCount = 0;
       const unsubscribe = fixture.targetStore.subscribe((state) => {
         const token = `collision-notification-${notificationCount++}`;
-        notificationStates.push(observeMergeState(token, state, fixture.targetStore));
-        fixture.targetFs.markFiles(token, binaryPaths);
+        notificationStates.push(observeExactMergeState(token, state, fixture.targetStore));
+        fixture.targetFs.markFiles(token, authorityPaths);
       });
       const originalMergeExternal = fixture.targetStore.mergeExternal.bind(fixture.targetStore);
       const mergeSpy = vi.spyOn(fixture.targetStore, 'mergeExternal').mockImplementation((incoming) => {
-        fixture.targetFs.markFiles(`collision-merge-call-${mergeCallCount++}`, binaryPaths);
+        fixture.targetFs.markFiles(`collision-merge-call-${mergeCallCount++}`, authorityPaths);
         return originalMergeExternal(incoming);
       });
       let result: Awaited<ReturnType<typeof settle>>;
@@ -2190,10 +2360,13 @@ describe.sequential('G0S-BLOB same-path binary identity', () => {
         unsubscribe();
       }
       await fixture.targetFs.settleProbes();
-      const closure = await inspectMergedClosure(fixture);
-      dispositionSafe = result.rejected
-        ? closure.oldState && closure.blobsMatch
-        : closure.completeState && closure.blobsMatch;
+      const authority = await inspectExactMergeAuthority(fixture);
+      const finalKind = exactMergeAuthorityKind(authority);
+      dispositionSafe =
+        authority.safe &&
+        finalKind !== null &&
+        currentMergeAuthorityKind(fixture) === finalKind &&
+        (result.rejected || finalKind === 'complete');
       const snapshots = fixture.targetFs.fileSnapshots.filter(
         (snapshot) => snapshot.token.startsWith('collision-notification-'),
       );
@@ -2202,12 +2375,19 @@ describe.sequential('G0S-BLOB same-path binary identity', () => {
       );
       metadataApplicationSafe = mergeCallSnapshots.length === 0
         ? result.rejected
-        : mergeCallSnapshots.every((snapshot) => snapshotHasExactIncomingBinaries(snapshot, fixture));
+        : mergeCallSnapshots.every((snapshot) =>
+          snapshotHasExactVisibleAuthority(snapshot, fixture.completeState, fixture));
       publicationSafe = snapshots.length === 0
-        ? result.rejected
-        : notificationStates.length === snapshots.length &&
+        ? result.rejected && mergeAuthorityMutationPathsAreKnown(
+          fixture,
+          fixture.targetFs.events.slice(eventOffset),
+        )
+        : mergeAuthorityMutationPathsAreKnown(
+          fixture,
+          fixture.targetFs.events.slice(eventOffset),
+        ) && notificationStates.length === snapshots.length &&
           notificationStates.every((observed) =>
-            observedPublicationIsSafe(
+            exactObservedMergePublicationIsSafe(
               observed,
               snapshots.find((snapshot) => snapshot.token === observed.token),
               fixture,
@@ -2218,15 +2398,15 @@ describe.sequential('G0S-BLOB same-path binary identity', () => {
       expect(fixtureValid).toBe(true);
     });
 
-    it.fails('rejects the merge without changing active state or completes with exact incoming bytes', () => {
+    it('rejects the merge without changing active state or completes with exact incoming bytes', () => {
       expect(dispositionSafe).toBe(true);
     });
 
-    it.fails('applies incoming operations only after every referenced incoming blob is exact', () => {
+    it('applies incoming operations only after every referenced incoming blob is exact', () => {
       expect(metadataApplicationSafe).toBe(true);
     });
 
-    it.fails('never notifies observers while a published asset points at different bytes', () => {
+    it('never notifies observers while a published asset points at different bytes', () => {
       expect(publicationSafe).toBe(true);
     });
 
@@ -2271,23 +2451,27 @@ describe.sequential('G0S-BLOB same-path binary identity', () => {
             ? { path: binary.path, data: collisionBytes }
             : binary),
       };
+      const eventOffset = fixture.targetFs.events.length;
       fixtureValid =
         collisionBytes.length === BASE_BYTES.length &&
         !bytesEqual(collisionBytes, BASE_BYTES) &&
         collisionInspection.binaries.filter((binary) => binary.path === fixture.baselinePath).length === 1;
       let mergeCallCount = 0;
-      const notificationStates: ObservedMergeState[] = [];
+      const notificationStates: ExactObservedMergeState[] = [];
+      const authorityPaths = mergeSnapshotPathsForAuthority(fixture);
       const originalMergeExternal = fixture.targetStore.mergeExternal.bind(fixture.targetStore);
       const mergeSpy = vi.spyOn(fixture.targetStore, 'mergeExternal').mockImplementation((incoming) => {
         mergeCallCount += 1;
         return originalMergeExternal(incoming);
       });
       const unsubscribe = fixture.targetStore.subscribe((state) => {
-        notificationStates.push(observeMergeState(
-          `referenced-collision-notification-${notificationStates.length}`,
+        const token = `referenced-collision-notification-${notificationStates.length}`;
+        notificationStates.push(observeExactMergeState(
+          token,
           state,
           fixture.targetStore,
         ));
+        fixture.targetFs.markFiles(token, authorityPaths);
       });
       let result: Awaited<ReturnType<typeof settle>>;
       try {
@@ -2303,32 +2487,266 @@ describe.sequential('G0S-BLOB same-path binary identity', () => {
         mergeSpy.mockRestore();
         unsubscribe();
       }
-      const closure = await inspectMergedClosure(fixture);
+      await fixture.targetFs.settleProbes();
+      const authority = await inspectExactMergeAuthority(fixture);
       rejectedWithoutMutation =
         result.rejected &&
-        closure.oldState &&
-        closure.blobsMatch &&
+        authority.safe &&
+        exactMergeAuthorityKind(authority) === 'old' &&
+        currentMergeAuthorityKind(fixture) === 'old' &&
         bytesEqual(
           await fixture.targetFs.readBytes(`${fixture.targetDir}/${fixture.baselinePath}`),
           BASE_BYTES,
         );
       noTransientPublication =
         mergeCallCount === 0 &&
-        notificationStates.every((observed) => observedOldState(observed, fixture));
+        mergeAuthorityMutationPathsAreKnown(
+          fixture,
+          fixture.targetFs.events.slice(eventOffset),
+        ) &&
+        notificationStates.every((observed) =>
+          exactObservedMergePublicationIsSafe(
+            observed,
+            fixture.targetFs.fileSnapshots.find((snapshot) => snapshot.token === observed.token),
+            fixture,
+          ) &&
+          isDeepStrictEqual(observed.state, fixture.baselineState));
     });
 
     it('uses a byte-different incoming payload for an already referenced path', () => {
       expect(fixtureValid).toBe(true);
     });
 
-    it.fails('rejects before mutating the old asset, its bytes, or any incoming metadata', () => {
+    it('rejects before mutating the old asset, its bytes, or any incoming metadata', () => {
       expect(rejectedWithoutMutation).toBe(true);
     });
 
-    it.fails('never applies or notifies the impossible shared-path metadata before rejection', () => {
+    it('never applies or notifies the impossible shared-path metadata before rejection', () => {
       expect(noTransientPublication).toBe(true);
     });
   });
+});
+
+describe.sequential('G0S-BLOB merge preflight controls', () => {
+  for (const mode of ['empty', 'verified'] as const) {
+    it(`${mode} optimized reference preserves an exact merged authority`, async () => {
+      const fixture = await makeMergeFixture();
+      const baselineStorageOps = [...fixture.targetStore.allOps];
+      const targetAssetId = fixture.incomingAssetIds[0];
+      const optimizedPath = `models/${targetAssetId}.opt.glb`;
+      const optimizedBytes = encoder.encode('verified optimized merge control');
+      const incomingOps = fixture.inspection.ops.map((op): Op => {
+        if (op.e !== 'asset' || op.id !== targetAssetId || op.v === undefined) return op;
+        return {
+          ...op,
+          v: mode === 'empty'
+            ? { ...op.v, optimizedPath: '' }
+            : {
+                ...op.v,
+                optimizedPath,
+                optimizedSize: optimizedBytes.length,
+              },
+        };
+      });
+      const unreferenced = {
+        path: 'models/private-unreferenced-control.bin',
+        data: encoder.encode('unreferenced package bytes'),
+      };
+      const inspection: ZipInspection = {
+        ...fixture.inspection,
+        ops: incomingOps,
+        binaries: [
+          ...fixture.inspection.binaries,
+          ...(mode === 'verified' ? [{ path: optimizedPath, data: optimizedBytes }] : []),
+          unreferenced,
+        ],
+      };
+      const preview = mergeOps(baselineStorageOps, incomingOps);
+      const expectedOps = operationsByKey([...baselineStorageOps, ...preview.newOps]);
+      const expectedFiles = expectedMergedOpsFiles(
+        fixture.baselineOpsFiles,
+        fixture.targetDir,
+        preview.newOps,
+      );
+      const expectedBinaries = new Map(fixture.expectedBinaries);
+      if (mode === 'verified') expectedBinaries.set(optimizedPath, optimizedBytes);
+
+      await mergeFromInspection(
+        fixture.targetFs,
+        fixture.targetDir,
+        fixture.targetStore,
+        inspection,
+      );
+      const reopened = await ProjectStore.open(fixture.targetFs, fixture.targetDir, USER_A);
+      const targetAsset = reopened.state.byKind.asset?.[targetAssetId];
+
+      expect(reopened.loadErrors).toHaveLength(0);
+      expect(reopened.state).toEqual(preview.stateAfter);
+      expect(operationsByKey(reopened.allOps)).toEqual(expectedOps);
+      expect(reopened.vector).toEqual(versionVector([...baselineStorageOps, ...preview.newOps]));
+      expect(opsFilesMatchAuthority(
+        await readActiveOpsFiles(fixture.targetFs, fixture.targetDir),
+        expectedFiles,
+        fixture.baselineOpsFiles,
+      )).toBe(true);
+      expect(await visibleBlobReferencesAreExact(
+        fixture.targetFs,
+        reopened.state,
+        { ...fixture, expectedBinaries },
+      )).toBe(true);
+      expect(targetAsset?.fields.optimizedPath).toBe(mode === 'empty' ? '' : optimizedPath);
+      if (mode === 'verified') {
+        expect(targetAsset?.fields.optimizedSize).toBe(optimizedBytes.length);
+      }
+    });
+  }
+
+  it('accepts ops-only existing targets plus semantic manifest and appended-operation JSON formatting', async () => {
+    const fixture = await makeMergeFixture();
+    for (const binary of fixture.incomingBinaries) {
+      await fixture.targetFs.writeBytes(`${fixture.targetDir}/${binary.path}`, binary.data);
+    }
+    await fixture.targetFs.writeText(
+      `${fixture.targetDir}/lociview.json`,
+      JSON.stringify(parseManifest(fixture.baselineManifestText)),
+    );
+    await mergeFromInspection(
+      fixture.targetFs,
+      fixture.targetDir,
+      fixture.targetStore,
+      { ...fixture.inspection, binaries: [] },
+    );
+    let reformatted = false;
+    for (const [path, completeText] of fixture.completeOpsFiles) {
+      const baselineText = fixture.baselineOpsFiles.get(path) ?? '';
+      if (!completeText.startsWith(baselineText)) {
+        throw new Error('semantic JSONL control lacks its exact baseline prefix');
+      }
+      const suffix = completeText.slice(baselineText.length);
+      if (suffix === '') continue;
+      const semanticText = baselineText + semanticallyReformatJsonl(suffix);
+      reformatted ||= semanticText !== completeText;
+      await fixture.targetFs.writeText(path, semanticText);
+    }
+    const authority = await inspectExactMergeAuthority(fixture);
+    expect(reformatted).toBe(true);
+    expect(exactMergeAuthorityKind(authority)).toBe('complete');
+    expect(authority.safe).toBe(true);
+  });
+
+  it('accepts an unchanged legacy asset without size when its existing target bytes are exact', async () => {
+    const fixture = await makeMergeFixture(undefined, USER_A, true);
+    for (const binary of fixture.incomingBinaries) {
+      await fixture.targetFs.writeBytes(`${fixture.targetDir}/${binary.path}`, binary.data);
+    }
+    await mergeFromInspection(
+      fixture.targetFs,
+      fixture.targetDir,
+      fixture.targetStore,
+      { ...fixture.inspection, binaries: [] },
+    );
+    const authority = await inspectExactMergeAuthority(fixture);
+    const baselineAsset = fixture.targetStore.state.byKind.asset?.[fixture.baselineAssetIds[0]!];
+    expect(baselineAsset?.fields.size).toBeUndefined();
+    expect(exactMergeAuthorityKind(authority)).toBe('complete');
+    expect(authority.safe).toBe(true);
+  });
+
+  it('applies the same incoming-operation snapshot that was used for async blob preflight', async () => {
+    const fs = new PausingWriteMemoryFS();
+    const fixture = await makeMergeFixture(fs);
+    const inspection: ZipInspection = {
+      ...fixture.inspection,
+      ops: structuredClone(fixture.inspection.ops),
+    };
+    const pausedBinary = fixture.incomingBinaries[0];
+    const pause = fs.pauseNextWrite(`${fixture.targetDir}/${pausedBinary.path}`);
+    const merge = mergeFromInspection(fs, fixture.targetDir, fixture.targetStore, inspection);
+    await pause.reached;
+    const mutableOp = inspection.ops.find(
+      (op) => op.e === 'asset' && op.id === fixture.incomingAssetIds[0] && op.v !== undefined,
+    );
+    if (mutableOp?.v === undefined) throw new Error('mutable merge control lacks its asset operation');
+    mutableOp.v.path = 'models/unverified-after-preview.stl';
+    mutableOp.v.size = 999;
+    pause.release();
+    await merge;
+    const authority = await inspectExactMergeAuthority(fixture);
+    expect(exactMergeAuthorityKind(authority)).toBe('complete');
+    expect(authority.safe).toBe(true);
+    expect(fixture.targetStore.state.byKind.asset?.[fixture.incomingAssetIds[0]]?.fields.path)
+      .not.toBe('models/unverified-after-preview.stl');
+  });
+
+  for (const boundary of [
+    'duplicate-binary',
+    'noncanonical-binary-path',
+    'missing-visible-path',
+    'missing-visible-size',
+    'invalid-visible-size',
+    'missing-baseline-target',
+  ] as const) {
+    it(`rejects ${boundary} before mergeExternal`, async () => {
+      const fixture = await makeMergeFixture();
+      let inspection: ZipInspection = fixture.inspection;
+      if (boundary === 'duplicate-binary') {
+        const duplicate = fixture.inspection.binaries[0]!;
+        inspection = {
+          ...fixture.inspection,
+          binaries: [...fixture.inspection.binaries, { path: duplicate.path, data: duplicate.data }],
+        };
+      } else if (boundary === 'noncanonical-binary-path') {
+        inspection = {
+          ...fixture.inspection,
+          binaries: [
+            ...fixture.inspection.binaries,
+            { path: '../outside.bin', data: encoder.encode('unsafe') },
+          ],
+        };
+      } else if (boundary === 'missing-baseline-target') {
+        await fixture.targetFs.remove(`${fixture.targetDir}/${fixture.baselinePath}`);
+        inspection = {
+          ...fixture.inspection,
+          binaries: fixture.inspection.binaries.filter(
+            (binary) => binary.path !== fixture.baselinePath,
+          ),
+        };
+      } else {
+        const targetAssetId = fixture.incomingAssetIds[0];
+        inspection = {
+          ...fixture.inspection,
+          ops: fixture.inspection.ops.map((op): Op => {
+            if (op.e !== 'asset' || op.id !== targetAssetId || op.v === undefined) return op;
+            const v = { ...op.v };
+            if (boundary === 'missing-visible-path') delete v.path;
+            else if (boundary === 'missing-visible-size') delete v.size;
+            else v.size = 'invalid';
+            return { ...op, v };
+          }),
+        };
+      }
+      let mergeCallCount = 0;
+      const original = fixture.targetStore.mergeExternal.bind(fixture.targetStore);
+      const spy = vi.spyOn(fixture.targetStore, 'mergeExternal').mockImplementation((ops) => {
+        mergeCallCount += 1;
+        return original(ops);
+      });
+      let outcome: Awaited<ReturnType<typeof settle>>;
+      try {
+        outcome = await settle(mergeFromInspection(
+          fixture.targetFs,
+          fixture.targetDir,
+          fixture.targetStore,
+          inspection,
+        ));
+      } finally {
+        spy.mockRestore();
+      }
+      expect(outcome.rejected).toBe(true);
+      expect(mergeCallCount).toBe(0);
+      expect(currentMergeAuthorityKind(fixture)).toBe('old');
+    });
+  }
 });
 
 describe('G0S-BLOB deferred package transaction boundaries', () => {

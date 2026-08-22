@@ -12,12 +12,15 @@ import { mountMaterialTab } from './tabs/material';
 import { mountModelTab } from './tabs/model';
 import { applyViewRecordToViewer, mountViewsTab } from './tabs/views';
 import { mountCaptionOverlay } from './overlay';
+import { describeSaveStatus, type PackageExportStatus } from './saveStatus';
 
 export interface ViewerScreenDeps {
   goHome: () => void;
   loadModelAsset: (assetId: string) => Promise<void>;
-  markExported: () => void;
-  unsavedCount: () => number;
+  unexportedCount: () => number;
+  persistentWorkspace: boolean;
+  packageExportStatus: () => PackageExportStatus;
+  setPackageExportStatus: (status: PackageExportStatus) => void;
   openProfile: () => void;
 }
 
@@ -39,6 +42,14 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
   // ---- トップバー -------------------------------------------------------------
 
   const saveStatus = el('span', { class: 'lv-dim lv-savestatus' });
+  const retrySaveBtn = el('button', {
+    class: 'mini',
+    title: '端末ワークスペースへの保存を再試行',
+    onclick: () => {
+      void ctx.store.flush().catch(() => undefined);
+    },
+  }, '保存を再試行');
+  retrySaveBtn.hidden = true;
   const undoBtn = el('button', { title: '元に戻す (Ctrl+Z)', onclick: () => { ctx.undo.undo(); } }, '↺');
   const redoBtn = el('button', { title: 'やり直す (Ctrl+Y)', onclick: () => { ctx.undo.redo(); } }, '↻');
 
@@ -46,6 +57,7 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
     el('button', { onclick: deps.goHome, title: 'ホームへ' }, '☰'),
     el('b', { class: 'lv-projname' }, ctx.store.manifest.name),
     saveStatus,
+    retrySaveBtn,
     el('span', { class: 'lv-flex1' }),
     undoBtn, redoBtn,
     el('button', { onclick: deps.openProfile, class: 'lv-profile' }, ctx.displayName(ctx.identity.userId)),
@@ -155,7 +167,7 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
       case 'data':
         refreshers.set('data', mountDataTab(containerEl, ctx, {
           loadModelAsset: deps.loadModelAsset,
-          markExported: deps.markExported,
+          setPackageExportStatus: deps.setPackageExportStatus,
         }));
         break;
     }
@@ -254,8 +266,15 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
   }
 
   function renderStatus(): void {
-    const n = deps.unsavedCount();
-    saveStatus.textContent = n > 0 ? `✓ 自動保存済み ・ 未書き出しの変更 ${n}件` : '✓ 自動保存済み ・ 書き出し済み';
+    const status = describeSaveStatus(
+      ctx.store.durabilityStatus,
+      deps.unexportedCount(),
+      deps.persistentWorkspace,
+      deps.packageExportStatus(),
+    );
+    saveStatus.textContent = status.compactText;
+    saveStatus.title = status.detailText;
+    retrySaveBtn.hidden = !status.canRetry;
     undoBtn.disabled = !ctx.undo.canUndo;
     redoBtn.disabled = !ctx.undo.canRedo;
   }

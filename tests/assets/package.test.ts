@@ -298,7 +298,7 @@ describe('G0-S characterization: package interruption', () => {
       }
     });
 
-    it.fails('G0S-BLOB/merge: interrupted package merge never leaves visible metadata pointing to a missing blob', () => {
+    it('G0S-BLOB/merge: interrupted package merge never leaves visible metadata pointing to a missing blob', () => {
       expect(safe).toBe(true);
     });
   });

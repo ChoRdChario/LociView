@@ -48,6 +48,7 @@ export class AppContext {
   ) {
     this.undo = new UndoManager(store);
     store.subscribe(() => this.notify());
+    store.subscribeDurability(() => this.notify());
     // 既定セット・既定モデルの初期解決
     const sets = this.sets();
     this.ui.activeSetId = sets[0]?.id ?? null;

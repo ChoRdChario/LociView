@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { parseOpsJsonl } from '../../src/core/jsonl';
 import { opKey, visibleEntities } from '../../src/core/reduce';
 import type { Op } from '../../src/core/schema';
-import { ProjectStore, type Identity } from '../../src/core/store';
+import { ProjectStore, type DurableWriteStatus, type Identity } from '../../src/core/store';
 import { MemoryFS, type WorkspaceFS } from '../../src/platform/fs';
 import { InterleavingAppendMemoryFS } from '../helpers/interleavingFs';
 
@@ -90,11 +90,37 @@ function mapsHaveSameOperations(actual: Map<string, Op>, expected: Map<string, O
   return true;
 }
 
+function mapIsOperationSubset(actual: Map<string, Op>, expected: Map<string, Op>): boolean {
+  for (const [id, actualOp] of actual) {
+    const expectedOp = expected.get(id);
+    if (expectedOp === undefined || !isDeepStrictEqual(actualOp, expectedOp)) return false;
+  }
+  return true;
+}
+
+function flushDispositionIsTruthful(
+  outcome: PromiseSettledResult<void>,
+  status: DurableWriteStatus,
+  laneOps: readonly Op[],
+  rawOps: ReadonlyMap<string, Op>,
+  reopenedOps: ReadonlyMap<string, Op>,
+): boolean {
+  if (outcome.status === 'rejected') {
+    return status.phase === 'failed' && status.pending > 0;
+  }
+  return status.phase === 'durable' &&
+    status.pending === 0 &&
+    laneOps.every((expected) =>
+      isDeepStrictEqual(rawOps.get(expected.id), expected) &&
+      isDeepStrictEqual(reopenedOps.get(expected.id), expected));
+}
+
 describe.sequential('G0S-TAB actor instance characterization', () => {
   let actorIds: [string, string];
   let operationMetadataIsConsistent: boolean;
   let rawIds: string[];
   let loadErrorCount: number;
+  let durableAuthorityIsTruthful: boolean;
 
   beforeAll(async () => {
     const fs = new MemoryFS();
@@ -111,7 +137,7 @@ describe.sequential('G0S-TAB actor instance characterization', () => {
     const opB = tabB.dispatch({
       t: 'create', e: 'caption', id: captionId(0, 1, 1), v: { title: 'actor B' },
     });
-    await Promise.all([tabA.flush(), tabB.flush()]);
+    const flushOutcomes = await Promise.allSettled([tabA.flush(), tabB.flush()]);
     const logs = await readLogs(fs, dir);
     rawIds = logs.ops.map((op) => op.id).sort();
     operationMetadataIsConsistent =
@@ -125,12 +151,26 @@ describe.sequential('G0S-TAB actor instance characterization', () => {
       logs.fileActorMatches;
     const reopened = await ProjectStore.open(fs, dir, USER_A);
     loadErrorCount = reopened.loadErrors.length;
+    const expectedOps = byId([opA, opB]);
+    const rawOps = byId(logs.ops);
+    const reopenedOps = byId(reopened.allOps);
+    durableAuthorityIsTruthful =
+      logs.ops.length === rawOps.size &&
+      mapIsOperationSubset(rawOps, expectedOps) &&
+      mapsHaveSameOperations(reopenedOps, rawOps) &&
+      flushDispositionIsTruthful(
+        flushOutcomes[0]!, tabA.durabilityStatus, [opA], rawOps, reopenedOps,
+      ) &&
+      flushDispositionIsTruthful(
+        flushOutcomes[1]!, tabB.durabilityStatus, [opB], rawOps, reopenedOps,
+      );
   });
 
   it('keeps setup, operation metadata, raw lines, and reopenability outside the xfail', () => {
     expect(operationMetadataIsConsistent).toBe(true);
-    expect(rawIds).toEqual([captionId(0, 0, 1), captionId(0, 1, 1)].sort());
+    expect(rawIds.every((id) => [captionId(0, 0, 1), captionId(0, 1, 1)].includes(id))).toBe(true);
     expect(loadErrorCount).toBe(0);
+    expect(durableAuthorityIsTruthful).toBe(true);
   });
 
   it.fails('G0S-TAB: two simultaneous stores for one identity use distinct actor instances', () => {
@@ -185,6 +225,7 @@ for (const scenario of STRESS_SCENARIOS) {
     let parseErrorCount: number;
     let fileActorMatches: boolean;
     let reopenLoadErrorCount: number;
+    let flushDispositionsAreTruthful: boolean;
 
     beforeAll(async () => {
       const fs = new MemoryFS();
@@ -201,21 +242,24 @@ for (const scenario of STRESS_SCENARIOS) {
         plan.filter((item) => item.lane === 1).length,
       ];
       const dispatched: Op[] = [];
+      const dispatchedByLane: [Op[], Op[]] = [[], []];
       for (const item of plan) {
         const id = captionId(scenario.scenarioDigit, item.lane, item.index);
         expectedIds.add(id);
-        dispatched.push(stores[item.lane].dispatch({
+        const op = stores[item.lane].dispatch({
           t: 'create',
           e: 'caption',
           id,
           v: { title: `${scenario.label} lane ${item.lane} item ${item.index}` },
-        }));
+        });
+        dispatched.push(op);
+        dispatchedByLane[item.lane].push(op);
       }
       expectedOps = byId(dispatched);
-      await Promise.all([tabA.flush(), tabB.flush()]);
+      const flushOutcomes = await Promise.allSettled([tabA.flush(), tabB.flush()]);
 
       const logs = await readLogs(fs, dir);
-      const scenarioRaw = logs.ops.filter((op) => expectedIds.has(op.id));
+      const scenarioRaw = logs.ops;
       rawOperationCount = scenarioRaw.length;
       rawOps = byId(scenarioRaw);
       rawUniqueKeyCount = new Set(scenarioRaw.map(opKey)).size;
@@ -223,38 +267,43 @@ for (const scenario of STRESS_SCENARIOS) {
       fileActorMatches = logs.fileActorMatches;
 
       const reopened = await ProjectStore.open(fs, dir, USER_A);
-      const scenarioReopened = reopened.allOps.filter((op) => expectedIds.has(op.id));
+      const scenarioReopened = [...reopened.allOps];
       reopenedOperationCount = scenarioReopened.length;
       reopenedOps = byId(scenarioReopened);
       reopenedUniqueKeyCount = new Set(scenarioReopened.map(opKey)).size;
       visibleIds = visibleEntities(reopened.state, 'caption')
         .map((record) => record.id)
-        .filter((id) => expectedIds.has(id))
         .sort();
       reopenLoadErrorCount = reopened.loadErrors.length;
+      flushDispositionsAreTruthful =
+        flushDispositionIsTruthful(
+          flushOutcomes[0]!, tabA.durabilityStatus, dispatchedByLane[0], rawOps, reopenedOps,
+        ) &&
+        flushDispositionIsTruthful(
+          flushOutcomes[1]!, tabB.durabilityStatus, dispatchedByLane[1], rawOps, reopenedOps,
+        );
     }, 60_000);
 
-    it('dispatches and durably parses the exact 2,000 planned operation payloads', () => {
+    it('plans exactly 2,000 payloads and keeps any fail-closed durable subset parseable and reopenable', () => {
       expect(planCounts).toEqual([1_000, 1_000]);
       expect(expectedIds.size).toBe(2_000);
       expect(expectedOps.size).toBe(2_000);
       expect(parseErrorCount).toBe(0);
       expect(fileActorMatches).toBe(true);
-      expect(rawOperationCount).toBe(2_000);
-      expect(rawOps.size).toBe(2_000);
-      expect(mapsHaveSameOperations(rawOps, expectedOps)).toBe(true);
+      expect(rawOps.size).toBe(rawOperationCount);
+      expect(mapIsOperationSubset(rawOps, expectedOps)).toBe(true);
       expect(reopenLoadErrorCount).toBe(0);
-      expect(reopenedOperationCount).toBe(2_000);
-      expect(reopenedOps.size).toBe(2_000);
-      expect(mapsHaveSameOperations(reopenedOps, expectedOps)).toBe(true);
+      expect(reopenedOps.size).toBe(reopenedOperationCount);
+      expect(mapsHaveSameOperations(reopenedOps, rawOps)).toBe(true);
+      expect(flushDispositionsAreTruthful).toBe(true);
     });
 
     it.fails('G0S-TAB: all 2,000 durable raw operations have distinct operation keys', () => {
-      expect(rawUniqueKeyCount).toBe(2_000);
+      expect(rawOperationCount === 2_000 && rawUniqueKeyCount === 2_000).toBe(true);
     });
 
     it.fails('G0S-TAB: all 2,000 reopened operations have distinct operation keys', () => {
-      expect(reopenedUniqueKeyCount).toBe(2_000);
+      expect(reopenedOperationCount === 2_000 && reopenedUniqueKeyCount === 2_000).toBe(true);
     });
 
     it.fails('G0S-TAB: reload reduces to the exact 2,000 visible captions', () => {
@@ -294,6 +343,7 @@ describe.sequential('G0S-TAB shared external actor append race', () => {
   let reopenedKeys: string[];
   let visibleIds: string[];
   let loadErrorCount: number;
+  let flushDispositionsAreTruthful: boolean;
 
   beforeAll(async () => {
     const fs = new InterleavingAppendMemoryFS();
@@ -313,7 +363,7 @@ describe.sequential('G0S-TAB shared external actor append race', () => {
     reportsCreatedExpectedIds =
       reportA.created.some((item) => item.id === expectedOps[0]!.id) &&
       reportB.created.some((item) => item.id === expectedOps[1]!.id);
-    await Promise.all([tabA.flush(), tabB.flush()]);
+    const flushOutcomes = await Promise.allSettled([tabA.flush(), tabB.flush()]);
 
     eventSummary = {
       reads: fs.events.filter((event) => event.type === 'read-attempt').length,
@@ -324,12 +374,25 @@ describe.sequential('G0S-TAB shared external actor append race', () => {
         .map((event) => event.type === 'barrier-release' ? event.mode : ''),
     };
     const logs = await readLogs(fs, dir);
+    const rawOps = byId(logs.ops);
     parseErrorCount = logs.parseErrorCount;
     durableKeys = logs.ops.filter((op) => op.actor === EXTERNAL_ACTOR).map(opKey).sort();
     const reopened = await ProjectStore.open(fs, dir, USER_A);
+    const reopenedOps = byId(reopened.allOps);
     loadErrorCount = reopened.loadErrors.length;
     reopenedKeys = reopened.allOps.filter((op) => op.actor === EXTERNAL_ACTOR).map(opKey).sort();
     visibleIds = visibleEntities(reopened.state, 'caption').map((record) => record.id).sort();
+    const expected = byId(expectedOps);
+    flushDispositionsAreTruthful =
+      logs.ops.length === rawOps.size &&
+      mapIsOperationSubset(rawOps, expected) &&
+      mapsHaveSameOperations(reopenedOps, rawOps) &&
+      flushDispositionIsTruthful(
+        flushOutcomes[0]!, tabA.durabilityStatus, [expectedOps[0]!], rawOps, reopenedOps,
+      ) &&
+      flushDispositionIsTruthful(
+        flushOutcomes[1]!, tabB.durabilityStatus, [expectedOps[1]!], rawOps, reopenedOps,
+      );
   });
 
   it('keeps merge setup, append attempts, parsing, and reopenability outside the xfails', () => {
@@ -342,8 +405,8 @@ describe.sequential('G0S-TAB shared external actor append race', () => {
     expect(['concurrent', 'timeout']).toContain(eventSummary.releaseModes[0]);
     expect(parseErrorCount).toBe(0);
     expect(loadErrorCount).toBe(0);
-    expect(durableKeys.length).toBeGreaterThanOrEqual(1);
     expect(durableKeys.every((key) => expectedOps.map(opKey).includes(key))).toBe(true);
+    expect(flushDispositionsAreTruthful).toBe(true);
   });
 
   it.fails('G0S-TAB: both shared-actor appends remain durable after the race', () => {

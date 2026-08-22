@@ -156,7 +156,7 @@ describe('G0-S characterization: actor/sequence と durable write queue', () => 
     ]);
     const capA = tabA.createEntity('caption', { title: 'tab A' });
     const capB = tabB.createEntity('caption', { title: 'tab B' });
-    await Promise.all([tabA.flush(), tabB.flush()]);
+    await Promise.allSettled([tabA.flush(), tabB.flush()]);
 
     const reopened = await ProjectStore.open(fs, 'projects/tabs', USER_A);
       captionIds = visibleEntities(reopened.state, 'caption').map((record) => record.id);
@@ -175,7 +175,7 @@ describe('G0-S characterization: actor/sequence と durable write queue', () => 
     beforeAll(async () => {
       const fs = new FaultInjectingMemoryFS();
       const store = await ProjectStore.create(fs, 'projects/write', 'write', USER_A);
-      fs.failNext('appendText', `projects/write/ops/${store.actorId}.jsonl`);
+      fs.failNextWrite(`projects/write/ops/${store.actorId}.jsonl`);
 
       const capA = store.createEntity('caption', { title: 'first queued write' });
       await store.flush().catch(() => undefined);
@@ -188,7 +188,7 @@ describe('G0-S characterization: actor/sequence と durable write queue', () => 
       expectedIds = [capA, capB];
     });
 
-    it.fails('G0S-WRITE: 一度だけ失敗したappendを再試行し、後続操作まで順序どおりdurableになる', () => {
+    it('G0S-WRITE: 一度だけ失敗したappendを再試行し、後続操作まで順序どおりdurableになる', () => {
       expect(captionIds).toEqual(expect.arrayContaining(expectedIds));
     });
   });

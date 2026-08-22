@@ -6,13 +6,20 @@
 
 import { parseOpsJsonl } from '../core/jsonl';
 import { parseManifest, type ProjectManifest } from '../core/manifest';
-import type { MergeReport } from '../core/merge';
-import { reduce, versionVector } from '../core/reduce';
+import { mergeOps, type MergeReport } from '../core/merge';
+import { reduce, versionVector, visibleEntities, type ProjectState } from '../core/reduce';
 import type { Op } from '../core/schema';
 import type { ProjectStore } from '../core/store';
 import type { WorkspaceFS } from '../platform/fs';
 import { buildCaptionsCsv } from '../io/csv';
-import { readZipEntries, writeZipEntries, type ZipEntryData, type ZipLimits } from './zipio';
+import {
+  readZipEntries,
+  sanitizeZipPath,
+  writeZipEntries,
+  type ZipEntryData,
+  type ZipLimits,
+} from './zipio';
+import { writeVerifiedBytes } from './verifiedWrite';
 
 const decoder = new TextDecoder();
 const encoder = new TextEncoder();
@@ -99,15 +106,158 @@ export async function mergeFromInspection(
       `merge: project mismatch (${insp.manifest.projectId} != ${store.manifest.projectId})`,
     );
   }
-  const report = store.mergeExternal(insp.ops);
-  for (const b of insp.binaries) {
-    const path = `${dir}/${b.path}`;
-    if (!(await fs.exists(path))) {
-      await fs.writeBytes(path, b.data);
+  await store.flush();
+  const baselineOps = structuredClone([...store.allOps]);
+  const baselineOpsSnapshot = JSON.stringify(baselineOps);
+  const incomingOps = structuredClone(insp.ops);
+  const baselineState = store.state;
+  const preview = mergeOps(baselineOps, incomingOps);
+  const required = requiredBlobClosure(preview.stateAfter, baselineState);
+  const binaries = uniqueBinaryRegistry(insp.binaries);
+  const writes: Array<{ path: string; data: Uint8Array }> = [];
+  const expectedBytes = new Map<string, Uint8Array>();
+
+  for (const [path, expectedSize] of required) {
+    const source = binaries.get(path);
+    if (source !== undefined && expectedSize !== null && source.length !== expectedSize) {
+      throw new Error(`merge: binary size mismatch for ${path}`);
+    }
+    const absolutePath = `${dir}/${path}`;
+    const existing = await fs.readBytes(absolutePath);
+    if (source !== undefined) {
+      if (existing === null) {
+        writes.push({ path: absolutePath, data: source });
+      } else if (!bytesEqual(existing, source)) {
+        throw new Error(`merge: binary collision for ${path}`);
+      }
+      expectedBytes.set(path, new Uint8Array(source));
+    } else if (existing === null) {
+      throw new Error(`merge: missing required binary ${path}`);
+    } else {
+      expectedBytes.set(path, new Uint8Array(existing));
+    }
+    if (existing !== null && expectedSize !== null && existing.length !== expectedSize) {
+      throw new Error(`merge: required binary verification failed for ${path}`);
     }
   }
+
+  for (const write of writes) await writeVerifiedBytes(fs, write.path, write.data);
+  for (const [path, expected] of expectedBytes) {
+    const stored = await fs.readBytes(`${dir}/${path}`);
+    if (stored === null || !bytesEqual(stored, expected)) {
+      throw new Error(`merge: required binary verification failed for ${path}`);
+    }
+  }
+  if (
+    store.allOps.length !== baselineOps.length ||
+    JSON.stringify(store.allOps) !== baselineOpsSnapshot
+  ) {
+    throw new Error('merge: target changed during binary preflight');
+  }
+
+  const report = store.mergeExternal(incomingOps);
   await store.flush();
   return report;
+}
+
+function uniqueBinaryRegistry(entries: readonly ZipEntryData[]): Map<string, Uint8Array> {
+  const registry = new Map<string, Uint8Array>();
+  for (const entry of entries) {
+    if (
+      entry.path === '' ||
+      entry.path.endsWith('/') ||
+      sanitizeZipPath(entry.path) !== entry.path
+    ) {
+      throw new Error(`merge: invalid binary path ${entry.path}`);
+    }
+    if (registry.has(entry.path)) throw new Error(`merge: duplicate binary path ${entry.path}`);
+    registry.set(entry.path, new Uint8Array(entry.data));
+  }
+  return registry;
+}
+
+function requiredBlobClosure(
+  state: ProjectState,
+  baselineState: ProjectState,
+): Map<string, number | null> {
+  const required = new Map<string, number | null>();
+  const baselineAssets = new Map(
+    visibleEntities(baselineState, 'asset').map((asset) => [asset.id, asset.fields]),
+  );
+  for (const asset of visibleEntities(state, 'asset')) {
+    const baselineFields = baselineAssets.get(asset.id);
+    registerRequiredBlob(
+      required,
+      asset.fields.path,
+      asset.fields.size,
+      baselineFields !== undefined,
+      baselineFields?.path,
+      baselineFields?.size,
+      ['models/', 'media/'],
+      true,
+    );
+    const optimizedPath = asset.fields.optimizedPath;
+    if (optimizedPath !== undefined && optimizedPath !== '') {
+      registerRequiredBlob(
+        required,
+        optimizedPath,
+        asset.fields.optimizedSize,
+        baselineFields !== undefined,
+        baselineFields?.optimizedPath,
+        baselineFields?.optimizedSize,
+        ['models/'],
+        true,
+      );
+    }
+  }
+  return required;
+}
+
+function registerRequiredBlob(
+  required: Map<string, number | null>,
+  rawPath: unknown,
+  rawSize: unknown,
+  baselineExists: boolean,
+  baselinePath: unknown,
+  baselineSize: unknown,
+  namespaces: readonly ('models/' | 'media/')[],
+  pathRequired: boolean,
+): void {
+  const referenceChanged =
+    !baselineExists ||
+    !Object.is(rawPath, baselinePath) ||
+    !Object.is(rawSize, baselineSize);
+  if (typeof rawPath !== 'string') {
+    if (!referenceChanged || (!pathRequired && rawPath === undefined)) return;
+    throw new Error(`merge: invalid required binary path ${String(rawPath)}`);
+  }
+  const invalidPath =
+    rawPath === '' ||
+    sanitizeZipPath(rawPath) !== rawPath ||
+    !namespaces.some((namespace) => rawPath.startsWith(namespace)) ||
+    rawPath.endsWith('/');
+  if (invalidPath) {
+    if (!referenceChanged) return;
+    throw new Error(`merge: invalid required binary path ${String(rawPath)}`);
+  }
+  let size: number | null;
+  if (rawSize === undefined) {
+    if (referenceChanged) throw new Error(`merge: missing required binary size for ${rawPath}`);
+    size = null;
+  } else if (typeof rawSize === 'number' && Number.isSafeInteger(rawSize) && rawSize >= 0) {
+    size = rawSize;
+  } else {
+    throw new Error(`merge: invalid required binary size for ${rawPath}`);
+  }
+  const previous = required.get(rawPath);
+  if (previous !== undefined && previous !== null && size !== null && previous !== size) {
+    throw new Error(`merge: conflicting required binary size for ${rawPath}`);
+  }
+  required.set(rawPath, previous ?? size);
+}
+
+function bytesEqual(left: Uint8Array, right: Uint8Array): boolean {
+  return left.length === right.length && left.every((byte, index) => byte === right[index]);
 }
 
 /** ワークスペースのプロジェクトをZIPへ書き出す */

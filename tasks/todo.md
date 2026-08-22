@@ -446,6 +446,45 @@ Review record:
 - Verification passed: 6 focused files / 152 passing tests plus 5 todos, 31 full-suite files / 990 passing tests plus 23 todos, fixture verification (10 Git entries / 708,867 bytes), evidence verification (3 pending device templates / 0 records), TypeScript typecheck, and the production build (93 modules / 11 PWA precache entries). The existing approximately 789.62 kB viewer-chunk warning remains
 - Three independent runtime/implementation, exact-closure and false-green reviews reported no unresolved P0/P1 after pre-settlement authority, retry freedom, canonical ULID/HLC, marker snapshots and positive/negative oracle controls were corrected
 
+### G0 stabilization slice 21 — recoverable durable-write queue and truthful save status
+
+- [x] Replace the poisoned promise chain with one recoverable FIFO that retains the failed head, retries it before later writes, and exposes immutable `queued` / `writing` / `durable` / `failed` plus retryable state
+- [x] Within one trusted single-writer store, retain the acknowledged durable byte length, verify every newly appended tail exactly, accept an already committed desired result, repair only an exact partial tail prefix, and reject divergent suffixes without overwriting raw evidence
+- [x] Keep normal writes automatic, make a later `flush()` retry a failed head, preserve exact FIFO under repeated quota/persistent failure, and continue blocking full/diff export until every acknowledged operation is durable
+- [x] Make the viewer distinguish device-write durability from unexported changes; never display a failed in-memory state as saved and offer an explicit retry without conflating package generation or download start
+- [x] Promote the existing `durableWriteQueue` recovery expectations to ordinary regressions and add only minimal state-transition/status formatting controls; do not add another broad fault matrix
+- [x] Keep cross-tab/base-prefix mutation detection, crash/power-loss guarantees, background retry/journaling, typed issue persistence, package download completion and v2 storage/CAS out of this bounded v1 root fix
+- [x] Run focused verification, then a gate/churn/xfail meta-audit before full verification and independent P0/P1 review; keep the commit atomic with a directly exposed dependent root fix when the exact intermediate tree is not green
+
+### G0 stabilization slice 21 review record
+
+- Replaced the rejected-promise chain with a retained-head FIFO drain. A later `flush()` retries the failed head before later operations; concurrent flushes share one drain, and failed writes no longer create an unhandled poisoned chain
+- Each active log keeps its acknowledged durable length. Successful appends verify the exact new byte tail, commit-then-error is accepted only when the desired bytes are present, exact partial UTF-8 byte prefixes are repaired, and wrong/extra/shorter tails become nonretryable without overwriting evidence. OPFS treats only `NotFoundError` as absence and propagates transient lookup failures
+- Added immutable durability status and subscriptions, and made queued observable before the new in-memory state. The viewer now separates persistent OPFS writes from MemoryFS tab-only retention and keeps package generation/download-started checkpoints independent from device durability; download start explicitly does not claim completion
+- Existing recovery expectations now pass ordinarily across repeated quota, prefix, commit-then-error and persistent faults. Multi-store tests accept explicit fail-closed rejection but bind every fulfilled lane to exact raw/reopened operations and every rejected lane to failed pending status; the unresolved actor/serialization loss expectations remain expected failures
+- Exact S21-only isolation exposed two existing package crash-boundary regressions because stricter queue verification changed the metadata-first timing. Rather than committing a red intermediate tree or weakening those ordinary assertions, the dependent blob-before-metadata S22 root fix is included in the same atomic commit
+- Verification passed: 8 changed-area files / 213 passing tests plus 5 todos, 31 full-suite files / 1,004 passing tests plus 21 todos, fixture verification (10 Git entries / 708,867 bytes), evidence verification (3 pending device templates / 0 records), TypeScript typecheck, and the production build (95 modules / 11 PWA precache entries). The existing 796.08 kB viewer-chunk warning remains
+- Cross-tab/base-prefix mutation detection, real OPFS crash/power-loss durability, background retry/journaling, durable typed issues, download completion/retention and v2 CAS remain open; this slice does not claim them
+
+### G0 stabilization slice 22 — verified existing-project package merge
+
+- [x] Preview the exact merged v1 state without mutating `ProjectStore`, then derive the visible asset original/optimized blob closure rather than trusting the package binary list alone
+- [x] Validate one canonical unique package-binary registry, accept an existing destination only when its bytes are exact, and route missing writes through the shared exact post-write verifier before metadata application
+- [x] Verify every final-state referenced blob before calling `mergeExternal`, including ops-only packages that rely on an already-present destination blob, then cross the existing `ProjectStore.flush()` durability barrier
+- [x] Promote only the now-satisfied merge ordering, pending-write, resolved-corruption, missing-required, blob-interruption and same-path collision expected failures; keep new-project marker-last and actor-log partial-write recovery separate
+- [x] Add or retain ordinary controls for byte-identical existing blobs, metadata-only/ops-only compatibility, optional optimized references, duplicate/path/size rejection and private unreferenced orphan freedom without fixing physical write counts or JSON member order
+- [x] Keep typed collision evidence, package-declared digests, unknown future blob-reference fields, project locking, crash/power-loss recovery, cleanup/GC, streaming/device budgets, new-project/wizard/caption parity and G0-S completion explicitly out of scope
+- [x] Run focused/full verification and independent implementation/false-green/spec review; commit atomically with S21 because the exact S21-only tree regresses existing package safety
+
+### G0 stabilization slice 22 review record
+
+- Existing-project merge now snapshots incoming operations, previews the merged state without publication, derives every visible `models/` / `media/` original and nonempty optimized reference, and validates the complete closure before calling `mergeExternal`
+- Package binaries are copied into one canonical duplicate-free registry. Existing targets must be byte-identical, missing targets use exact post-write read-back, all required targets are re-read after writes, and target-operation drift aborts before metadata. Ops-only input may use exact existing bytes; an unchanged legacy asset may omit size, while a new or changed reference may not
+- Merge publication, pending-I/O, resolved corruption, omitted required binary, blob interruption and same-path collision expectations now pass ordinarily. Exact final/reopened authority covers semantic manifest, active-log path inventory and actor-bound semantic operations while retaining existing raw prefixes, plus state, vector and original/optimized bytes; notification and fault histories reject unknown public markers or active logs
+- Controls cover semantic manifest and appended-operation JSON formatting, empty/verified optimized references, caller mutation during async preflight, duplicate/noncanonical entries, missing path/size, invalid size, missing baseline target and unreferenced orphan freedom. Actor-log prefix/partial recovery remains expected failure rather than being hidden by fixed actor ordering
+- Verification passed as part of the same 8-file / 213-pass integration run and 31-file / 1,004-pass full suite, with the same fixture, evidence, typecheck and 95-module production-build results recorded above
+- Typed collision evidence, declared digests for ops-only identity, unknown future reference fields, locking, actor-log atomic recovery, new-project/wizard/caption marker-last parity, cleanup/GC, streaming/device budgets and crash/power-loss durability remain open; this is not full G0-S completion
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
@@ -457,11 +496,11 @@ Review record:
 ## G0-S — v1 safety stabilization (blocking before G1 feature work)
 
 - [ ] Make the G0 multi-tab actor/sequence characterization pass without silent operation loss
-- [ ] Make the G0 rejected-append characterization pass with recovery and accurate durable-state UI
+- [x] Make the G0 rejected-append characterization pass with recovery and accurate durable-state UI
 - [ ] Make the G0 untrusted-operation characterization pass with reserved-key and canonical HLC/ID defenses
 - [ ] Make the G0 package/model interruption characterization pass without dangling blob references
 - [ ] Implement the smallest root fixes without coupling them to the v2 storage rewrite
-- [ ] Distinguish queued, durably saved, and exported state in user-visible status
+- [x] Distinguish queued, durably saved, and exported state in user-visible status
 - [ ] Run malicious-package and regression tests, then update the deployed v1 build before G1
 
 ## G1+ — Proposed v2 gates

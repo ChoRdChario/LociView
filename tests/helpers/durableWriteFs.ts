@@ -9,11 +9,12 @@ export type AppendFaultStep =
       prefixBytes: number;
       errorName?: 'DurableWriteFault' | 'QuotaExceededError';
     }
+  | { kind: 'write-prefix-then-resolve'; token: string; prefixBytes: number }
   | { kind: 'commit-then-throw'; token: string; errorName?: 'DurableWriteFault' | 'QuotaExceededError' };
 
 export type AppendOutcome = AppendFaultStep['kind'] | 'persistent-throw-before' | 'unplanned-pass';
 
-export type DurableMutationMethod = 'appendText' | 'writeText' | 'writeBytes';
+export type DurableMutationMethod = 'appendText' | 'appendBytes' | 'writeText' | 'writeBytes';
 
 export interface DurableAppendEvent {
   index: number;
@@ -74,7 +75,7 @@ export class DurableWriteMemoryFS extends MemoryFS {
     for (const step of steps) {
       if (step.token === '') throw new Error('durable write step token must not be empty');
       if (
-        step.kind === 'write-prefix-then-throw' &&
+        (step.kind === 'write-prefix-then-throw' || step.kind === 'write-prefix-then-resolve') &&
         (!Number.isSafeInteger(step.prefixBytes) || step.prefixBytes < 1)
       ) {
         throw new Error('partial append prefixBytes must be a positive safe integer');
@@ -202,14 +203,16 @@ export class DurableWriteMemoryFS extends MemoryFS {
       throw this.makeFault(step.token, step.kind, errorName);
     }
 
-    if (step.kind === 'write-prefix-then-throw') {
+    if (step.kind === 'write-prefix-then-throw' || step.kind === 'write-prefix-then-resolve') {
       if (step.prefixBytes >= requested.length) {
         throw new Error(`partial mutation prefix must be smaller than requested bytes for ${path}`);
       }
       const partial = requested.slice(0, step.prefixBytes);
       const after = append ? concatBytes(before, partial) : partial;
       await super.writeBytes(path, after);
-      const errorName = step.errorName ?? 'DurableWriteFault';
+      const errorName = step.kind === 'write-prefix-then-throw'
+        ? (step.errorName ?? 'DurableWriteFault')
+        : null;
       this.record(
         path,
         method,
@@ -221,7 +224,8 @@ export class DurableWriteMemoryFS extends MemoryFS {
         step.token,
         errorName,
       );
-      throw this.makeFault(step.token, step.kind, errorName);
+      if (step.kind === 'write-prefix-then-resolve') return;
+      throw this.makeFault(step.token, step.kind, errorName ?? 'DurableWriteFault');
     }
 
     await super.writeBytes(path, target);
@@ -244,6 +248,10 @@ export class DurableWriteMemoryFS extends MemoryFS {
 
   override async appendText(path: string, text: string): Promise<void> {
     await this.mutate(path, 'appendText', encoder.encode(text), text, true);
+  }
+
+  override async appendBytes(path: string, data: Uint8Array): Promise<void> {
+    await this.mutate(path, 'appendBytes', data, decoder.decode(data), true);
   }
 
   override async writeText(path: string, text: string): Promise<void> {

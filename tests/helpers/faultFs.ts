@@ -1,6 +1,6 @@
 import { MemoryFS } from '../../src/platform/fs';
 
-export type FaultMethod = 'appendText' | 'writeText' | 'writeBytes' | 'remove';
+export type FaultMethod = 'appendText' | 'appendBytes' | 'writeText' | 'writeBytes' | 'remove';
 
 export type FaultSelector = FaultMethod | 'write';
 
@@ -267,6 +267,18 @@ export class FaultInjectingMemoryFS extends MemoryFS {
         if (prefixBytes >= requested.length) throw new Error('append prefix must be shorter than the request');
         const before = (await super.readBytes(path)) ?? new Uint8Array();
         await super.writeBytes(path, concatBytes(before, requested.slice(0, prefixBytes)));
+      },
+    );
+  }
+
+  override async appendBytes(path: string, data: Uint8Array): Promise<void> {
+    await this.mutate(
+      'appendBytes',
+      path,
+      () => super.appendBytes(path, data),
+      async (prefixBytes) => {
+        if (prefixBytes >= data.length) throw new Error('append prefix must be shorter than the request');
+        await super.appendBytes(path, data.slice(0, prefixBytes));
       },
     );
   }

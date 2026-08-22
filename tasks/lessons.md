@@ -70,3 +70,10 @@
 
 - GS/proxy由来という内部hit方式は再現・診断・将来の再バインドに有用だが、注釈ピンをユーザーがギズモで修正でき、測量精度を製品が主張しない場合、常時「概算」バッジを付ける必要はない。
 - ルール: 安全性metadataの保存、製品全体の非測量保証、通常UIの表示を分離して判断する。技術的な不確実性を機械的に常時警告へ変換せず、ユーザーが取れる修正行動と警告疲れを考慮する。
+
+## 2026-08-23: 自律開発ではslice間にgate基準のメタ監査を入れる
+
+- characterizationを追加し続けるだけでは、失敗境界の理解は深まってもG0-Sのproduction defectは減らない。S0承認後はtests/fixturesの増分に対してproduction修正が大幅に遅れ、同じOP/BLOBリスクを複数sliceで細分化し過ぎた
+- ルール: 3〜4 sliceごと、tests-only sliceを追加する前、またはproduction変更量がacceptance増分に比べて小さい時に、承認済みgate、未解消xfail、production/test差分、外部証拠、critical pathをゼロベースで再監査する
+- ルール: 十分なacceptanceが既にある項目は新しいmatrixを増やさずroot fixへ移る。各sliceは少なくとも1つのrelease-blocking defectまたは外部gateを明確に閉じ、focused検証後にscope膨張と重複を再評価してからfull検証へ進む
+- ルール: 実機・実データ・product-owner批准はcode workで代替しない。production laneと外部evidence laneを分け、待ち項目を明示的に並行管理する

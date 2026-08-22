@@ -1,7 +1,7 @@
 import type { WorkspaceFS } from '../../src/platform/fs';
 
 export type ModeledFsContext = 'setup' | 'first' | 'second' | 'audit';
-export type ModeledMutationMethod = 'appendText' | 'writeText' | 'writeBytes' | 'remove';
+export type ModeledMutationMethod = 'appendText' | 'appendBytes' | 'writeText' | 'writeBytes' | 'remove';
 export type ModeledMutationPhase = 'start' | 'commit' | 'reject';
 export type ModeledGateRelease = 'overlap' | 'timeout' | 'abort';
 
@@ -100,8 +100,12 @@ class SnapshotMemoryFS implements WorkspaceFS {
   }
 
   async appendText(path: string, text: string): Promise<void> {
+    await this.appendBytes(path, encoder.encode(text));
+  }
+
+  async appendBytes(path: string, data: Uint8Array): Promise<void> {
     const previous = this.files.get(path);
-    const addition = encoder.encode(text);
+    const addition = new Uint8Array(data);
     if (previous === undefined) {
       this.files.set(path, addition);
       return;
@@ -114,6 +118,13 @@ class SnapshotMemoryFS implements WorkspaceFS {
 
   async readBytes(path: string): Promise<Uint8Array | null> {
     return copyBytes(this.files.get(path) ?? null);
+  }
+
+  async readBytesFrom(path: string, offset: number): Promise<{ size: number; data: Uint8Array } | null> {
+    if (!Number.isSafeInteger(offset) || offset < 0) throw new Error('snapshot fs: invalid byte offset');
+    const bytes = this.files.get(path);
+    if (bytes === undefined) return null;
+    return { size: bytes.length, data: bytes.slice(Math.min(offset, bytes.length)) };
   }
 
   async writeBytes(path: string, data: Uint8Array): Promise<void> {
@@ -180,7 +191,14 @@ export class ModeledTransactionGateFS {
         path,
         () => this.backing.appendText(path, text),
       ),
+      appendBytes: (path, data) => this.mutate(
+        context,
+        'appendBytes',
+        path,
+        () => this.backing.appendBytes(path, data),
+      ),
       readBytes: (path) => this.backing.readBytes(path),
+      readBytesFrom: (path, offset) => this.backing.readBytesFrom(path, offset),
       writeBytes: (path, data) => this.mutate(
         context,
         'writeBytes',

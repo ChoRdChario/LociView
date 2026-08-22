@@ -24,6 +24,32 @@ export interface DispatchInput {
   v?: Record<string, unknown>;
 }
 
+export type DurableWritePhase = 'durable' | 'queued' | 'writing' | 'failed';
+
+export interface DurableWriteStatus {
+  readonly phase: DurableWritePhase;
+  readonly pending: number;
+  readonly retryable: boolean;
+}
+
+interface PendingAppend {
+  readonly path: string;
+  readonly text: string;
+  readonly bytes: Uint8Array;
+  baseLength?: number;
+  attempted?: boolean;
+}
+
+class DurableAppendDivergedError extends Error {
+  constructor(path: string) {
+    super(`store: durable append diverged for ${path}`);
+    this.name = 'DurableAppendDivergedError';
+  }
+}
+
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
+
 const ENTITY_PREFIX: Record<string, IdPrefix> = {
   caption: 'cap',
   set: 'set',
@@ -45,7 +71,16 @@ export class ProjectStore {
   private seq = 0;
   private readonly clock: HlcClock;
   private readonly listeners = new Set<(state: ProjectState) => void>();
-  private writeQueue: Promise<void> = Promise.resolve();
+  private readonly durabilityListeners = new Set<(status: DurableWriteStatus) => void>();
+  private readonly pendingAppends: PendingAppend[] = [];
+  private pendingHead = 0;
+  private readonly durableLogLengths = new Map<string, number>();
+  private activeDrain: Promise<void> | null = null;
+  private durabilityValue: DurableWriteStatus = Object.freeze({
+    phase: 'durable',
+    pending: 0,
+    retryable: false,
+  });
   /** 起動時に読んだログの破損行（UIで警告表示する） */
   readonly loadErrors: { file: string; errors: JsonlParseError[] }[] = [];
 
@@ -91,8 +126,10 @@ export class ProjectStore {
     const all: Op[] = [];
     for (const file of opsFiles) {
       if (!file.endsWith('.jsonl')) continue;
-      const text = await fs.readText(file);
-      if (text === null) continue;
+      const bytes = await fs.readBytes(file);
+      if (bytes === null) continue;
+      store.durableLogLengths.set(file, bytes.length);
+      const text = textDecoder.decode(bytes);
       const { ops, errors } = parseOpsJsonl(text);
       if (errors.length > 0) store.loadErrors.push({ file, errors });
       all.push(...ops);
@@ -115,9 +152,18 @@ export class ProjectStore {
     return versionVector(this.ops);
   }
 
+  get durabilityStatus(): DurableWriteStatus {
+    return this.durabilityValue;
+  }
+
   subscribe(fn: (state: ProjectState) => void): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
+  }
+
+  subscribeDurability(fn: (status: DurableWriteStatus) => void): () => void {
+    this.durabilityListeners.add(fn);
+    return () => this.durabilityListeners.delete(fn);
   }
 
   // ---- 書き込み（自分のopのみ） ----------------------------------------------
@@ -150,8 +196,9 @@ export class ProjectStore {
       ...(input.v !== undefined ? { v: input.v } : {}),
     };
     this.ops.push(op);
-    this.recompute();
+    this.recompute(false);
     this.enqueueAppend(`${this.dir}/ops/${this.actorId}.jsonl`, serializeOps([op]));
+    this.notify();
     return op;
   }
 
@@ -188,7 +235,17 @@ export class ProjectStore {
 
   /** 書き込みキューの完了を待つ（テスト・エクスポート前に使用） */
   async flush(): Promise<void> {
-    await this.writeQueue;
+    for (;;) {
+      if (this.activeDrain === null) {
+        if (this.pendingCount() === 0) return;
+        this.publishDurability('queued');
+        this.startDrain();
+      }
+      const drain = this.activeDrain;
+      if (drain === null) continue;
+      await drain;
+      if (this.pendingCount() === 0) return;
+    }
   }
 
   // ---- 内部 -----------------------------------------------------------------
@@ -200,10 +257,10 @@ export class ProjectStore {
     this.recompute();
   }
 
-  private recompute(): void {
+  private recompute(shouldNotify = true): void {
     // 全再導出。数千op規模では十分高速。肥大時はsnapshot+差分適用に切替（docs/02 §4.5）
     this.stateCache = reduce(this.ops);
-    this.notify();
+    if (shouldNotify) this.notify();
   }
 
   private notify(): void {
@@ -211,6 +268,171 @@ export class ProjectStore {
   }
 
   private enqueueAppend(path: string, text: string): void {
-    this.writeQueue = this.writeQueue.then(() => this.fs.appendText(path, text));
+    this.pendingAppends.push({ path, text, bytes: textEncoder.encode(text) });
+    if (this.durabilityValue.phase === 'failed') {
+      this.publishDurability('failed', this.durabilityValue.retryable);
+      return;
+    }
+    this.publishDurability(this.durabilityValue.phase === 'writing' ? 'writing' : 'queued');
+    this.startDrain();
   }
+
+  private startDrain(): void {
+    if (this.activeDrain !== null || this.pendingCount() === 0) return;
+    const drain = Promise.resolve().then(() => this.drainAppends());
+    this.activeDrain = drain;
+    void drain
+      .catch(() => undefined)
+      .finally(() => {
+        if (this.activeDrain !== drain) return;
+        this.activeDrain = null;
+        if (this.pendingCount() === 0) {
+          this.publishDurability('durable');
+        } else if (this.durabilityValue.phase !== 'failed') {
+          this.publishDurability('queued');
+          this.startDrain();
+        }
+      });
+  }
+
+  private async drainAppends(): Promise<void> {
+    while (this.pendingCount() > 0) {
+      const next = this.pendingAppends[this.pendingHead];
+      if (next === undefined) return;
+      this.publishDurability('writing');
+      try {
+        await this.persistAppend(next);
+      } catch (error) {
+        this.publishDurability('failed', !(error instanceof DurableAppendDivergedError));
+        throw error;
+      }
+      this.pendingHead += 1;
+      if (this.pendingHead === this.pendingAppends.length) {
+        this.pendingAppends.length = 0;
+        this.pendingHead = 0;
+      }
+      this.publishDurability(this.pendingCount() === 0 ? 'durable' : 'queued');
+    }
+  }
+
+  private async persistAppend(append: PendingAppend): Promise<void> {
+    if (append.baseLength === undefined) {
+      append.baseLength = this.durableLogLengths.get(append.path) ?? 0;
+    }
+    const baseLength = append.baseLength;
+    const desiredLength = baseLength + append.bytes.length;
+
+    if (append.attempted !== true) {
+      append.attempted = true;
+      try {
+        await this.fs.appendText(append.path, append.text);
+      } catch (error) {
+        await this.classifyAfterWrite(append, baseLength, desiredLength, error);
+        return;
+      }
+      await this.classifyAfterWrite(
+        append,
+        baseLength,
+        desiredLength,
+        new Error(`store: durable append verification failed for ${append.path}`),
+      );
+      return;
+    }
+
+    const disposition = await this.inspectAppend(append, baseLength);
+    if (disposition.kind === 'complete') {
+      this.durableLogLengths.set(append.path, desiredLength);
+      return;
+    }
+    if (disposition.kind === 'diverged') throw new DurableAppendDivergedError(append.path);
+
+    try {
+      if (disposition.kind === 'base') {
+        await this.fs.appendText(append.path, append.text);
+      } else {
+        await this.fs.appendBytes(append.path, append.bytes.slice(disposition.additionOffset));
+      }
+    } catch (error) {
+      await this.classifyAfterWrite(append, baseLength, desiredLength, error);
+      return;
+    }
+    await this.classifyAfterWrite(
+      append,
+      baseLength,
+      desiredLength,
+      new Error(`store: durable append verification failed for ${append.path}`),
+    );
+  }
+
+  private async classifyAfterWrite(
+    append: PendingAppend,
+    baseLength: number,
+    desiredLength: number,
+    originalError: unknown,
+  ): Promise<void> {
+    let disposition: AppendByteDisposition;
+    try {
+      disposition = await this.inspectAppend(append, baseLength);
+    } catch {
+      throw originalError;
+    }
+    if (disposition.kind === 'complete') {
+      this.durableLogLengths.set(append.path, desiredLength);
+      return;
+    }
+    if (disposition.kind === 'diverged') throw new DurableAppendDivergedError(append.path);
+    throw originalError;
+  }
+
+  private async inspectAppend(
+    append: PendingAppend,
+    baseLength: number,
+  ): Promise<AppendByteDisposition> {
+    const tail = await this.fs.readBytesFrom(append.path, baseLength);
+    if (tail === null) return baseLength === 0 ? { kind: 'base' } : { kind: 'diverged' };
+    if (tail.size < baseLength || tail.size !== baseLength + tail.data.length) {
+      return { kind: 'diverged' };
+    }
+    return classifyAppendTail(tail.data, append.bytes);
+  }
+
+  private publishDurability(phase: DurableWritePhase, retryable = phase === 'failed'): void {
+    const next = Object.freeze({
+      phase,
+      pending: this.pendingCount(),
+      retryable,
+    });
+    if (
+      next.phase === this.durabilityValue.phase &&
+      next.pending === this.durabilityValue.pending &&
+      next.retryable === this.durabilityValue.retryable
+    ) {
+      return;
+    }
+    this.durabilityValue = next;
+    for (const fn of this.durabilityListeners) fn(next);
+  }
+
+  private pendingCount(): number {
+    return this.pendingAppends.length - this.pendingHead;
+  }
+}
+
+type AppendByteDisposition =
+  | { readonly kind: 'base' }
+  | { readonly kind: 'partial'; readonly additionOffset: number }
+  | { readonly kind: 'complete' }
+  | { readonly kind: 'diverged' };
+
+function classifyAppendTail(
+  current: Uint8Array,
+  addition: Uint8Array,
+): AppendByteDisposition {
+  if (current.length === 0) return { kind: 'base' };
+  if (current.length > addition.length) return { kind: 'diverged' };
+  for (let index = 0; index < current.length; index += 1) {
+    if (current[index] !== addition[index]) return { kind: 'diverged' };
+  }
+  if (current.length === addition.length) return { kind: 'complete' };
+  return { kind: 'partial', additionOffset: current.length };
 }

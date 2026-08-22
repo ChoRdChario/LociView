@@ -85,7 +85,7 @@ textarea { min-height: 72px; resize: vertical; }
   border-bottom: 1px solid var(--line); background: var(--panel);
 }
 .lv-projname { max-width: 30vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lv-savestatus { white-space: nowrap; }
+.lv-savestatus { max-width: 52vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lv-main { flex: 1; display: flex; min-height: 0; position: relative; }
 .lv-stage { flex: 1; position: relative; min-width: 0; background: var(--panel); }
 .lv-gl { width: 100%; height: 100%; display: block; }
@@ -308,7 +308,7 @@ textarea { min-height: 72px; resize: vertical; }
   .lv-sheet-handle { display: block; padding: 6px 0 2px; cursor: pointer; }
   .lv-handle-bar { width: 38px; height: 4px; border-radius: 2px; background: #3b4552; margin: 0 auto; }
   .lv-projname { max-width: 24vw; }
-  .lv-savestatus { display: none; }
+  .lv-savestatus { display: inline; max-width: 28vw; font-size: 11px; }
   button, select { min-height: 40px; } /* タップターゲット44px相当 */
   .lv-tabs button { min-height: 40px; }
 }

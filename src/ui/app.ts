@@ -18,6 +18,7 @@ import { infoDialog, promptDialog } from './dialogs';
 import { fNum, fStr } from './fields';
 import { mountHome } from './home';
 import { mountViewerScreen } from './viewerScreen';
+import type { PackageExportStatus } from './saveStatus';
 
 /** これを超えるモデルは開いた時点で自動読み込みせず、手動表示に委ねる（iOSメモリ対策） */
 const AUTO_LOAD_LIMIT = 25 * 1024 * 1024;
@@ -32,9 +33,11 @@ export async function bootApp(root: HTMLElement): Promise<void> {
 
   // ---- ワークスペース ----------------------------------------------------------
   let fs: WorkspaceFS;
+  let persistentWorkspace = false;
   let storageWarning: string | null = null;
   if (await OpfsFS.isAvailable()) {
     fs = await OpfsFS.open();
+    persistentWorkspace = true;
     // 永続化を要求（iOSのストレージ削除対策。docs/06 §4）
     try {
       await navigator.storage.persist?.();
@@ -58,17 +61,25 @@ export async function bootApp(root: HTMLElement): Promise<void> {
 
   let ctx: AppContext | null = null;
   let unmountViewer: (() => void) | null = null;
+  let packageExportStatus: PackageExportStatus = Object.freeze({ phase: 'idle' });
 
   // ---- 保存状態（書き出し済みop数をプロジェクトごとに記録） -----------------------------
-  const exportedKey = (projectId: string): string => `lv-exported-${projectId}`;
-  function unsavedCount(): number {
+  const exportedKey = (dir: string): string => `lv-package-covered:${dir}`;
+  function unexportedCount(): number {
     if (ctx === null) return 0;
-    const exported = Number(localStorage.getItem(exportedKey(ctx.store.manifest.projectId)) ?? '0');
-    return Math.max(0, ctx.store.allOps.length - exported);
+    const current = ctx.store.allOps.length;
+    const stored = localStorage.getItem(exportedKey(ctx.dir));
+    if (stored === null) return current;
+    const covered = Number(stored);
+    if (!Number.isSafeInteger(covered) || covered < 0 || covered > current) return current;
+    return current - covered;
   }
-  function markExported(): void {
-    if (ctx === null) return;
-    localStorage.setItem(exportedKey(ctx.store.manifest.projectId), String(ctx.store.allOps.length));
+  function setPackageExportStatus(dir: string, status: PackageExportStatus): void {
+    if (ctx === null || ctx.dir !== dir) return;
+    packageExportStatus = status;
+    if (status.phase === 'download-started') {
+      localStorage.setItem(exportedKey(dir), String(status.coveredOpCount));
+    }
     ctx.notify();
   }
 
@@ -158,6 +169,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
 
   async function openProject(dir: string): Promise<void> {
     const store = await ProjectStore.open(fs, dir, identity);
+    packageExportStatus = Object.freeze({ phase: 'idle' });
     if (store.loadErrors.length > 0) {
       const total = store.loadErrors.reduce((s, e) => s + e.errors.length, 0);
       await infoDialog('警告', `ログに破損行が ${total} 行あり、スキップしました（他のデータは無事です）`);
@@ -185,8 +197,10 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     unmountViewer = mountViewerScreen(root, ctx, {
       goHome: showHome,
       loadModelAsset,
-      markExported,
-      unsavedCount,
+      unexportedCount,
+      persistentWorkspace,
+      packageExportStatus: () => packageExportStatus,
+      setPackageExportStatus: (status) => setPackageExportStatus(dir, status),
       openProfile: () => void openProfile(),
     });
     // 最初のモデルを自動表示。ただし大きいモデルは自動で読まない。

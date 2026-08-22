@@ -516,9 +516,11 @@ for (const row of REPLACEMENT_ROWS) {
       );
       faultObserved = faultEvent?.outcome === row.expectedOutcome;
       const closure = await inspectReplacementClosure(fixture);
-      const exactAuthoritySafe = row.boundary === 'metadata-prefix'
-        ? true
-        : await finalReplacementAuthorityIsSafe(fixture, baseline, outcome.rejected);
+      const exactAuthoritySafe = await finalReplacementAuthorityIsSafe(
+        fixture,
+        baseline,
+        outcome.rejected,
+      );
       stateSafe =
         closure.safe &&
         (closure.oldComplete ? outcome.rejected : closure.newComplete) &&
@@ -558,7 +560,7 @@ for (const row of REPLACEMENT_ROWS) {
     });
 
     if (row.boundary === 'metadata-prefix') {
-      it.fails('recovers or truncates a partial metadata record before the project is reopened', () => {
+      it('recovers an exact partial metadata byte prefix before the project is reopened', () => {
         expect(logReadable).toBe(true);
       });
     } else {
