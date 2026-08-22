@@ -21,7 +21,7 @@ export async function addModelAsset(
   const astId = entityIdFor('asset');
   const ext = (name.split('.').pop() ?? 'bin').toLowerCase();
   const path = `models/${astId}.${ext}`;
-  await fs.writeBytes(`${dir}/${path}`, bytes);
+  await writeVerifiedBytes(fs, `${dir}/${path}`, bytes);
 
   let optimizedPath: string | undefined;
   let optimizedSize: number | undefined;
@@ -29,9 +29,10 @@ export async function addModelAsset(
     try {
       const opt = await optimizeGlbBytes(bytes);
       if (opt !== null) {
-        optimizedPath = `models/${astId}.opt.glb`;
+        const candidatePath = `models/${astId}.opt.glb`;
+        await writeVerifiedBytes(fs, `${dir}/${candidatePath}`, opt);
+        optimizedPath = candidatePath;
         optimizedSize = opt.length;
-        await fs.writeBytes(`${dir}/${optimizedPath}`, opt);
       }
     } catch {
       // 軽量化に失敗しても原本で続行する
@@ -53,6 +54,7 @@ export async function addModelAsset(
       pinScale: 1,
     },
   });
+  await store.flush();
   return astId;
 }
 

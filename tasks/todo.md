@@ -426,6 +426,26 @@ Review record:
 - Verification passed: 3 focused files / 58 passing tests plus 3 todos, 30 full-suite files / 981 passing tests plus 23 todos, fixture verification (10 Git entries / 708,867 bytes), evidence verification (3 pending device templates / 0 records), TypeScript typecheck, and the production build (93 modules / 11 PWA precache entries). The existing approximately 789.62 kB viewer-chunk warning remains
 - Three independent implementation/runtime, exact-authority and false-green reviews reported no unresolved P0/P1 after unique-path collision, adapter mutation, fulfilled-silent-old, active-log inventory, shared point-in-time reference, future GC, dynamic naming and attempted-versus-published retry findings were corrected
 
+### G0 stabilization slice 20 — verified model addition
+
+- [x] Route the required `addModelAsset` original through the shared exact post-write verifier before any asset metadata is dispatched
+- [x] Publish optional optimized path/size only after its candidate bytes verify exactly, otherwise continue from the verified original without a dangling optional reference
+- [x] Make the returned asset ID cross the existing `ProjectStore.flush()` durability barrier inside `addModelAsset`
+- [x] Add ordinary healthy, resolved bit-flip, resolved truncation and actor-log append-rejection scenarios with point-in-time referenced-byte and exact live/reopened authority oracles
+- [x] Allow verified fresh-path retry, private staging and unreferenced corrupt orphans; keep optimized fault injection, partial-JSONL repair, typed durability status, cleanup and multi-context locking out of this bounded slice
+- [x] Keep import-wizard/media/caption/native-package parity, new-project marker-last, streaming/incremental hashing, crash/power-loss durability, at-rest corruption, device evidence and G0-S completion explicit follow-up work
+- [x] Run focused/full verification and independent implementation/false-green/runtime review before staging and a separate commit
+
+### G0 stabilization slice 20 review record
+
+- Routed `addModelAsset` required originals through the shared exact post-write read-back helper. Optional optimized metadata is assigned only after its candidate bytes verify, and the returned asset ID now crosses the existing internal `ProjectStore.flush()` barrier
+- Added `tests/assets/modelAdditionDurability.test.ts` with nine ordinary assertions over a healthy STL addition, same-length bit flip, truncation and actor-log append rejection. The action boundary is reopened before any test-side settlement flush, so a missing internal barrier cannot be repaired into a false pass
+- Exact O/N authority covers semantic manifest, canonical IDs/HLC/operation envelope, state, vector, all active JSONL inventory, returned ID and referenced bytes. Point-in-time notification snapshots bind the marker and active blob, while attempted corruption paths remain distinct from a future verified published retry path
+- Ordinary controls reject manifest, malformed-ID, stale-HLC, extra-operation, extra-log, public-marker and referenced-blob corruption, while allowing semantic JSONL reformatting, private staging and unreferenced orphans. Retry/queue repair may finish as exact old or exact verified new authority; no error shape or physical write count is fixed
+- Deterministic optimized-write fault injection, import-wizard/media/caption/native-package parity, new-project marker-last, partial-JSONL recovery, typed durability UI/status, cleanup/journal/GC, locks, streaming/digest/CAS, crash/power-loss and at-rest corruption remain explicit follow-up work; this slice does not claim device evidence or G0-S completion
+- Verification passed: 6 focused files / 152 passing tests plus 5 todos, 31 full-suite files / 990 passing tests plus 23 todos, fixture verification (10 Git entries / 708,867 bytes), evidence verification (3 pending device templates / 0 records), TypeScript typecheck, and the production build (93 modules / 11 PWA precache entries). The existing approximately 789.62 kB viewer-chunk warning remains
+- Three independent runtime/implementation, exact-closure and false-green reviews reported no unresolved P0/P1 after pre-settlement authority, retry freedom, canonical ULID/HLC, marker snapshots and positive/negative oracle controls were corrected
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
