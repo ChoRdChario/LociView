@@ -371,6 +371,24 @@ Review record:
 - Verification passed: 3 focused files / 76 passing tests plus 3 todos, 29 full-suite files / 932 passing tests plus 24 todos, fixture verification (10 Git entries / 708,867 bytes), evidence verification (3 pending device templates / 0 records), typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
 - Three independent false-green, closure/spec and runtime/timing reviews reported no unresolved P0/P1 after exact authority, optimized fallback, marker-prefix, semantic reachability and listing-boundary gaps were corrected
 
+### G0 characterization slice 17 — native-package required-blob verification closure
+
+- [x] Add a one-shot resolved-corruption filesystem control that records exact requested bytes and in-action verification reads while allowing a future exact retry
+- [x] Characterize new-project native-package copies under same-length bit-flip and truncation, separating fault reachability, read-back verification and marker-or-exact-closure safety
+- [x] Characterize collaboration merge under a resolved same-length corruption, including transient state publication paired with the target blob bytes and final reopen safety
+- [x] Build an actual native package whose otherwise-valid asset operation references one omitted required binary, then exercise shared inspection plus new-import and existing-merge safety without fixing error text; with the current API, an unchanged inactive/old result counts as blocked only when the action rejects
+- [x] Allow private staging/quarantine and unreferenced orphan bytes; keep at-rest bit rot, declared package digests, incremental hashing, crash durability, wizard/model/attachment parity, UI status, typed issues and G0-S completion out of scope
+- [x] Run focused/full verification and independent false-green/spec/runtime review before staging and a separate commit
+
+### G0 characterization slice 17 review record
+
+- Added `tests/helpers/resolvedCorruptingFs.ts` and expanded `tests/assets/packagePublication.test.ts`; `src/**` remains unchanged. The helper commits one deterministic same-length bit flip or truncation while resolving the canonical final write, records only in-action reads after that bad commit, leaves private staging alone and permits a later exact retry
+- Eighteen ordinary controls independently bind the healthy native-package roles and bytes, resolved-corruption reachability, marker/history and HLC/own-sequence oracles, plus an actual ZIP that differs from its healthy source by exactly one still-referenced required binary. Nine narrow expected-failure assertions separately preserve read-back, transient-publication and final old-or-exact-new authority gaps; the representative package read-back todo was removed
+- New-project history treats every `projects/**/lociview.json` descendant as listing authority. Existing-merge history accepts exact old or exact complete point-in-time authority, including same-byte rewrites, while rejecting transient public markers and partial/extra active JSONL logs; notification snapshots pair exact full state/operations/vector with the required blob bytes at the same observation point
+- An inactive/old outcome is accepted only after the current import or merge action rejects, preventing fulfilled silent no-ops from masquerading as a typed blocked result. Complete exact authority may resolve normally. Error text, future typed disposition shape, private non-authoritative staging/quarantine and unreferenced orphan bytes remain unbound
+- Verification passed: 4 focused files / 131 passing tests plus 5 todos, 29 full-suite files / 959 passing tests plus 23 todos, fixture verification (10 Git entries / 708,867 bytes), evidence verification (3 pending device templates / 0 records), typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
+- Three independent false-green, exact-closure/spec and runtime/timing reviews reported no unresolved P0/P1 after canonical-target gating, full marker/log history, complete-branch controls, wrong-result silent no-op and HLC/own-sequence findings were corrected. This remains tests-only characterization, not a production fix, declared-digest or crash-durability guarantee, wizard/model/attachment parity, device evidence or G0-S completion
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes

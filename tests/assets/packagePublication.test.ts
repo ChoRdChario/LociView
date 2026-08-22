@@ -8,9 +8,10 @@ import {
   type ZipInspection,
 } from '../../src/assets/package';
 import { addModelAsset } from '../../src/assets/modelAsset';
-import { serializeOps } from '../../src/core/jsonl';
+import { parseHlc } from '../../src/core/hlc';
+import { parseOpsJsonl, serializeOps } from '../../src/core/jsonl';
 import { parseManifest, type ProjectManifest } from '../../src/core/manifest';
-import { visibleEntities } from '../../src/core/reduce';
+import { reduce, versionVector, visibleEntities } from '../../src/core/reduce';
 import type { Op } from '../../src/core/schema';
 import { ProjectStore, type Identity } from '../../src/core/store';
 import { MemoryFS } from '../../src/platform/fs';
@@ -20,6 +21,12 @@ import {
   type FaultFileSnapshot,
   type FaultOutcome,
 } from '../helpers/faultFs';
+import {
+  ResolvedCorruptingMemoryFS,
+  type ResolvedCorruptionMode,
+} from '../helpers/resolvedCorruptingFs';
+import { sanitizeZipPath, writeZipEntries, type ZipEntryData } from '../../src/assets/zipio';
+import { rawZipEntryShapes } from '../helpers/maliciousZip';
 
 const USER_A: Readonly<Identity> = Object.freeze({
   userId: 'usr_00000000000000000000000040',
@@ -41,6 +48,15 @@ const encoder = new TextEncoder();
 const BASE_BYTES = encoder.encode('solid base\nendsolid base\n');
 const PEER_B_BYTES = encoder.encode('solid peer-b\nendsolid peer-b\n');
 const PEER_C_BYTES = encoder.encode('solid peer-c\nendsolid peer-c\n');
+const IMPORT_MODEL_ROLES: readonly KnownModelRole[] = [
+  { originalName: 'source-a.stl', bytes: BASE_BYTES },
+  { originalName: 'source-b.stl', bytes: PEER_B_BYTES },
+];
+const MERGE_MODEL_ROLES: readonly KnownModelRole[] = [
+  { originalName: 'base.stl', bytes: BASE_BYTES },
+  { originalName: 'peer-b.stl', bytes: PEER_B_BYTES },
+  { originalName: 'peer-c.stl', bytes: PEER_C_BYTES },
+];
 
 function bytesEqual(actual: Uint8Array | null, expected: Uint8Array): boolean {
   return actual !== null &&
@@ -60,6 +76,13 @@ async function materializeSnapshot(snapshot: FaultFileSnapshot): Promise<MemoryF
   return fs;
 }
 
+async function copyWorkspace(source: MemoryFS, target: MemoryFS): Promise<void> {
+  for (const path of await source.list('')) {
+    const bytes = await source.readBytes(path);
+    if (bytes !== null) await target.writeBytes(path, bytes);
+  }
+}
+
 async function settle(promise: Promise<unknown>): Promise<{ rejected: boolean; message: string | null }> {
   try {
     await promise;
@@ -69,6 +92,28 @@ async function settle(promise: Promise<unknown>): Promise<{ rejected: boolean; m
       rejected: true,
       message: error instanceof Error ? error.message : String(error),
     };
+  }
+}
+
+async function settleValue<T>(promise: Promise<T>): Promise<{
+  rejected: boolean;
+  value: T | null;
+}> {
+  try {
+    return { rejected: false, value: await promise };
+  } catch {
+    return { rejected: true, value: null };
+  }
+}
+
+async function settleInspection(bytes: Uint8Array): Promise<{
+  rejected: boolean;
+  inspection: ZipInspection | null;
+}> {
+  try {
+    return { rejected: false, inspection: await inspectZip(bytes) };
+  } catch {
+    return { rejected: true, inspection: null };
   }
 }
 
@@ -107,8 +152,116 @@ interface ImportFixture {
   inspection: ZipInspection;
   expectedState: ProjectStore['state'];
   expectedManifest: ProjectManifest;
+  expectedOperationObjects: readonly Op[];
   expectedOps: ReadonlyMap<string, string>;
   expectedBinaries: ReadonlyMap<string, Uint8Array>;
+  requiredBinaryPaths: readonly string[];
+  healthyEntries: readonly ZipEntryData[];
+}
+
+function operationsByKey(ops: readonly Op[]): Op[] {
+  return [...ops].sort((left, right) => operationKey(left).localeCompare(operationKey(right)));
+}
+
+function requiredBinaryPathsFromOps(ops: readonly Op[]): string[] {
+  const paths = new Set<string>();
+  for (const op of ops) {
+    if (op.e !== 'asset' || op.t === 'delete' || op.v === undefined) continue;
+    for (const key of ['path', 'optimizedPath'] as const) {
+      const path = op.v[key];
+      if (typeof path === 'string') paths.add(path);
+    }
+  }
+  return [...paths].sort();
+}
+
+interface KnownModelRole {
+  originalName: string;
+  bytes: Uint8Array;
+}
+
+function expectedModelFields(id: string, role: KnownModelRole): Record<string, unknown> {
+  const extension = role.originalName.split('.').pop()!.toLowerCase();
+  return {
+    kind: 'model',
+    path: `models/${id}.${extension}`,
+    originalName: role.originalName,
+    mime: '',
+    size: role.bytes.length,
+    transform: { scale: 1, upAxis: 'Y' },
+    pinScale: 1,
+  };
+}
+
+function knownModelAssetsAreExact(
+  state: ProjectStore['state'],
+  ops: readonly Op[],
+  binaries: ReadonlyMap<string, Uint8Array>,
+  roles: readonly KnownModelRole[],
+): boolean {
+  const assets = visibleEntities(state, 'asset');
+  const assetOps = ops.filter((op) => op.e === 'asset');
+  const assetCreates = assetOps.filter((op) => op.t === 'create');
+  if (
+    assets.length !== roles.length ||
+    assetOps.length !== roles.length ||
+    assetCreates.length !== roles.length
+  ) {
+    return false;
+  }
+
+  const expectedPaths: string[] = [];
+  for (const role of roles) {
+    const matchingAssets = assets.filter((asset) => asset.fields.originalName === role.originalName);
+    if (matchingAssets.length !== 1) return false;
+    const asset = matchingAssets[0]!;
+    const expectedFields = expectedModelFields(asset.id, role);
+    const matchingOps = assetCreates.filter((op) => op.id === asset.id);
+    const path = expectedFields.path as string;
+    if (
+      !asset.id.startsWith('ast_') ||
+      !isDeepStrictEqual(asset.fields, expectedFields) ||
+      matchingOps.length !== 1 ||
+      !isDeepStrictEqual(matchingOps[0]!.v, expectedFields) ||
+      !bytesEqual(binaries.get(path) ?? null, role.bytes)
+    ) {
+      return false;
+    }
+    expectedPaths.push(path);
+  }
+
+  return isDeepStrictEqual(
+    [...binaries.keys()].sort(),
+    expectedPaths.sort(),
+  ) && isDeepStrictEqual(requiredBinaryPathsFromOps(ops), expectedPaths.sort());
+}
+
+function importFixtureFromInspection(
+  inspection: ZipInspection,
+  expectedState: ProjectStore['state'],
+): ImportFixture {
+  if (inspection.manifest === null) throw new Error('import fixture lacks a manifest');
+  const healthyEntries: ZipEntryData[] = [
+    {
+      path: 'lociview.json',
+      data: encoder.encode(JSON.stringify(inspection.manifest, null, 2)),
+    },
+    ...inspection.opsFiles.map((file) => ({ path: file.path, data: encoder.encode(file.text) })),
+    ...inspection.binaries.map((binary) => ({
+      path: binary.path,
+      data: new Uint8Array(binary.data),
+    })),
+  ];
+  return {
+    inspection,
+    expectedState,
+    expectedManifest: inspection.manifest,
+    expectedOperationObjects: operationsByKey(inspection.ops),
+    expectedOps: new Map(inspection.opsFiles.map((file) => [file.path, file.text])),
+    expectedBinaries: new Map(inspection.binaries.map((binary) => [binary.path, binary.data])),
+    requiredBinaryPaths: requiredBinaryPathsFromOps(inspection.ops),
+    healthyEntries,
+  };
 }
 
 async function makeImportFixture(): Promise<ImportFixture> {
@@ -122,14 +275,7 @@ async function makeImportFixture(): Promise<ImportFixture> {
   await addModelAsset(fs, dir, storeB, 'source-b.stl', PEER_B_BYTES);
   await storeB.flush();
   const inspection = await inspectZip(await exportProjectZip(fs, dir, storeB));
-  if (inspection.manifest === null) throw new Error('import fixture lacks a manifest');
-  return {
-    inspection,
-    expectedState: storeB.state,
-    expectedManifest: inspection.manifest,
-    expectedOps: new Map(inspection.opsFiles.map((file) => [file.path, file.text])),
-    expectedBinaries: new Map(inspection.binaries.map((binary) => [binary.path, binary.data])),
-  };
+  return importFixtureFromInspection(inspection, storeB.state);
 }
 
 interface ImportClosure {
@@ -143,8 +289,14 @@ async function inspectImportedClosure(
   dir: string,
   fixture: ImportFixture,
 ): Promise<ImportClosure> {
+  const markerPaths = (await fs.list('projects/'))
+    .filter((path) => path.endsWith('/lociview.json'))
+    .sort();
   const manifestText = await fs.readText(`${dir}/lociview.json`);
-  if (manifestText === null) return { active: false, complete: false, safe: true };
+  if (manifestText === null) {
+    const active = markerPaths.length > 0;
+    return { active, complete: false, safe: !active };
+  }
 
   let manifestComplete = false;
   try {
@@ -157,6 +309,12 @@ async function inspectImportedClosure(
       [...fixture.expectedOps].map(async ([path, text]) => (await fs.readText(`${dir}/${path}`)) === text),
     )
   ).every(Boolean);
+  const expectedActiveOpsPaths = [...fixture.expectedOps.keys()]
+    .map((path) => `${dir}/${path}`)
+    .sort();
+  const activeOpsPaths = (await fs.list(`${dir}/ops/`))
+    .filter((path) => path.endsWith('.jsonl'))
+    .sort();
   const binariesComplete = (
     await Promise.all(
       [...fixture.expectedBinaries].map(async ([path, bytes]) =>
@@ -171,16 +329,107 @@ async function inspectImportedClosure(
     return { active: true, complete: false, safe: false };
   }
   const stateComplete =
-    reopened.loadErrors.length === 0 && isDeepStrictEqual(reopened.state, fixture.expectedState);
-  const complete = manifestComplete && opsComplete && binariesComplete && stateComplete;
+    reopened.loadErrors.length === 0 &&
+    isDeepStrictEqual(reopened.state, fixture.expectedState) &&
+    isDeepStrictEqual(operationsByKey(reopened.allOps), fixture.expectedOperationObjects);
+  const complete =
+    isDeepStrictEqual(markerPaths, [`${dir}/lociview.json`]) &&
+    manifestComplete &&
+    isDeepStrictEqual(activeOpsPaths, expectedActiveOpsPaths) &&
+    opsComplete &&
+    binariesComplete &&
+    stateComplete;
   return { active: true, complete, safe: complete };
+}
+
+async function importMarkerHistoryIsSafe(
+  fs: FaultInjectingMemoryFS,
+  dir: string,
+  fixture: ImportFixture,
+  snapshotToken: string,
+): Promise<boolean> {
+  const markerPath = `${dir}/lociview.json`;
+  const expectedLogPaths = [...fixture.expectedOps.keys()]
+    .map((path) => `${dir}/${path}`)
+    .sort();
+  const expectedLogSet = new Set(expectedLogPaths);
+  const requiredBlobPaths = new Set(
+    fixture.requiredBinaryPaths.map((path) => `${dir}/${path}`),
+  );
+  const committed = fs.events
+    .filter((event): event is FaultEvent & { commitIndex: number } => event.commitIndex !== null)
+    .sort((left, right) => left.commitIndex - right.commitIndex);
+  const markerEvents = committed.filter((event) =>
+    event.path.startsWith('projects/') && event.path.endsWith('/lociview.json'));
+  const directMarkerEvents = markerEvents.filter((event) => event.path === markerPath);
+  const snapshots = fs.fileSnapshots.filter((snapshot) => snapshot.token === snapshotToken);
+  const snapshotByEvent = new Map(snapshots.map((snapshot) => [snapshot.eventIndex, snapshot]));
+  if (directMarkerEvents.length !== snapshots.length) return false;
+
+  const closureCommits = committed.filter((event) =>
+    expectedLogSet.has(event.path) || requiredBlobPaths.has(event.path));
+  const presentMarkers = new Set<string>();
+  const presentActiveLogs = new Set<string>();
+  let safe = true;
+  let lastDirectMarkerRemoval = 0;
+
+  for (const event of committed) {
+    const publishedBeforeEvent = presentMarkers.size > 0;
+    const activeLog = event.path.startsWith(`${dir}/ops/`) && event.path.endsWith('.jsonl');
+    if (publishedBeforeEvent && (activeLog || requiredBlobPaths.has(event.path))) safe = false;
+
+    if (event.path.startsWith('projects/') && event.path.endsWith('/lociview.json')) {
+      if (event.method === 'remove') presentMarkers.delete(event.path);
+      else presentMarkers.add(event.path);
+      if (event.path !== markerPath && event.method !== 'remove') safe = false;
+    }
+    if (activeLog) {
+      if (event.method === 'remove') presentActiveLogs.delete(event.path);
+      else presentActiveLogs.add(event.path);
+    }
+
+    if (event.path === markerPath && event.method !== 'remove') {
+      const lastClosureCommitInSegment = Math.max(
+        lastDirectMarkerRemoval,
+        ...closureCommits
+          .filter((candidate) =>
+            candidate.commitIndex > lastDirectMarkerRemoval &&
+            candidate.commitIndex <= event.commitIndex)
+          .map((candidate) => candidate.commitIndex),
+      );
+      if (event.startIndex <= lastClosureCommitInSegment) safe = false;
+      if (!isDeepStrictEqual([...presentMarkers].sort(), [markerPath])) safe = false;
+      if (!isDeepStrictEqual([...presentActiveLogs].sort(), expectedLogPaths)) safe = false;
+      const snapshot = snapshotByEvent.get(event.commitIndex);
+      if (
+        snapshot === undefined ||
+        !(await inspectImportedClosure(await materializeSnapshot(snapshot), dir, fixture)).complete
+      ) {
+        safe = false;
+      }
+    }
+    if (event.path === markerPath && event.method === 'remove') {
+      lastDirectMarkerRemoval = event.commitIndex;
+    }
+  }
+  return safe;
 }
 
 interface MergeFixture {
   targetFs: FaultInjectingMemoryFS;
   targetDir: string;
   targetStore: ProjectStore;
+  targetIdentity: Readonly<Identity>;
   inspection: ZipInspection;
+  baselineManifestText: string;
+  baselineState: ProjectStore['state'];
+  baselineOps: readonly Op[];
+  baselineVector: Readonly<Record<string, number>>;
+  baselineOpsFiles: ReadonlyMap<string, string>;
+  completeState: ProjectStore['state'];
+  completeOps: readonly Op[];
+  completeVector: Readonly<Record<string, number>>;
+  completeOpsFiles: ReadonlyMap<string, string>;
   baselineAssetIds: string[];
   baselinePath: string;
   baselineOpKeys: string[];
@@ -193,7 +442,39 @@ interface MergeFixture {
   expectedBinaries: ReadonlyMap<string, Uint8Array>;
 }
 
-async function makeMergeFixture(targetFs = new FaultInjectingMemoryFS()): Promise<MergeFixture> {
+async function readActiveOpsFiles(fs: MemoryFS, dir: string): Promise<Map<string, string>> {
+  const files = new Map<string, string>();
+  for (const path of (await fs.list(`${dir}/ops/`)).filter((item) => item.endsWith('.jsonl'))) {
+    const text = await fs.readText(path);
+    if (text === null) throw new Error(`listed active operation log is unreadable: ${path}`);
+    files.set(path, text);
+  }
+  return files;
+}
+
+function expectedMergedOpsFiles(
+  baseline: ReadonlyMap<string, string>,
+  dir: string,
+  incoming: readonly Op[],
+): Map<string, string> {
+  const expected = new Map(baseline);
+  const byActor = new Map<string, Op[]>();
+  for (const op of incoming) {
+    const actorOps = byActor.get(op.actor) ?? [];
+    actorOps.push(op);
+    byActor.set(op.actor, actorOps);
+  }
+  for (const [actor, ops] of byActor) {
+    const path = `${dir}/ops/${actor}.jsonl`;
+    expected.set(path, (expected.get(path) ?? '') + serializeOps(ops));
+  }
+  return expected;
+}
+
+async function makeMergeFixture(
+  targetFs = new FaultInjectingMemoryFS(),
+  targetIdentity: Readonly<Identity> = USER_A,
+): Promise<MergeFixture> {
   const targetDir = 'projects/merge-target';
   const createdStore = await ProjectStore.create(targetFs, targetDir, 'two-actor merge target', USER_A);
   const baselineAssetId = await addModelAsset(targetFs, targetDir, createdStore, 'base.stl', BASE_BYTES);
@@ -202,7 +483,13 @@ async function makeMergeFixture(targetFs = new FaultInjectingMemoryFS()): Promis
   const seedB = await ProjectStore.open(targetFs, targetDir, USER_B);
   seedB.createEntity('caption', { title: 'existing actor-B log seed' });
   await seedB.flush();
-  const targetStore = await ProjectStore.open(targetFs, targetDir, USER_A);
+  const targetStore = await ProjectStore.open(targetFs, targetDir, targetIdentity);
+  const baselineManifestText = await targetFs.readText(`${targetDir}/lociview.json`);
+  if (baselineManifestText === null) throw new Error('merge fixture lacks its baseline manifest');
+  const baselineState = structuredClone(targetStore.state);
+  const baselineOps = operationsByKey(targetStore.allOps);
+  const baselineVector = { ...targetStore.vector };
+  const baselineOpsFiles = await readActiveOpsFiles(targetFs, targetDir);
   const baselineAssetIds = visibleEntities(targetStore.state, 'asset').map((asset) => asset.id).sort();
   const baselinePath = targetStore.state.byKind.asset![baselineAssetId]!.fields.path as string;
   const baseKeys = new Set(targetStore.allOps.map(operationKey));
@@ -236,11 +523,30 @@ async function makeMergeFixture(targetFs = new FaultInjectingMemoryFS()): Promis
   if (existingActors.length !== 1 || newActors.length !== 1) {
     throw new Error('merge fixture must append one existing actor log and create one new actor log');
   }
+  const completeOpsInStorageOrder = [...targetStore.allOps, ...incomingOps];
+  const completeState = reduce(completeOpsInStorageOrder);
+  const completeOps = operationsByKey(completeOpsInStorageOrder);
+  const completeVector = versionVector(completeOpsInStorageOrder);
+  const completeOpsFiles = expectedMergedOpsFiles(
+    baselineOpsFiles,
+    targetDir,
+    incomingOps,
+  );
   return {
     targetFs,
     targetDir,
     targetStore,
+    targetIdentity,
     inspection,
+    baselineManifestText,
+    baselineState,
+    baselineOps,
+    baselineVector,
+    baselineOpsFiles,
+    completeState,
+    completeOps,
+    completeVector,
+    completeOpsFiles,
     baselineAssetIds,
     baselinePath,
     baselineOpKeys: [...baseKeys].sort(),
@@ -297,6 +603,263 @@ async function inspectMergedClosure(
   return inspectMergeState(fixture, fs, reopened.state, reopened.loadErrors.length === 0);
 }
 
+interface ExactMergeAuthority {
+  oldAuthority: boolean;
+  completeAuthority: boolean;
+  blobsMatch: boolean;
+  safe: boolean;
+}
+
+type MergeAuthorityKind = 'old' | 'complete';
+
+function currentMergeAuthorityKind(fixture: MergeFixture): MergeAuthorityKind | null {
+  const ops = operationsByKey(fixture.targetStore.allOps);
+  const old =
+    isDeepStrictEqual(fixture.targetStore.state, fixture.baselineState) &&
+    isDeepStrictEqual(ops, fixture.baselineOps) &&
+    isDeepStrictEqual(fixture.targetStore.vector, fixture.baselineVector);
+  if (old) return 'old';
+  const complete =
+    isDeepStrictEqual(fixture.targetStore.state, fixture.completeState) &&
+    isDeepStrictEqual(ops, fixture.completeOps) &&
+    isDeepStrictEqual(fixture.targetStore.vector, fixture.completeVector);
+  return complete ? 'complete' : null;
+}
+
+function exactMergeAuthorityKind(authority: ExactMergeAuthority): MergeAuthorityKind | null {
+  if (authority.oldAuthority && !authority.completeAuthority) return 'old';
+  if (authority.completeAuthority && !authority.oldAuthority) return 'complete';
+  return null;
+}
+
+interface ClockPosition {
+  physical: number;
+  counter: number;
+}
+
+function compareClockPosition(left: ClockPosition, right: ClockPosition): number {
+  return left.physical - right.physical || left.counter - right.counter;
+}
+
+function maximumClockPosition(ops: readonly Op[]): ClockPosition {
+  if (ops.length === 0) throw new Error('clock probe requires at least one operation');
+  return ops.reduce<ClockPosition>((maximum, op) => {
+    const parsed = parseHlc(op.hlc);
+    const candidate = { physical: parsed.physical, counter: parsed.counter };
+    return compareClockPosition(candidate, maximum) > 0 ? candidate : maximum;
+  }, { physical: 0, counter: 0 });
+}
+
+function incomingOpsForFixture(fixture: MergeFixture): Op[] {
+  const baselineKeys = new Set(fixture.baselineOps.map(operationKey));
+  return fixture.completeOps.filter((op) => !baselineKeys.has(operationKey(op)));
+}
+
+function mergeProbeShapeIsValid(fixture: MergeFixture): boolean {
+  const incoming = incomingOpsForFixture(fixture);
+  const baselineClock = maximumClockPosition(fixture.baselineOps);
+  const incomingClock = maximumClockPosition(incoming);
+  const actor = fixture.targetStore.actorId;
+  return (
+    compareClockPosition(incomingClock, baselineClock) > 0 &&
+    (fixture.completeVector[actor] ?? 0) > (fixture.baselineVector[actor] ?? 0) &&
+    incoming.some((op) => op.actor === actor) &&
+    baselineClock.physical > 0
+  );
+}
+
+function mergeProbeNow(fixture: MergeFixture): number {
+  return maximumClockPosition(fixture.baselineOps).physical - 1;
+}
+
+async function probeOldMergeStore(
+  fixture: MergeFixture,
+  twinFs: MemoryFS,
+  twinStore: ProjectStore,
+): Promise<boolean> {
+  const input = {
+    t: 'create' as const,
+    e: 'caption',
+    id: 'cap_00000000000000000000000049',
+    v: { title: 'post-rejection merge clock and sequence probe' },
+  };
+  const actual = fixture.targetStore.dispatch(input);
+  const twin = twinStore.dispatch(input);
+  const [targetFlush, twinFlush] = await Promise.all([
+    settle(fixture.targetStore.flush()),
+    settle(twinStore.flush()),
+  ]);
+  if (twinFlush.rejected) throw new Error('merge probe twin flush failed');
+  const twinReopened = await ProjectStore.open(twinFs, fixture.targetDir, fixture.targetIdentity);
+  const targetReopened = await settleValue(
+    ProjectStore.open(fixture.targetFs, fixture.targetDir, fixture.targetIdentity),
+  );
+  if (targetReopened.value === null) return false;
+  const targetFiles = await readActiveOpsFiles(fixture.targetFs, fixture.targetDir);
+  const twinFiles = await readActiveOpsFiles(twinFs, fixture.targetDir);
+  return (
+    !targetFlush.rejected &&
+    isDeepStrictEqual(actual, twin) &&
+    isDeepStrictEqual(fixture.targetStore.state, twinStore.state) &&
+    isDeepStrictEqual(
+      operationsByKey(fixture.targetStore.allOps),
+      operationsByKey(twinStore.allOps),
+    ) &&
+    isDeepStrictEqual(fixture.targetStore.vector, twinStore.vector) &&
+    targetReopened.value.loadErrors.length === 0 &&
+    twinReopened.loadErrors.length === 0 &&
+    isDeepStrictEqual(targetReopened.value.state, twinReopened.state) &&
+    isDeepStrictEqual(
+      operationsByKey(targetReopened.value.allOps),
+      operationsByKey(twinReopened.allOps),
+    ) &&
+    isDeepStrictEqual(targetReopened.value.vector, twinReopened.vector) &&
+    mapsAreDeepEqual(targetFiles, twinFiles)
+  );
+}
+
+function mapsAreDeepEqual<V>(
+  actual: ReadonlyMap<string, V>,
+  expected: ReadonlyMap<string, V>,
+): boolean {
+  const entries = (value: ReadonlyMap<string, V>): Array<[string, V]> =>
+    [...value.entries()].sort(([left], [right]) => left.localeCompare(right));
+  return isDeepStrictEqual(entries(actual), entries(expected));
+}
+
+async function inspectExactMergeAuthority(
+  fixture: MergeFixture,
+  fs: MemoryFS = fixture.targetFs,
+): Promise<ExactMergeAuthority> {
+  let reopened: ProjectStore;
+  try {
+    reopened = await ProjectStore.open(fs, fixture.targetDir, USER_A);
+  } catch {
+    return { oldAuthority: false, completeAuthority: false, blobsMatch: false, safe: false };
+  }
+  const markerPaths = (await fs.list('projects/'))
+    .filter((path) => path.endsWith('/lociview.json'))
+    .sort();
+  const manifestPath = `${fixture.targetDir}/lociview.json`;
+  const manifestExact =
+    isDeepStrictEqual(markerPaths, [manifestPath]) &&
+    (await fs.readText(manifestPath)) === fixture.baselineManifestText;
+  const activeOpsFiles = await readActiveOpsFiles(fs, fixture.targetDir);
+  const reopenedOps = operationsByKey(reopened.allOps);
+  const oldAuthority =
+    manifestExact &&
+    reopened.loadErrors.length === 0 &&
+    isDeepStrictEqual(reopened.state, fixture.baselineState) &&
+    isDeepStrictEqual(reopenedOps, fixture.baselineOps) &&
+    isDeepStrictEqual(reopened.vector, fixture.baselineVector) &&
+    mapsAreDeepEqual(activeOpsFiles, fixture.baselineOpsFiles);
+  const completeAuthority =
+    manifestExact &&
+    reopened.loadErrors.length === 0 &&
+    isDeepStrictEqual(reopened.state, fixture.completeState) &&
+    isDeepStrictEqual(reopenedOps, fixture.completeOps) &&
+    isDeepStrictEqual(reopened.vector, fixture.completeVector) &&
+    mapsAreDeepEqual(activeOpsFiles, fixture.completeOpsFiles);
+
+  let blobsMatch = true;
+  for (const asset of visibleEntities(reopened.state, 'asset')) {
+    const path = asset.fields.path;
+    const expected = typeof path === 'string' ? fixture.expectedBinaries.get(path) : undefined;
+    if (
+      typeof path !== 'string' ||
+      expected === undefined ||
+      asset.fields.size !== expected.length ||
+      !bytesEqual(await fs.readBytes(`${fixture.targetDir}/${path}`), expected)
+    ) {
+      blobsMatch = false;
+      break;
+    }
+  }
+  return {
+    oldAuthority,
+    completeAuthority,
+    blobsMatch,
+    safe: blobsMatch && (oldAuthority || completeAuthority),
+  };
+}
+
+interface MergeAuthorityHistoryWatch {
+  tokenByPath: ReadonlyMap<string, string>;
+}
+
+function armMergeAuthorityHistory(
+  fs: FaultInjectingMemoryFS,
+  fixture: MergeFixture,
+  tokenPrefix: string,
+): MergeAuthorityHistoryWatch {
+  const authorityPaths = [
+    `${fixture.targetDir}/lociview.json`,
+    ...fixture.completeOpsFiles.keys(),
+  ].sort();
+  const snapshotPaths = [
+    ...authorityPaths,
+    ...[...fixture.expectedBinaries.keys()].map((path) => `${fixture.targetDir}/${path}`),
+  ];
+  const tokenByPath = new Map<string, string>();
+  authorityPaths.forEach((path, index) => {
+    const token = `${tokenPrefix}-${index}`;
+    tokenByPath.set(path, token);
+    fs.watchFilesAfterCommit(token, path, snapshotPaths);
+  });
+  return { tokenByPath };
+}
+
+async function mergeAuthorityHistoryIsSafe(
+  fs: FaultInjectingMemoryFS,
+  fixture: MergeFixture,
+  scenarioEvents: readonly FaultEvent[],
+  watch: MergeAuthorityHistoryWatch,
+): Promise<boolean> {
+  const targetMarker = `${fixture.targetDir}/lociview.json`;
+  for (const event of scenarioEvents) {
+    if (event.commitIndex === null) continue;
+    const projectMarker =
+      event.path.startsWith('projects/') && event.path.endsWith('/lociview.json');
+    const activeLog =
+      event.path.startsWith(`${fixture.targetDir}/ops/`) && event.path.endsWith('.jsonl');
+    if (!projectMarker && !activeLog) continue;
+    if (projectMarker && event.path !== targetMarker) {
+      if (event.method !== 'remove') return false;
+      continue;
+    }
+    const token = watch.tokenByPath.get(event.path);
+    if (token === undefined) {
+      if (event.method !== 'remove') return false;
+      continue;
+    }
+    const snapshot = fs.fileSnapshots.find((candidate) =>
+      candidate.token === token && candidate.eventIndex === event.commitIndex);
+    if (
+      snapshot === undefined ||
+      !(await inspectExactMergeAuthority(fixture, await materializeSnapshot(snapshot))).safe
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function exactMergeAuthorityIsLiveAndCrashSafe(
+  fixture: MergeFixture,
+  authority: ExactMergeAuthority,
+  historySafe: boolean,
+): boolean {
+  const reopenedKind = exactMergeAuthorityKind(authority);
+  if (
+    !authority.safe ||
+    reopenedKind === null ||
+    currentMergeAuthorityKind(fixture) !== reopenedKind
+  ) {
+    return false;
+  }
+  return historySafe;
+}
+
 async function mergeSnapshotPaths(fixture: MergeFixture): Promise<string[]> {
   const paths = new Set(await fixture.targetFs.list(`${fixture.targetDir}/`));
   for (const actor of fixture.incomingActors) paths.add(`${fixture.targetDir}/ops/${actor}.jsonl`);
@@ -316,6 +879,49 @@ interface ObservedMergeState {
   token: string;
   assetIds: string[];
   opKeys: string[];
+}
+
+interface ExactObservedMergeState {
+  token: string;
+  state: ProjectStore['state'];
+  ops: readonly Op[];
+  vector: Readonly<Record<string, number>>;
+}
+
+function observeExactMergeState(
+  token: string,
+  state: ProjectStore['state'],
+  store: ProjectStore,
+): ExactObservedMergeState {
+  return {
+    token,
+    state: structuredClone(state),
+    ops: operationsByKey(structuredClone([...store.allOps])),
+    vector: { ...store.vector },
+  };
+}
+
+function exactObservedMergePublicationIsSafe(
+  observed: ExactObservedMergeState,
+  snapshot: FaultFileSnapshot | undefined,
+  fixture: MergeFixture,
+): boolean {
+  const oldAuthority =
+    isDeepStrictEqual(observed.state, fixture.baselineState) &&
+    isDeepStrictEqual(observed.ops, fixture.baselineOps) &&
+    isDeepStrictEqual(observed.vector, fixture.baselineVector);
+  if (oldAuthority) return true;
+  const completeAuthority =
+    isDeepStrictEqual(observed.state, fixture.completeState) &&
+    isDeepStrictEqual(observed.ops, fixture.completeOps) &&
+    isDeepStrictEqual(observed.vector, fixture.completeVector);
+  return completeAuthority &&
+    snapshot !== undefined &&
+    fixture.incomingBinaries.every((binary) =>
+      bytesEqual(
+        snapshot.files.get(`${fixture.targetDir}/${binary.path}`) ?? null,
+        binary.data,
+      ));
 }
 
 function observeMergeState(
@@ -442,6 +1048,270 @@ describe.sequential('FaultInjectingMemoryFS publication controls', () => {
   });
 });
 
+for (const mode of ['bitflip', 'truncate'] as const) {
+  it(`ResolvedCorruptingMemoryFS ${mode} corrupts once, observes it, and permits exact retry`, async () => {
+    const path = `verification/${mode}.bin`;
+    const setupPath = `verification/setup-${mode}.bin`;
+    const source = encoder.encode(`resolved ${mode} source bytes`);
+    const sourceBefore = new Uint8Array(source);
+    const fs = new ResolvedCorruptingMemoryFS(path, source, mode);
+    await fs.writeBytes(setupPath, source);
+    expect(fs.injectionCount).toBe(0);
+    fs.beginAction();
+    await fs.writeBytes(`verification/private-staging-${mode}.bin`, source);
+    expect(fs.injectionCount).toBe(0);
+    await fs.writeBytes(path, source);
+    const observed = await fs.readBytes(path);
+    await fs.writeBytes(path, source);
+    fs.endAction();
+    const finalBytes = await fs.readBytes(path);
+
+    expect(fs.injectionCount).toBe(1);
+    expect(fs.injectedPath).toBe(path);
+    expect(fs.requestedWrites).toHaveLength(2);
+    expect(fs.requestedWrites.every((bytes) => bytesEqual(bytes, sourceBefore))).toBe(true);
+    expect(bytesEqual(source, sourceBefore)).toBe(true);
+    expect(fs.corruptBytes).not.toBeNull();
+    expect(bytesEqual(fs.corruptBytes, sourceBefore)).toBe(false);
+    expect(mode === 'bitflip'
+      ? fs.corruptBytes!.length === sourceBefore.length
+      : fs.corruptBytes!.length === sourceBefore.length - 1).toBe(true);
+    expect(bytesEqual(observed, fs.corruptBytes!)).toBe(true);
+    expect(fs.verificationReads).toHaveLength(1);
+    expect(bytesEqual(fs.verificationReads[0] ?? null, fs.corruptBytes!)).toBe(true);
+    expect(bytesEqual(finalBytes, sourceBefore)).toBe(true);
+  });
+}
+
+type MarkerHistoryControl =
+  | 'marker-last'
+  | 'marker-early'
+  | 'nested-marker'
+  | 'extra-active-log'
+  | 'deactivate-repair-republish';
+
+async function exerciseMarkerHistoryControl(
+  fixture: ImportFixture,
+  control: MarkerHistoryControl,
+): Promise<{ finalComplete: boolean; historySafe: boolean }> {
+  const fs = new FaultInjectingMemoryFS();
+  const dir = `projects/marker-history-${control}`;
+  const markerPath = `${dir}/lociview.json`;
+  const markerText = JSON.stringify(fixture.expectedManifest, null, 2);
+  const markerToken = `marker-history-${control}`;
+  const closurePaths = [
+    markerPath,
+    ...[...fixture.expectedOps.keys()].map((path) => `${dir}/${path}`),
+    ...[...fixture.expectedBinaries.keys()].map((path) => `${dir}/${path}`),
+  ];
+  fs.watchFilesAfterCommit(markerToken, markerPath, closurePaths);
+  const writeClosure = async (): Promise<void> => {
+    for (const [path, text] of fixture.expectedOps) await fs.writeText(`${dir}/${path}`, text);
+    for (const [path, bytes] of fixture.expectedBinaries) {
+      await fs.writeBytes(`${dir}/${path}`, bytes);
+    }
+  };
+
+  if (control === 'marker-last') {
+    await fs.writeText(`staging/${control}/lociview.json`, markerText);
+  }
+  if (control === 'marker-early') await fs.writeText(markerPath, markerText);
+  await writeClosure();
+  if (control === 'nested-marker') {
+    const nested = `projects/.staging/${control}/lociview.json`;
+    await fs.writeText(nested, markerText);
+    await fs.remove(nested);
+  }
+  if (control === 'extra-active-log') {
+    await fs.writeText(`${dir}/ops/extra.jsonl`, [...fixture.expectedOps.values()][0]!);
+  }
+  if (control === 'deactivate-repair-republish') {
+    await fs.writeText(markerPath, markerText);
+    await fs.remove(markerPath);
+    const [repairPath, repairBytes] = [...fixture.expectedBinaries][0]!;
+    await fs.writeBytes(`${dir}/${repairPath}`, repairBytes);
+    await fs.writeText(markerPath, markerText);
+  } else if (control !== 'marker-early') {
+    await fs.writeText(markerPath, markerText);
+  }
+  if (control === 'extra-active-log') await fs.remove(`${dir}/ops/extra.jsonl`);
+  await fs.settleProbes();
+
+  return {
+    finalComplete: (await inspectImportedClosure(fs, dir, fixture)).complete,
+    historySafe: await importMarkerHistoryIsSafe(fs, dir, fixture, markerToken),
+  };
+}
+
+describe.sequential('import completion-marker history oracle controls', () => {
+  let fixture: ImportFixture;
+
+  beforeAll(async () => {
+    fixture = await makeImportFixture();
+  });
+
+  for (const control of [
+    'marker-last',
+    'marker-early',
+    'nested-marker',
+    'extra-active-log',
+    'deactivate-repair-republish',
+  ] as const satisfies readonly MarkerHistoryControl[]) {
+    it(`${control} reaches an exact final closure and the expected history disposition`, async () => {
+      expect(await exerciseMarkerHistoryControl(fixture, control)).toEqual({
+        finalComplete: true,
+        historySafe: control === 'marker-last' || control === 'deactivate-repair-republish',
+      });
+    });
+  }
+});
+
+type MergeAuthorityHistoryControl =
+  | 'same-byte-authority-rewrite'
+  | 'complete-same-byte-authority-rewrite'
+  | 'private-staging-marker'
+  | 'public-nested-marker'
+  | 'partial-active-log'
+  | 'extra-active-log';
+
+async function exerciseMergeAuthorityHistoryControl(
+  control: MergeAuthorityHistoryControl,
+): Promise<{ finalExact: boolean; historySafe: boolean }> {
+  const fixture = await makeMergeFixture();
+  const fs = fixture.targetFs;
+  const expectedKind: MergeAuthorityKind =
+    control === 'complete-same-byte-authority-rewrite' ? 'complete' : 'old';
+  if (expectedKind === 'complete') {
+    await mergeFromInspection(fs, fixture.targetDir, fixture.targetStore, fixture.inspection);
+  }
+  const watch = armMergeAuthorityHistory(fs, fixture, `merge-history-${control}`);
+  const eventOffset = fs.events.length;
+  const markerPath = `${fixture.targetDir}/lociview.json`;
+  const authorityOpsFiles = expectedKind === 'complete'
+    ? fixture.completeOpsFiles
+    : fixture.baselineOpsFiles;
+  const [logPath, logText] = [...authorityOpsFiles][0]!;
+
+  if (
+    control === 'same-byte-authority-rewrite' ||
+    control === 'complete-same-byte-authority-rewrite'
+  ) {
+    await fs.writeText(markerPath, fixture.baselineManifestText);
+    await fs.writeText(logPath, logText);
+  } else if (control === 'private-staging-marker') {
+    const path = `staging/${control}/lociview.json`;
+    await fs.writeText(path, fixture.baselineManifestText);
+    await fs.remove(path);
+  } else if (control === 'public-nested-marker') {
+    const path = `projects/.staging/${control}/lociview.json`;
+    await fs.writeText(path, fixture.baselineManifestText);
+    await fs.remove(path);
+  } else if (control === 'partial-active-log') {
+    await fs.writeText(logPath, '{"broken":');
+    await fs.writeText(logPath, logText);
+  } else {
+    const path = `${fixture.targetDir}/ops/a_extra.jsonl`;
+    await fs.writeText(path, logText);
+    await fs.remove(path);
+  }
+
+  await fs.settleProbes();
+  const authority = await inspectExactMergeAuthority(fixture);
+  return {
+    finalExact:
+      authority.safe &&
+      exactMergeAuthorityKind(authority) === expectedKind &&
+      currentMergeAuthorityKind(fixture) === expectedKind,
+    historySafe: await mergeAuthorityHistoryIsSafe(
+      fs,
+      fixture,
+      fs.events.slice(eventOffset),
+      watch,
+    ),
+  };
+}
+
+describe.sequential('merge authority history oracle controls', () => {
+  for (const control of [
+    'same-byte-authority-rewrite',
+    'complete-same-byte-authority-rewrite',
+    'private-staging-marker',
+    'public-nested-marker',
+    'partial-active-log',
+    'extra-active-log',
+  ] as const satisfies readonly MergeAuthorityHistoryControl[]) {
+    it(`${control} reaches exact final authority and the expected history disposition`, async () => {
+      expect(await exerciseMergeAuthorityHistoryControl(control)).toEqual({
+        finalExact: true,
+        historySafe:
+          control === 'same-byte-authority-rewrite' ||
+          control === 'complete-same-byte-authority-rewrite' ||
+          control === 'private-staging-marker',
+      });
+    });
+  }
+});
+
+describe.sequential('rejected-merge HLC and own-sequence probe control', () => {
+  it('keeps identical baselines equal and exposes observation of the incoming own actor', async () => {
+    const source = await makeMergeFixture(new FaultInjectingMemoryFS(), USER_B);
+    expect(mergeProbeShapeIsValid(source)).toBe(true);
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(mergeProbeNow(source));
+    try {
+      const poisonedFs = new FaultInjectingMemoryFS();
+      const cleanFs = new MemoryFS();
+      await copyWorkspace(source.targetFs, poisonedFs);
+      await copyWorkspace(source.targetFs, cleanFs);
+      const poisonedStore = await ProjectStore.open(
+        poisonedFs,
+        source.targetDir,
+        source.targetIdentity,
+      );
+      const cleanStore = await ProjectStore.open(
+        cleanFs,
+        source.targetDir,
+        source.targetIdentity,
+      );
+      const poisonedFixture: MergeFixture = { ...source, targetFs: poisonedFs, targetStore: poisonedStore };
+      poisonedStore.mergeExternal(incomingOpsForFixture(poisonedFixture));
+      const input = {
+        t: 'create' as const,
+        e: 'caption',
+        id: 'cap_00000000000000000000000048',
+        v: { title: 'probe control' },
+      };
+      const poisonedOp = poisonedStore.dispatch(input);
+      const cleanOp = cleanStore.dispatch(input);
+      const [poisonedFlush, cleanFlush] = await Promise.all([
+        settle(poisonedStore.flush()),
+        settle(cleanStore.flush()),
+      ]);
+      expect({
+        sameActor: poisonedOp.actor === cleanOp.actor,
+        sequenceAdvanced: poisonedOp.op > cleanOp.op,
+        clockAdvanced: poisonedOp.hlc > cleanOp.hlc,
+        flushesResolved: !poisonedFlush.rejected && !cleanFlush.rejected,
+      }).toEqual({
+        sameActor: true,
+        sequenceAdvanced: true,
+        clockAdvanced: true,
+        flushesResolved: true,
+      });
+
+      const targetFs = new FaultInjectingMemoryFS();
+      const twinFs = new MemoryFS();
+      await copyWorkspace(source.targetFs, targetFs);
+      await copyWorkspace(source.targetFs, twinFs);
+      const targetStore = await ProjectStore.open(targetFs, source.targetDir, source.targetIdentity);
+      const twinStore = await ProjectStore.open(twinFs, source.targetDir, source.targetIdentity);
+      const cleanFixture: MergeFixture = { ...source, targetFs, targetStore };
+      expect(await probeOldMergeStore(cleanFixture, twinFs, twinStore)).toBe(true);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+});
+
 describe.sequential('G0S-BLOB new-project publication', () => {
   let successComplete: boolean;
   let markerLast: boolean;
@@ -449,7 +1319,15 @@ describe.sequential('G0S-BLOB new-project publication', () => {
 
   beforeAll(async () => {
     const fixture = await makeImportFixture();
-    fixtureShapeValid = fixture.expectedOps.size === 2 && fixture.expectedBinaries.size === 2;
+    fixtureShapeValid =
+      fixture.expectedOps.size === 2 &&
+      fixture.expectedBinaries.size === 2 &&
+      knownModelAssetsAreExact(
+        fixture.expectedState,
+        fixture.expectedOperationObjects,
+        fixture.expectedBinaries,
+        IMPORT_MODEL_ROLES,
+      );
     const target = new FaultInjectingMemoryFS();
     const targetDir = 'projects/import-success';
     await importNewProject(target, targetDir, fixture.inspection);
@@ -580,6 +1458,96 @@ for (const row of IMPORT_FAULT_ROWS) {
   });
 }
 
+for (const mode of ['bitflip', 'truncate'] as const satisfies readonly ResolvedCorruptionMode[]) {
+  describe.sequential(`G0S-BLOB resolved import corruption: ${mode}`, () => {
+    let fixtureValid = false;
+    let corruptionReached = false;
+    let verificationReadObserved = false;
+    let publicationSafe = false;
+
+    beforeAll(async () => {
+      const fixture = await makeImportFixture();
+      const expectedBinaryPaths = [...fixture.expectedBinaries.keys()].sort();
+      fixtureValid =
+        fixture.requiredBinaryPaths.length === 2 &&
+        isDeepStrictEqual(fixture.requiredBinaryPaths, expectedBinaryPaths) &&
+        fixture.expectedOperationObjects.length === fixture.inspection.ops.length &&
+        knownModelAssetsAreExact(
+          fixture.expectedState,
+          fixture.expectedOperationObjects,
+          fixture.expectedBinaries,
+          IMPORT_MODEL_ROLES,
+        );
+      const relativeTarget = fixture.requiredBinaryPaths[0]!;
+      const expected = fixture.expectedBinaries.get(relativeTarget);
+      if (expected === undefined) throw new Error('resolved import target lacks healthy bytes');
+      const sourceBefore = new Uint8Array(expected);
+      const targetDir = `projects/import-resolved-${mode}`;
+      const targetPath = `${targetDir}/${relativeTarget}`;
+      const fs = new ResolvedCorruptingMemoryFS(targetPath, expected, mode);
+      const markerPath = `${targetDir}/lociview.json`;
+      const markerToken = `resolved-import-marker-${mode}`;
+      const closurePaths = [
+        markerPath,
+        ...[...fixture.expectedOps.keys()].map((path) => `${targetDir}/${path}`),
+        ...[...fixture.expectedBinaries.keys()].map((path) => `${targetDir}/${path}`),
+      ];
+      fs.watchFilesAfterCommit(markerToken, markerPath, closurePaths);
+
+      let actionOutcome: Awaited<ReturnType<typeof settleValue>>;
+      fs.beginAction();
+      try {
+        actionOutcome = await settleValue(importNewProject(fs, targetDir, fixture.inspection));
+      } finally {
+        fs.endAction();
+      }
+      await fs.settleProbes();
+
+      corruptionReached =
+        fs.injectionCount === 1 &&
+        fs.injectedPath !== null &&
+        fs.requestedWrites.length >= 1 &&
+        bytesEqual(fs.requestedWrites[0] ?? null, sourceBefore) &&
+        bytesEqual(expected, sourceBefore) &&
+        fs.corruptBytes !== null &&
+        !bytesEqual(fs.corruptBytes, sourceBefore) &&
+        (mode === 'bitflip'
+          ? fs.corruptBytes.length === sourceBefore.length
+          : fs.corruptBytes.length === sourceBefore.length - 1);
+      verificationReadObserved = fs.verificationReads.some((bytes) =>
+        bytesEqual(bytes, fs.corruptBytes!));
+
+      const markerHistorySafe = await importMarkerHistoryIsSafe(
+        fs,
+        targetDir,
+        fixture,
+        markerToken,
+      );
+      const finalClosure = await inspectImportedClosure(fs, targetDir, fixture);
+      const explicitlyRejected = actionOutcome.rejected;
+      publicationSafe =
+        markerHistorySafe &&
+        finalClosure.safe &&
+        (finalClosure.complete || explicitlyRejected);
+    });
+
+    it('uses an exact healthy closure and commits the requested resolved corruption once', () => {
+      expect({ fixtureValid, corruptionReached }).toEqual({
+        fixtureValid: true,
+        corruptionReached: true,
+      });
+    });
+
+    it.fails('reads and observes the wrong bytes before acknowledging or retrying the blob write', () => {
+      expect(verificationReadObserved).toBe(true);
+    });
+
+    it.fails('never publishes a marker unless the full reopened closure has exact healthy bytes', () => {
+      expect(publicationSafe).toBe(true);
+    });
+  });
+}
+
 describe.sequential('G0S-BLOB existing-project merge publication', () => {
   let fixtureShapeValid: boolean;
   let mergeComplete: boolean;
@@ -692,6 +1660,378 @@ describe.sequential('G0S-BLOB in-memory merge publication while blob I/O is pend
 
   it.fails('keeps synchronous state/allOps old until every newly referenced blob is durable', () => {
     expect(stateWasSafeWhilePaused).toBe(true);
+  });
+});
+
+describe.sequential('G0S-BLOB resolved merge corruption verification', () => {
+  let fixtureValid = false;
+  let corruptionReached = false;
+  let verificationReadObserved = false;
+  let notificationPublicationSafe = false;
+  let finalAuthoritySafe = false;
+
+  beforeAll(async () => {
+    const sourceFixture = await makeMergeFixture(new FaultInjectingMemoryFS(), USER_B);
+    const binary = sourceFixture.incomingBinaries[0];
+    const targetPath = `${sourceFixture.targetDir}/${binary.path}`;
+    const absentBeforeAction = !(await sourceFixture.targetFs.exists(targetPath));
+    const expectedBefore = new Uint8Array(binary.data);
+    const fs = new ResolvedCorruptingMemoryFS(targetPath, binary.data, 'bitflip');
+    await copyWorkspace(sourceFixture.targetFs, fs);
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(mergeProbeNow(sourceFixture));
+    try {
+      const targetStore = await ProjectStore.open(
+        fs,
+        sourceFixture.targetDir,
+        sourceFixture.targetIdentity,
+      );
+      const fixture: MergeFixture = { ...sourceFixture, targetFs: fs, targetStore };
+      const twinFs = new MemoryFS();
+      await copyWorkspace(fs, twinFs);
+      const twinStore = await ProjectStore.open(
+        twinFs,
+        fixture.targetDir,
+        fixture.targetIdentity,
+      );
+      fixtureValid =
+        absentBeforeAction &&
+        fixture.incomingBinaries.every((candidate) =>
+          fixture.expectedBinaries.has(candidate.path)) &&
+        isDeepStrictEqual(
+          requiredBinaryPathsFromOps(fixture.completeOps),
+          [...fixture.expectedBinaries.keys()].sort(),
+        ) &&
+        knownModelAssetsAreExact(
+          fixture.completeState,
+          fixture.completeOps,
+          fixture.expectedBinaries,
+          MERGE_MODEL_ROLES,
+        ) &&
+        mergeProbeShapeIsValid(fixture);
+
+      const authorityWatch = armMergeAuthorityHistory(
+        fs,
+        fixture,
+        'resolved-merge-authority',
+      );
+      const eventOffset = fs.events.length;
+      const binaryPaths = fixture.incomingBinaries.map(
+        (candidate) => `${fixture.targetDir}/${candidate.path}`,
+      );
+      const observed: ExactObservedMergeState[] = [];
+      const unsubscribe = fixture.targetStore.subscribe((state) => {
+        const token = `resolved-merge-notification-${observed.length}`;
+        observed.push(observeExactMergeState(token, state, fixture.targetStore));
+        fs.markFiles(token, binaryPaths);
+      });
+      let actionOutcome: Awaited<ReturnType<typeof settleValue>>;
+      fs.beginAction();
+      try {
+        actionOutcome = await settleValue(
+          mergeFromInspection(fs, fixture.targetDir, fixture.targetStore, fixture.inspection),
+        );
+      } finally {
+        fs.endAction();
+      }
+      try {
+        await settle(fixture.targetStore.flush());
+      } finally {
+        unsubscribe();
+      }
+      await fs.settleProbes();
+
+      corruptionReached =
+        fs.injectionCount === 1 &&
+        fs.injectedPath !== null &&
+        fs.requestedWrites.length >= 1 &&
+        bytesEqual(fs.requestedWrites[0] ?? null, expectedBefore) &&
+        bytesEqual(binary.data, expectedBefore) &&
+        fs.corruptBytes !== null &&
+        fs.corruptBytes.length === expectedBefore.length &&
+        !bytesEqual(fs.corruptBytes, expectedBefore);
+      verificationReadObserved = fs.verificationReads.some((bytes) =>
+        bytesEqual(bytes, fs.corruptBytes!));
+
+      const finalAuthority = await inspectExactMergeAuthority(fixture, fs);
+      const scenarioEvents = fs.events.slice(eventOffset);
+      const historySafe = await mergeAuthorityHistoryIsSafe(
+        fs,
+        fixture,
+        scenarioEvents,
+        authorityWatch,
+      );
+      finalAuthoritySafe = exactMergeAuthorityIsLiveAndCrashSafe(
+        fixture,
+        finalAuthority,
+        historySafe,
+      );
+      const finalKind = exactMergeAuthorityKind(finalAuthority);
+      if (finalKind === 'old') {
+        finalAuthoritySafe = finalAuthoritySafe &&
+          (await probeOldMergeStore(fixture, twinFs, twinStore));
+      }
+      const snapshots = fs.fileSnapshots.filter((snapshot) =>
+        snapshot.token.startsWith('resolved-merge-notification-'));
+      const notificationsAtSafeAuthority = observed.length === 0
+        ? finalKind === 'old' && finalAuthoritySafe
+        : observed.length === snapshots.length &&
+          observed.every((state) => exactObservedMergePublicationIsSafe(
+            state,
+            snapshots.find((snapshot) => snapshot.token === state.token),
+            fixture,
+          ));
+      notificationPublicationSafe =
+        notificationsAtSafeAuthority &&
+        (finalKind !== 'old' || actionOutcome.rejected);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('uses an absent exclusive target and commits one same-length wrong-byte result', () => {
+    expect({ fixtureValid, corruptionReached }).toEqual({
+      fixtureValid: true,
+      corruptionReached: true,
+    });
+  });
+
+  it.fails('reads and observes the wrong bytes before accepting or retrying the incoming blob', () => {
+    expect(verificationReadObserved).toBe(true);
+  });
+
+  it.fails('never notifies complete incoming authority against corrupt required bytes', () => {
+    expect(notificationPublicationSafe).toBe(true);
+  });
+
+  it.fails('reopens as the exact old authority or the fully verified merged authority', () => {
+    expect(finalAuthoritySafe).toBe(true);
+  });
+});
+
+describe.sequential('G0S-BLOB native package with one omitted required binary', () => {
+  let fixtureValid = false;
+  let newImportSafe = false;
+  let mergeSafe = false;
+
+  beforeAll(async () => {
+    let fixture = await makeMergeFixture(new FaultInjectingMemoryFS(), USER_B);
+    const healthyImport = importFixtureFromInspection(
+      fixture.inspection,
+      fixture.completeState,
+    );
+    const omitted = fixture.incomingBinaries[0];
+    const omittedTargetPath = `${fixture.targetDir}/${omitted.path}`;
+    const omittedAbsentFromTarget = !(await fixture.targetFs.exists(omittedTargetPath));
+    const healthyPaths = healthyImport.healthyEntries.map((entry) => entry.path);
+    const missingEntries = healthyImport.healthyEntries
+      .filter((entry) => entry.path !== omitted.path)
+      .map((entry) => ({ path: entry.path, data: new Uint8Array(entry.data) }));
+    const missingPaths = missingEntries.map((entry) => entry.path);
+    const referencingOp = healthyImport.expectedOperationObjects.find((op) =>
+      op.e === 'asset' && op.v?.path === omitted.path);
+    const omittedRole = MERGE_MODEL_ROLES.find((role) => bytesEqual(omitted.data, role.bytes));
+    const allOtherRequiredPresent = healthyImport.requiredBinaryPaths
+      .filter((path) => path !== omitted.path)
+      .every((path) => {
+        const healthy = healthyImport.expectedBinaries.get(path);
+        const candidate = missingEntries.find((entry) => entry.path === path)?.data;
+        return healthy !== undefined && bytesEqual(candidate ?? null, healthy);
+      });
+    const packageBytes = await writeZipEntries(missingEntries);
+    const rawEntries = await rawZipEntryShapes(packageBytes);
+    const actualEntryMap = new Map(
+      rawEntries.map((entry) => [entry.filename, entry.payload]),
+    );
+    const expectedMissingMap = new Map(missingEntries.map((entry) => [entry.path, entry.data]));
+    const healthyEntryMap = new Map(
+      healthyImport.healthyEntries.map((entry) => [entry.path, entry.data]),
+    );
+    const actualEntriesExact =
+      rawEntries.length === missingEntries.length &&
+      actualEntryMap.size === rawEntries.length &&
+      rawEntries.every((entry) =>
+        !entry.directory &&
+        entry.payload !== null &&
+        sanitizeZipPath(entry.filename) === entry.filename &&
+        bytesEqual(entry.payload, expectedMissingMap.get(entry.filename) ?? new Uint8Array())) &&
+      missingEntries.every((entry) =>
+        bytesEqual(actualEntryMap.get(entry.path) ?? null, entry.data));
+    const healthyDifference = healthyPaths
+      .filter((path) => !actualEntryMap.has(path))
+      .sort();
+    const commonEntriesExact = [...actualEntryMap].every(([path, bytes]) =>
+      bytes !== null && bytesEqual(bytes, healthyEntryMap.get(path) ?? new Uint8Array()));
+    const omittedCollisionKey = omitted.path.normalize('NFC').toLowerCase();
+    const noOmittedAlias = [...actualEntryMap.keys()].every((path) =>
+      sanitizeZipPath(path) !== omitted.path &&
+      path.normalize('NFC').toLowerCase() !== omittedCollisionKey);
+    const actualOps: Op[] = [];
+    let actualOpsParseClean = true;
+    for (const [path, bytes] of actualEntryMap) {
+      if (!path.startsWith('ops/') || !path.endsWith('.jsonl') || bytes === null) continue;
+      const parsed = parseOpsJsonl(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+      actualOps.push(...parsed.ops);
+      actualOpsParseClean = actualOpsParseClean && parsed.errors.length === 0;
+    }
+    const actualOmittedReferences = actualOps.filter((op) =>
+      op.e === 'asset' && op.t === 'create' && op.v?.path === omitted.path);
+
+    fixtureValid =
+      omittedAbsentFromTarget &&
+      new Set(healthyPaths).size === healthyPaths.length &&
+      healthyPaths.filter((path) => path === omitted.path).length === 1 &&
+      !missingPaths.includes(omitted.path) &&
+      missingEntries.length === healthyImport.healthyEntries.length - 1 &&
+      allOtherRequiredPresent &&
+      actualEntriesExact &&
+      isDeepStrictEqual(healthyDifference, [omitted.path]) &&
+      commonEntriesExact &&
+      noOmittedAlias &&
+      actualOpsParseClean &&
+      isDeepStrictEqual(
+        operationsByKey(actualOps),
+        healthyImport.expectedOperationObjects,
+      ) &&
+      actualOmittedReferences.length === 1 &&
+      isDeepStrictEqual(actualOmittedReferences[0], referencingOp) &&
+      referencingOp?.t === 'create' &&
+      referencingOp.v?.size === omitted.data.length &&
+      omittedRole !== undefined &&
+      isDeepStrictEqual(referencingOp.v, expectedModelFields(referencingOp.id, omittedRole)) &&
+      healthyImport.expectedBinaries.get(omitted.path) !== undefined &&
+      bytesEqual(healthyImport.expectedBinaries.get(omitted.path) ?? null, omitted.data) &&
+      isDeepStrictEqual(
+        healthyImport.requiredBinaryPaths,
+        [...healthyImport.expectedBinaries.keys()].sort(),
+      ) &&
+      knownModelAssetsAreExact(
+        fixture.completeState,
+        fixture.completeOps,
+        fixture.expectedBinaries,
+        MERGE_MODEL_ROLES,
+      ) &&
+      mergeProbeShapeIsValid(fixture);
+
+    const newOutcome = await settleInspection(packageBytes);
+    const newFs = new FaultInjectingMemoryFS();
+    const newDir = 'projects/missing-required-new';
+    const newMarkerPath = `${newDir}/lociview.json`;
+    const newClosurePaths = [
+      newMarkerPath,
+      ...[...healthyImport.expectedOps.keys()].map((path) => `${newDir}/${path}`),
+      ...[...healthyImport.expectedBinaries.keys()].map((path) => `${newDir}/${path}`),
+    ];
+    const newMarkerToken = 'missing-required-new-marker';
+    newFs.watchFilesAfterCommit(newMarkerToken, newMarkerPath, newClosurePaths);
+    let newActionRejected = newOutcome.rejected;
+    if (newOutcome.inspection !== null) {
+      const outcome = await settleValue(importNewProject(newFs, newDir, newOutcome.inspection));
+      newActionRejected = outcome.rejected;
+    }
+    await newFs.settleProbes();
+    const newMarkerHistorySafe = await importMarkerHistoryIsSafe(
+      newFs,
+      newDir,
+      healthyImport,
+      newMarkerToken,
+    );
+    const newFinalClosure = await inspectImportedClosure(newFs, newDir, healthyImport);
+    newImportSafe =
+      newMarkerHistorySafe &&
+      newFinalClosure.safe &&
+      (newFinalClosure.complete || newActionRejected);
+
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(mergeProbeNow(fixture));
+    try {
+      const targetStore = await ProjectStore.open(
+        fixture.targetFs,
+        fixture.targetDir,
+        fixture.targetIdentity,
+      );
+      fixture = { ...fixture, targetStore };
+      const twinFs = new MemoryFS();
+      await copyWorkspace(fixture.targetFs, twinFs);
+      const twinStore = await ProjectStore.open(
+        twinFs,
+        fixture.targetDir,
+        fixture.targetIdentity,
+      );
+      const mergeOutcome = await settleInspection(packageBytes);
+      let mergeActionRejected = mergeOutcome.rejected;
+      const authorityWatch = armMergeAuthorityHistory(
+        fixture.targetFs,
+        fixture,
+        'missing-required-merge-authority',
+      );
+      const eventOffset = fixture.targetFs.events.length;
+      const binaryPaths = fixture.incomingBinaries.map(
+        (binary) => `${fixture.targetDir}/${binary.path}`,
+      );
+      const observed: ExactObservedMergeState[] = [];
+      const unsubscribe = fixture.targetStore.subscribe((state) => {
+        const token = `missing-required-merge-notification-${observed.length}`;
+        observed.push(observeExactMergeState(token, state, fixture.targetStore));
+        fixture.targetFs.markFiles(token, binaryPaths);
+      });
+      try {
+        if (mergeOutcome.inspection !== null) {
+          const outcome = await settleValue(mergeFromInspection(
+            fixture.targetFs,
+            fixture.targetDir,
+            fixture.targetStore,
+            mergeOutcome.inspection,
+          ));
+          mergeActionRejected = outcome.rejected;
+        }
+        await settle(fixture.targetStore.flush());
+      } finally {
+        unsubscribe();
+      }
+      await fixture.targetFs.settleProbes();
+      const finalAuthority = await inspectExactMergeAuthority(fixture);
+      const finalKind = exactMergeAuthorityKind(finalAuthority);
+      const historySafe = await mergeAuthorityHistoryIsSafe(
+        fixture.targetFs,
+        fixture,
+        fixture.targetFs.events.slice(eventOffset),
+        authorityWatch,
+      );
+      const finalAuthoritySafe = exactMergeAuthorityIsLiveAndCrashSafe(
+        fixture,
+        finalAuthority,
+        historySafe,
+      );
+      const snapshots = fixture.targetFs.fileSnapshots.filter((snapshot) =>
+        snapshot.token.startsWith('missing-required-merge-notification-'));
+      const notificationsAtSafeAuthority = observed.length === 0
+        ? finalKind === 'old' && finalAuthoritySafe
+        : observed.length === snapshots.length &&
+          observed.every((state) => exactObservedMergePublicationIsSafe(
+            state,
+            snapshots.find((snapshot) => snapshot.token === state.token),
+            fixture,
+          ));
+      const notificationsSafe =
+        notificationsAtSafeAuthority &&
+        (finalKind !== 'old' || mergeActionRejected);
+      const clockAndSequenceSafe = finalKind !== 'old' ||
+        (await probeOldMergeStore(fixture, twinFs, twinStore));
+      mergeSafe = finalAuthoritySafe && notificationsSafe && clockAndSequenceSafe;
+    } finally {
+      nowSpy.mockRestore();
+    }
+  }, 30_000);
+
+  it('omits exactly one still-referenced exclusive binary from an otherwise exact native package', () => {
+    expect(fixtureValid).toBe(true);
+  });
+
+  it.fails('new-project import never publishes the incomplete required-blob closure', () => {
+    expect(newImportSafe).toBe(true);
+  });
+
+  it.fails('existing merge preserves exact old authority or completes with every required blob', () => {
+    expect(mergeSafe).toBe(true);
   });
 });
 
@@ -992,6 +2332,5 @@ describe.sequential('G0S-BLOB same-path binary identity', () => {
 });
 
 describe('G0S-BLOB deferred package transaction boundaries', () => {
-  it.todo('verifies size/hash read-back rather than trusting a resolved write call');
   it.todo('serializes simultaneous merge/replacement across browser contexts with a project-scoped lock');
 });
