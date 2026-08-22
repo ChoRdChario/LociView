@@ -389,6 +389,25 @@ Review record:
 - Verification passed: 4 focused files / 131 passing tests plus 5 todos, 29 full-suite files / 959 passing tests plus 23 todos, fixture verification (10 Git entries / 708,867 bytes), evidence verification (3 pending device templates / 0 records), typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
 - Three independent false-green, exact-closure/spec and runtime/timing reviews reported no unresolved P0/P1 after canonical-target gating, full marker/log history, complete-branch controls, wrong-result silent no-op and HLC/own-sequence findings were corrected. This remains tests-only characterization, not a production fix, declared-digest or crash-durability guarantee, wizard/model/attachment parity, device evidence or G0-S completion
 
+### G0 characterization slice 18 — modeled package/replacement transaction interleaving
+
+- [x] Add a method-neutral same-project transaction gate over one shared backing and two distinct `WorkspaceFS` facades; pause the first semantic active-log mutation, timeout-release a future serialized writer without deadlock, and record canonical log/blob start/commit order on one monotonic clock
+- [x] Build a deterministic shared-workspace fixture with two identities/ProjectStore instances, one replacement target and one disjoint incoming package asset; independently bind operation envelopes, paths, actor logs and distinct source bytes
+- [x] Exercise merge-first and replacement-first orders with future-safe exact whole-state candidates, separately isolating transaction serialization and point-in-time publication/blob closure as expected failures while allowing explicit safe rejection and commit-then-error
+- [x] Add ordinary concurrent/serialized controls for the gate itself and allow private staging, deferred orphan cleanup and physical mutation-method changes; observe old-blob deletion for dangling-reference safety without treating cleanup as an append/blob-commit serialization boundary
+- [x] Keep real `navigator.locks`/OPFS two-tab evidence, project-ID lock scoping, lock-unavailable read-only enforcement, crash/background release, same-asset typed conflict resolution, device evidence and G0-S completion out of this Node modeled-context slice
+- [x] Run focused/full verification and independent false-green/spec/runtime review before staging and a separate commit
+
+### G0 characterization slice 18 review record
+
+- Added `tests/helpers/modeledTransactionGateFs.ts` and `tests/assets/packageReplacementConcurrency.test.ts`, and narrowed the existing browser-lock todo in `tests/assets/packagePublication.test.ts`; `src/**` remains unchanged
+- The modeled gate uses one shared backing behind distinct frozen `WorkspaceFS` facades, records all mutation methods on one monotonic clock, snapshots the full backing at commit/publication time, and supports overlap, timeout-serialized and abort release without treating deferred cleanup as an authority-commit ordering boundary
+- A real native-package inspection and a dynamically bound replacement operation exercise merge-first and replacement-first orders with disjoint actors, assets, paths and bytes. Exact semantic O/M/R/combined candidates cover manifest, active actor-log inventory, operations, state, vector and referenced blobs without fixing JSON member order, random IDs, mutation method or retry count
+- Five ordinary tests independently cover the gate, candidate/outcome table, point-in-time snapshot behavior, private staging/orphans, cleanup freedom, semantic reformatting and negative oracle branches. Four narrow expected-failure assertions separately preserve the current cross-context serialization and published-blob-closure defects for both orders
+- This is a same-process modeled-context characterization only. Real `navigator.locks`/OPFS two-tab evidence, project-ID lock scoping, lock-unavailable read-only enforcement, crash/background release, same-asset typed conflict resolution, device evidence, a production fix and G0-S completion remain open
+- Verification passed: 3 focused files / 113 passing tests plus 5 todos, 30 full-suite files / 968 passing tests plus 23 todos, fixture verification (10 Git entries / 708,867 bytes), evidence verification (3 pending device templates / 0 records), TypeScript typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
+- Three independent false-green, exact-closure and runtime/timing reviews reported no unresolved P0/P1 after transaction-local flush, semantic replacement, parsed-authority, retry-count, private-staging, cleanup, stale-HLC and isolated negative-control findings were corrected
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes

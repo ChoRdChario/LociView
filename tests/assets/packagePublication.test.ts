@@ -2332,5 +2332,5 @@ describe.sequential('G0S-BLOB same-path binary identity', () => {
 });
 
 describe('G0S-BLOB deferred package transaction boundaries', () => {
-  it.todo('serializes simultaneous merge/replacement across browser contexts with a project-scoped lock');
+  it.todo('proves real navigator.locks/OPFS two-tab serialization, project-ID scoping and lock-unavailable read-only enforcement');
 });
