@@ -1,6 +1,7 @@
 import { FaultInjectingMemoryFS } from './faultFs';
 
 export type ResolvedCorruptionMode = 'bitflip' | 'truncate';
+export type ResolvedCorruptionTarget = string | ((path: string) => boolean);
 
 function bytesEqual(actual: Uint8Array, expected: Uint8Array): boolean {
   return actual.length === expected.length &&
@@ -19,6 +20,8 @@ function copyNullable(bytes: Uint8Array | null): Uint8Array | null {
  */
 export class ResolvedCorruptingMemoryFS extends FaultInjectingMemoryFS {
   private readonly expected: Uint8Array;
+  private readonly target: ResolvedCorruptionTarget;
+  private selectedTargetPath: string | null;
   private actionActive = false;
   private corruptionCommitted = false;
   private exactRetryCommitted = false;
@@ -29,18 +32,26 @@ export class ResolvedCorruptingMemoryFS extends FaultInjectingMemoryFS {
   corruptBytes: Uint8Array | null = null;
 
   constructor(
-    readonly targetPath: string,
+    target: ResolvedCorruptionTarget,
     expectedBytes: Uint8Array,
     readonly mode: ResolvedCorruptionMode,
   ) {
     super();
-    if (targetPath === '') throw new Error('resolved corruption target path must not be empty');
+    if (typeof target === 'string' && target === '') {
+      throw new Error('resolved corruption target path must not be empty');
+    }
     if (expectedBytes.length < 2) throw new Error('resolved corruption requires at least two bytes');
+    this.target = target;
+    this.selectedTargetPath = typeof target === 'string' ? target : null;
     this.expected = new Uint8Array(expectedBytes);
   }
 
+  get targetPath(): string | null {
+    return this.selectedTargetPath;
+  }
+
   get injectedPath(): string | null {
-    return this.corruptionCommitted ? this.targetPath : null;
+    return this.corruptionCommitted ? this.selectedTargetPath : null;
   }
 
   get requestedWrites(): readonly Uint8Array[] {
@@ -63,8 +74,17 @@ export class ResolvedCorruptingMemoryFS extends FaultInjectingMemoryFS {
 
   override async writeBytes(path: string, data: Uint8Array): Promise<void> {
     if (
+      this.actionActive &&
+      this.selectedTargetPath === null &&
+      typeof this.target === 'function' &&
+      this.target(path) &&
+      bytesEqual(data, this.expected)
+    ) {
+      this.selectedTargetPath = path;
+    }
+    if (
       !this.actionActive ||
-      path !== this.targetPath ||
+      path !== this.selectedTargetPath ||
       !bytesEqual(data, this.expected) ||
       this.exactRetryCommitted
     ) {
@@ -91,7 +111,7 @@ export class ResolvedCorruptingMemoryFS extends FaultInjectingMemoryFS {
   override async readBytes(path: string): Promise<Uint8Array | null> {
     const bytes = await super.readBytes(path);
     if (
-      path === this.targetPath &&
+      path === this.selectedTargetPath &&
       this.actionActive &&
       this.corruptionCommitted &&
       !this.exactRetryCommitted

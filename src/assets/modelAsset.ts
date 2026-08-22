@@ -2,8 +2,10 @@
 // 取り込みウィザード以外の経路（データタブ・モデル単体ドロップ）で共通利用する。
 
 import { entityIdFor, type ProjectStore } from '../core/store';
+import { ulid } from '../core/ids';
 import type { WorkspaceFS } from '../platform/fs';
 import { optimizeGlbBytes } from './glbOptimize';
+import { writeVerifiedBytes } from './verifiedWrite';
 
 /**
  * モデルをOPFSへ保存し、asset を登記する。GLBはテクスチャ縮小した軽量版も生成して
@@ -69,14 +71,11 @@ export async function replaceModelAsset(
 ): Promise<void> {
   const asset = store.state.byKind.asset?.[assetId];
   if (asset === undefined) throw new Error(`replaceModelAsset: asset not found: ${assetId}`);
-  const oldPath = typeof asset.fields.path === 'string' ? asset.fields.path : '';
-  const oldOpt = typeof asset.fields.optimizedPath === 'string' ? asset.fields.optimizedPath : '';
-
   const ext = (name.split('.').pop() ?? 'bin').toLowerCase();
   // 実体は毎回ユニーク名で書く（旧ファイルとの取り違え・キャッシュを避ける）
-  const stamp = Date.now().toString(36);
-  const path = `models/${assetId}.${stamp}.${ext}`;
-  await fs.writeBytes(`${dir}/${path}`, bytes);
+  const revision = ulid();
+  const path = `models/${assetId}.${revision}.${ext}`;
+  await writeVerifiedBytes(fs, `${dir}/${path}`, bytes);
 
   let optimizedPath = '';
   let optimizedSize = 0;
@@ -84,9 +83,10 @@ export async function replaceModelAsset(
     try {
       const opt = await optimizeGlbBytes(bytes);
       if (opt !== null) {
-        optimizedPath = `models/${assetId}.${stamp}.opt.glb`;
+        const candidatePath = `models/${assetId}.${revision}.opt.glb`;
+        await writeVerifiedBytes(fs, `${dir}/${candidatePath}`, opt);
+        optimizedPath = candidatePath;
         optimizedSize = opt.length;
-        await fs.writeBytes(`${dir}/${optimizedPath}`, opt);
       }
     } catch {
       // 軽量化に失敗しても原本で続行する
@@ -100,8 +100,8 @@ export async function replaceModelAsset(
     id: assetId,
     v: { path, originalName: name, size: bytes.length, optimizedPath, optimizedSize },
   });
+  await store.flush();
 
-  // 旧ファイルは削除（差し替えなので原本は残さない）
-  if (oldPath !== '' && oldPath !== path) await fs.remove(`${dir}/${oldPath}`);
-  if (oldOpt !== '' && oldOpt !== optimizedPath) await fs.remove(`${dir}/${oldOpt}`);
+  // 旧blob cleanupは、全active referenceを再確認できるdurable GC/journal境界まで延期する。
+  // 一時的なorphanは、共有参照や中断時に既知-good原本を失うより安全である。
 }

@@ -51,8 +51,7 @@ describe('replaceModelAsset', () => {
     // 新しい実体が保存され、中身がBになっている
     const newBytes = await fs.readBytes(`${dir}/${after.fields.path as string}`);
     expect(newBytes).toEqual(STL_B);
-    // 旧ファイルは削除されている
-    expect(await fs.exists(`${dir}/${oldPath}`)).toBe(false);
+    // 旧blob cleanupは、共有参照を確認できるdurable GC境界の責務とする。
   });
 
   it('差し替え後にプロジェクトを開き直しても復元できる', async () => {
@@ -80,7 +79,12 @@ describe('replaceModelAsset', () => {
       const { fs, store, dir, assetId } = await setup(faultFs);
       faultFs.failNext('appendText', `${dir}/ops/${store.actorId}.jsonl`);
 
-      await replaceModelAsset(fs, dir, store, assetId, 'model-b.stl', STL_B).catch(() => undefined);
+      let actionRejected = false;
+      try {
+        await replaceModelAsset(fs, dir, store, assetId, 'model-b.stl', STL_B);
+      } catch {
+        actionRejected = true;
+      }
       faultFs.assertAllConsumed();
       await store.flush().catch(() => undefined);
 
@@ -97,10 +101,11 @@ describe('replaceModelAsset', () => {
         actual !== null &&
         bytesEqual(actual, expected) &&
         fields.size === expected.length &&
-        optimizedSafe;
+        optimizedSafe &&
+        (actionRejected || fields.originalName === 'model-b.stl');
     });
 
-    it.fails('G0S-BLOB/replace: interrupted replacement reopens with a binding whose blob still exists', () => {
+    it('G0S-BLOB/replace: interrupted replacement reopens with a binding whose exact blob still exists', () => {
       expect(safe).toBe(true);
     });
   });

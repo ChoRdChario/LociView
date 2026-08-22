@@ -1332,7 +1332,7 @@ for (const order of ['merge-first', 'replacement-first'] as const) {
       expect(result.transactionSerializedOrRejected).toBe(true);
     });
 
-    it.fails('keeps every point-in-time publication backed by an exact referenced-blob closure', () => {
+    it('keeps every point-in-time publication backed by an exact referenced-blob closure', () => {
       expect(result.publicationClosureSafe).toBe(true);
     });
   });

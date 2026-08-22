@@ -408,6 +408,24 @@ Review record:
 - Verification passed: 3 focused files / 113 passing tests plus 5 todos, 30 full-suite files / 968 passing tests plus 23 todos, fixture verification (10 Git entries / 708,867 bytes), evidence verification (3 pending device templates / 0 records), TypeScript typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
 - Three independent false-green, exact-closure and runtime/timing reviews reported no unresolved P0/P1 after transaction-local flush, semantic replacement, parsed-authority, retry-count, private-staging, cleanup, stale-HLC and isolated negative-control findings were corrected
 
+### G0 stabilization slice 19 — verified model replacement
+
+- [x] Add one reusable v1 exact read-back helper that copies the requested bytes, writes them, and rejects a missing, truncated or same-length-corrupt stored result before metadata dispatch
+- [x] Route required replacement originals and optional optimized derivatives through verification; publish optimized path/size only after successful verification and otherwise fall back to the verified original
+- [x] Make replacement metadata cross its existing `ProjectStore.flush()` durability barrier before any cleanup, and retain old blobs until a reference-aware durable cleanup/GC boundary exists
+- [x] Promote only the now-satisfied replacement interruption, resolved-corruption and shared-reference expected failures to ordinary regressions; keep partial-JSONL repair, restart cleanup and typed concurrent-replacement work explicit
+- [x] Keep add/import-wizard/caption write-path parity, streaming/incremental hashing, crash/power-loss durability, typed write status, project locking, at-rest corruption and G0-S completion out of this bounded root slice
+- [x] Run focused/full verification and independent implementation/false-green/runtime review before staging and a separate commit
+
+### G0 stabilization slice 19 review record
+
+- Added `src/assets/verifiedWrite.ts` and routed `replaceModelAsset` original and optional optimized writes through an exact post-write read-back before metadata dispatch. The helper isolates both the caller buffer and comparison source from an adapter that mutates its write argument, and rejects missing, truncated and same-length-corrupt stored bytes
+- Each replacement now uses one fresh ULID revision for its original/optimized pair, eliminating same-wall-clock path reuse. The operation is dispatched only after required verification, `store.flush()` is awaited as the existing durability barrier, and old blobs are retained for a future reference-aware durable cleanup/GC boundary
+- Expanded replacement durability coverage with dynamic-path before/prefix/post-commit faults, bit-flip and truncation controls, same-timestamp consecutive replacements, exact live/reopened manifest-operation-state-vector/log authority, point-in-time referenced bytes, shared-old-blob preservation and attempted-versus-published fresh-path retry handling. The two modeled package/replacement publication-closure expectations now pass ordinarily; cross-context transaction serialization remains expected failure
+- Partial JSONL recovery, optimized-path injection parity, restartable cleanup, typed concurrent replacement resolution, add/import-wizard/caption verification parity, streaming/incremental hashing, crash/power-loss durability, typed write status, project locking, at-rest corruption, device evidence and G0-S completion remain explicitly open
+- Verification passed: 3 focused files / 58 passing tests plus 3 todos, 30 full-suite files / 981 passing tests plus 23 todos, fixture verification (10 Git entries / 708,867 bytes), evidence verification (3 pending device templates / 0 records), TypeScript typecheck, and the production build (93 modules / 11 PWA precache entries). The existing approximately 789.62 kB viewer-chunk warning remains
+- Three independent implementation/runtime, exact-authority and false-green reviews reported no unresolved P0/P1 after unique-path collision, adapter mutation, fulfilled-silent-old, active-log inventory, shared point-in-time reference, future GC, dynamic naming and attempted-versus-published retry findings were corrected
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
