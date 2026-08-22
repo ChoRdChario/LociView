@@ -352,6 +352,25 @@ Review record:
 - Verification passed: 4 focused files / 45 passing tests plus 2 todos, 28 full-suite files / 918 passing tests plus 25 todos, fixture verification (10 Git entries / 708,867 bytes), evidence verification (3 pending device templates / 0 records), typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
 - Independent false-green and runtime/spec reviews reported no unresolved P0/P1 after active-authority history, byte-exactness, private-evidence freedom and async rejection isolation were corrected
 
+### G0 characterization slice 16 — import-wizard publication closure
+
+- [x] Build a fresh deterministic one-model/one-image import plan per scenario, with distinct original, optimized and image bytes and independently checked dynamic asset bindings
+- [x] Characterize a successful `applyImportPlan` closure and separately require the root completion marker to start only after every active JSONL log and referenced blob is durably committed
+- [x] Add method-neutral fault reachability for root-marker prefix and post-commit, initial-log prefix, optimized-blob prefix, second normal-blob prefix and final asset-log prefix without fixing random IDs or physical append counts
+- [x] Keep each interruption safety oracle narrow: no completion marker, or an exact reopenable planned closure; allow optimized-write failure to omit `optimizedPath` and fall back to the original bytes
+- [x] Keep write read-back/hash verification, crash/power-loss durability, orphan cleanup, project locking, optimizer quality, UI behavior, package merge/v2 and device budgets explicitly out of scope
+- [x] Run focused/full verification and independent false-green/spec/runtime review before staging and a separate commit
+
+Review record:
+
+- Added `tests/assets/importWizardPublication.test.ts` and removed the matching deferred todo from `tests/assets/packagePublication.test.ts`; `src/**` remains unchanged. Every scenario uses a fresh one-model/one-image plan with distinct original-model, optimized-model and image bytes
+- The ordinary success oracle relates the returned result to the reopened manifest and exact planned closure: the sole active actor log reparses to exactly four ordered create operations, state contains only the default set/profile and two fully specified assets, and every referenced original/image/optimized byte sequence is present at its dynamic binding
+- Seven narrow expected-failure cases preserve the current baseline: the root marker starts before active logs/blobs, and six prefix/post-commit interruption rows currently leave the completion-marker path present without an exact reopenable closure. Only the optimized-blob interruption may satisfy the future oracle by omitting both optimized reference fields and falling back to the exact original bytes
+- Fault reachability validates the complete intended set/image operation envelope and canonical final path family without fixing random IDs, JSON member order, mutation method or append count. Safety also treats every `projects/**/lociview.json` descendant as listing authority, matching the current home-project discovery boundary and preventing a nested staging marker from being ignored
+- This tests-only characterization does not claim a production fix, resolved-write read-back/hash verification, crash/power-loss durability, orphan cleanup, locking, optimizer quality, UI-state completion, package merge/v2 coverage, device budgets or G0-S completion
+- Verification passed: 3 focused files / 76 passing tests plus 3 todos, 29 full-suite files / 932 passing tests plus 24 todos, fixture verification (10 Git entries / 708,867 bytes), evidence verification (3 pending device templates / 0 records), typecheck, and the production build (92 modules / 11 PWA precache entries). The existing approximately 789.61 kB viewer-chunk warning remains unchanged
+- Three independent false-green, closure/spec and runtime/timing reviews reported no unresolved P0/P1 after exact authority, optimized fallback, marker-prefix, semantic reachability and listing-boundary gaps were corrected
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes

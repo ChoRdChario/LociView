@@ -992,7 +992,6 @@ describe.sequential('G0S-BLOB same-path binary identity', () => {
 });
 
 describe('G0S-BLOB deferred package transaction boundaries', () => {
-  it.todo('characterizes applyImportPlan/new-project wizard imports with the same marker-last closure');
   it.todo('verifies size/hash read-back rather than trusting a resolved write call');
   it.todo('serializes simultaneous merge/replacement across browser contexts with a project-scoped lock');
 });
