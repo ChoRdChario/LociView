@@ -240,7 +240,13 @@ describe('G0-S characterization: package interruption', () => {
       const failedBinary = inspection.binaries[0]!;
       target.failNext('writeBytes', `${targetDir}/${failedBinary.path}`);
 
-      await importNewProject(target, targetDir, inspection).catch(() => undefined);
+      let rejected = false;
+      let returnedProjectId: string | null = null;
+      try {
+        returnedProjectId = await importNewProject(target, targetDir, inspection);
+      } catch {
+        rejected = true;
+      }
       target.assertAllConsumed();
       const active = await target.exists(`${targetDir}/lociview.json`);
       let opened = false;
@@ -254,10 +260,13 @@ describe('G0-S characterization: package interruption', () => {
           // An active marker plus an unopenable project is unsafe, not inactive staging.
         }
       }
-      safe = !active || (opened && blobsMatch);
+      const complete = active && opened && blobsMatch;
+      safe = rejected
+        ? !active || complete
+        : returnedProjectId === inspection.manifest?.projectId && complete;
     });
 
-    it.fails('G0S-BLOB/import: interrupted new-project import is either inactive or has every referenced blob', () => {
+    it('G0S-BLOB/import: interrupted new-project import is either inactive or has every referenced blob', () => {
       expect(safe).toBe(true);
     });
   });

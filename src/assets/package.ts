@@ -4,6 +4,7 @@
 // - importNewProject: ZIP → ワークスペースへ新規展開（ops原文を無改変で保存 = 未知フィールド素通し）
 // - mergeFromInspection: 開いているプロジェクトへの取込
 
+import { parseHlc } from '../core/hlc';
 import { parseOpsJsonl } from '../core/jsonl';
 import { parseManifest, type ProjectManifest } from '../core/manifest';
 import { mergeOps, type MergeReport } from '../core/merge';
@@ -23,6 +24,7 @@ import { writeVerifiedBytes } from './verifiedWrite';
 
 const decoder = new TextDecoder();
 const encoder = new TextEncoder();
+const ACTOR_ID_PATTERN = /^a_[0-9A-HJKMNP-TV-Z]{13}$/u;
 
 /** ZIP内の分類結果 */
 export interface ZipInspection {
@@ -81,14 +83,178 @@ export async function importNewProject(fs: WorkspaceFS, dir: string, insp: ZipIn
   if (insp.kind !== 'lociview' || insp.manifest === null) {
     throw new Error('importNewProject: not a lociview package');
   }
-  await fs.writeText(`${dir}/lociview.json`, JSON.stringify(insp.manifest, null, 2));
-  for (const f of insp.opsFiles) {
-    await fs.writeText(`${dir}/${f.path}`, f.text); // 原文のまま（未知フィールド保持）
+
+  // Snapshot every caller-owned value before the first await. The raw JSONL is
+  // the imported authority; insp.ops is only an inspection convenience.
+  const manifest = parseManifest(JSON.stringify(structuredClone(insp.manifest)));
+  const markerBytes = encoder.encode(JSON.stringify(manifest, null, 2));
+  const reportedOpsErrorCount = insp.opsErrorCount;
+  const opsFiles = insp.opsFiles.map((file) => ({
+    path: file.path,
+    text: file.text,
+    bytes: encoder.encode(file.text),
+  }));
+  const binaries = uniqueBinaryRegistry(
+    insp.binaries.map((entry) => ({ path: entry.path, data: new Uint8Array(entry.data) })),
+    'importNewProject',
+  );
+  const parsedOps: Op[] = [];
+  const opsPaths = new Set<string>();
+  for (const file of opsFiles) {
+    const actor = importOpsActor(file.path);
+    if (actor === null || opsPaths.has(file.path)) {
+      throw new Error(`importNewProject: invalid or duplicate operation log ${file.path}`);
+    }
+    opsPaths.add(file.path);
+    const parsed = parseOpsJsonl(file.text);
+    if (parsed.errors.length > 0) {
+      throw new Error(`importNewProject: malformed operation log ${file.path}`);
+    }
+    if (parsed.ops.some((op) => {
+      try {
+        return op.actor !== actor || parseHlc(op.hlc).actor !== actor;
+      } catch {
+        return true;
+      }
+    })) {
+      throw new Error(`importNewProject: operation actor does not match ${file.path}`);
+    }
+    parsedOps.push(...parsed.ops);
   }
-  for (const b of insp.binaries) {
-    await fs.writeBytes(`${dir}/${b.path}`, b.data);
+  if (reportedOpsErrorCount !== 0) {
+    throw new Error('importNewProject: inspection contains malformed operations');
   }
-  return insp.manifest.projectId;
+  for (const path of binaries.keys()) {
+    if (
+      !path.startsWith('models/') &&
+      !path.startsWith('media/') &&
+      !path.startsWith('thumbs/')
+    ) {
+      throw new Error(`importNewProject: invalid binary path ${path}`);
+    }
+  }
+
+  const required = requiredImportBlobClosure(reduce(parsedOps));
+  for (const [path, expectedSize] of required) {
+    const source = binaries.get(path);
+    if (source === undefined) throw new Error(`importNewProject: missing required binary ${path}`);
+    if (expectedSize !== null && source.length !== expectedSize) {
+      throw new Error(`importNewProject: binary size mismatch for ${path}`);
+    }
+  }
+
+  const markerPath = `${dir}/lociview.json`;
+  if (await fs.readBytes(markerPath) !== null) {
+    throw new Error(`importNewProject: target is already active (${dir})`);
+  }
+  const expectedActiveLogs = [...opsPaths].map((path) => `${dir}/${path}`).sort();
+  const expectedActiveLogSet = new Set(expectedActiveLogs);
+  const existingActiveLogs = (await fs.list(`${dir}/ops/`))
+    .filter((path) => path.endsWith('.jsonl'));
+  if (existingActiveLogs.some((path) => !expectedActiveLogSet.has(path))) {
+    throw new Error(`importNewProject: target contains an unexpected active log (${dir})`);
+  }
+
+  for (const file of opsFiles) {
+    await writeVerifiedBytes(fs, `${dir}/${file.path}`, file.bytes); // raw bytes preserve unknown fields
+  }
+  for (const [path, data] of binaries) {
+    await writeVerifiedBytes(fs, `${dir}/${path}`, data);
+  }
+
+  const activeLogs = (await fs.list(`${dir}/ops/`))
+    .filter((path) => path.endsWith('.jsonl'))
+    .sort();
+  if (
+    activeLogs.length !== expectedActiveLogs.length ||
+    activeLogs.some((path, index) => path !== expectedActiveLogs[index])
+  ) {
+    throw new Error(`importNewProject: active operation log inventory changed (${dir})`);
+  }
+  for (const file of opsFiles) {
+    const stored = await fs.readBytes(`${dir}/${file.path}`);
+    if (stored === null || !bytesEqual(stored, file.bytes)) {
+      throw new Error(`importNewProject: operation log verification failed for ${file.path}`);
+    }
+    const parsed = parseOpsJsonl(decoder.decode(stored));
+    if (parsed.errors.length > 0) {
+      throw new Error(`importNewProject: stored operation log is malformed ${file.path}`);
+    }
+  }
+  for (const [path, data] of binaries) {
+    const stored = await fs.readBytes(`${dir}/${path}`);
+    if (stored === null || !bytesEqual(stored, data)) {
+      throw new Error(`importNewProject: binary verification failed for ${path}`);
+    }
+  }
+  for (const [path, expectedSize] of required) {
+    const expected = binaries.get(path)!;
+    const stored = await fs.readBytes(`${dir}/${path}`);
+    if (
+      stored === null ||
+      !bytesEqual(stored, expected) ||
+      (expectedSize !== null && stored.length !== expectedSize)
+    ) {
+      throw new Error(`importNewProject: required binary verification failed for ${path}`);
+    }
+  }
+
+  await writeVerifiedBytes(fs, markerPath, markerBytes);
+  return manifest.projectId;
+}
+
+function importOpsActor(path: string): string | null {
+  if (
+    path === '' ||
+    sanitizeZipPath(path) !== path ||
+    !path.startsWith('ops/') ||
+    !path.endsWith('.jsonl')
+  ) {
+    return null;
+  }
+  const filename = path.slice('ops/'.length);
+  if (filename.length <= '.jsonl'.length || filename.includes('/')) return null;
+  const actor = filename.slice(0, -'.jsonl'.length);
+  return ACTOR_ID_PATTERN.test(actor) ? actor : null;
+}
+
+function requiredImportBlobClosure(state: ProjectState): Map<string, number | null> {
+  const required = new Map<string, number | null>();
+  for (const asset of visibleEntities(state, 'asset')) {
+    registerImportRequiredBlob(required, asset.fields.path, asset.fields.size, ['models/', 'media/']);
+    const optimizedPath = asset.fields.optimizedPath;
+    if (optimizedPath !== undefined && optimizedPath !== '') {
+      registerImportRequiredBlob(required, optimizedPath, asset.fields.optimizedSize, ['models/']);
+    }
+  }
+  return required;
+}
+
+function registerImportRequiredBlob(
+  required: Map<string, number | null>,
+  rawPath: unknown,
+  rawSize: unknown,
+  namespaces: readonly ('models/' | 'media/')[],
+): void {
+  if (
+    typeof rawPath !== 'string' ||
+    rawPath === '' ||
+    rawPath.endsWith('/') ||
+    sanitizeZipPath(rawPath) !== rawPath ||
+    !namespaces.some((namespace) => rawPath.startsWith(namespace))
+  ) {
+    throw new Error(`importNewProject: invalid required binary path ${String(rawPath)}`);
+  }
+  let size: number | null;
+  if (rawSize === undefined) size = null;
+  else if (typeof rawSize === 'number' && Number.isSafeInteger(rawSize) && rawSize >= 0) size = rawSize;
+  else throw new Error(`importNewProject: invalid required binary size for ${rawPath}`);
+
+  const previous = required.get(rawPath);
+  if (previous !== undefined && previous !== null && size !== null && previous !== size) {
+    throw new Error(`importNewProject: conflicting required binary size for ${rawPath}`);
+  }
+  required.set(rawPath, previous ?? size);
 }
 
 /** 開いているプロジェクトへZIPをマージする。バイナリは未知のものだけコピー */
@@ -160,7 +326,10 @@ export async function mergeFromInspection(
   return report;
 }
 
-function uniqueBinaryRegistry(entries: readonly ZipEntryData[]): Map<string, Uint8Array> {
+function uniqueBinaryRegistry(
+  entries: readonly ZipEntryData[],
+  operation = 'merge',
+): Map<string, Uint8Array> {
   const registry = new Map<string, Uint8Array>();
   for (const entry of entries) {
     if (
@@ -168,9 +337,9 @@ function uniqueBinaryRegistry(entries: readonly ZipEntryData[]): Map<string, Uin
       entry.path.endsWith('/') ||
       sanitizeZipPath(entry.path) !== entry.path
     ) {
-      throw new Error(`merge: invalid binary path ${entry.path}`);
+      throw new Error(`${operation}: invalid binary path ${entry.path}`);
     }
-    if (registry.has(entry.path)) throw new Error(`merge: duplicate binary path ${entry.path}`);
+    if (registry.has(entry.path)) throw new Error(`${operation}: duplicate binary path ${entry.path}`);
     registry.set(entry.path, new Uint8Array(entry.data));
   }
   return registry;

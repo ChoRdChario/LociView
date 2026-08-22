@@ -231,6 +231,7 @@ interface ManifestNumberCase {
 
 interface ManifestNumberResult {
   initialized: boolean;
+  explicitlyRejected: boolean;
   controlUnchanged: boolean;
   completionMarkerNeverPublished: boolean;
   sentinelNeverPublishedUnderCompletionMarker: boolean;
@@ -1278,6 +1279,7 @@ describe('G0 characterization: malicious ZIP envelope', () => {
   let manifestNumberResults = Object.fromEntries(
     MANIFEST_NUMBER_CASES.map(({ id }) => [id, {
       initialized: false,
+      explicitlyRejected: false,
       controlUnchanged: false,
       completionMarkerNeverPublished: false,
       sentinelNeverPublishedUnderCompletionMarker: false,
@@ -1762,6 +1764,7 @@ describe('G0 characterization: malicious ZIP envelope', () => {
         const mergeOutcome = await attemptExistingProjectMerge(zip);
         manifestNumberResults[numberCase.id] = {
           initialized: true,
+          explicitlyRejected: rejectedBeforeActivation(importOutcome),
           controlUnchanged: importOutcome.controlUnchanged,
           completionMarkerNeverPublished:
             !importOutcome.active && importOutcome.completionMarkerMutationCount === 0,
@@ -2377,6 +2380,10 @@ describe('G0 characterization: malicious ZIP envelope', () => {
     ] as const;
 
     for (const id of unsafeCases) {
+      const importPreflightRejectsWithoutMutation =
+        id === 'raw-duplicate-path' ||
+        id === 'raw-duplicate-path-reversed' ||
+        id === 'normalized-separator-collision';
       it(`${id}: leaves an existing control project byte-exact`, () => {
         expect(outcomes[id].controlUnchanged).toBe(true);
       });
@@ -2385,13 +2392,22 @@ describe('G0 characterization: malicious ZIP envelope', () => {
         expect(outcomes[id].inspectionRejected).toBe(true);
       });
 
-      it.fails(`${id}: performs no workspace mutations when inspection rejects`, () => {
-        expect(outcomes[id].mutationCalls).toBe(0);
-      });
+      (importPreflightRejectsWithoutMutation ? it : it.fails)(
+        `${id}: performs no workspace mutations before candidate activation is rejected`,
+        () => {
+          expect(
+            rejectedBeforeActivation(outcomes[id]) &&
+            outcomes[id].mutationCalls === 0,
+          ).toBe(true);
+        },
+      );
 
-      it.fails(`${id}: never publishes the candidate completion marker`, () => {
-        expect(candidateIsInactive(outcomes[id])).toBe(true);
-      });
+      (importPreflightRejectsWithoutMutation ? it : it.fails)(
+        `${id}: never publishes the candidate completion marker`,
+        () => {
+          expect(candidateIsInactive(outcomes[id])).toBe(true);
+        },
+      );
     }
 
     it.fails('future-schema: edit-mode import rejects a future schema boundary', () => {
@@ -2410,11 +2426,17 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       expect(outcomes['mixed-valid-invalid'].controlUnchanged).toBe(true);
     });
 
-    it.fails('mixed-valid-invalid: never publishes a completion marker', () => {
-      expect(candidateIsInactive(outcomes['mixed-valid-invalid'])).toBe(true);
+    it('mixed-valid-invalid: never publishes a completion marker', () => {
+      const outcome = outcomes['mixed-valid-invalid'];
+      expect(
+        rejectedBeforeActivation(outcome) &&
+        outcome.mutationCalls === 0 &&
+        outcome.completionMarkerMutationCount === 0 &&
+        candidateIsInactive(outcome),
+      ).toBe(true);
     });
 
-    it.fails('mixed-valid-invalid: never exposes the valid member of a rejected package', () => {
+    it('mixed-valid-invalid: never exposes the valid member of a rejected package', () => {
       expect(outcomes['mixed-valid-invalid'].mixedValidCaptionVisible).toBe(false);
     });
 
@@ -2558,6 +2580,7 @@ describe('G0 characterization: malicious ZIP envelope', () => {
 
   describe('decoded non-finite manifest numbers stay outside active authority', () => {
     const alreadySafeId: ManifestNumberId = 'manifest-number-overflow-known-negative';
+    const importPreflightSafeId: ManifestNumberId = 'manifest-number-overflow-known-positive';
     const unsafeCases = MANIFEST_NUMBER_CASES.filter(({ id }) => id !== alreadySafeId);
 
     it('accepts both modest finite-exponent controls through inspection, import, reopen and merge', () => {
@@ -2586,14 +2609,23 @@ describe('G0 characterization: malicious ZIP envelope', () => {
     });
 
     for (const numberCase of unsafeCases) {
-      it.fails(`${numberCase.id}: never publishes a candidate completion marker`, () => {
-        expect(manifestNumberResults[numberCase.id].completionMarkerNeverPublished).toBe(true);
-      });
+      (numberCase.id === importPreflightSafeId ? it : it.fails)(
+        `${numberCase.id}: never publishes a candidate completion marker`,
+        () => {
+          expect(
+            manifestNumberResults[numberCase.id].explicitlyRejected &&
+            manifestNumberResults[numberCase.id].completionMarkerNeverPublished,
+          ).toBe(true);
+        },
+      );
 
-      it.fails(`${numberCase.id}: never publishes the sentinel under a completion marker`, () => {
-        expect(manifestNumberResults[numberCase.id].sentinelNeverPublishedUnderCompletionMarker)
-          .toBe(true);
-      });
+      (numberCase.id === importPreflightSafeId ? it : it.fails)(
+        `${numberCase.id}: never publishes the sentinel under a completion marker`,
+        () => {
+          expect(manifestNumberResults[numberCase.id].sentinelNeverPublishedUnderCompletionMarker)
+            .toBe(true);
+        },
+      );
 
       it.fails(`${numberCase.id}: leaves existing active authority unchanged`, () => {
         expect(manifestNumberResults[numberCase.id].existingAuthorityUnchanged).toBe(true);

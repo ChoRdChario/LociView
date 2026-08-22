@@ -2,6 +2,7 @@ import { FaultInjectingMemoryFS } from './faultFs';
 
 export type ResolvedCorruptionMode = 'bitflip' | 'truncate';
 export type ResolvedCorruptionTarget = string | ((path: string) => boolean);
+const encoder = new TextEncoder();
 
 function bytesEqual(actual: Uint8Array, expected: Uint8Array): boolean {
   return actual.length === expected.length &&
@@ -72,7 +73,11 @@ export class ResolvedCorruptingMemoryFS extends FaultInjectingMemoryFS {
     this.actionActive = false;
   }
 
-  override async writeBytes(path: string, data: Uint8Array): Promise<void> {
+  private async writeAttempt(
+    path: string,
+    data: Uint8Array,
+    commit: (bytes: Uint8Array) => Promise<void>,
+  ): Promise<void> {
     if (
       this.actionActive &&
       this.selectedTargetPath === null &&
@@ -88,7 +93,7 @@ export class ResolvedCorruptingMemoryFS extends FaultInjectingMemoryFS {
       !bytesEqual(data, this.expected) ||
       this.exactRetryCommitted
     ) {
-      await super.writeBytes(path, data);
+      await commit(data);
       return;
     }
 
@@ -99,13 +104,29 @@ export class ResolvedCorruptingMemoryFS extends FaultInjectingMemoryFS {
         : data.slice(0, data.length - 1);
       this.injectionCount = 1;
       this.corruptBytes = new Uint8Array(corrupt);
-      await super.writeBytes(path, corrupt);
+      await commit(corrupt);
       this.corruptionCommitted = true;
       return;
     }
 
-    await super.writeBytes(path, data);
+    await commit(data);
     this.exactRetryCommitted = true;
+  }
+
+  override async writeBytes(path: string, data: Uint8Array): Promise<void> {
+    await this.writeAttempt(path, data, (bytes) => super.writeBytes(path, bytes));
+  }
+
+  override async writeText(path: string, text: string): Promise<void> {
+    await this.writeAttempt(path, encoder.encode(text), (bytes) => super.writeBytes(path, bytes));
+  }
+
+  override async appendBytes(path: string, data: Uint8Array): Promise<void> {
+    await this.writeAttempt(path, data, (bytes) => super.appendBytes(path, bytes));
+  }
+
+  override async appendText(path: string, text: string): Promise<void> {
+    await this.writeAttempt(path, encoder.encode(text), (bytes) => super.appendBytes(path, bytes));
   }
 
   override async readBytes(path: string): Promise<Uint8Array | null> {

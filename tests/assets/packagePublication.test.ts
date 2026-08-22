@@ -141,19 +141,39 @@ class PausingWriteMemoryFS extends FaultInjectingMemoryFS {
     };
   }
 
-  override async writeBytes(path: string, data: Uint8Array): Promise<void> {
+  private async waitForPause(path: string): Promise<void> {
     if (path === this.pausedPath) {
       this.pausedPath = null;
       this.reachedResolve?.();
       await this.releasePromise;
     }
+  }
+
+  override async writeBytes(path: string, data: Uint8Array): Promise<void> {
+    await this.waitForPause(path);
     await super.writeBytes(path, data);
+  }
+
+  override async writeText(path: string, text: string): Promise<void> {
+    await this.waitForPause(path);
+    await super.writeText(path, text);
+  }
+
+  override async appendBytes(path: string, data: Uint8Array): Promise<void> {
+    await this.waitForPause(path);
+    await super.appendBytes(path, data);
+  }
+
+  override async appendText(path: string, text: string): Promise<void> {
+    await this.waitForPause(path);
+    await super.appendText(path, text);
   }
 }
 
 interface ImportFixture {
   inspection: ZipInspection;
   expectedState: ProjectStore['state'];
+  expectedVector: Readonly<Record<string, number>>;
   expectedManifest: ProjectManifest;
   expectedOperationObjects: readonly Op[];
   expectedOps: ReadonlyMap<string, string>;
@@ -258,12 +278,101 @@ function importFixtureFromInspection(
   return {
     inspection,
     expectedState,
-    expectedManifest: inspection.manifest,
-    expectedOperationObjects: operationsByKey(inspection.ops),
+    expectedVector: versionVector(inspection.ops),
+    expectedManifest: structuredClone(inspection.manifest),
+    expectedOperationObjects: operationsByKey(structuredClone(inspection.ops)),
     expectedOps: new Map(inspection.opsFiles.map((file) => [file.path, file.text])),
-    expectedBinaries: new Map(inspection.binaries.map((binary) => [binary.path, binary.data])),
+    expectedBinaries: new Map(
+      inspection.binaries.map((binary) => [binary.path, new Uint8Array(binary.data)]),
+    ),
     requiredBinaryPaths: requiredBinaryPathsFromOps(inspection.ops),
     healthyEntries,
+  };
+}
+
+function importInspectionWithOperations(
+  source: ZipInspection,
+  operations: readonly Op[],
+  binaries: readonly ZipEntryData[] = source.binaries,
+): ZipInspection {
+  const copiedOperations = structuredClone([...operations]);
+  return {
+    ...source,
+    manifest: source.manifest === null ? null : structuredClone(source.manifest),
+    ops: copiedOperations,
+    opsFiles: source.opsFiles.map((file) => {
+      if (!file.path.startsWith('ops/') || !file.path.endsWith('.jsonl')) {
+        throw new Error(`import control has a noncanonical operation path: ${file.path}`);
+      }
+      const actor = file.path.slice('ops/'.length, -'.jsonl'.length);
+      return {
+        path: file.path,
+        text: serializeOps(copiedOperations.filter((op) => op.actor === actor)),
+      };
+    }),
+    binaries: binaries.map((entry) => ({
+      path: entry.path,
+      data: new Uint8Array(entry.data),
+    })),
+    others: source.others.map((entry) => ({
+      path: entry.path,
+      data: new Uint8Array(entry.data),
+    })),
+  };
+}
+
+async function makeOptimizedImportControl(
+  mode: 'healthy' | 'missing' | 'wrong-size' | 'invalid-size',
+): Promise<{
+  fixture: ImportFixture;
+  optimizedPath: string;
+  optimizedBytes: Uint8Array;
+  unreferencedPath: string;
+  unreferencedBytes: Uint8Array;
+}> {
+  const source = await makeImportFixture();
+  const target = source.inspection.ops.find((op) =>
+    op.e === 'asset' && op.t === 'create' && op.v !== undefined);
+  if (target === undefined || target.v === undefined) {
+    throw new Error('optimized import control lacks a target asset operation');
+  }
+  const optimizedPath = `models/${target.id}.opt.glb`;
+  const optimizedBytes = encoder.encode('verified optimized native import control');
+  const unreferencedPath = 'thumbs/unreferenced-native-import-control.bin';
+  const unreferencedBytes = encoder.encode('unreferenced native import bytes');
+  const operations = source.inspection.ops.map((op): Op => {
+    if (op !== target) return op;
+    const fields: Record<string, unknown> = { ...op.v };
+    if (mode === 'healthy') delete fields.size;
+    return {
+      ...op,
+      v: {
+        ...fields,
+        optimizedPath,
+        optimizedSize: mode === 'wrong-size'
+          ? optimizedBytes.length + 1
+          : mode === 'invalid-size'
+            ? 'invalid-size'
+            : optimizedBytes.length,
+        futureImportEvidence: { preserved: true },
+      },
+    };
+  });
+  const inspection = importInspectionWithOperations(
+    source.inspection,
+    operations,
+    [
+      ...source.inspection.binaries,
+      ...(mode === 'missing' ? [] : [{ path: optimizedPath, data: optimizedBytes }]),
+      ...(mode === 'healthy' ? [{ path: unreferencedPath, data: unreferencedBytes }] : []),
+    ],
+  );
+  return {
+    fixture: importFixtureFromInspection(inspection, reduce(operations)),
+    optimizedPath,
+    optimizedBytes,
+    unreferencedPath,
+    unreferencedBytes,
   };
 }
 
@@ -334,7 +443,8 @@ async function inspectImportedClosure(
   const stateComplete =
     reopened.loadErrors.length === 0 &&
     isDeepStrictEqual(reopened.state, fixture.expectedState) &&
-    isDeepStrictEqual(operationsByKey(reopened.allOps), fixture.expectedOperationObjects);
+    isDeepStrictEqual(operationsByKey(reopened.allOps), fixture.expectedOperationObjects) &&
+    isDeepStrictEqual(reopened.vector, fixture.expectedVector);
   const complete =
     isDeepStrictEqual(markerPaths, [`${dir}/lociview.json`]) &&
     manifestComplete &&
@@ -1664,9 +1774,11 @@ describe.sequential('G0S-BLOB new-project publication', () => {
       );
     const target = new FaultInjectingMemoryFS();
     const targetDir = 'projects/import-success';
-    await importNewProject(target, targetDir, fixture.inspection);
+    const importedProjectId = await importNewProject(target, targetDir, fixture.inspection);
     const closure = await inspectImportedClosure(target, targetDir, fixture);
-    successComplete = closure.complete;
+    successComplete =
+      importedProjectId === fixture.expectedManifest.projectId &&
+      closure.complete;
 
     const markerPath = `${targetDir}/lociview.json`;
     const markerEvents = target.events.filter((event) => event.path === markerPath);
@@ -1693,8 +1805,228 @@ describe.sequential('G0S-BLOB new-project publication', () => {
     expect(successComplete).toBe(true);
   });
 
-  it.fails('commits the manifest/completion marker only after every raw op and blob is durable', () => {
+  it('commits the manifest/completion marker only after every raw op and blob is durable', () => {
     expect(markerLast).toBe(true);
+  });
+});
+
+describe.sequential('G0S-BLOB native import preflight controls', () => {
+  it('imports optimized and unknown fields from the snapshotted input while preserving private and unreferenced bytes', async () => {
+    const { fixture, optimizedPath, optimizedBytes, unreferencedPath, unreferencedBytes } =
+      await makeOptimizedImportControl('healthy');
+    const fs = new PausingWriteMemoryFS();
+    const dir = 'projects/import-optimized-control';
+    const privatePath = `${dir}/staging/private-control.bin`;
+    const privateBytes = encoder.encode('private staging control');
+    await fs.writeBytes(privatePath, privateBytes);
+    const firstLog = [...fixture.expectedOps.keys()][0]!;
+    const pause = fs.pauseNextWrite(`${dir}/${firstLog}`);
+    const action = importNewProject(fs, dir, fixture.inspection);
+    await pause.reached;
+
+    if (fixture.inspection.manifest === null) throw new Error('optimized import control lost its manifest');
+    (fixture.inspection.manifest as ProjectManifest & { name: string }).name = 'caller-mutated name';
+    fixture.inspection.opsFiles[0]!.text = '{"callerMutation":';
+    fixture.inspection.ops.length = 0;
+    for (const binary of fixture.inspection.binaries) binary.data.fill(0);
+    pause.release();
+
+    const returnedProjectId = await action;
+    const closure = await inspectImportedClosure(fs, dir, fixture);
+    const optimizedAsset = visibleEntities(fixture.expectedState, 'asset')
+      .find((asset) => asset.fields.optimizedPath === optimizedPath);
+    const markerEvents = fs.events.filter((event) => event.path === `${dir}/lociview.json`);
+    const closurePaths = new Set([
+      ...[...fixture.expectedOps.keys()].map((path) => `${dir}/${path}`),
+      ...[...fixture.expectedBinaries.keys()].map((path) => `${dir}/${path}`),
+    ]);
+    const closureEvents = fs.events.filter((event) => closurePaths.has(event.path));
+    const closureBeforeMarker =
+      markerEvents.length > 0 &&
+      [...closurePaths].every((path) =>
+        closureEvents.some((event) => event.path === path && event.commitIndex !== null)) &&
+      Math.max(...closureEvents.map((event) => event.commitIndex ?? event.startIndex)) <
+        Math.min(...markerEvents.map((event) => event.startIndex));
+    expect({
+      returnedProjectId,
+      complete: closure.complete,
+      closureBeforeMarker,
+      optimizedBytesExact: bytesEqual(await fs.readBytes(`${dir}/${optimizedPath}`), optimizedBytes),
+      legacySize: optimizedAsset?.fields.size,
+      optimizedSize: optimizedAsset?.fields.optimizedSize,
+      unknownFieldPreserved: isDeepStrictEqual(
+        optimizedAsset?.fields.futureImportEvidence,
+        { preserved: true },
+      ),
+      unreferencedBytesExact: bytesEqual(
+        await fs.readBytes(`${dir}/${unreferencedPath}`),
+        unreferencedBytes,
+      ),
+      privateBytesExact: bytesEqual(await fs.readBytes(privatePath), privateBytes),
+    }).toEqual({
+      returnedProjectId: fixture.expectedManifest.projectId,
+      complete: true,
+      closureBeforeMarker: true,
+      optimizedBytesExact: true,
+      legacySize: undefined,
+      optimizedSize: optimizedBytes.length,
+      unknownFieldPreserved: true,
+      unreferencedBytesExact: true,
+      privateBytesExact: true,
+    });
+  });
+
+  it('rejects missing, invalid, mismatched or conflicting required sizes before any workspace mutation', async () => {
+    const results: boolean[] = [];
+    for (const mode of ['missing', 'wrong-size', 'invalid-size'] as const) {
+      const { fixture } = await makeOptimizedImportControl(mode);
+      const fs = new FaultInjectingMemoryFS();
+      const dir = `projects/import-optimized-${mode}`;
+      const outcome = await settleValue(importNewProject(fs, dir, fixture.inspection));
+      results.push(
+        outcome.rejected &&
+        fs.events.length === 0 &&
+        (await fs.readBytes(`${dir}/lociview.json`)) === null &&
+        (await fs.list(`${dir}/`)).length === 0,
+      );
+    }
+
+    const source = await makeImportFixture();
+    const assets = source.inspection.ops.filter((op) =>
+      op.e === 'asset' && op.t === 'create' && op.v !== undefined);
+    const first = assets[0];
+    const second = assets[1];
+    const firstPath = first?.v?.path;
+    const firstSize = first?.v?.size;
+    if (
+      first === undefined ||
+      second === undefined ||
+      second.v === undefined ||
+      typeof firstPath !== 'string' ||
+      typeof firstSize !== 'number'
+    ) {
+      throw new Error('conflicting-size import control lacks two exact asset operations');
+    }
+    const conflictingOps = source.inspection.ops.map((op): Op => op !== second
+      ? op
+      : { ...op, v: { ...op.v, path: firstPath, size: firstSize + 1 } });
+    const conflictingInspection = importInspectionWithOperations(source.inspection, conflictingOps);
+    const conflictFs = new FaultInjectingMemoryFS();
+    const conflictDir = 'projects/import-conflicting-size';
+    const conflictOutcome = await settleValue(
+      importNewProject(conflictFs, conflictDir, conflictingInspection),
+    );
+    results.push(
+      conflictOutcome.rejected &&
+      conflictFs.events.length === 0 &&
+      (await conflictFs.list(`${conflictDir}/`)).length === 0,
+    );
+    expect(results).toEqual([true, true, true, true]);
+  });
+
+  it('rejects an already-active target and a canonical unexpected active log without mutation', async () => {
+    const fixture = await makeImportFixture();
+    const results: boolean[] = [];
+    for (const mode of ['marker', 'extra-log'] as const) {
+      const fs = new FaultInjectingMemoryFS();
+      const dir = `projects/import-preexisting-${mode}`;
+      let extraPath: string | null = null;
+      let extraBytes: Uint8Array | null = null;
+      if (mode === 'marker') {
+        await importNewProject(fs, dir, fixture.inspection);
+      } else {
+        const actor = 'a_0000000000001';
+        const extraOperation: Op = {
+          op: 1,
+          hlc: formatHlc(4_102_444_800_000, 0, actor),
+          actor,
+          user: USER_C.userId,
+          t: 'create',
+          e: 'caption',
+          id: 'cap_00000000000000000000000049',
+          v: { title: 'canonical unexpected active log' },
+        };
+        extraPath = `${dir}/ops/${actor}.jsonl`;
+        extraBytes = encoder.encode(serializeOps([extraOperation]));
+        await fs.writeBytes(extraPath, extraBytes);
+        const parsed = parseOpsJsonl((await fs.readText(extraPath))!);
+        if (
+          parsed.errors.length !== 0 ||
+          parsed.ops.length !== 1 ||
+          parsed.ops[0]?.actor !== actor ||
+          parseHlc(parsed.ops[0].hlc).actor !== actor
+        ) {
+          throw new Error('unexpected-log control is not a canonical actor-bound JSONL file');
+        }
+      }
+      const eventOffset = fs.events.length;
+      const outcome = await settleValue(importNewProject(fs, dir, fixture.inspection));
+      const closure = await inspectImportedClosure(fs, dir, fixture);
+      results.push(
+        outcome.rejected &&
+        fs.events.length === eventOffset &&
+        (mode === 'marker'
+          ? closure.complete
+          : closure.safe &&
+            !closure.active &&
+            extraPath !== null &&
+            extraBytes !== null &&
+            bytesEqual(await fs.readBytes(extraPath), extraBytes)),
+      );
+    }
+    expect(results).toEqual([true, true]);
+  });
+
+  it('observes resolved raw-log corruption and reaches exact completion by internal or explicit retry', async () => {
+    const fixture = await makeImportFixture();
+    const [relativeLogPath, expectedText] = [...fixture.expectedOps][0]!;
+    const expectedBytes = encoder.encode(expectedText);
+    const dir = 'projects/import-resolved-log-retry';
+    const targetPath = `${dir}/${relativeLogPath}`;
+    const markerPath = `${dir}/lociview.json`;
+    const fs = new ResolvedCorruptingMemoryFS(targetPath, expectedBytes, 'bitflip');
+    const markerToken = 'resolved-import-log-marker';
+    fs.watchFilesAfterCommit(markerToken, markerPath, [
+      markerPath,
+      ...[...fixture.expectedOps.keys()].map((path) => `${dir}/${path}`),
+      ...[...fixture.expectedBinaries.keys()].map((path) => `${dir}/${path}`),
+    ]);
+
+    fs.beginAction();
+    const firstOutcome = await settleValue(importNewProject(fs, dir, fixture.inspection));
+    fs.endAction();
+    await fs.settleProbes();
+    const firstClosure = await inspectImportedClosure(fs, dir, fixture);
+    const corruptObserved =
+      fs.injectionCount === 1 &&
+      fs.corruptBytes !== null &&
+      !bytesEqual(fs.corruptBytes, expectedBytes) &&
+      fs.verificationReads.some((bytes) => bytesEqual(bytes, fs.corruptBytes!));
+
+    let finalOutcome = firstOutcome;
+    if (firstOutcome.rejected) {
+      fs.beginAction();
+      finalOutcome = await settleValue(importNewProject(fs, dir, fixture.inspection));
+      fs.endAction();
+      await fs.settleProbes();
+    }
+    const finalClosure = await inspectImportedClosure(fs, dir, fixture);
+    const historySafe = await importMarkerHistoryIsSafe(fs, dir, fixture, markerToken);
+    expect({
+      corruptObserved,
+      firstDispositionSafe: firstOutcome.rejected
+        ? firstClosure.safe && !firstClosure.active
+        : firstOutcome.value === fixture.expectedManifest.projectId && firstClosure.complete,
+      finalProjectId: finalOutcome.value,
+      finalComplete: !finalOutcome.rejected && finalClosure.complete,
+      historySafe,
+    }).toEqual({
+      corruptObserved: true,
+      firstDispositionSafe: true,
+      finalProjectId: fixture.expectedManifest.projectId,
+      finalComplete: true,
+      historySafe: true,
+    });
   });
 });
 
@@ -1714,10 +2046,10 @@ const IMPORT_FAULT_ROWS: Array<{
 }> = [
   { boundary: 'manifest-before', baselineSafe: true, expectedOutcome: 'throw-before' },
   { boundary: 'manifest-prefix', baselineSafe: false, expectedOutcome: 'write-prefix-then-throw' },
-  { boundary: 'manifest-after', baselineSafe: false, expectedOutcome: 'commit-then-throw' },
-  { boundary: 'actor-prefix', baselineSafe: false, expectedOutcome: 'write-prefix-then-throw' },
-  { boundary: 'first-blob-prefix', baselineSafe: false, expectedOutcome: 'write-prefix-then-throw' },
-  { boundary: 'second-blob-prefix', baselineSafe: false, expectedOutcome: 'write-prefix-then-throw' },
+  { boundary: 'manifest-after', baselineSafe: true, expectedOutcome: 'commit-then-throw' },
+  { boundary: 'actor-prefix', baselineSafe: true, expectedOutcome: 'write-prefix-then-throw' },
+  { boundary: 'first-blob-prefix', baselineSafe: true, expectedOutcome: 'write-prefix-then-throw' },
+  { boundary: 'second-blob-prefix', baselineSafe: true, expectedOutcome: 'write-prefix-then-throw' },
   { boundary: 'second-blob-after', baselineSafe: true, expectedOutcome: 'commit-then-throw' },
 ];
 
@@ -1767,13 +2099,28 @@ for (const row of IMPORT_FAULT_ROWS) {
       const targetDir = `projects/import-${row.boundary}`;
       const message = `injected import ${row.boundary}`;
       const armed = armImportFault(target, targetDir, fixture, row.boundary, message);
-      await settle(importNewProject(target, targetDir, fixture.inspection));
+      const markerPath = `${targetDir}/lociview.json`;
+      const markerToken = `import-fault-marker-${row.boundary}`;
+      target.watchFilesAfterCommit(markerToken, markerPath, [
+        markerPath,
+        ...[...fixture.expectedOps.keys()].map((path) => `${targetDir}/${path}`),
+        ...[...fixture.expectedBinaries.keys()].map((path) => `${targetDir}/${path}`),
+      ]);
+      const actionOutcome = await settleValue(importNewProject(target, targetDir, fixture.inspection));
       target.assertAllConsumed();
+      await target.settleProbes();
       const faultEvent = target.events.find(
         (event) => event.path === armed.path && event.outcome !== 'pass',
       );
       faultObserved = faultEvent?.outcome === row.expectedOutcome;
-      safe = (await inspectImportedClosure(target, targetDir, fixture)).safe;
+      const finalClosure = await inspectImportedClosure(target, targetDir, fixture);
+      safe =
+        finalClosure.safe &&
+        await importMarkerHistoryIsSafe(target, targetDir, fixture, markerToken) &&
+        (actionOutcome.rejected || (
+          actionOutcome.value === fixture.expectedManifest.projectId &&
+          finalClosure.complete
+        ));
     });
 
     it('reaches exactly the requested durable prefix outside the safety assertion', () => {
@@ -1862,7 +2209,10 @@ for (const mode of ['bitflip', 'truncate'] as const satisfies readonly ResolvedC
       publicationSafe =
         markerHistorySafe &&
         finalClosure.safe &&
-        (finalClosure.complete || explicitlyRejected);
+        (explicitlyRejected || (
+          actionOutcome.value === fixture.expectedManifest.projectId &&
+          finalClosure.complete
+        ));
     });
 
     it('uses an exact healthy closure and commits the requested resolved corruption once', () => {
@@ -1872,11 +2222,11 @@ for (const mode of ['bitflip', 'truncate'] as const satisfies readonly ResolvedC
       });
     });
 
-    it.fails('reads and observes the wrong bytes before acknowledging or retrying the blob write', () => {
+    it('reads and observes the wrong bytes before acknowledging or retrying the blob write', () => {
       expect(verificationReadObserved).toBe(true);
     });
 
-    it.fails('never publishes a marker unless the full reopened closure has exact healthy bytes', () => {
+    it('never publishes a marker unless the full reopened closure has exact healthy bytes', () => {
       expect(publicationSafe).toBe(true);
     });
   });
@@ -2267,9 +2617,11 @@ describe.sequential('G0S-BLOB native package with one omitted required binary', 
     const newMarkerToken = 'missing-required-new-marker';
     newFs.watchFilesAfterCommit(newMarkerToken, newMarkerPath, newClosurePaths);
     let newActionRejected = newOutcome.rejected;
+    let newActionValue: string | null = null;
     if (newOutcome.inspection !== null) {
       const outcome = await settleValue(importNewProject(newFs, newDir, newOutcome.inspection));
       newActionRejected = outcome.rejected;
+      newActionValue = outcome.value;
     }
     await newFs.settleProbes();
     const newMarkerHistorySafe = await importMarkerHistoryIsSafe(
@@ -2282,7 +2634,10 @@ describe.sequential('G0S-BLOB native package with one omitted required binary', 
     newImportSafe =
       newMarkerHistorySafe &&
       newFinalClosure.safe &&
-      (newFinalClosure.complete || newActionRejected);
+      (newActionRejected || (
+        newActionValue === healthyImport.expectedManifest.projectId &&
+        newFinalClosure.complete
+      ));
 
       const twinFs = new MemoryFS();
       await copyWorkspace(fixture.targetFs, twinFs);
@@ -2359,7 +2714,7 @@ describe.sequential('G0S-BLOB native package with one omitted required binary', 
     expect(fixtureValid).toBe(true);
   });
 
-  it.fails('new-project import never publishes the incomplete required-blob closure', () => {
+  it('new-project import never publishes the incomplete required-blob closure', () => {
     expect(newImportSafe).toBe(true);
   });
 
