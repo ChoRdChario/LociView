@@ -1,8 +1,11 @@
 import { isDeepStrictEqual } from 'node:util';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { inspectZip, mergeFromInspection } from '../../src/assets/package';
 import { writeZipEntries } from '../../src/assets/zipio';
-import { visibleEntities } from '../../src/core/reduce';
+import { formatHlc, parseHlc } from '../../src/core/hlc';
+import { parseOpsJsonl } from '../../src/core/jsonl';
+import { reduce as reduceOps, versionVector, visibleEntities } from '../../src/core/reduce';
+import type { Op } from '../../src/core/schema';
 import { ProjectStore, type DispatchInput, type Identity } from '../../src/core/store';
 import { MemoryFS } from '../../src/platform/fs';
 import {
@@ -24,54 +27,139 @@ const USER: Identity = {
   displayName: 'g0s corpus',
 };
 const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+
+interface PublicFileAuthority {
+  marker: Uint8Array | null;
+  logs: Map<string, number[]>;
+}
 
 class RecordingMemoryFS extends MemoryFS {
-  appendCalls = 0;
+  readonly publicAuthorityCheckpoints: PublicFileAuthority[] = [];
+  private watchedDir: string | null = null;
 
-  resetAppendCalls(): void {
-    this.appendCalls = 0;
+  beginPublicAuthorityHistory(dir: string): void {
+    this.watchedDir = dir;
+    this.publicAuthorityCheckpoints.length = 0;
+  }
+
+  private async checkpointPublicAuthority(): Promise<void> {
+    if (this.watchedDir === null) return;
+    this.publicAuthorityCheckpoints.push({
+      marker: await this.readBytes(`${this.watchedDir}/lociview.json`),
+      logs: await activeLogInventory(this, this.watchedDir),
+    });
+  }
+
+  override async writeText(path: string, text: string): Promise<void> {
+    await super.writeText(path, text);
+    await this.checkpointPublicAuthority();
   }
 
   override async appendText(path: string, text: string): Promise<void> {
-    this.appendCalls += 1;
     await super.appendText(path, text);
+    await this.checkpointPublicAuthority();
+  }
+
+  override async appendBytes(path: string, data: Uint8Array): Promise<void> {
+    await super.appendBytes(path, data);
+    await this.checkpointPublicAuthority();
+  }
+
+  override async writeBytes(path: string, data: Uint8Array): Promise<void> {
+    await super.writeBytes(path, data);
+    await this.checkpointPublicAuthority();
+  }
+
+  override async remove(path: string): Promise<void> {
+    await super.remove(path);
+    await this.checkpointPublicAuthority();
   }
 }
 
 type TestMode = 'pass' | 'xfail';
 
 const OPEN_KNOWN_DEFECTS = new Set([
-  'opaque-extra-top-level-member',
-  'opaque-delete-with-value',
-  'opaque-recursive-reserved-key',
-  'opaque-invalid-calendar-hlc',
-  'opaque-hlc-actor-mismatch',
   'opaque-known-title-control',
-  'opaque-nonfinite-number',
-  'opaque-nfc-colliding-keys',
   'opaque-duplicate-nested-key',
   'opaque-known-kind-wrong-id-prefix',
-  'opaque-reserved-entity-kind',
-  'opaque-reserved-entity-id',
-  'opaque-direct-reserved-value-key',
-  'opaque-uppercase-hlc-counter',
-  'opaque-noncanonical-actor',
   'opaque-noncanonical-user',
   'opaque-known-kind-malformed-ulid',
 ]);
 
-const INTRINSIC_KNOWN_DEFECTS = new Set([
-  'opaque-reserved-entity-kind',
+const INTRINSIC_KNOWN_DEFECTS = new Set<string>();
+
+const OPEN_FAILURE_KNOWN_DEFECTS = new Set<string>();
+
+const DISPATCH_KNOWN_DEFECTS = new Set([
+  'opaque-known-title-control',
+  'opaque-known-kind-wrong-id-prefix',
+  'opaque-known-kind-malformed-ulid',
 ]);
 
-const OPEN_FAILURE_KNOWN_DEFECTS = new Set([
-  'opaque-invalid-calendar-hlc',
-  'opaque-reserved-entity-id',
-]);
+const STRUCTURAL_CONTROL_CASE_ID = 'valid-unknown-nested-evidence';
+const STRUCTURAL_CONTROL_ACTOR = 'a_0ABCDEFGHJKMN';
+const FIXED_NOW = Date.UTC(2026, 7, 19, 12, 0, 0, 0);
+const NEXT_VALID_INPUT: DispatchInput = {
+  t: 'create',
+  e: 'caption',
+  id: 'cap_00000000000000000000000099',
+  v: { title: 'valid after structural rejection' },
+};
 
-const DISPATCH_QUEUE_ALREADY_SAFE = new Set([
-  'opaque-reserved-entity-id',
-]);
+function withStructuralPositiveControls(fixture: OpCorpusCase): OpCorpusCase {
+  if (fixture.id !== STRUCTURAL_CONTROL_CASE_ID) return fixture;
+  if (fixture.dispatchInputJson === null) throw new Error('structural positive control needs dispatch input');
+  const wire = JSON.parse(fixture.wireJson) as Record<string, unknown>;
+  const input = JSON.parse(fixture.dispatchInputJson) as Record<string, unknown>;
+  wire.actor = STRUCTURAL_CONTROL_ACTOR;
+  wire.hlc = `2026-08-19T00:00:00.000Z-00af-${STRUCTURAL_CONTROL_ACTOR}`;
+  const safeNearMisses = {
+    __proto: 'safe near-miss key',
+    prototypeSafe: 'safe near-miss key',
+    constructorSafe: 'safe near-miss key',
+    'é': 'NFC key',
+    'e\u0300': 'NFD key with a distinct NFC value',
+    reservedWordsAsValues: ['__proto__', 'prototype', 'constructor'],
+  };
+  for (const operation of [wire, input]) {
+    const value = operation.v;
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+      throw new Error('structural positive control has no object payload');
+    }
+    const future = (value as Record<string, unknown>).future;
+    if (future === null || typeof future !== 'object' || Array.isArray(future)) {
+      throw new Error('structural positive control has no future object');
+    }
+    (future as Record<string, unknown>).safeNearMisses = structuredClone(safeNearMisses);
+  }
+  return {
+    ...fixture,
+    logActor: STRUCTURAL_CONTROL_ACTOR,
+    wireJson: JSON.stringify(wire),
+    dispatchInputJson: JSON.stringify(input),
+    subject: { ...fixture.subject, actor: STRUCTURAL_CONTROL_ACTOR },
+  };
+}
+
+function structuralPositiveControlsAreExact(fixture: OpCorpusCase): boolean {
+  if (fixture.id !== STRUCTURAL_CONTROL_CASE_ID) return true;
+  const wire = JSON.parse(fixture.wireJson) as Record<string, unknown>;
+  const value = wire.v as Record<string, unknown>;
+  const future = value.future as Record<string, unknown>;
+  const controls = future.safeNearMisses as Record<string, unknown>;
+  const keys = Object.keys(controls).filter((key) => key !== 'reservedWordsAsValues');
+  return (
+    wire.actor === STRUCTURAL_CONTROL_ACTOR &&
+    wire.hlc === `2026-08-19T00:00:00.000Z-00af-${STRUCTURAL_CONTROL_ACTOR}` &&
+    /^a_[0-9A-HJKMNP-TV-Z]{13}$/u.test(STRUCTURAL_CONTROL_ACTOR) &&
+    Object.hasOwn(controls, '__proto') &&
+    !Object.hasOwn(controls, '__proto__') &&
+    isDeepStrictEqual(controls.reservedWordsAsValues, ['__proto__', 'prototype', 'constructor']) &&
+    new Set(keys.map((key) => key.normalize('NFC'))).size === keys.length &&
+    keys.some((key) => key !== key.normalize('NFC'))
+  );
+}
 
 function defineFinalAssertion(
   mode: TestMode,
@@ -119,6 +207,8 @@ interface IngestOutcome {
   issueReported: boolean;
   visible: boolean;
   payloadPreserved: boolean | null;
+  acceptedAuthorityExact: boolean | null;
+  inactiveAuthorityExact: boolean | null;
   rawPreserved: boolean;
   objectIntrinsicsIntact: boolean;
 }
@@ -131,6 +221,8 @@ function expectedIngest(fixture: OpCorpusCase): IngestOutcome {
     issueReported: fixture.expected.reducer === 'none',
     visible: fixture.expected.reducer === 'visible',
     payloadPreserved: accepted ? true : null,
+    acceptedAuthorityExact: accepted ? true : null,
+    inactiveAuthorityExact: accepted ? null : true,
     rawPreserved: true,
     objectIntrinsicsIntact: true,
   };
@@ -139,9 +231,19 @@ function expectedIngest(fixture: OpCorpusCase): IngestOutcome {
 async function characterizeOpen(fixture: OpCorpusCase): Promise<IngestOutcome> {
   const fs = new MemoryFS();
   const dir = `projects/open-${fixture.id}`;
-  await ProjectStore.create(fs, dir, fixture.id, USER);
+  const baseline = await ProjectStore.create(fs, dir, fixture.id, USER);
+  const baselineAuthority = {
+    allOps: structuredClone(baseline.allOps),
+    state: structuredClone(baseline.state),
+    vector: structuredClone(baseline.vector),
+    manifest: await fs.readBytes(`${dir}/lociview.json`),
+  };
   const logPath = `${dir}/ops/${fixture.logActor}.jsonl`;
   await fs.writeText(logPath, `${fixture.wireJson}\n`);
+  const expectedActiveLogs = await activeLogInventory(fs, dir);
+  const expectedAcceptedOps = fixture.expected.reducer === 'none'
+    ? null
+    : [...baselineAuthority.allOps, decodedFixtureOp(fixture)];
 
   const prototypeBefore = snapshotObjectIntrinsics();
   try {
@@ -158,6 +260,25 @@ async function characterizeOpen(fixture: OpCorpusCase): Promise<IngestOutcome> {
       issueReported: store !== null && store.loadErrors.some(({ file }) => file === logPath),
       visible: subjectVisible(store, fixture.subject),
       payloadPreserved: parsedPayloadMatches(fixture.wireJson, matching),
+      acceptedAuthorityExact: expectedAcceptedOps === null
+        ? null
+        : store !== null &&
+          await fullAuthorityIsExact(
+            fs,
+            dir,
+            store,
+            expectedAcceptedOps,
+            baselineAuthority.manifest,
+          ) &&
+          isDeepStrictEqual(await activeLogInventory(fs, dir), expectedActiveLogs),
+      inactiveAuthorityExact: fixture.expected.reducer === 'none'
+        ? store !== null &&
+          isDeepStrictEqual(store.allOps, baselineAuthority.allOps) &&
+          isDeepStrictEqual(store.state, baselineAuthority.state) &&
+          isDeepStrictEqual(store.vector, baselineAuthority.vector) &&
+          isDeepStrictEqual(await fs.readBytes(`${dir}/lociview.json`), baselineAuthority.manifest) &&
+          isDeepStrictEqual(await activeLogInventory(fs, dir), expectedActiveLogs)
+        : null,
       rawPreserved: (await fs.readText(logPath)) === `${fixture.wireJson}\n`,
       objectIntrinsicsIntact: objectIntrinsicsMatch(prototypeBefore),
     };
@@ -167,32 +288,38 @@ async function characterizeOpen(fixture: OpCorpusCase): Promise<IngestOutcome> {
 }
 
 interface DispatchOutcome {
+  explicitlyRejected: boolean;
+  activeAuthorityUnchanged: boolean | null;
   memoryReducerAccepted: boolean;
   memoryVisible: boolean;
   memoryPayloadPreserved: boolean | null;
+  acceptedAuthorityExact: boolean | null;
   durableLogChanged: boolean;
-  appendCalls: number;
   listenerNotified: boolean;
   reopened: boolean;
   reopenedReducerAccepted: boolean;
   reopenedVisible: boolean;
   reopenedPayloadPreserved: boolean | null;
+  nextValidTwinAuthorityExact: boolean | null;
   objectIntrinsicsIntact: boolean;
 }
 
 function expectedDispatch(fixture: OpCorpusCase): DispatchOutcome {
   const accepted = fixture.expected.reducer !== 'none';
   return {
+    explicitlyRejected: !accepted,
+    activeAuthorityUnchanged: accepted ? null : true,
     memoryReducerAccepted: accepted,
     memoryVisible: fixture.expected.reducer === 'visible',
     memoryPayloadPreserved: accepted ? true : null,
+    acceptedAuthorityExact: accepted ? true : null,
     durableLogChanged: accepted,
-    appendCalls: accepted ? 1 : 0,
     listenerNotified: accepted,
     reopened: true,
     reopenedReducerAccepted: accepted,
     reopenedVisible: fixture.expected.reducer === 'visible',
     reopenedPayloadPreserved: accepted ? true : null,
+    nextValidTwinAuthorityExact: accepted ? null : true,
     objectIntrinsicsIntact: true,
   };
 }
@@ -215,33 +342,199 @@ function operationKey(value: { actor: string; op: number }): string {
   return `${value.actor}#${value.op}`;
 }
 
+async function activeLogInventory(fs: MemoryFS, dir: string): Promise<Map<string, number[]>> {
+  const inventory = new Map<string, number[]>();
+  for (const path of (await fs.list(`${dir}/ops/`)).filter((path) => path.endsWith('.jsonl')).sort()) {
+    const bytes = await fs.readBytes(path);
+    if (bytes === null) throw new Error(`listed active log disappeared: ${path}`);
+    inventory.set(path, Array.from(bytes));
+  }
+  return inventory;
+}
+
+function publicAuthorityCheckpointsAreExact(
+  checkpoints: readonly PublicFileAuthority[],
+  expectedMarker: Uint8Array | null,
+  expectedLogs: Map<string, number[]>,
+): boolean {
+  return checkpoints.every(
+    ({ marker, logs }) =>
+      isDeepStrictEqual(marker, expectedMarker) && isDeepStrictEqual(logs, expectedLogs),
+  );
+}
+
+function logInventorySemanticallyMatches(
+  inventory: Map<string, number[]>,
+  dir: string,
+  expectedOps: readonly Op[],
+): boolean {
+  const byActor = new Map<string, Op[]>();
+  for (const op of expectedOps) {
+    const actorOps = byActor.get(op.actor) ?? [];
+    actorOps.push(op);
+    byActor.set(op.actor, actorOps);
+  }
+  const expectedPaths = [...byActor.keys()].map((actor) => `${dir}/ops/${actor}.jsonl`).sort();
+  if (!isDeepStrictEqual([...inventory.keys()].sort(), expectedPaths)) return false;
+  for (const [actor, ops] of byActor) {
+    const bytes = inventory.get(`${dir}/ops/${actor}.jsonl`);
+    if (bytes === undefined) return false;
+    const parsed = parseOpsJsonl(decoder.decode(Uint8Array.from(bytes)));
+    if (parsed.errors.length !== 0 || !operationsAreExact(parsed.ops, ops)) return false;
+  }
+  return true;
+}
+
+function publicAuthorityCheckpointsAreBaselineOrCandidate(
+  checkpoints: readonly PublicFileAuthority[],
+  dir: string,
+  expectedMarker: Uint8Array | null,
+  baselineLogs: Map<string, number[]>,
+  candidateOps: readonly Op[],
+): boolean {
+  return checkpoints.every(
+    ({ marker, logs }) =>
+      isDeepStrictEqual(marker, expectedMarker) &&
+      (isDeepStrictEqual(logs, baselineLogs) ||
+        logInventorySemanticallyMatches(logs, dir, candidateOps)),
+  );
+}
+
+function operationsAreExact(actual: readonly Op[], expected: readonly Op[]): boolean {
+  if (actual.length !== expected.length) return false;
+  const unmatched = [...actual];
+  for (const expectedOp of expected) {
+    const index = unmatched.findIndex((actualOp) => isDeepStrictEqual(actualOp, expectedOp));
+    if (index < 0) return false;
+    unmatched.splice(index, 1);
+  }
+  return unmatched.length === 0;
+}
+
+function memoryAuthorityIsExact(store: ProjectStore, expectedOps: readonly Op[]): boolean {
+  return (
+    operationsAreExact(store.allOps, expectedOps) &&
+    isDeepStrictEqual(store.state, reduceOps(expectedOps)) &&
+    isDeepStrictEqual(store.vector, versionVector(expectedOps))
+  );
+}
+
+async function fullAuthorityIsExact(
+  fs: MemoryFS,
+  dir: string,
+  store: ProjectStore,
+  expectedOps: readonly Op[],
+  expectedManifest: Uint8Array | null,
+): Promise<boolean> {
+  return (
+    memoryAuthorityIsExact(store, expectedOps) &&
+    isDeepStrictEqual(await fs.readBytes(`${dir}/lociview.json`), expectedManifest) &&
+    await activeLogsSemanticallyMatch(fs, dir, expectedOps)
+  );
+}
+
+function decodedFixtureOp(fixture: OpCorpusCase): Op {
+  const decoded = JSON.parse(fixture.wireJson) as unknown;
+  if (decoded === null || typeof decoded !== 'object' || Array.isArray(decoded)) {
+    throw new Error(`${fixture.id} accepted fixture is not an operation object`);
+  }
+  return structuredClone(decoded) as Op;
+}
+
+async function activeLogsSemanticallyMatch(
+  fs: MemoryFS,
+  dir: string,
+  expectedOps: readonly Op[],
+): Promise<boolean> {
+  return logInventorySemanticallyMatches(await activeLogInventory(fs, dir), dir, expectedOps);
+}
+
+function actorBoundOperationsEquivalent(
+  target: Record<string, unknown> | null,
+  targetActor: string,
+  twin: Record<string, unknown> | null,
+  twinActor: string,
+): boolean {
+  if (target === null || twin === null || targetActor === twinActor) return false;
+  if (typeof target.hlc !== 'string' || typeof twin.hlc !== 'string') return false;
+  let targetHlc: ReturnType<typeof parseHlc>;
+  let twinHlc: ReturnType<typeof parseHlc>;
+  try {
+    targetHlc = parseHlc(target.hlc);
+    twinHlc = parseHlc(twin.hlc);
+  } catch {
+    return false;
+  }
+  return (
+    target.actor === targetActor &&
+    twin.actor === twinActor &&
+    targetHlc.actor === targetActor &&
+    twinHlc.actor === twinActor &&
+    target.op === twin.op &&
+    targetHlc.physical === twinHlc.physical &&
+    targetHlc.counter === twinHlc.counter &&
+    target.user === twin.user &&
+    target.t === twin.t &&
+    target.e === twin.e &&
+    target.id === twin.id &&
+    isDeepStrictEqual(target.v, twin.v)
+  );
+}
+
 async function characterizeDispatch(fixture: OpCorpusCase): Promise<DispatchOutcome> {
   if (fixture.dispatchInputJson === null) throw new Error(`${fixture.id} has no dispatch input`);
+  const shouldReject = fixture.expected.reducer === 'none';
+  const now = vi.spyOn(Date, 'now').mockReturnValue(FIXED_NOW);
   const fs = new RecordingMemoryFS();
+  const twinFs = shouldReject ? new RecordingMemoryFS() : null;
   const dir = `projects/dispatch-${fixture.id}`;
   const store = await ProjectStore.create(fs, dir, fixture.id, USER);
+  const twin = twinFs === null ? null : await ProjectStore.create(twinFs, dir, fixture.id, USER);
   const logPath = `${dir}/ops/${store.actorId}.jsonl`;
   const beforeOps = store.allOps.length;
+  const beforeOwnOps = store.allOps.filter((op) => op.actor === store.actorId).length;
+  const twinBeforeOwnOps = twin?.allOps.filter((op) => op.actor === twin.actorId).length ?? null;
   const beforeKeys = new Set(store.allOps.map(operationKey));
   const beforeLog = await fs.readText(logPath);
+  const authorityBefore = {
+    allOps: structuredClone(store.allOps),
+    state: structuredClone(store.state),
+    vector: structuredClone(store.vector),
+    manifest: await fs.readBytes(`${dir}/lociview.json`),
+    logs: await activeLogInventory(fs, dir),
+    durability: structuredClone(store.durabilityStatus),
+  };
   let listenerCalls = 0;
   const unsubscribe = store.subscribe(() => {
     listenerCalls += 1;
   });
   const input = JSON.parse(fixture.dispatchInputJson) as DispatchInput;
-  fs.resetAppendCalls();
+  const expectedAcceptedOps = shouldReject
+    ? null
+    : [
+        ...authorityBefore.allOps,
+        {
+          op: beforeOwnOps + 1,
+          hlc: formatHlc(FIXED_NOW, beforeOwnOps, store.actorId),
+          actor: store.actorId,
+          user: USER.userId,
+          ...structuredClone(input),
+        } satisfies Op,
+      ];
+  fs.beginPublicAuthorityHistory(dir);
   const prototypeBefore = snapshotObjectIntrinsics();
 
   try {
+    let explicitlyRejected = false;
     try {
       store.dispatch(input);
     } catch {
-      // Throw versus Result is not fixed; only memory/queue/durable effects are asserted.
+      explicitlyRejected = true;
     }
     try {
       await store.flush();
     } catch {
-      // A rejected write queue is observed through append count, durable text, and reopen.
+      // A rejected write queue is observed through exact public authority and reopen.
     }
     unsubscribe();
 
@@ -276,22 +569,88 @@ async function characterizeDispatch(fixture: OpCorpusCase): Promise<DispatchOutc
             id: reopenedAdded[0]!.id,
           }
         : null;
+    const durableLogChanged = (await fs.readText(logPath)) !== beforeLog;
+    const activeAuthorityUnchanged = shouldReject
+      ? isDeepStrictEqual(store.allOps, authorityBefore.allOps) &&
+        isDeepStrictEqual(store.state, authorityBefore.state) &&
+        isDeepStrictEqual(store.vector, authorityBefore.vector) &&
+        isDeepStrictEqual(await fs.readBytes(`${dir}/lociview.json`), authorityBefore.manifest) &&
+        isDeepStrictEqual(await activeLogInventory(fs, dir), authorityBefore.logs) &&
+        isDeepStrictEqual(store.durabilityStatus, authorityBefore.durability) &&
+        publicAuthorityCheckpointsAreExact(
+          fs.publicAuthorityCheckpoints,
+          authorityBefore.manifest,
+          authorityBefore.logs,
+        )
+      : null;
+
+    const acceptedAuthorityExact = expectedAcceptedOps === null
+      ? null
+      : reopened !== null &&
+        await fullAuthorityIsExact(fs, dir, store, expectedAcceptedOps, authorityBefore.manifest) &&
+        await fullAuthorityIsExact(fs, dir, reopened, expectedAcceptedOps, authorityBefore.manifest);
+    let nextValidTwinAuthorityExact: boolean | null = null;
+    if (shouldReject && twin !== null && twinFs !== null && twinBeforeOwnOps !== null) {
+      let targetProbe: Record<string, unknown> | null = null;
+      let twinProbe: Record<string, unknown> | null = null;
+      let probesFlushed = false;
+      try {
+        targetProbe = store.dispatch(NEXT_VALID_INPUT) as unknown as Record<string, unknown>;
+        twinProbe = twin.dispatch(NEXT_VALID_INPUT) as unknown as Record<string, unknown>;
+        await store.flush();
+        await twin.flush();
+        probesFlushed = true;
+      } catch {
+        // A rejected operation must not poison the next valid operation or durability queue.
+      }
+      let targetProbeReopened: Record<string, unknown> | null = null;
+      let twinProbeReopened: Record<string, unknown> | null = null;
+      let targetOwnOps: readonly { actor: string; op: number }[] = [];
+      let twinOwnOps: readonly { actor: string; op: number }[] = [];
+      try {
+        const targetAfterProbe = await ProjectStore.open(fs, dir, USER);
+        const twinAfterProbe = await ProjectStore.open(twinFs, dir, USER);
+        targetOwnOps = targetAfterProbe.allOps.filter((op) => op.actor === store.actorId);
+        twinOwnOps = twinAfterProbe.allOps.filter((op) => op.actor === twin.actorId);
+        targetProbeReopened = targetOwnOps.at(-1) as unknown as Record<string, unknown>;
+        twinProbeReopened = twinOwnOps.at(-1) as unknown as Record<string, unknown>;
+      } catch {
+        // Reopen is part of the exact durable-authority check below.
+      }
+      nextValidTwinAuthorityExact =
+        probesFlushed &&
+        targetOwnOps.length === beforeOwnOps + 1 &&
+        twinOwnOps.length === twinBeforeOwnOps + 1 &&
+        actorBoundOperationsEquivalent(targetProbe, store.actorId, twinProbe, twin.actorId) &&
+        actorBoundOperationsEquivalent(
+          targetProbeReopened,
+          store.actorId,
+          twinProbeReopened,
+          twin.actorId,
+        ) &&
+        isDeepStrictEqual(targetProbe, targetProbeReopened) &&
+        isDeepStrictEqual(twinProbe, twinProbeReopened);
+    }
     return {
+      explicitlyRejected,
+      activeAuthorityUnchanged,
       memoryReducerAccepted: added.length === 1,
       memoryVisible: localSubject !== null && subjectVisible(store, localSubject),
       memoryPayloadPreserved: dispatchPayloadMatches(input, actual),
-      durableLogChanged: (await fs.readText(logPath)) !== beforeLog,
-      appendCalls: fs.appendCalls,
+      acceptedAuthorityExact,
+      durableLogChanged,
       listenerNotified: listenerCalls > 0,
       reopened: reopened !== null,
       reopenedReducerAccepted: reopenedAdded.length === 1,
       reopenedVisible: reopenedSubject !== null && subjectVisible(reopened, reopenedSubject),
       reopenedPayloadPreserved: dispatchPayloadMatches(input, reopenedActual),
+      nextValidTwinAuthorityExact,
       objectIntrinsicsIntact,
     };
   } finally {
     unsubscribe();
     restoreObjectIntrinsics(prototypeBefore);
+    now.mockRestore();
   }
 }
 
@@ -303,6 +662,8 @@ interface PackageOutcome {
   issueReported: boolean;
   visible: boolean;
   payloadPreserved: boolean | null;
+  acceptedAuthorityExact: boolean | null;
+  inactiveAuthorityExact: boolean | null;
   objectIntrinsicsIntact: boolean;
 }
 
@@ -316,6 +677,8 @@ function expectedPackage(fixture: OpCorpusCase): PackageOutcome {
     issueReported: fixture.expected.reducer === 'none',
     visible: fixture.expected.reducer === 'visible',
     payloadPreserved: accepted ? true : null,
+    acceptedAuthorityExact: accepted ? true : null,
+    inactiveAuthorityExact: accepted ? null : true,
     objectIntrinsicsIntact: true,
   };
 }
@@ -324,6 +687,16 @@ async function characterizePackage(fixture: OpCorpusCase): Promise<PackageOutcom
   const fs = new MemoryFS();
   const dir = `projects/package-${fixture.id}`;
   const target = await ProjectStore.create(fs, dir, fixture.id, USER);
+  const baselineAuthority = {
+    allOps: structuredClone(target.allOps),
+    state: structuredClone(target.state),
+    vector: structuredClone(target.vector),
+    manifest: await fs.readBytes(`${dir}/lociview.json`),
+    logs: await activeLogInventory(fs, dir),
+  };
+  const expectedAcceptedOps = fixture.expected.reducer === 'none'
+    ? null
+    : [...baselineAuthority.allOps, decodedFixtureOp(fixture)];
   const manifestText = await fs.readText(`${dir}/lociview.json`);
   if (manifestText === null) throw new Error('package target manifest setup failed');
   const zip = await writeZipEntries([
@@ -374,6 +747,31 @@ async function characterizePackage(fixture: OpCorpusCase): Promise<PackageOutcom
       issueReported: (inspection?.opsErrorCount ?? 0) > 0,
       visible: subjectVisible(reopened, fixture.subject),
       payloadPreserved: parsedPayloadMatches(fixture.wireJson, matching),
+      acceptedAuthorityExact: expectedAcceptedOps === null
+        ? null
+        : reopened !== null &&
+          await fullAuthorityIsExact(
+            fs,
+            dir,
+            target,
+            expectedAcceptedOps,
+            baselineAuthority.manifest,
+          ) &&
+          await fullAuthorityIsExact(
+            fs,
+            dir,
+            reopened,
+            expectedAcceptedOps,
+            baselineAuthority.manifest,
+          ),
+      inactiveAuthorityExact: fixture.expected.reducer === 'none'
+        ? reopened !== null &&
+          isDeepStrictEqual(reopened.allOps, baselineAuthority.allOps) &&
+          isDeepStrictEqual(reopened.state, baselineAuthority.state) &&
+          isDeepStrictEqual(reopened.vector, baselineAuthority.vector) &&
+          isDeepStrictEqual(await fs.readBytes(`${dir}/lociview.json`), baselineAuthority.manifest) &&
+          isDeepStrictEqual(await activeLogInventory(fs, dir), baselineAuthority.logs)
+        : null,
       objectIntrinsicsIntact,
     };
   } finally {
@@ -395,9 +793,8 @@ function ingestDecision(
 
 function dispatchDecision(
   outcome: DispatchOutcome,
-): Omit<DispatchOutcome, 'appendCalls' | 'reopened' | 'objectIntrinsicsIntact'> {
+): Omit<DispatchOutcome, 'reopened' | 'objectIntrinsicsIntact'> {
   const {
-    appendCalls: _appendCalls,
     reopened: _reopened,
     objectIntrinsicsIntact: _intrinsics,
     ...decision
@@ -421,18 +818,245 @@ function packageDecision(
   return decision;
 }
 
+const DIRECT_MERGE_ACTORS = ['a_0ABCDEFGHJKMP', 'a_0ABCDEFGHJKMQ'] as const;
+
+function directMergeOp(actor: string, op: number, id: string, v: Record<string, unknown>): Op {
+  return {
+    op,
+    hlc: `2026-08-19T12:00:00.000Z-000${op - 1}-${actor}`,
+    actor,
+    user: USER.userId,
+    t: 'create',
+    e: 'caption',
+    id,
+    v,
+  };
+}
+
+async function directMergeOrderIsAtomic(order: 'valid-first' | 'invalid-first'): Promise<boolean> {
+  const fs = new RecordingMemoryFS();
+  const twinFs = new RecordingMemoryFS();
+  const dir = `projects/direct-merge-${order}`;
+  const store = await ProjectStore.create(fs, dir, order, USER);
+  const twin = await ProjectStore.create(twinFs, dir, order, USER);
+  const incomingActor = DIRECT_MERGE_ACTORS.find((actor) => actor !== store.actorId)!;
+  const valid = directMergeOp(
+    incomingActor,
+    1,
+    'cap_00000000000000000000000081',
+    { title: 'valid batch member' },
+  );
+  const invalid = {
+    ...directMergeOp(
+      incomingActor,
+      2,
+      'cap_00000000000000000000000082',
+      { title: 'invalid batch member' },
+    ),
+    hlc: `2026-08-19T12:00:00.000Z-0001-${DIRECT_MERGE_ACTORS.find((actor) => actor !== incomingActor)!}`,
+  };
+  const baseline = {
+    allOps: structuredClone(store.allOps),
+    state: structuredClone(store.state),
+    vector: structuredClone(store.vector),
+    manifest: await fs.readBytes(`${dir}/lociview.json`),
+    logs: await activeLogInventory(fs, dir),
+    durability: structuredClone(store.durabilityStatus),
+    ownCount: store.allOps.filter((op) => op.actor === store.actorId).length,
+  };
+  const twinBaseline = {
+    allOps: structuredClone(twin.allOps),
+    manifest: await twinFs.readBytes(`${dir}/lociview.json`),
+    logs: await activeLogInventory(twinFs, dir),
+    ownCount: twin.allOps.filter((op) => op.actor === twin.actorId).length,
+  };
+  fs.beginPublicAuthorityHistory(dir);
+  twinFs.beginPublicAuthorityHistory(dir);
+  let listenerCalls = 0;
+  const unsubscribe = store.subscribe(() => {
+    listenerCalls += 1;
+  });
+  let explicitlyRejected = false;
+  try {
+    try {
+      store.mergeExternal(order === 'valid-first' ? [valid, invalid] : [invalid, valid]);
+    } catch {
+      explicitlyRejected = true;
+    }
+    await Promise.resolve();
+  } finally {
+    unsubscribe();
+  }
+  const boundaryExact =
+    explicitlyRejected &&
+    listenerCalls === 0 &&
+    memoryAuthorityIsExact(store, baseline.allOps) &&
+    isDeepStrictEqual(store.state, baseline.state) &&
+    isDeepStrictEqual(store.vector, baseline.vector) &&
+    isDeepStrictEqual(await fs.readBytes(`${dir}/lociview.json`), baseline.manifest) &&
+    isDeepStrictEqual(await activeLogInventory(fs, dir), baseline.logs) &&
+    isDeepStrictEqual(store.durabilityStatus, baseline.durability) &&
+    publicAuthorityCheckpointsAreExact(
+      fs.publicAuthorityCheckpoints,
+      baseline.manifest,
+      baseline.logs,
+    );
+
+  let targetProbe: Record<string, unknown> | null = null;
+  let twinProbe: Record<string, unknown> | null = null;
+  let expectedTargetOps: readonly Op[] | null = null;
+  let expectedTwinOps: readonly Op[] | null = null;
+  let liveProbeExact = false;
+  let probeDurable = false;
+  try {
+    targetProbe = store.dispatch(NEXT_VALID_INPUT) as unknown as Record<string, unknown>;
+    twinProbe = twin.dispatch(NEXT_VALID_INPUT) as unknown as Record<string, unknown>;
+    expectedTargetOps = [...baseline.allOps, structuredClone(targetProbe) as unknown as Op];
+    expectedTwinOps = [...twinBaseline.allOps, structuredClone(twinProbe) as unknown as Op];
+    liveProbeExact =
+      memoryAuthorityIsExact(store, expectedTargetOps) &&
+      memoryAuthorityIsExact(twin, expectedTwinOps);
+    await store.flush();
+    await twin.flush();
+    probeDurable = true;
+  } catch {
+    // Exact return/reopen checks below capture a poisoned sequence, clock, or queue.
+  }
+  const reopened = await ProjectStore.open(fs, dir, USER);
+  const twinReopened = await ProjectStore.open(twinFs, dir, USER);
+  const targetOwn = reopened.allOps.filter((op) => op.actor === store.actorId);
+  const twinOwn = twinReopened.allOps.filter((op) => op.actor === twin.actorId);
+  const targetReopenedProbe = targetOwn.at(-1) as unknown as Record<string, unknown>;
+  const twinReopenedProbe = twinOwn.at(-1) as unknown as Record<string, unknown>;
+  const probeExact =
+    probeDurable &&
+    liveProbeExact &&
+    expectedTargetOps !== null &&
+    expectedTwinOps !== null &&
+    targetOwn.length === baseline.ownCount + 1 &&
+    twinOwn.length === twinBaseline.ownCount + 1 &&
+    actorBoundOperationsEquivalent(targetProbe, store.actorId, twinProbe, twin.actorId) &&
+    actorBoundOperationsEquivalent(
+      targetReopenedProbe,
+      store.actorId,
+      twinReopenedProbe,
+      twin.actorId,
+    ) &&
+    isDeepStrictEqual(targetProbe, targetReopenedProbe) &&
+    isDeepStrictEqual(twinProbe, twinReopenedProbe) &&
+    await fullAuthorityIsExact(fs, dir, store, expectedTargetOps, baseline.manifest) &&
+    await fullAuthorityIsExact(fs, dir, reopened, expectedTargetOps, baseline.manifest) &&
+    await fullAuthorityIsExact(twinFs, dir, twin, expectedTwinOps, twinBaseline.manifest) &&
+    await fullAuthorityIsExact(twinFs, dir, twinReopened, expectedTwinOps, twinBaseline.manifest) &&
+    publicAuthorityCheckpointsAreBaselineOrCandidate(
+      fs.publicAuthorityCheckpoints,
+      dir,
+      baseline.manifest,
+      baseline.logs,
+      expectedTargetOps,
+    ) &&
+    publicAuthorityCheckpointsAreBaselineOrCandidate(
+      twinFs.publicAuthorityCheckpoints,
+      dir,
+      twinBaseline.manifest,
+      twinBaseline.logs,
+      expectedTwinOps,
+    ) &&
+    reopened.loadErrors.length === 0 &&
+    twinReopened.loadErrors.length === 0;
+  return boundaryExact && probeExact;
+}
+
+interface AliasIsolationOutcome {
+  localLiveExact: boolean;
+  localDurableExact: boolean;
+  mergeLiveExact: boolean;
+  mergeDurableExact: boolean;
+}
+
+async function acceptedCallerAliasesAreIsolated(): Promise<AliasIsolationOutcome> {
+  const localFs = new MemoryFS();
+  const localDir = 'projects/local-alias';
+  const localStore = await ProjectStore.create(localFs, localDir, 'local alias', USER);
+  const localValue = { future: { label: 'original' }, items: ['one'] };
+  const expectedLocalValue = structuredClone(localValue);
+  const localInput: DispatchInput = {
+    t: 'create',
+    e: 'caption',
+    id: 'cap_00000000000000000000000083',
+    v: localValue,
+  };
+  const localOp = localStore.dispatch(localInput);
+  const expectedLocalOp = structuredClone(localOp);
+  localValue.future.label = 'mutated';
+  localValue.items.push('two');
+  localInput.e = 'asset';
+  localInput.id = 'ast_00000000000000000000000083';
+  localInput.v = { replacement: true };
+  const localLiveExact =
+    isDeepStrictEqual(localOp, expectedLocalOp) &&
+    isDeepStrictEqual(localOp.v, expectedLocalValue) &&
+    isDeepStrictEqual(
+      visibleEntities(localStore.state, 'caption').find(({ id }) => id === localOp.id)?.fields,
+      expectedLocalValue,
+    );
+  await localStore.flush();
+  const localReopened = await ProjectStore.open(localFs, localDir, USER);
+  const localDurableExact = isDeepStrictEqual(
+    localReopened.allOps.find((op) => operationKey(op) === operationKey(expectedLocalOp)),
+    expectedLocalOp,
+  );
+
+  const mergeFs = new MemoryFS();
+  const mergeDir = 'projects/merge-alias';
+  const mergeStore = await ProjectStore.create(mergeFs, mergeDir, 'merge alias', USER);
+  const mergeActor = DIRECT_MERGE_ACTORS.find((actor) => actor !== mergeStore.actorId)!;
+  const mergeValue = { future: { label: 'original' }, items: ['one'] };
+  const expectedMergeValue = structuredClone(mergeValue);
+  const incoming = directMergeOp(
+    mergeActor,
+    1,
+    'cap_00000000000000000000000084',
+    mergeValue,
+  );
+  const expectedIncoming = structuredClone(incoming);
+  mergeStore.mergeExternal([incoming]);
+  mergeValue.future.label = 'mutated';
+  mergeValue.items.push('two');
+  incoming.e = 'asset';
+  incoming.id = 'ast_00000000000000000000000084';
+  incoming.v = { replacement: true };
+  const mergeLiveOp = mergeStore.allOps.find((op) => operationKey(op) === operationKey(expectedIncoming));
+  const mergeLiveExact =
+    isDeepStrictEqual(mergeLiveOp, expectedIncoming) &&
+    isDeepStrictEqual(mergeLiveOp?.v, expectedMergeValue) &&
+    isDeepStrictEqual(
+      visibleEntities(mergeStore.state, 'caption').find(({ id }) => id === expectedIncoming.id)?.fields,
+      expectedMergeValue,
+    );
+  await mergeStore.flush();
+  const mergeReopened = await ProjectStore.open(mergeFs, mergeDir, USER);
+  const mergeDurableExact = isDeepStrictEqual(
+    mergeReopened.allOps.find((op) => operationKey(op) === operationKey(expectedIncoming)),
+    expectedIncoming,
+  );
+  return { localLiveExact, localDurableExact, mergeLiveExact, mergeDurableExact };
+}
+
 describe.sequential('G0S-OP shared operation corpus', () => {
   describe.each(CORPUS.cases)('$id', (fixture) => {
+    const testedFixture = withStructuralPositiveControls(fixture);
+
     describe('JSONL open ingress', () => {
       let outcome: IngestOutcome;
       beforeAll(async () => {
-        outcome = await characterizeOpen(fixture);
+        outcome = await characterizeOpen(testedFixture);
       });
       defineFinalAssertion(
         OPEN_KNOWN_DEFECTS.has(fixture.id) ? 'xfail' : 'pass',
         'matches the approved accept/quarantine oracle',
         () => ingestDecision(outcome),
-        ingestDecision(expectedIngest(fixture)),
+        ingestDecision(expectedIngest(testedFixture)),
       );
       defineFinalAssertion(
         OPEN_FAILURE_KNOWN_DEFECTS.has(fixture.id) ? 'xfail' : 'pass',
@@ -458,13 +1082,13 @@ describe.sequential('G0S-OP shared operation corpus', () => {
       describe('local dispatch ingress', () => {
         let outcome: DispatchOutcome;
         beforeAll(async () => {
-          outcome = await characterizeDispatch(fixture);
+          outcome = await characterizeDispatch(testedFixture);
         });
         defineFinalAssertion(
-          fixture.expected.reducer === 'none' ? 'xfail' : 'pass',
+          DISPATCH_KNOWN_DEFECTS.has(fixture.id) ? 'xfail' : 'pass',
           'is atomic and matches the approved payload oracle',
           () => dispatchDecision(outcome),
-          dispatchDecision(expectedDispatch(fixture)),
+          dispatchDecision(expectedDispatch(testedFixture)),
         );
         defineFinalAssertion(
           'pass',
@@ -474,10 +1098,10 @@ describe.sequential('G0S-OP shared operation corpus', () => {
         );
         if (fixture.expected.reducer === 'none') {
           defineFinalAssertion(
-            DISPATCH_QUEUE_ALREADY_SAFE.has(fixture.id) ? 'pass' : 'xfail',
-            'does not enqueue a rejected local operation',
-            () => outcome.appendCalls,
-            0,
+            DISPATCH_KNOWN_DEFECTS.has(fixture.id) ? 'xfail' : 'pass',
+            'leaves rejected local active authority and durability byte-exact',
+            () => outcome.activeAuthorityUnchanged,
+            true,
           );
         }
         defineFinalAssertion(
@@ -492,13 +1116,13 @@ describe.sequential('G0S-OP shared operation corpus', () => {
     describe('package inspect/merge ingress', () => {
       let outcome: PackageOutcome;
       beforeAll(async () => {
-        outcome = await characterizePackage(fixture);
+        outcome = await characterizePackage(testedFixture);
       });
       defineFinalAssertion(
         OPEN_KNOWN_DEFECTS.has(fixture.id) ? 'xfail' : 'pass',
         'matches the same oracle through inspect, merge, and reopen',
         () => packageDecision(outcome),
-        packageDecision(expectedPackage(fixture)),
+        packageDecision(expectedPackage(testedFixture)),
       );
       defineFinalAssertion(
         'pass',
@@ -523,9 +1147,39 @@ describe.sequential('G0S-OP shared operation corpus', () => {
     if (fixture.expected.canonicalEvidence === 'accepted' && fixture.expected.reducer === 'none') {
       it.todo('observes canonical evidence acceptance before known-field quarantine');
     }
+
+    if (fixture.id === STRUCTURAL_CONTROL_CASE_ID) {
+      it('keeps safe key near-misses, reserved words as values, and NFC-distinct keys canonical', () => {
+        expect(structuralPositiveControlsAreExact(testedFixture)).toBe(true);
+      });
+    }
   });
 
   it.todo('verifies durable package evidence through a storage-location-neutral evidence API');
+});
+
+describe.sequential('G0S-OP direct ProjectStore structural boundary', () => {
+  it('atomically rejects invalid batches and snapshots accepted caller values', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(FIXED_NOW);
+    try {
+      expect({
+        validFirst: await directMergeOrderIsAtomic('valid-first'),
+        invalidFirst: await directMergeOrderIsAtomic('invalid-first'),
+        aliases: await acceptedCallerAliasesAreIsolated(),
+      }).toEqual({
+        validFirst: true,
+        invalidFirst: true,
+        aliases: {
+          localLiveExact: true,
+          localDurableExact: true,
+          mergeLiveExact: true,
+          mergeDurableExact: true,
+        },
+      });
+    } finally {
+      now.mockRestore();
+    }
+  });
 });
 
 interface RelationOutcome {

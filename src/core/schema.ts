@@ -36,21 +36,145 @@ function isPlainObject(x: unknown): x is Record<string, unknown> {
   return typeof x === 'object' && x !== null && !Array.isArray(x) && Object.getPrototypeOf(x) === Object.prototype;
 }
 
+const ACTOR_PATTERN = /^a_[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{13}$/u;
+const HLC_COUNTER_PATTERN = /^[0-9a-f]{4}$/u;
+const DANGEROUS_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+const COMMON_KEYS = ['op', 'hlc', 'actor', 'user', 't', 'e', 'id'] as const;
+const VALUE_KEYS = [...COMMON_KEYS, 'v'] as const;
+const INVALID_JSON = Symbol('invalid-json');
+
+type JsonClone = null | boolean | number | string | JsonClone[] | { [key: string]: JsonClone };
+
+function cloneJsonValue(value: unknown, ancestors: Set<object>): JsonClone | typeof INVALID_JSON {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : INVALID_JSON;
+  if (typeof value !== 'object') return INVALID_JSON;
+  if (ancestors.has(value)) return INVALID_JSON;
+
+  const isArray = Array.isArray(value);
+  if (Object.getPrototypeOf(value) !== (isArray ? Array.prototype : Object.prototype)) {
+    return INVALID_JSON;
+  }
+  const ownKeys = Reflect.ownKeys(value);
+  if (ownKeys.some((key) => typeof key !== 'string')) return INVALID_JSON;
+
+  ancestors.add(value);
+  try {
+    if (isArray) {
+      const itemKeys = ownKeys.filter((key) => key !== 'length') as string[];
+      if (itemKeys.length !== value.length) return INVALID_JSON;
+      const out: JsonClone[] = [];
+      for (let i = 0; i < value.length; i++) {
+        const descriptor = Object.getOwnPropertyDescriptor(value, String(i));
+        if (descriptor === undefined || descriptor.enumerable !== true || !('value' in descriptor)) {
+          return INVALID_JSON;
+        }
+        const item = cloneJsonValue(descriptor.value, ancestors);
+        if (item === INVALID_JSON) return INVALID_JSON;
+        out.push(item);
+      }
+      return out;
+    }
+
+    const out: { [key: string]: JsonClone } = {};
+    const normalizedKeys = new Set<string>();
+    for (const key of ownKeys as string[]) {
+      if (DANGEROUS_KEYS.has(key)) return INVALID_JSON;
+      const normalized = key.normalize('NFC');
+      if (normalizedKeys.has(normalized)) return INVALID_JSON;
+      normalizedKeys.add(normalized);
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (descriptor === undefined || descriptor.enumerable !== true || !('value' in descriptor)) {
+        return INVALID_JSON;
+      }
+      const item = cloneJsonValue(descriptor.value, ancestors);
+      if (item === INVALID_JSON) return INVALID_JSON;
+      out[key] = item;
+    }
+    return out;
+  } finally {
+    ancestors.delete(value);
+  }
+}
+
+function hasExactKeys(o: Record<string, unknown>, expected: readonly string[]): boolean {
+  const keys = Object.keys(o);
+  return keys.length === expected.length && expected.every((key) => Object.hasOwn(o, key));
+}
+
+function hasCanonicalHlc(hlc: string, actor: string): boolean {
+  const iso = hlc.slice(0, 24);
+  const counter = hlc.slice(25, 29);
+  if (hlc !== `${iso}-${counter}-${actor}` || !HLC_COUNTER_PATTERN.test(counter)) return false;
+  const physical = Date.parse(iso);
+  if (!Number.isFinite(physical)) return false;
+  try {
+    return new Date(physical).toISOString() === iso;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * JSONとして復元可能なv1 operationを検証し、呼出側から独立したコピーを返す。
+ * raw JSON の重複キー検出、field policy、既知ID/user policy、resource budgetは別境界。
+ */
+export function cloneValidatedOp(x: unknown): Op | null {
+  try {
+    const cloned = cloneJsonValue(x, new Set());
+    if (cloned === INVALID_JSON || !isPlainObject(cloned)) return null;
+    const o = cloned as Record<string, unknown>;
+    if (o.t !== 'create' && o.t !== 'update' && o.t !== 'delete') return null;
+    const expectedKeys = o.t === 'delete' ? COMMON_KEYS : VALUE_KEYS;
+    if (!hasExactKeys(o, expectedKeys)) return null;
+    if (typeof o.op !== 'number' || !Number.isSafeInteger(o.op) || o.op < 1) return null;
+    if (typeof o.actor !== 'string' || !ACTOR_PATTERN.test(o.actor)) return null;
+    if (typeof o.hlc !== 'string' || !hasCanonicalHlc(o.hlc, o.actor)) return null;
+    if (typeof o.user !== 'string' || o.user.length > LIMITS.maxUserLen) return null;
+    if (
+      typeof o.e !== 'string' ||
+      o.e.length < 1 ||
+      o.e.length > LIMITS.maxKindLen ||
+      DANGEROUS_KEYS.has(o.e)
+    ) return null;
+    if (
+      typeof o.id !== 'string' ||
+      o.id.length < 1 ||
+      o.id.length > LIMITS.maxIdLen ||
+      DANGEROUS_KEYS.has(o.id)
+    ) return null;
+    if (o.t !== 'delete') {
+      if (!isPlainObject(o.v) || Object.keys(o.v).length > LIMITS.maxFieldsPerOp) return null;
+    }
+    return o as unknown as Op;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Local dispatch input is a smaller closed envelope than a persisted operation.
+ * Clone it before combining it with store-owned sequence/clock metadata so extra
+ * members, accessors and caller aliases cannot bypass the persisted-op gate.
+ */
+export function cloneValidatedDispatchOp(
+  x: unknown,
+  metadata: Pick<Op, 'op' | 'hlc' | 'actor' | 'user'>,
+): Op | null {
+  try {
+    const cloned = cloneJsonValue(x, new Set());
+    if (cloned === INVALID_JSON || !isPlainObject(cloned)) return null;
+    const input = cloned as Record<string, unknown>;
+    if (input.t !== 'create' && input.t !== 'update' && input.t !== 'delete') return null;
+    const expectedKeys = input.t === 'delete' ? ['t', 'e', 'id'] : ['t', 'e', 'id', 'v'];
+    if (!hasExactKeys(input, expectedKeys)) return null;
+    return cloneValidatedOp({ ...metadata, ...input });
+  } catch {
+    return null;
+  }
+}
+
 /** 構造検証。falseの行は取込時にスキップし警告する（例外は投げない） */
 export function validateOp(x: unknown): x is Op {
-  if (!isPlainObject(x)) return false;
-  const o = x as Record<string, unknown>;
-  if (typeof o.op !== 'number' || !Number.isInteger(o.op) || o.op < 1 || o.op > Number.MAX_SAFE_INTEGER) return false;
-  if (typeof o.hlc !== 'string' || o.hlc.length < 32 || o.hlc.length > LIMITS.maxHlcLen || o.hlc[23] !== 'Z') return false;
-  if (typeof o.actor !== 'string' || o.actor.length < 1 || o.actor.length > LIMITS.maxActorLen) return false;
-  if (typeof o.user !== 'string' || o.user.length > LIMITS.maxUserLen) return false;
-  if (o.t !== 'create' && o.t !== 'update' && o.t !== 'delete') return false;
-  if (typeof o.e !== 'string' || o.e.length < 1 || o.e.length > LIMITS.maxKindLen) return false;
-  if (typeof o.id !== 'string' || o.id.length < 1 || o.id.length > LIMITS.maxIdLen) return false;
-  if (o.v !== undefined) {
-    if (!isPlainObject(o.v)) return false;
-    if (Object.keys(o.v).length > LIMITS.maxFieldsPerOp) return false;
-  }
-  if ((o.t === 'create' || o.t === 'update') && o.v === undefined) return false;
-  return true;
+  return cloneValidatedOp(x) !== null;
 }

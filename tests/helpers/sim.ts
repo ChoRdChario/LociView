@@ -31,6 +31,19 @@ export interface SimOptions {
   steps?: number;
 }
 
+const ACTOR_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+function actorIdForIndex(index: number): string {
+  let value = index;
+  const digits = new Array<string>(13);
+  for (let position = digits.length - 1; position >= 0; position -= 1) {
+    digits[position] = ACTOR_ALPHABET[value % 32]!;
+    value = Math.floor(value / 32);
+  }
+  if (value !== 0) throw new Error('simulation actor index is too large');
+  return `a_${digits.join('')}`;
+}
+
 export function simulateScenario(seed: number, opts: SimOptions = {}): Op[] {
   const rnd = mulberry32(seed);
   const nActors = opts.actors ?? 3;
@@ -39,7 +52,7 @@ export function simulateScenario(seed: number, opts: SimOptions = {}): Op[] {
   let globalTime = 1_780_000_000_000; // 2026年ごろのepoch ms
   const actors = Array.from({ length: nActors }, (_, i) => {
     const skew = Math.floor((rnd() - 0.5) * 20_000); // 端末時計±10秒の狂い
-    const actorId = `a_SIM${i}`;
+    const actorId = actorIdForIndex(i);
     return {
       actorId,
       userId: `usr_SIM${i}`,

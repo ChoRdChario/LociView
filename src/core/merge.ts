@@ -3,7 +3,7 @@
 // レポートは「何が増え、何が変わり、どの自動解決が起きたか」を人間可読に列挙する。
 
 import { compareHlc } from './hlc';
-import type { Op } from './schema';
+import { cloneValidatedOp, type Op } from './schema';
 import { dedupeOps, isVisible, opKey, reduce, type ProjectState } from './reduce';
 
 export interface EntityRef {
@@ -38,13 +38,25 @@ export interface MergeResult {
 }
 
 export function mergeOps(baseOps: readonly Op[], incomingOps: readonly Op[]): MergeResult {
-  const baseKeys = new Set(baseOps.map(opKey));
-  const newOps = dedupeOps(incomingOps).filter((o) => !baseKeys.has(opKey(o)));
+  const base = cloneOperationBatch(baseOps, 'base');
+  const incoming = cloneOperationBatch(incomingOps, 'incoming');
+  const baseKeys = new Set(base.map(opKey));
+  const newOps = dedupeOps(incoming).filter((o) => !baseKeys.has(opKey(o)));
 
-  const before = reduce(baseOps);
-  const after = reduce([...baseOps, ...newOps]);
+  const before = reduce(base);
+  const after = reduce([...base, ...newOps]);
   const report = buildReport(before, after, newOps);
   return { newOps, report, stateAfter: after };
+}
+
+function cloneOperationBatch(ops: readonly Op[], role: 'base' | 'incoming'): Op[] {
+  const cloned: Op[] = [];
+  for (const op of ops) {
+    const validated = cloneValidatedOp(op);
+    if (validated === null) throw new Error(`merge: invalid ${role} operation`);
+    cloned.push(validated);
+  }
+  return cloned;
 }
 
 function buildReport(before: ProjectState, after: ProjectState, newOps: readonly Op[]): MergeReport {

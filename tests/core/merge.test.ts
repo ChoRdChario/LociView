@@ -9,8 +9,8 @@ function hlc(ms: number, counter: number, actor: string): string {
   return `${iso}-${counter.toString(16).padStart(4, '0')}-${actor}`;
 }
 
-const A = 'a_AAA';
-const B = 'a_BBB';
+const A = 'a_000000000000A';
+const B = 'a_000000000000B';
 
 function op(partial: Partial<Op> & Pick<Op, 'op' | 'hlc' | 'actor' | 't' | 'id'>): Op {
   return { user: `usr_${partial.actor}`, e: 'caption', ...partial };
@@ -34,8 +34,8 @@ describe('mergeOps', () => {
     expect(report.overwritten[0]).toMatchObject({
       id: 'cap1',
       field: 'title',
-      winnerUser: 'usr_a_BBB',
-      loserUser: 'usr_a_AAA',
+      winnerUser: 'usr_a_000000000000B',
+      loserUser: 'usr_a_000000000000A',
     });
     expect(stateAfter.byKind.caption!.cap1!.fields.title).toBe('Y');
   });
@@ -51,7 +51,7 @@ describe('mergeOps', () => {
     const { report, stateAfter } = mergeOps(baseNewer, incoming);
     expect(stateAfter.byKind.caption!.cap1!.fields.title).toBe('A-newest');
     expect(report.rejected).toHaveLength(1);
-    expect(report.rejected[0]).toMatchObject({ field: 'title', loserUser: 'usr_a_BBB' });
+    expect(report.rejected[0]).toMatchObject({ field: 'title', loserUser: 'usr_a_000000000000B' });
     expect(report.overwritten).toHaveLength(0);
   });
 

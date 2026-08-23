@@ -643,6 +643,35 @@ Review record:
 - Independent production/runtime, exact-oracle and false-green reviews found no unresolved P0/P1 after the legitimate nested-XLSX compatibility boundary and separator-heavy path complexity findings were corrected. ZIP64/data descriptors remain delegated to zip.js rather than fixed to the tests' ZIP32 layout
 - Unicode normalization/general case collision, invalid UTF-8, symlink/special mode, native-package `.xlsx` context, compression-ratio/device limits, typed archive issues, streaming, MIME/decode/polyglot policy, cross-context locking, crash/device evidence and full malicious-package/G0-S completion remain explicitly unclaimed
 
+### Post-slice-28 gate/strategy checkpoint
+
+- [x] Re-read the approved G0/G0-S gates, current production ingress, remaining expected failures and the external-evidence state before selecting another slice
+- [x] Keep the production lane moving while physical-device measurements, representative external fixtures, numeric thresholds and product-owner release approval remain a separate blocking evidence lane with zero completed records
+- [x] Select one shared post-JSON operation firewall rather than splitting reserved names, HLC shape and envelope rules into repeated micro-slices: these rules are already approved and meet at the same validator seam
+- [x] Rank browser cross-context locking, actor-log/marker crash atomicity and typed collision/quarantine behind this slice because they require a lock, transaction/journal or durable issue API that the current v1 surface does not provide
+- [x] Apply a hard stop boundary: do not add a duplicate-aware raw parser, invent canonical digests, enforce legacy user/entity-ID migration policy, implement known-field quarantine or choose recursive resource limits in this slice
+
+### G0 stabilization slice 29 — shared post-JSON operation firewall
+
+- [x] Replace the permissive decoded-operation check with one shared validator/clone that enforces the closed top-level envelope, exact create/update/delete `v` presence rules, recursive dangerous-key rejection, finite JSON values, decoded NFC-key collision rejection and canonical HLC/actor binding
+- [x] Apply the same gate to JSONL open/package parsing, local dispatch before sequence/clock/state/listener/queue mutation, and direct external merge as an all-input preflight before clock/state/publication mutation
+- [x] Defend reducer and version-vector indexes with `Map` or null-prototype storage without changing the public semantic state, and retain recursively safe unknown evidence, escaped controls and NFC-distinct values unchanged
+- [x] Promote only the existing operation-corpus and untrusted-operation assertions satisfied by this gate; reuse one existing next-valid/twin authority check for local rejection and strengthen the existing safe-unknown positive rather than adding a new matrix
+- [x] Keep duplicate raw members, invalid Unicode raw decoding, raw evidence/digest generation, known-field control quarantine, canonical user/known-entity ID migration, same-key collision reporting, recursive budgets and full G0S-OP/G0-S completion explicitly open
+- [x] Run focused tests, typecheck, then full tests, fixture/evidence verification and production build; complete an independent P0/P1/future-correctness audit and a short scope/churn check before commit
+
+Review record:
+
+- `cloneValidatedOp()` is now the shared decoded-operation firewall. It returns an ownership-isolated JSON clone only for the approved closed envelope, exact type-specific `v` shape, finite values, canonical actor-bound HLC, and recursively safe non-colliding decoded keys. JSONL parsing retains raw evidence while admitting only that clone
+- `ProjectStore.dispatch()` validates a pure prospective operation before advancing sequence/HLC or changing memory, listeners or the durable queue. `mergeOps()` validates and clones both complete batches before reduction, so package preview and direct external merge share one fail-closed preflight and retain no caller-owned aliases
+- Reducer entity, field and version-vector indexes use `Map` internally and materialize ordinary public records. Existing merge/JSONL/simulation fixtures now use deterministic canonical actor IDs; public semantic object prototypes and merge algebra remain unchanged
+- Fifty existing runtime expected failures became ordinary (48 shared-corpus ingress assertions plus 2 direct untrusted-operation controls). One existing safe-unknown row now covers lowercase hexadecimal HLC counters, near-miss reserved names, reserved words as values and NFC-distinct keys across all three ingresses; one compact direct-store control covers both batch orders and caller-alias isolation without adding a new fixture or parameter matrix
+- Rejected local/direct mutations are checked through point-in-time marker and complete active-log authority rather than physical write counts. Accepted open/package/local authority and the post-rejection probe are bound to independently derived semantic operation multisets, reduced state, vector, manifest and complete active-log inventory. Same-byte writes, no-op removes, JSONL formatting changes and private non-authoritative evidence remain free
+- Scope/churn review found the slice upper-bound but justified: production is 5 files / +230/-69, while tests and deterministic fixture adaptation are 5 files plus one helper / +727/-60. The larger test side reuses the approved corpus and shared exact-authority helpers; there is no tests-only slice, new fixture matrix or unrelated production change. Direct `it.fails` declarations fall from 34 to 32
+- Verification passed on the exact final source/test tree: 6 focused files / 332 passing tests plus 2 todos; 32 full-suite files / 1,028 passing tests plus 21 todos; TypeScript typecheck; fixture verification (10 Git entries / 708,867 bytes, one unratified GS candidate); evidence verification (3 pending device templates / 0 run, environment or artifact records); and the production build (96 modules / 11 PWA precache entries, 888.38 KiB). The existing large viewer chunk warning is approximately 803.03 kB
+- Independent production/runtime, closure/future-correctness and false-green reviews found no unresolved P0/P1 after public-authority checkpoints, independently derived direct-probe authority, exact accepted authority and canonical pure-test fixtures were corrected
+- Duplicate raw JSON members, invalid raw Unicode, raw canonical evidence/digests, known-field control quarantine, canonical user/known-entity ID migration, same-key collision reporting, recursive resource budgets, hostile Proxy side effects and full G0S-OP/G0-S completion remain explicitly unclaimed
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes

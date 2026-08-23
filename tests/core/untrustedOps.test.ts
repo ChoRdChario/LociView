@@ -44,7 +44,7 @@ describe('G0-S characterization: untrusted operations', () => {
       allRejected = outcomes.every(({ ops, errors }) => ops.length === 0 && errors.length === 1);
     });
 
-    it.fails('G0S-OP: reserved map keys are rejected recursively before reaching the reducer', () => {
+    it('G0S-OP: reserved map keys are rejected recursively before reaching the reducer', () => {
       expect(allRejected).toBe(true);
     });
   });
@@ -77,7 +77,7 @@ describe('G0-S characterization: untrusted operations', () => {
       outcome = { opened: reopened !== null, activated, reported };
     });
 
-    it.fails('G0S-OP: noncanonical HLC is quarantined without crashing project open', () => {
+    it('G0S-OP: noncanonical HLC is quarantined without crashing project open', () => {
       expect(outcome).toEqual({ opened: true, activated: false, reported: true });
     });
   });

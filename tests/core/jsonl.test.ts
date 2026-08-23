@@ -7,8 +7,8 @@ function sampleOps(): Op[] {
   return [
     {
       op: 1,
-      hlc: `${iso}-0000-a_AAA`,
-      actor: 'a_AAA',
+      hlc: `${iso}-0000-a_000000000000A`,
+      actor: 'a_000000000000A',
       user: 'usr_1',
       t: 'create',
       e: 'caption',
@@ -17,8 +17,8 @@ function sampleOps(): Op[] {
     },
     {
       op: 2,
-      hlc: `${iso}-0001-a_AAA`,
-      actor: 'a_AAA',
+      hlc: `${iso}-0001-a_000000000000A`,
+      actor: 'a_000000000000A',
       user: 'usr_1',
       t: 'delete',
       e: 'caption',

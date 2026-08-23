@@ -29,6 +29,18 @@ export interface ProjectState {
   byKind: Record<string, Record<string, EntityRecord>>;
 }
 
+interface MutableEntityRecord {
+  id: string;
+  kind: string;
+  fields: Map<string, unknown>;
+  fieldClocks: Map<string, string>;
+  fieldWriters: Map<string, string>;
+  createdAt: string | null;
+  createdBy: string | null;
+  lastWrite: string | null;
+  deletedAt: string | null;
+}
+
 export function opKey(o: Op): string {
   return `${o.actor}#${o.op}`;
 }
@@ -58,21 +70,29 @@ export function sortOps(ops: readonly Op[]): Op[] {
 
 export function reduce(ops: readonly Op[]): ProjectState {
   const sorted = sortOps(dedupeOps(ops));
-  const byKind: ProjectState['byKind'] = {};
+  const byKind = new Map<string, Map<string, MutableEntityRecord>>();
 
   for (const o of sorted) {
-    const kindMap = (byKind[o.e] ??= {});
-    const rec = (kindMap[o.id] ??= {
-      id: o.id,
-      kind: o.e,
-      fields: {},
-      fieldClocks: {},
-      fieldWriters: {},
-      createdAt: null,
-      createdBy: null,
-      lastWrite: null,
-      deletedAt: null,
-    });
+    let kindMap = byKind.get(o.e);
+    if (kindMap === undefined) {
+      kindMap = new Map();
+      byKind.set(o.e, kindMap);
+    }
+    let rec = kindMap.get(o.id);
+    if (rec === undefined) {
+      rec = {
+        id: o.id,
+        kind: o.e,
+        fields: new Map(),
+        fieldClocks: new Map(),
+        fieldWriters: new Map(),
+        createdAt: null,
+        createdBy: null,
+        lastWrite: null,
+        deletedAt: null,
+      };
+      kindMap.set(o.id, rec);
+    }
 
     if (o.t === 'delete') {
       if (rec.deletedAt === null || compareHlc(o.hlc, rec.deletedAt) > 0) {
@@ -87,11 +107,11 @@ export function reduce(ops: readonly Op[]): ProjectState {
     }
     if (o.v) {
       for (const [k, val] of Object.entries(o.v)) {
-        const prev = rec.fieldClocks[k];
+        const prev = rec.fieldClocks.get(k);
         if (prev === undefined || compareHlc(o.hlc, prev) > 0) {
-          rec.fields[k] = val;
-          rec.fieldClocks[k] = o.hlc;
-          rec.fieldWriters[k] = o.user;
+          rec.fields.set(k, val);
+          rec.fieldClocks.set(k, o.hlc);
+          rec.fieldWriters.set(k, o.user);
         }
       }
     }
@@ -100,7 +120,29 @@ export function reduce(ops: readonly Op[]): ProjectState {
     }
   }
 
-  return { byKind };
+  return {
+    byKind: Object.fromEntries(
+      [...byKind].map(([kind, idMap]) => [
+        kind,
+        Object.fromEntries(
+          [...idMap].map(([id, rec]) => [
+            id,
+            {
+              id: rec.id,
+              kind: rec.kind,
+              fields: Object.fromEntries(rec.fields),
+              fieldClocks: Object.fromEntries(rec.fieldClocks),
+              fieldWriters: Object.fromEntries(rec.fieldWriters),
+              createdAt: rec.createdAt,
+              createdBy: rec.createdBy,
+              lastWrite: rec.lastWrite,
+              deletedAt: rec.deletedAt,
+            },
+          ]),
+        ),
+      ]),
+    ),
+  };
 }
 
 /** 可視性: 未削除、または削除より新しい書き込みがある（update-wins） */
@@ -119,9 +161,9 @@ export function getRecord(state: ProjectState, kind: string, id: string): Entity
 
 /** actor → 既知の最大seq（バージョンベクトル。snapshot.jsonとマージ差分抽出に使用） */
 export function versionVector(ops: readonly Op[]): Record<string, number> {
-  const vv: Record<string, number> = {};
+  const vv = new Map<string, number>();
   for (const o of ops) {
-    if ((vv[o.actor] ?? 0) < o.op) vv[o.actor] = o.op;
+    if ((vv.get(o.actor) ?? 0) < o.op) vv.set(o.actor, o.op);
   }
-  return vv;
+  return Object.fromEntries(vv);
 }

@@ -8,7 +8,7 @@ import { MAX_LINE_CHARS, parseOpsJsonl, serializeOps, type JsonlParseError } fro
 import { createManifest, parseManifest, type ProjectManifest } from './manifest';
 import { mergeOps, type MergeReport } from './merge';
 import { reduce, versionVector, type ProjectState } from './reduce';
-import { LIMITS, type Op, type OpType } from './schema';
+import { cloneValidatedDispatchOp, type Op, type OpType } from './schema';
 import type { WorkspaceFS } from '../platform/fs';
 
 export interface Identity {
@@ -210,43 +210,26 @@ export class ProjectStore {
   }
 
   dispatch(input: DispatchInput): Op {
-    if (
-      input.v !== undefined &&
-      input.v !== null &&
-      typeof input.v === 'object' &&
-      !Array.isArray(input.v) &&
-      Object.keys(input.v).length > LIMITS.maxFieldsPerOp
-    ) {
-      throw new Error('store: local operation has too many fields');
-    }
-
     // HLCの値は可変だが文字幅は固定なので、時計とseqを進めない純粋な候補で
     // 永続化される1行全体の上限を先に検証する。
-    const prospectiveOp: Op = {
+    const prospectiveOp = cloneValidatedDispatchOp(input, {
       op: this.seq + 1,
       hlc: formatHlc(0, 0, this.actorId),
       actor: this.actorId,
       user: this.identity.userId,
-      t: input.t,
-      e: input.e,
-      id: input.id,
-      ...(input.v !== undefined ? { v: input.v } : {}),
-    };
+    });
+    if (prospectiveOp === null) throw new Error('store: invalid local operation');
     const prospectiveLine = serializeOps([prospectiveOp]);
     if (prospectiveLine.length - 1 > MAX_LINE_CHARS) {
       throw new Error('store: local operation line is too long');
     }
 
     const op: Op = {
-      op: ++this.seq,
+      ...prospectiveOp,
+      op: this.seq + 1,
       hlc: this.clock.tick(),
-      actor: this.actorId,
-      user: this.identity.userId,
-      t: input.t,
-      e: input.e,
-      id: input.id,
-      ...(input.v !== undefined ? { v: input.v } : {}),
     };
+    this.seq += 1;
     this.ops.push(op);
     this.recompute(false);
     this.enqueueAppend(`${this.dir}/ops/${this.actorId}.jsonl`, serializeOps([op]));
