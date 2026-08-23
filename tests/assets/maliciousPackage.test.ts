@@ -2496,6 +2496,8 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       'platform-case-collision-reversed',
       'duplicate-manifest',
       'duplicate-manifest-reversed',
+      'invalid-utf8-manifest',
+      'malformed-utf8-entry-name',
       'unsafe-directory-path',
       'directory-count-bypass',
       'local-central-name-mismatch',

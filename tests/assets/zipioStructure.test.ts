@@ -90,6 +90,19 @@ async function extractWithSignatureCheck(bytes: Uint8Array): Promise<{
 describe('G0 ZIP structural characterization', () => {
   const portableRtlPath = 'media/صورة-é.jpg';
   const payload = encoder.encode('fixed writer payload');
+  const nonEfsUnicodePath = 'media/café.txt';
+  const nonEfsRawPath = new Uint8Array([
+    ...encoder.encode('media/caf'),
+    0x82,
+    ...encoder.encode('.txt'),
+  ]);
+  const nonEfsPayload = encoder.encode('CP437 path payload');
+  const unicodePathExtra = new Uint8Array([
+    1,
+    // CRC32(nonEfsRawPath) = 0x5f5583e8, little-endian per Info-ZIP 0x7075.
+    0xe8, 0x83, 0x55, 0x5f,
+    ...encoder.encode(nonEfsUnicodePath),
+  ]);
   const directoryPayload = encoder.encode('explicit directory child');
   const nestedSuffixes = [
     'inner.zip',
@@ -158,7 +171,18 @@ describe('G0 ZIP structural characterization', () => {
   let allAdversarialFixturesDeterministic: boolean;
 
   beforeAll(async () => {
-    const writerEntries = [{ path: portableRtlPath, data: payload }] as const;
+    const writerEntries = [
+      { path: portableRtlPath, data: payload },
+      {
+        path: nonEfsUnicodePath,
+        data: nonEfsPayload,
+        options: {
+          useUnicodeFileNames: false,
+          encodeText: (text: string) => text === nonEfsUnicodePath ? nonEfsRawPath : undefined,
+          extraField: new Map([[0x7075, unicodePathExtra]]),
+        },
+      },
+    ] as const;
     writerBytes = await writeDirectZip(writerEntries);
     writerBytesAgain = await writeDirectZip(writerEntries);
     writerIntegrity = await extractWithSignatureCheck(writerBytes);
@@ -303,24 +327,34 @@ describe('G0 ZIP structural characterization', () => {
       expect(sanitizeZipPath(portableRtlPath)).toBe(portableRtlPath);
     });
 
-    it('writes fixed bytes and passes zip.js payload CRC verification without pinning raw layout', () => {
+    it('passes CRC verification and preserves EFS-off Unicode-path compatibility', () => {
       expect(bytesEqual(writerBytes, writerBytesAgain)).toBe(true);
       expect(writerIntegrity).toEqual({
-        filenames: [portableRtlPath],
-        payloads: [payload],
+        filenames: [portableRtlPath, nonEfsUnicodePath],
+        payloads: [payload, nonEfsPayload],
         passed: true,
       });
       expect(writerReadOutcome).toEqual({
         rejected: false,
         error: null,
-        entries: [{ path: portableRtlPath, data: payload }],
+        entries: [
+          { path: portableRtlPath, data: payload },
+          { path: nonEfsUnicodePath, data: nonEfsPayload },
+        ],
       });
-      expect(writerShapes).toHaveLength(1);
+      expect(writerShapes).toHaveLength(2);
       expect(writerShapes[0]!.localCrc32).toBe(writerShapes[0]!.centralCrc32);
       expect(writerShapes[0]!.localCompressedSize).toBe(writerShapes[0]!.centralCompressedSize);
       expect(writerShapes[0]!.localUncompressedSize).toBe(
         writerShapes[0]!.centralUncompressedSize,
       );
+      expect(writerShapes[1]!.filename).toBe(nonEfsUnicodePath);
+      expect(writerShapes[1]!.rawFilename).toEqual(nonEfsRawPath);
+      expect(writerShapes[1]!.localRawFilename).toEqual(nonEfsRawPath);
+      expect(writerShapes[1]!.centralBitFlag & 0x0800).toBe(0);
+      expect(writerShapes[1]!.localBitFlag & 0x0800).toBe(0);
+      expect(writerShapes[1]!.filenameUTF8).toBe(true);
+      expect(() => new TextDecoder('utf-8', { fatal: true }).decode(nonEfsRawPath)).toThrow();
     });
 
     it('ignores an explicit directory and returns its child under injected generous fixture limits', () => {

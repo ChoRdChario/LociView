@@ -23,6 +23,7 @@ import {
 import { writeVerifiedBytes } from './verifiedWrite';
 
 const decoder = new TextDecoder();
+const fatalUtf8Decoder = new TextDecoder('utf-8', { fatal: true });
 const encoder = new TextEncoder();
 const ACTOR_ID_PATTERN = /^a_[0-9A-HJKMNP-TV-Z]{13}$/u;
 
@@ -44,7 +45,9 @@ export interface ZipInspection {
 export async function inspectZip(bytes: Uint8Array, limits?: ZipLimits): Promise<ZipInspection> {
   const entries = await readZipEntries(bytes, limits);
   const manifestEntry = entries.find((e) => e.path === 'lociview.json');
-  const manifest = manifestEntry !== undefined ? parseManifest(decoder.decode(manifestEntry.data)) : null;
+  const manifest = manifestEntry !== undefined
+    ? parseManifest(fatalUtf8Decoder.decode(manifestEntry.data))
+    : null;
 
   const opsFiles: { path: string; text: string }[] = [];
   const ops: Op[] = [];

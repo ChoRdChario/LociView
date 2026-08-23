@@ -770,6 +770,31 @@ Review record:
 - Verification passed on the exact source/test tree: focused 2 files / 534 passing tests plus 13 todos; full 32 files / 1,028 passing tests plus 21 todos; TypeScript typecheck; fixture verification (10 Git entries / 708,867 bytes, one unratified GS candidate); evidence verification (3 pending device templates / 0 run, environment or artifact records); and the production build (97 modules / 11 PWA precache entries, 890.73 KiB). The existing large viewer chunk warning is approximately 805.44 kB
 - Independent production/runtime and exact-closure reviews found no unresolved P0/P1 after the punctuation success/reject pair was added. Production changed three files (+184/-2, including the 180-line shared scanner); the two existing tests changed +17/-2, direct `it.fails` declarations remain 17 and runtime expected failures fall from 67 to 50
 
+### Post-slice-33 gate/strategy checkpoint
+
+- [x] Recount the clean `b976ebc` baseline as 50 runtime expected failures, 17 direct `it.fails` declarations and 21 todos: operation field/identity policy 14, same-key collision 6, invalid ZIP UTF-8/special entry type 12, future-schema edit policy 2, transaction/tab publication 10 and migration 6
+- [x] Confirm across slices 31–33 that production changed +252/-31 versus tests +89/-40 with no tests-only commit, and select one more production-first envelope root rather than extending the recent parser/test surface
+- [x] Rank strict UTF-8 first because six approved payload/name expectations share mutation-free package inspection, while keeping Unix special entry types as the next independent one-file root and stopping operation identity/collision work at its policy/evidence boundary
+- [x] Keep the next slice bounded to the package manifest payload plus EFS-flagged central filename bytes; preserve non-EFS CP437 fallback and Unicode path-extra behavior, and stop before ops payload policy, filename rewriting, typed issues, budgets or device claims
+
+### G0 stabilization slice 34 — strict package UTF-8 boundary
+
+- [x] Decode the native package manifest with fatal UTF-8 semantics before manifest construction and reject malformed bytes during inspection
+- [x] Validate only EFS-flagged central filename bytes as fatal UTF-8 before path normalization or extraction, preserving non-EFS CP437 and Unicode path-extra compatibility
+- [x] Promote exactly the six existing invalid-manifest-payload and malformed-EFS-filename runtime expectations, binding inspection rejection to zero workspace mutation and no candidate completion marker
+- [x] Preserve ordinary valid Unicode manifest/name, non-EFS compatibility and raw fixture self-validation without adding a fixture file, helper, parameter matrix or standalone test case
+- [x] Keep operation payload decoding, ZIP comments/Unicode-extra precedence, filename rewriting, special Unix entry types, typed evidence/error wording, budgets, device behavior and full G0-S completion explicitly open
+- [x] Run focused/full tests, typecheck, fixture/evidence verification and production build; complete independent compatibility, exact-closure and scope/churn review before a separate commit
+
+Review record:
+
+- Native package inspection now uses a dedicated fatal UTF-8 decoder only for `lociview.json`; operation JSONL decoding and durable readback retain their previous behavior. ZIP envelope inspection independently validates the raw central filename only when the central general-purpose language-encoding flag is set, before path normalization or entry extraction
+- The existing invalid-manifest and malformed-EFS-name cases now satisfy all three ordinary envelope assertions: inspection rejects explicitly, candidate import performs zero workspace mutations, and no completion marker becomes active. This promotes exactly six runtime expectations while direct `it.fails(` declarations remain 17 and remaining runtime expected failures fall from 50 to 44
+- The existing writer archive control was extended with an EFS-off CP437 high byte plus a valid Info-ZIP Unicode Path extra field. It proves the raw central/local bytes are not valid UTF-8, both EFS bits are clear, zip.js reports its post-extra `filenameUTF8` convenience as true, and production still returns the exact Unicode path and payload. This prevents either all-name fatal decoding or a post-extra convenience flag from becoming the trust boundary
+- Valid EFS Unicode names and valid manifests remain covered. Operation payload decoding, ZIP comments and Unicode-extra precedence policy, path rewriting, Unix special entry types and permissions, typed evidence/error wording, budgets, device behavior and full G0-S completion remain explicitly unclaimed
+- Verification passed on the exact final source/test tree: focused 2 files / 258 passing tests plus 11 todos; full 32 files / 1,028 passing tests plus 21 todos; TypeScript typecheck; fixture verification (10 Git entries / 708,867 bytes, one unratified GS candidate); evidence verification (3 pending device templates / 0 run, environment or artifact records); and the production build (97 modules / 11 PWA precache entries, 890.87 KiB). The existing large viewer-chunk warning is approximately 805.59 kB
+- Independent production/runtime, compatibility and exact-closure reviews found no unresolved P0/P1. Production changed two files (+6/-1), while the two existing test files changed +42/-6; no new fixture file, helper, parameter matrix or test case was added
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes

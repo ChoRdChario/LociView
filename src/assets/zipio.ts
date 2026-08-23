@@ -55,6 +55,7 @@ export function sanitizeZipPath(raw: string): string | null {
 
 const NESTED_ARCHIVE_RE = /\.(zip|lociview|7z|rar|tar|gz|tgz)$/i;
 const SUPPORTED_NESTED_CONTAINER_RE = /\.xlsx$/i;
+const fatalUtf8Decoder = new TextDecoder('utf-8', { fatal: true });
 
 function normalizedEntryPath(filename: string, directory: boolean): string | null {
   const candidate = directory && filename.endsWith('/') ? filename.slice(0, -1) : filename;
@@ -137,6 +138,7 @@ export async function readZipEntries(
     let declaredTotal = 0;
     const normalizedEntries: { path: string; directory: boolean }[] = [];
     for (const e of entries) {
+      if (e.bitFlag?.languageEncodingFlag === true) fatalUtf8Decoder.decode(e.rawFilename);
       const path = normalizedEntryPath(e.filename, e.directory);
       if (path === null) {
         throw new ZipGuardError('unsafe-path', `unsafe entry path: ${e.filename}`);
