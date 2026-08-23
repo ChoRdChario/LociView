@@ -616,6 +616,33 @@ Review record:
 - Independent production/runtime, exact-closure, false-green and final current-tree reviews found no unresolved P0/P1 after notification/retry freedom, semantic source-role mapping and durable-prefix direction were corrected
 - Multi-operation all-or-none durability, actor-log prefix recovery, same-caption/cross-tab locking, MIME/content/decode validation, media limits, orphan cleanup/GC, streaming/CAS, crash/power-loss, physical-device evidence and full G0S-BLOB/G0-S completion remain explicitly unclaimed
 
+### Post-slice-27 gate/strategy checkpoint
+
+- [x] Recount the remaining expected-failure families and distinguish implement-now production seams from browser-lock, transaction, device-evidence and product-policy blockers
+- [x] Confirm that the product blob-write paths now use exact verification; do not invent another blob characterization slice while structural archive and operation-ingress defects remain
+- [x] Rank ZIP structural rejection ahead of the broader operation firewall for the next slice because its approved raw fixtures already isolate eleven failures and zip.js exposes strict ambiguity/signature checks without a new parser
+- [x] Keep the next G0S-OP phase bounded to a later shared structural gate; do not mix typed evidence, legacy-ID policy, duplicate-aware raw parsing or collision resolution into this ZIP slice
+- [x] Apply a stop rule: if ZIP safety requires a custom general ZIP parser, device-derived numeric limits, streaming, typed issue persistence or archive-format policy beyond the approved fixtures, stop and re-plan
+
+### G0 stabilization slice 28 — strict ZIP structural guard
+
+- [x] Enable zip.js strict archive/local-header ambiguity checks and CRC verification before an entry can be returned to package, XLSX or wizard inspection
+- [x] Reject C0, DEL and C1 entry-path controls plus exact or case-folded file-versus-descendant prefix conflicts while preserving valid Unicode names and explicit directory parents
+- [x] Reject content-disguised nested ZIP payloads by signature in addition to the existing archive-extension guard, while preserving the explicitly supported `.xlsx` container path needed by foreign LociMyu migration
+- [x] Promote only the existing ZIP structural expected failures and directly satisfied malicious-package structural assertions; add no standalone characterization matrix
+- [x] Keep native-versus-foreign `.xlsx` context policy, ZIP64/data-descriptor layout, entry ordering, compression algorithm, Unicode normalization/case collision beyond file-prefix ambiguity, symlink/special-mode policy, invalid UTF-8, ratio/device limits, streaming and full malicious-package/G0-S completion explicitly open
+- [x] Run focused/full verification, typecheck, fixture/evidence checks and production build; complete independent implementation/closure/false-green review before commit
+
+Review record:
+
+- `readZipEntries()` now asks zip.js for strict central/local-header ambiguity validation and verifies every extracted file's CRC. Directory entries participate in entry-count, declared-size, control-path and namespace preflight rather than disappearing before safety checks
+- Portable-path preflight rejects C0/DEL/C1 and exact normalized duplicates. An internal ASCII-only folded namespace detects a file used as an ancestor or as the same logical directory in either entry order; sorted lower-bound lookup avoids quadratic work on separator-heavy maximum-length names while leaving returned entry order and Unicode spelling unchanged
+- Nested archive extensions remain blocked, and signature-valid ZIP payloads hidden under another extension are now rejected after verified extraction. `.xlsx` is the sole supported container-path exception needed by the LociMyu/Drive wizard; its inner workbook is parsed again through the same strict reader. Native-versus-foreign `.xlsx` context policy remains open rather than being invented here
+- Promoted 32 existing runtime expected failures without adding a characterization matrix: 11 ZIP structural assertions and 21 directly dependent malicious-envelope inspection, no-mutation and inactive-authority assertions. Direct `.fails(` declarations fell from 43 to 34; parameterized G0S-OP and malicious expectations still make the runtime remainder larger
+- Verification passed on the exact final tree: 4 focused files / 286 passing tests plus 12 todos; 32 full-suite files / 1,026 passing tests plus 21 todos; TypeScript typecheck; fixture verification (10 Git entries / 708,867 bytes, one unratified GS candidate); evidence verification (3 pending device templates / 0 run, environment or artifact records); and the production build (96 modules / 11 PWA precache entries, 886.30 KiB). The existing large viewer-chunk warning is now approximately 800.90 kB
+- Independent production/runtime, exact-oracle and false-green reviews found no unresolved P0/P1 after the legitimate nested-XLSX compatibility boundary and separator-heavy path complexity findings were corrected. ZIP64/data descriptors remain delegated to zip.js rather than fixed to the tests' ZIP32 layout
+- Unicode normalization/general case collision, invalid UTF-8, symlink/special mode, native-package `.xlsx` context, compression-ratio/device limits, typed archive issues, streaming, MIME/decode/polyglot policy, cross-context locking, crash/device evidence and full malicious-package/G0-S completion remain explicitly unclaimed
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes

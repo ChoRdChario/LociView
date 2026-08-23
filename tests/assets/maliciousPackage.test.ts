@@ -2378,21 +2378,31 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       'directory-count-bypass',
       'local-central-name-mismatch',
     ] as const;
+    const strictZipGuardCases = new Set<(typeof unsafeCases)[number]>([
+      'raw-duplicate-path',
+      'raw-duplicate-path-reversed',
+      'normalized-separator-collision',
+      'duplicate-manifest',
+      'duplicate-manifest-reversed',
+      'unsafe-directory-path',
+      'directory-count-bypass',
+      'local-central-name-mismatch',
+    ]);
 
     for (const id of unsafeCases) {
-      const importPreflightRejectsWithoutMutation =
-        id === 'raw-duplicate-path' ||
-        id === 'raw-duplicate-path-reversed' ||
-        id === 'normalized-separator-collision';
+      const zipGuardRejectsWithoutMutation = strictZipGuardCases.has(id);
       it(`${id}: leaves an existing control project byte-exact`, () => {
         expect(outcomes[id].controlUnchanged).toBe(true);
       });
 
-      it.fails(`${id}: rejects during envelope inspection`, () => {
-        expect(outcomes[id].inspectionRejected).toBe(true);
-      });
+      (zipGuardRejectsWithoutMutation ? it : it.fails)(
+        `${id}: rejects during envelope inspection`,
+        () => {
+          expect(outcomes[id].inspectionRejected).toBe(true);
+        },
+      );
 
-      (importPreflightRejectsWithoutMutation ? it : it.fails)(
+      (zipGuardRejectsWithoutMutation ? it : it.fails)(
         `${id}: performs no workspace mutations before candidate activation is rejected`,
         () => {
           expect(
@@ -2402,7 +2412,7 @@ describe('G0 characterization: malicious ZIP envelope', () => {
         },
       );
 
-      (importPreflightRejectsWithoutMutation ? it : it.fails)(
+      (zipGuardRejectsWithoutMutation ? it : it.fails)(
         `${id}: never publishes the candidate completion marker`,
         () => {
           expect(candidateIsInactive(outcomes[id])).toBe(true);
@@ -2441,15 +2451,15 @@ describe('G0 characterization: malicious ZIP envelope', () => {
     });
 
     describe('foreign normalized collision through build/apply', () => {
-      it.fails('rejects before building an import plan', () => {
+      it('rejects before building an import plan', () => {
         expect(foreignCollisionOutcome.inspectionRejected).toBe(true);
       });
 
-      it.fails('performs no workspace mutation', () => {
+      it('performs no workspace mutation', () => {
         expect(foreignCollisionOutcome.mutationCalls).toBe(0);
       });
 
-      it.fails('publishes no foreign-project completion marker', () => {
+      it('publishes no foreign-project completion marker', () => {
         expect(foreignCollisionOutcome.activeMarkerCount).toBe(0);
       });
     });

@@ -439,26 +439,26 @@ describe('G0 ZIP structural characterization', () => {
 
   describe('missing structural rejection boundaries', () => {
     for (const id of Object.keys(controlPathDefinitions) as ControlPathId[]) {
-      it.fails(`${id}: rejects the complete archive`, () => {
+      it(`${id}: rejects the complete archive`, () => {
         expect(controlPathOutcomes[id].rejected).toBe(true);
       });
     }
 
     for (const id of Object.keys(prefixDefinitions) as PrefixId[]) {
-      it.fails(`${id}: rejects the complete archive`, () => {
+      it(`${id}: rejects the complete archive`, () => {
         expect(prefixOutcomes[id].rejected).toBe(true);
       });
     }
 
-    it.fails('content-disguised nested ZIP: rejects the complete archive', () => {
+    it('content-disguised nested ZIP: rejects the complete archive', () => {
       expect(contentDisguisedOutcome.rejected).toBe(true);
     });
 
-    it.fails('bad CRC: rejects the complete archive', () => {
+    it('bad CRC: rejects the complete archive', () => {
       expect(badCrcOutcome.rejected).toBe(true);
     });
 
-    it.fails('local/central encryption-bit mismatch: rejects the complete archive', () => {
+    it('local/central encryption-bit mismatch: rejects the complete archive', () => {
       expect(localFlagOutcome.rejected).toBe(true);
     });
   });
