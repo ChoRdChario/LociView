@@ -77,3 +77,11 @@
 - ルール: 3〜4 sliceごと、tests-only sliceを追加する前、またはproduction変更量がacceptance増分に比べて小さい時に、承認済みgate、未解消xfail、production/test差分、外部証拠、critical pathをゼロベースで再監査する
 - ルール: 十分なacceptanceが既にある項目は新しいmatrixを増やさずroot fixへ移る。各sliceは少なくとも1つのrelease-blocking defectまたは外部gateを明確に閉じ、focused検証後にscope膨張と重複を再評価してからfull検証へ進む
 - ルール: 実機・実データ・product-owner批准はcode workで代替しない。production laneと外部evidence laneを分け、待ち項目を明示的に並行管理する
+
+## 2026-08-24: 長期プロジェクトと長期Codexセッションを分離する
+
+- clean commit、task review、仕様、acceptanceがrepositoryへ外部化済みなら、長期gateを理由に長大化した同一セッションを維持しない。context圧縮、canonical workspaceの再確認、過去scopeの再読、stale diff監査が増えた時点でfresh sessionへ切り替える
+- 1 branchのwriterは常に1つにする。並列化は原則2つまでのread-only監査に限定し、full test、build、fixture/evidence verifierなど同じworkspaceを使う重い処理は直列に実行する
+- production待ちのtest writer、複数writerのshared-tree編集、長時間応答しないpatchを待ち続けない。full test/buildの正常な実行時間ではなく、5分を超えて進捗のないpatch/writer停滞、権限失敗、canonical repository不一致が起きたら中止してrootへ戻し、clean statusから再計画する
+- writerの最終変更後にauditorはlatest treeを再読する。stage後はexact index、unstaged/untrackedゼロ、cached diff-checkを確認し、test/build/review実績をそのcached treeにだけ帰属させる
+- 小さいexpected-failureを減らせることだけでは次sliceを正当化しない。外部evidence、実機、product/spec決定、lock/journal/typed issue APIがcritical pathなら、repository内micro-sliceより先にその依存を明示して停止する

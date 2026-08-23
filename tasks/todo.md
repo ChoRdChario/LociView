@@ -795,6 +795,21 @@ Review record:
 - Verification passed on the exact final source/test tree: focused 2 files / 258 passing tests plus 11 todos; full 32 files / 1,028 passing tests plus 21 todos; TypeScript typecheck; fixture verification (10 Git entries / 708,867 bytes, one unratified GS candidate); evidence verification (3 pending device templates / 0 run, environment or artifact records); and the production build (97 modules / 11 PWA precache entries, 890.87 KiB). The existing large viewer-chunk warning is approximately 805.59 kB
 - Independent production/runtime, compatibility and exact-closure reviews found no unresolved P0/P1. Production changed two files (+6/-1), while the two existing test files changed +42/-6; no new fixture file, helper, parameter matrix or test case was added
 
+### Post-slice-34 session checkpoint
+
+- [x] Confirm `g0-baseline` at clean S34 commit `8be3098`; S34 promoted six runtime expectations without adding an expected failure or todo, leaving 44 runtime expected failures, 17 direct `it.fails` declarations and 21 todos
+- [x] Reclassify the remaining runtime failures as operation field/identity policy 14, same-key collision 6, Unix symlink/FIFO 6, future-schema edit policy 2, transaction/tab publication 10 and migration 6
+- [x] Reconfirm that G0/G0-S remain active: the durable queue and several operation/blob/package roots are fixed, but physical-iOS evidence, measured baselines and approved thresholds are absent; shared-path locking/journaling, typed quarantine/collision resolution and migration recipe authority remain blocked
+- [x] Audit the production-first trend: slices 31–34 changed production +258/-32 versus tests +131/-46, added no expected failure/todo and promoted 93 runtime expectations, but S34's six added production lines and repeated ZIP/manifest micro-slices show declining marginal gate value
+- [x] Select a fresh Codex session instead of continuing this compressed thread. Start it at absolute canonical root `G:/00_AI_dev/LociView`, use one writer plus at most two parallel read-only auditors, and run focused/typecheck/diff-check/full/fixture/evidence/build verification serially
+
+Handoff:
+
+- The longest-lead G0 critical path is now the external-evidence/product-decision lane, while G0-S remains a parallel release blocker: three device templates remain pending with zero run, environment or artifact records; desktop/tablet details, physical iPhone 14 Pro evidence, remaining GS/rendering fixtures, numeric thresholds/ratified profile goldens and G0-exit product-owner acceptance remain open
+- If repository-only safety work is explicitly selected in a fresh session, the bounded candidate is the existing `symlink-entry` / `special-mode-entry` six-assertion cluster in `tests/assets/maliciousPackage.test.ts`, rooted in `src/assets/zipio.ts`; preserve the ordinary compatibility controls in `tests/assets/zipioStructure.test.ts`. Re-audit the central `externalFileAttributes` type authority and ordinary type-0/regular/directory/DOS-lower-only controls before implementation; do not extend into permissions, mode rewriting, typed issue policy, device claims or extraction semantics
+- Do not begin operation-policy, same-key collision, transaction/tab, future-schema or migration fixes until their field-quarantine/evidence, canonical digest/resolution, lock/journal/physical-browser, schema-version or migration-recipe dependencies are approved and testable
+- This session stops at the checkpoint. No slice 35 production or test change has started
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
