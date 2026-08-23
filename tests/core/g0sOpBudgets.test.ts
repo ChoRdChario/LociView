@@ -450,11 +450,12 @@ async function characterizeLocal(fixture: BudgetCase): Promise<LocalOutcome> {
       listenerCalls += 1;
     });
     targetFs.resetMutations();
+    let invalidDispatchRejected = false;
     try {
       try {
         target.dispatch(fixture.dispatchInput);
       } catch {
-        // Throw versus Result is not fixed; mutation effects below are the contract.
+        invalidDispatchRejected = true;
       }
       try {
         await target.flush();
@@ -466,6 +467,7 @@ async function characterizeLocal(fixture: BudgetCase): Promise<LocalOutcome> {
     }
 
     const allOpsStateListenerUnchanged =
+      invalidDispatchRejected &&
       isDeepStrictEqual(target.allOps, [BASE_OP]) &&
       isDeepStrictEqual(target.state, BASE_STATE) &&
       listenerCalls === 0;
@@ -543,51 +545,109 @@ async function characterizeLocal(fixture: BudgetCase): Promise<LocalOutcome> {
   }
 }
 
-async function modestValidDispatchRoundTrips(): Promise<boolean> {
+interface ValidDispatchCase {
+  id: 'modest' | 'serialized-line-max' | 'direct-fields-max';
+  input: DispatchInput;
+  lineLength: number | 'below-max';
+  fieldCount: number;
+}
+
+function validDispatchCases(): readonly ValidDispatchCase[] {
+  const tooLongPadding = CASES[0]!.op.v?.futurePadding;
+  const tooManyFields = CASES[1]!.op.v;
+  if (typeof tooLongPadding !== 'string' || tooManyFields === undefined) {
+    throw new Error('budget boundary fixture setup is invalid');
+  }
+  return [
+    {
+      id: 'modest',
+      input: {
+        t: 'create',
+        e: 'caption',
+        id: VALID_CAPTION_ID,
+        v: { title: 'modest valid dispatch' },
+      },
+      lineLength: 'below-max',
+      fieldCount: 1,
+    },
+    {
+      id: 'serialized-line-max',
+      input: {
+        ...CASES[0]!.dispatchInput,
+        v: { futurePadding: tooLongPadding.slice(0, -1) },
+      },
+      lineLength: MAX_LINE_CHARS,
+      fieldCount: 1,
+    },
+    {
+      id: 'direct-fields-max',
+      input: {
+        ...CASES[1]!.dispatchInput,
+        v: Object.fromEntries(Object.entries(tooManyFields).slice(0, LIMITS.maxFieldsPerOp)),
+      },
+      lineLength: 'below-max',
+      fieldCount: LIMITS.maxFieldsPerOp,
+    },
+  ];
+}
+
+async function validDispatchRoundTrips(
+  fixture: ValidDispatchCase,
+): Promise<boolean> {
   const fs = new MemoryFS();
   await seedProject(fs);
+  const store = await ProjectStore.open(fs, PROJECT_DIR, USER);
+  const expected: Op = {
+    op: 1,
+    hlc: `${FIXED_ISO}-0001-${store.actorId}`,
+    actor: store.actorId,
+    user: USER.userId,
+    ...fixture.input,
+  };
+  const expectedLine = serializeOps([expected]);
+  const expectedLineLength = expectedLine.length - 1;
+  const boundaryExact =
+    Object.keys(expected.v ?? {}).length === fixture.fieldCount &&
+    (fixture.lineLength === 'below-max'
+      ? expectedLineLength < MAX_LINE_CHARS
+      : expectedLineLength === fixture.lineLength);
+  const actual = store.dispatch(fixture.input);
+  await store.flush();
+  const reopened = await ProjectStore.open(fs, PROJECT_DIR, USER);
+  const localLogPath = `${PROJECT_DIR}/ops/${store.actorId}.jsonl`;
+  const baselineLog = await fs.readText(LOG_PATH);
+  const localLog = await fs.readText(localLogPath);
+  const parsedBaseline = baselineLog === null ? null : parseOpsJsonl(baselineLog);
+  const parsedLocal = localLog === null ? null : parseOpsJsonl(localLog);
+  const reopenedHasExactOps =
+    reopened.allOps.length === 2 &&
+    reopened.allOps.some((op) => isDeepStrictEqual(op, BASE_OP)) &&
+    reopened.allOps.some((op) => isDeepStrictEqual(op, expected));
+  return (
+    boundaryExact &&
+    isDeepStrictEqual(actual, expected) &&
+    store.actorId !== ACTOR &&
+    /^a_[0-9A-HJKMNP-TV-Z]{13}$/u.test(store.actorId) &&
+    isDeepStrictEqual((await fs.list(`${PROJECT_DIR}/ops/`)).sort(), [LOG_PATH, localLogPath].sort()) &&
+    baselineLog === BASE_LOG && localLog === expectedLine &&
+    parsedBaseline !== null && parsedBaseline.errors.length === 0 &&
+    isDeepStrictEqual(parsedBaseline.ops, [BASE_OP]) &&
+    parsedLocal !== null && parsedLocal.errors.length === 0 &&
+    isDeepStrictEqual(parsedLocal.ops, [expected]) &&
+    reopenedHasExactOps &&
+    isDeepStrictEqual(reopened.state, reduce([BASE_OP, expected])) &&
+    reopened.loadErrors.length === 0
+  );
+}
+
+async function validDispatchBoundaryResults(): Promise<Array<{ id: string; roundTrips: boolean }>> {
   const now = vi.spyOn(Date, 'now').mockReturnValue(FIXED_NOW);
   try {
-    const store = await ProjectStore.open(fs, PROJECT_DIR, USER);
-    const input: DispatchInput = {
-      t: 'create',
-      e: 'caption',
-      id: VALID_CAPTION_ID,
-      v: { title: 'modest valid dispatch' },
-    };
-    const expected: Op = {
-      op: 1,
-      hlc: `${FIXED_ISO}-0001-${store.actorId}`,
-      actor: store.actorId,
-      user: USER.userId,
-      ...input,
-    };
-    const actual = store.dispatch(input);
-    await store.flush();
-    const reopened = await ProjectStore.open(fs, PROJECT_DIR, USER);
-    const localLogPath = `${PROJECT_DIR}/ops/${store.actorId}.jsonl`;
-    const baselineLog = await fs.readText(LOG_PATH);
-    const localLog = await fs.readText(localLogPath);
-    const parsedBaseline = baselineLog === null ? null : parseOpsJsonl(baselineLog);
-    const parsedLocal = localLog === null ? null : parseOpsJsonl(localLog);
-    const reopenedHasExactOps =
-      reopened.allOps.length === 2 &&
-      reopened.allOps.some((op) => isDeepStrictEqual(op, BASE_OP)) &&
-      reopened.allOps.some((op) => isDeepStrictEqual(op, expected));
-    return (
-      isDeepStrictEqual(actual, expected) &&
-      store.actorId !== ACTOR &&
-      /^a_[0-9A-HJKMNP-TV-Z]{13}$/u.test(store.actorId) &&
-      isDeepStrictEqual((await fs.list(`${PROJECT_DIR}/ops/`)).sort(), [LOG_PATH, localLogPath].sort()) &&
-      baselineLog === BASE_LOG && localLog === serializeOps([expected]) &&
-      parsedBaseline !== null && parsedBaseline.errors.length === 0 &&
-      isDeepStrictEqual(parsedBaseline.ops, [BASE_OP]) &&
-      parsedLocal !== null && parsedLocal.errors.length === 0 &&
-      isDeepStrictEqual(parsedLocal.ops, [expected]) &&
-      reopenedHasExactOps &&
-      isDeepStrictEqual(reopened.state, reduce([BASE_OP, expected])) &&
-      reopened.loadErrors.length === 0
-    );
+    const results: Array<{ id: string; roundTrips: boolean }> = [];
+    for (const fixture of validDispatchCases()) {
+      results.push({ id: fixture.id, roundTrips: await validDispatchRoundTrips(fixture) });
+    }
+    return results;
   } finally {
     now.mockRestore();
   }
@@ -598,7 +658,7 @@ describe.sequential('G0S-OP configured reload-budget parity', () => {
   let openResults: Record<BudgetCaseId, OpenOutcome>;
   let packageResults: Record<BudgetCaseId, PackageOutcome>;
   let localResults: Record<BudgetCaseId, LocalOutcome>;
-  let modestValidRoundTrips = false;
+  let validDispatchResults: Array<{ id: string; roundTrips: boolean }> = [];
 
   beforeAll(async () => {
     directResults = {} as Record<BudgetCaseId, DirectParseOutcome>;
@@ -611,7 +671,7 @@ describe.sequential('G0S-OP configured reload-budget parity', () => {
       packageResults[fixture.id] = await characterizePackage(fixture);
       localResults[fixture.id] = await characterizeLocal(fixture);
     }
-    modestValidRoundTrips = await modestValidDispatchRoundTrips();
+    validDispatchResults = await validDispatchBoundaryResults();
   }, 30_000);
 
   it('builds only the two configured N+1 rejection fixtures with an otherwise common canonical envelope', () => {
@@ -646,8 +706,12 @@ describe.sequential('G0S-OP configured reload-budget parity', () => {
     expect(CASES[1]!.wire.length).toBeLessThan(MAX_LINE_CHARS);
   });
 
-  it('keeps a modest valid local dispatch visible and byte-reloadable', () => {
-    expect(modestValidRoundTrips).toBe(true);
+  it('keeps modest and exact-limit local dispatches visible and byte-reloadable', () => {
+    expect(validDispatchResults).toEqual([
+      { id: 'modest', roundTrips: true },
+      { id: 'serialized-line-max', roundTrips: true },
+      { id: 'direct-fields-max', roundTrips: true },
+    ]);
   });
 
   for (const fixture of CASES) {
@@ -707,15 +771,15 @@ describe.sequential('G0S-OP configured reload-budget parity', () => {
         });
       });
 
-      it.fails('local rejection leaves allOps, state and listener publication unchanged', () => {
+      it('local rejection leaves allOps, state and listener publication unchanged', () => {
         expect(localResults[fixture.id].allOpsStateListenerUnchanged).toBe(true);
       });
 
-      it.fails('local rejection does not mutate the active actor log and leaves its bytes exact', () => {
+      it('local rejection does not mutate the active actor log and leaves its bytes exact', () => {
         expect(localResults[fixture.id].activeLogMutationZeroAndByteExact).toBe(true);
       });
 
-      it.fails('reload stays twin-equal and the rejected attempt does not poison seq or HLC', () => {
+      it('reload stays twin-equal and the rejected attempt does not poison seq or HLC', () => {
         expect(localResults[fixture.id].reopenAndNextOperationTwinEqual).toBe(true);
       });
     });

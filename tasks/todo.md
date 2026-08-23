@@ -561,6 +561,32 @@ Review record:
 - Three independent production/runtime, closure/future-correctness and false-green/scope reviews found no unresolved P0/P1. The test diff is intentionally larger than the production seam because the pre-existing publication oracle did not bind point-in-time authority; the scope review found no standalone characterization matrix or safely removable oracle group
 - Manifest-prefix/process-crash atomicity, caption attachment, native-package behavior beyond S24, actor-log partial recovery, same-directory cross-context locking, cleanup/GC, streaming/CAS, device durability/evidence and full G0S-BLOB/G0-S completion remain explicitly unclaimed
 
+### Post-slice-25 gate/strategy checkpoint
+
+- [x] Recount the current expected failures and todos, reread the approved G0/G0-S exits, and rank remaining work by user-data risk, dependency and existing acceptance readiness
+- [x] Keep full G0S-OP highest by security severity, but do not combine duplicate-aware raw parsing, known-field quarantine, canonical collision evidence and legacy-ID compatibility in one slice
+- [x] Keep G0S-TAB, actor-log partial recovery and atomic marker-prefix recovery blocked on browser locking, transaction/journal or atomic filesystem primitives rather than substituting a Node-only model
+- [x] Prefer the already-characterized local-dispatch budget defect over caption attachment and migration work: it is one production seam, has exact old-state/next-op/reopen acceptance, and prevents acknowledged local state from disappearing on reload
+- [x] Continue the production-first stop rule: no standalone characterization slice, and no claim beyond parity with the two currently exported/configured local JSONL guards
+
+### G0 stabilization slice 26 — local dispatch budget preflight
+
+- [x] Reject a local dispatch whose direct `v` field count exceeds `LIMITS.maxFieldsPerOp` before sequence, HLC, memory state, listener, queue or filesystem mutation
+- [x] Reject a local dispatch whose prospective serialized operation exceeds `MAX_LINE_CHARS`, using a pure fixed-width HLC preview rather than mutating and rolling back the live clock
+- [x] Preserve the current valid dispatch path and prove that the next valid operation after rejection has the same actor-bound sequence/HLC position and durable authority as an untouched twin
+- [x] Promote only the existing two budget rows' six runtime expected failures; do not add a new fault matrix
+- [x] Keep recursive depth/node/string budgets, raw whitespace policy, reserved keys, canonical HLC/ID/actor/user, known-field quarantine, duplicate-aware parsing, collision evidence, package/open ingress and full G0S-OP completion explicitly open
+- [x] Run focused/full verification, typecheck, fixture/evidence checks and production build; complete independent implementation/closure/false-green review before commit
+
+Review record:
+
+- `ProjectStore.dispatch()` now checks the direct payload field count and the complete prospective serialized operation before advancing its sequence or HLC. The HLC preview uses the production formatter with a fixed-width value, so the length check is pure and the accepted path still creates the real clock value exactly once
+- Both configured maxima are inclusive, matching the existing JSONL parser/schema guards rather than creating a product/device budget guarantee. Ordinary controls cover modest input, exactly `MAX_LINE_CHARS`, exactly `LIMITS.maxFieldsPerOp`, and N+1 rejection with an explicit throw
+- The existing two rejection rows now prove no allOps/state/listener/log mutation and no hidden sequence/HLC poisoning by comparing the next valid dispatch, durable log and reopen against an untouched actor-normalized twin. Six runtime expected failures became ordinary without adding another fault matrix
+- Verification passed on the exact final tree: 3 focused files / 323 passing tests plus 4 todos; 31 full-suite files / 1,015 passing tests plus 21 todos; TypeScript typecheck; fixture verification (10 Git entries / 708,867 bytes, one unratified GS candidate); evidence verification (3 pending device templates / 0 run, environment or artifact records); and the production build (95 modules / 11 PWA precache entries, 884.42 KiB). The existing 799.79 kB viewer-chunk warning remains
+- Independent production/runtime, exact-boundary/future-correctness and false-green/scope reviews found no unresolved P0/P1 after explicit rejection, exact-limit positive controls and guard-status wording were corrected. The tree retains 43 direct `it.fails` declarations plus 21 todos; parameterized G0S-OP expectations make the runtime expected-failure count larger
+- Recursive budgets and hostile accessor snapshots, raw whitespace, reserved keys, canonical HLC/ID/actor/user, known-field quarantine, duplicate-aware parsing, collision evidence, package/open ingress, device-derived hard limits and full G0S-OP/G0-S completion remain explicitly unclaimed
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
