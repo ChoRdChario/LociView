@@ -60,7 +60,20 @@
           "launchMode": { "enum": ["pwa", "browser-tab"] },
           "viewportCss": { "$ref": "#/$defs/size" },
           "devicePixelRatio": { "type": "number", "exclusiveMinimum": 0 },
-          "drawingBufferPx": { "$ref": "#/$defs/size" },
+          "drawingBufferPx": { "$ref": "#/$defs/size" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": { "const": "measured" },
+          "deviceClass": { "enum": ["windows-desktop", "windows-tablet-pc"] }
+        },
+        "required": ["status", "deviceClass"]
+      },
+      "then": {
+        "properties": {
           "ramGiB": { "type": "number", "exclusiveMinimum": 0 },
           "gpu": { "type": "string" },
           "freeStorageBytes": { "type": "integer", "minimum": 0 },

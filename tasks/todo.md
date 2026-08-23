@@ -861,7 +861,93 @@ First-slice review — 2026-08-24:
 - The coverage reviewer passed the corrected 135-row G0/product-dependency map with no P0/P1/P2. The independent privacy/workflow reviewer passed `PROD-12/13`, Ki84, external-fixture publication and exact-SHA release/rollback boundaries with no P0/P1/P2.
 - Initial serial verification passed: `git diff --check`; untracked-map whitespace check; fixture registry 10 Git entries / 708,867 bytes / 0 external or generated entries; evidence verifier 3 pending templates / 0 run / 0 environment / 0 artifact records; typecheck; full test 32 files / 1,028 passed / 21 todo; production build with the pre-existing large-chunk warning.
 - Serial verification of the review-record tree passed with the same results. This result/checkbox update is the only subsequent content change; the same commands run once more before staging, and any failure reopens this item.
-- Meta-audit: G0 external evidence and evidence-contract blockers remain the longest lead. G0-S remains a parallel release blocker. The next repository slice should close the nullable-device/license-attribution/external-acquisition contract boundary; the ready ZIP special-entry fix is useful only during unavoidable external/device wait time.
+- Meta-audit: G0 external evidence and evidence-contract blockers remain the longest lead, while G0-S remains a parallel release blocker. A follow-up audit split device nullability from the attribution/acquisition contract: close the already-approved device mismatch independently, obtain the remaining Product Owner fixture-policy decisions, then return to the longest-lead external contract. The ready ZIP special-entry fix is useful only during unavoidable external/device wait time.
+
+### G0 evidence-contract slice 2 — honest iPhone environment records
+
+The post-first-slice meta-audit split the previously grouped evidence-contract
+work into independent schema boundaries. External fixture adoption remains the
+longest-lead lane, but its registry lifecycle, redistribution-license policy and
+Release retention details require Product Owner decisions. This bounded slice
+therefore closes the already-approved, immediately executable device contract
+without pre-empting those policies.
+
+Target and purpose:
+
+- [x] Permit a measured iPhone 14 Pro environment to record genuinely
+  unavailable RAM, GPU, free-storage, power and thermal facts as `null` or
+  `unknown`, rather than inventing values that Safari/PWA operation did not
+  expose
+- [x] Keep environment identity and comparison-critical facts non-null:
+  environment ID, exact device/OS/browser identity and version, launch mode,
+  CSS viewport, device-pixel ratio and drawing-buffer dimensions
+- [x] Keep the current measured Windows desktop/tablet resource requirements;
+  do not weaken all device classes merely to accommodate the iPhone boundary
+
+Implementation and acceptance boundary:
+
+- [x] Change only the measured conditional in
+  `evidence/g0/schema/device-environment.schema.json`; keep every field and the
+  `power` object structurally required, and avoid a duplicate policy in the
+  verifier implementation
+- [x] Add focused acceptance proving (1) a complete synthetic iPhone run with
+  only the approved unavailable values succeeds, (2) a missing comparison-
+  critical iPhone value fails schema validation and (3) the same resource
+  omissions on a measured Windows environment fail schema validation
+- [x] Preserve the existing fully populated complete-run control, neutral
+  pending-template rule, privacy scan, duplicate and cross-record checks, and
+  the current zero-real-record evidence baseline
+- [x] Synchronize the runbook, evidence README if needed and coverage map so
+  schema-valid does not mean measured, representative, threshold-ratified or
+  G0-passing
+- [x] Run focused tests, `npm run evidence:verify`, typecheck, full tests,
+  fixture verification, production build and `git diff --check` serially; then
+  obtain an independent read-only schema/evidence review
+
+Explicit exclusions:
+
+- physical-device measurement, fabricated or copied device specifications,
+  performance thresholds, support guarantees or completed evidence records;
+- external fixture registry/acquisition, license policy, GitHub Release work,
+  fixture bytes, Ki84 conversion/anonymization or `PROD-13` decisions;
+- production runtime/UI, run-record schema, dependencies, ZIP special-entry
+  handling, deployment or release.
+
+Stop conditions:
+
+- Stop before introducing a general availability taxonomy or weakening Windows
+  requirements; either change expands the accepted evidence policy.
+- Stop if the verifier requires behavior beyond schema enforcement, or if a
+  real environment/run/artifact record would be needed to prove this slice.
+- Stop rather than interpreting a nullable field as evidence that the value was
+  unavailable; human evidence review remains authoritative for that fact.
+
+Slice-2 review — 2026-08-24:
+
+- The measured conditional now keeps identity, version, launch mode, viewport,
+  DPR and drawing-buffer dimensions non-null for every device class. Only an
+  iPhone 14 Pro measured environment may retain unavailable RAM/GPU/storage and
+  power facts as the field-specific `null`/`unknown` values; measured Windows
+  desktop/tablet records retain every prior non-null requirement.
+- The verifier implementation and run-record schema did not change. The trusted
+  device schema remains the single machine authority, and no production
+  runtime/UI, fixture byte, dependency, measurement, artifact, support claim,
+  deploy or Release was added.
+- Focused verifier acceptance passed 72/72. The full suite passed 32 files /
+  1,038 tests with 21 existing todos. Evidence verification still reports three
+  pending device templates and zero run/environment/artifact records; fixture
+  verification still reports 10 Git entries / 708,867 bytes, zero external or
+  generated entries and one unratified GS candidate. Typecheck and production
+  build passed; the pre-existing approximately 805.59 kB viewer-chunk warning
+  and 11-entry PWA precache remain unchanged.
+- Independent schema review initially found that one Windows negative case
+  changed seven facts together. A valid Windows control and seven isolated
+  table-driven negatives now bind every retained constraint. Independent docs/
+  scope review found stale grouped-critical-path and generic-null wording; both
+  were corrected. Final re-reviews report no unresolved P0/P1/P2.
+- The result record is the only change after that verification/review pass. The
+  same serial verification matrix runs once more on the exact final tree before
+  staging; any failure reopens this checklist item.
 
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results

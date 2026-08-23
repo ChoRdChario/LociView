@@ -252,6 +252,25 @@ async function makeMeasuredEnvironment(root: string, id = 'env_synthetic-iphone'
   return environment;
 }
 
+function markIphoneResourceFactsUnavailable(environment: JsonObject): void {
+  Object.assign(environment, {
+    ramGiB: null,
+    gpu: null,
+    freeStorageBytes: null,
+    power: { source: 'unknown', chargePercent: null, lowPowerMode: null, thermalCondition: 'unknown' },
+  });
+}
+
+const windowsUnavailableResourceMutations: Array<[string, (environment: JsonObject) => void]> = [
+  ['RAM', (environment) => { environment.ramGiB = null; }],
+  ['GPU', (environment) => { environment.gpu = null; }],
+  ['free storage', (environment) => { environment.freeStorageBytes = null; }],
+  ['power source', (environment) => { (environment.power as JsonObject).source = 'unknown'; }],
+  ['charge percentage', (environment) => { (environment.power as JsonObject).chargePercent = null; }],
+  ['low-power mode', (environment) => { (environment.power as JsonObject).lowPowerMode = null; }],
+  ['thermal condition', (environment) => { (environment.power as JsonObject).thermalCondition = 'unknown'; }],
+];
+
 async function makeCompleteRun(
   workspace: SyntheticWorkspace,
   options: { traceSource?: 'git' | 'generated'; traceLocator?: string; gitCommit?: string } = {},
@@ -780,6 +799,67 @@ describe('G0 evidence verifier CLI', () => {
     expect(result.stdout).toContain('1 run records');
     expect(result.stdout).toContain('1 environment records');
   });
+
+  it('accepts a complete iPhone run without guessed resource and power facts', async () => {
+    const workspace = await makeWorkspace();
+    const environment = await makeMeasuredEnvironment(workspace.root);
+    markIphoneResourceFactsUnavailable(environment);
+    await writeEnvironment(workspace.root, 'synthetic.json', environment);
+    await writeRun(workspace.root, 'synthetic.json', await makeCompleteRun(workspace));
+    const result = await runVerifier(workspace.root);
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toContain('1 run records');
+    expect(result.stdout).toContain('1 environment records');
+  });
+
+  it('rejects a measured iPhone environment without drawing-buffer dimensions', async () => {
+    const workspace = await makeWorkspace();
+    const environment = await makeMeasuredEnvironment(workspace.root);
+    markIphoneResourceFactsUnavailable(environment);
+    environment.drawingBufferPx = null;
+    await writeEnvironment(workspace.root, 'synthetic.json', environment);
+    await writeRun(workspace.root, 'synthetic.json', await makeCompleteRun(workspace));
+    expectRelativeDiagnostic(
+      await runVerifier(workspace.root),
+      workspace.root,
+      'E_SCHEMA',
+      'devices/synthetic.json',
+    );
+  });
+
+  it('accepts a fully populated measured Windows environment', async () => {
+    const workspace = await makeWorkspace();
+    const environment = await makeMeasuredEnvironment(workspace.root);
+    environment.deviceClass = 'windows-desktop';
+    const run = await makeCompleteRun(workspace);
+    run.deviceClass = 'windows-desktop';
+    await writeEnvironment(workspace.root, 'synthetic.json', environment);
+    await writeRun(workspace.root, 'synthetic.json', run);
+    const result = await runVerifier(workspace.root);
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe('');
+  });
+
+  it.each(windowsUnavailableResourceMutations)(
+    'rejects unavailable %s on a measured Windows environment',
+    async (_label, mutate) => {
+      const workspace = await makeWorkspace();
+      const environment = await makeMeasuredEnvironment(workspace.root);
+      environment.deviceClass = 'windows-desktop';
+      mutate(environment);
+      const run = await makeCompleteRun(workspace);
+      run.deviceClass = 'windows-desktop';
+      await writeEnvironment(workspace.root, 'synthetic.json', environment);
+      await writeRun(workspace.root, 'synthetic.json', run);
+      expectRelativeDiagnostic(
+        await runVerifier(workspace.root),
+        workspace.root,
+        'E_SCHEMA',
+        'devices/synthetic.json',
+      );
+    },
+  );
 
   it('ignores inherited Git repository redirection while verifying recorded sources', async () => {
     const workspace = await makeWorkspace();

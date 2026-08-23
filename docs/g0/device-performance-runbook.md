@@ -22,8 +22,8 @@ measured run records the exact device/OS/browser facts available from that
 device, while support wording remains bounded to the repeatedly tested class.
 
 Never record a serial number, hostname, account name, device advertising ID or
-other durable personal identifier. Unknown fields remain `null`; they are not
-estimated.
+other durable personal identifier. An unavailable fact uses the field's `null`
+or schema-defined `unknown` representation; it is not estimated.
 
 ## Before a run
 
@@ -42,15 +42,21 @@ estimated.
    locator. A complete run uses a Git trace or a same-run recorded external
    artifact; generated traces remain incomplete until a durable recipe contract
    exists. A run without the same restorable trace cannot be marked complete.
-6. Fix viewport, DPR, drawing-buffer size, power mode and thermal condition.
-   Performance video capture is a separate run because recording changes load.
+6. Fix viewport, DPR and drawing-buffer size. Record the power and thermal facts
+   the device exposes; for an iPhone fact that is genuinely unavailable, retain
+   the schema's `null` or `unknown` value instead of estimating it. Performance
+   video capture is a separate run because recording changes load.
 
-The current app does not yet expose all build/resource fields. Leave missing
-values `null` and mark the run `incomplete`; do not infer them from another run.
-The current measured-environment schema still requires several non-null
-hardware/resource fields, so an iPhone run with genuinely unavailable values
-cannot yet be recorded as complete. Resolve that contract mismatch before the
-first measured run instead of inventing device specifications.
+The current app does not yet expose all run/build instrumentation fields. Leave
+missing run values `null` and mark the run `incomplete`; do not infer them from
+another run. Separately, for a measured iPhone 14 Pro environment, RAM, GPU,
+free storage, charge and low-power mode may remain `null`, while power source
+and thermal condition may remain `unknown`, when genuinely unavailable.
+Environment identity, exact OS/browser versions, launch mode, viewport, DPR and
+drawing-buffer dimensions remain required so runs stay comparable. Measured
+Windows environments retain the non-null resource and power requirements.
+Schema validity cannot establish that a value was truly unavailable; the raw
+record and independent review remain authoritative.
 
 ## Measurement sequence
 

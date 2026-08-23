@@ -18,12 +18,21 @@ not G0 completion and cannot replace the exit evidence in
   Copy environment, run and artifact-manifest records into `devices/`, `runs/`
   and `manifests/`, respectively; create those directories when first needed.
 
-Use `null` for an unknown value. Never substitute zero, another device's value,
-or a model specification found online for a value that was not measured on the
-test device. There are no dedicated serial-number, hostname or account-ID
-fields, but schemas cannot detect secrets or identifiers hidden in free-text
-notes, URLs, locators or hardware strings. Review those fields before commit;
-never store credentials in a URL or a local path containing an account name.
+Use the field's `null` or schema-defined `unknown` representation for an
+unavailable fact. Never substitute zero, another device's value or a model
+specification found online for a value that was not measured on the test
+device. There are no dedicated serial-number, hostname or account-ID fields,
+but schemas cannot detect secrets or identifiers hidden in free-text notes,
+URLs, locators or hardware strings. Review those fields before commit; never
+store credentials in a URL or a local path containing an account name.
+
+A measured iPhone 14 Pro environment may keep RAM, GPU, free-storage, charge
+and low-power-mode facts `null`, and power source or thermal condition
+`unknown`, when the device does not expose them. Its identity/version, launch
+mode, viewport, DPR and drawing buffer remain mandatory, and measured Windows
+records retain their non-null resource requirements. The schema represents an
+unavailable fact; it cannot prove that the operator attempted to observe it.
+That remains an evidence-review responsibility.
 
 Large fixtures, large traces, screenshots and videos stay outside Git. A manifest
 entry is useful only when its locator/acquisition process and retention policy

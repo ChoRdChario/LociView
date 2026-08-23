@@ -182,26 +182,26 @@ approved product outcomes that constrain later production/release work.
 
 | ID | Requirement | State | Present evidence or decision | Owner / next action |
 |---|---|---|---|---|
-| `G0-ENV-01` | Repeated physical iPhone 14 Pro / Safari PWA as the current oldest physical-iOS alpha target | `candidate` | Device remains repeatedly available; pending template exists. | `Writer` resolves the unavailable-field schema conflict; `Device operator` records exact facts and raw runs. |
+| `G0-ENV-01` | Repeated physical iPhone 14 Pro / Safari PWA as the current oldest physical-iOS alpha target | `candidate` | Device remains repeatedly available; pending template exists and the measured schema can represent genuinely unavailable iPhone resource facts. | `Device operator` records exact facts and raw runs; `Independent reviewer` checks unavailable dispositions. |
 | `G0-ENV-02` | Windows 11 desktop baseline | `external-blocked` | Device class is repeatedly available; Edge primary and Chrome smoke are approved. | `Device operator` records exact CPU/RAM/GPU/OS/browser/viewport/storage in a measured environment record. |
 | `G0-ENV-03` | Windows 11 tablet-PC desktop/touch class | `external-blocked` | Device class is repeatedly available; same browser policy applies. | `Device operator` records exact hardware/OS/browser/touch/viewport facts separately from desktop. |
 | `G0-ENV-04` | Safari PWA plus Edge-primary/Chrome-secondary browser matrix, aligning the primary Edge version across Windows where practical | `covered` | Browser roles are approved for the three repeatable classes. | `Device operator` records exact versions and aligns Edge where practical; Chrome smoke never substitutes for required Edge evidence. |
 | `G0-ENV-05` | Newer iOS comparison device is desirable but not alpha-required | `deferred` | No repeatedly available newer device is recorded. | `PO` adds it only after repeated access exists; no current action. |
 | `G0-ENV-06` | iPad/iPadOS is not a supported class without a repeatable physical iPad | `deferred` | No physical iPad class is available. | `PO` keeps it unsupported until evidence can be repeated. |
 | `G0-ENV-07` | Untestable device classes receive no support claim | `covered` | Policy is approved; availability alone is not a guarantee. | `PO` ratifies support/degradation wording only after reviewed evidence. |
-| `G0-ENV-08` | Record exact hardware, OS/browser, PWA/tab, viewport, DPR, free storage and available power/thermal facts without estimating unavailable values or generalizing | `implementation-blocked` | Privacy-safe schema/templates exist, but several legitimate iPhone unknowns cannot be represented in a completed record. | `Writer` reconciles nullability; `Device operator` records observed facts; `Independent reviewer` rejects guessed values. |
+| `G0-ENV-08` | Record exact hardware, OS/browser, PWA/tab, viewport, DPR, free storage and available power/thermal facts without estimating unavailable values or generalizing | `external-blocked` | The privacy-safe schema now permits genuinely unavailable iPhone resource/power facts while retaining comparison-critical fields and Windows requirements; zero physical records exist. | `Device operator` records observed facts; `Independent reviewer` rejects guessed values and unsupported unavailable dispositions. |
 
 ## Section 2.3 — baseline measurements and ratification
 
 | ID | Atomic requirement | State | Present evidence or exact gap | Owner / next action |
 |---|---|---|---|---|
 | `G0-TRACE-01` | Comparable runs use fixed, restorable fixtures and camera/input traces | `implementation-blocked` | Runbook/fields exist; no complete fixture/trace pair is adopted. | `Writer` binds a Git trace or same-run external manifest and verifies source bytes before measurement. |
-| `G0-MEAS-01` | Offline cold start and project-open timing | `external-blocked` | Pending templates only; zero completed runs. | `Device operator` runs the fixed build/fixture/trace after schema resolution; `Writer` validates records. |
+| `G0-MEAS-01` | Offline cold start and project-open timing | `external-blocked` | Pending templates only; zero completed runs. | `Device operator` runs the fixed build/fixture/trace after fixture, trace and instrumentation prerequisites close; `Writer` validates records. |
 | `G0-MEAS-02` | Package inspect/import/export timing and result | `external-blocked` | No completed run. | `Device operator` uses a restorable non-sensitive package; private Ki84 remains diagnostic-only. |
 | `G0-MEAS-03` | First-preview and fully-usable timing | `external-blocked` | Procedure exists; zero measurements. | `Device operator` records both events on the fixed pair. |
 | `G0-MEAS-04` | p50/p95/max frame time and frame drops | `implementation-blocked` | App lacks all required identifiable instrumentation. | `Writer` audits/reuses telemetry and adds only the missing collection boundary before device runs. |
 | `G0-MEAS-05` | Pick p50/p95 and ground-truth error | `implementation-blocked` | Sampling rule exists; fixed targets/trace/oracle do not. | `Writer` freezes targets and separates gesture from computation; `Device operator` executes. |
-| `G0-MEAS-06` | Observable JS heap plus reload, memory-warning and context-loss symptoms | `implementation-blocked` | iOS heap may be unavailable; schema/resource ledger cannot yet represent a complete honest run. | `Writer` fixes representation/instrumentation; `Device operator` records unavailable fields as unavailable and captures symptoms. |
+| `G0-MEAS-06` | Observable JS heap plus reload, memory-warning and context-loss symptoms | `implementation-blocked` | The environment schema represents unavailable iPhone facts, but the runtime resource ledger and complete observable symptom capture still do not exist. | `Writer` fixes instrumentation; `Device operator` records unavailable samples honestly and captures symptoms. |
 | `G0-MEAS-07` | Three background/foreground cycles | `external-blocked` | Procedure exists; zero physical runs. | `Device operator` executes on each required class after build/fixture identity is valid. |
 | `G0-MEAS-08` | Ten-minute continuous use | `external-blocked` | Procedure exists; zero physical runs. | `Device operator` executes the fixed trace without measurement-distorting capture. |
 | `G0-MEAS-09` | Twenty load/unload cycles | `implementation-blocked` | Procedure exists, but the declared resource ledger/baseline is absent. | `Writer` closes ledger instrumentation, then `Device operator` executes. |
@@ -237,7 +237,7 @@ approved product outcomes that constrain later production/release work.
 | ID | Exit criterion | State | What remains | Owner / acceptance action |
 |---|---|---|---|---|
 | `G0-EXIT-01` | Every fixture restorable by hash | `external-blocked` | Operational derivatives, representative GS/scene assets, stress inputs and semantic families are absent/unratified. | `Writer` runs repository and external acquisition verification; `Independent reviewer` checks every row/locator. |
-| `G0-EXIT-02` | Physical-iOS raw evidence exists | `external-blocked` | Zero measured iPhone runs; schema mismatch must be fixed first. | `Device operator` captures raw runs; `Writer` verifies; `PO` accepts required physical evidence. |
+| `G0-EXIT-02` | Physical-iOS raw evidence exists | `external-blocked` | Zero measured iPhone runs; the environment schema is ready, while fixed fixture/trace and instrumentation dependencies remain. | `Device operator` captures raw runs after those dependencies close; `Writer` verifies; `PO` accepts required physical evidence. |
 | `G0-EXIT-03` | G0-S reproductions fail on the recorded unfixed baseline | `candidate` | Expected failures exist, but the exact pre-fix ledger is incomplete. | `Writer` completes provenance; `Independent reviewer` reproduces or verifies raw failing evidence. |
 | `G0-EXIT-04` | Package bytes and splat counts are recorded | `external-blocked` | No adopted representative external GS/package run records. | `Writer` binds exact counts/bytes to restored inputs and run manifests. |
 | `G0-EXIT-05` | Resource plateau and supported-image tolerances are numeric/reproducible | `specification-blocked` | Measurements and approved numeric limits are absent. | `Device operator` measures; `Writer` presents reproducibility; `PO` ratifies values. |
@@ -249,47 +249,45 @@ neither gate may be represented as passed by completing this map.
 
 ## Known evidence-contract blockers
 
-1. The runbook correctly requires unknown device facts to remain `null`, while
-   the measured environment schema currently requires several RAM/GPU/storage/
-   power/thermal values to be non-null. Resolve that conflict before recording
-   a physical iPhone run; never fill it from an online model specification.
-2. Registry v1 cannot bind creator/credit, license URL/text or a modification
+1. Registry v1 cannot bind creator/credit, license URL/text or a modification
    notice. Those fields and review evidence are required before adopting or
    uploading a CC-BY-4.0 fixture; SPDX plus `reviewStatus` is insufficient.
-3. Registry v1 requires a Gaussian-splat semantic contract to use Git-tier
+2. Registry v1 requires a Gaussian-splat semantic contract to use Git-tier
    bytes, while representative GS is intentionally external. A later schema and
    verifier slice must separate external transport bytes from a small Git
    specification/oracle without allowing a fixture to self-ratify.
-4. The evidence verifier validates a supplied external locator/hash but never
+3. The evidence verifier validates a supplied external locator/hash but never
    fetches it. The fixture Release path therefore needs a separate acquisition,
    restore and streamed-hash verification step with focused tests.
-5. A private operational package is not a render fixture for a complete device
+4. A private operational package is not a render fixture for a complete device
    run. Keep raw Ki84 conversion diagnostics separate; use a reviewed derivative
    for migration acceptance and an appropriate registered render fixture for
    device measurements rather than broadening the run contract merely to fit
    one archive.
-6. Served `index.html` and service-worker digests have no byte locator in the
+5. Served `index.html` and service-worker digests have no byte locator in the
    current run schema. A reviewer must compare them with the identified local or
    deployed response until a later contract explicitly automates that step.
-7. The deploy workflow exposes both `main` push and `workflow_dispatch` without
+6. The deploy workflow exposes both `main` push and `workflow_dispatch` without
    enforcing an approved candidate SHA. The release operator must apply section
    3.7's exact-ref check and explicit Product Owner approval before either
    trigger; a green workflow alone is not release authority.
 
 ## Current critical path and stop rules
 
-1. Close this decision/coverage slice without adding measurements or fixtures.
-2. Repair only the evidence/schema/verifier blockers that prevent honest,
-   restorable records.
-3. Produce and privacy-review the Ki84 derivative; acquire/license-review public
-   GS and author the deterministic intersection/aircraft inputs where external
-   bytes do not materially improve the acceptance oracle.
-4. Collect Windows and physical-iPhone baselines while completing the G0-S
+1. Obtain the Product Owner decisions for fixture adoption, redistribution
+   license and Release retention, then close the external registry/acquisition
+   contract without uploading an asset.
+2. Specify the `PROD-13` conversion dispositions, produce and privacy-review the
+   Ki84 derivative, acquire/license-review public GS and author deterministic
+   intersection/aircraft inputs where external bytes do not materially improve
+   the acceptance oracle.
+3. Close the remaining trace/instrumentation blockers, then collect Windows and
+   physical-iPhone baselines while completing the G0-S
    pre-fix ledger. A bounded ZIP symlink/FIFO root fix may use unavoidable
    acquisition/device wait time but cannot replace the external lane.
-5. Ask the Product Owner to ratify numeric support/degradation/profile decisions
+4. Ask the Product Owner to ratify numeric support/degradation/profile decisions
    only after reviewed measurements exist.
-6. Designate an exact stabilized-v1 candidate before final verification and bind
+5. Designate an exact stabilized-v1 candidate before final verification and bind
    all affected evidence/review to it. Release only after both G0 and G0-S exit,
    exact-tree review has no P0/P1 and the Product Owner approves the exact SHA
    and trigger. Stop before `main` push, `workflow_dispatch` or deployment.
