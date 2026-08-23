@@ -811,12 +811,64 @@ Handoff:
 - Do not begin operation-policy, same-key collision, transaction/tab, future-schema or migration fixes until their field-quarantine/evidence, canonical digest/resolution, lock/journal/physical-browser, schema-version or migration-recipe dependencies are approved and testable
 - This session stops at the checkpoint. No slice 35 production or test change has started
 
+### G0 restart plan — decision capture and coverage map
+
+Product-owner direction was approved on 2026-08-24. This section is the
+approved implementation plan for the bounded documentation slice. The Product
+Owner explicitly authorized writer work and approved the LociMyu conversion
+outcome, the exact-candidate/both-gates release boundary and the bounded deploy/
+post-deploy/rollback procedure on 2026-08-24. Checklist completion still requires
+the recorded verification and independent final review below.
+
+First slice — documentation and coverage only:
+
+- [x] Record the approved short meta-audit triggers, critical-path check and human-stop boundaries in `AGENTS.md` without creating a separate audit workstream
+- [x] Record in the approved product contract that LociView preserves the useful LociMyu viewing/recording workflow while remaining account-independent and offline-capable, that ordinary flows target a non-specialist with roughly Microsoft Office file-workflow literacy, and that LociMyu XLSX/model/image/file-ID-map datasets remain convertible without silently mutating or guessing source meaning
+- [x] Fix the repeatable environment matrix as iPhone 14 Pro / Safari PWA plus separate Windows 11 desktop and tablet-PC classes using Edge as the primary Chromium browser and Chrome as a secondary smoke browser; record exact measured versions/hardware without generalizing beyond tested classes
+- [x] Add a one-to-one coverage map for every fixture, trace, device, measurement, threshold and exit requirement in `docs/specs/03-gates-and-delivery.md` sections 2.1–2.4, classifying each row as covered, candidate, external-blocked, specification-blocked, implementation-blocked or deferred
+- [x] Distinguish the deployed-v1 baseline `4f6e48196041d7ae39a11aba04f647db99deb450`, development HEAD and not-yet-designated stabilized-v1 candidate; designate the exact candidate before final verification, but permit release only after both G0/G0-S exit, exact-tree no-P0/P1 review and Product Owner approval of the SHA and trigger
+- [x] Record that both `main` push and `workflow_dispatch` can deploy, and bind either trigger to the same exact-SHA approval, Actions head-SHA check, live digest capture, post-deploy PWA/offline smoke and retained named rollback ref/non-destructive rollback record
+- [x] Record the fixture-only GitHub Release convention for redistribution-approved external fixtures: approve schema/attribution/local hash/privacy/license first, upload only as draft/non-adopted, then fetch/hash/register exact Release bytes before adoption or gate credit
+- [x] Record Ki84 only as private operational source evidence bound by SHA-256 and aggregate shape: it has no durable private locator, is not anonymized, must not be uploaded to a public Release or fixture registry, and earns no G0/STO-MIG gate credit in that state; any derivative reconstructs text/IDs/media/model/spatial values and container metadata from an explicit privacy-safe whitelist
+- [x] Keep GS and any third-party aircraft source at candidate status until bytes, provenance, license, semantic checks and restore are verified; allow a deterministic project-authored aircraft/intersection oracle so external acquisition does not create an unnecessary G0 dependency
+- [x] Update documentation indexes for the new coverage map, then obtain independent read-only completeness and privacy/specification reviews of the final writer diff
+
+First-slice acceptance:
+
+- [x] Map every requirement in G0 sections 2.1–2.4 exactly once and make every missing prerequisite, owner and next action explicit
+- [x] Do not conflate available, discovered, restorable, measured, ratified or gate-passing states
+- [x] Close the open coverage-mapping item below only after the independent review finds no omitted G0 row; leave fixture acquisition, measurements, pre-fix ledger and threshold approvals open
+- [x] Preserve `0` completed run, environment and artifact records; this slice creates no measurement, manifest, fixture byte, GitHub Release or support guarantee
+- [x] Run, serially, `git diff --check`, fixture verification, evidence verification, typecheck, the full test suite and the production build on the final tree
+
+Explicit first-slice exclusions:
+
+- production, test, schema or verifier changes;
+- artifact download/upload, GitHub Release creation, Ki84 anonymization or converter changes;
+- physical-device runs, performance thresholds or support-class ratification;
+- the G0-S pre-fix ledger, ZIP special-entry fix, lock/journal, collision/quarantine or migration fixes;
+- `main` push, deploy or stabilized-v1 release.
+
+Planned follow-on order after the first-slice review:
+
+1. resolve evidence-contract blockers before measurement: reconcile nullable unavailable iPhone fields with the measured-environment schema, add complete external-license attribution fields, separate external GS transport bytes from a small Git semantic oracle, and verify acquisition/restore bytes rather than trusting a locator;
+2. specify and close `PROD-13` conversion reporting for inferred sheet mappings, duplicate IDs and unresolved media links, then implement a dev-only whitelist-reconstructed Ki84 derivative and public external-fixture acquisition verification; require independent privacy/license review and exact-SHA Product Owner approval before a fixture Release upload;
+3. acquire/verify public GS, evaluate the aircraft candidate or author deterministic closed geometry, and start reproducible device evidence; use unavoidable acquisition/physical-run wait time for the bounded ZIP symlink/FIFO production fix, without letting it replace the external G0 critical path.
+
+First-slice review — 2026-08-24:
+
+- Scope stayed documentation/governance-only: no `src/**`, test, fixture bytes, registry/schema, verifier, artifact, Release, deploy or dependency change.
+- The coverage reviewer passed the corrected 135-row G0/product-dependency map with no P0/P1/P2. The independent privacy/workflow reviewer passed `PROD-12/13`, Ki84, external-fixture publication and exact-SHA release/rollback boundaries with no P0/P1/P2.
+- Initial serial verification passed: `git diff --check`; untracked-map whitespace check; fixture registry 10 Git entries / 708,867 bytes / 0 external or generated entries; evidence verifier 3 pending templates / 0 run / 0 environment / 0 artifact records; typecheck; full test 32 files / 1,028 passed / 21 todo; production build with the pre-existing large-chunk warning.
+- Serial verification of the review-record tree passed with the same results. This result/checkbox update is the only subsequent content change; the same commands run once more before staging, and any failure reopens this item.
+- Meta-audit: G0 external evidence and evidence-contract blockers remain the longest lead. G0-S remains a parallel release blocker. The next repository slice should close the nullable-device/license-attribution/external-acquisition contract boundary; the ready ZIP special-entry fix is useful only during unavoidable external/device wait time.
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
 - [ ] Complete target-device record: iPhone 14 Pro is fixed as the oldest physical-iOS alpha target; add desktop and tablet-PC OS/browser/RAM/GPU details
 - [ ] Measure current load, memory, frame-time, picking, and package baselines
-- [ ] Map every `03-gates-and-delivery.md` section 2.1–2.4 fixture, trace, device and threshold requirement to a restorable source/status before claiming G0 evidence coverage; the high-level checklist and a successful `evidence:verify` are not completion proof
+- [x] Map every `03-gates-and-delivery.md` section 2.1–2.4 fixture, trace, device and threshold requirement to a restorable source/status before claiming G0 evidence coverage; the high-level checklist and a successful `evidence:verify` are not completion proof
 - [ ] Complete the G0-S pre-fix reproduction ledger: for each known case record the unfixed code commit, compatible test revision, exact reproduction command/procedure, observed failing assertion/disposition and restorable evidence locator; current green regressions do not retroactively prove the baseline
 - [ ] Approve support guarantees, degradation behavior, and Go/No-Go thresholds
 

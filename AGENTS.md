@@ -41,6 +41,15 @@
 - Chat history is not a specification. Move approved decisions and acceptance criteria into this repository before implementation.
 - A PoC is disposable and isolated. Do not promote PoC code directly into production without a production implementation and review.
 
+## Short meta-audits
+
+- Run a short meta-audit after a meaningful slice, before changing acceptance contract/workstream/subsystem, when scope must expand, when a new P0/P1 or external/specification dependency appears, or when auxiliary tests/fixtures/docs keep growing without closing a production boundary or gate item.
+- Recheck branch, HEAD, worktree, active gate and exit criteria, recent production versus auxiliary changes, verification, known failures, blockers and external evidence lanes. Treat the previous priority and next-slice choice as hypotheses, not authority.
+- Prefer closing an accepted boundary, ordinaryizing a known failure or removing a release blocker over increasing test, fixture, review or commit counts. Add auxiliary verification only when the current slice cannot be judged safely with existing acceptance.
+- Keep the audit brief and use existing repository evidence. If the current strategy still follows the critical path, record that conclusion concisely and continue; do not turn meta-audit into a separate workstream.
+- Before the next slice, state its target, purpose, boundary/acceptance, production scope, reused and genuinely missing acceptance, completion criteria, exclusions and stop conditions.
+- Change priority or slice structure autonomously within the approved product/gate scope when evidence supports it. Stop and ask the Product Owner before resolving a specification conflict, ratifying a product policy or numeric guarantee, making a large architecture or compatibility/migration decision, expanding beyond approved scope, or crossing a release/deploy/destructive boundary.
+
 ## Change rules
 
 - For architecture, storage schema, renderer, migration, security, or package changes: write or update the specification and acceptance criteria before implementation.

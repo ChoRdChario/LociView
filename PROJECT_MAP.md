@@ -33,6 +33,7 @@ For a normal task, read only the target file, its matching tests, and direct imp
 | `public/samples` | Small deterministic files used by the manual viewer and iOS runbook |
 | `fixtures` | G0 fixture registry, provenance, hashes and small committed fixture metadata |
 | `evidence/g0` | Pending device/run schemas and small evidence manifests; large artifacts remain external |
+| `docs/g0` | Active G0 coverage map, device/performance runbook and unratified source-profile preflight |
 
 ## Actual dependency direction
 

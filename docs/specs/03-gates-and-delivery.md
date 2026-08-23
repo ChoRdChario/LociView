@@ -53,7 +53,7 @@ G0 owns the failing characterization tests for every known G0-S defect. G0-S beg
 
 ### 2.2 Target environments
 
-Record the desktop baseline and iPhone 14 Pro as the current oldest repeatedly testable physical-iOS alpha target. Record hardware, OS/Safari version, PWA versus tab, viewport, device pixel ratio, free storage and power/thermal conditions. A newer iOS comparison device is desirable evidence but not an alpha prerequisite; iPad/iPadOS is not a supported release class until a physical iPad can be tested repeatedly. Record the tablet PC separately as a desktop/touch class with its OS, browser, RAM and GPU. A device class the project cannot repeatedly test is not a supported release class.
+Record iPhone 14 Pro / Safari PWA as the current oldest repeatedly testable physical-iOS alpha target. Record Windows 11 desktop and Windows 11 tablet PC as separate desktop and desktop/touch classes. Use Edge as their primary Chromium browser and Chrome as a secondary smoke browser, keeping the primary browser/version aligned where practical. Record exact hardware, OS/browser version, PWA versus tab, viewport, device pixel ratio, free storage and available power/thermal conditions without estimating an unavailable value or generalizing beyond the tested class. A newer iOS comparison device is desirable evidence but not an alpha prerequisite; iPad/iPadOS is not a supported release class until a physical iPad can be tested repeatedly. A device class the project cannot repeatedly test is not a supported release class.
 
 ### 2.3 Baseline measurements
 
@@ -163,6 +163,37 @@ Current 2 GiB/1 GiB ZIP limits are not safe promises while the implementation ma
 - typecheck, full tests and production build pass;
 - read-only reliability/security review has no P0/P1;
 - product owner approves release of the stabilized v1 path.
+
+### 3.7 Stabilized-v1 candidate and release boundary
+
+Candidate designation and release approval are different states. Before final
+gate verification, designate one exact commit SHA as the stabilized-v1
+candidate and record the prior known-good deployed SHA. Retain a named rollback
+branch or tag that resolves to that known-good SHA until post-deploy acceptance;
+`workflow_dispatch` is not assumed to accept an arbitrary historical SHA. The
+candidate label grants no release status. Bind the final G0/G0-S evidence, typecheck, full test,
+fixture/evidence verification, production Pages-path build and independent
+review to that exact candidate tree. If a merge or other operation changes the
+commit SHA, the resulting SHA is a new candidate and the affected verification
+and review MUST run again.
+
+A candidate is release-eligible only after both G0 and G0-S exit, the exact-tree
+read-only review has no P0/P1, and the Product Owner approves that exact SHA and
+deployment method. The current workflow can deploy either from a push to
+`main` or from `workflow_dispatch`; neither trigger is authorized implicitly.
+Before triggering either path, the release operator verifies that the checked
+out branch/tag resolves to the approved candidate SHA. The resulting Actions
+run record MUST report that same head SHA; a mismatch fails release acceptance.
+
+For each authorized deployment, record the Actions run and Pages deployment
+identities, URL, served `index.html` and service-worker digests, and the
+candidate/local bytes used for comparison. Then run the approved online,
+installed-PWA, offline, reload and representative package smoke on the required
+device/browser classes. A failed deployment or smoke does not redefine the
+candidate as stable: redeploy the retained prior-known-good branch/tag by an
+approved manual run, or create and verify a non-destructive revert commit, and
+record the rollback run/head SHA. Release assets and fixture-only Release assets
+remain separate.
 
 ## 4. G1-A — bounded streaming and CAS PoC
 
@@ -324,8 +355,8 @@ Rollback means preserving the source v1 package/workspace, opening conversion in
 
 ## 10. Production sequence after gates
 
-1. G0 fixtures, devices and contracts.
-2. G0-S fixes and stabilized v1 release.
+1. G0 fixtures, devices, measurements and contracts, with allowed G0-S work proceeding in parallel only after its failing baseline characterizations exist.
+2. G0-S safety fixes; both G0 and G0-S must exit before the exact stabilized-v1 candidate is released under section 3.7.
 3. G1-A streaming/CAS decision.
 4. G1-B renderer decision.
 5. G1-C metadata decision.

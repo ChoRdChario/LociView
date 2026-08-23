@@ -6,7 +6,7 @@
 
 LociView v2 is a local-first, offline-capable browser viewer for portable project packages. It MUST let a non-specialist open a project, inspect mesh and Gaussian Splatting (GS) representations in a shared coordinate space, place and edit captions, exchange project packages, and recover from unsupported or damaged inputs without silently losing work.
 
-The current application remains the migration base. v2 replaces storage and rendering internals behind explicit ports while preserving useful v1 workflows and the ability to open source v1 packages.
+The current application remains the migration base. v2 replaces storage and rendering internals behind explicit ports while preserving the useful LociMyu/LociView viewing and recording workflow and the ability to open source v1 packages. Ordinary file, caption, merge, export and recovery flows target a person comfortable with normal Microsoft Office file workflows; they MUST NOT require developer, 3D-engine, storage-engine or synchronization-protocol knowledge.
 
 ## 2. Non-negotiable user outcomes
 
@@ -23,6 +23,8 @@ The current application remains the migration base. v2 replaces storage and rend
 | `PROD-09` | Large GS and package paths degrade quality or refuse safely before browser memory pressure kills the page. |
 | `PROD-10` | Unsupported schema, renderer capability, material policy or missing blob produces an actionable diagnosis, not a blank viewer. |
 | `PROD-11` | The same validated static source produces the same pose, logical bounds, material class and canonical pick anchor/method across supported backends; candidate-local weak provenance may differ or be absent, and a decoder upgrade cannot reinterpret an existing Representation silently. |
+| `PROD-12` | A non-specialist can complete ordinary open/import, caption, merge, export and recovery flows using familiar file/task language, without a Google/LociView account or exposure to actor, HLC, hash, CAS, OPFS, renderer-profile or similar implementation terminology. |
+| `PROD-13` | A LociMyu save dataset consisting of an XLSX save, associated model and images, and an optional file-ID map remains convertible into a new LociView project without a Google account or Google API. Conversion never overwrites the selected source files/archive artifacts, preserves every unambiguous record and reports duplicate or ambiguous identifiers, inferred sheet mappings and unresolved media links. An affected mapping is not committed through a lossy or guessed choice until the user gives an explicit disposition under the accepted conversion contract. Transient caller buffers may be consumed or cleared after ownership transfer; they are not the durable source artifact. |
 
 ## 3. Product modes and support levels
 
@@ -140,9 +142,10 @@ It MUST NOT evict the only source copy, an attachment, or an irreplaceable displ
 
 ## 8. Compatibility and rollback
 
+- LociMyu dataset conversion and LociView v1-package-to-v2 migration are distinct compatibility paths. The user outcome in `PROD-13` is required; whether it is delivered by the integrated importer or a separately packaged tool is an implementation decision, but implementations MUST share one accepted conversion contract rather than silently diverging.
 - v1 input remains readable after v2 ships.
-- Conversion writes a new v2 project and never overwrites the selected v1 source.
-- After explicit conversion the project is v2-only-write; no reverse synchronization to v1 is implied.
+- LociView v1-package-to-v2 conversion writes a new v2 project and never overwrites the selected v1 source.
+- After explicit v1-package-to-v2 conversion the new project is v2-only-write; no reverse synchronization to v1 is implied.
 - Unknown future major versions are read-only or rejected clearly.
 - Every new storage or renderer path remains behind a feature flag until its rollback test passes.
 - A failed v2 open MUST leave source packages and the last durable local project unchanged.
@@ -165,8 +168,16 @@ Recorded on 2026-08-19:
 - runtime animation playback remains outside the MVP;
 - semantic collaboration conflicts fail closed for the affected unit rather than silently selecting a winner.
 
+Recorded on 2026-08-24:
+
+- the useful LociMyu viewing and recording workflow remains a product asset while Google-account dependence is removed and offline/local package use remains the core path;
+- LociMyu XLSX/model/image datasets, including an optional file-ID map, remain convertible to LociView without mutating the selected source; this is a product outcome rather than a commitment to an integrated or standalone UI architecture;
+- ordinary flows target a non-specialist with roughly Microsoft Office file-workflow literacy; internal storage, merge-clock and renderer terminology is diagnostic detail, not required user knowledge;
+- the repeatedly available alpha classes are iPhone 14 Pro/Safari PWA, Windows 11 desktop and Windows 11 tablet PC. G0 records exact measured hardware/browser versions and does not generalize a support guarantee from one model.
+
 Still required later:
 
+- a scripted Product Owner usability walkthrough before public release, using the intended non-specialist persona to complete open/import, caption, merge, export and recovery without implementation terminology; `PROD-12` remains unaccepted until this succeeds;
 - tablet-PC hardware/OS/browser details and any additional repeatedly testable release classes;
 - G0 performance, memory, package-size, support-class and degradation guarantees after baseline measurement;
 - adoption, wording and default behavior for experimental smooth transparency only if G1-D passes, and a separate future decision before any transmission/refraction claim;

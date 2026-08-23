@@ -1,7 +1,7 @@
 # LociView v2 approved direction
 
 > Status: `ACCEPTED DIRECTION SUMMARY / NON-NORMATIVE / NOT IMPLEMENTED`
-> Updated: 2026-08-18
+> Updated: 2026-08-24
 > Technology choices marked as candidates remain subject to the listed PoC gates.
 
 This is a navigation summary, not an independent requirements source. Rationale, decisions, rejected defaults and reconsideration triggers are normative in `docs/adr/0001-v2-foundation.md`. Review-ready implementation contracts are indexed in `docs/specs/README.md`; after product-owner approval they provide the detailed normative contract. Until then they remain proposed and do not authorize implementation.
@@ -10,6 +10,7 @@ This is a navigation summary, not an independent requirements source. Rationale,
 
 Evolve the current offline LociView without a full rewrite so it can:
 
+- convert LociMyu XLSX/model/image datasets without Google-account or Google-API dependence while leaving selected source bytes unchanged and surfacing ambiguous mappings;
 - display Gaussian Splatting data;
 - support mesh and GS data in the same project;
 - provide reliable Mesh, GS, and comparison workflows;
@@ -82,6 +83,7 @@ Package purposes remain distinct:
 
 ## Migration
 
+- LociMyu dataset conversion and LociView v1-package-to-v2 migration are distinct compatibility paths; the former may remain integrated or use a separate tool, but both must follow the accepted product contract rather than fork semantics silently.
 - Read v1 and v2; write only v2 after explicit conversion.
 - Never overwrite the source v1 package.
 - Convert known copies to one canonical genesis/history epoch.
@@ -93,6 +95,7 @@ Package purposes remain distinct:
 
 ## Mobile constraints
 
+- The repeatable G0 classes are iPhone 14 Pro/Safari PWA, Windows 11 desktop and Windows 11 tablet PC; Edge is the primary Windows browser and Chrome is secondary smoke evidence. Exact measured facts are recorded per device/run and are not generalized to an untested class.
 - No product path may require full package or full large-GS materialization in memory.
 - Import streams to staging storage, incrementally hashes, validates, then commits.
 - Runtime uses paging and explicit draw/resident budgets.
@@ -127,10 +130,17 @@ Package purposes remain distinct:
 13. iOS, migration, corruption, privacy, and security hardening.
 14. Productionize an adopted smooth result only after core hardening and a separate production review; otherwise leave it off. Exact-renderer/transmission research remains later and separate.
 
+The exact stabilized-v1 candidate SHA is designated before final verification so
+evidence and review can bind to it. It becomes release-eligible only after both
+G0 and G0-S exit, independent exact-tree review has no P0/P1, and the Product
+Owner approves that SHA and deployment method; a `main` push or manual workflow
+dispatch is never implicit approval.
+
 ## MVP boundary
 
 Included:
 
+- account-independent conversion of LociMyu save datasets under one accepted compatibility contract;
 - bounded-memory package I/O;
 - v2 metadata/blob storage and v1 conversion;
 - Mesh, GS, and Compare;

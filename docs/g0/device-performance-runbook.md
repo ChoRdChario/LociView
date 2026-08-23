@@ -10,10 +10,16 @@ remains the short v1 UX smoke test; it is not performance evidence.
 
 - iPhone 14 Pro, physical device, Safari PWA is the oldest repeatedly testable
   iOS alpha target.
-- Windows desktop and Windows tablet PC are separate device classes. Use the
-  same chosen primary Chromium browser and version where possible.
+- Windows 11 desktop and Windows 11 tablet PC are separate device classes.
+  Use Edge as the primary Chromium browser and keep its version aligned where
+  possible; use Chrome only as a secondary compatibility smoke run unless a
+  later approved matrix says otherwise.
 - iPad/iPadOS is not a supported class until a physical iPad can be tested
   repeatedly.
+
+Availability of one device does not establish a broad hardware guarantee. Each
+measured run records the exact device/OS/browser facts available from that
+device, while support wording remains bounded to the repeatedly tested class.
 
 Never record a serial number, hostname, account name, device advertising ID or
 other durable personal identifier. Unknown fields remain `null`; they are not
@@ -41,6 +47,10 @@ estimated.
 
 The current app does not yet expose all build/resource fields. Leave missing
 values `null` and mark the run `incomplete`; do not infer them from another run.
+The current measured-environment schema still requires several non-null
+hardware/resource fields, so an iPhone run with genuinely unavailable values
+cannot yet be recorded as complete. Resolve that contract mismatch before the
+first measured run instead of inventing device specifications.
 
 ## Measurement sequence
 

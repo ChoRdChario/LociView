@@ -85,3 +85,8 @@
 - production待ちのtest writer、複数writerのshared-tree編集、長時間応答しないpatchを待ち続けない。full test/buildの正常な実行時間ではなく、5分を超えて進捗のないpatch/writer停滞、権限失敗、canonical repository不一致が起きたら中止してrootへ戻し、clean statusから再計画する
 - writerの最終変更後にauditorはlatest treeを再読する。stage後はexact index、unstaged/untrackedゼロ、cached diff-checkを確認し、test/build/review実績をそのcached treeにだけ帰属させる
 - 小さいexpected-failureを減らせることだけでは次sliceを正当化しない。外部evidence、実機、product/spec決定、lock/journal/typed issue APIがcritical pathなら、repository内micro-sliceより先にその依存を明示して停止する
+
+## 2026-08-24: legacy product import and internal schema migration are different requirements
+
+- Do not collapse LociMyu XLSX/model/image dataset conversion into LociView v1-package-to-v2 migration. They have different source shapes, user entry points and acceptance evidence even if they later share services.
+- When the Product Owner reaffirms a foundational compatibility outcome, place it in the normative product contract in the same slice; a partly superseded vision note or chat history is not enough to preserve it.

@@ -20,6 +20,32 @@ placed in `public/` or the normal source tree. Never register unredacted persona
 data. Derive an irreversible, structurally representative fixture first and
 register only that derivative.
 
+## External release boundary
+
+The default durable locator for redistribution-approved public fixtures is a
+fixture-only GitHub Release asset, separate from a product release. Discovery
+of a URL or upload of an asset does not adopt a fixture. The registry and
+evidence must bind the exact asset locator, SHA-256, byte size, license and
+attribution, privacy review, retention expectation and restore instructions.
+Assets are versioned instead of overwritten in place.
+
+Registry v1 cannot yet bind the creator/credit string, license URL or text, and
+modification notice required for a redistributable CC-BY asset; its `license`
+object stores only SPDX and review status. Before upload, an approved schema/
+evidence change must be able to record those attribution facts, and the exact
+local candidate hash, privacy/license review and Product Owner upload approval
+must be fixed. Upload first to a draft/non-adopted fixture Release; then fetch
+and hash the exact Release asset. It remains unadopted and earns no gate credit
+until that restore check succeeds and the immutable locator is registered.
+
+Operational source data remains private unless the Product Owner separately
+approves the exact bytes for redistribution. In particular, the Ki84 LociMyu
+archive may be used as private diagnostic/source evidence, but it has no durable
+private restore locator, is not anonymized and MUST NOT be uploaded to a public
+Release or entered in the fixture registry. Only an irreversibly anonymized,
+independently privacy-reviewed derivative with an approved license and exact
+digest may become a public external fixture.
+
 ## Current scope
 
 `registry.json` records the existing viewer smoke samples and small G0 contract

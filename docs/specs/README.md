@@ -2,7 +2,7 @@
 
 > Status: `PRODUCT-OWNER APPROVED IMPLEMENTATION CONTRACT / NOT IMPLEMENTED`
 > Baseline implementation: normalized v1 commit `fc7054f`; this specification revision is identified by its own Git commit
-> Approved: 2026-08-19
+> Approved: 2026-08-19; Product Owner amendments recorded 2026-08-24
 
 These documents turn ADR-0001 and the approved v2 direction into testable implementation contracts. They intentionally separate fixed product and domain rules from technologies that may still fail a proof-of-concept gate.
 
