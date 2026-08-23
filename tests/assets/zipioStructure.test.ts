@@ -100,12 +100,14 @@ describe('G0 ZIP structural characterization', () => {
     'inner.GZ',
     'inner.tgz',
   ] as const;
-  const benignSuffixLikePaths = [
+  const benignPortablePaths = [
     'media/archive.zip.txt',
     'media/archive.zipper',
     'media/archive.tgz.preview',
     'media/zip',
     'media/model.tar.json',
+    'media/cafe\u0301-singleton.jpg',
+    'Models/MixedCase.glb',
   ] as const;
   const controlPathDefinitions = {
     'c0-file': { path: 'media/c0-\u001f.bin', directory: false },
@@ -141,7 +143,7 @@ describe('G0 ZIP structural characterization', () => {
   let writerShapes: RawZipEntryShape[];
   let directoryOutcome: FixtureOutcome;
   let nestedSuffixOutcomes: ReadOutcome[];
-  let benignSuffixOutcome: FixtureOutcome;
+  let benignPortableOutcome: FixtureOutcome;
   let falseSizeOutcome: ReadOutcome;
   let falseSizeOriginalShape: RawZipEntryShape;
   let falseSizeShape: RawZipEntryShape;
@@ -180,8 +182,8 @@ describe('G0 ZIP structural characterization', () => {
       ])));
     }
 
-    benignSuffixOutcome = await makeFixtureOutcome(
-      benignSuffixLikePaths.map((path) => ({ path, data: encoder.encode(path) })),
+    benignPortableOutcome = await makeFixtureOutcome(
+      benignPortablePaths.map((path) => ({ path, data: encoder.encode(path) })),
     );
 
     const falseSizeEntries = [
@@ -342,11 +344,11 @@ describe('G0 ZIP structural characterization', () => {
       }
     });
 
-    it('accepts benign names that only resemble nested-archive suffixes', () => {
-      expect(benignSuffixOutcome.rejected).toBe(false);
-      expect(benignSuffixOutcome.entries?.map(({ path }) => path)).toEqual(benignSuffixLikePaths);
-      expect(benignSuffixOutcome.entries?.map(({ path, data }) => decoder.decode(data)))
-        .toEqual(benignSuffixLikePaths);
+    it('accepts benign suffix-like, isolated NFD and mixed-case names without rewriting', () => {
+      expect(benignPortableOutcome.rejected).toBe(false);
+      expect(benignPortableOutcome.entries?.map(({ path }) => path)).toEqual(benignPortablePaths);
+      expect(benignPortableOutcome.entries?.map(({ path, data }) => decoder.decode(data)))
+        .toEqual(benignPortablePaths);
     });
 
     it('rejects a matching local/central false uncompressed size', () => {

@@ -77,29 +77,31 @@ function lowerBound(sorted: readonly string[], target: string): number {
 }
 
 function assertUnambiguousNamespace(entries: readonly { path: string; directory: boolean }[]): void {
-  const exactPaths = new Set<string>();
-  const foldedFilePaths = new Set<string>();
-  const foldedDirectoryPaths = new Set<string>();
-  const foldedPaths: string[] = [];
+  const logicalEntries = new Map<string, { path: string; directory: boolean }>();
+  const logicalFilePaths = new Set<string>();
+  const logicalPaths: string[] = [];
   for (const entry of entries) {
-    if (exactPaths.has(entry.path)) {
-      throw new ZipGuardError('ambiguous-path', `duplicate entry path: ${entry.path}`);
+    const logical = asciiCaseFold(entry.path.normalize('NFC'));
+    const existing = logicalEntries.get(logical);
+    if (existing !== undefined) {
+      const relation = existing.directory === entry.directory
+        ? 'duplicate entry path'
+        : 'file/directory path collision';
+      throw new ZipGuardError(
+        'ambiguous-path',
+        `${relation}: ${existing.path} / ${entry.path}`,
+      );
     }
-    exactPaths.add(entry.path);
-    const folded = asciiCaseFold(entry.path);
-    foldedPaths.push(folded);
-    if (entry.directory) foldedDirectoryPaths.add(folded);
-    else foldedFilePaths.add(folded);
+    logicalEntries.set(logical, entry);
+    logicalPaths.push(logical);
+    if (!entry.directory) logicalFilePaths.add(logical);
   }
-  foldedPaths.sort();
+  logicalPaths.sort();
 
-  for (const filePath of foldedFilePaths) {
-    if (foldedDirectoryPaths.has(filePath)) {
-      throw new ZipGuardError('ambiguous-path', `file/directory path collision: ${filePath}`);
-    }
+  for (const filePath of logicalFilePaths) {
     const prefix = `${filePath}/`;
-    const descendantIndex = lowerBound(foldedPaths, prefix);
-    if (foldedPaths[descendantIndex]?.startsWith(prefix)) {
+    const descendantIndex = lowerBound(logicalPaths, prefix);
+    if (logicalPaths[descendantIndex]?.startsWith(prefix)) {
       throw new ZipGuardError('ambiguous-path', `file path is an ancestor: ${filePath}`);
     }
   }

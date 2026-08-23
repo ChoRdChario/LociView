@@ -721,6 +721,30 @@ Review record:
 - Verification passed on the exact source/test tree: the focused malicious-package file had 235 passing tests plus 11 todos; the full suite had 32 files / 1,028 passing tests plus 21 todos; TypeScript typecheck; fixture verification (10 Git entries / 708,867 bytes, one unratified GS candidate); evidence verification (3 pending device templates / 0 run, environment or artifact records); and the production build (96 modules / 11 PWA precache entries, 888.79 KiB). The existing large viewer chunk warning is approximately 803.46 kB
 - Independent production/runtime and exact-closure reviews found no unresolved P0/P1 after the trailing-high-surrogate range check was made NaN-safe. Production changed only `schema.ts` and `manifest.ts` (+48/-11); the existing malicious-package test changed +57/-29, and direct `it.fails` declarations fell from 27 to 17 while runtime promotion remained exactly 58
 
+### Post-slice-31 gate/strategy checkpoint
+
+- [x] Recount the clean `e95c180` baseline as 17 direct `it.fails` declarations, 79 runtime expected failures and 21 todos: raw duplicate JSON members 17, operation field/identity policy 14, same-key operation collisions 6, residual ZIP envelope risks 24, future-schema edit policy 2, transaction/tab publication 10 and migration 6
+- [x] Re-rank portable ZIP logical-name collisions first after independent review found that 12 approved NFC/ASCII-case expectations share the existing namespace seam and need only a bounded production change; keep the duplicate-aware raw JSON preflight second rather than adding its scanner in the same slice
+- [x] Keep the production-first stop rule explicit: preserve raw returned ZIP names/order/bytes, add no dependency or test matrix, and stop if the change expands into general filename rewriting, Unicode case folding, malformed UTF-8, platform-specific filesystem behavior, schema/evidence or transaction work
+
+### G0 stabilization slice 32 — portable ZIP logical namespace
+
+- [x] Derive an internal logical namespace key as NFC followed by ASCII-only case folding, while returning every accepted ZIP path with its original normalized spelling, entry order and bytes unchanged
+- [x] Reject two entries with the same logical key in either order and retain the existing file/directory and file-as-ancestor checks on segment boundaries without making the scan worse than O(entries log entries × path length)
+- [x] Preserve isolated NFC, NFD, mixed-case and RTL names plus an explicit directory parent with its child; add at most one narrow positive self-control rather than another fixture matrix
+- [x] Promote exactly the 12 existing Unicode-normalization and ASCII-case collision runtime expectations (two input orders × inspection/no-mutation/no-marker) with failure before any workspace mutation
+- [x] Keep malformed UTF-8 names/payloads, symlink/special-mode policy, Unicode-wide case folding, platform-specific filesystem rules, raw duplicate JSON, future-schema, evidence and transaction roots explicitly open
+- [x] Run focused/full tests, typecheck, fixture/evidence verification and production build; complete independent namespace-correctness, exact-closure, complexity and scope/churn review before a separate commit
+
+Review record:
+
+- ZIP namespace checks now derive a private `NFC → ASCII-only casefold` key for each sanitized entry. Any file/file, directory/directory or file/directory logical duplicate is rejected independent of input order, and file-as-ancestor checks use the same key and `/` segment boundary while retaining the sorted/lower-bound O(entries log entries × path length) design
+- Accepted entries retain their original path spelling, order and bytes. The existing portable-name control now also proves an isolated NFD path and a mixed-case path round-trip unchanged alongside the existing NFC RTL and explicit-directory-parent controls
+- The existing four Unicode-normalization/ASCII-case collision fixtures were added to the strict envelope set, promoting exactly 12 runtime expectations: both input orders must reject during inspection, perform zero workspace mutation and publish no completion marker. No new fixture, parameter matrix or test case was added
+- Malformed UTF-8 names or payloads, symlink/special-mode policy, Unicode-wide or locale case folding, platform-specific filesystem rules, raw duplicate JSON, future-schema policy, typed evidence and transaction/lock roots remain open
+- Verification passed on the exact source/test tree: focused 2 files / 258 passing tests plus 11 todos; full 32 files / 1,028 passing tests plus 21 todos; TypeScript typecheck; fixture verification (10 Git entries / 708,867 bytes, one unratified GS candidate); evidence verification (3 pending device templates / 0 run, environment or artifact records); and the production build (96 modules / 11 PWA precache entries, 888.80 KiB). The existing large viewer chunk warning is approximately 803.47 kB
+- Independent production/runtime and exact-closure reviews found no unresolved P0/P1 or future-correct complexity obstruction. Production changed only `zipio.ts` (+20/-18), while the two existing test files changed +15/-9; direct `it.fails` declarations remain 17 because the 12 promotions are data-driven
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
