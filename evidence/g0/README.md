@@ -3,6 +3,12 @@
 This directory contains small schemas, pending templates and future summaries.
 It contains no completed physical-device measurement yet.
 
+`npm run evidence:verify` returning success proves only that the templates and
+records currently present are structurally and cross-referentially valid. A
+pending-only repository is expected to pass that command; verifier success is
+not G0 completion and cannot replace the exit evidence in
+`docs/specs/03-gates-and-delivery.md`.
+
 - `schema/device-environment.schema.json`: privacy-safe device/environment
   identity for a repeatable test class.
 - `schema/run-record.schema.json`: one fixture/build/environment measurement.

@@ -1,6 +1,7 @@
 # LociView project map
 
 > Status: `CURRENT` map; repository-normalization baseline `fc7054f` (2026-08-18).
+> That baseline is a historical normalization anchor, not a checkout target. Use Git `HEAD` and `tasks/todo.md` for the active checkpoint.
 > Gaussian Splatting, multiple simultaneous models, Automerge, content-addressed storage, and renderer backends are `PROPOSED`, not current behavior.
 
 ## Start here
@@ -89,17 +90,16 @@ For v1, distinguish:
 - Viewer, OPFS, PWA, and physical-iOS behavior are not fully covered by automated tests.
 - Some 2026-07 documents describe intended behavior that the code never implemented. Consult `docs/README.md` before treating prose as current.
 
-The following risks are observed in the current code and are not fixed by G-1:
+The following residual risks are observed in the current code:
 
 | Risk | Reproduction condition / impact | Evidence area |
 |---|---|---|
 | Non-atomic cross-tab append | OPFS append obtains size then writes at that position without a cross-tab lock | `src/platform/opfs.ts` |
-| Poisoned write queue | One rejected queued append can prevent later queued writes while memory/UI continues changing | `src/core/store.ts` |
-| Unsafe imported map keys | Imported operation entity/id values are used with ordinary objects; reserved prototype keys require stricter validation or `Map`/null-prototype storage | `src/core/schema.ts`, `src/core/reduce.ts` |
-| Non-transactional binary/document update | Package/model replacement can update operations and blobs in separate steps; interruption or concurrent replacement can leave missing/stale references | `src/assets/package.ts`, `src/assets/modelAsset.ts` |
+| Incomplete operation field/collision policy | Decoded structural validation and Map-backed internal indexes are hardened, but known-field control/identity policy and typed divergent-key reporting/resolution remain incomplete | `src/core/schema.ts`, `src/core/merge.ts`, `src/core/reduce.ts` |
+| Non-atomic shared transaction | Bounded blob-first and marker-last paths are hardened, but shared merge/replacement and actor-log publication still lack one browser-proven lock/journal transaction | `src/assets/package.ts`, `src/assets/modelAsset.ts`, `src/core/store.ts` |
 | Whole-buffer large-file path | Package and asset paths can hold full ZIP/entry buffers, conflicting with large GS and iOS memory goals | `src/assets/zipio.ts`, `src/assets/package.ts`, `src/platform/fs.ts` |
 
-These are G0 regression inputs and blocking items for the `G0-S` v1 safety-stabilization gate in `tasks/todo.md`. Local stores now self-issue distinct writer actors, but shared external-actor paths and multi-file transactions still lack a browser-proven lock; do not claim conflict-free multi-tab durability from the current v1 implementation.
+The former poisoned-write-queue root is fixed and remains under regression coverage; it is not a current unimplemented risk. The residual rows above are G0 regression inputs and blocking items for the `G0-S` v1 safety-stabilization gate in `tasks/todo.md`. Local stores now self-issue distinct writer actors, but shared external-actor paths and multi-file transactions still lack a browser-proven lock; do not claim conflict-free multi-tab durability from the current v1 implementation.
 
 The executable `G0S-*` cases use Vitest `it.fails` while the defects remain in
 v1. They assert the desired safe invariant: an unexpected pass makes the suite

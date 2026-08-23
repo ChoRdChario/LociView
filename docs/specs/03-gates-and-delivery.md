@@ -112,7 +112,7 @@ Acceptance `G0S-TAB`:
 
 ### 3.2 Recoverable durable-write queue
 
-Current rejected append can poison the promise chain while memory/UI continues. Required state is `queued -> writing -> durable` or `failed/retryable`.
+The recorded unfixed v1 baseline allowed a rejected append to poison the promise chain while memory/UI continued. The current production root now exposes `queued -> writing -> durable` or `failed/retryable` and remains under the acceptance regression below; device durability and overall G0-S exit remain open.
 
 Acceptance `G0S-WRITE`:
 

@@ -52,4 +52,4 @@ Reopen the relevant part of this ADR only when evidence shows one of the followi
 - a local packer and web application require a genuinely shared schema/build package, making a small monorepo beneficial;
 - the fixed three-frame/Sim(3) model cannot represent validated target data.
 
-The concise accepted direction remains in `docs/v2/00-approved-direction.md`. Review-ready gate details and the MVP contract are now expanded under `docs/specs/`; they remain proposed until product-owner approval.
+The concise accepted direction remains in `docs/v2/00-approved-direction.md`. The product owner approved the implementation contracts under `docs/specs/` on 2026-08-19. Their v2 architecture remains gated and not implemented; current G0/G0-S progress is tracked in `tasks/todo.md`.

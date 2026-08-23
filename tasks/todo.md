@@ -802,6 +802,7 @@ Review record:
 - [x] Reconfirm that G0/G0-S remain active: the durable queue and several operation/blob/package roots are fixed, but physical-iOS evidence, measured baselines and approved thresholds are absent; shared-path locking/journaling, typed quarantine/collision resolution and migration recipe authority remain blocked
 - [x] Audit the production-first trend: slices 31–34 changed production +258/-32 versus tests +131/-46, added no expected failure/todo and promoted 93 runtime expectations, but S34's six added production lines and repeated ZIP/manifest micro-slices show declining marginal gate value
 - [x] Select a fresh Codex session instead of continuing this compressed thread. Start it at absolute canonical root `G:/00_AI_dev/LociView`, use one writer plus at most two parallel read-only auditors, and run focused/typecheck/diff-check/full/fixture/evidence/build verification serially
+- [x] Complete a repository-only cold-start handoff audit and reconcile stale current-risk, approval-state, queue-baseline and evidence-verifier wording without production, test or slice-35 changes
 
 Handoff:
 
@@ -815,7 +816,8 @@ Handoff:
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
 - [ ] Complete target-device record: iPhone 14 Pro is fixed as the oldest physical-iOS alpha target; add desktop and tablet-PC OS/browser/RAM/GPU details
 - [ ] Measure current load, memory, frame-time, picking, and package baselines
-- [ ] Add and confirm failing G0-S characterization tests on the unfixed v1 baseline
+- [ ] Map every `03-gates-and-delivery.md` section 2.1–2.4 fixture, trace, device and threshold requirement to a restorable source/status before claiming G0 evidence coverage; the high-level checklist and a successful `evidence:verify` are not completion proof
+- [ ] Complete the G0-S pre-fix reproduction ledger: for each known case record the unfixed code commit, compatible test revision, exact reproduction command/procedure, observed failing assertion/disposition and restorable evidence locator; current green regressions do not retroactively prove the baseline
 - [ ] Approve support guarantees, degradation behavior, and Go/No-Go thresholds
 
 ## G0-S — v1 safety stabilization (blocking before G1 feature work)
