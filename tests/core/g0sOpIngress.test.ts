@@ -81,7 +81,6 @@ type TestMode = 'pass' | 'xfail';
 
 const OPEN_KNOWN_DEFECTS = new Set([
   'opaque-known-title-control',
-  'opaque-duplicate-nested-key',
   'opaque-known-kind-wrong-id-prefix',
   'opaque-noncanonical-user',
   'opaque-known-kind-malformed-ulid',

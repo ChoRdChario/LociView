@@ -2,6 +2,7 @@
 // 可変状態は持たせない。可変なものはすべて ops から導出する。
 
 import { newId } from './ids';
+import { parseJsonWithoutDuplicateMembers } from './json';
 import { cloneValidatedJsonObject } from './schema';
 
 export const MANIFEST_FORMAT = 'lociview-project';
@@ -31,7 +32,7 @@ export function createManifest(name: string, now: Date = new Date()): ProjectMan
 export function parseManifest(text: string): ProjectManifest {
   let x: unknown;
   try {
-    x = JSON.parse(text);
+    x = parseJsonWithoutDuplicateMembers(text);
   } catch {
     throw new Error('manifest: invalid JSON');
   }

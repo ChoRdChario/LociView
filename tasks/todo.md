@@ -745,6 +745,31 @@ Review record:
 - Verification passed on the exact source/test tree: focused 2 files / 258 passing tests plus 11 todos; full 32 files / 1,028 passing tests plus 21 todos; TypeScript typecheck; fixture verification (10 Git entries / 708,867 bytes, one unratified GS candidate); evidence verification (3 pending device templates / 0 run, environment or artifact records); and the production build (96 modules / 11 PWA precache entries, 888.80 KiB). The existing large viewer chunk warning is approximately 803.47 kB
 - Independent production/runtime and exact-closure reviews found no unresolved P0/P1 or future-correct complexity obstruction. Production changed only `zipio.ts` (+20/-18), while the two existing test files changed +15/-9; direct `it.fails` declarations remain 17 because the 12 promotions are data-driven
 
+### Post-slice-32 gate/strategy checkpoint
+
+- [x] Recount the clean `2017a5a` baseline as 67 runtime expected failures, 17 direct `it.fails` declarations and 21 todos: raw duplicate JSON 17, operation field/identity policy 14, same-key collision 6, invalid ZIP UTF-8/special mode 12, future schema 2, transaction/tab publication 10 and migration 6
+- [x] Rank duplicate-aware raw JSON ingress first because one shared preflight closes 15 manifest and 2 operation expectations with existing exact authority and escaped-singleton/different-scope controls; keep special-mode and payload/raw-name UTF-8 roots separate
+- [x] Keep the parser stop rule explicit: reuse the audited iterative grammar shape, delegate value construction to standard `JSON.parse`, add no dependency or test matrix, and stop if work expands into byte decoding, raw NFC rewriting, canonical serialization/digest, budgets, typed evidence or schema policy
+
+### G0 stabilization slice 33 — duplicate-aware raw JSON ingress
+
+- [x] Add one iterative O(text length) preflight that parses exactly one JSON value, tracks decoded member names in a separate Set for every object scope and rejects exact or escape-equivalent duplicates before ordinary value construction
+- [x] Route `parseManifest` and every nonempty `parseOpsJsonl` line through the shared preflight, preserving manifest throw semantics, JSONL line-error/skip behavior, raw persisted operation evidence and the S29/S31 decoded ownership/shape gate
+- [x] Preserve unique escaped keys, identical decoded keys in different object scopes, arrays, string-contained punctuation, whitespace and standard number/literal syntax without rewriting raw spelling, order or values
+- [x] Promote exactly the 17 existing runtime expectations: five manifest ambiguity cases × inactive/sentinel/old-authority assertions plus the one operation duplicate case at open and package ingress
+- [x] Keep malformed UTF-8 bytes/names, raw NFC rewriting, schema policy, canonical digest/same-operation collision, typed evidence/quarantine and depth/node/string budgets explicitly open
+- [x] Run focused/full tests, typecheck, fixture/evidence verification and production build; complete independent grammar, complexity, exact-closure and scope/churn review before a separate commit
+
+Review record:
+
+- A new core preflight scans exactly one JSON value with an iterative root/object/array state machine. Each live object owns its decoded-key Set, so exact and escape-equivalent duplicates are rejected while identical names in parent, child or sibling objects remain valid; final value construction and number/string semantics stay with standard `JSON.parse`
+- `parseManifest` now rejects duplicate members before decoded validation/projection, while `parseOpsJsonl` records the affected line as invalid JSON and continues. Existing manifest throw behavior, JSONL skip/error handling, raw persisted operation evidence and the S29/S31 ownership/shape checks remain unchanged
+- Five manifest ambiguity cases now satisfy all three inactive/sentinel/old-authority assertions, and the existing operation duplicate case satisfies open and package ingress, promoting exactly 17 runtime expectations. No new fixture, parameter matrix or test case was added
+- The existing ordinary ambiguity control now proves an escaped singleton and equal decoded names in different scopes; a paired direct control accepts nested JSON-like punctuation and escaped quotes, then rejects only its post-nesting root escape-equivalent duplicate, fixing parent-scope restoration and string-boundary reach without constraining error wording
+- Malformed UTF-8 bytes/names, raw NFC rewriting, schema policy, canonical serialization/digest and same-operation collision, typed evidence/quarantine and depth/node/string budgets remain open
+- Verification passed on the exact source/test tree: focused 2 files / 534 passing tests plus 13 todos; full 32 files / 1,028 passing tests plus 21 todos; TypeScript typecheck; fixture verification (10 Git entries / 708,867 bytes, one unratified GS candidate); evidence verification (3 pending device templates / 0 run, environment or artifact records); and the production build (97 modules / 11 PWA precache entries, 890.73 KiB). The existing large viewer chunk warning is approximately 805.44 kB
+- Independent production/runtime and exact-closure reviews found no unresolved P0/P1 after the punctuation success/reject pair was added. Production changed three files (+184/-2, including the 180-line shared scanner); the two existing tests changed +17/-2, direct `it.fails` declarations remain 17 and runtime expected failures fall from 67 to 50
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes

@@ -1,6 +1,7 @@
 // ops/*.jsonl の読み書き (docs/02 §4.1, §8)
 // 不正行は例外にせずスキップして警告リストに積む（1行の破損でログ全体を失わない）。
 
+import { parseJsonWithoutDuplicateMembers } from './json';
 import { cloneValidatedOp, type Op } from './schema';
 
 export const MAX_LINE_CHARS = 65536;
@@ -38,7 +39,7 @@ export function parseOpsJsonl(text: string): JsonlParseResult {
     }
     let parsed: unknown;
     try {
-      parsed = JSON.parse(line);
+      parsed = parseJsonWithoutDuplicateMembers(line);
     } catch {
       errors.push({ line: i + 1, reason: 'invalid JSON' });
       continue;

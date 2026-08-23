@@ -1992,6 +1992,22 @@ describe('G0 characterization: malicious ZIP envelope', () => {
         label: 'nested escaped singleton',
         '\u00e9': 'nested NFC singleton',
       });
+      const nestedPunctuationMember = '"futureAfterName":{"text":"} , \\" name"}';
+      const separatedScopeControl = rawManifestWithExtra(nestedPunctuationMember);
+      const separatedScopeDecoded = JSON.parse(separatedScopeControl) as Record<string, unknown>;
+      expect({
+        name: parseManifest(separatedScopeControl).name,
+        futureAfterName: separatedScopeDecoded.futureAfterName,
+      }).toEqual({
+        name: 'malicious envelope fixture',
+        futureAfterName: { text: '} , " name' },
+      });
+      const separatedRootDuplicate = rawManifestWithExtra(
+        `${nestedPunctuationMember},"n\\u0061me":"duplicate after nested"`,
+      );
+      expect((JSON.parse(separatedRootDuplicate) as Record<string, unknown>).name)
+        .toBe('duplicate after nested');
+      expect(() => parseManifest(separatedRootDuplicate)).toThrow();
     });
 
     it('registers both isolated invalid-scalar cases and reproduces every ZIP byte-for-byte', () => {
@@ -2611,7 +2627,7 @@ describe('G0 characterization: malicious ZIP envelope', () => {
     });
 
     for (const ambiguityCase of MANIFEST_AMBIGUITY_CASES) {
-      const testCase = ambiguityCase.relation === 'nfc-collision' ? it : it.fails;
+      const testCase = it;
       testCase(`${ambiguityCase.id}: never publishes a candidate completion marker`, () => {
         expect(manifestAmbiguityResults[ambiguityCase.id].completionMarkerNeverPublished)
           .toBe(true);
