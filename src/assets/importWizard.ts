@@ -7,6 +7,7 @@
 // 表示セット・ビュー・マテリアル設定まで引き継ぐ。
 
 import { entityIdFor, ProjectStore, type Identity } from '../core/store';
+import { visibleEntities } from '../core/reduce';
 import {
   analyzeLociMyuSheets,
   isLociMyuCaptionSheet,
@@ -17,15 +18,49 @@ import { parseCsv } from '../io/csv';
 import { looksLikeXlsx, readXlsx } from '../io/xlsx';
 import type { WorkspaceFS } from '../platform/fs';
 import { detectFormat } from '../viewer/loaders';
+import { writeVerifiedBytes } from './verifiedWrite';
 import type { ZipEntryData } from './zipio';
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|avif)$/i;
 const VIDEO_EXT = /\.(mp4|mov|webm|m4v)$/i;
+const encoder = new TextEncoder();
+
+function bytesEqual(actual: Uint8Array, expected: Uint8Array): boolean {
+  return actual.length === expected.length &&
+    actual.every((value, index) => value === expected[index]);
+}
+
+interface AssetWriteReceipt {
+  readonly byteLength: number;
+  readonly sha256: Uint8Array;
+}
+
+async function assetWriteReceipt(bytes: Uint8Array): Promise<AssetWriteReceipt> {
+  const digestInput = new Uint8Array(bytes);
+  return {
+    byteLength: bytes.length,
+    sha256: new Uint8Array(await crypto.subtle.digest('SHA-256', digestInput.buffer)),
+  };
+}
 
 export interface ForeignFile {
   path: string;
   name: string;
   data: Uint8Array;
+}
+
+function takeForeignFileSnapshot(files: readonly ForeignFile[]): ForeignFile[] {
+  return files.map((file) => {
+    const snapshot = {
+      path: file.path,
+      name: file.name,
+      data: new Uint8Array(file.data),
+    };
+    // applyImportPlan is a one-shot ownership transfer. Clearing each source as
+    // it is copied keeps the caller and action buffers from doubling peak use.
+    (file as { data: Uint8Array }).data = new Uint8Array(0);
+    return snapshot;
+  });
 }
 
 /** 1つのスプレッドシート（xlsx/csv）ファイル由来のシート群 */
@@ -226,30 +261,57 @@ export async function applyImportPlan(
   plan: ImportPlan,
   opts: ImportOptions,
 ): Promise<ImportResult> {
+  // Snapshot every caller-owned value before the first await. The wizard is a
+  // one-shot consumer, so large source buffers are transferred into these
+  // independent copies and released progressively after their verified write.
+  const projectName = opts.projectName;
+  const optimizeModel = opts.optimizeModel;
+  const imageLinks = opts.imageLinks === undefined ? undefined : new Map(opts.imageLinks);
+  const actionIdentity: Identity = {
+    userId: identity.userId,
+    deviceId: identity.deviceId,
+    ...(identity.displayName === undefined ? {} : { displayName: identity.displayName }),
+  };
+  const migration = plan.migration === null ? null : structuredClone(plan.migration);
+  const fileIdMap = new Map(plan.fileIdMap);
+  const models = takeForeignFileSnapshot(plan.models);
+  const images = takeForeignFileSnapshot(plan.images);
+  const videos = takeForeignFileSnapshot(plan.videos);
+  plan.migration = null;
+  plan.fileIdMap.clear();
+
   const dir = `projects/${entityIdFor('meta')}`;
-  const store = await ProjectStore.create(fs, dir, opts.projectName, identity);
+  const store = await ProjectStore.createUnpublished(fs, dir, projectName, actionIdentity);
+  const assetWriteReceipts = new Map<string, AssetWriteReceipt>();
+  const requiredOriginalPaths = new Set<string>();
 
   // ---- アセット（モデル・画像・映像）----------------------------------------
   const assetIdByName = new Map<string, string>();
   const writeAsset = async (f: ForeignFile, kind: 'model' | 'image' | 'video'): Promise<string> => {
     const astId = entityIdFor('asset');
+    const originalBytes = new Uint8Array(f.data);
     // 拡張子が無い/不明な画像はマジックバイトで補う（保存パスと表示に拡張子が要るため）
     const nameExt = f.name.includes('.') ? f.name.split('.').pop()!.toLowerCase() : '';
-    const ext = nameExt !== '' ? nameExt : (kind === 'image' ? sniffImageExt(f.data) ?? 'bin' : 'bin');
+    const ext = nameExt !== '' ? nameExt : (kind === 'image' ? sniffImageExt(originalBytes) ?? 'bin' : 'bin');
     const path = `${kind === 'model' ? 'models' : 'media'}/${astId}.${ext}`;
-    const size = f.data.length;
-    await fs.writeBytes(`${dir}/${path}`, f.data);
+    const size = originalBytes.length;
+    await writeVerifiedBytes(fs, `${dir}/${path}`, originalBytes);
+    assetWriteReceipts.set(path, await assetWriteReceipt(originalBytes));
+    requiredOriginalPaths.add(path);
 
     // GLBは軽量版を生成（原本は上で保存済み。表示は軽量版を使う=原本主義）
     let optimizedPath: string | undefined;
     let optimizedSize: number | undefined;
-    if (kind === 'model' && opts.optimizeModel !== undefined && ext === 'glb') {
+    if (kind === 'model' && optimizeModel !== undefined && ext === 'glb') {
       try {
-        const opt = await opts.optimizeModel(f.data);
+        const opt = await optimizeModel(originalBytes);
         if (opt !== null) {
-          optimizedPath = `models/${astId}.opt.glb`;
-          optimizedSize = opt.length;
-          await fs.writeBytes(`${dir}/${optimizedPath}`, opt);
+          const candidatePath = `models/${astId}.opt.glb`;
+          const candidateBytes = new Uint8Array(opt);
+          await writeVerifiedBytes(fs, `${dir}/${candidatePath}`, candidateBytes);
+          assetWriteReceipts.set(candidatePath, await assetWriteReceipt(candidateBytes));
+          optimizedPath = candidatePath;
+          optimizedSize = candidateBytes.length;
         }
       } catch {
         // 軽量化に失敗しても原本で続行する
@@ -278,12 +340,12 @@ export async function applyImportPlan(
   };
 
   let firstModelId: string | null = null;
-  for (const f of plan.models) {
+  for (const f of models) {
     const id = await writeAsset(f, 'model');
     if (firstModelId === null) firstModelId = id;
   }
-  for (const f of plan.images) await writeAsset(f, 'image');
-  for (const f of plan.videos) await writeAsset(f, 'video');
+  for (const f of images) await writeAsset(f, 'image');
+  for (const f of videos) await writeAsset(f, 'video');
 
   // ---- 表示セット・キャプション ---------------------------------------------
   let captionCount = 0;
@@ -292,12 +354,12 @@ export async function applyImportPlan(
   let chromaDisabledCount = 0;
   const setIdByGid = new Map<string, string>();
 
-  if (plan.migration !== null) {
+  if (migration !== null) {
     // 既定セットは移行セットで置き換える（LociMyuのシート=セットをそのまま持ち込む）
     const defaultSets = Object.values(store.state.byKind.set ?? {});
     for (const s of defaultSets) store.dispatch({ t: 'delete', e: 'set', id: s.id });
 
-    plan.migration.sets.forEach((lmSet, order) => {
+    migration.sets.forEach((lmSet, order) => {
       const setId = entityIdFor('set');
       // ビュー・マテリアルはGoogle Sheetsのgidで参照するため、解決済みのlegacyGidで引く
       if (lmSet.legacyGid !== null) setIdByGid.set(lmSet.legacyGid, setId);
@@ -308,7 +370,7 @@ export async function applyImportPlan(
         if (cap.legacyImageFileId !== null) {
           // 1) 手動リンク 2) fileId対応表 の順で解決
           const linkedName =
-            opts.imageLinks?.get(cap.captionId) ?? plan.fileIdMap.get(cap.legacyImageFileId);
+            imageLinks?.get(cap.captionId) ?? fileIdMap.get(cap.legacyImageFileId);
           const astId = linkedName !== undefined ? assetIdByName.get(linkedName) : undefined;
           if (astId !== undefined) {
             attachments.push(astId);
@@ -342,7 +404,7 @@ export async function applyImportPlan(
     });
 
     // ---- ビュー ----
-    for (const v of plan.migration.views) {
+    for (const v of migration.views) {
       const setId = setIdByGid.get(v.sheetGid) ?? [...setIdByGid.values()][0];
       if (setId === undefined) continue;
       store.dispatch({
@@ -359,7 +421,7 @@ export async function applyImportPlan(
     }
 
     // ---- マテリアル設定 ----
-    for (const m of plan.migration.materials) {
+    for (const m of migration.materials) {
       const setId = setIdByGid.get(m.sheetGid) ?? [...setIdByGid.values()][0];
       // モデルが同梱されていなくても設定は捨てず、modelAssetId=null で保持する
       // （後からモデルを追加したときに再割り当てできる）
@@ -390,11 +452,68 @@ export async function applyImportPlan(
   }
 
   await store.flush();
+  const referencedPaths = new Set<string>();
+  for (const asset of visibleEntities(store.state, 'asset')) {
+    const path = asset.fields.path;
+    const size = asset.fields.size;
+    if (
+      typeof path !== 'string' ||
+      path.length === 0 ||
+      !Number.isSafeInteger(size) ||
+      Number(size) < 0
+    ) {
+      throw new Error(`wizard: invalid asset authority for ${asset.id}`);
+    }
+    const expected = assetWriteReceipts.get(path);
+    const stored = await fs.readBytes(`${dir}/${path}`);
+    if (
+      expected === undefined ||
+      expected.byteLength !== size ||
+      stored === null ||
+      stored.length !== expected.byteLength ||
+      !bytesEqual((await assetWriteReceipt(stored)).sha256, expected.sha256)
+    ) {
+      throw new Error(`wizard: asset verification failed for ${path}`);
+    }
+    referencedPaths.add(path);
+
+    const optimizedPath = asset.fields.optimizedPath;
+    const optimizedSize = asset.fields.optimizedSize;
+    if (optimizedPath === undefined && optimizedSize === undefined) continue;
+    if (
+      typeof optimizedPath !== 'string' ||
+      optimizedPath.length === 0 ||
+      !Number.isSafeInteger(optimizedSize) ||
+      Number(optimizedSize) < 0
+    ) {
+      throw new Error(`wizard: invalid optimized asset authority for ${asset.id}`);
+    }
+    const expectedOptimized = assetWriteReceipts.get(optimizedPath);
+    const storedOptimized = await fs.readBytes(`${dir}/${optimizedPath}`);
+    if (
+      expectedOptimized === undefined ||
+      expectedOptimized.byteLength !== optimizedSize ||
+      storedOptimized === null ||
+      storedOptimized.length !== expectedOptimized.byteLength ||
+      !bytesEqual((await assetWriteReceipt(storedOptimized)).sha256, expectedOptimized.sha256)
+    ) {
+      throw new Error(`wizard: optimized asset verification failed for ${optimizedPath}`);
+    }
+    referencedPaths.add(optimizedPath);
+  }
+  if ([...requiredOriginalPaths].some((path) => !referencedPaths.has(path))) {
+    throw new Error('wizard: planned original asset is not referenced by durable metadata');
+  }
+  await writeVerifiedBytes(
+    fs,
+    `${dir}/lociview.json`,
+    encoder.encode(JSON.stringify(store.manifest, null, 2)),
+  );
   return {
     dir,
     projectId: store.manifest.projectId,
     captionCount,
-    setCount: plan.migration?.sets.length ?? 1,
+    setCount: migration?.sets.length ?? 1,
     linkedImages,
     unlinkedImages,
     chromaDisabledCount,

@@ -531,6 +531,36 @@ Review record:
 - Verification passed: 4 focused files / 349 passing tests plus 13 todos, 31 full-suite files / 1,010 passing tests plus 21 todos, fixture verification (10 Git entries / 708,867 bytes, one unratified GS candidate), evidence verification (3 pending device templates / 0 run, environment or artifact records), TypeScript typecheck, and the production build (95 modules / 11 PWA precache entries). The existing 799.21 kB viewer-chunk warning remains
 - Independent implementation/runtime, exact-closure and false-green reviews reported no unresolved P0/P1. Manifest-prefix/process-crash atomicity, same-directory cross-context locking, full G0S-OP and unknown-future-reference policy, wizard/caption parity, actor-log partial recovery, cleanup/GC, streaming/CAS, device durability and G0S-BLOB/G0-S completion remain explicitly unclaimed
 
+### Post-slice-24 gate/strategy checkpoint
+
+- [x] Re-rank the remaining G0/G0-S work by user-data severity, dependency, existing acceptance strength and bounded production readiness instead of continuing the previous slice sequence by inertia
+- [x] Keep the production-fix lane active: S21-S24 retired separate queue, merge, actor-collision and native-activation defects, so another tests-only characterization slice is not justified
+- [x] Rank full G0S-OP hardening highest by security severity but not as one immediate slice: duplicate-aware raw parsing, opaque evidence, known-field quarantine and canonical collision reporting must be separated before implementation
+- [x] Keep G0S-TAB shared-path locking behind the real browser/OPFS, project-scoping and lock-unavailable read-only contract rather than substituting a same-process model
+- [x] Select wizard inactive verified activation as the next bounded root fix because its marker-first and unverified-blob defects are live, its dependencies are local, and the existing S16 oracle already covers the publication boundary
+- [x] Apply a stop rule: do not add a standalone characterization matrix; stop and re-plan if the fix requires a general transaction API, typed quarantine/digest policy, browser lock, or atomic filesystem primitive
+
+### G0 stabilization slice 25 — verified import-wizard activation
+
+- [x] Add one narrow unpublished `ProjectStore` initialization seam so wizard metadata can be built and flushed without exposing a completion marker; preserve the existing ordinary create path
+- [x] Route wizard original model/media and optional optimized bytes through the shared exact post-write verifier, and publish optimized metadata only after its candidate bytes verify
+- [x] Flush the complete operation log, recheck the referenced original/nonempty-optimized asset closure, then write and verify the manifest marker last
+- [x] Bind fulfilled actions to the exact expected result/closure and rejected actions to marker-absent or exact-complete authority; retain caller-owned source isolation and allow private inactive orphans
+- [x] Promote only the existing marker/order and handled interruption expectations satisfied by this root fix; keep marker-prefix/process-crash atomicity expected-failing
+- [x] Add the smallest resolved-success integration controls needed to prove each distinct wizard write role reaches exact verification, reusing existing closure helpers rather than adding a broad new matrix
+- [x] Keep caption attachment, native package, actor-log atomic recovery, same-directory locking, cleanup/GC, streaming/CAS, device evidence and full G0S-BLOB/G0-S completion out of scope
+- [x] Run focused/full verification and three independent implementation/closure/false-green reviews, then record the exact promotion count and remaining blockers before commit
+
+Review record:
+
+- Added `ProjectStore.createUnpublished()` as a wizard-only initialization seam while preserving the existing marker-first `create()` behavior and its focused regression coverage
+- `applyImportPlan()` now snapshots caller identity/options/migration/maps and one-shot source files before its first await, verifies original model/media and optional optimized bytes before publishing their metadata, flushes the full log, rechecks every referenced path with compact SHA-256 receipts, and verifies the manifest marker last
+- The activation oracle now binds full state/all operations/vector/recursive active-log inventory/referenced bytes and every project marker at marker start/commit. It permits exact deactivate/no-op cleanup and inactive repair/republication, but rejects partial markers or mutation of active authority; caller aliases, mutable objects/options/identity and all three write roles are reached by ordinary controls
+- Promoted 6 existing runtime expected failures to ordinary assertions (marker-last plus 5 handled interruption safety rows). The root-marker-prefix row remains expected-failing because WorkspaceFS has no atomic activation primitive. Added 5 ordinary runtime controls: 3 resolved wrong-byte roles, one post-verification receipt recheck control covering original/optimized/media, and one call-entry snapshot control
+- Verification passed on the exact final tree: 4 focused files / 75 tests, 31 full-suite files / 1,015 passing tests plus 21 todos, TypeScript typecheck, fixture verification (10 Git entries / 708,867 bytes; one unratified GS candidate), evidence verification (3 pending device templates / 0 run, environment or artifact records), and production build (95 modules / 11 PWA precache entries, 884.03 KiB). The existing 799.39 kB viewer-chunk warning remains
+- Three independent production/runtime, closure/future-correctness and false-green/scope reviews found no unresolved P0/P1. The test diff is intentionally larger than the production seam because the pre-existing publication oracle did not bind point-in-time authority; the scope review found no standalone characterization matrix or safely removable oracle group
+- Manifest-prefix/process-crash atomicity, caption attachment, native-package behavior beyond S24, actor-log partial recovery, same-directory cross-context locking, cleanup/GC, streaming/CAS, device durability/evidence and full G0S-BLOB/G0-S completion remain explicitly unclaimed
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes

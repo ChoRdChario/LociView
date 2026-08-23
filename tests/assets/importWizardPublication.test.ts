@@ -16,12 +16,13 @@ import {
 import { visibleEntities } from '../../src/core/reduce';
 import type { Op } from '../../src/core/schema';
 import { ProjectStore, type Identity } from '../../src/core/store';
-import type { WorkspaceFS } from '../../src/platform/fs';
+import { MemoryFS, type WorkspaceFS } from '../../src/platform/fs';
 import {
   FaultInjectingMemoryFS,
   type FaultEvent,
   type FaultOutcome,
 } from '../helpers/faultFs';
+import { ResolvedCorruptingMemoryFS } from '../helpers/resolvedCorruptingFs';
 
 const USER: Readonly<Identity> = Object.freeze({
   userId: 'usr_00000000000000000000000080',
@@ -55,8 +56,58 @@ interface WizardClosure {
 interface WizardFaultResult {
   inputShapeValid: boolean;
   faultReached: boolean;
-  safety: boolean;
+  closureSafe: boolean;
+  outcomeBound: boolean;
+  publicationHistorySafe: boolean;
 }
+
+type ImportActionOutcome =
+  | { status: 'fulfilled'; result: ImportResult }
+  | { status: 'rejected'; result: null };
+
+type ResolvedWriteRole = 'original-model' | 'optimized-model' | 'image-media';
+
+interface ResolvedWriteResult {
+  inputShapeValid: boolean;
+  optimizerInputExact: boolean;
+  faultReached: boolean;
+  verificationObserved: boolean;
+  closureSafe: boolean;
+  outcomeBound: boolean;
+  publicationHistorySafe: boolean;
+}
+
+type ReceiptRecheckRole = ResolvedWriteRole;
+
+interface ReceiptRecheckResult {
+  inputShapeValid: boolean;
+  initialVerificationReturnedExact: boolean;
+  corruptionInjected: boolean;
+  closureSafe: boolean;
+  outcomeBound: boolean;
+  publicationHistorySafe: boolean;
+}
+
+interface SnapshotResult {
+  inputShapeValid: boolean;
+  pauseReached: boolean;
+  pauseBeforeEffects: boolean;
+  optimizerInputExact: boolean;
+  outcomeBound: boolean;
+  closureSafe: boolean;
+  publicationHistorySafe: boolean;
+}
+
+interface MarkerPointSnapshot {
+  readonly eventStartIndex: number;
+  readonly path: string;
+  readonly files: ReadonlyMap<string, Uint8Array | null>;
+}
+
+type MarkerHistoryFS = FaultInjectingMemoryFS & {
+  readonly markerStarts: readonly MarkerPointSnapshot[];
+  readonly markerCommits: readonly MarkerPointSnapshot[];
+};
 
 function bytesEqual(actual: Uint8Array | null, expected: Uint8Array): boolean {
   return actual !== null &&
@@ -198,11 +249,16 @@ function wizardLogActor(path: string): string | null {
 }
 
 function isOptimizedModelPath(path: string): boolean {
-  return /^projects\/meta_[0-7][0-9A-HJKMNP-TV-Z]{25}\/models\/ast_[0-7][0-9A-HJKMNP-TV-Z]{25}\.opt\.glb$/.test(path);
+  return /^projects\/meta_[0-7][0-9A-HJKMNP-TV-Z]{25}\/models\/[^/]+\.opt\.glb$/.test(path);
+}
+
+function isOriginalModelPath(path: string): boolean {
+  return /^projects\/meta_[0-7][0-9A-HJKMNP-TV-Z]{25}\/models\/[^/]+\.glb$/.test(path) &&
+    !path.endsWith('.opt.glb');
 }
 
 function isImagePath(path: string): boolean {
-  return /^projects\/meta_[0-7][0-9A-HJKMNP-TV-Z]{25}\/media\/ast_[0-7][0-9A-HJKMNP-TV-Z]{25}\.png$/.test(path);
+  return /^projects\/meta_[0-7][0-9A-HJKMNP-TV-Z]{25}\/media\/[^/]+\.png$/.test(path);
 }
 
 function isRootMarkerPath(path: string): boolean {
@@ -213,10 +269,73 @@ function isProjectListingMarkerPath(path: string): boolean {
   return path.startsWith('projects/') && path.endsWith('/lociview.json');
 }
 
+function isActiveLogPath(dir: string, path: string): boolean {
+  const prefix = `${dir}/ops/`;
+  return path.startsWith(prefix) && path.slice(prefix.length).endsWith('.jsonl');
+}
+
+function vectorMatchesOps(
+  vector: Readonly<Record<string, number>>,
+  ops: readonly Pick<Op, 'actor' | 'op'>[],
+): boolean {
+  const expected: Record<string, number> = {};
+  for (const op of ops) {
+    if ((expected[op.actor] ?? 0) < op.op) expected[op.actor] = op.op;
+  }
+  return isDeepStrictEqual(vector, expected);
+}
+
+async function snapshotProjectFiles(
+  fs: FaultInjectingMemoryFS,
+): Promise<ReadonlyMap<string, Uint8Array | null>> {
+  const pending = (await fs.list('projects/')).map((path) => ({ path, bytes: fs.readBytes(path) }));
+  const files = new Map<string, Uint8Array | null>();
+  for (const item of pending) files.set(item.path, await item.bytes);
+  return files;
+}
+
+async function markerStartFiles(
+  fs: FaultInjectingMemoryFS,
+  path: string,
+): Promise<ReadonlyMap<string, Uint8Array | null> | null> {
+  return isProjectListingMarkerPath(path) ? snapshotProjectFiles(fs) : null;
+}
+
+async function captureMarkerMutation(
+  fs: FaultInjectingMemoryFS,
+  captured: Set<number>,
+  starts: MarkerPointSnapshot[],
+  commits: MarkerPointSnapshot[],
+  path: string,
+  startFiles: ReadonlyMap<string, Uint8Array | null> | null,
+): Promise<void> {
+  if (startFiles === null) return;
+  const event = [...fs.events].reverse().find((candidate) =>
+    candidate.path === path && !captured.has(candidate.startIndex),
+  );
+  if (event === undefined) return;
+  captured.add(event.startIndex);
+  starts.push({
+    eventStartIndex: event.startIndex,
+    path,
+    files: startFiles,
+  });
+  if (event.commitIndex !== null) {
+    commits.push({
+      eventStartIndex: event.startIndex,
+      path,
+      files: await snapshotProjectFiles(fs),
+    });
+  }
+}
+
 class WizardFaultFS extends FaultInjectingMemoryFS {
   private armed = false;
+  private readonly capturedMarkerEvents = new Set<number>();
   matchedPath: string | null = null;
   expectedOutcome: FaultOutcome | null = null;
+  readonly markerStarts: MarkerPointSnapshot[] = [];
+  readonly markerCommits: MarkerPointSnapshot[] = [];
 
   constructor(private readonly boundary: WizardFaultBoundary | null) {
     super();
@@ -270,17 +389,235 @@ class WizardFaultFS extends FaultInjectingMemoryFS {
 
   override async writeText(path: string, text: string): Promise<void> {
     this.armForPayload(path, text);
-    await super.writeText(path, text);
+    const startFiles = await markerStartFiles(this, path);
+    try {
+      await super.writeText(path, text);
+    } finally {
+      await captureMarkerMutation(
+        this,
+        this.capturedMarkerEvents,
+        this.markerStarts,
+        this.markerCommits,
+        path,
+        startFiles,
+      );
+    }
   }
 
   override async appendText(path: string, text: string): Promise<void> {
     this.armForPayload(path, text);
-    await super.appendText(path, text);
+    const startFiles = await markerStartFiles(this, path);
+    try {
+      await super.appendText(path, text);
+    } finally {
+      await captureMarkerMutation(
+        this,
+        this.capturedMarkerEvents,
+        this.markerStarts,
+        this.markerCommits,
+        path,
+        startFiles,
+      );
+    }
+  }
+
+  override async appendBytes(path: string, data: Uint8Array): Promise<void> {
+    this.armForPayload(path, data);
+    const startFiles = await markerStartFiles(this, path);
+    try {
+      await super.appendBytes(path, data);
+    } finally {
+      await captureMarkerMutation(
+        this,
+        this.capturedMarkerEvents,
+        this.markerStarts,
+        this.markerCommits,
+        path,
+        startFiles,
+      );
+    }
   }
 
   override async writeBytes(path: string, data: Uint8Array): Promise<void> {
     this.armForPayload(path, data);
+    const startFiles = await markerStartFiles(this, path);
+    try {
+      await super.writeBytes(path, data);
+    } finally {
+      await captureMarkerMutation(
+        this,
+        this.capturedMarkerEvents,
+        this.markerStarts,
+        this.markerCommits,
+        path,
+        startFiles,
+      );
+    }
+  }
+
+  override async remove(path: string): Promise<void> {
+    const startFiles = await markerStartFiles(this, path);
+    try {
+      await super.remove(path);
+    } finally {
+      await captureMarkerMutation(
+        this,
+        this.capturedMarkerEvents,
+        this.markerStarts,
+        this.markerCommits,
+        path,
+        startFiles,
+      );
+    }
+  }
+}
+
+class WizardResolvedCorruptingMemoryFS extends ResolvedCorruptingMemoryFS {
+  private readonly capturedMarkerEvents = new Set<number>();
+  readonly markerStarts: MarkerPointSnapshot[] = [];
+  readonly markerCommits: MarkerPointSnapshot[] = [];
+
+  private async capture(
+    path: string,
+    startFiles: ReadonlyMap<string, Uint8Array | null> | null,
+  ): Promise<void> {
+    await captureMarkerMutation(
+      this,
+      this.capturedMarkerEvents,
+      this.markerStarts,
+      this.markerCommits,
+      path,
+      startFiles,
+    );
+  }
+
+  override async writeText(path: string, text: string): Promise<void> {
+    const startFiles = await markerStartFiles(this, path);
+    try {
+      await super.writeText(path, text);
+    } finally {
+      await this.capture(path, startFiles);
+    }
+  }
+
+  override async appendText(path: string, text: string): Promise<void> {
+    const startFiles = await markerStartFiles(this, path);
+    try {
+      await super.appendText(path, text);
+    } finally {
+      await this.capture(path, startFiles);
+    }
+  }
+
+  override async writeBytes(path: string, data: Uint8Array): Promise<void> {
+    const startFiles = await markerStartFiles(this, path);
+    try {
+      await super.writeBytes(path, data);
+    } finally {
+      await this.capture(path, startFiles);
+    }
+  }
+
+  override async appendBytes(path: string, data: Uint8Array): Promise<void> {
+    const startFiles = await markerStartFiles(this, path);
+    try {
+      await super.appendBytes(path, data);
+    } finally {
+      await this.capture(path, startFiles);
+    }
+  }
+
+  override async remove(path: string): Promise<void> {
+    const startFiles = await markerStartFiles(this, path);
+    try {
+      await super.remove(path);
+    } finally {
+      await this.capture(path, startFiles);
+    }
+  }
+}
+
+class ReceiptRecheckCorruptingFS extends WizardFaultFS {
+  private readonly expected: Uint8Array;
+  private injected = false;
+  injectedPath: string | null = null;
+  initialVerificationReturnedExact = false;
+  corruptionInjected = false;
+
+  constructor(
+    private readonly matches: (path: string) => boolean,
+    expected: Uint8Array,
+  ) {
+    super(null);
+    this.expected = new Uint8Array(expected);
+  }
+
+  override async readBytes(path: string): Promise<Uint8Array | null> {
+    const bytes = await super.readBytes(path);
+    if (!this.injected && bytesEqual(bytes, this.expected) && this.matches(path)) {
+      const exactResult = new Uint8Array(bytes!);
+      const corrupt = Uint8Array.from(bytes!, (value, index) => index === 0 ? value ^ 0xff : value);
+      this.injected = true;
+      this.injectedPath = path;
+      await super.writeBytes(path, corrupt);
+      this.corruptionInjected = true;
+      this.initialVerificationReturnedExact = true;
+      return exactResult;
+    }
+    return bytes;
+  }
+}
+
+class SnapshotPauseFS extends WizardFaultFS {
+  private paused = false;
+  private releasePause: (() => void) | null = null;
+  private reachPause: (() => void) | null = null;
+  readonly reached = new Promise<void>((resolve) => {
+    this.reachPause = resolve;
+  });
+
+  constructor() {
+    super(null);
+  }
+
+  release(): void {
+    this.releasePause?.();
+    this.releasePause = null;
+  }
+
+  private async pauseBeforeFirstMutation(): Promise<void> {
+    if (this.paused) return;
+    this.paused = true;
+    await new Promise<void>((resolve) => {
+      this.releasePause = resolve;
+      this.reachPause?.();
+      this.reachPause = null;
+    });
+  }
+
+  override async writeText(path: string, text: string): Promise<void> {
+    await this.pauseBeforeFirstMutation();
+    await super.writeText(path, text);
+  }
+
+  override async appendText(path: string, text: string): Promise<void> {
+    await this.pauseBeforeFirstMutation();
+    await super.appendText(path, text);
+  }
+
+  override async writeBytes(path: string, data: Uint8Array): Promise<void> {
+    await this.pauseBeforeFirstMutation();
     await super.writeBytes(path, data);
+  }
+
+  override async appendBytes(path: string, data: Uint8Array): Promise<void> {
+    await this.pauseBeforeFirstMutation();
+    await super.appendBytes(path, data);
+  }
+
+  override async remove(path: string): Promise<void> {
+    await this.pauseBeforeFirstMutation();
+    await super.remove(path);
   }
 }
 
@@ -378,7 +715,8 @@ async function inspectWizardClosure(
   const optimizedExact =
     optimizedPresent &&
     model !== undefined &&
-    optimizedPath === `models/${model.id}.opt.glb` &&
+    isOptimizedModelPath(`${dir}/${optimizedPath}`) &&
+    optimizedPath !== modelPath &&
     model.fields.optimizedSize === OPTIMIZED_BYTES.length &&
     bytesEqual(await fs.readBytes(`${dir}/${optimizedPath}`), OPTIMIZED_BYTES);
   const optimizedAbsent =
@@ -394,13 +732,13 @@ async function inspectWizardClosure(
     ? null
     : {
         kind: 'model',
-        path: `models/${model.id}.glb`,
+        path: modelPath,
         originalName: MODEL_NAME,
         mime: '',
         size: MODEL_BYTES.length,
         ...(optimizedExact
           ? {
-              optimizedPath: `models/${model.id}.opt.glb`,
+              optimizedPath,
               optimizedSize: OPTIMIZED_BYTES.length,
             }
           : {}),
@@ -411,7 +749,7 @@ async function inspectWizardClosure(
     ? null
     : {
         kind: 'image',
-        path: `media/${image.id}.png`,
+        path: imagePath,
         originalName: IMAGE_NAME,
         mime: '',
         size: IMAGE_BYTES.length,
@@ -431,6 +769,10 @@ async function inspectWizardClosure(
     /^ast_[0-7][0-9A-HJKMNP-TV-Z]{25}$/.test(model.id) &&
     /^ast_[0-7][0-9A-HJKMNP-TV-Z]{25}$/.test(image.id) &&
     model.id !== image.id &&
+    typeof modelPath === 'string' &&
+    isOriginalModelPath(`${dir}/${modelPath}`) &&
+    typeof imagePath === 'string' &&
+    isImagePath(`${dir}/${imagePath}`) &&
     isDeepStrictEqual(sets[0]!.fields, expectedSetFields) &&
     isDeepStrictEqual(profiles[0]!.fields, expectedProfileFields) &&
     isDeepStrictEqual(model.fields, expectedModelFields) &&
@@ -486,7 +828,7 @@ async function inspectWizardClosure(
     });
 
   const activeLogPaths = (await fs.list(`${dir}/ops/`))
-    .filter((path) => path.endsWith('.jsonl'))
+    .filter((path) => isActiveLogPath(dir, path))
     .sort();
   const logText = activeLogPaths.length === 1 ? await fs.readText(activeLogPaths[0]!) : null;
   const parsedLog = logText === null ? null : parseOpsJsonl(logText);
@@ -499,11 +841,13 @@ async function inspectWizardClosure(
 
   const modelBytesExact =
     model !== undefined &&
-    modelPath === `models/${model.id}.glb` &&
+    typeof modelPath === 'string' &&
+    isOriginalModelPath(`${dir}/${modelPath}`) &&
     bytesEqual(await fs.readBytes(`${dir}/${modelPath}`), MODEL_BYTES);
   const imageBytesExact =
     image !== undefined &&
-    imagePath === `media/${image.id}.png` &&
+    typeof imagePath === 'string' &&
+    isImagePath(`${dir}/${imagePath}`) &&
     bytesEqual(await fs.readBytes(`${dir}/${imagePath}`), IMAGE_BYTES);
   const complete =
     manifestExact &&
@@ -511,6 +855,7 @@ async function inspectWizardClosure(
     /^projects\/meta_[0-7][0-9A-HJKMNP-TV-Z]{25}$/.test(dir) &&
     stateShapeExact &&
     operationsExact &&
+    vectorMatchesOps(store.vector, store.allOps) &&
     activeLogExact &&
     assets.length === 2 &&
     captions.length === 0 &&
@@ -536,14 +881,15 @@ function matchingFaultEvent(fs: WizardFaultFS): FaultEvent | undefined {
 }
 
 async function markerStartsAfterActiveClosure(
-  fs: WizardFaultFS,
+  fs: FaultInjectingMemoryFS,
   closure: WizardClosure,
 ): Promise<boolean> {
   if (!closure.complete || closure.dir === null) return false;
   const store = await ProjectStore.open(fs, closure.dir, USER);
   const assets = visibleEntities(store.state, 'asset');
-  const activePaths = [
-    ...(await fs.list(`${closure.dir}/ops/`)).filter((path) => path.endsWith('.jsonl')),
+  const activePaths = [...new Set([
+    ...(await fs.list(`${closure.dir}/ops/`))
+      .filter((path) => isActiveLogPath(closure.dir!, path)),
     ...assets.flatMap((asset) => {
       const paths: string[] = [];
       if (typeof asset.fields.path === 'string') paths.push(`${closure.dir}/${asset.fields.path}`);
@@ -552,14 +898,18 @@ async function markerStartsAfterActiveClosure(
       }
       return paths;
     }),
-  ];
+  ])];
   const markerPath = `${closure.dir}/lociview.json`;
-  const markerEvents = fs.events.filter((event) => event.path === markerPath);
-  const closureEvents = activePaths.map((path) => fs.events.filter((event) => event.path === path));
+  const markerEvents = fs.events.filter((event) =>
+    event.path === markerPath && event.commitIndex !== null,
+  );
+  const closureEvents = activePaths.map((path) =>
+    fs.events.filter((event) => event.path === path && event.commitIndex !== null),
+  );
   if (
     markerEvents.length === 0 ||
     activePaths.length === 0 ||
-    closureEvents.some((events) => events.length === 0 || events.some((event) => event.commitIndex === null))
+    closureEvents.some((events) => events.length === 0)
   ) {
     return false;
   }
@@ -570,26 +920,279 @@ async function markerStartsAfterActiveClosure(
   return lastClosureCommit < firstMarkerStart;
 }
 
-async function settleImport(
-  fs: WizardFaultFS,
-  plan: ImportPlan,
-): Promise<{ result: ImportResult | null; optimizerInputExact: boolean }> {
-  let optimizerInputExact = true;
-  let result: ImportResult | null = null;
+interface FinalMarkerAuthority {
+  readonly dir: string;
+  readonly markerPath: string;
+  readonly manifest: unknown;
+  readonly logs: ReadonlyMap<string, readonly Op[]>;
+  readonly blobs: ReadonlyMap<string, Uint8Array>;
+}
+
+async function finalMarkerAuthority(
+  fs: WorkspaceFS,
+  closure: WizardClosure,
+): Promise<FinalMarkerAuthority | null> {
+  if (!closure.complete || closure.dir === null) return null;
+  const markerPath = `${closure.dir}/lociview.json`;
+  const markerText = await fs.readText(markerPath);
+  if (markerText === null) return null;
+  let manifest: unknown;
   try {
-    result = await applyImportPlan(fs, USER, plan, {
+    manifest = JSON.parse(markerText) as unknown;
+  } catch {
+    return null;
+  }
+
+  const logs = new Map<string, readonly Op[]>();
+  const logPaths = (await fs.list(`${closure.dir}/ops/`))
+    .filter((path) => isActiveLogPath(closure.dir!, path))
+    .sort();
+  for (const path of logPaths) {
+    const text = await fs.readText(path);
+    if (text === null) return null;
+    const parsed = parseOpsJsonl(text);
+    if (parsed.errors.length !== 0) return null;
+    logs.set(path, parsed.ops);
+  }
+
+  const store = await ProjectStore.open(fs, closure.dir, USER);
+  const blobPaths = new Set<string>();
+  for (const asset of visibleEntities(store.state, 'asset')) {
+    if (typeof asset.fields.path === 'string') blobPaths.add(`${closure.dir}/${asset.fields.path}`);
+    if (typeof asset.fields.optimizedPath === 'string' && asset.fields.optimizedPath !== '') {
+      blobPaths.add(`${closure.dir}/${asset.fields.optimizedPath}`);
+    }
+  }
+  const blobs = new Map<string, Uint8Array>();
+  for (const path of [...blobPaths].sort()) {
+    const bytes = await fs.readBytes(path);
+    if (bytes === null) return null;
+    blobs.set(path, bytes);
+  }
+  return { dir: closure.dir, markerPath, manifest, logs, blobs };
+}
+
+function markerBytesAreExact(
+  bytes: Uint8Array | null | undefined,
+  expectedManifest: unknown,
+): boolean {
+  if (bytes === null || bytes === undefined) return false;
+  try {
+    return isDeepStrictEqual(
+      JSON.parse(new TextDecoder().decode(bytes)) as unknown,
+      expectedManifest,
+    );
+  } catch {
+    return false;
+  }
+}
+
+function markerPointMatchesFinalAuthority(
+  snapshot: MarkerPointSnapshot,
+  authority: FinalMarkerAuthority,
+  requireMarker: boolean,
+): boolean {
+  if (snapshot.path !== authority.markerPath) return false;
+  const markerPaths = [...snapshot.files.keys()].filter(isProjectListingMarkerPath).sort();
+  const markerPresent = markerPaths.length === 1 && markerPaths[0] === authority.markerPath;
+  if (
+    (requireMarker && !markerPresent) ||
+    (!markerPresent && markerPaths.length !== 0) ||
+    (markerPresent && !markerBytesAreExact(snapshot.files.get(authority.markerPath), authority.manifest))
+  ) {
+    return false;
+  }
+
+  const actualLogPaths = [...snapshot.files.keys()]
+    .filter((path) => isActiveLogPath(authority.dir, path))
+    .sort();
+  const expectedLogPaths = [...authority.logs.keys()].sort();
+  if (!isDeepStrictEqual(actualLogPaths, expectedLogPaths)) return false;
+  for (const path of expectedLogPaths) {
+    const bytes = snapshot.files.get(path);
+    if (bytes === null || bytes === undefined) return false;
+    const parsed = parseOpsJsonl(new TextDecoder().decode(bytes));
+    if (parsed.errors.length !== 0 || !isDeepStrictEqual(parsed.ops, authority.logs.get(path))) {
+      return false;
+    }
+  }
+  for (const [path, expected] of authority.blobs) {
+    if (!bytesEqual(snapshot.files.get(path) ?? null, expected)) return false;
+  }
+  return true;
+}
+
+async function closureFromMarkerSnapshot(
+  files: ReadonlyMap<string, Uint8Array | null>,
+): Promise<WizardClosure> {
+  const snapshotFs = new MemoryFS();
+  for (const [path, bytes] of files) {
+    if (bytes !== null) await snapshotFs.writeBytes(path, bytes);
+  }
+  return inspectWizardClosure(snapshotFs, false);
+}
+
+async function markerSegmentIsSafe(
+  start: MarkerPointSnapshot,
+  commit: MarkerPointSnapshot,
+): Promise<boolean> {
+  if (start.eventStartIndex !== commit.eventStartIndex || start.path !== commit.path) return false;
+  const committedMarkerPaths = [...commit.files.keys()].filter(isProjectListingMarkerPath).sort();
+  if (committedMarkerPaths.length === 0) {
+    const startMarkerPaths = [...start.files.keys()].filter(isProjectListingMarkerPath).sort();
+    if (startMarkerPaths.length === 0) return true;
+    if (startMarkerPaths.length !== 1 || startMarkerPaths[0] !== start.path) return false;
+    const beforeRemoval = await closureFromMarkerSnapshot(start.files);
+    return beforeRemoval.complete &&
+      beforeRemoval.dir !== null &&
+      start.path === `${beforeRemoval.dir}/lociview.json`;
+  }
+  if (committedMarkerPaths.length !== 1 || committedMarkerPaths[0] !== commit.path) return false;
+
+  const committedClosure = await closureFromMarkerSnapshot(commit.files);
+  if (!committedClosure.complete || committedClosure.dir === null) return false;
+  const startMarkerPaths = [...start.files.keys()].filter(isProjectListingMarkerPath).sort();
+  if (
+    startMarkerPaths.length > 1 ||
+    (startMarkerPaths.length === 1 && startMarkerPaths[0] !== commit.path)
+  ) {
+    return false;
+  }
+  const startFiles = new Map(start.files);
+  if (startMarkerPaths.length === 0) {
+    const markerBytes = commit.files.get(commit.path);
+    if (markerBytes === null || markerBytes === undefined) return false;
+    startFiles.set(commit.path, markerBytes);
+  }
+  const startClosure = await closureFromMarkerSnapshot(startFiles);
+  return startClosure.complete &&
+    startClosure.dir === committedClosure.dir &&
+    startClosure.projectId === committedClosure.projectId;
+}
+
+function markerSegmentsKeepAuthorityInactiveDuringMutation(
+  fs: MarkerHistoryFS,
+  commitsByStart: ReadonlyMap<number, MarkerPointSnapshot>,
+): boolean {
+  let activeDir: string | null = null;
+  const committedEvents = fs.events
+    .filter((event) => event.commitIndex !== null)
+    .sort((left, right) => left.commitIndex! - right.commitIndex!);
+  for (const event of committedEvents) {
+    if (isProjectListingMarkerPath(event.path)) {
+      const snapshot = commitsByStart.get(event.startIndex);
+      if (snapshot === undefined) return false;
+      const markers = [...snapshot.files.keys()].filter(isProjectListingMarkerPath);
+      activeDir = markers.length === 1
+        ? markers[0]!.slice(0, -'/lociview.json'.length)
+        : null;
+      continue;
+    }
+    if (
+      activeDir !== null &&
+      (
+        event.path.startsWith(`${activeDir}/ops/`) ||
+        event.path.startsWith(`${activeDir}/models/`) ||
+        event.path.startsWith(`${activeDir}/media/`)
+      )
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+async function publicationHistoryIsSafe(
+  fs: MarkerHistoryFS,
+  closure: WizardClosure,
+): Promise<boolean> {
+  const markerEvents = fs.events.filter((event) => isProjectListingMarkerPath(event.path));
+  const committedEvents = markerEvents.filter((event) => event.commitIndex !== null);
+  if (
+    fs.markerStarts.length !== markerEvents.length ||
+    fs.markerCommits.length !== committedEvents.length
+  ) {
+    return false;
+  }
+  const startsByStart = new Map(fs.markerStarts.map((snapshot) => [snapshot.eventStartIndex, snapshot]));
+  const commitsByStart = new Map(fs.markerCommits.map((snapshot) => [snapshot.eventStartIndex, snapshot]));
+  if (startsByStart.size !== fs.markerStarts.length || commitsByStart.size !== fs.markerCommits.length) {
+    return false;
+  }
+  for (const event of committedEvents) {
+    const start = startsByStart.get(event.startIndex);
+    const commit = commitsByStart.get(event.startIndex);
+    if (start === undefined || commit === undefined || !await markerSegmentIsSafe(start, commit)) {
+      return false;
+    }
+  }
+  if (!markerSegmentsKeepAuthorityInactiveDuringMutation(fs, commitsByStart)) return false;
+  if (!closure.active) return true;
+
+  const authority = await finalMarkerAuthority(fs, closure);
+  if (authority === null) return false;
+  const finalActivationEvent = [...committedEvents]
+    .sort((left, right) => right.commitIndex! - left.commitIndex!)
+    .find((event) => commitsByStart.get(event.startIndex)?.files.has(authority.markerPath));
+  if (finalActivationEvent === undefined) return false;
+  const finalStart = startsByStart.get(finalActivationEvent.startIndex);
+  const finalCommit = commitsByStart.get(finalActivationEvent.startIndex);
+  return finalStart !== undefined &&
+    finalCommit !== undefined &&
+    markerPointMatchesFinalAuthority(finalStart, authority, false) &&
+    markerPointMatchesFinalAuthority(finalCommit, authority, true);
+}
+
+function resultMatchesClosure(result: ImportResult, closure: WizardClosure): boolean {
+  return closure.complete &&
+    closure.dir !== null &&
+    closure.projectId !== null &&
+    isDeepStrictEqual(result, {
+      dir: closure.dir,
+      projectId: closure.projectId,
+      captionCount: 0,
+      setCount: 1,
+      linkedImages: 0,
+      unlinkedImages: 0,
+      chromaDisabledCount: 0,
+    });
+}
+
+function outcomeMatchesClosure(
+  outcome: ImportActionOutcome,
+  closure: WizardClosure,
+): boolean {
+  if (outcome.status === 'fulfilled') return resultMatchesClosure(outcome.result, closure);
+  return !closure.active || closure.complete;
+}
+
+async function settleImport(
+  fs: FaultInjectingMemoryFS,
+  plan: ImportPlan,
+): Promise<{
+  outcome: ImportActionOutcome;
+  optimizerInputExact: boolean;
+  optimizerCallCount: number;
+}> {
+  let optimizerInputExact = true;
+  let optimizerCallCount = 0;
+  let outcome: ImportActionOutcome;
+  try {
+    const result = await applyImportPlan(fs, USER, plan, {
       projectName: PROJECT_NAME,
       optimizeModel: async (bytes) => {
+        optimizerCallCount++;
         optimizerInputExact = optimizerInputExact && bytesEqual(bytes, MODEL_BYTES);
         return new Uint8Array(OPTIMIZED_BYTES);
       },
     });
+    outcome = { status: 'fulfilled', result };
   } catch {
-    // Throw versus return is intentionally outside the safety oracle.
+    outcome = { status: 'rejected', result: null };
   }
   await fs.settleProbes();
   await Promise.resolve();
-  return { result, optimizerInputExact };
+  return { outcome, optimizerInputExact, optimizerCallCount };
 }
 
 const FAULT_ROWS: ReadonlyArray<{
@@ -608,8 +1211,13 @@ describe.sequential('G0S-BLOB import-wizard publication closure', () => {
   let successInputShapeValid = false;
   let successOptimizerInputExact = false;
   let successComplete = false;
+  let vectorOracleSelfValid = false;
+  let markerPointOracleSelfValid = false;
   let markerLast = false;
   let faultResults: Record<WizardFaultBoundary, WizardFaultResult>;
+  let resolvedResults: Record<ResolvedWriteRole, ResolvedWriteResult>;
+  let receiptRecheckResults: Record<ReceiptRecheckRole, ReceiptRecheckResult>;
+  let snapshotResult: SnapshotResult;
 
   beforeAll(async () => {
     const successFs = new WizardFaultFS(null);
@@ -618,19 +1226,163 @@ describe.sequential('G0S-BLOB import-wizard publication closure', () => {
     const success = await settleImport(successFs, successPlan);
     successOptimizerInputExact = success.optimizerInputExact;
     const successClosure = await inspectWizardClosure(successFs, true);
-    successComplete =
-      success.result !== null &&
-      isDeepStrictEqual(success.result, {
-        dir: successClosure.dir,
-        projectId: successClosure.projectId,
-        captionCount: 0,
-        setCount: 1,
-        linkedImages: 0,
-        unlinkedImages: 0,
-        chromaDisabledCount: 0,
-      }) &&
-      successClosure.complete &&
-      successClosure.optimizedPresent;
+    successComplete = success.outcome.status === 'fulfilled' &&
+      resultMatchesClosure(success.outcome.result, successClosure) &&
+      successClosure.optimizedPresent &&
+      success.optimizerCallCount === 1;
+    const vectorActor = 'a_0000000000000';
+    const vectorOps = [
+      { actor: vectorActor, op: 1 },
+      { actor: vectorActor, op: 4 },
+    ];
+    vectorOracleSelfValid =
+      vectorMatchesOps({ [vectorActor]: 4 }, vectorOps) &&
+      !vectorMatchesOps({ [vectorActor]: 3 }, vectorOps) &&
+      !vectorMatchesOps({ [vectorActor]: 4, a_0000000000001: 1 }, vectorOps);
+    const successAuthority = await finalMarkerAuthority(successFs, successClosure);
+    const successStart = successFs.markerStarts.find((snapshot) =>
+      successFs.events.some((event) =>
+        event.path === snapshot.path &&
+        event.startIndex === snapshot.eventStartIndex &&
+        event.commitIndex !== null,
+      ),
+    );
+    const successCommit = successFs.markerCommits[0];
+    if (successAuthority !== null && successStart !== undefined && successCommit !== undefined) {
+      const extraLogFiles = new Map(successStart.files);
+      extraLogFiles.set(
+        `${successAuthority.dir}/ops/stage/a_0000000000000.jsonl`,
+        new Uint8Array(),
+      );
+      const corruptBlobFiles = new Map(successStart.files);
+      const firstBlob = successAuthority.blobs.entries().next().value as
+        | [string, Uint8Array]
+        | undefined;
+      if (firstBlob !== undefined) {
+        corruptBlobFiles.set(
+          firstBlob[0],
+          Uint8Array.from(firstBlob[1], (value, index) => index === 0 ? value ^ 0xff : value),
+        );
+      }
+      const privateOrphanFiles = new Map(successStart.files);
+      privateOrphanFiles.set(
+        `${successAuthority.dir}/staging/private-orphan.bin`,
+        new Uint8Array([0x70]),
+      );
+      const corruptMarkerFiles = new Map(successCommit.files);
+      corruptMarkerFiles.set(successAuthority.markerPath, new Uint8Array([0x7b, 0x22, 0x66]));
+      const otherProjectMarkerFiles = new Map(successStart.files);
+      const exactMarkerBytes = successCommit.files.get(successAuthority.markerPath);
+      if (exactMarkerBytes !== null && exactMarkerBytes !== undefined) {
+        otherProjectMarkerFiles.set(
+          `projects/meta_${'0'.repeat(25)}1/lociview.json`,
+          exactMarkerBytes,
+        );
+      }
+      const deactivationStart: MarkerPointSnapshot = {
+        ...successCommit,
+        eventStartIndex: successCommit.eventStartIndex + 1_000,
+      };
+      const deactivationFiles = new Map(deactivationStart.files);
+      deactivationFiles.delete(successAuthority.markerPath);
+      const deactivationCommit: MarkerPointSnapshot = {
+        ...deactivationStart,
+        files: deactivationFiles,
+      };
+      const noOpRemovalStart: MarkerPointSnapshot = {
+        ...deactivationCommit,
+        eventStartIndex: deactivationCommit.eventStartIndex + 1,
+      };
+      const noOpRemovalCommit: MarkerPointSnapshot = { ...noOpRemovalStart };
+      const replayBlobPath = firstBlob?.[0] ?? `${successAuthority.dir}/models/unreachable.glb`;
+      const activeMutationFs = new WizardFaultFS(null);
+      activeMutationFs.events.push(
+        {
+          startIndex: 1,
+          commitIndex: 2,
+          method: 'writeBytes',
+          path: successAuthority.markerPath,
+          outcome: 'pass',
+        },
+        { startIndex: 3, commitIndex: 4, method: 'writeBytes', path: replayBlobPath, outcome: 'pass' },
+      );
+      const activeCommit = { ...successCommit, eventStartIndex: 1 };
+      activeMutationFs.markerCommits.push(activeCommit);
+      const inactiveRepairFs = new WizardFaultFS(null);
+      inactiveRepairFs.events.push(
+        {
+          startIndex: 1,
+          commitIndex: 2,
+          method: 'writeBytes',
+          path: successAuthority.markerPath,
+          outcome: 'pass',
+        },
+        {
+          startIndex: 3,
+          commitIndex: 4,
+          method: 'remove',
+          path: successAuthority.markerPath,
+          outcome: 'pass',
+        },
+        { startIndex: 5, commitIndex: 6, method: 'writeBytes', path: replayBlobPath, outcome: 'pass' },
+        {
+          startIndex: 7,
+          commitIndex: 8,
+          method: 'writeBytes',
+          path: successAuthority.markerPath,
+          outcome: 'pass',
+        },
+      );
+      const inactiveCommit = { ...deactivationCommit, eventStartIndex: 3 };
+      const reactivationCommit = { ...successCommit, eventStartIndex: 7 };
+      inactiveRepairFs.markerCommits.push(activeCommit, inactiveCommit, reactivationCommit);
+      markerPointOracleSelfValid =
+        markerPointMatchesFinalAuthority(successStart, successAuthority, false) &&
+        markerPointMatchesFinalAuthority(successCommit, successAuthority, true) &&
+        !markerPointMatchesFinalAuthority(
+          { ...successCommit, files: corruptMarkerFiles },
+          successAuthority,
+          true,
+        ) &&
+        exactMarkerBytes !== null &&
+        exactMarkerBytes !== undefined &&
+        !markerPointMatchesFinalAuthority(
+          { ...successStart, files: otherProjectMarkerFiles },
+          successAuthority,
+          false,
+        ) &&
+        !markerPointMatchesFinalAuthority(
+          { ...successStart, files: extraLogFiles },
+          successAuthority,
+          false,
+        ) &&
+        firstBlob !== undefined &&
+        !markerPointMatchesFinalAuthority(
+          { ...successStart, files: corruptBlobFiles },
+          successAuthority,
+          false,
+        ) &&
+        markerPointMatchesFinalAuthority(
+          { ...successStart, files: privateOrphanFiles },
+          successAuthority,
+          false,
+        ) &&
+        await markerSegmentIsSafe(deactivationStart, deactivationCommit) &&
+        await markerSegmentIsSafe(noOpRemovalStart, noOpRemovalCommit) &&
+        firstBlob !== undefined &&
+        !markerSegmentsKeepAuthorityInactiveDuringMutation(
+          activeMutationFs,
+          new Map([[1, activeCommit]]),
+        ) &&
+        markerSegmentsKeepAuthorityInactiveDuringMutation(
+          inactiveRepairFs,
+          new Map([
+            [1, activeCommit],
+            [3, inactiveCommit],
+            [7, reactivationCommit],
+          ]),
+        );
+    }
     markerLast = await markerStartsAfterActiveClosure(successFs, successClosure);
 
     faultResults = {} as Record<WizardFaultBoundary, WizardFaultResult>;
@@ -638,7 +1390,7 @@ describe.sequential('G0S-BLOB import-wizard publication closure', () => {
       const fs = new WizardFaultFS(row.boundary);
       const plan = freshPlan();
       const inputShapeValid = planShapeIsExact(plan);
-      await settleImport(fs, plan);
+      const action = await settleImport(fs, plan);
       fs.assertAllConsumed();
       const event = matchingFaultEvent(fs);
       const closure = await inspectWizardClosure(
@@ -651,9 +1403,162 @@ describe.sequential('G0S-BLOB import-wizard publication closure', () => {
           event !== undefined &&
           event.outcome === row.outcome &&
           event.path === fs.matchedPath,
-        safety: closure.safe,
+        closureSafe: closure.safe,
+        outcomeBound: outcomeMatchesClosure(action.outcome, closure),
+        publicationHistorySafe: await publicationHistoryIsSafe(fs, closure),
       };
     }
+
+    const resolvedRows: ReadonlyArray<{
+      role: ResolvedWriteRole;
+      expected: Uint8Array;
+      matches: (path: string) => boolean;
+    }> = [
+      { role: 'original-model', expected: MODEL_BYTES, matches: isOriginalModelPath },
+      { role: 'optimized-model', expected: OPTIMIZED_BYTES, matches: isOptimizedModelPath },
+      { role: 'image-media', expected: IMAGE_BYTES, matches: isImagePath },
+    ];
+    resolvedResults = {} as Record<ResolvedWriteRole, ResolvedWriteResult>;
+    for (const row of resolvedRows) {
+      const fs = new WizardResolvedCorruptingMemoryFS(row.matches, row.expected, 'bitflip');
+      const plan = freshPlan();
+      const inputShapeValid = planShapeIsExact(plan);
+      let optimizerInputExact = true;
+      let outcome: ImportActionOutcome;
+      fs.beginAction();
+      try {
+        const result = await applyImportPlan(fs, USER, plan, {
+          projectName: PROJECT_NAME,
+          optimizeModel: async (bytes) => {
+            optimizerInputExact = optimizerInputExact && bytesEqual(bytes, MODEL_BYTES);
+            return new Uint8Array(OPTIMIZED_BYTES);
+          },
+        });
+        outcome = { status: 'fulfilled', result };
+      } catch {
+        outcome = { status: 'rejected', result: null };
+      } finally {
+        fs.endAction();
+      }
+      await fs.settleProbes();
+      const closure = await inspectWizardClosure(fs, row.role !== 'optimized-model');
+      resolvedResults[row.role] = {
+        inputShapeValid,
+        optimizerInputExact,
+        faultReached:
+          fs.injectionCount === 1 &&
+          fs.injectedPath !== null &&
+          fs.requestedWrites.some((bytes) => bytesEqual(bytes, row.expected)),
+        verificationObserved:
+          fs.corruptBytes !== null &&
+          fs.verificationReads.some((bytes) => bytesEqual(bytes, fs.corruptBytes!)),
+        closureSafe: closure.safe,
+        outcomeBound: outcomeMatchesClosure(outcome, closure),
+        publicationHistorySafe: await publicationHistoryIsSafe(fs, closure),
+      };
+    }
+
+    const receiptRows: ReadonlyArray<{
+      role: ReceiptRecheckRole;
+      expected: Uint8Array;
+      matches: (path: string) => boolean;
+    }> = [
+      { role: 'original-model', expected: MODEL_BYTES, matches: isOriginalModelPath },
+      { role: 'optimized-model', expected: OPTIMIZED_BYTES, matches: isOptimizedModelPath },
+      { role: 'image-media', expected: IMAGE_BYTES, matches: isImagePath },
+    ];
+    receiptRecheckResults = {} as Record<ReceiptRecheckRole, ReceiptRecheckResult>;
+    for (const row of receiptRows) {
+      const fs = new ReceiptRecheckCorruptingFS(row.matches, row.expected);
+      const plan = freshPlan();
+      const inputShapeValid = planShapeIsExact(plan);
+      const action = await settleImport(fs, plan);
+      const closure = await inspectWizardClosure(fs, row.role !== 'optimized-model');
+      receiptRecheckResults[row.role] = {
+        inputShapeValid,
+        initialVerificationReturnedExact: fs.initialVerificationReturnedExact,
+        corruptionInjected: fs.corruptionInjected && fs.injectedPath !== null,
+        closureSafe: closure.safe,
+        outcomeBound: outcomeMatchesClosure(action.outcome, closure),
+        publicationHistorySafe: await publicationHistoryIsSafe(fs, closure),
+      };
+    }
+
+    const snapshotFs = new SnapshotPauseFS();
+    const snapshotPlan = freshPlan();
+    const originalModelFile = snapshotPlan.models[0]!;
+    const originalImageFile = snapshotPlan.images[0]!;
+    const originalModelData = originalModelFile.data;
+    const originalImageData = originalImageFile.data;
+    const snapshotIdentity: Identity = { ...USER };
+    const snapshotInputShapeValid = planShapeIsExact(snapshotPlan);
+    let snapshotOptimizerInputExact = true;
+    let snapshotOptimizerCallCount = 0;
+    const snapshotOptions: {
+      projectName: string;
+      optimizeModel: (bytes: Uint8Array) => Promise<Uint8Array | null>;
+    } = {
+      projectName: PROJECT_NAME,
+      optimizeModel: async (bytes) => {
+        snapshotOptimizerCallCount++;
+        snapshotOptimizerInputExact = snapshotOptimizerInputExact && bytesEqual(bytes, MODEL_BYTES);
+        return new Uint8Array(OPTIMIZED_BYTES);
+      },
+    };
+    const snapshotAction = applyImportPlan(snapshotFs, snapshotIdentity, snapshotPlan, snapshotOptions);
+    originalModelFile.path = 'source/mutated-alias.glb';
+    originalModelFile.name = 'mutated-alias.glb';
+    originalModelData.fill(0x6d);
+    originalModelFile.data = new TextEncoder().encode('replacement model alias');
+    originalImageFile.path = 'source/mutated-alias.png';
+    originalImageFile.name = 'mutated-alias.png';
+    originalImageData.fill(0x69);
+    originalImageFile.data = new TextEncoder().encode('replacement image alias');
+    snapshotPlan.models.splice(0, snapshotPlan.models.length, {
+      path: 'source/mutated.glb',
+      name: 'mutated.glb',
+      data: new TextEncoder().encode('mutated model bytes'),
+    });
+    snapshotPlan.images.splice(0, snapshotPlan.images.length, {
+      path: 'source/mutated.png',
+      name: 'mutated.png',
+      data: new TextEncoder().encode('mutated image bytes'),
+    });
+    snapshotPlan.fileIdMap.set('mutated', 'mutated.png');
+    snapshotPlan.migration = structuredClone({
+      sets: [],
+      views: [],
+      materials: [],
+      unlinkedImages: new Map(),
+      gidToSetName: new Map(),
+      gidMappingIsGuess: false,
+      warnings: ['mutated'],
+    });
+    snapshotOptions.projectName = 'mutated project name';
+    snapshotOptions.optimizeModel = async () => new TextEncoder().encode('mutated optimized bytes');
+    snapshotIdentity.userId = 'usr_00000000000000000000000081';
+    snapshotIdentity.deviceId = 'dev_00000000000000000000000081';
+    snapshotIdentity.displayName = 'mutated identity';
+    await snapshotFs.reached;
+    const pauseBeforeEffects = snapshotFs.events.length === 0 && snapshotOptimizerCallCount === 0;
+    snapshotFs.release();
+    let snapshotOutcome: ImportActionOutcome;
+    try {
+      snapshotOutcome = { status: 'fulfilled', result: await snapshotAction };
+    } catch {
+      snapshotOutcome = { status: 'rejected', result: null };
+    }
+    await snapshotFs.settleProbes();
+    const snapshotClosure = await inspectWizardClosure(snapshotFs, true);
+    snapshotResult = {
+      inputShapeValid: snapshotInputShapeValid,
+      pauseReached: true,
+      pauseBeforeEffects,
+      optimizerInputExact: snapshotOptimizerInputExact,
+      outcomeBound: outcomeMatchesClosure(snapshotOutcome, snapshotClosure),
+      closureSafe: snapshotClosure.safe,
+      publicationHistorySafe: await publicationHistoryIsSafe(snapshotFs, snapshotClosure),
+    };
   }, 30_000);
 
   it('uses fresh one-model/one-image bytes and completes the exact optimized success closure', () => {
@@ -661,14 +1566,18 @@ describe.sequential('G0S-BLOB import-wizard publication closure', () => {
       successInputShapeValid,
       successOptimizerInputExact,
       successComplete,
+      vectorOracleSelfValid,
+      markerPointOracleSelfValid,
     }).toEqual({
       successInputShapeValid: true,
       successOptimizerInputExact: true,
       successComplete: true,
+      vectorOracleSelfValid: true,
+      markerPointOracleSelfValid: true,
     });
   });
 
-  it.fails('starts the root completion marker only after every active log and referenced blob commit', () => {
+  it('starts the root completion marker only after every active log and referenced blob commit', () => {
     expect(markerLast).toBe(true);
   });
 
@@ -681,9 +1590,77 @@ describe.sequential('G0S-BLOB import-wizard publication closure', () => {
         }).toEqual({ inputShapeValid: true, faultReached: true });
       });
 
-      it.fails('leaves no completion marker or an exact reopenable planned closure', () => {
-        expect(faultResults[row.boundary].safety).toBe(true);
+      const assertSafety = (): void => {
+        expect({
+          closureSafe: faultResults[row.boundary].closureSafe,
+          outcomeBound: faultResults[row.boundary].outcomeBound,
+          publicationHistorySafe: faultResults[row.boundary].publicationHistorySafe,
+        }).toEqual({
+          closureSafe: true,
+          outcomeBound: true,
+          publicationHistorySafe: true,
+        });
+      };
+      if (row.boundary === 'root-marker-prefix') {
+        it.fails('leaves no completion marker or an exact reopenable planned closure', assertSafety);
+      } else {
+        it('leaves no completion marker or an exact reopenable planned closure', assertSafety);
+      }
+    });
+  }
+
+  for (const role of ['original-model', 'optimized-model', 'image-media'] as const) {
+    it(`${role}: observes resolved wrong bytes and publishes only inactive or exact complete authority`, () => {
+      expect(resolvedResults[role]).toEqual({
+        inputShapeValid: true,
+        optimizerInputExact: true,
+        faultReached: true,
+        verificationObserved: true,
+        closureSafe: true,
+        outcomeBound: true,
+        publicationHistorySafe: true,
       });
     });
   }
+
+  it('rechecks every referenced write role before activation after an exact initial verification', () => {
+    expect(receiptRecheckResults).toEqual({
+      'original-model': {
+        inputShapeValid: true,
+        initialVerificationReturnedExact: true,
+        corruptionInjected: true,
+        closureSafe: true,
+        outcomeBound: true,
+        publicationHistorySafe: true,
+      },
+      'optimized-model': {
+        inputShapeValid: true,
+        initialVerificationReturnedExact: true,
+        corruptionInjected: true,
+        closureSafe: true,
+        outcomeBound: true,
+        publicationHistorySafe: true,
+      },
+      'image-media': {
+        inputShapeValid: true,
+        initialVerificationReturnedExact: true,
+        corruptionInjected: true,
+        closureSafe: true,
+        outcomeBound: true,
+        publicationHistorySafe: true,
+      },
+    });
+  });
+
+  it('uses one call-time plan snapshot while asynchronous initialization is paused', () => {
+    expect(snapshotResult).toEqual({
+      inputShapeValid: true,
+      pauseReached: true,
+      pauseBeforeEffects: true,
+      optimizerInputExact: true,
+      outcomeBound: true,
+      closureSafe: true,
+      publicationHistorySafe: true,
+    });
+  });
 });

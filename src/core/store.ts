@@ -99,10 +99,12 @@ export class ProjectStore {
 
   // ---- ライフサイクル -------------------------------------------------------
 
-  /** 新規プロジェクト作成。既定の表示セットと自分のprofileを添えて初期化する */
-  static async create(fs: WorkspaceFS, dir: string, name: string, identity: Identity): Promise<ProjectStore> {
-    const manifest = createManifest(name);
-    await fs.writeText(`${dir}/lociview.json`, JSON.stringify(manifest, null, 2));
+  private static initializeNew(
+    fs: WorkspaceFS,
+    dir: string,
+    manifest: ProjectManifest,
+    identity: Identity,
+  ): ProjectStore {
     const store = new ProjectStore(fs, dir, manifest, identity);
     store.createEntity('set', { name: '標準', order: 1 });
     store.dispatch({
@@ -111,6 +113,29 @@ export class ProjectStore {
       id: identity.userId,
       v: { displayName: identity.displayName ?? '', defaultPinColor: '#eab308' },
     });
+    return store;
+  }
+
+  /** 新規プロジェクト作成。既定の表示セットと自分のprofileを添えて初期化する */
+  static async create(fs: WorkspaceFS, dir: string, name: string, identity: Identity): Promise<ProjectStore> {
+    const manifest = createManifest(name);
+    await fs.writeText(`${dir}/lociview.json`, JSON.stringify(manifest, null, 2));
+    const store = ProjectStore.initializeNew(fs, dir, manifest, identity);
+    await store.flush();
+    return store;
+  }
+
+  /**
+   * 新規プロジェクトを completion marker なしで初期化する。
+   * 呼出側は必要な全authorityをdurableにした後でmanifestを最後に公開する。
+   */
+  static async createUnpublished(
+    fs: WorkspaceFS,
+    dir: string,
+    name: string,
+    identity: Identity,
+  ): Promise<ProjectStore> {
+    const store = ProjectStore.initializeNew(fs, dir, createManifest(name), identity);
     await store.flush();
     return store;
   }
