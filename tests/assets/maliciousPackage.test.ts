@@ -56,10 +56,18 @@ const UNIX_FIFO_MODE = 0o010644;
 class CountingMemoryFS extends MemoryFS {
   mutationCalls = 0;
   readonly mutationPaths: string[] = [];
+  readonly activeAuthorityCheckpoints: string[] = [];
+  private watchedAuthorityDir: string | null = null;
 
   resetMutationCalls(): void {
     this.mutationCalls = 0;
     this.mutationPaths.length = 0;
+    this.activeAuthorityCheckpoints.length = 0;
+  }
+
+  watchActiveAuthority(dir: string): void {
+    this.watchedAuthorityDir = dir;
+    this.activeAuthorityCheckpoints.length = 0;
   }
 
   private recordMutation(path: string): void {
@@ -67,24 +75,41 @@ class CountingMemoryFS extends MemoryFS {
     this.mutationPaths.push(path);
   }
 
+  private async captureActiveAuthority(): Promise<void> {
+    if (this.watchedAuthorityDir === null) return;
+    this.activeAuthorityCheckpoints.push(
+      await activeManifestAndLogCheckpoint(this, this.watchedAuthorityDir),
+    );
+  }
+
   override async writeText(path: string, text: string): Promise<void> {
     this.recordMutation(path);
     await super.writeText(path, text);
+    await this.captureActiveAuthority();
   }
 
   override async appendText(path: string, text: string): Promise<void> {
     this.recordMutation(path);
     await super.appendText(path, text);
+    await this.captureActiveAuthority();
   }
 
   override async writeBytes(path: string, data: Uint8Array): Promise<void> {
     this.recordMutation(path);
     await super.writeBytes(path, data);
+    await this.captureActiveAuthority();
+  }
+
+  override async appendBytes(path: string, data: Uint8Array): Promise<void> {
+    this.recordMutation(path);
+    await super.appendBytes(path, data);
+    await this.captureActiveAuthority();
   }
 
   override async remove(path: string): Promise<void> {
     this.recordMutation(path);
     await super.remove(path);
+    await this.captureActiveAuthority();
   }
 }
 
@@ -173,6 +198,7 @@ interface ExistingMergeAttempt {
   rawLogUnchanged: boolean;
   allOpsUnchanged: boolean;
   stateUnchanged: boolean;
+  vectorUnchanged: boolean;
   reopenedStateUnchanged: boolean;
   internalClockAndSequenceUnchanged: boolean;
   authoritativeUnchanged: boolean;
@@ -866,12 +892,26 @@ async function attemptForeignNormalizedCollision(zip: Uint8Array): Promise<Forei
 async function activeManifestAndLogSnapshot(fs: MemoryFS, dir: string): Promise<string> {
   const manifestPath = `${dir}/lociview.json`;
   const activeLogPaths = (await fs.list(`${dir}/ops/`))
-    .filter((path) => path.endsWith('.jsonl'));
+    .filter((path) => path.endsWith('.jsonl'))
+    .sort();
   const paths = [manifestPath, ...activeLogPaths];
   const entries = await Promise.all(paths.map(async (path) => {
     const bytes = await fs.readBytes(path);
     if (bytes === null) throw new Error(`active authority disappeared while snapshotting: ${path}`);
     return [path.slice(dir.length + 1), Array.from(bytes)] as const;
+  }));
+  return JSON.stringify(entries);
+}
+
+async function activeManifestAndLogCheckpoint(fs: MemoryFS, dir: string): Promise<string> {
+  const manifestPath = `${dir}/lociview.json`;
+  const activeLogPaths = (await fs.list(`${dir}/ops/`))
+    .filter((path) => path.endsWith('.jsonl'))
+    .sort();
+  const paths = [manifestPath, ...activeLogPaths];
+  const entries = await Promise.all(paths.map(async (path) => {
+    const bytes = await fs.readBytes(path);
+    return [path.slice(dir.length + 1), bytes === null ? null : Array.from(bytes)] as const;
   }));
   return JSON.stringify(entries);
 }
@@ -974,12 +1014,22 @@ async function attemptExistingProjectMerge(
 
   const rawBefore = await fs.readBytes(logPath);
   if (rawBefore === null) throw new Error('mixed merge target log setup failed');
-  const allOpsBefore = JSON.stringify(store.allOps);
-  const stateBefore = JSON.stringify(store.state);
+  const allOpsBefore = structuredClone(store.allOps);
+  const stateBefore = structuredClone(store.state);
+  const vectorBefore = structuredClone(store.vector);
   const authorityBefore = await activeManifestAndLogSnapshot(fs, dir);
-  const publishedStates: string[] = [];
-  const unsubscribe = store.subscribe((state) => publishedStates.push(JSON.stringify(state)));
+  const publishedAuthorities: Array<{
+    state: typeof stateBefore;
+    allOps: typeof allOpsBefore;
+    vector: typeof vectorBefore;
+  }> = [];
+  const unsubscribe = store.subscribe((state) => publishedAuthorities.push({
+    state: structuredClone(state),
+    allOps: structuredClone(store.allOps),
+    vector: structuredClone(store.vector),
+  }));
   fs.resetMutationCalls();
+  fs.watchActiveAuthority(dir);
   let inspection: Awaited<ReturnType<typeof inspectZip>> | null = null;
   let inspectionRejected = false;
   try {
@@ -999,21 +1049,33 @@ async function attemptExistingProjectMerge(
   }
   unsubscribe();
 
-  const rawLogUnchanged = bytesEqual(await fs.readBytes(logPath), rawBefore);
-  const allOpsUnchanged = JSON.stringify(store.allOps) === allOpsBefore;
-  const stateUnchanged = JSON.stringify(store.state) === stateBefore;
   const authorityBytesUnchanged =
     await activeManifestAndLogSnapshot(fs, dir) === authorityBefore;
-  const authorityPathsUnmutated = fs.mutationPaths.every((path) =>
-    path !== `${dir}/lociview.json` &&
-    !(path.startsWith(`${dir}/ops/`) && path.endsWith('.jsonl')));
-  const publishedStatesUnchanged = publishedStates.every((state) => state === stateBefore);
+  const authorityCheckpointsUnchanged = fs.activeAuthorityCheckpoints.every(
+    (snapshot) => snapshot === authorityBefore,
+  );
+  const rawLogUnchanged =
+    bytesEqual(await fs.readBytes(logPath), rawBefore) &&
+    authorityBytesUnchanged &&
+    authorityCheckpointsUnchanged;
+  const allOpsUnchanged = isDeepStrictEqual(store.allOps, allOpsBefore);
+  const vectorUnchanged = isDeepStrictEqual(store.vector, vectorBefore);
+  const publishedAuthoritiesUnchanged = publishedAuthorities.every(
+    (published) =>
+      isDeepStrictEqual(published.state, stateBefore) &&
+      isDeepStrictEqual(published.allOps, allOpsBefore) &&
+      isDeepStrictEqual(published.vector, vectorBefore),
+  );
+  const stateUnchanged =
+    isDeepStrictEqual(store.state, stateBefore) && publishedAuthoritiesUnchanged;
   let reopenedStateUnchanged = false;
   try {
     const reopened = await ProjectStore.open(fs, dir, USER);
     reopenedStateUnchanged =
-      JSON.stringify(reopened.allOps) === allOpsBefore &&
-      JSON.stringify(reopened.state) === stateBefore;
+      isDeepStrictEqual(reopened.allOps, allOpsBefore) &&
+      isDeepStrictEqual(reopened.state, stateBefore) &&
+      isDeepStrictEqual(reopened.vector, vectorBefore) &&
+      await activeManifestAndLogSnapshot(fs, dir) === authorityBefore;
   } catch {
     // An unreadable active project is not a safe quarantine outcome.
   }
@@ -1091,15 +1153,17 @@ async function attemptExistingProjectMerge(
     rawLogUnchanged,
     allOpsUnchanged,
     stateUnchanged,
+    vectorUnchanged,
     reopenedStateUnchanged,
     internalClockAndSequenceUnchanged,
     authoritativeUnchanged:
       rawLogUnchanged &&
       allOpsUnchanged &&
       stateUnchanged &&
+      vectorUnchanged &&
       authorityBytesUnchanged &&
-      authorityPathsUnmutated &&
-      publishedStatesUnchanged &&
+      authorityCheckpointsUnchanged &&
+      publishedAuthoritiesUnchanged &&
       reopenedStateUnchanged &&
       internalClockAndSequenceUnchanged,
   };
@@ -2475,23 +2539,25 @@ describe('G0 characterization: malicious ZIP envelope', () => {
         });
       });
 
-      it.fails('leaves the existing actor log byte-exact', () => {
+      it('leaves the manifest and every active actor log byte-exact', () => {
         expect(existingMergeOutcome.rawLogUnchanged).toBe(true);
       });
 
-      it.fails('leaves the in-memory raw operation set unchanged', () => {
+      it('leaves the in-memory raw operation set unchanged', () => {
         expect(existingMergeOutcome.allOpsUnchanged).toBe(true);
       });
 
-      it.fails('leaves the in-memory reduced state unchanged', () => {
-        expect(existingMergeOutcome.stateUnchanged).toBe(true);
+      it('leaves the in-memory reduced state and vector unchanged', () => {
+        expect(
+          existingMergeOutcome.stateUnchanged && existingMergeOutcome.vectorUnchanged,
+        ).toBe(true);
       });
 
-      it.fails('reopens with the same active operation set and reduced state', () => {
+      it('reopens with the same manifest, logs, operation set, state and vector', () => {
         expect(existingMergeOutcome.reopenedStateUnchanged).toBe(true);
       });
 
-      it.fails('explicitly rejects without advancing the internal HLC or own sequence', () => {
+      it('explicitly rejects without advancing the internal HLC or own sequence', () => {
         expect(
           existingMergeOutcome.explicitlyRejected &&
           existingMergeOutcome.internalClockAndSequenceUnchanged,

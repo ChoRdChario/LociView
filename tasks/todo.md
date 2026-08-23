@@ -672,6 +672,31 @@ Review record:
 - Independent production/runtime, closure/future-correctness and false-green reviews found no unresolved P0/P1 after public-authority checkpoints, independently derived direct-probe authority, exact accepted authority and canonical pure-test fixtures were corrected
 - Duplicate raw JSON members, invalid raw Unicode, raw canonical evidence/digests, known-field control quarantine, canonical user/known-entity ID migration, same-key collision reporting, recursive resource budgets, hostile Proxy side effects and full G0S-OP/G0-S completion remain explicitly unclaimed
 
+### Post-slice-29 gate/strategy checkpoint
+
+- [x] Recount the remaining expected failures and todos by production root, recheck the approved G0/G0-S dependencies and keep the external evidence lane explicit before selecting another implementation slice
+- [x] Confirm that the last three slices each shipped a production root fix, while treating the S27/S29 exact-authority test churn as an upper bound rather than a pattern to extend
+- [x] Rank mixed valid/malformed existing-project merge above manifest/parser expansion because it is a live partial-authority defect with five existing acceptance assertions, one production seam and no API, device or product-policy blocker
+- [x] Keep decoded manifest validation, duplicate-aware raw JSON parsing, typed quarantine/evidence, cross-tab locking, actor-log/marker atomicity and the six independent migration roots outside the next slice
+
+### G0 stabilization slice 30 — malformed-operation merge preflight
+
+- [x] Snapshot the inspection error disposition, incoming operations and binary bytes before the first await in `mergeFromInspection()`, and reject any nonzero operation-error count before target flush, blob I/O, preview, clock/state change, notification or durable append
+- [x] Preserve the healthy exact-complete merge path and strengthen the existing caller-owned inspection control so operation and binary aliases mutated immediately after invocation cannot change the snapshotted authority
+- [x] Promote only the five existing mixed-valid/malformed existing-project merge assertions, binding explicit rejection to exact old manifest/log/allOps/state/vector/reopen authority and an unchanged next-valid HLC/own-sequence probe
+- [x] Add no new fixture or fault matrix, and keep typed issue/quarantine reporting, raw duplicate detection, evidence location/digest, known-field/user/ID policy, private evidence, cross-context locking and crash/transaction guarantees explicitly open
+- [x] Run focused/full tests, typecheck, fixture/evidence verification and production build; complete independent P0/P1/future-correctness and scope/churn review before a separate commit
+
+Review record:
+
+- `mergeFromInspection()` now rejects any nonzero inspected operation-error count synchronously, then ownership-clones the accepted operation batch and builds a unique registry of copied binary bytes before its first await. The target flush, blob reads/writes, preview, clock/state/listener changes and durable append are therefore unreachable for a reported malformed mix
+- The existing caller-owned inspection control now mutates the error count, nested and top-level operation fields, operation-array membership, binary path/data aliases and binary-array membership immediately after invocation. The action still publishes the original exact complete authority, proving the merge uses one call-entry operation/binary snapshot rather than a later live view
+- Five existing mixed-valid/malformed existing-project expectations are ordinary. Explicit rejection retains the exact manifest and complete recursive active-log inventory, semantic `allOps`, reduced state, vector and reopen authority; a target/twin next-valid probe independently verifies unchanged local sequence and HLC position
+- Method-neutral write/append/remove checkpoints compare point-in-time active authority bytes with the baseline, so transient public corruption followed by restoration is rejected while same-byte writes, no-op removal and private non-authoritative evidence remain free. No new fixture, parameter matrix or fault row was added
+- Scope/churn stayed bounded: production is one file / +6/-2, while the two existing acceptance files are +117/-33 to strengthen shared exact-authority and caller-alias controls. Direct `it.fails(` declarations fall from 32 to 27; typed quarantine/evidence, raw duplicate parsing/digests, known-field/user/ID policy, cross-context locking, crash transactions and full malicious-package/G0-S completion remain open
+- Verification passed on the exact source/test tree: 2 focused files / 322 passing tests plus 13 todos; 32 full-suite files / 1,028 passing tests plus 21 todos; TypeScript typecheck; fixture verification (10 Git entries / 708,867 bytes, one unratified GS candidate); evidence verification (3 pending device templates / 0 run, environment or artifact records); and the production build (96 modules / 11 PWA precache entries, 888.47 KiB). The existing large viewer chunk warning is approximately 803.13 kB
+- Independent production/runtime, exact-closure and false-green/scope reviews found no unresolved P0/P1 after method-neutral active-authority checkpoints and point-in-time notification authority were bound into the promoted assertions
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes

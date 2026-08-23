@@ -3250,30 +3250,48 @@ describe.sequential('G0S-BLOB merge preflight controls', () => {
     expect(authority.safe).toBe(true);
   });
 
-  it('applies the same incoming-operation snapshot that was used for async blob preflight', async () => {
-    const fs = new PausingWriteMemoryFS();
-    const fixture = await makeMergeFixture(fs);
+  it('applies the call-entry operation and binary snapshot despite immediate caller mutation', async () => {
+    const fixture = await makeMergeFixture();
     const inspection: ZipInspection = {
       ...fixture.inspection,
       ops: structuredClone(fixture.inspection.ops),
+      binaries: fixture.inspection.binaries.map((binary) => ({
+        path: binary.path,
+        data: new Uint8Array(binary.data),
+      })),
     };
-    const pausedBinary = fixture.incomingBinaries[0];
-    const pause = fs.pauseNextWrite(`${fixture.targetDir}/${pausedBinary.path}`);
-    const merge = mergeFromInspection(fs, fixture.targetDir, fixture.targetStore, inspection);
-    await pause.reached;
     const mutableOp = inspection.ops.find(
       (op) => op.e === 'asset' && op.id === fixture.incomingAssetIds[0] && op.v !== undefined,
     );
+    const mutableBinary = inspection.binaries.find(
+      (binary) => binary.path === fixture.incomingBinaries[0]?.path,
+    );
     if (mutableOp?.v === undefined) throw new Error('mutable merge control lacks its asset operation');
-    mutableOp.v.path = 'models/unverified-after-preview.stl';
-    mutableOp.v.size = 999;
-    pause.release();
+    if (mutableBinary === undefined) throw new Error('mutable merge control lacks its binary');
+
+    const merge = mergeFromInspection(
+      fixture.targetFs,
+      fixture.targetDir,
+      fixture.targetStore,
+      inspection,
+    );
+    const mutatedPath = 'models/unverified-after-invocation.stl';
+    mutableOp.id = 'ast_00000000000000000000000099';
+    mutableOp.v.path = mutatedPath;
+    mutableOp.v.size = mutableBinary.data.length;
+    mutableBinary.path = mutatedPath;
+    mutableBinary.data.fill(0);
+    inspection.ops.length = 0;
+    inspection.binaries.length = 0;
+    inspection.opsErrorCount = 1;
+
     await merge;
     const authority = await inspectExactMergeAuthority(fixture);
     expect(exactMergeAuthorityKind(authority)).toBe('complete');
     expect(authority.safe).toBe(true);
     expect(fixture.targetStore.state.byKind.asset?.[fixture.incomingAssetIds[0]]?.fields.path)
-      .not.toBe('models/unverified-after-preview.stl');
+      .not.toBe(mutatedPath);
+    expect(await fixture.targetFs.readBytes(`${fixture.targetDir}/${mutatedPath}`)).toBeNull();
   });
 
   for (const boundary of [

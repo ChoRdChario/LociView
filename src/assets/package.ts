@@ -272,14 +272,18 @@ export async function mergeFromInspection(
       `merge: project mismatch (${insp.manifest.projectId} != ${store.manifest.projectId})`,
     );
   }
+  const reportedOpsErrorCount = insp.opsErrorCount;
+  if (reportedOpsErrorCount !== 0) {
+    throw new Error('merge: inspection contains malformed operations');
+  }
+  const incomingOps = structuredClone(insp.ops);
+  const binaries = uniqueBinaryRegistry(insp.binaries);
   await store.flush();
   const baselineOps = structuredClone([...store.allOps]);
   const baselineOpsSnapshot = JSON.stringify(baselineOps);
-  const incomingOps = structuredClone(insp.ops);
   const baselineState = store.state;
   const preview = mergeOps(baselineOps, incomingOps);
   const required = requiredBlobClosure(preview.stateAfter, baselineState);
-  const binaries = uniqueBinaryRegistry(insp.binaries);
   const writes: Array<{ path: string; data: Uint8Array }> = [];
   const expectedBytes = new Map<string, Uint8Array>();
 
