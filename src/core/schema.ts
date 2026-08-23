@@ -45,8 +45,29 @@ const INVALID_JSON = Symbol('invalid-json');
 
 type JsonClone = null | boolean | number | string | JsonClone[] | { [key: string]: JsonClone };
 
-function cloneJsonValue(value: unknown, ancestors: Set<object>): JsonClone | typeof INVALID_JSON {
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+function isUnicodeScalarText(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const codeUnit = value.charCodeAt(index);
+    if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return false;
+      index += 1;
+    } else if (codeUnit >= 0xdc00 && codeUnit <= 0xdfff) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function cloneJsonValue(
+  value: unknown,
+  ancestors: Set<object>,
+  requireUnicodeScalarText: boolean,
+): JsonClone | typeof INVALID_JSON {
+  if (value === null || typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    return !requireUnicodeScalarText || isUnicodeScalarText(value) ? value : INVALID_JSON;
+  }
   if (typeof value === 'number') return Number.isFinite(value) ? value : INVALID_JSON;
   if (typeof value !== 'object') return INVALID_JSON;
   if (ancestors.has(value)) return INVALID_JSON;
@@ -69,7 +90,7 @@ function cloneJsonValue(value: unknown, ancestors: Set<object>): JsonClone | typ
         if (descriptor === undefined || descriptor.enumerable !== true || !('value' in descriptor)) {
           return INVALID_JSON;
         }
-        const item = cloneJsonValue(descriptor.value, ancestors);
+        const item = cloneJsonValue(descriptor.value, ancestors, requireUnicodeScalarText);
         if (item === INVALID_JSON) return INVALID_JSON;
         out.push(item);
       }
@@ -80,6 +101,7 @@ function cloneJsonValue(value: unknown, ancestors: Set<object>): JsonClone | typ
     const normalizedKeys = new Set<string>();
     for (const key of ownKeys as string[]) {
       if (DANGEROUS_KEYS.has(key)) return INVALID_JSON;
+      if (requireUnicodeScalarText && !isUnicodeScalarText(key)) return INVALID_JSON;
       const normalized = key.normalize('NFC');
       if (normalizedKeys.has(normalized)) return INVALID_JSON;
       normalizedKeys.add(normalized);
@@ -87,13 +109,28 @@ function cloneJsonValue(value: unknown, ancestors: Set<object>): JsonClone | typ
       if (descriptor === undefined || descriptor.enumerable !== true || !('value' in descriptor)) {
         return INVALID_JSON;
       }
-      const item = cloneJsonValue(descriptor.value, ancestors);
+      const item = cloneJsonValue(descriptor.value, ancestors, requireUnicodeScalarText);
       if (item === INVALID_JSON) return INVALID_JSON;
       out[key] = item;
     }
     return out;
   } finally {
     ancestors.delete(value);
+  }
+}
+
+/** Decoded JSON objectを検証し、呼出側から独立したordinary objectを返す。 */
+export function cloneValidatedJsonObject(
+  value: unknown,
+  requireUnicodeScalarText = false,
+): Record<string, unknown> | null {
+  try {
+    const cloned = cloneJsonValue(value, new Set(), requireUnicodeScalarText);
+    return cloned === INVALID_JSON || !isPlainObject(cloned)
+      ? null
+      : cloned as Record<string, unknown>;
+  } catch {
+    return null;
   }
 }
 
@@ -121,9 +158,8 @@ function hasCanonicalHlc(hlc: string, actor: string): boolean {
  */
 export function cloneValidatedOp(x: unknown): Op | null {
   try {
-    const cloned = cloneJsonValue(x, new Set());
-    if (cloned === INVALID_JSON || !isPlainObject(cloned)) return null;
-    const o = cloned as Record<string, unknown>;
+    const o = cloneValidatedJsonObject(x);
+    if (o === null) return null;
     if (o.t !== 'create' && o.t !== 'update' && o.t !== 'delete') return null;
     const expectedKeys = o.t === 'delete' ? COMMON_KEYS : VALUE_KEYS;
     if (!hasExactKeys(o, expectedKeys)) return null;
@@ -162,9 +198,8 @@ export function cloneValidatedDispatchOp(
   metadata: Pick<Op, 'op' | 'hlc' | 'actor' | 'user'>,
 ): Op | null {
   try {
-    const cloned = cloneJsonValue(x, new Set());
-    if (cloned === INVALID_JSON || !isPlainObject(cloned)) return null;
-    const input = cloned as Record<string, unknown>;
+    const input = cloneValidatedJsonObject(x);
+    if (input === null) return null;
     if (input.t !== 'create' && input.t !== 'update' && input.t !== 'delete') return null;
     const expectedKeys = input.t === 'delete' ? ['t', 'e', 'id'] : ['t', 'e', 'id', 'v'];
     if (!hasExactKeys(input, expectedKeys)) return null;

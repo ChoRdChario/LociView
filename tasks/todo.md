@@ -697,6 +697,30 @@ Review record:
 - Verification passed on the exact source/test tree: 2 focused files / 322 passing tests plus 13 todos; 32 full-suite files / 1,028 passing tests plus 21 todos; TypeScript typecheck; fixture verification (10 Git entries / 708,867 bytes, one unratified GS candidate); evidence verification (3 pending device templates / 0 run, environment or artifact records); and the production build (96 modules / 11 PWA precache entries, 888.47 KiB). The existing large viewer chunk warning is approximately 803.13 kB
 - Independent production/runtime, exact-closure and false-green/scope reviews found no unresolved P0/P1 after method-neutral active-authority checkpoints and point-in-time notification authority were bound into the promoted assertions
 
+### Post-slice-30 gate/strategy checkpoint
+
+- [x] Recount the remaining expected failures and todos after the malformed-merge root fix, separating decoded manifest defects from raw JSON/UTF-8 parsing, schema policy, operation identity, migration, browser-lock and transaction roots
+- [x] Rank the decoded manifest firewall first because 58 approved existing expectations share one post-JSON/pre-projection seam and have positive compatibility controls, while future-schema, strict raw decoding, cross-tab and atomic publication roots still have policy, parser, lock, journal or device blockers
+- [x] Keep the production-first limit explicit: no new fixture or parameter matrix, no raw duplicate-aware parser, no schema-version decision, no resource-budget invention and no typed evidence/quarantine API in the next slice
+
+### G0 stabilization slice 31 — decoded manifest firewall
+
+- [x] Reuse the S29 safe decoded-JSON ownership clone for manifest objects before known-field projection, with a manifest-only valid-Unicode-scalar requirement that leaves the accepted v1 operation set unchanged
+- [x] Reject recursive exact `__proto__` / `prototype` / `constructor` own keys, NFC-equivalent decoded key collisions, lone-surrogate strings or keys and non-finite decoded numbers before inspection can return a candidate manifest
+- [x] Preserve the ordinary public `ProjectManifest` shape and safe unknown/near-miss/value-only, finite exponent, distinct-normalization and paired-astral controls across inspection, import, reopen and existing-project merge
+- [x] Promote exactly the 58 existing decoded-manifest runtime expectations and bind explicit rejection to zero candidate activation plus exact old manifest/log/allOps/state/vector/reopen/next-probe authority without adding another test matrix
+- [x] Keep raw exact/escaped-equivalent duplicate members, malformed UTF-8 bytes/names, non-NFC values, future-schema major/minor policy, known-field semantics, depth/node/string budgets, typed evidence and full malicious-package/G0-S completion explicitly open
+- [x] Run focused/full tests, typecheck, fixture/evidence verification and production build; complete independent P0/P1/future-correctness and scope/churn review before a separate commit
+
+Review record:
+
+- `parseManifest` now validates and ownership-clones the complete decoded JSON tree before known-field projection, reusing the S29 dangerous-key, NFC-key-collision and finite-number gate while enabling Unicode-scalar validation only for manifests. The returned `ProjectManifest` remains an ordinary projected object, and operation/dispatch validation keeps its prior accepted set
+- The existing malicious-package corpus promoted 58 runtime expectations: 12 decoded NFC-key-collision, 6 lone-surrogate, 27 recursive reserved-key and 13 non-finite-number assertions. Every invalid case now requires direct parser rejection plus explicit import/inspection and existing-merge rejection, zero candidate activation and the existing exact old manifest/log/allOps/state/vector/reopen/next-probe authority
+- Existing compatibility controls remain ordinary and non-vacuous for safe unknown nested members, NFC-singleton/distinct keys, paired astral scalars, dangerous-name near misses and string values, and finite exponents. No new test fixture, test helper or parameter matrix was added
+- Raw exact/escaped-equivalent duplicate members, malformed UTF-8 bytes or names, isolated non-NFC value policy, future-schema policy, known-field semantics, depth/node/string budgets, typed evidence/quarantine and full malicious-package/G0-S completion remain open
+- Verification passed on the exact source/test tree: the focused malicious-package file had 235 passing tests plus 11 todos; the full suite had 32 files / 1,028 passing tests plus 21 todos; TypeScript typecheck; fixture verification (10 Git entries / 708,867 bytes, one unratified GS candidate); evidence verification (3 pending device templates / 0 run, environment or artifact records); and the production build (96 modules / 11 PWA precache entries, 888.79 KiB). The existing large viewer chunk warning is approximately 803.46 kB
+- Independent production/runtime and exact-closure reviews found no unresolved P0/P1 after the trailing-high-surrogate range check was made NaN-safe. Production changed only `schema.ts` and `manifest.ts` (+48/-11); the existing malicious-package test changed +57/-29, and direct `it.fails` declarations fell from 27 to 17 while runtime promotion remained exactly 58
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes

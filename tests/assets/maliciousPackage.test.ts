@@ -9,7 +9,7 @@ import {
 } from '../../src/assets/zipio';
 import { parseHlc } from '../../src/core/hlc';
 import { parseOpsJsonl } from '../../src/core/jsonl';
-import { SCHEMA_VERSION } from '../../src/core/manifest';
+import { parseManifest, SCHEMA_VERSION } from '../../src/core/manifest';
 import { actorIdFrom } from '../../src/core/ids';
 import { reduce, versionVector, visibleEntities } from '../../src/core/reduce';
 import type { Op } from '../../src/core/schema';
@@ -483,8 +483,14 @@ async function attemptNewProject(
   };
 }
 
-function rejectedBeforeActivation(outcome: ImportAttempt): boolean {
-  return outcome.inspectionRejected || outcome.importRejected;
+function rejectedBeforeActivation(outcome: ImportAttempt, manifestText?: string): boolean {
+  let manifestRejected = manifestText === undefined;
+  try {
+    if (manifestText !== undefined) parseManifest(manifestText);
+  } catch {
+    manifestRejected = true;
+  }
+  return manifestRejected && (outcome.inspectionRejected || outcome.importRejected);
 }
 
 function candidateIsUnmodified(outcome: ImportAttempt): boolean {
@@ -1181,13 +1187,16 @@ function pollutionPropertiesInvisible(properties: readonly string[]): boolean {
 
 async function validManifestControlRoundTrips(
   zip: Uint8Array,
+  manifestText: string,
   expectedName: string,
   pollutionProperties: readonly string[] = [],
 ): Promise<boolean> {
   const intrinsicSnapshot = snapshotObjectIntrinsics();
   try {
+    const directlyParsed = parseManifest(manifestText);
     const inspection = await inspectZip(zip);
     const inspectionIsExact =
+      isDeepStrictEqual(directlyParsed, inspection.manifest) &&
       inspection.kind === 'lociview' &&
       inspection.manifest?.projectId === PROJECT_ID &&
       inspection.manifest.schemaVersion === SCHEMA_VERSION &&
@@ -1276,14 +1285,17 @@ async function attemptManifestReservedCase(
     restoreObjectIntrinsics(mergeSnapshot);
   }
   if (mergeOutcome === null) throw new Error(`reserved manifest merge did not complete: ${reservedCase.id}`);
+  const explicitlyRejected =
+    rejectedBeforeActivation(importOutcome, reservedCase.manifestText) &&
+    mergeOutcome.explicitlyRejected;
 
   return {
     initialized: true,
     controlUnchanged: importOutcome.controlUnchanged,
     completionMarkerNeverPublished:
-      !importOutcome.active && importOutcome.completionMarkerMutationCount === 0,
-    sentinelNeverActive: !importOutcome.mixedValidCaptionVisible,
-    existingAuthorityUnchanged: mergeOutcome.authoritativeUnchanged,
+      explicitlyRejected && !importOutcome.active && importOutcome.completionMarkerMutationCount === 0,
+    sentinelNeverActive: explicitlyRejected && !importOutcome.mixedValidCaptionVisible,
+    existingAuthorityUnchanged: explicitlyRejected && mergeOutcome.authoritativeUnchanged,
     objectIntrinsicsIntact: importIntrinsicsIntact && mergeIntrinsicsIntact,
   };
 }
@@ -1763,8 +1775,10 @@ describe('G0 characterization: malicious ZIP envelope', () => {
         foreignNormalizedCollisionZip,
       );
       try {
+        const directlyParsed = parseManifest(MANIFEST_AMBIGUITY_CONTROL_TEXT);
         const controlInspection = await inspectZip(manifestAmbiguityControlZip);
         manifestAmbiguityControlAccepted =
+          isDeepStrictEqual(directlyParsed, controlInspection.manifest) &&
           controlInspection.kind === 'lociview' &&
           controlInspection.manifest?.projectId === PROJECT_ID &&
           controlInspection.opsErrorCount === 0 &&
@@ -1776,32 +1790,39 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       }
       manifestScalarControlRoundTrips = await validManifestControlRoundTrips(
         manifestScalarControlZip,
+        MANIFEST_SCALAR_CONTROL_TEXT,
         VALID_ASTRAL_SCALAR,
       );
       for (const ambiguityCase of MANIFEST_AMBIGUITY_CASES) {
         const zip = manifestAmbiguityZips[ambiguityCase.id];
         const importOutcome = await attemptNewProject(ambiguityCase.id, zip);
         const mergeOutcome = await attemptExistingProjectMerge(zip);
+        const explicitlyRejected =
+          rejectedBeforeActivation(importOutcome, ambiguityCase.manifestText) &&
+          mergeOutcome.explicitlyRejected;
         manifestAmbiguityResults[ambiguityCase.id] = {
           initialized: true,
           controlUnchanged: importOutcome.controlUnchanged,
           completionMarkerNeverPublished:
-            !importOutcome.active && importOutcome.completionMarkerMutationCount === 0,
-          sentinelNeverActive: !importOutcome.mixedValidCaptionVisible,
-          existingAuthorityUnchanged: mergeOutcome.authoritativeUnchanged,
+            explicitlyRejected && !importOutcome.active && importOutcome.completionMarkerMutationCount === 0,
+          sentinelNeverActive: explicitlyRejected && !importOutcome.mixedValidCaptionVisible,
+          existingAuthorityUnchanged: explicitlyRejected && mergeOutcome.authoritativeUnchanged,
         };
       }
       for (const scalarCase of MANIFEST_SCALAR_CASES) {
         const zip = manifestScalarZips[scalarCase.id];
         const importOutcome = await attemptNewProject(scalarCase.id, zip);
         const mergeOutcome = await attemptExistingProjectMerge(zip);
+        const explicitlyRejected =
+          rejectedBeforeActivation(importOutcome, scalarCase.manifestText) &&
+          mergeOutcome.explicitlyRejected;
         manifestScalarResults[scalarCase.id] = {
           initialized: true,
           controlUnchanged: importOutcome.controlUnchanged,
           completionMarkerNeverPublished:
-            !importOutcome.active && importOutcome.completionMarkerMutationCount === 0,
-          sentinelNeverActive: !importOutcome.mixedValidCaptionVisible,
-          existingAuthorityUnchanged: mergeOutcome.authoritativeUnchanged,
+            explicitlyRejected && !importOutcome.active && importOutcome.completionMarkerMutationCount === 0,
+          sentinelNeverActive: explicitlyRejected && !importOutcome.mixedValidCaptionVisible,
+          existingAuthorityUnchanged: explicitlyRejected && mergeOutcome.authoritativeUnchanged,
         };
       }
       for (const reservedCase of MANIFEST_RESERVED_CASES) {
@@ -1812,6 +1833,7 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       }
       manifestReservedControlRoundTrips = await validManifestControlRoundTrips(
         manifestReservedControlZip,
+        MANIFEST_RESERVED_CONTROL_TEXT,
         MANIFEST_RESERVED_CONTROL_NAME,
         MANIFEST_RESERVED_CASES.map(({ pollutionProperty }) => pollutionProperty),
       );
@@ -1819,6 +1841,7 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       for (const sign of MANIFEST_NUMBER_SIGNS) {
         manifestNumberControlRoundTrips[sign] = await validManifestControlRoundTrips(
           manifestNumberControlZips[sign],
+          MANIFEST_NUMBER_CONTROL_TEXTS[sign],
           'malicious envelope fixture',
         );
       }
@@ -1826,15 +1849,20 @@ describe('G0 characterization: malicious ZIP envelope', () => {
         const zip = manifestNumberZips[numberCase.id];
         const importOutcome = await attemptNewProject(numberCase.id, zip);
         const mergeOutcome = await attemptExistingProjectMerge(zip);
+        const explicitlyRejected =
+          rejectedBeforeActivation(importOutcome, numberCase.manifestText) &&
+          mergeOutcome.explicitlyRejected;
         manifestNumberResults[numberCase.id] = {
           initialized: true,
-          explicitlyRejected: rejectedBeforeActivation(importOutcome),
+          explicitlyRejected,
           controlUnchanged: importOutcome.controlUnchanged,
           completionMarkerNeverPublished:
-            !importOutcome.active && importOutcome.completionMarkerMutationCount === 0,
+            explicitlyRejected &&
+            !importOutcome.active &&
+            importOutcome.completionMarkerMutationCount === 0,
           sentinelNeverPublishedUnderCompletionMarker:
-            !importOutcome.sentinelPublishedUnderCompletionMarker,
-          existingAuthorityUnchanged: mergeOutcome.authoritativeUnchanged,
+            explicitlyRejected && !importOutcome.sentinelPublishedUnderCompletionMarker,
+          existingAuthorityUnchanged: explicitlyRejected && mergeOutcome.authoritativeUnchanged,
         };
       }
     } finally {
@@ -2579,16 +2607,17 @@ describe('G0 characterization: malicious ZIP envelope', () => {
     });
 
     for (const ambiguityCase of MANIFEST_AMBIGUITY_CASES) {
-      it.fails(`${ambiguityCase.id}: never publishes a candidate completion marker`, () => {
+      const testCase = ambiguityCase.relation === 'nfc-collision' ? it : it.fails;
+      testCase(`${ambiguityCase.id}: never publishes a candidate completion marker`, () => {
         expect(manifestAmbiguityResults[ambiguityCase.id].completionMarkerNeverPublished)
           .toBe(true);
       });
 
-      it.fails(`${ambiguityCase.id}: never activates the valid sentinel operation`, () => {
+      testCase(`${ambiguityCase.id}: never activates the valid sentinel operation`, () => {
         expect(manifestAmbiguityResults[ambiguityCase.id].sentinelNeverActive).toBe(true);
       });
 
-      it.fails(`${ambiguityCase.id}: leaves existing active authority unchanged`, () => {
+      testCase(`${ambiguityCase.id}: leaves existing active authority unchanged`, () => {
         expect(manifestAmbiguityResults[ambiguityCase.id].existingAuthorityUnchanged).toBe(true);
       });
     }
@@ -2607,15 +2636,15 @@ describe('G0 characterization: malicious ZIP envelope', () => {
     });
 
     for (const scalarCase of MANIFEST_SCALAR_CASES) {
-      it.fails(`${scalarCase.id}: never publishes a candidate completion marker`, () => {
+      it(`${scalarCase.id}: never publishes a candidate completion marker`, () => {
         expect(manifestScalarResults[scalarCase.id].completionMarkerNeverPublished).toBe(true);
       });
 
-      it.fails(`${scalarCase.id}: never activates the valid sentinel operation`, () => {
+      it(`${scalarCase.id}: never activates the valid sentinel operation`, () => {
         expect(manifestScalarResults[scalarCase.id].sentinelNeverActive).toBe(true);
       });
 
-      it.fails(`${scalarCase.id}: leaves existing active authority unchanged`, () => {
+      it(`${scalarCase.id}: leaves existing active authority unchanged`, () => {
         expect(manifestScalarResults[scalarCase.id].existingAuthorityUnchanged).toBe(true);
       });
     }
@@ -2640,15 +2669,15 @@ describe('G0 characterization: malicious ZIP envelope', () => {
     });
 
     for (const reservedCase of MANIFEST_RESERVED_CASES) {
-      it.fails(`${reservedCase.id}: never publishes a candidate completion marker`, () => {
+      it(`${reservedCase.id}: never publishes a candidate completion marker`, () => {
         expect(manifestReservedResults[reservedCase.id].completionMarkerNeverPublished).toBe(true);
       });
 
-      it.fails(`${reservedCase.id}: never activates the valid sentinel operation`, () => {
+      it(`${reservedCase.id}: never activates the valid sentinel operation`, () => {
         expect(manifestReservedResults[reservedCase.id].sentinelNeverActive).toBe(true);
       });
 
-      it.fails(`${reservedCase.id}: leaves existing active authority unchanged`, () => {
+      it(`${reservedCase.id}: leaves existing active authority unchanged`, () => {
         expect(manifestReservedResults[reservedCase.id].existingAuthorityUnchanged).toBe(true);
       });
     }
@@ -2656,7 +2685,6 @@ describe('G0 characterization: malicious ZIP envelope', () => {
 
   describe('decoded non-finite manifest numbers stay outside active authority', () => {
     const alreadySafeId: ManifestNumberId = 'manifest-number-overflow-known-negative';
-    const importPreflightSafeId: ManifestNumberId = 'manifest-number-overflow-known-positive';
     const unsafeCases = MANIFEST_NUMBER_CASES.filter(({ id }) => id !== alreadySafeId);
 
     it('accepts both modest finite-exponent controls through inspection, import, reopen and merge', () => {
@@ -2685,7 +2713,7 @@ describe('G0 characterization: malicious ZIP envelope', () => {
     });
 
     for (const numberCase of unsafeCases) {
-      (numberCase.id === importPreflightSafeId ? it : it.fails)(
+      it(
         `${numberCase.id}: never publishes a candidate completion marker`,
         () => {
           expect(
@@ -2695,7 +2723,7 @@ describe('G0 characterization: malicious ZIP envelope', () => {
         },
       );
 
-      (numberCase.id === importPreflightSafeId ? it : it.fails)(
+      it(
         `${numberCase.id}: never publishes the sentinel under a completion marker`,
         () => {
           expect(manifestNumberResults[numberCase.id].sentinelNeverPublishedUnderCompletionMarker)
@@ -2703,7 +2731,7 @@ describe('G0 characterization: malicious ZIP envelope', () => {
         },
       );
 
-      it.fails(`${numberCase.id}: leaves existing active authority unchanged`, () => {
+      it(`${numberCase.id}: leaves existing active authority unchanged`, () => {
         expect(manifestNumberResults[numberCase.id].existingAuthorityUnchanged).toBe(true);
       });
     }

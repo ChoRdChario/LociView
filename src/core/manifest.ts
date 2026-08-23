@@ -2,6 +2,7 @@
 // 可変状態は持たせない。可変なものはすべて ops から導出する。
 
 import { newId } from './ids';
+import { cloneValidatedJsonObject } from './schema';
 
 export const MANIFEST_FORMAT = 'lociview-project';
 export const SCHEMA_VERSION = 1;
@@ -35,7 +36,8 @@ export function parseManifest(text: string): ProjectManifest {
     throw new Error('manifest: invalid JSON');
   }
   if (typeof x !== 'object' || x === null) throw new Error('manifest: not an object');
-  const m = x as Record<string, unknown>;
+  const m = cloneValidatedJsonObject(x, true);
+  if (m === null) throw new Error('manifest: invalid decoded JSON');
   if (m.format !== MANIFEST_FORMAT) throw new Error('manifest: unknown format');
   if (typeof m.schemaVersion !== 'number' || m.schemaVersion < 1) throw new Error('manifest: bad schemaVersion');
   if (m.schemaVersion > SCHEMA_VERSION) {
