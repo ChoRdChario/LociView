@@ -2,9 +2,9 @@
 
 import { el, clear } from '../dom';
 import { fAnchor, fStr, fStrArr, type AnchorData } from '../fields';
-import { entityIdFor } from '../../core/store';
+import { addCaptionAttachments, type AttachmentSource } from '../../assets/captionAttachment';
 import type { AppContext } from '../context';
-import { confirmDialog } from '../dialogs';
+import { confirmDialog, infoDialog } from '../dialogs';
 import { openImageWindow } from '../imageWindow';
 import { openImagePicker } from '../imagePicker';
 
@@ -162,31 +162,33 @@ export function mountCaptionTab(container: HTMLElement, ctx: AppContext): () => 
 
     const fileInput = el('input', { type: 'file', accept: 'image/*,video/*', multiple: true, style: 'display:none' }) as HTMLInputElement;
     const cameraInput = el('input', { type: 'file', accept: 'image/*', capture: 'environment', style: 'display:none' }) as HTMLInputElement;
-    const attach = async (files: FileList | null): Promise<void> => {
-      if (files === null || files.length === 0) return;
+    const attach = async (files: readonly File[]): Promise<void> => {
+      if (files.length === 0) return;
       const current = ctx.selectedCaption();
       if (current === null) return;
-      const newIds: string[] = [];
-      for (const file of files) {
-        const astId = entityIdFor('asset');
-        const ext = (file.name.split('.').pop() ?? 'bin').toLowerCase();
-        const path = `media/${astId}.${ext}`;
-        await ctx.fs.writeBytes(`${ctx.dir}/${path}`, new Uint8Array(await file.arrayBuffer()));
-        ctx.store.dispatch({
-          t: 'create', e: 'asset', id: astId,
-          v: {
-            kind: file.type.startsWith('video/') ? 'video' : 'image',
-            path, originalName: file.name, mime: file.type, size: file.size,
-          },
-        });
-        newIds.push(astId);
-      }
-      ctx.undo.update('caption', current.id, {
-        attachments: [...fStrArr(current, 'attachments'), ...newIds],
+      const sources: AttachmentSource[] = files.map((file) => ({
+        name: file.name,
+        mime: file.type,
+        readBytes: async () => new Uint8Array(await file.arrayBuffer()),
+      }));
+      await addCaptionAttachments(
+        ctx.fs,
+        ctx.dir,
+        ctx.store,
+        current.id,
+        sources,
+        (attachments) => ctx.undo.update('caption', current.id, { attachments: [...attachments] }),
+      );
+    };
+    const handleFiles = (input: HTMLInputElement): void => {
+      const files = Array.from(input.files ?? []);
+      input.value = '';
+      void attach(files).catch(async (error: unknown) => {
+        await infoDialog('添付失敗', error instanceof Error ? error.message : String(error));
       });
     };
-    fileInput.addEventListener('change', () => void attach(fileInput.files));
-    cameraInput.addEventListener('change', () => void attach(cameraInput.files));
+    fileInput.addEventListener('change', () => handleFiles(fileInput));
+    cameraInput.addEventListener('change', () => handleFiles(cameraInput));
 
     // ピン位置の3軸調整（モデル内部への配置用。モデルローカル座標）
     const posEditor = el('div', { class: 'lv-grp' });

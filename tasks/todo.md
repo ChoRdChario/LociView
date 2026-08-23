@@ -587,6 +587,35 @@ Review record:
 - Independent production/runtime, exact-boundary/future-correctness and false-green/scope reviews found no unresolved P0/P1 after explicit rejection, exact-limit positive controls and guard-status wording were corrected. The tree retains 43 direct `it.fails` declarations plus 21 todos; parameterized G0S-OP expectations make the runtime expected-failure count larger
 - Recursive budgets and hostile accessor snapshots, raw whitespace, reserved keys, canonical HLC/ID/actor/user, known-field quarantine, duplicate-aware parsing, collision evidence, package/open ingress, device-derived hard limits and full G0S-OP/G0-S completion remain explicitly unclaimed
 
+### Post-slice-26 gate/strategy checkpoint
+
+- [x] Re-rank the remaining immediately implementable work after the budget root fix instead of extending the G0S-OP characterization matrix
+- [x] Keep full G0S-OP structural/canonical ingress work blocked on legacy-ID compatibility, duplicate-aware raw evidence and typed collision/quarantine design; keep G0S-TAB and atomic marker/log recovery behind browser locks or filesystem transaction primitives
+- [x] Select caption attachment publication as the next bounded root fix because it is the remaining live UI path that writes an unverified blob, publishes asset metadata without an internal durability barrier and drops asynchronous failures
+- [x] Limit the slice to verified media bytes, metadata-after-verification ordering, exact referenced closure, an internal flush and surfaced UI failure; do not introduce a general batch/transaction API
+- [x] Apply the production-first stop rule: add only the smallest Node acceptance needed for this previously private DOM closure, and stop if correct behavior requires all-or-none multi-operation durability, cleanup/GC, locking or streaming/CAS
+
+### G0 stabilization slice 27 — verified caption attachments
+
+- [x] Extract one DOM-independent attachment action that snapshots File-bound descriptors before its first await, reads one source at a time and writes each fresh media blob through the shared exact post-write verifier
+- [x] Keep only staged metadata in memory, publish asset operations only after every selected blob verifies, update the current caption attachments last without an intervening await, and return IDs only after `ProjectStore.flush()` succeeds
+- [x] Preserve the existing caption Undo update, reset file inputs after capture and surface action rejection through the existing information dialog rather than leaving an unhandled `void` promise
+- [x] Add a compact healthy two-file control plus resolved bit-flip/truncation and actor-log rejection coverage; bind notifications, action boundary and reopen to causal old/staged/complete authority in which every visible asset and caption reference has exact bytes
+- [x] Permit verified unreferenced blobs and verified staged asset records after rejection, fresh-path retry and semantic JSONL formatting; reject fulfilled partial/no-op outcomes and never use a test-side flush to satisfy the action's durability barrier
+- [x] Keep multi-operation all-or-none durability, actor-log prefix recovery, same-caption/cross-tab locking, MIME/content/decode validation, media limits, cleanup/GC, streaming/CAS, crash/power-loss and full G0S-BLOB/G0-S completion explicitly open
+- [x] Run focused/full verification, typecheck, fixture/evidence checks and production build; complete independent implementation/closure/false-green review before commit
+
+Review record:
+
+- Added one DOM-independent caption-attachment action. It snapshots descriptor/read functions before the first await, reads and copies one immutable File payload at a time, writes every fresh direct `media/` child through exact post-write verification, retains metadata rather than aggregate source bytes, and publishes no asset operation until all selected blobs verify
+- Immediately before publication the action rechecks the target caption and derives its latest string attachment list. It then dispatches all asset creates and the existing Undo-backed caption update without an intervening await, crosses an internal `ProjectStore.flush()` barrier, and only then returns the new IDs; metadata size comes from verified bytes rather than `File.size`
+- The UI captures `FileList` membership into immutable File objects, resets the input for same-file reselection and reports rejection through `infoDialog`. It retains the prior caption Undo semantics and does not silently discard the asynchronous action failure
+- Eleven ordinary tests cover healthy two-file publication, resolved bit-flip/truncation of the second source, and semantic append rejection at both the first asset and final caption update. Point snapshots and action-boundary reopen classify exact old, verified-asset prefix or complete authority; fulfilled requires complete durable authority, while rejected recovery may finish at any causal candidate without fixing retry count, write method, asset-op order or notification count
+- The dedicated test is 700 lines versus 116 added production lines. This is intentionally not another tests-only slice: most of the test is the first Node-accessible manifest/operation/state/vector/log/blob point-in-time oracle for the previously private DOM closure. A shared model/addition publication-helper refactor could reduce duplication, but touching established tests solely for line count would widen this root fix; the next slice must reuse existing expected failures rather than add another matrix
+- Verification passed on the exact final tree: 4 focused files / 94 passing tests plus 3 todos; 32 full-suite files / 1,026 passing tests plus 21 todos; TypeScript typecheck; fixture verification (10 Git entries / 708,867 bytes, one unratified GS candidate); evidence verification (3 pending device templates / 0 run, environment or artifact records); and the production build (96 modules / 11 PWA precache entries, 885.21 KiB). The existing 799.79 kB viewer-chunk warning remains
+- Independent production/runtime, exact-closure, false-green and final current-tree reviews found no unresolved P0/P1 after notification/retry freedom, semantic source-role mapping and durable-prefix direction were corrected
+- Multi-operation all-or-none durability, actor-log prefix recovery, same-caption/cross-tab locking, MIME/content/decode validation, media limits, orphan cleanup/GC, streaming/CAS, crash/power-loss, physical-device evidence and full G0S-BLOB/G0-S completion remain explicitly unclaimed
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
