@@ -1544,6 +1544,42 @@ Mode-B slice 3B implementation review record — 2026-08-25:
   record is the only writer change after the first matrix; the exact tree must
   pass the same serial matrix again before staging and cached-diff review.
 
+Post-3B meta-audit and authority-status sync — 2026-08-25:
+
+- [x] Confirm branch `g0-baseline`, clean worktree, commit `96c35ca`, the closed
+  Mode-B implementation gate and its twice-passing final verification matrix
+- [x] Replace the coverage map's obsolete “implement the acquisition verifier”
+  blocker with the exact implemented/offline-verified capability and remaining
+  descriptor, real-acquisition, privacy/license, Release/adoption and G0-credit
+  stops; do not change any coverage row to gate-passing
+- [x] Verify the docs-only status diff and obtain independent consistency review;
+  keep the sync isolated in a separate documentation-only commit before beginning
+  another production slice
+- [x] Re-rank the external evidence lane against the ready internal G0-S failures;
+  continue only an accepted bounded internal boundary, and ask the Product Owner
+  before real network acquisition or any Release/adoption action
+
+Meta-audit result:
+
+- G0 remains active/incomplete and G0-S remains a parallel release blocker; G1+
+  cannot begin. Mode B closed an implementation and offline-acceptance boundary,
+  not an external fixture, adoption, device-evidence or G0-credit boundary.
+- The external critical path is exact candidate selection and inspection,
+  independent exact-asset privacy/license review, Product Owner approval of the
+  exact digest/tag/asset name/draft upload, that draft upload, separate Product
+  Owner authorization for unchanged public-but-unadopted publication, that
+  publication, exact descriptor review/indexing, separate real-network
+  authorization and Mode-B execution, independent receipt review, separate
+  registry-adoption approval, and only then fixed-input device measurement and
+  numeric ratification. No step authorizes the next one.
+- The remaining G0-S production roots require Product Owner policy or a reviewed
+  browser lock/journal or migration decision. The only immediately ready internal
+  slice is the pre-fix provenance ledger using existing reproducible evidence;
+  it must not reconstruct or invent missing historical failures.
+- Independent contract and progress reviewers both passed the corrected status
+  sync with no P0/P1/P2 finding; in particular, the ordered authorization stops,
+  `external-blocked` state and no-G0-credit boundary remain intact.
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes

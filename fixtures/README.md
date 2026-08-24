@@ -76,11 +76,13 @@ exact stage-0 indexed regular blobs whose bytes equal the worktree candidate:
 entries do not qualify. Complete-run evidence resolves the registry, license
 text and semantic bindings from the run's recorded evidence-source commit
 (`evidenceSource.gitCommit`) rather than its build commit or current worktree
-metadata. Verification deliberately reports
-external transport as awaiting the separate acquisition verifier. For
-external GS, the large transport can remain outside Git while the candidate
-specification and diagnostic oracle are distinct hashed Git files. Registration
-never ratifies a FormatProfile, renderer behavior or device evidence.
+metadata. The network-capable Mode-B command exists and is offline-verified, but
+normal registry/evidence verification never invokes it and deliberately reports
+external transport as pending separately executed acquisition/receipt
+verification. For external GS, the large transport can remain outside Git while
+the candidate specification and diagnostic oracle are distinct hashed Git files.
+Registration never ratifies a FormatProfile, renderer behavior or device
+evidence.
 
 Operational source data remains private unless the Product Owner separately
 approves the exact bytes for redistribution. In particular, the Ki84 LociMyu

@@ -64,7 +64,7 @@ its parent requirement independently.
 
 | ID | Atomic requirement | State | Present evidence or exact gap | Owner / next action |
 |---|---|---|---|---|
-| `G0-REG-01` | Per-fixture digest/bytes, geometry counts, bounds, coordinates/units, provenance/license/privacy, restore instructions and expected warnings/results | `external-blocked` | Registry v2 can bind complete reviewed attribution, canonical license terms, exact versioned fixture-Release transport and external GS plus Git specification/oracle. All ten current entries intentionally remain `NOASSERTION`/unreviewed and Git-tier; no external asset has passed acquisition/restore or entry-specific privacy/license review. | `Writer` implements and runs explicit acquisition verification; `Privacy/license reviewer` reviews each exact candidate; `PO` approves any upload/adoption and later project-license scope. |
+| `G0-REG-01` | Per-fixture digest/bytes, geometry counts, bounds, coordinates/units, provenance/license/privacy, restore instructions and expected warnings/results | `external-blocked` | Registry v2 can bind complete reviewed attribution, canonical license terms, exact versioned fixture-Release transport and external GS plus Git specification/oracle. The network-capable Mode-B CLI/core, exact schemas and independent receipt verifier are implemented and verified entirely offline. All ten current entries intentionally remain `NOASSERTION`/unreviewed and Git-tier; no exact indexed Mode-B descriptor or fixture-Release asset exists, no real-network acquisition/restore receipt has been produced, and no external asset has passed entry-specific privacy/license review. | `Writer` selects and inspects exact candidate bytes; `Privacy/license reviewer` independently reviews them; and `PO` approves the exact digest, tag, asset name and draft upload. After that upload, unchanged public-but-unadopted publication needs separate `PO` authorization; only then does `Writer` add the exact indexed descriptor. Separate real-network authorization precedes Mode-B execution, `Independent reviewer` receipt review precedes separate `PO` adoption approval, and none of these steps grants G0 credit by itself. |
 | `G0-FX-01A` | Small anonymized real v1 operational project | `external-blocked` | No anonymized real fixture or durable locator. | `Writer` derives/restores exact bytes; `Privacy/license reviewer` and `PO` approve the derivative SHA and redistribution. |
 | `G0-FX-01B` | Medium anonymized real v1 operational project | `external-blocked` | No anonymized real fixture or accepted size classification. | `Writer` derives/restores exact bytes; `Privacy/license reviewer` approves them; `PO` decides whether one source-derived size class is representative. |
 | `G0-FX-01C` | Largest available anonymized real v1 operational project | `external-blocked` | Private Ki84 is the only known operational source and is diagnostic-only. | `Writer` derives/restores it or another largest example; `Privacy/license reviewer` audits it; `PO` approves the exact bytes and why this is the largest available class. |
@@ -236,7 +236,7 @@ approved product outcomes that constrain later production/release work.
 
 | ID | Exit criterion | State | What remains | Owner / acceptance action |
 |---|---|---|---|---|
-| `G0-EXIT-01` | Every fixture restorable by hash | `external-blocked` | Operational derivatives, representative GS/scene assets, stress inputs and semantic families are absent/unratified. | `Writer` runs repository and external acquisition verification; `Independent reviewer` checks every row/locator. |
+| `G0-EXIT-01` | Every fixture restorable by hash | `external-blocked` | Mode-B restore and independent receipt verification are implemented and offline-verified, but no exact external descriptor, real restore receipt or adopted representative asset exists. Operational derivatives, representative GS/scene assets, stress inputs and semantic families remain absent/unratified. | `Writer` continues repository restore checks and runs external Mode-B acquisition only after its separate authorization; `Independent reviewer` verifies each receipt, row and locator. |
 | `G0-EXIT-02` | Physical-iOS raw evidence exists | `external-blocked` | Zero measured iPhone runs; the environment schema is ready, while fixed fixture/trace and instrumentation dependencies remain. | `Device operator` captures raw runs after those dependencies close; `Writer` verifies; `PO` accepts required physical evidence. |
 | `G0-EXIT-03` | G0-S reproductions fail on the recorded unfixed baseline | `candidate` | Expected failures exist, but the exact pre-fix ledger is incomplete. | `Writer` completes provenance; `Independent reviewer` reproduces or verifies raw failing evidence. |
 | `G0-EXIT-04` | Package bytes and splat counts are recorded | `external-blocked` | No adopted representative external GS/package run records. | `Writer` binds exact counts/bytes to restored inputs and run manifests. |
@@ -261,8 +261,11 @@ immutable evidence-source revision, allowing the pre-registry deployed-v1
 baseline to use fixed G0 inputs without pretending they shipped together.
 
 1. The evidence verifier validates a supplied external locator/hash but never
-   fetches it. The fixture Release path therefore needs a separate acquisition,
-   restore and streamed-hash verification step with focused tests.
+   fetches it. The separate network-capable Mode-B acquisition/restore path and
+   receipt verifier are now implemented and offline-verified, but normal
+   verification does not invoke them. No exact indexed descriptor,
+   fixture-Release asset or real-network receipt exists, and a pre-adoption
+   receipt alone grants no registry, adoption or G0 credit.
 2. A private operational package is not a render fixture for a complete device
    run. Keep raw Ki84 conversion diagnostics separate; use a reviewed derivative
    for migration acceptance and an appropriate registered render fixture for
@@ -278,18 +281,24 @@ baseline to use fixed G0 inputs without pretending they shipped together.
 
 ## Current critical path and stop rules
 
-1. Implement the separate explicit acquisition/restore verifier, then inspect
-   candidate public GS bytes without uploading or adopting them. Exact-asset
-   privacy/license review and Product Owner approval remain mandatory before a
-   fixture Release upload or registry adoption.
+1. Inspect candidate public GS bytes without uploading or adopting them. The
+   Mode-B boundary is implemented and offline-verified; next complete independent
+   exact-asset privacy/license review and obtain Product Owner approval of the
+   exact digest, tag, asset name and draft upload, then perform only that upload.
+   Unchanged public-but-unadopted publication needs another Product Owner
+   authorization; only after publication may the exact descriptor be reviewed
+   and indexed. Separate real-network authorization must precede Mode-B execution,
+   independent receipt review must precede separate registry-adoption approval,
+   and none of these steps grants G0 credit by itself.
 2. Specify the `PROD-13` conversion dispositions, produce and privacy-review the
    Ki84 derivative, acquire/license-review public GS and author deterministic
    intersection/aircraft inputs where external bytes do not materially improve
    the acceptance oracle.
-3. Close the remaining trace/instrumentation blockers, then collect Windows and
-   physical-iPhone baselines while completing the G0-S
-   pre-fix ledger. A bounded ZIP symlink/FIFO root fix may use unavoidable
-   acquisition/device wait time but cannot replace the external lane.
+3. Complete the G0-S pre-fix ledger from existing reproducible evidence while
+   the policy/architecture prerequisites for its remaining production roots are
+   resolved. Close the remaining trace/instrumentation blockers, then collect
+   Windows and physical-iPhone baselines. Parallel internal work cannot replace
+   the external lane.
 4. Ask the Product Owner to ratify numeric support/degradation/profile decisions
    only after reviewed measurements exist.
 5. Designate an exact stabilized-v1 candidate before final verification and bind
