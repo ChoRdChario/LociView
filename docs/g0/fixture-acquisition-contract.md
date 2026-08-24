@@ -1,11 +1,15 @@
 # G0 fixture acquisition and Release restore contract
 
-> Status: `PROPOSED SECURITY/EVIDENCE CONTRACT / NOT IMPLEMENTED`.
+> Status: `PRODUCT-OWNER RATIFIED SECURITY/EVIDENCE CONTRACT / NOT IMPLEMENTED`.
 >
 > The Product Owner approved the two-mode boundary and fixture-Release
-> publication lifecycle on 2026-08-24. The numeric envelope, exact redirect
-> origins and receipt schema in this revision remain proposed and require
-> explicit Product Owner ratification before network-capable implementation.
+> publication lifecycle, then ratified this revision's exact numeric envelope,
+> two Mode-B origins and exact descriptor/receipt schema on 2026-08-24. This
+> authorizes the dependency-free Mode-B network-capable implementation defined
+> here. The Product Owner also ratified the timeout/commit, safe-lock receipt
+> exception and conservative quota clarification in this revision on the same
+> date. It does not authorize real network acquisition, a Release operation,
+> upload, publication, registry adoption, push, deploy or product release.
 
 ## 1. Purpose and authority
 
@@ -37,7 +41,7 @@ code-owned allowlist change. Descriptor data alone never grants network access.
 
 ## 2. Commands and trust anchor
 
-The proposed commands are:
+The contracted commands are:
 
 ```text
 npm run fixtures:candidate:acquire -- --descriptor <path>
@@ -179,7 +183,7 @@ The following condition table is closed; no other combination is valid:
 | B failure before locator validation | `sourceIdentity=null`; `stableTransportIdentity=false`; `expectedMatch=null` | `none` or `partial-deleted` with null path |
 | B failure after locator validation but before clean EOF | canonical source identity; `stableTransportIdentity=true`; `streamEnded=false`; measured digest and `expectedMatch` are null | `none` or `partial-deleted` with null path |
 | B failure after clean EOF/mismatch | canonical source identity; `stableTransportIdentity=true`; `streamEnded=true`; measured digest present; `expectedMatch=false` | `none` or `partial-deleted` with null path; mismatched bytes never enter `verified-transport` or `orphan-cache` |
-| B failure after clean EOF/exact match but local commit failure | canonical source identity; measured tuple exactly equals the descriptor; `stableTransportIdentity=true`; `streamEnded=true`; `expectedMatch=true`; failure error is limited to applicable local containment/cache/publish/receipt codes | `none` or `partial-deleted` with null path before byte publication; `orphan-cache` with non-null path only after exact bytes were published but no success receipt committed |
+| B failure after clean EOF/exact match but before the durable success-receipt commit point | canonical source identity; measured tuple exactly equals the descriptor; `stableTransportIdentity=true`; `streamEnded=true`; `expectedMatch=true`; `E_OVERALL_TIMEOUT` is allowed when expiry is observed before the receipt commit-critical section begins; every other failure is limited to applicable local containment/cache/publish/receipt codes | `none` or `partial-deleted` with null path before byte publication; `orphan-cache` with non-null path only after exact bytes were published by this attempt but no durable success receipt committed |
 
 For every failure, `error.exitCode` must equal section 10's mapping for
 `error.code`. For every disposition ending in `published`, `cache-reused` or
@@ -194,19 +198,31 @@ measured tuple, outcome, false-credit constants, error/exit mapping and local
 disposition. A self-asserted `expectedMatch: true` never suffices. Receipt
 construction calls the same semantic validator before atomic publication; an
 independent reviewer can rerun the offline command without network access.
+The verifier acquires the same zero-byte exclusive writer lock with the same
+safe precheck, `wx` and identity rules, then holds its handle from before opening
+the receipt through file identity, bounded read, semantic/local-path checks and
+post-validation identity checks. A pre-existing lock or `EEXIST` yields a fixed
+fail-closed verifier result. The verifier releases only its own identity-checked
+lock after the verdict and never creates an acquisition receipt. A check-only
+lock-existence probe is forbidden: serialization covers the complete receipt
+observation, so an indeterminate in-progress or failed publication cannot become
+independent success evidence during a race.
 
 Receipt filenames derive only from the validated request ID and unpredictable
 attempt ID. They never contain a URL, host, asset name or remote error text.
 An exit-2 failure before a descriptor yields a valid request ID and exact raw
 digest produces no receipt; stderr still contains only the fixed error code.
-After that validation boundary, every outcome attempts the mode-specific
-receipt.
+After descriptor validation and successful safe writer-lock acquisition, every
+outcome attempts the mode-specific receipt. A failure that prevents safe root
+initialization or lock acquisition, including `E_LOCK_BUSY`, produces no receipt
+and emits only its fixed code and hop index.
 
-## 5. Proposed numeric envelope
+## 5. Ratified numeric envelope
 
-These values require Product Owner ratification before implementation:
+The Product Owner ratified these exact values for Mode-B implementation on
+2026-08-24:
 
-| Limit | Proposed value |
+| Limit | Ratified value |
 |---|---:|
 | Final body / one local candidate or restore | 2 GiB |
 | Connect phase per hop (DNS + TCP + TLS + headers) | 15 seconds |
@@ -217,25 +233,84 @@ These values require Product Owner ratification before implementation:
 | DNS A/AAAA answers per hop | 16 |
 | Descriptor / receipt bytes | 64 KiB / 128 KiB |
 | Acquisition-root total bytes | 6 GiB |
-| Minimum free-space headroom before streaming | requested maximum + 512 MiB |
+| Minimum free-space headroom before streaming | requested maximum + 128 KiB receipt reservation + 512 MiB |
 | Directory entries inspected per acquisition root/tier | 1,000 |
 | Concurrent writers | 1 |
 | Automatic retries | 0 |
 
 Mode B stops after `expectedBytes + 1` observed final-body bytes, subject to the
-2 GiB expected-byte cap; the one-byte probe distinguishes extra bytes. Mode A
-stops after `maximumBytes + 1`. Redirect bodies are never consumed. Header and
-body counters use safe integers. The overall deadline never resets and includes
-redirects, streaming, sync, receipt validation and cleanup. The idle timer is
-refreshed only by a non-empty final-body chunk.
+2 GiB expected-byte cap; the one-byte probe distinguishes extra bytes and is
+never persisted. Mode A stops after `maximumBytes + 1`. Redirect bodies are
+never consumed. Header and body counters use safe integers.
 
-One tool-owned writer lock protects the acquisition root. A busy or stale lock
-fails closed; v1 does not break or delete another process's lock. Stale partials
-remain non-authoritative, count against the root quota and cause a bounded
-diagnostic rather than automatic destructive cleanup. A separately reviewed
-cleanup command is outside this slice.
-Before streaming, both `currentRootBytes + requestedMaximum <= 6 GiB` and the
-free-space headroom rule must hold; satisfying only one limit is insufficient.
+The monotonic overall deadline never resets and covers all work before the
+success-receipt commit-critical section, including redirects, streaming, byte
+sync, cache publication or reuse, receipt construction/validation/staging and
+pre-commit cleanup. It is checked before and after every pre-commit await and
+immediately before that section begins. Before another failure has been fixed,
+at or after expiry no new success step or success-receipt commit-critical
+section begins, every abortable network operation is cancelled, and the outcome
+is fixed as `E_OVERALL_TIMEOUT` / exit 4, including after clean EOF and an exact
+match. Exact bytes already published by this attempt then have `orphan-cache`
+disposition; a pre-existing cache selected for reuse does not.
+
+An in-flight filesystem operation is not forcibly cancellable and is allowed to
+settle. Its local effects are re-inspected before another step or failure
+disposition is chosen. The receipt commit-critical section comprises atomic
+no-clobber publication of the already written, synced, re-read and validated
+receipt; removal of every source name hard-linked to it; final single-link and
+containment revalidation; and supported directory sync. If that section begins
+before the deadline, it completes without interruption and its actual result is
+authoritative: a durable validated receipt commits success and exit 0 even when
+completion is observed after the deadline, while a failed section retains its
+applicable local/receipt code and exit 6.
+
+Once any failure code is fixed, only that outcome's failure-receipt attempt and
+tool-owned safety cleanup may continue. A later deadline or secondary receipt or
+cleanup error does not replace the fixed primary code/exit, and neither may
+restore success. In particular, a fixed timeout remains exit 4. The deadline is
+an outcome/admission deadline, not a guarantee that an already running
+non-cancellable filesystem call or safety cleanup returns by exactly 30
+minutes. The body idle timer is refreshed only by a non-empty final-body chunk.
+
+One tool-owned writer lock protects the acquisition root. Before its zero-byte
+exclusive `wx` file is created, a bounded root precheck reserves one root entry
+for it and requires the pre-lock file-byte total to remain within 6 GiB. After
+the lock is acquired, the authoritative root/tier byte and entry inspection is
+re-run. A busy or stale lock fails closed; v1 does not break or delete another
+process's lock. Stale partials remain non-authoritative, count against the root
+quota and cause a bounded diagnostic rather than automatic destructive cleanup.
+A separately reviewed cleanup command is outside this slice.
+After the fixed tier directories and safe writer lock exist, bounded inspection
+requires every existing file to be regular, non-link and single-link. Under the
+lock, `currentRootBytes` is the BigInt sum of each accepted file's logical size,
+including the lock, stale partials, caches and receipts; unsafe or multiply
+linked entries fail rather than being deduplicated. Directory metadata is not a
+file byte. A transient hard-link source and destination created by this attempt
+refer to one allocation and are counted once only inside the tool-owned cache or
+receipt no-clobber publication critical section.
+
+For Mode B, admission before transport requires both:
+
+```text
+currentRootBytes + expectedBytes + 128 KiB <= 6 GiB
+availableFilesystemBytes >= expectedBytes + 128 KiB + 512 MiB
+```
+
+The 128 KiB reserves at most one receipt inode at a time. Receipt staging and
+its no-clobber destination may temporarily give that inode two names, but no
+second receipt inode may be created without removing the prior owned inode or
+re-running quota and slot admission. Anticipated cache reuse never reduces the
+conservative byte reservation.
+
+The implementation also reserves the maximum simultaneously required directory
+entries before transport: one body-staging name in `partial`, one cache name in
+`verified-transport`, and one receipt-staging plus one receipt-publication name
+in `receipts`. Fixed directories and the writer-lock name are counted before
+the checks; the acquisition root and every tier remain at or below 1,000 entries
+throughout the transaction. Existing destinations do not relax the reservation.
+A failure receipt reuses the receipt staging budget or fails closed without
+creating another name.
 
 ## 6. URL, redirect, DNS and TLS policy
 
@@ -257,7 +332,7 @@ Mode B's initial URL must match the existing registry-v2 canonical path:
 https://github.com/ChoRdChario/LociView/releases/download/fixtures-v<integer>[.<integer>...]/<portable-asset-name>
 ```
 
-Its only proposed origins are `https://github.com:443` and
+Its only approved origins are `https://github.com:443` and
 `https://release-assets.githubusercontent.com:443`. A query is permitted only
 on a redirect to the latter origin. It exists only in memory for that request.
 Mode A permits a redirect query only when the exact origin is separately listed
@@ -323,7 +398,11 @@ Partial files use unpredictable names and exclusive `wx` creation. After clean
 EOF the file is flushed, synced and closed. Publication uses a same-filesystem
 atomic **no-clobber** primitive (for example link-then-unlink where supported),
 not a replacement rename. There is no overwrite fallback. The destination
-directory is synced where the platform supports it.
+link must succeed, its source name must be removed, the final destination must
+be revalidated as contained and single-link, and both source and destination
+directories must be synced where the platform supports it before byte
+publication completes. Only specifically allowlisted platform-unsupported
+directory-sync results may be waived; every other sync error fails closed.
 
 On `EEXIST`, the existing destination is re-inspected and streamed through the
 same byte-count/SHA-256 verifier. An exact match may be reused; a mismatch is
@@ -344,16 +423,40 @@ The receipt is the success commit marker and is published last:
 2. stream, hash and sync the partial bytes;
 3. prepare a receipt object using fixed error mappings;
 4. schema-validate and privacy-scan the receipt;
-5. publish or rehash/reuse bytes with no-clobber semantics;
+5. publish or rehash/reuse bytes using section 8's complete no-clobber
+   publication critical section;
 6. write, sync, re-read, schema/privacy-validate and no-clobber-publish the
-   receipt; and
+   receipt; remove its hard-linked source name, revalidate a single contained
+   final link and sync supported directories as one commit-critical section; and
 7. report exit 0 only after the receipt is durable at its local path.
 
-If step 6 fails after byte publication, exit code 6 is returned and the byte
-copy is an `orphan-cache`: it is not a successful result and must be fully
-rehashed on the next attempt. Failure receipts use the same atomic validation
-and no-clobber rules. If no receipt can be written, stderr contains only a fixed
-error code and hop index.
+If step 6 begins before the deadline and fails after byte publication, its
+applicable local/receipt exit code 6 is returned and the byte copy is an
+`orphan-cache`: it is not a successful result and must be fully rehashed on the
+next attempt. If timeout was fixed before step 6, no success commit begins and
+its exit 4 remains authoritative. Failure receipts use the same atomic
+validation and no-clobber rules. If no receipt can be written, stderr contains
+only a fixed error code and hop index.
+
+Once the durable success receipt is committed, the outcome is irreversible.
+Only closing detached handles, deleting non-aliasing attempt scratch and
+identity-checked release of this attempt's writer lock are post-commit
+housekeeping. A later clock crossing or housekeeping failure never deletes or
+rewrites committed state, changes exit 0 to failure or publishes a second
+receipt. Residual tool-owned names remain non-authoritative and count against
+the next invocation's quotas.
+
+A failing invocation MUST NOT leave a final success receipt that the offline
+verifier can accept. If a final success-receipt name becomes visible and a later
+commit-critical substep fails, the tool either removes that exact owned link,
+syncs the affected directory where supported and revalidates its absence before
+releasing the writer lock, or retains the fail-closed writer lock and any
+staging alias while returning failure. Later cleanup in that invocation MUST
+NOT transform the visible receipt into a verifier-acceptable single-link result.
+Conversely, a contained, single-link, semantically valid final success receipt
+observed while the verifier owns the lock and no producer lock pre-existed is an
+observable committed success and cannot coexist with a producer-reported
+failure.
 
 Every failure attempts to close handles and remove its own exclusive partial.
 Cleanup failure never changes failure into success. Residual names contain only
@@ -423,6 +526,18 @@ non-CLI seam. Standard tests never use Internet or DNS. They cover at minimum:
   no-clobber publication, `EEXIST` rehash/reuse, mismatch preservation and
   receipt-last/orphan-cache recovery;
 - exact exit/retry mapping and success/failure receipt conditionals;
+- deadline crossings around every local phase, a non-cancellable filesystem
+  operation and receipt commit-critical section crossing the deadline,
+  exact-match timeout/orphan behavior and post-commit housekeeping failure;
+- equality and one-unit-over root-byte, free-space and root/per-tier entry-slot
+  boundaries, including the receipt reservation and non-persisted probe byte;
+- no-receipt behavior before safe root/writer-lock ownership;
+- failure injection after each receipt publication substep, proving that a
+  producer-reported failure never leaves a verifier-acceptable success receipt
+  and that an indeterminate final link retains the fail-closed writer lock;
+- verifier/producer races paused after final receipt link, after staging unlink
+  and before or during supported directory sync; the verifier must never accept
+  until durable producer success and writer-lock release;
 - redaction across receipt, stdout, stderr, filenames and residual partials;
 - proof that neither the injected transport nor policy overrides are selectable
   by CLI, descriptor or environment; and
@@ -440,10 +555,10 @@ It does not add a Release workflow, Mode A production entry point, external
 registry entry, adopted receipt binding, run artifact manifest, fixture byte,
 device record, project-wide license or renderer/profile behavior.
 
-Stop before network implementation until the proposed numeric envelope,
-Mode-B redirect origins and exact receipt fields are explicitly ratified. Stop
-before Mode A until exact upstream origins and its code-owned allowlist are
-separately approved. Stop before real network acquisition, Release creation or
-publication, upload, registry adoption, exact-asset privacy/license approval,
-push, deploy or product release without their separately required Product Owner
-decisions.
+The Product Owner ratification and clarification recorded on 2026-08-24
+authorize the bounded Mode-B network-capable implementation in this contract.
+Stop before Mode A until exact upstream origins and its code-owned allowlist are
+separately approved. Stop before executing real network acquisition, Release
+creation or publication, upload, registry adoption, exact-asset privacy/license
+approval, push, deploy or product release without their separately required
+Product Owner decisions.

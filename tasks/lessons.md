@@ -90,3 +90,9 @@
 
 - Do not collapse LociMyu XLSX/model/image dataset conversion into LociView v1-package-to-v2 migration. They have different source shapes, user entry points and acceptance evidence even if they later share services.
 - When the Product Owner reaffirms a foundational compatibility outcome, place it in the normative product contract in the same slice; a partly superseded vision note or chat history is not enough to preserve it.
+
+## 2026-08-24: 非プログラマーPOには大きな仕組みを口語で説明して確認する
+
+- 通常の実装詳細や可逆なプログラミング判断は自律的に進める。
+- アーキテクチャ、security境界、運用process、Release手順など大きな仕組みを変える前には、利用者や運用に何が起きるか、何が許可され何がまだ許可されないかを口語で説明し、Product Ownerに確認する。
+- 批准済みの仕組みの範囲内では細部ごとに再確認を求めず、批准範囲を越える時点で止まる。

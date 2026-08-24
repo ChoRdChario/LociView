@@ -1203,10 +1203,10 @@ Review and short meta-audit — 2026-08-24:
 ### G0 evidence-contract slice 3B — bounded acquisition/restore contract
 
 This section is a sequencing checklist, not the normative security contract.
-The proposed contract is
+The Product Owner-ratified contract is
 `docs/g0/fixture-acquisition-contract.md`. If this checklist and that document
-disagree, the dedicated contract controls. Network implementation remains
-blocked on the explicit Product Owner ratification below.
+disagree, the dedicated contract controls. Bounded Mode-B network-capable
+implementation is authorized; real network execution remains a separate stop.
 
 Approved direction recorded 2026-08-24:
 
@@ -1222,7 +1222,7 @@ Approved direction recorded 2026-08-24:
   separately approved
 - [x] Record the detailed descriptor trust anchor, receipt/false-credit fields,
   every-hop DNS/TLS/redirect policy, fixed error mapping, bounded resources,
-  no-clobber staging and receipt-last commit boundary in the dedicated proposed
+  no-clobber staging and receipt-last commit boundary in the dedicated
   contract
 
 Documentation/continuity acceptance:
@@ -1268,9 +1268,9 @@ Documentation/specification review — 2026-08-24:
   result-record tree then passed the same serial matrix before staging; no
   production, test, schema, dependency or generated output entered the diff.
 
-Human stop before implementation:
+Product Owner ratification and remaining external stops:
 
-- [ ] Product Owner ratifies the proposed 2 GiB body cap, 15-second per-hop
+- [x] Product Owner ratified on 2026-08-24 the exact 2 GiB body cap, 15-second per-hop
   connect phase, 30-second idle timeout, 30-minute overall deadline, five
   redirects, exact `github.com:443` /
   `release-assets.githubusercontent.com:443` origins, acquisition quotas and
@@ -1377,6 +1377,112 @@ Implementation review and short meta-audit — 2026-08-24:
 - This result record is the only change after the first complete matrix. The
   exact result-record tree is re-run through the same serial verification before
   staging, then the cached diff receives one final independent review.
+
+### G0 evidence-contract slice 3B implementation — approved Mode-B offline vertical slice
+
+Approval and supersession record — 2026-08-24:
+
+- [x] Record the Product Owner's ratification of the exact numeric envelope,
+  exact `github.com:443` / `release-assets.githubusercontent.com:443` origin
+  pair and exact descriptor/receipt schema before production implementation
+- [x] Preserve the earlier slice-35 meta-audit as a true historical record; this
+  newer approval supersedes only its then-current ratification wait
+- [x] Interpret the approval as permission to implement the network-capable
+  Mode-B tool, not permission to execute a real network acquisition or perform
+  any Release, publication, upload, adoption, push, deploy or product-release
+  action
+
+Target, purpose and implementation boundary:
+
+- [ ] Close one dependency-free Mode-B vertical slice outside `src/**`: trusted
+  indexed descriptor -> bounded exact Release restore -> no-clobber local cache
+  -> durable receipt-last commit -> independent offline receipt verification
+- [ ] Use three internal review checkpoints, not three separately claimable
+  product outcomes: (A) descriptor/receipt schema and trusted offline verifier,
+  (B) injected-stream staging/cache/receipt transaction, and (C) production
+  transport plus the two fixed CLIs
+- [ ] Keep production transport fixed in the restore CLI. The lower-level
+  injected transport is import-only test infrastructure and cannot be selected
+  through CLI arguments, descriptors or environment variables
+
+Acceptance and verification:
+
+- [ ] Prove descriptor Git trust, bounded duplicate-safe JSON and exact raw-byte
+  digest; exact receipt branches, error/exit mapping and false-credit constants;
+  every-hop URL/DNS/TLS/redirect policy; exact stream length/hash; local
+  containment, quota, one-writer, no-clobber, cache rehash and receipt-last rules
+- [ ] Exercise success, rejection, timeout, truncation, mismatch, local failure,
+  cleanup and receipt-verifier tamper paths entirely offline through imported
+  injected seams; normal tests and verifiers must not use Internet or DNS
+- [ ] Add only `fixtures:release:restore` and `fixtures:receipt:verify`; do not add
+  the Mode-A candidate command, a real descriptor placeholder or an adopted
+  external fixture
+- [ ] Run focused acceptance, the offline fixture/evidence verifiers,
+  typecheck, full tests, production build and `git diff --check` serially on the
+  final tree, then obtain independent contract/security/false-green review
+
+Explicit exclusions and stop conditions:
+
+- Mode A, its schema/allowlist/command and unverified publication;
+- real Internet acquisition, credentials, Release creation/upload/publication,
+  exact asset selection or privacy/license approval, registry/evidence binding,
+  fixture adoption, G0 credit, device/profile/renderer ratification;
+- dependencies, `src/**`, UI, workflow, retry/resume/range support, proxy,
+  cookie/auth/custom-header/custom-CA support, cleanup automation, push, deploy
+  or product release;
+- stop and re-plan before changing the ratified numeric/origin/schema contract,
+  weakening a fail-closed branch, adding a new external origin or dependency, or
+  crossing any excluded external/release boundary.
+
+Pre-implementation independent security review stop — 2026-08-24:
+
+- [x] Find and record the contract conflict where the 30-minute overall deadline
+  includes sync/receipt/cleanup, but an exact-match local/receipt failure permits
+  only exit-6 local errors while `E_OVERALL_TIMEOUT` is fixed at exit 4
+- [x] Find and record the quota gap where the 6 GiB acquisition-root preflight
+  reserves the requested body but not the bounded receipt and required directory
+  entry capacity
+- [x] Find and record that a busy/unsafe writer-lock boundary cannot safely host
+  the otherwise-required failure receipt; only outcomes after safe lock ownership
+  may attempt one
+- [x] Distinguish receipt commit-critical publication from post-commit
+  housekeeping: hard-link source removal, final single-link revalidation and
+  supported directory sync remain commit conditions, while detached-handle
+  closure, non-alias scratch cleanup and identity-checked lock release cannot
+  revoke a durable success
+- [x] Product Owner approved on 2026-08-24 the exact amendment for the timeout commit
+  point/critical section, non-cancellable in-flight filesystem calls, safe-lock
+  no-receipt exception, post-commit housekeeping and conservative body/receipt/
+  entry-slot quota reservation before implementation or commit
+- [x] Keep this ratification-capture diff uncommitted and do not start production
+  implementation while that clarification remained open
+- [x] Independently re-review the ratification plus clarification record with no
+  unresolved P0/P1/P2 and prepare its exact four-file diff for commit before
+  beginning production implementation
+
+Ratification/clarification review record — 2026-08-24:
+
+- The Product Owner ratified the exact Mode-B numeric envelope, two origins and
+  descriptor/receipt schema, then approved the timeout/commit-critical,
+  non-cancellable filesystem, safe-lock no-receipt, quota and entry-slot
+  clarification. No Mode-A, real-network, Release, upload, publication,
+  adoption, push, deploy or product-release authority was added.
+- Independent contract and security reviews found and closed timeout/error
+  precedence, pre-lock quota, cache/receipt hard-link durability, observable
+  false-success and verifier/producer race gaps. The final four-file diff has no
+  unresolved P0/P1/P2; the offline verifier owns the same exclusive lock for
+  its complete receipt observation rather than relying on a check-only probe.
+- The first exact-tree serial matrix passed `git diff --check`, typecheck, all
+  33 test files / 1,091 tests with 21 existing todos, fixture verification (10
+  Git entries / 708,867 bytes, zero generated/external entries and one
+  unratified GS candidate), evidence verification (three pending templates and
+  zero run/environment/artifact records), and the production build. The
+  pre-existing 805.83 kB viewer warning and 11-entry, 891.11 KiB PWA precache
+  remain unchanged.
+- This review record is the only writer change after that matrix. The exact
+  result-record tree receives the same serial verification before staging and
+  commit; production code, schemas, tests, dependencies and generated output
+  remain outside this ratification commit.
 
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
