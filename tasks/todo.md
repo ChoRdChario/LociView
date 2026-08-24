@@ -1484,6 +1484,30 @@ Ratification/clarification review record — 2026-08-24:
   commit; production code, schemas, tests, dependencies and generated output
   remain outside this ratification commit.
 
+Transport status-mapping clarification stop — 2026-08-24:
+
+- [x] Record that section 7 rejects every final non-redirect status except 200,
+  while the closed section-10 error table has no truthful code for 201–206,
+  other non-redirect 2xx/3xx or syntactically valid 600–999 statuses
+- [x] Product Owner approved on 2026-08-24 the fixed
+  `E_HTTP_UNEXPECTED_STATUS` / exit 4 / retryable false rather than mislabel a
+  stable unexpected response as retryable `E_STREAM_IO`
+- [x] Do not freeze the receipt schema/error validator or production transport
+  status mapping while that one exact clarification remained open
+- [x] Independently review this closed status mapping with no unresolved
+  P0/P1/P2 and prepare its docs-only commit before freezing the receipt schema
+  and production transport implementation
+
+Status-mapping review record — 2026-08-24:
+
+- The closed partition fixes malformed/out-of-range status to
+  `E_STREAM_IO`/null, the five redirect statuses and their policy failures,
+  exact auth/not-found/retryable 4xx classes, remaining 4xx, 5xx and every
+  remaining parsed 100–399/600–999 status. Receipt status is null or 100–999.
+- Independent contract/security review found no unresolved P0/P1/P2 and no
+  network-execution or Release/adoption authority expansion. This docs/todo
+  record is committed separately before its implementation files are staged.
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes

@@ -8,8 +8,9 @@
 > authorizes the dependency-free Mode-B network-capable implementation defined
 > here. The Product Owner also ratified the timeout/commit, safe-lock receipt
 > exception and conservative quota clarification in this revision on the same
-> date. It does not authorize real network acquisition, a Release operation,
-> upload, publication, registry adoption, push, deploy or product release.
+> date, followed by the closed unexpected-HTTP-status mapping. It does not
+> authorize real network acquisition, a Release operation, upload, publication,
+> registry adoption, push, deploy or product release.
 
 ## 1. Purpose and authority
 
@@ -156,7 +157,8 @@ No raw exception message or cause is serializable.
 - `redirectOrigins`: normalized origin enums only, with no path/query;
 - `redirectCount`;
 - `finalOrigin`: normalized origin or `null`;
-- `status`: final integer status or `null`;
+- `status`: one parsed final integer status in the closed 100–999 range, or
+  `null` when no valid final status was parsed;
 - `declaredBytes`: one validated Content-Length value or `null`;
 - `measuredBytes`: bytes actually read from the final body;
 - `measuredSha256`: a digest only after a clean body EOF, otherwise `null`;
@@ -362,7 +364,21 @@ partial-file contents.
 Requests use GET and `Accept-Encoding: identity`. A final response succeeds only
 with status 200, no unsupported Content-Encoding and a readable byte stream.
 Status 206 and every other non-redirect status fail closed; response bodies and
-headers are not echoed.
+headers are not echoed. The explicitly listed 4xx/5xx classes use section 10's
+specific mappings. Parsed status classification is closed:
+
+- malformed status lines and values outside 100–999 map to `E_STREAM_IO`, with
+  receipt `status: null`;
+- 200 is the only final success status;
+- 301, 302, 303, 307 and 308 always enter redirect handling; missing,
+  duplicate or invalid `Location`, redirect-count and redirect-policy failures
+  remain `E_REDIRECT_POLICY` rather than becoming unexpected-status failures;
+- 401, 403 and 407 map to `E_HTTP_AUTH`; 404 maps to `E_HTTP_NOT_FOUND`;
+- 408, 425 and 429 use their same-named fixed classes; every other 400–499 maps
+  to `E_HTTP_OTHER_4XX`, and 500–599 maps to `E_HTTP_5XX`; and
+- every remaining parsed 100–399 or 600–999 status, including 201–206 and a
+  non-redirect 3xx, maps to `E_HTTP_UNEXPECTED_STATUS` / exit 4 / retryable
+  false.
 
 Content-Length is advisory, never authoritative. If present, it must be one
 unambiguous canonical decimal safe integer. Mode A rejects a value above its
@@ -475,7 +491,7 @@ invocation and follows this closed table:
 | `E_USAGE`, `E_DESCRIPTOR`, `E_SCHEMA` | 2 | false |
 | `E_URL_POLICY`, `E_REDIRECT_POLICY`, `E_ADDRESS_POLICY`, `E_SECRET_POLICY` | 3 | false |
 | `E_DNS_IO`, `E_TCP_IO`, `E_TLS_IO`, `E_STREAM_IO` | 4 | true |
-| `E_TLS_IDENTITY`, `E_HTTP_AUTH`, `E_HTTP_NOT_FOUND`, `E_HTTP_OTHER_4XX` | 4 | false |
+| `E_TLS_IDENTITY`, `E_HTTP_AUTH`, `E_HTTP_NOT_FOUND`, `E_HTTP_OTHER_4XX`, `E_HTTP_UNEXPECTED_STATUS` | 4 | false |
 | `E_HTTP_408`, `E_HTTP_425`, `E_HTTP_429`, `E_HTTP_5XX` | 4 | true |
 | `E_CONTENT_ENCODING` | 4 | false |
 | `E_CANCELLED` | 4 | false |
