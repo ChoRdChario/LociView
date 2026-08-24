@@ -29,14 +29,16 @@ evidence must bind the exact asset locator, SHA-256, byte size, license and
 attribution, privacy review, retention expectation and restore instructions.
 Assets are versioned instead of overwritten in place.
 
-Registry v1 cannot yet bind the creator/credit string, license URL or text, and
-modification notice required for a redistributable CC-BY asset; its `license`
-object stores only SPDX and review status. Before upload, an approved schema/
-evidence change must be able to record those attribution facts, and the exact
-local candidate hash, privacy/license review and Product Owner upload approval
-must be fixed. Upload first to a draft/non-adopted fixture Release; then fetch
-and hash the exact Release asset. It remains unadopted and earns no gate credit
-until that restore check succeeds and the immutable locator is registered.
+Registry v1 cannot yet bind the attribution record required for a redistributable
+CC-BY asset: including, when supplied or applicable, creator, title/credit line,
+copyright notice, source, license URL or durable license text, retained license/
+disclaimer notices and modification indication. Its `license` object stores only
+SPDX and review status. Before upload, an approved schema/evidence change must be
+able to record those attribution facts, and the exact local candidate hash,
+privacy/license review and Product Owner upload approval must be fixed. Upload
+first to a draft/non-adopted fixture Release; then fetch and hash the exact
+Release asset. It remains unadopted and earns no gate credit until that restore
+check succeeds and the immutable locator is registered.
 
 Operational source data remains private unless the Product Owner separately
 approves the exact bytes for redistribution. In particular, the Ki84 LociMyu
@@ -83,7 +85,10 @@ Run `npm run fixtures:verify` to validate the registry and checked-in bytes.
 
 The repository has no adopted top-level license declaration yet, so the current
 fixture license state is deliberately `NOASSERTION`. Do not assume an SPDX
-license without product-owner review.
+license without product-owner review. The
+[`licensing-and-ownership` proposal](../docs/licensing-and-ownership.md) records
+a future scope boundary but is not a license grant and does not change any
+fixture entry.
 
 ZIP byte hashes are transport evidence only. Even when entry order, timestamps,
 and writer options are deterministic, verify logical entries and semantic

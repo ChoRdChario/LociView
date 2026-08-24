@@ -17,6 +17,23 @@ LociView is the local-first successor to LociMyu: an offline browser application
 
 The current operation log has known concurrency and durability limitations. Treat it as a v1 compatibility format, not as the approved v2 persistence choice.
 
+## Licensing status
+
+No project-wide software or documentation license has been adopted yet. The
+Product Owner has not made a general LociView grant to copy, modify or
+redistribute the project. Limited rights arising from applicable hosting-
+platform terms, ordinary technical access to a deployed build or a file-
+specific third-party license remain governed by those terms; they do not create
+a project-wide LociView license.
+
+The Product Owner approved a freedom-first direction with standard `MPL-2.0` as
+the proposed software license and separate documentation, fixture, user-data,
+trademark and sponsor boundaries. The current
+[licensing/ownership proposal](docs/licensing-and-ownership.md) and
+[sponsorship proposal](docs/sponsorship-policy.md) are decision records, not
+license grants. A top-level license will be a separate independently reviewed
+and explicitly approved adoption change.
+
 ## Start development
 
 ```powershell

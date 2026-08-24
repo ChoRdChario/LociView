@@ -949,6 +949,93 @@ Slice-2 review — 2026-08-24:
   same serial verification matrix runs once more on the exact final tree before
   staging; any failure reopens this checklist item.
 
+### Licensing and sponsorship contract proposal — documentation only
+
+The Product Owner approved the freedom-first direction on 2026-08-24: LociView
+does not withhold functions or user freedoms in order to sell their restoration;
+commercial and non-commercial users receive the same official functionality,
+and sponsor value comes from transparently supporting that public work. The
+Product Owner also confirmed that there are no exceptions to their ownership and
+relicensing authority for the relevant LociMyu/LociView code, selected `ChoRd.`
+as the exact public copyright display name, and approved individual consultation
+as a sponsor benefit.
+
+Target and purpose:
+
+- [x] Record the Product Owner rights/provenance attestation and exact public
+  copyright display without treating Git metadata or chat history as legal proof
+- [x] Specify canonical unmodified `MPL-2.0` as the proposed software license,
+  without attaching its Exhibit B notice to Covered Software, with
+  `AGPL-3.0-only` reconsidered only if a later approved hosted-service invariant
+  requires network copyleft
+- [x] Separate proposed software, documentation, project-authored fixture,
+  third-party dependency/fixture, user-data and trademark/logo license scopes
+- [x] Record sponsor acknowledgement and individual consultation as additive
+  benefits that grant no feature exclusivity, gate authority, user-data access or
+  tracking entitlement
+- [x] Index the proposal and make the current no-license state explicit in the
+  public README
+- [x] Obtain independent read-only license/provenance and sponsorship/product-
+  boundary reviews of the final writer diff
+
+Acceptance and stop boundary:
+
+- [x] The proposal is conspicuously not a license grant; no top-level `LICENSE`,
+  source header, `package.json` license field or deployed-build notice is added
+- [x] No production, test, fixture byte, registry/schema, dependency, build,
+  GitHub Release, deploy or support-guarantee change is made
+- [x] Legacy LociMyu terms, third-party notices, external fixture licenses and
+  user-owned project data are not silently relicensed by the proposed scope
+- [x] Formal adoption remains blocked on exact mixed-content scope, clearance of
+  every in-scope file, third-party notices, source-retrieval verification and an
+  adopted mark/logo redistribution policy (or distributable-build exclusion)
+- [x] Formal-adoption independent review has no unresolved P0/P1 or ownership/
+  compatibility blocker, followed by separate Product Owner approval of the
+  final license-adoption diff and exact commit
+- [x] Run `git diff --check`, fixture verification, evidence verification,
+  typecheck, the full test suite and the production build serially on the final
+  documentation tree
+
+Explicit exclusions:
+
+- adding or publishing the `MPL-2.0` license grant;
+- sponsor onboarding, payment processing, consultation scheduling or contracts;
+- About/Credits/Home UI, source-link plumbing, trademark registration or legal
+  advice;
+- changing G0/G0-S priority, evidence credit, fixture adoption or release state.
+
+Review and short meta-audit — 2026-08-24:
+
+- The final writer scope is documentation/task records only on `g0-baseline` at
+  baseline HEAD `90e4eb7a193b1281df20e417022304249f3c6e02`; no production,
+  test, fixture byte/schema, dependency, build, release asset or deployment was
+  changed.
+- Independent license/provenance, material-scope and sponsorship/privacy reviews
+  report no remaining P0/P1/P2 after the writer fixes. Reviewers were read-only.
+- G0 remains active and incomplete, with G0-S a parallel release blocker. This
+  licensing lane does not replace the external fixture/device evidence critical
+  path and does not claim either gate.
+- Deployed-v1 third-party notice completeness is a newly confirmed independent
+  pre-deployment blocker, recorded below. It changes the next-deploy boundary,
+  not the current G0 evidence priority.
+- The first serial matrix passed: `git diff --check` and local Markdown links;
+  fixture verification (10 Git entries / 708,867 bytes, zero generated/external
+  entries and one unratified GS candidate); evidence verification (three pending
+  device templates and zero run/environment/artifact records); typecheck; 32
+  test files / 1,038 passing tests with 21 existing todos; and production build.
+  The pre-existing 805.59 kB viewer warning and 11-entry PWA precache remain.
+- This result record is the only change after that pass. The same serial matrix
+  runs once more on the exact final tree before staging; any failure reopens the
+  verification checklist item.
+
+Release blocker discovered during this proposal (separate production slice):
+
+- [ ] Before the next deployment, enumerate the third-party material in every
+  built output (including Three.js, zip.js and Workbox), satisfy its exact notice
+  obligations, and verify recipient access in the deployed artifact. Current
+  public-alpha notice completeness has not been established and does not wait
+  for MPL adoption.
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
