@@ -1156,9 +1156,11 @@ Independent-review remediation required before this slice can complete:
 Review and short meta-audit — 2026-08-24:
 
 - The writer scope is the G0 evidence contract on `g0-baseline` at baseline HEAD
-  `21ed456c05d332372d821b5e622ea265efbb8d7e`. There are no `src/**`, dependency,
-  fixture-byte, external-artifact-manifest, Ki84/private-data, network, Release,
-  deployment or project-license changes.
+  `21ed456c05d332372d821b5e622ea265efbb8d7e`. The verified subject is commit
+  `74113b20a71b5900bc8a41a56cf68ecf036407f1`, tree
+  `78b9f3d84a8758a23d132d9672e570c99050a707`. There are no `src/**`,
+  dependency, fixture-byte, external-artifact-manifest, Ki84/private-data,
+  network, Release, deployment or project-license changes.
 - Registry v2 preserves all 10 Git fixture IDs, bytes, digests, geometry and
   classifications (708,867 bytes total), zero adopted generated/external
   entries and one unratified GS candidate. External registration remains
@@ -1186,9 +1188,100 @@ Review and short meta-audit — 2026-08-24:
   needed before an exact external fixture can be proposed for adoption; a ready
   ZIP special-entry fix remains lower priority because it does not close the
   present external-evidence blocker.
-- This result record is the only change after the first serial pass. The same
-  serial matrix runs again on the exact final tree before staging; any failure
-  reopens the verification checklist item.
+- The second pre-commit serial matrix completed successfully on the final slice
+  tree. Before this documentation edit, a fresh-session rerun on the clean exact
+  committed subject reconfirmed fixture/evidence verification, typecheck,
+  33 test files / 1,091 passing tests with 21 existing todos, and the production
+  build with the same viewer warning and PWA precache. The first fresh full-test
+  attempt hit two existing 5-second test-harness timeouts by 15–47 ms; both
+  focused reruns and the immediate full retry passed without a code change.
+  This timing observation is not a product failure or a reason to weaken the
+  verifier acceptance. `git status --porcelain=v1` was empty before the edit;
+  `git diff --check HEAD^ HEAD` also passes for the exact subject commit rather
+  than treating a no-diff clean-worktree check as commit-content evidence.
+
+### G0 evidence-contract slice 3B — bounded acquisition/restore contract
+
+This section is a sequencing checklist, not the normative security contract.
+The proposed contract is
+`docs/g0/fixture-acquisition-contract.md`. If this checklist and that document
+disagree, the dedicated contract controls. Network implementation remains
+blocked on the explicit Product Owner ratification below.
+
+Approved direction recorded 2026-08-24:
+
+- [x] Separate upstream candidate exploration (Mode A) from exact public
+  fixture-Release restore (Mode B), while allowing an internal bounded streaming
+  core
+- [x] Treat draft upload integrity, public-but-unadopted restore verification and
+  registry adoption as separate states and separate Product Owner decisions
+- [x] Keep successful or failed acquisition from changing the registry,
+  evidence, G0 credit, renderer/profile/device ratification or Release state
+- [x] Make the first implementation slice Mode B only; Mode A remains
+  unimplemented until exact upstream origins and a code-owned allowlist are
+  separately approved
+- [x] Record the detailed descriptor trust anchor, receipt/false-credit fields,
+  every-hop DNS/TLS/redirect policy, fixed error mapping, bounded resources,
+  no-clobber staging and receipt-last commit boundary in the dedicated proposed
+  contract
+
+Documentation/continuity acceptance:
+
+- [x] Correct `G0-EXIT-07`: the three required classes are repeatedly
+  available; exact records, measurements and review are absent, while newer
+  iOS/iPad remain optional/unsupported
+- [x] Bind the slice-3A verification subject to commit
+  `74113b20a71b5900bc8a41a56cf68ecf036407f1`, tree
+  `78b9f3d84a8758a23d132d9672e570c99050a707`, and record the completed
+  second matrix plus the fresh-session rerun and observed test-timeout retry
+- [x] Clarify the fixture README lifecycle without creating a Release, upload,
+  external fixture, receipt or gate claim
+- [x] Obtain independent read-only security and specification/false-credit
+  re-review of the remediated dedicated contract with no unresolved P0/P1/P2
+- [x] Run the final documentation-tree serial matrix and create a clean commit
+
+Documentation/specification review — 2026-08-24:
+
+- Scope remains documentation/governance only: no `src/**`, dependency,
+  network command, schema implementation, fixture/evidence byte, Release,
+  registry adoption, upload, deploy or project-license change
+- Initial independent security and specification/false-credit reviews found no
+  P0 and identified descriptor self-authorization, incomplete every-hop
+  DNS/TLS/redirect authorization, replacement rename, failure-path leakage,
+  receipt false-success and todo-authority gaps
+- The dedicated indexed proposed contract now fixes a code-owned trust anchor,
+  Mode-B-first order, exact descriptor/receipt fields and semantic receipt
+  verifier, every-hop address pinning, bounded parser/resource/concurrency
+  rules, atomic no-clobber staging, receipt-last commit semantics, fixed
+  error/retry mapping and explicit no-credit constants
+- Final read-only security and specification re-reviews report no unresolved
+  P0/P1/P2; the last receipt branch separates mismatched bytes, which never
+  publish, from exact-match bytes orphaned only by a local receipt commit failure
+- The first final-tree serial matrix passed `git diff --check`, local Markdown
+  links, fixture verification (10 Git entries / 708,867 bytes, zero external or
+  generated entries, one unratified GS candidate), evidence verification (three
+  pending templates and zero run/environment/artifact records), typecheck,
+  33 test files / 1,091 passing tests with 21 existing todos, and the production
+  build. The existing 805.59 kB viewer warning and 11-entry, 890.87 KiB PWA
+  precache remain unchanged.
+- This result record is the only subsequent content change. The exact
+  result-record tree then passed the same serial matrix before staging; no
+  production, test, schema, dependency or generated output entered the diff.
+
+Human stop before implementation:
+
+- [ ] Product Owner ratifies the proposed 2 GiB body cap, 15-second per-hop
+  connect phase, 30-second idle timeout, 30-minute overall deadline, five
+  redirects, exact `github.com:443` /
+  `release-assets.githubusercontent.com:443` origins, acquisition quotas and
+  the exact descriptor/receipt fields
+- [ ] Only after that ratification, implement the dependency-free Mode-B CLI,
+  schemas, staging/receipt core and offline injected-transport acceptance
+- [ ] Do not implement Mode A until a concrete upstream origin set and its
+  code-owned allowlist are separately approved
+- [ ] Stop before any real network acquisition, Release operation, upload,
+  registry adoption, exact-asset privacy/license approval, push, deploy or
+  product release without its separate Product Owner decision
 
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results

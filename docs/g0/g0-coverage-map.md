@@ -242,7 +242,7 @@ approved product outcomes that constrain later production/release work.
 | `G0-EXIT-04` | Package bytes and splat counts are recorded | `external-blocked` | No adopted representative external GS/package run records. | `Writer` binds exact counts/bytes to restored inputs and run manifests. |
 | `G0-EXIT-05` | Resource plateau and supported-image tolerances are numeric/reproducible | `specification-blocked` | Measurements and approved numeric limits are absent. | `Device operator` measures; `Writer` presents reproducibility; `PO` ratifies values. |
 | `G0-EXIT-06` | FormatProfile, point, chroma and dither specifications/golden hashes are ratified/restorable | `specification-blocked` | Only a candidate GS source envelope exists. | `Writer` supplies exact bytes/restore; `Independent reviewer` audits; `PO` ratifies. |
-| `G0-EXIT-07` | PO approves support classes, degradation behavior and provisional hard metrics | `specification-blocked` | Reviewed measurements do not exist; device availability is insufficient. | `PO` decides only after the complete reviewed evidence package. |
+| `G0-EXIT-07` | PO approves support classes, degradation behavior and provisional hard metrics | `specification-blocked` | The three required device classes are repeatedly available, but exact environment records, reviewed measurements and the complete review package do not exist. Newer iOS and iPad remain optional/unsupported rather than required blockers. | `PO` decides only after the complete reviewed evidence package. |
 
 G0 is therefore active and incomplete. G0-S remains a parallel release blocker;
 neither gate may be represented as passed by completing this map.

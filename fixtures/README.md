@@ -58,9 +58,17 @@ source evidence required before upload/adoption. An anonymized derivative needs
 a substantive description of what was removed or reconstructed;
 `not-applicable`, `unknown` and similar sentinels are not an anonymization
 record.
-Upload first to a draft/non-adopted fixture Release; then fetch and hash the
-exact Release asset. It remains unadopted and earns no gate credit until that
-separate restore check succeeds and the immutable locator is registered.
+Upload first to a draft fixture-only Release after Product Owner approval of the
+exact digest, tag and asset name. An authenticated draft re-download may check
+upload integrity, but it is not public restore evidence and its credential or
+signed redirect URL is never a durable identity. After separate Product Owner
+authorization, publish the unchanged asset as public but still unadopted; only
+then fetch and hash it without credentials through the canonical Release
+locator. It remains unadopted and earns no gate credit until that separate
+restore check succeeds, its receipt is independently reviewed and the Product
+Owner separately approves registry adoption. Registry adoption itself still
+does not grant G0, renderer/profile or device credit: a future reviewed
+receipt-binding/evidence-contract slice must define any such transition.
 
 Normal registry and evidence verification stays offline. Git bindings must be
 exact stage-0 indexed regular blobs whose bytes equal the worktree candidate:
