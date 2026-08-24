@@ -1,6 +1,8 @@
 # G0 fixture acquisition and Release restore contract
 
-> Status: `PRODUCT-OWNER RATIFIED SECURITY/EVIDENCE CONTRACT / NOT IMPLEMENTED`.
+> Status: `PRODUCT-OWNER RATIFIED SECURITY/EVIDENCE CONTRACT` /
+> `MODE B IMPLEMENTED AND OFFLINE-VERIFIED` / `MODE A NOT IMPLEMENTED` /
+> `REAL NETWORK AND RELEASE ACTIONS NOT EXECUTED OR AUTHORIZED`.
 >
 > The Product Owner approved the two-mode boundary and fixture-Release
 > publication lifecycle, then ratified this revision's exact numeric envelope,

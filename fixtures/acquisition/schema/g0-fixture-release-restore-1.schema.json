@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lociview.example/schemas/g0-fixture-release-restore-1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "requestId",
+    "locator",
+    "expectedSha256",
+    "expectedBytes"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "fixtures/acquisition/schema/g0-fixture-release-restore-1.schema.json"
+    },
+    "schemaVersion": {
+      "const": "g0-fixture-release-restore-1"
+    },
+    "requestId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,95}(?![\\s\\S])"
+    },
+    "locator": {
+      "type": "string",
+      "pattern": "^https://github\\.com/ChoRdChario/LociView/releases/download/fixtures-v[0-9]+(?:\\.[0-9]+)*/(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][1-9]|[Ll][Pp][Tt][1-9])(?:\\.|$))[A-Za-z0-9](?:[A-Za-z0-9._-]{0,253}[A-Za-z0-9])?(?![\\s\\S])"
+    },
+    "expectedSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+    },
+    "expectedBytes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483648
+    }
+  }
+}

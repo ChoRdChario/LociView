@@ -1,0 +1,625 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lociview.example/schemas/g0-fixture-release-restore-receipt-1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "mode",
+    "trustTier",
+    "requestId",
+    "attemptId",
+    "descriptor",
+    "startedAtUtc",
+    "completedAtUtc",
+    "outcome",
+    "error",
+    "sourceIdentity",
+    "transport",
+    "local",
+    "stableTransportIdentity",
+    "stableFixtureIdentity",
+    "registryAdopted",
+    "g0Credit",
+    "rendererOrProfileRatified",
+    "deviceEvidence"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "fixtures/acquisition/schema/g0-fixture-release-restore-receipt-1.schema.json"
+    },
+    "schemaVersion": {
+      "const": "g0-fixture-release-restore-receipt-1"
+    },
+    "mode": {
+      "const": "release-restore"
+    },
+    "trustTier": {
+      "const": "pre-adoption-transport-only"
+    },
+    "requestId": {
+      "$ref": "#/$defs/portableId"
+    },
+    "attemptId": {
+      "$ref": "#/$defs/portableId"
+    },
+    "descriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "maxLength": 512,
+          "pattern": "^fixtures/acquisition/descriptors/[A-Za-z0-9._/-]+(?![\\s\\S])"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "startedAtUtc": {
+      "type": "string",
+      "format": "strict-utc"
+    },
+    "completedAtUtc": {
+      "type": "string",
+      "format": "strict-utc"
+    },
+    "outcome": {
+      "enum": ["success", "failure"]
+    },
+    "error": {
+      "anyOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/error" }
+      ]
+    },
+    "sourceIdentity": {
+      "anyOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/locator" }
+      ]
+    },
+    "transport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "redirectOrigins",
+        "redirectCount",
+        "finalOrigin",
+        "status",
+        "declaredBytes",
+        "measuredBytes",
+        "measuredSha256",
+        "streamEnded",
+        "expectedMatch"
+      ],
+      "properties": {
+        "redirectOrigins": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/origin"
+          }
+        },
+        "redirectCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "finalOrigin": {
+          "anyOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/origin" }
+          ]
+        },
+        "status": {
+          "anyOf": [
+            { "type": "null" },
+            {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 999
+            }
+          ]
+        },
+        "declaredBytes": {
+          "anyOf": [
+            { "type": "null" },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "measuredBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483649
+        },
+        "measuredSha256": {
+          "anyOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/sha256" }
+          ]
+        },
+        "streamEnded": {
+          "type": "boolean"
+        },
+        "expectedMatch": {
+          "type": ["boolean", "null"]
+        }
+      }
+    },
+    "local": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["disposition", "relativePath"],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "none",
+            "partial-deleted",
+            "unverified-published",
+            "verified-published",
+            "cache-reused",
+            "orphan-cache"
+          ]
+        },
+        "relativePath": {
+          "anyOf": [
+            { "type": "null" },
+            {
+              "type": "string",
+              "maxLength": 96,
+              "pattern": "^verified-transport/sha256-[0-9a-f]{64}\\.blob(?![\\s\\S])"
+            }
+          ]
+        }
+      }
+    },
+    "stableTransportIdentity": {
+      "type": "boolean"
+    },
+    "stableFixtureIdentity": {
+      "const": false
+    },
+    "registryAdopted": {
+      "const": false
+    },
+    "g0Credit": {
+      "const": false
+    },
+    "rendererOrProfileRatified": {
+      "const": false
+    },
+    "deviceEvidence": {
+      "const": false
+    }
+  },
+  "$defs": {
+    "portableId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,95}(?![\\s\\S])"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+    },
+    "locator": {
+      "type": "string",
+      "pattern": "^https://github\\.com/ChoRdChario/LociView/releases/download/fixtures-v[0-9]+(?:\\.[0-9]+)*/(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][1-9]|[Ll][Pp][Tt][1-9])(?:\\.|$))[A-Za-z0-9](?:[A-Za-z0-9._-]{0,253}[A-Za-z0-9])?(?![\\s\\S])"
+    },
+    "origin": {
+      "enum": [
+        "https://github.com:443",
+        "https://release-assets.githubusercontent.com:443"
+      ]
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "exitCode", "retryable", "hopIndex"],
+      "properties": {
+        "code": {
+          "enum": [
+            "E_USAGE",
+            "E_DESCRIPTOR",
+            "E_SCHEMA",
+            "E_URL_POLICY",
+            "E_REDIRECT_POLICY",
+            "E_ADDRESS_POLICY",
+            "E_SECRET_POLICY",
+            "E_DNS_IO",
+            "E_TCP_IO",
+            "E_TLS_IO",
+            "E_STREAM_IO",
+            "E_TLS_IDENTITY",
+            "E_HTTP_AUTH",
+            "E_HTTP_NOT_FOUND",
+            "E_HTTP_OTHER_4XX",
+            "E_HTTP_UNEXPECTED_STATUS",
+            "E_HTTP_408",
+            "E_HTTP_425",
+            "E_HTTP_429",
+            "E_HTTP_5XX",
+            "E_CONTENT_ENCODING",
+            "E_CANCELLED",
+            "E_CONNECT_TIMEOUT",
+            "E_IDLE_TIMEOUT",
+            "E_OVERALL_TIMEOUT",
+            "E_DECLARED_LENGTH",
+            "E_OVERSIZE",
+            "E_EXTRA_BYTES",
+            "E_DIGEST_MISMATCH",
+            "E_TRUNCATED",
+            "E_LOCK_BUSY",
+            "E_NO_SPACE",
+            "E_LOCAL_IO",
+            "E_CONTAINMENT",
+            "E_LINK",
+            "E_CACHE_MISMATCH",
+            "E_PUBLISH_CONFLICT",
+            "E_RECEIPT_SCHEMA",
+            "E_RECEIPT_PRIVACY",
+            "E_RECEIPT_IO"
+          ]
+        },
+        "exitCode": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 6
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "hopIndex": {
+          "anyOf": [
+            { "type": "null" },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "code": { "enum": ["E_USAGE", "E_DESCRIPTOR", "E_SCHEMA"] },
+            "exitCode": { "const": 2 },
+            "retryable": { "const": false }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": { "enum": ["E_URL_POLICY", "E_REDIRECT_POLICY", "E_ADDRESS_POLICY", "E_SECRET_POLICY"] },
+            "exitCode": { "const": 3 },
+            "retryable": { "const": false }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": { "enum": ["E_DNS_IO", "E_TCP_IO", "E_TLS_IO", "E_STREAM_IO"] },
+            "exitCode": { "const": 4 },
+            "retryable": { "const": true }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": { "enum": ["E_TLS_IDENTITY", "E_HTTP_AUTH", "E_HTTP_NOT_FOUND", "E_HTTP_OTHER_4XX", "E_HTTP_UNEXPECTED_STATUS", "E_CONTENT_ENCODING", "E_CANCELLED"] },
+            "exitCode": { "const": 4 },
+            "retryable": { "const": false }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": { "enum": ["E_HTTP_408", "E_HTTP_425", "E_HTTP_429", "E_HTTP_5XX", "E_CONNECT_TIMEOUT", "E_IDLE_TIMEOUT", "E_OVERALL_TIMEOUT"] },
+            "exitCode": { "const": 4 },
+            "retryable": { "const": true }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": { "enum": ["E_DECLARED_LENGTH", "E_OVERSIZE", "E_EXTRA_BYTES", "E_DIGEST_MISMATCH"] },
+            "exitCode": { "const": 5 },
+            "retryable": { "const": false }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": { "const": "E_TRUNCATED" },
+            "exitCode": { "const": 5 },
+            "retryable": { "const": true }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": { "enum": ["E_LOCK_BUSY", "E_NO_SPACE", "E_LOCAL_IO"] },
+            "exitCode": { "const": 6 },
+            "retryable": { "const": true }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": { "enum": ["E_CONTAINMENT", "E_LINK", "E_CACHE_MISMATCH", "E_PUBLISH_CONFLICT", "E_RECEIPT_SCHEMA", "E_RECEIPT_PRIVACY"] },
+            "exitCode": { "const": 6 },
+            "retryable": { "const": false }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": { "const": "E_RECEIPT_IO" },
+            "exitCode": { "const": 6 },
+            "retryable": { "const": true }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "stableTransportIdentity": { "const": false }
+        }
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "sourceIdentity": { "type": "null" }
+        }
+      },
+      "else": {
+        "type": "object",
+        "properties": {
+          "sourceIdentity": { "$ref": "#/$defs/locator" }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "transport": {
+            "type": "object",
+            "properties": {
+              "streamEnded": { "const": false }
+            }
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "transport": {
+            "type": "object",
+            "properties": {
+              "measuredSha256": { "type": "null" },
+              "expectedMatch": { "type": "null" }
+            }
+          }
+        }
+      },
+      "else": {
+        "type": "object",
+        "properties": {
+          "transport": {
+            "type": "object",
+            "properties": {
+              "measuredSha256": { "$ref": "#/$defs/sha256" },
+              "expectedMatch": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "local": {
+            "type": "object",
+            "properties": {
+              "disposition": {
+                "enum": ["none", "partial-deleted"]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "local": {
+            "type": "object",
+            "properties": {
+              "relativePath": { "type": "null" }
+            }
+          }
+        }
+      },
+      "else": {
+        "type": "object",
+        "properties": {
+          "local": {
+            "type": "object",
+            "properties": {
+              "relativePath": {
+                "type": "string",
+                "pattern": "^verified-transport/sha256-[0-9a-f]{64}\\.blob(?![\\s\\S])"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "outcome": { "const": "success" },
+        "error": { "type": "null" },
+        "sourceIdentity": { "$ref": "#/$defs/locator" },
+        "stableTransportIdentity": { "const": true },
+        "transport": {
+          "type": "object",
+          "properties": {
+            "status": { "const": 200 },
+            "streamEnded": { "const": true },
+            "expectedMatch": { "const": true },
+            "measuredSha256": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "local": {
+          "type": "object",
+          "properties": {
+            "disposition": {
+              "enum": ["verified-published", "cache-reused"]
+            },
+            "relativePath": { "type": "string" }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "outcome": { "const": "failure" },
+        "error": { "$ref": "#/$defs/error" },
+        "sourceIdentity": { "type": "null" },
+        "stableTransportIdentity": { "const": false },
+        "transport": {
+          "type": "object",
+          "properties": {
+            "redirectOrigins": { "type": "array", "maxItems": 0 },
+            "redirectCount": { "const": 0 },
+            "finalOrigin": { "type": "null" },
+            "status": { "type": "null" },
+            "declaredBytes": { "type": "null" },
+            "measuredBytes": { "const": 0 },
+            "measuredSha256": { "type": "null" },
+            "streamEnded": { "const": false },
+            "expectedMatch": { "type": "null" }
+          }
+        },
+        "local": {
+          "type": "object",
+          "properties": {
+            "disposition": { "enum": ["none", "partial-deleted"] },
+            "relativePath": { "type": "null" }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "outcome": { "const": "failure" },
+        "error": { "$ref": "#/$defs/error" },
+        "sourceIdentity": { "$ref": "#/$defs/locator" },
+        "stableTransportIdentity": { "const": true },
+        "transport": {
+          "type": "object",
+          "properties": {
+            "measuredSha256": { "type": "null" },
+            "streamEnded": { "const": false },
+            "expectedMatch": { "type": "null" }
+          }
+        },
+        "local": {
+          "type": "object",
+          "properties": {
+            "disposition": { "enum": ["none", "partial-deleted"] },
+            "relativePath": { "type": "null" }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "outcome": { "const": "failure" },
+        "error": { "$ref": "#/$defs/error" },
+        "sourceIdentity": { "$ref": "#/$defs/locator" },
+        "stableTransportIdentity": { "const": true },
+        "transport": {
+          "type": "object",
+          "properties": {
+            "measuredSha256": { "$ref": "#/$defs/sha256" },
+            "streamEnded": { "const": true },
+            "expectedMatch": { "const": false }
+          }
+        },
+        "local": {
+          "type": "object",
+          "properties": {
+            "disposition": { "enum": ["none", "partial-deleted"] },
+            "relativePath": { "type": "null" }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "outcome": { "const": "failure" },
+        "error": {
+          "allOf": [
+            { "$ref": "#/$defs/error" },
+            {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "enum": [
+                    "E_OVERALL_TIMEOUT",
+                    "E_LOCAL_IO",
+                    "E_CONTAINMENT",
+                    "E_LINK",
+                    "E_CACHE_MISMATCH",
+                    "E_PUBLISH_CONFLICT",
+                    "E_RECEIPT_SCHEMA",
+                    "E_RECEIPT_PRIVACY",
+                    "E_RECEIPT_IO"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "sourceIdentity": { "$ref": "#/$defs/locator" },
+        "stableTransportIdentity": { "const": true },
+        "transport": {
+          "type": "object",
+          "properties": {
+            "measuredSha256": { "$ref": "#/$defs/sha256" },
+            "streamEnded": { "const": true },
+            "expectedMatch": { "const": true }
+          }
+        },
+        "local": {
+          "type": "object",
+          "properties": {
+            "disposition": { "enum": ["none", "partial-deleted", "orphan-cache"] }
+          }
+        }
+      }
+    }
+  ]
+}

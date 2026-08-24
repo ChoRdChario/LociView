@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "evidence:verify": "node scripts/verify-g0-evidence.mjs",
     "fixtures:verify": "node scripts/fixtures/verify.mjs",
+    "fixtures:release:restore": "node scripts/fixtures/restore-release-fixture.mjs",
+    "fixtures:receipt:verify": "node scripts/fixtures/verify-acquisition-receipt.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"

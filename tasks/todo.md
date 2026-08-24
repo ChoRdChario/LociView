@@ -1275,7 +1275,7 @@ Product Owner ratification and remaining external stops:
   redirects, exact `github.com:443` /
   `release-assets.githubusercontent.com:443` origins, acquisition quotas and
   the exact descriptor/receipt fields
-- [ ] Only after that ratification, implement the dependency-free Mode-B CLI,
+- [x] Only after that ratification, implement the dependency-free Mode-B CLI,
   schemas, staging/receipt core and offline injected-transport acceptance
 - [ ] Do not implement Mode A until a concrete upstream origin set and its
   code-owned allowlist are separately approved
@@ -1394,30 +1394,30 @@ Approval and supersession record — 2026-08-24:
 
 Target, purpose and implementation boundary:
 
-- [ ] Close one dependency-free Mode-B vertical slice outside `src/**`: trusted
+- [x] Close one dependency-free Mode-B vertical slice outside `src/**`: trusted
   indexed descriptor -> bounded exact Release restore -> no-clobber local cache
   -> durable receipt-last commit -> independent offline receipt verification
-- [ ] Use three internal review checkpoints, not three separately claimable
+- [x] Use three internal review checkpoints, not three separately claimable
   product outcomes: (A) descriptor/receipt schema and trusted offline verifier,
   (B) injected-stream staging/cache/receipt transaction, and (C) production
   transport plus the two fixed CLIs
-- [ ] Keep production transport fixed in the restore CLI. The lower-level
+- [x] Keep production transport fixed in the restore CLI. The lower-level
   injected transport is import-only test infrastructure and cannot be selected
   through CLI arguments, descriptors or environment variables
 
 Acceptance and verification:
 
-- [ ] Prove descriptor Git trust, bounded duplicate-safe JSON and exact raw-byte
+- [x] Prove descriptor Git trust, bounded duplicate-safe JSON and exact raw-byte
   digest; exact receipt branches, error/exit mapping and false-credit constants;
   every-hop URL/DNS/TLS/redirect policy; exact stream length/hash; local
   containment, quota, one-writer, no-clobber, cache rehash and receipt-last rules
-- [ ] Exercise success, rejection, timeout, truncation, mismatch, local failure,
+- [x] Exercise success, rejection, timeout, truncation, mismatch, local failure,
   cleanup and receipt-verifier tamper paths entirely offline through imported
   injected seams; normal tests and verifiers must not use Internet or DNS
-- [ ] Add only `fixtures:release:restore` and `fixtures:receipt:verify`; do not add
+- [x] Add only `fixtures:release:restore` and `fixtures:receipt:verify`; do not add
   the Mode-A candidate command, a real descriptor placeholder or an adopted
   external fixture
-- [ ] Run focused acceptance, the offline fixture/evidence verifiers,
+- [x] Run focused acceptance, the offline fixture/evidence verifiers,
   typecheck, full tests, production build and `git diff --check` serially on the
   final tree, then obtain independent contract/security/false-green review
 
@@ -1507,6 +1507,42 @@ Status-mapping review record — 2026-08-24:
 - Independent contract/security review found no unresolved P0/P1/P2 and no
   network-execution or Release/adoption authority expansion. This docs/todo
   record is committed separately before its implementation files are staged.
+
+Mode-B slice 3B implementation review record — 2026-08-25:
+
+- The dependency-free vertical slice now freezes the approved descriptor and
+  receipt schemas, trusted indexed-descriptor admission, fixed two-origin Node
+  transport, bounded staging/cache/receipt transaction and independent offline
+  receipt verifier outside `src/**`. The two fixed CLIs expose no transport,
+  origin, root or policy-selection seam.
+- Offline acceptance passed 7 files / 211 tests covering success and every
+  approved rejection/error branch, raw response framing, DNS/TLS/redirect
+  policy, exact stream length/hash, root/entry/byte quotas, writer ownership,
+  no-clobber cache publication, directory durability, deadline crossings,
+  cleanup uncertainty, receipt-link lost results, parent/hop cancellation and
+  receipt tampering. Three integration tests retain local wall-clock margins for
+  full-suite contention only; no product deadline, assertion or global test
+  policy was weakened.
+- The first final-tree serial matrix passed `git diff --check`, typecheck, all 40
+  test files / 1,302 tests with 21 existing todos, fixture verification (10 Git
+  entries / 708,867 bytes, zero generated/external entries and one unratified GS
+  candidate), evidence verification (three pending templates and zero run,
+  environment or artifact records), and the production build. The pre-existing
+  805.83 kB viewer warning and 11-entry, 891.11 KiB PWA precache remain unchanged.
+- The first cached review found and closed one P1 receipt-link lost-result race,
+  one P2 parent-to-hop abort propagation gap and one P2 implementation-status
+  record mismatch. Exact owned receipt pairs now finish the admitted durable
+  commit, indeterminate pairs retain the writer lock and aliases, non-handoff
+  transports are aborted, and the docs distinguish implemented/offline-verified
+  Mode B from unimplemented Mode A and unexecuted external actions. Independent
+  bounded re-reviews report no remaining P0/P1/P2 in those fixes.
+- The apparent post-test hang was disproved by waiting for the existing child-CLI
+  evidence suite. The corrected unmodified `npm test` completed normally with
+  exit code 0 in 101.49 seconds.
+- No Internet or DNS acquisition, Release/upload/publication/adoption, registry
+  or evidence credit, push, deploy or product release was performed. This result
+  record is the only writer change after the first matrix; the exact tree must
+  pass the same serial matrix again before staging and cached-diff review.
 
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
