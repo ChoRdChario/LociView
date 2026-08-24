@@ -28,6 +28,21 @@ const GENEROUS_FIXTURE_LIMITS: ZipLimits = {
   maxEntryBytes: 64 * 1024,
   maxTotalBytes: 256 * 1024,
 };
+const ZIP_HOST_SYSTEM_UNIX = 3;
+const ZIP_HOST_SYSTEM_MSDOS = 0;
+const UNIX_ENTRY_TYPE_MASK = 0o170000;
+const UNIX_ENTRY_TYPE_REGULAR = 0o100000;
+const UNIX_ENTRY_TYPE_DIRECTORY = 0o040000;
+const UNIX_ENTRY_TYPE_SYMLINK = 0o120000;
+const MSDOS_ARCHIVE_ATTRIBUTE = 0x20;
+
+function rawHostSystem(shape: RawZipEntryShape): number {
+  return (shape.versionMadeBy >>> 8) & 0xff;
+}
+
+function rawUnixEntryType(shape: RawZipEntryShape): number {
+  return ((shape.externalFileAttributes >>> 16) & 0xffff) & UNIX_ENTRY_TYPE_MASK;
+}
 
 interface ReadOutcome {
   rejected: boolean;
@@ -97,6 +112,14 @@ describe('G0 ZIP structural characterization', () => {
     ...encoder.encode('.txt'),
   ]);
   const nonEfsPayload = encoder.encode('CP437 path payload');
+  const unixRegularPath = 'media/unix-regular.bin';
+  const unixRegularPayload = encoder.encode('explicit Unix regular payload');
+  const msdosLowerOnlyPath = 'media/msdos-lower-only.bin';
+  const msdosLowerOnlyPayload = encoder.encode('MS-DOS lower attributes payload');
+  const foreignOpaqueUpperPath = 'media/foreign-opaque-upper.bin';
+  const foreignOpaqueUpperPayload = encoder.encode('foreign opaque upper payload');
+  const foreignOpaqueExternalAttributes =
+    (0o120644 * 0x1_0000) + MSDOS_ARCHIVE_ATTRIBUTE;
   const unicodePathExtra = new Uint8Array([
     1,
     // CRC32(nonEfsRawPath) = 0x5f5583e8, little-endian per Info-ZIP 0x7075.
@@ -180,6 +203,29 @@ describe('G0 ZIP structural characterization', () => {
           useUnicodeFileNames: false,
           encodeText: (text: string) => text === nonEfsUnicodePath ? nonEfsRawPath : undefined,
           extraField: new Map([[0x7075, unicodePathExtra]]),
+        },
+      },
+      {
+        path: unixRegularPath,
+        data: unixRegularPayload,
+        options: { unixMode: 0o100644 },
+      },
+      {
+        path: msdosLowerOnlyPath,
+        data: msdosLowerOnlyPayload,
+        options: {
+          versionMadeBy: 20,
+          msDosCompatible: true,
+          externalFileAttributes: MSDOS_ARCHIVE_ATTRIBUTE,
+        },
+      },
+      {
+        path: foreignOpaqueUpperPath,
+        data: foreignOpaqueUpperPayload,
+        options: {
+          versionMadeBy: 20,
+          msDosCompatible: true,
+          externalFileAttributes: foreignOpaqueExternalAttributes,
         },
       },
     ] as const;
@@ -327,11 +373,23 @@ describe('G0 ZIP structural characterization', () => {
       expect(sanitizeZipPath(portableRtlPath)).toBe(portableRtlPath);
     });
 
-    it('passes CRC verification and preserves EFS-off Unicode-path compatibility', () => {
+    it('passes CRC verification and preserves EFS-off and entry-attribute compatibility', () => {
       expect(bytesEqual(writerBytes, writerBytesAgain)).toBe(true);
       expect(writerIntegrity).toEqual({
-        filenames: [portableRtlPath, nonEfsUnicodePath],
-        payloads: [payload, nonEfsPayload],
+        filenames: [
+          portableRtlPath,
+          nonEfsUnicodePath,
+          unixRegularPath,
+          msdosLowerOnlyPath,
+          foreignOpaqueUpperPath,
+        ],
+        payloads: [
+          payload,
+          nonEfsPayload,
+          unixRegularPayload,
+          msdosLowerOnlyPayload,
+          foreignOpaqueUpperPayload,
+        ],
         passed: true,
       });
       expect(writerReadOutcome).toEqual({
@@ -340,9 +398,12 @@ describe('G0 ZIP structural characterization', () => {
         entries: [
           { path: portableRtlPath, data: payload },
           { path: nonEfsUnicodePath, data: nonEfsPayload },
+          { path: unixRegularPath, data: unixRegularPayload },
+          { path: msdosLowerOnlyPath, data: msdosLowerOnlyPayload },
+          { path: foreignOpaqueUpperPath, data: foreignOpaqueUpperPayload },
         ],
       });
-      expect(writerShapes).toHaveLength(2);
+      expect(writerShapes).toHaveLength(5);
       expect(writerShapes[0]!.localCrc32).toBe(writerShapes[0]!.centralCrc32);
       expect(writerShapes[0]!.localCompressedSize).toBe(writerShapes[0]!.centralCompressedSize);
       expect(writerShapes[0]!.localUncompressedSize).toBe(
@@ -355,6 +416,16 @@ describe('G0 ZIP structural characterization', () => {
       expect(writerShapes[1]!.localBitFlag & 0x0800).toBe(0);
       expect(writerShapes[1]!.filenameUTF8).toBe(true);
       expect(() => new TextDecoder('utf-8', { fatal: true }).decode(nonEfsRawPath)).toThrow();
+      expect(rawHostSystem(writerShapes[0]!)).toBe(ZIP_HOST_SYSTEM_UNIX);
+      expect(rawUnixEntryType(writerShapes[0]!)).toBe(0);
+      expect(rawHostSystem(writerShapes[2]!)).toBe(ZIP_HOST_SYSTEM_UNIX);
+      expect(rawUnixEntryType(writerShapes[2]!)).toBe(UNIX_ENTRY_TYPE_REGULAR);
+      expect(rawHostSystem(writerShapes[3]!)).toBe(ZIP_HOST_SYSTEM_MSDOS);
+      expect(rawUnixEntryType(writerShapes[3]!)).toBe(0);
+      expect(writerShapes[3]!.externalFileAttributes & 0xff).toBe(MSDOS_ARCHIVE_ATTRIBUTE);
+      expect(rawHostSystem(writerShapes[4]!)).toBe(ZIP_HOST_SYSTEM_MSDOS);
+      expect(rawUnixEntryType(writerShapes[4]!)).toBe(UNIX_ENTRY_TYPE_SYMLINK);
+      expect(writerShapes[4]!.externalFileAttributes).toBe(foreignOpaqueExternalAttributes);
     });
 
     it('ignores an explicit directory and returns its child under injected generous fixture limits', () => {
@@ -364,6 +435,8 @@ describe('G0 ZIP structural characterization', () => {
           { filename: 'media/explicit/', directory: true },
           { filename: 'media/explicit/child.bin', directory: false },
         ]);
+      expect(rawHostSystem(directoryOutcome.shapes[0]!)).toBe(ZIP_HOST_SYSTEM_UNIX);
+      expect(rawUnixEntryType(directoryOutcome.shapes[0]!)).toBe(UNIX_ENTRY_TYPE_DIRECTORY);
       expect(directoryOutcome.entries).toEqual([
         { path: 'media/explicit/child.bin', data: directoryPayload },
       ]);

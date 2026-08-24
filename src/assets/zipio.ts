@@ -31,6 +31,7 @@ export class ZipGuardError extends Error {
       | 'total-too-large'
       | 'entry-too-large'
       | 'unsafe-path'
+      | 'unsafe-entry-type'
       | 'ambiguous-path'
       | 'nested-archive',
     message: string,
@@ -56,6 +57,16 @@ export function sanitizeZipPath(raw: string): string | null {
 const NESTED_ARCHIVE_RE = /\.(zip|lociview|7z|rar|tar|gz|tgz)$/i;
 const SUPPORTED_NESTED_CONTAINER_RE = /\.xlsx$/i;
 const fatalUtf8Decoder = new TextDecoder('utf-8', { fatal: true });
+const ZIP_HOST_SYSTEM_UNIX = 3;
+const UNIX_ENTRY_TYPE_MASK = 0o170000;
+const UNIX_ENTRY_TYPE_FIFO = 0o010000;
+const UNIX_ENTRY_TYPE_SYMLINK = 0o120000;
+
+function rawUnixEntryType(versionMadeBy: number, externalFileAttributes: number): number | null {
+  const hostSystem = (versionMadeBy >>> 8) & 0xff;
+  if (hostSystem !== ZIP_HOST_SYSTEM_UNIX) return null;
+  return ((externalFileAttributes >>> 16) & 0xffff) & UNIX_ENTRY_TYPE_MASK;
+}
 
 function normalizedEntryPath(filename: string, directory: boolean): string | null {
   const candidate = directory && filename.endsWith('/') ? filename.slice(0, -1) : filename;
@@ -142,6 +153,13 @@ export async function readZipEntries(
       const path = normalizedEntryPath(e.filename, e.directory);
       if (path === null) {
         throw new ZipGuardError('unsafe-path', `unsafe entry path: ${e.filename}`);
+      }
+      const unixEntryType = rawUnixEntryType(e.versionMadeBy, e.externalFileAttributes);
+      if (unixEntryType === UNIX_ENTRY_TYPE_SYMLINK || unixEntryType === UNIX_ENTRY_TYPE_FIFO) {
+        throw new ZipGuardError(
+          'unsafe-entry-type',
+          `unsupported Unix entry type: ${e.filename}`,
+        );
       }
       normalizedEntries.push({ path, directory: e.directory });
       if (e.uncompressedSize > limits.maxEntryBytes) {

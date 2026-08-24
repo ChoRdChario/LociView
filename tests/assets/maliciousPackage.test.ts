@@ -2373,14 +2373,22 @@ describe('G0 characterization: malicious ZIP envelope', () => {
 
     it('constructs malformed UTF-8 raw names, encrypted/unsupported entries, and Unix special modes', () => {
       const malformed = fixtureShapes.malformedUtf8Name![1]!;
+      const symlink = fixtureShapes.symlink![1]!;
+      const fifo = fixtureShapes.specialMode![1]!;
       expect(malformed.rawFilename).toEqual(MALFORMED_RAW_FILENAME);
       expect(malformed.localRawFilename).toEqual(MALFORMED_RAW_FILENAME);
       expect(malformed.filenameUTF8).toBe(true);
       expect(() => new TextDecoder('utf-8', { fatal: true }).decode(malformed.rawFilename)).toThrow();
       expect(fixtureShapes.encrypted![1]!.encrypted).toBe(true);
       expect(fixtureShapes.unsupportedCompression![1]!.compressionMethod).toBe(12);
-      expect(fixtureShapes.symlink![1]!.unixMode! & UNIX_TYPE_MASK).toBe(UNIX_SYMLINK_MODE & UNIX_TYPE_MASK);
-      expect(fixtureShapes.specialMode![1]!.unixMode! & UNIX_TYPE_MASK).toBe(UNIX_FIFO_MODE & UNIX_TYPE_MASK);
+      expect((symlink.versionMadeBy >>> 8) & 0xff).toBe(3);
+      expect((fifo.versionMadeBy >>> 8) & 0xff).toBe(3);
+      expect((symlink.externalFileAttributes >>> 16) & UNIX_TYPE_MASK)
+        .toBe(UNIX_SYMLINK_MODE & UNIX_TYPE_MASK);
+      expect((fifo.externalFileAttributes >>> 16) & UNIX_TYPE_MASK)
+        .toBe(UNIX_FIFO_MODE & UNIX_TYPE_MASK);
+      expect(symlink.unixMode! & UNIX_TYPE_MASK).toBe(UNIX_SYMLINK_MODE & UNIX_TYPE_MASK);
+      expect(fifo.unixMode! & UNIX_TYPE_MASK).toBe(UNIX_FIFO_MODE & UNIX_TYPE_MASK);
     });
 
     it('constructs unsafe directories, duplicate JSON, and local/central name disagreement exactly', () => {
@@ -2498,6 +2506,8 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       'duplicate-manifest-reversed',
       'invalid-utf8-manifest',
       'malformed-utf8-entry-name',
+      'symlink-entry',
+      'special-mode-entry',
       'unsafe-directory-path',
       'directory-count-bypass',
       'local-central-name-mismatch',
@@ -2513,6 +2523,11 @@ describe('G0 characterization: malicious ZIP envelope', () => {
         `${id}: rejects during envelope inspection`,
         () => {
           expect(outcomes[id].inspectionRejected).toBe(true);
+          if (id === 'symlink-entry' || id === 'special-mode-entry') {
+            expect(outcomes[id].inspectionError).toBeInstanceOf(ZipGuardError);
+            expect((outcomes[id].inspectionError as ZipGuardError).code)
+              .toBe('unsafe-entry-type');
+          }
         },
       );
 

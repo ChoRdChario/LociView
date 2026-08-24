@@ -36,6 +36,8 @@ export interface RawZipEntryShape {
   directory: boolean;
   encrypted: boolean;
   compressionMethod: number;
+  versionMadeBy: number;
+  externalFileAttributes: number;
   unixMode: number | null;
   payload: Uint8Array | null;
 }
@@ -85,6 +87,8 @@ interface CentralDirectoryRecord {
   filenameOffset: number;
   filenameLength: number;
   localOffset: number;
+  versionMadeBy: number;
+  externalFileAttributes: number;
 }
 
 function centralDirectoryRecords(bytes: Uint8Array): CentralDirectoryRecord[] {
@@ -105,6 +109,8 @@ function centralDirectoryRecords(bytes: Uint8Array): CentralDirectoryRecord[] {
       filenameOffset,
       filenameLength,
       localOffset: uint32(bytes, offset + 42),
+      versionMadeBy: uint16(bytes, offset + 4),
+      externalFileAttributes: uint32(bytes, offset + 38),
     });
     offset = filenameOffset + filenameLength + extraLength + commentLength;
   }
@@ -208,6 +214,8 @@ export async function rawZipEntryShapes(
         directory: entry.directory,
         encrypted: entry.encrypted,
         compressionMethod: entry.compressionMethod,
+        versionMadeBy: central.versionMadeBy,
+        externalFileAttributes: central.externalFileAttributes,
         unixMode: entry.unixMode ?? null,
         payload,
       });

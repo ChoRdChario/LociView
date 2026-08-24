@@ -1283,6 +1283,101 @@ Human stop before implementation:
   registry adoption, exact-asset privacy/license approval, push, deploy or
   product release without its separate Product Owner decision
 
+### G0 stabilization slice 35 — reject Unix symlink/FIFO package entries
+
+This bounded production slice uses the fixture-acquisition approval wait to
+reduce the parallel G0-S release blocker. The accepted package contract already
+requires special and symlink entries to be rejected before activation. This
+slice closes only the existing Unix symlink/FIFO six-assertion cluster; it does
+not replace the external-evidence critical path or claim full package safety.
+
+Target, authority and purpose:
+
+- [x] Interpret Unix entry type only from the central-directory wire pair:
+  host system `3` from the high byte of `versionMadeBy`, plus the high 16 bits
+  of raw `externalFileAttributes`; do not use zip.js `unixMode`, `directory` or
+  `msDosCompatible` convenience fields as the type authority
+- [x] Reject host-3 symlink (`0120000`) and FIFO (`0010000`) type bits during
+  side-effect-free envelope inspection, before namespace/size accounting or
+  any entry extraction, with one internal `ZipGuardError` code
+- [x] Apply the preflight to every central entry, not only entries zip.js has
+  classified as files, while preserving the raw path/order/bytes of every
+  accepted entry
+
+Compatibility and false-green acceptance:
+
+- [x] Extend the existing raw ZIP shape oracle with central
+  `versionMadeBy` and `externalFileAttributes`, and prove that the two existing
+  malicious fixtures reach the intended host-3 symlink/FIFO branch
+- [x] Preserve ordinary read behavior for host-3 type-zero files, an explicit
+  Unix regular file, an explicit Unix directory and child, a host-0 DOS
+  lower-attributes-only file, and a host-0 file whose opaque upper bits resemble
+  a Unix symlink; extend the existing writer/directory controls rather than add
+  a new fixture matrix
+- [x] Promote exactly the existing two cases times three assertions: inspection
+  rejection, zero workspace mutations before candidate activation and no
+  completion-marker publication; add no expected failure or todo
+- [x] Keep the existing control project byte-exact and assert the new internal
+  guard code inside the promoted inspection assertions so another parser error
+  cannot create a false green
+
+Explicit exclusions and stop conditions:
+
+- permissions, ownership, setuid/setgid/sticky interpretation or mode rewriting;
+- character/block devices, sockets, unknown/non-Unix host upper-bit policy,
+  directory or extraction semantics, typed user issue/evidence wording;
+- dependency, numeric/device-limit, acquisition, registry, Release or network
+  changes, and any operation/collision/transaction/migration work;
+- stop and re-plan if the public raw zip.js fields cannot identify both existing
+  fixtures, an accepted v1/golden compatibility case requires symlink/FIFO, a
+  central-directory parser or dependency change is needed, or the change must
+  decide any excluded entry-type policy.
+
+Verification and review:
+
+- [x] Run the two focused ZIP files first, then serially run typecheck,
+  `git diff --check`, the full test suite, fixture verification, evidence
+  verification and the production build on the exact final tree
+- [x] Obtain independent read-only production/security and compatibility/
+  false-green reviews with no unresolved P0/P1/P2
+- [x] Record a short meta-audit and prepare one atomic commit
+
+Implementation review and short meta-audit — 2026-08-24:
+
+- Production changed only `src/assets/zipio.ts` (+18): it derives the host byte
+  and Unix type from raw central metadata, rejects only host-3 symlink/FIFO in
+  the all-entry pre-extraction loop and adds one internal guard code. No package
+  format, dependency, budget, extraction, UI issue or acquisition API changed.
+- The existing raw helper now records the two central fields directly from the
+  archive bytes. Existing malicious fixtures prove the exact host/type branch;
+  only their six inspection/mutation/marker runtime expectations became
+  ordinary. Direct `it.fails` declarations remain 17, runtime expected failures
+  fall from 44 to 38 and the existing 21 todos are unchanged.
+- The existing writer/directory tests now cover host-3 type-zero, regular and
+  directory entries plus host-0 DOS-lower-only and opaque symlink-like upper
+  bits. The last control distinguishes the raw host-gated implementation from a
+  false-positive `unixMode` convenience-field implementation without creating a
+  separate fixture matrix.
+- Focused verification passed 2 files / 258 tests plus 11 todos. Typecheck,
+  `git diff --check`, the full 33 files / 1,091 tests plus 21 todos, fixture
+  verification (10 Git entries / 708,867 bytes, zero external/generated and one
+  unratified GS candidate), evidence verification (three pending templates and
+  zero run/environment/artifact records) and the production build all passed.
+  The existing large viewer warning is 805.83 kB and the 11-entry PWA precache
+  is 891.11 KiB.
+- Independent production/security and compatibility/false-green reviews found
+  no unresolved P0/P1/P2. They confirmed raw wire authority, pre-extraction
+  coverage, non-Unix compatibility, exact branch reachability and no new error
+  payload or symlink-target leakage.
+- Meta-audit: this closes one ready G0-S boundary but gives no G0 exit or fixture
+  credit. External fixture acquisition and device evidence remain the longest
+  path; Mode-B implementation still stops at the explicit numeric/origin/schema
+  Product Owner ratification. After this commit, do not drift into another
+  operation, lock, migration or ZIP policy slice while that decision is pending.
+- This result record is the only change after the first complete matrix. The
+  exact result-record tree is re-run through the same serial verification before
+  staging, then the cached diff receives one final independent review.
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
