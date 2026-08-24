@@ -64,7 +64,7 @@ its parent requirement independently.
 
 | ID | Atomic requirement | State | Present evidence or exact gap | Owner / next action |
 |---|---|---|---|---|
-| `G0-REG-01` | Per-fixture digest/bytes, geometry counts, bounds, coordinates/units, provenance/license/privacy, restore instructions and expected warnings/results | `implementation-blocked` | Registry v1 binds core fields, but all ten current Git entries are `NOASSERTION`/unreviewed and the repository has no adopted top-level license. External acquisition is not verified, and the license object cannot store creator/credit, license URL/text or modification notice required by CC-BY-4.0. | `Writer` adds reviewed attribution/schema/acquisition evidence; `Privacy/license reviewer` reviews every adopted source; `PO` approves any upload and unresolved project-owned licensing. |
+| `G0-REG-01` | Per-fixture digest/bytes, geometry counts, bounds, coordinates/units, provenance/license/privacy, restore instructions and expected warnings/results | `external-blocked` | Registry v2 can bind complete reviewed attribution, canonical license terms, exact versioned fixture-Release transport and external GS plus Git specification/oracle. All ten current entries intentionally remain `NOASSERTION`/unreviewed and Git-tier; no external asset has passed acquisition/restore or entry-specific privacy/license review. | `Writer` implements and runs explicit acquisition verification; `Privacy/license reviewer` reviews each exact candidate; `PO` approves any upload/adoption and later project-license scope. |
 | `G0-FX-01A` | Small anonymized real v1 operational project | `external-blocked` | No anonymized real fixture or durable locator. | `Writer` derives/restores exact bytes; `Privacy/license reviewer` and `PO` approve the derivative SHA and redistribution. |
 | `G0-FX-01B` | Medium anonymized real v1 operational project | `external-blocked` | No anonymized real fixture or accepted size classification. | `Writer` derives/restores exact bytes; `Privacy/license reviewer` approves them; `PO` decides whether one source-derived size class is representative. |
 | `G0-FX-01C` | Largest available anonymized real v1 operational project | `external-blocked` | Private Ki84 is the only known operational source and is diagnostic-only. | `Writer` derives/restores it or another largest example; `Privacy/license reviewer` audits it; `PO` approves the exact bytes and why this is the largest available class. |
@@ -247,36 +247,41 @@ approved product outcomes that constrain later production/release work.
 G0 is therefore active and incomplete. G0-S remains a parallel release blocker;
 neither gate may be represented as passed by completing this map.
 
-## Known evidence-contract blockers
+## Evidence-contract status and remaining blockers
 
-1. Registry v1 cannot bind creator/credit, license URL/text or a modification
-   notice. Those fields and review evidence are required before adopting or
-   uploading a CC-BY-4.0 fixture; SPDX plus `reviewStatus` is insufficient.
-2. Registry v1 requires a Gaussian-splat semantic contract to use Git-tier
-   bytes, while representative GS is intentionally external. A later schema and
-   verifier slice must separate external transport bytes from a small Git
-   specification/oracle without allowing a fixture to self-ratify.
-3. The evidence verifier validates a supplied external locator/hash but never
+Registry v2 closes two representation blockers without claiming fixture or G0
+completion: approved content now binds complete attribution plus a canonical
+license URI and/or hashed Git license text, and representative GS transport may
+be external while its candidate specification and diagnostic oracle remain
+distinct hashed Git files. External registration still cannot self-ratify a
+FormatProfile, renderer result or device evidence. The current inventory has no
+approved or external entry, so these are capabilities rather than gate credit.
+Run contract v2 separately binds the measured application build and the later
+immutable evidence-source revision, allowing the pre-registry deployed-v1
+baseline to use fixed G0 inputs without pretending they shipped together.
+
+1. The evidence verifier validates a supplied external locator/hash but never
    fetches it. The fixture Release path therefore needs a separate acquisition,
    restore and streamed-hash verification step with focused tests.
-4. A private operational package is not a render fixture for a complete device
+2. A private operational package is not a render fixture for a complete device
    run. Keep raw Ki84 conversion diagnostics separate; use a reviewed derivative
    for migration acceptance and an appropriate registered render fixture for
    device measurements rather than broadening the run contract merely to fit
    one archive.
-5. Served `index.html` and service-worker digests have no byte locator in the
+3. Served `index.html` and service-worker digests have no byte locator in the
    current run schema. A reviewer must compare them with the identified local or
    deployed response until a later contract explicitly automates that step.
-6. The deploy workflow exposes both `main` push and `workflow_dispatch` without
+4. The deploy workflow exposes both `main` push and `workflow_dispatch` without
    enforcing an approved candidate SHA. The release operator must apply section
    3.7's exact-ref check and explicit Product Owner approval before either
    trigger; a green workflow alone is not release authority.
 
 ## Current critical path and stop rules
 
-1. Obtain the Product Owner decisions for fixture adoption, redistribution
-   license and Release retention, then close the external registry/acquisition
-   contract without uploading an asset.
+1. Implement the separate explicit acquisition/restore verifier, then inspect
+   candidate public GS bytes without uploading or adopting them. Exact-asset
+   privacy/license review and Product Owner approval remain mandatory before a
+   fixture Release upload or registry adoption.
 2. Specify the `PROD-13` conversion dispositions, produce and privacy-review the
    Ki84 derivative, acquire/license-review public GS and author deterministic
    intersection/aircraft inputs where external bytes do not materially improve

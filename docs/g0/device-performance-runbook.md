@@ -35,9 +35,10 @@ or schema-defined `unknown` representation; it is not estimated.
    run and an HTTPS deploy URL.
 3. Confirm the installed PWA has updated. A run against an unidentifiable or
    stale service worker is `invalid`.
-4. Verify the fixture against `fixtures/registry.json`. Save mobile fixtures to
-   "On My iPhone" before going offline; do not rely on an undownloaded iCloud
-   placeholder.
+4. Record `evidenceSource.gitCommit` and the SHA-256 of that commit's exact
+   `fixtures/registry.json`, then verify the fixture against that revision.
+   Save mobile fixtures to "On My iPhone" before going offline; do not rely on
+   an undownloaded iCloud placeholder.
 5. Register the fixed camera/input trace ID, SHA-256, bytes, version and restore
    locator. A complete run uses a Git trace or a same-run recorded external
    artifact; generated traces remain incomplete until a durable recipe contract
@@ -113,8 +114,10 @@ product-owner decision can turn measured values into support guarantees.
   by a non-implementing reviewer before a gate decision.
 - Run `npm run evidence:verify` to apply the bundled schemas and check bounded
   input, duplicate IDs, privacy-sensitive strings, source bytes and
-  cross-record references. Git inputs are verified at the recorded build
-  commit, which must be an ancestor of the evidence checkout's `HEAD`.
+  cross-record references. In `g0-device-run-2`, `build.gitCommit` identifies
+  the measured application and package lock, while `evidenceSource.gitCommit`
+  identifies the registry and Git fixture/trace/license/semantic inputs. Both
+  must be ancestors of the evidence checkout's `HEAD`; they need not be equal.
   Generated fixtures must be byte-reproducible regular non-link files under
   `.artifacts/fixtures/`; generated traces cannot complete a run until a durable
   recipe contract exists. External inputs resolve through the same run's

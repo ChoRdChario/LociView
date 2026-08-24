@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://lociview.example/schemas/g0-fixture-registry-v1.json",
+  "$id": "https://lociview.example/schemas/g0-fixture-registry-v2.json",
   "title": "LociView G0 fixture registry",
   "type": "object",
   "additionalProperties": false,
   "required": ["$schema", "registryVersion", "fixtures"],
   "properties": {
     "$schema": { "const": "./registry.schema.json" },
-    "registryVersion": { "const": 1 },
+    "registryVersion": { "const": 2 },
     "fixtures": { "type": "array", "items": { "$ref": "#/$defs/fixture" } }
   },
   "$defs": {
@@ -18,13 +18,200 @@
       "prefixItems": [{ "type": "number" }, { "type": "number" }, { "type": "number" }],
       "items": false
     },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nullableText": {
+      "anyOf": [
+        { "type": "string", "minLength": 1, "maxLength": 2048 },
+        { "type": "null" }
+      ]
+    },
+    "publicHttpsUrl": {
+      "type": "string",
+      "minLength": 9,
+      "maxLength": 2048,
+      "pattern": "^https://(?![^/?#]*@)(?!\\[)(?!(?:0x[0-9a-f]+|[0-9]+)(?:\\.(?:0x[0-9a-f]+|[0-9]+)){0,3}(?::[0-9]+)?(?:[/?#]|$))(?!(?:[a-z0-9-]+\\.)*(?:localhost|local|internal|invalid|test|example|onion|home|lan)(?::[0-9]+)?(?:[/?#]|$))(?!(?:[a-z0-9-]+\\.)*home\\.arpa(?::[0-9]+)?(?:[/?#]|$))(?=[a-z0-9.-]*\\.)[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?(?::0*(?:[0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(?:[/?#][^\\s]*)?$"
+    },
+    "nullableHttpsUrl": {
+      "anyOf": [
+        { "$ref": "#/$defs/publicHttpsUrl" },
+        { "type": "null" }
+      ]
+    },
+    "boundGitFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "attribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["creators", "title", "creditLine", "copyrightNotice", "sourceUrl", "licenseNotice", "disclaimerNotice", "retainedNotices", "modified", "modificationNotice"],
+      "properties": {
+        "creators": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+        },
+        "title": { "$ref": "#/$defs/nullableText" },
+        "creditLine": { "$ref": "#/$defs/nullableText" },
+        "copyrightNotice": { "$ref": "#/$defs/nullableText" },
+        "sourceUrl": { "$ref": "#/$defs/nullableHttpsUrl" },
+        "licenseNotice": { "$ref": "#/$defs/nullableText" },
+        "disclaimerNotice": { "$ref": "#/$defs/nullableText" },
+        "retainedNotices": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "type": "string", "minLength": 1, "maxLength": 2048 }
+        },
+        "modified": { "type": "boolean" },
+        "modificationNotice": { "$ref": "#/$defs/nullableText" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "modified": { "const": true } }, "required": ["modified"] },
+          "then": { "properties": { "modificationNotice": { "type": "string", "minLength": 1 } } }
+        }
+      ]
+    },
+    "license": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["spdx", "reviewStatus", "licenseUrl", "licenseText", "attribution"],
+      "properties": {
+        "spdx": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "reviewStatus": { "enum": ["unreviewed", "approved"] },
+        "licenseUrl": { "$ref": "#/$defs/nullableHttpsUrl" },
+        "licenseText": {
+          "anyOf": [
+            { "$ref": "#/$defs/boundGitFile" },
+            { "type": "null" }
+          ]
+        },
+        "attribution": {
+          "anyOf": [
+            { "$ref": "#/$defs/attribution" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "reviewStatus": { "const": "unreviewed" } }, "required": ["reviewStatus"] },
+          "then": {
+            "properties": {
+              "spdx": { "const": "NOASSERTION" },
+              "licenseUrl": { "type": "null" },
+              "licenseText": { "type": "null" },
+              "attribution": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "reviewStatus": { "const": "approved" } }, "required": ["reviewStatus"] },
+          "then": {
+            "properties": {
+              "spdx": { "enum": ["CC-BY-4.0", "CC0-1.0"] },
+              "attribution": { "$ref": "#/$defs/attribution" }
+            },
+            "anyOf": [
+              { "properties": { "licenseUrl": { "type": "string" } } },
+              { "properties": { "licenseText": { "$ref": "#/$defs/boundGitFile" } } }
+            ]
+          }
+        },
+        {
+          "if": { "properties": { "spdx": { "const": "CC-BY-4.0" } }, "required": ["spdx"] },
+          "then": {
+            "properties": {
+              "reviewStatus": { "const": "approved" },
+              "licenseUrl": { "const": "https://creativecommons.org/licenses/by/4.0/" },
+              "attribution": {
+                "type": "object",
+                "properties": {
+                  "creators": { "type": "array", "minItems": 1 },
+                  "creditLine": { "type": "string", "minLength": 1 },
+                  "sourceUrl": { "$ref": "#/$defs/publicHttpsUrl" },
+                  "modificationNotice": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "spdx": { "const": "CC0-1.0" },
+              "licenseUrl": { "type": "string" }
+            },
+            "required": ["spdx", "licenseUrl"]
+          },
+          "then": {
+            "properties": {
+              "licenseUrl": { "const": "https://creativecommons.org/publicdomain/zero/1.0/" }
+            }
+          }
+        }
+      ]
+    },
+    "storage": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tier", "path"],
+          "properties": {
+            "tier": { "const": "git" },
+            "path": { "type": "string", "minLength": 1, "maxLength": 512 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tier", "path"],
+          "properties": {
+            "tier": { "const": "generated" },
+            "path": { "type": "string", "minLength": 1, "maxLength": 512 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tier", "transport"],
+          "properties": {
+            "tier": { "const": "external" },
+            "transport": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "locator", "retentionPolicy"],
+              "properties": {
+                "kind": { "const": "github-release-asset" },
+                "locator": {
+                  "type": "string",
+                  "maxLength": 512,
+                  "pattern": "^https://github\\.com/ChoRdChario/LociView/releases/download/fixtures-v[0-9]+(?:\\.[0-9]+)*/(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][1-9]|[Ll][Pp][Tt][1-9])(?:\\.|$))[A-Za-z0-9](?:[A-Za-z0-9._-]{0,253}[A-Za-z0-9])?$"
+                },
+                "retentionPolicy": { "const": "versioned-no-overwrite" }
+              }
+            }
+          }
+        }
+      ]
+    },
     "semanticContractFile": {
       "type": "object",
       "additionalProperties": false,
       "required": ["path", "sha256"],
       "properties": {
         "path": { "type": "string", "minLength": 1, "maxLength": 512 },
-        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        "sha256": { "$ref": "#/$defs/sha256" }
       }
     },
     "semanticContract": {
@@ -44,17 +231,9 @@
       "required": ["id", "storage", "byteSize", "sha256", "mediaType", "classification", "geometry", "coordinates", "provenance", "license", "privacy", "restore", "expected"],
       "properties": {
         "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,95}$" },
-        "storage": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["tier", "path"],
-          "properties": {
-            "tier": { "enum": ["git", "generated", "external"] },
-            "path": { "type": "string", "minLength": 1, "maxLength": 512 }
-          }
-        },
+        "storage": { "$ref": "#/$defs/storage" },
         "byteSize": { "type": "integer", "minimum": 0 },
-        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "sha256": { "$ref": "#/$defs/sha256" },
         "mediaType": { "type": "string", "minLength": 1, "maxLength": 128 },
         "classification": { "enum": ["mesh", "ordinary-point-cloud", "gaussian-splat", "package", "evidence"] },
         "geometry": {
@@ -94,23 +273,16 @@
             "reproducibility": { "enum": ["pinned-output-only", "byte-reproducible", "external-restore"] }
           }
         },
-        "license": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["spdx", "reviewStatus"],
-          "properties": {
-            "spdx": { "type": "string", "minLength": 1, "maxLength": 128 },
-            "reviewStatus": { "enum": ["unreviewed", "approved"] }
-          }
-        },
+        "license": { "$ref": "#/$defs/license" },
         "privacy": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["content", "personalData", "anonymization"],
+          "required": ["content", "personalData", "anonymization", "reviewStatus"],
           "properties": {
-            "content": { "enum": ["synthetic", "anonymized-derived", "operational"] },
-            "personalData": { "type": "boolean" },
-            "anonymization": { "type": "string", "minLength": 1, "maxLength": 256 }
+            "content": { "enum": ["synthetic", "anonymized-derived"] },
+            "personalData": { "const": false },
+            "anonymization": { "type": "string", "minLength": 1, "maxLength": 256 },
+            "reviewStatus": { "enum": ["unreviewed", "approved"] }
           }
         },
         "restore": {
@@ -136,6 +308,213 @@
       "allOf": [
         {
           "if": {
+            "properties": {
+              "storage": {
+                "type": "object",
+                "properties": { "tier": { "const": "git" } },
+                "required": ["tier"]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": { "reproducibility": { "enum": ["pinned-output-only", "byte-reproducible"] } }
+              },
+              "restore": {
+                "type": "object",
+                "properties": { "method": { "const": "repository" } }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "storage": {
+                "type": "object",
+                "properties": { "tier": { "const": "generated" } },
+                "required": ["tier"]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "kind": { "const": "generated" },
+                  "reproducibility": { "const": "byte-reproducible" }
+                }
+              },
+              "restore": {
+                "type": "object",
+                "properties": { "method": { "const": "generate" } }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "storage": {
+                "type": "object",
+                "properties": { "tier": { "const": "external" } },
+                "required": ["tier"]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": { "reproducibility": { "const": "external-restore" } }
+              },
+              "license": {
+                "type": "object",
+                "properties": { "reviewStatus": { "const": "approved" } }
+              },
+              "privacy": {
+                "type": "object",
+                "properties": { "reviewStatus": { "const": "approved" } }
+              },
+              "restore": {
+                "type": "object",
+                "properties": { "method": { "const": "external" } }
+              },
+              "expected": {
+                "type": "object",
+                "properties": {
+                  "warnings": {
+                    "type": "array",
+                    "contains": { "const": "External transport identity requires separate acquisition verification." }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": { "kind": { "const": "third-party" } },
+                "required": ["kind"]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "license": {
+                "type": "object",
+                "properties": { "reviewStatus": { "const": "approved" } }
+              },
+              "privacy": {
+                "type": "object",
+                "properties": { "reviewStatus": { "const": "approved" } }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": { "kind": { "const": "anonymized-derived" } },
+                "required": ["kind"]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "license": {
+                "type": "object",
+                "properties": { "reviewStatus": { "const": "approved" } }
+              },
+              "privacy": {
+                "type": "object",
+                "properties": { "content": { "const": "anonymized-derived" } }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "privacy": {
+                "type": "object",
+                "properties": { "content": { "const": "anonymized-derived" } },
+                "required": ["content"]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": { "kind": { "const": "anonymized-derived" } }
+              },
+              "license": {
+                "type": "object",
+                "properties": { "reviewStatus": { "const": "approved" } }
+              },
+              "privacy": {
+                "type": "object",
+                "properties": {
+                  "anonymization": {
+                    "type": "string",
+                    "minLength": 16,
+                    "pattern": "^\\s*\\S[\\s\\S]{14,}\\S\\s*$",
+                    "not": { "pattern": "^\\s*(?:[Nn][Oo][Tt]-[Aa][Pp][Pp][Ll][Ii][Cc][Aa][Bb][Ll][Ee]|[Nn][Oo][Nn][Ee]|[Uu][Nn][Kk][Nn][Oo][Ww][Nn]|[Nn]/[Aa])\\s*$" }
+                  },
+                  "reviewStatus": { "const": "approved" }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": { "kind": { "const": "authored" } },
+                "required": ["kind"]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "storage": {
+                "type": "object",
+                "properties": { "tier": { "const": "git" } }
+              },
+              "provenance": {
+                "type": "object",
+                "properties": { "reproducibility": { "const": "pinned-output-only" } }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "classification": { "const": "ordinary-point-cloud" } },
+            "required": ["classification"]
+          },
+          "then": {
+            "properties": {
+              "geometry": {
+                "type": "object",
+                "properties": { "splatCount": { "const": 0 } }
+              }
+            }
+          }
+        },
+        {
+          "if": {
             "required": ["classification"],
             "properties": { "classification": { "const": "gaussian-splat" } }
           },
@@ -145,7 +524,7 @@
               "semanticContract": { "$ref": "#/$defs/semanticContract" },
               "storage": {
                 "type": "object",
-                "properties": { "tier": { "const": "git" } }
+                "properties": { "tier": { "enum": ["git", "external"] } }
               },
               "geometry": {
                 "type": "object",

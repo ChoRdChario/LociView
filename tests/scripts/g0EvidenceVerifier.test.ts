@@ -10,7 +10,10 @@ type JsonObject = Record<string, unknown>;
 type CliResult = { exitCode: number; stdout: string; stderr: string };
 type SyntheticWorkspace = {
   root: string;
-  gitCommit: string;
+  buildCommit: string;
+  buildPackageLockSha256: string;
+  evidenceCommit: string;
+  registrySha256: string;
   fixture: {
     id: string;
     sha256: string;
@@ -29,6 +32,8 @@ const evidenceSource = resolve(repositoryRoot, 'evidence', 'g0');
 const registrySchemaSource = resolve(repositoryRoot, 'fixtures', 'registry.schema.json');
 const createdRoots: string[] = [];
 const SYNTHETIC_NOTE = 'SYNTHETIC TEST FIXTURE ONLY; this is not measured G0 evidence.';
+const EXTERNAL_FIXTURE_LOCATOR = 'https://github.com/ChoRdChario/LociView/releases/download/fixtures-v1.0.0/synthetic-g0-mesh-v1.glb';
+const EXTERNAL_ACQUISITION_WARNING = 'External transport identity requires separate acquisition verification.';
 const SHA_A = 'a'.repeat(64);
 const SHA_B = 'b'.repeat(64);
 
@@ -38,6 +43,40 @@ function sha256(data: string | Buffer): string {
 
 function clone<T>(value: T): T {
   return structuredClone(value);
+}
+
+function externalizeFixture(fixture: JsonObject, reproducibility = 'external-restore'): void {
+  fixture.storage = {
+    tier: 'external',
+    transport: {
+      kind: 'github-release-asset',
+      locator: EXTERNAL_FIXTURE_LOCATOR,
+      retentionPolicy: 'versioned-no-overwrite',
+    },
+  };
+  Object.assign(fixture.provenance as JsonObject, { reproducibility });
+  Object.assign(fixture.privacy as JsonObject, { reviewStatus: 'approved' });
+  fixture.license = {
+    spdx: 'CC-BY-4.0',
+    reviewStatus: 'approved',
+    licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+    licenseText: null,
+    attribution: {
+      creators: ['Synthetic Test Creator'],
+      title: 'Synthetic G0 mesh',
+      creditLine: 'Synthetic Test Creator, CC BY 4.0',
+      copyrightNotice: null,
+      sourceUrl: 'https://example.com/synthetic-g0-mesh',
+      licenseNotice: null,
+      disclaimerNotice: null,
+      retainedNotices: [],
+      modified: false,
+      modificationNotice: 'Unmodified synthetic upstream bytes.',
+    },
+  };
+  Object.assign(fixture.restore as JsonObject, { method: 'external', instructions: SYNTHETIC_NOTE });
+  const expected = fixture.expected as JsonObject;
+  expected.warnings = [...(expected.warnings as unknown[]), EXTERNAL_ACQUISITION_WARNING];
 }
 
 function replaceRequired(value: string, target: string, replacement: string): string {
@@ -135,7 +174,7 @@ async function makeWorkspace(): Promise<SyntheticWorkspace> {
   };
   await writeJson(resolve(root, 'fixtures', 'registry.json'), {
     $schema: './registry.schema.json',
-    registryVersion: 1,
+    registryVersion: 2,
     fixtures: [
       {
         id: fixture.id,
@@ -153,8 +192,14 @@ async function makeWorkspace(): Promise<SyntheticWorkspace> {
         },
         coordinates: { handedness: 'right', upAxis: '+Y', unit: 'source-unit' },
         provenance: { kind: 'generated', source: 'test builder', reproducibility: 'pinned-output-only' },
-        license: { spdx: 'NOASSERTION', reviewStatus: 'unreviewed' },
-        privacy: { content: 'synthetic', personalData: false, anonymization: 'not-applicable' },
+        license: {
+          spdx: 'NOASSERTION',
+          reviewStatus: 'unreviewed',
+          licenseUrl: null,
+          licenseText: null,
+          attribution: null,
+        },
+        privacy: { content: 'synthetic', personalData: false, anonymization: 'not-applicable', reviewStatus: 'unreviewed' },
         restore: { method: 'repository', instructions: SYNTHETIC_NOTE },
         expected: { classification: 'mesh', warnings: [SYNTHETIC_NOTE] },
       },
@@ -174,8 +219,9 @@ async function makeWorkspace(): Promise<SyntheticWorkspace> {
   const lockBytes = Buffer.from('{"name":"synthetic-g0-test-workspace","lockfileVersion":3}\n', 'utf8');
   await writeFile(resolve(root, 'package-lock.json'), lockBytes);
 
-  const gitCommit = await initialiseGit(root);
-  return { root, gitCommit, fixture, trace };
+  const commits = await initialiseGit(root);
+  const registrySha256 = sha256(await readFile(resolve(root, 'fixtures', 'registry.json')));
+  return { root, ...commits, buildPackageLockSha256: sha256(lockBytes), registrySha256, fixture, trace };
 }
 
 async function deviceTemplate(root: string): Promise<JsonObject> {
@@ -273,10 +319,9 @@ const windowsUnavailableResourceMutations: Array<[string, (environment: JsonObje
 
 async function makeCompleteRun(
   workspace: SyntheticWorkspace,
-  options: { traceSource?: 'git' | 'generated'; traceLocator?: string; gitCommit?: string } = {},
+  options: { traceSource?: 'git' | 'generated'; traceLocator?: string; buildCommit?: string; evidenceCommit?: string } = {},
 ): Promise<JsonObject> {
   const run = await runTemplate(workspace.root);
-  const packageLock = await readFile(resolve(workspace.root, 'package-lock.json'));
   Object.assign(run, {
     status: 'measured',
     runId: 'run_synthetic-local',
@@ -289,13 +334,17 @@ async function makeCompleteRun(
   });
   Object.assign(run.build as JsonObject, {
     deliveryMode: 'local',
-    gitCommit: options.gitCommit ?? workspace.gitCommit,
+    gitCommit: options.buildCommit ?? workspace.buildCommit,
     gitDirty: false,
-    packageLockSha256: sha256(packageLock),
+    packageLockSha256: workspace.buildPackageLockSha256,
     workflowRunId: null,
     deployUrl: null,
     indexSha256: SHA_A,
     serviceWorkerSha256: SHA_B,
+  });
+  Object.assign(run.evidenceSource as JsonObject, {
+    gitCommit: options.evidenceCommit ?? workspace.evidenceCommit,
+    fixtureRegistrySha256: workspace.registrySha256,
   });
   Object.assign(run.fixture as JsonObject, {
     fixtureId: workspace.fixture.id,
@@ -383,7 +432,7 @@ async function writeManifest(root: string, name: string, value: unknown): Promis
   await writeJson(resolve(root, 'evidence', 'g0', 'manifests', name), value);
 }
 
-async function initialiseGit(root: string): Promise<string> {
+async function initialiseGit(root: string): Promise<{ buildCommit: string; evidenceCommit: string }> {
   const env = {
     ...process.env,
     GIT_AUTHOR_NAME: 'LociView synthetic verifier test',
@@ -393,8 +442,38 @@ async function initialiseGit(root: string): Promise<string> {
   };
   for (const args of [
     ['init', '--quiet'],
-    ['add', '--', 'package-lock.json', 'fixtures/registry.json', 'fixtures/data/synthetic-g0-mesh.glb', 'fixtures/traces/synthetic-camera-input.trace'],
+    ['add', '--', 'package-lock.json'],
+    ['commit', '--quiet', '-m', 'synthetic application build'],
+  ]) {
+    const result = await runFile('git', args, { cwd: root, env });
+    if (result.exitCode !== 0) throw new Error(`git ${args[0]} failed: ${result.stderr}`);
+  }
+  const buildResult = await runFile('git', ['rev-parse', 'HEAD'], { cwd: root, env });
+  if (buildResult.exitCode !== 0) throw new Error(`git rev-parse failed: ${buildResult.stderr}`);
+
+  for (const args of [
+    ['add', '--', 'fixtures/registry.json', 'fixtures/data/synthetic-g0-mesh.glb', 'fixtures/traces/synthetic-camera-input.trace'],
     ['commit', '--quiet', '-m', 'synthetic evidence inputs'],
+  ]) {
+    const result = await runFile('git', args, { cwd: root, env });
+    if (result.exitCode !== 0) throw new Error(`git ${args[0]} failed: ${result.stderr}`);
+  }
+  const evidenceResult = await runFile('git', ['rev-parse', 'HEAD'], { cwd: root, env });
+  if (evidenceResult.exitCode !== 0) throw new Error(`git rev-parse failed: ${evidenceResult.stderr}`);
+  return { buildCommit: buildResult.stdout.trim(), evidenceCommit: evidenceResult.stdout.trim() };
+}
+
+async function commitFiles(root: string, paths: string[], message: string): Promise<string> {
+  const env = {
+    ...process.env,
+    GIT_AUTHOR_NAME: 'LociView synthetic verifier test',
+    GIT_AUTHOR_EMAIL: 'synthetic-test@invalid.example',
+    GIT_COMMITTER_NAME: 'LociView synthetic verifier test',
+    GIT_COMMITTER_EMAIL: 'synthetic-test@invalid.example',
+  };
+  for (const args of [
+    ['add', '--', ...paths],
+    ['commit', '--quiet', '-m', message],
   ]) {
     const result = await runFile('git', args, { cwd: root, env });
     if (result.exitCode !== 0) throw new Error(`git ${args[0]} failed: ${result.stderr}`);
@@ -402,6 +481,11 @@ async function initialiseGit(root: string): Promise<string> {
   const result = await runFile('git', ['rev-parse', 'HEAD'], { cwd: root, env });
   if (result.exitCode !== 0) throw new Error(`git rev-parse failed: ${result.stderr}`);
   return result.stdout.trim();
+}
+
+async function commitEvidenceFiles(workspace: SyntheticWorkspace, paths: string[], message: string): Promise<void> {
+  workspace.evidenceCommit = await commitFiles(workspace.root, paths, message);
+  workspace.registrySha256 = sha256(await readFile(resolve(workspace.root, 'fixtures', 'registry.json')));
 }
 
 async function commitGitSymlink(
@@ -701,6 +785,73 @@ describe('G0 evidence verifier CLI', () => {
     expectRelativeDiagnostic(result, workspace.root, 'E_DUPLICATE_ID');
   });
 
+  it('rejects a recorded registry that assigns one external locator to divergent fixture identities', async () => {
+    const workspace = await makeWorkspace();
+    const registryPath = resolve(workspace.root, 'fixtures', 'registry.json');
+    const currentRegistry = await readJson(registryPath);
+    const recordedRegistry = clone(currentRegistry);
+    const fixture = (recordedRegistry.fixtures as JsonObject[])[0];
+    if (fixture === undefined) throw new Error('Synthetic fixture registry is empty');
+    externalizeFixture(fixture);
+    const duplicate = clone(fixture);
+    duplicate.id = 'synthetic-g0-mesh-duplicate-v1';
+    duplicate.sha256 = SHA_A;
+    duplicate.byteSize = (duplicate.byteSize as number) + 1;
+    (recordedRegistry.fixtures as JsonObject[]).push(duplicate);
+    await writeJson(registryPath, recordedRegistry);
+    await commitEvidenceFiles(workspace, ['fixtures/registry.json'], 'record divergent external locator claims');
+    await writeJson(registryPath, currentRegistry);
+
+    const run = await makeCompleteRun(workspace);
+    await writeEnvironment(workspace.root, 'synthetic.json', await makeMeasuredEnvironment(workspace.root));
+    await writeRun(workspace.root, 'synthetic.json', run);
+    expectRelativeDiagnostic(await runVerifier(workspace.root), workspace.root, 'E_FIXTURE');
+  });
+
+  it('rejects approved fixture terms that are not bound to a public HTTPS origin', async () => {
+    const workspace = await makeWorkspace();
+    const registryPath = resolve(workspace.root, 'fixtures', 'registry.json');
+    const registry = await readJson(registryPath);
+    const fixture = (registry.fixtures as JsonObject[])[0];
+    if (fixture === undefined) throw new Error('Synthetic fixture registry is empty');
+    fixture.license = {
+      spdx: 'CC0-1.0',
+      reviewStatus: 'approved',
+      licenseUrl: 'https://localhost/terms',
+      licenseText: null,
+      attribution: {
+        creators: [],
+        title: 'Synthetic local terms',
+        creditLine: null,
+        copyrightNotice: null,
+        sourceUrl: null,
+        licenseNotice: null,
+        disclaimerNotice: null,
+        retainedNotices: [],
+        modified: false,
+        modificationNotice: null,
+      },
+    };
+    await writeJson(registryPath, registry);
+
+    const result = await runVerifier(workspace.root);
+    expectRelativeDiagnostic(result, workspace.root, 'E_FIXTURE');
+  });
+
+  it('rejects an approved CC-BY fixture whose required source uses a nonpublic origin', async () => {
+    const workspace = await makeWorkspace();
+    const registryPath = resolve(workspace.root, 'fixtures', 'registry.json');
+    const registry = await readJson(registryPath);
+    const fixture = (registry.fixtures as JsonObject[])[0];
+    if (fixture === undefined) throw new Error('Synthetic fixture registry is empty');
+    externalizeFixture(fixture);
+    ((fixture.license as JsonObject).attribution as JsonObject).sourceUrl = 'https://localhost/source';
+    await writeJson(registryPath, registry);
+
+    const result = await runVerifier(workspace.root);
+    expectRelativeDiagnostic(result, workspace.root, 'E_FIXTURE');
+  });
+
   const privacyCases: Array<[string, string, (workspace: SyntheticWorkspace) => Promise<void>]> = [
     ['device record', 'devices/private.json', async (workspace) => {
       const device = await deviceTemplate(workspace.root);
@@ -789,8 +940,9 @@ describe('G0 evidence verifier CLI', () => {
     expect(result.stderr).not.toContain(privateValue);
   });
 
-  it('accepts a complete local run with null deployment metadata and a verified Git trace', async () => {
+  it('accepts a complete local run whose application build predates its registry and Git evidence inputs', async () => {
     const workspace = await makeWorkspace();
+    expect(workspace.buildCommit).not.toBe(workspace.evidenceCommit);
     await writeEnvironment(workspace.root, 'synthetic.json', await makeMeasuredEnvironment(workspace.root));
     await writeRun(workspace.root, 'synthetic.json', await makeCompleteRun(workspace));
     const result = await runVerifier(workspace.root);
@@ -798,6 +950,22 @@ describe('G0 evidence verifier CLI', () => {
     expect(result.stderr).toBe('');
     expect(result.stdout).toContain('1 run records');
     expect(result.stdout).toContain('1 environment records');
+  });
+
+  it('keeps package-lock identity bound to the measured build when the later evidence source has another lockfile', async () => {
+    const workspace = await makeWorkspace();
+    await writeFile(
+      resolve(workspace.root, 'package-lock.json'),
+      '{"name":"later-synthetic-evidence-tooling","lockfileVersion":3}\n',
+      'utf8',
+    );
+    await commitEvidenceFiles(workspace, ['package-lock.json'], 'change only later evidence tooling lock');
+    await writeEnvironment(workspace.root, 'synthetic.json', await makeMeasuredEnvironment(workspace.root));
+    await writeRun(workspace.root, 'synthetic.json', await makeCompleteRun(workspace));
+
+    const result = await runVerifier(workspace.root);
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe('');
   });
 
   it('accepts a complete iPhone run without guessed resource and power facts', async () => {
@@ -889,6 +1057,18 @@ describe('G0 evidence verifier CLI', () => {
     expect(result.stdout).toContain('2 run records');
   });
 
+  it('rejects two runs that assign divergent registry digests to one evidence-source commit', async () => {
+    const workspace = await makeWorkspace();
+    const firstRun = await makeCompleteRun(workspace);
+    const secondRun = clone(firstRun);
+    secondRun.runId = 'run_synthetic-local-two';
+    (secondRun.evidenceSource as JsonObject).fixtureRegistrySha256 = SHA_A;
+    await writeEnvironment(workspace.root, 'synthetic.json', await makeMeasuredEnvironment(workspace.root));
+    await writeRun(workspace.root, 'one.json', firstRun);
+    await writeRun(workspace.root, 'two.json', secondRun);
+    expectRelativeDiagnostic(await runVerifier(workspace.root), workspace.root, 'E_EVIDENCE_SOURCE');
+  });
+
   it('rejects a complete run that relies on an unregistered generated trace', async () => {
     const workspace = await makeWorkspace();
     const generatedPath = '.artifacts/traces/synthetic-camera-input.trace';
@@ -947,19 +1127,17 @@ describe('G0 evidence verifier CLI', () => {
     expectRelativeDiagnostic(result, workspace.root, 'E_TRACE');
   });
 
-  it('accepts a complete deployed run with matching external fixture and trace artifacts', async () => {
+  it('accepts historical external fixture metadata with an exact manifest after the worktree registry returns to Git-only', async () => {
     const workspace = await makeWorkspace();
     const registryPath = resolve(workspace.root, 'fixtures', 'registry.json');
     const registry = await readJson(registryPath);
+    const gitOnlyRegistry = clone(registry);
     const fixture = (registry.fixtures as JsonObject[])[0];
     if (fixture === undefined) throw new Error('Synthetic fixture registry is empty');
-    Object.assign(fixture.storage as JsonObject, {
-      tier: 'external',
-      path: 'external-store/synthetic-fixture.glb',
-    });
-    Object.assign(fixture.provenance as JsonObject, { reproducibility: 'external-restore' });
-    Object.assign(fixture.restore as JsonObject, { method: 'external', instructions: SYNTHETIC_NOTE });
+    externalizeFixture(fixture);
     await writeJson(registryPath, registry);
+    await commitEvidenceFiles(workspace, ['fixtures/registry.json'], 'record external fixture metadata');
+    await writeJson(registryPath, gitOnlyRegistry);
 
     const run = await makeCompleteRun(workspace);
     run.artifactManifestId = 'art_synthetic-external-complete';
@@ -981,7 +1159,7 @@ describe('G0 evidence verifier CLI', () => {
       kind: 'large-fixture',
       sha256: (run.fixture as JsonObject).sha256 as string,
       bytes: (run.fixture as JsonObject).sourceBytes as number,
-      storageLocator: 'external-store/synthetic-fixture.glb',
+      storageLocator: EXTERNAL_FIXTURE_LOCATOR,
     });
     manifest.artifacts = [
       ...(manifest.artifacts as JsonObject[]),
@@ -1005,6 +1183,121 @@ describe('G0 evidence verifier CLI', () => {
     expect(result.exitCode).toBe(0);
     expect(result.stderr).toBe('');
     expect(result.stdout).toContain('1 artifact manifests');
+    expect(result.stdout).toContain('1 external fixture transport pending separate acquisition verification (no G0 credit)');
+  });
+
+  it('rejects current-worktree registry metadata that is absent from the run evidence-source commit', async () => {
+    const workspace = await makeWorkspace();
+    const registryPath = resolve(workspace.root, 'fixtures', 'registry.json');
+    const registry = await readJson(registryPath);
+    const fixture = (registry.fixtures as JsonObject[])[0];
+    if (fixture === undefined) throw new Error('Synthetic fixture registry is empty');
+    externalizeFixture(fixture);
+    await writeJson(registryPath, registry);
+
+    const run = await makeCompleteRun(workspace);
+    run.artifactManifestId = 'art_synthetic-worktree-only-external';
+    Object.assign(run.fixture as JsonObject, { sourceLocation: 'external' });
+    const manifest = await makeRecordedManifest(workspace.root, {
+      manifestId: 'art_synthetic-worktree-only-external',
+      runId: run.runId as string,
+      artifactId: 'blob_synthetic-worktree-only-external',
+      kind: 'large-fixture',
+      sha256: (run.fixture as JsonObject).sha256 as string,
+      bytes: (run.fixture as JsonObject).sourceBytes as number,
+      storageLocator: EXTERNAL_FIXTURE_LOCATOR,
+    });
+    await writeEnvironment(workspace.root, 'synthetic.json', await makeMeasuredEnvironment(workspace.root));
+    await writeRun(workspace.root, 'synthetic.json', run);
+    await writeManifest(workspace.root, 'synthetic.json', manifest);
+    expectRelativeDiagnostic(await runVerifier(workspace.root), workspace.root, 'E_FIXTURE');
+  });
+
+  it('rejects an approved license-text digest that does not match the recorded evidence-source commit', async () => {
+    const workspace = await makeWorkspace();
+    const licensePath = 'fixtures/licenses/synthetic-license.txt';
+    const licenseFile = resolve(workspace.root, licensePath);
+    await mkdir(dirname(licenseFile), { recursive: true });
+    await writeFile(licenseFile, 'synthetic license terms\n', 'utf8');
+    const registryPath = resolve(workspace.root, 'fixtures', 'registry.json');
+    const registry = await readJson(registryPath);
+    const fixture = (registry.fixtures as JsonObject[])[0];
+    if (fixture === undefined) throw new Error('Synthetic fixture registry is empty');
+    fixture.license = {
+      spdx: 'CC0-1.0',
+      reviewStatus: 'approved',
+      licenseUrl: null,
+      licenseText: { path: licensePath, sha256: SHA_A },
+      attribution: {
+        creators: [],
+        title: 'Synthetic license binding',
+        creditLine: null,
+        copyrightNotice: null,
+        sourceUrl: null,
+        licenseNotice: null,
+        disclaimerNotice: null,
+        retainedNotices: [],
+        modified: false,
+        modificationNotice: null,
+      },
+    };
+    await writeJson(registryPath, registry);
+    await commitEvidenceFiles(
+      workspace,
+      ['fixtures/registry.json', licensePath],
+      'record mismatched license-text binding',
+    );
+
+    await writeEnvironment(workspace.root, 'synthetic.json', await makeMeasuredEnvironment(workspace.root));
+    await writeRun(workspace.root, 'synthetic.json', await makeCompleteRun(workspace));
+    expectRelativeDiagnostic(await runVerifier(workspace.root), workspace.root, 'E_FIXTURE');
+  });
+
+  it('selects an external fixture artifact by locator as well as kind, hash and size', async () => {
+    const workspace = await makeWorkspace();
+    const registryPath = resolve(workspace.root, 'fixtures', 'registry.json');
+    const registry = await readJson(registryPath);
+    const fixture = (registry.fixtures as JsonObject[])[0];
+    if (fixture === undefined) throw new Error('Synthetic fixture registry is empty');
+    externalizeFixture(fixture);
+    await writeJson(registryPath, registry);
+    await commitEvidenceFiles(workspace, ['fixtures/registry.json'], 'record exact external fixture locator');
+
+    const run = await makeCompleteRun(workspace);
+    run.artifactManifestId = 'art_synthetic-exact-fixture-locator';
+    Object.assign(run.fixture as JsonObject, { sourceLocation: 'external' });
+    const manifest = await makeRecordedManifest(workspace.root, {
+      manifestId: 'art_synthetic-exact-fixture-locator',
+      runId: run.runId as string,
+      artifactId: 'blob_synthetic-wrong-fixture-locator',
+      kind: 'large-fixture',
+      sha256: (run.fixture as JsonObject).sha256 as string,
+      bytes: (run.fixture as JsonObject).sourceBytes as number,
+      storageLocator: 'external-store/wrong-but-same-bytes.glb',
+    });
+
+    await writeEnvironment(workspace.root, 'synthetic.json', await makeMeasuredEnvironment(workspace.root));
+    await writeRun(workspace.root, 'synthetic.json', run);
+    await writeManifest(workspace.root, 'synthetic.json', manifest);
+    expectRelativeDiagnostic(await runVerifier(workspace.root), workspace.root, 'E_FIXTURE');
+
+    (manifest.artifacts as JsonObject[]).push({
+      artifactId: 'blob_synthetic-correct-fixture-locator',
+      kind: 'large-fixture',
+      sha256: (run.fixture as JsonObject).sha256,
+      bytes: (run.fixture as JsonObject).sourceBytes,
+      storageLocator: EXTERNAL_FIXTURE_LOCATOR,
+      restoreInstructions: SYNTHETIC_NOTE,
+      capturedAtUtc: '2026-08-19T00:00:00Z',
+      containsSensitiveData: false,
+      retentionNote: SYNTHETIC_NOTE,
+    });
+
+    await writeManifest(workspace.root, 'synthetic.json', manifest);
+    const result = await runVerifier(workspace.root);
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toContain('1 external fixture transport pending separate acquisition verification (no G0 credit)');
   });
 
   it('accepts a complete local run with a verified generated fixture', async () => {
@@ -1024,6 +1317,7 @@ describe('G0 evidence verifier CLI', () => {
     Object.assign(fixture.provenance as JsonObject, { reproducibility: 'byte-reproducible' });
     Object.assign(fixture.restore as JsonObject, { method: 'generate', instructions: SYNTHETIC_NOTE });
     await writeJson(registryPath, registry);
+    await commitEvidenceFiles(workspace, ['fixtures/registry.json'], 'record generated fixture metadata');
 
     const run = await makeCompleteRun(workspace);
     Object.assign(run.fixture as JsonObject, { sourceLocation: 'generated' });
@@ -1048,6 +1342,7 @@ describe('G0 evidence verifier CLI', () => {
     Object.assign(fixture.storage as JsonObject, { tier: 'generated', path: generatedFixturePath });
     Object.assign(fixture.restore as JsonObject, { method: 'generate', instructions: SYNTHETIC_NOTE });
     await writeJson(registryPath, registry);
+    await commitEvidenceFiles(workspace, ['fixtures/registry.json'], 'record invalid generated fixture metadata');
     const run = await makeCompleteRun(workspace);
     Object.assign(run.fixture as JsonObject, { sourceLocation: 'generated' });
     await writeEnvironment(workspace.root, 'synthetic.json', await makeMeasuredEnvironment(workspace.root));
@@ -1061,9 +1356,9 @@ describe('G0 evidence verifier CLI', () => {
     const registry = await readJson(registryPath);
     const fixture = (registry.fixtures as JsonObject[])[0];
     if (fixture === undefined) throw new Error('Synthetic fixture registry is empty');
-    Object.assign(fixture.storage as JsonObject, { tier: 'external', path: 'external-store/synthetic-fixture.glb' });
-    Object.assign(fixture.restore as JsonObject, { method: 'external', instructions: SYNTHETIC_NOTE });
+    externalizeFixture(fixture, 'pinned-output-only');
     await writeJson(registryPath, registry);
+    await commitEvidenceFiles(workspace, ['fixtures/registry.json'], 'record invalid external restore metadata');
     const run = await makeCompleteRun(workspace);
     Object.assign(run.fixture as JsonObject, { sourceLocation: 'external' });
     await writeEnvironment(workspace.root, 'synthetic.json', await makeMeasuredEnvironment(workspace.root));
@@ -1093,6 +1388,7 @@ describe('G0 evidence verifier CLI', () => {
       Object.assign(fixture.geometry as JsonObject, geometry);
       (fixture.expected as JsonObject).classification = classification;
       await writeJson(registryPath, registry);
+      await commitEvidenceFiles(workspace, ['fixtures/registry.json'], `record unsupported ${classification} fixture`);
       const run = await makeCompleteRun(workspace);
       Object.assign(run.fixture as JsonObject, {
         triangles: geometry.triangleCount,
@@ -1207,7 +1503,7 @@ describe('G0 evidence verifier CLI', () => {
     const locator = 'fixtures/traces/synthetic-symlink.trace';
     const link = await commitGitSymlink(workspace.root, locator, 'synthetic-camera-input.trace');
     const run = await makeCompleteRun(workspace);
-    (run.build as JsonObject).gitCommit = link.commit;
+    (run.evidenceSource as JsonObject).gitCommit = link.commit;
     Object.assign(run.traceRef as JsonObject, {
       sourceLocation: 'git',
       restoreLocator: locator,
@@ -1230,6 +1526,26 @@ describe('G0 evidence verifier CLI', () => {
     expectRelativeDiagnostic(result, workspace.root, 'E_BUILD');
   });
 
+  it('rejects a dangling evidence-source commit even when its tree contains the declared registry and Git inputs', async () => {
+    const workspace = await makeWorkspace();
+    const run = await makeCompleteRun(workspace);
+    (run.evidenceSource as JsonObject).gitCommit = await createDanglingCommit(workspace.root);
+    await writeEnvironment(workspace.root, 'synthetic.json', await makeMeasuredEnvironment(workspace.root));
+    await writeRun(workspace.root, 'synthetic.json', run);
+    const result = await runVerifier(workspace.root);
+    expectRelativeDiagnostic(result, workspace.root, 'E_EVIDENCE_SOURCE');
+  });
+
+  it('rejects an evidence-source registry digest that differs from the recorded Git blob', async () => {
+    const workspace = await makeWorkspace();
+    const run = await makeCompleteRun(workspace);
+    (run.evidenceSource as JsonObject).fixtureRegistrySha256 = SHA_A;
+    await writeEnvironment(workspace.root, 'synthetic.json', await makeMeasuredEnvironment(workspace.root));
+    await writeRun(workspace.root, 'synthetic.json', run);
+    const result = await runVerifier(workspace.root);
+    expectRelativeDiagnostic(result, workspace.root, 'E_EVIDENCE_SOURCE');
+  });
+
   it('rejects a bracketed Git symlink locator even when its pathspec also matches a regular blob', async () => {
     const workspace = await makeWorkspace();
     const regularPath = resolve(workspace.root, 'fixtures', 'a.trace');
@@ -1240,7 +1556,7 @@ describe('G0 evidence verifier CLI', () => {
     const locator = 'fixtures/[a].trace';
     const link = await commitGitSymlink(workspace.root, locator, 'a.trace');
     const run = await makeCompleteRun(workspace);
-    (run.build as JsonObject).gitCommit = link.commit;
+    (run.evidenceSource as JsonObject).gitCommit = link.commit;
     Object.assign(run.traceRef as JsonObject, {
       sourceLocation: 'git',
       restoreLocator: locator,
@@ -1264,9 +1580,9 @@ describe('G0 evidence verifier CLI', () => {
     Object.assign(fixture, { byteSize: link.bytes, sha256: link.sha256 });
     Object.assign(fixture.storage as JsonObject, { path: locator });
     await writeJson(registryPath, registry);
+    await commitEvidenceFiles(workspace, ['fixtures/registry.json'], 'record symlink fixture metadata');
 
     const run = await makeCompleteRun(workspace);
-    (run.build as JsonObject).gitCommit = link.commit;
     Object.assign(run.fixture as JsonObject, { sourceBytes: link.bytes, sha256: link.sha256 });
     await writeEnvironment(workspace.root, 'synthetic.json', await makeMeasuredEnvironment(workspace.root));
     await writeRun(workspace.root, 'synthetic.json', run);

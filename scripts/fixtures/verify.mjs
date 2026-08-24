@@ -1,7 +1,10 @@
 import { createHash } from 'node:crypto';
+import { spawn } from 'node:child_process';
 import { lstat, readFile, realpath } from 'node:fs/promises';
+import { isIP } from 'node:net';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import Ajv2020 from 'ajv/dist/2020.js';
 import {
   CANONICAL_GS_EXPECTED_PATH,
   CANONICAL_GS_OUTPUT_PATH,
@@ -17,6 +20,7 @@ const schemaFile = resolve(root, 'fixtures', 'registry.schema.json');
 const GS_CANDIDATE_PROFILE_ID = 'lociview-gs-ply-f32le-sh3-1';
 const GS_CANDIDATE_SPECIFICATION_PATH = 'docs/g0/gs-source-profile-candidate.md';
 const CANDIDATE_EVIDENCE_WARNING = 'Candidate semantic contract is not ratified renderer or device evidence.';
+const EXTERNAL_ACQUISITION_WARNING = 'External transport identity requires separate acquisition verification.';
 
 function fail(message) { throw new Error(`fixture registry: ${message}`); }
 function object(value, label) {
@@ -63,27 +67,255 @@ function normalizedLogicalPath(value, label) {
   return value.toLowerCase();
 }
 
-function repositoryPath(value, label) {
+function repositoryPath(value, label, repositoryRoot = root) {
   normalizedLogicalPath(value, label);
-  const absolute = resolve(root, value);
-  const fromRoot = relative(root, absolute);
+  const absolute = resolve(repositoryRoot, value);
+  const fromRoot = relative(repositoryRoot, absolute);
   if (fromRoot === '..' || fromRoot.startsWith(`..${sep}`) || isAbsolute(fromRoot)) fail(`${label} escapes the repository`);
   return absolute;
 }
 
-async function readRepositoryFile(value, label) {
-  const absolute = repositoryPath(value, label);
+async function readRepositoryFile(value, label, repositoryRoot = root) {
+  const absolute = repositoryPath(value, label, repositoryRoot);
   const stat = await lstat(absolute);
   if (!stat.isFile() || stat.isSymbolicLink()) fail(`${label} must resolve to a regular non-link file`);
   const resolved = await realpath(absolute);
-  const fromRoot = relative(rootReal, resolved);
+  const repositoryReal = repositoryRoot === root ? rootReal : await realpath(repositoryRoot);
+  const fromRoot = relative(repositoryReal, resolved);
   if (fromRoot === '..' || fromRoot.startsWith(`..${sep}`) || isAbsolute(fromRoot)) fail(`${label} resolves outside the repository`);
   return readFile(resolved);
+}
+
+const inheritedNonGitEnvironment = Object.fromEntries(
+  Object.entries(process.env).filter(([key]) => !key.toUpperCase().startsWith('GIT_') && key.toUpperCase() !== 'GCM_INTERACTIVE'),
+);
+const gitEnvironment = Object.freeze({
+  ...inheritedNonGitEnvironment,
+  GIT_NO_LAZY_FETCH: '1',
+  GIT_TERMINAL_PROMPT: '0',
+  GCM_INTERACTIVE: 'Never',
+  GIT_NO_REPLACE_OBJECTS: '1',
+});
+const GIT_QUERY_TIMEOUT_MS = 120_000;
+
+function requireTrackedRegularBlob(value, label, repositoryRoot = root) {
+  return new Promise((accept, reject) => {
+    const safeRoot = repositoryRoot.replaceAll('\\', '/');
+    const child = spawn(
+      'git',
+      ['-c', `safe.directory=${safeRoot}`, '-C', repositoryRoot, '--literal-pathspecs', 'ls-files', '--stage', '-z', '--', value],
+      { shell: false, windowsHide: true, env: gitEnvironment, stdio: ['ignore', 'pipe', 'ignore'] },
+    );
+    const chunks = [];
+    let bytes = 0;
+    let done = false;
+    let timer;
+    const bad = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      child.kill();
+      reject(new Error(`fixture registry: ${label} must be one exact tracked regular Git blob`));
+    };
+    timer = setTimeout(bad, GIT_QUERY_TIMEOUT_MS);
+    timer.unref();
+    child.stdout.on('data', (chunk) => {
+      bytes += chunk.length;
+      if (bytes > 2048) bad();
+      else chunks.push(chunk);
+    });
+    child.once('error', bad);
+    child.once('close', (exitCode) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (exitCode !== 0) {
+        reject(new Error(`fixture registry: ${label} must be one exact tracked regular Git blob`));
+        return;
+      }
+      let metadata;
+      try { metadata = new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)); } catch { metadata = ''; }
+      const match = /^(100644|100755) ([0-9a-f]{40,64}) 0\t([^\0]+)\0$/u.exec(metadata);
+      if (match === null || match[3] !== value) {
+        reject(new Error(`fixture registry: ${label} must be one exact tracked regular Git blob`));
+        return;
+      }
+      accept(match[2]);
+    });
+  });
+}
+
+function hashIndexedRegularBlob(objectId, expectedBytes, label, repositoryRoot = root) {
+  return new Promise((accept, reject) => {
+    const safeRoot = repositoryRoot.replaceAll('\\', '/');
+    const child = spawn(
+      'git',
+      ['-c', `safe.directory=${safeRoot}`, '-C', repositoryRoot, 'cat-file', 'blob', objectId],
+      { shell: false, windowsHide: true, env: gitEnvironment, stdio: ['ignore', 'pipe', 'ignore'] },
+    );
+    const hash = createHash('sha256');
+    let bytes = 0;
+    let done = false;
+    const bad = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      child.kill();
+      reject(new Error(`fixture registry: ${label} must equal its indexed regular Git blob`));
+    };
+    const timer = setTimeout(bad, GIT_QUERY_TIMEOUT_MS);
+    timer.unref();
+    child.stdout.on('data', (chunk) => {
+      bytes += chunk.length;
+      if (!Number.isSafeInteger(bytes) || bytes > expectedBytes) bad();
+      else hash.update(chunk);
+    });
+    child.once('error', bad);
+    child.once('close', (exitCode) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (exitCode !== 0 || bytes !== expectedBytes) {
+        reject(new Error(`fixture registry: ${label} must equal its indexed regular Git blob`));
+        return;
+      }
+      accept(hash.digest('hex'));
+    });
+  });
+}
+
+async function readTrackedRepositoryFile(value, label, repositoryRoot = root) {
+  normalizedLogicalPath(value, label);
+  const objectId = await requireTrackedRegularBlob(value, label, repositoryRoot);
+  const bytes = await readRepositoryFile(value, label, repositoryRoot);
+  const indexedDigest = await hashIndexedRegularBlob(objectId, bytes.byteLength, label, repositoryRoot);
+  if (indexedDigest !== createHash('sha256').update(bytes).digest('hex')) {
+    fail(`${label} worktree bytes must equal the indexed regular Git blob`);
+  }
+  return bytes;
 }
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
 function sha256(value, label) {
   if (typeof value !== 'string' || !/^[0-9a-f]{64}$/.test(value)) fail(`${label} must be a lowercase SHA-256 digest`);
+}
+
+function publicHttpsUrl(value, label, { canonical = false, publicTerms = false } = {}) {
+  string(value, label, 2048);
+  if (/\s/u.test(value)) fail(`${label} must not contain whitespace`);
+  let url;
+  try { url = new URL(value); } catch { fail(`${label} must be a public HTTPS URL`); }
+  if (url.protocol !== 'https:' || url.hostname === '' || url.username !== '' || url.password !== '') {
+    fail(`${label} must be a public HTTPS URL without user information`);
+  }
+  if (canonical && (url.search !== '' || url.hash !== '' || url.href !== value)) {
+    fail(`${label} must be a canonical HTTPS URL without a query or fragment`);
+  }
+  const hostname = url.hostname.replace(/^\[|\]$/gu, '');
+  if (
+    publicTerms &&
+    (
+      isIP(hostname) !== 0 ||
+      !hostname.includes('.') ||
+      /(?:^|\.)(?:localhost|local|internal|invalid|test|example|onion|home|lan)$/iu.test(hostname) ||
+      hostname.toLowerCase().endsWith('.home.arpa')
+    )
+  ) fail(`${label} must use a public terms host, not a local, literal, or special-use host`);
+  return url;
+}
+
+function fixtureReleaseLocator(value, label) {
+  const url = publicHttpsUrl(value, label, { canonical: true });
+  const match = /^\/ChoRdChario\/LociView\/releases\/download\/fixtures-v[0-9]+(?:\.[0-9]+)*\/([A-Za-z0-9](?:[A-Za-z0-9._-]{0,253}[A-Za-z0-9])?)$/u.exec(url.pathname);
+  if (url.hostname !== 'github.com' || match === null || /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/iu.test(match[1])) {
+    fail(`${label} must identify a versioned fixture-only LociView GitHub Release asset with a portable asset name`);
+  }
+  return value;
+}
+
+export function validateFixtureRegistrySchema(registry, schema) {
+  let validate;
+  try {
+    validate = new Ajv2020({
+      strict: true,
+      allErrors: false,
+      validateFormats: true,
+      allowUnionTypes: false,
+      $data: false,
+      coerceTypes: false,
+      useDefaults: false,
+      removeAdditional: false,
+    }).compile(schema);
+  } catch {
+    fail('trusted registry schema compilation failed');
+  }
+  if (validate(registry)) return;
+  const detail = (validate.errors ?? []).slice(0, 4)
+    .map((error) => `${error.instancePath || '/'} ${error.message ?? error.keyword}`)
+    .join('; ');
+  fail(`registry does not match schema${detail === '' ? '' : `: ${detail}`}`);
+}
+
+export async function verifyFixtureLicenseBindings(fixture, label = 'fixture', repositoryRoot = root) {
+  const license = fixture.license;
+  exactKeys(license, ['spdx', 'reviewStatus', 'licenseUrl', 'licenseText', 'attribution'], `${label}.license`);
+  string(license.spdx, `${label}.license.spdx`, 128);
+  choice(license.reviewStatus, ['unreviewed', 'approved'], `${label}.license.reviewStatus`);
+  if (license.reviewStatus === 'unreviewed') return;
+
+  if (license.licenseUrl !== null) publicHttpsUrl(license.licenseUrl, `${label}.license.licenseUrl`, { canonical: true, publicTerms: true });
+  if (license.spdx === 'CC-BY-4.0' && license.licenseUrl !== 'https://creativecommons.org/licenses/by/4.0/') {
+    fail(`${label}.license.licenseUrl must use the canonical CC-BY-4.0 terms URL`);
+  }
+  if (
+    license.spdx === 'CC0-1.0' &&
+    license.licenseUrl !== null &&
+    license.licenseUrl !== 'https://creativecommons.org/publicdomain/zero/1.0/'
+  ) fail(`${label}.license.licenseUrl must use the canonical CC0-1.0 terms URL`);
+  if (license.licenseText !== null) {
+    exactKeys(license.licenseText, ['path', 'sha256'], `${label}.license.licenseText`);
+    normalizedLogicalPath(license.licenseText.path, `${label}.license.licenseText.path`);
+    sha256(license.licenseText.sha256, `${label}.license.licenseText.sha256`);
+    const bytes = await readTrackedRepositoryFile(license.licenseText.path, `${label}.license.licenseText.path`, repositoryRoot);
+    const actual = digest(bytes);
+    if (actual !== license.licenseText.sha256) {
+      fail(`${label}.license.licenseText SHA-256 mismatch: ${actual} != ${license.licenseText.sha256}`);
+    }
+  }
+
+  const attribution = license.attribution;
+  exactKeys(attribution, [
+    'creators', 'title', 'creditLine', 'copyrightNotice', 'sourceUrl',
+    'licenseNotice', 'disclaimerNotice', 'retainedNotices', 'modified',
+    'modificationNotice',
+  ], `${label}.license.attribution`);
+  if (attribution.sourceUrl !== null) {
+    publicHttpsUrl(attribution.sourceUrl, `${label}.license.attribution.sourceUrl`, { publicTerms: true });
+  }
+}
+
+export function verifyFixturePrivacyBindings(fixture, label = 'fixture') {
+  exactKeys(fixture.privacy, ['content', 'personalData', 'anonymization', 'reviewStatus'], `${label}.privacy`);
+  choice(fixture.privacy.content, ['synthetic', 'anonymized-derived'], `${label}.privacy.content`);
+  choice(fixture.privacy.reviewStatus, ['unreviewed', 'approved'], `${label}.privacy.reviewStatus`);
+  if (typeof fixture.privacy.personalData !== 'boolean') fail(`${label}.privacy.personalData must be boolean`);
+  if (fixture.privacy.personalData) fail(`${label} contains personal data and cannot enter the registry`);
+  string(fixture.privacy.anonymization, `${label}.privacy.anonymization`, 256);
+  const provenanceDeclaresDerived = fixture.provenance.kind === 'anonymized-derived';
+  const privacyDeclaresDerived = fixture.privacy.content === 'anonymized-derived';
+  if (provenanceDeclaresDerived !== privacyDeclaresDerived) {
+    fail(`${label} anonymized-derived provenance and privacy declarations must agree`);
+  }
+  const anonymization = fixture.privacy.anonymization.trim();
+  if (
+    provenanceDeclaresDerived &&
+    (
+      fixture.license.reviewStatus !== 'approved' ||
+      fixture.privacy.reviewStatus !== 'approved' ||
+      anonymization.length < 16 ||
+      ['not-applicable', 'none', 'unknown', 'n/a'].includes(anonymization.toLowerCase())
+    )
+  ) fail(`${label} anonymized-derived data requires approved license/privacy reviews and a substantive anonymization record`);
 }
 
 function sameJson(left, right) {
@@ -96,13 +328,14 @@ async function verifySemanticContract(fixture, label) {
   exactKeys(contract, ['status', 'profileId', 'specification', 'oracle'], `${label}.semanticContract`);
   choice(contract.status, ['candidate', 'ratified'], `${label}.semanticContract.status`);
   if (contract.status === 'ratified') {
-    fail(`${label}.semanticContract.status cannot be ratified under registryVersion 1; ratification requires a reviewed schema/version update`);
+    fail(`${label}.semanticContract.status cannot be ratified under registryVersion 2; ratification requires a separate reviewed contract`);
   }
   if (typeof contract.profileId !== 'string' || !/^[a-z0-9][a-z0-9._-]{2,95}$/.test(contract.profileId)) {
     fail(`${label}.semanticContract.profileId is invalid`);
   }
 
   const contractFiles = [];
+  const contractDigests = [];
   for (const name of ['specification', 'oracle']) {
     const binding = contract[name];
     const bindingLabel = `${label}.semanticContract.${name}`;
@@ -110,11 +343,14 @@ async function verifySemanticContract(fixture, label) {
     normalizedLogicalPath(binding.path, `${bindingLabel}.path`);
     sha256(binding.sha256, `${bindingLabel}.sha256`);
     contractFiles.push(binding.path.toLowerCase());
-    const bytes = await readRepositoryFile(binding.path, `${bindingLabel}.path`);
+    contractDigests.push(binding.sha256);
+    const bytes = await readTrackedRepositoryFile(binding.path, `${bindingLabel}.path`);
     const actual = digest(bytes);
     if (actual !== binding.sha256) fail(`${bindingLabel} SHA-256 mismatch: ${actual} != ${binding.sha256}`);
   }
-  if (contractFiles[0] === contractFiles[1]) fail(`${label}.semanticContract specification and oracle must be distinct files`);
+  if (contractFiles[0] === contractFiles[1] || contractDigests[0] === contractDigests[1]) {
+    fail(`${label}.semanticContract specification and oracle must be distinct Git blobs`);
+  }
 
   if (contract.status === 'candidate') {
     object(fixture.expected, `${label}.expected`);
@@ -148,20 +384,25 @@ export async function verifyGsRegistryBindings(registry) {
     }
     object(fixture.storage, `${label}.storage`);
     choice(fixture.storage.tier, ['git', 'generated', 'external'], `${label}.storage.tier`);
-    if (fixture.storage.tier !== 'git') {
-      fail(`${label} registryVersion 1 gaussian-splat semantic contracts require Git-tier bytes for inspection`);
+    if (fixture.storage.tier === 'generated') {
+      fail(`${label} registryVersion 2 gaussian-splat semantic contracts require Git or external transport bytes`);
     }
 
-    const bytes = new Uint8Array(await readRepositoryFile(fixture.storage.path, `${label}.storage.path`));
-    const inspection = inspectPlyFixture(bytes);
-    if (inspection.verdict !== 'candidate' || inspection.classification !== 'gaussian-splat') {
-      fail(`${label} registered GS bytes inspect as ${inspection.classification}${inspection.code === undefined ? '' : ` (${inspection.code})`}, not gaussian-splat`);
-    }
-    if (inspection.vertexCount !== fixture.geometry.splatCount) {
-      fail(`${label}.geometry.splatCount differs from inspected vertex count`);
-    }
-    if (!sameJson(inspection.meanBounds, fixture.geometry.bounds)) {
-      fail(`${label}.geometry.bounds must equal the inspected Gaussian mean bounds`);
+    let inspection = null;
+    if (fixture.storage.tier === 'git') {
+      const bytes = new Uint8Array(await readTrackedRepositoryFile(fixture.storage.path, `${label}.storage.path`));
+      inspection = inspectPlyFixture(bytes);
+      if (inspection.verdict !== 'candidate' || inspection.classification !== 'gaussian-splat') {
+        fail(`${label} registered GS bytes inspect as ${inspection.classification}${inspection.code === undefined ? '' : ` (${inspection.code})`}, not gaussian-splat`);
+      }
+      if (inspection.vertexCount !== fixture.geometry.splatCount) {
+        fail(`${label}.geometry.splatCount differs from inspected vertex count`);
+      }
+      if (!sameJson(inspection.meanBounds, fixture.geometry.bounds)) {
+        fail(`${label}.geometry.bounds must equal the inspected Gaussian mean bounds`);
+      }
+    } else if (!fixture.expected.warnings.includes(EXTERNAL_ACQUISITION_WARNING)) {
+      fail(`${label} external GS transport must remain pending separate acquisition verification`);
     }
 
     if (contract.status === 'candidate') candidateCount += 1;
@@ -175,7 +416,7 @@ export async function verifyGsRegistryBindings(registry) {
   } catch (error) {
     fail(`canonical GS profile artifacts failed verification: ${error instanceof Error ? error.message : String(error)}`);
   }
-  const canonicalMatches = gsFixtures.filter(({ fixture }) => fixture.storage.path === CANONICAL_GS_OUTPUT_PATH);
+  const canonicalMatches = gsFixtures.filter(({ fixture }) => fixture.storage.tier === 'git' && fixture.storage.path === CANONICAL_GS_OUTPUT_PATH);
   if (canonicalMatches.length !== 1) fail(`${CANONICAL_GS_OUTPUT_PATH} must have exactly one gaussian-splat registry entry`);
   const canonical = canonicalMatches[0];
   const { fixture, contract, inspection, label } = canonical;
@@ -202,16 +443,18 @@ export async function verifyGsRegistryBindings(registry) {
 }
 
 let registry;
+let schema;
 try {
   registry = JSON.parse(await readFile(registryFile, 'utf8'));
-  JSON.parse(await readFile(schemaFile, 'utf8'));
+  schema = JSON.parse(await readFile(schemaFile, 'utf8'));
 } catch (error) {
   fail(`invalid JSON: ${error instanceof Error ? error.message : String(error)}`);
 }
 
+validateFixtureRegistrySchema(registry, schema);
 exactKeys(registry, ['$schema', 'registryVersion', 'fixtures'], 'root');
 if (registry.$schema !== './registry.schema.json') fail('$schema must be ./registry.schema.json');
-if (registry.registryVersion !== 1) fail('registryVersion must be 1');
+if (registry.registryVersion !== 2) fail('registryVersion must be 2');
 if (!Array.isArray(registry.fixtures)) fail('fixtures must be an array');
 
 const classes = ['mesh', 'ordinary-point-cloud', 'gaussian-splat', 'package', 'evidence'];
@@ -229,10 +472,19 @@ for (const [index, fixture] of registry.fixtures.entries()) {
   if (ids.has(fixture.id)) fail(`${label}.id duplicates ${fixture.id}`);
   ids.add(fixture.id);
 
-  exactKeys(fixture.storage, ['tier', 'path'], `${label}.storage`);
   choice(fixture.storage.tier, ['git', 'generated', 'external'], `${label}.storage.tier`);
-  const pathKey = normalizedLogicalPath(fixture.storage.path, `${label}.storage.path`);
-  if (paths.has(pathKey)) fail(`${label}.storage.path has a case/NFC collision`);
+  let pathKey;
+  if (fixture.storage.tier === 'external') {
+    exactKeys(fixture.storage, ['tier', 'transport'], `${label}.storage`);
+    exactKeys(fixture.storage.transport, ['kind', 'locator', 'retentionPolicy'], `${label}.storage.transport`);
+    if (fixture.storage.transport.kind !== 'github-release-asset') fail(`${label}.storage.transport.kind is unsupported`);
+    if (fixture.storage.transport.retentionPolicy !== 'versioned-no-overwrite') fail(`${label}.storage.transport.retentionPolicy is unsupported`);
+    pathKey = fixtureReleaseLocator(fixture.storage.transport.locator, `${label}.storage.transport.locator`).toLowerCase();
+  } else {
+    exactKeys(fixture.storage, ['tier', 'path'], `${label}.storage`);
+    pathKey = normalizedLogicalPath(fixture.storage.path, `${label}.storage.path`);
+  }
+  if (paths.has(pathKey)) fail(`${label}.storage identity has a case/NFC collision`);
   paths.add(pathKey);
 
   count(fixture.byteSize, `${label}.byteSize`);
@@ -258,17 +510,10 @@ for (const [index, fixture] of registry.fixtures.entries()) {
   string(fixture.provenance.source, `${label}.provenance.source`);
   choice(fixture.provenance.reproducibility, ['pinned-output-only', 'byte-reproducible', 'external-restore'], `${label}.provenance.reproducibility`);
 
-  exactKeys(fixture.license, ['spdx', 'reviewStatus'], `${label}.license`);
-  string(fixture.license.spdx, `${label}.license.spdx`, 128);
-  choice(fixture.license.reviewStatus, ['unreviewed', 'approved'], `${label}.license.reviewStatus`);
-  exactKeys(fixture.privacy, ['content', 'personalData', 'anonymization'], `${label}.privacy`);
-  choice(fixture.privacy.content, ['synthetic', 'anonymized-derived', 'operational'], `${label}.privacy.content`);
-  if (typeof fixture.privacy.personalData !== 'boolean') fail(`${label}.privacy.personalData must be boolean`);
-  if (fixture.privacy.personalData) fail(`${label} contains personal data and cannot enter the registry`);
-  string(fixture.privacy.anonymization, `${label}.privacy.anonymization`, 256);
-  if (fixture.storage.tier === 'git' && fixture.privacy.content === 'operational') fail(`${label} operational data cannot be committed as a Git fixture`);
-  if (fixture.license.reviewStatus === 'approved' && ['NOASSERTION', 'NONE'].includes(fixture.license.spdx)) {
-    fail(`${label} cannot approve an unknown or absent license`);
+  await verifyFixtureLicenseBindings(fixture, label);
+  verifyFixturePrivacyBindings(fixture, label);
+  if (fixture.license.reviewStatus === 'approved' && !['CC-BY-4.0', 'CC0-1.0'].includes(fixture.license.spdx)) {
+    fail(`${label} approved license must use a registry-v2 supported SPDX identifier`);
   }
   if (
     fixture.storage.tier === 'git' &&
@@ -289,19 +534,26 @@ for (const [index, fixture] of registry.fixtures.entries()) {
 
   if (fixture.storage.tier === 'git') {
     if (fixture.restore.method !== 'repository') fail(`${label} Git storage requires repository restore`);
-    const bytes = await readRepositoryFile(fixture.storage.path, `${label}.storage.path`);
+    const bytes = await readTrackedRepositoryFile(fixture.storage.path, `${label}.storage.path`);
     if (fixture.provenance.kind === 'generated' || fixture.provenance.kind === 'authored') {
-      await readRepositoryFile(fixture.provenance.source, `${label}.provenance.source`);
+      await readTrackedRepositoryFile(fixture.provenance.source, `${label}.provenance.source`);
     }
     if (bytes.byteLength !== fixture.byteSize) fail(`${label} byte size mismatch: ${bytes.byteLength} != ${fixture.byteSize}`);
     const actualDigest = digest(bytes);
     if (actualDigest !== fixture.sha256) fail(`${label} SHA-256 mismatch: ${actualDigest} != ${fixture.sha256}`);
     checkedBytes += bytes.byteLength;
-  } else if (fixture.storage.tier === 'generated' && fixture.restore.method !== 'generate') {
-    fail(`${label} generated storage requires generate restore`);
-  } else if (fixture.storage.tier === 'external' && fixture.restore.method !== 'external') {
-    fail(`${label} external storage requires external restore`);
   } else {
+    if (fixture.storage.tier === 'generated' && fixture.restore.method !== 'generate') {
+      fail(`${label} generated storage requires generate restore`);
+    }
+    if (fixture.storage.tier === 'external') {
+      if (fixture.restore.method !== 'external' || fixture.provenance.reproducibility !== 'external-restore') {
+        fail(`${label} external storage requires external restore provenance`);
+      }
+      if (!fixture.expected.warnings.includes(EXTERNAL_ACQUISITION_WARNING)) {
+        fail(`${label} external transport must remain pending separate acquisition verification`);
+      }
+    }
     pendingEntries += 1;
   }
 }

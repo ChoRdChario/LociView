@@ -51,15 +51,36 @@ digests currently have no byte locator in the schema, so the verifier checks
 their required shape but the reviewer must still compare them with the served
 deployment.
 
-A complete run resolves its environment and all fixture metadata. Git-tier
-fixture and trace bytes, plus `package-lock.json`, are read from the recorded
-build commit rather than trusted from the current checkout; that commit must be
-an ancestor of the evidence checkout's `HEAD`. Each Git blob is limited to
-64 MiB, and one verification run may hash at most 8 GiB of unique local source
-bytes. Generated fixtures must be byte-reproducible regular non-link files
+A `g0-device-run-2` complete run separates the application build from its
+measurement inputs. `build.gitCommit` identifies the application that actually
+ran and supplies its `package-lock.json`. `evidenceSource.gitCommit` supplies
+`fixtures/registry.json`, Git-tier fixture and trace bytes, Git license text and
+semantic specification/oracle bindings; `fixtureRegistrySha256` independently
+records the exact registry blob digest. Both commits must be ancestors of the
+evidence checkout's `HEAD`, but they need not be the same. This permits an
+honest run of a deployed build that predates the later G0 corpus without
+retroactively claiming that the corpus shipped in that build.
+
+The verifier reads the registry from the evidence-source commit with bounded,
+duplicate-member-safe parsing and the trusted registry-v2 schema. Those inputs
+therefore cannot be replaced by current-worktree metadata. Each Git blob is
+limited to 64 MiB, and one verification run may hash at most 8 GiB of unique
+local source bytes. Generated fixtures must be byte-reproducible regular non-link files
 under `.artifacts/fixtures/`. A generated trace cannot complete a run until a
 durable trace-recipe contract exists; use a Git trace or a same-run external
-manifest instead. External bytes
-must resolve by locator, kind, digest and size in the same run's recorded
-artifact manifest. The verifier never executes restore instructions or fetches
-remote content.
+manifest instead. External bytes must resolve by locator, kind, digest and size
+in the same run's recorded artifact manifest. The verifier never executes
+restore instructions or fetches remote content.
+
+Fixture registry v2 represents a public external fixture with the exact
+fixture-only GitHub Release URL at `storage.transport.locator`; it does not use
+a repository `path` for external bytes. Registry validation also requires the
+versioned/no-overwrite retention declaration, approved entry-specific license
+and attribution record, external restore provenance and an explicit warning
+that acquisition verification remains pending. Matching that metadata to a run
+manifest is intentionally offline and does not prove that the remote bytes are
+available or hash correctly. A separate, explicit acquisition verifier must
+stream and hash the Release asset before the fixture is adopted or earns G0
+credit. The evidence command therefore reports the number of unique external
+fixture transports as pending separate acquisition verification even when all
+metadata cross-references are valid.

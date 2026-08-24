@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "g0-device-run-1",
+  "schemaVersion": "g0-device-run-2",
   "status": "pending",
   "runId": null,
   "environmentId": null,
@@ -14,6 +14,10 @@
     "deployUrl": null,
     "indexSha256": null,
     "serviceWorkerSha256": null
+  },
+  "evidenceSource": {
+    "gitCommit": null,
+    "fixtureRegistrySha256": null
   },
   "fixture": {
     "fixtureId": null,

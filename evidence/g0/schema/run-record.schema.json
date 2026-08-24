@@ -1,17 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://lociview.example/schemas/g0-device-run-1.json",
+  "$id": "https://lociview.example/schemas/g0-device-run-2.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "status", "runId", "environmentId", "deviceClass", "startedAtUtc", "build", "fixture", "traceRef", "conditions", "metrics", "v1GsSupport", "provisionalThresholds", "completion", "artifactManifestId", "notes"],
+  "required": ["schemaVersion", "status", "runId", "environmentId", "deviceClass", "startedAtUtc", "build", "evidenceSource", "fixture", "traceRef", "conditions", "metrics", "v1GsSupport", "provisionalThresholds", "completion", "artifactManifestId", "notes"],
   "properties": {
-    "schemaVersion": { "const": "g0-device-run-1" },
+    "schemaVersion": { "const": "g0-device-run-2" },
     "status": { "enum": ["pending", "measured"] },
     "runId": { "type": ["string", "null"], "pattern": "^run_[a-z0-9][a-z0-9._-]{2,95}$" },
     "environmentId": { "type": ["string", "null"], "pattern": "^env_[a-z0-9][a-z0-9._-]{2,95}$" },
     "deviceClass": { "enum": ["iphone-14-pro", "windows-desktop", "windows-tablet-pc", null] },
     "startedAtUtc": { "type": ["string", "null"], "format": "utc-date-time" },
     "build": { "$ref": "#/$defs/build" },
+    "evidenceSource": { "$ref": "#/$defs/evidenceSource" },
     "fixture": { "$ref": "#/$defs/fixture" },
     "traceRef": { "$ref": "#/$defs/traceRef" },
     "conditions": { "$ref": "#/$defs/conditions" },
@@ -49,6 +50,15 @@
         "deployUrl": { "type": ["string", "null"], "format": "https-url", "maxLength": 2048 },
         "indexSha256": { "$ref": "#/$defs/shaOrNull" },
         "serviceWorkerSha256": { "$ref": "#/$defs/shaOrNull" }
+      }
+    },
+    "evidenceSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gitCommit", "fixtureRegistrySha256"],
+      "properties": {
+        "gitCommit": { "type": ["string", "null"], "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
+        "fixtureRegistrySha256": { "$ref": "#/$defs/shaOrNull" }
       }
     },
     "fixture": {
@@ -249,6 +259,7 @@
           "startedAtUtc": { "type": "string", "format": "utc-date-time" },
           "completion": { "enum": ["complete", "incomplete", "invalid"] },
           "build": { "type": "object", "properties": { "deliveryMode": { "enum": ["local", "deployed"] }, "gitCommit": { "type": "string" }, "gitDirty": { "const": false }, "packageLockSha256": { "type": "string" } } },
+          "evidenceSource": { "type": "object", "properties": { "gitCommit": { "type": "string" }, "fixtureRegistrySha256": { "type": "string" } } },
           "fixture": { "type": "object", "properties": { "fixtureId": { "type": "string" }, "sha256": { "type": "string" }, "sourceBytes": { "type": "integer" }, "sourceLocation": { "enum": ["git", "generated", "external"] } } }
         }
       }

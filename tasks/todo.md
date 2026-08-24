@@ -1036,6 +1036,160 @@ Release blocker discovered during this proposal (separate production slice):
   public-alpha notice completeness has not been established and does not wait
   for MPL adoption.
 
+### G0 evidence-contract slice 3A — fixture registry v2 offline boundary
+
+The Product Owner approved fixture-only GitHub Release assets as the durable
+store for redistribution-approved external G0 fixtures. Registered assets are
+versioned rather than overwritten; deleting or replacing bytes referenced by a
+registry digest invalidates that fixture/evidence and requires a separately
+reviewed Product Owner decision. Formal adoption of the project-wide LociView
+license remains deferred, so every existing project-owned fixture stays
+`NOASSERTION`/unreviewed in this slice. Third-party fixture review is entry-
+specific and does not adopt the project license.
+
+The Product Owner additionally approved the evidence-source/run-schema scope
+extension on 2026-08-24 after independent review found that the deployed-v1
+baseline `4f6e48196041d7ae39a11aba04f647db99deb450` predates the fixture
+registry. Run schema v2 therefore separates the measured application build from
+the later immutable evidence-input revision instead of falsifying either
+identity or creating a one-build compatibility exception.
+
+Target and purpose:
+
+- [x] Upgrade the fixture registry to version 2 without changing any registered
+  fixture byte, ID, digest, geometry count, classification or gate disposition
+- [x] Bind approved license terms by a v2-supported SPDX identifier and
+  canonical public HTTPS URI and/or a hashed tracked Git license-text blob, plus
+  conditional creator/title/credit/source/copyright/
+  license/disclaimer/change attribution facts needed for redistributable content
+- [x] Represent external transport with an exact public fixture-Release asset
+  locator and `versioned-no-overwrite` retention policy rather than treating a
+  URL or hash alone as adoption
+- [x] Permit representative GS transport bytes to remain external while its
+  candidate specification and diagnostic oracle stay distinct, hashed Git
+  files; never infer FormatProfile ratification, renderer support or device
+  evidence from transport registration
+- [x] Upgrade the zero-record run contract to `g0-device-run-2`: keep
+  `build.gitCommit` as the measured application/package-lock identity and add
+  `evidenceSource.gitCommit` plus the fixture-registry SHA-256 for registry,
+  Git fixture/trace, license-text and semantic specification/oracle identity
+
+Implementation and acceptance boundary:
+
+- [x] Keep `npm run fixtures:verify` and `npm run evidence:verify` offline. They
+  validate the v2 contract and Git bindings but report external transport as
+  requiring the separate acquisition verification slice
+- [x] Make the JSON Schema, fixture verifier and G0 evidence verifier agree on
+  registry version, external locator selection, license review and storage/
+  restore/provenance invariants
+- [x] Accept an ancestor build commit that predates the registry when a later
+  ancestor evidence-source commit contains the exact registry and Git inputs;
+  continue rejecting missing/dangling/non-ancestor commits, current-worktree
+  drift and digest/blob mismatches, while `package-lock.json` remains bound to
+  the measured build commit
+- [x] Add focused positive and negative acceptance for complete CC-BY metadata,
+  missing/unsafe attribution or terms, immutable Git license-text binding, and
+  external GS with a Git-bound candidate semantic contract
+- [x] Preserve the current 10 Git entries / 708,867 bytes, zero external or
+  generated entries, one unratified GS candidate, three pending device templates
+  and zero real run/environment/artifact records
+- [x] Update the fixture README and G0 coverage/blocker map so only the attribution
+  and external-transport/semantic-separation blockers close; acquisition/restore,
+  actual fixture adoption, physical runs and G0 exit remain open
+- [x] Obtain independent read-only schema/security and evidence false-green
+  reviews, then run focused tests, fixture/evidence verification, typecheck, the
+  full suite, production build and `git diff --check` serially
+
+Explicit exclusions:
+
+- network fetch, downloader/acquisition CLI, redirect/timeout/streaming budgets,
+  local staging or `.artifacts/**` publication;
+- fixture byte download/upload, GitHub Release creation, registry adoption of an
+  external entry or Product Owner approval of any exact third-party asset;
+- changing the current project-wide no-license state, adding a root `LICENSE`,
+  approving any existing fixture license or publishing third-party notices;
+- external-artifact-manifest schema changes, Ki84 derivation,
+  `PROD-13`, device measurements, renderer/profile ratification, G0-S production
+  fixes, deploy or release.
+
+Stop conditions:
+
+- Stop if an approved external entry could pass using a credential-bearing,
+  mutable/non-Release or unversioned locator, or without complete license review.
+- Stop rather than making normal verification depend on network availability or
+  allowing registry metadata to self-ratify semantic/rendering behavior.
+- Stop before per-asset publication/adoption; exact bytes, privacy/license review
+  and Product Owner upload/adoption approval belong to later slices.
+
+Independent-review remediation required before this slice can complete:
+
+- [x] Treat every `licenseText` and semantic specification/oracle binding as a
+  Git binding, not merely a repository-contained file: ordinary fixture
+  verification accepts only one exact indexed regular blob whose bytes equal
+  the worktree candidate, and complete-run evidence resolves and hashes the
+  binding from that run's recorded evidence-source commit
+- [x] Resolve a complete run's fixture registry metadata from the recorded
+  evidence-source commit with bounded, duplicate-member-safe parsing and the
+  trusted v2 schema;
+  reject uncommitted/current-worktree registry drift instead of retroactively
+  changing the fixture identity, license, geometry or external locator of a run
+- [x] Limit approved v2 fixture licenses to the explicitly supported SPDX IDs
+  needed by the current G0 candidate lane, reject local/private or non-canonical
+  terms URLs, and keep future license additions behind a reviewed schema change
+- [x] Report every unique external fixture transport seen by normal evidence
+  verification as pending separate acquisition verification and earning no G0
+  credit, even when its manifest kind/locator/hash/size metadata matches
+- [x] Add focused acceptance for untracked/`.git/**` bindings, recorded-registry
+  divergence, recorded-commit license-text mismatch, exact external pending
+  reporting and the existing Git/generated paths before repeating both
+  independent reviews
+- [x] Reject duplicate case/NFC-normalized Git/generated paths or external
+  Release locators in both current and recorded registries; deduplicate pending
+  external transport by locator identity rather than accepting divergent
+  digest/size claims for one locator
+- [x] Require `provenance.kind` and `privacy.content` to agree bidirectionally
+  for every `anonymized-derived` fixture, with entry-specific approved license/
+  privacy metadata and a substantive trimmed anonymization record; apply the
+  public-host and valid-port boundary to required CC-BY source URLs as well as
+  license terms without adopting a project license
+
+Review and short meta-audit — 2026-08-24:
+
+- The writer scope is the G0 evidence contract on `g0-baseline` at baseline HEAD
+  `21ed456c05d332372d821b5e622ea265efbb8d7e`. There are no `src/**`, dependency,
+  fixture-byte, external-artifact-manifest, Ki84/private-data, network, Release,
+  deployment or project-license changes.
+- Registry v2 preserves all 10 Git fixture IDs, bytes, digests, geometry and
+  classifications (708,867 bytes total), zero adopted generated/external
+  entries and one unratified GS candidate. External registration remains
+  candidate-only and earns no acquisition, renderer, device or gate credit.
+- Run contract `g0-device-run-2` separates the measured build/package-lock
+  commit from the evidence-source registry/Git-input commit and raw registry
+  digest. Focused acceptance proves the deployed-v1-compatible case where the
+  application build predates the registry, plus dangling/drift/digest/locator
+  failure boundaries.
+- Independent design, schema/security and evidence false-green reviewers were
+  read-only and report no remaining P0/P1/P2 after remediation. The writer
+  closed indexed-versus-worktree Git binding, duplicate storage identities,
+  bidirectional anonymized-derived review, public-source/port validation,
+  historical registry selection and locator-discriminating acceptance gaps.
+- The first exact serial matrix passed: `git diff --check`; fixture verification
+  (10 Git entries / 708,867 bytes, zero generated/external entries, one
+  candidate GS contract); evidence verification (three pending templates, zero
+  run/environment/artifact records and zero current external transports);
+  typecheck; 33 test files / 1,091 passing tests with 21 existing todos; and
+  production build. The existing 805.59 kB viewer warning and 11-entry,
+  890.87 KiB PWA precache remain.
+- G0 remains active and incomplete, with G0-S a parallel release blocker. This
+  slice closes the offline registry/evidence identity boundary only. The next
+  G0 critical-path slice is the separate bounded acquisition/restore verifier
+  needed before an exact external fixture can be proposed for adoption; a ready
+  ZIP special-entry fix remains lower priority because it does not close the
+  present external-evidence blocker.
+- This result record is the only change after the first serial pass. The same
+  serial matrix runs again on the exact final tree before staging; any failure
+  reopens the verification checklist item.
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes

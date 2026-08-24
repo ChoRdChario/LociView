@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { createReadStream } from 'node:fs';
 import { lstat, readdir, readFile, realpath } from 'node:fs/promises';
+import { isIP } from 'node:net';
 import { isAbsolute, posix, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -219,6 +220,36 @@ function httpsUrl(value) {
   } catch { return false; }
 }
 
+function publicHttpsOriginUrl(value) {
+  if (!httpsUrl(value)) return false;
+  const url = new URL(value);
+  const hostname = url.hostname.replace(/^\[|\]$/gu, '');
+  return isIP(hostname) === 0
+    && hostname.includes('.')
+    && !/(?:^|\.)(?:localhost|local|internal|invalid|test|example|onion|home|lan)$/iu.test(hostname)
+    && !hostname.toLowerCase().endsWith('.home.arpa');
+}
+
+function canonicalPublicTermsUrl(value) {
+  if (!publicHttpsOriginUrl(value)) return false;
+  const url = new URL(value);
+  return url.search === '' && url.hash === '' && url.href === value;
+}
+
+function validateApprovedFixtureLicenseMetadata(fixture, label) {
+  if (fixture.license.reviewStatus !== 'approved') return;
+  if (!['CC-BY-4.0', 'CC0-1.0'].includes(fixture.license.spdx)) {
+    fail('E_FIXTURE', `${label} uses an unsupported approved SPDX identifier`);
+  }
+  if (fixture.license.licenseUrl !== null && !canonicalPublicTermsUrl(fixture.license.licenseUrl)) {
+    fail('E_FIXTURE', `${label} license URL is not a canonical public terms URL`);
+  }
+  const sourceUrl = fixture.license.attribution?.sourceUrl;
+  if (sourceUrl !== null && sourceUrl !== undefined && !publicHttpsOriginUrl(sourceUrl)) {
+    fail('E_FIXTURE', `${label} attribution source URL is not a public HTTPS origin`);
+  }
+}
+
 function compileValidators(schemas) {
   try {
     const ajv = new Ajv2020({ strict: true, allErrors: false, validateFormats: true, allowUnionTypes: true, $data: false, coerceTypes: false, useDefaults: false, removeAdditional: false });
@@ -373,6 +404,31 @@ function safePath(value, label, code) {
   return value;
 }
 
+function validateFixtureStorageIdentities(fixtures, label) {
+  const identities = new Set();
+  for (const [index, fixture] of fixtures.entries()) {
+    const storageLabel = `${label} fixture ${index + 1} storage`;
+    const identity = fixture.storage.tier === 'external'
+      ? fixture.storage.transport.locator.normalize('NFC').toLowerCase()
+      : safePath(fixture.storage.path, `${storageLabel} path`, 'E_FIXTURE').toLowerCase();
+    if (identities.has(identity)) fail('E_FIXTURE', `${storageLabel} duplicates a case/NFC-normalized storage identity`);
+    identities.add(identity);
+  }
+}
+
+function registerExternalTransportClaims(fixtures, label, claims) {
+  for (const [index, fixture] of fixtures.entries()) {
+    if (fixture.storage.tier !== 'external') continue;
+    const identity = fixture.storage.transport.locator.normalize('NFC').toLowerCase();
+    const signature = JSON.stringify([fixture.sha256, fixture.byteSize]);
+    const previous = claims.get(identity);
+    if (previous !== undefined && previous !== signature) {
+      fail('E_FIXTURE', `${label} fixture ${index + 1} changes the digest or size claimed by an existing external locator`);
+    }
+    claims.set(identity, signature);
+  }
+}
+
 const inheritedNonGitEnvironment = Object.fromEntries(
   Object.entries(process.env).filter(([key]) => !key.toUpperCase().startsWith('GIT_') && key.toUpperCase() !== 'GCM_INTERACTIVE'),
 );
@@ -385,7 +441,7 @@ const gitEnvironment = Object.freeze({
 });
 function gitBytes(root, args, label, code, timeoutMs) {
   return new Promise((accept, reject) => {
-    const child = spawn('git', ['-C', root, ...args], { shell: false, windowsHide: true, env: gitEnvironment, stdio: ['ignore', 'pipe', 'ignore'] });
+    const child = spawn('git', ['-c', `safe.directory=${root.replaceAll('\\', '/')}`, '-C', root, ...args], { shell: false, windowsHide: true, env: gitEnvironment, stdio: ['ignore', 'pipe', 'ignore'] });
     const chunks = []; let count = 0; let done = false;
     const timer = setTimeout(() => bad(`${label} Git query timed out`), timeoutMs);
     timer.unref();
@@ -406,7 +462,7 @@ async function commitExists(root, commit, cache, label, code, timeoutMs) {
 }
 function hashGit(root, spec, expectedBytes, label, code, timeoutMs) {
   return new Promise((accept, reject) => {
-    const child = spawn('git', ['-C', root, 'cat-file', 'blob', spec], { shell: false, windowsHide: true, env: gitEnvironment, stdio: ['ignore', 'pipe', 'ignore'] });
+    const child = spawn('git', ['-c', `safe.directory=${root.replaceAll('\\', '/')}`, '-C', root, 'cat-file', 'blob', spec], { shell: false, windowsHide: true, env: gitEnvironment, stdio: ['ignore', 'pipe', 'ignore'] });
     const hash = createHash('sha256'); let bytes = 0; let done = false;
     const timer = setTimeout(() => bad(`${label} Git blob read timed out`), timeoutMs);
     timer.unref();
@@ -416,10 +472,8 @@ function hashGit(root, spec, expectedBytes, label, code, timeoutMs) {
     child.once('close', (exitCode) => { if (!done) { done = true; clearTimeout(timer); if (exitCode === 0) accept({ bytes, sha256: hash.digest('hex') }); else reject(new EvidenceVerificationError(code, `${label} cannot read the recorded Git blob`)); } });
   });
 }
-async function verifyGit({ root, commit, locator, bytes, sha256, label, code, commitCache, sourceBudget, maximum, timeoutMs }) {
+async function gitBlobInfo({ root, commit, locator, label, code, commitCache, maximum, timeoutMs }) {
   const path = safePath(locator, `${label} locator`, code);
-  const knownKey = bytes === undefined ? null : JSON.stringify(['git', commit, path, bytes, sha256]);
-  if (knownKey !== null && sourceBudget.has(knownKey)) return;
   await commitExists(root, commit, commitCache, `${label} commit`, code, timeoutMs);
   const treeBytes = await gitBytes(root, ['--literal-pathspecs', 'ls-tree', '-z', '--full-tree', commit, '--', path], label, code, timeoutMs);
   let tree;
@@ -430,13 +484,44 @@ async function verifyGit({ root, commit, locator, bytes, sha256, label, code, co
   const sizeText = await gitText(root, ['cat-file', '-s', spec], label, code, timeoutMs);
   if (!/^(?:0|[1-9]\d*)$/u.test(sizeText) || !isSafeBytes(Number(sizeText))) fail(code, `${label} has an invalid Git blob size`);
   const size = Number(sizeText);
-  if (bytes !== undefined && size !== bytes) fail(code, `${label} byte size differs from the recorded Git blob`);
   if (maximum !== undefined && size > maximum) fail('E_LIMIT', `${label} exceeds the Git metadata budget`);
-  const key = knownKey ?? JSON.stringify(['git', commit, path, size, sha256]);
+  return { path, spec, size };
+}
+
+function readGitBlobBytes(root, spec, expectedBytes, label, code, timeoutMs) {
+  return new Promise((accept, reject) => {
+    const child = spawn('git', ['-c', `safe.directory=${root.replaceAll('\\', '/')}`, '-C', root, 'cat-file', 'blob', spec], { shell: false, windowsHide: true, env: gitEnvironment, stdio: ['ignore', 'pipe', 'ignore'] });
+    const chunks = []; let bytes = 0; let done = false;
+    const timer = setTimeout(() => bad(`${label} Git blob read timed out`), timeoutMs);
+    timer.unref();
+    const bad = (message) => { if (!done) { done = true; clearTimeout(timer); child.kill(); reject(new EvidenceVerificationError(code, message)); } };
+    child.stdout.on('data', (chunk) => {
+      bytes += chunk.length;
+      if (!isSafeBytes(bytes) || bytes > expectedBytes) bad(`${label} exceeds its declared byte size`);
+      else chunks.push(chunk);
+    });
+    child.once('error', () => bad(`${label} cannot read the recorded Git blob`));
+    child.once('close', (exitCode) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (exitCode !== 0 || bytes !== expectedBytes) reject(new EvidenceVerificationError(code, `${label} cannot read the recorded Git blob`));
+      else accept(Buffer.concat(chunks));
+    });
+  });
+}
+
+async function verifyGit({ root, commit, locator, bytes, sha256, label, code, commitCache, sourceBudget, maximum, timeoutMs }) {
+  const path = safePath(locator, `${label} locator`, code);
+  const knownKey = bytes === undefined ? null : JSON.stringify(['git', commit, path, bytes, sha256]);
+  if (knownKey !== null && sourceBudget.has(knownKey)) return;
+  const info = await gitBlobInfo({ root, commit, locator: path, label, code, commitCache, maximum, timeoutMs });
+  if (bytes !== undefined && info.size !== bytes) fail(code, `${label} byte size differs from the recorded Git blob`);
+  const key = knownKey ?? JSON.stringify(['git', commit, path, info.size, sha256]);
   if (sourceBudget.has(key)) return;
-  sourceBudget.reserve(key, size);
-  const actual = await hashGit(root, spec, bytes, label, code, timeoutMs);
-  if (actual.bytes !== size || actual.sha256 !== sha256) fail(code, `${label} hash or byte size differs from the recorded Git blob`);
+  sourceBudget.reserve(key, info.size);
+  const actual = await hashGit(root, info.spec, bytes, label, code, timeoutMs);
+  if (actual.bytes !== info.size || actual.sha256 !== sha256) fail(code, `${label} hash or byte size differs from the recorded Git blob`);
   sourceBudget.complete(key);
 }
 
@@ -463,7 +548,14 @@ async function verifyGenerated({ root, locator, bytes: expectedBytes, sha256, la
   sourceBudget.complete(key);
 }
 
-function artifact(manifest, kind, sha256, bytes) { return manifest?.artifacts?.find((item) => item.kind === kind && item.sha256 === sha256 && item.bytes === bytes); }
+function artifact(manifest, kind, sha256, bytes, storageLocator) {
+  return manifest?.artifacts?.find((item) =>
+    item.kind === kind &&
+    item.sha256 === sha256 &&
+    item.bytes === bytes &&
+    item.storageLocator === storageLocator
+  );
+}
 function sameSize(a, b) { return a?.width === b?.width && a?.height === b?.height; }
 
 export async function verifyG0Evidence(options = {}) {
@@ -514,8 +606,8 @@ export async function verifyG0Evidence(options = {}) {
   validate(validators.run, runTemplate, runTemplateLabel, limits); privacy(runTemplate, runTemplateLabel);
   if (runTemplate.status !== 'pending' || runTemplate.completion !== 'pending' || runTemplate.v1GsSupport !== 'unsupported' || runTemplate.provisionalThresholds?.approvalState !== 'unapproved' || Object.values(runTemplate.provisionalThresholds?.observations ?? {}).some((value) => value !== 'not-evaluated')) fail('E_TEMPLATE', `${runTemplateLabel} contains non-pending or fabricated evidence`);
   const pendingClaims = [runTemplate.runId, runTemplate.environmentId, runTemplate.deviceClass, runTemplate.startedAtUtc, runTemplate.artifactManifestId,
-    ...Object.values(runTemplate.build), ...Object.values(runTemplate.fixture), ...Object.values(runTemplate.traceRef)];
-  if (pendingClaims.some((value) => value !== null)) fail('E_TEMPLATE', `${runTemplateLabel} must not contain IDs or measured build, fixture, or trace claims`);
+    ...Object.values(runTemplate.build), ...Object.values(runTemplate.evidenceSource), ...Object.values(runTemplate.fixture), ...Object.values(runTemplate.traceRef)];
+  if (pendingClaims.some((value) => value !== null)) fail('E_TEMPLATE', `${runTemplateLabel} must not contain IDs or measured build, evidence-source, fixture, or trace claims`);
   if (Object.values(runTemplate.conditions).some((value) => value !== null) || !neutralPendingMetric(runTemplate.metrics) || runTemplate.notes.length !== 0) {
     fail('E_TEMPLATE', `${runTemplateLabel} must contain only neutral pending conditions, metrics, and notes`);
   }
@@ -527,11 +619,13 @@ export async function verifyG0Evidence(options = {}) {
 
   const registry = await readJson(resolve(root, 'fixtures', 'registry.json'), 'fixtures/registry.json', limits.jsonBytes, budget);
   validate(validators.registry, registry, 'fixtures/registry.json', limits, 'E_FIXTURE'); privacy(registry, 'fixtures/registry.json');
+  registry.fixtures.forEach((fixture, index) => validateApprovedFixtureLicenseMetadata(fixture, `fixtures/registry.json fixture ${index + 1}`));
+  unique(registry.fixtures, (item) => item.id, 'fixture');
+  validateFixtureStorageIdentities(registry.fixtures, 'fixtures/registry.json');
   const devices = await records(evidenceRoot, 'devices', validators.device, limits, budget);
   const manifests = await records(evidenceRoot, 'manifests', validators.manifest, limits, budget);
   const runs = await records(evidenceRoot, 'runs', validators.run, limits, budget);
 
-  const fixtureById = unique(registry.fixtures, (item) => item.id, 'fixture');
   const deviceById = unique(devices, (item) => item.environmentId, 'environment');
   const manifestById = unique(manifests, (item) => item.manifestId, 'manifest');
   const runById = unique(runs, (item) => item.runId, 'run');
@@ -561,11 +655,99 @@ export async function verifyG0Evidence(options = {}) {
 
   const commits = new Set();
   const sourceBudget = new SourceBudget(limits.totalSourceBytes);
+  const recordedRegistryCache = new Map();
+  const pendingExternalFixtureTransports = new Map();
+  registerExternalTransportClaims(registry.fixtures, 'fixtures/registry.json', pendingExternalFixtureTransports);
+
+  const recordedRegistryForCommit = async (commit, expectedSha256) => {
+    const cached = recordedRegistryCache.get(commit);
+    if (cached !== undefined) {
+      if (cached.sha256 !== expectedSha256) fail('E_EVIDENCE_SOURCE', 'recorded fixture registry digest differs from the run evidence source');
+      return cached;
+    }
+    const label = 'recorded fixture registry';
+    await commitExists(root, commit, commits, 'recorded evidence-source commit', 'E_EVIDENCE_SOURCE', limits.gitTimeoutMs);
+    const info = await gitBlobInfo({
+      root,
+      commit,
+      locator: 'fixtures/registry.json',
+      label,
+      code: 'E_EVIDENCE_SOURCE',
+      commitCache: commits,
+      maximum: limits.jsonBytes,
+      timeoutMs: limits.gitTimeoutMs,
+    });
+    const key = JSON.stringify(['git-json', commit, info.path, info.size]);
+    sourceBudget.reserve(key, info.size);
+    budget.add(info.size);
+    const bytes = await readGitBlobBytes(root, info.spec, info.size, label, 'E_EVIDENCE_SOURCE', limits.gitTimeoutMs);
+    const actualSha256 = createHash('sha256').update(bytes).digest('hex');
+    if (actualSha256 !== expectedSha256) fail('E_EVIDENCE_SOURCE', `${label} digest differs from the run evidence source`);
+    let text;
+    try { text = decoder.decode(bytes); } catch { fail('E_FIXTURE', `${label} is not UTF-8 JSON`); }
+    const recordedRegistry = parseJsonWithoutDuplicateMembers(text, label, 'E_FIXTURE');
+    validate(validators.registry, recordedRegistry, label, limits, 'E_FIXTURE');
+    privacy(recordedRegistry, label);
+    recordedRegistry.fixtures.forEach((fixture, index) => validateApprovedFixtureLicenseMetadata(fixture, `${label} fixture ${index + 1}`));
+    const fixtureById = unique(recordedRegistry.fixtures, (item) => item.id, 'recorded fixture');
+    validateFixtureStorageIdentities(recordedRegistry.fixtures, label);
+    registerExternalTransportClaims(recordedRegistry.fixtures, label, pendingExternalFixtureTransports);
+    const result = {
+      registry: recordedRegistry,
+      fixtureById,
+      sha256: actualSha256,
+    };
+    sourceBudget.complete(key);
+    recordedRegistryCache.set(commit, result);
+    return result;
+  };
+
   for (const run of runs.filter((item) => item.completion === 'complete')) {
     const device = deviceById.get(run.environmentId);
     if (device === undefined || device.status !== 'measured' || device.deviceClass !== run.deviceClass || device.launchMode !== run.conditions.launchMode || device.devicePixelRatio !== run.conditions.devicePixelRatio || !sameSize(device.viewportCss, run.conditions.viewportCss) || !sameSize(device.drawingBufferPx, run.conditions.drawingBufferPx)) fail('E_ENVIRONMENT', `run ${run.runId} does not match its measured environment`);
-    const fixture = fixtureById.get(run.fixture.fixtureId);
+    const evidenceCommit = run.evidenceSource.gitCommit;
+    const recordedRegistry = await recordedRegistryForCommit(evidenceCommit, run.evidenceSource.fixtureRegistrySha256);
+    const fixture = recordedRegistry.fixtureById.get(run.fixture.fixtureId);
     if (fixture === undefined) fail('E_FIXTURE', `run ${run.runId} fixture is not registered`);
+    if (fixture.license.licenseText !== null) {
+      await verifyGit({
+        root,
+        commit: evidenceCommit,
+        locator: fixture.license.licenseText.path,
+        sha256: fixture.license.licenseText.sha256,
+        label: `run ${run.runId} fixture license text`,
+        code: 'E_FIXTURE',
+        commitCache: commits,
+        sourceBudget,
+        maximum: limits.gitMetadataBytes,
+        timeoutMs: limits.gitTimeoutMs,
+      });
+    }
+    if (fixture.semanticContract !== undefined) {
+      if (
+        fixture.semanticContract.specification.path === fixture.semanticContract.oracle.path ||
+        fixture.semanticContract.specification.sha256 === fixture.semanticContract.oracle.sha256
+      ) {
+        fail('E_FIXTURE', `run ${run.runId} fixture semantic specification and oracle must be distinct Git blobs`);
+      }
+      for (const [name, binding] of Object.entries({
+        specification: fixture.semanticContract.specification,
+        oracle: fixture.semanticContract.oracle,
+      })) {
+        await verifyGit({
+          root,
+          commit: evidenceCommit,
+          locator: binding.path,
+          sha256: binding.sha256,
+          label: `run ${run.runId} fixture semantic ${name}`,
+          code: 'E_FIXTURE',
+          commitCache: commits,
+          sourceBudget,
+          maximum: limits.gitMetadataBytes,
+          timeoutMs: limits.gitTimeoutMs,
+        });
+      }
+    }
     const drawableFixture = (fixture.classification === 'mesh' && fixture.geometry.triangleCount > 0)
       || (fixture.classification === 'ordinary-point-cloud' && fixture.geometry.ordinaryPointCount > 0);
     if (!drawableFixture || fixture.geometry.splatCount !== 0) fail('E_FIXTURE', `run ${run.runId} fixture is not drawable by the v1 evidence target`);
@@ -584,16 +766,28 @@ export async function verifyG0Evidence(options = {}) {
     }
 
     await verifyGit({ root, commit: run.build.gitCommit, locator: 'package-lock.json', sha256: run.build.packageLockSha256, label: `run ${run.runId} package lock`, code: 'E_BUILD', commitCache: commits, sourceBudget, maximum: limits.gitMetadataBytes, timeoutMs: limits.gitTimeoutMs });
-    if (fixture.storage.tier === 'git') await verifyGit({ root, commit: run.build.gitCommit, locator: fixture.storage.path, bytes: fixture.byteSize, sha256: fixture.sha256, label: `run ${run.runId} fixture`, code: 'E_FIXTURE', commitCache: commits, sourceBudget, maximum: limits.gitBlobBytes, timeoutMs: limits.gitTimeoutMs });
+    if (fixture.storage.tier === 'git') await verifyGit({ root, commit: evidenceCommit, locator: fixture.storage.path, bytes: fixture.byteSize, sha256: fixture.sha256, label: `run ${run.runId} fixture`, code: 'E_FIXTURE', commitCache: commits, sourceBudget, maximum: limits.gitBlobBytes, timeoutMs: limits.gitTimeoutMs });
     else if (fixture.storage.tier === 'generated') await verifyGenerated({ root, locator: fixture.storage.path, bytes: fixture.byteSize, sha256: fixture.sha256, label: `run ${run.runId} fixture`, code: 'E_FIXTURE', sourceBudget, allowedPrefix: '.artifacts/fixtures/' });
-    else { const found = artifact(manifest, 'large-fixture', fixture.sha256, fixture.byteSize); if (found === undefined || found.storageLocator !== fixture.storage.path) fail('E_FIXTURE', `run ${run.runId} fixture does not resolve through its manifest`); }
+    else {
+      const found = artifact(manifest, 'large-fixture', fixture.sha256, fixture.byteSize, fixture.storage.transport.locator);
+      if (found === undefined) fail('E_FIXTURE', `run ${run.runId} fixture does not resolve through its manifest`);
+    }
 
     const trace = run.traceRef;
-    if (trace.sourceLocation === 'git') await verifyGit({ root, commit: run.build.gitCommit, locator: trace.restoreLocator, bytes: trace.bytes, sha256: trace.sha256, label: `run ${run.runId} trace`, code: 'E_TRACE', commitCache: commits, sourceBudget, maximum: limits.gitBlobBytes, timeoutMs: limits.gitTimeoutMs });
+    if (trace.sourceLocation === 'git') await verifyGit({ root, commit: evidenceCommit, locator: trace.restoreLocator, bytes: trace.bytes, sha256: trace.sha256, label: `run ${run.runId} trace`, code: 'E_TRACE', commitCache: commits, sourceBudget, maximum: limits.gitBlobBytes, timeoutMs: limits.gitTimeoutMs });
     else if (trace.sourceLocation === 'generated') fail('E_TRACE', `run ${run.runId} generated trace has no durable recipe contract`);
-    else { const found = artifact(manifest, 'camera-input-trace', trace.sha256, trace.bytes); if (found === undefined || found.storageLocator !== trace.restoreLocator) fail('E_TRACE', `run ${run.runId} trace does not resolve through its manifest`); }
+    else {
+      const found = artifact(manifest, 'camera-input-trace', trace.sha256, trace.bytes, trace.restoreLocator);
+      if (found === undefined) fail('E_TRACE', `run ${run.runId} trace does not resolve through its manifest`);
+    }
   }
-  return { pendingDeviceTemplates: deviceTemplates.length, runRecords: runs.length, environmentRecords: devices.length, artifactManifests: manifests.length };
+  return {
+    pendingDeviceTemplates: deviceTemplates.length,
+    runRecords: runs.length,
+    environmentRecords: devices.length,
+    artifactManifests: manifests.length,
+    pendingExternalFixtureTransports: pendingExternalFixtureTransports.size,
+  };
 }
 
 function parseArgs(args) {
@@ -607,7 +801,8 @@ async function main() {
   try { options = parseArgs(process.argv.slice(2)); } catch (error) { process.stderr.write(`${error.code}: ${error.message}\n`); process.exitCode = 2; return; }
   try {
     const result = await verifyG0Evidence(options);
-    process.stdout.write(`G0 evidence verified: ${result.pendingDeviceTemplates} pending device templates, ${result.runRecords} run records, ${result.environmentRecords} environment records, ${result.artifactManifests} artifact manifests\n`);
+    const transportNoun = result.pendingExternalFixtureTransports === 1 ? 'transport' : 'transports';
+    process.stdout.write(`G0 evidence verified: ${result.pendingDeviceTemplates} pending device templates, ${result.runRecords} run records, ${result.environmentRecords} environment records, ${result.artifactManifests} artifact manifests; ${result.pendingExternalFixtureTransports} external fixture ${transportNoun} pending separate acquisition verification (no G0 credit)\n`);
   } catch (error) {
     if (error instanceof EvidenceVerificationError) process.stderr.write(`${error.code}: ${error.message}\n`);
     else process.stderr.write('E_INTERNAL: G0 evidence verification failed unexpectedly\n');

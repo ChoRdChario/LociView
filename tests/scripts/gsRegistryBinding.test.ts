@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,9 +22,20 @@ interface SemanticContract {
   oracle: ContractFile;
 }
 
+type RegistryStorage =
+  | { tier: 'git' | 'generated'; path: string }
+  | {
+      tier: 'external';
+      transport: {
+        kind: 'github-release-asset';
+        locator: string;
+        retentionPolicy: 'versioned-no-overwrite';
+      };
+    };
+
 interface RegistryFixture {
   id: string;
-  storage: { tier: 'git' | 'generated' | 'external'; path: string };
+  storage: RegistryStorage;
   byteSize: number;
   sha256: string;
   mediaType: string;
@@ -113,24 +125,96 @@ describe('G0 GS registry semantic-contract binding', () => {
     await expect(verifyGsRegistryBindings(mutated)).rejects.toThrow(/registered GS bytes inspect as ordinary-point-cloud/u);
   });
 
-  it.each(['generated', 'external'] as const)('rejects uninspected %s-tier GS candidate bytes', async (tier) => {
+  it('rejects generated GS candidate bytes without an adopted external transport identity', async () => {
     const mutated = structuredClone(registry);
     candidateFixture(mutated).storage = {
-      tier,
-      path: tier === 'generated'
-        ? '.artifacts/fixtures/gs/unverified-points.ply'
-        : 'external/unverified-points.ply',
+      tier: 'generated',
+      path: '.artifacts/fixtures/gs/unverified-points.ply',
     };
 
     const validate = new Ajv2020({ strict: true }).compile(schema);
     expect(validate(mutated)).toBe(false);
-    await expect(verifyGsRegistryBindings(mutated)).rejects.toThrow(/require Git-tier bytes for inspection/u);
+    await expect(verifyGsRegistryBindings(mutated)).rejects.toThrow(/require Git or external transport bytes/u);
+  });
+
+  it('accepts an external GS candidate while leaving transport acquisition pending and its Git oracle unratified', async () => {
+    const mutated = structuredClone(registry);
+    const external = structuredClone(candidateFixture(mutated));
+    external.id = 'external-gs-candidate-v1';
+    external.storage = {
+      tier: 'external',
+      transport: {
+        kind: 'github-release-asset',
+        locator: 'https://github.com/ChoRdChario/LociView/releases/download/fixtures-v1.0.0/external-gs-candidate-v1.ply',
+        retentionPolicy: 'versioned-no-overwrite',
+      },
+    };
+    external.provenance = {
+      kind: 'third-party',
+      source: 'https://example.invalid/external-gs-candidate',
+      reproducibility: 'external-restore',
+    };
+    external.license = {
+      spdx: 'CC-BY-4.0',
+      reviewStatus: 'approved',
+      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+      licenseText: null,
+      attribution: {
+        creators: ['Synthetic Test Creator'],
+        title: 'Synthetic external GS candidate',
+        creditLine: 'Synthetic Test Creator, CC BY 4.0',
+        copyrightNotice: null,
+        sourceUrl: 'https://example.com/external-gs-candidate',
+        licenseNotice: null,
+        disclaimerNotice: null,
+        retainedNotices: [],
+        modified: false,
+        modificationNotice: 'Unmodified upstream bytes.',
+      },
+    };
+    external.privacy = {
+      ...(external.privacy as Record<string, unknown>),
+      reviewStatus: 'approved',
+    };
+    external.restore = { method: 'external', instructions: 'Acquire by the separately reviewed fixture acquisition command.' };
+    external.expected.warnings = [
+      ...external.expected.warnings,
+      'External transport identity requires separate acquisition verification.',
+    ];
+    mutated.fixtures.push(external);
+
+    const validate = new Ajv2020({ strict: true }).compile(schema);
+    expect(validate(mutated), JSON.stringify(validate.errors)).toBe(true);
+    await expect(verifyGsRegistryBindings(mutated)).resolves.toEqual({
+      fixtureCount: 2,
+      candidateCount: 2,
+      ratifiedCount: 0,
+    });
   });
 
   it.each(['specification', 'oracle'] as const)('rejects a %s digest mismatch', async (binding) => {
     const mutated = structuredClone(registry);
     candidateFixture(mutated).semanticContract[binding].sha256 = '0'.repeat(64);
     await expect(verifyGsRegistryBindings(mutated)).rejects.toThrow(new RegExp(`semanticContract\\.${binding} SHA-256 mismatch`, 'u'));
+  });
+
+  it('rejects repository metadata that is hashed but is not a tracked semantic-contract blob', async () => {
+    const mutated = structuredClone(registry);
+    const path = '.git/config';
+    const bytes = await readFile(resolve(repositoryRoot, path));
+    candidateFixture(mutated).semanticContract.specification = {
+      path,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+    };
+
+    await expect(verifyGsRegistryBindings(mutated)).rejects.toThrow(/tracked regular Git blob/u);
+  });
+
+  it('requires the semantic specification and oracle to be distinct Git blobs', async () => {
+    const mutated = structuredClone(registry);
+    const contract = candidateFixture(mutated).semanticContract;
+    contract.oracle = structuredClone(contract.specification);
+    await expect(verifyGsRegistryBindings(mutated)).rejects.toThrow(/distinct Git blobs/u);
   });
 
   it('rejects registry splat counts and bounds that diverge from inspected bytes', async () => {
@@ -152,13 +236,13 @@ describe('G0 GS registry semantic-contract binding', () => {
     await expect(verifyGsRegistryBindings(mutated)).rejects.toThrow(/gaussian-splat fixture requires semanticContract/u);
   });
 
-  it('rejects self-asserted ratification under registryVersion 1', async () => {
+  it('rejects self-asserted ratification under registryVersion 2', async () => {
     const mutated = structuredClone(registry);
     candidateFixture(mutated).semanticContract.status = 'ratified';
 
     const validate = new Ajv2020({ strict: true }).compile(schema);
     expect(validate(mutated)).toBe(false);
-    await expect(verifyGsRegistryBindings(mutated)).rejects.toThrow(/cannot be ratified under registryVersion 1/u);
+    await expect(verifyGsRegistryBindings(mutated)).rejects.toThrow(/cannot be ratified under registryVersion 2/u);
   });
 
   it('requires the candidate evidence-boundary warning', async () => {

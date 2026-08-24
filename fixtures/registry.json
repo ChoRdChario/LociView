@@ -1,6 +1,6 @@
 {
   "$schema": "./registry.schema.json",
-  "registryVersion": 1,
+  "registryVersion": 2,
   "fixtures": [
     {
       "id": "smoke-cube-obj-v1",
@@ -12,8 +12,8 @@
       "geometry": { "triangleCount": 12, "ordinaryPointCount": 0, "splatCount": 0, "textureCount": 0, "bounds": { "min": [0, 0, 0], "max": [1, 1, 1] } },
       "coordinates": { "handedness": "unspecified", "upAxis": "unspecified", "unit": "source-unit" },
       "provenance": { "kind": "generated", "source": "scripts/gen-samples.mjs", "reproducibility": "pinned-output-only" },
-      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed" },
-      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable" },
+      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed", "licenseUrl": null, "licenseText": null, "attribution": null },
+      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable", "reviewStatus": "unreviewed" },
       "restore": { "method": "repository", "instructions": "Restore this path from the same Git revision as fixtures/registry.json." },
       "expected": { "classification": "mesh", "warnings": [] }
     },
@@ -27,8 +27,8 @@
       "geometry": { "triangleCount": 0, "ordinaryPointCount": 0, "splatCount": 0, "textureCount": 0, "bounds": { "min": [0, 0, 0], "max": [0, 0, 0] } },
       "coordinates": { "handedness": "unspecified", "upAxis": "unspecified", "unit": "not-applicable" },
       "provenance": { "kind": "authored", "source": "docs/specs/02-storage-package-migration.md", "reproducibility": "pinned-output-only" },
-      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed" },
-      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable" },
+      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed", "licenseUrl": null, "licenseText": null, "attribution": null },
+      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable", "reviewStatus": "unreviewed" },
       "restore": { "method": "repository", "instructions": "Restore the corpus and its README from the same Git revision as fixtures/registry.json." },
       "expected": { "classification": "evidence", "warnings": ["This corpus fixes accept/quarantine decisions only; canonical digest goldens are intentionally deferred."] }
     },
@@ -42,8 +42,8 @@
       "geometry": { "triangleCount": 12, "ordinaryPointCount": 0, "splatCount": 0, "textureCount": 0, "bounds": { "min": [0, 0, 0], "max": [1, 1, 1] } },
       "coordinates": { "handedness": "unspecified", "upAxis": "unspecified", "unit": "source-unit" },
       "provenance": { "kind": "generated", "source": "scripts/gen-samples.mjs", "reproducibility": "pinned-output-only" },
-      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed" },
-      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable" },
+      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed", "licenseUrl": null, "licenseText": null, "attribution": null },
+      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable", "reviewStatus": "unreviewed" },
       "restore": { "method": "repository", "instructions": "Restore this path from the same Git revision as fixtures/registry.json." },
       "expected": { "classification": "mesh", "warnings": [] }
     },
@@ -57,8 +57,8 @@
       "geometry": { "triangleCount": 0, "ordinaryPointCount": 20000, "splatCount": 0, "textureCount": 0, "bounds": { "min": [-1.3401, 0, -1.3701], "max": [1.3999, 2.4999, 1.3101] } },
       "coordinates": { "handedness": "unspecified", "upAxis": "unspecified", "unit": "source-unit" },
       "provenance": { "kind": "generated", "source": "scripts/gen-samples.mjs", "reproducibility": "pinned-output-only" },
-      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed" },
-      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable" },
+      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed", "licenseUrl": null, "licenseText": null, "attribution": null },
+      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable", "reviewStatus": "unreviewed" },
       "restore": { "method": "repository", "instructions": "Restore this path from the same Git revision as fixtures/registry.json." },
       "expected": { "classification": "ordinary-point-cloud", "warnings": ["This is ordinary PLY point data, not Gaussian Splatting data."] }
     },
@@ -72,8 +72,8 @@
       "geometry": { "triangleCount": 0, "ordinaryPointCount": 0, "splatCount": 8, "textureCount": 0, "bounds": { "min": [-1, -1, -1], "max": [1, 1, 1] } },
       "coordinates": { "handedness": "unspecified", "upAxis": "unspecified", "unit": "source-unit" },
       "provenance": { "kind": "generated", "source": "scripts/fixtures/generate-gs-profile-fixtures.mjs", "reproducibility": "byte-reproducible" },
-      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed" },
-      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable" },
+      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed", "licenseUrl": null, "licenseText": null, "attribution": null },
+      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable", "reviewStatus": "unreviewed" },
       "restore": { "method": "repository", "instructions": "Restore the PLY, source recipe, candidate specification, diagnostic oracle, and generator from the same Git revision." },
       "expected": {
         "classification": "gaussian-splat",
@@ -106,8 +106,8 @@
       "geometry": { "triangleCount": 1, "ordinaryPointCount": 0, "splatCount": 0, "textureCount": 0, "bounds": { "min": [0, 0, 0], "max": [1, 1, 0] } },
       "coordinates": { "handedness": "right", "upAxis": "+Y", "unit": "source-unit" },
       "provenance": { "kind": "generated", "source": "scripts/gen-samples.mjs", "reproducibility": "pinned-output-only" },
-      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed" },
-      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable" },
+      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed", "licenseUrl": null, "licenseText": null, "attribution": null },
+      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable", "reviewStatus": "unreviewed" },
       "restore": { "method": "repository", "instructions": "Restore this path from the same Git revision as fixtures/registry.json." },
       "expected": { "classification": "mesh", "warnings": [] }
     },
@@ -121,8 +121,8 @@
       "geometry": { "triangleCount": 1, "ordinaryPointCount": 0, "splatCount": 0, "textureCount": 2, "bounds": { "min": [0, 0, 0], "max": [1, 1, 0] } },
       "coordinates": { "handedness": "right", "upAxis": "+Y", "unit": "source-unit" },
       "provenance": { "kind": "generated", "source": "scripts/fixtures/generate-v1-migration-fixtures.mjs", "reproducibility": "byte-reproducible" },
-      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed" },
-      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable" },
+      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed", "licenseUrl": null, "licenseText": null, "attribution": null },
+      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable", "reviewStatus": "unreviewed" },
       "restore": { "method": "repository", "instructions": "Restore the package, source recipe, semantic oracle, and generator from the same Git revision." },
       "expected": { "classification": "package", "warnings": ["Synthetic characterization only; this is not an anonymized real-project fixture."] }
     },
@@ -136,8 +136,8 @@
       "geometry": { "triangleCount": 1, "ordinaryPointCount": 0, "splatCount": 0, "textureCount": 1, "bounds": { "min": [0, 0, 0], "max": [1, 1, 0] } },
       "coordinates": { "handedness": "right", "upAxis": "+Y", "unit": "source-unit" },
       "provenance": { "kind": "generated", "source": "scripts/fixtures/generate-v1-migration-fixtures.mjs", "reproducibility": "byte-reproducible" },
-      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed" },
-      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable" },
+      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed", "licenseUrl": null, "licenseText": null, "attribution": null },
+      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable", "reviewStatus": "unreviewed" },
       "restore": { "method": "repository", "instructions": "Restore the package, source recipe, semantic oracle, and generator from the same Git revision." },
       "expected": { "classification": "package", "warnings": ["Derived snapshot and CSV are deliberately stale; the operation log is authoritative."] }
     },
@@ -151,8 +151,8 @@
       "geometry": { "triangleCount": 1, "ordinaryPointCount": 0, "splatCount": 0, "textureCount": 1, "bounds": { "min": [0, 0, 0], "max": [1, 1, 0] } },
       "coordinates": { "handedness": "right", "upAxis": "+Y", "unit": "source-unit" },
       "provenance": { "kind": "generated", "source": "scripts/fixtures/generate-v1-migration-fixtures.mjs", "reproducibility": "byte-reproducible" },
-      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed" },
-      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable" },
+      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed", "licenseUrl": null, "licenseText": null, "attribution": null },
+      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable", "reviewStatus": "unreviewed" },
       "restore": { "method": "repository", "instructions": "Restore the package, source recipe, semantic oracle, and generator from the same Git revision." },
       "expected": { "classification": "package", "warnings": ["This branch is meaningful only with the base and branch-B fixtures from the same Git revision."] }
     },
@@ -166,8 +166,8 @@
       "geometry": { "triangleCount": 1, "ordinaryPointCount": 0, "splatCount": 0, "textureCount": 1, "bounds": { "min": [0, 0, 0], "max": [1, 1, 0] } },
       "coordinates": { "handedness": "right", "upAxis": "+Y", "unit": "source-unit" },
       "provenance": { "kind": "generated", "source": "scripts/fixtures/generate-v1-migration-fixtures.mjs", "reproducibility": "byte-reproducible" },
-      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed" },
-      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable" },
+      "license": { "spdx": "NOASSERTION", "reviewStatus": "unreviewed", "licenseUrl": null, "licenseText": null, "attribution": null },
+      "privacy": { "content": "synthetic", "personalData": false, "anonymization": "not-applicable", "reviewStatus": "unreviewed" },
       "restore": { "method": "repository", "instructions": "Restore the package, source recipe, semantic oracle, and generator from the same Git revision." },
       "expected": { "classification": "package", "warnings": ["This branch is meaningful only with the base and branch-A fixtures from the same Git revision."] }
     }

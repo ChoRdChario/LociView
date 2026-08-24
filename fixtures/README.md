@@ -10,9 +10,11 @@ does not imply that the complete G0 fixture set already exists.
 - `generated`: deterministic stress data written under `.artifacts/fixtures/`.
   A generator, seed, byte layout, restore command and expected digest are
   required before adoption.
-- `external`: large or redistribution-restricted evidence outside Git. An
-  immutable locator or reproducible acquisition procedure, SHA-256, provenance,
-  privacy review and license state are required. A hash alone is not a restore
+- `external`: large, redistribution-approved public fixture bytes outside Git.
+  Registry v2 requires the exact fixture-Release transport, SHA-256, provenance,
+  privacy/license review and restore contract. Redistribution-restricted or
+  operational evidence belongs in its separately controlled evidence store and
+  run manifest, not this public fixture registry. A hash alone is not a restore
   mechanism.
 
 Large GS files, device traces, videos and operational projects must not be
@@ -29,16 +31,48 @@ evidence must bind the exact asset locator, SHA-256, byte size, license and
 attribution, privacy review, retention expectation and restore instructions.
 Assets are versioned instead of overwritten in place.
 
-Registry v1 cannot yet bind the attribution record required for a redistributable
-CC-BY asset: including, when supplied or applicable, creator, title/credit line,
-copyright notice, source, license URL or durable license text, retained license/
-disclaimer notices and modification indication. Its `license` object stores only
-SPDX and review status. Before upload, an approved schema/evidence change must be
-able to record those attribution facts, and the exact local candidate hash,
-privacy/license review and Product Owner upload approval must be fixed. Upload
-first to a draft/non-adopted fixture Release; then fetch and hash the exact
-Release asset. It remains unadopted and earns no gate credit until that restore
-check succeeds and the immutable locator is registered.
+Registry v2 binds the attribution record required for redistributable content.
+An approved license records one of the explicitly supported SPDX identifiers
+(`CC-BY-4.0` or `CC0-1.0` in v2) and at least one exact terms binding: a
+canonical public HTTPS license URI and/or a tracked regular Git blob path plus
+SHA-256 of the retained license text. Adding another identifier requires a
+reviewed schema change instead of accepting arbitrary license-like text.
+Approved content also carries an explicit attribution object. Required keys may
+use `null` (or an empty creator/notice list) only to record that the reviewed
+upstream source did not supply that fact; omitting a key is not the same claim.
+`CC-BY-4.0` additionally requires at least one creator, a credit line, source
+URI, canonical license URI and modification notice.
+
+An external storage entry uses `storage.transport` to bind an exact public
+fixture-only GitHub Release asset URL, `github-release-asset` transport kind and
+the `versioned-no-overwrite` retention policy. Fixture Release tags use the
+`fixtures-v<integer>[.<integer>...]` namespace so they cannot be confused with a
+product release. Credential-bearing, query-bearing, fragmented, mutable
+landing-page or non-Release locators are not registry transport identities.
+Deleting or replacing bytes referenced by a registered digest invalidates that
+fixture and its dependent evidence and requires a separately reviewed Product
+Owner decision.
+It also requires `privacy.reviewStatus=approved`; this registry claim records
+the outcome but does not replace the independent review of the exact digest and
+source evidence required before upload/adoption. An anonymized derivative needs
+a substantive description of what was removed or reconstructed;
+`not-applicable`, `unknown` and similar sentinels are not an anonymization
+record.
+Upload first to a draft/non-adopted fixture Release; then fetch and hash the
+exact Release asset. It remains unadopted and earns no gate credit until that
+separate restore check succeeds and the immutable locator is registered.
+
+Normal registry and evidence verification stays offline. Git bindings must be
+exact stage-0 indexed regular blobs whose bytes equal the worktree candidate:
+`.git/**`, untracked/ignored/worktree-only files, symlinks and non-blob tree
+entries do not qualify. Complete-run evidence resolves the registry, license
+text and semantic bindings from the run's recorded evidence-source commit
+(`evidenceSource.gitCommit`) rather than its build commit or current worktree
+metadata. Verification deliberately reports
+external transport as awaiting the separate acquisition verifier. For
+external GS, the large transport can remain outside Git while the candidate
+specification and diagnostic oracle are distinct hashed Git files. Registration
+never ratifies a FormatProfile, renderer behavior or device evidence.
 
 Operational source data remains private unless the Product Owner separately
 approves the exact bytes for redistribution. In particular, the Ki84 LociMyu
