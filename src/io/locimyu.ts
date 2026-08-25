@@ -10,7 +10,7 @@
 // 重要な変換規則:
 //   - キャプションシート1枚 → 表示セット1つ（シート名=セット名）。docs/07 U-03の運用実態に基づく
 //   - __LM_VIEWS / __LM_MATERIALS の行は captionSheetGid / sheetGid で各セットへ割り当てる
-//   - captionId は旧idから決定的に生成（同じZIPを二度取り込んでもマージで重複しない）
+//   - captionId は承認済みrecipe 2でsheet/occurrenceを含めて決定的に生成する
 //   - imageFileId はオフラインで解決できないため未リンクとして保持（対応表CSVがあれば解決）
 
 import { ulid } from '../core/ids';
@@ -24,6 +24,11 @@ export const LM_MATERIALS_SHEET = '__LM_MATERIALS';
 export const LM_SHEET_NAMES_SHEET = '__LM_SHEET_NAMES';
 export const LM_META_SHEET = '__LM_META';
 const INTERNAL_SHEETS = new Set([LM_VIEWS_SHEET, LM_MATERIALS_SHEET, LM_SHEET_NAMES_SHEET, LM_META_SHEET]);
+export const LOCIMYU_CAPTION_ID_RECIPE = 'locimyu-caption-id-2' as const;
+export const LOCIMYU_SOURCE_RETENTION_NOTICE =
+  '元のLociMyu ZIPは別に保管してください。現在のLociView書き出しには、読み取れなかった元データを後から確認するための完全な原本は含まれず、元ZIPのバックアップにはなりません。';
+const LOCIMYU_CAPTION_ID_PREFIX = 'lociview:v1:locimyu-caption-id:2:jcs-v1\n';
+const CROCKFORD_BASE32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
 /** LociMyuが「そのシートで最後に見ていた視点」を記録する予約名 */
 export const LAST_VIEW_NAME = '__last';
@@ -39,6 +44,7 @@ export interface SheetTable {
 export interface LociMyuCaption {
   legacyId: string;
   captionId: string;
+  identity: LociMyuCaptionIdentityPlanV2;
   title: string;
   body: string;
   color: string;
@@ -46,6 +52,42 @@ export interface LociMyuCaption {
   legacyImageFileId: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface LociMyuCaptionIdentityKeyV2 {
+  legacyId: string;
+  occurrence: number;
+  sheetIdentity:
+    | { kind: 'legacyGid'; value: string }
+    | { kind: 'sheetName'; value: string };
+}
+
+export interface LociMyuCaptionIdentityPlanV2 {
+  recipeId: typeof LOCIMYU_CAPTION_ID_RECIPE;
+  key: LociMyuCaptionIdentityKeyV2;
+  preimage: string;
+  preimageBytes: Uint8Array;
+  fullDigest: Uint8Array;
+  captionId: string;
+}
+
+export type LociMyuSourceValidationCode =
+  | 'invalid-legacy-id'
+  | 'invalid-sheet-identity'
+  | 'non-unique-sheet-name'
+  | 'missing-legacy-id'
+  | 'duplicate-identity-key';
+
+/** A failure caused by one candidate workbook, safe for candidate fallback. */
+export class LociMyuSourceValidationError extends Error {
+  override readonly name = 'LociMyuSourceValidationError';
+
+  constructor(
+    readonly code: LociMyuSourceValidationCode,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 
 export interface LociMyuView {
@@ -94,64 +136,362 @@ export interface LociMyuMigration {
 
 // ---- ヘルパ --------------------------------------------------------------------
 
+function isLociMyuTrimCodeUnit(code: number): boolean {
+  return (
+    (code >= 0x0009 && code <= 0x000d) ||
+    code === 0x0020 ||
+    code === 0x00a0 ||
+    code === 0x1680 ||
+    (code >= 0x2000 && code <= 0x200a) ||
+    code === 0x2028 ||
+    code === 0x2029 ||
+    code === 0x202f ||
+    code === 0x205f ||
+    code === 0x3000 ||
+    code === 0xfeff
+  );
+}
+
+/** Approved, versioned edge trim used by every identity/source-authority field. */
+export function lociMyuTrimV1(value: string): string {
+  let start = 0;
+  let end = value.length;
+  while (start < end && isLociMyuTrimCodeUnit(value.charCodeAt(start))) start++;
+  while (end > start && isLociMyuTrimCodeUnit(value.charCodeAt(end - 1))) end--;
+  return start === 0 && end === value.length ? value : value.slice(start, end);
+}
+
 function cell(row: string[] | undefined, i: number): string {
-  return (row?.[i] ?? '').trim();
+  return lociMyuTrimV1(row?.[i] ?? '');
+}
+
+function isCompletelyEmptyRow(row: readonly string[] | undefined): boolean {
+  return row === undefined || row.every((value) => lociMyuTrimV1(value) === '');
+}
+
+function unicodeScalarLength(
+  value: string,
+  label: string,
+  errorCode: LociMyuSourceValidationCode,
+): number {
+  let length = 0;
+  for (let i = 0; i < value.length; i++) {
+    const codeUnit = value.charCodeAt(i);
+    if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
+      const low = value.charCodeAt(i + 1);
+      if (!(low >= 0xdc00 && low <= 0xdfff)) {
+        throw new LociMyuSourceValidationError(
+          errorCode,
+          `locimyu identity: ${label} contains a lone surrogate`,
+        );
+      }
+      i++;
+    } else if (codeUnit >= 0xdc00 && codeUnit <= 0xdfff) {
+      throw new LociMyuSourceValidationError(
+        errorCode,
+        `locimyu identity: ${label} contains a lone surrogate`,
+      );
+    }
+    length++;
+  }
+  return length;
+}
+
+function validateIdentityString(
+  value: string,
+  label: string,
+  maxScalars: number,
+  code: LociMyuSourceValidationCode,
+): void {
+  if (typeof value !== 'string' || value === '') {
+    throw new LociMyuSourceValidationError(code, `locimyu identity: ${label} is empty`);
+  }
+  if (lociMyuTrimV1(value) !== value) {
+    throw new LociMyuSourceValidationError(
+      code,
+      `locimyu identity: ${label} is not LociMyuTrimV1 canonical`,
+    );
+  }
+  if (unicodeScalarLength(value, label, code) > maxScalars) {
+    throw new LociMyuSourceValidationError(
+      code,
+      `locimyu identity: ${label} exceeds ${maxScalars} Unicode scalars`,
+    );
+  }
+}
+
+function restrictedLegacyJcsV1(key: LociMyuCaptionIdentityKeyV2): string {
+  validateIdentityString(key.legacyId, 'legacyId', 128, 'invalid-legacy-id');
+  if (!Number.isSafeInteger(key.occurrence) || key.occurrence < 0) {
+    throw new Error('locimyu identity: occurrence is outside the safe non-negative range');
+  }
+  if (key.sheetIdentity.kind !== 'legacyGid' && key.sheetIdentity.kind !== 'sheetName') {
+    throw new Error('locimyu identity: unknown sheet identity kind');
+  }
+  validateIdentityString(key.sheetIdentity.value, 'sheetIdentity.value', 256, 'invalid-sheet-identity');
+  return (
+    `{"legacyId":${JSON.stringify(key.legacyId)},` +
+    `"occurrence":${JSON.stringify(key.occurrence)},` +
+    `"sheetIdentity":{"kind":${JSON.stringify(key.sheetIdentity.kind)},` +
+    `"value":${JSON.stringify(key.sheetIdentity.value)}}}`
+  );
+}
+
+async function lociMyuSha256(bytes: Uint8Array): Promise<Uint8Array> {
+  const snapshot = new Uint8Array(bytes);
+  const digest = await crypto.subtle.digest('SHA-256', snapshot.buffer);
+  if (!(digest instanceof ArrayBuffer)) {
+    throw new Error('locimyu identity: SHA-256 provider returned a non-ArrayBuffer result');
+  }
+  return new Uint8Array(digest);
+}
+
+function digestHex(bytes: Uint8Array): string {
+  return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
+}
+
+function portableCaptionId(fullDigest: Uint8Array): string {
+  let value = 0n;
+  for (let i = 0; i < 16; i++) value = (value << 8n) | BigInt(fullDigest[i]!);
+  let suffix = '';
+  for (let i = 0; i < 26; i++) {
+    suffix = CROCKFORD_BASE32[Number(value & 31n)]! + suffix;
+    value >>= 5n;
+  }
+  return `cap_${suffix}`;
+}
+
+export async function planLociMyuCaptionIdentity(
+  key: LociMyuCaptionIdentityKeyV2,
+): Promise<LociMyuCaptionIdentityPlanV2> {
+  const keySnapshot: LociMyuCaptionIdentityKeyV2 = {
+    legacyId: key.legacyId,
+    occurrence: key.occurrence,
+    sheetIdentity: { ...key.sheetIdentity },
+  };
+  const canonicalKey = restrictedLegacyJcsV1(keySnapshot);
+  const preimage = `${LOCIMYU_CAPTION_ID_PREFIX}${canonicalKey}`;
+  const preimageBytes = new TextEncoder().encode(preimage);
+  const fullDigest = new Uint8Array(await lociMyuSha256(new Uint8Array(preimageBytes)));
+  if (fullDigest.length !== 32) {
+    throw new Error(`locimyu identity: SHA-256 provider returned ${fullDigest.length} bytes`);
+  }
+  const captionId = portableCaptionId(fullDigest);
+  if (!/^cap_[0-7][0-9A-HJKMNP-TV-Z]{25}$/.test(captionId)) {
+    throw new Error('locimyu identity: portable Caption ID postcondition failed');
+  }
+  return {
+    recipeId: LOCIMYU_CAPTION_ID_RECIPE,
+    key: keySnapshot,
+    preimage,
+    preimageBytes,
+    fullDigest,
+    captionId,
+  };
 }
 
 function num(v: string, fallback: number): number {
   // Number('') は 0 を返し isFinite も通るため、空欄は明示的に既定値へ倒す。
   // （実データのfov列が空欄で、fov=0 → 平行投影のfrustumが潰れる不具合があった）
-  if (v.trim() === '') return fallback;
+  if (lociMyuTrimV1(v) === '') return fallback;
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 }
 
 function normHex(v: string): string | null {
-  const s = v.trim();
+  const s = lociMyuTrimV1(v);
   return /^#[0-9a-fA-F]{6}$/.test(s) ? s.toLowerCase() : null;
 }
 
 function truthy(v: string): boolean {
-  const s = v.trim().toLowerCase();
+  const s = lociMyuTrimV1(v).toLowerCase();
   return s === 'true' || s === '1' || s === 'yes';
-}
-
-/** 旧id → LociView captionId（決定的。同一ZIPの再取込で重複しない） */
-export function legacyCaptionId(legacyId: string): string {
-  // 旧idは 'c_xxxxxxxx' 形式。ULID風の固定長へ決定的にマップする
-  let h1 = 0x811c9dc5;
-  let h2 = 0x01000193;
-  for (let i = 0; i < legacyId.length; i++) {
-    const c = legacyId.charCodeAt(i);
-    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
-    h2 = Math.imul(h2 + c, 0x85ebca6b) >>> 0;
-  }
-  const B32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
-  let out = '';
-  let a = h1;
-  let b = h2;
-  for (let i = 0; i < 13; i++) {
-    out += B32[a % 32];
-    a = Math.floor(a / 32) + (i === 6 ? b : 0);
-  }
-  for (let i = 0; i < 13; i++) {
-    out += B32[b % 32];
-    b = Math.floor(b / 32) + 7;
-  }
-  return `cap_LM${out.slice(0, 24)}`;
 }
 
 /** ヘッダ行がLociMyuキャプションシートかを判定する */
 export function isLociMyuCaptionSheet(rows: string[][]): boolean {
-  const header = (rows[0] ?? []).map((h) => h.trim().toLowerCase());
+  const header = (rows[0] ?? []).map((h) => lociMyuTrimV1(h).toLowerCase());
   if (header.length < 7) return false;
   const expect = LOCIMYU_CAPTION_HEADER.slice(0, 7).map((h) => h.toLowerCase());
   return expect.every((h, i) => header[i] === h);
 }
 
+/** Exact candidate-row count: reserved sheets and completely empty rows do not count. */
+export function countLociMyuCaptionSourceRows(tables: readonly SheetTable[]): number {
+  let count = 0;
+  for (const table of tables) {
+    if (INTERNAL_SHEETS.has(lociMyuTrimV1(table.name)) || !isLociMyuCaptionSheet(table.rows)) continue;
+    for (const row of table.rows.slice(1)) {
+      if (!isCompletelyEmptyRow(row)) count++;
+    }
+  }
+  return count;
+}
+
 // ---- 本体 ----------------------------------------------------------------------
 
-export function analyzeLociMyuSheets(tables: readonly SheetTable[]): LociMyuMigration {
+export type LociMyuCaptionSheetIdentity = LociMyuCaptionIdentityKeyV2['sheetIdentity'];
+
+/**
+ * Pure, order-independent __LM_SHEET_NAMES authority projection used by ID
+ * planning. View/material activation intentionally keeps its historical path
+ * until the reviewed deferred-review destination exists.
+ */
+export function projectLociMyuCaptionSheetIdentities(
+  tables: readonly SheetTable[],
+): Map<SheetTable, LociMyuCaptionSheetIdentity> {
+  const captionTables = tables.filter((table) =>
+    !INTERNAL_SHEETS.has(lociMyuTrimV1(table.name)) && isLociMyuCaptionSheet(table.rows),
+  );
+  const captionTablesByName = new Map<string, SheetTable[]>();
+  for (const table of captionTables) {
+    const name = lociMyuTrimV1(table.name);
+    const matches = captionTablesByName.get(name) ?? [];
+    matches.push(table);
+    captionTablesByName.set(name, matches);
+  }
+  for (const [name, matches] of captionTablesByName) {
+    if (matches.length > 1) {
+      throw new LociMyuSourceValidationError(
+        'non-unique-sheet-name',
+        'LOCIMYU_ID_NON_UNIQUE_SHEET_NAME',
+      );
+    }
+  }
+
+  const titlesByGid = new Map<string, Set<string>>();
+  const gidsByTitle = new Map<string, Set<string>>();
+  const taintedGids = new Set<string>();
+  const taintedTitles = new Set<string>();
+  for (const table of tables) {
+    if (lociMyuTrimV1(table.name) !== LM_SHEET_NAMES_SHEET) continue;
+    for (const row of table.rows.slice(1)) {
+      if (isCompletelyEmptyRow(row)) continue;
+      const gid = cell(row, 0);
+      const sheetTitle = cell(row, 2);
+      const title = sheetTitle !== '' ? sheetTitle : cell(row, 1);
+      if (gid === '' || title === '') {
+        if (gid !== '') taintedGids.add(gid);
+        if (title !== '') taintedTitles.add(title);
+        continue;
+      }
+      const titles = titlesByGid.get(gid) ?? new Set<string>();
+      titles.add(title);
+      titlesByGid.set(gid, titles);
+      const gids = gidsByTitle.get(title) ?? new Set<string>();
+      gids.add(gid);
+      gidsByTitle.set(title, gids);
+    }
+  }
+
+  const projection = new Map<SheetTable, LociMyuCaptionSheetIdentity>();
+  for (const table of captionTables) {
+    const name = lociMyuTrimV1(table.name);
+    const candidateGids = gidsByTitle.get(name);
+    const candidateGid = candidateGids?.size === 1 ? [...candidateGids][0]! : null;
+    const reverseTitles = candidateGid === null ? undefined : titlesByGid.get(candidateGid);
+    const authoritative =
+      candidateGid !== null &&
+      !taintedTitles.has(name) &&
+      !taintedGids.has(candidateGid) &&
+      reverseTitles?.size === 1 &&
+      reverseTitles.has(name);
+    const identity: LociMyuCaptionSheetIdentity = authoritative
+      ? { kind: 'legacyGid', value: candidateGid }
+      : { kind: 'sheetName', value: name };
+    validateIdentityString(identity.value, 'sheetIdentity.value', 256, 'invalid-sheet-identity');
+    projection.set(table, identity);
+  }
+  return projection;
+}
+
+function preflightLociMyuCaptionIdentityKeys(
+  tables: readonly SheetTable[],
+  projection: ReadonlyMap<SheetTable, LociMyuCaptionSheetIdentity>,
+): void {
+  const canonicalKeys = new Set<string>();
+  for (const table of tables) {
+    const name = lociMyuTrimV1(table.name);
+    if (INTERNAL_SHEETS.has(name) || !isLociMyuCaptionSheet(table.rows)) continue;
+    const sheetIdentity = projection.get(table);
+    if (sheetIdentity === undefined) throw new Error('LOCIMYU_ID_MISSING_SHEET_PROJECTION');
+    const occurrenceByLegacyId = new Map<string, number>();
+    for (let r = 1; r < table.rows.length; r++) {
+      const row = table.rows[r];
+      if (isCompletelyEmptyRow(row)) continue;
+      const legacyId = cell(row, 0);
+      if (legacyId === '') {
+        throw new LociMyuSourceValidationError(
+          'missing-legacy-id',
+          `LOCIMYU_ID_MISSING_LEGACY_ID:${r + 1}`,
+        );
+      }
+      const occurrence = occurrenceByLegacyId.get(legacyId) ?? 0;
+      occurrenceByLegacyId.set(legacyId, occurrence + 1);
+      const canonicalKey = restrictedLegacyJcsV1({
+        legacyId,
+        occurrence,
+        sheetIdentity: { ...sheetIdentity },
+      });
+      if (canonicalKeys.has(canonicalKey)) {
+        throw new LociMyuSourceValidationError(
+          'duplicate-identity-key',
+          'locimyu identity: duplicate canonical identity key',
+        );
+      }
+      canonicalKeys.add(canonicalKey);
+    }
+  }
+}
+
+interface LociMyuIdentityRegistry {
+  readonly preimages: Set<string>;
+  readonly fullDigestOwners: Map<string, string>;
+  readonly portableOwners: Map<string, string>;
+}
+
+function newIdentityRegistry(): LociMyuIdentityRegistry {
+  return {
+    preimages: new Set(),
+    fullDigestOwners: new Map(),
+    portableOwners: new Map(),
+  };
+}
+
+function registerIdentityPlan(
+  identity: LociMyuCaptionIdentityPlanV2,
+  registry: LociMyuIdentityRegistry,
+): void {
+  if (registry.preimages.has(identity.preimage)) {
+    throw new LociMyuSourceValidationError(
+      'duplicate-identity-key',
+      'locimyu identity: duplicate canonical identity key',
+    );
+  }
+  const fullDigest = digestHex(identity.fullDigest);
+  const fullOwner = registry.fullDigestOwners.get(fullDigest);
+  if (fullOwner !== undefined && fullOwner !== identity.preimage) {
+    throw new Error('locimyu identity: full SHA-256 collision');
+  }
+  const portableOwner = registry.portableOwners.get(identity.captionId);
+  if (portableOwner !== undefined && portableOwner !== identity.preimage) {
+    throw new Error('locimyu identity: truncated Caption ID collision');
+  }
+  registry.preimages.add(identity.preimage);
+  registry.fullDigestOwners.set(fullDigest, identity.preimage);
+  registry.portableOwners.set(identity.captionId, identity.preimage);
+}
+
+export async function analyzeLociMyuSheets(
+  inputTables: readonly SheetTable[],
+): Promise<LociMyuMigration> {
+  // Every caller-owned source value is captured before the first await. This
+  // prevents a delayed digest from mixing rows from different source states.
+  const tables: SheetTable[] = inputTables.map((table) => ({
+    name: table.name,
+    ...(table.gid === undefined ? {} : { gid: table.gid }),
+    rows: table.rows.map((row) => [...row]),
+  }));
   const result: LociMyuMigration = {
     sets: [],
     views: [],
@@ -161,9 +501,12 @@ export function analyzeLociMyuSheets(tables: readonly SheetTable[]): LociMyuMigr
     gidMappingIsGuess: false,
     warnings: [],
   };
+  const captionSheetIdentities = projectLociMyuCaptionSheetIdentities(tables);
+  preflightLociMyuCaptionIdentityKeys(tables, captionSheetIdentities);
+  const identityRegistry = newIdentityRegistry();
 
   for (const table of tables) {
-    const name = table.name.trim();
+    const name = lociMyuTrimV1(table.name);
     const gid = table.gid ?? String(table.rows.length); // gid不明時は識別子を仮置き
 
     if (name === LM_VIEWS_SHEET) {
@@ -183,10 +526,29 @@ export function analyzeLociMyuSheets(tables: readonly SheetTable[]): LociMyuMigr
     }
 
     const captions: LociMyuCaption[] = [];
+    const occurrenceByLegacyId = new Map<string, number>();
+    const sheetIdentity = captionSheetIdentities.get(table);
+    if (sheetIdentity === undefined) {
+      throw new Error('LOCIMYU_ID_MISSING_SHEET_PROJECTION');
+    }
     for (let r = 1; r < table.rows.length; r++) {
       const row = table.rows[r];
+      if (isCompletelyEmptyRow(row)) continue;
       const legacyId = cell(row, 0);
-      if (legacyId === '') continue; // ソフト削除された空行
+      if (legacyId === '') {
+        throw new LociMyuSourceValidationError(
+          'missing-legacy-id',
+          `LOCIMYU_ID_MISSING_LEGACY_ID:${r + 1}`,
+        );
+      }
+      const occurrence = occurrenceByLegacyId.get(legacyId) ?? 0;
+      occurrenceByLegacyId.set(legacyId, occurrence + 1);
+      const identity = await planLociMyuCaptionIdentity({
+        legacyId,
+        occurrence,
+        sheetIdentity: { ...sheetIdentity },
+      });
+      registerIdentityPlan(identity, identityRegistry);
 
       const px = cell(row, 4);
       const py = cell(row, 5);
@@ -203,7 +565,7 @@ export function analyzeLociMyuSheets(tables: readonly SheetTable[]): LociMyuMigr
         }
       }
 
-      const captionId = legacyCaptionId(legacyId);
+      const captionId = identity.captionId;
       const imageFileId = cell(row, 7);
       if (imageFileId !== '') {
         const list = result.unlinkedImages.get(imageFileId) ?? [];
@@ -214,6 +576,7 @@ export function analyzeLociMyuSheets(tables: readonly SheetTable[]): LociMyuMigr
       captions.push({
         legacyId,
         captionId,
+        identity,
         title: cell(row, 1),
         body: cell(row, 2),
         color: normHex(cell(row, 3)) ?? '#eab308',
@@ -261,7 +624,7 @@ function resolveLegacyGids(tables: readonly SheetTable[], result: LociMyuMigrati
   // 1) 対応表による確定
   const nameByGid = new Map<string, string>();
   for (const table of tables) {
-    if (table.name.trim() !== LM_SHEET_NAMES_SHEET) continue;
+    if (lociMyuTrimV1(table.name) !== LM_SHEET_NAMES_SHEET) continue;
     for (const row of table.rows.slice(1)) {
       const gid = cell(row, 0);
       // sheetTitle（実シート名）を優先、無ければdisplayName
@@ -357,8 +720,8 @@ function parseMaterials(table: SheetTable, result: LociMyuMigration): void {
 export function parseFileIdMap(csvRows: readonly string[][]): Map<string, string> {
   const map = new Map<string, string>();
   for (const row of csvRows) {
-    const a = (row[0] ?? '').trim();
-    const b = (row[1] ?? '').trim();
+    const a = lociMyuTrimV1(row[0] ?? '');
+    const b = lociMyuTrimV1(row[1] ?? '');
     if (a === '' || b === '') continue;
     if (a.toLowerCase() === 'fileid' || a.toLowerCase() === 'id') continue; // ヘッダ
     map.set(a, b);

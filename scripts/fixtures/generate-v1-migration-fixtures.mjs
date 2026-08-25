@@ -15,6 +15,7 @@ configure({ useWebWorkers: false });
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const sourcePath = 'fixtures/v1-migration/source.v1.json';
 const expectedPath = 'fixtures/v1-migration/expected.v1.json';
+const captionIdentityExpectedPath = 'fixtures/v1-migration/expected.locimyu-caption-id-2.json';
 export const CANONICAL_V1_MIGRATION_OUTPUTS = Object.freeze([
   'fixtures/v1-migration/locimyu-drive-exact-v1.zip',
   'fixtures/v1-migration/native-v1-base.lociview',
@@ -47,6 +48,87 @@ function fail(message) {
 
 function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
+}
+
+function exactObject(value, keys, label) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) fail(`${label} must be an object`);
+  const actual = Object.keys(value).sort();
+  const expected = [...keys].sort();
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) fail(`${label} has extra or missing members`);
+  return value;
+}
+
+function isLociMyuTrimCodeUnit(code) {
+  return (
+    (code >= 0x0009 && code <= 0x000d) ||
+    code === 0x0020 ||
+    code === 0x00a0 ||
+    code === 0x1680 ||
+    (code >= 0x2000 && code <= 0x200a) ||
+    code === 0x2028 ||
+    code === 0x2029 ||
+    code === 0x202f ||
+    code === 0x205f ||
+    code === 0x3000 ||
+    code === 0xfeff
+  );
+}
+
+function lociMyuTrimV1(value) {
+  let start = 0;
+  let end = value.length;
+  while (start < end && isLociMyuTrimCodeUnit(value.charCodeAt(start))) start++;
+  while (end > start && isLociMyuTrimCodeUnit(value.charCodeAt(end - 1))) end--;
+  return start === 0 && end === value.length ? value : value.slice(start, end);
+}
+
+function exactCaptionIdentityString(value, maxScalars, label) {
+  if (typeof value !== 'string' || value === '' || lociMyuTrimV1(value) !== value) {
+    fail(`${label} is not an exact non-empty LociMyuTrimV1 string`);
+  }
+  let scalarLength = 0;
+  for (let index = 0; index < value.length; index++) {
+    const codeUnit = value.charCodeAt(index);
+    if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
+      const low = value.charCodeAt(index + 1);
+      if (!(low >= 0xdc00 && low <= 0xdfff)) fail(`${label} contains a lone surrogate`);
+      index++;
+    } else if (codeUnit >= 0xdc00 && codeUnit <= 0xdfff) {
+      fail(`${label} contains a lone surrogate`);
+    }
+    scalarLength++;
+  }
+  if (scalarLength > maxScalars) fail(`${label} exceeds ${maxScalars} Unicode scalars`);
+  return value;
+}
+
+function restrictedCaptionIdentityJcs(key, label) {
+  exactObject(key, ['legacyId', 'occurrence', 'sheetIdentity'], label);
+  exactObject(key.sheetIdentity, ['kind', 'value'], `${label}.sheetIdentity`);
+  exactCaptionIdentityString(key.legacyId, 128, `${label}.legacyId`);
+  if (!Number.isSafeInteger(key.occurrence) || key.occurrence < 0) fail(`${label}.occurrence is invalid`);
+  if (key.sheetIdentity.kind !== 'legacyGid' && key.sheetIdentity.kind !== 'sheetName') fail(`${label}.sheetIdentity.kind is invalid`);
+  exactCaptionIdentityString(key.sheetIdentity.value, 256, `${label}.sheetIdentity.value`);
+  return (
+    `{"legacyId":${JSON.stringify(key.legacyId)},` +
+    `"occurrence":${JSON.stringify(key.occurrence)},` +
+    `"sheetIdentity":{"kind":${JSON.stringify(key.sheetIdentity.kind)},` +
+    `"value":${JSON.stringify(key.sheetIdentity.value)}}}`
+  );
+}
+
+function portableCaptionIdFromDigestHex(fullDigest, label) {
+  if (typeof fullDigest !== 'string' || !/^[0-9a-f]{64}$/u.test(fullDigest)) fail(`${label} is not a SHA-256 hex digest`);
+  const bytes = Buffer.from(fullDigest, 'hex');
+  let value = 0n;
+  for (let index = 0; index < 16; index++) value = (value << 8n) | BigInt(bytes[index]);
+  const alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+  let suffix = '';
+  for (let index = 0; index < 26; index++) {
+    suffix = alphabet[Number(value & 31n)] + suffix;
+    value >>= 5n;
+  }
+  return `cap_${suffix}`;
 }
 
 function equalBytes(a, b) {
@@ -296,6 +378,18 @@ async function zipInventory(bytes) {
   }
 }
 
+async function exactZipEntryBytes(bytes, expectedPath, label) {
+  const reader = new ZipReader(new Uint8ArrayReader(bytes));
+  try {
+    const matches = (await reader.getEntries()).filter((entry) => !entry.directory && entry.filename === expectedPath);
+    if (matches.length !== 1) fail(`${label} must contain exactly one ${expectedPath}`);
+    const data = await matches[0].getData(new Uint8ArrayWriter());
+    return data;
+  } finally {
+    await reader.close().catch(() => {});
+  }
+}
+
 async function buildArtifacts(source) {
   if (source.$schema !== 'lociview.synthetic-v1-migration-source' || source.version !== 1) fail('source identity is invalid');
   if (!projectRe.test(source.native.manifest.projectId)) fail('native manifest projectId is noncanonical');
@@ -382,6 +476,91 @@ async function validateExpected(expected, source, built) {
   if (JSON.stringify(actualArtifacts) !== JSON.stringify(expected.transport.artifacts)) fail('expected transport inventory is stale');
 }
 
+async function validateCaptionIdentityExpected(identityExpected, historicalExpected, source, built) {
+  exactObject(
+    identityExpected,
+    ['$schema', 'version', 'recipeId', 'preimagePrefix', 'source', 'vectors', 'fixtureCaptions'],
+    'caption identity expected',
+  );
+  if (
+    identityExpected.$schema !== 'lociview.synthetic-locimyu-caption-id-expected' ||
+    identityExpected.version !== 1 ||
+    identityExpected.recipeId !== 'locimyu-caption-id-2' ||
+    identityExpected.preimagePrefix !== 'lociview:v1:locimyu-caption-id:2:jcs-v1\n'
+  ) fail('caption identity expected identity is invalid');
+
+  const sourceBinding = exactObject(
+    identityExpected.source,
+    ['transportPath', 'transportSha256', 'selectedWorkbookPath', 'selectedWorkbookSha256'],
+    'caption identity expected.source',
+  );
+  if (sourceBinding.transportPath !== source.locimyu.output) fail('caption identity transport path differs from source');
+  if (sourceBinding.selectedWorkbookPath !== source.locimyu.primary.path) fail('caption identity workbook path differs from source');
+  const transport = built.artifacts.get(sourceBinding.transportPath);
+  if (transport === undefined || sha256(transport) !== sourceBinding.transportSha256) fail('caption identity transport hash is stale');
+  const workbook = await exactZipEntryBytes(
+    transport,
+    sourceBinding.selectedWorkbookPath,
+    'caption identity transport',
+  );
+  if (sha256(workbook) !== sourceBinding.selectedWorkbookSha256) fail('caption identity workbook hash is stale');
+
+  if (!Array.isArray(identityExpected.vectors) || identityExpected.vectors.length !== 6) fail('caption identity expected must contain six vectors');
+  const expectedVectorIds = [
+    'synthetic-a',
+    'synthetic-b',
+    'duplicate-a-0',
+    'duplicate-a-1',
+    'duplicate-b-0',
+    'unicode',
+  ];
+  const vectorIds = [];
+  const vectorsById = new Map();
+  const preimages = new Set();
+  const captionIds = new Set();
+  for (const [index, vector] of identityExpected.vectors.entries()) {
+    const label = `caption identity expected.vectors[${index}]`;
+    exactObject(vector, ['vectorId', 'identityKey', 'fullDigest', 'captionId'], label);
+    if (typeof vector.vectorId !== 'string' || vectorsById.has(vector.vectorId)) fail(`${label}.vectorId is invalid or duplicated`);
+    const canonicalKey = restrictedCaptionIdentityJcs(vector.identityKey, `${label}.identityKey`);
+    const preimage = `${identityExpected.preimagePrefix}${canonicalKey}`;
+    const actualDigest = sha256(encoder.encode(preimage));
+    if (vector.fullDigest !== actualDigest) fail(`${label}.fullDigest does not match its exact preimage`);
+    if (vector.captionId !== portableCaptionIdFromDigestHex(actualDigest, `${label}.fullDigest`)) fail(`${label}.captionId does not match its digest`);
+    if (!/^cap_[0-7][0-9A-HJKMNP-TV-Z]{25}$/u.test(vector.captionId)) fail(`${label}.captionId is noncanonical`);
+    if (preimages.has(preimage) || captionIds.has(vector.captionId)) fail(`${label} duplicates another vector identity`);
+    preimages.add(preimage);
+    captionIds.add(vector.captionId);
+    vectorIds.push(vector.vectorId);
+    vectorsById.set(vector.vectorId, vector);
+  }
+  if (JSON.stringify(vectorIds) !== JSON.stringify(expectedVectorIds)) fail('caption identity vector IDs/order are invalid');
+
+  if (!Array.isArray(identityExpected.fixtureCaptions) || identityExpected.fixtureCaptions.length !== 2) {
+    fail('caption identity expected must bind exactly two historical fixture captions');
+  }
+  const boundHistoricalIds = new Set();
+  for (const [index, binding] of identityExpected.fixtureCaptions.entries()) {
+    const label = `caption identity expected.fixtureCaptions[${index}]`;
+    exactObject(binding, ['setName', 'historicalCaptionId', 'vectorId'], label);
+    if (typeof binding.setName !== 'string' || binding.setName === '') fail(`${label}.setName is invalid`);
+    if (!/^cap_LM[0-9A-HJKMNP-TV-Z]{24}$/u.test(binding.historicalCaptionId)) fail(`${label}.historicalCaptionId is invalid`);
+    if (!vectorsById.has(binding.vectorId)) fail(`${label}.vectorId is unknown`);
+    if (boundHistoricalIds.has(binding.historicalCaptionId)) fail(`${label}.historicalCaptionId is duplicated`);
+    const historicalSet = historicalExpected.locimyu.sets.find((candidate) => candidate.name === binding.setName);
+    if (!historicalSet?.captions.some((caption) => caption.captionId === binding.historicalCaptionId)) {
+      fail(`${label} does not match the historical expected oracle`);
+    }
+    boundHistoricalIds.add(binding.historicalCaptionId);
+  }
+  const historicalIds = historicalExpected.locimyu.sets
+    .flatMap((set) => set.captions.map((caption) => caption.captionId))
+    .sort();
+  if (JSON.stringify([...boundHistoricalIds].sort()) !== JSON.stringify(historicalIds)) {
+    fail('caption identity fixture bindings do not cover the historical Caption IDs exactly');
+  }
+}
+
 export async function verifyV1MigrationFixtures({ write = false } = {}) {
   const source = JSON.parse(decoder.decode(await readRepositoryRegularFile(sourcePath, 'source.v1.json')));
   validateCanonicalOutputPaths(source);
@@ -409,11 +588,19 @@ export async function verifyV1MigrationFixtures({ write = false } = {}) {
   }
   let expected;
   try { expected = JSON.parse(decoder.decode(await readRepositoryRegularFile(expectedPath, 'expected.v1.json'))); } catch (error) {
-    if (!write) fail(`expected.v1.json is missing or invalid: ${error instanceof Error ? error.message : String(error)}`);
-    return { source, ...first };
+    fail(`expected.v1.json is missing or invalid: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  let captionIdentityExpected;
+  try {
+    captionIdentityExpected = JSON.parse(decoder.decode(
+      await readRepositoryRegularFile(captionIdentityExpectedPath, 'expected.locimyu-caption-id-2.json'),
+    ));
+  } catch (error) {
+    fail(`expected.locimyu-caption-id-2.json is missing or invalid: ${error instanceof Error ? error.message : String(error)}`);
   }
   await validateExpected(expected, source, first);
-  return { source, expected, ...first };
+  await validateCaptionIdentityExpected(captionIdentityExpected, expected, source, first);
+  return { source, expected, captionIdentityExpected, ...first };
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

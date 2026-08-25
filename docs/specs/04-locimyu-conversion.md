@@ -62,6 +62,30 @@ silently dropping a row that needs the missing review destination.
   preserved, a deterministic identity collision is detected, the container
   cannot be read safely, or a verified write/publication invariant fails.
 
+For the identity-only transition, default workbook selection is deterministic
+and uses the same decoded snapshots that identity analysis uses. Candidates
+recognized as LociMyu precede unrelated tables; candidates with at least one
+admitted non-empty Caption precede recognized-but-empty candidates; then a
+non-backup filename, greater admitted Caption count and original archive order
+break ties, in that order. Reserved internal sheets and completely empty rows
+never contribute to this count. A candidate-local source validation failure
+(invalid/missing identity input, non-unique fallback sheet name or duplicate
+canonical key) may be reported and skipped in favor of the next candidate.
+WebCrypto/provider failure, invalid digest output, identity postcondition or
+internal-invariant failure, and full/truncated digest collision abort planning;
+they MUST NOT be downgraded to a bad workbook or bypassed by a generic table.
+
+Archive/container warnings, current-workbook warnings and the current selection
+notice are distinct UI state. Changing the selected workbook replaces the latter
+two as a unit; a candidate-local validation failure leaves the prior selection
+and any user-entered media links intact while reporting that candidate's
+failure. A fatal provider, collision or invariant failure invalidates that
+wizard plan: confirmation and further source selection stay disabled until the
+user cancels and rebuilds the plan. The current
+selection and current-workbook diagnostic group remain visible independently of
+bounded archive/rejected-candidate diagnostics; bounded groups report the number
+of additional items instead of silently hiding the whole group.
+
 ## 3. Canonical Caption identity
 
 ### 3.1 Identity key
@@ -318,6 +342,11 @@ gate and its acceptance pass.
   map row, zero/one/many media entry and reverse filename-to-file-ID conflict
   produces the section-4 outcome with no row-order, ordinal, first-set,
   first-file or fuzzy winner.
+- `LM-AUTH-02`: multiple workbook candidates use the transition ordering above;
+  only typed candidate-local source validation may fall through to an alternate.
+  Provider/internal/collision failures remain fatal, and a successful or failed
+  manual switch leaves diagnostics, selected preview and manual media links
+  consistent with the current workbook.
 
 The exact `LM-REV-*` acceptance set is specification-blocked by section 5 and
 must be added in the same reviewed amendment as the local wire/capability

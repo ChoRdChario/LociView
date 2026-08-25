@@ -5,6 +5,7 @@ import { exportOpsOnlyZip, exportProjectZip, inspectZip, mergeFromInspection } f
 import { addModelAsset } from '../../assets/modelAsset';
 import { detectFormat } from '../../viewer/loaders';
 import { applyCsvPlan, buildCaptionsCsv, planCaptionsCsvImport } from '../../io/csv';
+import { LOCIMYU_SOURCE_RETENTION_NOTICE } from '../../io/locimyu';
 import { el, downloadBlob, fmtBytes } from '../dom';
 import type { AppContext } from '../context';
 import { csvPlanDialog, infoDialog, mergeReportDialog } from '../dialogs';
@@ -14,6 +15,15 @@ import type { PackageExportStatus } from '../saveStatus';
 export interface DataTabDeps {
   loadModelAsset: (assetId: string) => Promise<void>;
   setPackageExportStatus: (status: PackageExportStatus) => void;
+}
+
+export function packageExportCompletionMessage(
+  kind: 'full' | 'diff',
+  byteLength: number,
+): string {
+  return `${fmtBytes(byteLength)} のダウンロードを開始しました（ブラウザでの保存完了は未確認です）。${kind === 'diff'
+    ? '（opsのみの軽量差分。相手がモデル・画像を持っている場合の受け渡し用）'
+    : `LociMyuから取り込んだプロジェクトの場合: ${LOCIMYU_SOURCE_RETENTION_NOTICE}`}`;
 }
 
 export function mountDataTab(container: HTMLElement, ctx: AppContext, deps: DataTabDeps): () => void {
@@ -128,7 +138,7 @@ export function mountDataTab(container: HTMLElement, ctx: AppContext, deps: Data
       );
       await infoDialog(
         'ダウンロード開始',
-        `${fmtBytes(bytes.length)} のダウンロードを開始しました（ブラウザでの保存完了は未確認です）。${kind === 'diff' ? '（opsのみの軽量差分。相手がモデル・画像を持っている場合の受け渡し用）' : ''}`,
+        packageExportCompletionMessage(kind, bytes.length),
       );
     } catch (error) {
       await infoDialog('書き出し失敗', error instanceof Error ? error.message : String(error));

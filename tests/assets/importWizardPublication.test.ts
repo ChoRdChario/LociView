@@ -133,6 +133,12 @@ function freshPlan(): ImportPlan {
     selectedSourceIndex: 0,
     migration: null,
     fileIdMap: new Map(),
+    diagnostics: {
+      archive: [],
+      rejectedCandidates: [],
+      selection: null,
+      selectedSource: [],
+    },
     warnings: [],
   };
 }
@@ -146,6 +152,10 @@ function planShapeIsExact(plan: ImportPlan): boolean {
     plan.selectedSourceIndex === 0 &&
     plan.migration === null &&
     plan.fileIdMap.size === 0 &&
+    plan.diagnostics.archive.length === 0 &&
+    plan.diagnostics.rejectedCandidates.length === 0 &&
+    plan.diagnostics.selection === null &&
+    plan.diagnostics.selectedSource.length === 0 &&
     plan.warnings.length === 0 &&
     plan.models[0]?.path === `source/${MODEL_NAME}` &&
     plan.models[0]?.name === MODEL_NAME &&

@@ -1,13 +1,55 @@
 // インポートウィザードUI（FR-02）
 // Drive フォルダZIP を投入したときに、中身の確認・プロジェクト名・画像手動リンクを行う。
 
-import { selectSource, type ImportPlan } from '../assets/importWizard';
-import { summarizeMigration } from '../io/locimyu';
+import {
+  IMPORT_DIAGNOSTIC_DISPLAY_LIMIT,
+  type ImportPlan,
+} from '../assets/importWizard';
+import { LOCIMYU_SOURCE_RETENTION_NOTICE, summarizeMigration } from '../io/locimyu';
 import { el, clear, fmtBytes } from './dom';
+import {
+  ImportSourceSelectionController,
+  type ImportSourceSelectionOutcome,
+} from './importSourceSelection';
 
 export interface ImportWizardResult {
   projectName: string;
   imageLinks: Map<string, string>;
+}
+
+export function importWizardRetentionNotice(plan: Pick<ImportPlan, 'migration'>): string | null {
+  return plan.migration === null ? null : `⚠ ${LOCIMYU_SOURCE_RETENTION_NOTICE}`;
+}
+
+export function shouldRebuildImportLinks(outcome: ImportSourceSelectionOutcome): boolean {
+  return outcome.kind === 'selected';
+}
+
+export interface ImportWizardVisibleDiagnostics {
+  selection: string | null;
+  currentSource: string[];
+  omittedCurrentSource: number;
+  background: string[];
+  omittedBackground: number;
+}
+
+/** Keep current-source facts visible even when the archive has many rejected candidates. */
+export function importWizardVisibleDiagnostics(
+  plan: Pick<ImportPlan, 'diagnostics'>,
+  limitPerGroup = IMPORT_DIAGNOSTIC_DISPLAY_LIMIT,
+): ImportWizardVisibleDiagnostics {
+  const currentSource = plan.diagnostics.selectedSource.slice(0, limitPerGroup);
+  const allBackground = [
+    ...plan.diagnostics.archive,
+    ...plan.diagnostics.rejectedCandidates,
+  ];
+  return {
+    selection: plan.diagnostics.selection,
+    currentSource,
+    omittedCurrentSource: plan.diagnostics.selectedSource.length - currentSource.length,
+    background: allBackground.slice(0, limitPerGroup),
+    omittedBackground: Math.max(0, allBackground.length - limitPerGroup),
+  };
 }
 
 /** キャプション → 画像ファイル名 の手動リンクを含むウィザード。キャンセル時はnull */
@@ -16,15 +58,24 @@ export function importWizardDialog(plan: ImportPlan, defaultName: string): Promi
     const backdrop = el('div', { class: 'lv-modal-backdrop' });
     const nameInput = el('input', { type: 'text', value: defaultName, placeholder: 'プロジェクト名' }) as HTMLInputElement;
     const imageLinks = new Map<string, string>();
+    const sourceSelection = new ImportSourceSelectionController();
+    let okButton: HTMLButtonElement | null = null;
 
     // ---- スプレッドシートの選択（複数ある場合） ----
     const sourceSection = el('div', { class: 'lv-grp' });
     if (plan.sources.length > 1) {
       const sourceSelect = el('select', {
-        onchange: (ev) => {
-          selectSource(plan, Number((ev.target as HTMLSelectElement).value));
+        onchange: async (ev) => {
+          const select = ev.target as HTMLSelectElement;
+          const selection = sourceSelection.select(plan, Number(select.value));
+          select.disabled = true;
+          if (okButton !== null) okButton.disabled = !sourceSelection.canConfirm;
+          const outcome = await selection;
+          if (outcome.kind !== 'selected') select.value = String(outcome.previousIndex);
+          select.disabled = !sourceSelection.canSelect;
+          if (okButton !== null) okButton.disabled = !sourceSelection.canConfirm;
           renderSummary();
-          renderLinkSection();
+          if (shouldRebuildImportLinks(outcome)) renderLinkSection();
         },
       }) as HTMLSelectElement;
       plan.sources.forEach((s, i) => {
@@ -65,6 +116,10 @@ export function importWizardDialog(plan: ImportPlan, defaultName: string): Promi
           el('div', { class: 'lv-mr-detail' }, summarizeMigration(plan.migration)),
           el('div', { class: 'lv-mr-detail' }, 'キャプションシートは表示セットとして引き継がれます'),
         );
+        const retentionNotice = importWizardRetentionNotice(plan);
+        if (retentionNotice !== null) {
+          summary.append(el('div', { class: 'lv-mr-detail warn' }, retentionNotice));
+        }
         // マテリアル・ビューの割り当て（gidが推定の場合は明示する）
         if (plan.migration.gidToSetName.size > 0) {
           const assign = [...plan.migration.gidToSetName.values()].join('、');
@@ -85,8 +140,26 @@ export function importWizardDialog(plan: ImportPlan, defaultName: string): Promi
           ),
         );
       }
-      for (const w of plan.warnings.slice(0, 5)) {
+      const diagnostics = importWizardVisibleDiagnostics(plan);
+      if (diagnostics.selection !== null) {
+        summary.append(el('div', { class: 'lv-mr-detail warn' }, `⚠ ${diagnostics.selection}`));
+      }
+      for (const w of diagnostics.currentSource) {
+        summary.append(el('div', { class: 'lv-mr-detail warn' }, `⚠ 現在のスプレッドシート: ${w}`));
+      }
+      if (diagnostics.omittedCurrentSource > 0) {
+        summary.append(el('div', { class: 'lv-mr-detail warn' },
+          `⚠ 現在のスプレッドシートに他${diagnostics.omittedCurrentSource}件の確認事項があります`));
+      }
+      for (const w of diagnostics.background) {
         summary.append(el('div', { class: 'lv-mr-detail warn' }, `⚠ ${w}`));
+      }
+      if (diagnostics.omittedBackground > 0) {
+        summary.append(el('div', { class: 'lv-mr-detail warn' },
+          `⚠ 使用しなかった候補など、他${diagnostics.omittedBackground}件の確認事項があります`));
+      }
+      if (sourceSelection.error !== null) {
+        summary.append(el('div', { class: 'lv-mr-detail warn' }, `⚠ ${sourceSelection.error}`));
       }
     }
     renderSummary();
@@ -139,13 +212,15 @@ export function importWizardDialog(plan: ImportPlan, defaultName: string): Promi
     const ok = el('button', {
       class: 'primary',
       onclick: () => {
+        if (!sourceSelection.canConfirm) return;
         backdrop.remove();
         resolve({
           projectName: nameInput.value.trim() !== '' ? nameInput.value.trim() : defaultName,
           imageLinks,
         });
       },
-    }, '取り込む');
+    }, '取り込む') as HTMLButtonElement;
+    okButton = ok;
 
     const card = el('div', { class: 'lv-modal-card', role: 'dialog', 'aria-label': 'インポート' },
       el('div', { class: 'lv-modal-title' }, 'ZIPの取り込み'),

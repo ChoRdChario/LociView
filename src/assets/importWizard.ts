@@ -10,7 +10,10 @@ import { entityIdFor, ProjectStore, type Identity } from '../core/store';
 import { visibleEntities } from '../core/reduce';
 import {
   analyzeLociMyuSheets,
+  countLociMyuCaptionSourceRows,
   isLociMyuCaptionSheet,
+  LociMyuSourceValidationError,
+  lociMyuTrimV1,
   type LociMyuMigration,
   type SheetTable,
 } from '../io/locimyu';
@@ -24,6 +27,7 @@ import type { ZipEntryData } from './zipio';
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|avif)$/i;
 const VIDEO_EXT = /\.(mp4|mov|webm|m4v)$/i;
 const encoder = new TextEncoder();
+const sourceSelectionRevisions = new WeakMap<ImportPlan, number>();
 
 function bytesEqual(actual: Uint8Array, expected: Uint8Array): boolean {
   return actual.length === expected.length &&
@@ -49,18 +53,24 @@ export interface ForeignFile {
   data: Uint8Array;
 }
 
-function takeForeignFileSnapshot(files: readonly ForeignFile[]): ForeignFile[] {
-  return files.map((file) => {
-    const snapshot = {
-      path: file.path,
-      name: file.name,
-      data: new Uint8Array(file.data),
-    };
-    // applyImportPlan is a one-shot ownership transfer. Clearing each source as
-    // it is copied keeps the caller and action buffers from doubling peak use.
-    (file as { data: Uint8Array }).data = new Uint8Array(0);
-    return snapshot;
-  });
+function snapshotForeignFiles(files: readonly ForeignFile[]): ForeignFile[] {
+  return files.map((file) => ({
+    path: file.path,
+    name: file.name,
+    data: new Uint8Array(file.data),
+  }));
+}
+
+function releaseForeignFiles(files: readonly ForeignFile[]): void {
+  for (const file of files) (file as { data: Uint8Array }).data = new Uint8Array(0);
+}
+
+function snapshotSheetTables(tables: readonly SheetTable[]): SheetTable[] {
+  return tables.map((table) => ({
+    name: table.name,
+    ...(table.gid === undefined ? {} : { gid: table.gid }),
+    rows: table.rows.map((row) => [...row]),
+  }));
 }
 
 /** 1つのスプレッドシート（xlsx/csv）ファイル由来のシート群 */
@@ -86,10 +96,53 @@ export interface ImportPlan {
   migration: LociMyuMigration | null;
   /** fileId→filename 対応表（あれば未リンク画像を自動解決できる） */
   fileIdMap: Map<string, string>;
+  /** ZIP全体・候補拒否・現在の候補を混同しないための構造化診断。 */
+  diagnostics: {
+    archive: string[];
+    rejectedCandidates: string[];
+    selection: string | null;
+    selectedSource: string[];
+  };
+  /** diagnostics と現在選択中のファイル名から生成するUI用の平坦な一覧。 */
   warnings: string[];
 }
 
 const BACKUP_HINT = /(backup|バックアップ|コピー|copy|_old|旧)/i;
+export const IMPORT_DIAGNOSTIC_DISPLAY_LIMIT = 5;
+export const IMPORT_SOURCE_ANALYSIS_FAILURE_NOTICE =
+  'スプレッドシートの安全な確認処理を完了できませんでした。元のZIPを保管したまま、ブラウザを更新して再試行してください。';
+
+function boundedDiagnosticsSummary(messages: readonly string[]): string {
+  const visible = messages.slice(0, IMPORT_DIAGNOSTIC_DISPLAY_LIMIT);
+  const omitted = messages.length - visible.length;
+  return `${visible.join(' / ')}${omitted > 0 ? ` / 他${omitted}件の候補` : ''}`;
+}
+
+function refreshImportPlanWarnings(plan: ImportPlan): void {
+  const selected = plan.sources[plan.selectedSourceIndex];
+  plan.diagnostics.selection = plan.sources.length > 1 && selected !== undefined
+    ? `スプレッドシートが${plan.sources.length}個見つかりました。「${selected.fileName}」を使用します（取込前に切り替えられます）`
+    : null;
+  plan.warnings = [
+    ...plan.diagnostics.archive,
+    ...plan.diagnostics.rejectedCandidates,
+    ...(plan.diagnostics.selection === null ? [] : [plan.diagnostics.selection]),
+    ...plan.diagnostics.selectedSource,
+  ];
+}
+
+function commitSourceSelection(
+  plan: ImportPlan,
+  index: number,
+  tables: SheetTable[],
+  migration: LociMyuMigration,
+): void {
+  plan.selectedSourceIndex = index;
+  plan.tables = tables;
+  plan.migration = migration.sets.length > 0 ? migration : null;
+  plan.diagnostics.selectedSource = [...migration.warnings];
+  refreshImportPlanWarnings(plan);
+}
 
 /**
  * マジックバイトから画像形式を判定する（拡張子なし対策）。
@@ -112,15 +165,17 @@ export function sniffImageExt(b: Uint8Array): string | null {
 }
 
 /** 採用するスプレッドシートを切り替える（ウィザードのUIから呼ぶ） */
-export function selectSource(plan: ImportPlan, index: number): void {
+export async function selectSource(plan: ImportPlan, index: number): Promise<void> {
   const source = plan.sources[index];
-  if (source === undefined) return;
-  plan.selectedSourceIndex = index;
-  plan.tables = source.tables;
-  plan.warnings = plan.warnings.filter((w) => !w.startsWith('シート「'));
-  const migration = analyzeLociMyuSheets(plan.tables);
-  plan.migration = migration.sets.length > 0 ? migration : null;
-  if (plan.migration !== null) plan.warnings.push(...migration.warnings);
+  if (source === undefined) throw new Error('import plan: spreadsheet source index is out of range');
+  const revision = (sourceSelectionRevisions.get(plan) ?? 0) + 1;
+  sourceSelectionRevisions.set(plan, revision);
+  const tables = snapshotSheetTables(source.tables);
+  const migration = await analyzeLociMyuSheets(tables);
+  if (sourceSelectionRevisions.get(plan) !== revision) {
+    throw new Error('import plan: spreadsheet selection was superseded');
+  }
+  commitSourceSelection(plan, index, tables, migration);
 }
 
 function baseName(path: string): string {
@@ -139,6 +194,12 @@ export async function buildImportPlan(entries: readonly ZipEntryData[]): Promise
     selectedSourceIndex: 0,
     migration: null,
     fileIdMap: new Map(),
+    diagnostics: {
+      archive: [],
+      rejectedCandidates: [],
+      selection: null,
+      selectedSource: [],
+    },
     warnings: [],
   };
 
@@ -171,62 +232,99 @@ export async function buildImportPlan(entries: readonly ZipEntryData[]): Promise
           fileName: name,
           tables,
           looksLikeBackup: BACKUP_HINT.test(name),
-          captionCount: countCaptions(tables),
+          captionCount: countLociMyuCaptionSourceRows(tables),
         });
-      } catch (err) {
-        plan.warnings.push(`${name} を読めませんでした: ${err instanceof Error ? err.message : String(err)}`);
+      } catch {
+        plan.diagnostics.archive.push(`${name} を安全に読み取れませんでした`);
       }
       continue;
     }
     if (/\.csv$/i.test(name)) {
       const rows = parseCsv(new TextDecoder().decode(e.data));
-      // fileId対応表かどうかを判定（1列目がDrive fileId風の長い英数字）
-      const header = (rows[0] ?? []).map((h) => h.trim().toLowerCase());
-      if (header[0] === 'fileid' || header[0] === 'id') {
+      // Caption CSVも先頭列が id なので、完全なCaption headerを先に判定する。
+      // file-ID対応表は2列の見出しまで一致した場合だけauthority入力にする。
+      const header = (rows[0] ?? []).map((h) => lociMyuTrimV1(h).toLowerCase());
+      const isFileIdMap =
+        (header[0] === 'fileid' || header[0] === 'id') &&
+        header[1] === 'filename';
+      const table: SheetTable = { name: name.replace(/\.csv$/i, ''), rows };
+      if (isLociMyuCaptionSheet(rows)) {
+        plan.sources.push({
+          fileName: name,
+          tables: [table],
+          looksLikeBackup: BACKUP_HINT.test(name),
+          captionCount: countLociMyuCaptionSourceRows([table]),
+        });
+      } else if (isFileIdMap) {
         for (const row of rows.slice(1)) {
-          const id = (row[0] ?? '').trim();
-          const fname = (row[1] ?? '').trim();
+          const id = lociMyuTrimV1(row[0] ?? '');
+          const fname = lociMyuTrimV1(row[1] ?? '');
           if (id !== '' && fname !== '') plan.fileIdMap.set(id, fname);
         }
       } else {
         plan.sources.push({
           fileName: name,
-          tables: [{ name: name.replace(/\.csv$/i, ''), rows }],
+          tables: [table],
           looksLikeBackup: BACKUP_HINT.test(name),
-          captionCount: countCaptions([{ name, rows }]),
+          captionCount: countLociMyuCaptionSourceRows([table]),
         });
       }
     }
   }
 
   if (plan.sources.length > 0) {
-    // 既定は「バックアップでない・キャプションが多い」もの。
+    // 全候補を同じauthority解析に通し、その実結果から既定を選ぶ。
     // 複数のスプレッドシートを同時に取り込むと、同じ旧IDのキャプションが
     // 二重に生成されて後勝ちで所属セットが壊れるため、必ず1つだけを採用する。
-    let best = 0;
-    plan.sources.forEach((s, i) => {
-      const cur = plan.sources[best]!;
-      const better =
-        (cur.looksLikeBackup && !s.looksLikeBackup) ||
-        (cur.looksLikeBackup === s.looksLikeBackup && s.captionCount > cur.captionCount);
-      if (better) best = i;
-    });
-    selectSource(plan, best);
-    if (plan.sources.length > 1) {
-      plan.warnings.push(
-        `スプレッドシートが${plan.sources.length}個見つかりました。「${plan.sources[best]!.fileName}」を使用します（取込前に切り替えられます）`,
+    type AnalyzedCandidate = {
+      index: number;
+      tables: SheetTable[];
+      migration: LociMyuMigration;
+      captionCount: number;
+    };
+    const compareCandidates = (left: AnalyzedCandidate, right: AnalyzedCandidate): number => {
+      const leftRecognized = left.migration.sets.length > 0;
+      const rightRecognized = right.migration.sets.length > 0;
+      if (leftRecognized !== rightRecognized) return leftRecognized ? -1 : 1;
+      const leftPopulated = left.captionCount > 0;
+      const rightPopulated = right.captionCount > 0;
+      if (leftPopulated !== rightPopulated) return leftPopulated ? -1 : 1;
+      const leftBackup = plan.sources[left.index]!.looksLikeBackup;
+      const rightBackup = plan.sources[right.index]!.looksLikeBackup;
+      if (leftBackup !== rightBackup) return leftBackup ? 1 : -1;
+      if (left.captionCount !== right.captionCount) return right.captionCount - left.captionCount;
+      return left.index - right.index;
+    };
+    let best: AnalyzedCandidate | null = null;
+    for (let candidateIndex = 0; candidateIndex < plan.sources.length; candidateIndex++) {
+      const source = plan.sources[candidateIndex]!;
+      const tables = snapshotSheetTables(source.tables);
+      try {
+        const migration = await analyzeLociMyuSheets(tables);
+        const captionCount = migration.sets.reduce((count, set) => count + set.captions.length, 0);
+        source.captionCount = captionCount;
+        const candidate = { index: candidateIndex, tables, migration, captionCount };
+        if (best === null || compareCandidates(candidate, best) < 0) best = candidate;
+      } catch (error) {
+        if (error instanceof LociMyuSourceValidationError) {
+          plan.diagnostics.rejectedCandidates.push(
+            `${source.fileName} は取り込めませんでした: ${error.message}`,
+          );
+          continue;
+        }
+        throw new Error(IMPORT_SOURCE_ANALYSIS_FAILURE_NOTICE, { cause: error });
+      }
+    }
+    if (best === null) {
+      throw new Error(
+        `取り込めるスプレッドシートがありません。${boundedDiagnosticsSummary(plan.diagnostics.rejectedCandidates)}`,
       );
     }
+    commitSourceSelection(plan, best.index, best.tables, best.migration);
+  } else {
+    refreshImportPlanWarnings(plan);
   }
   return plan;
-}
-
-function countCaptions(tables: readonly SheetTable[]): number {
-  let n = 0;
-  for (const t of tables) {
-    if (isLociMyuCaptionSheet(t.rows)) n += Math.max(0, t.rows.length - 1);
-  }
-  return n;
 }
 
 export interface ImportOptions {
@@ -272,11 +370,30 @@ export async function applyImportPlan(
     deviceId: identity.deviceId,
     ...(identity.displayName === undefined ? {} : { displayName: identity.displayName }),
   };
-  const migration = plan.migration === null ? null : structuredClone(plan.migration);
+  const selectedTables = snapshotSheetTables(plan.tables);
   const fileIdMap = new Map(plan.fileIdMap);
-  const models = takeForeignFileSnapshot(plan.models);
-  const images = takeForeignFileSnapshot(plan.images);
-  const videos = takeForeignFileSnapshot(plan.videos);
+  const models = snapshotForeignFiles(plan.models);
+  const images = snapshotForeignFiles(plan.images);
+  const videos = snapshotForeignFiles(plan.videos);
+
+  // Rebuild identity from the selected raw tables. Caller-provided migration
+  // objects are only previews and never authority for a workspace write.
+  let analyzed: LociMyuMigration | null = null;
+  try {
+    analyzed = selectedTables.length === 0
+      ? null
+      : await analyzeLociMyuSheets(selectedTables);
+  } catch (error) {
+    if (error instanceof LociMyuSourceValidationError) throw error;
+    throw new Error(IMPORT_SOURCE_ANALYSIS_FAILURE_NOTICE, { cause: error });
+  }
+  const migration = analyzed !== null && analyzed.sets.length > 0 ? analyzed : null;
+
+  // The one-shot ownership transfer starts only after every identity check has
+  // succeeded. On preflight failure all caller maps and buffers stay intact.
+  releaseForeignFiles(plan.models);
+  releaseForeignFiles(plan.images);
+  releaseForeignFiles(plan.videos);
   plan.migration = null;
   plan.fileIdMap.clear();
 

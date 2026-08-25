@@ -144,6 +144,27 @@ interface ExpectedOracle {
   native: ExpectedNative;
 }
 
+interface CaptionIdentityVectorOracle {
+  vectorId: string;
+  identityKey: {
+    legacyId: string;
+    occurrence: number;
+    sheetIdentity: { kind: 'legacyGid' | 'sheetName'; value: string };
+  };
+  fullDigest: string;
+  captionId: string;
+}
+
+interface CaptionIdentityExpectedOracle {
+  recipeId: 'locimyu-caption-id-2';
+  vectors: CaptionIdentityVectorOracle[];
+  fixtureCaptions: Array<{
+    setName: string;
+    historicalCaptionId: string;
+    vectorId: string;
+  }>;
+}
+
 function sha256(bytes: Uint8Array | string): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
@@ -160,6 +181,48 @@ function transportArtifact(expected: ExpectedOracle, path: string): TransportArt
   const artifact = expected.transport.artifacts.find((candidate) => candidate.path === path);
   if (artifact === undefined) throw new Error(`fixture: missing transport oracle for ${path}`);
   return artifact;
+}
+
+function identityVector(
+  expected: CaptionIdentityExpectedOracle,
+  vectorId: string,
+): CaptionIdentityVectorOracle {
+  const vector = expected.vectors.find((candidate) => candidate.vectorId === vectorId);
+  if (vector === undefined) throw new Error(`fixture: missing Caption identity vector ${vectorId}`);
+  return vector;
+}
+
+function overlayCurrentCaptionIdentities(
+  historical: ExpectedLociMyu,
+  identityExpected: CaptionIdentityExpectedOracle,
+): ExpectedLociMyu {
+  const current = structuredClone(historical);
+  const currentIdByHistoricalId = new Map(
+    identityExpected.fixtureCaptions.map((binding) => [
+      binding.historicalCaptionId,
+      identityVector(identityExpected, binding.vectorId).captionId,
+    ]),
+  );
+  for (const set of current.sets) {
+    for (const caption of set.captions) {
+      caption.captionId = currentIdByHistoricalId.get(caption.captionId) ?? caption.captionId;
+    }
+  }
+  current.unlinkedImageReferences = current.unlinkedImageReferences.map(([fileId, captionIds]) => [
+    fileId,
+    captionIds.map((captionId) => currentIdByHistoricalId.get(captionId) ?? captionId),
+  ]);
+  const migratedState = current.migratedState as {
+    captions?: Array<{ id: string; [key: string]: unknown }>;
+  };
+  if (!Array.isArray(migratedState.captions)) throw new Error('fixture: expected migrated Caption state');
+  migratedState.captions = migratedState.captions
+    .map((caption) => ({
+      ...caption,
+      id: currentIdByHistoricalId.get(caption.id) ?? caption.id,
+    }))
+    .sort((left, right) => left.id.localeCompare(right.id, 'en'));
+  return current;
 }
 
 function entryInventory(entries: readonly ZipEntryData[]): EntryOracle[] {
@@ -540,10 +603,16 @@ async function lociMyuZip(
 describe('v1 migration fixtures', () => {
   let source: SourceOracle;
   let expected: ExpectedOracle;
+  let captionIdentityExpected: CaptionIdentityExpectedOracle;
+  let currentLociMyuExpected: ExpectedLociMyu;
 
   beforeAll(async () => {
     source = await readFixtureJson<SourceOracle>('source.v1.json');
     expected = await readFixtureJson<ExpectedOracle>('expected.v1.json');
+    captionIdentityExpected = await readFixtureJson<CaptionIdentityExpectedOracle>(
+      'expected.locimyu-caption-id-2.json',
+    );
+    currentLociMyuExpected = overlayCurrentCaptionIdentities(expected.locimyu, captionIdentityExpected);
   });
 
   describe('LociMyu Drive ZIP', () => {
@@ -571,7 +640,7 @@ describe('v1 migration fixtures', () => {
       expect(backup!.tables.map(({ name, rows }) => ({ name, rows }))).toEqual(
         sourceSheetProjection(source.locimyu.backup.sheets),
       );
-      expect(planProjection(plan)).toEqual(expectedPlanProjection(expected.locimyu));
+      expect(planProjection(plan)).toEqual(expectedPlanProjection(currentLociMyuExpected));
       expect(plan.warnings).toEqual(
         expected.locimyu.warnings ?? [
           'スプレッドシートが2個見つかりました。「LociMyu Save.xlsx」を使用します（取込前に切り替えられます）',
@@ -591,6 +660,25 @@ describe('v1 migration fixtures', () => {
         .join('\n');
       expect(workbookXml).toContain(`<v>${expected.locimyu.numericGidEvidence.raw}</v>`);
       expect(expected.locimyu.sets[1]?.legacyGid).toBe(expected.locimyu.numericGidEvidence.normalized);
+
+      const historicalBindings = expected.locimyu.sets.flatMap((set) =>
+        set.captions.map((caption) => ({ setName: set.name, historicalCaptionId: caption.captionId })),
+      );
+      expect(historicalBindings).toEqual(captionIdentityExpected.fixtureCaptions.map((binding) => ({
+        setName: binding.setName,
+        historicalCaptionId: binding.historicalCaptionId,
+      })));
+      expect(historicalBindings.every((binding) => /^cap_LM[0-9A-HJKMNP-TV-Z]{24}$/.test(binding.historicalCaptionId))).toBe(true);
+      for (const binding of captionIdentityExpected.fixtureCaptions) {
+        const vector = identityVector(captionIdentityExpected, binding.vectorId);
+        const actualCaption = plan.migration!.sets
+          .find((set) => set.name === binding.setName)!
+          .captions.find((caption) => caption.legacyId === vector.identityKey.legacyId)!;
+        expect(actualCaption.identity.key).toEqual(vector.identityKey);
+        expect(sha256(actualCaption.identity.preimageBytes)).toBe(vector.fullDigest);
+        expect(actualCaption.captionId).toBe(vector.captionId);
+        expect(actualCaption.captionId.startsWith('cap_LM')).toBe(false);
+      }
     });
 
     it('applies, opens, and exports/imports without random IDs or HLCs entering the semantic oracle', async () => {
@@ -616,8 +704,8 @@ describe('v1 migration fixtures', () => {
       const store = await ProjectStore.open(fs, result.dir, MIGRATION_IDENTITY);
       const stateProjection = migratedStateProjection(store);
       const logicalEntries = transportArtifact(expected, source.locimyu.output).entries;
-      const expectedAssets = expectedLociMyuAssetInventory(expected.locimyu, logicalEntries);
-      expect(stateProjection).toEqual(expected.locimyu.migratedState);
+      const expectedAssets = expectedLociMyuAssetInventory(currentLociMyuExpected, logicalEntries);
+      expect(stateProjection).toEqual(currentLociMyuExpected.migratedState);
       expect(await workspaceAssetInventory(fs, result.dir, store)).toEqual(expectedAssets);
       const titles = visibleEntities(store.state, 'caption').map((record) => String(record.fields.title)).sort();
       expect(titles).toEqual([...expected.locimyu.apply.selectedTitles].sort());
@@ -825,8 +913,12 @@ describe('known v1 migration gaps', () => {
   let duplicateCaptionIdsStayedUnique = false;
   let missingActiveBlobWasDetected = false;
   let migratedCaptionIdsWereCanonical = false;
+  let gapCaptionIdentityExpected: CaptionIdentityExpectedOracle;
 
   beforeAll(async () => {
+    gapCaptionIdentityExpected = await readFixtureJson<CaptionIdentityExpectedOracle>(
+      'expected.locimyu-caption-id-2.json',
+    );
     const captionRows = [
       CAPTION_HEADER,
       ['c_SYNTH_GAP', 'Synthetic gap', '', '#eab308', '0', '0', '0', '', '', ''],
@@ -919,11 +1011,11 @@ describe('known v1 migration gaps', () => {
       { name: 'A', rows: [CAPTION_HEADER, ['c_DUPLICATE', 'A', '', '', '0', '0', '0', '', '', '']] },
       { name: 'B', rows: [CAPTION_HEADER, ['c_DUPLICATE', 'B', '', '', '1', '1', '1', '', '', '']] },
     ];
-    const duplicateMigration = analyzeLociMyuSheets(duplicateTables);
+    const duplicateMigration = await analyzeLociMyuSheets(duplicateTables);
     expect(duplicateMigration.sets).toHaveLength(2);
     expect(duplicateMigration.sets.flatMap((set) => set.captions)).toHaveLength(2);
     const duplicateIds = duplicateMigration.sets.flatMap((set) => set.captions.map((caption) => caption.captionId));
-    const repeatedIds = analyzeLociMyuSheets(duplicateTables).sets.flatMap((set) =>
+    const repeatedIds = (await analyzeLociMyuSheets(duplicateTables)).sets.flatMap((set) =>
       set.captions.map((caption) => caption.captionId),
     );
     const duplicateZip = await lociMyuZip(duplicateTables);
@@ -941,6 +1033,10 @@ describe('known v1 migration gaps', () => {
     duplicateCaptionIdsStayedUnique =
       new Set(duplicateIds).size === duplicateIds.length &&
       JSON.stringify(duplicateIds) === JSON.stringify(repeatedIds) &&
+      JSON.stringify(duplicateIds) === JSON.stringify([
+        identityVector(gapCaptionIdentityExpected, 'duplicate-a-0').captionId,
+        identityVector(gapCaptionIdentityExpected, 'duplicate-b-0').captionId,
+      ]) &&
       appliedCaptions.length === 2 &&
       appliedCaptions.some(
         (record) => record.fields.title === 'A' && duplicateSetNames.get(String(record.fields.setId)) === 'A',
@@ -994,7 +1090,7 @@ describe('known v1 migration gaps', () => {
     expect(lastViewBecameDefaultCamera).toBe(true);
   });
 
-  it.fails('does not collapse duplicate legacy caption IDs across sets', () => {
+  it('does not collapse duplicate legacy caption IDs across sets', () => {
     expect(duplicateCaptionIdsStayedUnique).toBe(true);
   });
 
@@ -1002,7 +1098,7 @@ describe('known v1 migration gaps', () => {
     expect(missingActiveBlobWasDetected).toBe(true);
   });
 
-  it.fails('emits canonical v1 IDs for migrated LociMyu captions', () => {
+  it('emits canonical v1 IDs for migrated LociMyu captions', () => {
     expect(migratedCaptionIdsWereCanonical).toBe(true);
   });
 

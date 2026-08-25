@@ -1645,20 +1645,48 @@ Independent review result:
 
 Identity-only production slice:
 
-- [ ] Add exact `LociMyuTrimV1`, Unicode-scalar/key validation, restricted
+- [x] Add exact `LociMyuTrimV1`, Unicode-scalar/key validation, restricted
   `LegacyJcsV1`, SHA-256/Crockford encoding and full/truncated collision checks
-- [ ] Add the shared pure sheet-authority projection and complete invalid-row/
+- [x] Add the shared pure sheet-authority projection and complete invalid-row/
   duplicate-key preflight without changing view/material activation
-- [ ] Route new LociMyu conversions through recipe 2, preserve every duplicate
+- [x] Route new LociMyu conversions through recipe 2, preserve every duplicate
   occurrence, and keep the historical `cap_LM...` generator/read fixtures only
   as characterization evidence
-- [ ] Add a versioned recipe-2 companion oracle without rewriting
+- [x] Add a versioned recipe-2 companion oracle without rewriting
   `fixtures/v1-migration/expected.v1.json`; cover raw XLSX/CSV authority,
   trim/Unicode/reorder/collision and apply/open/export/re-import behavior
-- [ ] Run focused tests, typecheck, full tests, build and fixture/evidence
+- [x] Run focused tests, typecheck, full tests, build and fixture/evidence
   verifiers; obtain independent production-diff review before commit
-- [ ] Keep local source/review persistence, guessed relationship activation,
+- [x] Keep local source/review persistence, guessed relationship activation,
   editor recovery, locking, G0-S firewall and release/deploy outside this slice
+
+Identity-only production slice review — 2026-08-26:
+
+- New conversions now issue only `locimyu-caption-id-2` canonical Caption IDs,
+  preserve repeated legacy-ID occurrences independently and revalidate the raw
+  selected tables before the first workspace write. Historical `cap_LM...`
+  fixture IDs remain an unchanged read oracle; `expected.v1.json` is unchanged.
+- Multiple workbook candidates are analyzed from call-entry snapshots. Only a
+  typed candidate-local source failure may fall through; provider, digest,
+  collision and invariant failures stop the wizard with a fixed ordinary-user
+  message and keep confirmation disabled. Ranking uses recognized/admitted data,
+  backup status, exact admitted count and archive order without reserved-sheet or
+  empty-row inflation. Only the current best analyzed snapshot is retained.
+- Archive, rejected-candidate, current-selection and current-workbook diagnostics
+  are structured separately, bounded ordinary displays report omitted counts,
+  and failed source changes preserve both the previous preview and manual image
+  links. Import confirmation and completed full export carry the approved source
+  ZIP retention limitation.
+- Final staged verification passed `git diff --cached --check`, typecheck, all 41
+  test files / 1,348 tests with 21 existing todos, the production build, fixture
+  verification (10 Git entries / 708,867 bytes and v1 artifacts verified), and
+  evidence verification (three pending templates and no credited run evidence).
+  The existing 805.83 kB viewer chunk warning remains.
+- Independent contract, security and fixture/gate reviewers report no remaining
+  P0/P1/P2. Browser execution of the six vectors remains unrecorded because no
+  browser-control/repl tool was callable in this session; Node vectors, raw
+  XLSX/CSV, apply/open/export/re-import and collision paths are recorded. No
+  release, deploy, push, network acquisition or local-review persistence occurred.
 
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results

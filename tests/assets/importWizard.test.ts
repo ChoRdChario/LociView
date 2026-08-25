@@ -1,7 +1,12 @@
-import { describe, expect, it } from 'vitest';
-import { applyImportPlan, buildImportPlan, selectSource, sniffImageExt } from '../../src/assets/importWizard';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  IMPORT_SOURCE_ANALYSIS_FAILURE_NOTICE,
+  applyImportPlan,
+  buildImportPlan,
+  selectSource,
+  sniffImageExt,
+} from '../../src/assets/importWizard';
 import { writeZipEntries, readZipEntries } from '../../src/assets/zipio';
-import { legacyCaptionId } from '../../src/io/locimyu';
 import { isVisible, visibleEntities } from '../../src/core/reduce';
 import { ProjectStore, type Identity } from '../../src/core/store';
 import { MemoryFS } from '../../src/platform/fs';
@@ -13,6 +18,18 @@ const enc = new TextEncoder();
 const CAP_HEADER = ['id', 'title', 'body', 'color', 'posX', 'posY', 'posZ', 'imageFileId', 'createdAt', 'updatedAt'];
 const VIEWS_HEADER = ['id', 'captionSheetGid', 'name', 'bgColor', 'cameraType', 'eyeX', 'eyeY', 'eyeZ', 'targetX', 'targetY', 'targetZ', 'upX', 'upY', 'upZ', 'fov', 'createdAt', 'updatedAt'];
 const MAT_HEADER = ['materialKey', 'opacity', 'doubleSided', 'unlitLike', 'chromaEnable', 'chromaColor', 'chromaTolerance', 'chromaFeather', 'roughness', 'metalness', 'emissiveHex', 'updatedAt', 'updatedBy', 'sheetGid'];
+
+function hex(bytes: Uint8Array): string {
+  return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
+}
+
+function captionCsvBytes(rows: string[][]): Uint8Array {
+  return enc.encode([CAP_HEADER, ...rows].map((row) => row.join(',')).join('\n'));
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 /** Google Drive のフォルダZIPダウンロードを模した ZIP を作る */
 async function makeDriveZip(opts: { withFileIdMap?: boolean } = {}): Promise<Uint8Array> {
@@ -87,6 +104,31 @@ describe('buildImportPlan', () => {
     expect(plan.tables.some((t) => t.name === 'fileid-map')).toBe(false);
   });
 
+  it('raw Caption CSVをfileId対応表と誤認せず、trim済みfilenameとrecord順でidentity化する', async () => {
+    const captionCsv = [
+      CAP_HEADER.join(','),
+      'c_DUPLICATE,first,,,,,,,,',
+      'c_OTHER,other,,,,,,,,',
+      'c_DUPLICATE,second,,,,,,,,',
+    ].join('\n');
+    const zip = await writeZipEntries([
+      { path: '\u3000A\u00a0.csv', data: enc.encode(captionCsv) },
+      { path: 'fileid-map.csv', data: enc.encode('fileId,filename\nDRIVEID_A,photo.png\n') },
+    ]);
+    const plan = await buildImportPlan(await readZipEntries(zip));
+    expect(plan.sources).toHaveLength(1);
+    expect(plan.fileIdMap.get('DRIVEID_A')).toBe('photo.png');
+    const duplicates = plan.migration!.sets[0]!.captions.filter((caption) => caption.legacyId === 'c_DUPLICATE');
+    expect(duplicates.map((caption) => caption.identity.key)).toEqual([
+      { legacyId: 'c_DUPLICATE', occurrence: 0, sheetIdentity: { kind: 'sheetName', value: 'A' } },
+      { legacyId: 'c_DUPLICATE', occurrence: 1, sheetIdentity: { kind: 'sheetName', value: 'A' } },
+    ]);
+    expect(duplicates.map((caption) => caption.captionId)).toEqual([
+      'cap_67WP1YG84SRWSBFJXWY68ZH03T',
+      'cap_0C8PPVY42VKBAN3HPDQS29678S',
+    ]);
+  });
+
   it('拡張子のない画像をマジックバイトで取り込む（Drive由来のHEIC等）', async () => {
     // 先頭がJPEGマジックの拡張子なしファイル
     const jpeg = new Uint8Array(16);
@@ -121,6 +163,77 @@ describe('buildImportPlan', () => {
     expect(plan.images).toHaveLength(1);
     expect(plan.tables).toHaveLength(0);
   });
+
+  it('読めないxlsxの内部parser/path詳細を通常warningへ露出しない', async () => {
+    const plan = await buildImportPlan([
+      { path: 'broken.xlsx', data: Uint8Array.of(0x50, 0x4b, 0, 0, 0) },
+    ]);
+    expect(plan.diagnostics.archive).toEqual(['broken.xlsx を安全に読み取れませんでした']);
+    expect(plan.warnings).toEqual(['broken.xlsx を安全に読み取れませんでした']);
+    expect(plan.warnings.join('\n')).not.toMatch(/workbook\.xml|central directory|zip/u);
+  });
+
+  it('未認識の現在候補でも、その候補の診断を構造化stateに保持する', async () => {
+    const plan = await buildImportPlan([
+      { path: 'generic.csv', data: enc.encode('name,value\nfoo,bar\n') },
+    ]);
+    expect(plan.migration).toBeNull();
+    expect(plan.diagnostics.selectedSource).toContain(
+      'LociMyu形式のキャプションシートが見つかりませんでした',
+    );
+    expect(plan.warnings).toContain('LociMyu形式のキャプションシートが見つかりませんでした');
+  });
+});
+
+describe('raw XLSX Caption identity authority', () => {
+  async function identityFromWorkbook(mapRows: string[][], legacyId: string): Promise<{
+    key: unknown;
+    captionId: string;
+  }> {
+    const xlsx = await makeXlsx([
+      { name: 'A', rows: [CAP_HEADER, [legacyId, 'caption', '', '', '', '', '', '', '', '']] },
+      {
+        name: '__LM_SHEET_NAMES',
+        rows: [['sheetGid', 'displayName', 'sheetTitle', 'updatedAt'], ...mapRows],
+      },
+    ]);
+    const plan = await buildImportPlan(await readZipEntries(await writeZipEntries([
+      { path: 'raw.xlsx', data: xlsx },
+    ])));
+    const caption = plan.migration!.sets[0]!.captions[0]!;
+    return { key: caption.identity.key, captionId: caption.captionId };
+  }
+
+  it('exact duplicate map pairをdedupeしてauthoritative GIDを使う', async () => {
+    const identity = await identityFromWorkbook([
+      ['0', '', 'A', ''],
+      ['0', '', 'A', ''],
+    ], 'c_SYNTH_A');
+    expect(identity).toEqual({
+      key: { legacyId: 'c_SYNTH_A', occurrence: 0, sheetIdentity: { kind: 'legacyGid', value: '0' } },
+      captionId: 'cap_0TVSSJ69V3DJPVB0ZMWRGZ7J40',
+    });
+  });
+
+  it.each([
+    ['incomplete row', [['0', '', '', ''], ['0', '', 'A', '']]],
+    ['GID-to-title conflict', [['0', '', 'A', ''], ['0', '', 'B', '']]],
+    ['title-to-GID conflict', [['0', '', 'A', ''], ['1', '', 'A', '']]],
+  ])('%sをrow-order winnerにせずsheetName fallbackにする', async (_label, rows) => {
+    const identity = await identityFromWorkbook(rows, 'c_DUPLICATE');
+    expect(identity).toEqual({
+      key: { legacyId: 'c_DUPLICATE', occurrence: 0, sheetIdentity: { kind: 'sheetName', value: 'A' } },
+      captionId: 'cap_67WP1YG84SRWSBFJXWY68ZH03T',
+    });
+  });
+
+  it('sheet-map row permutationでkeyとIDが変わらない', async () => {
+    const rows = [['99', '', 'B', ''], ['0', '', 'A', ''], ['0', '', 'A', '']];
+    const first = await identityFromWorkbook(rows, 'c_SYNTH_A');
+    const second = await identityFromWorkbook([...rows].reverse(), 'c_SYNTH_A');
+    expect(first).toEqual(second);
+    expect(first.captionId).toBe('cap_0TVSSJ69V3DJPVB0ZMWRGZ7J40');
+  });
 });
 
 describe('複数スプレッドシート（実データで判明した問題の回帰テスト）', () => {
@@ -150,8 +263,235 @@ describe('複数スプレッドシート（実データで判明した問題の�
   it('採用するスプレッドシートを切り替えられる', async () => {
     const plan = await buildImportPlan(await readZipEntries(await makeZipWithBackup()));
     const backupIndex = plan.sources.findIndex((s) => s.looksLikeBackup);
-    selectSource(plan, backupIndex);
+    await selectSource(plan, backupIndex);
     expect(plan.migration!.sets[0]!.captions[0]!.title).toBe('古い記録');
+  });
+
+  it('既定候補が不正でも、同じZIP内の正常な候補を自動選択して不正候補を残す', async () => {
+    const invalidMain = await makeXlsx([
+      {
+        name: 'シート1',
+        rows: [
+          CAP_HEADER,
+          ['', 'IDがない行', '', '', '', '', '', '', '', ''],
+          ['c_2', '件数を多くする行', '', '', '', '', '', '', '', ''],
+        ],
+      },
+    ]);
+    const validBackup = await makeXlsx([
+      { name: 'シート1', rows: [CAP_HEADER, ['c_valid', '正常なバックアップ', '', '', '', '', '', '', '', '']] },
+    ]);
+    const plan = await buildImportPlan(await readZipEntries(await writeZipEntries([
+      { path: 'LociMyu Save.xlsx', data: invalidMain },
+      { path: 'LociMyu Save backup.xlsx', data: validBackup },
+    ])));
+    expect(plan.sources).toHaveLength(2);
+    expect(plan.sources[plan.selectedSourceIndex]!.fileName).toBe('LociMyu Save backup.xlsx');
+    expect(plan.migration!.sets[0]!.captions[0]!.title).toBe('正常なバックアップ');
+    expect(plan.warnings.some((warning) => warning.includes('LociMyu Save.xlsx は取り込めませんでした'))).toBe(true);
+  });
+
+  it('全候補が不正なerrorは先頭5件と省略件数だけを通常表示へ渡す', async () => {
+    const entries = Array.from({ length: 6 }, (_unused, index) => ({
+      path: `invalid-${index}.csv`,
+      data: captionCsvBytes([['', `invalid ${index}`, '', '', '', '', '', '', '', '']]),
+    }));
+    const failure = await buildImportPlan(entries).then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(Error);
+    const message = (failure as Error).message;
+    for (let index = 0; index < 5; index++) expect(message).toContain(`invalid-${index}.csv`);
+    expect(message).not.toContain('invalid-5.csv');
+    expect(message).toContain('他1件の候補');
+  });
+
+  it('予約シートと完全空行を件数に数えず、実CaptionのあるLociMyu候補をgeneric/空候補より先にする', async () => {
+    const emptyCurrent = await makeXlsx([
+      {
+        name: '__LM_META',
+        rows: [CAP_HEADER, ['c_internal', '予約シートの行', '', '', '', '', '', '', '', '']],
+      },
+      {
+        name: '空の現行シート',
+        rows: [CAP_HEADER, ...Array.from({ length: 20 }, () => ['\u3000', '', '', '', '', '', '', '', '', ''])],
+      },
+    ]);
+    const populatedBackup = await makeXlsx([
+      {
+        name: '記録',
+        rows: [CAP_HEADER, ['c_valid', '実際の記録', '', '', '', '', '', '', '', '']],
+      },
+    ]);
+    const plan = await buildImportPlan([
+      { path: 'unrelated-current.xlsx', data: emptyCurrent },
+      { path: 'LociMyu Save backup.xlsx', data: populatedBackup },
+      { path: 'unrelated.csv', data: enc.encode('name,value\nfoo,bar\n') },
+    ]);
+
+    expect(plan.sources.find((source) => source.fileName === 'unrelated-current.xlsx')!.captionCount).toBe(0);
+    expect(plan.sources[plan.selectedSourceIndex]!.fileName).toBe('LociMyu Save backup.xlsx');
+    expect(plan.migration!.sets[0]!.captions[0]!.title).toBe('実際の記録');
+  });
+
+  it('recognized・実件数・archive順の各比較段を決定的に適用する', async () => {
+    const cases: Array<{
+      label: string;
+      entries: Array<{ path: string; data: Uint8Array }>;
+      expected: string;
+    }> = [
+      {
+        label: 'recognized-empty precedes generic',
+        entries: [
+          { path: 'generic.csv', data: enc.encode('name,value\nfoo,bar\n') },
+          { path: 'recognized-empty.csv', data: captionCsvBytes([]) },
+        ],
+        expected: 'recognized-empty.csv',
+      },
+      {
+        label: 'greater admitted count wins within the same class',
+        entries: [
+          { path: 'one.csv', data: captionCsvBytes([['c_1', 'one', '', '', '', '', '', '', '', '']]) },
+          { path: 'two.csv', data: captionCsvBytes([
+            ['c_1', 'one', '', '', '', '', '', '', '', ''],
+            ['c_2', 'two', '', '', '', '', '', '', '', ''],
+          ]) },
+        ],
+        expected: 'two.csv',
+      },
+      {
+        label: 'archive order wins an exact tie',
+        entries: [
+          { path: 'first.csv', data: captionCsvBytes([['c_1', 'first', '', '', '', '', '', '', '', '']]) },
+          { path: 'second.csv', data: captionCsvBytes([['c_2', 'second', '', '', '', '', '', '', '', '']]) },
+        ],
+        expected: 'first.csv',
+      },
+    ];
+
+    for (const testCase of cases) {
+      const plan = await buildImportPlan(testCase.entries);
+      expect(plan.sources[plan.selectedSourceIndex]!.fileName, testCase.label).toBe(testCase.expected);
+    }
+  });
+
+  it.each(['full', 'truncated'] as const)(
+    '%s digest collisionを正常な別候補へfall-throughさせない',
+    async (collisionKind) => {
+      let digestCall = 0;
+      vi.spyOn(crypto.subtle, 'digest').mockImplementation(async () => {
+        const digest = new Uint8Array(32);
+        if (collisionKind === 'truncated') digest[31] = digestCall++;
+        return digest.buffer as ArrayBuffer;
+      });
+      const collisionCandidate = captionCsvBytes([
+        ['c_1', 'one', '', '', '', '', '', '', '', ''],
+        ['c_2', 'two', '', '', '', '', '', '', '', ''],
+      ]);
+      const validAlternate = captionCsvBytes([
+        ['c_valid', 'valid', '', '', '', '', '', '', '', ''],
+      ]);
+
+      const failure = await buildImportPlan([
+        { path: 'collision.csv', data: collisionCandidate },
+        { path: 'valid.csv', data: validAlternate },
+      ]).then(
+        () => null,
+        (error: unknown) => error,
+      );
+
+      expect(failure).toBeInstanceOf(Error);
+      expect((failure as Error).message).toBe(IMPORT_SOURCE_ANALYSIS_FAILURE_NOTICE);
+      expect((failure as Error & { cause?: Error }).cause?.message).toContain(
+        collisionKind === 'full' ? 'full SHA-256 collision' : 'truncated Caption ID collision',
+      );
+    },
+  );
+
+  it('WebCrypto/内部失敗を候補不正へ降格せず、詳細を通常warningへ露出しない', async () => {
+    const workbook = await makeXlsx([
+      { name: '記録', rows: [CAP_HEADER, ['c_valid', '記録', '', '', '', '', '', '', '', '']] },
+    ]);
+    const providerFailure = new Error('sensitive provider detail');
+    vi.spyOn(crypto.subtle, 'digest').mockRejectedValueOnce(providerFailure);
+
+    const failure = await buildImportPlan([
+      { path: 'LociMyu Save.xlsx', data: workbook },
+      { path: 'unrelated.csv', data: enc.encode('name,value\nfoo,bar\n') },
+    ]).then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toBe(IMPORT_SOURCE_ANALYSIS_FAILURE_NOTICE);
+    expect((failure as Error).message).not.toContain('sensitive provider detail');
+    expect((failure as Error & { cause?: unknown }).cause).toBe(providerFailure);
+  });
+
+  it('source切替成功時に現在候補のwarningと使用中ファイル表示を丸ごと置換する', async () => {
+    const main = await makeXlsx([
+      {
+        name: '現行',
+        rows: [CAP_HEADER, ['c_main', '現行', '', '', 'x', '1', '2', '', '', '']],
+      },
+    ]);
+    const backup = await makeXlsx([
+      {
+        name: '旧版',
+        rows: [CAP_HEADER, ['c_backup', '旧版', '', '', '1', '2', '3', '', '', '']],
+      },
+    ]);
+    const plan = await buildImportPlan([
+      { path: 'LociMyu Save.xlsx', data: main },
+      { path: 'LociMyu Save backup.xlsx', data: backup },
+    ]);
+    expect(plan.diagnostics.selectedSource.some((warning) => warning.includes('「現行」'))).toBe(true);
+    expect(plan.warnings.some((warning) => warning.includes('「LociMyu Save.xlsx」を使用します'))).toBe(true);
+
+    const backupIndex = plan.sources.findIndex((source) => source.looksLikeBackup);
+    await selectSource(plan, backupIndex);
+
+    expect(plan.diagnostics.selectedSource).toEqual([]);
+    expect(plan.warnings.some((warning) => warning.includes('「現行」'))).toBe(false);
+    expect(plan.warnings.some((warning) => warning.includes('「LociMyu Save backup.xlsx」を使用します'))).toBe(true);
+    expect(plan.warnings.some((warning) => warning.includes('「LociMyu Save.xlsx」を使用します'))).toBe(false);
+  });
+
+  it('source切替はcall-entry snapshotを解析し、失敗時は現在の選択を原子的に保つ', async () => {
+    const plan = await buildImportPlan(await readZipEntries(await makeZipWithBackup()));
+    const backupIndex = plan.sources.findIndex((source) => source.looksLikeBackup);
+    const backup = plan.sources[backupIndex]!;
+    const realDigest = crypto.subtle.digest.bind(crypto.subtle);
+    let resume!: () => void;
+    const gate = new Promise<void>((resolve) => { resume = resolve; });
+    vi.spyOn(crypto.subtle, 'digest').mockImplementation(async (algorithm, data) => {
+      await gate;
+      return realDigest(algorithm, data);
+    });
+    const pending = selectSource(plan, backupIndex);
+    backup.tables[0]!.name = 'mutated';
+    backup.tables[0]!.rows[1]![0] = 'c_mutated';
+    backup.tables[0]!.rows[1]![1] = 'mutated title';
+    resume();
+    await pending;
+    expect(plan.tables[0]!.name).toBe('シート1');
+    expect(plan.migration!.sets[0]!.captions[0]!.legacyId).toBe('c_1');
+    expect(plan.migration!.sets[0]!.captions[0]!.title).toBe('古い記録');
+
+    vi.restoreAllMocks();
+    const selectedIndex = plan.selectedSourceIndex;
+    const selectedTables = plan.tables;
+    const selectedMigration = plan.migration;
+    const warnings = plan.warnings;
+    backup.tables[0]!.rows[1]![0] = '';
+    await expect(selectSource(plan, backupIndex)).rejects.toThrow('LOCIMYU_ID_MISSING_LEGACY_ID:2');
+    expect(plan.selectedSourceIndex).toBe(selectedIndex);
+    expect(plan.tables).toBe(selectedTables);
+    expect(plan.migration).toBe(selectedMigration);
+    expect(plan.warnings).toBe(warnings);
   });
 });
 
@@ -243,6 +583,7 @@ describe('applyImportPlan（LociMyu移行）', () => {
   it('セット・キャプション・ビュー・マテリアルを引き継いで新規プロジェクトを作る', async () => {
     const fs = new MemoryFS();
     const plan = await buildImportPlan(await readZipEntries(await makeDriveZip()));
+    const expectedKiretsuId = plan.migration!.sets[0]!.captions[0]!.captionId;
     const result = await applyImportPlan(fs, USER, plan, { projectName: '現場A（移行）' });
 
     expect(result.captionCount).toBe(3);
@@ -255,7 +596,7 @@ describe('applyImportPlan（LociMyu移行）', () => {
     const captions = visibleEntities(store.state, 'caption');
     expect(captions).toHaveLength(3);
     const kiretsu = captions.find((c) => c.fields.title === '北壁の亀裂')!;
-    expect(kiretsu.id).toBe(legacyCaptionId('c_a1'));
+    expect(kiretsu.id).toBe(expectedKiretsuId);
     expect((kiretsu.fields.anchor as { position: number[] }).position).toEqual([1.5, 2, -3]);
     // キャプションは所属セットに正しく割り当てられる
     const setA = sets.find((s) => s.fields.name === '通常表示')!;
@@ -305,12 +646,13 @@ describe('applyImportPlan（LociMyu移行）', () => {
   it('手動リンクで画像を結び付けられる', async () => {
     const fs = new MemoryFS();
     const plan = await buildImportPlan(await readZipEntries(await makeDriveZip()));
-    const links = new Map([[legacyCaptionId('c_a1'), 'kiso.png']]);
+    const captionId = plan.migration!.sets[0]!.captions[0]!.captionId;
+    const links = new Map([[captionId, 'kiso.png']]);
     const result = await applyImportPlan(fs, USER, plan, { projectName: 'p', imageLinks: links });
     expect(result.linkedImages).toBe(1);
 
     const store = await ProjectStore.open(fs, result.dir, USER);
-    const cap = store.state.byKind.caption![legacyCaptionId('c_a1')]!;
+    const cap = store.state.byKind.caption![captionId]!;
     const astId = (cap.fields.attachments as string[])[0]!;
     expect(store.state.byKind.asset![astId]!.fields.originalName).toBe('kiso.png');
   });
@@ -318,11 +660,12 @@ describe('applyImportPlan（LociMyu移行）', () => {
   it('未リンク画像は legacyImageFileId を保持し、後から解決できる', async () => {
     const fs = new MemoryFS();
     const plan = await buildImportPlan(await readZipEntries(await makeDriveZip()));
+    const captionId = plan.migration!.sets[0]!.captions[0]!.captionId;
     const result = await applyImportPlan(fs, USER, plan, { projectName: 'p' });
     expect(result.unlinkedImages).toBe(1);
 
     const store = await ProjectStore.open(fs, result.dir, USER);
-    const cap = store.state.byKind.caption![legacyCaptionId('c_a1')]!;
+    const cap = store.state.byKind.caption![captionId]!;
     expect(cap.fields.legacyImageFileId).toBe('DRIVEID_A');
   });
 
@@ -351,5 +694,113 @@ describe('applyImportPlan（LociMyu移行）', () => {
     await importNewProject(fs2, 'projects/re', await inspectZip(zip));
     const store2 = await ProjectStore.open(fs2, 'projects/re', USER);
     expect(store2.state).toEqual(store.state);
+  });
+
+  it('preview migrationを改変されてもselected raw tablesからcanonical IDを再構築する', async () => {
+    const fs = new MemoryFS();
+    const plan = await buildImportPlan(await readZipEntries(await makeDriveZip()));
+    const canonicalId = plan.migration!.sets[0]!.captions[0]!.captionId;
+    plan.migration!.sets[0]!.captions[0]!.captionId = 'cap_00000000000000000000000000';
+    plan.migration!.sets[0]!.captions[0]!.identity.captionId = 'cap_00000000000000000000000000';
+    const result = await applyImportPlan(fs, USER, plan, { projectName: 'preview tamper' });
+    const store = await ProjectStore.open(fs, result.dir, USER);
+    expect(visibleEntities(store.state, 'caption').some((caption) => caption.id === canonicalId)).toBe(true);
+    expect(store.state.byKind.caption?.cap_00000000000000000000000000).toBeUndefined();
+  });
+
+  it('apply call-entry後のtable・asset mutationを遮断する', async () => {
+    const plan = await buildImportPlan(await readZipEntries(await makeDriveZip()));
+    const canonicalId = plan.migration!.sets[0]!.captions[0]!.captionId;
+    const originalModelBytes = new Uint8Array(plan.models[0]!.data);
+    const realDigest = crypto.subtle.digest.bind(crypto.subtle);
+    let resume!: () => void;
+    const gate = new Promise<void>((resolve) => { resume = resolve; });
+    vi.spyOn(crypto.subtle, 'digest').mockImplementation(async (algorithm, data) => {
+      await gate;
+      return realDigest(algorithm, data);
+    });
+    const fs = new MemoryFS();
+    const pending = applyImportPlan(fs, USER, plan, { projectName: 'snapshot' });
+    const selected = plan.sources[plan.selectedSourceIndex]!;
+    selected.tables[0]!.name = 'mutated sheet';
+    selected.tables[0]!.rows[1]![0] = 'c_mutated';
+    selected.tables[0]!.rows[1]![1] = 'mutated title';
+    plan.models[0]!.name = 'mutated.stl';
+    plan.models[0]!.data.fill(0x6d);
+    resume();
+    const result = await pending;
+    const store = await ProjectStore.open(fs, result.dir, USER);
+    const caption = store.state.byKind.caption![canonicalId]!;
+    expect(caption.fields.title).toBe('北壁の亀裂');
+    const model = visibleEntities(store.state, 'asset').find((asset) => asset.fields.kind === 'model')!;
+    expect(model.fields.originalName).toBe('site.stl');
+    expect(await fs.readBytes(`${result.dir}/${model.fields.path as string}`)).toEqual(originalModelBytes);
+  });
+
+  it('raw tableのidentity preflight失敗時はworkspace・plan・map・buffersを一切変えない', async () => {
+    const plan = await buildImportPlan(await readZipEntries(await makeDriveZip({ withFileIdMap: true })));
+    const migration = plan.migration;
+    const fileIdMap = plan.fileIdMap;
+    const modelData = plan.models[0]!.data;
+    const imageData = plan.images[0]!.data;
+    const modelBytes = new Uint8Array(modelData);
+    const imageBytes = new Uint8Array(imageData);
+    plan.tables[0]!.rows[1]![0] = '';
+    const fs = new MemoryFS();
+    await expect(applyImportPlan(fs, USER, plan, { projectName: 'invalid' }))
+      .rejects.toThrow('LOCIMYU_ID_MISSING_LEGACY_ID:2');
+    expect(await fs.list('')).toEqual([]);
+    expect(plan.migration).toBe(migration);
+    expect(plan.fileIdMap).toBe(fileIdMap);
+    expect(plan.fileIdMap.get('DRIVEID_A')).toBe('kiretsu_01.jpg');
+    expect(plan.models[0]!.data).toBe(modelData);
+    expect(plan.images[0]!.data).toBe(imageData);
+    expect(plan.models[0]!.data).toEqual(modelBytes);
+    expect(plan.images[0]!.data).toEqual(imageBytes);
+  });
+
+  it('crypto collision時もworkspace write 0件でcaller buffersを保持する', async () => {
+    const xlsx = await makeXlsx([
+      {
+        name: 'A',
+        rows: [
+          CAP_HEADER,
+          ['c_1', 'one', '', '', '', '', '', '', '', ''],
+          ['c_2', 'two', '', '', '', '', '', '', '', ''],
+        ],
+      },
+    ]);
+    const plan = await buildImportPlan(await readZipEntries(await writeZipEntries([
+      { path: 'raw.xlsx', data: xlsx },
+      { path: 'model.stl', data: enc.encode('solid s\nendsolid s\n') },
+    ])));
+    const migration = plan.migration;
+    const modelData = plan.models[0]!.data;
+    const modelBytes = new Uint8Array(modelData);
+    vi.spyOn(crypto.subtle, 'digest').mockResolvedValue(new Uint8Array(32).buffer as ArrayBuffer);
+    const fs = new MemoryFS();
+    const failure = await applyImportPlan(fs, USER, plan, { projectName: 'collision' }).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toBe(IMPORT_SOURCE_ANALYSIS_FAILURE_NOTICE);
+    expect((failure as Error & { cause?: Error }).cause?.message).toContain('full SHA-256 collision');
+    expect(await fs.list('')).toEqual([]);
+    expect(plan.migration).toBe(migration);
+    expect(plan.models[0]!.data).toBe(modelData);
+    expect(plan.models[0]!.data).toEqual(modelBytes);
+  });
+
+  it('identity planningのpreimageとfull digestをproject state/logへ永続化しない', async () => {
+    const fs = new MemoryFS();
+    const plan = await buildImportPlan(await readZipEntries(await makeDriveZip()));
+    const forbiddenDigest = hex(plan.migration!.sets[0]!.captions[0]!.identity.fullDigest);
+    const result = await applyImportPlan(fs, USER, plan, { projectName: 'no identity internals' });
+    const storedText = (await Promise.all((await fs.list(result.dir)).map(async (path) =>
+      await fs.readText(path) ?? '',
+    ))).join('\n');
+    expect(storedText).not.toContain('lociview:v1:locimyu-caption-id:2:jcs-v1');
+    expect(storedText).not.toContain(forbiddenDigest);
   });
 });

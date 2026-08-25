@@ -1,0 +1,86 @@
+{
+  "$schema": "lociview.synthetic-locimyu-caption-id-expected",
+  "version": 1,
+  "recipeId": "locimyu-caption-id-2",
+  "preimagePrefix": "lociview:v1:locimyu-caption-id:2:jcs-v1\n",
+  "source": {
+    "transportPath": "fixtures/v1-migration/locimyu-drive-exact-v1.zip",
+    "transportSha256": "17f0bca42f157641fc0bd4feea23c2d7872ede56593e78a8fe51174f27ee9b05",
+    "selectedWorkbookPath": "LociMyu Save.xlsx",
+    "selectedWorkbookSha256": "f286db2b1ae82dd1ace26cb545a83b1afc1abea9c56ccc22df39dc1c1a7c7a1f"
+  },
+  "vectors": [
+    {
+      "vectorId": "synthetic-a",
+      "identityKey": {
+        "legacyId": "c_SYNTH_A",
+        "occurrence": 0,
+        "sheetIdentity": { "kind": "legacyGid", "value": "0" }
+      },
+      "fullDigest": "1ade732327636cadb583f4e621f3c880e14d093ec00523b35cafee626bbc3309",
+      "captionId": "cap_0TVSSJ69V3DJPVB0ZMWRGZ7J40"
+    },
+    {
+      "vectorId": "synthetic-b",
+      "identityKey": {
+        "legacyId": "c_SYNTH_B",
+        "occurrence": 0,
+        "sheetIdentity": { "kind": "legacyGid", "value": "617884617" }
+      },
+      "fullDigest": "8b53b92ddf5babd667d6221b89f8336bc44c2ad204c8826c05904500180fc582",
+      "captionId": "cap_4BAEWJVQTVNFB6FNH23E4ZGCVB"
+    },
+    {
+      "vectorId": "duplicate-a-0",
+      "identityKey": {
+        "legacyId": "c_DUPLICATE",
+        "occurrence": 0,
+        "sheetIdentity": { "kind": "sheetName", "value": "A" }
+      },
+      "fullDigest": "c7e583e82099c732b7cbbcf191f8807a46cc86e3ce6e64cf20b09b35fdb7a12f",
+      "captionId": "cap_67WP1YG84SRWSBFJXWY68ZH03T"
+    },
+    {
+      "vectorId": "duplicate-a-1",
+      "identityKey": {
+        "legacyId": "c_DUPLICATE",
+        "occurrence": 1,
+        "sheetIdentity": { "kind": "sheetName", "value": "A" }
+      },
+      "fullDigest": "0c45adbf105b9ad551c6cdbe44931d193f51e8d93ac5db99f1450c6b23caeba2",
+      "captionId": "cap_0C8PPVY42VKBAN3HPDQS29678S"
+    },
+    {
+      "vectorId": "duplicate-b-0",
+      "identityKey": {
+        "legacyId": "c_DUPLICATE",
+        "occurrence": 0,
+        "sheetIdentity": { "kind": "sheetName", "value": "B" }
+      },
+      "fullDigest": "f88081b973a362541b0629581f218f00e2f04b12598de9966d524b744799080d",
+      "captionId": "cap_7RG20VJWX3C9A1P1H9B0FJ33R0"
+    },
+    {
+      "vectorId": "unicode",
+      "identityKey": {
+        "legacyId": "c_合成",
+        "occurrence": 0,
+        "sheetIdentity": { "kind": "sheetName", "value": "写真" }
+      },
+      "fullDigest": "71c01b3b6f58926b2fe975262481405b34ab8d264b9fdfa1582884383d90d993",
+      "captionId": "cap_3HR0DKPVTRJ9NJZTBN4RJ82G2V"
+    }
+  ],
+  "fixtureCaptions": [
+    {
+      "setName": "通常表示",
+      "historicalCaptionId": "cap_LMV6Q4BG13K9QT53TGY1DA7777",
+      "vectorId": "synthetic-a"
+    },
+    {
+      "setName": "半透明・内部",
+      "historicalCaptionId": "cap_LMEKQ4VG1E6WES8ED3P0G87777",
+      "vectorId": "synthetic-b"
+    }
+  ]
+}
