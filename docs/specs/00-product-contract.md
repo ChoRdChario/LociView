@@ -23,9 +23,9 @@ are never defaults.
 | ID | Outcome |
 |---|---|
 | `PROD-01` | A project remains portable as a bounded, inspectable package and does not require a LociView server or account. |
-| `PROD-02` | Mesh and GS can exist in one project and be aligned without rewriting source assets. |
+| `PROD-02` | Mesh and GS can exist in one project and be aligned without rewriting source assets. The standard interactive GS configuration keeps its Mesh and GS Representations in the same logical Asset and active AssetRevision; Mesh-only and GS-only assets remain valid. |
 | `PROD-03` | Mesh, GS and Compare remain reliable even when Integrated cannot correctly compose a material. |
-| `PROD-04` | A user can attempt a caption pick on GS without first supplying a mesh. A derived proxy is a fallback, not a prerequisite. |
+| `PROD-04` | A user interacts with the displayed GS while the initial supported path raycasts an explicitly bound same-asset normal Mesh or interaction proxy. Missing, invalid, cross-asset or unregistered interaction data is reported and never guessed; direct splat picking is not an initial MVP requirement. |
 | `PROD-05` | A topology-changing asset replacement never moves captions or material overrides to a new surface silently. |
 | `PROD-06` | Data shown as durably saved survives a reload or process interruption covered by the durability gate. |
 | `PROD-07` | Collaboration import exposes unresolved concurrent edits instead of silently choosing a destructive winner. |
@@ -90,7 +90,34 @@ The user selects a reference asset and adjusts another asset non-destructively. 
 
 ### 4.5 Caption a GS
 
-The app first attempts direct GS picking. If the backend cannot meet the accepted latency or quality threshold, it offers GPU ID/depth picking or a precomputed interaction proxy. The stored anchor retains its current internal hit method/confidence for validation and diagnostics, but the ordinary pin UI does not add a persistent “approximate” badge: every created pin is movable with the same gizmo correction flow. A manual gizmo correction preserves a still-active compatibility class; if the old class is no longer active, the user explicitly targets one active visual family and rebinds to its current class. In either case the command records the active revision, changes the current method to `manual`, and removes stale normal/source/confidence evidence. LociView does not present any GS- or proxy-derived anchor as survey-grade measurement.
+The first supported flow opens one logical Asset whose active AssetRevision
+contains a normal Mesh and GS. The user clicks the displayed GS; the runtime
+raycasts an explicitly bound same-asset normal Mesh or `interactionProxy`, then
+stores the ordinary Caption anchor in AssetFrame. It never chooses a surface by
+array order, filename, label, bounds, transform similarity or proximity. Direct
+splat and GPU ID/depth picking are later optional paths, not first-slice
+acceptance.
+
+The stored anchor retains the actual hit method/confidence for validation and
+diagnostics, but the ordinary pin UI does not add a persistent “approximate”
+badge: every created pin is movable with the same gizmo correction flow. A
+manual gizmo correction preserves a still-active compatibility class; if the
+old class is no longer active, the user explicitly targets one active visual
+family and rebinds to its current class. In either case the command records the
+active revision, changes the current method to `manual`, and removes stale
+normal/source/confidence evidence. LociView does not present a proxy-derived
+anchor as survey-grade measurement.
+
+Incomplete paired data degrades exactly as follows:
+
+- usable Mesh plus missing/unusable GS: open Mesh-only and report the GS issue;
+- usable GS plus missing/unusable bound Mesh/proxy: open GS view-only and disable
+  Caption placement;
+- invalid or cross-asset interaction binding: disable interaction and report it,
+  without selecting another surface;
+- unknown registration: keep the pair unregistered and never assume identity or
+  infer alignment;
+- neither usable Mesh nor usable GS: exclude the asset from the active scene.
 
 ### 4.6 Exchange work
 
@@ -110,7 +137,7 @@ Included:
 - v2 metadata/blob storage and explicit v1 conversion;
 - Mesh, GS and Compare;
 - multiple assets and manual shared-coordinate alignment;
-- direct GS picking plus external interaction-proxy support;
+- a paired Mesh+GS AssetRevision with explicit same-asset Mesh/proxy interaction;
 - caption edit, package merge conflict review and clean share export;
 - opaque/mask/dither Integrated rendering;
 - mobile LOD, resident budgets and deterministic degradation;
@@ -120,6 +147,7 @@ Included:
 Excluded:
 
 - exact smooth-alpha mesh/GS intersection;
+- direct splat or GPU ID/depth picking as an initial product dependency;
 - a custom exact or front-K unified rasterizer;
 - automatic high-quality visual mesh reconstruction from GS;
 - raw large-GS optimization or collision generation on iOS;
@@ -192,6 +220,13 @@ Recorded on 2026-08-26:
 - only exact one-to-one source-authoritative sheet/media relationships may activate automatically; unresolved relationships are stocked for later expert batch review rather than presented as ordinary-user questions;
 - the first review stock is a private device-local bridge and is deliberately excluded from ordinary package export. It does not satisfy portable-project completion; portable collaboration/resolution requires a separate package/privacy contract.
 - landing the identity correction before that private stock is an integration slice, not a claim that unread source can already be recovered later; the original outer ZIP remains required and the transitional slice is not release-complete without the disclosure in `04-locimyu-conversion.md`.
+- the standard first interactive GS configuration is one logical Asset and one
+  active AssetRevision containing Mesh plus GS; the user clicks GS while an
+  explicit same-asset normal Mesh or interaction proxy supplies the raycast;
+- direct splat picking and ordinary-point acceptance are outside the first paired
+  vertical slice, while Mesh-only and GS-only assets remain schema-valid;
+- the five incomplete-data outcomes in section 4.5 are fixed product behavior;
+  no implementation may infer registration or interaction binding.
 
 Still required later:
 

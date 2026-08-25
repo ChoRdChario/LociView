@@ -282,6 +282,16 @@ type BackgroundIntent =
 - `interactionProxy` requires `contentKind: 'mesh'` and purposes exactly `['interaction']`; it cannot be a visual or preview candidate.
 - `interactionProxy` names exactly one `proxyForGsVariantFamilyId` present in the same asset revision.
 - Relationship fields are role-closed. `proxyForGsVariantFamilyId` is required only for `interactionProxy`; `targetGsVariantFamilyIds` is required only for `splatExclusion`; and `compositeGroupId` is allowed only on `visualPatch` or `splatExclusion`. Every other role omits those members. A field on the wrong role is invalid rather than ignored.
+
+The first paired Mesh+GS vertical slice reuses this existing proxy relation and
+does not add another domain, revision or interaction framework. The current
+closed relation fields do not identify a normal `meshPrimary` family as the
+selected raycast surface for one `gsPrimary` family. Array order, labels,
+filenames, bounds, equal transforms, `derivedFrom` and compatibility classes are
+not substitutes for that missing relation. A later minimal amendment MAY add one
+AssetRevision-scoped GS-family-to-Mesh-family binding, but production MUST NOT
+claim the normal-Mesh route until that relation is explicitly specified. The
+proxy route remains implementable with `proxyForGsVariantFamilyId` now.
 - `splatExclusion` requires `contentKind: 'splatMask'`, includes `display` purpose, has a `compositeGroupId`, and names a non-empty, deduplicated, lexicographically sorted `targetGsVariantFamilyIds` list whose families are `gsPrimary` contributions in the same asset revision. Its `representationFrameId` equals the owning `Asset.assetFrameId` and its canonical `representationToAsset` is identity, so the wire predicate is already baked into AssetFrame. It never produces color by itself.
 - A source-only representation is never rendered. A visual representation is eligible only when purposes contain `display` or `preview`.
 - `variantFamilyId` groups mutually exclusive source/display/preview encodings of the same logical contribution. SceneDocument exposes all valid candidates; RenderPlan selects exactly one eligible candidate per visible family. Independent surfaces use distinct families and may draw together.
@@ -384,6 +394,10 @@ Every new nonmanual pick writes the class containing its selected source Variant
 | `direct-splat` or `gpu-id-depth` | `contentKind: 'gaussianSplat'`, role `gsPrimary` | `splatSample` only |
 | `proxy` | `contentKind: 'mesh'`, role `interactionProxy` | `meshTriangle` only |
 | `manual` | no source Representation | no `normalAsset`, `surfaceRef`, source or confidence |
+
+The `direct-splat` and `gpu-id-depth` values remain reserved for a later optional
+path. Their wire presence does not make either method part of the first paired
+vertical slice or its renderer gate.
 
 A `surfaceRef` cannot exist without its source. New pick commands record only a Representation that the current RenderPlan made visible/pickable, validate source indices against its loaded verified bytes, and for a proxy require its declared GS family to be visible. Package/open validation always checks resolvable owner/method/content/role/surface-kind metadata; it range-checks an index when the weak source bytes are already in the validated closure. If those non-protecting bytes are absent, the source remains non-dereferenceable/unverified provenance and never invalidates the canonical anchor. A history-free package may omit the complete weak `source` while retaining method/confidence and the canonical anchor.
 
@@ -650,7 +664,9 @@ Responsibilities:
 
 - **ViewerController** owns product mode, project camera, selection and UI-facing commands.
 - **RenderCoordinator** diffs scenes, builds passes, coordinates Compare and schedules frames.
-- **InteractionIndex** combines visual hits, direct splat hits and proxy hits, then normalizes them to AssetFrame.
+- **InteractionIndex** combines hits from the explicitly selected same-asset
+  interaction surface and normalizes them to AssetFrame. Future direct-splat or
+  GPU ID/depth paths remain optional inputs rather than first-slice dependencies.
 - **ResourceManager** resolves SceneDocument's opaque logical resource references through BlobStore and owns source streams, decoded CPU resources, leases/refcounts, budgets, cancellation, eviction policy and restore scheduling. It accounts for backend-reported GPU bytes. Blob availability affects loading/diagnostics, never SceneResolver's semantic output.
 - **RenderBackend** reports capabilities, owns opaque GPU handles, realizes a RenderPlan, renders and picks. On final lease release or context loss the coordinator commands the backend to destroy its handle; handles never escape the adapter.
 - **LegacyV1BackendAdapter** preserves current single-model behavior during strangler migration; the current `ViewerCore` is not expanded into the v2 domain.
@@ -679,7 +695,11 @@ WBOIT, if its optional gate passes, remains an approximation. A future exact uni
 Picking policies:
 
 - Mesh: nearest valid visible hit across selected `meshPrimary`/enabled `visualPatch` triangle contributions and selected `pointPrimary` ordinary-point contributions. An ordinary-point hit records `hitEvidence.method: 'point-cloud'`; it records `SurfaceRef.pointSample` only when the complete source occurrence is available under the rule above. `normalAsset` is included only when a validated source normal can be transformed under the frame contract, and its absence never prevents caption creation.
-- GS: direct splat picking first.
+- GS: the first paired slice resolves the displayed GS to its explicit same-asset
+  interaction surface and raycasts that Mesh/proxy. The existing schema supports
+  the proxy route; the normal-`meshPrimary` route remains blocked on the one
+  minimal relation described in section 3.2. Missing or invalid interaction data
+  makes the GS view-only and never triggers an inferred target.
 - Compare: pick the pane or source currently under interaction.
 - Integrated: choose by effective visible depth when the backend can prove it; otherwise expose `auto`, `mesh`, or `GS` targeting and report ambiguity.
 
@@ -687,11 +707,19 @@ For picking, the Mesh source means the visible non-GS `meshPrimary`, `pointPrima
 
 The provisional ordinary-point click radius is 6 CSS pixels and is frozen or superseded by the G0 device/UX decision before G1. Eligible points come only from a RenderPlan-selected `pointPrimary` candidate and must pass its current LOD, visibility, clipping and depth rules. Binary/dither accepted samples always emit pick ID; rejected samples do not. For smooth material or smooth geometry, an integer pick-ID fragment exists only when the effective final coverage alpha at that canonical sample is at least the active point profile's `pickCoverageAlphaThreshold`; a lower-alpha visible fringe does not count as a fragment hit and may proceed to radius fallback. First, visible triangle and such accepted ordinary-point fragments that actually cover the click pixel are compared by effective visible depth. Only when no Mesh-source fragment covers that pixel may the point-radius fallback consider visible points within 6 CSS pixels. The coordinator orders those candidates by screen-space distance, effective depth and stable Representation ID. For candidates still tied, it uses the lexicographic `(nodeIndex, primitiveIndex, pointIndex)` locator only when every tied candidate has the complete occurrence; if any lacks it, it compares the finite validated RepresentationFrame positions of all tied candidates lexicographically after normalizing negative zero. This position is a non-persisted tie-break. Equal final position with unavailable/distinct normal evidence yields the same canonical anchor and omits source/normal evidence. If any required position cannot be recovered deterministically, or the backend cannot prove fragment coverage, comparable depth or stable ordering under the active plan, it returns an ambiguity and asks for Triangle or Points targeting rather than silently preferring one.
 
-Direct GS picking is click-triggered, never an every-frame full scan. The gate measures p50/p95 latency, miss rate, position error and normal availability. Failure triggers GPU ID/depth investigation, then external or generated interaction proxy support.
+Direct GS and GPU ID/depth picking are outside the first paired scope. A later
+gate may measure their latency, miss rate, position error and normal availability
+without changing the initial bound-surface contract.
 
 Proxy generation is desktop/local preprocessing. The original source and derivation record are preserved. A generated proxy is suitable for approximate hit testing only. It MUST NOT be rendered, exported as a visual reconstruction by default, or used for measurement claims.
 
-In Integrated `auto` picking, a proxy is a candidate only when its declared `proxyForGsVariantFamilyId` is visible and pickable and direct/ID picking is unavailable or has failed its gate. If the backend cannot prove ordering between that approximate hit and a visible mesh hit, `auto` returns an ambiguity and asks the user to target Mesh or GS; it never lets an invisible proxy silently win. Exclusion applies only to its declared `targetGsVariantFamilyIds`; the same active AssetFrame predicate filters direct/ID hits and proxy hit positions, so an excluded GS region cannot remain invisibly pickable.
+In Integrated `auto` picking, a proxy is a candidate only when its declared
+`proxyForGsVariantFamilyId` is visible and pickable. If the backend cannot prove
+ordering between that approximate hit and a visible mesh hit, `auto` returns an
+ambiguity and asks the user to target Mesh or GS; it never lets an invisible
+proxy silently win. Exclusion applies only to its declared
+`targetGsVariantFamilyIds`; the same active AssetFrame predicate filters bound
+surface hits, so an excluded GS region cannot remain invisibly pickable.
 
 ## 9. Alignment UX
 
@@ -746,7 +774,8 @@ Spark/Three and PlayCanvas receive the same source fixtures, camera paths and ha
 - Mesh, GS, Compare and opaque/mask/dither Integrated;
 - patch/exclusion groups and intersecting geometry;
 - closed translucent aircraft diagnostics;
-- direct and proxy picking;
+- paired same-asset Mesh+GS interaction through the explicit proxy binding;
+  direct GS picking is optional later evidence and cannot block this slice;
 - first preview, p50/p95 frame time and resource budgets;
 - cancellation, 20 load/unload cycles, context loss and background restore;
 - dependency size, license, security audit and migration effort.
@@ -769,7 +798,7 @@ Useful current candidate evidence:
 - `RND-DOM-05`: surface-compatible derivative addition retains anchors; incompatible or unknown replacement derives `needsReview`.
 - `RND-DOM-06`: material overrides survive nonvisual derivative and candidate LOD/preview switching through complete family slot maps and never cross a new family through a display-name guess.
 - `RND-DOM-07`: SceneDocument is deterministic and contains no forbidden backend/storage types.
-- `RND-DOM-08`: role matrices for all four modes match this specification; proxies never reach color/depth/screenshot. Reusing one VariantFamily across assets, roles, content kinds or inconsistent semantic targets is rejected, while a raw reflected source and correctly baked identity display candidate remain one selectable family. Mesh/GS/point/patch families remain independently selectable in Compare/Integrated.
+- `RND-DOM-08`: role matrices for all four modes match this specification; proxies never reach color/depth/screenshot. Reusing one VariantFamily across assets, roles, content kinds or inconsistent semantic targets is rejected, while a raw reflected source and correctly baked identity display candidate remain one selectable family. Mesh/GS/point/patch families remain independently selectable in Compare/Integrated. The paired fixture keeps its Mesh and GS families in one logical Asset and active AssetRevision rather than satisfying the row with unrelated assets.
 - `RND-DOM-09`: patch and exclusion activate atomically.
 - `RND-DOM-10`: a fixture with two GS families proves that proxy and exclusion records affect only their explicitly targeted family.
 - `RND-DOM-11`: ProjectFrame wire validation and camera/view/migration golden vectors agree for meters, custom scale and unknown legacy units.
@@ -803,7 +832,7 @@ Useful current candidate evidence:
 - `RND-BE-02`: golden images cover Mesh, GS, Compare and supported Integrated material classes.
 - `RND-BE-03`: supported Integrated classes meet G0 image-difference masks/tolerances and product-owner visual acceptance for z-fighting, halo, duplicate surface and exclusion holes; a warning cannot convert a supported-class failure into a pass.
 - `RND-BE-04`: the translucent aircraft shows the correct support warning and every promised fallback.
-- `RND-BE-05`: mesh, ordinary-point, direct-GS and proxy picks are normalized to AssetFrame. Point-only and mixed fixtures pick the nearest accepted visible ordinary point with a missing-normal path; proxy hits remain approximate and never enter measurement.
+- `RND-BE-05`: mesh, ordinary-point and explicitly bound proxy picks are normalized to AssetFrame. In the first paired fixture the user targets the displayed GS and the bound same-asset proxy supplies the hit; direct-GS is not required. Point-only and mixed fixtures pick the nearest accepted visible ordinary point with a missing-normal path; proxy hits remain approximate and never enter measurement.
 - `RND-BE-06`: cancellation, decode error, quota error and obsolete generation leave no attached partial resource.
 - `RND-BE-07`: backend resource ledgers return to zero live handles after unload, and repeated load/unload meets the numeric heap/resource plateau slope and tolerance fixed in G0; context restore is progressive.
 - `RND-BE-08`: physical iOS completes the G1 fixed-camera and background/restore run without reload or context loss.
@@ -813,3 +842,4 @@ Useful current candidate evidence:
 - `RND-BE-12`: anisotropic GS with degree-greater-than-zero view dependence and reflection matches accepted image/bounds/pick goldens in both backends.
 - `RND-BE-13`: at all G0 fractional DPR/render-scale cases, both backends derive identical integer targets, top-left sample/pointer mapping, dither coordinates and ordinary-point color/depth/ID disc coverage. Smooth pick threshold, fragment result and the separate 6-CSS-pixel fallback agree without a hidden native size clamp.
 - `RND-BE-14`: source/material override matrix produces the same effective class, supported/redirected label and accepted image in both backends; profile summary/decode disagreement is a decode error rather than a backend reclassification.
+- `RND-BE-15`: one logical Asset and active AssetRevision contain the standard Mesh+GS pair and an explicit same-asset proxy binding. GS display -> proxy raycast -> AssetFrame Caption -> durable save/reopen preserves the Asset, active binding, both visual Representations, proxy relation, transforms, source bytes and Caption. Missing GS degrades to diagnosed Mesh-only; a missing or unusable explicitly bound Mesh/proxy degrades to GS view-only with Caption placement disabled; invalid/cross-asset binding disables interaction and reports; unknown registration remains unregistered and neither alignment nor an interaction target is inferred; and no usable Mesh or GS excludes the asset. Mesh-only and GS-only remain valid schema cases but cannot substitute for this acceptance, and ordinary-point/direct-splat behavior is not credited.

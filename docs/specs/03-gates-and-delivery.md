@@ -41,7 +41,9 @@ Required fixtures:
 - mesh/GS intersection, ordinary-point/GS Integrated overlap, and GS gap repaired by a visual patch;
 - visual patch plus same-asset atomic splat-exclusion group, a differently oriented/scaled external repair import and cancel/failure path, unchanged-base versus singleton-patch anchor compatibility across patch add/update/remove, manual C1-to-C2 rebind and ambiguous-target refusal, ungrouped/cross-asset/missing-patch, nonidentity-mask and wrong-role relationship-field failures, raw/paged/preview target switching, overlapping hard-mask union and excluded-region direct/proxy picks;
 - a closed translucent aircraft with at least six mesh surfaces on representative view rays;
-- direct-GS pick ground truth and an external interaction proxy;
+- one same-logical-Asset/same-active-AssetRevision Mesh+GS pair with explicit
+  proxy-to-GS binding, AssetFrame raycast/Caption ground truth and all five fixed
+  incomplete-data outcomes; direct-GS ground truth is optional later evidence;
 - multiple assets with different origins, axes, units and Sim(3) alignment;
 - 10,000 captions and 50,000 metadata changes;
 - deleted/private sentinel values for package privacy tests;
@@ -218,7 +220,7 @@ Failure stops CAS production work and triggers a format/sink/desktop-packer ADR 
 
 Spark/Three and PlayCanvas use identical source fixtures, camera traces, render scale, exposure/background and hard requirements. Engine-native derivatives are allowed only when preprocessing time, output size and provenance are included.
 
-Required scenes: GS, mesh, one-container mixed mesh+ordinary-points, reflected-raw/identity-baked candidates in one family, profile-defined static pose and explicit static-pose bake/reject inputs, anisotropic/view-dependent GS transformed against mesh axes, missing-blob metadata-only bounds parity, Compare, opaque/mask/dither Integrated, the source-semantics/opacity/chroma/final-alpha matrix, mesh/GS and ordinary-point/GS intersection, atomic same-asset patch/exclusion including external repair alignment/cancel/failure and base-versus-patch compatibility partition through add/update/remove plus ungrouped/cross-asset/missing-patch/nonidentity-mask/wrong-role negatives, raw/paged/preview GS under one hard AssetFrame mask, overlapping-mask union and excluded direct/proxy picks, multiple aligned assets, point-only/mixed ordinary-point rendering/picks at identical CSS diameter/DPR/render scale across the three ratified binary/dither/smooth profile IDs including symmetric index-present/index-absent ties, two-node indexed/reflected mesh picks, paged/reordered splat picks, direct-GS/proxy/manual-gizmo C1-to-C2 rebind picks, closed translucent aircraft, context loss and twenty load/unload cycles.
+Required scenes: one same-logical-Asset/same-active-AssetRevision Mesh+GS pair with an explicit proxy-to-GS interaction binding, GS-display/proxy-raycast/AssetFrame-Caption/save/reopen ground truth and the five fixed incomplete-data outcomes; GS, mesh, one-container mixed mesh+ordinary-points, reflected-raw/identity-baked candidates in one family, profile-defined static pose and explicit static-pose bake/reject inputs, anisotropic/view-dependent GS transformed against mesh axes, missing-blob metadata-only bounds parity, Compare, opaque/mask/dither Integrated, the source-semantics/opacity/chroma/final-alpha matrix, mesh/GS and ordinary-point/GS intersection, atomic same-asset patch/exclusion including external repair alignment/cancel/failure and base-versus-patch compatibility partition through add/update/remove plus ungrouped/cross-asset/missing-patch/nonidentity-mask/wrong-role negatives, raw/paged/preview GS under one hard AssetFrame mask, overlapping-mask union and excluded bound-surface picks, multiple aligned assets, point-only/mixed ordinary-point rendering/picks at identical CSS diameter/DPR/render scale across the three ratified binary/dither/smooth profile IDs including symmetric index-present/index-absent ties, two-node indexed/reflected mesh picks, paged/reordered splat inputs, proxy/manual-gizmo C1-to-C2 rebind picks, closed translucent aircraft, context loss and twenty load/unload cycles. Direct-GS/GPU-ID picking is optional later evidence and does not block the paired slice; ordinary-point fixtures do not count toward its acceptance.
 
 Provisional physical-iOS hard floor, confirmed in G0:
 
@@ -228,11 +230,15 @@ Provisional physical-iOS hard floor, confirmed in G0:
 - initial preview within 5 seconds from a defined offline local cold open;
 - ten minutes without page reload or context loss;
 - three successful background/foreground restores;
-- direct pick p95 at most 100 ms desktop and 150 ms iOS, or a documented fallback;
-- pick error within two screen pixels or one projected ordinary-point/splat footprint for the applicable ground-truth fixture;
+- bound-surface pick p95 at most 100 ms desktop and 150 ms iOS;
+- pick error within two screen pixels or the applicable bound-surface/ordinary-point footprint for the ground-truth fixture;
 - resource usage reaches a stable plateau after twenty load/unload cycles.
 
-A picking fallback passes only if it meets the latency/error/availability threshold assigned to that fallback in G0; merely having a proxy or GPU path is insufficient. Proxy and direct paths are evaluated separately through internal method/confidence telemetry, while the normal pin UI remains one editable gizmo-correctable presentation without a persistent approximation badge.
+A bound normal-Mesh or proxy path passes only if it meets its assigned
+latency/error/availability threshold; merely having bytes is insufficient.
+Direct-GS/GPU-ID paths may be evaluated later through their own telemetry, while
+the normal pin UI remains one editable gizmo-correctable presentation without a
+persistent approximation badge.
 
 Hard functional requirements:
 
@@ -240,7 +246,7 @@ Hard functional requirements:
 - unknown/digest-mismatched FormatProfiles and profile-summary/decode mismatches fail explicitly without extension-based fallback;
 - progressive paging and bounded lifecycle;
 - Mesh, GS, Compare and supported Integrated classes;
-- direct or fallback caption picking;
+- explicit same-asset Mesh/proxy-bound caption picking; direct-GS is not required;
 - context restore and explicit disposal;
 - no backend type in persistent data.
 - identical profile-derived static pose, bounds, material class, transformed GS footprint/color basis and point footprint/pick result across both backends, or an explicit Unsupported result.
@@ -341,7 +347,7 @@ integratedTransparencyExperimental
 | `v2WorkspaceCreation` | storage gate adopted | Hides new conversion/creation only. It never chooses a writer for an existing workspace. |
 | `rendererV2` | renderer gate adopted | v1 uses the legacy viewer. A v2 workspace opens metadata-only/read-only diagnostics; it is never handed to the v1 viewer or writer. |
 | `gsStandalone` | `rendererV2` | GS is diagnosed but not drawn. Use Mesh when available; a GS-only project remains read-only/view-metadata until enabled. |
-| `gsDirectPicking` | `rendererV2`, `gsStandalone` | Use a gate-passing GPU ID/depth or external proxy. Existing captions remain readable; new surface picks are disabled clearly if no fallback passes. |
+| `gsDirectPicking` | later optional gate after `rendererV2`, `gsStandalone` | This future control never gates the first paired slice. When disabled, explicitly bound same-asset Mesh/proxy interaction remains available; a GS without a usable binding is view-only. |
 | `proxyGeneration` | adopted desktop packer path | Prepared external proxies may still be consumed. Generation is unavailable on iOS. |
 | `compareV2` | `rendererV2`, Mesh and GS capability | Offer independent Mesh or GS modes without comparison. |
 | `integratedOpaque` | `rendererV2`, supported Mesh and GS | Offer Mesh, GS and Compare; never approximate Integrated silently. |
@@ -363,7 +369,12 @@ Rollback means preserving the source v1 package/workspace, opening conversion in
 6. renderer/storage-neutral domain and ports with unchanged v1 characterization.
 7. production blob journal, metadata repository and package classes.
 8. ratify the immutable `v1-migration-recipe-1` companion/golden manifest and its one-to-one descriptor, then implement canonical v1 conversion; no durable conversion exists before this sub-gate passes.
-9. GS vertical slice: import -> stream -> display -> pick -> caption -> durable save -> reload.
+9. Paired Mesh+GS vertical slice in one logical Asset/active AssetRevision:
+   import -> stream -> display GS -> raycast the explicit same-asset proxy ->
+   AssetFrame Caption -> durable save -> reload, including the five fixed
+   incomplete-data outcomes. A normal-Mesh binding remains blocked until its
+   one minimal schema relation is separately specified; direct-GS and ordinary
+   points do not block this slice.
 10. multiple assets, alignment and Compare.
 11. opaque/mask/dither Integrated and patch/exclusion.
 12. iOS, migration, corruption, privacy and security hardening.

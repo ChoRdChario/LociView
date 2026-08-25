@@ -39,7 +39,7 @@
 ## 2026-08-16: GSとmeshの共存には同一空間の補修・交差を含める
 
 - meshは別表示物だけでなく、GS欠損部を補うため同一領域で交差・重複し得る。
-- `interactionProxy`、`visualPatch`、`splatExclusion`を異なるroleとして保存・描画し、collision用meshをvisual/depthへ流用しない。
+- `interactionProxy`、`visualPatch`、`splatExclusion`を異なるroleとして保存・描画し、interaction-only proxyをvisual/depthへ流用しない。同じactive revision内で明示的にbindされた通常`meshPrimary`は、proxyへ読み替えずGSのraycast surfaceとして使用できる。
 - 不透明補修でも境界のちらつき、halo、二重表現を評価する。
 
 ## 2026-08-16: 半透明は数値ではなく合成意図としてモデル化する
@@ -102,3 +102,18 @@
 - 技術的に安全で非損失な既定処理がある場合、一般利用者へ細かなID・移行・保存判断を連続して求めず、ツール側で全件を保持して進める。
 - 自動確定できない関連付けや曖昧さは、黙って推測・削除・統合せず、通常作業を妨げない範囲でレビュー待ちとして蓄積し、詳しい利用者や支援者が後からまとめて解決できるようにする。
 - 通常UIは短い結果と必要な行動だけを示し、技術的な根拠や個別問題は段階的に開けるようにする。継続がデータ損失・誤関連・不変条件違反を起こす場合だけ、影響単位を限定して止める。
+
+## 2026-08-26: severityとdelivery priorityを分離する
+
+- レビューで問題を発見した事実だけではactive scopeへ取り込まない。現sliceのacceptance、active gate exit、データ破壊・重大security・重大互換性、または大幅な後続手戻り防止のいずれにも該当しないP2は原則backlogとし、P1も同じ因果を確認する。
+- reviewerは通常1名、security・storage・migration・wire compatibilityで独立したrisk classがある場合のみ最大2名とする。初回reviewと受け入れたP0/P1修正のtargeted確認後は探索を再開せず、P2ゼロを完了条件にしない。
+- 既存acceptanceがroot defectを十分に拘束している場合は追加test・fixture・oracleを作らない。sliceはrelease blockerまたはgate exit rowを1つ閉じる単位とし、xfail/todo件数の削減だけで開始しない。
+- full matrixは最終の実行系treeで原則1回とし、その後が結果記録だけなら静的確認に限定する。exact release-candidate treeの最終matrixは別に実行する。
+- external evidenceは一括して「外部待ち」にせず、repository準備、Codex実行、物理端末操作、外部data、Product Owner批准、前項待ちへ分解する。実機runはfixed fixture/trace/instrumentationが揃ってから一度に実施し、code workで代替しない。
+- monolithic gateが無関係な後続laneを止めている疑いがある場合も黙ってgateを緩めない。依存関係をread-onlyで示し、Product Ownerが批准するまでは現行gateを維持する。
+
+## 2026-08-26: 承認済みAND関係をsliceでORへ弱めない
+
+- 同一logical Asset内のMesh＋GSのような承認済み併存関係を、最小sliceの都合で「MeshまたはGS」へ変えない。Mesh-only／GS-onlyがschema-validでも、paired acceptanceの代替にはしない。
+- 既存`AssetRevision`／`Representation`で表現できる構造に、別名のdomain model、representation set、revision frameworkを重ねない。不足が一つなら既存record間の最小relationだけを説明し、批准前にfieldやframeworkを実装しない。
+- ユーザー体験上の操作対象と内部hit-test方式を分ける。GSを操作するUXでも、初回は明示的にbindされた同一asset内のMesh/proxy raycastでよく、direct splatや汎用collisionを自動的にscopeへ入れない。

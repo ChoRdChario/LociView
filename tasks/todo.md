@@ -2,6 +2,31 @@
 
 Completed v1 implementation history remains available in Git before the G-1 cleanup baseline (`4f6e481`). This file contains only active and next work.
 
+## Active delivery refocus — Product Owner review pending 2026-08-26
+
+- [x] Complete a read-only `NEEDS REFOCUS` meta-audit of completion conditions,
+  active gates, recent cost allocation and review closure behavior
+- [x] Reconstruct the completion path as five major workstreams and decompose G0
+  external evidence into repository, Codex, physical-device, external-data,
+  Product Owner approval and predecessor-dependent acquisition units
+- [x] Limit the external-wait production lane to the three actual G0-S roots and
+  the existing-evidence pre-fix ledger; reject micro-edge/xfail-count work
+- [x] Analyze G0-to-G1 dependencies without changing the approved gate and record
+  the recommendation to propose Product Owner-approved lane readiness gates
+- [x] Record P2/backlog, reviewer-count, full-matrix, test-reuse and slice-unit
+  stop rules in `tasks/critical-path.md` and `tasks/lessons.md`
+- [x] Product Owner reviewed and amended the paired Mesh+GS policy in
+  [`tasks/critical-path.md`](critical-path.md) and authorized this docs-only
+  commit
+- [ ] Product Owner reviews the remaining delivery/gate-refocus proposal and
+  separately authorizes production restart; no implementation, test addition,
+  external acquisition, device run, schema implementation or gate amendment
+  starts before that authorization
+
+Current authority remains unchanged: G0 and G0-S are active/incomplete and G1+
+cannot begin under the approved contract. This docs-only commit records product
+policy and does not approve a gate split or a production unit.
+
 ## G-1 — Repository normalization
 
 - [x] Confirm `G:/00_AI_dev/LociView` as the canonical Git repository and record baseline commit
@@ -52,6 +77,26 @@ Completed v1 implementation history remains available in Git before the G-1 clea
 - hard `splatExclusion` is accepted as the rendering counterpart of a human-authored/imported `visualPatch`
 - animation playback remains outside MVP
 - semantic conflicts fail closed only for the affected unit and never silently choose a winner
+
+### Product-owner paired Mesh+GS decisions recorded 2026-08-26
+
+- The first standard interactive configuration is one logical Asset and one
+  active AssetRevision containing normal Mesh plus GS; Mesh-only and GS-only
+  assets remain schema-valid but do not close the first paired slice.
+- The user clicks the displayed GS while an explicit same-asset normal Mesh or
+  interaction proxy supplies the raycast. Direct splat picking and ordinary-point
+  acceptance are outside the first paired slice.
+- Reuse the existing `AssetRevision`/`Representation` structure. Do not add a
+  parallel domain model, revision framework, renderer abstraction or transaction
+  system for this correction.
+- Missing GS degrades to diagnosed Mesh-only; missing Mesh/proxy degrades to GS
+  view-only with Caption placement disabled; invalid/cross-asset binding disables
+  interaction and reports; unknown registration is never inferred; and an asset
+  with neither usable Mesh nor GS is not active.
+- The existing proxy relation is sufficient for the first proxy-backed slice.
+  A normal `meshPrimary` interaction route remains blocked on explaining and
+  separately approving one minimal relation; no field or implementation is added
+  by this docs-only task.
 
 ## G0 — Baseline fixtures and acceptance contracts
 
@@ -1715,4 +1760,7 @@ Start only after G0 and G0-S pass. See `docs/v2/00-approved-direction.md`. Order
 2. Spark/Three versus PlayCanvas renderer bakeoff;
 3. Automerge durability/merge/privacy PoC;
 4. renderer/storage-neutral ports with unchanged v1 behavior;
-5. v2 persistence, canonical migration, and the GS vertical slice.
+5. v2 persistence, canonical migration, and the paired Mesh+GS vertical slice in
+   one logical Asset/active AssetRevision, using the existing explicit same-asset
+   proxy binding for the initial raycast; direct-GS and ordinary points do not
+   close that slice.

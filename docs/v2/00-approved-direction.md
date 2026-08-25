@@ -12,9 +12,11 @@ Evolve the current offline LociView without a full rewrite so it can:
 
 - convert LociMyu XLSX/model/image datasets without Google-account or Google-API dependence while leaving selected source bytes unchanged, preserving duplicate source occurrences independently and retaining uncertain relationships for later expert review;
 - display Gaussian Splatting data;
-- support mesh and GS data in the same project;
+- support mesh and GS data in the same project, with the standard interactive
+  configuration keeping both in one logical Asset and one active AssetRevision;
 - provide reliable Mesh, GS, and comparison workflows;
-- retain usable caption picking when no authored mesh exists;
+- keep Mesh-only and GS-only assets valid, while treating GS without a registered
+  same-asset interaction surface as view-only rather than guessing a surface;
 - remain portable, local-first, and practical on iOS;
 - replace the unsafe parts of the custom persistence layer without losing v1 projects.
 
@@ -59,7 +61,23 @@ An asset may carry:
 - optional preview representation;
 - optional invisible interaction proxy.
 
-No mesh is required for the first caption attempt. Ordinary points use visible point picking; GS uses direct splat picking first. Introduce GPU ID/depth picking or an interaction proxy when latency or normal quality fails the agreed threshold.
+The first standard interactive configuration is one `meshPrimary` plus one
+`gsPrimary` in the same logical Asset and active AssetRevision. The user clicks
+the displayed GS, while the implementation raycasts an explicitly bound
+same-asset normal Mesh or `interactionProxy`. The existing
+`interactionProxy.proxyForGsVariantFamilyId` relation covers the proxy route.
+The current closed schema does not yet express a normal `meshPrimary` as the
+selected GS interaction surface; do not infer that relation from order, label,
+bounds, transform similarity or `derivedFrom`. Direct splat and GPU ID/depth
+picking are outside the first vertical slice and may be reconsidered later.
+
+Degradation is fixed: a usable Mesh with missing GS opens Mesh-only with a
+diagnosis; a usable GS with no usable bound Mesh/proxy opens GS view-only with
+caption placement disabled; an invalid or cross-asset interaction binding
+disables interaction and reports the problem without guessing; unknown
+registration remains unregistered; and an asset with neither usable Mesh nor GS
+does not enter the active scene. Ordinary-point Representations remain valid but
+are not part of the first paired acceptance.
 
 Automatic proxy generation is a desktop/local preprocessing option, not an iOS runtime requirement. A proxy is derived collision evidence, not a visual or measurement-quality mesh. Its hit method/confidence remains internal portable provenance, but the resulting caption uses the same visible pin and gizmo correction flow without a persistent approximation badge.
 
@@ -127,7 +145,9 @@ Package purposes remain distinct:
 8. Renderer/storage-neutral ports inserted with unchanged v1 behavior.
 9. v2 binary storage and metadata productionization.
 10. Ratified byte-exact v1 migration recipe, then canonical v1 migration.
-11. GS vertical slice: import -> display -> pick -> caption -> save -> reload.
+11. Paired Mesh+GS vertical slice in one logical Asset/active AssetRevision:
+    import -> display GS -> raycast the explicit same-asset Mesh/proxy -> caption
+    -> save -> reload.
 12. Multiple assets, alignment, Compare, and opaque/mask/dither Integrated.
 13. iOS, migration, corruption, privacy, and security hardening.
 14. Productionize an adopted smooth result only after core hardening and a separate production review; otherwise leave it off. Exact-renderer/transmission research remains later and separate.
@@ -147,7 +167,7 @@ Included:
 - v2 metadata/blob storage and v1 conversion;
 - Mesh, GS, and Compare;
 - multiple assets and coordinate alignment;
-- direct GS picking and external interaction-proxy support;
+- paired Mesh+GS interaction through an explicit same-asset Mesh/proxy surface;
 - ordinary-point display and caption picking for v1-compatible point data;
 - captions, collaboration merge, and clean share export;
 - opaque/mask/dither Integrated rendering;
@@ -156,6 +176,7 @@ Included:
 Excluded from the MVP:
 
 - exact smooth-alpha mesh/GS intersection;
+- direct splat or GPU ID/depth picking as an initial product dependency;
 - custom front-K or exact unified rasterizer;
 - automatic high-quality visual mesh reconstruction from GS;
 - large raw-GS preprocessing on iOS;
