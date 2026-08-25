@@ -8,6 +8,16 @@ LociView v2 is a local-first, offline-capable browser viewer for portable projec
 
 The current application remains the migration base. v2 replaces storage and rendering internals behind explicit ports while preserving the useful LociMyu/LociView viewing and recording workflow and the ability to open source v1 packages. Ordinary file, caption, merge, export and recovery flows target a person comfortable with normal Microsoft Office file workflows; they MUST NOT require developer, 3D-engine, storage-engine or synchronization-protocol knowledge.
 
+When a deterministic non-lossy default can preserve every source record, the
+product MUST apply that default without asking an ordinary user to decide
+technical identity, storage or migration details. Uncertainty that does not
+prevent safe preservation is retained as a bounded review item and disclosed in
+a concise summary; a knowledgeable user or support operator can inspect and
+resolve such items in batches later. The product blocks only the affected unit or
+commit when continuing would lose a record, guess a semantic relationship or
+violate an invariant. Exclusion, destructive merge and silent guessed linkage
+are never defaults.
+
 ## 2. Non-negotiable user outcomes
 
 | ID | Outcome |
@@ -24,7 +34,8 @@ The current application remains the migration base. v2 replaces storage and rend
 | `PROD-10` | Unsupported schema, renderer capability, material policy or missing blob produces an actionable diagnosis, not a blank viewer. |
 | `PROD-11` | The same validated static source produces the same pose, logical bounds, material class and canonical pick anchor/method across supported backends; candidate-local weak provenance may differ or be absent, and a decoder upgrade cannot reinterpret an existing Representation silently. |
 | `PROD-12` | A non-specialist can complete ordinary open/import, caption, merge, export and recovery flows using familiar file/task language, without a Google/LociView account or exposure to actor, HLC, hash, CAS, OPFS, renderer-profile or similar implementation terminology. |
-| `PROD-13` | A LociMyu save dataset consisting of an XLSX save, associated model and images, and an optional file-ID map remains convertible into a new LociView project without a Google account or Google API. Conversion never overwrites the selected source files/archive artifacts, preserves every unambiguous record and reports duplicate or ambiguous identifiers, inferred sheet mappings and unresolved media links. An affected mapping is not committed through a lossy or guessed choice until the user gives an explicit disposition under the accepted conversion contract. Transient caller buffers may be consumed or cleared after ownership transfer; they are not the durable source artifact. |
+| `PROD-13` | A LociMyu save dataset consisting of an XLSX save, associated model and images, and an optional file-ID map remains convertible into a new LociView project without a Google account or Google API. Conversion never overwrites the selected source artifacts. Every non-empty LociMyu caption data-row occurrence is preserved independently. Duplicate legacy caption identifiers do not identify one target entity: every otherwise valid occurrence becomes a distinct Caption, and no occurrence is dropped, merged or selected as a winner. A uniquely source-authoritative relationship may be applied automatically. An inferred or ambiguous sheet relationship and an unresolved or ambiguous media relationship remain non-authoritative while the source row, reference, candidates and provenance are preserved in the durable expert-review backlog. Such issues do not block the conversion while a bounded, durable and deterministic preserved result can be committed. The ordinary-user flow reports the aggregate result and permits later review; it does not require item-by-item dispositions. Transient caller buffers may be consumed or cleared after ownership transfer; they are not the durable source artifact. |
+| `PROD-14` | When an import or conversion can preserve all source facts and isolate uncertain semantics, it MUST continue with the safe preserved result and a durable expert-review item instead of asking an ordinary user for fine-grained decisions. It MUST NOT silently drop, merge, choose a winner, invent a relationship or activate a guessed relationship. An ordinary-user choice is permitted only for a coarse source/target-authority decision, a destructive or irreversible action, or a condition that the accepted contract identifies as preventing any safe preserved result. |
 
 ## 3. Product modes and support levels
 

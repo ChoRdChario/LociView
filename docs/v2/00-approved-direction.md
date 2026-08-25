@@ -1,7 +1,7 @@
 # LociView v2 approved direction
 
 > Status: `ACCEPTED DIRECTION SUMMARY / NON-NORMATIVE / NOT IMPLEMENTED`
-> Updated: 2026-08-24
+> Updated: 2026-08-26
 > Technology choices marked as candidates remain subject to the listed PoC gates.
 
 This is a navigation summary, not an independent requirements source. Rationale, decisions, rejected defaults and reconsideration triggers are normative in `docs/adr/0001-v2-foundation.md`. Review-ready implementation contracts are indexed in `docs/specs/README.md`; after product-owner approval they provide the detailed normative contract. Until then they remain proposed and do not authorize implementation.
@@ -10,7 +10,7 @@ This is a navigation summary, not an independent requirements source. Rationale,
 
 Evolve the current offline LociView without a full rewrite so it can:
 
-- convert LociMyu XLSX/model/image datasets without Google-account or Google-API dependence while leaving selected source bytes unchanged and surfacing ambiguous mappings;
+- convert LociMyu XLSX/model/image datasets without Google-account or Google-API dependence while leaving selected source bytes unchanged, preserving duplicate source occurrences independently and retaining uncertain relationships for later expert review;
 - display Gaussian Splatting data;
 - support mesh and GS data in the same project;
 - provide reliable Mesh, GS, and comparison workflows;
@@ -84,6 +84,7 @@ Package purposes remain distinct:
 ## Migration
 
 - LociMyu dataset conversion and LociView v1-package-to-v2 migration are distinct compatibility paths; the former may remain integrated or use a separate tool, but both must follow the accepted product contract rather than fork semantics silently.
+- Apply a deterministic non-lossy default instead of asking ordinary users for technical identity or mapping decisions. Preserve uncertain semantics as durable expert-review items; never silently drop, merge, choose a winner or activate a guessed relationship.
 - Read v1 and v2; write only v2 after explicit conversion.
 - Never overwrite the source v1 package.
 - Convert known copies to one canonical genesis/history epoch.

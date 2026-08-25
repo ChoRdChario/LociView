@@ -1580,6 +1580,47 @@ Meta-audit result:
   sync with no P0/P1/P2 finding; in particular, the ordered authorization stops,
   `external-blocked` state and no-G0-credit boundary remain intact.
 
+### LociMyu broad-user disposition and identity contract — 2026-08-26
+
+- [x] Record the Product Owner's decision criterion: prefer a safe deterministic
+  non-lossy default over asking ordinary users for technical choices; retain
+  unresolved cases for later batch review by a knowledgeable user or support
+  operator
+- [x] Ratify duplicate-caption behavior at the product level: preserve every
+  duplicate-ID source occurrence independently, make every otherwise-valid
+  occurrence a distinct Caption, continue the unambiguous portion, and never
+  silently merge or exclude a row
+- [x] Ratify current-editor recovery at the product level: a malformed persisted
+  editor ID may be replaced before project writes while retaining the display
+  name; existing logs/profiles remain unchanged and the new ID is a separate
+  author
+- [ ] Specify and independently review the exact versioned canonical caption-ID
+  preimage, repeat-import matching and collision disposition before changing the
+  current `cap_LM...` generator or its historical oracle
+- [ ] Specify a bounded durable review-item shape and lifecycle for duplicate IDs,
+  inferred sheet relationships and unresolved media without inventing the v2
+  migration/quarantine store
+- [ ] Specify exact one-to-one source-authority rules for duplicate/conflicting
+  sheet-map rows, file-map conflicts and zero/one/many media candidates; forbid
+  ordinal, first-set and basename fallback activation
+- [ ] Reconcile malformed-line preservation and file/line/reason diagnostics for
+  workspace open, native new-project import and atomic existing-project merge
+- [ ] Split production work at the reviewed boundary; do not combine deterministic
+  LociMyu identity, browser editor-identity recovery, cross-tab locking and the
+  whole G0S operation firewall into one change
+
+Decision result:
+
+- Ordinary import should finish whenever every source record can be preserved
+  safely. Duplicate legacy IDs create separate captions plus review items rather
+  than a sequence of blocking questions.
+- Uncertain sheet/media relationships stay inactive or unlinked when activation
+  would be a guess. Their source facts are retained for later batch resolution;
+  only the affected relation is blocked, not unrelated captions or assets.
+- The current converter's `cap_LM...` output and duplicate collapse are known
+  implementation defects, not a compatibility exception. No validator or golden
+  fixture may be changed until the exact identity recipe is independently judged.
+
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results
 - [ ] Add mesh/GS intersection and closed translucent aircraft reference scenes
