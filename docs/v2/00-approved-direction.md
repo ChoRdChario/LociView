@@ -85,6 +85,7 @@ Package purposes remain distinct:
 
 - LociMyu dataset conversion and LociView v1-package-to-v2 migration are distinct compatibility paths; the former may remain integrated or use a separate tool, but both must follow the accepted product contract rather than fork semantics silently.
 - Apply a deterministic non-lossy default instead of asking ordinary users for technical identity or mapping decisions. Preserve uncertain semantics as durable expert-review items; never silently drop, merge, choose a winner or activate a guessed relationship.
+- New LociMyu conversions use `locimyu-caption-id-2` from `specs/04-locimyu-conversion.md`; the approved first source/review stock is device-local and intentionally omitted from ordinary package export, but its storage/wire contract remains blocked until the separate gate passes.
 - Read v1 and v2; write only v2 after explicit conversion.
 - Never overwrite the source v1 package.
 - Convert known copies to one canonical genesis/history epoch.

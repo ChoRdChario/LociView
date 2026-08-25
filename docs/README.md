@@ -45,6 +45,7 @@ If observed code conflicts with the applicable compatibility or accepted future 
 | `specs/01-domain-rendering.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | Frames, revisions, SceneDocument, modes, picking and renderer gates |
 | `specs/02-storage-package-migration.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | Metadata/CAS candidate boundaries, transactions, package purposes and conversion |
 | `specs/03-gates-and-delivery.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | G0/G0-S/G1 evidence, thresholds, feature flags, rollback and schedule |
+| `specs/04-locimyu-conversion.md` | `APPROVED IDENTITY/SOURCE AUTHORITY / LOCAL RETENTION SPECIFICATION BLOCKED / NOT IMPLEMENTED` | Exact LociMyu Caption identity/source-authority and the bounded local-review design stop |
 
 ## Known implementation drift
 

@@ -1594,15 +1594,25 @@ Meta-audit result:
   editor ID may be replaced before project writes while retaining the display
   name; existing logs/profiles remain unchanged and the new ID is a separate
   author
-- [ ] Specify and independently review the exact versioned canonical caption-ID
-  preimage, repeat-import matching and collision disposition before changing the
-  current `cap_LM...` generator or its historical oracle
-- [ ] Specify a bounded durable review-item shape and lifecycle for duplicate IDs,
-  inferred sheet relationships and unresolved media without inventing the v2
-  migration/quarantine store
-- [ ] Specify exact one-to-one source-authority rules for duplicate/conflicting
+- [x] Independently review and freeze the exact `locimyu-caption-id-2` preimage,
+  repeat behavior, canonical encoding, transition and fail-closed collision
+  disposition without rewriting the historical `cap_LM...` oracle
+- [ ] Specify the closed device-local review wire, exact-source/selected-workbook/
+  identity-plan receipt, parser/admission budgets, storage capability and
+  deletion lifecycle without inventing the v2 migration/quarantine store or
+  portable package semantics
+- [x] Specify exact one-to-one source-authority rules for duplicate/conflicting
   sheet-map rows, file-map conflicts and zero/one/many media candidates; forbid
-  ordinal, first-set and basename fallback activation
+  ordinal, first-set and fuzzy/basename-winner fallback activation, including
+  reverse filename-to-file-ID conflicts
+- [x] Specify the identity-only transition: exact trim/decoded-row order,
+  whole-import zero-write refusal for any non-empty row without a valid key,
+  pure shared sheet-authority projection, exact historical `cap_LM...` reader
+  compatibility, and no reviewability claim while the original outer ZIP is not
+  retained
+- [x] Obtain independent contract and security review of the corrected identity
+  and source-authority specification; keep local retention specification-blocked
+  until its separate capability/wire amendment passes
 - [ ] Reconcile malformed-line preservation and file/line/reason diagnostics for
   workspace open, native new-project import and atomic existing-project merge
 - [ ] Split production work at the reviewed boundary; do not combine deterministic
@@ -1620,6 +1630,35 @@ Decision result:
 - The current converter's `cap_LM...` output and duplicate collapse are known
   implementation defects, not a compatibility exception. No validator or golden
   fixture may be changed until the exact identity recipe is independently judged.
+- Delivery is intentionally split: canonical identity and duplicate preservation
+  may proceed first; guessed relationship behavior changes only together with a
+  reviewed durable local-review destination. The private local source/review
+  direction is approved, but its exact wire and storage capability are still
+  specification-blocked.
+
+Independent review result:
+
+- Contract, security and progress/gate reviewers passed the final corrected
+  document set with no P0/P1/P2 finding. All six SHA-256/Crockford vectors were
+  independently recomputed. The review explicitly keeps local retention,
+  view/material activation, portable review and release completion blocked.
+
+Identity-only production slice:
+
+- [ ] Add exact `LociMyuTrimV1`, Unicode-scalar/key validation, restricted
+  `LegacyJcsV1`, SHA-256/Crockford encoding and full/truncated collision checks
+- [ ] Add the shared pure sheet-authority projection and complete invalid-row/
+  duplicate-key preflight without changing view/material activation
+- [ ] Route new LociMyu conversions through recipe 2, preserve every duplicate
+  occurrence, and keep the historical `cap_LM...` generator/read fixtures only
+  as characterization evidence
+- [ ] Add a versioned recipe-2 companion oracle without rewriting
+  `fixtures/v1-migration/expected.v1.json`; cover raw XLSX/CSV authority,
+  trim/Unicode/reorder/collision and apply/open/export/re-import behavior
+- [ ] Run focused tests, typecheck, full tests, build and fixture/evidence
+  verifiers; obtain independent production-diff review before commit
+- [ ] Keep local source/review persistence, guessed relationship activation,
+  editor recovery, locking, G0-S firewall and release/deploy outside this slice
 
 - [ ] Freeze representative v1 projects and migration fixtures
 - [ ] Add small/medium/large GS fixtures with provenance and expected results

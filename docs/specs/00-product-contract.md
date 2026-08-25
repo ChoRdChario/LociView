@@ -186,6 +186,13 @@ Recorded on 2026-08-24:
 - ordinary flows target a non-specialist with roughly Microsoft Office file-workflow literacy; internal storage, merge-clock and renderer terminology is diagnostic detail, not required user knowledge;
 - the repeatedly available alpha classes are iPhone 14 Pro/Safari PWA, Windows 11 desktop and Windows 11 tablet PC. G0 records exact measured hardware/browser versions and does not generalize a support guarantee from one model.
 
+Recorded on 2026-08-26:
+
+- deterministic LociMyu Caption identity uses the exact versioned recipe in `04-locimyu-conversion.md`; every duplicate legacy-ID occurrence remains distinct, and the digest-derived ULID-shaped ID is explicitly not a wall-clock creation timestamp or time-sortable migration ID;
+- only exact one-to-one source-authoritative sheet/media relationships may activate automatically; unresolved relationships are stocked for later expert batch review rather than presented as ordinary-user questions;
+- the first review stock is a private device-local bridge and is deliberately excluded from ordinary package export. It does not satisfy portable-project completion; portable collaboration/resolution requires a separate package/privacy contract.
+- landing the identity correction before that private stock is an integration slice, not a claim that unread source can already be recovered later; the original outer ZIP remains required and the transitional slice is not release-complete without the disclosure in `04-locimyu-conversion.md`.
+
 Still required later:
 
 - a scripted Product Owner usability walkthrough before public release, using the intended non-specialist persona to complete open/import, caption, merge, export and recovery without implementation terminology; `PROD-12` remains unaccepted until this succeeds;
