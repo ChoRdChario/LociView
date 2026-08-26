@@ -280,6 +280,56 @@ Failure stops CAS production work and triggers a format/sink/desktop-packer ADR 
 
 ## 5. G1-B — renderer bakeoff
 
+Before the full bakeoff or any production adoption, the Product Owner authorizes
+one bounded Spark/Three technical harness. It is candidate evidence only and does
+not satisfy G1-B, adopt Spark, implement the production renderer boundary or earn
+production-persistence credit.
+
+Phase A updates the existing v1 dependency from exact Three.js/`@types/three`
+`0.170.0` to exact `0.180.0` without Spark, schema, fixture or feature changes.
+Only official r170–r180 migration items exercised by current imports may change
+code. Typecheck, existing full tests, production build and a representative v1
+Edge smoke must pass before that migration is committed independently. A broad
+v1 rewrite or new architecture stops Phase A for Product Owner review.
+
+Only after Phase A is green may Phase B add exact `@sparkjsdev/spark@2.1.0` behind
+a nondefault entry and dynamic import. The ordinary v1 route must not load Spark,
+its workers/WASM or GS chunks; the harness uses bundled local bytes only, with no
+runtime CDN or external URL. It supports exactly the existing candidate's one GS
+format and adds neither converters nor a format matrix.
+
+The disposable harness fixture contains two independent logical Assets in one
+project: one ordinary Mesh Asset, and one partial-GS Asset whose active revision
+also contains that GS Asset's explicit invisible interaction Proxy. The Mesh and
+GS need not describe the same object, extent or alignment. Mesh+GS, GS-only and
+Mesh-only visibility are required. Caption target selection is explicit: a Mesh
+target raycasts that Mesh itself; a GS target raycasts only its dedicated Proxy.
+The independent Mesh is never substituted for a missing or invalid GS Proxy.
+After a Proxy hit, the user adjusts the marker with a gizmo and the harness saves
+the final Caption as GS-owned `positionAsset`, not Proxy coordinates or a triangle
+ID. Real reload while fully offline must reproduce that position. Initial GS
+transform acceptance covers translation, rotation and uniform scale only;
+non-uniform scale and experimental covariance splats are outside this harness.
+
+The harness preserves these five degradation outcomes:
+
+1. valid Mesh plus missing/broken GS keeps the Mesh usable and reports the GS;
+2. valid GS plus missing/broken Proxy keeps the GS visible but disables new GS
+   Caption placement, while already saved GS-local Captions remain independent of
+   the Proxy;
+3. missing, invalid, ambiguous or cross-Asset GS binding disables GS interaction,
+   reports it and never guesses another surface;
+4. an unknown required transform/registration disables only that affected path
+   without guessing identity; independent Mesh and GS require no mutual
+   registration, while Proxy-to-GS and each Asset-to-project transform are explicit;
+5. if both visual Assets are unusable, neither is activated and diagnostics remain
+   available. A missing Mesh with valid GS/Proxy is the ordinary GS-only pattern,
+   not a sixth degradation case.
+
+Desktop acceptance is followed by the minimum iPhone 14 Pro fully-offline smoke
+before any architecture expansion. Phase B ends with exactly one `ADOPT CANDIDATE`,
+`REJECT` or `RETRY` report and stops before Spark adoption or production integration.
+
 Spark/Three and PlayCanvas use identical source fixtures, camera traces, render scale, exposure/background and hard requirements. Engine-native derivatives are allowed only when preprocessing time, output size and provenance are included.
 
 Base-adoption scenes are limited to the first supported renderer boundary: one

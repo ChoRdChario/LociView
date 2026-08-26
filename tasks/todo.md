@@ -139,6 +139,56 @@ had one existing evidence-CLI case exceed its 5-second timeout by 26 ms while it
 assertion never failed; the exact case passed alone in 738 ms and the unchanged
 full suite then passed. No timeout or unrelated test change was made.
 
+Repository-bound Edge record: the exercised production tree is commit `4c6b365`;
+browser `Edg/151.0.4129.107`. The six recorded results were `PASS`: Microsoft Edge
+binary confirmed; View mode read-only; View requested no project lock; Edit
+coexisted with View while holding one exclusive lock; the second Edit was
+lock-wait/read-only with zero enabled mutation controls; and handoff reloaded the
+durable marker before becoming writable. Console/runtime error count was `0`.
+The external JSON and screenshots are convenience artifacts only; this paragraph
+is the durable repository record and does not claim G0/G0-S or release completion.
+
+### Approved Three migration and Spark technical harness — active
+
+Phase A — Three.js migration, independent commit:
+
+- [ ] Compare the official r170→r180 Migration Guide with only the Three APIs
+  actually imported by the repository; stop instead of widening into a v1 rewrite
+- [ ] Set `three` and `@types/three` to exact `0.180.0`; do not add Spark or alter
+  schema, fixtures, product behavior or architecture
+- [ ] Apply only repository-relevant compatibility fixes and review the exact
+  lockfile/dependency delta
+- [ ] Run typecheck, the existing full test suite, production build and `npm audit`
+- [ ] In real Edge, smoke one representative v1 project through model display,
+  camera control, Caption pick, gizmo, material/texture, durable save/reopen and
+  zero console/runtime errors
+- [ ] Obtain one independent P0/P1 review, commit Phase A alone and return to a
+  clean worktree before adding Spark
+
+Phase B — isolated Spark 2.1.0 technical harness, only after Phase A is green:
+
+- [ ] Add exact `@sparkjsdev/spark@2.1.0` behind a nondefault entry plus dynamic
+  import; keep Spark worker/WASM/GS chunks out of the ordinary v1 route and use no
+  runtime CDN/external URL
+- [ ] Use one existing GS format without a converter and one harness project with
+  an independent Mesh Asset plus an independent partial-GS Asset whose same-Asset
+  active revision contains its dedicated invisible Proxy
+- [ ] Provide Mesh+GS, GS-only and Mesh-only visibility; require explicit Caption
+  target selection, raycast Mesh itself for a Mesh target and only the dedicated
+  Proxy for a GS target
+- [ ] Convert a Proxy hit through translation, rotation and uniform scale into the
+  GS AssetFrame, allow gizmo adjustment, and save/reload the final GS-owned
+  `positionAsset`; exclude non-uniform scale and experimental covariance splats
+- [ ] Preserve the five approved degradation outcomes without direct splat picking,
+  proxy auto-generation, format expansion or a generalized collision subsystem
+- [ ] Prove real page reload and complete offline reopen without crediting harness
+  persistence as production persistence; verify the normal v1 route never loads
+  Spark/worker/WASM/GS chunks
+- [ ] After desktop acceptance and before architecture expansion, run the minimal
+  iPhone 14 Pro offline smoke
+- [ ] Report `ADOPT CANDIDATE`, `REJECT` or `RETRY` with evidence and stop; do not
+  proceed to Spark adoption or production integration
+
 ### Proxy-backed initial interaction policy — docs-only recording
 
 - [x] Record the three initial display patterns—simple Mesh+GS mixed, GS-only
