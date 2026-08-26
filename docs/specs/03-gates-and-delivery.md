@@ -134,33 +134,43 @@ introduce v2 storage dependencies.
 
 ### 3.1 Multi-tab actor/sequence and append safety
 
-Before the per-store actor fix, tabs could share an actor and initialize the same next sequence, so deduplication could silently keep one of two different operations. Each live `ProjectStore` now self-issues a distinct actor, but two tabs can still write the same project without one project-wide authority.
+Before the per-store actor fix, tabs could share an actor and initialize the same next sequence, so deduplication could silently keep one of two different operations. Each live `ProjectStore` now self-issues a distinct actor. Project opening additionally separates user-selected View/Edit mode from the project-scoped write lock; neither is an account role, ACL or delegated permission.
 
 Required behavior:
 
 - each tab/session gets a unique actor instance;
-- one project has exactly one editable tab/session at a time; all other tabs are
-  explicitly read-only;
+- View mode is always read-only and never requests a write lock;
+- Edit mode alone requests one project-scoped write lock; a second Edit-mode tab
+  remains explicitly read-only while the first Edit-mode tab holds that lock;
 - normal edits, merge, package import, model replacement and every other
-  project mutation use the same project-scoped authority;
-- acquisition failure or ownership loss stops new writes fail closed;
-- a tab that receives ownership reopens the durable project state before it can
-  become editable;
-- `editable`, `read-only` and `lock-lost` are displayed accurately;
-- production OPFS uses a browser cross-context lock; no local-storage or
-  optimistic lease fallback may claim editable authority.
+  project mutation require that same project-scoped write lock at both the
+  store/service boundary and the project filesystem boundary;
+- lock acquisition failure, lock API absence or lock loss stops new writes fail
+  closed and leaves the session read-only;
+- after a write lock is obtained, that Edit-mode tab reopens the durable project
+  state before it can write;
+- View mode, writable Edit mode, waiting/read-only Edit mode and lock-lost
+  read-only Edit mode are displayed accurately without calling any of them a
+  user permission or role;
+- the browser product uses a browser cross-context lock even when OPFS is not
+  available; no tab-local, local-storage or optimistic lease fallback may claim
+  that Edit mode can write.
 
 Acceptance `G0S-TAB`:
 
-- while one tab owns the project, a second tab cannot add any operation or blob
-  and is visibly read-only;
-- after ownership transfer, the successor reloads durable state before editing,
-  and sequential 1,000-operation phases retain every unique operation on reopen;
-- package merge/replacement in a non-owner tab is rejected before its first
+- a View-mode tab requests no lock, remains visibly read-only and can coexist
+  with one writable Edit-mode tab for the same project;
+- while one Edit-mode tab holds the write lock, a second Edit-mode tab cannot add
+  any operation or blob and is visibly read-only;
+- after lock handoff, the successor reloads durable state before writing, and
+  sequential 1,000-operation phases retain every unique operation on reopen;
+- package merge/replacement without the write lock is rejected before its first
   project write;
-- simulated acquisition failure/loss blocks dispatch, merge and filesystem
-  writes without changing in-memory project state;
-- target iOS demonstrates safe editing or read-only enforcement.
+- simulated acquisition failure, API absence and loss block dispatch, merge and
+  filesystem writes without changing in-memory project state;
+- real Edge demonstrates View plus Edit, two-Edit exclusion and durable-reload
+  handoff in two tabs; target iOS separately demonstrates safe Edit mode or
+  read-only fallback.
 
 ### 3.2 Recoverable durable-write queue
 

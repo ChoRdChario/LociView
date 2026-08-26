@@ -3,7 +3,7 @@
 import { ProjectStore, type Identity } from '../core/store';
 import { newId } from '../core/ids';
 import { parseManifest } from '../core/manifest';
-import { MemoryFS, type WorkspaceFS } from '../platform/fs';
+import { MemoryFS, type ProjectSessionMode, type WorkspaceFS } from '../platform/fs';
 import { OpfsFS } from '../platform/opfs';
 import { ProjectMutationCoordinator, type ProjectMutationSession } from '../platform/projectLock';
 import {
@@ -51,11 +51,11 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     storageWarning =
       'このブラウザは永続ワークスペース(OPFS)に未対応です。作業内容はタブを閉じると消えます。必ず「書き出し」で保存してください。';
   }
-  const mutationCoordinator = persistentWorkspace
-    ? ProjectMutationCoordinator.browser(
-        typeof navigator !== 'undefined' && navigator.locks !== undefined ? navigator.locks : null,
-      )
-    : ProjectMutationCoordinator.local();
+  // View mode never needs this coordinator. Edit mode always requires the real
+  // browser cross-context primitive, even when the workspace itself is tab-local.
+  const mutationCoordinator = ProjectMutationCoordinator.browser(
+    typeof navigator !== 'undefined' && navigator.locks !== undefined ? navigator.locks : null,
+  );
 
   // ---- 編集者identity（自己発行。docs/02 §3） ------------------------------------
   const identity: Identity = {
@@ -96,7 +96,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
   // ---- プロファイル -------------------------------------------------------------
   async function openProfile(): Promise<void> {
     if (ctx !== null && !ctx.store.canMutate) {
-      await infoDialog('読み取り専用', 'このプロジェクトの編集権限を取得して再読込するまで、プロファイル変更は記録できません。');
+      await infoDialog('読み取り専用', 'Edit modeで書込みロックを取得し、端末保存済みデータを再読込するまで、プロファイル変更は記録できません。');
       return;
     }
     const name = await promptDialog('プロファイル', '表示名（マージ時に相手へ見える名前）', identity.displayName ?? '');
@@ -173,7 +173,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     existing: boolean,
   ): Promise<WritableProjectSession | null> {
     const access = await mutationCoordinator.tryAcquire(fs, dir, projectId);
-    if (!access.hasOwnership) {
+    if (!access.holdsWriteLock) {
       access.release();
       return null;
     }
@@ -240,7 +240,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
         activeCtx.notify();
         await infoDialog(
           '保存を完了できません',
-          `編集セッションを維持しています。保存を再試行してからホームへ戻ってください。\n\n${error instanceof Error ? error.message : String(error)}`,
+          `Edit modeと書込みロックを維持しています。保存を再試行してからホームへ戻ってください。\n\n${error instanceof Error ? error.message : String(error)}`,
         );
         return false;
       }
@@ -254,7 +254,11 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     return true;
   }
 
-  async function openProject(dir: string, prepared?: WritableProjectSession): Promise<void> {
+  async function openProject(
+    dir: string,
+    mode: ProjectSessionMode,
+    prepared?: WritableProjectSession,
+  ): Promise<void> {
     if (projectOpening) {
       // A plain home-list double click does not own anything that needs cleanup.
       // Prepared mutation sessions must reject so their caller releases the unused lock.
@@ -271,19 +275,24 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       let store = prepared?.store ?? null;
       if (access === null) {
         const manifest = await readProjectManifest(dir);
-        access = await mutationCoordinator.tryAcquire(fs, dir, manifest.projectId);
+        access = mode === 'view'
+          ? mutationCoordinator.openView(fs, dir, manifest.projectId)
+          : await mutationCoordinator.tryAcquire(fs, dir, manifest.projectId);
         store = await ProjectStore.open(access.workspace, dir, identity);
         if (store.manifest.projectId !== manifest.projectId) {
           throw new Error('project: manifest identity changed during open');
         }
-        if (access.hasOwnership) access.activateAfterDurableReload();
+        if (access.holdsWriteLock) access.activateAfterDurableReload();
       } else {
+        if (mode !== 'edit' || access.sessionMode !== 'edit') {
+          throw new Error('project: prepared mutation session requires Edit mode');
+        }
         if (access.projectRoot !== dir) throw new Error('project: prepared session root mismatch');
         store ??= await ProjectStore.open(access.workspace, dir, identity);
         if (store.workspace !== access.workspace || store.manifest.projectId !== access.projectId) {
           throw new Error('project: prepared session identity mismatch');
         }
-        if (access.hasOwnership && access.accessState !== 'editable') {
+        if (access.holdsWriteLock && access.accessState !== 'editable') {
           access.activateAfterDurableReload();
         }
       }
@@ -304,7 +313,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     }
   }
 
-  async function retryProjectAccess(): Promise<void> {
+  async function requestEditMode(): Promise<void> {
     const activeCtx = ctx;
     const oldAccess = projectAccess;
     if (activeCtx === null || oldAccess === null || activeCtx.store.canMutate) return;
@@ -314,10 +323,10 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       activeCtx.dir,
       activeCtx.store.manifest.projectId,
     );
-    if (!next.hasOwnership) {
+    if (!next.holdsWriteLock) {
       const detail = next.accessDetail;
       next.release();
-      await infoDialog('読み取り専用', `編集権限をまだ取得できません。\n\n${detail}`);
+      await infoDialog('読み取り専用', `書込みロックをまだ取得できません。\n\n${detail}`);
       return;
     }
     try {
@@ -345,7 +354,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
         disposeViewer();
         if (navigationEpoch === projectNavigationEpoch) renderHome();
       }
-      await infoDialog('編集権限の再取得', error instanceof Error ? error.message : String(error));
+      await infoDialog('Edit modeへの切替', error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -392,7 +401,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       packageExportStatus: () => packageExportStatus,
       setPackageExportStatus: (status) => setPackageExportStatus(dir, status),
       openProfile: () => void openProfile(),
-      retryProjectAccess: () => void retryProjectAccess(),
+      requestEditMode: () => void requestEditMode(),
     });
     // 最初のモデルを自動表示。ただし大きいモデルは自動で読まない。
     // （iOSはタブのメモリ上限が厳しく、開くたびに巨大モデルを読むとクラッシュが繰り返す。

@@ -9,7 +9,7 @@ import { createManifest, parseManifest, type ProjectManifest } from './manifest'
 import { mergeOps, type MergeReport } from './merge';
 import { reduce, versionVector, type ProjectState } from './reduce';
 import { cloneValidatedDispatchOp, type Op, type OpType } from './schema';
-import type { ProjectAccessState, ProjectWorkspaceFS } from '../platform/fs';
+import type { ProjectAccessState, ProjectSessionMode, ProjectWorkspaceFS } from '../platform/fs';
 
 export interface Identity {
   userId: string;
@@ -201,6 +201,10 @@ export class ProjectStore {
 
   get accessState(): ProjectAccessState {
     return this.workspace.mutationAuthority.accessState;
+  }
+
+  get sessionMode(): ProjectSessionMode {
+    return this.workspace.mutationAuthority.sessionMode;
   }
 
   get accessDetail(): string {

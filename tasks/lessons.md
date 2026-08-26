@@ -131,3 +131,16 @@
 - Caption位置の正本は対象GSが属するlogical Assetの`AssetFrame`上の`positionAsset`とする。ProxyのRepresentation IDやtriangle locatorは任意の弱い由来情報に留め、Proxyの欠落・交換・再openで保存位置を再計算・移動・無効化しない。
 - mixed表示でも選択中GS familyへ`proxyForGsVariantFamilyId`で明示関係を持つProxyだけを初期配置に使う。近い、見えている、同じAssetにあるという理由で通常Meshや別Proxyを自動選択しない。
 - 概略配置を採用したscopeで、精密な画面誤差をProxyの合格条件へ残さない。必要なのは有効な対象領域・奥行き、操作可能なギズモ、AssetFrame保存・再openであり、direct splatや精密Proxy自動生成で穴埋めしない。
+
+## 2026-08-27: project open modeと書込みlockを権限概念へ混同しない
+
+- View modeとEdit modeはユーザーが選ぶプロジェクトの開き方であり、user account、role、ACLや権限委譲ではない。書込みlockはEdit modeが現在安全にmutationできるかを示す別のruntime状態である。
+- View modeは意図的にread-onlyで、Web Locksを要求・保持・自動再試行しない。Edit modeだけがproject-scoped write lockを要求し、取得不能・API不在・喪失時はread-onlyへ倒す。
+- UIのボタン無効化だけを安全境界にせず、store dispatch/merge、service mutationとproject filesystem writeを同じlockで拒否する。lock取得後のEdit modeは古いin-memory stateを昇格させず、durable stateを開き直してから書込み可能にする。
+- Product Ownerがmodeとlockを区別した場合、実装済みのsingle-writerを理由に完了扱いを維持しない。用語、初回open、fallbackと実ブラウザ証拠まで同じacceptanceへ戻して確認する。
+
+## 2026-08-27: 候補harnessのfixture関係を製品identityへ一般化しない
+
+- 初期技術harnessの独立Mesh Assetと部分GS Assetは、後続productionの標準paired Assetを否定・置換しない。candidate fixtureの都合をlogical identityやalignmentの証拠へ自己昇格させない。
+- interactionは表示パターンだけで決めず、ユーザーが明示選択した対象Assetから解決する。独立Mesh対象ならそのMesh、GS対象なら同じGS Asset/revision内の専用Proxyだけをraycastし、別AssetのMeshを近接・可視性から推測利用しない。
+- harness、PoC、production acceptanceのcreditを分離し、候補harnessのsave/reloadや描画成功をG1採用、production persistence、同一logical-Asset acceptanceとして再利用しない。

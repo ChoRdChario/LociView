@@ -18,6 +18,7 @@ export interface WorkspaceFS {
 }
 
 export type ProjectAccessState = 'editable' | 'read-only' | 'lock-lost';
+export type ProjectSessionMode = 'view' | 'edit';
 
 export class ProjectMutationDeniedError extends Error {
   constructor(readonly accessState: ProjectAccessState, message?: string) {
@@ -28,6 +29,7 @@ export class ProjectMutationDeniedError extends Error {
 
 /** One project session's synchronous mutation authority. */
 export interface ProjectMutationAuthority {
+  readonly sessionMode: ProjectSessionMode;
   readonly accessState: ProjectAccessState;
   readonly accessDetail: string;
   assertEditable(): void;
@@ -47,6 +49,7 @@ export interface ProjectWorkspaceFS extends WorkspaceFS {
 }
 
 export const LOCAL_PROJECT_MUTATION_AUTHORITY: ProjectMutationAuthority = Object.freeze({
+  sessionMode: 'edit' as const,
   accessState: 'editable' as const,
   accessDetail: 'tab-local workspace',
   assertEditable: () => undefined,

@@ -6,13 +6,13 @@
 
 ## 1. 基本モデル: ワークスペース + 明示的書き出し
 
-> `PARTLY IMPLEMENTED`: OPFS workspaceと明示的download exportは実装済み。ただしmulti-tab append、write failure、durability表示には既知リスクがあるため、「1opごとに安全」「直前操作だけが消える」とは保証しない。`PROJECT_MAP.md`のknown risksを参照。
+> `PARTLY IMPLEMENTED`: OPFS workspace、明示的download export、View/Edit modeを分けたproject-scoped write lock、durability表示は実装済み。ただしcrash中のmulti-file publication recoveryとtarget-device evidenceは未完了のため、「1opごとに安全」「直前操作だけが消える」とはまだ保証しない。`PROJECT_MAP.md`のknown risksを参照。
 
 ```
 [ZIP] ──取込──▶ [ワークスペース(ブラウザ内OPFS)] ──編集(自動保存)──▶ [書き出し/共有でZIP化]
 ```
 
-- **作業中の正本はブラウザ内ワークスペース**（OPFS: Origin Private File System）に置く。1op毎に自ログへ追記flushされるため、クラッシュ・バッテリー切れでも消えるのは直前操作のみ
+- **作業中の正本はブラウザ内ワークスペース**（OPFS: Origin Private File System）に置く。各操作は自ログへの追記flushを試み、現在の保存状態を画面に表示する。クラッシュ時の損失上限は、残るG0-S recoveryと実機evidenceが閉じるまで保証しない
 - ZIPは「持ち運び・受け渡しのための梱包」。作業のたびにZIPを書き換える方式は採らない（スマホでは任意ファイルへの追記が不可能なため、この分離が横展開の鍵）
 - これにより「開く→編集→閉じる」だけならファイル操作ゼロ。ZIPに触るのは受け渡しの時だけ
 

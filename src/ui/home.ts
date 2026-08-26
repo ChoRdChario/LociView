@@ -8,7 +8,7 @@ import { addModelAsset } from '../assets/modelAsset';
 import { readZipEntries } from '../assets/zipio';
 import { createManifest, parseManifest } from '../core/manifest';
 import { entityIdFor, ProjectStore, type Identity } from '../core/store';
-import type { ProjectWorkspaceFS, WorkspaceFS } from '../platform/fs';
+import type { ProjectSessionMode, ProjectWorkspaceFS, WorkspaceFS } from '../platform/fs';
 import type { ProjectMutationSession } from '../platform/projectLock';
 import { detectFormat } from '../viewer/loaders';
 import { el, clear } from './dom';
@@ -19,7 +19,11 @@ import { isStandalone, onInstallAvailability, promptInstall } from '../platform/
 export interface HomeDeps {
   fs: WorkspaceFS;
   identity: Identity;
-  openProject: (dir: string, prepared?: WritableProjectSession) => Promise<void>;
+  openProject: (
+    dir: string,
+    mode: ProjectSessionMode,
+    prepared?: WritableProjectSession,
+  ) => Promise<void>;
   startProjectMutation: (
     dir: string,
     projectId: string,
@@ -134,7 +138,7 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
               const dir = `projects/${entityIdFor('meta')}`;
               const session = await deps.startProjectMutation(dir, manifest.projectId, false);
               if (session === null) {
-                await infoDialog('新規プロジェクト', '安全な編集権限を取得できないため作成を開始できません。');
+                await infoDialog('新規プロジェクト', '書込みロックを取得できないため作成を開始できません。');
                 return;
               }
               let handedOff = false;
@@ -145,7 +149,7 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
                   manifest,
                   deps.identity,
                 );
-                await deps.openProject(dir, session);
+                await deps.openProject(dir, 'edit', session);
                 handedOff = true;
               } catch (error) {
                 await infoDialog('新規プロジェクト', error instanceof Error ? error.message : String(error));
@@ -172,14 +176,14 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
       const dir = `projects/${entityIdFor('meta')}`;
       const manifest = createManifest(name);
       const session = await deps.startProjectMutation(dir, manifest.projectId, false);
-      if (session === null) throw new Error('安全な編集権限を取得できないため作成を開始できません');
+      if (session === null) throw new Error('書込みロックを取得できないため作成を開始できません');
       let handedOff = false;
       try {
         const store = await ProjectStore.createWithManifest(session.fs, dir, manifest, deps.identity);
         session.store = store;
         await addModelAsset(session.fs, dir, store, file.name, bytes);
         await store.flush();
-        await deps.openProject(dir, session);
+        await deps.openProject(dir, 'edit', session);
         handedOff = true;
       } catch (error) {
         await infoDialog('モデル取込失敗', error instanceof Error ? error.message : String(error));
@@ -208,14 +212,14 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
         const session = await deps.startProjectMutation(existing.dir, existing.projectId, true);
         if (session === null || session.store === null) {
           await infoDialog('読み取り専用', '別のタブが編集中のためZIPをマージせず、保存済み状態を読み取り専用で開きます。');
-          await deps.openProject(existing.dir);
+          await deps.openProject(existing.dir, 'view');
           return;
         }
         let handedOff = false;
         const { mergeFromInspection } = await import('../assets/package');
         try {
           await mergeFromInspection(session.fs, existing.dir, session.store, insp);
-          await deps.openProject(existing.dir, session);
+          await deps.openProject(existing.dir, 'edit', session);
           handedOff = true;
         } finally {
           if (!handedOff) session.access.release();
@@ -224,11 +228,11 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
       }
       const dir = `projects/${insp.manifest.projectId}`;
       const session = await deps.startProjectMutation(dir, insp.manifest.projectId, false);
-      if (session === null) throw new Error('安全な編集権限を取得できないため取込を開始できません');
+      if (session === null) throw new Error('書込みロックを取得できないため取込を開始できません');
       let handedOff = false;
       try {
         await importNewProject(session.fs, dir, insp);
-        await deps.openProject(dir, session);
+        await deps.openProject(dir, 'edit', session);
         handedOff = true;
       } finally {
         if (!handedOff) session.access.release();
@@ -255,7 +259,7 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
     const dir = `projects/${entityIdFor('meta')}`;
     const session = await deps.startProjectMutation(dir, manifest.projectId, false);
     if (session === null) {
-      await infoDialog('取込', '安全な編集権限を取得できないため取込を開始できません。');
+      await infoDialog('取込', '書込みロックを取得できないため取込を開始できません。');
       return;
     }
     let handedOff = false;
@@ -283,7 +287,7 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
           `キャプション${result.captionCount}件・表示セット${result.setCount}件を取り込みました。\n\n${notes.join('\n\n')}`,
         );
       }
-      await deps.openProject(result.dir, session);
+      await deps.openProject(result.dir, 'edit', session);
       handedOff = true;
     } finally {
       if (!handedOff) session.access.release();
@@ -303,7 +307,8 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
           el('b', {}, item.name),
           el('span', { class: 'lv-dim' }, item.createdAt.slice(0, 10)),
           el('span', { class: 'lv-flex1' }),
-          el('button', { class: 'primary', onclick: () => void deps.openProject(item.dir) }, '開く'),
+          el('button', { class: 'primary', onclick: () => void deps.openProject(item.dir, 'edit') }, 'Editで開く'),
+          el('button', { onclick: () => void deps.openProject(item.dir, 'view') }, 'Viewで開く'),
           el('button', {
             class: 'danger',
             onclick: () => {

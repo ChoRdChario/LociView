@@ -1,6 +1,7 @@
 import type {
   ProjectAccessState,
   ProjectMutationAuthority,
+  ProjectSessionMode,
   ProjectWorkspaceFS,
   WorkspaceFS,
 } from './fs';
@@ -102,7 +103,7 @@ class ScopedProjectWorkspace implements ProjectWorkspaceFS {
 export class ProjectMutationSession implements ProjectMutationAuthority {
   readonly workspace: ProjectWorkspaceFS;
   private stateValue: ProjectAccessState = 'read-only';
-  private detailValue = '別のタブがこのプロジェクトを編集中です';
+  private detailValue: string;
   private held = false;
   private activated = false;
   private closing = false;
@@ -117,7 +118,12 @@ export class ProjectMutationSession implements ProjectMutationAuthority {
     base: WorkspaceFS,
     readonly projectRoot: string,
     readonly projectId: string,
+    readonly sessionMode: ProjectSessionMode,
   ) {
+    this.detailValue = sessionMode === 'view'
+      ? 'View modeは書込みロックを要求しません'
+      : '別のEdit modeタブがこのプロジェクトの書込みロックを使用しています';
+    this.writesSealed = sessionMode === 'view';
     this.workspace = new ScopedProjectWorkspace(base, projectRoot, this);
   }
 
@@ -129,7 +135,7 @@ export class ProjectMutationSession implements ProjectMutationAuthority {
     return this.detailValue;
   }
 
-  get hasOwnership(): boolean {
+  get holdsWriteLock(): boolean {
     return this.held && !this.released;
   }
 
@@ -167,12 +173,12 @@ export class ProjectMutationSession implements ProjectMutationAuthority {
 
   /** Existing projects may activate only after a fresh durable reload under the held lock. */
   activateAfterDurableReload(): void {
-    this.activate('このタブが編集権限を保持しています');
+    this.activate('Edit mode（書込みロック取得済み）');
   }
 
   /** A newly allocated, absent project has no durable state to reload. */
   activateNewProject(): void {
-    this.activate('このタブが新規プロジェクトの編集権限を保持しています');
+    this.activate('Edit mode（新規プロジェクトの書込みロック取得済み）');
   }
 
   /** Stop accepting new writes while queued writes are flushed before release. */
@@ -187,7 +193,7 @@ export class ProjectMutationSession implements ProjectMutationAuthority {
     if (this.held && !this.released && this.stateValue !== 'lock-lost') {
       this.closing = false;
       this.writesSealed = false;
-      this.publish('editable', '保存に失敗したため編集セッションを維持しています');
+      this.publish('editable', '保存に失敗したためEdit modeと書込みロックを維持しています');
     }
   }
 
@@ -202,7 +208,19 @@ export class ProjectMutationSession implements ProjectMutationAuthority {
     return true;
   }
 
-  failClosed(detail = '編集権限を確認できないため新規書込みを停止しました'): void {
+  denyWriteLock(detail: string): void {
+    if (this.released) return;
+    this.held = false;
+    this.activated = false;
+    this.closing = false;
+    this.writesSealed = true;
+    const release = this.releaseLock;
+    this.releaseLock = null;
+    release?.();
+    this.publish('read-only', detail);
+  }
+
+  failClosed(detail = '書込みロックを確認できないため新規書込みを停止しました'): void {
     if (this.released) return;
     this.held = false;
     this.activated = false;
@@ -224,7 +242,7 @@ export class ProjectMutationSession implements ProjectMutationAuthority {
     const release = this.releaseLock;
     this.releaseLock = null;
     release?.();
-    this.publish('read-only', '編集セッションを終了しました');
+    this.publish('read-only', this.sessionMode === 'view' ? 'View modeを終了しました' : 'Edit modeを終了しました');
   }
 
   /** @internal coordinator grant hook */
@@ -238,7 +256,7 @@ export class ProjectMutationSession implements ProjectMutationAuthority {
     this.closing = false;
     this.writesSealed = false;
     this.releaseLock = release;
-    this.publish('read-only', '編集権限を取得しました。データを再読込しています');
+    this.publish('read-only', '書込みロックを取得しました。端末保存済みデータを再読込しています');
   }
 
   private activate(detail: string): void {
@@ -280,12 +298,21 @@ export class ProjectMutationCoordinator {
     return new ProjectMutationCoordinator(null, true);
   }
 
+  /** Deliberate View mode: read-only and never touches the lock manager. */
+  openView(
+    base: WorkspaceFS,
+    projectRoot: string,
+    projectId: string,
+  ): ProjectMutationSession {
+    return new ProjectMutationSession(base, projectRoot, projectId, 'view');
+  }
+
   async tryAcquire(
     base: WorkspaceFS,
     projectRoot: string,
     projectId: string,
   ): Promise<ProjectMutationSession> {
-    const session = new ProjectMutationSession(base, projectRoot, projectId);
+    const session = new ProjectMutationSession(base, projectRoot, projectId, 'edit');
     const lockName = `lociview:project:${projectId}:mutation`;
 
     if (this.localHolders !== null) {
@@ -296,7 +323,7 @@ export class ProjectMutationCoordinator {
     }
 
     if (this.lockManager === null) {
-      session.failClosed('安全な排他編集を利用できないため新規書込みを停止しました');
+      session.denyWriteLock('Web Locks APIを利用できないためEdit modeは読み取り専用です');
       return session;
     }
 
@@ -311,6 +338,7 @@ export class ProjectMutationCoordinator {
         async (lock) => {
           callbackStarted = true;
           if (lock === null) {
+            session.denyWriteLock('別のEdit modeタブが書込みロックを使用しているため読み取り専用です');
             started.resolve();
             return;
           }
@@ -324,18 +352,22 @@ export class ProjectMutationCoordinator {
       );
       void request.then(
         () => {
-          if (session.hasOwnership && !intentionalRelease) {
-            session.failClosed('排他編集lockが予期せず終了したため新規書込みを停止しました');
+          if (session.holdsWriteLock && !intentionalRelease) {
+            session.failClosed('書込みロックが予期せず終了したため新規書込みを停止しました');
           }
         },
         () => {
           if (!callbackStarted) started.resolve();
-          session.failClosed('排他編集lockの取得または維持に失敗したため新規書込みを停止しました');
+          if (session.holdsWriteLock) {
+            session.failClosed('書込みロックの維持に失敗したため新規書込みを停止しました');
+          } else {
+            session.denyWriteLock('書込みロックを取得できないためEdit modeは読み取り専用です');
+          }
         },
       );
       await started.promise;
     } catch {
-      session.failClosed('排他編集lockを利用できないため新規書込みを停止しました');
+      session.denyWriteLock('書込みロックを利用できないためEdit modeは読み取り専用です');
     }
     return session;
   }

@@ -215,6 +215,67 @@ describe.sequential('InterleavingAppendMemoryFS serialized path', () => {
   });
 });
 
+describe.sequential('G0S-TAB View/Edit mode boundary', () => {
+  it('keeps View mode lock-free and read-only while an Edit session acquires the project lock', async () => {
+    const fs = new MemoryFS();
+    const dir = 'projects/g0s-view-edit';
+    await seedEmptyProject(fs, dir);
+    const coordinator = ProjectMutationCoordinator.local();
+    const viewAccess = coordinator.openView(fs, dir, 'prj_00000000000000000000000010');
+    const viewStore = await ProjectStore.open(viewAccess.workspace, dir, USER_A);
+
+    expect(viewAccess.sessionMode).toBe('view');
+    expect(viewAccess.holdsWriteLock).toBe(false);
+    expect(viewStore.accessState).toBe('read-only');
+    expect(() => viewStore.dispatch({
+      t: 'create',
+      e: 'caption',
+      id: captionId(7, 0, 1),
+      v: { title: 'view must not mutate' },
+    })).toThrow(ProjectMutationDeniedError);
+    await expect(viewAccess.workspace.writeText(`${dir}/media/view-forbidden.bin`, 'forbidden'))
+      .rejects.toBeInstanceOf(ProjectMutationDeniedError);
+
+    const editAccess = await coordinator.tryAcquire(fs, dir, 'prj_00000000000000000000000010');
+    const editStore = await ProjectStore.open(editAccess.workspace, dir, USER_B);
+    expect(editAccess.sessionMode).toBe('edit');
+    expect(editAccess.holdsWriteLock).toBe(true);
+    expect(editAccess.accessState).toBe('read-only');
+    editAccess.activateAfterDurableReload();
+    expect(editStore.accessState).toBe('editable');
+
+    editAccess.release();
+    viewAccess.release();
+  });
+
+  it('keeps Edit mode fail closed when the browser Web Locks API is unavailable', async () => {
+    const fs = new MemoryFS();
+    const dir = 'projects/g0s-no-web-locks';
+    await seedEmptyProject(fs, dir);
+    const coordinator = ProjectMutationCoordinator.browser(null);
+    const viewAccess = coordinator.openView(fs, dir, 'prj_00000000000000000000000010');
+    const editAccess = await coordinator.tryAcquire(fs, dir, 'prj_00000000000000000000000010');
+    const editStore = await ProjectStore.open(editAccess.workspace, dir, USER_A);
+
+    expect(viewAccess.accessState).toBe('read-only');
+    expect(editAccess.sessionMode).toBe('edit');
+    expect(editAccess.holdsWriteLock).toBe(false);
+    expect(editAccess.accessState).toBe('read-only');
+    expect(editAccess.accessDetail).toContain('Web Locks API');
+    expect(() => editStore.dispatch({
+      t: 'create',
+      e: 'caption',
+      id: captionId(7, 1, 1),
+      v: { title: 'missing API must not mutate' },
+    })).toThrow(ProjectMutationDeniedError);
+    await expect(editAccess.workspace.writeText(`${dir}/media/edit-forbidden.bin`, 'forbidden'))
+      .rejects.toBeInstanceOf(ProjectMutationDeniedError);
+
+    editAccess.release();
+    viewAccess.release();
+  });
+});
+
 describe.sequential('G0S-TAB fail-closed ownership loss', () => {
   it('blocks dispatch, merge, and project bytes before memory or durable authority changes', async () => {
     const fs = new MemoryFS();

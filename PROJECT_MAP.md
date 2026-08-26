@@ -95,12 +95,11 @@ The following residual risks are observed in the current code:
 
 | Risk | Reproduction condition / impact | Evidence area |
 |---|---|---|
-| Non-atomic cross-tab append | OPFS append obtains size then writes at that position without a cross-tab lock | `src/platform/opfs.ts` |
 | Incomplete operation field/collision policy | Decoded structural validation and Map-backed internal indexes are hardened, but known-field control/identity policy and typed divergent-key reporting/resolution remain incomplete | `src/core/schema.ts`, `src/core/merge.ts`, `src/core/reduce.ts` |
-| Non-atomic shared transaction | Bounded blob-first and marker-last paths are hardened, but shared merge/replacement and actor-log publication still lack one browser-proven lock/journal transaction | `src/assets/package.ts`, `src/assets/modelAsset.ts`, `src/core/store.ts` |
+| Crash consistency across multi-file publication | The project-scoped write lock prevents concurrent tabs from publishing project mutations, and bounded blob-first/marker-last paths are hardened, but a crash can still interrupt merge/replacement or actor-log plus metadata publication without recovery | `src/assets/package.ts`, `src/assets/modelAsset.ts`, `src/core/store.ts` |
 | Whole-buffer large-file path | Package and asset paths can hold full ZIP/entry buffers, conflicting with large GS and iOS memory goals | `src/assets/zipio.ts`, `src/assets/package.ts`, `src/platform/fs.ts` |
 
-The former poisoned-write-queue root is fixed and remains under regression coverage; it is not a current unimplemented risk. The residual rows above are G0 regression inputs and blocking items for the `G0-S` v1 safety-stabilization gate in `tasks/todo.md`. Local stores now self-issue distinct writer actors, but shared external-actor paths and multi-file transactions still lack a browser-proven lock; do not claim conflict-free multi-tab durability from the current v1 implementation.
+The former poisoned-write-queue and concurrent cross-tab append roots are fixed and remain under regression coverage; they are not current unimplemented risks. View mode is lock-free/read-only, while Edit mode requires the one project-scoped browser write lock and reloads durable state before writing after handoff. The residual rows above are G0 regression inputs and blocking items for the `G0-S` v1 safety-stabilization gate in `tasks/todo.md`. The write lock does not itself provide crash recovery across a multi-file publication, so do not claim crash-consistent transactions from the current v1 implementation.
 
 The executable `G0S-*` cases use Vitest `it.fails` while the defects remain in
 v1. They assert the desired safe invariant: an unexpected pass makes the suite

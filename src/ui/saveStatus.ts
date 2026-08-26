@@ -1,5 +1,5 @@
 import type { DurableWriteStatus } from '../core/store';
-import type { ProjectAccessState } from '../platform/fs';
+import type { ProjectAccessState, ProjectSessionMode } from '../platform/fs';
 
 export interface SaveStatusPresentation {
   readonly compactText: string;
@@ -11,22 +11,48 @@ export interface ProjectAccessPresentation {
   readonly compactText: string;
   readonly detailText: string;
   readonly canRetry: boolean;
+  readonly actionLabel: string | null;
+  readonly actionTitle: string | null;
 }
 
 export function describeProjectAccess(
+  mode: ProjectSessionMode,
   state: ProjectAccessState,
   detail: string,
 ): ProjectAccessPresentation {
+  if (mode === 'view') {
+    return {
+      compactText: 'View mode（読み取り専用）',
+      detailText: detail,
+      canRetry: true,
+      actionLabel: 'Edit modeへ切替',
+      actionTitle: '書込みロックを取得し、端末に保存された最新状態を再読込してEdit modeへ切り替えます',
+    };
+  }
   if (state === 'editable') {
-    return { compactText: '編集可能（このタブ）', detailText: detail, canRetry: false };
+    return {
+      compactText: 'Edit mode（書込み可能）',
+      detailText: detail,
+      canRetry: false,
+      actionLabel: null,
+      actionTitle: null,
+    };
   }
   if (state === 'read-only') {
-    return { compactText: '読み取り専用', detailText: detail, canRetry: true };
+    return {
+      compactText: 'Edit mode（書込みロック待ち・読み取り専用）',
+      detailText: detail,
+      canRetry: true,
+      actionLabel: '書込みロックを再試行',
+      actionTitle: '書込みロックを再取得し、端末に保存された最新状態を再読込します',
+    };
   }
   return {
-    compactText: '編集権限を失いました',
+    compactText: 'Edit mode（ロック喪失・読み取り専用）',
     detailText: `${detail} 新規書込みは停止しています。`,
     canRetry: true,
+    actionLabel: '書込みロックを再試行',
+    actionTitle: '書込みロックを再取得し、端末に保存された最新状態を再読込します',
   };
 }
 

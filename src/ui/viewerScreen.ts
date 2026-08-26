@@ -22,7 +22,7 @@ export interface ViewerScreenDeps {
   packageExportStatus: () => PackageExportStatus;
   setPackageExportStatus: (status: PackageExportStatus) => void;
   openProfile: () => void;
-  retryProjectAccess: () => void;
+  requestEditMode: () => void;
 }
 
 const TABS = [
@@ -46,9 +46,8 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
   const accessStatus = el('span', { class: 'lv-badge' });
   const retryAccessBtn = el('button', {
     class: 'mini',
-    title: '編集権限を再取得し、端末に保存された最新状態を再読込します',
-    onclick: deps.retryProjectAccess,
-  }, '再取得して再読込');
+    onclick: deps.requestEditMode,
+  });
   retryAccessBtn.hidden = true;
   const retrySaveBtn = el('button', {
     class: 'mini',
@@ -298,11 +297,13 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
   }
 
   function renderStatus(): void {
-    const access = describeProjectAccess(ctx.store.accessState, ctx.store.accessDetail);
+    const access = describeProjectAccess(ctx.store.sessionMode, ctx.store.accessState, ctx.store.accessDetail);
     accessStatus.textContent = access.compactText;
     accessStatus.title = access.detailText;
     accessStatus.classList.toggle('lv-warn', ctx.store.accessState === 'lock-lost');
     retryAccessBtn.hidden = !access.canRetry;
+    retryAccessBtn.textContent = access.actionLabel ?? '';
+    retryAccessBtn.title = access.actionTitle ?? '';
     const status = describeSaveStatus(
       ctx.store.durabilityStatus,
       deps.unexportedCount(),

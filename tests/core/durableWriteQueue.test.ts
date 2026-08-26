@@ -779,9 +779,10 @@ describe.sequential('G0S-WRITE status and package checkpoints', () => {
     const persistent = describeSaveStatus(durableStatus, 2, true, idle);
     const ephemeral = describeSaveStatus(durableStatus, 2, false, idle);
     const failed = describeSaveStatus(failedStatus, 2, true, idle);
-    const editableAccess = describeProjectAccess('editable', 'owner tab');
-    const readOnlyAccess = describeProjectAccess('read-only', 'other tab');
-    const lostAccess = describeProjectAccess('lock-lost', 'lock ended');
+    const viewAccess = describeProjectAccess('view', 'read-only', 'deliberate view');
+    const editableAccess = describeProjectAccess('edit', 'editable', 'write lock held');
+    const readOnlyAccess = describeProjectAccess('edit', 'read-only', 'other Edit tab');
+    const lostAccess = describeProjectAccess('edit', 'lock-lost', 'lock ended');
 
     expect(persistent.detailText).toContain('ワークスペースへの書き込み完了');
     expect(persistent.detailText).toContain('未ダウンロードの変更 2件');
@@ -790,9 +791,18 @@ describe.sequential('G0S-WRITE status and package checkpoints', () => {
     expect(failed.detailText).toContain('保存に失敗');
     expect(failed.detailText).not.toContain('書き込み完了');
     expect(failed.canRetry).toBe(true);
-    expect(editableAccess).toMatchObject({ compactText: '編集可能（このタブ）', canRetry: false });
-    expect(readOnlyAccess).toMatchObject({ compactText: '読み取り専用', canRetry: true });
-    expect(lostAccess.compactText).toBe('編集権限を失いました');
+    expect(viewAccess).toMatchObject({
+      compactText: 'View mode（読み取り専用）',
+      canRetry: true,
+      actionLabel: 'Edit modeへ切替',
+    });
+    expect(editableAccess).toMatchObject({ compactText: 'Edit mode（書込み可能）', canRetry: false });
+    expect(readOnlyAccess).toMatchObject({
+      compactText: 'Edit mode（書込みロック待ち・読み取り専用）',
+      canRetry: true,
+      actionLabel: '書込みロックを再試行',
+    });
+    expect(lostAccess.compactText).toBe('Edit mode（ロック喪失・読み取り専用）');
     expect(lostAccess.detailText).toContain('新規書込みは停止');
     for (const phase of ['queued', 'writing'] as const) {
       const presentation = describeSaveStatus(

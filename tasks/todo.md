@@ -53,14 +53,14 @@ is complete without reconstructing or falsely crediting the missing history.
 
 ### G0S-TAB project-scoped single-writer root fix
 
-- [x] Record the approved project-lifetime authority, second-tab read-only,
-  fail-closed loss and durable-reload-before-transfer contract in existing docs
+- [x] Record the approved project-lifetime write lock, second-Edit read-only,
+  fail-closed loss and durable-reload-before-handoff contract in existing docs
 - [x] Guard `ProjectStore.dispatch()`/merge and every project-scoped filesystem
-  write with the same session authority; do not add a journal or transaction API
+  write with the same write-lock state; do not add a journal or transaction API
 - [x] Route create/import/merge/model/attachment/delete flows through that one
-  authority and release it on project-session close
-- [x] Show exact `editable`, `read-only` and `lock-lost` state; keep view-only
-  navigation usable and stop new mutation controls when authority is absent
+  write lock and release it on project-session close
+- [x] Show View mode and the exact Edit-mode write state; keep read-only
+  navigation usable and stop new mutation controls without the write lock
 - [x] Reuse multi-tab and package/replacement acceptance, adding only assertions
   needed to prove authority acquisition/loss and durable reload on transfer
 - [x] Run focused acceptance and one independent runtime/security review
@@ -69,17 +69,38 @@ is complete without reconstructing or falsely crediting the missing history.
 - [ ] Move next to the paired Mesh+GS/Proxy technical vertical slice; do not
   explore another G0-S micro-slice unless a direct P0/P1 makes that slice unsafe
 
+### G0S-TAB Edit/View clarification — corrective slice
+
+- [x] Re-audit commit `180ab11` against the Product Owner's clarified distinction
+  between project open mode and the project-scoped write lock
+- [x] Amend the existing G0S-TAB contract before code: View mode is always
+  read-only and requests no lock; only Edit mode requests the write lock
+- [x] Add explicit View/Edit choices for existing projects, keep create/import/
+  merge/delete in Edit mode, and distinguish deliberate View from a blocked Edit
+- [x] Remove permission-style user wording; report View mode, Edit mode and exact
+  write-lock state without adding accounts, roles, ACLs or delegation
+- [x] Keep the existing store/service/filesystem mutation guards and durable
+  reload-before-write path; fail closed when Web Locks is absent, unavailable or
+  lost, including the non-OPFS browser fallback
+- [x] Reuse the current G0S-TAB acceptance and add only the concretely missing
+  no-lock View-mode assertion and mode-aware presentation checks
+- [x] Run focused verification and one independent runtime/security review, then
+  perform a real two-tab Edge smoke covering View+Edit, two Edit tabs and handoff
+- [x] Run the final executable-tree matrix, commit only this corrective
+  G0S-TAB scope independently, and leave a clean worktree before the harness
+
 ### G0S-TAB review record
 
-- One project-lifetime Web Lock, keyed by parsed `projectId`, now grants the only
-  editable session. A second tab opens the same durable project read-only; lock
-  unavailability/loss rejects dispatch, merge and project-root filesystem writes.
+- View mode is lock-free and always read-only. Edit mode alone requests one
+  project-lifetime Web Lock keyed by parsed `projectId`; a second Edit tab is
+  read-only. Lock unavailability/loss rejects dispatch, merge and project-root
+  filesystem writes.
 - Create, native/wizard import, opened-project package merge, model add/replace,
   Caption attachment and project deletion use the same guarded workspace. Close
   flushes and quiesces writes before release; takeover opens a fresh store before
   becoming editable. No v2 schema, journal, transaction or quarantine was added.
-- The viewer reports `編集可能（このタブ）`, `読み取り専用` or
-  `編集権限を失いました`, disables mutation controls without disabling viewing,
+- The viewer reports Edit mode plus write availability, deliberate View mode, or
+  lock loss separately; it disables mutation controls without disabling viewing
   and offers explicit lock reacquisition plus durable reload.
 - Independent review found and the writer fixed two P1 lifecycle races: duplicate
   project-open could overwrite the retained session, and a delayed retry could
@@ -103,6 +124,20 @@ is complete without reconstructing or falsely crediting the missing history.
   orphan blob before metadata is rejected. Neither extends this slice because the
   release loop prevents concurrent ownership and no dangling visible authority is
   published.
+
+Corrective-slice evidence: focused TypeScript and 4 files / 66 tests passed. One
+independent reviewer found no P0/P1. Microsoft Edge 151.0.4129.107 exercised two
+real tabs: View held no project lock; a simultaneous Edit held one exclusive lock;
+the second Edit showed lock-wait/read-only with zero enabled mutation controls;
+after the writer flushed and returned Home, retry acquired the lock, reloaded the
+durable profile marker, and became writable. All six assertions passed with zero
+console/runtime errors. Final verification passed TypeScript, 41 test files / 1,351
+tests plus 21 todos, production build (99 modules / 11 PWA precache entries),
+fixture verification (10 Git entries / 708,867 bytes) and evidence verification
+(3 pending device templates / no claimed run evidence). The first full-suite run
+had one existing evidence-CLI case exceed its 5-second timeout by 26 ms while its
+assertion never failed; the exact case passed alone in 738 ms and the unchanged
+full suite then passed. No timeout or unrelated test change was made.
 
 ### Proxy-backed initial interaction policy — docs-only recording
 
