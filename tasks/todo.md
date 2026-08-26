@@ -66,7 +66,7 @@ is complete without reconstructing or falsely crediting the missing history.
 - [x] Run focused acceptance and one independent runtime/security review
 - [x] Run typecheck, the full test suite and production build once on the final
   executable tree; commit `G0S-TAB` independently and leave a clean worktree
-- [ ] Move next to the paired Mesh+GS/Proxy technical vertical slice; do not
+- [x] Move next to the paired Mesh+GS/Proxy technical vertical slice; do not
   explore another G0-S micro-slice unless a direct P0/P1 makes that slice unsafe
 
 ### G0S-TAB Edit/View clarification — corrective slice
@@ -148,46 +148,112 @@ durable marker before becoming writable. Console/runtime error count was `0`.
 The external JSON and screenshots are convenience artifacts only; this paragraph
 is the durable repository record and does not claim G0/G0-S or release completion.
 
-### Approved Three migration and Spark technical harness — active
+### Approved Three migration and Spark technical harness — Desktop complete; iPhone pending
 
 Phase A — Three.js migration, independent commit:
 
-- [ ] Compare the official r170→r180 Migration Guide with only the Three APIs
+- [x] Compare the official r170→r180 Migration Guide with only the Three APIs
   actually imported by the repository; stop instead of widening into a v1 rewrite
-- [ ] Set `three` and `@types/three` to exact `0.180.0`; do not add Spark or alter
+- [x] Set `three` and `@types/three` to exact `0.180.0`; do not add Spark or alter
   schema, fixtures, product behavior or architecture
-- [ ] Apply only repository-relevant compatibility fixes and review the exact
+- [x] Apply only repository-relevant compatibility fixes and review the exact
   lockfile/dependency delta
-- [ ] Run typecheck, the existing full test suite, production build and `npm audit`
-- [ ] In real Edge, smoke one representative v1 project through model display,
+- [x] Run typecheck, the existing full test suite, production build and `npm audit`
+- [x] In real Edge, smoke one representative v1 project through model display,
   camera control, Caption pick, gizmo, material/texture, durable save/reopen and
   zero console/runtime errors
-- [ ] Obtain one independent P0/P1 review, commit Phase A alone and return to a
+- [x] Obtain one independent P0/P1 review, commit Phase A alone and return to a
   clean worktree before adding Spark
 
 Phase B — isolated Spark 2.1.0 technical harness, only after Phase A is green:
 
-- [ ] Add exact `@sparkjsdev/spark@2.1.0` behind a nondefault entry plus dynamic
+- [x] Add exact `@sparkjsdev/spark@2.1.0` behind a nondefault entry plus dynamic
   import; keep Spark worker/WASM/GS chunks out of the ordinary v1 route and use no
   runtime CDN/external URL
-- [ ] Use one existing GS format without a converter and one harness project with
+- [x] Use one existing GS format without a converter and one harness project with
   an independent Mesh Asset plus an independent partial-GS Asset whose same-Asset
   active revision contains its dedicated invisible Proxy
-- [ ] Provide Mesh+GS, GS-only and Mesh-only visibility; require explicit Caption
+- [x] Provide Mesh+GS, GS-only and Mesh-only visibility; require explicit Caption
   target selection, raycast Mesh itself for a Mesh target and only the dedicated
   Proxy for a GS target
-- [ ] Convert a Proxy hit through translation, rotation and uniform scale into the
+- [x] Convert a Proxy hit through translation, rotation and uniform scale into the
   GS AssetFrame, allow gizmo adjustment, and save/reload the final GS-owned
   `positionAsset`; exclude non-uniform scale and experimental covariance splats
-- [ ] Preserve the five approved degradation outcomes without direct splat picking,
+- [x] Preserve the five approved degradation outcomes without direct splat picking,
   proxy auto-generation, format expansion or a generalized collision subsystem
-- [ ] Prove real page reload and complete offline reopen without crediting harness
+- [x] Prove real page reload and complete offline reopen without crediting harness
   persistence as production persistence; verify the normal v1 route never loads
   Spark/worker/WASM/GS chunks
 - [ ] After desktop acceptance and before architecture expansion, run the minimal
   iPhone 14 Pro offline smoke
-- [ ] Report `ADOPT CANDIDATE`, `REJECT` or `RETRY` with evidence and stop; do not
+- [x] Report `RETRY` with evidence and stop; do not
   proceed to Spark adoption or production integration
+
+Phase A result — commit `0d9e45c`:
+
+- The repository-relevant r170→r180 Migration Guide rows required no production
+  source rewrite. Exact `three` and `@types/three` `0.180.0` passed typecheck,
+  41 test files / 1,351 tests plus 21 todos, production build and `npm audit`
+  with zero vulnerabilities; Spark was absent from this commit.
+- Edge `151.0.4129.107` exercised a representative v1 project through model and
+  texture/material rendering, orbit/zoom and camera mode, Caption pick, actual
+  gizmo drag, save and actual page reload with zero console/runtime errors. One
+  independent review found no unresolved P0/P1. This is a Three migration result,
+  not G0/G0-S completion, renderer adoption or release approval.
+
+Phase B Desktop result — commit `7abb44b`:
+
+- The exact Spark `2.1.0` candidate is recorded under `devDependencies`. It is
+  reached only by the nondefault `dev.html?mode=spark` dynamic entry. The ordinary
+  product build
+  contains no harness entry, Spark/GS candidate bytes or Spark reference; runtime
+  resources observed in the harness were same-origin, `data:` WASM or same-origin
+  `blob:` workers, with no runtime CDN or external URL.
+- Edge `151.0.4129.107` on NVIDIA GeForce RTX 5080 passed all 27 targeted Desktop
+  assertions: exact 8-splat PLY decode; visibly distinct Mesh+GS, GS-only and
+  Mesh-only frames; Mesh-self and dedicated-Proxy hits; the same GS Proxy hit
+  while GS was hidden by Mesh-only display; nonidentity translation/rotation/
+  uniform-scale conversion; actual gizmo movement; exact GS-owned manual
+  `positionAsset`; activation-time forms of all five degradation outcomes; and
+  actual completely-offline page reload without reraycast. Console/runtime errors
+  and WebGL errors were zero.
+- The final executable tree passed `git diff --check`, typecheck, 41 test files /
+  1,351 tests plus 21 todos, normal and `/LociView/` production builds, the
+  isolated harness build and `npm audit` with zero vulnerabilities. One
+  independent review found two P1s—display visibility incorrectly gating the
+  selected GS Proxy and coupled resource initialization. Both received bounded
+  fixes; the re-review found no unresolved P0/P1. The nonblocking P2
+  that a Caption placed for a hidden GS remains hidden until that GS is displayed
+  is backlog; mixed-mode two-stage placement is proven and no acceptance scope
+  was extended.
+- No physical iPhone was connected to the Codex host, so the required iPhone 14
+  Pro smoke is not credited. Verdict is `RETRY` until the procedure below passes.
+  This result does not adopt Spark, integrate production persistence, pass G1,
+  complete G0/G0-S, authorize release or expand architecture.
+
+Pending Product Owner physical iPhone 14 Pro minimum offline smoke:
+
+1. Build commit `7abb44b` with `npm run build:harness` and serve only `dev-dist`
+   from a nonrelease HTTPS origin trusted by the physical iPhone; record iOS and
+   Safari versions, the exact commit and the served origin. Do not use a CDN.
+2. While online, open `dev.html?mode=spark`, wait for `ready · 8 splats` and one
+   service-worker-controlled reload, then capture the mixed, GS-only and Mesh-only
+   displays. Select Mesh and tap the Mesh. Without moving the camera, note a GS
+   Proxy hit position while GS is visible; then select GS in Mesh-only, tap that
+   same screen position, and confirm Current evidence state reports
+   `representation-harness-gs-proxy`.
+3. In mixed mode, place a GS Caption via Proxy, move it with the gizmo, save the
+   final GS-local `positionAsset`, and capture the final visible position.
+4. Open `dev.html?mode=spark&fault=proxy-failure`; verify the GS remains visible,
+   new placement is disabled, and the saved GS-local Caption remains present and
+   editable without another Proxy hit.
+5. Return to the healthy URL, enable airplane mode and disable Wi-Fi, fully close
+   and reopen Safari/the installed harness page, and verify the scene and saved
+   final position reopen while the network remains unavailable and without
+   reraycast. Save screenshots of mixed, final gizmo position, proxy-failure and
+   offline reopen plus a six-row PASS/FAIL record: mixed, GS-only, Mesh-only,
+   target-specific picking, Proxy failure and offline reopen. This is candidate
+   smoke only, not G0 device/performance evidence or a release deployment.
 
 ### Proxy-backed initial interaction policy — docs-only recording
 

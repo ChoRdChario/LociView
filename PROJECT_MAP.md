@@ -2,7 +2,7 @@
 
 > Status: `CURRENT` map; repository-normalization baseline `fc7054f` (2026-08-18).
 > That baseline is a historical normalization anchor, not a checkout target. Use Git `HEAD` and `tasks/todo.md` for the active checkpoint.
-> Gaussian Splatting, multiple simultaneous models, Automerge, content-addressed storage, and renderer backends are `PROPOSED`, not current behavior.
+> Gaussian Splatting in the product, multiple simultaneous models, Automerge, content-addressed storage, and renderer backends are `PROPOSED`, not current product behavior. An isolated Spark candidate harness exists only for the recorded technical evaluation below.
 
 ## Start here
 
@@ -14,7 +14,9 @@ index.html
       -> ProjectStore / WorkspaceFS / ViewerCore
 
 dev.html
-  -> src/devharness.ts   # manual harness; not the product entry point
+  -> src/dev-entry.ts
+    -> src/devharness.ts                 # default manual v1 harness
+    -> src/harness/sparkHarness.ts       # ?mode=spark; isolated candidate only
 ```
 
 For a normal task, read only the target file, its matching tests, and direct imports first.
