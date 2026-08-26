@@ -75,24 +75,33 @@ Asset and active AssetRevision. The same proxy remains the raycast target while
 the user switches among simple Mesh+GS mixed, GS-only and Mesh-only visibility;
 it is not a display mode and never contributes visual output. The existing
 `interactionProxy.proxyForGsVariantFamilyId` relation is reused without another
-domain model or schema field. A GS-only asset without a usable proxy remains
-view-only. Direct splat/GPU ID picking, normal-Mesh binding and automatic proxy
-generation are outside the first vertical slice and may be reconsidered later.
+domain model or schema field. The selected GS family resolves only to the exact
+same-Asset proxy naming that family; an unrelated visual Mesh, nearby surface or
+another GS proxy is never inferred. A GS-only asset without a usable proxy
+remains view-only for new placement. Direct splat/GPU ID picking, normal-Mesh
+binding and automatic proxy generation are outside the first vertical
+slice and may be reconsidered later.
 
 Degradation is fixed: a usable Mesh with missing GS opens Mesh-only with a
 diagnosis; a usable GS with no usable proxy opens GS view-only with caption
-placement disabled; an invalid or cross-asset proxy binding disables interaction
-and reports the problem without guessing; unknown
+placement disabled, while existing Captions remain at their saved AssetFrame
+positions and stay gizmo-editable; an invalid, ambiguous or cross-asset proxy
+binding disables new interaction and reports the problem without guessing; unknown
 registration remains unregistered; and an asset with neither usable Mesh nor GS
 does not enter the active scene. Ordinary-point Representations remain valid but
 are not part of the first paired acceptance.
 
 Prepared/imported proxies may be consumed in the first slice. Automatic proxy
 generation is later optional desktop/local preprocessing and is not an initial
-product path or an iOS runtime requirement. A proxy is derived interaction
-evidence, not a visual or measurement-quality mesh. Its hit method/confidence
-remains internal portable provenance, but the resulting caption uses the same
-visible pin and gizmo correction flow without a persistent approximation badge.
+product path or an iOS runtime requirement. A proxy is an approximate initial-
+placement aid, not a visual, measurement-quality or saved-position mesh. Its hit
+is converted through `representationToAsset` into a transient AssetFrame
+candidate. The user then adjusts or confirms the ordinary Caption gizmo; the
+current saved anchor is the existing source-less `manual` variant whose
+`positionAsset` and GS compatibility class are authoritative. Save/reopen does
+not reraycast the proxy, and its absence or replacement alone cannot move the
+Caption. Any proxy hit details retained outside that current anchor are weak
+diagnostics and never require a persistent approximation badge.
 
 ## Persistence candidate
 
@@ -162,7 +171,9 @@ Package purposes remain distinct:
 10. Ratified byte-exact v1 migration recipe, then canonical v1 migration.
 11. Proxy-backed paired Mesh+GS vertical slice in one logical Asset/active
     AssetRevision: import -> switch simple mixed/GS-only/Mesh-only visibility ->
-    raycast the same invisible proxy -> caption -> save -> reload.
+    select GS -> raycast only its explicitly related invisible proxy -> coarse
+    AssetFrame candidate -> Caption gizmo adjust/confirm -> manual
+    `positionAsset` -> save -> reload without proxy reraycast.
 12. Multiple assets, alignment, Compare, and opaque/mask/dither Integrated.
 13. iOS, migration, corruption, privacy, and security hardening.
 14. Productionize an adopted smooth result only after core hardening and a separate production review; otherwise leave it off. Exact-renderer/transmission research remains later and separate.

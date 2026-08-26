@@ -41,6 +41,20 @@ policy and does not approve a gate split or a production unit.
 - [x] Stop after the documentation report; production restart remains a separate
   Product Owner authorization
 
+### GS Caption two-stage placement policy — docs-only recording
+
+- [x] Record proxy raycast as approximate initial placement followed by ordinary
+  Caption gizmo adjustment, without requiring a surface-faithful proxy
+- [x] Make `AssetAnchor.positionAsset` in the target GS logical Asset's
+  AssetFrame the position authority; keep proxy source/triangle data weak and
+  non-authoritative after edit, save and reopen
+- [x] In mixed visibility, raycast only the proxy explicitly related to the
+  selected GS family and never infer an unrelated visual Mesh target
+- [x] Reconcile the existing product/domain acceptance, proxy accuracy evidence
+  and critical path; obtain one independent docs-only review
+- [x] Commit only existing docs/tasks, restore a clean tree and stop before
+  production implementation
+
 ## G-1 — Repository normalization
 
 - [x] Confirm `G:/00_AI_dev/LociView` as the canonical Git repository and record baseline commit
@@ -85,7 +99,7 @@ policy and does not approve a gate split or a production unit.
 ### Product-owner decisions recorded 2026-08-19
 
 - iPhone 14 Pro is the oldest physical iOS alpha target available for repeated testing; no iPad/iPadOS support claim is made yet, and the tablet PC is recorded separately after its OS/browser/RAM/GPU are supplied
-- GS/proxy picks use the ordinary editable pin UI without a persistent approximation badge; method/confidence remains internal metadata and no measurement-grade claim is made
+- GS/proxy-derived candidates use the ordinary editable pin UI without a persistent approximation badge and make no measurement-grade claim; the later two-stage initial flow commits a source-less `manual` current anchor, while nonmanual method/confidence remains portable only for a path that actually persists it
 - smooth-alpha Integrated work is deferred to optional G1-D after the base renderer gate; transmission/refraction needs a later separate material/research decision, and neither blocks MVP delivery
 - ordinary-point handling and the current binary default proceed to G0 visual/device validation
 - hard `splatExclusion` is accepted as the rendering counterpart of a human-authored/imported `visualPatch`
@@ -121,6 +135,20 @@ policy and does not approve a gate split or a production unit.
 - The existing `proxyForGsVariantFamilyId` relation is sufficient for the first
   proxy-backed slice. Normal-`meshPrimary` binding is deferred and no field or
   implementation is added by this docs-only task.
+- Proxy raycast supplies only a transient approximate initial Caption position.
+  The user then adjusts or confirms the ordinary gizmo, and the current saved
+  anchor is the existing source-less `manual` variant in the selected GS logical
+  Asset's AssetFrame.
+- Save/reopen uses canonical `positionAsset`, never proxy-local coordinates or a
+  triangle locator and never a new proxy raycast. Proxy removal/replacement alone
+  does not move or invalidate an existing Caption.
+- Mixed visibility resolves only the Proxy whose
+  `proxyForGsVariantFamilyId` exactly names the selected GS family. It never
+  substitutes a visible/unrelated Mesh, nearby surface or another GS proxy.
+- Initial proxy acceptance requires a finite coarse target-region/depth result,
+  interaction latency/availability and gizmo-confirmed persistence, not a
+  surface-faithful proxy or two-screen-pixel accuracy. Direct splat and automatic
+  proxy generation remain later optional work.
 
 ## G0 — Baseline fixtures and acceptance contracts
 
@@ -1786,6 +1814,9 @@ Start only after G0 and G0-S pass. See `docs/v2/00-approved-direction.md`. Order
 4. renderer/storage-neutral ports with unchanged v1 behavior;
 5. v2 persistence, canonical migration, and the proxy-backed paired Mesh+GS
    vertical slice in one logical Asset/active AssetRevision; simple mixed,
-   GS-only and Mesh-only visibility raycast the same invisible proxy under the
-   simple opaque mixed rule. Direct-GS, proxy generation, ordinary points and
-   advanced composition do not close that slice.
+   GS-only and Mesh-only visibility resolve the selected GS only to its explicitly
+   related invisible proxy under the simple opaque mixed rule; coarse hit ->
+   ordinary Caption gizmo adjustment/confirmation -> source-less manual
+   AssetFrame `positionAsset` -> save/reopen without proxy reraycast. Direct-GS,
+   automatic proxy generation, ordinary points and advanced composition do not
+   close that slice.

@@ -47,9 +47,12 @@ Required fixtures:
 - 500 MiB incompressible streaming stress data, labelled non-product-guarantee;
 - one same-logical-Asset/same-active-AssetRevision Mesh+GS pair with one
   unambiguous invisible proxy-to-GS binding; simple mixed, GS-only and Mesh-only
-  visibility all raycast that same proxy and preserve one AssetFrame Caption
-  through save/reopen, with the simple opaque mixed rule and all five fixed
-  incomplete-data outcomes; direct-GS and proxy generation are optional later;
+  visibility all raycast only that same selected-GS proxy, produce a coarse
+  AssetFrame placement candidate, require gizmo adjustment/confirmation and
+  preserve the resulting manual AssetFrame Caption through save/reopen without
+  proxy source/triangle authority, with the simple opaque mixed rule and all five
+  fixed incomplete-data outcomes; direct-GS and proxy generation are optional
+  later;
 - 10,000 captions and 50,000 metadata changes;
 - deleted/private sentinel values for package privacy tests;
 - parent-delete/concurrent-child and unknown-minor-only-blob fixtures;
@@ -85,7 +88,9 @@ Use fixed fixtures and camera/input traces to record:
 - package inspect/import/export;
 - first preview and fully usable state;
 - p50/p95/max frame time and frame drops;
-- pick p50/p95 and error;
+- pick p50/p95 and method-appropriate placement evidence; the initial proxy path
+  records its coarse target-region/depth outcome rather than surface-precision
+  error;
 - observable JS heap plus reload, memory-warning and context-loss symptoms;
 - three background/foreground cycles;
 - ten-minute continuous use;
@@ -249,13 +254,17 @@ Spark/Three and PlayCanvas use identical source fixtures, camera traces, render 
 Base-adoption scenes are limited to the first supported renderer boundary: one
 same-logical-Asset/same-active-AssetRevision Mesh+GS pair with one unambiguous
 invisible proxy-to-GS interaction binding; simple Mesh+GS mixed, GS-only and
-Mesh-only visibility all raycast that same proxy and preserve its source ID plus
-one AssetFrame Caption through save/reopen. The mixed smoke uses an opaque Mesh
-depth-writing/GS-against-depth rule. The base pack also covers standalone GS and
-Mesh, reflected/raw versus identity-baked candidates, the ratified static pose,
-anisotropic/view-dependent GS transforms against Mesh axes, metadata-only bounds,
-paged/reordered GS input, the five incomplete-data outcomes, context loss and
-twenty load/unload cycles.
+Mesh-only visibility all resolve the selected GS family to that exact proxy and
+never include an unrelated visual Mesh. Each path produces a finite hit inside
+the fixture's declared coarse target-region/depth envelope, exposes the ordinary
+Caption gizmo, and after user adjustment/confirmation saves a manual AssetFrame
+anchor with no proxy source/triangle authority. Save/reopen reproduces that
+`positionAsset` even after the proxy provenance is unavailable. The mixed smoke
+uses an opaque Mesh depth-writing/GS-against-depth rule. The base pack also covers
+standalone GS and Mesh, reflected/raw versus identity-baked candidates, the
+ratified static pose, anisotropic/view-dependent GS transforms against Mesh axes,
+metadata-only bounds, paged/reordered GS input, the five incomplete-data
+outcomes, context loss and twenty load/unload cycles.
 
 Later feature acceptance retains the following scenes but does not block G1-B
 base adoption or the first paired slice:
@@ -284,11 +293,14 @@ Provisional physical-iOS hard floor, confirmed in G0:
 - ten minutes without page reload or context loss;
 - three successful background/foreground restores;
 - bound-surface pick p95 at most 100 ms desktop and 150 ms iOS;
-- pick error within two screen pixels for the bound-proxy ground-truth fixture;
+- bound-proxy initial placement is finite and lies inside the fixture's declared
+  coarse target-region/depth envelope; no surface-precision pixel threshold is
+  imposed on this initial path;
 - resource usage reaches a stable plateau after twenty load/unload cycles.
 
 A bound proxy path passes only if it meets its assigned
-latency/error/availability threshold; merely having bytes is insufficient.
+latency/availability/coarse-envelope requirement and completes gizmo-confirmed
+AssetFrame save/reopen without reraycast; merely having bytes is insufficient.
 Direct-GS/GPU-ID paths may be evaluated later through their own telemetry, while
 the normal pin UI remains one editable gizmo-correctable presentation without a
 persistent approximation badge.
@@ -299,7 +311,10 @@ Hard functional requirements:
 - unknown/digest-mismatched FormatProfiles and profile-summary/decode mismatches fail explicitly without extension-based fallback;
 - progressive paging and bounded lifecycle;
 - Mesh, GS and the simple opaque mixed visibility pattern;
-- one explicit invisible same-asset proxy used across the three first-slice visibility patterns; direct-GS and proxy generation are not required;
+- one explicit invisible same-asset proxy selected by an exact GS-family
+  relationship across the three first-slice visibility patterns; it supplies
+  only the initial candidate, and direct-GS, visual-Mesh fallback and proxy
+  generation are not required;
 - context restore and explicit disposal;
 - no backend type in persistent data.
 - identical profile-derived static pose, bounds, minimal opaque material class and transformed GS footprint/color basis across both backends, or an explicit Unsupported result.
@@ -428,9 +443,11 @@ Rollback means preserving the source v1 package/workspace, opening conversion in
 8. ratify the immutable `v1-migration-recipe-1` companion/golden manifest and its one-to-one descriptor, then implement canonical v1 conversion; no durable conversion exists before this sub-gate passes.
 9. Proxy-backed paired Mesh+GS vertical slice in one logical Asset/active
    AssetRevision: import -> stream -> switch simple mixed/GS-only/Mesh-only
-   visibility -> raycast the same invisible proxy -> AssetFrame Caption ->
-   durable save -> reload, including the simple opaque mixed rule and five fixed
-   incomplete-data outcomes. Normal-Mesh binding, direct-GS, proxy generation,
+   visibility -> select GS -> raycast only its explicitly related invisible
+   proxy -> coarse AssetFrame candidate -> Caption gizmo adjustment/confirmation
+   -> source-less manual `positionAsset` -> durable save -> reload without proxy
+   reraycast, including the simple opaque mixed rule and five fixed incomplete-
+   data outcomes. Normal-Mesh binding, direct-GS, automatic proxy generation,
    ordinary points and advanced composition do not block this slice.
 10. ordinary-point display/picking acceptance, multiple assets, alignment and
     Compare.

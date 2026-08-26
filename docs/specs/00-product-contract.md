@@ -25,7 +25,7 @@ are never defaults.
 | `PROD-01` | A project remains portable as a bounded, inspectable package and does not require a LociView server or account. |
 | `PROD-02` | Mesh and GS can exist in one project and be aligned without rewriting source assets. The standard interactive configuration keeps its Mesh, GS and invisible interaction proxy in the same logical Asset and active AssetRevision, and offers simple Mesh+GS mixed, GS-only and Mesh-only visibility without changing that asset closure; Mesh-only and GS-only assets remain valid. |
 | `PROD-03` | Mesh, GS and Compare remain reliable even when Integrated cannot correctly compose a material. |
-| `PROD-04` | The initial supported interaction path raycasts one explicitly bound invisible same-asset proxy. The same proxy is used in simple Mesh+GS mixed, GS-only and Mesh-only visibility; a proxy-less GS-only asset is view-only. Missing, invalid, cross-asset or unregistered interaction data is reported and never guessed; direct splat picking and automatic proxy generation are not initial MVP requirements. |
+| `PROD-04` | The initial supported GS interaction path raycasts only the invisible same-asset proxy explicitly related to the selected GS family. It converts that approximate hit to a transient candidate in the logical Asset's AssetFrame; the user then adjusts or confirms the ordinary Caption gizmo before a source-less manual anchor is saved. The same proxy is used in simple Mesh+GS mixed, GS-only and Mesh-only visibility, but it is never the saved-position authority and an unrelated visual Mesh is never substituted automatically. A proxy-less GS-only asset is view-only for new placement. Missing, invalid, ambiguous, cross-asset or unregistered interaction data is reported and never guessed; direct splat picking and automatic proxy generation are not initial MVP requirements. |
 | `PROD-05` | A topology-changing asset replacement never moves captions or material overrides to a new surface silently. |
 | `PROD-06` | Data shown as durably saved survives a reload or process interruption covered by the durability gate. |
 | `PROD-07` | Collaboration import exposes unresolved concurrent edits instead of silently choosing a destructive winner. |
@@ -100,31 +100,39 @@ The user selects a reference asset and adjusts another asset non-destructively. 
 
 The first supported flow opens one logical Asset whose active AssetRevision
 contains a normal Mesh, GS and one unambiguous invisible `interactionProxy`.
-The same proxy is raycast while the user switches among simple Mesh+GS mixed,
-GS-only and Mesh-only visibility, then the ordinary Caption anchor is stored in
-AssetFrame. The proxy never contributes color, visual depth, screenshots or fit
-bounds. The runtime never chooses another surface by array order, filename,
-label, bounds, transform similarity or proximity. Direct splat/GPU ID picking,
-normal-Mesh binding and automatic proxy generation are later optional paths, not
-first-slice acceptance.
+For initial placement, the user targets the displayed GS family and the runtime
+raycasts exactly the proxy whose `proxyForGsVariantFamilyId` names that family.
+The same proxy is used while visibility switches among simple Mesh+GS mixed,
+GS-only and Mesh-only. A normal visual Mesh, another proxy or any nearby surface
+is never substituted by array order, filename, label, bounds, transform
+similarity, visibility or proximity. The proxy only needs to supply a useful
+coarse target region and depth; it need not reproduce the GS surface precisely
+and never contributes color, visual depth, screenshots or fit bounds.
 
-The stored anchor retains the actual hit method/confidence for validation and
-diagnostics, but the ordinary pin UI does not add a persistent “approximate”
-badge: every created pin is movable with the same gizmo correction flow. A
-manual gizmo correction preserves a still-active compatibility class; if the
-old class is no longer active, the user explicitly targets one active visual
-family and rebinds to its current class. In either case the command records the
-active revision, changes the current method to `manual`, and removes stale
-normal/source/confidence evidence. LociView does not present a proxy-derived
-anchor as survey-grade measurement.
+Caption placement is explicitly two-stage. The proxy intersection is converted
+through `representationToAsset` into a transient candidate in the target GS
+logical Asset's AssetFrame; no current Caption anchor is committed yet. The user
+then adjusts or explicitly confirms the ordinary Caption gizmo. Confirmation
+writes `AssetAnchor.positionAsset`, the active GS compatibility class and
+`hitEvidence:{method:'manual'}`, omitting proxy normal/source/confidence and any
+triangle locator. `positionAsset` is the saved position authority. Proxy hit
+details need not be persisted; if retained outside the current anchor for
+diagnostics, they are weak evidence, not proxy-frame coordinates or a recipe for
+reconstructing the position. Save and reopen use `positionAsset` directly and
+never reraycast the proxy; later proxy absence or replacement alone does not
+move, invalidate or hide an existing Caption. The ordinary pin UI does not add
+a persistent “approximate” badge, and LociView makes no survey-grade claim.
+Direct splat/GPU ID picking, normal-Mesh binding and automatic proxy
+generation are later optional paths, not first-slice acceptance.
 
 Incomplete paired data degrades exactly as follows:
 
 - usable Mesh plus missing/unusable GS: open Mesh-only and report the GS issue;
-- usable GS plus missing/unusable proxy: open GS view-only and disable Caption
-  placement through GS;
-- invalid or cross-asset proxy binding: disable proxy interaction and report it,
-  without selecting another surface;
+- usable GS plus missing/unusable proxy: keep the GS surface view-only for new
+  Caption placement; existing Captions retain their saved AssetFrame positions
+  and remain editable with the ordinary gizmo;
+- invalid, ambiguous or cross-asset proxy binding: disable proxy interaction and
+  report it, without selecting another surface;
 - unknown registration: keep the pair unregistered and never assume identity or
   infer alignment;
 - neither usable Mesh nor usable GS: exclude the asset from the active scene.
@@ -210,7 +218,7 @@ Productionizing an acceptable WBOIT approximation may add roughly 3–7 focused 
 Recorded on 2026-08-19:
 
 - the oldest physical iOS target available for repeated alpha testing is iPhone 14 Pro; no iPad/iPadOS support claim is made without a repeatedly testable iPad, while a tablet PC is a separate desktop/touch test class;
-- GS/proxy picks create ordinary editable pins without a persistent approximation badge; internal hit method/confidence remains portable metadata and the product makes no measurement-grade claim;
+- GS/proxy-derived candidates use the ordinary editable pin UI without a persistent approximation badge and the product makes no measurement-grade claim. The later 2026-08-26 two-stage rule makes the initial proxy candidate transient and commits a `manual` current anchor; nonmanual method/confidence remains portable metadata only for a path that actually persists such evidence;
 - smooth-alpha Integrated implementation is deferred to optional G1-D after a base renderer passes and does not block the MVP; transmission/refraction remains Unsupported until a later explicit material/research scope because G1-D alone cannot validate it;
 - ordinary-point profiles and the current binary default may proceed to G0 visual/device validation;
 - `visualPatch + splatExclusion` is the rendering pair for a human-authored/imported repair model, with the MVP hard-mask contract accepted;
@@ -239,6 +247,13 @@ Recorded on 2026-08-26:
 - automatic proxy generation and advanced mixed transparency/compositing are
   outside the first slice; prepared/imported proxies and the simple opaque mixed
   rule are sufficient;
+- the initial GS Caption flow is approximate proxy candidate -> ordinary gizmo
+  adjustment/confirmation -> source-less manual AssetFrame anchor. Save/reopen
+  uses `positionAsset` and never reraycasts or treats proxy triangle data as the
+  position authority;
+- mixed visibility selects only the same-Asset proxy whose
+  `proxyForGsVariantFamilyId` exactly names the selected GS family; it never
+  substitutes an unrelated visual Mesh, nearby surface or another GS proxy;
 - base renderer adoption and the first paired slice do not wait for
   ordinary-point, Compare or broader Integrated feature evidence; those
   requirements remain mandatory before their later support claim/control is

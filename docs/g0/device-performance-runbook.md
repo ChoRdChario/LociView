@@ -90,8 +90,12 @@ the product owner reviews real runs. The templates cannot record a gate `pass`:
 - median at least 24 fps and p95 frame interval at most 66.7 ms;
 - goal: 30 fps / 50 ms;
 - first preview within 5 seconds;
-- direct-pick p95: desktop 100 ms, iOS 150 ms;
-- pick error within two screen pixels or one projected footprint;
+- bound-proxy initial-placement compute p95: desktop 100 ms, iOS 150 ms;
+- bound-proxy initial placement lands inside the fixture's declared coarse target
+  region/depth envelope, then the gizmo-confirmed AssetFrame position survives
+  reopen; record precision error as `not-evaluated` for this path;
+- a future direct/precision path, if separately evaluated, may use the provisional
+  two-screen-pixel or one-projected-footprint error seed;
 - background restore 3/3 and no reload/context loss during ten minutes;
 - resource plateau after twenty load/unload cycles;
 - where comparable heap samples exist, final-five median no more than 10%

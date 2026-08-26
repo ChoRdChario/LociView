@@ -124,3 +124,10 @@
 - `interactionProxy`がある場合、表示状態を切り替えても同じ非表示proxyをraycastし、proxyをcolor/depth/boundsへ出さない。GSが非表示でも同じactive revision内のtarget familyとの明示関係は維持する。
 - proxy-less GS-onlyはview-onlyとし、穴を埋めるためにdirect splat pickingやproxy自動生成を初回scopeへ取り込まない。最初のmixed smokeは単純な不透明Mesh depth規則だけで閉じ、高度な透過・合成は後続へ送る。
 - 「後続へ送る」と記すだけでは、上流gateのrequired fixtureに残っている限りcritical pathから外れない。初回base acceptanceと後続feature acceptanceの依存先を同時に直し、後続要件は削除せず対応feature controlを有効にする前へ移す。
+
+## 2026-08-26: interaction hitとCaption位置の正本を分離する
+
+- Proxy raycastはCaptionの概略初期位置を得る入力であり、GS表面を精密再現する位置正本ではない。配置後はユーザーが通常ギズモで調整できることを初回flowに含める。
+- Caption位置の正本は対象GSが属するlogical Assetの`AssetFrame`上の`positionAsset`とする。ProxyのRepresentation IDやtriangle locatorは任意の弱い由来情報に留め、Proxyの欠落・交換・再openで保存位置を再計算・移動・無効化しない。
+- mixed表示でも選択中GS familyへ`proxyForGsVariantFamilyId`で明示関係を持つProxyだけを初期配置に使う。近い、見えている、同じAssetにあるという理由で通常Meshや別Proxyを自動選択しない。
+- 概略配置を採用したscopeで、精密な画面誤差をProxyの合格条件へ残さない。必要なのは有効な対象領域・奥行き、操作可能なギズモ、AssetFrame保存・再openであり、direct splatや精密Proxy自動生成で穴埋めしない。
