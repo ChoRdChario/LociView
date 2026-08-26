@@ -27,6 +27,20 @@ Current authority remains unchanged: G0 and G0-S are active/incomplete and G1+
 cannot begin under the approved contract. This docs-only commit records product
 policy and does not approve a gate split or a production unit.
 
+### Proxy-backed initial interaction policy — docs-only recording
+
+- [x] Record the three initial display patterns—simple Mesh+GS mixed, GS-only
+  and Mesh-only—without creating another persistent display/domain model
+- [x] Make one existing same-asset `interactionProxy` the shared invisible
+  raycast target across all three patterns when present
+- [x] Keep proxy-less GS-only view-only and keep direct splat picking, automatic
+  proxy generation and advanced mixed transparency/compositing out of the first
+  vertical slice
+- [x] Reconcile the existing contract, domain acceptance, gate map and critical
+  path; obtain one independent docs-only review and commit a clean tree
+- [x] Stop after the documentation report; production restart remains a separate
+  Product Owner authorization
+
 ## G-1 — Repository normalization
 
 - [x] Confirm `G:/00_AI_dev/LociView` as the canonical Git repository and record baseline commit
@@ -81,22 +95,32 @@ policy and does not approve a gate split or a production unit.
 ### Product-owner paired Mesh+GS decisions recorded 2026-08-26
 
 - The first standard interactive configuration is one logical Asset and one
-  active AssetRevision containing normal Mesh plus GS; Mesh-only and GS-only
-  assets remain schema-valid but do not close the first paired slice.
-- The user clicks the displayed GS while an explicit same-asset normal Mesh or
-  interaction proxy supplies the raycast. Direct splat picking and ordinary-point
-  acceptance are outside the first paired slice.
+  active AssetRevision containing normal Mesh, GS and one unambiguous invisible
+  interaction proxy; Mesh-only and GS-only assets remain schema-valid but do not
+  close the first paired slice.
+- The initial slice switches simple Mesh+GS mixed, GS-only and Mesh-only
+  visibility without changing the proxy. All three patterns raycast the same
+  proxy, which never becomes a display mode or visual contribution.
+- A proxy-less GS-only asset is view-only. Direct splat picking, automatic proxy
+  generation and ordinary-point acceptance are outside the first paired slice.
+- The first mixed smoke uses only the simple opaque-Mesh depth rule; advanced
+  transparency and cross-representation composition remain later work.
+- G1-B may adopt the base renderer from Mesh, GS, the three visibility patterns,
+  shared-proxy interaction and base device/resource evidence. Ordinary-point,
+  Compare and advanced Integrated evidence remains mandatory before its own
+  later support claim/control, but no longer serially blocks the first slice.
+- Ordinary-point display/picking acceptance remains an MVP release requirement;
+  it closes in the existing later production workstream rather than base G1-B.
 - Reuse the existing `AssetRevision`/`Representation` structure. Do not add a
   parallel domain model, revision framework, renderer abstraction or transaction
   system for this correction.
-- Missing GS degrades to diagnosed Mesh-only; missing Mesh/proxy degrades to GS
-  view-only with Caption placement disabled; invalid/cross-asset binding disables
-  interaction and reports; unknown registration is never inferred; and an asset
-  with neither usable Mesh nor GS is not active.
-- The existing proxy relation is sufficient for the first proxy-backed slice.
-  A normal `meshPrimary` interaction route remains blocked on explaining and
-  separately approving one minimal relation; no field or implementation is added
-  by this docs-only task.
+- Missing GS degrades to diagnosed Mesh-only; missing proxy leaves GS view-only
+  with Caption placement through GS disabled; invalid/cross-asset proxy binding
+  disables proxy interaction and reports; unknown registration is never inferred;
+  and an asset with neither usable Mesh nor GS is not active.
+- The existing `proxyForGsVariantFamilyId` relation is sufficient for the first
+  proxy-backed slice. Normal-`meshPrimary` binding is deferred and no field or
+  implementation is added by this docs-only task.
 
 ## G0 — Baseline fixtures and acceptance contracts
 
@@ -1760,7 +1784,8 @@ Start only after G0 and G0-S pass. See `docs/v2/00-approved-direction.md`. Order
 2. Spark/Three versus PlayCanvas renderer bakeoff;
 3. Automerge durability/merge/privacy PoC;
 4. renderer/storage-neutral ports with unchanged v1 behavior;
-5. v2 persistence, canonical migration, and the paired Mesh+GS vertical slice in
-   one logical Asset/active AssetRevision, using the existing explicit same-asset
-   proxy binding for the initial raycast; direct-GS and ordinary points do not
-   close that slice.
+5. v2 persistence, canonical migration, and the proxy-backed paired Mesh+GS
+   vertical slice in one logical Asset/active AssetRevision; simple mixed,
+   GS-only and Mesh-only visibility raycast the same invisible proxy under the
+   simple opaque mixed rule. Direct-GS, proxy generation, ordinary points and
+   advanced composition do not close that slice.

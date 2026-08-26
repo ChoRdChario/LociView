@@ -39,7 +39,7 @@
 ## 2026-08-16: GSとmeshの共存には同一空間の補修・交差を含める
 
 - meshは別表示物だけでなく、GS欠損部を補うため同一領域で交差・重複し得る。
-- `interactionProxy`、`visualPatch`、`splatExclusion`を異なるroleとして保存・描画し、interaction-only proxyをvisual/depthへ流用しない。同じactive revision内で明示的にbindされた通常`meshPrimary`は、proxyへ読み替えずGSのraycast surfaceとして使用できる。
+- `interactionProxy`、`visualPatch`、`splatExclusion`を異なるroleとして保存・描画し、interaction-only proxyをvisual/depthへ流用しない。通常`meshPrimary`をGSのraycast surfaceにする将来案は別の明示的なpolicyを要し、初回標準へ混ぜない。
 - 不透明補修でも境界のちらつき、halo、二重表現を評価する。
 
 ## 2026-08-16: 半透明は数値ではなく合成意図としてモデル化する
@@ -116,4 +116,11 @@
 
 - 同一logical Asset内のMesh＋GSのような承認済み併存関係を、最小sliceの都合で「MeshまたはGS」へ変えない。Mesh-only／GS-onlyがschema-validでも、paired acceptanceの代替にはしない。
 - 既存`AssetRevision`／`Representation`で表現できる構造に、別名のdomain model、representation set、revision frameworkを重ねない。不足が一つなら既存record間の最小relationだけを説明し、批准前にfieldやframeworkを実装しない。
-- ユーザー体験上の操作対象と内部hit-test方式を分ける。GSを操作するUXでも、初回は明示的にbindされた同一asset内のMesh/proxy raycastでよく、direct splatや汎用collisionを自動的にscopeへ入れない。
+- ユーザー体験上の操作対象と内部hit-test方式を分ける。GSを操作するUXでも、初回は明示的にbindされた同一asset内のproxy raycastでよく、normal-Mesh binding、direct splatや汎用collisionを自動的にscopeへ入れない。
+
+## 2026-08-26: 表示パターンとinteraction representationを分離する
+
+- simple Mesh+GS mixed、GS-only、Mesh-onlyは同じactive AssetRevisionの表示状態であり、新しい永続modeや別domain modelを作らない。
+- `interactionProxy`がある場合、表示状態を切り替えても同じ非表示proxyをraycastし、proxyをcolor/depth/boundsへ出さない。GSが非表示でも同じactive revision内のtarget familyとの明示関係は維持する。
+- proxy-less GS-onlyはview-onlyとし、穴を埋めるためにdirect splat pickingやproxy自動生成を初回scopeへ取り込まない。最初のmixed smokeは単純な不透明Mesh depth規則だけで閉じ、高度な透過・合成は後続へ送る。
+- 「後続へ送る」と記すだけでは、上流gateのrequired fixtureに残っている限りcritical pathから外れない。初回base acceptanceと後続feature acceptanceの依存先を同時に直し、後続要件は削除せず対応feature controlを有効にする前へ移す。

@@ -44,6 +44,14 @@ Formal product modes:
 3. Compare
 4. Integrated
 
+The first proxy-backed vertical slice uses three visibility patterns of the same
+active AssetRevision rather than adding another mode: simple Mesh+GS mixed,
+GS-only and Mesh-only. They map to the existing Integrated, GS and Mesh requests;
+Compare remains a later comparison workflow. The initial mixed pattern draws an
+opaque depth-writing Mesh contribution and then GS against that depth. Smooth
+Mesh alpha, transmission and exact cross-representation multi-layer composition
+remain later work.
+
 Guaranteed Integrated coverage for the first release is opaque, mask/cutout, and dithered coverage. Arbitrarily intersecting smooth-alpha mesh and GS fragments are not guaranteed by separate conventional renderers.
 
 GS alignment transforms means, covariance and view-dependent basis consistently; mean-only transforms are forbidden. Ordinary-point size is CSS-pixel intent resolved once into a RenderPlan, and drawing and picking use the same effective footprint.
@@ -61,25 +69,30 @@ An asset may carry:
 - optional preview representation;
 - optional invisible interaction proxy.
 
-The first standard interactive configuration is one `meshPrimary` plus one
-`gsPrimary` in the same logical Asset and active AssetRevision. The user clicks
-the displayed GS, while the implementation raycasts an explicitly bound
-same-asset normal Mesh or `interactionProxy`. The existing
-`interactionProxy.proxyForGsVariantFamilyId` relation covers the proxy route.
-The current closed schema does not yet express a normal `meshPrimary` as the
-selected GS interaction surface; do not infer that relation from order, label,
-bounds, transform similarity or `derivedFrom`. Direct splat and GPU ID/depth
-picking are outside the first vertical slice and may be reconsidered later.
+The first standard interactive configuration is one `meshPrimary`, one
+`gsPrimary` and one unambiguous invisible `interactionProxy` in the same logical
+Asset and active AssetRevision. The same proxy remains the raycast target while
+the user switches among simple Mesh+GS mixed, GS-only and Mesh-only visibility;
+it is not a display mode and never contributes visual output. The existing
+`interactionProxy.proxyForGsVariantFamilyId` relation is reused without another
+domain model or schema field. A GS-only asset without a usable proxy remains
+view-only. Direct splat/GPU ID picking, normal-Mesh binding and automatic proxy
+generation are outside the first vertical slice and may be reconsidered later.
 
 Degradation is fixed: a usable Mesh with missing GS opens Mesh-only with a
-diagnosis; a usable GS with no usable bound Mesh/proxy opens GS view-only with
-caption placement disabled; an invalid or cross-asset interaction binding
-disables interaction and reports the problem without guessing; unknown
+diagnosis; a usable GS with no usable proxy opens GS view-only with caption
+placement disabled; an invalid or cross-asset proxy binding disables interaction
+and reports the problem without guessing; unknown
 registration remains unregistered; and an asset with neither usable Mesh nor GS
 does not enter the active scene. Ordinary-point Representations remain valid but
 are not part of the first paired acceptance.
 
-Automatic proxy generation is a desktop/local preprocessing option, not an iOS runtime requirement. A proxy is derived collision evidence, not a visual or measurement-quality mesh. Its hit method/confidence remains internal portable provenance, but the resulting caption uses the same visible pin and gizmo correction flow without a persistent approximation badge.
+Prepared/imported proxies may be consumed in the first slice. Automatic proxy
+generation is later optional desktop/local preprocessing and is not an initial
+product path or an iOS runtime requirement. A proxy is derived interaction
+evidence, not a visual or measurement-quality mesh. Its hit method/confidence
+remains internal portable provenance, but the resulting caption uses the same
+visible pin and gizmo correction flow without a persistent approximation badge.
 
 ## Persistence candidate
 
@@ -139,15 +152,17 @@ Package purposes remain distinct:
 2. `G0` golden projects, reference scenes, target devices, and baseline measurements.
 3. `G0-S` current-v1 safety stabilization for multi-tab collisions, durable-write failure, untrusted keys, and operation/blob consistency.
 4. Bounded-memory streaming/CAS package PoC.
-5. Spark/Three versus PlayCanvas renderer bakeoff.
+5. Spark/Three versus PlayCanvas base-renderer bakeoff for Mesh, GS, the simple
+   mixed pattern and shared-proxy interaction; later feature packs do not block
+   this adoption decision.
 6. Optional time-boxed smooth-transparency feasibility after the renderer decision; it records evidence only and may be deferred without blocking the MVP.
 7. Automerge multi-tab/package/privacy/durability PoC.
 8. Renderer/storage-neutral ports inserted with unchanged v1 behavior.
 9. v2 binary storage and metadata productionization.
 10. Ratified byte-exact v1 migration recipe, then canonical v1 migration.
-11. Paired Mesh+GS vertical slice in one logical Asset/active AssetRevision:
-    import -> display GS -> raycast the explicit same-asset Mesh/proxy -> caption
-    -> save -> reload.
+11. Proxy-backed paired Mesh+GS vertical slice in one logical Asset/active
+    AssetRevision: import -> switch simple mixed/GS-only/Mesh-only visibility ->
+    raycast the same invisible proxy -> caption -> save -> reload.
 12. Multiple assets, alignment, Compare, and opaque/mask/dither Integrated.
 13. iOS, migration, corruption, privacy, and security hardening.
 14. Productionize an adopted smooth result only after core hardening and a separate production review; otherwise leave it off. Exact-renderer/transmission research remains later and separate.
@@ -167,7 +182,7 @@ Included:
 - v2 metadata/blob storage and v1 conversion;
 - Mesh, GS, and Compare;
 - multiple assets and coordinate alignment;
-- paired Mesh+GS interaction through an explicit same-asset Mesh/proxy surface;
+- paired Mesh+GS interaction through one explicit invisible same-asset proxy;
 - ordinary-point display and caption picking for v1-compatible point data;
 - captions, collaboration merge, and clean share export;
 - opaque/mask/dither Integrated rendering;

@@ -23,9 +23,9 @@ are never defaults.
 | ID | Outcome |
 |---|---|
 | `PROD-01` | A project remains portable as a bounded, inspectable package and does not require a LociView server or account. |
-| `PROD-02` | Mesh and GS can exist in one project and be aligned without rewriting source assets. The standard interactive GS configuration keeps its Mesh and GS Representations in the same logical Asset and active AssetRevision; Mesh-only and GS-only assets remain valid. |
+| `PROD-02` | Mesh and GS can exist in one project and be aligned without rewriting source assets. The standard interactive configuration keeps its Mesh, GS and invisible interaction proxy in the same logical Asset and active AssetRevision, and offers simple Mesh+GS mixed, GS-only and Mesh-only visibility without changing that asset closure; Mesh-only and GS-only assets remain valid. |
 | `PROD-03` | Mesh, GS and Compare remain reliable even when Integrated cannot correctly compose a material. |
-| `PROD-04` | A user interacts with the displayed GS while the initial supported path raycasts an explicitly bound same-asset normal Mesh or interaction proxy. Missing, invalid, cross-asset or unregistered interaction data is reported and never guessed; direct splat picking is not an initial MVP requirement. |
+| `PROD-04` | The initial supported interaction path raycasts one explicitly bound invisible same-asset proxy. The same proxy is used in simple Mesh+GS mixed, GS-only and Mesh-only visibility; a proxy-less GS-only asset is view-only. Missing, invalid, cross-asset or unregistered interaction data is reported and never guessed; direct splat picking and automatic proxy generation are not initial MVP requirements. |
 | `PROD-05` | A topology-changing asset replacement never moves captions or material overrides to a new surface silently. |
 | `PROD-06` | Data shown as durably saved survives a reload or process interruption covered by the durability gate. |
 | `PROD-07` | Collaboration import exposes unresolved concurrent edits instead of silently choosing a destructive winner. |
@@ -47,6 +47,14 @@ The four modes are user-visible concepts, not renderer implementation details.
 | **GS** | Draw selected GS representations without Integrated-only exclusions. Mesh proxies do not contribute color. |
 | **Compare** | Render Mesh and GS independently with the same project camera, exposure and background, then compare by wipe, split, flicker or side-by-side. It does not promise cross-representation depth composition. |
 | **Integrated** | Draw selected non-GS mesh/ordinary-point contributions and GS in one view. The MVP guarantees opaque, alpha-mask/cutout and explicit dithered coverage only. |
+
+The first proxy-backed vertical slice exercises only three visibility patterns on
+one paired active AssetRevision: simple Mesh+GS mixed, GS-only and Mesh-only.
+These reuse Integrated, GS and Mesh rather than creating a persisted fifth mode;
+Compare remains a later workflow. The initial mixed fixture uses an opaque
+depth-writing Mesh pass followed by ordinary GS rendering against that depth.
+Smooth Mesh alpha, transmission and exact cross-representation multi-layer
+composition are not first-slice acceptance.
 
 Support labels MUST appear in UI and diagnostics:
 
@@ -91,12 +99,14 @@ The user selects a reference asset and adjusts another asset non-destructively. 
 ### 4.5 Caption a GS
 
 The first supported flow opens one logical Asset whose active AssetRevision
-contains a normal Mesh and GS. The user clicks the displayed GS; the runtime
-raycasts an explicitly bound same-asset normal Mesh or `interactionProxy`, then
-stores the ordinary Caption anchor in AssetFrame. It never chooses a surface by
-array order, filename, label, bounds, transform similarity or proximity. Direct
-splat and GPU ID/depth picking are later optional paths, not first-slice
-acceptance.
+contains a normal Mesh, GS and one unambiguous invisible `interactionProxy`.
+The same proxy is raycast while the user switches among simple Mesh+GS mixed,
+GS-only and Mesh-only visibility, then the ordinary Caption anchor is stored in
+AssetFrame. The proxy never contributes color, visual depth, screenshots or fit
+bounds. The runtime never chooses another surface by array order, filename,
+label, bounds, transform similarity or proximity. Direct splat/GPU ID picking,
+normal-Mesh binding and automatic proxy generation are later optional paths, not
+first-slice acceptance.
 
 The stored anchor retains the actual hit method/confidence for validation and
 diagnostics, but the ordinary pin UI does not add a persistent “approximate”
@@ -111,9 +121,9 @@ anchor as survey-grade measurement.
 Incomplete paired data degrades exactly as follows:
 
 - usable Mesh plus missing/unusable GS: open Mesh-only and report the GS issue;
-- usable GS plus missing/unusable bound Mesh/proxy: open GS view-only and disable
-  Caption placement;
-- invalid or cross-asset interaction binding: disable interaction and report it,
+- usable GS plus missing/unusable proxy: open GS view-only and disable Caption
+  placement through GS;
+- invalid or cross-asset proxy binding: disable proxy interaction and report it,
   without selecting another surface;
 - unknown registration: keep the pair unregistered and never assume identity or
   infer alignment;
@@ -137,7 +147,7 @@ Included:
 - v2 metadata/blob storage and explicit v1 conversion;
 - Mesh, GS and Compare;
 - multiple assets and manual shared-coordinate alignment;
-- a paired Mesh+GS AssetRevision with explicit same-asset Mesh/proxy interaction;
+- a paired Mesh+GS AssetRevision with one explicit invisible same-asset proxy;
 - caption edit, package merge conflict review and clean share export;
 - opaque/mask/dither Integrated rendering;
 - mobile LOD, resident budgets and deterministic degradation;
@@ -220,11 +230,19 @@ Recorded on 2026-08-26:
 - only exact one-to-one source-authoritative sheet/media relationships may activate automatically; unresolved relationships are stocked for later expert batch review rather than presented as ordinary-user questions;
 - the first review stock is a private device-local bridge and is deliberately excluded from ordinary package export. It does not satisfy portable-project completion; portable collaboration/resolution requires a separate package/privacy contract.
 - landing the identity correction before that private stock is an integration slice, not a claim that unread source can already be recovered later; the original outer ZIP remains required and the transitional slice is not release-complete without the disclosure in `04-locimyu-conversion.md`.
-- the standard first interactive GS configuration is one logical Asset and one
-  active AssetRevision containing Mesh plus GS; the user clicks GS while an
-  explicit same-asset normal Mesh or interaction proxy supplies the raycast;
+- the standard first interactive configuration is one logical Asset and one
+  active AssetRevision containing Mesh, GS and one invisible interaction proxy;
+  the same proxy supplies raycasts in simple mixed, GS-only and Mesh-only
+  visibility and never becomes a display mode;
 - direct splat picking and ordinary-point acceptance are outside the first paired
   vertical slice, while Mesh-only and GS-only assets remain schema-valid;
+- automatic proxy generation and advanced mixed transparency/compositing are
+  outside the first slice; prepared/imported proxies and the simple opaque mixed
+  rule are sufficient;
+- base renderer adoption and the first paired slice do not wait for
+  ordinary-point, Compare or broader Integrated feature evidence; those
+  requirements remain mandatory before their later support claim/control is
+  enabled;
 - the five incomplete-data outcomes in section 4.5 are fixed product behavior;
   no implementation may infer registration or interaction binding.
 

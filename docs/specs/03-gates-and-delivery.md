@@ -18,6 +18,14 @@ Average results, a single successful run, or “it appears to work” do not pas
 
 Small deterministic fixtures and reports belong in Git. Large GS/package data, Safari traces and device captures remain external artifacts referenced by immutable hash and provenance; they MUST NOT bloat normal AI search scope.
 
+Product Owner dependency amendment recorded 2026-08-26: G1-B may adopt the
+base renderer for Mesh, GS, the simple opaque mixed pattern and shared-proxy
+interaction without first closing advanced Integrated composition. The existing
+`integratedOpaque` and `integratedTransparencyExperimental` controls remain off
+until their later fixture/image acceptance passes. This is not a new gate and
+does not delete those requirements; it removes them only from the base-renderer
+and first paired-slice prerequisite chain.
+
 ## 2. G0 — baseline and acceptance inputs
 
 ### 2.1 Fixture registry
@@ -31,25 +39,37 @@ Required fixtures:
 - known divergent v1 copies, ops-only exchange, interrupted workspace and malformed log;
 - GS around 100k, 500k and 2–4M splats;
 - ordinary PLY and GS PLY with explicit expected classification;
-- mesh-only, points-only, one-container mixed mesh+points, multi-primitive/two-node-instanced point models and two-node indexed/reflected triangle models with frozen inspection, immutable-record golden bytes and source-occurrence/pick ground truth;
+- mesh-only and two-node indexed/reflected triangle models with frozen inspection,
+  immutable-record golden bytes and source-occurrence/pick ground truth;
 - static GLB fixtures with authored node transforms, initial morph weights, skin/joints and animation clips whose expected no-clip static pose, bounds and pick points are frozen, plus inputs that must be rejected or explicitly `staticPoseBake`d;
 - anisotropic GS with nonzero view-dependent coefficients under translation, rotation, positive scale and reflection, with profile-derived finite support bounds and mesh-axis alignment ground truth;
-- opaque, mask, blend and transmission source-material slots combined with opacity and hard/soft chroma overrides, including final transparent-background alpha, duplicate catalog/override keys, invalid and redirected combinations;
-- ordinary-point footprint fixtures at the target CSS diameters, DPRs and render scales under the distinct ratified binary/dither/smooth profile IDs, including triangle/point pixel overlap and radius-fallback ties;
 - v1 captions with absent normals and with stored normals under Y-up, Z-up and transformed child nodes; migration output always omits `normalAsset` and emits the exact issue only when a source normal is present;
 - 500 MiB incompressible streaming stress data, labelled non-product-guarantee;
-- mesh/GS intersection, ordinary-point/GS Integrated overlap, and GS gap repaired by a visual patch;
-- visual patch plus same-asset atomic splat-exclusion group, a differently oriented/scaled external repair import and cancel/failure path, unchanged-base versus singleton-patch anchor compatibility across patch add/update/remove, manual C1-to-C2 rebind and ambiguous-target refusal, ungrouped/cross-asset/missing-patch, nonidentity-mask and wrong-role relationship-field failures, raw/paged/preview target switching, overlapping hard-mask union and excluded-region direct/proxy picks;
-- a closed translucent aircraft with at least six mesh surfaces on representative view rays;
-- one same-logical-Asset/same-active-AssetRevision Mesh+GS pair with explicit
-  proxy-to-GS binding, AssetFrame raycast/Caption ground truth and all five fixed
-  incomplete-data outcomes; direct-GS ground truth is optional later evidence;
-- multiple assets with different origins, axes, units and Sim(3) alignment;
+- one same-logical-Asset/same-active-AssetRevision Mesh+GS pair with one
+  unambiguous invisible proxy-to-GS binding; simple mixed, GS-only and Mesh-only
+  visibility all raycast that same proxy and preserve one AssetFrame Caption
+  through save/reopen, with the simple opaque mixed rule and all five fixed
+  incomplete-data outcomes; direct-GS and proxy generation are optional later;
 - 10,000 captions and 50,000 metadata changes;
 - deleted/private sentinel values for package privacy tests;
 - parent-delete/concurrent-child and unknown-minor-only-blob fixtures;
 - v1 media fixtures with equal bytes under distinct asset IDs plus later-copy attachment prepend/reorder/reviewed duplicate-count/content-revision changes;
 - malicious package and model corpus.
+
+Later feature fixtures are retained but do not block G0 exit, base G1-B adoption
+or the first paired slice. Before the corresponding support claim or control is
+enabled, the same registry discipline applies to:
+
+- opaque/mask/dither plus blend/transmission redirect source-material axes,
+  opacity/chroma/final-alpha, duplicate-key and invalid/redirected matrices;
+- mesh/GS and ordinary-point/GS intersections, GS visual repair, patch/exclusion
+  relationships, external repair/rebind/failure, target switching, mask union and
+  excluded-region proxy picks;
+- the closed translucent-aircraft scene and its later transparency evidence.
+- ordinary PLY/container-mixed/multi-node point rendering and picking, including
+  profile footprint, overlap and radius-tie evidence;
+- Compare and multiple assets with different origins, axes, units and Sim(3)
+  alignment.
 
 G0 owns the failing characterization tests for every known G0-S defect. G0-S begins only after those tests demonstrably fail on the recorded v1 baseline, then owns the minimal fixes that make them pass. Characterization work and fixture collection may proceed in parallel, but G0 does not depend on unstarted G0-S implementation.
 
@@ -72,21 +92,27 @@ Use fixed fixtures and camera/input traces to record:
 - twenty load/unload cycles;
 - storage used before/after and orphan cleanup.
 
-G0 also fixes numeric acceptance for resource plateau, supported-rendering images, the provisional 6-CSS-pixel ordinary-point pick radius and the common default/minimum/maximum CSS diameter plus coverage threshold for `lociview-point-binary-1`, `lociview-point-dither-1` and `lociview-point-smooth-1`; it ratifies their distinct companion digests and chooses binary as the product default. It ratifies the exact initial FormatProfile ID/specification-digest registry and goldens for static pose, contribution/material/source-occurrence enumeration, bounds, source-material semantics, GS transform semantics and hard AssetFrame splat-mask predicates, plus the chroma evaluator and stable dither matrix/seed/coordinate rule, before either backend may pass G1-B. At minimum, the backend resource ledger returns to its declared baseline handle/byte count after unload; comparable heap samples from the final five cycles stay within a product-owner-approved percentage of the first stable five and show no approved positive slope. Reference images include masks and difference tolerances for supported opaque/mask/dither intersections. A warning alone cannot waive those tolerances.
+G0 also fixes numeric acceptance for resource plateau and the simple Mesh, GS and opaque-mixed images. It ratifies the exact initial FormatProfile ID/specification-digest registry and goldens needed by the base renderer for static pose, Mesh/GS contribution/source-occurrence enumeration, bounds, minimal opaque source-material semantics and GS transform semantics before either backend may pass base G1-B. At minimum, the backend resource ledger returns to its declared baseline handle/byte count after unload; comparable heap samples from the final five cycles stay within a product-owner-approved percentage of the first stable five and show no approved positive slope. Later feature acceptance separately ratifies ordinary-point pick/diameter/coverage profiles, the complete material resolver, hard AssetFrame splat-mask predicate, chroma evaluator, stable dither matrix/seed/coordinate rule and supported opaque/mask/dither intersection images. A warning alone cannot waive the applicable base or later tolerance.
 
-Changing ratified profile bytes, point-footprint rules, material resolver rules or dither rules invalidates prior G1-B evidence and requires the affected bakeoff fixtures to run again; an implementation/library update that still passes byte/image goldens does not create a new semantic profile.
+Changing ratified base profile bytes invalidates affected base G1-B evidence and
+requires only those fixtures to run again. Changing point, complete material,
+mask, chroma or dither rules invalidates the corresponding later feature
+evidence, not an unrelated passing base lane. An implementation/library update
+that still passes its applicable byte/image goldens does not create a new
+semantic profile.
 
 GS is “unsupported” in the v1 baseline; do not invent a comparison value.
 
 ### 2.4 G0 exit
 
-- every fixture can be restored by hash;
+- every base-required fixture can be restored by hash; later feature fixtures are
+  required only before their corresponding support claim or control is enabled;
 - physical-iOS raw evidence exists;
 - v1 G0-S reproductions fail on the unfixed baseline;
 - package bytes as well as splat counts are recorded;
-- resource-plateau and supported-image tolerances are numeric and reproducible;
-- initial FormatProfile, point-footprint, chroma and dither specifications/golden hashes are ratified and restorable;
-- the product owner approves support classes, degradation behavior and provisional hard metrics.
+- resource-plateau and base Mesh/GS/simple-mixed image tolerances are numeric and reproducible;
+- initial base Mesh/GS FormatProfile specification/golden hashes are ratified and restorable;
+- the product owner approves base support classes, degradation behavior and provisional hard metrics. Later Integrated support claims require their separately retained feature evidence.
 
 ## 3. G0-S — blocking v1 safety stabilization
 
@@ -220,7 +246,34 @@ Failure stops CAS production work and triggers a format/sink/desktop-packer ADR 
 
 Spark/Three and PlayCanvas use identical source fixtures, camera traces, render scale, exposure/background and hard requirements. Engine-native derivatives are allowed only when preprocessing time, output size and provenance are included.
 
-Required scenes: one same-logical-Asset/same-active-AssetRevision Mesh+GS pair with an explicit proxy-to-GS interaction binding, GS-display/proxy-raycast/AssetFrame-Caption/save/reopen ground truth and the five fixed incomplete-data outcomes; GS, mesh, one-container mixed mesh+ordinary-points, reflected-raw/identity-baked candidates in one family, profile-defined static pose and explicit static-pose bake/reject inputs, anisotropic/view-dependent GS transformed against mesh axes, missing-blob metadata-only bounds parity, Compare, opaque/mask/dither Integrated, the source-semantics/opacity/chroma/final-alpha matrix, mesh/GS and ordinary-point/GS intersection, atomic same-asset patch/exclusion including external repair alignment/cancel/failure and base-versus-patch compatibility partition through add/update/remove plus ungrouped/cross-asset/missing-patch/nonidentity-mask/wrong-role negatives, raw/paged/preview GS under one hard AssetFrame mask, overlapping-mask union and excluded bound-surface picks, multiple aligned assets, point-only/mixed ordinary-point rendering/picks at identical CSS diameter/DPR/render scale across the three ratified binary/dither/smooth profile IDs including symmetric index-present/index-absent ties, two-node indexed/reflected mesh picks, paged/reordered splat inputs, proxy/manual-gizmo C1-to-C2 rebind picks, closed translucent aircraft, context loss and twenty load/unload cycles. Direct-GS/GPU-ID picking is optional later evidence and does not block the paired slice; ordinary-point fixtures do not count toward its acceptance.
+Base-adoption scenes are limited to the first supported renderer boundary: one
+same-logical-Asset/same-active-AssetRevision Mesh+GS pair with one unambiguous
+invisible proxy-to-GS interaction binding; simple Mesh+GS mixed, GS-only and
+Mesh-only visibility all raycast that same proxy and preserve its source ID plus
+one AssetFrame Caption through save/reopen. The mixed smoke uses an opaque Mesh
+depth-writing/GS-against-depth rule. The base pack also covers standalone GS and
+Mesh, reflected/raw versus identity-baked candidates, the ratified static pose,
+anisotropic/view-dependent GS transforms against Mesh axes, metadata-only bounds,
+paged/reordered GS input, the five incomplete-data outcomes, context loss and
+twenty load/unload cycles.
+
+Later feature acceptance retains the following scenes but does not block G1-B
+base adoption or the first paired slice:
+
+- `compareV2`: Compare and multiple aligned assets;
+- ordinary-point support: point-only, container-mixed, profile footprint/pick and
+  tie fixtures; this acceptance remains required before MVP ordinary-point
+  display/picking support is claimed;
+- `integratedOpaque`: complete source-material/opacity/chroma/final-alpha matrix,
+  opaque/mask/dither intersections, visual patch/exclusion, external repair,
+  compatibility/rebind negatives, target switching and excluded proxy picks;
+- `integratedTransparencyExperimental`: the closed translucent aircraft and its
+  G1-D evidence.
+
+Direct-GS/GPU-ID picking and proxy generation remain optional later paths. A
+later acceptance failure keeps only its feature/control unsupported; it does not
+retroactively convert a passing base renderer into a failed first slice unless
+it exposes a defect in the shared base invariant.
 
 Provisional physical-iOS hard floor, confirmed in G0:
 
@@ -231,10 +284,10 @@ Provisional physical-iOS hard floor, confirmed in G0:
 - ten minutes without page reload or context loss;
 - three successful background/foreground restores;
 - bound-surface pick p95 at most 100 ms desktop and 150 ms iOS;
-- pick error within two screen pixels or the applicable bound-surface/ordinary-point footprint for the ground-truth fixture;
+- pick error within two screen pixels for the bound-proxy ground-truth fixture;
 - resource usage reaches a stable plateau after twenty load/unload cycles.
 
-A bound normal-Mesh or proxy path passes only if it meets its assigned
+A bound proxy path passes only if it meets its assigned
 latency/error/availability threshold; merely having bytes is insufficient.
 Direct-GS/GPU-ID paths may be evaluated later through their own telemetry, while
 the normal pin UI remains one editable gizmo-correctable presentation without a
@@ -245,11 +298,11 @@ Hard functional requirements:
 - no external runtime request;
 - unknown/digest-mismatched FormatProfiles and profile-summary/decode mismatches fail explicitly without extension-based fallback;
 - progressive paging and bounded lifecycle;
-- Mesh, GS, Compare and supported Integrated classes;
-- explicit same-asset Mesh/proxy-bound caption picking; direct-GS is not required;
+- Mesh, GS and the simple opaque mixed visibility pattern;
+- one explicit invisible same-asset proxy used across the three first-slice visibility patterns; direct-GS and proxy generation are not required;
 - context restore and explicit disposal;
 - no backend type in persistent data.
-- identical profile-derived static pose, bounds, material class, transformed GS footprint/color basis and point footprint/pick result across both backends, or an explicit Unsupported result.
+- identical profile-derived static pose, bounds, minimal opaque material class and transformed GS footprint/color basis across both backends, or an explicit Unsupported result.
 
 If both pass comparably, adopt the lower migration/maintenance cost. A hard failure cannot be hidden by a weighted score. If neither passes, stop at the ADR reconsideration trigger.
 
@@ -347,11 +400,15 @@ integratedTransparencyExperimental
 | `v2WorkspaceCreation` | storage gate adopted | Hides new conversion/creation only. It never chooses a writer for an existing workspace. |
 | `rendererV2` | renderer gate adopted | v1 uses the legacy viewer. A v2 workspace opens metadata-only/read-only diagnostics; it is never handed to the v1 viewer or writer. |
 | `gsStandalone` | `rendererV2` | GS is diagnosed but not drawn. Use Mesh when available; a GS-only project remains read-only/view-metadata until enabled. |
-| `gsDirectPicking` | later optional gate after `rendererV2`, `gsStandalone` | This future control never gates the first paired slice. When disabled, explicitly bound same-asset Mesh/proxy interaction remains available; a GS without a usable binding is view-only. |
-| `proxyGeneration` | adopted desktop packer path | Prepared external proxies may still be consumed. Generation is unavailable on iOS. |
-| `compareV2` | `rendererV2`, Mesh and GS capability | Offer independent Mesh or GS modes without comparison. |
-| `integratedOpaque` | `rendererV2`, supported Mesh and GS | Offer Mesh, GS and Compare; never approximate Integrated silently. |
+| `gsDirectPicking` | later optional gate after `rendererV2`, `gsStandalone` | This future control never gates the first paired slice. When disabled, the explicitly bound same-asset proxy remains available in all three visibility patterns; a GS without a usable proxy is view-only. |
+| `proxyGeneration` | later optional desktop packer path | Prepared/imported proxies may still be consumed. Generation is outside the first slice and unavailable on iOS. |
+| `compareV2` | `rendererV2`, Mesh and GS capability, later Compare acceptance | Offer independent Mesh or GS modes without comparison. |
+| `integratedOpaque` | `rendererV2`, simple mixed base, later opaque/mask/dither Integrated acceptance | Keep the first simple mixed pattern plus Mesh, GS and any accepted Compare path; never expose unaccepted advanced Integrated classes. |
 | `integratedTransparencyExperimental` | `integratedOpaque`, optional G1-D and production review | Preserve smooth intent and offer supported fallback; experimental smooth compositor stays off. Transmission/refraction remains Unsupported pending a separate future gate. |
+
+The bounded simple opaque Mesh+GS pattern is part of `rendererV2` base adoption;
+`integratedOpaque` gates the broader material/intersection/patch classes, not that
+first smoke path. No additional persisted mode or feature-control field is added.
 
 `v2WorkspaceCreation` is a migration-cohort control, not a runtime `storageV2` toggle. An existing workspace selects its repository/writer by validated schema major. A build without the required v2 implementation can only diagnose/read safely; a v2-written workspace MUST NOT be opened by a v1 writer.
 
@@ -369,13 +426,14 @@ Rollback means preserving the source v1 package/workspace, opening conversion in
 6. renderer/storage-neutral domain and ports with unchanged v1 characterization.
 7. production blob journal, metadata repository and package classes.
 8. ratify the immutable `v1-migration-recipe-1` companion/golden manifest and its one-to-one descriptor, then implement canonical v1 conversion; no durable conversion exists before this sub-gate passes.
-9. Paired Mesh+GS vertical slice in one logical Asset/active AssetRevision:
-   import -> stream -> display GS -> raycast the explicit same-asset proxy ->
-   AssetFrame Caption -> durable save -> reload, including the five fixed
-   incomplete-data outcomes. A normal-Mesh binding remains blocked until its
-   one minimal schema relation is separately specified; direct-GS and ordinary
-   points do not block this slice.
-10. multiple assets, alignment and Compare.
+9. Proxy-backed paired Mesh+GS vertical slice in one logical Asset/active
+   AssetRevision: import -> stream -> switch simple mixed/GS-only/Mesh-only
+   visibility -> raycast the same invisible proxy -> AssetFrame Caption ->
+   durable save -> reload, including the simple opaque mixed rule and five fixed
+   incomplete-data outcomes. Normal-Mesh binding, direct-GS, proxy generation,
+   ordinary points and advanced composition do not block this slice.
+10. ordinary-point display/picking acceptance, multiple assets, alignment and
+    Compare.
 11. opaque/mask/dither Integrated and patch/exclusion.
 12. iOS, migration, corruption, privacy and security hardening.
 13. after core iOS/migration/corruption/privacy/security hardening, productionize a previously adopted G1-D result only through production review; if the feasibility spike was deferred, it may instead run now. Exact-renderer research remains a separate later gate.

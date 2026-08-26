@@ -80,13 +80,13 @@ Classification:
 | `E2` | Representative GS 100k/500k/2–4M family | `EXT C P-APPROVE WAIT` | Exact source/derived relation, bytes, SHA-256, splat count, bounds, format, attribution, privacy/license approval and restorable transport for all three sizes | Exact candidate acquisition and review; current 2–4M URL is only a candidate |
 | `E3` | External fixture Release/restore/adoption | `EXT C P-APPROVE WAIT` | Approved draft, unchanged public-but-unadopted asset, indexed descriptor, verified transport under `.artifacts/acquisition/verified-transport/`, real Mode-B receipt under `.artifacts/acquisition/receipts/`, independent receipt review and separately approved registry entry | `E1` or `E2`; Mode B exists but no real descriptor/receipt/asset exists |
 | `E4-A` | G1-A I/O input pack | `R C` | Deterministic 500 MiB incompressible recipe/output/hash/restore command and bounded package round-trip input | No external bytes required; execution evidence remains G1-A |
-| `E4-B` | G1-B renderer input pack | `R C EXT P-APPROVE WAIT` | One same-logical-Asset/same-active-AssetRevision Mesh+GS pair using the existing explicit proxy binding, GS-display/proxy-raycast/AssetFrame-Caption/save-reopen oracle and the five fixed incomplete-data outcomes; exact mesh/point/mixed/static-pose/GS-transform/material/intersection/repair/multi-asset scenes, fixed trace and independent oracle; fixed candidate profile/image bindings before measurement; closed translucent-aircraft input is either an independently approved external candidate or an authored repository fixture. Direct-GS and ordinary-point results do not substitute for paired-slice acceptance | Candidate profile semantics and selected GS bytes; normal-`meshPrimary` interaction remains specification-blocked on one minimal relation; final numeric/support ratification is `E9` |
+| `E4-B` | G1-B base-renderer input pack | `R C EXT P-APPROVE WAIT` | One same-logical-Asset/same-active-AssetRevision Mesh+GS pair using one unambiguous invisible proxy; simple mixed, GS-only and Mesh-only visibility raycast the same proxy and preserve one AssetFrame Caption through save/reopen under the simple opaque mixed rule and five fixed incomplete-data outcomes. Base inputs also cover standalone Mesh/GS, required static pose/GS transforms/bounds, fixed trace/oracle, context restore and resource lifecycle. Direct-GS, proxy generation, ordinary points, Compare, material/intersection/repair matrices and advanced composition are retained for later feature acceptance rather than E4-B | Candidate base-profile semantics and selected GS bytes; no normal-Mesh interaction relation is required; final base numeric/support ratification is `E9` |
 | `E4-C` | G1-C metadata/privacy input pack | `R C P-APPROVE WAIT` | Exact divergent/interrupted/malformed v1 inputs, 10k-caption/50k-change recipe, conflict/privacy/later-copy fixtures and semantic outcomes; map the existing malicious package/model/media corpus to restorable threat/result rows without starting new corpus exploration | Collision/migration/privacy decisions |
 | `E5` | Measurement instrumentation and operator kit | `R C` | Identifiable frame samples, pick compute/gesture split, resource handle/byte ledger, load/unload samples, storage checkpoints, fixed trace and a run card that produces the existing run schema | Existing schema/runbook are ready; runtime instrumentation is incomplete |
 | `E6` | Three target-environment records | `P-DEVICE C` | Measured iPhone 14 Pro/Safari PWA, Windows 11 desktop/Edge and Windows 11 tablet-PC/Edge records under `evidence/g0/devices/`; Chrome remains secondary smoke | Device facts can start now; never record serial, hostname or account ID |
 | `E7` | Physical device baseline runs | `P-DEVICE C WAIT` | Complete run records for the three classes, fixed build/fixture/trace identity, raw logs and package results | `E0`, applicable `E1`/`E2`/`E4`, `E5`, `E6` |
 | `E8` | External raw-artifact preservation and review | `EXT C WAIT` | Git-external logs/traces/screenshots/video/package bytes plus manifest SHA-256, byte size, restorable locator, capture UTC, sensitivity and retention; reviewer checks served bytes | Each `E7` run; video is a separate run because capture changes load |
-| `E9` | Profile and numeric/support ratification | `R C P-APPROVE WAIT` | Before `E7`, freeze the exact candidate profile/spec/oracle bytes and hashes without a support claim. After reviewed `E7`/`E8`, approve the final resource plateau, image tolerance, point radius/diameter/coverage, profile/chroma/dither hashes, support classes, degradation and hard metrics. A changed final digest invalidates the affected run and reruns only that evidence lane | Candidate freeze depends on `E4-B`; final ratification depends on reviewed `E7`/`E8` |
+| `E9` | Base profile and numeric/support ratification | `R C P-APPROVE WAIT` | Before `E7`, freeze the exact base candidate profile/spec/oracle bytes and hashes without a support claim. After reviewed `E7`/`E8`, approve the base resource plateau, Mesh/GS/simple-mixed image tolerance, proxy-pick limits, support classes, degradation and hard metrics. Point/chroma/dither/full-material hashes and images are ratified with their later feature evidence rather than blocking this base decision. A changed final digest invalidates only the affected evidence lane | Base candidate freeze depends on `E4-B`; final base ratification depends on reviewed `E7`/`E8` |
 | `E10` | Aggregate G0 exit package | `C P-APPROVE WAIT` | All seven G0 exit rows trace to reproducible bytes/evidence; verifier and one independent review pass; PO records the G0 decision | `E1`–`E9` and the G0-S pre-fix ledger |
 
 ### 3.1 Exact external-asset lifecycle
@@ -197,9 +197,10 @@ limits. The Product Owner approves or rejects exact values and hashes for:
 
 - resource plateau/heap trend and storage cleanup;
 - supported-image masks/difference tolerances;
-- point pick radius and point diameter/coverage;
-- binary point default and FormatProfile/point/chroma/dither companions;
-- supported device classes, degradation behavior and hard Go/No-Go metrics.
+- base proxy-pick accuracy/latency and Mesh/GS/simple-mixed image limits;
+- supported base device classes, degradation behavior and hard Go/No-Go metrics;
+- in later feature decisions, point radius/diameter/coverage, binary point default
+  and point/chroma/dither/full-material companion hashes.
 
 Save the decision with exact run IDs, fixture/profile digests and rejected
 alternatives. Approval is not inferred from a successful verifier.
@@ -236,7 +237,7 @@ and G0-S completion before any G1 work. The dependency analysis found:
 | G1 gate | Actual G0 inputs it consumes | Unrelated aggregate-G0 inputs currently serializing it |
 |---|---|---|
 | G1-A streaming/CAS | 500 MiB I/O fixture, package round trip, buffer/storage/quota/cancel conditions, target environment and I/O budget | Renderer profiles/images/GS transforms/material/dither and metadata migration conflicts |
-| G1-B renderer | Paired same-logical-Asset Mesh+GS with explicit same-asset proxy binding, fixed incomplete-data outcomes, representative GS, mesh/point/mixed/alignment/pick/material/patch scenes, fixed trace, FormatProfiles, image tolerance and physical-iOS render/resource thresholds | Divergent/later-copy metadata and Automerge privacy/conflict families |
+| G1-B base renderer | Paired same-logical-Asset Mesh+GS with one invisible same-asset proxy shared by simple mixed/GS-only/Mesh-only visibility, the simple opaque mixed rule, fixed incomplete-data outcomes, representative Mesh/GS, base transforms/bounds, fixed trace, base FormatProfiles/image tolerance and physical-iOS render/resource thresholds | Ordinary-point, Compare and advanced Integrated feature packs now block only their own later support controls; divergent/later-copy metadata and Automerge privacy/conflict families remain unrelated |
 | G1-C metadata | Real/divergent/interrupted/malformed v1, 10k/50k stress, canonical operation/collision, privacy/deletion/migration inputs and open/edit/durable/merge budgets | Renderer images, chroma/dither, translucent-aircraft rendering and backend choice |
 
 The proposed amendment, if separately approved, is:
@@ -253,6 +254,13 @@ dependency proposal is `G0-S + COMMON + IO-READY -> G1-A`, then G1-A plus the
 applicable READY bundle permits G1-B and G1-C without forcing those two lanes to
 wait on each other's unrelated evidence. A READY result is PoC entry only; it is
 not G0 completion, release authority or permission to promote PoC code.
+
+The Product Owner's proxy/simple-mixed decision additionally narrows G1-B here to
+base renderer adoption. Ordinary-point, Compare and Integrated feature packs are
+retained, but their evidence blocks only the corresponding later support claim or
+feature control. This is dependency removal inside the existing feature-control
+model, not a new gate and not permission to skip those checks before release of
+those features.
 
 Reasons to propose rather than maintain the monolith:
 
@@ -276,15 +284,15 @@ G0/G0-S release barriers, disposable PoCs and one writer.
 | `WS1` G0 evidence inputs/acquisition | `E0`–`E5` inputs are exact/restorable; external bytes complete the approved Release/restore/adoption lifecycle | Source bytes, privacy/license, profile decisions, instrumentation | Codex / PO / external / reviewer | None, units run in parallel | `YES`, only approved repository preparation and source requests |
 | `WS2` G0 device evidence/ratification | `E6`–`E10`; three device classes, complete raw runs, reviewed artifacts and all seven G0 exit rows approved | `WS1`, physical devices, PO numeric decisions | PO/device operator / Codex / reviewer | WS1 | Environment facts only now; full runs `WAIT` |
 | `WS3` G0-S current-user safety | Ledger plus `S1`–`S4`; real-browser/iOS evidence, exact-tree matrix, no unresolved P0/P1 and PO stabilized-v1 approval | Lock/journal/quarantine decisions and physical evidence | Codex / PO / reviewer | Ledger first; S2 after S1; final closure also WS2 | Ledger now; production waits for approval |
-| `WS4` G1 technology decisions | G1-A/B/C each records reproducible `ADOPT`, `REJECT` or `RETRY` with rollback/fallback | Current aggregate G0/G0-S, or a separately approved READY amendment | Codex / PO / device operator | WS2/WS3 under current gate | `NO` |
-| `WS5` v2 MVP and release | Reuse the existing Asset/AssetBindingRevision/AssetRevision/Representation closure; one logical Asset and active AssetRevision durably preserve a Mesh+GS pair, explicit same-asset proxy relation, GS-display/raycast/AssetFrame Caption/save/reopen and the five fixed incomplete-data outcomes. Then complete production storage, canonical migration, separately approved LociMyu local-review/source-retention work, multiple assets/Compare/Integrated, iOS/privacy/security/usability/rollback and exact release approval. Direct-GS and ordinary points do not close the first paired slice | WS4 choices, local-review wire/capability approval, the separately reviewed minimal normal-Mesh interaction-binding gap if that route is required, and remaining product approvals | Codex / PO / external reviewer | WS4 | `NO` |
+| `WS4` G1 technology decisions | G1-A, G1-B base renderer and G1-C each record reproducible `ADOPT`, `REJECT` or `RETRY` with rollback/fallback; later renderer features retain separate acceptance before their controls turn on | Current base G0/G0-S, or a separately approved READY amendment | Codex / PO / device operator | WS2/WS3 under current gate | `NO` |
+| `WS5` v2 MVP and release | Reuse the existing Asset/AssetBindingRevision/AssetRevision/Representation closure; one logical Asset and active AssetRevision durably preserve a Mesh+GS pair and one invisible proxy. Simple mixed, GS-only and Mesh-only visibility all raycast that same proxy and preserve one AssetFrame Caption through save/reopen under the simple opaque mixed rule and five fixed incomplete-data outcomes. Then complete production storage, canonical migration, separately approved LociMyu local-review/source-retention work, ordinary-point display/picking acceptance, multiple assets/Compare/later Integrated classes, iOS/privacy/security/usability/rollback and exact release approval. Direct-GS, proxy generation, ordinary points and advanced composition do not close the first slice, but ordinary-point acceptance remains required before MVP release | WS4 choices, local-review wire/capability approval and remaining product approvals; no new normal-Mesh interaction relation is required for the first slice | Codex / PO / external reviewer | WS4 | `NO` |
 
 ## 8. Approval stop
 
-The Product Owner reviewed and amended the paired Mesh+GS policy and authorized
-this docs-only commit. That approval does not approve the remaining delivery/
+The Product Owner reviewed and amended the paired Mesh+GS policy, then selected
+the existing proxy-backed path and three visibility patterns as the initial
+standard. Recording that policy does not approve the remaining delivery/
 gate-refocus proposal or authorize `S0`, `S1`, fixture authoring,
 instrumentation, acquisition, device runs, schema implementation or a gate
-amendment. Commit these docs, report existing-schema reuse and the one normal-
-Mesh interaction-binding gap, then stop until a separate production restart is
-authorized.
+amendment. Commit these docs, report that the first slice needs no schema
+addition, then stop until a separate production restart is authorized.
