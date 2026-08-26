@@ -12,7 +12,7 @@ import { mountMaterialTab } from './tabs/material';
 import { mountModelTab } from './tabs/model';
 import { applyViewRecordToViewer, mountViewsTab } from './tabs/views';
 import { mountCaptionOverlay } from './overlay';
-import { describeSaveStatus, type PackageExportStatus } from './saveStatus';
+import { describeProjectAccess, describeSaveStatus, type PackageExportStatus } from './saveStatus';
 
 export interface ViewerScreenDeps {
   goHome: () => void;
@@ -22,6 +22,7 @@ export interface ViewerScreenDeps {
   packageExportStatus: () => PackageExportStatus;
   setPackageExportStatus: (status: PackageExportStatus) => void;
   openProfile: () => void;
+  retryProjectAccess: () => void;
 }
 
 const TABS = [
@@ -42,6 +43,13 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
   // ---- トップバー -------------------------------------------------------------
 
   const saveStatus = el('span', { class: 'lv-dim lv-savestatus' });
+  const accessStatus = el('span', { class: 'lv-badge' });
+  const retryAccessBtn = el('button', {
+    class: 'mini',
+    title: '編集権限を再取得し、端末に保存された最新状態を再読込します',
+    onclick: deps.retryProjectAccess,
+  }, '再取得して再読込');
+  retryAccessBtn.hidden = true;
   const retrySaveBtn = el('button', {
     class: 'mini',
     title: '端末ワークスペースへの保存を再試行',
@@ -50,17 +58,24 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
     },
   }, '保存を再試行');
   retrySaveBtn.hidden = true;
-  const undoBtn = el('button', { title: '元に戻す (Ctrl+Z)', onclick: () => { ctx.undo.undo(); } }, '↺');
-  const redoBtn = el('button', { title: 'やり直す (Ctrl+Y)', onclick: () => { ctx.undo.redo(); } }, '↻');
+  const undoBtn = el('button', { 'data-project-mutation': '', title: '元に戻す (Ctrl+Z)', onclick: () => { ctx.undo.undo(); } }, '↺');
+  const redoBtn = el('button', { 'data-project-mutation': '', title: 'やり直す (Ctrl+Y)', onclick: () => { ctx.undo.redo(); } }, '↻');
+  const profileBtn = el('button', {
+    'data-project-mutation': '',
+    onclick: deps.openProfile,
+    class: 'lv-profile',
+  }, ctx.displayName(ctx.identity.userId));
 
   const topbar = el('header', { class: 'lv-topbar' },
     el('button', { onclick: deps.goHome, title: 'ホームへ' }, '☰'),
     el('b', { class: 'lv-projname' }, ctx.store.manifest.name),
+    accessStatus,
+    retryAccessBtn,
     saveStatus,
     retrySaveBtn,
     el('span', { class: 'lv-flex1' }),
     undoBtn, redoBtn,
-    el('button', { onclick: deps.openProfile, class: 'lv-profile' }, ctx.displayName(ctx.identity.userId)),
+    profileBtn,
   );
 
   // ---- ステージ ---------------------------------------------------------------
@@ -77,6 +92,7 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
     void switchSet(setSelect.value);
   });
   const addSetBtn = el('button', {
+    'data-project-mutation': '',
     onclick: () => {
       void promptDialog('新しい表示セット', 'セット名（例: 半透明・内部指摘用）').then((name) => {
         if (name === null) return;
@@ -86,6 +102,7 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
     },
   }, '＋');
   const renameSetBtn = el('button', {
+    'data-project-mutation': '',
     title: 'セット名変更',
     onclick: () => {
       const setId = ctx.ui.activeSetId;
@@ -97,6 +114,7 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
     },
   }, '✎');
   const deleteSetBtn = el('button', {
+    'data-project-mutation': '',
     title: 'セット削除',
     onclick: () => {
       const setId = ctx.ui.activeSetId;
@@ -138,7 +156,18 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
     tabBody,
   );
 
-  root.append(el('div', { class: 'lv-viewer-layout' }, topbar, el('div', { class: 'lv-main' }, stage, panel)));
+  const layout = el('div', { class: 'lv-viewer-layout' }, topbar, el('div', { class: 'lv-main' }, stage, panel));
+  const blockUnauthorizedMutation = (event: Event): void => {
+    const target = event.target;
+    if (!(target instanceof Element) || target.closest('[data-project-mutation]') === null) return;
+    if (ctx.store.canMutate) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  };
+  layout.addEventListener('click', blockUnauthorizedMutation, true);
+  layout.addEventListener('input', blockUnauthorizedMutation, true);
+  layout.addEventListener('change', blockUnauthorizedMutation, true);
+  root.append(layout);
 
   // ---- タブ描画 ---------------------------------------------------------------
 
@@ -171,6 +200,7 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
         }));
         break;
     }
+    applyMutationControls();
   }
 
   // ---- セット切替（キャプション・マテリアル・ビューが一括で変わる。docs/02 §5 set） ----
@@ -205,6 +235,7 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
   // ---- ビューアイベント結線 ------------------------------------------------------
 
   const offPick = ctx.viewer.onPick((hit) => {
+    if (!ctx.store.canMutate) return;
     // ピン追加（PC: Shift+Click / スマホ: 長押し）
     const id = ctx.undo.create('caption', {
       setId: ctx.ui.activeSetId,
@@ -244,6 +275,7 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
 
   // ギズモドラッグ確定 → アンカー位置を通常編集として記録（Undo可・マージ可）
   const offMove = ctx.viewer.onPinMove((id, position) => {
+    if (!ctx.store.canMutate) return;
     const rec = ctx.state.byKind.caption?.[id];
     if (rec === undefined) return;
     const anchor = fAnchor(rec) ?? {};
@@ -266,6 +298,11 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
   }
 
   function renderStatus(): void {
+    const access = describeProjectAccess(ctx.store.accessState, ctx.store.accessDetail);
+    accessStatus.textContent = access.compactText;
+    accessStatus.title = access.detailText;
+    accessStatus.classList.toggle('lv-warn', ctx.store.accessState === 'lock-lost');
+    retryAccessBtn.hidden = !access.canRetry;
     const status = describeSaveStatus(
       ctx.store.durabilityStatus,
       deps.unexportedCount(),
@@ -275,8 +312,21 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
     saveStatus.textContent = status.compactText;
     saveStatus.title = status.detailText;
     retrySaveBtn.hidden = !status.canRetry;
-    undoBtn.disabled = !ctx.undo.canUndo;
-    redoBtn.disabled = !ctx.undo.canRedo;
+    retrySaveBtn.disabled = !ctx.store.canMutate;
+    undoBtn.disabled = !ctx.store.canMutate || !ctx.undo.canUndo;
+    redoBtn.disabled = !ctx.store.canMutate || !ctx.undo.canRedo;
+    profileBtn.disabled = !ctx.store.canMutate;
+    addSetBtn.disabled = !ctx.store.canMutate;
+    renameSetBtn.disabled = !ctx.store.canMutate;
+    deleteSetBtn.disabled = !ctx.store.canMutate;
+    applyMutationControls();
+  }
+
+  function applyMutationControls(): void {
+    const disabled = !ctx.store.canMutate;
+    for (const control of tabBody.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | HTMLButtonElement>('[data-project-mutation]')) {
+      control.disabled = disabled;
+    }
   }
 
   let lastSelectedForMove: string | null = null;
@@ -292,9 +342,12 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
       lastSelectedForMove = ctx.ui.selectedCaptionId;
       ctx.ui.pinMoveMode = false;
     }
-    ctx.viewer.showPinGizmo(ctx.ui.pinMoveMode ? ctx.ui.selectedCaptionId : null);
+    ctx.viewer.showPinGizmo(
+      ctx.store.canMutate && ctx.ui.pinMoveMode ? ctx.ui.selectedCaptionId : null,
+    );
     const refresh = refreshers.get(activeTab);
     if (refresh !== undefined) refresh();
+    applyMutationControls();
   });
 
   // 初期描画
@@ -311,5 +364,8 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
     offMove();
     offChange();
     unmountOverlay();
+    layout.removeEventListener('click', blockUnauthorizedMutation, true);
+    layout.removeEventListener('input', blockUnauthorizedMutation, true);
+    layout.removeEventListener('change', blockUnauthorizedMutation, true);
   };
 }

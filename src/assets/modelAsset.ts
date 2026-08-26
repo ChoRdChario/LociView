@@ -3,7 +3,7 @@
 
 import { entityIdFor, type ProjectStore } from '../core/store';
 import { ulid } from '../core/ids';
-import type { WorkspaceFS } from '../platform/fs';
+import type { ProjectWorkspaceFS } from '../platform/fs';
 import { optimizeGlbBytes } from './glbOptimize';
 import { writeVerifiedBytes } from './verifiedWrite';
 
@@ -12,12 +12,13 @@ import { writeVerifiedBytes } from './verifiedWrite';
  * `optimizedPath` に持たせる（原本は無改変で保持）。返り値は assetId。
  */
 export async function addModelAsset(
-  fs: WorkspaceFS,
+  fs: ProjectWorkspaceFS,
   dir: string,
   store: ProjectStore,
   name: string,
   bytes: Uint8Array,
 ): Promise<string> {
+  store.assertWorkspace(fs, dir);
   const astId = entityIdFor('asset');
   const ext = (name.split('.').pop() ?? 'bin').toLowerCase();
   const path = `models/${astId}.${ext}`;
@@ -64,13 +65,14 @@ export async function addModelAsset(
  * キャプションやマテリアル設定は modelAssetId で紐づくため、そのまま追従する。
  */
 export async function replaceModelAsset(
-  fs: WorkspaceFS,
+  fs: ProjectWorkspaceFS,
   dir: string,
   store: ProjectStore,
   assetId: string,
   name: string,
   bytes: Uint8Array,
 ): Promise<void> {
+  store.assertWorkspace(fs, dir);
   const asset = store.state.byKind.asset?.[assetId];
   if (asset === undefined) throw new Error(`replaceModelAsset: asset not found: ${assetId}`);
   const ext = (name.split('.').pop() ?? 'bin').toLowerCase();

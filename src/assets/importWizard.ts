@@ -7,6 +7,7 @@
 // 表示セット・ビュー・マテリアル設定まで引き継ぐ。
 
 import { entityIdFor, ProjectStore, type Identity } from '../core/store';
+import type { ProjectManifest } from '../core/manifest';
 import { visibleEntities } from '../core/reduce';
 import {
   analyzeLociMyuSheets,
@@ -19,7 +20,7 @@ import {
 } from '../io/locimyu';
 import { parseCsv } from '../io/csv';
 import { looksLikeXlsx, readXlsx } from '../io/xlsx';
-import type { WorkspaceFS } from '../platform/fs';
+import type { ProjectWorkspaceFS, WorkspaceFS } from '../platform/fs';
 import { detectFormat } from '../viewer/loaders';
 import { writeVerifiedBytes } from './verifiedWrite';
 import type { ZipEntryData } from './zipio';
@@ -336,6 +337,9 @@ export interface ImportOptions {
    * 縮小できなければnullを返す。テスト（Node）では未指定=軽量化しない。
    */
   optimizeModel?: (bytes: Uint8Array) => Promise<Uint8Array | null>;
+  /** Pre-locked target supplied by the production project-session boundary. */
+  targetDir?: string;
+  targetManifest?: ProjectManifest;
 }
 
 export interface ImportResult {
@@ -354,7 +358,7 @@ export interface ImportResult {
  * 全てのopは実行者のログへ記録される（移行の実行者が「取り込んだ人」になる）。
  */
 export async function applyImportPlan(
-  fs: WorkspaceFS,
+  fs: ProjectWorkspaceFS,
   identity: Identity,
   plan: ImportPlan,
   opts: ImportOptions,
@@ -397,8 +401,17 @@ export async function applyImportPlan(
   plan.migration = null;
   plan.fileIdMap.clear();
 
-  const dir = `projects/${entityIdFor('meta')}`;
-  const store = await ProjectStore.createUnpublished(fs, dir, projectName, actionIdentity);
+  if ((opts.targetDir === undefined) !== (opts.targetManifest === undefined)) {
+    throw new Error('wizard: targetDir and targetManifest must be supplied together');
+  }
+  const dir = opts.targetDir ?? `projects/${entityIdFor('meta')}`;
+  const store = await ProjectStore.createUnpublished(
+    fs,
+    dir,
+    projectName,
+    actionIdentity,
+    opts.targetManifest,
+  );
   const assetWriteReceipts = new Map<string, AssetWriteReceipt>();
   const requiredOriginalPaths = new Set<string>();
 

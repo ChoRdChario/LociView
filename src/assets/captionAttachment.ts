@@ -1,6 +1,6 @@
 import { isVisible } from '../core/reduce';
 import { entityIdFor, type ProjectStore } from '../core/store';
-import type { WorkspaceFS } from '../platform/fs';
+import type { ProjectWorkspaceFS } from '../platform/fs';
 import { writeVerifiedBytes } from './verifiedWrite';
 
 export interface AttachmentSource {
@@ -37,13 +37,14 @@ function currentAttachmentIds(store: ProjectStore, captionId: string): string[] 
  * The callback is synchronous so its caption update joins the same flush barrier.
  */
 export async function addCaptionAttachments(
-  fs: WorkspaceFS,
+  fs: ProjectWorkspaceFS,
   dir: string,
   store: ProjectStore,
   captionId: string,
   sources: readonly AttachmentSource[],
   publishAttachments: (allAttachmentIds: readonly string[]) => void,
 ): Promise<readonly string[]> {
+  store.assertWorkspace(fs, dir);
   const sourceSnapshots = sources.map((source) => ({
     name: source.name,
     mime: source.mime,

@@ -17,11 +17,51 @@ export interface WorkspaceFS {
   remove(path: string): Promise<void>;
 }
 
+export type ProjectAccessState = 'editable' | 'read-only' | 'lock-lost';
+
+export class ProjectMutationDeniedError extends Error {
+  constructor(readonly accessState: ProjectAccessState, message?: string) {
+    super(message ?? `project mutation denied: ${accessState}`);
+    this.name = 'ProjectMutationDeniedError';
+  }
+}
+
+/** One project session's synchronous mutation authority. */
+export interface ProjectMutationAuthority {
+  readonly accessState: ProjectAccessState;
+  readonly accessDetail: string;
+  assertEditable(): void;
+  beginWorkspaceWrite(): () => void;
+  assertWorkspaceWriteAuthorized(): void;
+  subscribeAccess(fn: (state: ProjectAccessState) => void): () => void;
+}
+
+/**
+ * A filesystem capability already bound to one project and one authority.
+ * Persistent production stores accept this type, never a raw OPFS handle.
+ */
+export interface ProjectWorkspaceFS extends WorkspaceFS {
+  /** `null` is reserved for tab-local MemoryFS/test use. */
+  readonly projectRoot: string | null;
+  readonly mutationAuthority: ProjectMutationAuthority;
+}
+
+export const LOCAL_PROJECT_MUTATION_AUTHORITY: ProjectMutationAuthority = Object.freeze({
+  accessState: 'editable' as const,
+  accessDetail: 'tab-local workspace',
+  assertEditable: () => undefined,
+  beginWorkspaceWrite: () => () => undefined,
+  assertWorkspaceWriteAuthorized: () => undefined,
+  subscribeAccess: () => () => undefined,
+});
+
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 /** テストおよび file:// 起動時のfallback実装（docs/03 §3） */
-export class MemoryFS implements WorkspaceFS {
+export class MemoryFS implements ProjectWorkspaceFS {
+  readonly projectRoot = null;
+  readonly mutationAuthority = LOCAL_PROJECT_MUTATION_AUTHORITY;
   private files = new Map<string, Uint8Array>();
 
   async readText(path: string): Promise<string | null> {

@@ -44,6 +44,7 @@ export function mountMaterialTab(container: HTMLElement, ctx: AppContext): () =>
     controls,
     el('div', { class: 'lv-row' },
       el('button', {
+        'data-project-mutation': '',
         onclick: () => {
           for (const m of ctx.materialSettings()) ctx.undo.delete('material', m.id);
           ctx.syncMaterials();
@@ -107,6 +108,7 @@ export function mountMaterialTab(container: HTMLElement, ctx: AppContext): () =>
     // ---- 不透明度 ----
     const opacityOut = el('output', {}, opacity.toFixed(2));
     const opacityRange = el('input', {
+      'data-project-mutation': '',
       type: 'range', min: '0', max: '1', step: '0.01', value: String(opacity),
       oninput: (ev) => {
         const v = Number((ev.target as HTMLInputElement).value);
@@ -118,6 +120,7 @@ export function mountMaterialTab(container: HTMLElement, ctx: AppContext): () =>
 
     // ---- 両面・Unlit ----
     const dsCheck = el('input', {
+      'data-project-mutation': '',
       type: 'checkbox',
       onchange: (ev) => {
         const v = (ev.target as HTMLInputElement).checked;
@@ -128,6 +131,7 @@ export function mountMaterialTab(container: HTMLElement, ctx: AppContext): () =>
     dsCheck.checked = setting?.doubleSided ?? false;
 
     const unlitCheck = el('input', {
+      'data-project-mutation': '',
       type: 'checkbox',
       onchange: (ev) => {
         const v = (ev.target as HTMLInputElement).checked;
@@ -140,6 +144,7 @@ export function mountMaterialTab(container: HTMLElement, ctx: AppContext): () =>
     // ---- クロマキー ----
     const chromaBody = el('div', { class: 'lv-grp' });
     const chromaCheck = el('input', {
+      'data-project-mutation': '',
       type: 'checkbox',
       onchange: (ev) => {
         const on = (ev.target as HTMLInputElement).checked;
@@ -182,12 +187,14 @@ export function mountMaterialTab(container: HTMLElement, ctx: AppContext): () =>
     };
 
     const colorInput = el('input', {
+      'data-project-mutation': '',
       type: 'color', value: chroma?.color ?? '#000000',
       oninput: applyChromaLive,
       onchange: persistChroma,
     }) as HTMLInputElement;
     const tolOut = el('output', {}, (chroma?.tolerance ?? 0.1).toFixed(2));
     const tolRange = el('input', {
+      'data-project-mutation': '',
       type: 'range', min: '0', max: '1', step: '0.01', value: String(chroma?.tolerance ?? 0.1),
       oninput: (ev) => {
         tolOut.textContent = Number((ev.target as HTMLInputElement).value).toFixed(2);
@@ -197,6 +204,7 @@ export function mountMaterialTab(container: HTMLElement, ctx: AppContext): () =>
     }) as HTMLInputElement;
     const featherOut = el('output', {}, (chroma?.feather ?? 0).toFixed(2));
     const featherRange = el('input', {
+      'data-project-mutation': '',
       type: 'range', min: '0', max: '1', step: '0.01', value: String(chroma?.feather ?? 0),
       oninput: (ev) => {
         featherOut.textContent = Number((ev.target as HTMLInputElement).value).toFixed(2);
@@ -211,6 +219,7 @@ export function mountMaterialTab(container: HTMLElement, ctx: AppContext): () =>
       chromaBody.append(
         el('div', { class: 'lv-row' }, '抜く色 ', colorInput,
           el('button', {
+            'data-project-mutation': '',
             class: 'mini',
             title: '画面から色を拾う',
             onclick: () => {

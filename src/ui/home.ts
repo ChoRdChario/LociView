@@ -6,9 +6,10 @@ import { applyImportPlan, buildImportPlan } from '../assets/importWizard';
 import { optimizeGlbBytes } from '../assets/glbOptimize';
 import { addModelAsset } from '../assets/modelAsset';
 import { readZipEntries } from '../assets/zipio';
-import { parseManifest } from '../core/manifest';
+import { createManifest, parseManifest } from '../core/manifest';
 import { entityIdFor, ProjectStore, type Identity } from '../core/store';
-import type { WorkspaceFS } from '../platform/fs';
+import type { ProjectWorkspaceFS, WorkspaceFS } from '../platform/fs';
+import type { ProjectMutationSession } from '../platform/projectLock';
 import { detectFormat } from '../viewer/loaders';
 import { el, clear } from './dom';
 import { confirmDialog, infoDialog, promptDialog } from './dialogs';
@@ -18,9 +19,20 @@ import { isStandalone, onInstallAvailability, promptInstall } from '../platform/
 export interface HomeDeps {
   fs: WorkspaceFS;
   identity: Identity;
-  openProject: (dir: string) => Promise<void>;
+  openProject: (dir: string, prepared?: WritableProjectSession) => Promise<void>;
+  startProjectMutation: (
+    dir: string,
+    projectId: string,
+    existing: boolean,
+  ) => Promise<WritableProjectSession | null>;
   openProfile: () => void;
   storageWarning: string | null;
+}
+
+export interface WritableProjectSession {
+  readonly access: ProjectMutationSession;
+  readonly fs: ProjectWorkspaceFS;
+  store: ProjectStore | null;
 }
 
 interface ProjectListItem {
@@ -118,11 +130,28 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
           onclick: () => {
             void promptDialog('新規プロジェクト', 'プロジェクト名').then(async (name) => {
               if (name === null) return;
-              const store = await ProjectStore.create(deps.fs, `projects/${entityIdFor('meta')}`, name, deps.identity);
-              await store.flush();
-              const items = await listProjects(deps.fs);
-              const item = items.find((i) => i.projectId === store.manifest.projectId);
-              if (item !== undefined) await deps.openProject(item.dir);
+              const manifest = createManifest(name);
+              const dir = `projects/${entityIdFor('meta')}`;
+              const session = await deps.startProjectMutation(dir, manifest.projectId, false);
+              if (session === null) {
+                await infoDialog('新規プロジェクト', '安全な編集権限を取得できないため作成を開始できません。');
+                return;
+              }
+              let handedOff = false;
+              try {
+                session.store = await ProjectStore.createWithManifest(
+                  session.fs,
+                  dir,
+                  manifest,
+                  deps.identity,
+                );
+                await deps.openProject(dir, session);
+                handedOff = true;
+              } catch (error) {
+                await infoDialog('新規プロジェクト', error instanceof Error ? error.message : String(error));
+              } finally {
+                if (!handedOff) session.access.release();
+              }
             });
           },
         }, '新規プロジェクト'),
@@ -141,10 +170,22 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
     if (fmt !== null && !lower.endsWith('.zip') && !lower.endsWith('.lociview')) {
       const name = file.name.replace(/\.[^.]+$/, '');
       const dir = `projects/${entityIdFor('meta')}`;
-      const store = await ProjectStore.create(deps.fs, dir, name, deps.identity);
-      await addModelAsset(deps.fs, dir, store, file.name, bytes);
-      await store.flush();
-      await deps.openProject(dir);
+      const manifest = createManifest(name);
+      const session = await deps.startProjectMutation(dir, manifest.projectId, false);
+      if (session === null) throw new Error('安全な編集権限を取得できないため作成を開始できません');
+      let handedOff = false;
+      try {
+        const store = await ProjectStore.createWithManifest(session.fs, dir, manifest, deps.identity);
+        session.store = store;
+        await addModelAsset(session.fs, dir, store, file.name, bytes);
+        await store.flush();
+        await deps.openProject(dir, session);
+        handedOff = true;
+      } catch (error) {
+        await infoDialog('モデル取込失敗', error instanceof Error ? error.message : String(error));
+      } finally {
+        if (!handedOff) session.access.release();
+      }
       return;
     }
 
@@ -164,15 +205,34 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
         );
         if (!ok) return;
         // 開いた後にデータタブから取込…ではなく、その場でマージして開く
-        const store = await ProjectStore.open(deps.fs, existing.dir, deps.identity);
+        const session = await deps.startProjectMutation(existing.dir, existing.projectId, true);
+        if (session === null || session.store === null) {
+          await infoDialog('読み取り専用', '別のタブが編集中のためZIPをマージせず、保存済み状態を読み取り専用で開きます。');
+          await deps.openProject(existing.dir);
+          return;
+        }
+        let handedOff = false;
         const { mergeFromInspection } = await import('../assets/package');
-        await mergeFromInspection(deps.fs, existing.dir, store, insp);
-        await deps.openProject(existing.dir);
+        try {
+          await mergeFromInspection(session.fs, existing.dir, session.store, insp);
+          await deps.openProject(existing.dir, session);
+          handedOff = true;
+        } finally {
+          if (!handedOff) session.access.release();
+        }
         return;
       }
       const dir = `projects/${insp.manifest.projectId}`;
-      await importNewProject(deps.fs, dir, insp);
-      await deps.openProject(dir);
+      const session = await deps.startProjectMutation(dir, insp.manifest.projectId, false);
+      if (session === null) throw new Error('安全な編集権限を取得できないため取込を開始できません');
+      let handedOff = false;
+      try {
+        await importNewProject(session.fs, dir, insp);
+        await deps.openProject(dir, session);
+        handedOff = true;
+      } finally {
+        if (!handedOff) session.access.release();
+      }
     } catch (e) {
       await infoDialog('取込失敗', e instanceof Error ? e.message : String(e));
     }
@@ -191,28 +251,43 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
     const defaultName = fileName.replace(/\.(zip|lociview)$/i, '');
     const answer = await importWizardDialog(plan, defaultName);
     if (answer === null) return;
-    const result = await applyImportPlan(deps.fs, deps.identity, plan, {
-      projectName: answer.projectName,
-      imageLinks: answer.imageLinks,
-      optimizeModel: (b) => optimizeGlbBytes(b),
-    });
-    const notes: string[] = [];
-    if (result.unlinkedImages > 0) {
-      notes.push(`画像${result.unlinkedImages}件は対応付けされていません（キャプションを選んで添付できます）。`);
+    const manifest = createManifest(answer.projectName);
+    const dir = `projects/${entityIdFor('meta')}`;
+    const session = await deps.startProjectMutation(dir, manifest.projectId, false);
+    if (session === null) {
+      await infoDialog('取込', '安全な編集権限を取得できないため取込を開始できません。');
+      return;
     }
-    if (result.chromaDisabledCount > 0) {
-      notes.push(
-        `クロマキー設定${result.chromaDisabledCount}件は、LociMyuでは実際には描画に反映されていなかったため、` +
-          `当時の見え方を保つ目的で「無効」の状態で取り込みました。設定値は残っているので、Materialタブから有効にできます。`,
-      );
+    let handedOff = false;
+    try {
+      const result = await applyImportPlan(session.fs, deps.identity, plan, {
+        projectName: answer.projectName,
+        imageLinks: answer.imageLinks,
+        optimizeModel: (b) => optimizeGlbBytes(b),
+        targetDir: dir,
+        targetManifest: manifest,
+      });
+      const notes: string[] = [];
+      if (result.unlinkedImages > 0) {
+        notes.push(`画像${result.unlinkedImages}件は対応付けされていません（キャプションを選んで添付できます）。`);
+      }
+      if (result.chromaDisabledCount > 0) {
+        notes.push(
+          `クロマキー設定${result.chromaDisabledCount}件は、LociMyuでは実際には描画に反映されていなかったため、` +
+            `当時の見え方を保つ目的で「無効」の状態で取り込みました。設定値は残っているので、Materialタブから有効にできます。`,
+        );
+      }
+      if (notes.length > 0) {
+        await infoDialog(
+          '取込完了',
+          `キャプション${result.captionCount}件・表示セット${result.setCount}件を取り込みました。\n\n${notes.join('\n\n')}`,
+        );
+      }
+      await deps.openProject(result.dir, session);
+      handedOff = true;
+    } finally {
+      if (!handedOff) session.access.release();
     }
-    if (notes.length > 0) {
-      await infoDialog(
-        '取込完了',
-        `キャプション${result.captionCount}件・表示セット${result.setCount}件を取り込みました。\n\n${notes.join('\n\n')}`,
-      );
-    }
-    await deps.openProject(result.dir);
   }
 
   async function renderList(): Promise<void> {
@@ -234,8 +309,17 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
             onclick: () => {
               void confirmDialog('プロジェクト削除', `「${item.name}」をこの端末から削除しますか？（書き出したZIPは影響を受けません）`).then(async (ok) => {
                 if (!ok) return;
-                for (const f of await deps.fs.list(item.dir + '/')) await deps.fs.remove(f);
-                await renderList();
+                const session = await deps.startProjectMutation(item.dir, item.projectId, true);
+                if (session === null) {
+                  await infoDialog('削除できません', '別のタブがこのプロジェクトを編集中です。編集タブを閉じてから再試行してください。');
+                  return;
+                }
+                try {
+                  for (const f of await session.fs.list(item.dir + '/')) await session.fs.remove(f);
+                  await renderList();
+                } finally {
+                  session.access.release();
+                }
               });
             },
           }, '削除'),

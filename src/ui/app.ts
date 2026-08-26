@@ -2,8 +2,10 @@
 
 import { ProjectStore, type Identity } from '../core/store';
 import { newId } from '../core/ids';
+import { parseManifest } from '../core/manifest';
 import { MemoryFS, type WorkspaceFS } from '../platform/fs';
 import { OpfsFS } from '../platform/opfs';
+import { ProjectMutationCoordinator, type ProjectMutationSession } from '../platform/projectLock';
 import {
   initFileHandlers,
   initInstallPrompt,
@@ -16,7 +18,7 @@ import { AppContext } from './context';
 import { el, clear, fmtBytes } from './dom';
 import { infoDialog, promptDialog } from './dialogs';
 import { fNum, fStr } from './fields';
-import { mountHome } from './home';
+import { mountHome, type WritableProjectSession } from './home';
 import { mountViewerScreen } from './viewerScreen';
 import type { PackageExportStatus } from './saveStatus';
 
@@ -49,6 +51,11 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     storageWarning =
       'このブラウザは永続ワークスペース(OPFS)に未対応です。作業内容はタブを閉じると消えます。必ず「書き出し」で保存してください。';
   }
+  const mutationCoordinator = persistentWorkspace
+    ? ProjectMutationCoordinator.browser(
+        typeof navigator !== 'undefined' && navigator.locks !== undefined ? navigator.locks : null,
+      )
+    : ProjectMutationCoordinator.local();
 
   // ---- 編集者identity（自己発行。docs/02 §3） ------------------------------------
   const identity: Identity = {
@@ -61,6 +68,9 @@ export async function bootApp(root: HTMLElement): Promise<void> {
 
   let ctx: AppContext | null = null;
   let unmountViewer: (() => void) | null = null;
+  let projectAccess: ProjectMutationSession | null = null;
+  let projectOpening = false;
+  let projectNavigationEpoch = 0;
   let packageExportStatus: PackageExportStatus = Object.freeze({ phase: 'idle' });
 
   // ---- 保存状態（書き出し済みop数をプロジェクトごとに記録） -----------------------------
@@ -85,6 +95,10 @@ export async function bootApp(root: HTMLElement): Promise<void> {
 
   // ---- プロファイル -------------------------------------------------------------
   async function openProfile(): Promise<void> {
+    if (ctx !== null && !ctx.store.canMutate) {
+      await infoDialog('読み取り専用', 'このプロジェクトの編集権限を取得して再読込するまで、プロファイル変更は記録できません。');
+      return;
+    }
     const name = await promptDialog('プロファイル', '表示名（マージ時に相手へ見える名前）', identity.displayName ?? '');
     if (name === null) return;
     identity.displayName = name;
@@ -111,9 +125,9 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     // 軽量版があればそれを表示に使う（原本は書き出し用に保持）。iOSメモリ対策
     const optPath = fStr(asset, 'optimizedPath');
     const displayPath = optPath !== '' ? optPath : fStr(asset, 'path');
-    let bytes = await fs.readBytes(`${ctx.dir}/${displayPath}`);
+    let bytes = await ctx.fs.readBytes(`${ctx.dir}/${displayPath}`);
     if (bytes === null && optPath !== '') {
-      bytes = await fs.readBytes(`${ctx.dir}/${fStr(asset, 'path')}`); // 軽量版が無ければ原本
+      bytes = await ctx.fs.readBytes(`${ctx.dir}/${fStr(asset, 'path')}`); // 軽量版が無ければ原本
     }
     if (bytes === null) {
       await infoDialog('モデル読込', `ファイルが見つかりません（差分ZIPで受け取った場合はフルZIPの取込が必要です）`);
@@ -146,37 +160,213 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     }
   }
 
-  // ---- 画面遷移 ----------------------------------------------------------------
-  function showHome(): void {
+  // ---- project session / 画面遷移 ----------------------------------------------
+  async function readProjectManifest(dir: string) {
+    const text = await fs.readText(`${dir}/lociview.json`);
+    if (text === null) throw new Error(`project: no manifest in ${dir}`);
+    return parseManifest(text);
+  }
+
+  async function startProjectMutation(
+    dir: string,
+    projectId: string,
+    existing: boolean,
+  ): Promise<WritableProjectSession | null> {
+    const access = await mutationCoordinator.tryAcquire(fs, dir, projectId);
+    if (!access.hasOwnership) {
+      access.release();
+      return null;
+    }
+    try {
+      if (!existing) {
+        if (await fs.exists(`${dir}/lociview.json`)) {
+          throw new Error(`project: target is already active (${dir})`);
+        }
+        access.activateNewProject();
+        return { access, fs: access.workspace, store: null };
+      }
+      const store = await ProjectStore.open(access.workspace, dir, identity);
+      if (store.manifest.projectId !== projectId) {
+        throw new Error('project: manifest identity changed during lock acquisition');
+      }
+      access.activateAfterDurableReload();
+      return { access, fs: access.workspace, store };
+    } catch (error) {
+      access.release();
+      throw error;
+    }
+  }
+
+  function disposeViewer(): void {
     if (unmountViewer !== null) {
       unmountViewer();
       unmountViewer = null;
     }
     if (ctx !== null) {
       ctx.viewer.dispose();
-      ctx.disposeMedia();
+      ctx.dispose();
       ctx = null;
     }
+  }
+
+  function renderHome(): void {
     clear(root);
     mountHome(root, {
       fs,
       identity,
       openProject,
+      startProjectMutation,
       openProfile: () => void openProfile(),
       storageWarning,
     });
   }
 
-  async function openProject(dir: string): Promise<void> {
-    const store = await ProjectStore.open(fs, dir, identity);
+  async function closeProjectAndShowHome(): Promise<boolean> {
+    projectNavigationEpoch += 1;
+    const activeCtx = ctx;
+    const access = projectAccess;
+    if (activeCtx !== null && access !== null) {
+      access.beginClose();
+      activeCtx.notify();
+      try {
+        for (;;) {
+          await activeCtx.store.flush();
+          await access.waitForWorkspaceIdle();
+          await activeCtx.store.flush();
+          if (access.sealWorkspaceWritesForRelease()) break;
+        }
+      } catch (error) {
+        access.resumeAfterCloseFailure();
+        activeCtx.notify();
+        await infoDialog(
+          '保存を完了できません',
+          `編集セッションを維持しています。保存を再試行してからホームへ戻ってください。\n\n${error instanceof Error ? error.message : String(error)}`,
+        );
+        return false;
+      }
+      access.release();
+    } else {
+      access?.release();
+    }
+    projectAccess = null;
+    disposeViewer();
+    renderHome();
+    return true;
+  }
+
+  async function openProject(dir: string, prepared?: WritableProjectSession): Promise<void> {
+    if (projectOpening) {
+      // A plain home-list double click does not own anything that needs cleanup.
+      // Prepared mutation sessions must reject so their caller releases the unused lock.
+      if (prepared === undefined) return;
+      throw new Error('project: another project is already opening');
+    }
+    if (ctx !== null || projectAccess !== null) {
+      throw new Error('project: close the current session before opening another project');
+    }
+    projectOpening = true;
+    const navigationEpoch = ++projectNavigationEpoch;
+    let access: ProjectMutationSession | null = prepared?.access ?? null;
+    try {
+      let store = prepared?.store ?? null;
+      if (access === null) {
+        const manifest = await readProjectManifest(dir);
+        access = await mutationCoordinator.tryAcquire(fs, dir, manifest.projectId);
+        store = await ProjectStore.open(access.workspace, dir, identity);
+        if (store.manifest.projectId !== manifest.projectId) {
+          throw new Error('project: manifest identity changed during open');
+        }
+        if (access.hasOwnership) access.activateAfterDurableReload();
+      } else {
+        if (access.projectRoot !== dir) throw new Error('project: prepared session root mismatch');
+        store ??= await ProjectStore.open(access.workspace, dir, identity);
+        if (store.workspace !== access.workspace || store.manifest.projectId !== access.projectId) {
+          throw new Error('project: prepared session identity mismatch');
+        }
+        if (access.hasOwnership && access.accessState !== 'editable') {
+          access.activateAfterDurableReload();
+        }
+      }
+      if (navigationEpoch !== projectNavigationEpoch) {
+        throw new Error('project: opening was superseded by another navigation');
+      }
+      await mountOpenedProject(dir, access, store, navigationEpoch);
+    } catch (error) {
+      access?.release();
+      if (projectAccess === access) {
+        projectAccess = null;
+        disposeViewer();
+        if (navigationEpoch === projectNavigationEpoch) renderHome();
+      }
+      throw error;
+    } finally {
+      projectOpening = false;
+    }
+  }
+
+  async function retryProjectAccess(): Promise<void> {
+    const activeCtx = ctx;
+    const oldAccess = projectAccess;
+    if (activeCtx === null || oldAccess === null || activeCtx.store.canMutate) return;
+    const navigationEpoch = projectNavigationEpoch;
+    const next = await mutationCoordinator.tryAcquire(
+      fs,
+      activeCtx.dir,
+      activeCtx.store.manifest.projectId,
+    );
+    if (!next.hasOwnership) {
+      const detail = next.accessDetail;
+      next.release();
+      await infoDialog('読み取り専用', `編集権限をまだ取得できません。\n\n${detail}`);
+      return;
+    }
+    try {
+      const store = await ProjectStore.open(next.workspace, activeCtx.dir, identity);
+      if (
+        navigationEpoch !== projectNavigationEpoch ||
+        ctx !== activeCtx ||
+        projectAccess !== oldAccess
+      ) {
+        next.release();
+        return;
+      }
+      if (store.manifest.projectId !== activeCtx.store.manifest.projectId) {
+        throw new Error('project: manifest identity changed before ownership transfer');
+      }
+      next.activateAfterDurableReload();
+      oldAccess.release();
+      projectAccess = null;
+      disposeViewer();
+      await mountOpenedProject(activeCtx.dir, next, store, navigationEpoch);
+    } catch (error) {
+      next.release();
+      if (projectAccess === next) {
+        projectAccess = null;
+        disposeViewer();
+        if (navigationEpoch === projectNavigationEpoch) renderHome();
+      }
+      await infoDialog('編集権限の再取得', error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function mountOpenedProject(
+    dir: string,
+    access: ProjectMutationSession,
+    store: ProjectStore,
+    navigationEpoch: number,
+  ): Promise<void> {
+    projectAccess = access;
     packageExportStatus = Object.freeze({ phase: 'idle' });
     if (store.loadErrors.length > 0) {
       const total = store.loadErrors.reduce((s, e) => s + e.errors.length, 0);
       await infoDialog('警告', `ログに破損行が ${total} 行あり、スキップしました（他のデータは無事です）`);
     }
+    if (navigationEpoch !== projectNavigationEpoch || projectAccess !== access) {
+      throw new Error('project: opening was superseded by another navigation');
+    }
     clear(root);
     const viewer = new ViewerCore();
-    ctx = new AppContext(fs, dir, store, viewer, identity);
+    ctx = new AppContext(access.workspace, dir, store, viewer, identity);
     // メモリ不足でGLが落ちたら、白画面のままにせず状況を伝える
     let contextLostShown = false;
     viewer.onContextLost(() => {
@@ -195,13 +385,14 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       );
     });
     unmountViewer = mountViewerScreen(root, ctx, {
-      goHome: showHome,
+      goHome: () => void closeProjectAndShowHome(),
       loadModelAsset,
       unexportedCount,
       persistentWorkspace,
       packageExportStatus: () => packageExportStatus,
       setPackageExportStatus: (status) => setPackageExportStatus(dir, status),
       openProfile: () => void openProfile(),
+      retryProjectAccess: () => void retryProjectAccess(),
     });
     // 最初のモデルを自動表示。ただし大きいモデルは自動で読まない。
     // （iOSはタブのメモリ上限が厳しく、開くたびに巨大モデルを読むとクラッシュが繰り返す。
@@ -224,7 +415,13 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     }
     // 開発検証用フック（devビルドのみ）
     if (import.meta.env.DEV) {
-      (window as unknown as Record<string, unknown>).__lv = { ctx, fs, viewer, store, loadModelAsset };
+      (window as unknown as Record<string, unknown>).__lv = {
+        ctx,
+        fs: access.workspace,
+        viewer,
+        store,
+        loadModelAsset,
+      };
     }
   }
 
@@ -233,6 +430,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     if (ctx === null) return;
     const editing = (ev.target as HTMLElement).tagName === 'INPUT' || (ev.target as HTMLElement).tagName === 'TEXTAREA';
     if (editing) return;
+    if (!ctx.store.canMutate) return;
     if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z' && !ev.shiftKey) {
       ev.preventDefault();
       ctx.undo.undo();
@@ -245,7 +443,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
   // ---- OSから開かれたファイル（関連付け・共有シート） -------------------------------
   onExternalFileOpen(async (file) => {
     // ビューアを開いている場合はホームへ戻してから投入する（ホームが受け口の一貫ルール）
-    showHome();
+    if (!(await closeProjectAndShowHome())) return;
     await new Promise((r) => setTimeout(r, 0));
     const dropTarget = root.querySelector('.lv-drop');
     if (dropTarget === null) return;
@@ -254,7 +452,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     dropTarget.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
   });
 
-  showHome();
+  renderHome();
 }
 
 /** 画面下部の一時通知（更新案内など） */

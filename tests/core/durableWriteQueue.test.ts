@@ -12,6 +12,7 @@ import {
 import type { WorkspaceFS } from '../../src/platform/fs';
 import { generateAndStartPackageDownload } from '../../src/ui/packageExport';
 import {
+  describeProjectAccess,
   describeSaveStatus,
   type PackageExportStatus,
 } from '../../src/ui/saveStatus';
@@ -778,6 +779,9 @@ describe.sequential('G0S-WRITE status and package checkpoints', () => {
     const persistent = describeSaveStatus(durableStatus, 2, true, idle);
     const ephemeral = describeSaveStatus(durableStatus, 2, false, idle);
     const failed = describeSaveStatus(failedStatus, 2, true, idle);
+    const editableAccess = describeProjectAccess('editable', 'owner tab');
+    const readOnlyAccess = describeProjectAccess('read-only', 'other tab');
+    const lostAccess = describeProjectAccess('lock-lost', 'lock ended');
 
     expect(persistent.detailText).toContain('ワークスペースへの書き込み完了');
     expect(persistent.detailText).toContain('未ダウンロードの変更 2件');
@@ -786,6 +790,10 @@ describe.sequential('G0S-WRITE status and package checkpoints', () => {
     expect(failed.detailText).toContain('保存に失敗');
     expect(failed.detailText).not.toContain('書き込み完了');
     expect(failed.canRetry).toBe(true);
+    expect(editableAccess).toMatchObject({ compactText: '編集可能（このタブ）', canRetry: false });
+    expect(readOnlyAccess).toMatchObject({ compactText: '読み取り専用', canRetry: true });
+    expect(lostAccess.compactText).toBe('編集権限を失いました');
+    expect(lostAccess.detailText).toContain('新規書込みは停止');
     for (const phase of ['queued', 'writing'] as const) {
       const presentation = describeSaveStatus(
         { phase, pending: 1, retryable: false }, 2, false, idle,

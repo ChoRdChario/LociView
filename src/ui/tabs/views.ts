@@ -31,6 +31,7 @@ export function mountViewsTab(container: HTMLElement, ctx: AppContext): () => vo
 
   // ピンサイズ: 即時反映はinput、opとしての保存はchange（ドラッグ完了時に1op）
   const pinScaleSlider = el('input', {
+    'data-project-mutation': '',
     type: 'range', min: '0.3', max: '3', step: '0.1', value: '1',
     'aria-label': 'ピンの大きさ',
     oninput: (ev) => ctx.viewer.setPinScale(Number((ev.target as HTMLInputElement).value)),
@@ -47,6 +48,7 @@ export function mountViewsTab(container: HTMLElement, ctx: AppContext): () => vo
     el('div', { class: 'lv-row lv-space' },
       el('div', { class: 'lv-hint' }, 'ビュープリセット（表示セットごと）'),
       el('button', {
+        'data-project-mutation': '',
         class: 'primary',
         onclick: () => {
           const n = ctx.views().length + 1;
@@ -102,7 +104,7 @@ export function mountViewsTab(container: HTMLElement, ctx: AppContext): () => vo
         el('div', { class: 'lv-cap-row' },
           el('span', { class: 'lv-cap-title' }, fStr(v, 'name', '(無名ビュー)')),
           el('button', { class: 'mini', onclick: () => applyViewRecordToViewer(ctx, v.id) }, '適用'),
-          el('button', { class: 'mini danger', onclick: () => ctx.undo.delete('view', v.id) }, '削除'),
+          el('button', { 'data-project-mutation': '', class: 'mini danger', onclick: () => ctx.undo.delete('view', v.id) }, '削除'),
         ),
       );
     }

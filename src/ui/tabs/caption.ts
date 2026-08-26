@@ -56,7 +56,7 @@ export function mountCaptionTab(container: HTMLElement, ctx: AppContext): () => 
             pinColor = c;
             localStorage.setItem('lv-pin-color', c);
             const sel = ctx.selectedCaption();
-            if (sel !== null) ctx.undo.update('caption', sel.id, { color: c });
+            if (sel !== null && ctx.store.canMutate) ctx.undo.update('caption', sel.id, { color: c });
             else ctx.notify();
           },
         }),
@@ -109,17 +109,20 @@ export function mountCaptionTab(container: HTMLElement, ctx: AppContext): () => 
     if (sel === null) return;
 
     const title = el('input', {
+      'data-project-mutation': '',
       type: 'text',
       placeholder: 'タイトル',
       value: fStr(sel, 'title'),
       onchange: (ev) => ctx.undo.update('caption', sel.id, { title: (ev.target as HTMLInputElement).value }),
     });
     const body = el('textarea', {
+      'data-project-mutation': '',
       placeholder: '本文',
       onchange: (ev) => ctx.undo.update('caption', sel.id, { body: (ev.target as HTMLTextAreaElement).value }),
     }) as HTMLTextAreaElement;
     body.value = fStr(sel, 'body');
     const tags = el('input', {
+      'data-project-mutation': '',
       type: 'text',
       placeholder: 'タグ（; 区切り）',
       value: fStrArr(sel, 'tags').join(';'),
@@ -146,6 +149,7 @@ export function mountCaptionTab(container: HTMLElement, ctx: AppContext): () => 
       img.addEventListener('click', () => openImageWindow(ctx, attachmentIds, i));
       // 添付を外す（× ボタン）
       const del = el('button', {
+        'data-project-mutation': '',
         class: 'lv-thumb-del',
         title: '添付を外す',
         onclick: (ev) => {
@@ -160,10 +164,11 @@ export function mountCaptionTab(container: HTMLElement, ctx: AppContext): () => 
       thumbs.append(el('div', { class: 'lv-thumb-wrap' }, img, del));
     });
 
-    const fileInput = el('input', { type: 'file', accept: 'image/*,video/*', multiple: true, style: 'display:none' }) as HTMLInputElement;
-    const cameraInput = el('input', { type: 'file', accept: 'image/*', capture: 'environment', style: 'display:none' }) as HTMLInputElement;
+    const fileInput = el('input', { 'data-project-mutation': '', type: 'file', accept: 'image/*,video/*', multiple: true, style: 'display:none' }) as HTMLInputElement;
+    const cameraInput = el('input', { 'data-project-mutation': '', type: 'file', accept: 'image/*', capture: 'environment', style: 'display:none' }) as HTMLInputElement;
     const attach = async (files: readonly File[]): Promise<void> => {
       if (files.length === 0) return;
+      ctx.store.assertMutationAllowed();
       const current = ctx.selectedCaption();
       if (current === null) return;
       const sources: AttachmentSource[] = files.map((file) => ({
@@ -198,6 +203,7 @@ export function mountCaptionTab(container: HTMLElement, ctx: AppContext): () => 
       const step = Number((diag / 200).toPrecision(2));
       const axisInput = (axis: 0 | 1 | 2, label: string): HTMLElement => {
         const input = el('input', {
+          'data-project-mutation': '',
           type: 'number',
           step: String(step),
           value: String(anchor.position![axis]),
@@ -214,6 +220,7 @@ export function mountCaptionTab(container: HTMLElement, ctx: AppContext): () => 
         return el('label', { class: 'lv-axis-input' }, label, input);
       };
       const moveBtn = el('button', {
+        'data-project-mutation': '',
         class: ctx.ui.pinMoveMode ? 'active' : '',
         onclick: () => {
           ctx.ui.pinMoveMode = !ctx.ui.pinMoveMode;
@@ -231,6 +238,7 @@ export function mountCaptionTab(container: HTMLElement, ctx: AppContext): () => 
 
     // プロジェクトに取り込み済みの画像から選んで添付（ZIP画像・LociMyu画像の結び付け）
     const pickFromProject = async (): Promise<void> => {
+      if (!ctx.store.canMutate) return;
       const current = ctx.selectedCaption();
       if (current === null) return;
       const existing = fStrArr(current, 'attachments');
@@ -248,13 +256,14 @@ export function mountCaptionTab(container: HTMLElement, ctx: AppContext): () => 
       posEditor,
       el('div', { class: 'lv-row' },
         thumbs,
-        el('button', { onclick: () => void pickFromProject() }, '🖼 プロジェクト画像'),
-        el('button', { onclick: () => fileInput.click() }, '＋ 端末から'),
-        el('button', { onclick: () => cameraInput.click() }, '📷 撮影'),
+        el('button', { 'data-project-mutation': '', onclick: () => void pickFromProject() }, '🖼 プロジェクト画像'),
+        el('button', { 'data-project-mutation': '', onclick: () => fileInput.click() }, '＋ 端末から'),
+        el('button', { 'data-project-mutation': '', onclick: () => cameraInput.click() }, '📷 撮影'),
         fileInput, cameraInput,
       ),
       el('div', { class: 'lv-row lv-space' },
         el('button', {
+          'data-project-mutation': '',
           class: 'danger',
           onclick: () => {
             void confirmDialog('キャプションの削除', 'このキャプションを削除しますか？（マージ・Undoで復元できます）').then((ok) => {

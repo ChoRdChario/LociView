@@ -16,7 +16,7 @@ import {
 import { visibleEntities } from '../../src/core/reduce';
 import type { Op } from '../../src/core/schema';
 import { ProjectStore, type Identity } from '../../src/core/store';
-import { MemoryFS, type WorkspaceFS } from '../../src/platform/fs';
+import { MemoryFS, type ProjectWorkspaceFS, type WorkspaceFS } from '../../src/platform/fs';
 import {
   FaultInjectingMemoryFS,
   type FaultEvent,
@@ -640,7 +640,7 @@ async function projectDirs(fs: WorkspaceFS): Promise<string[]> {
 }
 
 async function inspectWizardClosure(
-  fs: WorkspaceFS,
+  fs: ProjectWorkspaceFS,
   requireOptimized: boolean,
 ): Promise<WizardClosure> {
   const dirs = await projectDirs(fs);
@@ -939,7 +939,7 @@ interface FinalMarkerAuthority {
 }
 
 async function finalMarkerAuthority(
-  fs: WorkspaceFS,
+  fs: ProjectWorkspaceFS,
   closure: WizardClosure,
 ): Promise<FinalMarkerAuthority | null> {
   if (!closure.complete || closure.dir === null) return null;

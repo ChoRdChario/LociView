@@ -1,9 +1,33 @@
 import type { DurableWriteStatus } from '../core/store';
+import type { ProjectAccessState } from '../platform/fs';
 
 export interface SaveStatusPresentation {
   readonly compactText: string;
   readonly detailText: string;
   readonly canRetry: boolean;
+}
+
+export interface ProjectAccessPresentation {
+  readonly compactText: string;
+  readonly detailText: string;
+  readonly canRetry: boolean;
+}
+
+export function describeProjectAccess(
+  state: ProjectAccessState,
+  detail: string,
+): ProjectAccessPresentation {
+  if (state === 'editable') {
+    return { compactText: '編集可能（このタブ）', detailText: detail, canRetry: false };
+  }
+  if (state === 'read-only') {
+    return { compactText: '読み取り専用', detailText: detail, canRetry: true };
+  }
+  return {
+    compactText: '編集権限を失いました',
+    detailText: `${detail} 新規書込みは停止しています。`,
+    canRetry: true,
+  };
 }
 
 export type PackageKind = 'full' | 'diff';

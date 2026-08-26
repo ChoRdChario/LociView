@@ -11,7 +11,7 @@ import { mergeOps, type MergeReport } from '../core/merge';
 import { reduce, versionVector, visibleEntities, type ProjectState } from '../core/reduce';
 import type { Op } from '../core/schema';
 import type { ProjectStore } from '../core/store';
-import type { WorkspaceFS } from '../platform/fs';
+import type { ProjectWorkspaceFS, WorkspaceFS } from '../platform/fs';
 import { buildCaptionsCsv } from '../io/csv';
 import {
   readZipEntries,
@@ -82,7 +82,7 @@ export async function inspectZip(bytes: Uint8Array, limits?: ZipLimits): Promise
 }
 
 /** 新規プロジェクトとしてワークスペースへ展開する。dirは 'projects/<projectId>' 想定 */
-export async function importNewProject(fs: WorkspaceFS, dir: string, insp: ZipInspection): Promise<string> {
+export async function importNewProject(fs: ProjectWorkspaceFS, dir: string, insp: ZipInspection): Promise<string> {
   if (insp.kind !== 'lociview' || insp.manifest === null) {
     throw new Error('importNewProject: not a lociview package');
   }
@@ -262,11 +262,12 @@ function registerImportRequiredBlob(
 
 /** 開いているプロジェクトへZIPをマージする。バイナリは未知のものだけコピー */
 export async function mergeFromInspection(
-  fs: WorkspaceFS,
+  fs: ProjectWorkspaceFS,
   dir: string,
   store: ProjectStore,
   insp: ZipInspection,
 ): Promise<MergeReport> {
+  store.assertWorkspace(fs, dir);
   if (insp.kind !== 'lociview' || insp.manifest === null) {
     throw new Error('merge: not a lociview package');
   }

@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { ProjectStore, type Identity } from '../../src/core/store';
 import { visibleEntities } from '../../src/core/reduce';
 import { MemoryFS } from '../../src/platform/fs';
+import { ProjectMutationCoordinator } from '../../src/platform/projectLock';
 import { FaultInjectingMemoryFS } from '../helpers/faultFs';
 
 const USER_A: Identity = { userId: 'usr_AAA', deviceId: 'dev_A1', displayName: '田中' };
@@ -159,17 +160,43 @@ describe('G0-S characterization: actor/sequence と durable write queue', () => 
     let captionIds: string[];
     let expectedIds: string[];
     let bothTabsDurable: boolean;
+    let secondTabReadOnlyBeforeHandoff: boolean;
+    let handoffReloadedFirstEdit: boolean;
 
     beforeAll(async () => {
       const fs = new MemoryFS();
-      await ProjectStore.create(fs, 'projects/tabs', 'tabs', USER_A);
-      const [tabA, tabB] = await Promise.all([
-        ProjectStore.open(fs, 'projects/tabs', USER_A),
-        ProjectStore.open(fs, 'projects/tabs', USER_A),
+      const setup = await ProjectStore.create(fs, 'projects/tabs', 'tabs', USER_A);
+      const coordinator = ProjectMutationCoordinator.local();
+      const accessA = await coordinator.tryAcquire(fs, 'projects/tabs', setup.manifest.projectId);
+      const accessBReadOnly = await coordinator.tryAcquire(fs, 'projects/tabs', setup.manifest.projectId);
+      const [tabA, tabBReadOnly] = await Promise.all([
+        ProjectStore.open(accessA.workspace, 'projects/tabs', USER_A),
+        ProjectStore.open(accessBReadOnly.workspace, 'projects/tabs', USER_A),
       ]);
+      accessA.activateAfterDurableReload();
       const capA = tabA.createEntity('caption', { title: 'tab A' });
+      let readOnlyRejected = false;
+      try {
+        tabBReadOnly.createEntity('caption', { title: 'must be rejected' });
+      } catch {
+        readOnlyRejected = true;
+      }
+      const firstOutcome = await Promise.allSettled([tabA.flush()]);
+      secondTabReadOnlyBeforeHandoff =
+        accessBReadOnly.accessState === 'read-only' &&
+        readOnlyRejected &&
+        visibleEntities(tabBReadOnly.state, 'caption').length === 0;
+      accessA.release();
+      accessBReadOnly.release();
+
+      const accessB = await coordinator.tryAcquire(fs, 'projects/tabs', setup.manifest.projectId);
+      const tabB = await ProjectStore.open(accessB.workspace, 'projects/tabs', USER_A);
+      handoffReloadedFirstEdit = visibleEntities(tabB.state, 'caption').some((record) => record.id === capA);
+      accessB.activateAfterDurableReload();
       const capB = tabB.createEntity('caption', { title: 'tab B' });
-      const outcomes = await Promise.allSettled([tabA.flush(), tabB.flush()]);
+      const secondOutcome = await Promise.allSettled([tabB.flush()]);
+      accessB.release();
+      const outcomes = [firstOutcome[0]!, secondOutcome[0]!] as const;
       bothTabsDurable =
         outcomes.every((outcome) => outcome.status === 'fulfilled') &&
         [tabA, tabB].every(
@@ -181,8 +208,10 @@ describe('G0-S characterization: actor/sequence と durable write queue', () => 
       expectedIds = [capA, capB].sort();
     });
 
-    it('G0S-TAB: 同一identityで同時に開いた2 storeの異なる操作がreload後も両方残る', () => {
+    it('G0S-TAB: 非ownerをread-onlyにし、durable reload後の権限移行で両方の操作を残す', () => {
       expect(bothTabsDurable).toBe(true);
+      expect(secondTabReadOnlyBeforeHandoff).toBe(true);
+      expect(handoffReloadedFirstEdit).toBe(true);
       expect(captionIds).toEqual(expectedIds);
     });
   });

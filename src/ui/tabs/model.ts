@@ -87,6 +87,7 @@ export function mountModelTab(container: HTMLElement, ctx: AppContext, deps: Mod
     const t = transformOf(activeId);
 
     const scaleInput = el('input', {
+      'data-project-mutation': '',
       type: 'number', step: '0.001', min: '0.000001', value: String(t.scale),
       onchange: (ev) => {
         const v = Number((ev.target as HTMLInputElement).value);
@@ -96,6 +97,7 @@ export function mountModelTab(container: HTMLElement, ctx: AppContext, deps: Mod
       },
     });
     const upSelect = el('select', {
+      'data-project-mutation': '',
       onchange: (ev) => {
         const v = (ev.target as HTMLSelectElement).value === 'Z' ? 'Z' : 'Y';
         ctx.undo.update('asset', activeId, { transform: { ...t, upAxis: v } });
@@ -128,6 +130,7 @@ export function mountModelTab(container: HTMLElement, ctx: AppContext, deps: Mod
 
     // ---- モデル差し替え ----
     const replaceInput = el('input', {
+      'data-project-mutation': '',
       type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply', style: 'display:none',
     }) as HTMLInputElement;
     replaceInput.addEventListener('change', () => {
@@ -139,7 +142,7 @@ export function mountModelTab(container: HTMLElement, ctx: AppContext, deps: Mod
       el('div', { class: 'lv-grp' },
         el('div', { class: 'lv-hint' }, 'モデルの差し替え'),
         el('div', { class: 'lv-row' },
-          el('button', { onclick: () => replaceInput.click() }, '別のモデルに差し替え'),
+          el('button', { 'data-project-mutation': '', onclick: () => replaceInput.click() }, '別のモデルに差し替え'),
           replaceInput,
         ),
         el('div', { class: 'lv-dim' }, 'ピン・キャプションは同じ位置に残ります。マテリアルの見え方は差し替え後に確認してください。'),
@@ -148,6 +151,7 @@ export function mountModelTab(container: HTMLElement, ctx: AppContext, deps: Mod
   }
 
   async function doReplace(assetId: string, file: File): Promise<void> {
+    ctx.store.assertMutationAllowed();
     const ok = await confirmDialog(
       'モデルを差し替え',
       `現在のモデルを「${file.name}」に差し替えます。ピン・キャプションはそのまま残り、` +

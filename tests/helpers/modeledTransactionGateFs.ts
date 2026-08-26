@@ -1,4 +1,7 @@
-import type { WorkspaceFS } from '../../src/platform/fs';
+import {
+  LOCAL_PROJECT_MUTATION_AUTHORITY,
+  type ProjectWorkspaceFS,
+} from '../../src/platform/fs';
 
 export type ModeledFsContext = 'setup' | 'first' | 'second' | 'audit';
 export type ModeledMutationMethod = 'appendText' | 'appendBytes' | 'writeText' | 'writeBytes' | 'remove';
@@ -87,7 +90,9 @@ interface ArmedState {
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-class SnapshotMemoryFS implements WorkspaceFS {
+class SnapshotMemoryFS implements ProjectWorkspaceFS {
+  readonly projectRoot = null;
+  readonly mutationAuthority = LOCAL_PROJECT_MUTATION_AUTHORITY;
   private readonly files = new Map<string, Uint8Array>();
 
   async readText(path: string): Promise<string | null> {
@@ -176,8 +181,10 @@ export class ModeledTransactionGateFS {
   private readonly events: ModeledMutationEvent[] = [];
   private readonly pendingSnapshots: Array<Promise<ModeledFileSnapshot>> = [];
 
-  context(context: ModeledFsContext): WorkspaceFS {
-    const facade: WorkspaceFS = {
+  context(context: ModeledFsContext): ProjectWorkspaceFS {
+    const facade: ProjectWorkspaceFS = {
+      projectRoot: null,
+      mutationAuthority: LOCAL_PROJECT_MUTATION_AUTHORITY,
       readText: (path) => this.backing.readText(path),
       writeText: (path, text) => this.mutate(
         context,

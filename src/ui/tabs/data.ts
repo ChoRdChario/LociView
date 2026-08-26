@@ -29,7 +29,7 @@ export function packageExportCompletionMessage(
 export function mountDataTab(container: HTMLElement, ctx: AppContext, deps: DataTabDeps): () => void {
   // ---- 取込 / マージ ---------------------------------------------------------
 
-  const zipInput = el('input', { type: 'file', accept: '.zip,.lociview', style: 'display:none' }) as HTMLInputElement;
+  const zipInput = el('input', { 'data-project-mutation': '', type: 'file', accept: '.zip,.lociview', style: 'display:none' }) as HTMLInputElement;
   zipInput.addEventListener('change', () => {
     const file = zipInput.files?.[0];
     if (file !== undefined) void importZipFile(file);
@@ -38,6 +38,7 @@ export function mountDataTab(container: HTMLElement, ctx: AppContext, deps: Data
 
   async function importZipFile(file: File): Promise<void> {
     try {
+      ctx.store.assertMutationAllowed();
       const insp = await inspectZip(new Uint8Array(await file.arrayBuffer()));
       if (insp.kind !== 'lociview' || insp.manifest === null) {
         await infoDialog(
@@ -73,7 +74,7 @@ export function mountDataTab(container: HTMLElement, ctx: AppContext, deps: Data
 
   // ---- CSV取込 ---------------------------------------------------------------
 
-  const csvInput = el('input', { type: 'file', accept: '.csv', style: 'display:none' }) as HTMLInputElement;
+  const csvInput = el('input', { 'data-project-mutation': '', type: 'file', accept: '.csv', style: 'display:none' }) as HTMLInputElement;
   csvInput.addEventListener('change', () => {
     const file = csvInput.files?.[0];
     if (file !== undefined) void importCsvFile(file);
@@ -81,6 +82,7 @@ export function mountDataTab(container: HTMLElement, ctx: AppContext, deps: Data
   });
 
   async function importCsvFile(file: File): Promise<void> {
+    ctx.store.assertMutationAllowed();
     const text = await file.text();
     const plan = planCaptionsCsvImport(text, ctx.state);
     const { apply, applyDeletes } = await csvPlanDialog(plan);
@@ -96,7 +98,7 @@ export function mountDataTab(container: HTMLElement, ctx: AppContext, deps: Data
 
   // ---- モデル追加 -------------------------------------------------------------
 
-  const modelInput = el('input', { type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply', style: 'display:none' }) as HTMLInputElement;
+  const modelInput = el('input', { 'data-project-mutation': '', type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply', style: 'display:none' }) as HTMLInputElement;
   modelInput.addEventListener('change', () => {
     const file = modelInput.files?.[0];
     if (file !== undefined) void addModelFile(file);
@@ -104,6 +106,7 @@ export function mountDataTab(container: HTMLElement, ctx: AppContext, deps: Data
   });
 
   async function addModelFile(file: File): Promise<void> {
+    ctx.store.assertMutationAllowed();
     const bytes = new Uint8Array(await file.arrayBuffer());
     if (detectFormat(file.name, bytes) === null) {
       await infoDialog('モデル追加', `対応していない形式です: ${file.name}（GLB/OBJ/STL/PLY）`);
@@ -151,8 +154,8 @@ export function mountDataTab(container: HTMLElement, ctx: AppContext, deps: Data
     el('div', { class: 'lv-grp' },
       el('div', { class: 'lv-hint' }, '取込'),
       el('div', { class: 'lv-row' },
-        el('button', { class: 'primary', onclick: () => zipInput.click() }, 'ZIP取込 / マージ'),
-        el('button', { onclick: () => csvInput.click() }, 'CSV取込'),
+        el('button', { 'data-project-mutation': '', class: 'primary', onclick: () => zipInput.click() }, 'ZIP取込 / マージ'),
+        el('button', { 'data-project-mutation': '', onclick: () => csvInput.click() }, 'CSV取込'),
       ),
       el('div', { class: 'lv-dim' }, '同一プロジェクトのZIPは自動でマージされ、結果レポートが表示されます。CSVはスプレッドシート編集の反映用（変更はあなたの編集として記録されます）。'),
     ),
@@ -168,7 +171,7 @@ export function mountDataTab(container: HTMLElement, ctx: AppContext, deps: Data
     el('div', { class: 'lv-grp' },
       el('div', { class: 'lv-hint' }, 'モデル追加'),
       el('div', { class: 'lv-row' },
-        el('button', { onclick: () => modelInput.click() }, 'モデルファイルを追加（GLB/OBJ/STL/PLY）'),
+        el('button', { 'data-project-mutation': '', onclick: () => modelInput.click() }, 'モデルファイルを追加（GLB/OBJ/STL/PLY）'),
       ),
     ),
     el('div', { class: 'lv-grp' },

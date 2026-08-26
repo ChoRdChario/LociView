@@ -76,6 +76,7 @@ export class UndoManager {
   }
 
   undo(): void {
+    this.store.assertMutationAllowed();
     const entry = this.undoStack.pop();
     if (entry === undefined) return;
     for (const input of entry.undo) this.store.dispatch(input);
@@ -83,6 +84,7 @@ export class UndoManager {
   }
 
   redo(): void {
+    this.store.assertMutationAllowed();
     const entry = this.redoStack.pop();
     if (entry === undefined) return;
     for (const input of entry.redo) this.store.dispatch(input);

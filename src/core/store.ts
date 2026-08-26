@@ -9,7 +9,7 @@ import { createManifest, parseManifest, type ProjectManifest } from './manifest'
 import { mergeOps, type MergeReport } from './merge';
 import { reduce, versionVector, type ProjectState } from './reduce';
 import { cloneValidatedDispatchOp, type Op, type OpType } from './schema';
-import type { WorkspaceFS } from '../platform/fs';
+import type { ProjectAccessState, ProjectWorkspaceFS } from '../platform/fs';
 
 export interface Identity {
   userId: string;
@@ -87,11 +87,14 @@ export class ProjectStore {
   readonly actorId: string;
 
   private constructor(
-    private readonly fs: WorkspaceFS,
-    private readonly dir: string,
+    readonly workspace: ProjectWorkspaceFS,
+    readonly dir: string,
     readonly manifest: ProjectManifest,
     readonly identity: Identity,
   ) {
+    if (workspace.projectRoot !== null && workspace.projectRoot !== dir) {
+      throw new Error(`store: project workspace root mismatch (${workspace.projectRoot} !== ${dir})`);
+    }
     this.actorId = newActorId();
     this.clock = new HlcClock(this.actorId);
     this.stateCache = reduce([]);
@@ -100,7 +103,7 @@ export class ProjectStore {
   // ---- ライフサイクル -------------------------------------------------------
 
   private static initializeNew(
-    fs: WorkspaceFS,
+    fs: ProjectWorkspaceFS,
     dir: string,
     manifest: ProjectManifest,
     identity: Identity,
@@ -117,8 +120,18 @@ export class ProjectStore {
   }
 
   /** 新規プロジェクト作成。既定の表示セットと自分のprofileを添えて初期化する */
-  static async create(fs: WorkspaceFS, dir: string, name: string, identity: Identity): Promise<ProjectStore> {
-    const manifest = createManifest(name);
+  static async create(fs: ProjectWorkspaceFS, dir: string, name: string, identity: Identity): Promise<ProjectStore> {
+    return ProjectStore.createWithManifest(fs, dir, createManifest(name), identity);
+  }
+
+  /** A caller that acquired the projectId lock before first write uses this factory. */
+  static async createWithManifest(
+    fs: ProjectWorkspaceFS,
+    dir: string,
+    manifestInput: ProjectManifest,
+    identity: Identity,
+  ): Promise<ProjectStore> {
+    const manifest = parseManifest(JSON.stringify(manifestInput));
     await fs.writeText(`${dir}/lociview.json`, JSON.stringify(manifest, null, 2));
     const store = ProjectStore.initializeNew(fs, dir, manifest, identity);
     await store.flush();
@@ -130,18 +143,23 @@ export class ProjectStore {
    * 呼出側は必要な全authorityをdurableにした後でmanifestを最後に公開する。
    */
   static async createUnpublished(
-    fs: WorkspaceFS,
+    fs: ProjectWorkspaceFS,
     dir: string,
     name: string,
     identity: Identity,
+    manifestInput?: ProjectManifest,
   ): Promise<ProjectStore> {
-    const store = ProjectStore.initializeNew(fs, dir, createManifest(name), identity);
+    const manifest = manifestInput === undefined
+      ? createManifest(name)
+      : parseManifest(JSON.stringify(manifestInput));
+    if (manifest.name !== name) throw new Error('store: preallocated manifest name mismatch');
+    const store = ProjectStore.initializeNew(fs, dir, manifest, identity);
     await store.flush();
     return store;
   }
 
   /** 既存プロジェクトを開く。全opsを読み、時計を観測済み最大値まで進める */
-  static async open(fs: WorkspaceFS, dir: string, identity: Identity): Promise<ProjectStore> {
+  static async open(fs: ProjectWorkspaceFS, dir: string, identity: Identity): Promise<ProjectStore> {
     const manifestText = await fs.readText(`${dir}/lociview.json`);
     if (manifestText === null) throw new Error(`store: no manifest in ${dir}`);
     const manifest = parseManifest(manifestText);
@@ -181,6 +199,18 @@ export class ProjectStore {
     return this.durabilityValue;
   }
 
+  get accessState(): ProjectAccessState {
+    return this.workspace.mutationAuthority.accessState;
+  }
+
+  get accessDetail(): string {
+    return this.workspace.mutationAuthority.accessDetail;
+  }
+
+  get canMutate(): boolean {
+    return this.accessState === 'editable';
+  }
+
   subscribe(fn: (state: ProjectState) => void): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -189,6 +219,20 @@ export class ProjectStore {
   subscribeDurability(fn: (status: DurableWriteStatus) => void): () => void {
     this.durabilityListeners.add(fn);
     return () => this.durabilityListeners.delete(fn);
+  }
+
+  subscribeAccess(fn: (state: ProjectAccessState) => void): () => void {
+    return this.workspace.mutationAuthority.subscribeAccess(fn);
+  }
+
+  assertMutationAllowed(): void {
+    this.workspace.mutationAuthority.assertEditable();
+  }
+
+  assertWorkspace(fs: ProjectWorkspaceFS, dir: string): void {
+    if (fs !== this.workspace || dir !== this.dir) {
+      throw new Error('store: mutation workspace does not match the opened project');
+    }
   }
 
   // ---- 書き込み（自分のopのみ） ----------------------------------------------
@@ -210,6 +254,7 @@ export class ProjectStore {
   }
 
   dispatch(input: DispatchInput): Op {
+    this.assertMutationAllowed();
     // HLCの値は可変だが文字幅は固定なので、時計とseqを進めない純粋な候補で
     // 永続化される1行全体の上限を先に検証する。
     const prospectiveOp = cloneValidatedDispatchOp(input, {
@@ -244,6 +289,7 @@ export class ProjectStore {
    * 自分のログファイルには触れない（docs/02 §7）。
    */
   mergeExternal(incoming: readonly Op[]): MergeReport {
+    this.assertMutationAllowed();
     const { newOps, report, stateAfter } = mergeOps(this.ops, incoming);
     if (newOps.length === 0) return report;
 
@@ -360,7 +406,7 @@ export class ProjectStore {
     if (append.attempted !== true) {
       append.attempted = true;
       try {
-        await this.fs.appendText(append.path, append.text);
+        await this.workspace.appendText(append.path, append.text);
       } catch (error) {
         await this.classifyAfterWrite(append, baseLength, desiredLength, error);
         return;
@@ -383,9 +429,9 @@ export class ProjectStore {
 
     try {
       if (disposition.kind === 'base') {
-        await this.fs.appendText(append.path, append.text);
+        await this.workspace.appendText(append.path, append.text);
       } else {
-        await this.fs.appendBytes(append.path, append.bytes.slice(disposition.additionOffset));
+        await this.workspace.appendBytes(append.path, append.bytes.slice(disposition.additionOffset));
       }
     } catch (error) {
       await this.classifyAfterWrite(append, baseLength, desiredLength, error);
@@ -423,7 +469,7 @@ export class ProjectStore {
     append: PendingAppend,
     baseLength: number,
   ): Promise<AppendByteDisposition> {
-    const tail = await this.fs.readBytesFrom(append.path, baseLength);
+    const tail = await this.workspace.readBytesFrom(append.path, baseLength);
     if (tail === null) return baseLength === 0 ? { kind: 'base' } : { kind: 'diverged' };
     if (tail.size < baseLength || tail.size !== baseLength + tail.data.length) {
       return { kind: 'diverged' };

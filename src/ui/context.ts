@@ -4,7 +4,7 @@
 import type { EntityRecord, ProjectState } from '../core/reduce';
 import { isVisible, visibleEntities } from '../core/reduce';
 import type { Identity, ProjectStore } from '../core/store';
-import type { WorkspaceFS } from '../platform/fs';
+import type { ProjectWorkspaceFS } from '../platform/fs';
 import type { ViewerCore } from '../viewer/viewer';
 import type { ChromaSettings } from '../viewer/shaderPatch';
 import { fAnchor, fStr } from './fields';
@@ -38,17 +38,21 @@ export class AppContext {
   readonly mediaUrls = new Map<string, string>();
 
   private listeners = new Set<() => void>();
+  private readonly subscriptions: Array<() => void> = [];
 
   constructor(
-    readonly fs: WorkspaceFS,
+    readonly fs: ProjectWorkspaceFS,
     readonly dir: string,
     readonly store: ProjectStore,
     readonly viewer: ViewerCore,
     readonly identity: Identity,
   ) {
     this.undo = new UndoManager(store);
-    store.subscribe(() => this.notify());
-    store.subscribeDurability(() => this.notify());
+    this.subscriptions.push(
+      store.subscribe(() => this.notify()),
+      store.subscribeDurability(() => this.notify()),
+      store.subscribeAccess(() => this.notify()),
+    );
     // 既定セット・既定モデルの初期解決
     const sets = this.sets();
     this.ui.activeSetId = sets[0]?.id ?? null;
@@ -213,5 +217,11 @@ export class AppContext {
   disposeMedia(): void {
     for (const url of this.mediaUrls.values()) URL.revokeObjectURL(url);
     this.mediaUrls.clear();
+  }
+
+  dispose(): void {
+    this.disposeMedia();
+    for (const unsubscribe of this.subscriptions.splice(0)) unsubscribe();
+    this.listeners.clear();
   }
 }

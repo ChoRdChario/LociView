@@ -14,7 +14,8 @@ import { parseManifest } from '../../src/core/manifest';
 import { reduce, versionVector, visibleEntities, type ProjectState } from '../../src/core/reduce';
 import { validateOp, type Op } from '../../src/core/schema';
 import { ProjectStore, type Identity } from '../../src/core/store';
-import type { WorkspaceFS } from '../../src/platform/fs';
+import type { ProjectWorkspaceFS } from '../../src/platform/fs';
+import { ProjectMutationCoordinator, type ProjectMutationSession } from '../../src/platform/projectLock';
 import {
   ModeledTransactionGateFS,
   type ModeledFileSnapshot,
@@ -74,12 +75,14 @@ interface PublishedProjection {
 
 interface ConcurrencyFixture {
   gateFs: ModeledTransactionGateFS;
-  setupFs: WorkspaceFS;
-  firstFs: WorkspaceFS;
-  secondFs: WorkspaceFS;
-  auditFs: WorkspaceFS;
-  mergeFs: WorkspaceFS;
-  replacementFs: WorkspaceFS;
+  setupFs: ProjectWorkspaceFS;
+  firstFs: ProjectWorkspaceFS;
+  secondFs: ProjectWorkspaceFS;
+  auditFs: ProjectWorkspaceFS;
+  mergeFs: ProjectWorkspaceFS;
+  replacementFs: ProjectWorkspaceFS;
+  firstAccess: ProjectMutationSession | null;
+  secondAccess: ProjectMutationSession | null;
   mergeContext: 'first' | 'second';
   replacementContext: 'first' | 'second';
   mergeStore: ProjectStore;
@@ -165,7 +168,7 @@ function cloneProjection(store: ProjectStore): PublishedProjection {
   };
 }
 
-async function readActiveLogs(fs: WorkspaceFS): Promise<Map<string, string>> {
+async function readActiveLogs(fs: ProjectWorkspaceFS): Promise<Map<string, string>> {
   const result = new Map<string, string>();
   for (const path of (await fs.list(`${DIR}/ops/`)).filter((item) => item.endsWith('.jsonl'))) {
     const text = await fs.readText(path);
@@ -175,7 +178,7 @@ async function readActiveLogs(fs: WorkspaceFS): Promise<Map<string, string>> {
   return result;
 }
 
-async function snapshotAll(fs: WorkspaceFS): Promise<Map<string, Uint8Array | null>> {
+async function snapshotAll(fs: ProjectWorkspaceFS): Promise<Map<string, Uint8Array | null>> {
   const result = new Map<string, Uint8Array | null>();
   for (const path of await fs.list('')) result.set(path, await fs.readBytes(path));
   return result;
@@ -408,15 +411,14 @@ function outcomeAllowsCandidate(
 async function buildFixture(
   order: TransactionOrder,
   gateFs = new ModeledTransactionGateFS(),
+  enforceSingleWriter = true,
 ): Promise<ConcurrencyFixture> {
   const setupFs = gateFs.context('setup');
-  const firstFs = gateFs.context('first');
-  const secondFs = gateFs.context('second');
+  const firstBaseFs = gateFs.context('first');
+  const secondBaseFs = gateFs.context('second');
   const auditFs = gateFs.context('audit');
   const mergeContext = order === 'merge-first' ? 'first' : 'second';
   const replacementContext = order === 'replacement-first' ? 'first' : 'second';
-  const mergeFs = mergeContext === 'first' ? firstFs : secondFs;
-  const replacementFs = replacementContext === 'first' ? firstFs : secondFs;
 
   const setupStore = await ProjectStore.create(
     setupFs,
@@ -480,8 +482,24 @@ async function buildFixture(
   // defect, leaving only the cross-context replacement/cleanup boundary here.
   await setupFs.writeBytes(`${DIR}/${incomingPath}`, INCOMING_BYTES);
 
+  let firstAccess: ProjectMutationSession | null = null;
+  let secondAccess: ProjectMutationSession | null = null;
+  let firstFs = firstBaseFs;
+  let secondFs = secondBaseFs;
+  if (enforceSingleWriter) {
+    const coordinator = ProjectMutationCoordinator.local();
+    const projectId = parseManifest(manifestText).projectId;
+    firstAccess = await coordinator.tryAcquire(firstBaseFs, DIR, projectId);
+    secondAccess = await coordinator.tryAcquire(secondBaseFs, DIR, projectId);
+    firstFs = firstAccess.workspace;
+    secondFs = secondAccess.workspace;
+  }
+  const mergeFs = mergeContext === 'first' ? firstFs : secondFs;
+  const replacementFs = replacementContext === 'first' ? firstFs : secondFs;
+
   const mergeStore = await ProjectStore.open(mergeFs, DIR, MERGER);
   const replacementStore = await ProjectStore.open(replacementFs, DIR, REPLACER);
+  firstAccess?.activateAfterDurableReload();
   const mergeLogPath = `${DIR}/ops/${incomingActor}.jsonl`;
   const replacementLogPath = `${DIR}/ops/${replacementStore.actorId}.jsonl`;
   const actors = new Set([
@@ -541,6 +559,8 @@ async function buildFixture(
     auditFs,
     mergeFs,
     replacementFs,
+    firstAccess,
+    secondAccess,
     mergeContext,
     replacementContext,
     mergeStore,
@@ -851,6 +871,8 @@ async function runScenario(order: TransactionOrder): Promise<ScenarioResult> {
       (replacementOutcome.rejected || replacementBindingIsDisjoint) &&
       capturedPublications.length >= 2;
 
+    fixture.firstAccess?.release();
+    fixture.secondAccess?.release();
     return {
       initialized,
       finalAuthoritySafe,
@@ -864,7 +886,7 @@ async function runScenario(order: TransactionOrder): Promise<ScenarioResult> {
 }
 
 async function controlMutation(
-  fs: WorkspaceFS,
+  fs: ProjectWorkspaceFS,
   method: 'appendText' | 'writeText' | 'writeBytes' | 'remove',
   path: string,
 ): Promise<void> {
@@ -982,7 +1004,7 @@ function syntheticProjection(
 async function runOracleControls(): Promise<OracleControlResult> {
   const dateSpy = vi.spyOn(Date, 'now').mockReturnValue(FIXED_NOW);
   try {
-    const fixture = await buildFixture('merge-first');
+    const fixture = await buildFixture('merge-first', new ModeledTransactionGateFS(), false);
     const initialFiles = await snapshotAll(fixture.auditFs);
     await replaceModelAsset(
       fixture.replacementFs,
@@ -1328,7 +1350,7 @@ for (const order of ['merge-first', 'replacement-first'] as const) {
       expect(result.initialized && result.finalAuthoritySafe && result.finalKind !== null).toBe(true);
     });
 
-    it.fails('does not start the second canonical log/blob mutation before every first commit', () => {
+    it('does not start the second canonical log/blob mutation before every first commit', () => {
       expect(result.transactionSerializedOrRejected).toBe(true);
     });
 

@@ -55,19 +55,54 @@ is complete without reconstructing or falsely crediting the missing history.
 
 - [x] Record the approved project-lifetime authority, second-tab read-only,
   fail-closed loss and durable-reload-before-transfer contract in existing docs
-- [ ] Guard `ProjectStore.dispatch()`/merge and every project-scoped filesystem
+- [x] Guard `ProjectStore.dispatch()`/merge and every project-scoped filesystem
   write with the same session authority; do not add a journal or transaction API
-- [ ] Route create/import/merge/model/attachment/delete flows through that one
+- [x] Route create/import/merge/model/attachment/delete flows through that one
   authority and release it on project-session close
-- [ ] Show exact `editable`, `read-only` and `lock-lost` state; keep view-only
+- [x] Show exact `editable`, `read-only` and `lock-lost` state; keep view-only
   navigation usable and stop new mutation controls when authority is absent
-- [ ] Reuse multi-tab and package/replacement acceptance, adding only assertions
+- [x] Reuse multi-tab and package/replacement acceptance, adding only assertions
   needed to prove authority acquisition/loss and durable reload on transfer
-- [ ] Run focused acceptance and one independent runtime/security review
-- [ ] Run typecheck, the full test suite and production build once on the final
+- [x] Run focused acceptance and one independent runtime/security review
+- [x] Run typecheck, the full test suite and production build once on the final
   executable tree; commit `G0S-TAB` independently and leave a clean worktree
 - [ ] Move next to the paired Mesh+GS/Proxy technical vertical slice; do not
   explore another G0-S micro-slice unless a direct P0/P1 makes that slice unsafe
+
+### G0S-TAB review record
+
+- One project-lifetime Web Lock, keyed by parsed `projectId`, now grants the only
+  editable session. A second tab opens the same durable project read-only; lock
+  unavailability/loss rejects dispatch, merge and project-root filesystem writes.
+- Create, native/wizard import, opened-project package merge, model add/replace,
+  Caption attachment and project deletion use the same guarded workspace. Close
+  flushes and quiesces writes before release; takeover opens a fresh store before
+  becoming editable. No v2 schema, journal, transaction or quarantine was added.
+- The viewer reports `編集可能（このタブ）`, `読み取り専用` or
+  `編集権限を失いました`, disables mutation controls without disabling viewing,
+  and offers explicit lock reacquisition plus durable reload.
+- Independent review found and the writer fixed two P1 lifecycle races: duplicate
+  project-open could overwrite the retained session, and a delayed retry could
+  remount after Home navigation. Synchronous open reservation plus navigation/
+  session identity checks now discard and release superseded acquisitions. Final
+  independent review reports no remaining P0/P1.
+- Focused acceptance passed 5 files / 69 tests; the existing binary-publication
+  acceptance passed 5 files / 171 tests plus 5 todos. Real Chrome exercised native
+  Web Locks across four pages: duplicate open suppression, editable/read-only,
+  durable-reload handoff, retry-versus-Home cancellation and subsequent lock
+  acquisition all passed with zero page/console errors.
+- Final verification passed TypeScript, 41 test files / 1,349 tests plus 21 todos,
+  production build (99 modules / 11 PWA precache entries), fixture verification
+  (10 Git entries / 708,867 bytes) and evidence verification (3 pending device
+  templates / no claimed run evidence). The first parallel full-test attempt was
+  resource-terminated without an assertion result while build ran; the required
+  full suite was rerun alone to completion. The existing large viewer-chunk warning
+  remains.
+- P2 backlog: a shared fake `LockManager` case may later supplement the real-Chrome
+  proof; close can still allow an already-running async task to leave an unreferenced
+  orphan blob before metadata is rejected. Neither extends this slice because the
+  release loop prevents concurrent ownership and no dangling visible authority is
+  published.
 
 ### Proxy-backed initial interaction policy — docs-only recording
 

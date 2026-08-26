@@ -4,7 +4,8 @@ import { parseOpsJsonl } from '../../src/core/jsonl';
 import { opKey, visibleEntities } from '../../src/core/reduce';
 import type { Op } from '../../src/core/schema';
 import { ProjectStore, type DurableWriteStatus, type Identity } from '../../src/core/store';
-import { MemoryFS, type WorkspaceFS } from '../../src/platform/fs';
+import { MemoryFS, ProjectMutationDeniedError, type WorkspaceFS } from '../../src/platform/fs';
+import { ProjectMutationCoordinator } from '../../src/platform/projectLock';
 import { InterleavingAppendMemoryFS } from '../helpers/interleavingFs';
 
 const USER_A: Readonly<Identity> = Object.freeze({
@@ -214,6 +215,38 @@ describe.sequential('InterleavingAppendMemoryFS serialized path', () => {
   });
 });
 
+describe.sequential('G0S-TAB fail-closed ownership loss', () => {
+  it('blocks dispatch, merge, and project bytes before memory or durable authority changes', async () => {
+    const fs = new MemoryFS();
+    const dir = 'projects/g0s-lock-lost';
+    await seedEmptyProject(fs, dir);
+    const coordinator = ProjectMutationCoordinator.local();
+    const access = await coordinator.tryAcquire(fs, dir, 'prj_00000000000000000000000010');
+    const store = await ProjectStore.open(access.workspace, dir, USER_A);
+    access.activateAfterDurableReload();
+    const beforeOps = structuredClone(store.allOps);
+    const beforeState = structuredClone(store.state);
+    const beforeManifest = await fs.readText(`${dir}/lociview.json`);
+
+    access.failClosed('simulated lock loss');
+    expect(() => store.dispatch({
+      t: 'create',
+      e: 'caption',
+      id: captionId(8, 0, 1),
+      v: { title: 'must not enter memory' },
+    })).toThrow(ProjectMutationDeniedError);
+    expect(() => store.mergeExternal([])).toThrow(ProjectMutationDeniedError);
+    await expect(access.workspace.writeText(`${dir}/media/forbidden.bin`, 'forbidden'))
+      .rejects.toBeInstanceOf(ProjectMutationDeniedError);
+
+    expect(access.accessState).toBe('lock-lost');
+    expect(store.allOps).toEqual(beforeOps);
+    expect(store.state).toEqual(beforeState);
+    expect(await fs.readText(`${dir}/lociview.json`)).toBe(beforeManifest);
+    expect(await fs.readBytes(`${dir}/media/forbidden.bin`)).toBeNull();
+  });
+});
+
 const STRESS_SCENARIOS = [
   { label: 'seed 0x13579bdf', scenarioDigit: 1, seed: 0x13579bdf },
   { label: 'seed 0x2468ace0', scenarioDigit: 2, seed: 0x2468ace0 },
@@ -236,16 +269,38 @@ for (const scenario of STRESS_SCENARIOS) {
     let reopenLoadErrorCount: number;
     let flushDispositionsAreTruthful: boolean;
     let bothHealthyLanesAreDurable: boolean;
+    let nonOwnerWasFailClosed: boolean;
+    let successorReloadedDurableState: boolean;
 
     beforeAll(async () => {
       const fs = new MemoryFS();
       const dir = `projects/g0s-stress-${scenario.scenarioDigit}`;
       await seedEmptyProject(fs, dir);
-      const [tabA, tabB] = await Promise.all([
-        ProjectStore.open(fs, dir, USER_A),
-        ProjectStore.open(fs, dir, USER_B),
+      const coordinator = ProjectMutationCoordinator.local();
+      const accessA = await coordinator.tryAcquire(fs, dir, 'prj_00000000000000000000000010');
+      const accessBReadOnly = await coordinator.tryAcquire(fs, dir, 'prj_00000000000000000000000010');
+      const [tabA, tabBReadOnly] = await Promise.all([
+        ProjectStore.open(accessA.workspace, dir, USER_A),
+        ProjectStore.open(accessBReadOnly.workspace, dir, USER_B),
       ]);
-      const stores = [tabA, tabB] as const;
+      accessA.activateAfterDurableReload();
+      const readOnlyOpCount = tabBReadOnly.allOps.length;
+      let readOnlyRejected = false;
+      try {
+        tabBReadOnly.dispatch({
+          t: 'create',
+          e: 'caption',
+          id: captionId(scenario.scenarioDigit, 1, 9_999),
+          v: { title: 'must remain read-only' },
+        });
+      } catch (error) {
+        readOnlyRejected = error instanceof ProjectMutationDeniedError;
+      }
+      nonOwnerWasFailClosed =
+        accessA.accessState === 'editable' &&
+        accessBReadOnly.accessState === 'read-only' &&
+        readOnlyRejected &&
+        tabBReadOnly.allOps.length === readOnlyOpCount;
       const plan = shuffledPlan(scenario.seed);
       planCounts = [
         plan.filter((item) => item.lane === 0).length,
@@ -253,20 +308,42 @@ for (const scenario of STRESS_SCENARIOS) {
       ];
       const dispatched: Op[] = [];
       const dispatchedByLane: [Op[], Op[]] = [[], []];
-      for (const item of plan) {
+      for (const item of plan.filter((entry) => entry.lane === 0)) {
         const id = captionId(scenario.scenarioDigit, item.lane, item.index);
         expectedIds.add(id);
-        const op = stores[item.lane].dispatch({
+        const op = tabA.dispatch({
           t: 'create',
           e: 'caption',
           id,
           v: { title: `${scenario.label} lane ${item.lane} item ${item.index}` },
         });
         dispatched.push(op);
-        dispatchedByLane[item.lane].push(op);
+        dispatchedByLane[0].push(op);
       }
+      const firstFlush = await Promise.allSettled([tabA.flush()]);
+      accessA.release();
+      accessBReadOnly.release();
+
+      const accessB = await coordinator.tryAcquire(fs, dir, 'prj_00000000000000000000000010');
+      const tabB = await ProjectStore.open(accessB.workspace, dir, USER_B);
+      successorReloadedDurableState = tabB.allOps.length === 1_000 && accessB.accessState === 'read-only';
+      accessB.activateAfterDurableReload();
+      for (const item of plan.filter((entry) => entry.lane === 1)) {
+        const id = captionId(scenario.scenarioDigit, item.lane, item.index);
+        expectedIds.add(id);
+        const op = tabB.dispatch({
+          t: 'create',
+          e: 'caption',
+          id,
+          v: { title: `${scenario.label} lane ${item.lane} item ${item.index}` },
+        });
+        dispatched.push(op);
+        dispatchedByLane[1].push(op);
+      }
+      const secondFlush = await Promise.allSettled([tabB.flush()]);
+      const flushOutcomes = [firstFlush[0]!, secondFlush[0]!] as const;
+      accessB.release();
       expectedOps = byId(dispatched);
-      const flushOutcomes = await Promise.allSettled([tabA.flush(), tabB.flush()]);
 
       const logs = await readLogs(fs, dir);
       const scenarioRaw = logs.ops;
@@ -312,6 +389,8 @@ for (const scenario of STRESS_SCENARIOS) {
       expect(mapsHaveSameOperations(reopenedOps, rawOps)).toBe(true);
       expect(flushDispositionsAreTruthful).toBe(true);
       expect(bothHealthyLanesAreDurable).toBe(true);
+      expect(nonOwnerWasFailClosed).toBe(true);
+      expect(successorReloadedDurableState).toBe(true);
     });
 
     it('G0S-TAB: all 2,000 durable raw operations have distinct operation keys', () => {
@@ -360,26 +439,46 @@ describe.sequential('G0S-TAB shared external actor append race', () => {
   let visibleIds: string[];
   let loadErrorCount: number;
   let flushDispositionsAreTruthful: boolean;
+  let nonOwnerMergeRejected: boolean;
 
   beforeAll(async () => {
     const fs = new InterleavingAppendMemoryFS();
     const dir = 'projects/g0s-shared-append';
     await seedEmptyProject(fs, dir);
-    const [tabA, tabB] = await Promise.all([
-      ProjectStore.open(fs, dir, USER_A),
-      ProjectStore.open(fs, dir, USER_B),
+    const coordinator = ProjectMutationCoordinator.local();
+    const accessA = await coordinator.tryAcquire(fs, dir, 'prj_00000000000000000000000010');
+    const accessBReadOnly = await coordinator.tryAcquire(fs, dir, 'prj_00000000000000000000000010');
+    const [tabA, tabBReadOnly] = await Promise.all([
+      ProjectStore.open(accessA.workspace, dir, USER_A),
+      ProjectStore.open(accessBReadOnly.workspace, dir, USER_B),
     ]);
+    accessA.activateAfterDurableReload();
     const expectedKeys = expectedOps.map(opKey).sort();
     baseHasNoExternalKeys = !tabA.allOps.some((op) => expectedKeys.includes(opKey(op))) &&
-      !tabB.allOps.some((op) => expectedKeys.includes(opKey(op)));
+      !tabBReadOnly.allOps.some((op) => expectedKeys.includes(opKey(op)));
     const path = `${dir}/ops/${EXTERNAL_ACTOR}.jsonl`;
     fs.armAppendRace(path, 2, 100);
     const reportA = tabA.mergeExternal([expectedOps[0]!]);
+    let readOnlyRejected = false;
+    try {
+      tabBReadOnly.mergeExternal([expectedOps[1]!]);
+    } catch (error) {
+      readOnlyRejected = error instanceof ProjectMutationDeniedError;
+    }
+    const flushA = await Promise.allSettled([tabA.flush()]);
+    accessA.release();
+    accessBReadOnly.release();
+    const accessB = await coordinator.tryAcquire(fs, dir, 'prj_00000000000000000000000010');
+    const tabB = await ProjectStore.open(accessB.workspace, dir, USER_B);
+    accessB.activateAfterDurableReload();
     const reportB = tabB.mergeExternal([expectedOps[1]!]);
     reportsCreatedExpectedIds =
       reportA.created.some((item) => item.id === expectedOps[0]!.id) &&
       reportB.created.some((item) => item.id === expectedOps[1]!.id);
-    const flushOutcomes = await Promise.allSettled([tabA.flush(), tabB.flush()]);
+    const flushB = await Promise.allSettled([tabB.flush()]);
+    const flushOutcomes = [flushA[0]!, flushB[0]!] as const;
+    nonOwnerMergeRejected = readOnlyRejected && tabBReadOnly.allOps.length === 0;
+    accessB.release();
 
     eventSummary = {
       reads: fs.events.filter((event) => event.type === 'read-attempt').length,
@@ -423,17 +522,18 @@ describe.sequential('G0S-TAB shared external actor append race', () => {
     expect(loadErrorCount).toBe(0);
     expect(durableKeys.every((key) => expectedOps.map(opKey).includes(key))).toBe(true);
     expect(flushDispositionsAreTruthful).toBe(true);
+    expect(nonOwnerMergeRejected).toBe(true);
   });
 
-  it.fails('G0S-TAB: both shared-actor appends remain durable after the race', () => {
+  it('G0S-TAB: both shared-actor appends remain durable after ownership transfer', () => {
     expect(durableKeys).toEqual(expectedOps.map(opKey).sort());
   });
 
-  it.fails('G0S-TAB: reopen retains both shared-actor operations', () => {
+  it('G0S-TAB: reopen retains both shared-actor operations', () => {
     expect(reopenedKeys).toEqual(expectedOps.map(opKey).sort());
   });
 
-  it.fails('G0S-TAB: reload exposes both shared-actor captions', () => {
+  it('G0S-TAB: reload exposes both shared-actor captions', () => {
     expect(visibleIds).toEqual(expectedOps.map((op) => op.id).sort());
   });
 });
