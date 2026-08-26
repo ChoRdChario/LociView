@@ -1,6 +1,6 @@
 # LociView critical-path execution plan
 
-> Status: `PROPOSED DELIVERY REFOCUS / PAIRED INTERACTION POLICY APPROVED / PRODUCTION RESTART NOT AUTHORIZED`
+> Status: `PROPOSED DELIVERY REFOCUS / PAIRED INTERACTION POLICY APPROVED / CRITICAL-PATH WORK RESTART AUTHORIZED`
 >
 > Recorded: 2026-08-26 at `fa3e423` on `g0-baseline`.
 >
@@ -8,8 +8,10 @@
 > policy is Product-Owner-approved and recorded in the existing product/domain
 > specifications; the delivery/gate-refocus proposal otherwise remains proposed.
 > The current G0/G0-S ordering remains binding until separately amended.
-> No implementation, new test, external acquisition, Release action, upload,
-> publication, adoption, push or deployment is authorized by this plan.
+> On 2026-08-26 the Product Owner authorized work to resume after a whole-project
+> consistency check. That authorization starts only work permitted by the current
+> approved gates; it does not amend the G0/G0-S ordering or authorize external
+> acquisition, Release action, upload, publication, adoption, push or deployment.
 
 ## 1. Delivery objective and present position
 
@@ -213,7 +215,7 @@ Only the following gate/root units qualify. No new edge-case search is planned.
 
 | Order | Unit | Why it is critical | Existing acceptance reuse | Prerequisite | Startability after this plan |
 |---|---|---|---|---|---|
-| `S0` | Pre-fix reproduction ledger | Directly closes `G0-EXIT-03`; green regressions alone do not prove the unfixed baseline | Existing Git characterization history and commands only; no new tests | None; never reconstruct missing results | `YES`, documentation/evidence only, reviewer 1 |
+| `S0` | Pre-fix reproduction ledger | Closes the reproducible portion of `G0-EXIT-03`; green regressions alone do not prove the unfixed baseline | Existing Git characterization history and commands only; no new tests | One caption-attachment seam/test first appeared with its fix, so PO must accept the explicit unavailable disposition or separately approve a bounded compatibility reproduction; never reconstruct missing results | `PARTIAL`: repository evidence and review complete; one PO disposition waits |
 | `S1` | Project-scoped cross-context mutation authority | Prevents silent operation loss; closes `G0S-TAB` and unlocks the transaction root | Existing multi-tab and package/replacement concurrency acceptance; add no Node matrix | PO confirms lock lifetime, second-tab read-only behavior and lock-loss handling; real browser/iPhone evidence later | `YES` only after the mechanism is explained and approved |
 | `S2` | Crash-consistent v1 publication/recovery | Prevents a visible project from pointing at missing/partial blobs or actor-log prefixes; closes `G0S-BLOB` | Existing manifest/root-marker/actor-prefix/fault acceptance; add no fault matrix | `S1` lock plus PO approval of a minimal v1 journal/recovery boundary | `NO`, predecessor/approval wait |
 | `S3` | Operation activation/quarantine and divergent-key resolution | Stops malformed active fields and silent first-wins for the same actor/sequence; closes `G0S-OP` | Existing operation-ingress/collision corpus; add no new corpus | PO confirms durable typed issue location/lifecycle and keep-A/keep-B/export review boundary; keep distinct from LociMyu local review | `NO`, approval wait |
@@ -289,12 +291,13 @@ G0/G0-S release barriers, disposable PoCs and one writer.
 | `WS4` G1 technology decisions | G1-A, G1-B base renderer and G1-C each record reproducible `ADOPT`, `REJECT` or `RETRY` with rollback/fallback; later renderer features retain separate acceptance before their controls turn on | Current base G0/G0-S, or a separately approved READY amendment | Codex / PO / device operator | WS2/WS3 under current gate | `NO` |
 | `WS5` v2 MVP and release | Reuse the existing Asset/AssetBindingRevision/AssetRevision/Representation closure; one logical Asset and active AssetRevision durably preserve a Mesh+GS pair and one invisible proxy. Simple mixed, GS-only and Mesh-only visibility resolve the selected GS only to that proxy; approximate proxy hit -> ordinary Caption gizmo adjustment/confirmation -> source-less manual AssetFrame `positionAsset` survives save/reopen without proxy authority under the simple opaque mixed rule and five fixed incomplete-data outcomes. Then complete production storage, canonical migration, separately approved LociMyu local-review/source-retention work, ordinary-point display/picking acceptance, multiple assets/Compare/later Integrated classes, iOS/privacy/security/usability/rollback and exact release approval. Direct-GS, automatic proxy generation, ordinary points and advanced composition do not close the first slice, but ordinary-point acceptance remains required before MVP release | WS4 choices, local-review wire/capability approval and remaining product approvals; no new normal-Mesh interaction relation is required for the first slice | Codex / PO / external reviewer | WS4 | `NO` |
 
-## 8. Approval stop
+## 8. Current authorization boundary
 
-The Product Owner reviewed and amended the paired Mesh+GS policy, then selected
-the existing proxy-backed path and three visibility patterns as the initial
-standard. Recording that policy does not approve the remaining delivery/
-gate-refocus proposal or authorize `S0`, `S1`, fixture authoring,
-instrumentation, acquisition, device runs, schema implementation or a gate
-amendment. Commit these docs, report that the first slice needs no schema
-addition, then stop until a separate production restart is authorized.
+The Product Owner reviewed and amended the paired Mesh+GS policy, selected the
+existing proxy-backed path and three visibility patterns as the initial
+standard, and then authorized critical-path work to resume after a whole-project
+consistency check. `S0` may therefore proceed immediately. `S1` still waits for
+the plain-language mechanism confirmation recorded in section 5, and `S2`/`S3`
+retain their own approval prerequisites. The delivery/gate-refocus proposal is
+not ratified, and no gate amendment, external acquisition, device run, Release
+action, upload, publication, adoption, push or deployment is implied.

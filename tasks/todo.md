@@ -2,7 +2,7 @@
 
 Completed v1 implementation history remains available in Git before the G-1 cleanup baseline (`4f6e481`). This file contains only active and next work.
 
-## Active delivery refocus — Product Owner review pending 2026-08-26
+## Active delivery refocus — critical-path work resumed 2026-08-26
 
 - [x] Complete a read-only `NEEDS REFOCUS` meta-audit of completion conditions,
   active gates, recent cost allocation and review closure behavior
@@ -18,14 +18,39 @@ Completed v1 implementation history remains available in Git before the G-1 clea
 - [x] Product Owner reviewed and amended the paired Mesh+GS policy in
   [`tasks/critical-path.md`](critical-path.md) and authorized this docs-only
   commit
-- [ ] Product Owner reviews the remaining delivery/gate-refocus proposal and
-  separately authorizes production restart; no implementation, test addition,
-  external acquisition, device run, schema implementation or gate amendment
-  starts before that authorization
+- [x] Product Owner authorized critical-path work to resume after a whole-project
+  consistency check; this does not ratify the proposed gate split or authorize
+  external acquisition, device runs, Release actions or deployment
 
 Current authority remains unchanged: G0 and G0-S are active/incomplete and G1+
-cannot begin under the approved contract. This docs-only commit records product
-policy and does not approve a gate split or a production unit.
+cannot begin under the approved contract. The first executable unit is the
+existing-evidence `G0-EXIT-03` ledger. Its repository portion is complete with
+one explicit unavailable pre-fix disposition; production `S1` retains its
+separately recorded mechanism-confirmation prerequisite.
+
+### G0-EXIT-03 pre-fix reproduction ledger
+
+- [x] Map every known G0-S defect family to its unfixed code commit, compatible
+  test revision, exact reproduction command/procedure and assertion/disposition
+- [x] Preserve only genuinely observed historical or rerun failure evidence;
+  do not infer a missing result from a current green regression
+- [x] Record a restorable raw locator or an explicit absence for each row without
+  adding a new test or fixture and without widening into new edge-case discovery
+- [x] Obtain one independent read-only provenance/false-credit review and keep
+  `G0-CHAR-01`, `G0-CHAR-02` and `G0-EXIT-03` uncredited unless every row closes
+
+Writer disposition: 14 exact-baseline JSON reruns now preserve ordinary failed
+assertions. Model addition is an explicitly labelled hybrid of pre-fix code and
+the fix commit's test blob. Caption attachments remain the one honest gap because
+their DOM-independent production seam and exact acceptance first appeared in the
+same fix commit; `G0-CHAR-01`, `G0-CHAR-02` and `G0-EXIT-03` therefore all
+remain `candidate`.
+
+Independent review found one false-credit P1 in the initial draft: an owner row
+with an explicit absence is not the failing characterization required by
+`G0-CHAR-01`. The credit was reverted; targeted re-review reports no remaining
+P0/P1. S0 is partial rather than complete until the Product Owner accepts the
+unavailable disposition or approves a bounded compatibility reproduction.
 
 ### Proxy-backed initial interaction policy — docs-only recording
 

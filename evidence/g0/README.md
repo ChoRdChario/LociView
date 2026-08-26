@@ -3,6 +3,11 @@
 This directory contains small schemas, pending templates and future summaries.
 It contains no completed physical-device measurement yet.
 
+[`pre-fix-reproduction-ledger.md`](pre-fix-reproduction-ledger.md) maps the
+known G0-S defect families to exact unfixed/test revisions and saved ordinary-
+failure reruns. It is partial because one caption-attachment boundary has no
+compatible pre-fix characterization; it therefore does not claim G0 exit.
+
 `npm run evidence:verify` returning success proves only that the templates and
 records currently present are structurally and cross-referentially valid. A
 pending-only repository is expected to pass that command; verifier success is
