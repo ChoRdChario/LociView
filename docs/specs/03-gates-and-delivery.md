@@ -74,7 +74,7 @@ enabled, the same registry discipline applies to:
 - Compare and multiple assets with different origins, axes, units and Sim(3)
   alignment.
 
-G0 owns the failing characterization tests for every known G0-S defect. G0-S begins only after those tests demonstrably fail on the recorded v1 baseline, then owns the minimal fixes that make them pass. Characterization work and fixture collection may proceed in parallel, but G0 does not depend on unstarted G0-S implementation.
+G0 owns the failing characterization tests for every known G0-S defect. G0-S begins only after those tests demonstrably fail on the recorded v1 baseline, then owns the minimal fixes that make them pass. The caption-attachment row is the sole approved exception: its Product-Owner-recorded disposition is `historical reproduction unavailable` because the testable production seam and its acceptance first appeared with the fix. That disposition is not a pre-fix failure or PASS, creates no general exception for another row and does not authorize reconstructing historical evidence. Characterization work and fixture collection may proceed in parallel, but G0 does not depend on unstarted G0-S implementation.
 
 ### 2.2 Target environments
 
@@ -113,7 +113,10 @@ GS is “unsupported” in the v1 baseline; do not invent a comparison value.
 - every base-required fixture can be restored by hash; later feature fixtures are
   required only before their corresponding support claim or control is enabled;
 - physical-iOS raw evidence exists;
-- v1 G0-S reproductions fail on the unfixed baseline;
+- v1 G0-S reproductions fail on the unfixed baseline, except for an explicitly
+  Product-Owner-approved `historical reproduction unavailable` row as narrowly
+  defined in section 2.1; the exception is recorded, never counted as a
+  pre-fix failure or PASS;
 - package bytes as well as splat counts are recorded;
 - resource-plateau and base Mesh/GS/simple-mixed image tolerances are numeric and reproducible;
 - initial base Mesh/GS FormatProfile specification/golden hashes are ratified and restorable;
@@ -121,26 +124,42 @@ GS is “unsupported” in the v1 baseline; do not invent a comparison value.
 
 ## 3. G0-S — blocking v1 safety stabilization
 
-G0-S protects current users and MUST ship before GS feature work. It is not a v2 PoC. Fixes remain the smallest root changes and do not introduce v2 storage dependencies.
+G0-S protects current users and remains a release barrier. After `G0S-TAB` is
+implemented, the approved proxy-backed paired Mesh+GS technical vertical slice
+may proceed while the remaining G0 and G0-S evidence/fixes continue in parallel,
+unless an unresolved P0/P1 directly makes that slice unsafe. Starting that slice
+does not complete G0/G0-S, adopt a G1 technology, authorize release, or permit an
+unaccepted support claim. G0-S fixes remain the smallest root changes and do not
+introduce v2 storage dependencies.
 
 ### 3.1 Multi-tab actor/sequence and append safety
 
-Before the per-store actor fix, tabs could share an actor and initialize the same next sequence, so deduplication could silently keep one of two different operations. Each live `ProjectStore` now self-issues a distinct actor, but imported/shared actor logs and OPFS append still lack a cross-tab atomic boundary.
+Before the per-store actor fix, tabs could share an actor and initialize the same next sequence, so deduplication could silently keep one of two different operations. Each live `ProjectStore` now self-issues a distinct actor, but two tabs can still write the same project without one project-wide authority.
 
 Required behavior:
 
 - each tab/session gets a unique actor instance;
-- identical `(actor, sequence)` plus identical canonical operation is idempotent;
-- identical key with different content stops or quarantines the import as a collision;
-- a quarantined collision offers explicit keep-A, keep-B, or export-for-migration review; it never silently first-wins;
-- shared-path mutation runs under a browser-proven cross-context lock;
-- if a required lock primitive is unavailable or unverified, the second tab is read-only.
+- one project has exactly one editable tab/session at a time; all other tabs are
+  explicitly read-only;
+- normal edits, merge, package import, model replacement and every other
+  project mutation use the same project-scoped authority;
+- acquisition failure or ownership loss stops new writes fail closed;
+- a tab that receives ownership reopens the durable project state before it can
+  become editable;
+- `editable`, `read-only` and `lock-lost` are displayed accurately;
+- production OPFS uses a browser cross-context lock; no local-storage or
+  optimistic lease fallback may claim editable authority.
 
 Acceptance `G0S-TAB`:
 
-- two tabs each produce 1,000 operations over multiple deterministic seeds; reload retains every unique operation;
-- reversed input order gives the same collision report;
-- simultaneous package merge/replacement cannot interleave append or blob commit;
+- while one tab owns the project, a second tab cannot add any operation or blob
+  and is visibly read-only;
+- after ownership transfer, the successor reloads durable state before editing,
+  and sequential 1,000-operation phases retain every unique operation on reopen;
+- package merge/replacement in a non-owner tab is rejected before its first
+  project write;
+- simulated acquisition failure/loss blocks dispatch, merge and filesystem
+  writes without changing in-memory project state;
 - target iOS demonstrates safe editing or read-only enforcement.
 
 ### 3.2 Recoverable durable-write queue
@@ -190,7 +209,9 @@ Current 2 GiB/1 GiB ZIP limits are not safe promises while the implementation ma
 
 ### 3.6 G0-S exit
 
-- every reproduction fails before and passes after the fix;
+- every available reproduction fails before and passes after the fix; the sole
+  caption-attachment `historical reproduction unavailable` row retains current
+  fix acceptance without being counted as a pre-fix failure or PASS;
 - real-browser OPFS/cross-tab tests and malicious corpus pass without crash, prototype mutation or partial activation;
 - queued/durable/package UI is accurate;
 - typecheck, full tests and production build pass;
@@ -432,6 +453,16 @@ The control resolver rejects illegal combinations before project mutation. Every
 Rollback means preserving the source v1 package/workspace, opening conversion in a new workspace, cleaning incomplete staging, retaining the old history epoch, and falling back to renderer-neutral Mesh/diagnostic paths without modifying metadata. It is never described as flipping a storage flag after v2-only writes.
 
 ## 10. Production sequence after gates
+
+This remains the release/adoption sequence. The Product Owner has approved one
+narrow scheduling exception: after the bounded `G0S-TAB` production root fix is
+committed, the proxy-backed paired Mesh+GS technical vertical slice in item 9 may
+start on existing accepted seams while external G0 evidence and remaining G0-S
+work continue in parallel. It earns no G0/G0-S exit, G1 adoption, support or
+release credit, and an unresolved P0/P1 that directly endangers the slice stops
+it. This exception does not authorize the intervening CAS, renderer-port,
+journal, transaction or v2-storage work merely because those items precede it
+below.
 
 1. G0 fixtures, devices, measurements and contracts, with allowed G0-S work proceeding in parallel only after its failing baseline characterizations exist.
 2. G0-S safety fixes; both G0 and G0-S must exit before the exact stabilized-v1 candidate is released under section 3.7.

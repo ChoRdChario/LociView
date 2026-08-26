@@ -1,17 +1,16 @@
 # LociView critical-path execution plan
 
-> Status: `PROPOSED DELIVERY REFOCUS / PAIRED INTERACTION POLICY APPROVED / CRITICAL-PATH WORK RESTART AUTHORIZED`
+> Status: `DELIVERY REFOCUS PARTIAL / G0S-TAB AND PAIRED-SLICE SCHEDULING APPROVED`
 >
 > Recorded: 2026-08-26 at `fa3e423` on `g0-baseline`.
 >
-> This is an execution plan, not a gate amendment. The paired Mesh+GS interaction
-> policy is Product-Owner-approved and recorded in the existing product/domain
-> specifications; the delivery/gate-refocus proposal otherwise remains proposed.
-> The current G0/G0-S ordering remains binding until separately amended.
-> On 2026-08-26 the Product Owner authorized work to resume after a whole-project
-> consistency check. That authorization starts only work permitted by the current
-> approved gates; it does not amend the G0/G0-S ordering or authorize external
-> acquisition, Release action, upload, publication, adoption, push or deployment.
+> This is an execution plan plus the Product Owner's narrow scheduling decision.
+> G0 and G0-S remain release barriers. After the independently committed
+> `G0S-TAB` root fix, the approved paired Mesh+GS/Proxy technical vertical slice
+> may start while external G0 evidence and remaining G0-S continue in parallel.
+> That start is not G0/G0-S completion, G1 adoption, a support claim or release
+> authority, and it does not authorize external acquisition, Release action,
+> upload, publication, adoption, push or deployment.
 
 ## 1. Delivery objective and present position
 
@@ -20,20 +19,23 @@ v1 codebase. G-1 and S0 are complete. G0 is active/incomplete, G0-S is a
 parallel release blocker, and G1-A/B/C plus v2 production remain unstarted.
 
 ```text
-G0 evidence and approval ─┐
-                          ├─> G1 technology gates -> v2 production -> release
-G0-S current-user safety ─┘
+G0 evidence and approval ──────────────────────────────────────┐
+G0-S current-user safety ──────────────────────────────────────┼─> release
+G0S-TAB -> paired Mesh+GS/Proxy technical vertical slice ──────┘
 ```
 
-The current critical path has two parallel lanes that join before G1:
+The current critical path has parallel release lanes. The paired technical slice
+may begin after `G0S-TAB`; the lanes still join before release:
 
 1. **G0 evidence lane:** make inputs/instrumentation executable, acquire and
    adopt exact external bytes, run the three device classes, then ratify the
    measured limits;
 2. **G0-S safety lane:** close only the pre-fix ledger and three remaining
    production roots while external evidence proceeds;
-3. **Join:** satisfy the applicable G0/G0-S barriers, pass the G1 PoCs, then
-   build and harden the MVP.
+3. **Approved technical lane:** close `G0S-TAB`, then build the paired
+   Mesh+GS/Proxy slice without implying technology adoption or release;
+4. **Join:** satisfy all applicable G0/G0-S barriers and technology decisions
+   before the supported release.
 
 The completed LociMyu identity slice stays closed. Browser vector evidence is
 collected with the next consolidated browser/device run. Local review storage,
@@ -215,8 +217,8 @@ Only the following gate/root units qualify. No new edge-case search is planned.
 
 | Order | Unit | Why it is critical | Existing acceptance reuse | Prerequisite | Startability after this plan |
 |---|---|---|---|---|---|
-| `S0` | Pre-fix reproduction ledger | Closes the reproducible portion of `G0-EXIT-03`; green regressions alone do not prove the unfixed baseline | Existing Git characterization history and commands only; no new tests | One caption-attachment seam/test first appeared with its fix, so PO must accept the explicit unavailable disposition or separately approve a bounded compatibility reproduction; never reconstruct missing results | `PARTIAL`: repository evidence and review complete; one PO disposition waits |
-| `S1` | Project-scoped cross-context mutation authority | Prevents silent operation loss; closes `G0S-TAB` and unlocks the transaction root | Existing multi-tab and package/replacement concurrency acceptance; add no Node matrix | PO confirms lock lifetime, second-tab read-only behavior and lock-loss handling; real browser/iPhone evidence later | `YES` only after the mechanism is explained and approved |
+| `S0` | Pre-fix reproduction ledger | Closes `G0-EXIT-03` without manufacturing historical evidence | Existing Git characterization history and commands only; no new tests | Product Owner approved the one caption-attachment `historical reproduction unavailable` exception; it is neither failure nor PASS evidence | `COMPLETE` |
+| `S1` | Project-scoped cross-context mutation authority | Prevents silent operation loss; closes the bounded production root of `G0S-TAB` | Existing multi-tab and package/replacement concurrency acceptance; add only assertions concretely missing from those files | Product Owner approved project-lifetime single-writer, explicit read-only, fail-closed loss and durable-reload-before-transfer; real browser/iPhone evidence remains in the parallel gate-evidence lane | `IN PROGRESS` |
 | `S2` | Crash-consistent v1 publication/recovery | Prevents a visible project from pointing at missing/partial blobs or actor-log prefixes; closes `G0S-BLOB` | Existing manifest/root-marker/actor-prefix/fault acceptance; add no fault matrix | `S1` lock plus PO approval of a minimal v1 journal/recovery boundary | `NO`, predecessor/approval wait |
 | `S3` | Operation activation/quarantine and divergent-key resolution | Stops malformed active fields and silent first-wins for the same actor/sequence; closes `G0S-OP` | Existing operation-ingress/collision corpus; add no new corpus | PO confirms durable typed issue location/lifecycle and keep-A/keep-B/export review boundary; keep distinct from LociMyu local review | `NO`, approval wait |
 | `S4` | Exact stabilized-v1 closure | Binds real-browser malicious/cross-tab, iOS, full matrix and review to one SHA | Existing malicious corpus and full suite | `S1`–`S3`, G0 evidence, exact candidate designation | `NO`, final wait |
@@ -233,10 +235,16 @@ Explicit backlog/non-selections:
 
 ## 6. Read-only G0/G1 dependency assessment
 
-Decision: **propose a dependency-based gate split to the Product Owner**.
+The earlier broad dependency split remains unratified. The Product Owner instead
+approved only this narrow scheduling rule: G0/G0-S remain release barriers, but
+after `G0S-TAB` the paired Mesh+GS/Proxy technical slice may start while the
+remaining barriers continue in parallel. No larger gate redesign is made here.
 
-The present gate is not changed by this plan. It currently requires aggregate G0
-and G0-S completion before any G1 work. The dependency analysis found:
+Earlier read-only analysis (retained for context) proposed a dependency-based
+split:
+
+At the time of that analysis, the gate required aggregate G0 and G0-S completion
+before any G1 work. The dependency analysis found:
 
 | G1 gate | Actual G0 inputs it consumes | Unrelated aggregate-G0 inputs currently serializing it |
 |---|---|---|
@@ -253,11 +261,15 @@ The proposed amendment, if separately approved, is:
 - `G0-METADATA-READY`: `E1`, `E4-C`, conflict/privacy/migration/budget conditions for G1-C;
 - aggregate `G0 COMPLETE`: retain the current seven exit rows as the final state.
 
-G0-S remains a common barrier because it protects current users. The resulting
+That unratified proposal kept G0-S as a common barrier because it protects current users. The resulting
 dependency proposal is `G0-S + COMMON + IO-READY -> G1-A`, then G1-A plus the
 applicable READY bundle permits G1-B and G1-C without forcing those two lanes to
 wait on each other's unrelated evidence. A READY result is PoC entry only; it is
 not G0 completion, release authority or permission to promote PoC code.
+
+The proposal above is retained only as audit history. Current authority is the
+smaller post-`G0S-TAB` paired-technical-slice exception stated at the start of
+this section; none of the READY gates above has been adopted.
 
 The Product Owner's proxy/simple-mixed decision additionally narrows G1-B here to
 base renderer adoption. Ordinary-point, Compare and Integrated feature packs are
@@ -287,17 +299,16 @@ G0/G0-S release barriers, disposable PoCs and one writer.
 |---|---|---|---|---|---|
 | `WS1` G0 evidence inputs/acquisition | `E0`–`E5` inputs are exact/restorable; external bytes complete the approved Release/restore/adoption lifecycle | Source bytes, privacy/license, profile decisions, instrumentation | Codex / PO / external / reviewer | None, units run in parallel | `YES`, only approved repository preparation and source requests |
 | `WS2` G0 device evidence/ratification | `E6`–`E10`; three device classes, complete raw runs, reviewed artifacts and all seven G0 exit rows approved | `WS1`, physical devices, PO numeric decisions | PO/device operator / Codex / reviewer | WS1 | Environment facts only now; full runs `WAIT` |
-| `WS3` G0-S current-user safety | Ledger plus `S1`–`S4`; real-browser/iOS evidence, exact-tree matrix, no unresolved P0/P1 and PO stabilized-v1 approval | Lock/journal/quarantine decisions and physical evidence | Codex / PO / reviewer | Ledger first; S2 after S1; final closure also WS2 | Ledger now; production waits for approval |
-| `WS4` G1 technology decisions | G1-A, G1-B base renderer and G1-C each record reproducible `ADOPT`, `REJECT` or `RETRY` with rollback/fallback; later renderer features retain separate acceptance before their controls turn on | Current base G0/G0-S, or a separately approved READY amendment | Codex / PO / device operator | WS2/WS3 under current gate | `NO` |
-| `WS5` v2 MVP and release | Reuse the existing Asset/AssetBindingRevision/AssetRevision/Representation closure; one logical Asset and active AssetRevision durably preserve a Mesh+GS pair and one invisible proxy. Simple mixed, GS-only and Mesh-only visibility resolve the selected GS only to that proxy; approximate proxy hit -> ordinary Caption gizmo adjustment/confirmation -> source-less manual AssetFrame `positionAsset` survives save/reopen without proxy authority under the simple opaque mixed rule and five fixed incomplete-data outcomes. Then complete production storage, canonical migration, separately approved LociMyu local-review/source-retention work, ordinary-point display/picking acceptance, multiple assets/Compare/later Integrated classes, iOS/privacy/security/usability/rollback and exact release approval. Direct-GS, automatic proxy generation, ordinary points and advanced composition do not close the first slice, but ordinary-point acceptance remains required before MVP release | WS4 choices, local-review wire/capability approval and remaining product approvals; no new normal-Mesh interaction relation is required for the first slice | Codex / PO / external reviewer | WS4 | `NO` |
+| `WS3` G0-S current-user safety | Ledger plus `S1`–`S4`; real-browser/iOS evidence, exact-tree matrix, no unresolved P0/P1 and PO stabilized-v1 approval | Remaining journal/quarantine decisions and physical evidence | Codex / PO / reviewer | S0 complete; S1 now; final closure also WS2 | `YES`: only approved S1; remaining roots stay parallel and are not searched before the paired slice |
+| `WS4` G1 technology decisions | G1-A, G1-B base renderer and G1-C each record reproducible `ADOPT`, `REJECT` or `RETRY` with rollback/fallback; later renderer features retain separate acceptance before their controls turn on | Applicable evidence and Product Owner adoption decisions | Codex / PO / device operator | Parallel evidence lanes; still required for adoption/release | `NO` for an adoption claim; paired technical implementation alone may start after S1 |
+| `WS5` paired slice, then v2 MVP/release | First close the approved proxy-backed paired Mesh+GS technical slice on existing accepted schema/seams. It preserves one logical Asset/active AssetRevision, Mesh+GS and one invisible proxy; simple mixed/GS-only/Mesh-only visibility resolve the selected GS only to that proxy; approximate hit -> Caption gizmo -> source-less manual AssetFrame position survives reopen. Later production storage/migration, ordinary points, multiple assets/Compare, hardening and exact release approval remain separate. | S1 for technical start; technology adoption and all release barriers for supported release | Codex / PO / external reviewer | Technical slice after S1; release after WS1–WS4 | `YES AFTER S1`, without G0/G1/release credit |
 
 ## 8. Current authorization boundary
 
-The Product Owner reviewed and amended the paired Mesh+GS policy, selected the
-existing proxy-backed path and three visibility patterns as the initial
-standard, and then authorized critical-path work to resume after a whole-project
-consistency check. `S0` may therefore proceed immediately. `S1` still waits for
-the plain-language mechanism confirmation recorded in section 5, and `S2`/`S3`
-retain their own approval prerequisites. The delivery/gate-refocus proposal is
-not ratified, and no gate amendment, external acquisition, device run, Release
+The Product Owner approved the caption historical-unavailable disposition and
+the project-scoped single-writer `S1` mechanism. Implement and independently
+commit `S1`, then move directly to the approved paired Mesh+GS/Proxy technical
+slice. Do not explore another G0-S micro-slice first unless an unresolved P0/P1
+directly endangers that slice. Remaining G0/G0-S and external evidence continue
+as parallel release-barrier lanes. No external acquisition, device run, Release
 action, upload, publication, adoption, push or deployment is implied.

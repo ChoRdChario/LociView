@@ -1,6 +1,6 @@
 # G0-S pre-fix reproduction ledger
 
-> Status: `PARTIAL / ONE COMPATIBLE PRE-FIX CHARACTERIZATION ABSENT`
+> Status: `COMPLETE WITH ONE PO-APPROVED HISTORICAL-UNAVAILABLE ROW`
 >
 > Recorded: 2026-08-26 on branch `g0-baseline` from HEAD `d63a90b`.
 >
@@ -51,7 +51,7 @@ that hybrid is called out below and is not mislabelled as a historical test run.
 | `G0S-BLOB-VERIFY` | Resolved corrupt or omitted required blobs could be accepted during native import/merge | `f8c6556` / `f8c6556` | `tests/assets/packagePublication.test.ts` | 29/74 fail at read-back, notification, marker and old-or-complete authority boundaries | Fixed portions are ordinary regressions after `4271e8c`/`99133fd`; actor-log atomic publication remains open |
 | `G0S-BLOB-WIZARD` | Import wizard published its root marker before the complete planned closure | `c9566c7` / `c9566c7` | `tests/assets/importWizardPublication.test.ts` | 7/14 fail across marker start and interruption rows | Fixed by `e24fb03` except the root-marker-prefix crash row, which remains open |
 | `G0S-BLOB-ADD` | Model addition could acknowledge metadata against unverified/corrupt/missing durable bytes | code `1d733eb`; test blob `cc01313:tests/assets/modelAdditionDurability.test.ts` | `tests/assets/modelAdditionDurability.test.ts` | Actual hybrid rerun fails 6/9: verification was not observed, publication/final authority was unsafe, and rejected append could still be acknowledged | Fixed by `cc01313`; provenance is a recorded hybrid rerun rather than a contemporaneous characterization |
-| `G0S-BLOB-ATTACH` | Caption attachment publication needed the same verified blob-before-metadata boundary | candidate code parent `512b8f9`; production seam and test first appear together at `fd5df28` | `tests/assets/captionAttachmentDurability.test.ts` exists only after the fix | **No compatible pre-fix test/API exists. No failure artifact is claimed.** | Fixed behavior is covered at `fd5df28`, but this provenance gap keeps `G0-CHAR-01`, `G0-CHAR-02` and `G0-EXIT-03` incomplete |
+| `G0S-BLOB-ATTACH` | Caption attachment publication needed the same verified blob-before-metadata boundary | candidate code parent `512b8f9`; production seam and test first appear together at `fd5df28` | `tests/assets/captionAttachmentDurability.test.ts` exists only after the fix | **`historical reproduction unavailable`: no compatible pre-fix test/API exists and no failure artifact is claimed.** | Product Owner approved the explicit exception. Current fix acceptance at `fd5df28` remains; no retroactive test, fixture or evidence work is authorized and this row is never described as a pre-fix failure or PASS. |
 | `G0S-MAL-ENVELOPE` | Malicious package shapes could inspect/apply partially or mutate existing authority | `8694756` / `8694756` | `tests/assets/maliciousPackage.test.ts` | 67/124 fail after expansion; exact inspection, mutation, marker, state/reopen and clock assertions are in the raw result | Subsequent minimal fixes close most rows; future-major edit policy remains open |
 | `G0S-MAL-MANIFEST` | Duplicate/ambiguous members, invalid scalars, reserved keys and non-finite values could activate | `aa1ebb4` / `aa1ebb4`, containing rows introduced at `9d67a56`, `5825727`, `2c10fda`, `aa1ebb4` | `tests/assets/maliciousPackage.test.ts` | 135/245 fail after expansion, with per-case marker/sentinel/old-authority failures | Fixed by `e95c180` and `b976ebc`; related UTF-8/path/special-entry fixes remain ordinary regressions |
 | `G0S-MAL-ZIP` | Control paths, parent/child ambiguity, disguised nested ZIP, CRC and encryption mismatch were accepted | `bd09790` / `bd09790` | `tests/assets/zipioStructure.test.ts` | 11/23 fail as ordinary assertions | Fixed by `bec3f76`; portable collisions, UTF-8 and Unix special entries were later fixed by `2017a5a`, `8be3098` and `6c0e344` |
@@ -100,14 +100,13 @@ assertion names and failure messages. Counts are total/passed/failed/todo.
 
 ## Honest gate disposition
 
-`G0-CHAR-01`, `G0-CHAR-02` and `G0-EXIT-03` must all remain `candidate`.
-Every known family now has one owner row and an exact current disposition, but
-the ownership map is not itself the failing characterization required by
-`G0-CHAR-01`. Caption-attachment acceptance and its production seam were
-introduced together at `fd5df28`; no compatible pre-fix characterization
-exists, and this evidence-only slice does not create one retroactively.
+`G0-CHAR-01`, `G0-CHAR-02` and `G0-EXIT-03` are covered under the narrow
+Product-Owner-approved exception recorded above. This means that every known
+family has an exact evidence/disposition row; it does **not** mean caption
+attachments have pre-fix failure or PASS evidence. Their acceptance and
+testable production seam were introduced together at `fd5df28`, so the row is
+permanently labelled `historical reproduction unavailable`.
 
-The missing row is narrowly identified rather than reconstructed. Closing it
-requires a separately approved compatibility reproduction or an explicit
-Product Owner decision that the contemporaneous fix-boundary evidence is an
-acceptable disposition. Neither is inferred by this ledger.
+No compatibility reconstruction, additional test, fixture or evidence work is
+authorized for that missing historical seam. Current fix acceptance remains the
+only executable caption-attachment result.

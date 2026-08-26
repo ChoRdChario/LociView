@@ -22,11 +22,10 @@ Completed v1 implementation history remains available in Git before the G-1 clea
   consistency check; this does not ratify the proposed gate split or authorize
   external acquisition, device runs, Release actions or deployment
 
-Current authority remains unchanged: G0 and G0-S are active/incomplete and G1+
-cannot begin under the approved contract. The first executable unit is the
-existing-evidence `G0-EXIT-03` ledger. Its repository portion is complete with
-one explicit unavailable pre-fix disposition; production `S1` retains its
-separately recorded mechanism-confirmation prerequisite.
+Current authority keeps G0 and G0-S as release barriers. The approved narrow
+scheduling exception permits the paired Mesh+GS/Proxy technical vertical slice
+after the independent `G0S-TAB` commit, without claiming G0/G0-S completion,
+G1 adoption or release authority.
 
 ### G0-EXIT-03 pre-fix reproduction ledger
 
@@ -41,16 +40,34 @@ separately recorded mechanism-confirmation prerequisite.
 
 Writer disposition: 14 exact-baseline JSON reruns now preserve ordinary failed
 assertions. Model addition is an explicitly labelled hybrid of pre-fix code and
-the fix commit's test blob. Caption attachments remain the one honest gap because
-their DOM-independent production seam and exact acceptance first appeared in the
-same fix commit; `G0-CHAR-01`, `G0-CHAR-02` and `G0-EXIT-03` therefore all
-remain `candidate`.
+the fix commit's test blob. Caption attachments have the Product-Owner-approved
+`historical reproduction unavailable` disposition because their testable seam
+and exact acceptance first appeared with the fix. It is neither failure nor PASS
+evidence; no retroactive test, fixture or evidence work is authorized.
 
 Independent review found one false-credit P1 in the initial draft: an owner row
 with an explicit absence is not the failing characterization required by
 `G0-CHAR-01`. The credit was reverted; targeted re-review reports no remaining
-P0/P1. S0 is partial rather than complete until the Product Owner accepts the
-unavailable disposition or approves a bounded compatibility reproduction.
+P0/P1. The Product Owner accepted the explicit unavailable disposition, so S0
+is complete without reconstructing or falsely crediting the missing history.
+
+### G0S-TAB project-scoped single-writer root fix
+
+- [x] Record the approved project-lifetime authority, second-tab read-only,
+  fail-closed loss and durable-reload-before-transfer contract in existing docs
+- [ ] Guard `ProjectStore.dispatch()`/merge and every project-scoped filesystem
+  write with the same session authority; do not add a journal or transaction API
+- [ ] Route create/import/merge/model/attachment/delete flows through that one
+  authority and release it on project-session close
+- [ ] Show exact `editable`, `read-only` and `lock-lost` state; keep view-only
+  navigation usable and stop new mutation controls when authority is absent
+- [ ] Reuse multi-tab and package/replacement acceptance, adding only assertions
+  needed to prove authority acquisition/loss and durable reload on transfer
+- [ ] Run focused acceptance and one independent runtime/security review
+- [ ] Run typecheck, the full test suite and production build once on the final
+  executable tree; commit `G0S-TAB` independently and leave a clean worktree
+- [ ] Move next to the paired Mesh+GS/Proxy technical vertical slice; do not
+  explore another G0-S micro-slice unless a direct P0/P1 makes that slice unsafe
 
 ### Proxy-backed initial interaction policy — docs-only recording
 
@@ -1816,10 +1833,10 @@ Identity-only production slice review — 2026-08-26:
 - [ ] Complete target-device record: iPhone 14 Pro is fixed as the oldest physical-iOS alpha target; add desktop and tablet-PC OS/browser/RAM/GPU details
 - [ ] Measure current load, memory, frame-time, picking, and package baselines
 - [x] Map every `03-gates-and-delivery.md` section 2.1–2.4 fixture, trace, device and threshold requirement to a restorable source/status before claiming G0 evidence coverage; the high-level checklist and a successful `evidence:verify` are not completion proof
-- [ ] Complete the G0-S pre-fix reproduction ledger: for each known case record the unfixed code commit, compatible test revision, exact reproduction command/procedure, observed failing assertion/disposition and restorable evidence locator; current green regressions do not retroactively prove the baseline
+- [x] Complete the G0-S pre-fix reproduction ledger: for each known case record the unfixed code commit, compatible test revision, exact reproduction command/procedure, observed failing assertion/disposition and restorable evidence locator; current green regressions do not retroactively prove the baseline, and the caption row retains its explicit approved historical-unavailable disposition
 - [ ] Approve support guarantees, degradation behavior, and Go/No-Go thresholds
 
-## G0-S — v1 safety stabilization (blocking before G1 feature work)
+## G0-S — v1 safety stabilization (release barrier; paired technical-slice exception)
 
 - [ ] Make the G0 multi-tab actor/sequence characterization pass without silent operation loss
 - [x] Make the G0 rejected-append characterization pass with recovery and accurate durable-state UI
@@ -1831,7 +1848,11 @@ Identity-only production slice review — 2026-08-26:
 
 ## G1+ — Proposed v2 gates
 
-Start only after G0 and G0-S pass. See `docs/v2/00-approved-direction.md`. Order:
+The sequence below still governs technology adoption and release. After the
+independent `G0S-TAB` commit, only the approved paired Mesh+GS/Proxy technical
+slice may start early on existing accepted seams; that start does not pass G0,
+pass G0-S, adopt G1, or authorize release. See
+`docs/v2/00-approved-direction.md`. Order:
 
 1. bounded-memory streaming/CAS package PoC;
 2. Spark/Three versus PlayCanvas renderer bakeoff;
