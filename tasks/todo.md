@@ -148,7 +148,7 @@ durable marker before becoming writable. Console/runtime error count was `0`.
 The external JSON and screenshots are convenience artifacts only; this paragraph
 is the durable repository record and does not claim G0/G0-S or release completion.
 
-### Approved Three migration and Spark technical harness — Desktop complete; iPhone pending
+### Approved Three migration and Spark technical harness — complete; ADOPT CANDIDATE
 
 Phase A — Three.js migration, independent commit:
 
@@ -184,9 +184,9 @@ Phase B — isolated Spark 2.1.0 technical harness, only after Phase A is green:
 - [x] Prove real page reload and complete offline reopen without crediting harness
   persistence as production persistence; verify the normal v1 route never loads
   Spark/worker/WASM/GS chunks
-- [ ] After desktop acceptance and before architecture expansion, run the minimal
+- [x] After desktop acceptance and before architecture expansion, run the minimal
   iPhone 14 Pro offline smoke
-- [x] Report `RETRY` with evidence and stop; do not
+- [x] Report `ADOPT CANDIDATE` with evidence and stop; do not
   proceed to Spark adoption or production integration
 
 Phase A result — commit `0d9e45c`:
@@ -201,7 +201,7 @@ Phase A result — commit `0d9e45c`:
   independent review found no unresolved P0/P1. This is a Three migration result,
   not G0/G0-S completion, renderer adoption or release approval.
 
-Phase B Desktop result — commit `7abb44b`:
+Phase B result — commit `7abb44b`:
 
 - The exact Spark `2.1.0` candidate is recorded under `devDependencies`. It is
   reached only by the nondefault `dev.html?mode=spark` dynamic entry. The ordinary
@@ -226,12 +226,26 @@ Phase B Desktop result — commit `7abb44b`:
   that a Caption placed for a hidden GS remains hidden until that GS is displayed
   is backlog; mixed-mode two-stage placement is proven and no acceptance scope
   was extended.
-- No physical iPhone was connected to the Codex host, so the required iPhone 14
-  Pro smoke is not credited. Verdict is `RETRY` until the procedure below passes.
-  This result does not adopt Spark, integrate production persistence, pass G1,
-  complete G0/G0-S, authorize release or expand architecture.
+- On 2026-08-27, the Product Owner operated physical iPhone 14 Pro Safari on iOS
+  26.6.1 against a temporary HTTPS tunnel serving the same isolated candidate
+  build. The separate Safari build number was not available and is not inferred.
+  Only model and OS/browser class are recorded; the supplied device name, model
+  number and serial number are intentionally excluded.
+- The physical smoke passed all six rows: `ready · 8 splats` after an online
+  reload; distinct Mesh+GS, GS-only and Mesh-only displays; touch placement and
+  gizmo manipulation on the Mesh itself and the GS dedicated Proxy, including a
+  successful GS hit while GS was hidden by Mesh-only display; adjusted GS-local
+  position save; restored/editable saved Caption with new placement disabled
+  under activation-time Proxy failure; and actual Safari termination, reopen and
+  reload in airplane mode with Wi-Fi absent, restoring Mesh+GS and the saved GS
+  Caption while fully offline. Screenshots support each visible result; no
+  screenshot is promoted to G0 performance/device evidence.
+- Verdict is `ADOPT CANDIDATE`: Spark 2.1.0 is technically suitable to advance to
+  the next explicit adoption decision. This verdict does not adopt Spark,
+  integrate production persistence, pass G1, complete G0/G0-S, authorize release
+  or expand architecture.
 
-Pending Product Owner physical iPhone 14 Pro minimum offline smoke:
+Completed Product Owner physical iPhone 14 Pro minimum offline smoke:
 
 1. Build commit `7abb44b` with `npm run build:harness` and serve only `dev-dist`
    from a nonrelease HTTPS origin trusted by the physical iPhone; record iOS and
