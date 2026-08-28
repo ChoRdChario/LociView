@@ -6,7 +6,26 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
-import gsFixtureUrl from '../../fixtures/gs/profile-golden-sh3-v1.ply?url';
+import tinyGsFixtureUrl from '../../fixtures/gs/profile-golden-sh3-v1.ply?url';
+
+const query = new URLSearchParams(globalThis.location.search);
+const useLocalRepresentative = query.get('source') === 'local-representative';
+const REPRESENTATIVE_GS = {
+  fileName: 'ki84_ver1.ply',
+  byteLength: 781_785_120,
+  splatCount: 4_766_975,
+  sha256: '8c6a6e6ee5fca9676a23f9337a251064817277aad9bf6dec715bb0af3c9ea18c',
+  representationToAsset: {
+    translation: [0.08313684463500977, 0.5155202388763428, -0.1576920509338379] as const,
+    rotationXYZW: [0, 0, 0, 1] as const,
+    uniformScale: 0.05,
+    reflection: 'none',
+  },
+  logicalBoundsAsset: {
+    min: [-0.5933557510375977, -0.6942761898040772, -2.329973888397217] as const,
+    max: [0.5933557510375977, 0.6942761898040772, 2.329973888397217] as const,
+  },
+} as const;
 
 type DisplayMode = 'mixed' | 'gs-only' | 'mesh-only';
 type CaptionTarget = 'mesh' | 'gs';
@@ -18,7 +37,7 @@ type Scenario =
   | 'transform-failure'
   | 'both-failure';
 type BootFault = Exclude<Scenario, 'healthy'>;
-type ResourceState = 'pending' | 'ready' | 'failed';
+type ResourceState = 'pending' | 'ready' | 'failed' | 'unloaded' | 'not-evaluated';
 
 type Vec3Tuple = [number, number, number];
 
@@ -46,6 +65,14 @@ interface HarnessSnapshot {
     splatCount: number;
     finiteBounds: boolean;
     candidateFormatOnly: true;
+    source: 'tiny-fixture' | 'local-representative';
+    sourceFileName: string | null;
+    sourceByteLength: number | null;
+    loadedBytes: number;
+    loading: boolean;
+    loadCount: number;
+    disposeCount: number;
+    lastLoadDurationMs: number | null;
   };
   resources: {
     mesh: ResourceState;
@@ -172,7 +199,9 @@ const HARNESS_PROJECT = {
     {
       id: IDS.gsRevision,
       assetId: IDS.gsAsset,
-      representationIds: [IDS.gsRepresentation, IDS.proxyRepresentation] as const,
+      representationIds: useLocalRepresentative
+        ? ([IDS.gsRepresentation] as readonly string[])
+        : ([IDS.gsRepresentation, IDS.proxyRepresentation] as readonly string[]),
       anchorCompatibilityClasses: [
         { id: IDS.gsCompatibility, targetVariantFamilyIds: [IDS.gsFamily] as const },
       ],
@@ -211,53 +240,69 @@ const HARNESS_PROJECT = {
       purposes: ['source', 'display'] as const,
       role: 'gsPrimary',
       variantFamilyId: IDS.gsFamily,
-      formatProfile: { id: 'harness-only-graphdeco-ply', specificationSha256: 'unratified' },
+      formatProfile: {
+        id: useLocalRepresentative ? 'harness-only-graphdeco-ply-sh2' : 'harness-only-graphdeco-ply-sh3',
+        specificationSha256: 'unratified',
+      },
       blob: {
         algorithm: 'sha256',
-        digest: 'd62becb6b21de9e2f7b24e51f05e2327ae261439b0b4af3c90bc4e75acf3cf5f',
-        byteLength: 3573,
+        digest: useLocalRepresentative
+          ? REPRESENTATIVE_GS.sha256
+          : 'd62becb6b21de9e2f7b24e51f05e2327ae261439b0b4af3c90bc4e75acf3cf5f',
+        byteLength: useLocalRepresentative ? REPRESENTATIVE_GS.byteLength : 3573,
         mediaType: 'application/octet-stream',
       },
-      representationToAsset: {
-        translation: [0, 0, 0] as const,
-        rotationXYZW: [0, 0, 0, 1] as const,
-        uniformScale: 1,
-        reflection: 'none',
-      },
-      logicalBoundsAsset: { min: [-1, -1, -1] as const, max: [1, 1, 1] as const },
+      representationToAsset: useLocalRepresentative
+        ? REPRESENTATIVE_GS.representationToAsset
+        : {
+            translation: [0, 0, 0] as const,
+            rotationXYZW: [0, 0, 0, 1] as const,
+            uniformScale: 1,
+            reflection: 'none',
+          },
+      logicalBoundsAsset: useLocalRepresentative
+        ? REPRESENTATIVE_GS.logicalBoundsAsset
+        : { min: [-1, -1, -1] as const, max: [1, 1, 1] as const },
       derivedFrom: [] as const,
     },
-    {
-      id: IDS.proxyRepresentation,
-      assetId: IDS.gsAsset,
-      representationFrameId: 'frame-harness-gs-proxy-representation',
-      contentKind: 'mesh',
-      purposes: ['interaction'] as const,
-      role: 'interactionProxy',
-      variantFamilyId: IDS.proxyFamily,
-      proxyForGsVariantFamilyId: IDS.gsFamily,
-      formatProfile: { id: 'harness-only-obj-proxy', specificationSha256: 'unratified' },
-      // The same tiny OBJ bytes are reused under an interaction-only role. This
-      // creates no converter or extra fixture and does not imply shared Assets.
-      blob: {
-        algorithm: 'sha256',
-        digest: 'c425cf4ea06178e8068f4cd896cd342b32bf586a8b24bd3dfc7f6dd6fd94810d',
-        byteLength: 190,
-        mediaType: 'model/obj',
-      },
-      representationToAsset: {
-        translation: [-1, -1, -1] as const,
-        rotationXYZW: [0, 0, 0, 1] as const,
-        uniformScale: 2,
-        reflection: 'none',
-      },
-      logicalBoundsAsset: { min: [-1, -1, -1] as const, max: [1, 1, 1] as const },
-      derivedFrom: [IDS.gsRepresentation] as const,
-    },
+    ...(useLocalRepresentative
+      ? []
+      : [
+          {
+            id: IDS.proxyRepresentation,
+            assetId: IDS.gsAsset,
+            representationFrameId: 'frame-harness-gs-proxy-representation',
+            contentKind: 'mesh',
+            purposes: ['interaction'] as const,
+            role: 'interactionProxy',
+            variantFamilyId: IDS.proxyFamily,
+            proxyForGsVariantFamilyId: IDS.gsFamily,
+            formatProfile: { id: 'harness-only-obj-proxy', specificationSha256: 'unratified' },
+            // The same tiny OBJ bytes are reused under an interaction-only role.
+            // It is entirely absent from representative-Ply mode.
+            blob: {
+              algorithm: 'sha256',
+              digest: 'c425cf4ea06178e8068f4cd896cd342b32bf586a8b24bd3dfc7f6dd6fd94810d',
+              byteLength: 190,
+              mediaType: 'model/obj',
+            },
+            representationToAsset: {
+              translation: [-1, -1, -1] as const,
+              rotationXYZW: [0, 0, 0, 1] as const,
+              uniformScale: 2,
+              reflection: 'none',
+            },
+            logicalBoundsAsset: { min: [-1, -1, -1] as const, max: [1, 1, 1] as const },
+            derivedFrom: [IDS.gsRepresentation] as const,
+          },
+        ]),
   ],
 } as const;
 
-const STORAGE_KEY = 'lociview.spark-harness.caption.v1';
+const STORAGE_KEY = useLocalRepresentative
+  ? 'lociview.spark-harness.caption.representative-v1'
+  : 'lociview.spark-harness.caption.v1';
+const UI_STATE_KEY = 'lociview.spark-harness.ui.representative-v1';
 const INIT_TIMEOUT_MS = 30_000;
 
 document.title = 'LociView Spark 2.1.0 Technical Harness';
@@ -276,6 +321,7 @@ document.head.insertAdjacentHTML(
     .card { border:1px solid #243247; border-radius:9px; padding:10px; background:#101a2a; }
     .row { display:flex; gap:7px; align-items:center; flex-wrap:wrap; }
     label { display:grid; gap:4px; flex:1; min-width:140px; }
+    [hidden] { display:none !important; }
     select,button { color:#e2e8f0; background:#111c2e; border:1px solid #334155; border-radius:6px; padding:7px 9px; font:inherit; }
     button { cursor:pointer; } button.primary { background:#1d4ed8; border-color:#2563eb; } button:disabled { opacity:.45; cursor:not-allowed; }
     #spark-diagnostics { margin:0; padding-left:18px; color:#fbbf24; }
@@ -292,26 +338,41 @@ document.body.innerHTML = `
   <aside id="spark-panel">
     <h1>Spark 2.1.0 Technical Harness</h1>
     <p class="small">Candidate evidence only — no Spark adoption, production persistence, G1 pass, or release claim.</p>
+    ${
+      useLocalRepresentative
+        ? `<section class="card">
+      <h2>Representative local GS</h2>
+      <input id="spark-local-source" type="file" accept=".ply,application/octet-stream">
+      <p class="small" id="spark-source-status" style="margin-top:7px">Select the unchanged local ki84_ver1.ply. Its bytes are streamed directly and are not uploaded or added to the build.</p>
+      <div class="row" style="margin-top:7px"><button id="spark-unload" disabled>Unload GS / dispose</button><button id="spark-reload" disabled>Reload selected file</button></div>
+      <p class="small" style="margin-top:7px"><strong>NOT EVALUATED — no matching representative proxy supplied.</strong> Caption, Proxy, gizmo, and save/reopen acceptance remains with the approved 8-splat fixture.</p>
+    </section>`
+        : ''
+    }
     <section class="card">
-      <h2>Display and Caption target</h2>
+      <h2>${useLocalRepresentative ? 'Display' : 'Display and Caption target'}</h2>
       <div class="row">
         <label>Display
           <select id="spark-display">
             <option value="mixed">Mesh + GS</option><option value="gs-only">GS only</option><option value="mesh-only">Mesh only</option>
           </select>
         </label>
-        <label>Caption target
+        <label ${useLocalRepresentative ? 'hidden' : ''}>Caption target
           <select id="spark-target"><option value="gs">partial GS</option><option value="mesh">ordinary Mesh</option></select>
         </label>
       </div>
-      <p class="small" style="margin-top:7px">Mesh target raycasts itself. GS target raycasts only its explicit invisible Proxy.</p>
+      <p class="small" style="margin-top:7px">${
+        useLocalRepresentative
+          ? 'The cube and representative GS are independent visual Assets. Neither is used as the other’s interaction surface.'
+          : 'Mesh target raycasts itself. GS target raycasts only its explicit invisible Proxy.'
+      }</p>
     </section>
-    <section class="card">
+    <section class="card" ${useLocalRepresentative ? 'hidden' : ''}>
       <h2>Two-stage Caption placement</h2>
       <div class="row"><button class="primary" id="spark-place">1. Arm placement</button><button id="spark-save">2. Save final position</button><button id="spark-clear">Clear saved</button></div>
       <p class="small" style="margin-top:7px">After the coarse surface hit, drag the ordinary gizmo. Saving stores only the target AssetFrame <code>positionAsset</code>.</p>
     </section>
-    <section class="card">
+    <section class="card" ${useLocalRepresentative ? 'hidden' : ''}>
       <h2>Approved degradation outcome</h2>
       <select id="spark-scenario" style="width:100%">
         <option value="healthy">Healthy fixture</option>
@@ -338,6 +399,10 @@ const targetSelect = $<HTMLSelectElement>('#spark-target');
 const scenarioSelect = $<HTMLSelectElement>('#spark-scenario');
 const placeButton = $<HTMLButtonElement>('#spark-place');
 const saveButton = $<HTMLButtonElement>('#spark-save');
+const localSourceInput = document.querySelector<HTMLInputElement>('#spark-local-source');
+const localSourceStatus = document.querySelector<HTMLElement>('#spark-source-status');
+const unloadButton = document.querySelector<HTMLButtonElement>('#spark-unload');
+const reloadButton = document.querySelector<HTMLButtonElement>('#spark-reload');
 
 let runtimeErrorCount = 0;
 globalThis.addEventListener('error', () => {
@@ -351,14 +416,33 @@ globalThis.addEventListener('unhandledrejection', () => {
 
 const bootFault = readBootFault();
 
+function readSavedUiState(): { displayMode: DisplayMode; target: CaptionTarget } | null {
+  if (!useLocalRepresentative) return null;
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(UI_STATE_KEY) ?? 'null');
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    const candidate = parsed as { displayMode?: unknown; target?: unknown };
+    const validDisplay =
+      candidate.displayMode === 'mixed' || candidate.displayMode === 'gs-only' || candidate.displayMode === 'mesh-only';
+    const validTarget = candidate.target === 'mesh' || candidate.target === 'gs';
+    return validDisplay && validTarget
+      ? { displayMode: candidate.displayMode as DisplayMode, target: candidate.target as CaptionTarget }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+const savedUiState = readSavedUiState();
+
 let ready = false;
-let displayMode: DisplayMode = 'mixed';
-let target: CaptionTarget = 'gs';
+let displayMode: DisplayMode = savedUiState?.displayMode ?? 'mixed';
+let target: CaptionTarget = savedUiState?.target ?? 'gs';
 let scenario: Scenario = bootFault ?? 'healthy';
 let placementArmed = false;
 let restoredFromStorage = false;
 let currentAnchor: ManualAssetAnchor | null = null;
-let savedAnchor: ManualAssetAnchor | null = readSavedAnchor();
+let savedAnchor: ManualAssetAnchor | null = useLocalRepresentative ? null : readSavedAnchor();
 let lastHit: HarnessSnapshot['lastHit'] = null;
 let frameCount = 0;
 let splatCount = 0;
@@ -369,6 +453,14 @@ let disposed = false;
 let meshResourceState: ResourceState = 'pending';
 let gsResourceState: ResourceState = 'pending';
 let proxyResourceState: ResourceState = 'pending';
+let sourceFileName: string | null = useLocalRepresentative ? null : 'profile-golden-sh3-v1.ply';
+let sourceByteLength: number | null = useLocalRepresentative ? null : 3573;
+let loadedBytes = useLocalRepresentative ? 0 : 3573;
+let selectedRepresentativeFile: File | null = null;
+let gsLoadInProgress = false;
+let gsLoadCount = 0;
+let gsDisposeCount = 0;
+let lastLoadDurationMs: number | null = null;
 
 const diagnostics: string[] = [];
 const resourceIssues: string[] = [];
@@ -413,6 +505,8 @@ let splatMesh: (THREE.Object3D & {
   dispose(): void;
 }) | null = null;
 
+displaySelect.value = displayMode;
+targetSelect.value = target;
 scenarioSelect.value = scenario;
 
 const gizmo = new TransformControls(camera, canvas);
@@ -540,6 +634,15 @@ function interactionResolution(): {
   assetGroup: THREE.Group | null;
   reason: string | null;
 } {
+  if (useLocalRepresentative) {
+    return {
+      enabled: false,
+      surfaceRepresentationId: null,
+      object: null,
+      assetGroup: null,
+      reason: 'NOT EVALUATED — no matching representative proxy supplied.',
+    };
+  }
   if (!ready) return { enabled: false, surfaceRepresentationId: null, object: null, assetGroup: null, reason: 'Harness is not ready.' };
   if (scenario === 'both-failure') {
     return { enabled: false, surfaceRepresentationId: null, object: null, assetGroup: null, reason: 'Both visual Assets are unusable; neither is activated.' };
@@ -602,6 +705,12 @@ function interactionResolution(): {
 }
 
 function degradationDiagnostics(): string[] {
+  if (useLocalRepresentative) {
+    return [
+      'Representative smoke is renderer-only: load, display, camera, visibility, unload/dispose, and same-session reload.',
+      'NOT EVALUATED — no matching representative proxy supplied.',
+    ];
+  }
   switch (scenario) {
     case 'healthy':
       return ['Healthy candidate: explicit target selection is required; no interaction surface is inferred.'];
@@ -722,6 +831,7 @@ canvas.addEventListener('click', (event) => {
 function setDisplayMode(mode: DisplayMode): void {
   displayMode = mode;
   displaySelect.value = mode;
+  if (useLocalRepresentative) localStorage.setItem(UI_STATE_KEY, JSON.stringify({ displayMode, target }));
   applyVisibility();
   renderState();
 }
@@ -729,6 +839,7 @@ function setDisplayMode(mode: DisplayMode): void {
 function setTarget(nextTarget: CaptionTarget): void {
   target = nextTarget;
   targetSelect.value = nextTarget;
+  if (useLocalRepresentative) localStorage.setItem(UI_STATE_KEY, JSON.stringify({ displayMode, target }));
   placementArmed = false;
   renderState();
 }
@@ -855,6 +966,14 @@ function getSnapshot(): HarnessSnapshot {
       splatCount,
       finiteBounds: finiteGsBounds,
       candidateFormatOnly: true,
+      source: useLocalRepresentative ? 'local-representative' : 'tiny-fixture',
+      sourceFileName,
+      sourceByteLength,
+      loadedBytes,
+      loading: gsLoadInProgress,
+      loadCount: gsLoadCount,
+      disposeCount: gsDisposeCount,
+      lastLoadDurationMs,
     },
     resources: {
       mesh: meshResourceState,
@@ -876,11 +995,19 @@ function getSnapshot(): HarnessSnapshot {
 function renderState(): void {
   const snapshot = getSnapshot();
   const readyBadge = $('#spark-ready');
-  readyBadge.textContent = ready
-    ? gsResourceState === 'ready'
+  readyBadge.textContent = !ready
+    ? useLocalRepresentative && sourceFileName === null
+      ? 'select local GS'
+      : gsLoadInProgress
+        ? 'loading local GS'
+        : 'starting'
+    : gsResourceState === 'ready'
       ? `ready · ${splatCount} splats`
-      : 'ready · degraded'
-    : 'starting';
+      : gsResourceState === 'unloaded'
+        ? 'GS unloaded'
+        : gsLoadInProgress
+          ? 'loading local GS'
+          : 'ready · degraded';
   readyBadge.classList.toggle('ok', ready);
   readyBadge.classList.toggle('bad', runtimeErrorCount > 0);
   $('#spark-mode-badge').textContent =
@@ -888,6 +1015,8 @@ function renderState(): void {
   placeButton.textContent = placementArmed ? 'Click/tap selected surface…' : '1. Arm placement';
   placeButton.disabled = !snapshot.interaction.enabled;
   saveButton.disabled = currentAnchor === null;
+  if (unloadButton !== null) unloadButton.disabled = gsLoadInProgress || gsResourceState !== 'ready';
+  if (reloadButton !== null) reloadButton.disabled = gsLoadInProgress || selectedRepresentativeFile === null;
   $('#spark-diagnostics').innerHTML = snapshot.diagnostics.map((message) => `<li>${escapeHtml(message)}</li>`).join('');
   $('#spark-state').textContent = JSON.stringify(snapshot, null, 2);
 }
@@ -902,6 +1031,10 @@ scenarioSelect.addEventListener('change', () => setScenario(scenarioSelect.value
 placeButton.addEventListener('click', armPlacement);
 saveButton.addEventListener('click', saveCaption);
 $('#spark-clear').addEventListener('click', clearSavedCaption);
+unloadButton?.addEventListener('click', unloadRepresentativeGs);
+reloadButton?.addEventListener('click', () => {
+  void reloadRepresentativeGs();
+});
 
 function resize(): void {
   const rect = canvas.getBoundingClientRect();
@@ -922,9 +1055,9 @@ function errorMessage(error: unknown): string {
 async function initializeMeshAndProxyResources(): Promise<void> {
   if (bootFault === 'both-failure') {
     meshResourceState = 'failed';
-    proxyResourceState = 'failed';
+    proxyResourceState = useLocalRepresentative ? 'not-evaluated' : 'failed';
     resourceIssues.push('Boot fault: the Mesh visual was not activated.');
-    resourceIssues.push('Boot fault: the dedicated Proxy was not activated.');
+    if (!useLocalRepresentative) resourceIssues.push('Boot fault: the dedicated Proxy was not activated.');
     return;
   }
 
@@ -944,6 +1077,11 @@ async function initializeMeshAndProxyResources(): Promise<void> {
     meshAssetGroup.add(meshSurface);
     meshResourceState = 'ready';
 
+    if (useLocalRepresentative) {
+      proxyResourceState = 'not-evaluated';
+      return;
+    }
+
     if (bootFault === 'proxy-failure') {
       proxyResourceState = 'failed';
       resourceIssues.push('Boot fault: the dedicated Proxy was not activated.');
@@ -953,7 +1091,11 @@ async function initializeMeshAndProxyResources(): Promise<void> {
     try {
       proxySurface = parsed.clone(true);
       proxySurface.name = IDS.proxyRepresentation;
-      const proxyTransform = HARNESS_PROJECT.representations[2].representationToAsset;
+      const proxyRepresentation = HARNESS_PROJECT.representations.find(
+        (representation) => representation.id === IDS.proxyRepresentation,
+      );
+      if (proxyRepresentation === undefined) throw new Error('Tiny-fixture Proxy record is unavailable.');
+      const proxyTransform = proxyRepresentation.representationToAsset;
       applySim3(proxySurface, proxyTransform);
       proxySurface.traverse((object) => {
         if (object instanceof THREE.Mesh) {
@@ -976,43 +1118,129 @@ async function initializeMeshAndProxyResources(): Promise<void> {
     proxySurface?.removeFromParent();
     proxySurface = null;
     meshResourceState = 'failed';
-    proxyResourceState = 'failed';
+    proxyResourceState = useLocalRepresentative ? 'not-evaluated' : 'failed';
     resourceIssues.push(`Mesh fixture load/activation failed: ${errorMessage(error)}`);
-    resourceIssues.push('The dedicated Proxy shares the tiny fixture bytes and could not be activated.');
+    if (!useLocalRepresentative) {
+      resourceIssues.push('The dedicated Proxy shares the tiny fixture bytes and could not be activated.');
+    }
   }
 }
 
-async function initializeGsResource(): Promise<void> {
+function waitForRepresentativeFile(): Promise<File> {
+  if (localSourceInput === null) throw new Error('Representative local-file input is unavailable.');
+  localSourceStatus!.textContent =
+    `Waiting for ${REPRESENTATIVE_GS.fileName} (${REPRESENTATIVE_GS.byteLength.toLocaleString()} bytes).`;
+  return new Promise<File>((resolve) => {
+    const onChange = (): void => {
+      const file = localSourceInput.files?.[0];
+      if (file === undefined) return;
+      if (file.name !== REPRESENTATIVE_GS.fileName || file.size !== REPRESENTATIVE_GS.byteLength) {
+        localSourceStatus!.textContent =
+          `Rejected ${file.name} (${file.size.toLocaleString()} bytes): select the exact unchanged representative original.`;
+        localSourceInput.value = '';
+        return;
+      }
+      localSourceInput.removeEventListener('change', onChange);
+      localSourceInput.disabled = true;
+      selectedRepresentativeFile = file;
+      sourceFileName = file.name;
+      sourceByteLength = file.size;
+      loadedBytes = 0;
+      localSourceStatus!.textContent = `Streaming ${file.name} from local bytes…`;
+      renderState();
+      resolve(file);
+    };
+    localSourceInput.addEventListener('change', onChange);
+  });
+}
+
+function releaseGsResource(recordDisposal: boolean): void {
+  const hadRuntimeResource = splatMesh !== null || sparkRenderer !== null;
+  splatMesh?.removeFromParent();
+  splatMesh?.dispose();
+  splatMesh = null;
+  sparkRenderer?.removeFromParent();
+  sparkRenderer?.dispose();
+  sparkRenderer = null;
+  gsInitialized = false;
+  splatCount = 0;
+  finiteGsBounds = false;
+  loadedBytes = 0;
+  if (recordDisposal && hadRuntimeResource) gsDisposeCount += 1;
+}
+
+async function initializeGsResource(representativeFile?: File): Promise<boolean> {
   if (bootFault === 'gs-failure' || bootFault === 'both-failure') {
     gsResourceState = 'failed';
     resourceIssues.push('Boot fault: the GS visual was not activated.');
-    return;
+    return false;
   }
 
-  try {
-    const gsResponse = await fetch(gsFixtureUrl);
-    if (!gsResponse.ok) throw new Error(`HTTP ${gsResponse.status}`);
+  const localFile = useLocalRepresentative
+    ? (representativeFile ?? (await waitForRepresentativeFile()))
+    : null;
+  if (localFile !== null) selectedRepresentativeFile = localFile;
+  gsLoadInProgress = true;
+  gsResourceState = 'pending';
+  loadedBytes = 0;
+  lastLoadDurationMs = null;
+  for (let index = resourceIssues.length - 1; index >= 0; index -= 1) {
+    if (resourceIssues[index]?.startsWith('GS fixture load/decode failed:')) resourceIssues.splice(index, 1);
+  }
+  const loadStartedAt = performance.now();
+  renderState();
 
+  try {
     const sparkModule = await withTimeout(import('@sparkjsdev/spark'), 'Spark dynamic import');
     await withTimeout(sparkModule.SplatMesh.staticInitialized, 'Spark WASM initialization');
     const candidateRenderer = new sparkModule.SparkRenderer({ renderer, enableLod: false });
     sparkRenderer = candidateRenderer;
     scene.add(candidateRenderer);
 
-    const candidateSplatMesh = new sparkModule.SplatMesh({
-      fileBytes: new Uint8Array(await gsResponse.arrayBuffer()),
-      fileName: 'profile-golden-sh3-v1.ply',
-      fileType: sparkModule.SplatFileType.PLY,
-      editable: false,
-      raycastable: false,
-      enableLod: false,
-    });
+    let lastProgressRender = 0;
+    const progress = (event: ProgressEvent): void => {
+      loadedBytes = event.loaded;
+      const now = performance.now();
+      if (now - lastProgressRender >= 500 || (sourceByteLength !== null && loadedBytes >= sourceByteLength)) {
+        lastProgressRender = now;
+        if (localSourceStatus !== null && sourceByteLength !== null) {
+          const percent = Math.min(100, (loadedBytes / sourceByteLength) * 100);
+          localSourceStatus.textContent =
+            `Streaming ${sourceFileName ?? 'local PLY'}: ${percent.toFixed(1)}% ` +
+            `(${loadedBytes.toLocaleString()} / ${sourceByteLength.toLocaleString()} bytes)`;
+        }
+        renderState();
+      }
+    };
+    const candidateSplatMesh = localFile !== null
+      ? new sparkModule.SplatMesh({
+          stream: localFile.stream(),
+          streamLength: localFile.size,
+          fileName: localFile.name,
+          fileType: sparkModule.SplatFileType.PLY,
+          onProgress: progress,
+          editable: false,
+          raycastable: false,
+          enableLod: false,
+        })
+      : await fetch(tinyGsFixtureUrl).then(async (gsResponse) => {
+          if (!gsResponse.ok) throw new Error(`HTTP ${gsResponse.status}`);
+          const bytes = new Uint8Array(await gsResponse.arrayBuffer());
+          loadedBytes = bytes.byteLength;
+          return new sparkModule.SplatMesh({
+            fileBytes: bytes,
+            fileName: 'profile-golden-sh3-v1.ply',
+            fileType: sparkModule.SplatFileType.PLY,
+            editable: false,
+            raycastable: false,
+            enableLod: false,
+          });
+        });
     splatMesh = candidateSplatMesh;
-    await withTimeout(candidateSplatMesh.initialized, 'GS fixture decode');
+    if (useLocalRepresentative) await candidateSplatMesh.initialized;
+    else await withTimeout(candidateSplatMesh.initialized, 'GS fixture decode');
     candidateSplatMesh.name = IDS.gsRepresentation;
-    candidateSplatMesh.position.set(0, 0, 0);
-    candidateSplatMesh.quaternion.identity();
-    candidateSplatMesh.scale.setScalar(1);
+    applySim3(candidateSplatMesh, HARNESS_PROJECT.representations[1].representationToAsset);
     gsAssetGroup.add(candidateSplatMesh);
     gsInitialized = candidateSplatMesh.isInitialized;
     splatCount = candidateSplatMesh.packedSplats?.numSplats ?? 0;
@@ -1020,23 +1248,58 @@ async function initializeGsResource(): Promise<void> {
     finiteGsBounds =
       !bounds.isEmpty() &&
       [bounds.min.x, bounds.min.y, bounds.min.z, bounds.max.x, bounds.max.y, bounds.max.z].every(Number.isFinite);
-    if (!gsInitialized || splatCount !== 8 || !finiteGsBounds) {
+    const expectedSplatCount = useLocalRepresentative ? REPRESENTATIVE_GS.splatCount : 8;
+    if (!gsInitialized || splatCount !== expectedSplatCount || !finiteGsBounds) {
       throw new Error(`candidate invariant failed (initialized=${gsInitialized}, splats=${splatCount}, finiteBounds=${finiteGsBounds})`);
     }
+    if (localSourceStatus !== null) {
+      loadedBytes = localFile?.size ?? loadedBytes;
+      lastLoadDurationMs = Math.round(performance.now() - loadStartedAt);
+      localSourceStatus.textContent =
+        `Loaded ${splatCount.toLocaleString()} splats from ${sourceFileName} without conversion in ` +
+        `${(lastLoadDurationMs / 1000).toFixed(1)} s.`;
+    }
     gsResourceState = 'ready';
+    gsLoadCount += 1;
+    return true;
   } catch (error: unknown) {
-    splatMesh?.removeFromParent();
-    splatMesh?.dispose();
-    splatMesh = null;
-    sparkRenderer?.removeFromParent();
-    sparkRenderer?.dispose();
-    sparkRenderer = null;
-    gsInitialized = false;
-    splatCount = 0;
-    finiteGsBounds = false;
+    releaseGsResource(false);
     gsResourceState = 'failed';
     resourceIssues.push(`GS fixture load/decode failed: ${errorMessage(error)}`);
+    if (localSourceStatus !== null) {
+      localSourceStatus.textContent = `Representative GS load failed: ${errorMessage(error)}`;
+    }
+    return false;
+  } finally {
+    gsLoadInProgress = false;
+    applyVisibility();
+    renderState();
   }
+}
+
+function unloadRepresentativeGs(): void {
+  if (!useLocalRepresentative || gsLoadInProgress || gsResourceState !== 'ready') return;
+  try {
+    releaseGsResource(true);
+    gsResourceState = 'unloaded';
+    localSourceStatus!.textContent =
+      `GS unloaded; Spark resources disposed (${gsDisposeCount.toLocaleString()} completed disposal).`;
+    diagnostics.splice(0, diagnostics.length, ...currentDiagnostics());
+  } catch (error: unknown) {
+    gsResourceState = 'failed';
+    resourceIssues.push(`GS resource disposal failed: ${errorMessage(error)}`);
+  }
+  applyVisibility();
+  renderState();
+}
+
+async function reloadRepresentativeGs(): Promise<void> {
+  if (!useLocalRepresentative || gsLoadInProgress || selectedRepresentativeFile === null) return;
+  if (gsResourceState === 'ready') releaseGsResource(true);
+  localSourceStatus!.textContent = `Reloading ${selectedRepresentativeFile.name} from the same local File…`;
+  await initializeGsResource(selectedRepresentativeFile);
+  diagnostics.splice(0, diagnostics.length, ...currentDiagnostics());
+  renderState();
 }
 
 async function initialize(): Promise<void> {
@@ -1074,8 +1337,7 @@ function dispose(): void {
   gizmo.detach();
   gizmo.dispose();
   controls.dispose();
-  splatMesh?.dispose();
-  sparkRenderer?.dispose();
+  releaseGsResource(false);
   const geometries = new Set<THREE.BufferGeometry>();
   const materials = new Set<THREE.Material>();
   scene.traverse((object) => {

@@ -245,6 +245,65 @@ Phase B result — commit `7abb44b`:
   integrate production persistence, pass G1, complete G0/G0-S, authorize release
   or expand architecture.
 
+### Spark representative GS and conditional first production path — active
+
+- [x] Product Owner supplied one local-only representative original,
+  `ki84_ver1.ply`; keep the source unchanged and do not commit or publicly upload
+  its bytes
+- [x] Verify the exact original as 781,785,120 bytes, 4,766,975 splats,
+  binary-little-endian Graphdeco PLY with 41 float32 fields / SH degree 2 and
+  SHA-256 `8c6a6e6ee5fca9676a23f9337a251064817277aad9bf6dec715bb0af3c9ea18c`;
+  Spark 2.1.0 recognizes this layout without a converter
+- [x] Use only that original in the existing nondefault Spark harness and observe
+  Desktop local-byte load without conversion, camera operation, three visibility
+  states, runtime unload/dispose, same-session reload and continuing console
+  errors without inventing a performance threshold; record representative
+  Caption interaction as `NOT EVALUATED — no matching representative proxy
+  supplied` and retain the prior 8-splat interaction acceptance
+- [x] If Desktop has no hard blocker, run the matching physical iPhone 14 Pro
+  local-only minimum smoke once; record observed operability, crash/memory
+  warning, unload and any required degradation rather than claiming a device
+  guarantee or requiring a complete offline reload of this 745.6 MiB original
+- [x] Decide `PASS`, bounded `RETRY`, or `REJECT`; only `PASS` authorizes the
+  already-approved minimum production integration below
+- [ ] On `PASS`, perform one short read-only production gap check, then reuse the
+  canonical `Asset` / `AssetRevision` / `Representation` records, explicit
+  GS-to-Proxy binding and existing save path for the thinnest production GS
+  runtime integration
+- [ ] Keep Spark out of the ordinary v1 route, preserve source bytes, prove
+  save/close/offline reopen and bundle isolation, obtain one independent review,
+  run the final executable-tree matrix once, commit, report and stop
+
+This slice does not adopt Spark beyond the first production GS path, set a
+performance guarantee, pass G0/G0-S/G1, authorize release, add another renderer
+or format converter, or introduce renderer/storage frameworks, CAS, Automerge,
+journals, transactions, Proxy generation or direct splat picking. The current
+production preflight is SH3-only and capped below this file's count; that gap is
+not changed before representative smoke `PASS` and must be solved only to the
+minimum extent required by the selected production path.
+
+Desktop representative observation on 2026-08-28 (manual Chrome smoke): the
+unchanged 781,785,120-byte local file loaded without conversion as 4,766,975
+splats; Mesh + GS / GS-only / Mesh-only, camera operation, unload/dispose and
+same-session reload all completed without a crash or loss of control. Final
+state recorded `loadCount: 2`, `disposeCount: 1`, `lastLoadDurationMs: 3865`,
+finite bounds, no resource issue and `runtimeErrorCount: 0`. DevTools showed
+extension-origin `contentscript.js` warnings and one WebGL shader warning, but
+no continuing application runtime error. The Product Owner observed that the
+source orientation may not match LociView axes; treat manual position/rotation
+adjustment through the existing Asset transform as a production-gap candidate,
+not as a renderer failure or a reason to add a new transform architecture.
+
+Physical iPhone 14 Pro representative observation on 2026-08-28: after a
+Product Owner-controlled private Drive transfer of the unchanged source, Safari
+loaded the file as 4,766,975 splats from local file bytes. Rendering, camera
+operation, all three visibility states and unload/dispose completed without a
+crash, forced reload, memory warning, loss of control or other hard blocker.
+The temporary LAN server delivered only the built harness and was stopped after
+the observation; it never served the representative PLY. Caption interaction
+remains `NOT EVALUATED — no matching representative proxy supplied`. Result:
+`SPARK REPRESENTATIVE SMOKE: PASS`.
+
 Completed Product Owner physical iPhone 14 Pro minimum offline smoke:
 
 1. Build commit `7abb44b` with `npm run build:harness` and serve only `dev-dist`
