@@ -3,7 +3,7 @@
 // 注意: appendText は read-modify-write で実装している。op追記は逐次化されるため
 // （ProjectStore側で書き込みキューを直列化）、これで整合する。
 
-import type { WorkspaceFS } from './fs';
+import type { WorkspaceFS, WorkspaceReadableFile } from './fs';
 
 function isNotFoundError(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'NotFoundError';
@@ -114,6 +114,40 @@ export class OpfsFS implements WorkspaceFS {
     // ArrayBuffer裏付けのコピーを渡す（SharedArrayBuffer由来ビューを型上排除）
     await w.write(new Uint8Array(data));
     await w.close();
+  }
+
+  async readStream(path: string): Promise<WorkspaceReadableFile | null> {
+    const h = await this.fileHandle(path, false);
+    if (!h) return null;
+    const file = await h.getFile();
+    return {
+      size: file.size,
+      stream: () => file.stream() as ReadableStream<Uint8Array>,
+    };
+  }
+
+  async writeStream(path: string, stream: ReadableStream<Uint8Array>): Promise<void> {
+    const h = await this.fileHandle(path, true);
+    if (!h) throw new Error(`opfs: cannot open ${path}`);
+    const writable = await h.createWritable();
+    const reader = stream.getReader();
+    try {
+      while (true) {
+        const result = await reader.read();
+        if (result.done) break;
+        await writable.write(new Uint8Array(result.value));
+      }
+      await writable.close();
+    } catch (error) {
+      try {
+        await writable.abort(error);
+      } catch {
+        // The original write failure is authoritative.
+      }
+      throw error;
+    } finally {
+      reader.releaseLock();
+    }
   }
 
   async list(prefix: string): Promise<string[]> {

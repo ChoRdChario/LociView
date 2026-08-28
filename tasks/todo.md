@@ -2125,3 +2125,92 @@ pass G0-S, adopt G1, or authorize release. See
    AssetFrame `positionAsset` -> save/reopen without proxy reraycast. Direct-GS,
    automatic proxy generation, ordinary points and advanced composition do not
    close that slice.
+
+## First production GS path — approved bounded native snapshot slice
+
+Checkpoint and non-claims:
+
+- [x] Start from clean commit `140e7ac`; retain its one representative SH2 PLY
+  Desktop/iPhone Spark checkpoint and the separate 8-splat Proxy/Caption evidence
+- [x] Record the Product Owner-approved local snapshot v1 boundary in the
+  existing storage specification before implementation
+- [x] Keep G0/G0-S/G1, permanent Spark adoption and release explicitly open
+
+Production boundary:
+
+- [x] Add one versioned `native-projects/<projectId>` snapshot path without
+  changing or mixing the frozen v1 log/schema; fail closed on unknown versions
+- [x] Stream Mesh/GS/Proxy source bytes to Representation-ID-derived local paths,
+  verify size and SHA-256 by streamed read-back, then publish snapshot and active
+  marker last under the existing project-scoped write lock
+- [x] Admit only header-derived Graphdeco binary-little-endian float32 SH2/SH3
+  PLY and reject unsupported/truncated payloads without conversion
+- [x] Add one explicit nondefault native-GS route with independent Mesh Asset,
+  partial GS Asset, same-GS-Asset Proxy, explicit target selection, three display
+  states, gizmo-adjusted `positionAsset`, transforms and durable reopen
+- [x] Keep Spark lazy and exact `2.1.0`; ordinary v1 route must not request its
+  chunk, and native GS offline-ready appears only after explicit cache preparation
+
+Acceptance and stop rule:
+
+- [x] Reuse focused storage/lock/viewer acceptance; add only snapshot-version,
+  publication-failure, streaming/profile and production wiring coverage that the
+  harness cannot prove
+- [x] On the final production tree run typecheck, focused/full tests, production
+  build, BASE_PATH build, dependency audit and bundle inspection once, serially
+- [x] Obtain one independent production-diff review; treat P2 as backlog unless
+  it is required by this slice's acceptance or a data/security boundary
+- [x] Record one Desktop representative save/open and one physical iPhone 14 Pro
+  Safari-close/fully-offline reopen. If iPhone storage fails, stop as RETRY rather
+  than changing the file or inventing a larger storage architecture
+- [x] Commit the bounded slice with a clean worktree and stop before `.lociview`
+  streaming export/import, alignment, Compare/Integrated, migration or another
+  renderer workstream
+
+Backlog (not part of this bounded slice):
+
+- [ ] Improve Asset transform number fields with Unity-style drag adjustment and
+  live preview without an explicit apply button; retain exact numeric entry and
+  snapshot save as the durable boundary
+- [ ] For a Proxy-less GS, keep surface-hit placement disabled but allow an
+  explicit Caption creation at the GS AssetFrame origin, followed by ordinary
+  gizmo adjustment and durable `positionAsset`; do not infer a surface or add
+  direct splat picking
+- [ ] Add an explicit corruption-suspicion/repair action that stream-rehashes an
+  existing Representation against its saved digest. Do not add a 745.6 MiB
+  full-blob rehash to every ordinary open or metadata-only snapshot save.
+
+Observed manual acceptance — 2026-08-29:
+
+- Product Owner confirmed the small SH3 + explicit-Proxy production project:
+  three display modes, Mesh/Proxy target routing, Caption placement, gizmo,
+  transform, snapshot save/reopen and GS unload/reload all behaved normally.
+- Product Owner confirmed the 781,785,120-byte, 4,766,975-splat SH2 representative
+  PLY on Desktop Chrome: streamed project-local save/read-back, Spark display,
+  camera, visibility, transform, unload, online reopen and complete-offline reopen.
+  Representative Caption interaction remained not evaluated because no matching
+  Proxy was supplied.
+- Product Owner confirmed the same production path on physical iPhone 14 Pro,
+  including local project creation, Safari-close reopen and complete-offline
+  reopen. No crash, forced termination, memory warning or blocking runtime error
+  was reported.
+- The manual run exposed and closed two offline-preparation defects: first-load
+  Service Worker control was incorrectly required, then `Vary: Origin` separated
+  explicit-fetch and ES-module cache matches. Final acceptance used active-worker
+  registration plus exact versioned URL cache/read-back with matched `ignoreVary`.
+
+Final review and verification — 2026-08-29:
+
+- The independent production-diff review found no remaining P0/P1. Ordinary
+  reopen and metadata-only saves intentionally trust the verified receipt;
+  explicit stream rehash after suspected corruption remains P2 backlog.
+- Final-tree fixture and evidence verification passed (10 Git fixture entries /
+  708,867 bytes; three pending device templates and no credited G0 runs), as did
+  TypeScript typecheck, 46 full-suite files / 1,374 passing tests plus 21 existing
+  todos, and `npm audit` with zero vulnerabilities.
+- Both normal and `/LociView/` production builds passed. Spark remains an exact
+  `2.1.0` lazy native-route chunk, excluded from the ordinary v1 route and PWA
+  precache; the representative PLY name/size/count are absent from build output.
+- The existing large-chunk and mixed dynamic/static-import build warnings remain
+  observable but are not P0/P1 blockers for this bounded path. G0/G0-S/G1,
+  permanent Spark adoption and release approval remain open.

@@ -1302,3 +1302,41 @@ Specific rules:
 - `STO-MIG-18`: profile fixtures cover source opaque/MASK-default/MASK-explicit/BLEND, supported transmission, unlit/double-sided, OBJ dissolve/alpha map, STL synthetic default and PLY vertex alpha. Material-object-less PLY fixtures prove that RGB-only and RGBA-alpha-identically-one inputs receive one synthetic opaque slot, while any RGBA alpha below one receives one synthetic blend slot without alpha erasure. Source semantics, two-axis material intent, logical bounds, IDs, full Representation bytes and payload digests match across browser/worker/test and survive collaboration/review/clean re-keying without backend flags.
 - `STO-MIG-19`: recipe 1 emits one sorted compatibility class over every migrated pickable contribution family because v1 lacks reliable family-level pin provenance. Collaboration/clean retain the full partition and exact target sets, while review flattens the validated active classes to sorted ID membership without dangling family references. Adding/removing a singleton repair class leaves the migrated base class and base pins unchanged; a partial base-family replacement rotates the grouped class and reviews all ambiguous legacy pins.
 - `STO-MIG-20`: the exact historical `^cap_LM[0-9A-HJKMNP-TV-Z]{24}$` class is admitted only with v1 `caption` operations and survives read/migration plus later update/delete references without rewrite; every near-miss, use with another known kind and attempt by a new converter/allocator is rejected.
+
+## 13. Bounded first production GS path (Product Owner approved 2026-08-28)
+
+This section authorizes one interim native-project persistence path before the
+general v2 storage work. It does not pass G0/G0-S/G1, adopt Spark permanently or
+authorize release. The frozen v1 log/schema and v1 project roots are unchanged.
+
+- A native project lives only below `native-projects/<projectId>/` and uses the
+  exact `lociview-native-project-snapshot` version `1` envelope. A project is
+  either v1 or native; the first path performs no conversion or mixed write.
+  Unknown snapshot or active-marker versions fail closed. No general migration
+  framework is introduced.
+- Snapshot v1 persists the existing `Asset`, `AssetRevision`,
+  `AssetBindingRevision` and `Representation` concepts needed by this slice:
+  independent ordinary-Mesh and partial-GS Assets, a same-GS-Asset
+  `interactionProxy`, its explicit `proxyForGsVariantFamilyId`, positive Sim(3)
+  transforms, the three simple visibility states, and one manual Caption whose
+  target Asset and final `positionAsset` are authoritative. It introduces no
+  renderer, revision, transaction or duplicate domain framework.
+- Every Representation blob is stored at a project-local path derived from its
+  Representation ID, never from the source filename. Creation runs under the
+  existing project single-writer lock and orders publication as streamed blob
+  write, streamed size/SHA-256/read-back verification, snapshot write, then the
+  active marker last. A failure before the marker leaves no active project and
+  no saved-success claim. Orphan cleanup, CAS, global dedupe/GC and a general
+  journal/transaction are outside this path.
+- The initial GS ingress accepts only structurally exact Graphdeco-compatible
+  binary-little-endian PLY with float32 SH degree 2 or 3. Vertex count, property
+  set/order, stride and exact payload length are derived from the bounded header;
+  no representative-file size, count or property-count constant is an
+  acceptance rule. Unsupported profiles are rejected without conversion.
+- Spark `2.1.0` is a lazy first-path runtime only. Its chunk is absent from the
+  ordinary v1 precache/load path and becomes offline-ready only after an explicit
+  user preparation completes the controlled Cache Storage write and runtime
+  initialization. No CDN or external runtime URL is permitted.
+- `.lociview` native export/import and bounded-memory backup packaging remain a
+  later product workstream. This local snapshot is not a portable package and
+  does not remove that requirement.

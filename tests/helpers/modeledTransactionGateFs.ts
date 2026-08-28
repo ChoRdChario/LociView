@@ -4,7 +4,7 @@ import {
 } from '../../src/platform/fs';
 
 export type ModeledFsContext = 'setup' | 'first' | 'second' | 'audit';
-export type ModeledMutationMethod = 'appendText' | 'appendBytes' | 'writeText' | 'writeBytes' | 'remove';
+export type ModeledMutationMethod = 'appendText' | 'appendBytes' | 'writeText' | 'writeBytes' | 'writeStream' | 'remove';
 export type ModeledMutationPhase = 'start' | 'commit' | 'reject';
 export type ModeledGateRelease = 'overlap' | 'timeout' | 'abort';
 
@@ -136,6 +136,45 @@ class SnapshotMemoryFS implements ProjectWorkspaceFS {
     this.files.set(path, new Uint8Array(data));
   }
 
+  async readStream(path: string): Promise<{ size: number; stream(): ReadableStream<Uint8Array> } | null> {
+    const bytes = this.files.get(path);
+    if (bytes === undefined) return null;
+    const stable = new Uint8Array(bytes);
+    return {
+      size: stable.byteLength,
+      stream: () => new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new Uint8Array(stable));
+          controller.close();
+        },
+      }),
+    };
+  }
+
+  async writeStream(path: string, stream: ReadableStream<Uint8Array>): Promise<void> {
+    const reader = stream.getReader();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    try {
+      while (true) {
+        const result = await reader.read();
+        if (result.done) break;
+        const copy = new Uint8Array(result.value);
+        chunks.push(copy);
+        size += copy.byteLength;
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    this.files.set(path, bytes);
+  }
+
   async list(prefix: string): Promise<string[]> {
     return [...this.files.keys()].filter((path) => path.startsWith(prefix)).sort();
   }
@@ -211,6 +250,13 @@ export class ModeledTransactionGateFS {
         'writeBytes',
         path,
         () => this.backing.writeBytes(path, data),
+      ),
+      readStream: (path) => this.backing.readStream(path),
+      writeStream: (path, stream) => this.mutate(
+        context,
+        'writeStream',
+        path,
+        () => this.backing.writeStream(path, stream),
       ),
       list: (prefix) => this.backing.list(prefix),
       exists: (path) => this.backing.exists(path),

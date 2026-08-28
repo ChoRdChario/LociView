@@ -3,6 +3,7 @@ import type {
   ProjectMutationAuthority,
   ProjectSessionMode,
   ProjectWorkspaceFS,
+  WorkspaceReadableFile,
   WorkspaceFS,
 } from './fs';
 import { ProjectMutationDeniedError } from './fs';
@@ -83,6 +84,15 @@ class ScopedProjectWorkspace implements ProjectWorkspaceFS {
 
   async writeBytes(path: string, data: Uint8Array): Promise<void> {
     await this.mutate(path, () => this.base.writeBytes(path, data));
+  }
+
+  async readStream(path: string): Promise<WorkspaceReadableFile | null> {
+    this.assertPath(path);
+    return this.base.readStream(path);
+  }
+
+  async writeStream(path: string, stream: ReadableStream<Uint8Array>): Promise<void> {
+    await this.mutate(path, () => this.base.writeStream(path, stream));
   }
 
   async list(prefix: string): Promise<string[]> {

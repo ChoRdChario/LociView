@@ -2,7 +2,7 @@
 
 > Status: `CURRENT` map; repository-normalization baseline `fc7054f` (2026-08-18).
 > That baseline is a historical normalization anchor, not a checkout target. Use Git `HEAD` and `tasks/todo.md` for the active checkpoint.
-> Gaussian Splatting in the product, multiple simultaneous models, Automerge, content-addressed storage, and renderer backends are `PROPOSED`, not current product behavior. An isolated Spark candidate harness exists only for the recorded technical evaluation below.
+> A bounded, nondefault native-GS production path now exists for one ordinary Mesh and one Graphdeco SH2/SH3 GS, with an optional explicit Proxy. It does not pass G0/G0-S/G1 or adopt Spark permanently. General multiple-asset workflows, Automerge, content-addressed storage, and renderer backends remain `PROPOSED`.
 
 ## Start here
 
@@ -12,6 +12,7 @@ index.html
     -> src/ui/app.ts
       -> Home / ViewerScreen
       -> ProjectStore / WorkspaceFS / ViewerCore
+    -> src/nativeGs/app.ts              # ?mode=native-gs; bounded first production GS path
 
 dev.html
   -> src/dev-entry.ts
@@ -30,6 +31,7 @@ For a normal task, read only the target file, its matching tests, and direct imp
 | `src/assets` | ZIP/package handling, model asset registration/replacement, GLB optimization, import wizard |
 | `src/io` | CSV, minimal XLSX reader, and legacy LociMyu conversion |
 | `src/viewer` | Three.js loaders, material shader patch, single-model `ViewerCore` |
+| `src/nativeGs` | Version-1 native snapshot, streamed project-local binaries, exact SH2/SH3 admission, lazy Spark runtime, and nondefault production UI |
 | `src/ui` | App shell, home, viewer screen, dialogs, tabs, and UI-only state |
 | `tests` | Executable contracts for core, assets, I/O, and UI logic |
 | `public/samples` | Small deterministic files used by the manual viewer and iOS runbook |
@@ -87,8 +89,8 @@ For v1, distinguish:
 
 ## Current constraints and known risks
 
-- One model is active in `ViewerCore` at a time.
-- PLY means ordinary mesh/point rendering, not Gaussian Splatting.
+- The default v1 `ViewerCore` keeps one active model and treats PLY as ordinary mesh/points.
+- The separate `?mode=native-gs` path is limited to one Mesh Asset, one GS Asset and one optional same-GS-Asset Proxy; it is not the general multi-asset/v2 implementation.
 - ZIP import/export and OPFS reads can materialize complete buffers in memory.
 - Viewer, OPFS, PWA, and physical-iOS behavior are not fully covered by automated tests.
 - Some 2026-07 documents describe intended behavior that the code never implemented. Consult `docs/README.md` before treating prose as current.

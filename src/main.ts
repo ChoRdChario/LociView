@@ -1,7 +1,11 @@
 // LociView 製品エントリポイント
 import './ui/style.css';
-import { bootApp } from './ui/app';
 
 const root = document.getElementById('app');
 if (root === null) throw new Error('missing #app');
-void bootApp(root);
+const mode = new URLSearchParams(location.search).get('mode');
+if (mode === 'native-gs') {
+  void import('./nativeGs/app').then(({ bootNativeGsApp }) => bootNativeGsApp(root));
+} else {
+  void import('./ui/app').then(({ bootApp }) => bootApp(root));
+}

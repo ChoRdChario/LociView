@@ -22,6 +22,20 @@ export default defineConfig(({ mode }) => {
         // The product PWA and disposable renderer harness are separate build graphs.
         // Otherwise Workbox would precache Spark merely because its lazy chunk exists.
         input,
+        output: isSparkHarness
+          ? undefined
+          : {
+              chunkFileNames(chunk) {
+                if (chunk.name === 'native-gs-spark') return 'assets/native-gs-spark-2.1.0.js';
+                if (chunk.name === 'three-vendor') return 'assets/three-vendor-0.180.0.js';
+                return 'assets/[name]-[hash].js';
+              },
+              manualChunks(id) {
+                if (id.includes('/node_modules/three/') || id.includes('\\node_modules\\three\\')) return 'three-vendor';
+                if (id.includes('@sparkjsdev/spark')) return 'native-gs-spark';
+                return undefined;
+              },
+            },
       },
     },
     plugins: [
@@ -46,6 +60,24 @@ export default defineConfig(({ mode }) => {
             workbox: {
               // three.js・全ローダ・WASMを含めてprecache（オフラインで全形式が開ける）
               globPatterns: ['**/*.{js,css,html,woff2,wasm}'],
+              // The GS runtime is cached only after the user explicitly prepares
+              // the native GS path; ordinary v1 PWA installation must not fetch it.
+              globIgnores: ['**/native-gs-spark-2.1.0.js'],
+              runtimeCaching: [
+                {
+                  urlPattern: /\/assets\/native-gs-spark-2\.1\.0\.js$/,
+                  handler: 'CacheFirst',
+                  options: {
+                    cacheName: 'lociview-native-gs-runtime-v1',
+                    // The same exact versioned URL is requested once by explicit
+                    // preparation and later as an ES module. Hosts may return
+                    // `Vary: Origin`; those request modes must share this entry.
+                    matchOptions: { ignoreVary: true },
+                    cacheableResponse: { statuses: [0, 200] },
+                    expiration: { maxEntries: 2, maxAgeSeconds: 60 * 60 * 24 * 365 },
+                  },
+                },
+              ],
               maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
               navigateFallback: `${base}index.html`,
               cleanupOutdatedCaches: true,

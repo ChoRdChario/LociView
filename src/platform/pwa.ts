@@ -64,9 +64,9 @@ export interface PwaStatus {
 export async function registerPwa(callbacks: {
   onOfflineReady?: () => void;
   onUpdate?: (applyUpdate: () => void) => void;
-}): Promise<void> {
-  if (!('serviceWorker' in navigator)) return;
-  if (import.meta.env.DEV) return; // devサーバーではSWを使わない
+}): Promise<ServiceWorkerRegistration | null> {
+  if (!('serviceWorker' in navigator)) return null;
+  if (import.meta.env.DEV) return null; // devサーバーではSWを使わない
 
   try {
     // GitHub Pages等のサブパス配信に対応（BASE_URLはビルド時に埋め込まれる）
@@ -95,8 +95,10 @@ export async function registerPwa(callbacks: {
         else callbacks.onOfflineReady?.();
       });
     });
+    return reg;
   } catch {
     // 登録失敗（file://・非HTTPS等）はオフライン機能なしで続行する
+    return null;
   }
 }
 

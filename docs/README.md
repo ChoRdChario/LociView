@@ -25,7 +25,7 @@ If observed code conflicts with the applicable compatibility or accepted future 
 | `01-vision-requirements.md` | `V1 BASELINE / PARTLY SUPERSEDED` | Original goals and v1 requirements; not the new v2 scope |
 | `02-data-format.md` | `FROZEN V1 FORMAT` | Compatibility and migration reference only; do not extend for v2 writes |
 | `03-architecture.md` | `HISTORICAL DESIGN` | Contains implementation drift; use code and `PROJECT_MAP.md` for current behavior |
-| `04-formats-rendering.md` | `V1 RENDERING BASELINE` | GLB/OBJ/STL/ordinary PLY; Gaussian Splatting is not implemented |
+| `04-formats-rendering.md` | `V1 RENDERING BASELINE` | Default-v1 GLB/OBJ/STL/ordinary PLY; the bounded native GS path is outside this legacy contract |
 | `05-ui-ux.md` | `V1 PRODUCT + SUPERSEDED DRAFTS` | Current UI intent mixed with earlier proposals; code wins on conflict |
 | `06-device-offline.md` | `V1 PRODUCT + UNVERIFIED TARGETS` | OPFS/PWA intent; size, streaming, sharing, and single-file claims are not guarantees |
 | `07-roadmap.md` | `SUPERSEDED 2026-07 ROADMAP` | Historical only; never use as the active plan |
@@ -43,7 +43,7 @@ If observed code conflicts with the applicable compatibility or accepted future 
 | `specs/README.md` | `PRODUCT-OWNER APPROVED CONTRACT / NOT IMPLEMENTED` | Index and authority for the gated v2 implementation contract |
 | `specs/00-product-contract.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | Product guarantees, MVP boundary, privacy and mobile behavior |
 | `specs/01-domain-rendering.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | Frames, revisions, SceneDocument, modes, picking and renderer gates |
-| `specs/02-storage-package-migration.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | Metadata/CAS candidate boundaries, transactions, package purposes and conversion |
+| `specs/02-storage-package-migration.md` | `PRODUCT-OWNER APPROVED / §13 BOUNDED PATH IMPLEMENTED / GENERAL V2 NOT IMPLEMENTED` | General metadata/CAS candidate boundaries plus the implemented interim native snapshot v1 boundary |
 | `specs/03-gates-and-delivery.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | G0/G0-S/G1 evidence, thresholds, feature flags, rollback and schedule |
 | `specs/04-locimyu-conversion.md` | `APPROVED IDENTITY/SOURCE AUTHORITY / LOCAL RETENTION SPECIFICATION BLOCKED / NOT IMPLEMENTED` | Exact LociMyu Caption identity/source-authority and the bounded local-review design stop |
 
@@ -53,7 +53,7 @@ If observed code conflicts with the applicable compatibility or accepted future 
 - Current XLSX reading is the local minimal reader in `src/io/xlsx.ts`, not SheetJS.
 - Strict CSP and single-file distribution are goals, not current implemented controls.
 - Current export is download-based; File System Access/Web Share flows described in older documents are incomplete.
-- Current viewer holds one model, and current PLY support is not Gaussian Splatting.
+- Default-v1 viewer holds one model and its PLY support is not Gaussian Splatting; the isolated `?mode=native-gs` production path has its own exact SH2/SH3 admission and remains bounded.
 - Current material identity and loader behavior differ from parts of `04-formats-rendering.md`.
 
 Do not repair these documents opportunistically during unrelated code changes. Update the relevant current contract or v2 specification in a dedicated documentation change with code evidence.

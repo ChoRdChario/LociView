@@ -144,3 +144,20 @@
 - 初期技術harnessの独立Mesh Assetと部分GS Assetは、後続productionの標準paired Assetを否定・置換しない。candidate fixtureの都合をlogical identityやalignmentの証拠へ自己昇格させない。
 - interactionは表示パターンだけで決めず、ユーザーが明示選択した対象Assetから解決する。独立Mesh対象ならそのMesh、GS対象なら同じGS Asset/revision内の専用Proxyだけをraycastし、別AssetのMeshを近接・可視性から推測利用しない。
 - harness、PoC、production acceptanceのcreditを分離し、候補harnessのsave/reloadや描画成功をG1採用、production persistence、同一logical-Asset acceptanceとして再利用しない。
+
+## 2026-08-28: 承認済み仕様recordとproduction実装済みschemaを混同しない
+
+- 文書に`AssetRevision`／`Representation`が承認済みでも、production codeにvalidator・保存・再読込経路がなければ「既存schemaをそのまま利用できる」とは言わない。先にimplemented gapを明示する。
+- Product Ownerがそのgapに対する限定snapshotを批准した場合だけ、既存record名・意味を再利用した最小wireを実装し、v1への便宜的field追加や汎用v2 frameworkへ拡張しない。
+
+## 2026-08-28: offline-readyは非同期cacheの時間待ちから推定しない
+
+- 大きなlazy chunkのruntime cachingはmodule初期化後にも継続し得る。固定時間pollで完了を推定せず、明示準備操作自身がexact URLをCache Storageへ保存・read-backし、その成功後だけoffline-readyを表示する。
+- 初回登録直後の`navigator.serviceWorker.controller === null`はinstall失敗ではなく、現在のpageがまだ制御対象でないだけである。再open用の準備では`navigator.serviceWorker.ready`でactive workerとapp-shell install完了を待ち、不要な手動reloadを合格条件へ足さない。
+- Service Worker登録をfire-and-forgetにして失敗を握り潰したまま`ready`だけを待つと、明示準備操作が永久待機し得る。登録結果のpromiseを利用側へ共有し、登録失敗と「active worker＋exact cache」の不足を明示的にfail closedにする。
+- `navigator.serviceWorker.ready`はfirst installが失敗してもrejectしない。明示準備では返されたregistration自身のworker stateを監視し、`redundant`とbounded timeoutを操作可能なエラーへ変換してボタンを必ず復帰させる。
+- 同じversion付きchunkでも、明示`fetch`とES module importではrequest modeが異なり、hostの`Vary: Origin`によってCache Storage照合が外れ得る。同一originのexact URLに限定して準備側とService Worker側の`ignoreVary`条件を一致させ、オンライン成功をoffline-readyへ誤認しない。
+
+## 2026-08-28: interaction surface不在とCaption作成不能を恒久的に同一視しない
+
+- ProxyなしGSではsurface hitを推測せず無効にする一方、後続UXとしてGS AssetFrame原点へ明示作成し、ギズモで最終`positionAsset`を決める経路は両立できる。現在sliceの固定degradationを無断変更せず、Product Ownerが示した正式版の改善としてbacklogへ分離する。

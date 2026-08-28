@@ -11,10 +11,22 @@ export interface WorkspaceFS {
   /** Returns the total file size plus an exact copy of bytes from offset to EOF. */
   readBytesFrom(path: string, offset: number): Promise<{ size: number; data: Uint8Array } | null>;
   writeBytes(path: string, data: Uint8Array): Promise<void>;
+  /**
+   * Opens a restartable byte stream without materializing the complete file.
+   * Each call to `stream()` returns a fresh stream from byte zero.
+   */
+  readStream(path: string): Promise<WorkspaceReadableFile | null>;
+  /** Writes one stream to a file. Production OPFS consumes it incrementally. */
+  writeStream(path: string, stream: ReadableStream<Uint8Array>): Promise<void>;
   /** prefix配下のファイルパス一覧（辞書順） */
   list(prefix: string): Promise<string[]>;
   exists(path: string): Promise<boolean>;
   remove(path: string): Promise<void>;
+}
+
+export interface WorkspaceReadableFile {
+  readonly size: number;
+  stream(): ReadableStream<Uint8Array>;
 }
 
 export type ProjectAccessState = 'editable' | 'read-only' | 'lock-lost';
@@ -110,6 +122,48 @@ export class MemoryFS implements ProjectWorkspaceFS {
 
   async writeBytes(path: string, data: Uint8Array): Promise<void> {
     this.files.set(path, new Uint8Array(data));
+  }
+
+  async readStream(path: string): Promise<WorkspaceReadableFile | null> {
+    const bytes = this.files.get(path);
+    if (bytes === undefined) return null;
+    const stable = new Uint8Array(bytes);
+    return {
+      size: stable.byteLength,
+      stream: () => {
+        const copy = new Uint8Array(stable);
+        return new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(copy);
+            controller.close();
+          },
+        });
+      },
+    };
+  }
+
+  async writeStream(path: string, stream: ReadableStream<Uint8Array>): Promise<void> {
+    const reader = stream.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    try {
+      while (true) {
+        const result = await reader.read();
+        if (result.done) break;
+        const chunk = new Uint8Array(result.value);
+        chunks.push(chunk);
+        total += chunk.byteLength;
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    const merged = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      merged.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    this.files.set(path, merged);
   }
 
   async list(prefix: string): Promise<string[]> {
