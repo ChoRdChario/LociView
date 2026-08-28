@@ -132,18 +132,29 @@ export function digestNativeBytes(bytes: Uint8Array): NativeStreamDigest {
   return { byteLength: bytes.byteLength, sha256: hash.digestHex() };
 }
 
-export async function digestNativeStream(stream: ReadableStream<Uint8Array>): Promise<NativeStreamDigest> {
+export async function digestNativeStream(
+  stream: ReadableStream<Uint8Array>,
+  signal?: AbortSignal,
+): Promise<NativeStreamDigest> {
   const reader = stream.getReader();
   const hash = new NativeSha256();
   let byteLength = 0;
   try {
     while (true) {
+      if (signal?.aborted) throw signal.reason ?? new DOMException('Operation aborted', 'AbortError');
       const result = await reader.read();
       if (result.done) break;
       hash.update(result.value);
       byteLength += result.value.byteLength;
       if (!Number.isSafeInteger(byteLength)) throw new Error('native sha256: byte length exceeds safe integer range');
     }
+  } catch (error) {
+    try {
+      await reader.cancel(error);
+    } catch {
+      // The original stream/digest failure remains authoritative.
+    }
+    throw error;
   } finally {
     reader.releaseLock();
   }

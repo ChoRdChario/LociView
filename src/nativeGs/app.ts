@@ -23,6 +23,7 @@ import {
 import {
   assertNativeProjectDoesNotMixV1,
   createNativeProjectV1,
+  deleteNativeProjectV1,
   listNativeProjectsV1,
   nativeProjectRoot,
   openNativeProjectV1,
@@ -30,6 +31,12 @@ import {
   saveNativeProjectV1,
   type NativeBinarySource,
 } from './storage';
+import {
+  exportNativePortablePackageV1,
+  inspectNativePortablePackageV1,
+  restoreNativePortablePackageV1,
+} from './portablePackage';
+import { digestNativeStream } from './sha256';
 import { NativeGsViewer } from './viewer';
 import './style.css';
 
@@ -201,6 +208,43 @@ function setButtonDisabled(button: HTMLButtonElement, disabled: boolean): void {
   button.disabled = disabled;
 }
 
+type NativeSavePicker = (options: {
+  readonly suggestedName: string;
+  readonly types: readonly [{
+    readonly description: string;
+    readonly accept: Readonly<Record<string, readonly string[]>>;
+  }];
+}) => Promise<FileSystemFileHandle>;
+
+function requestNativeBackupDestination(suggestedName: string): Promise<FileSystemFileHandle | null> {
+  const picker = (window as typeof window & { showSaveFilePicker?: NativeSavePicker }).showSaveFilePicker;
+  return picker === undefined
+    ? Promise.resolve(null)
+    : picker.call(window, {
+        suggestedName,
+        types: [{ description: 'LociView native portable backup', accept: { 'application/zip': ['.lociview'] } }],
+      });
+}
+
+function nativeBackupFileName(title: string): string {
+  const safe = title
+    .normalize('NFC')
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
+    .replace(/[. ]+$/g, '')
+    .trim()
+    .slice(0, 120);
+  return `${safe === '' ? 'LociView-native-project' : safe}.lociview`;
+}
+
+function nativeBackupStagePath(projectId: string, snapshotId: string): string {
+  return `native-backup-staging/${projectId}/${snapshotId}.lociview`;
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof DOMException && error.name === 'AbortError') return '操作を中止しました。完成backup／active projectは公開していません。';
+  return error instanceof Error ? error.message : String(error);
+}
+
 export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
   clear(root);
   root.className = 'ng-app';
@@ -222,6 +266,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
   let activeSession: ProjectMutationSession | null = null;
   let unsubscribeAccess: (() => void) | null = null;
   let transitionInFlight = false;
+  let activeDownloadUrl: string | null = null;
+  let homeNotice: string | null = null;
 
   const closeActive = (): void => {
     unsubscribeAccess?.();
@@ -230,6 +276,10 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     activeViewer = null;
     activeSession?.release();
     activeSession = null;
+    if (activeDownloadUrl !== null) {
+      URL.revokeObjectURL(activeDownloadUrl);
+      activeDownloadUrl = null;
+    }
   };
 
   const renderHome = async (): Promise<void> => {
@@ -244,6 +294,24 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const createStatus = el('p', { class: 'ng-status' });
     const create = el('button', { class: 'primary' }, 'Native projectを作成');
     const projectList = el('div', { class: 'ng-list' });
+    // iOS Files may classify a custom .lociview extension as an unknown UTI and
+    // hide it when an accept filter is present. Selection is only a UI hint;
+    // the strict package/version/path/size/hash checks below are authoritative.
+    const restoreInput = el('input', { type: 'file' });
+    const restore = el('button', { class: 'primary' }, '.lociviewから復元');
+    const cancelPortable = el('button', { disabled: 'true' }, '処理を中止');
+    const portableStatus = el('p', { class: 'ng-status' }, homeNotice ?? 'backup／restore待機中');
+    const portableResult = el('div', { class: 'ng-row' });
+    let portableAbort: AbortController | null = null;
+    homeNotice = null;
+
+    const setPortableBusy = (busy: boolean): void => {
+      restore.disabled = busy;
+      cancelPortable.disabled = !busy;
+    };
+    cancelPortable.addEventListener('click', () => {
+      portableAbort?.abort(new DOMException('User cancelled portable backup operation', 'AbortError'));
+    });
 
     const refreshOffline = async (): Promise<void> => {
       const ready = await isNativeGsOfflineReady(await pwaRegistration);
@@ -311,18 +379,252 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       });
     });
 
+    restore.addEventListener('click', () => {
+      if (transitionInFlight) return;
+      const packageFile = selectedFile(restoreInput);
+      if (packageFile === null) {
+        portableStatus.className = 'ng-error';
+        portableStatus.textContent = '復元する .lociview fileを選択してください。';
+        return;
+      }
+      transitionInFlight = true;
+      portableAbort = new AbortController();
+      setPortableBusy(true);
+      clear(portableResult);
+      portableStatus.className = 'ng-status';
+      portableStatus.textContent = 'package version、entry、snapshot整合性を検査しています…';
+      void (async () => {
+        const signal = portableAbort!.signal;
+        const inspection = await inspectNativePortablePackageV1(packageFile, signal);
+        const required = inspection.representationByteLength + inspection.manifest.nativeSnapshot.byteLength + 64 * 1024;
+        const estimate = await navigator.storage.estimate?.();
+        if (
+          estimate?.quota !== undefined && estimate.usage !== undefined &&
+          Number.isFinite(estimate.quota) && Number.isFinite(estimate.usage) &&
+          estimate.quota - estimate.usage < required
+        ) {
+          throw new Error(`復元先の保存可能容量が不足しています（Representation ${fmtBytes(inspection.representationByteLength)}）。不完全projectはactiveにしません。`);
+        }
+        const projectId = inspection.snapshot.project.id;
+        const session = await coordinator.tryAcquire(fs, nativeProjectRoot(projectId), projectId);
+        if (!session.holdsWriteLock) {
+          const detail = session.accessDetail;
+          session.release();
+          throw new Error(detail);
+        }
+        session.activateNewProject();
+        const unsubscribeRestore = session.subscribeAccess((state) => {
+          if (state !== 'editable') portableAbort?.abort(new Error(session.accessDetail));
+        });
+        try {
+          const restored = await restoreNativePortablePackageV1(session.workspace, fs, packageFile, {
+            signal,
+            onStatus(message) { portableStatus.textContent = message; },
+          });
+          homeNotice = `復元完了：${restored.snapshot.project.title}（snapshot ${restored.snapshot.generation}、最大application chunk ${fmtBytes(restored.maxApplicationChunkBytes)}）。`;
+        } finally {
+          unsubscribeRestore();
+          session.release();
+        }
+        await renderHome();
+      })().catch((error: unknown) => {
+        portableStatus.className = 'ng-error';
+        portableStatus.textContent = `復元失敗：${errorMessage(error)}`;
+      }).finally(() => {
+        portableAbort = null;
+        transitionInFlight = false;
+        setPortableBusy(false);
+      });
+    });
+
     const summaries = await listNativeProjectsV1(fs);
     if (summaries.length === 0) projectList.append(el('p', { class: 'ng-note' }, 'activeなNative projectはまだありません。'));
     for (const summary of summaries) {
       const view = el('button', {}, 'View mode');
       const edit = el('button', { class: 'primary' }, 'Edit mode');
+      const backup = el('button', {}, '.lociview backup');
+      const remove = el('button', {}, 'local削除');
       view.addEventListener('click', () => void openProject(summary.projectId, 'view'));
       edit.addEventListener('click', () => void openProject(summary.projectId, 'edit'));
+      backup.addEventListener('click', () => {
+        if (transitionInFlight) return;
+        if (portableResult.childElementCount > 0) {
+          portableStatus.className = 'ng-error';
+          portableStatus.textContent = '先に検証済み一時backupを外部へ保存し、「端末内の一時backupを削除」で片付けてください。';
+          return;
+        }
+        const suggestedName = nativeBackupFileName(summary.title);
+        let destinationHandle: Promise<FileSystemFileHandle | null>;
+        try {
+          // Calling the picker inside the user gesture is required by browsers.
+          destinationHandle = requestNativeBackupDestination(suggestedName);
+        } catch (error) {
+          portableStatus.className = 'ng-error';
+          portableStatus.textContent = `backup開始失敗：${errorMessage(error)}`;
+          return;
+        }
+        transitionInFlight = true;
+        portableAbort = new AbortController();
+        setPortableBusy(true);
+        clear(portableResult);
+        portableStatus.className = 'ng-status';
+        portableStatus.textContent = '保存先を確認しています…';
+        void (async () => {
+          const signal = portableAbort!.signal;
+          const handle = await destinationHandle;
+          if (signal.aborted) throw signal.reason;
+          const session = await coordinator.tryAcquire(fs, nativeProjectRoot(summary.projectId), summary.projectId);
+          if (!session.holdsWriteLock) {
+            const detail = session.accessDetail;
+            session.release();
+            throw new Error(detail);
+          }
+          let stagedPath: string | null = null;
+          let stagedWrite: Promise<void> | null = null;
+          let unsubscribeExport: (() => void) | null = null;
+          let destination: WritableStream<Uint8Array> | null = null;
+          try {
+            const durable = await openNativeProjectV1(session.workspace, summary.projectId);
+            session.activateAfterDurableReload();
+            unsubscribeExport = session.subscribeAccess((state) => {
+              if (state !== 'editable') portableAbort?.abort(new Error(session.accessDetail));
+            });
+            if (handle !== null) {
+              portableStatus.textContent = '選択した .lociview fileへstream出力しています…';
+              const writable = await handle.createWritable();
+              destination = writable as unknown as WritableStream<Uint8Array>;
+            } else {
+              const representationBytes = durable.snapshot.representations.reduce(
+                (sum, representation) => sum + representation.blob.byteLength,
+                0,
+              );
+              const estimate = await navigator.storage.estimate?.();
+              const required = representationBytes + 32 * 1024 * 1024;
+              if (
+                estimate?.quota !== undefined && estimate.usage !== undefined &&
+                Number.isFinite(estimate.quota) && Number.isFinite(estimate.usage) &&
+                estimate.quota - estimate.usage < required
+              ) {
+                throw new Error(`download準備用の端末保存容量が不足しています（Representation ${fmtBytes(representationBytes)}）。`);
+              }
+              stagedPath = nativeBackupStagePath(summary.projectId, durable.snapshot.snapshotId);
+              await fs.remove(stagedPath).catch(() => {});
+              const bridge = new TransformStream<Uint8Array, Uint8Array>();
+              stagedWrite = fs.writeStream(stagedPath, bridge.readable);
+              void stagedWrite.catch(() => {});
+              destination = bridge.writable;
+              portableStatus.textContent = '端末内の検証用Fileへstream出力しています…';
+            }
+            const exported = await exportNativePortablePackageV1(session.workspace, summary.projectId, destination, {
+              signal,
+              onStatus(message) { portableStatus.textContent = message; },
+            });
+            await stagedWrite;
+            let completedFile: Blob;
+            if (handle !== null) {
+              completedFile = await handle.getFile();
+            } else {
+              const staged = stagedPath === null ? null : await fs.readStream(stagedPath);
+              if (staged === null || staged.blob === undefined) {
+                throw new Error('検証済みbackupをbrowser downloadへ渡せません。');
+              }
+              completedFile = await staged.blob();
+            }
+            portableStatus.textContent = '完成した .lociview fileをstreamでread-back検証しています…';
+            const readBack = await digestNativeStream(completedFile.stream(), signal);
+            if (
+              readBack.byteLength !== exported.metrics.packageByteLength ||
+              readBack.sha256 !== exported.metrics.packageSha256
+            ) {
+              throw new Error('完成 .lociview fileのsize／SHA-256 read-backが一致しません。');
+            }
+            if (handle === null) {
+              if (activeDownloadUrl !== null) URL.revokeObjectURL(activeDownloadUrl);
+              activeDownloadUrl = URL.createObjectURL(completedFile);
+              const download = el('a', { href: activeDownloadUrl, download: suggestedName }, '検証済み .lociview を保存');
+              download.addEventListener('click', () => {
+                portableStatus.textContent = '検証済みbackupのdownloadを開始しました。端末のFiles／download先で保存完了を確認してください。';
+              });
+              const discard = el('button', {}, '端末内の一時backupを削除');
+              discard.addEventListener('click', () => {
+                if (transitionInFlight || stagedPath === null || !window.confirm('Files／download先への保存完了を確認しましたか？ 端末内の一時backupを削除します。')) return;
+                transitionInFlight = true;
+                void fs.remove(stagedPath).then(() => {
+                  if (activeDownloadUrl !== null) URL.revokeObjectURL(activeDownloadUrl);
+                  activeDownloadUrl = null;
+                  clear(portableResult);
+                  portableStatus.textContent = '端末内の一時backupを削除しました。外部へ保存した .lociview は変更していません。';
+                }).catch((error: unknown) => {
+                  portableStatus.className = 'ng-error';
+                  portableStatus.textContent = `一時backup削除失敗：${errorMessage(error)}`;
+                }).finally(() => { transitionInFlight = false; });
+              });
+              portableResult.append(download, discard);
+            }
+            const heap = exported.metrics.jsHeapPeakBytes === null
+              ? 'heap値はこのbrowserでは取得不可'
+              : `観測heap peak ${fmtBytes(exported.metrics.jsHeapPeakBytes)}`;
+            portableStatus.className = 'ng-status ng-ok';
+            portableStatus.textContent = handle === null
+              ? `package生成・read-back検証完了（${fmtBytes(exported.metrics.packageByteLength)}、最大chunk ${fmtBytes(exported.metrics.maxApplicationChunkBytes)}、${heap}）。上のlinkから端末外へ保存してください。`
+              : `backup完了・read-back検証済み（${fmtBytes(exported.metrics.packageByteLength)}、最大chunk ${fmtBytes(exported.metrics.maxApplicationChunkBytes)}、${heap}）。`;
+          } catch (error) {
+            await destination?.abort(error).catch(() => {});
+            await stagedWrite?.catch(() => {});
+            if (stagedPath !== null) await fs.remove(stagedPath).catch(() => {});
+            throw error;
+          } finally {
+            unsubscribeExport?.();
+            session.release();
+          }
+        })().catch((error: unknown) => {
+          portableStatus.className = 'ng-error';
+          portableStatus.textContent = `backup失敗：${errorMessage(error)}`;
+        }).finally(() => {
+          portableAbort = null;
+          transitionInFlight = false;
+          setPortableBusy(false);
+        });
+      });
+      remove.addEventListener('click', () => {
+        if (transitionInFlight || !window.confirm(`「${summary.title}」の端末内projectを削除します。復元用 .lociview を確認してから続行してください。`)) return;
+        transitionInFlight = true;
+        portableStatus.className = 'ng-status';
+        portableStatus.textContent = '書込みロック取得後に端末保存済みprojectを再読込しています…';
+        void (async () => {
+          const session = await coordinator.tryAcquire(fs, nativeProjectRoot(summary.projectId), summary.projectId);
+          if (!session.holdsWriteLock) {
+            const detail = session.accessDetail;
+            session.release();
+            throw new Error(detail);
+          }
+          try {
+            const durable = await openNativeProjectV1(session.workspace, summary.projectId);
+            if (
+              durable.snapshot.snapshotId !== summary.snapshotId ||
+              durable.snapshot.generation !== summary.generation
+            ) {
+              throw new Error('確認後にprojectが更新されました。最新状態を再表示してから、もう一度削除を確認してください。');
+            }
+            session.activateAfterDurableReload();
+            await deleteNativeProjectV1(session.workspace, summary.projectId, summary);
+            homeNotice = `端末内project「${summary.title}」を削除しました。.lociviewから復元できます。`;
+          } finally {
+            session.release();
+          }
+          await renderHome();
+        })().catch((error: unknown) => {
+          portableStatus.className = 'ng-error';
+          portableStatus.textContent = `local削除失敗：${errorMessage(error)}`;
+        }).finally(() => { transitionInFlight = false; });
+      });
       projectList.append(el('div', { class: 'ng-project-row' },
         el('strong', {}, summary.title),
         el('span', { class: 'ng-note' }, `snapshot ${summary.generation}`),
         view,
         edit,
+        backup,
+        remove,
       ));
     }
 
@@ -345,7 +647,16 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         createStatus,
       ),
       el('section', { class: 'ng-card' }, el('h2', {}, '保存済みNative projects'), projectList),
-      el('p', { class: 'ng-note' }, '.lociview export/importと大容量backup streamingは後続workstreamです。'),
+      el('section', { class: 'ng-card' },
+        el('h2', {}, 'Portable .lociview backup／restore'),
+        el('p', { class: 'ng-note' }, 'snapshotと全Mesh／GS／Proxy source bytesを変換せず保存します。復元は同じproject IDが存在しないworkspaceだけへ行います。'),
+        el('label', { class: 'ng-field' }, el('span', {}, '復元する .lociview'), restoreInput),
+        el('p', { class: 'ng-note' }, 'iPhoneを含め全fileを選択候補へ表示し、選択後にLociView packageとして厳格検証します。'),
+        el('div', { class: 'ng-row' }, restore, cancelPortable),
+        portableStatus,
+        portableResult,
+      ),
+      el('p', { class: 'ng-note' }, 'Alignment、Compare／Integrated、v1／LociMyu migrationは後続workstreamです。'),
     ));
     await refreshOffline();
   };

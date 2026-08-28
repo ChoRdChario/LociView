@@ -122,6 +122,7 @@ export class OpfsFS implements WorkspaceFS {
     const file = await h.getFile();
     return {
       size: file.size,
+      blob: async () => file,
       stream: () => file.stream() as ReadableStream<Uint8Array>,
     };
   }
@@ -139,6 +140,11 @@ export class OpfsFS implements WorkspaceFS {
       }
       await writable.close();
     } catch (error) {
+      try {
+        await reader.cancel(error);
+      } catch {
+        // The original sink failure is authoritative.
+      }
       try {
         await writable.abort(error);
       } catch {

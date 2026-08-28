@@ -27,6 +27,11 @@ export interface WorkspaceFS {
 export interface WorkspaceReadableFile {
   readonly size: number;
   stream(): ReadableStream<Uint8Array>;
+  /**
+   * Returns a Blob/File view without reading it into an application buffer when
+   * the backing store supports that boundary (OPFS does).
+   */
+  blob?(): Promise<Blob>;
 }
 
 export type ProjectAccessState = 'editable' | 'read-only' | 'lock-lost';
@@ -130,6 +135,7 @@ export class MemoryFS implements ProjectWorkspaceFS {
     const stable = new Uint8Array(bytes);
     return {
       size: stable.byteLength,
+      blob: async () => new Blob([new Uint8Array(stable)]),
       stream: () => {
         const copy = new Uint8Array(stable);
         return new ReadableStream<Uint8Array>({

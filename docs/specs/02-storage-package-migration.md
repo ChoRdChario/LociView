@@ -1340,3 +1340,54 @@ authorize release. The frozen v1 log/schema and v1 project roots are unchanged.
 - `.lociview` native export/import and bounded-memory backup packaging remain a
   later product workstream. This local snapshot is not a portable package and
   does not remove that requirement.
+
+## 14. Bounded native portable backup (Product Owner approved 2026-08-29)
+
+This section closes that next workstream only for the implemented native
+snapshot version 1. It does not change the v1 package contract, pass G0/G0-S/G1,
+authorize release, or generalize storage, transactions, migration or renderers.
+
+- A native portable `.lociview` has exact envelope
+  `lociview-native-portable-backup`, package version `1`. Its logical entries are
+  `native/package.json`, `native/snapshot.json`, and one
+  `native/representations/<RepresentationId>.bin` per snapshot Representation.
+  The manifest binds the snapshot version/project/snapshot/generation, the
+  snapshot entry and every Representation entry to an exact byte length and
+  SHA-256. The manifest itself is covered by strict ZIP CRC/schema validation;
+  it cannot recursively contain its own digest. Package entry names do not expose
+  or define the project-local OPFS layout.
+- Export captures one already-durable active native snapshot. Snapshot and
+  Representation source bytes are immutable for that export. The existing
+  zip.js dependency writes every entry serially to a stream with STORE/no
+  compression; the application never constructs the complete archive or a
+  complete binary entry in memory. Source and final output are stream-hashed,
+  and a failed/cancelled output is never reported as a completed backup.
+  Native package v1 reuses the current ZIP safety envelope: at most 20,000
+  entries, 1 GiB per entry and 2 GiB total declared entry bytes; export checks
+  the same bounds before writing so it cannot create a package its importer
+  rejects.
+- Import uses strict random-access ZIP inspection over the selected `Blob`/File
+  and streams each STORE entry to the inactive destination project root. Before
+  publication it rejects an unknown package/snapshot version, unsafe or
+  ambiguous path, duplicate/extra/missing entry, directory/special/encrypted or
+  compressed entry, declared size mismatch, CRC failure, metadata/schema
+  failure, Representation-set mismatch, and streamed size/SHA-256 mismatch.
+- Restore preserves the packaged native snapshot and source bytes. It runs under
+  the existing project-scoped single-writer lock, refuses an existing active v1
+  or native project with the same ID, stream-writes and read-back verifies every
+  Representation, verifies the GS profile, writes/verifies the snapshot, and
+  publishes `active.json` last. A quota, cancellation, corruption or lock failure
+  leaves no active restored project and does not mutate an existing project.
+- Desktop may stream to a user-selected file when the File System Access API is
+  present. The portable fallback first writes a verified OPFS-backed File and
+  exposes that File to the browser download/share surface; it does not create a
+  package-sized application buffer. Restore file selection does not rely on an
+  extension/MIME `accept` filter because iOS Files can hide a valid custom
+  `.lociview` extension as an unknown UTI; the strict package parser remains the
+  authoritative boundary after selection. A physical-iOS Files/export
+  limitation is reported as a platform-specific constraint rather than
+  generalized silently.
+- This version adds no CAS, cross-project dedupe, global GC, Automerge, general
+  journal/transaction, encryption, network restore, converter, second package
+  format or second renderer. Alignment, Compare/Integrated and v1/LociMyu
+  migration remain later workstreams.

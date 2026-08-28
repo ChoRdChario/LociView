@@ -28,6 +28,7 @@ export interface NativeProjectSummary {
   readonly projectId: string;
   readonly title: string;
   readonly generation: number;
+  readonly snapshotId: string;
 }
 
 export interface NativeOpenProject {
@@ -88,16 +89,24 @@ function sameGsFacts(
   );
 }
 
+function throwIfAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) return;
+  throw signal.reason ?? new DOMException('Operation aborted', 'AbortError');
+}
+
 async function writeAndVerifyBinary(
   fs: ProjectWorkspaceFS,
   path: string,
   source: NativeBinarySource,
+  signal?: AbortSignal,
 ): Promise<NativeBlobRefV1> {
+  throwIfAborted(signal);
   if (await fs.exists(path)) throw new Error(`native project: immutable Representation path already exists: ${path}`);
   let writeDigest: NativeStreamDigest | null = null;
   await fs.writeStream(path, hashingNativeStream(source.stream(), (digest) => {
     writeDigest = digest;
   }));
+  throwIfAborted(signal);
   if (writeDigest === null) throw new Error('native project: source stream ended without a digest');
   const written = writeDigest as NativeStreamDigest;
   if (written.byteLength !== source.size) {
@@ -106,7 +115,7 @@ async function writeAndVerifyBinary(
   const stored = await fs.readStream(path);
   if (stored === null) throw new Error(`native project: staged binary is missing after write: ${path}`);
   if (stored.size !== source.size) throw new Error(`native project: staged binary size mismatch: ${path}`);
-  const readBack = await digestNativeStream(stored.stream());
+  const readBack = await digestNativeStream(stored.stream(), signal);
   if (readBack.byteLength !== written.byteLength || readBack.sha256 !== written.sha256) {
     throw new Error(`native project: staged binary read-back mismatch: ${path}`);
   }
@@ -121,8 +130,16 @@ async function writeAndVerifyBinary(
 async function writeVerifiedSnapshot(
   fs: ProjectWorkspaceFS,
   snapshot: NativeProjectSnapshotV1,
+  exactText?: string,
 ): Promise<{ readonly text: string; readonly digest: NativeStreamDigest }> {
-  const text = serializeNativeSnapshotV1(snapshot);
+  const text = exactText ?? serializeNativeSnapshotV1(snapshot);
+  const parsedText = parseNativeSnapshotV1(text);
+  const normalizedExpected = serializeNativeSnapshotV1(
+    parseNativeSnapshotV1(serializeNativeSnapshotV1(snapshot)),
+  );
+  if (serializeNativeSnapshotV1(parsedText) !== normalizedExpected) {
+    throw new Error('native project: supplied snapshot text does not match the candidate state');
+  }
   const bytes = new TextEncoder().encode(text);
   const digest = digestNativeBytes(bytes);
   const path = nativeSnapshotPath(snapshot.project.id, snapshot.snapshotId);
@@ -157,7 +174,16 @@ async function publishActiveMarker(
   };
   const path = nativeActiveMarkerPath(snapshot.project.id);
   const text = serializeNativeActiveMarkerV1(marker);
-  await fs.writeText(path, text);
+  try {
+    await fs.writeText(path, text);
+  } catch (writeError) {
+    // The scoped writer can lose its lock immediately after the underlying
+    // marker write commits. Resolve that commit-then-throw ambiguity by reading
+    // the marker through the still-valid read capability. An exact marker is a
+    // completed publication; anything else preserves the original failure.
+    const committed = await fs.readText(path).catch(() => null);
+    if (committed !== text) throw writeError;
+  }
   const readBack = await fs.readText(path);
   if (readBack === null) throw new Error('native project: active marker is missing after publication');
   const parsed = parseNativeActiveMarkerV1(readBack);
@@ -229,6 +255,88 @@ export async function createNativeProjectV1(
   return snapshot;
 }
 
+/**
+ * Restores one already-validated portable snapshot without changing any IDs,
+ * generations, metadata, or source bytes. The absent project root is the
+ * unpublished staging area; only active.json makes it visible.
+ */
+export async function restoreNativeProjectV1(
+  fs: ProjectWorkspaceFS,
+  namespaceFs: WorkspaceFS,
+  candidate: NativeProjectSnapshotV1,
+  sources: ReadonlyMap<string, NativeBinarySource>,
+  onStatus?: (message: string) => void,
+  signal?: AbortSignal,
+  exactSnapshotText?: string,
+): Promise<NativeProjectSnapshotV1> {
+  const snapshot = parseNativeSnapshotV1(exactSnapshotText ?? serializeNativeSnapshotV1(candidate));
+  assertProjectWorkspace(fs, snapshot.project.id);
+  throwIfAborted(signal);
+  // This check is deliberately repeated after lock acquisition. A UI-only
+  // preflight must not be able to race a v1 project into the same identity.
+  await assertNativeProjectDoesNotMixV1(namespaceFs, snapshot.project.id);
+  // An empty root gives this attempt exclusive ownership of every path it may
+  // clean after failure; never delete unknown remnants from an older attempt.
+  const existingPaths = await fs.list(`${nativeProjectRoot(snapshot.project.id)}/`);
+  if (existingPaths.length > 0) {
+    throw new Error('native restore: destination project root is not empty');
+  }
+  if (sources.size !== snapshot.representations.length) {
+    throw new Error('native restore: every Representation requires exactly one package source');
+  }
+
+  const stagedPaths: string[] = [];
+  const snapshotPath = nativeSnapshotPath(snapshot.project.id, snapshot.snapshotId);
+  try {
+    for (const representation of [...snapshot.representations].sort((a, b) => a.id.localeCompare(b.id))) {
+      throwIfAborted(signal);
+      const source = sources.get(representation.id);
+      if (source === undefined) throw new Error(`native restore: missing package source for ${representation.id}`);
+      if (source.size !== representation.blob.byteLength || source.mediaType !== representation.blob.mediaType) {
+        throw new Error(`native restore: package source metadata mismatch for ${representation.id}`);
+      }
+      const path = nativeRepresentationPath(snapshot.project.id, representation.id);
+      if (await fs.exists(path)) throw new Error(`native restore: destination staging path already exists: ${path}`);
+      stagedPaths.push(path);
+      onStatus?.(`Streaming ${representation.role} from portable backup…`);
+      const blob = await writeAndVerifyBinary(fs, path, source, signal);
+      if (
+        blob.byteLength !== representation.blob.byteLength ||
+        blob.digest !== representation.blob.digest ||
+        blob.mediaType !== representation.blob.mediaType
+      ) {
+        throw new Error(`native restore: Representation size/SHA-256 mismatch for ${representation.id}`);
+      }
+      if (representation.role === 'gsPrimary') {
+        const stored = await fs.readStream(path);
+        if (stored === null || representation.gsPly === undefined) {
+          throw new Error('native restore: verified GS staging bytes are unavailable');
+        }
+        const inspection = await inspectNativeGsPlyV1(stored);
+        if (inspection.kind !== 'supported-gs' || !sameGsFacts(inspection.facts, representation.gsPly)) {
+          throw new Error('native restore: GS bytes do not match snapshot profile facts');
+        }
+      }
+      onStatus?.(`Verified ${representation.role} size and SHA-256 by streamed read-back.`);
+    }
+    throwIfAborted(signal);
+    onStatus?.('Writing and verifying restored native snapshot v1…');
+    stagedPaths.push(snapshotPath);
+    const verified = await writeVerifiedSnapshot(fs, snapshot, exactSnapshotText);
+    throwIfAborted(signal);
+    onStatus?.('Publishing restored active receipt…');
+    await publishActiveMarker(fs, snapshot, verified.digest);
+    onStatus?.('Portable backup restored and active.');
+    return snapshot;
+  } catch (error) {
+    // Best-effort cleanup is scoped to paths written by this attempt. Even if a
+    // browser interruption prevents cleanup, no valid marker was published.
+    await fs.remove(nativeActiveMarkerPath(snapshot.project.id)).catch(() => {});
+    for (const path of [...stagedPaths].reverse()) await fs.remove(path).catch(() => {});
+    throw error;
+  }
+}
+
 export async function saveNativeProjectV1(
   fs: ProjectWorkspaceFS,
   current: NativeProjectSnapshotV1,
@@ -294,6 +402,28 @@ export async function readNativeRepresentationV1(
   return fs.readStream(nativeRepresentationPath(projectId, representationId));
 }
 
+/** Marker-first removal ensures an interrupted delete is never listed active. */
+export async function deleteNativeProjectV1(
+  fs: ProjectWorkspaceFS,
+  projectId: string,
+  expected: { readonly snapshotId: string; readonly generation: number },
+): Promise<void> {
+  assertProjectWorkspace(fs, projectId);
+  const durable = await openNativeProjectV1(fs, projectId);
+  if (
+    durable.snapshot.snapshotId !== expected.snapshotId ||
+    durable.snapshot.generation !== expected.generation
+  ) {
+    throw new Error('native project: project changed after deletion was confirmed; refresh and confirm again');
+  }
+  const root = nativeProjectRoot(projectId);
+  const paths = await fs.list(`${root}/`);
+  await fs.remove(nativeActiveMarkerPath(projectId));
+  for (const path of paths) {
+    if (path !== nativeActiveMarkerPath(projectId)) await fs.remove(path);
+  }
+}
+
 export async function listNativeProjectsV1(fs: WorkspaceFS): Promise<NativeProjectSummary[]> {
   const files = await fs.list(`${NATIVE_PROJECTS_ROOT}/`);
   const ids = new Set<string>();
@@ -306,7 +436,12 @@ export async function listNativeProjectsV1(fs: WorkspaceFS): Promise<NativeProje
     try {
       await assertNativeProjectDoesNotMixV1(fs, projectId);
       const opened = await openNativeProjectV1(fs, projectId);
-      summaries.push({ projectId, title: opened.snapshot.project.title, generation: opened.snapshot.generation });
+      summaries.push({
+        projectId,
+        title: opened.snapshot.project.title,
+        generation: opened.snapshot.generation,
+        snapshotId: opened.snapshot.snapshotId,
+      });
     } catch {
       // Invalid/unknown projects are never guessed into the active list.
     }

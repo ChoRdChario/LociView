@@ -2214,3 +2214,80 @@ Final review and verification — 2026-08-29:
 - The existing large-chunk and mixed dynamic/static-import build warnings remain
   observable but are not P0/P1 blockers for this bounded path. G0/G0-S/G1,
   permanent Spark adoption and release approval remain open.
+
+## Native portable backup — approved bounded stream export/import slice
+
+Checkpoint, target and stop rule:
+
+- [x] Accept commit `e584266` as `FIRST PRODUCTION GS PATH: PASS`; treat Spark as
+  the provisional first production GS renderer unless a new hard blocker appears
+  and do not return to GS micro-hardening, fixtures, fallback or P2 work
+- [x] Read-only gap check the frozen v1 package path, native snapshot v1,
+  WorkspaceFS/OPFS and the installed zip.js API; proceed only because the
+  existing dependency supports streamed STORE output and Blob-backed streamed
+  extraction without a package-sized application buffer
+- [x] Record the exact package-v1 logical-entry, integrity, unpublished-staging,
+  single-writer and marker-last boundary in the existing storage specification
+- [x] Implement one native-route `.lociview` export/import path for snapshot v1,
+  preserving all Representation bytes and metadata without changing v1 package
+  behavior or exposing OPFS layout as package format
+- [x] Reject unsafe/ambiguous/extra/missing/version-mismatched packages before
+  publication; stream, size/hash/read-back verify every binary and publish the
+  active marker last under the existing project lock
+- [x] Add only focused package-schema, streamed round-trip, corruption,
+  cancellation/quota and no-active-on-failure acceptance missing from the prior
+  native snapshot tests
+- [x] Obtain one independent read-only production/security review and close only
+  P0/P1 required by this slice; keep P2 in backlog
+- [x] On the exact final production tree run focused tests, typecheck, full tests,
+  fixture/evidence verification, normal and `/LociView/` builds, audit and bundle
+  inspection once and serially
+- [x] Record Desktop representative export -> local delete -> restore -> offline
+  reopen and physical iPhone 14 Pro realistic restore/offline reopen, separating
+  any iOS Files/export constraint from the Desktop result
+- [x] Commit one bounded slice with a clean worktree and stop before alignment,
+  Compare/Integrated, migration, renderer expansion or unrelated P2 work
+
+Explicit exclusions remain CAS, cross-project dedupe, global GC, Automerge,
+general journal/transaction, encryption/key management, network restore,
+converter, second package/renderer, bundled representative data and GS P2 work.
+
+Manual acceptance — 2026-08-29:
+
+- Desktop Chrome exported the native project containing the unchanged
+  781,785,120-byte / 4,766,975-splat representative GS, performed final package
+  read-back, deleted the local project, restored the `.lociview`, and reopened it
+  completely offline. Mesh + GS / GS-only / Mesh-only, Mesh/GS/Proxy state,
+  transforms and saved Caption state remained usable. The UI observed a rounded
+  745.6 MB package, 2.0 MB maximum application chunk and 184.0 MB JS heap peak;
+  no package-sized application buffer was observed.
+- Physical iPhone 14 Pro restored the same completed package from Files, loaded
+  the representative GS after explicit per-origin Spark offline preparation,
+  exercised the three display states, then survived Safari termination and
+  complete-offline reopen without a reported crash, forced termination, memory
+  warning or continuing runtime error.
+- The physical run exposed one bounded iOS picker blocker: an HTML `accept`
+  filter hid the valid custom `.lociview` extension as an unknown UTI. The final
+  route lists all selectable files and relies on the existing strict
+  format/version/path/size/hash parser after selection. A fresh-origin rerun
+  confirmed selection and restore. `.lociview` remains a ZIP container with a
+  product-specific extension; the package and representative source were never
+  uploaded through the temporary app-shell tunnel, which was stopped after the
+  run.
+
+Final verification — 2026-08-29:
+
+- Focused native portable/storage/hash acceptance passed: 18 tests.
+- Typecheck passed. The exact final production tree full run passed 47 test
+  files, 1,384 tests, with 21 explicit todos (1,405 total; 100.76 seconds).
+- Frozen fixture verification passed with 10 Git entries / 708,867 bytes.
+  Evidence verification passed with three pending device templates and no
+  run/environment/artifact record, so this slice makes no G0 evidence claim.
+- Normal and `/LociView/` production builds passed. The Spark 2.1.0 runtime is
+  emitted as its own native-only chunk; only the native app chunk references it,
+  while the normal app chunk and the 13-entry PWA precache do not. No
+  representative PLY filename, fixed representative count/size or matching
+  781,785,120-byte artifact is present in `dist` or tracked files.
+- `npm audit` reported zero vulnerabilities. Final independent review reported
+  no P0/P1; partial-output abort, marker commit ambiguity and stale-delete races
+  found during review were closed before the final run.

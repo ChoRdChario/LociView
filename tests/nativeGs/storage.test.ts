@@ -4,6 +4,7 @@ import { ProjectMutationCoordinator } from '../../src/platform/projectLock';
 import {
   assertNativeProjectDoesNotMixV1,
   createNativeProjectV1,
+  deleteNativeProjectV1,
   listNativeProjectsV1,
   nativeActiveMarkerPath,
   nativeProjectRoot,
@@ -42,6 +43,15 @@ class CorruptActiveMarkerMemoryFS extends RecordingMemoryFS {
   }
 }
 
+class LoseLockAfterMarkerCommitFS extends RecordingMemoryFS {
+  onMarkerCommitted: (() => void) | null = null;
+
+  override async writeText(path: string, text: string): Promise<void> {
+    await super.writeText(path, text);
+    if (path.endsWith('/active.json')) this.onMarkerCommitted?.();
+  }
+}
+
 async function editable(fs: MemoryFS) {
   const coordinator = ProjectMutationCoordinator.local();
   const session = await coordinator.tryAcquire(fs, nativeProjectRoot(NATIVE_TEST_IDS.project), NATIVE_TEST_IDS.project);
@@ -66,7 +76,12 @@ describe('native project blob-first/marker-last publication', () => {
       missingRepresentationIds: [],
       sizeMismatchRepresentationIds: [],
     });
-    expect(await listNativeProjectsV1(fs)).toEqual([{ projectId: snapshot.project.id, title: draft.project.title, generation: 1 }]);
+    expect(await listNativeProjectsV1(fs)).toEqual([{
+      projectId: snapshot.project.id,
+      title: draft.project.title,
+      generation: 1,
+      snapshotId: snapshot.snapshotId,
+    }]);
     session.release();
   });
 
@@ -87,6 +102,20 @@ describe('native project blob-first/marker-last publication', () => {
     const { draft, sources } = makeNativeDraft();
     await expect(createNativeProjectV1(session.workspace, draft, sources)).rejects.toThrow(/marker read-back/);
     await expect(openNativeProjectV1(fs, draft.project.id)).rejects.toThrow(/active snapshot verification failed/);
+    session.release();
+  });
+
+  it('admits an exact active marker that committed immediately before lock loss', async () => {
+    const fs = new LoseLockAfterMarkerCommitFS();
+    const session = await editable(fs);
+    fs.onMarkerCommitted = () => session.failClosed('injected post-commit lock loss');
+    const { draft, sources } = makeNativeDraft();
+    const snapshot = await createNativeProjectV1(session.workspace, draft, sources);
+    expect(session.accessState).toBe('lock-lost');
+    await expect(openNativeProjectV1(fs, snapshot.project.id)).resolves.toMatchObject({
+      snapshot: { snapshotId: snapshot.snapshotId },
+    });
+    expect(await listNativeProjectsV1(fs)).toHaveLength(1);
     session.release();
   });
 
@@ -122,6 +151,25 @@ describe('native project blob-first/marker-last publication', () => {
     await fs.writeBytes(nativeRepresentationPath(draft.project.id, NATIVE_TEST_IDS.meshRepresentation), new Uint8Array([1]));
     await expect(createNativeProjectV1(session.workspace, draft, sources)).rejects.toThrow(/already exists/);
     expect(await fs.exists(nativeActiveMarkerPath(draft.project.id))).toBe(false);
+    session.release();
+  });
+
+  it('refuses a stale deletion confirmation, then removes the exact confirmed snapshot', async () => {
+    const fs = new RecordingMemoryFS();
+    const session = await editable(fs);
+    const { draft, sources } = makeNativeDraft();
+    const first = await createNativeProjectV1(session.workspace, draft, sources);
+    const current = await saveNativeProjectV1(session.workspace, {
+      ...first,
+      presentation: { ...first.presentation, displayMode: 'gs-only' },
+    });
+    await expect(deleteNativeProjectV1(session.workspace, draft.project.id, first)).rejects.toThrow(/changed/);
+    await expect(openNativeProjectV1(fs, draft.project.id)).resolves.toMatchObject({
+      snapshot: { snapshotId: current.snapshotId },
+    });
+    await deleteNativeProjectV1(session.workspace, draft.project.id, current);
+    expect(await fs.list(`${nativeProjectRoot(draft.project.id)}/`)).toEqual([]);
+    expect(await listNativeProjectsV1(fs)).toEqual([]);
     session.release();
   });
 });

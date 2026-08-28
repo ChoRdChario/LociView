@@ -161,3 +161,8 @@
 ## 2026-08-28: interaction surface不在とCaption作成不能を恒久的に同一視しない
 
 - ProxyなしGSではsurface hitを推測せず無効にする一方、後続UXとしてGS AssetFrame原点へ明示作成し、ギズモで最終`positionAsset`を決める経路は両立できる。現在sliceの固定degradationを無断変更せず、Product Ownerが示した正式版の改善としてbacklogへ分離する。
+
+## 2026-08-29: custom package拡張子をmobile file pickerのaccept filterへ依存させない
+
+- iOS Filesは未登録のcustom extensionを未知UTIとして扱い、HTML file inputへ拡張子/MIMEの`accept` filterがあると正しいfileまで一覧から隠すことがある。
+- 選択後にcontainer version、entry path、size、hashを厳格検証するpackageでは、picker filterを安全境界にしない。mobile互換を優先して全fileを選択可能にし、不正fileはauthoritative parserで明示拒否する。
