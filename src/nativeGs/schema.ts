@@ -433,14 +433,22 @@ function semanticClosure(snapshot: NativeProjectSnapshotV1): void {
   const bindings = new Map(snapshot.assetBindingRevisions.map((binding) => [binding.id, binding]));
   const revisions = new Map(snapshot.assetRevisions.map((revision) => [revision.id, revision]));
   const representations = new Map(snapshot.representations.map((representation) => [representation.id, representation]));
+  for (const binding of snapshot.assetBindingRevisions) {
+    const asset = assets.get(binding.assetId);
+    const revision = revisions.get(binding.assetRevisionId);
+    if (asset === undefined || revision === undefined || revision.assetId !== binding.assetId) {
+      throw new Error('native snapshot: retained binding ownership is invalid');
+    }
+  }
   for (const asset of snapshot.assets) {
     const binding = bindings.get(asset.status.activeBindingId);
     if (binding === undefined || binding.assetId !== asset.id) throw new Error('native snapshot: Asset active binding is missing or foreign');
-    const revision = revisions.get(binding.assetRevisionId);
-    if (revision === undefined || revision.assetId !== asset.id) throw new Error('native snapshot: binding revision is missing or foreign');
+  }
+  for (const revision of snapshot.assetRevisions) {
+    if (!assets.has(revision.assetId)) throw new Error('native snapshot: retained revision Asset is missing');
     for (const representationId of revision.representationIds) {
       const representation = representations.get(representationId);
-      if (representation === undefined || representation.assetId !== asset.id) {
+      if (representation === undefined || representation.assetId !== revision.assetId) {
         throw new Error('native snapshot: revision Representation is missing or foreign');
       }
     }
@@ -608,4 +616,43 @@ export function normalizeNativeSim3(input: NativeSim3V1): NativeSim3V1 {
   const uniformScale = finite(input.uniformScale, 'uniformScale');
   if (uniformScale <= 0) throw new Error('native snapshot: uniformScale must be positive');
   return { translation, rotationXYZW: rotation, uniformScale };
+}
+
+function sameNativeSim3(left: NativeSim3V1, right: NativeSim3V1): boolean {
+  return left.uniformScale === right.uniformScale &&
+    left.translation.every((value, index) => value === right.translation[index]) &&
+    left.rotationXYZW.every((value, index) => value === right.rotationXYZW[index]);
+}
+
+/**
+ * Creates one immutable manual binding and flips only the selected Asset's
+ * active pointer. In-progress gizmo state remains UI-only until this boundary.
+ */
+export function activateNativeManualAssetTransformV1(
+  snapshot: NativeProjectSnapshotV1,
+  assetId: string,
+  bindingId: string,
+  input: NativeSim3V1,
+): NativeProjectSnapshotV1 {
+  const asset = snapshot.assets.find((candidate) => candidate.id === assetId);
+  const current = snapshot.assetBindingRevisions.find((candidate) => candidate.id === asset?.status.activeBindingId);
+  if (asset === undefined || current === undefined || current.assetId !== assetId) {
+    throw new Error('native snapshot: selected Asset active binding is unavailable');
+  }
+  const transform = normalizeNativeSim3(input);
+  if (sameNativeSim3(current.assetToProject, transform)) return snapshot;
+  const nextBinding: NativeAssetBindingRevisionV1 = {
+    ...current,
+    id: bindingId,
+    assetToProject: transform,
+    method: 'manual',
+  };
+  const candidate: NativeProjectSnapshotV1 = {
+    ...snapshot,
+    assets: snapshot.assets.map((entry) => entry.id === assetId
+      ? { ...entry, status: { kind: 'ready', activeBindingId: nextBinding.id } }
+      : entry),
+    assetBindingRevisions: [...snapshot.assetBindingRevisions, nextBinding],
+  };
+  return parseNativeSnapshotV1(serializeNativeSnapshotV1(candidate));
 }

@@ -1389,5 +1389,29 @@ authorize release, or generalize storage, transactions, migration or renderers.
   generalized silently.
 - This version adds no CAS, cross-project dedupe, global GC, Automerge, general
   journal/transaction, encryption, network restore, converter, second package
-  format or second renderer. Alignment, Compare/Integrated and v1/LociMyu
+  format or second renderer. The bounded manual-alignment subset in section 15
+  reuses this exact version; full Alignment, Compare/Integrated and v1/LociMyu
   migration remain later workstreams.
+
+## 15. Bounded native two-Asset manual alignment (Product Owner approved 2026-08-29)
+
+This slice reuses native snapshot version `1` and native portable package
+version `1` unchanged. Their existing Asset arrays, immutable
+`AssetBindingRevision.assetToProject`, `activeBindingId`, Caption AssetFrame
+anchor and generic Representation inventory already describe the approved one
+independent Mesh Asset plus one independent GS Asset with its optional explicit
+Proxy. UI selection, gizmo mode and an in-progress drag are not persisted.
+
+A committed numeric or gizmo edit appends one normalized positive-Sim(3) manual
+binding and changes only the selected Asset's active pointer. Runtime resolution
+must follow that pointer rather than binding-array order. The GS and its Proxy
+remain children of one AssetFrame, so the Proxy follows every GS Asset move
+without becoming a visual/selectable Asset, while a Caption's final
+`positionAsset` remains unchanged and follows its owning Asset in ProjectFrame.
+
+Ordinary snapshot save/reopen and portable export/restore retain the exact
+active binding and every source byte. A missing/invalid transform is rejected;
+it is never repaired as identity. The existing single-writer, snapshot-last and
+marker-last boundaries remain authoritative. No registration solver, scene
+graph, migration framework, general transaction or package/schema version is
+introduced by this slice.

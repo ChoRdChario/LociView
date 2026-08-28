@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { MemoryFS } from '../../src/platform/fs';
 import { ProjectMutationCoordinator } from '../../src/platform/projectLock';
+import { activeNativeBindingV1 } from '../../src/nativeGs/resolver';
+import { activateNativeManualAssetTransformV1, normalizeNativeSim3 } from '../../src/nativeGs/schema';
 import {
   assertNativeProjectDoesNotMixV1,
   createNativeProjectV1,
@@ -12,7 +14,7 @@ import {
   openNativeProjectV1,
   saveNativeProjectV1,
 } from '../../src/nativeGs/storage';
-import { makeNativeDraft, NATIVE_TEST_IDS } from './nativeTestProject';
+import { makeNativeDraft, NATIVE_TEST_IDS, testNativeId } from './nativeTestProject';
 
 class RecordingMemoryFS extends MemoryFS {
   readonly writes: string[] = [];
@@ -125,13 +127,32 @@ describe('native project blob-first/marker-last publication', () => {
     const { draft, sources } = makeNativeDraft();
     const first = await createNativeProjectV1(session.workspace, draft, sources);
     const binaryWriteCount = fs.writes.filter((path) => path.endsWith('.bin')).length;
+    const aligned = activateNativeManualAssetTransformV1(
+      first,
+      NATIVE_TEST_IDS.gsAsset,
+      testNativeId('bnd', 91),
+      {
+        translation: [8, 1.5, -4],
+        rotationXYZW: [0, Math.SQRT1_2, 0, Math.SQRT1_2],
+        uniformScale: 0.5,
+      },
+    );
     const next = await saveNativeProjectV1(session.workspace, {
-      ...first,
-      presentation: { ...first.presentation, displayMode: 'gs-only' },
+      ...aligned,
+      presentation: { ...aligned.presentation, displayMode: 'gs-only' },
     });
     expect(next.generation).toBe(2);
     expect(fs.writes.filter((path) => path.endsWith('.bin'))).toHaveLength(binaryWriteCount);
-    expect((await openNativeProjectV1(fs, first.project.id)).snapshot.presentation.displayMode).toBe('gs-only');
+    const reopened = (await openNativeProjectV1(fs, first.project.id)).snapshot;
+    expect(reopened.presentation.displayMode).toBe('gs-only');
+    expect(activeNativeBindingV1(reopened, NATIVE_TEST_IDS.gsAsset)?.assetToProject).toEqual(normalizeNativeSim3({
+      translation: [8, 1.5, -4],
+      rotationXYZW: [0, Math.SQRT1_2, 0, Math.SQRT1_2],
+      uniformScale: 0.5,
+    }));
+    expect(activeNativeBindingV1(reopened, NATIVE_TEST_IDS.meshAsset)?.assetToProject).toEqual(
+      activeNativeBindingV1(first, NATIVE_TEST_IDS.meshAsset)?.assetToProject,
+    );
     session.release();
   });
 

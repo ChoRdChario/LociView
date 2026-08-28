@@ -2291,3 +2291,73 @@ Final verification — 2026-08-29:
 - `npm audit` reported zero vulnerabilities. Final independent review reported
   no P0/P1; partial-output abort, marker commit ambiguity and stale-delete races
   found during review were closed before the final run.
+
+## Native two-Asset manual alignment — approved bounded production slice
+
+Checkpoint, boundary and stop rule:
+
+- [x] Accept commit `346d25e` as `NATIVE PORTABLE BACKUP: PASS`; close that
+  workstream and do not reopen package permutations, micro-hardening, P2 or
+  memory instrumentation without a new downstream-blocking P0/P1
+- [x] Read-only gap check snapshot/storage/viewer/resolver/portable-package v1;
+  keep exact snapshot and package version 1 because their existing Asset arrays,
+  Sim(3), binding, Caption and Representation records already express the slice
+- [x] Record the bounded two-Asset manual-alignment subset in the existing domain
+  and storage specifications before implementation; do not claim full Alignment
+- [x] Add an explicit Mesh/GS Asset selection and translate/rotate/positive-
+  uniform-scale gizmo; Proxy remains nonvisual, nonselectable and follows its GS
+- [x] Commit each manual placement as one new immutable binding selected only by
+  that Asset's `activeBindingId`; never resolve alignment by binding-array order
+- [x] Reuse global mixed/GS-only/Mesh-only visibility and selected-only
+  Mesh/Proxy Caption raycast; preserve Asset-local Caption position through moves
+- [x] Add only focused acceptance for active-binding authority, selected-Asset
+  isolation and manual transform save/reopen; reuse existing portable/degradation
+  acceptance instead of creating another package or edge-case matrix
+- [x] Obtain one independent read-only final-diff review and close only P0/P1
+  required by this slice; retain numeric dragging and unrelated UX as P2
+- [x] On the exact final executable tree run focused tests, typecheck, full tests,
+  fixture/evidence verification, normal and `/LociView/` builds, audit and bundle
+  inspection once and serially
+- [x] Record Desktop small explicit-Proxy interaction plus representative
+  781,785,120-byte GS alignment/save/portable restore evidence, then physical
+  iPhone 14 Pro translate/rotate/uniform-scale/save/offline-reopen evidence
+- [x] Commit one bounded slice with a clean worktree and stop before full
+  Alignment, Compare/Integrated, v1/LociMyu migration or release acceptance
+
+The exact production scenario remains one independent Mesh Asset, one
+independent partial-GS Asset and one optional explicit same-GS Proxy. Multiple
+Mesh or GS Assets per kind, same-Asset Mesh/GS family targeting, per-Asset eye
+toggles, multiple-Caption UX, locked-reference/bounds/undo/reset workflows,
+automatic registration/ICP, non-uniform scale, Proxy generation, direct splat
+picking and renderer/storage/framework expansion are excluded.
+
+Manual acceptance — 2026-08-29:
+
+- Product Owner reported every requested Desktop check passed: independent
+  Mesh/GS translate, rotate and positive uniform scale; selected-Asset isolation;
+  moved-GS Proxy placement; continuous Caption gizmo drag; three display states;
+  snapshot close/reopen; and representative-GS portable export, local deletion,
+  restore and offline reopen.
+- Product Owner reported every requested physical iPhone 14 Pro check passed:
+  touch translate/rotate/uniform-scale, three display states, snapshot save,
+  Safari termination and offline reopen. No operation blocker was reported.
+- Two independent read-only reviews found and verified closure of active-binding
+  array-order misuse, Caption mid-drag gizmo detachment, placement/gizmo overlap
+  and read-only working-state mutation. No P0/P1 remains; Unity-style numeric
+  dragging remains the already-recorded P2 backlog item.
+
+Final verification — 2026-08-29:
+
+- Focused native schema/resolver/storage/portable acceptance passed: 24 tests.
+  Typecheck passed. The exact final production tree full run passed 47 test
+  files, 1,386 tests, with 21 explicit todos (1,407 total).
+- Frozen fixture verification passed with 10 Git entries / 708,867 bytes.
+  Evidence verification passed with three pending device templates and no
+  credited G0 runs, so this slice makes no G0/G0-S/G1 or release claim.
+- Normal and `/LociView/` production builds passed. Spark 2.1.0 remains an exact
+  lazy chunk referenced only by the native app chunk; the ordinary v1 app does
+  not fetch it and the PWA precache excludes the Spark chunk. No representative
+  GS bytes, fixed count or fixed byte length entered the build output.
+- `npm audit` reported zero vulnerabilities. Final independent review reported
+  no unresolved P0/P1; full Alignment/Compare/Integrated and migration remain
+  separate later workstreams.

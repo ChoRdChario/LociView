@@ -769,6 +769,34 @@ Repair alignment is representation-local, not a second Asset alignment. “Add v
 
 Three non-collinear point pairs are the mathematical minimum for correspondence fitting; production UI SHOULD accept 4–8 pairs and report residuals. PCA and ICP are later assistants only because symmetry, missing GS regions and floaters can produce plausible but wrong alignment.
 
+### 9.1 Bounded native two-Asset manual alignment
+
+The first production manual-alignment slice is a strict subset of the complete
+MVP tool above. It contains one independent ordinary-Mesh Asset and one
+independent partial-GS Asset; they need not describe the same object, extent or
+origin. The GS Asset may contain one explicitly bound, interaction-only Proxy.
+That Proxy is never directly selected and inherits the GS Asset's
+`assetToProject` transform.
+
+The user explicitly selects either visual Asset and previews translation,
+quaternion-backed rotation and positive uniform scale with an Asset gizmo. A
+committed edit creates a new immutable `AssetBindingRevision` with
+`method:'manual'` and changes only that Asset's `activeBindingId`; the previous
+binding, source bytes, Representation transforms and Asset-local Caption
+`positionAsset` remain unchanged. Numeric entry remains available, but
+Unity-style numeric dragging is later UX. This slice does not claim the locked
+reference, bounds-fit, undo/reset, fitted-method or Compare portions of the full
+alignment tool.
+
+`mixed`, `gs-only` and `mesh-only` remain project-wide role visibility states,
+not per-Asset eye toggles or Compare UI. Caption targeting remains explicit:
+the selected visible Mesh raycasts only itself, while the selected visible GS
+raycasts only its same-Asset bound Proxy. Hidden or unusable surfaces never
+capture a raycast, and a missing/broken/cross-Asset Proxy makes only that GS
+view-only. Snapshot selection/gizmo state is transient; snapshot v1 persists
+the authoritative active binding and existing Caption anchor, and portable
+package v1 carries that exact snapshot without a version change.
+
 ## 10. Large GS and iOS lifecycle
 
 The resource state machine is:

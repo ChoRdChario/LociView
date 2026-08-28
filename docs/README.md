@@ -43,7 +43,7 @@ If observed code conflicts with the applicable compatibility or accepted future 
 | `specs/README.md` | `PRODUCT-OWNER APPROVED CONTRACT / NOT IMPLEMENTED` | Index and authority for the gated v2 implementation contract |
 | `specs/00-product-contract.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | Product guarantees, MVP boundary, privacy and mobile behavior |
 | `specs/01-domain-rendering.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | Frames, revisions, SceneDocument, modes, picking and renderer gates |
-| `specs/02-storage-package-migration.md` | `PRODUCT-OWNER APPROVED / §13 BOUNDED PATH IMPLEMENTED / GENERAL V2 NOT IMPLEMENTED` | General metadata/CAS candidate boundaries plus the implemented interim native snapshot v1 boundary |
+| `specs/02-storage-package-migration.md` | `PRODUCT-OWNER APPROVED / §13 + §15 BOUNDED PATHS IMPLEMENTED / GENERAL V2 NOT IMPLEMENTED` | General metadata/CAS candidate boundaries plus the implemented native snapshot/package and two-Asset manual-alignment boundaries |
 | `specs/03-gates-and-delivery.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | G0/G0-S/G1 evidence, thresholds, feature flags, rollback and schedule |
 | `specs/04-locimyu-conversion.md` | `APPROVED IDENTITY/SOURCE AUTHORITY / LOCAL RETENTION SPECIFICATION BLOCKED / NOT IMPLEMENTED` | Exact LociMyu Caption identity/source-authority and the bounded local-review design stop |
 

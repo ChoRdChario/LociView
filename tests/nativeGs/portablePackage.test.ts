@@ -17,7 +17,10 @@ import {
   NATIVE_PORTABLE_SNAPSHOT_ENTRY,
   restoreNativePortablePackageV1,
 } from '../../src/nativeGs/portablePackage';
-import type { NativeProjectDraftV1 } from '../../src/nativeGs/schema';
+import {
+  activateNativeManualAssetTransformV1,
+  type NativeProjectDraftV1,
+} from '../../src/nativeGs/schema';
 import {
   createNativeProjectV1,
   listNativeProjectsV1,
@@ -26,8 +29,9 @@ import {
   nativeRepresentationPath,
   nativeSnapshotPath,
   openNativeProjectV1,
+  saveNativeProjectV1,
 } from '../../src/nativeGs/storage';
-import { makeGsPlySource, makeNativeDraft, NATIVE_TEST_IDS } from './nativeTestProject';
+import { makeGsPlySource, makeNativeDraft, NATIVE_TEST_IDS, testNativeId } from './nativeTestProject';
 
 class ChunkedMemoryFS extends MemoryFS {
   constructor(private readonly chunkBytes = 4096) {
@@ -165,7 +169,17 @@ async function makeSourceProject(): Promise<{
   const sources = new Map(base.sources);
   sources.set(NATIVE_TEST_IDS.gsRepresentation, gs.source);
   const session = await acquireNew(fs);
-  const snapshot = await createNativeProjectV1(session.workspace, detailedDraft, sources);
+  const created = await createNativeProjectV1(session.workspace, detailedDraft, sources);
+  const snapshot = await saveNativeProjectV1(session.workspace, activateNativeManualAssetTransformV1(
+    created,
+    NATIVE_TEST_IDS.gsAsset,
+    testNativeId('bnd', 92),
+    {
+      translation: [6, 2, -3],
+      rotationXYZW: [0, Math.SQRT1_2, 0, Math.SQRT1_2],
+      uniformScale: 0.625,
+    },
+  ));
   return { fs, session, snapshot };
 }
 

@@ -3,10 +3,18 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { loadModel } from '../viewer/loaders';
 import { inspectNativeGsPlyV1 } from './plyProfile';
-import { resolveNativeGsSliceV1, type NativeResourceStateV1, type NativeSliceResolutionV1 } from './resolver';
+import {
+  activeNativeBindingV1,
+  activeNativeRepresentationsV1,
+  allActiveNativeRepresentationsV1,
+  resolveNativeGsSliceV1,
+  type NativeResourceStateV1,
+  type NativeSliceResolutionV1,
+} from './resolver';
 import {
   nativeModelFormat,
   newNativeId,
+  normalizeNativeSim3,
   type NativeCaptionV1,
   type NativeCanonicalTransformV1,
   type NativeProjectSnapshotV1,
@@ -18,10 +26,18 @@ import type { WorkspaceReadableFile } from '../platform/fs';
 
 export interface NativeGsViewerCallbacks {
   onCaptionChanged(caption: NativeCaptionV1): void;
+  onAssetTransformCommitted(assetId: string, transform: NativeSim3V1): void;
   onIssuesChanged(issues: readonly string[]): void;
   onProgress(message: string): void;
   onRuntimeError(message: string): void;
 }
+
+export type NativeAssetGizmoMode = 'translate' | 'rotate' | 'scale';
+
+type NativeGizmoTarget =
+  | { readonly kind: 'caption' }
+  | { readonly kind: 'asset'; readonly assetId: string }
+  | null;
 
 function applySim3(object: THREE.Object3D, transform: NativeSim3V1): void {
   object.position.fromArray(transform.translation);
@@ -118,6 +134,9 @@ export class NativeGsViewer {
   private sparkRuntime: NativeSparkRuntime | null = null;
   private captionMarker: THREE.Mesh | null = null;
   private currentCaption: NativeCaptionV1 | null = null;
+  private gizmoTarget: NativeGizmoTarget = null;
+  private assetGizmoMode: NativeAssetGizmoMode = 'translate';
+  private assetScaleDragStart = 1;
   private placementArmed = false;
   private editingEnabled = false;
   private gizmoDragging = false;
@@ -155,13 +174,24 @@ export class NativeGsViewer {
     this.gizmo.setSize(0.75);
     const withHelper = this.gizmo as unknown as { getHelper?: () => THREE.Object3D };
     this.gizmoRoot = withHelper.getHelper?.() ?? this.gizmo as unknown as THREE.Object3D;
+    this.gizmoRoot.visible = false;
     this.scene.add(this.gizmoRoot);
+    this.gizmo.addEventListener('mouseDown', () => {
+      if (this.gizmoTarget?.kind !== 'asset') return;
+      const group = this.assetGroups.get(this.gizmoTarget.assetId);
+      if (group !== undefined) this.assetScaleDragStart = group.scale.x;
+    });
     this.gizmo.addEventListener('dragging-changed', (event) => {
       this.gizmoDragging = (event as unknown as { value: boolean }).value;
       this.controls.enabled = !this.gizmoDragging;
-      if (!this.gizmoDragging) this.syncCaptionFromMarker();
+      if (this.gizmoDragging) return;
+      if (this.gizmoTarget?.kind === 'caption') this.syncCaptionFromMarker();
+      else if (this.gizmoTarget?.kind === 'asset') this.commitAssetTransformFromGroup();
     });
-    this.gizmo.addEventListener('objectChange', () => this.syncCaptionFromMarker());
+    this.gizmo.addEventListener('objectChange', () => {
+      if (this.gizmoTarget?.kind === 'caption') this.syncCaptionFromMarker();
+      else if (this.gizmoTarget?.kind === 'asset') this.enforceUniformAssetScale();
+    });
     this.canvas.addEventListener('click', this.onCanvasClick);
     this.canvas.addEventListener('webglcontextlost', this.onContextLost);
     this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -178,13 +208,13 @@ export class NativeGsViewer {
     for (const asset of this.snapshot.assets) {
       const group = new THREE.Group();
       group.name = asset.id;
-      const binding = this.snapshot.assetBindingRevisions.find((entry) => entry.id === asset.status.activeBindingId);
-      if (binding === undefined) continue;
+      const binding = activeNativeBindingV1(this.snapshot, asset.id);
+      if (binding === null) continue;
       applySim3(group, binding.assetToProject);
       this.assetGroups.set(asset.id, group);
       this.scene.add(group);
     }
-    const ordered = [...this.snapshot.representations].sort((left, right) => {
+    const ordered = allActiveNativeRepresentationsV1(this.snapshot).sort((left, right) => {
       const rank = (role: NativeRepresentationV1['role']): number => role === 'meshPrimary' ? 0 : role === 'interactionProxy' ? 1 : 2;
       return rank(left.role) - rank(right.role) || left.id.localeCompare(right.id);
     });
@@ -212,7 +242,10 @@ export class NativeGsViewer {
       }
     }
     this.currentCaption = this.snapshot.captions[0] ?? null;
-    if (this.currentCaption !== null) this.showCaption(this.currentCaption);
+    if (this.currentCaption !== null) {
+      this.gizmoTarget = { kind: 'caption' };
+      this.showCaption(this.currentCaption);
+    }
     this.updateResolution();
     this.fitCamera();
   }
@@ -227,24 +260,67 @@ export class NativeGsViewer {
 
   setSnapshot(snapshot: NativeProjectSnapshotV1): void {
     this.snapshot = snapshot;
-    for (const binding of snapshot.assetBindingRevisions) {
-      const group = this.assetGroups.get(binding.assetId);
-      if (group !== undefined) applySim3(group, binding.assetToProject);
+    for (const asset of snapshot.assets) {
+      const binding = activeNativeBindingV1(snapshot, asset.id);
+      const group = this.assetGroups.get(asset.id);
+      if (binding !== null && group !== undefined) applySim3(group, binding.assetToProject);
+    }
+    const gizmoTarget = this.gizmoTarget;
+    if (gizmoTarget?.kind === 'asset' && !snapshot.assets.some((asset) => asset.id === gizmoTarget.assetId)) {
+      this.gizmoTarget = null;
     }
     this.currentCaption = snapshot.captions[0] ?? null;
-    if (this.currentCaption === null) this.hideCaption();
+    if (this.currentCaption === null) {
+      if (this.gizmoTarget?.kind === 'caption') this.gizmoTarget = null;
+      this.hideCaption();
+    }
     else this.showCaption(this.currentCaption);
     this.placementArmed = false;
     this.updateResolution();
   }
 
   setEditingEnabled(enabled: boolean): void {
+    if (this.editingEnabled === enabled) return;
     this.editingEnabled = enabled;
-    if (!enabled) this.placementArmed = false;
+    if (!enabled) {
+      this.placementArmed = false;
+      this.gizmoDragging = false;
+      this.controls.enabled = true;
+      this.applyActiveAssetTransforms();
+    }
     this.updateResolution();
   }
 
+  selectAlignmentAsset(assetId: string): boolean {
+    const visual = activeNativeRepresentationsV1(this.snapshot, assetId)
+      .some((representation) => representation.role === 'meshPrimary' || representation.role === 'gsPrimary');
+    if (!visual || !this.assetGroups.has(assetId)) return false;
+    this.placementArmed = false;
+    this.gizmoTarget = { kind: 'asset', assetId };
+    this.gizmo.setMode(this.assetGizmoMode);
+    this.updateResolution();
+    return this.gizmoRoot.visible;
+  }
+
+  setAssetGizmoMode(mode: NativeAssetGizmoMode): void {
+    this.assetGizmoMode = mode;
+    if (this.gizmoTarget?.kind === 'asset') this.gizmo.setMode(mode);
+    this.refreshGizmoAttachment();
+  }
+
+  editCaptionPosition(): boolean {
+    if (this.currentCaption === null || this.captionMarker === null) return false;
+    this.placementArmed = false;
+    this.gizmoTarget = { kind: 'caption' };
+    this.gizmo.setMode('translate');
+    this.updateResolution();
+    return this.gizmoRoot.visible;
+  }
+
   armPlacement(): boolean {
+    this.gizmoTarget = null;
+    this.gizmo.detach();
+    this.gizmoRoot.visible = false;
     this.updateResolution();
     const interaction = this.resolution.interaction;
     this.placementArmed = this.editingEnabled && interaction.enabled;
@@ -255,7 +331,7 @@ export class NativeGsViewer {
   }
 
   disposeGs(): void {
-    const gs = this.snapshot.representations.find((representation) => representation.role === 'gsPrimary');
+    const gs = allActiveNativeRepresentationsV1(this.snapshot).find((representation) => representation.role === 'gsPrimary');
     if (gs !== undefined) {
       this.representationObjects.get(gs.id)?.removeFromParent();
       this.representationObjects.delete(gs.id);
@@ -344,8 +420,8 @@ export class NativeGsViewer {
       const object = this.representationObjects.get(representation.id);
       if (object === undefined) continue;
       if (representation.role === 'interactionProxy') {
-        const targetGs = this.snapshot.representations.find((candidate) => (
-          candidate.role === 'gsPrimary' && candidate.assetId === representation.assetId &&
+        const targetGs = activeNativeRepresentationsV1(this.snapshot, representation.assetId).find((candidate) => (
+          candidate.role === 'gsPrimary' &&
           candidate.variantFamilyId === representation.proxyForGsVariantFamilyId
         ));
         object.visible = targetGs !== undefined && visible.has(targetGs.id);
@@ -354,18 +430,76 @@ export class NativeGsViewer {
       }
     }
     if (this.captionMarker !== null && this.currentCaption !== null) {
-      const active = this.snapshot.representations.some((representation) => (
+      const active = allActiveNativeRepresentationsV1(this.snapshot).some((representation) => (
         representation.assetId === this.currentCaption?.anchor.assetId &&
         representation.role !== 'interactionProxy' && visible.has(representation.id)
       ));
       this.captionMarker.visible = active;
-      if (active && this.editingEnabled) this.gizmo.attach(this.captionMarker);
-      else this.gizmo.detach();
-      this.gizmoRoot.visible = active && this.editingEnabled;
-    } else {
-      this.gizmoRoot.visible = false;
     }
+    this.refreshGizmoAttachment();
     this.callbacks.onIssuesChanged(this.resolution.issues);
+  }
+
+  private applyActiveAssetTransforms(): void {
+    for (const asset of this.snapshot.assets) {
+      const binding = activeNativeBindingV1(this.snapshot, asset.id);
+      const group = this.assetGroups.get(asset.id);
+      if (binding !== null && group !== undefined) applySim3(group, binding.assetToProject);
+    }
+  }
+
+  private assetIsVisible(assetId: string): boolean {
+    const visible = new Set(this.resolution.visibleRepresentationIds);
+    return activeNativeRepresentationsV1(this.snapshot, assetId).some((representation) => (
+      representation.role !== 'interactionProxy' && visible.has(representation.id)
+    ));
+  }
+
+  private refreshGizmoAttachment(): void {
+    this.gizmo.detach();
+    this.gizmoRoot.visible = false;
+    if (!this.editingEnabled) return;
+    if (this.gizmoTarget?.kind === 'caption') {
+      if (this.captionMarker === null || !this.captionMarker.visible) return;
+      this.gizmo.setMode('translate');
+      this.gizmo.attach(this.captionMarker);
+      this.gizmoRoot.visible = true;
+      return;
+    }
+    if (this.gizmoTarget?.kind !== 'asset' || !this.assetIsVisible(this.gizmoTarget.assetId)) return;
+    const group = this.assetGroups.get(this.gizmoTarget.assetId);
+    if (group === undefined) return;
+    this.gizmo.setMode(this.assetGizmoMode);
+    this.gizmo.attach(group);
+    this.gizmoRoot.visible = true;
+  }
+
+  private enforceUniformAssetScale(): void {
+    if (this.gizmoTarget?.kind !== 'asset' || this.assetGizmoMode !== 'scale') return;
+    const group = this.assetGroups.get(this.gizmoTarget.assetId);
+    if (group === undefined) return;
+    const candidates = [group.scale.x, group.scale.y, group.scale.z];
+    let selected = candidates[0]!;
+    for (const candidate of candidates.slice(1)) {
+      if (Math.abs(candidate - this.assetScaleDragStart) > Math.abs(selected - this.assetScaleDragStart)) {
+        selected = candidate;
+      }
+    }
+    group.scale.setScalar(Math.max(Math.abs(selected), 0.000001));
+  }
+
+  private commitAssetTransformFromGroup(): void {
+    if (!this.editingEnabled || this.gizmoTarget?.kind !== 'asset') return;
+    const assetId = this.gizmoTarget.assetId;
+    const group = this.assetGroups.get(assetId);
+    if (group === undefined) return;
+    this.enforceUniformAssetScale();
+    const transform = normalizeNativeSim3({
+      translation: tuple(group.position),
+      rotationXYZW: [group.quaternion.x, group.quaternion.y, group.quaternion.z, group.quaternion.w],
+      uniformScale: group.scale.x,
+    });
+    this.callbacks.onAssetTransformCommitted(assetId, transform);
   }
 
   private readonly onCanvasClick = (event: MouseEvent): void => {
@@ -385,11 +519,10 @@ export class NativeGsViewer {
       return;
     }
     const asset = this.snapshot.assets.find((candidate) => candidate.id === interaction.targetAssetId);
-    const binding = this.snapshot.assetBindingRevisions.find((candidate) => candidate.id === asset?.status.activeBindingId);
+    const binding = activeNativeBindingV1(this.snapshot, interaction.targetAssetId);
     const revision = this.snapshot.assetRevisions.find((candidate) => candidate.id === binding?.assetRevisionId);
-    const visual = revision?.representationIds
-      .map((id) => this.snapshot.representations.find((candidate) => candidate.id === id))
-      .find((candidate) => candidate?.role === interaction.targetRole);
+    const visual = activeNativeRepresentationsV1(this.snapshot, interaction.targetAssetId)
+      .find((candidate) => candidate.role === interaction.targetRole);
     const compatibility = revision?.anchorCompatibilityClasses.find((entry) => entry.targetVariantFamilyIds.includes(visual?.variantFamilyId ?? ''));
     if (asset === undefined || revision === undefined || compatibility === undefined) {
       this.callbacks.onIssuesChanged([...this.resolution.issues, 'Caption target closure is invalid.']);
@@ -411,6 +544,7 @@ export class NativeGsViewer {
       },
     };
     this.currentCaption = caption;
+    this.gizmoTarget = { kind: 'caption' };
     this.showCaption(caption);
     this.callbacks.onCaptionChanged(caption);
     this.callbacks.onIssuesChanged([...this.resolution.issues, 'Coarse hit accepted. Adjust the gizmo, then save.']);
@@ -430,17 +564,19 @@ export class NativeGsViewer {
     this.captionMarker.position.fromArray(caption.anchor.positionAsset);
     this.captionMarker.quaternion.identity();
     this.captionMarker.scale.setScalar(1);
-    if (this.editingEnabled) this.gizmo.attach(this.captionMarker);
     this.updateResolution();
   }
 
   private hideCaption(): void {
-    this.gizmo.detach();
+    if (this.gizmoTarget?.kind === 'caption') this.gizmo.detach();
     this.captionMarker?.removeFromParent();
   }
 
   private syncCaptionFromMarker(): void {
-    if (!this.editingEnabled || this.captionMarker === null || this.currentCaption === null) return;
+    if (
+      !this.editingEnabled || this.gizmoTarget?.kind !== 'caption' ||
+      this.captionMarker === null || this.currentCaption === null
+    ) return;
     this.currentCaption = {
       ...this.currentCaption,
       anchor: { ...this.currentCaption.anchor, positionAsset: tuple(this.captionMarker.position), hitEvidence: { method: 'manual' } },

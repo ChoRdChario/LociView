@@ -1,4 +1,5 @@
 import type {
+  NativeAssetBindingRevisionV1,
   NativeDisplayMode,
   NativeProjectSnapshotV1,
   NativeRepresentationV1,
@@ -29,14 +30,32 @@ function isReady(states: ReadonlyMap<string, NativeResourceStateV1>, representat
   return state?.availability === 'ready' && state.registration === 'known';
 }
 
-function activeRepresentations(snapshot: NativeProjectSnapshotV1, assetId: string): NativeRepresentationV1[] {
+export function activeNativeBindingV1(
+  snapshot: NativeProjectSnapshotV1,
+  assetId: string,
+): NativeAssetBindingRevisionV1 | null {
   const asset = snapshot.assets.find((candidate) => candidate.id === assetId);
-  if (asset === undefined) return [];
+  if (asset === undefined) return null;
   const binding = snapshot.assetBindingRevisions.find((candidate) => candidate.id === asset.status.activeBindingId);
+  return binding?.assetId === assetId ? binding : null;
+}
+
+export function activeNativeRepresentationsV1(
+  snapshot: NativeProjectSnapshotV1,
+  assetId: string,
+): NativeRepresentationV1[] {
+  const binding = activeNativeBindingV1(snapshot, assetId);
   const revision = snapshot.assetRevisions.find((candidate) => candidate.id === binding?.assetRevisionId);
   if (binding?.assetId !== assetId || revision?.assetId !== assetId) return [];
   const ids = new Set(revision.representationIds);
   return snapshot.representations.filter((candidate) => candidate.assetId === assetId && ids.has(candidate.id));
+}
+
+export function allActiveNativeRepresentationsV1(snapshot: NativeProjectSnapshotV1): NativeRepresentationV1[] {
+  const ids = new Set(snapshot.assets.flatMap((asset) => (
+    activeNativeRepresentationsV1(snapshot, asset.id).map((representation) => representation.id)
+  )));
+  return snapshot.representations.filter((representation) => ids.has(representation.id));
 }
 
 export function resolveNativeGsSliceV1(
@@ -44,8 +63,9 @@ export function resolveNativeGsSliceV1(
   states: ReadonlyMap<string, NativeResourceStateV1>,
 ): NativeSliceResolutionV1 {
   const issues: string[] = [];
-  const meshRepresentations = snapshot.representations.filter((representation) => representation.role === 'meshPrimary');
-  const gsRepresentations = snapshot.representations.filter((representation) => representation.role === 'gsPrimary');
+  const activeRepresentations = allActiveNativeRepresentationsV1(snapshot);
+  const meshRepresentations = activeRepresentations.filter((representation) => representation.role === 'meshPrimary');
+  const gsRepresentations = activeRepresentations.filter((representation) => representation.role === 'gsPrimary');
   const usableMesh = meshRepresentations.filter((representation) => isReady(states, representation));
   const usableGs = gsRepresentations.filter((representation) => isReady(states, representation));
   for (const representation of meshRepresentations) {
@@ -91,7 +111,7 @@ export function resolveNativeGsSliceV1(
       issues,
     };
   }
-  const targetRepresentations = activeRepresentations(snapshot, targetAssetId);
+  const targetRepresentations = activeNativeRepresentationsV1(snapshot, targetAssetId);
   const targetMesh = targetRepresentations.find((representation) => representation.role === 'meshPrimary');
   if (targetMesh !== undefined) {
     if (!showMesh || !isReady(states, targetMesh)) {
@@ -127,7 +147,7 @@ export function resolveNativeGsSliceV1(
       issues,
     };
   }
-  const allProxies = snapshot.representations.filter((representation) => representation.role === 'interactionProxy');
+  const allProxies = activeRepresentations.filter((representation) => representation.role === 'interactionProxy');
   const sameAssetProxies = targetRepresentations.filter((representation) => representation.role === 'interactionProxy');
   const bound = sameAssetProxies.filter((representation) => (
     representation.proxyForGsVariantFamilyId === targetGs.variantFamilyId &&

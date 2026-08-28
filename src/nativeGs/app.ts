@@ -8,6 +8,7 @@ import { registerPwa } from '../platform/pwa';
 import { inspectNativeGsPlyV1 } from './plyProfile';
 import { isNativeGsOfflineReady, prepareNativeGsOffline } from './offline';
 import {
+  activateNativeManualAssetTransformV1,
   NATIVE_GS_PROFILE_ID,
   NATIVE_IDENTITY_TRANSFORM,
   nativeModelProfileId,
@@ -37,7 +38,7 @@ import {
   restoreNativePortablePackageV1,
 } from './portablePackage';
 import { digestNativeStream } from './sha256';
-import { NativeGsViewer } from './viewer';
+import { NativeGsViewer, type NativeAssetGizmoMode } from './viewer';
 import './style.css';
 
 interface SelectedFiles {
@@ -656,7 +657,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         portableStatus,
         portableResult,
       ),
-      el('p', { class: 'ng-note' }, 'Alignment、Compare／Integrated、v1／LociMyu migrationは後続workstreamです。'),
+      el('p', { class: 'ng-note' }, '高度なAlignment workflow、Compare／Integrated、v1／LociMyu migrationは後続workstreamです。'),
     ));
     await refreshOffline();
   };
@@ -707,6 +708,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     display.value = working.presentation.displayMode;
     const target = el('select');
     const arm = el('button', { class: 'primary' }, '1. Caption初期配置');
+    const editCaption = el('button', {}, 'Caption位置を調整');
     const save = el('button', { class: 'primary' }, '2. Snapshot保存');
     const unload = el('button', {}, 'GSを解放');
     const close = el('button', {}, '閉じる');
@@ -715,6 +717,12 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const rotationInputs = [0, 1, 2].map(() => el('input', { type: 'number', step: '1' }));
     const scaleInput = el('input', { type: 'number', step: '0.01', min: '0.000001' });
     const applyTransformButton = el('button', {}, '位置・回転・scaleを適用');
+    let assetGizmoMode: NativeAssetGizmoMode = 'translate';
+    const assetGizmoButtons = new Map<NativeAssetGizmoMode, HTMLButtonElement>([
+      ['translate', el('button', { 'aria-pressed': 'true' }, '移動')],
+      ['rotate', el('button', { 'aria-pressed': 'false' }, '回転')],
+      ['scale', el('button', { 'aria-pressed': 'false' }, 'Uniform scale')],
+    ]);
     const captionTitle = el('input', { type: 'text', maxlength: '160' });
     const captionBody = el('textarea');
 
@@ -733,20 +741,23 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       clear(diagnostics);
       for (const message of messages) diagnostics.append(el('li', {}, message));
     };
+    const canMutateWorking = (): boolean => session.accessState === 'editable' && !saving;
     const updateAccess = (): void => {
       accessBadge.textContent = session.sessionMode === 'view'
         ? 'View mode · read-only'
         : session.accessState === 'editable'
           ? 'Edit mode · write lock held'
           : `Edit mode · ${session.accessState}`;
-      const editable = session.accessState === 'editable' && !saving;
+      const editable = canMutateWorking();
       save.disabled = !editable || !dirty;
       applyTransformButton.disabled = !editable;
       arm.disabled = !editable;
+      editCaption.disabled = !editable || working.captions.length === 0;
+      for (const button of assetGizmoButtons.values()) button.disabled = !editable;
       captionTitle.disabled = !editable;
       captionBody.disabled = !editable;
-      display.disabled = saving;
-      target.disabled = saving;
+      display.disabled = !editable;
+      target.disabled = !editable;
       close.disabled = saving;
       activeViewer?.setEditingEnabled(editable);
     };
@@ -768,6 +779,15 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       [euler.x, euler.y, euler.z].forEach((value, index) => { rotationInputs[index]!.value = String(THREE.MathUtils.radToDeg(value)); });
       scaleInput.value = String(binding.assetToProject.uniformScale);
     };
+    const commitWorkingAssetTransform = (assetId: string, transform: NativeSim3V1): boolean => {
+      if (!canMutateWorking()) return false;
+      const next = activateNativeManualAssetTransformV1(working, assetId, newNativeId('bnd'), transform);
+      if (next === working) return false;
+      working = next;
+      transformAsset.value = assetId;
+      populateTransform();
+      return true;
+    };
 
     root.append(el('main', { class: 'ng-view' },
       el('section', { class: 'ng-stage' }, canvas, el('div', { class: 'ng-stage-badges' }, accessBadge, modeBadge)),
@@ -783,14 +803,16 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         ),
         el('section', { class: 'ng-card' },
           el('h2', {}, 'Two-stage Caption placement'),
-          el('div', { class: 'ng-row' }, arm, save, unload),
+          el('div', { class: 'ng-row' }, arm, editCaption, save, unload),
           el('label', { class: 'ng-field' }, el('span', {}, 'Caption title'), captionTitle),
           el('label', { class: 'ng-field' }, el('span', {}, 'Caption body'), captionBody),
           el('p', { class: 'ng-note' }, 'Proxy/Mesh hit後にギズモで調整し、最終positionAssetだけを保存します。'),
         ),
         el('section', { class: 'ng-card' },
           el('h2', {}, 'Asset placement adjustment'),
-          el('label', { class: 'ng-field' }, el('span', {}, 'Asset'), transformAsset),
+          el('label', { class: 'ng-field' }, el('span', {}, '現在選択中のAsset（Proxyは選択対象外）'), transformAsset),
+          el('span', { class: 'ng-note' }, 'Asset gizmo'),
+          el('div', { class: 'ng-row ng-gizmo-modes' }, ...assetGizmoButtons.values()),
           el('span', { class: 'ng-note' }, 'Translation X/Y/Z'), el('div', { class: 'ng-three' }, ...translationInputs),
           el('span', { class: 'ng-note' }, 'Rotation X/Y/Z (degrees)'), el('div', { class: 'ng-three' }, ...rotationInputs),
           el('label', { class: 'ng-field' }, el('span', {}, 'Uniform scale'), scaleInput),
@@ -806,11 +828,18 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const offlineReady = import.meta.env.DEV || await isNativeGsOfflineReady(await pwaRegistration);
     const viewer = new NativeGsViewer(canvas, working, {
       onCaptionChanged(caption) {
+        if (!canMutateWorking()) return;
         const titleValue = captionTitle.value.trim();
         const next = { ...caption, title: titleValue === '' ? 'Caption' : titleValue, body: captionBody.value };
         working = { ...working, captions: [next] };
         captionTitle.value = next.title;
         captionBody.value = next.body;
+        markDirty();
+      },
+      onAssetTransformCommitted(assetId, transform) {
+        if (session.accessState !== 'editable' || !commitWorkingAssetTransform(assetId, transform)) return;
+        viewer.setSnapshot(working);
+        viewer.selectAlignmentAsset(assetId);
         markDirty();
       },
       onIssuesChanged: setDiagnostics,
@@ -830,15 +859,19 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     captionTitle.value = working.captions[0]?.title ?? 'Caption';
     captionBody.value = working.captions[0]?.body ?? '';
     populateTransform();
+    viewer.selectAlignmentAsset(transformAsset.value);
+    viewer.setAssetGizmoMode(assetGizmoMode);
     updateAccess();
 
     display.addEventListener('change', () => {
+      if (!canMutateWorking()) return;
       working = { ...working, presentation: { ...working.presentation, displayMode: display.value as NativeDisplayMode } };
       viewer.setSnapshot(working);
       modeBadge.textContent = viewer.getResolution().effectiveDisplayMode;
       markDirty();
     });
     target.addEventListener('change', () => {
+      if (!canMutateWorking()) return;
       working = { ...working, presentation: { ...working.presentation, captionTargetAssetId: target.value } };
       viewer.setSnapshot(working);
       markDirty();
@@ -848,17 +881,36 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         ? '配置待機中：canvas上の選択対象をclick/tapしてください。'
         : '選択対象ではCaption配置を開始できません。';
     });
+    editCaption.addEventListener('click', () => {
+      runtimeStatus.textContent = viewer.editCaptionPosition()
+        ? 'Caption位置gizmoを表示しました。'
+        : '調整できるCaptionがありません。';
+    });
     unload.addEventListener('click', () => {
       viewer.disposeGs();
       modeBadge.textContent = viewer.getResolution().effectiveDisplayMode;
       runtimeStatus.textContent = 'GS runtime resourceを解放しました。再読込はprojectを閉じて開き直してください。';
     });
-    transformAsset.addEventListener('change', populateTransform);
+    transformAsset.addEventListener('change', () => {
+      populateTransform();
+      runtimeStatus.textContent = viewer.selectAlignmentAsset(transformAsset.value)
+        ? '選択Assetのalignment gizmoを表示しました。'
+        : '選択Assetは現在非表示のためgizmoを表示できません。';
+    });
+    for (const [mode, button] of assetGizmoButtons) {
+      button.addEventListener('click', () => {
+        assetGizmoMode = mode;
+        for (const [candidate, candidateButton] of assetGizmoButtons) {
+          candidateButton.setAttribute('aria-pressed', String(candidate === mode));
+        }
+        viewer.selectAlignmentAsset(transformAsset.value);
+        viewer.setAssetGizmoMode(mode);
+        runtimeStatus.textContent = `Asset gizmo: ${button.textContent}`;
+      });
+    }
     applyTransformButton.addEventListener('click', () => {
       try {
         const assetId = transformAsset.value;
-        const current = bindingFor(assetId);
-        if (current === null) throw new Error('Asset bindingが見つかりません。');
         const euler = new THREE.Euler(
           THREE.MathUtils.degToRad(Number(rotationInputs[0]!.value)),
           THREE.MathUtils.degToRad(Number(rotationInputs[1]!.value)),
@@ -871,25 +923,23 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
           rotationXYZW: [quaternion.x, quaternion.y, quaternion.z, quaternion.w],
           uniformScale: Number(scaleInput.value),
         });
-        const nextBinding: NativeAssetBindingRevisionV1 = { ...current, id: newNativeId('bnd'), assetToProject: transform, method: 'manual' };
-        working = {
-          ...working,
-          assets: working.assets.map((asset) => asset.id === assetId ? { ...asset, status: { kind: 'ready', activeBindingId: nextBinding.id } } : asset),
-          assetBindingRevisions: working.assetBindingRevisions.map((binding) => binding.id === current.id ? nextBinding : binding),
-        };
+        if (!commitWorkingAssetTransform(assetId, transform)) return;
         viewer.setSnapshot(working);
+        viewer.selectAlignmentAsset(assetId);
         markDirty();
       } catch (error) {
         runtimeStatus.textContent = error instanceof Error ? error.message : String(error);
       }
     });
     captionTitle.addEventListener('input', () => {
+      if (!canMutateWorking()) return;
       const caption = working.captions[0];
       if (caption === undefined) return;
       working = { ...working, captions: [{ ...caption, title: captionTitle.value.trim() || 'Caption' }] };
       markDirty();
     });
     captionBody.addEventListener('input', () => {
+      if (!canMutateWorking()) return;
       const caption = working.captions[0];
       if (caption === undefined) return;
       working = { ...working, captions: [{ ...caption, body: captionBody.value }] };
