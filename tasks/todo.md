@@ -2535,3 +2535,73 @@ Review and verification — 2026-08-29:
   attachment, renderer, storage architecture or dependency changed. No new
   physical-device run is required for this platform-neutral data-preservation
   correction; the later consolidated iPhone regression remains unchanged.
+
+## Native Asset addition — approved bounded production slice
+
+Checkpoint and plan:
+
+- [x] Recompute the critical path after per-Asset visibility and close the
+  direct multi-Caption preservation P1 in independent commit `69e60e1`
+- [x] Confirm that native snapshot v1, viewer resolution and portable package
+  v1 already support multiple and same-kind Assets; the missing boundary is an
+  opened-project import/publish path, not a new schema or renderer architecture
+- [x] Record the bounded storage and acceptance contract in existing section 17
+  of `docs/specs/02-storage-package-migration.md`
+- [x] Add one transient import builder for either one ordinary Mesh Asset or one
+  GS Asset plus optional same-Asset Proxy, using existing records and explicit
+  identity initial placement
+- [x] Stream and read-back verify only the new immutable Representation bytes,
+  then publish one verified whole-Project snapshot and active marker last under
+  the existing project writer
+- [x] Add the minimal Edit-mode UI needed to repeat the import action; reuse
+  current per-Asset visibility, target selection, alignment, Caption and save
+  controls without replacement/deletion/general layer UI
+- [x] Reuse existing storage and portable acceptance, extending it only enough
+  to prove same-kind independent Assets survive save/reopen and package restore
+- [x] Obtain one independent read-only P0/P1 review; run focused checks and the
+  final executable-tree typecheck/full test/build serially
+- [x] Record Desktop evidence and include the previously deferred physical
+  iPhone per-Asset regression in one consolidated mobile run
+- [x] Commit the bounded slice and leave the worktree clean
+
+Exclusions and stop conditions:
+
+- Ordinary-point profiles/picking, multi-Caption navigation, DisplaySet,
+  Compare, replacement/deletion, automatic registration, Proxy generation,
+  CAS, Automerge, general journal/transaction, renderer abstraction and a
+  second renderer remain outside this slice.
+- Stop before implementation expansion if existing version-1 records cannot
+  express the added Asset, or if safe publication requires a new storage
+  architecture rather than the existing immutable-byte/snapshot/marker order.
+
+Automated acceptance — 2026-08-29:
+
+- One independent read-only review found no unresolved P0/P1 in the bounded
+  import, publication, same-kind Asset, Proxy-binding, reopen, package-v1 or
+  ordinary-route isolation boundaries.
+- Focused native storage/package acceptance passed 18/18. The exact staged tree
+  passed typecheck and the full suite: 47 files, 1,392 tests passed and 21
+  existing todos remained explicit.
+- Normal and `/LociView/` production builds passed. Spark 2.1.0 remains a lazy
+  `native-gs-spark-2.1.0.js` chunk reached only through the native route; the
+  ordinary v1 entry selects its existing app chunk and the 13-entry PWA
+  precache excludes Spark.
+- No dependency, snapshot/package version, renderer architecture or source-file
+  format changed. Desktop and the consolidated physical-iPhone check remain
+  external acceptance, not inferred from these automated results.
+
+Manual acceptance — 2026-08-29:
+
+- The Product Owner reported no problem in the requested Desktop smoke using a
+  small Project with repeated Mesh and GS imports plus explicit same-GS
+  Proxies. Same-kind Assets remained independent, visibility and manual
+  placement were preserved across snapshot close/reopen, and the resulting
+  small `.lociview` was retained for the consolidated physical-iPhone check.
+- The Product Owner then reported every requested physical iPhone 14 Pro check
+  passed against the same static production build: restoring the small
+  `.lociview`, independent same-kind visibility, hidden-GS Proxy/Caption
+  exclusion, snapshot save, online reload, Safari termination and complete-
+  offline reopen. Asset count, visibility and placement remained intact.
+- The explicitly approved account-less HTTPS tunnel served only the static app
+  build; Project, package and source-model bytes were never served by it. The
+  tunnel and both local servers were stopped immediately after acceptance.

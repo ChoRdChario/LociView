@@ -23,6 +23,7 @@ import {
   type NativeProjectDraftV1,
 } from '../../src/nativeGs/schema';
 import {
+  addNativeAssetV1,
   createNativeProjectV1,
   listNativeProjectsV1,
   nativeActiveMarkerPath,
@@ -32,7 +33,7 @@ import {
   openNativeProjectV1,
   saveNativeProjectV1,
 } from '../../src/nativeGs/storage';
-import { makeGsPlySource, makeNativeDraft, NATIVE_TEST_IDS, testNativeId } from './nativeTestProject';
+import { makeGsPlySource, makeNativeDraft, makeNativeMeshImport, NATIVE_TEST_IDS, testNativeId } from './nativeTestProject';
 
 class ChunkedMemoryFS extends MemoryFS {
   constructor(private readonly chunkBytes = 4096) {
@@ -184,8 +185,10 @@ async function makeSourceProject(): Promise<{
   sources.set(NATIVE_TEST_IDS.gsRepresentation, gs.source);
   const session = await acquireNew(fs);
   const created = await createNativeProjectV1(session.workspace, detailedDraft, sources);
+  const added = makeNativeMeshImport();
+  const multiAsset = await addNativeAssetV1(session.workspace, created, added.imported, added.sources);
   const aligned = activateNativeManualAssetTransformV1(
-    created,
+    multiAsset,
     NATIVE_TEST_IDS.gsAsset,
     testNativeId('bnd', 92),
     {
@@ -224,7 +227,7 @@ async function expectInactive(fs: MemoryFS, projectId = NATIVE_TEST_IDS.project)
 }
 
 describe('native portable .lociview streamed backup/restore', () => {
-  it('round-trips the exact snapshot and every Mesh/GS/Proxy byte through five STORE entries', async () => {
+  it('round-trips the exact snapshot and every same-kind Mesh/GS/Proxy byte through STORE entries', async () => {
     const source = await makeSourceProject();
     const { blob, result } = await exportBlob(source);
     const entries = await storedZipEntries(blob);
@@ -235,7 +238,7 @@ describe('native portable .lociview streamed backup/restore', () => {
         `native/representations/${representation.id}.bin`
       )),
     ].sort());
-    expect(entries).toHaveLength(5);
+    expect(entries).toHaveLength(6);
     expect(result.metrics.packageByteLength).toBe(blob.size);
     expect(result.metrics.maxApplicationChunkBytes).toBeLessThan(result.metrics.representationByteLength);
 

@@ -1436,3 +1436,37 @@ version `1` already carries the exact native snapshot text and therefore retains
 this optional field through export/restore without a new package entry or
 version. No migration framework, layer tree, scene preset, CAS, journal or
 transaction framework is introduced.
+
+## 17. Bounded native Asset addition (Product Owner approved 2026-08-29)
+
+An opened native project in Edit mode may add exactly one new user-visible
+Asset per import action: either one ordinary Mesh Asset, or one GS Asset with
+an optional explicit Interaction Proxy stored inside that same GS Asset. The
+action may be repeated, including for more than one Asset of the same
+Representation kind. It reuses the existing `Asset`, active
+`AssetBindingRevision`, `AssetRevision` and `Representation` records; the
+import request is transient input and is not a new persistent domain model.
+
+The imported Asset starts visible at an explicitly disclosed identity placement
+in the current ProjectFrame. This is only an initial user placement, not inferred
+registration. The existing manual position/rotation/uniform-scale controls are
+used to align it. A Proxy, when supplied, remains a non-visible Representation
+of its GS Asset and follows that AssetFrame. No replacement, deletion,
+automatic registration, Proxy generation, ordinary-point profile, DisplaySet,
+Compare, renderer abstraction or general scene/layer framework is added.
+
+The current project-scoped writer first reloads and matches the exact durable
+generation/snapshot, validates that the one-Asset record closure and every new
+source are complete, then streams each new Representation to its immutable
+Representation-ID path and verifies size/SHA-256 by streamed read-back. It next
+writes and verifies one whole-Project native snapshot and publishes the active
+marker last. Existing Representation bytes are not rewritten. Until the marker
+is published, the previous snapshot remains active; an interruption may leave
+unreferenced immutable bytes, but must not expose a partial Asset or claim a
+general transaction/recovery guarantee.
+
+Native snapshot version `1` and portable package version `1` remain unchanged:
+both already store arrays of Assets and Representations, and the package writer
+already enumerates every Representation. Save/reopen and portable
+export/delete/restore/reopen must retain all old and newly added Assets,
+bindings, transforms, visibility and Captions without changing source bytes.

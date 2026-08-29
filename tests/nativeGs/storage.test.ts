@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { MemoryFS } from '../../src/platform/fs';
 import { ProjectMutationCoordinator } from '../../src/platform/projectLock';
-import { activeNativeBindingV1 } from '../../src/nativeGs/resolver';
+import { activeNativeBindingV1, isNativeAssetVisibleV1 } from '../../src/nativeGs/resolver';
 import {
   activateNativeManualAssetTransformV1,
   normalizeNativeSim3,
   setNativeAssetVisibilityV1,
 } from '../../src/nativeGs/schema';
 import {
+  addNativeAssetV1,
   assertNativeProjectDoesNotMixV1,
   createNativeProjectV1,
   deleteNativeProjectV1,
@@ -18,7 +19,7 @@ import {
   openNativeProjectV1,
   saveNativeProjectV1,
 } from '../../src/nativeGs/storage';
-import { makeNativeDraft, NATIVE_TEST_IDS, testNativeId } from './nativeTestProject';
+import { makeNativeDraft, makeNativeMeshImport, NATIVE_TEST_IDS, testNativeId } from './nativeTestProject';
 
 class RecordingMemoryFS extends MemoryFS {
   readonly writes: string[] = [];
@@ -158,6 +159,51 @@ describe('native project blob-first/marker-last publication', () => {
     expect(activeNativeBindingV1(reopened, NATIVE_TEST_IDS.meshAsset)?.assetToProject).toEqual(
       activeNativeBindingV1(first, NATIVE_TEST_IDS.meshAsset)?.assetToProject,
     );
+    session.release();
+  });
+
+  it('adds one same-kind Asset by streaming only its new bytes before snapshot and marker publication', async () => {
+    const fs = new RecordingMemoryFS();
+    const session = await editable(fs);
+    const { draft, sources } = makeNativeDraft(2);
+    const first = await createNativeProjectV1(session.workspace, draft, sources);
+    const binaryWriteCount = fs.writes.filter((path) => path.endsWith('.bin')).length;
+    const added = makeNativeMeshImport();
+    const next = await addNativeAssetV1(session.workspace, first, added.imported, added.sources);
+
+    expect(next.generation).toBe(2);
+    expect(next.assets.filter((asset) => (
+      next.representations.some((representation) => representation.assetId === asset.id && representation.role === 'meshPrimary')
+    ))).toHaveLength(2);
+    expect(next.representations.slice(0, first.representations.length)).toEqual(first.representations);
+    expect(fs.writes.filter((path) => path.endsWith('.bin'))).toHaveLength(binaryWriteCount + 1);
+    expect(fs.writes.at(-1)).toBe(nativeActiveMarkerPath(next.project.id));
+    expect(isNativeAssetVisibleV1(next, added.assetId)).toBe(true);
+    expect(await fs.readBytes(nativeRepresentationPath(next.project.id, added.representationId))).toEqual(added.bytes);
+    await expect(openNativeProjectV1(fs, next.project.id)).resolves.toMatchObject({
+      snapshot: { snapshotId: next.snapshotId, generation: 2 },
+      missingRepresentationIds: [],
+      sizeMismatchRepresentationIds: [],
+    });
+    session.release();
+  });
+
+  it('keeps the prior active snapshot and removes staged import bytes when snapshot publication fails', async () => {
+    const fs = new RecordingMemoryFS();
+    const session = await editable(fs);
+    const { draft, sources } = makeNativeDraft();
+    const first = await createNativeProjectV1(session.workspace, draft, sources);
+    const added = makeNativeMeshImport();
+    fs.failBeforePath = '/snapshots/';
+
+    await expect(addNativeAssetV1(session.workspace, first, added.imported, added.sources)).rejects.toThrow('injected');
+    expect((await openNativeProjectV1(fs, first.project.id)).snapshot).toMatchObject({
+      snapshotId: first.snapshotId,
+      generation: first.generation,
+      assets: first.assets,
+      representations: first.representations,
+    });
+    expect(await fs.exists(nativeRepresentationPath(first.project.id, added.representationId))).toBe(false);
     session.release();
   });
 

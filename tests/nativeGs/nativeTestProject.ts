@@ -1,4 +1,4 @@
-import type { NativeBinarySource } from '../../src/nativeGs/storage';
+import type { NativeAssetImportV1, NativeBinarySource } from '../../src/nativeGs/storage';
 import {
   NATIVE_GS_PROFILE_ID,
   NATIVE_SCHEMA_VERSION,
@@ -95,6 +95,70 @@ export const NATIVE_TEST_IDS = Object.freeze({
   caption: testNativeId('cap', 1),
   snapshot: testNativeId('snp', 1),
 });
+
+export function makeNativeMeshImport(ordinal = 100): {
+  readonly imported: NativeAssetImportV1;
+  readonly sources: ReadonlyMap<string, NativeBinarySource>;
+  readonly assetId: string;
+  readonly representationId: string;
+  readonly bytes: Uint8Array;
+} {
+  const assetId = testNativeId('ast', ordinal);
+  const assetFrameId = testNativeId('frm', ordinal + 100);
+  const revisionId = testNativeId('rev', ordinal);
+  const bindingId = testNativeId('bnd', ordinal);
+  const representationId = testNativeId('rep', ordinal);
+  const representationFrameId = testNativeId('frm', ordinal + 200);
+  const familyId = testNativeId('fam', ordinal);
+  const compatibilityId = testNativeId('cls', ordinal);
+  const bytes = new TextEncoder().encode(`o mesh-${ordinal}\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n`);
+  const blob = new Blob([bytes], { type: 'text/plain' });
+  const sources = new Map<string, NativeBinarySource>([[representationId, {
+    size: blob.size,
+    mediaType: blob.type,
+    stream: () => blob.stream(),
+  }]]);
+  return {
+    assetId,
+    representationId,
+    bytes,
+    sources,
+    imported: {
+      asset: {
+        id: assetId,
+        label: `ordinary Mesh ${ordinal}`,
+        assetFrameId,
+        status: { kind: 'ready', activeBindingId: bindingId },
+      },
+      binding: {
+        id: bindingId,
+        assetId,
+        assetRevisionId: revisionId,
+        assetToProject: { translation: [0, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 },
+        method: 'import',
+      },
+      revision: {
+        id: revisionId,
+        assetId,
+        representationIds: [representationId],
+        anchorCompatibilityClasses: [{ id: compatibilityId, targetVariantFamilyIds: [familyId] }],
+      },
+      representations: [{
+        id: representationId,
+        assetId,
+        representationFrameId,
+        contentKind: 'mesh',
+        purposes: ['source', 'display'],
+        role: 'meshPrimary',
+        variantFamilyId: familyId,
+        formatProfile: { id: nativeModelProfileId('obj') },
+        representationToAsset: { translation: [0, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1, reflection: 'none' },
+        derivedFrom: [],
+        mediaType: 'text/plain',
+      }],
+    },
+  };
+}
 
 export function makeNativeDraft(shDegree: 2 | 3 = 3): {
   readonly draft: NativeProjectDraftV1;

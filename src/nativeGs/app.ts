@@ -25,6 +25,7 @@ import {
 } from './schema';
 import { activeNativeRepresentationsV1, isNativeAssetVisibleV1 } from './resolver';
 import {
+  addNativeAssetV1,
   assertNativeProjectDoesNotMixV1,
   createNativeProjectV1,
   deleteNativeProjectV1,
@@ -33,6 +34,7 @@ import {
   openNativeProjectV1,
   readNativeRepresentationV1,
   saveNativeProjectV1,
+  type NativeAssetImportV1,
   type NativeBinarySource,
 } from './storage';
 import {
@@ -52,6 +54,11 @@ interface SelectedFiles {
 
 interface DraftResult {
   readonly draft: NativeProjectDraftV1;
+  readonly sources: ReadonlyMap<string, NativeBinarySource>;
+}
+
+interface AssetImportBuild {
+  readonly imported: NativeAssetImportV1;
   readonly sources: ReadonlyMap<string, NativeBinarySource>;
 }
 
@@ -85,85 +92,66 @@ function labelFromFile(file: File, fallback: string): string {
   return withoutExtension === '' ? fallback : withoutExtension.slice(0, 160);
 }
 
-async function buildDraft(title: string, files: SelectedFiles): Promise<DraftResult> {
-  if (files.mesh === null && files.gs === null) throw new Error('通常MeshまたはGSを少なくとも一つ選択してください。');
-  if (files.proxy !== null && files.gs === null) throw new Error('Interaction Proxyは対象GSと一緒に指定してください。');
-  const projectId = newNativeId('prj');
-  const projectFrameId = newNativeId('frm');
-  const assets: NativeProjectDraftV1['assets'][number][] = [];
-  const bindings: NativeAssetBindingRevisionV1[] = [];
-  const revisions: NativeProjectDraftV1['assetRevisions'][number][] = [];
+async function buildAssetImport(
+  kind: 'mesh' | 'gs',
+  file: File,
+  proxy: File | null,
+  assetToProject: NativeSim3V1,
+): Promise<AssetImportBuild> {
+  if (kind === 'mesh' && proxy !== null) throw new Error('Interaction Proxyは対象GSと一緒に指定してください。');
+  const assetId = newNativeId('ast');
+  const assetFrameId = newNativeId('frm');
+  const revisionId = newNativeId('rev');
+  const bindingId = newNativeId('bnd');
+  const primaryRepresentationId = newNativeId('rep');
+  const primaryFamilyId = newNativeId('fam');
   const representations: NativeRepresentationDraftV1[] = [];
   const sources = new Map<string, NativeBinarySource>();
-  let meshAssetId: string | null = null;
-  let gsAssetId: string | null = null;
+  const representationIds = [primaryRepresentationId];
 
-  if (files.mesh !== null) {
-    const format = await inspectModelFile(files.mesh, '通常Mesh');
-    meshAssetId = newNativeId('ast');
-    const assetFrameId = newNativeId('frm');
-    const revisionId = newNativeId('rev');
-    const bindingId = newNativeId('bnd');
-    const representationId = newNativeId('rep');
-    const familyId = newNativeId('fam');
-    assets.push({ id: meshAssetId, label: labelFromFile(files.mesh, 'ordinary Mesh'), assetFrameId, status: { kind: 'ready', activeBindingId: bindingId } });
-    bindings.push({ id: bindingId, assetId: meshAssetId, assetRevisionId: revisionId, assetToProject: { translation: [-1.5, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 }, method: 'import' });
-    revisions.push({
-      id: revisionId,
-      assetId: meshAssetId,
-      representationIds: [representationId],
-      anchorCompatibilityClasses: [{ id: newNativeId('cls'), targetVariantFamilyIds: [familyId] }],
-    });
+  if (kind === 'mesh') {
+    const format = await inspectModelFile(file, '通常Mesh');
     representations.push({
-      id: representationId,
-      assetId: meshAssetId,
+      id: primaryRepresentationId,
+      assetId,
       representationFrameId: newNativeId('frm'),
       contentKind: 'mesh',
       purposes: ['source', 'display'],
       role: 'meshPrimary',
-      variantFamilyId: familyId,
+      variantFamilyId: primaryFamilyId,
       formatProfile: { id: nativeModelProfileId(format) },
       representationToAsset: NATIVE_IDENTITY_TRANSFORM,
       derivedFrom: [],
       mediaType: modelMediaType(format),
     });
-    sources.set(representationId, fileSource(files.mesh, modelMediaType(format)));
-  }
-
-  if (files.gs !== null) {
-    const inspection = await inspectNativeGsPlyV1(files.gs);
-    if (inspection.kind !== 'supported-gs') throw new Error('GS欄には対応Graphdeco binary little-endian SH2/SH3 PLYを選択してください。');
-    gsAssetId = newNativeId('ast');
-    const assetFrameId = newNativeId('frm');
-    const revisionId = newNativeId('rev');
-    const bindingId = newNativeId('bnd');
-    const gsRepresentationId = newNativeId('rep');
-    const gsFamilyId = newNativeId('fam');
-    const representationIds = [gsRepresentationId];
-    assets.push({ id: gsAssetId, label: labelFromFile(files.gs, 'partial GS'), assetFrameId, status: { kind: 'ready', activeBindingId: bindingId } });
-    bindings.push({ id: bindingId, assetId: gsAssetId, assetRevisionId: revisionId, assetToProject: { translation: [1.5, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 }, method: 'import' });
+    sources.set(primaryRepresentationId, fileSource(file, modelMediaType(format)));
+  } else {
+    const inspection = await inspectNativeGsPlyV1(file);
+    if (inspection.kind !== 'supported-gs') {
+      throw new Error('GS欄には対応Graphdeco binary little-endian SH2/SH3 PLYを選択してください。');
+    }
     representations.push({
-      id: gsRepresentationId,
-      assetId: gsAssetId,
+      id: primaryRepresentationId,
+      assetId,
       representationFrameId: newNativeId('frm'),
       contentKind: 'gaussianSplat',
       purposes: ['source', 'display'],
       role: 'gsPrimary',
-      variantFamilyId: gsFamilyId,
+      variantFamilyId: primaryFamilyId,
       formatProfile: { id: NATIVE_GS_PROFILE_ID },
       representationToAsset: NATIVE_IDENTITY_TRANSFORM,
       derivedFrom: [],
       gsPly: inspection.facts,
       mediaType: 'application/octet-stream',
     });
-    sources.set(gsRepresentationId, fileSource(files.gs, 'application/octet-stream'));
-    if (files.proxy !== null) {
-      const proxyFormat = await inspectModelFile(files.proxy, 'Interaction Proxy');
+    sources.set(primaryRepresentationId, fileSource(file, 'application/octet-stream'));
+    if (proxy !== null) {
+      const proxyFormat = await inspectModelFile(proxy, 'Interaction Proxy');
       const proxyRepresentationId = newNativeId('rep');
       representationIds.push(proxyRepresentationId);
       representations.push({
         id: proxyRepresentationId,
-        assetId: gsAssetId,
+        assetId,
         representationFrameId: newNativeId('frm'),
         contentKind: 'mesh',
         purposes: ['interaction'],
@@ -171,20 +159,55 @@ async function buildDraft(title: string, files: SelectedFiles): Promise<DraftRes
         variantFamilyId: newNativeId('fam'),
         formatProfile: { id: nativeModelProfileId(proxyFormat) },
         representationToAsset: NATIVE_IDENTITY_TRANSFORM,
-        derivedFrom: [gsRepresentationId],
-        proxyForGsVariantFamilyId: gsFamilyId,
+        derivedFrom: [primaryRepresentationId],
+        proxyForGsVariantFamilyId: primaryFamilyId,
         mediaType: modelMediaType(proxyFormat),
       });
-      sources.set(proxyRepresentationId, fileSource(files.proxy, modelMediaType(proxyFormat)));
+      sources.set(proxyRepresentationId, fileSource(proxy, modelMediaType(proxyFormat)));
     }
-    revisions.push({
-      id: revisionId,
-      assetId: gsAssetId,
-      representationIds,
-      anchorCompatibilityClasses: [{ id: newNativeId('cls'), targetVariantFamilyIds: [gsFamilyId] }],
-    });
   }
 
+  return {
+    imported: {
+      asset: {
+        id: assetId,
+        label: labelFromFile(file, kind === 'mesh' ? 'ordinary Mesh' : 'partial GS'),
+        assetFrameId,
+        status: { kind: 'ready', activeBindingId: bindingId },
+      },
+      binding: { id: bindingId, assetId, assetRevisionId: revisionId, assetToProject, method: 'import' },
+      revision: {
+        id: revisionId,
+        assetId,
+        representationIds,
+        anchorCompatibilityClasses: [{ id: newNativeId('cls'), targetVariantFamilyIds: [primaryFamilyId] }],
+      },
+      representations,
+    },
+    sources,
+  };
+}
+
+async function buildDraft(title: string, files: SelectedFiles): Promise<DraftResult> {
+  if (files.mesh === null && files.gs === null) throw new Error('通常MeshまたはGSを少なくとも一つ選択してください。');
+  if (files.proxy !== null && files.gs === null) throw new Error('Interaction Proxyは対象GSと一緒に指定してください。');
+  const projectId = newNativeId('prj');
+  const projectFrameId = newNativeId('frm');
+  const builtAssets: AssetImportBuild[] = [];
+  const sources = new Map<string, NativeBinarySource>();
+  if (files.mesh !== null) {
+    builtAssets.push(await buildAssetImport('mesh', files.mesh, null, {
+      translation: [-1.5, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1,
+    }));
+  }
+  if (files.gs !== null) {
+    builtAssets.push(await buildAssetImport('gs', files.gs, files.proxy, {
+      translation: [1.5, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1,
+    }));
+  }
+  for (const built of builtAssets) for (const [id, source] of built.sources) sources.set(id, source);
+  const meshAssetId = builtAssets.find((built) => built.imported.representations.some((entry) => entry.role === 'meshPrimary'))?.imported.asset.id ?? null;
+  const gsAssetId = builtAssets.find((built) => built.imported.representations.some((entry) => entry.role === 'gsPrimary'))?.imported.asset.id ?? null;
   const displayMode: NativeDisplayMode = meshAssetId !== null && gsAssetId !== null ? 'mixed' : gsAssetId !== null ? 'gs-only' : 'mesh-only';
   return {
     draft: {
@@ -193,10 +216,10 @@ async function buildDraft(title: string, files: SelectedFiles): Promise<DraftRes
         title: title.trim() === '' ? 'Native GS project' : title.trim().slice(0, 160),
         frame: { id: projectFrameId, handedness: 'right', upAxis: '+Y', unit: { kind: 'unknown' } },
       },
-      assets,
-      assetBindingRevisions: bindings,
-      assetRevisions: revisions,
-      representations,
+      assets: builtAssets.map((built) => built.imported.asset),
+      assetBindingRevisions: builtAssets.map((built) => built.imported.binding),
+      assetRevisions: builtAssets.map((built) => built.imported.revision),
+      representations: builtAssets.flatMap((built) => built.imported.representations),
       presentation: { displayMode, captionTargetAssetId: gsAssetId ?? meshAssetId, hiddenAssetIds: [] },
       captions: [],
     },
@@ -719,6 +742,12 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const save = el('button', { class: 'primary' }, '2. Snapshot保存');
     const unload = el('button', {}, 'GSを解放');
     const close = el('button', {}, '閉じる');
+    const addKind = el('select');
+    addKind.append(el('option', { value: 'mesh' }, '通常Mesh Asset'), el('option', { value: 'gs' }, 'GS Asset'));
+    const addSourceLabel = el('span', {}, '通常Mesh file');
+    const addSource = el('input', { type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply' });
+    const addProxy = el('input', { type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply', disabled: 'true' });
+    const addAsset = el('button', { class: 'primary' }, 'Assetを追加してSnapshot保存');
     const transformAsset = el('select');
     const translationInputs = [0, 1, 2].map(() => el('input', { type: 'number', step: '0.01' }));
     const rotationInputs = [0, 1, 2].map(() => el('input', { type: 'number', step: '1' }));
@@ -797,6 +826,10 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       display.disabled = !editable;
       for (const checkbox of visibilityInputs.values()) checkbox.disabled = !editable;
       target.disabled = !editable;
+      addKind.disabled = !editable;
+      addSource.disabled = !editable;
+      addProxy.disabled = !editable || addKind.value !== 'gs';
+      addAsset.disabled = !editable;
       close.disabled = saving;
       activeViewer?.setEditingEnabled(editable);
     };
@@ -848,6 +881,16 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
           el('label', { class: 'ng-field' }, el('span', {}, 'Caption title'), captionTitle),
           el('label', { class: 'ng-field' }, el('span', {}, 'Caption body'), captionBody),
           el('p', { class: 'ng-note' }, 'Proxy/Mesh hit後にギズモで調整し、最終positionAssetだけを保存します。'),
+        ),
+        el('section', { class: 'ng-card' },
+          el('h2', {}, 'Assetを追加'),
+          el('div', { class: 'ng-grid' },
+            el('label', { class: 'ng-field' }, el('span', {}, '描画形式'), addKind),
+            el('label', { class: 'ng-field' }, addSourceLabel, addSource),
+          ),
+          el('label', { class: 'ng-field' }, el('span', {}, 'GS専用Interaction Proxy（GSのみ・任意）'), addProxy),
+          addAsset,
+          el('p', { class: 'ng-note' }, '一回に一つのAssetを追加します。自動registrationは行わず、Project原点から既存gizmoで配置します。'),
         ),
         el('section', { class: 'ng-card' },
           el('h2', {}, 'Asset placement adjustment'),
@@ -903,6 +946,70 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     viewer.selectAlignmentAsset(transformAsset.value);
     viewer.setAssetGizmoMode(assetGizmoMode);
     updateAccess();
+
+    addKind.addEventListener('change', () => {
+      const isGs = addKind.value === 'gs';
+      addSource.value = '';
+      addProxy.value = '';
+      addSource.accept = isGs ? '.ply,application/octet-stream' : '.glb,.gltf,.obj,.stl,.ply';
+      addSourceLabel.textContent = isGs ? 'Graphdeco GS PLY SH2/SH3' : '通常Mesh file';
+      updateAccess();
+    });
+    addAsset.addEventListener('click', () => {
+      if (!canMutateWorking()) return;
+      const sourceFile = selectedFile(addSource);
+      if (sourceFile === null) {
+        runtimeStatus.className = 'ng-error';
+        runtimeStatus.textContent = '追加するAsset fileを選択してください。';
+        return;
+      }
+      saving = true;
+      updateAccess();
+      runtimeStatus.className = 'ng-status';
+      runtimeStatus.textContent = '追加Assetを検査しています…';
+      void (async () => {
+        const kind = addKind.value === 'gs' ? 'gs' : 'mesh';
+        const built = await buildAssetImport(
+          kind,
+          sourceFile,
+          kind === 'gs' ? selectedFile(addProxy) : null,
+          { translation: [0, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 },
+        );
+        const required = [...built.sources.values()].reduce((sum, source) => sum + source.size, 0);
+        const estimate = await navigator.storage.estimate?.();
+        if (
+          estimate?.quota !== undefined && estimate.usage !== undefined &&
+          Number.isFinite(estimate.quota) && Number.isFinite(estimate.usage) &&
+          estimate.quota - estimate.usage < required
+        ) {
+          throw new Error(`保存可能容量が不足しています（必要 ${fmtBytes(required)}）。既存snapshotは変更しません。`);
+        }
+        const saved = await addNativeAssetV1(
+          session.workspace,
+          working,
+          built.imported,
+          built.sources,
+          (message) => { runtimeStatus.textContent = message; },
+        );
+        durable = saved;
+        working = saved;
+        dirty = false;
+        unsubscribeAccess?.();
+        unsubscribeAccess = null;
+        viewer.dispose();
+        if (activeViewer === viewer) activeViewer = null;
+        saving = false;
+        await renderProject(saved, session);
+      })().catch((error: unknown) => {
+        runtimeStatus.className = 'ng-error';
+        runtimeStatus.textContent = `Asset追加失敗：${error instanceof Error ? error.message : String(error)}。既存active snapshotを維持しました。`;
+      }).finally(() => {
+        if (activeViewer === viewer) {
+          saving = false;
+          updateAccess();
+        }
+      });
+    });
 
     display.addEventListener('change', () => {
       if (!canMutateWorking()) return;

@@ -12,9 +12,14 @@ import {
   serializeNativeActiveMarkerV1,
   serializeNativeSnapshotV1,
   type NativeActiveMarkerV1,
+  type NativeAssetBindingRevisionV1,
+  type NativeAssetRevisionV1,
+  type NativeAssetV1,
   type NativeBlobRefV1,
   type NativeProjectDraftV1,
   type NativeProjectSnapshotV1,
+  type NativeRepresentationDraftV1,
+  type NativeRepresentationV1,
 } from './schema';
 import { digestNativeBytes, digestNativeStream, hashingNativeStream, type NativeStreamDigest } from './sha256';
 
@@ -35,6 +40,14 @@ export interface NativeOpenProject {
   readonly snapshot: NativeProjectSnapshotV1;
   readonly missingRepresentationIds: readonly string[];
   readonly sizeMismatchRepresentationIds: readonly string[];
+}
+
+/** Transient input for one opened-project import; no new durable record type. */
+export interface NativeAssetImportV1 {
+  readonly asset: NativeAssetV1;
+  readonly binding: NativeAssetBindingRevisionV1;
+  readonly revision: NativeAssetRevisionV1;
+  readonly representations: readonly NativeRepresentationDraftV1[];
 }
 
 export function nativeProjectRoot(projectId: string): string {
@@ -125,6 +138,14 @@ async function writeAndVerifyBinary(
     byteLength: written.byteLength,
     mediaType: source.mediaType,
   };
+}
+
+function representationWithBlob(
+  representation: NativeRepresentationDraftV1,
+  blob: NativeBlobRefV1,
+): NativeRepresentationV1 {
+  const { mediaType: _mediaType, ...record } = representation;
+  return { ...record, blob };
 }
 
 async function writeVerifiedSnapshot(
@@ -253,6 +274,120 @@ export async function createNativeProjectV1(
   await publishActiveMarker(fs, snapshot, verified.digest);
   onStatus?.('Native project saved and active.');
   return snapshot;
+}
+
+/**
+ * Adds one Asset to an existing native project. New immutable bytes are
+ * verified first; one whole-project snapshot and the active marker follow.
+ */
+export async function addNativeAssetV1(
+  fs: ProjectWorkspaceFS,
+  current: NativeProjectSnapshotV1,
+  imported: NativeAssetImportV1,
+  sources: ReadonlyMap<string, NativeBinarySource>,
+  onStatus?: (message: string) => void,
+): Promise<NativeProjectSnapshotV1> {
+  assertProjectWorkspace(fs, current.project.id);
+  const durable = await openNativeProjectV1(fs, current.project.id);
+  if (durable.snapshot.generation !== current.generation || durable.snapshot.snapshotId !== current.snapshotId) {
+    throw new Error('native project: durable snapshot changed; reload before adding an Asset');
+  }
+  for (const representation of current.representations) {
+    const source = await fs.readStream(nativeRepresentationPath(current.project.id, representation.id));
+    if (source === null || source.size !== representation.blob.byteLength) {
+      throw new Error(`native project: active Representation bytes are unavailable: ${representation.id}`);
+    }
+  }
+  if (imported.representations.length < 1 || sources.size !== imported.representations.length) {
+    throw new Error('native project: one imported Asset requires every new Representation source');
+  }
+
+  const snapshotId = newNativeId('snp');
+  const provisionalRepresentations: NativeRepresentationV1[] = [];
+  for (const representation of imported.representations) {
+    const source = sources.get(representation.id);
+    if (source === undefined) throw new Error(`native project: missing import source for ${representation.id}`);
+    if (source.size < 1) throw new Error(`native project: empty import source for ${representation.id}`);
+    provisionalRepresentations.push(representationWithBlob(representation, {
+      algorithm: 'sha256',
+      digest: '0'.repeat(64),
+      byteLength: source.size,
+      mediaType: source.mediaType,
+    }));
+  }
+  // Validate ID uniqueness, ownership, binding, Proxy relationship and GS facts
+  // before the first persistent write.
+  parseNativeSnapshotV1(serializeNativeSnapshotV1({
+    ...current,
+    snapshotId,
+    generation: current.generation + 1,
+    assets: [...current.assets, imported.asset],
+    assetBindingRevisions: [...current.assetBindingRevisions, imported.binding],
+    assetRevisions: [...current.assetRevisions, imported.revision],
+    representations: [...current.representations, ...provisionalRepresentations],
+  }));
+
+  const verifiedRepresentations: NativeRepresentationV1[] = [];
+  const stagedPaths: string[] = [];
+  const snapshotPath = nativeSnapshotPath(current.project.id, snapshotId);
+  try {
+    for (const representation of [...imported.representations].sort((a, b) => a.id.localeCompare(b.id))) {
+      const source = sources.get(representation.id)!;
+      if (representation.role === 'gsPrimary') {
+        onStatus?.('Inspecting gsPrimary header…');
+        if (representation.formatProfile.id !== NATIVE_GS_PROFILE_ID || representation.gsPly === undefined) {
+          throw new Error('native project: imported GS Representation lacks the approved profile facts');
+        }
+        const inspection = await inspectNativeGsPlyV1(source);
+        if (inspection.kind !== 'supported-gs' || !sameGsFacts(inspection.facts, representation.gsPly)) {
+          throw new Error('native project: imported GS profile facts do not match the selected source');
+        }
+      }
+      const path = nativeRepresentationPath(current.project.id, representation.id);
+      stagedPaths.push(path);
+      onStatus?.(`Streaming ${representation.role} bytes to project-local storage…`);
+      const blob = await writeAndVerifyBinary(fs, path, source);
+      verifiedRepresentations.push(representationWithBlob(representation, blob));
+      onStatus?.(`Verified ${representation.role} size and SHA-256 by streamed read-back.`);
+    }
+    const next = parseNativeSnapshotV1(serializeNativeSnapshotV1({
+      ...current,
+      snapshotId,
+      generation: current.generation + 1,
+      assets: [...current.assets, imported.asset],
+      assetBindingRevisions: [...current.assetBindingRevisions, imported.binding],
+      assetRevisions: [...current.assetRevisions, imported.revision],
+      representations: [...current.representations, ...verifiedRepresentations],
+    }));
+    stagedPaths.push(snapshotPath);
+    onStatus?.('Writing and verifying native snapshot v1…');
+    const verified = await writeVerifiedSnapshot(fs, next);
+    onStatus?.('Publishing active receipt…');
+    await publishActiveMarker(fs, next, verified.digest);
+    onStatus?.('Asset added and native project saved.');
+    return next;
+  } catch (error) {
+    // If publication committed immediately before an authority error, the
+    // exact candidate is success. Otherwise clean only when the old snapshot is
+    // still provably active; uncertain paths remain harmless unreferenced bytes.
+    const active = await openNativeProjectV1(fs, current.project.id).catch(() => null);
+    if (
+      active?.snapshot.snapshotId === snapshotId &&
+      active.snapshot.generation === current.generation + 1 &&
+      active.missingRepresentationIds.length === 0 &&
+      active.sizeMismatchRepresentationIds.length === 0
+    ) {
+      return active.snapshot;
+    }
+    if (
+      active?.snapshot.snapshotId === durable.snapshot.snapshotId &&
+      active.snapshot.generation === durable.snapshot.generation &&
+      fs.mutationAuthority.accessState === 'editable'
+    ) {
+      for (const path of [...stagedPaths].reverse()) await fs.remove(path).catch(() => {});
+    }
+    throw error;
+  }
 }
 
 /**
