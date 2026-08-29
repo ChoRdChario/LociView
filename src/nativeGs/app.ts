@@ -14,6 +14,7 @@ import {
   nativeModelProfileId,
   newNativeId,
   normalizeNativeSim3,
+  setNativeAssetVisibilityV1,
   type NativeAssetBindingRevisionV1,
   type NativeDisplayMode,
   type NativeProjectDraftV1,
@@ -21,6 +22,7 @@ import {
   type NativeRepresentationDraftV1,
   type NativeSim3V1,
 } from './schema';
+import { activeNativeRepresentationsV1, isNativeAssetVisibleV1 } from './resolver';
 import {
   assertNativeProjectDoesNotMixV1,
   createNativeProjectV1,
@@ -194,7 +196,7 @@ async function buildDraft(title: string, files: SelectedFiles): Promise<DraftRes
       assetBindingRevisions: bindings,
       assetRevisions: revisions,
       representations,
-      presentation: { displayMode, captionTargetAssetId: gsAssetId ?? meshAssetId },
+      presentation: { displayMode, captionTargetAssetId: gsAssetId ?? meshAssetId, hiddenAssetIds: [] },
       captions: [],
     },
     sources,
@@ -657,7 +659,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         portableStatus,
         portableResult,
       ),
-      el('p', { class: 'ng-note' }, '高度なAlignment workflow、Compare／Integrated、v1／LociMyu migrationは後続workstreamです。'),
+      el('p', { class: 'ng-note' }, '高度なAlignment workflow、DisplaySet連携、v1／LociMyu migrationは後続workstreamです。'),
     ));
     await refreshOffline();
   };
@@ -698,14 +700,17 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     let dirty = false;
     const canvas = el('canvas', { 'aria-label': 'Native Mesh and Gaussian Splatting project' });
     const accessBadge = el('span', { class: 'ng-badge' });
-    const modeBadge = el('span', { class: 'ng-badge' });
+    const visibilityBadge = el('span', { class: 'ng-badge' });
     const runtimeStatus = el('p', { class: 'ng-status' }, 'resourcesを読み込んでいます…');
     const diagnostics = el('ul', { class: 'ng-diagnostics' });
     const display = el('select');
-    for (const [value, label] of [['mixed', 'Mesh + GS'], ['gs-only', 'GS only'], ['mesh-only', 'Mesh only']] as const) {
+    display.append(el('option', { value: '' }, '一括表示を選択'));
+    for (const [value, label] of [['mixed', 'すべてのAsset'], ['gs-only', 'GS Assetのみ'], ['mesh-only', 'Mesh Assetのみ']] as const) {
       display.append(el('option', { value }, label));
     }
-    display.value = working.presentation.displayMode;
+    display.value = '';
+    const visibilityList = el('div', { class: 'ng-list' });
+    const visibilityInputs = new Map<string, HTMLInputElement>();
     const target = el('select');
     const arm = el('button', { class: 'primary' }, '1. Caption初期配置');
     const editCaption = el('button', {}, 'Caption位置を調整');
@@ -726,14 +731,18 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const captionTitle = el('input', { type: 'text', maxlength: '160' });
     const captionBody = el('textarea');
 
+    const rolesByAsset = new Map(working.assets.map((asset) => [
+      asset.id,
+      activeNativeRepresentationsV1(working, asset.id).map((representation) => representation.role),
+    ]));
     for (const asset of working.assets) {
-      const activeRevision = working.assetBindingRevisions.find((binding) => binding.id === asset.status.activeBindingId)?.assetRevisionId;
-      const roles = working.assetRevisions.find((revision) => revision.id === activeRevision)?.representationIds
-        .map((id) => working.representations.find((representation) => representation.id === id)?.role)
-        .filter(Boolean) ?? [];
+      const roles = rolesByAsset.get(asset.id) ?? [];
       const role = roles.includes('gsPrimary') ? 'GS' : 'Mesh';
       target.append(el('option', { value: asset.id }, `${asset.label} (${role})`));
       transformAsset.append(el('option', { value: asset.id }, `${asset.label} (${role})`));
+      const checkbox = el('input', { type: 'checkbox', checked: isNativeAssetVisibleV1(working, asset.id) });
+      visibilityInputs.set(asset.id, checkbox);
+      visibilityList.append(el('label', { class: 'ng-project-row' }, checkbox, el('strong', {}, asset.label), el('span', { class: 'ng-note' }, role)));
     }
     target.value = working.presentation.captionTargetAssetId ?? '';
 
@@ -742,6 +751,16 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       for (const message of messages) diagnostics.append(el('li', {}, message));
     };
     const canMutateWorking = (): boolean => session.accessState === 'editable' && !saving;
+    const syncVisibilityControls = (): void => {
+      let visibleCount = 0;
+      for (const asset of working.assets) {
+        const visible = isNativeAssetVisibleV1(working, asset.id);
+        visibilityInputs.get(asset.id)!.checked = visible;
+        if (visible) visibleCount += 1;
+      }
+      visibilityBadge.textContent = `${visibleCount}/${working.assets.length} Assets visible`;
+      display.value = '';
+    };
     const updateAccess = (): void => {
       accessBadge.textContent = session.sessionMode === 'view'
         ? 'View mode · read-only'
@@ -749,14 +768,18 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
           ? 'Edit mode · write lock held'
           : `Edit mode · ${session.accessState}`;
       const editable = canMutateWorking();
+      const caption = working.captions[0];
+      const captionVisible = caption !== undefined && isNativeAssetVisibleV1(working, caption.anchor.assetId);
+      const captionFieldsEditable = caption === undefined || captionVisible;
       save.disabled = !editable || !dirty;
       applyTransformButton.disabled = !editable;
       arm.disabled = !editable;
-      editCaption.disabled = !editable || working.captions.length === 0;
+      editCaption.disabled = !editable || !captionVisible;
       for (const button of assetGizmoButtons.values()) button.disabled = !editable;
-      captionTitle.disabled = !editable;
-      captionBody.disabled = !editable;
+      captionTitle.disabled = !editable || !captionFieldsEditable;
+      captionBody.disabled = !editable || !captionFieldsEditable;
       display.disabled = !editable;
+      for (const checkbox of visibilityInputs.values()) checkbox.disabled = !editable;
       target.disabled = !editable;
       close.disabled = saving;
       activeViewer?.setEditingEnabled(editable);
@@ -790,16 +813,18 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     };
 
     root.append(el('main', { class: 'ng-view' },
-      el('section', { class: 'ng-stage' }, canvas, el('div', { class: 'ng-stage-badges' }, accessBadge, modeBadge)),
+      el('section', { class: 'ng-stage' }, canvas, el('div', { class: 'ng-stage-badges' }, accessBadge, visibilityBadge)),
       el('aside', { class: 'ng-panel' },
         el('div', {}, el('h1', {}, working.project.title), el('p', { class: 'ng-note' }, `Native snapshot v1 · generation ${working.generation}`)),
         el('section', { class: 'ng-card' },
           el('h2', {}, 'Display and Caption target'),
           el('div', { class: 'ng-grid' },
-            el('label', { class: 'ng-field' }, el('span', {}, '表示'), display),
+            el('label', { class: 'ng-field' }, el('span', {}, '一括表示プリセット'), display),
             el('label', { class: 'ng-field' }, el('span', {}, 'Caption対象Asset'), target),
           ),
-          el('p', { class: 'ng-note' }, 'Meshは自身、GSは同じGS Asset内の明示Proxyだけへraycastします。GS非表示時はProxyもinteraction対象外です。'),
+          el('span', { class: 'ng-note' }, 'Assetごとの表示／非表示'),
+          visibilityList,
+          el('p', { class: 'ng-note' }, '各Assetは形式に関係なく独立して表示します。Meshは自身、GSは同じGS Asset内の明示Proxyだけへraycastします。'),
         ),
         el('section', { class: 'ng-card' },
           el('h2', {}, 'Two-stage Caption placement'),
@@ -852,7 +877,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       (representationId) => readNativeRepresentationV1(fs, working.project.id, representationId),
       offlineReady,
     );
-    modeBadge.textContent = viewer.getResolution().effectiveDisplayMode;
+    syncVisibilityControls();
     runtimeStatus.textContent = offlineReady
       ? 'Native resources ready. Camera、表示切替、Caption配置を確認できます。'
       : 'Spark offline準備がないためGSはactivateしていません。';
@@ -865,11 +890,36 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
 
     display.addEventListener('change', () => {
       if (!canMutateWorking()) return;
-      working = { ...working, presentation: { ...working.presentation, displayMode: display.value as NativeDisplayMode } };
+      const preset = display.value as NativeDisplayMode;
+      if (preset !== 'mixed' && preset !== 'gs-only' && preset !== 'mesh-only') return;
+      let next: NativeProjectSnapshotV1 = {
+        ...working,
+        presentation: { ...working.presentation, displayMode: preset },
+      };
+      for (const asset of working.assets) {
+        const roles = rolesByAsset.get(asset.id) ?? [];
+        const visible = preset === 'mixed' ||
+          (preset === 'gs-only' && roles.includes('gsPrimary')) ||
+          (preset === 'mesh-only' && roles.includes('meshPrimary'));
+        next = setNativeAssetVisibilityV1(next, asset.id, visible);
+      }
+      working = next;
       viewer.setSnapshot(working);
-      modeBadge.textContent = viewer.getResolution().effectiveDisplayMode;
+      syncVisibilityControls();
       markDirty();
     });
+    for (const [assetId, checkbox] of visibilityInputs) {
+      checkbox.addEventListener('change', () => {
+        if (!canMutateWorking()) {
+          syncVisibilityControls();
+          return;
+        }
+        working = setNativeAssetVisibilityV1(working, assetId, checkbox.checked);
+        viewer.setSnapshot(working);
+        syncVisibilityControls();
+        markDirty();
+      });
+    }
     target.addEventListener('change', () => {
       if (!canMutateWorking()) return;
       working = { ...working, presentation: { ...working.presentation, captionTargetAssetId: target.value } };
@@ -888,7 +938,6 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     });
     unload.addEventListener('click', () => {
       viewer.disposeGs();
-      modeBadge.textContent = viewer.getResolution().effectiveDisplayMode;
       runtimeStatus.textContent = 'GS runtime resourceを解放しました。再読込はprojectを閉じて開き直してください。';
     });
     transformAsset.addEventListener('change', () => {
@@ -955,10 +1004,12 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         working = saved;
         dirty = false;
         viewer.setSnapshot(saved);
+        syncVisibilityControls();
         runtimeStatus.textContent = `保存済み：snapshot generation ${saved.generation}`;
       }).catch((error: unknown) => {
         working = durable;
         viewer.setSnapshot(durable);
+        syncVisibilityControls();
         dirty = false;
         runtimeStatus.textContent = `保存失敗：${error instanceof Error ? error.message : String(error)}。最後のdurable snapshotを再表示しました。`;
       }).finally(() => {

@@ -805,6 +805,32 @@ view-only. Snapshot selection/gizmo state is transient; snapshot v1 persists
 the authoritative active binding and existing Caption anchor, and portable
 package v1 carries that exact snapshot without a version change.
 
+### 9.2 Bounded native per-Asset visibility
+
+The first production per-Asset visibility slice keeps Asset as the display,
+selection and editing unit, Representation as the binary/rendering unit, and
+Project as the durable snapshot/publication unit. Native snapshot v1 records the
+hidden Asset IDs as optional project presentation state. Absence means that every
+Asset is visible, so a snapshot written before this field existed opens without
+silently hiding content. The list is unique, sorted when serialized and may name
+only Assets retained by that snapshot. It is not an Asset revision, a
+Representation property, a DisplaySet field or an independent transaction.
+
+A hidden Asset remains present in the flat Asset list but contributes no visual
+Representation, Caption marker, pick surface or gizmo. Its same-Asset
+interaction Proxy is also ineligible; hiding one GS Asset never affects a Proxy
+belonging to another GS Asset. Existing `mixed`, `gs-only` and `mesh-only` values
+remain wire-compatible bulk-preset labels only: applying one updates Asset
+visibility, while runtime resolution is driven by the per-Asset state rather
+than by Representation kind. This also makes the state independent of a future
+ordinary-point rendering path.
+
+Multiple active GS Representations use multiple Spark splat objects under the
+existing single native Spark renderer. This is a bounded removal of the former
+single-object limitation, not a second renderer or renderer framework. The
+current single-Caption authoring UX is unchanged; its marker and edit gizmo are
+suppressed whenever its owning Asset is hidden.
+
 ## 10. Large GS and iOS lifecycle
 
 The resource state machine is:

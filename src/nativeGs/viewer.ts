@@ -331,14 +331,15 @@ export class NativeGsViewer {
   }
 
   disposeGs(): void {
-    const gs = allActiveNativeRepresentationsV1(this.snapshot).find((representation) => representation.role === 'gsPrimary');
-    if (gs !== undefined) {
+    const gsRepresentations = allActiveNativeRepresentationsV1(this.snapshot)
+      .filter((representation) => representation.role === 'gsPrimary');
+    for (const gs of gsRepresentations) {
       this.representationObjects.get(gs.id)?.removeFromParent();
       this.representationObjects.delete(gs.id);
       this.representationBounds.delete(gs.id);
       this.resourceStates.set(gs.id, { availability: 'missing', registration: 'known' });
+      this.sparkRuntime?.disposeSplat(gs.id);
     }
-    this.sparkRuntime?.disposeSplat();
     this.updateResolution();
   }
 
@@ -587,9 +588,10 @@ export class NativeGsViewer {
   private fitCamera(): void {
     this.scene.updateMatrixWorld(true);
     const bounds = new THREE.Box3();
+    const visible = new Set(this.resolution.visibleRepresentationIds);
     for (const [representationId, object] of this.representationObjects) {
       const representation = this.snapshot.representations.find((candidate) => candidate.id === representationId);
-      if (representation?.role === 'interactionProxy') continue;
+      if (representation?.role === 'interactionProxy' || !visible.has(representationId)) continue;
       const localGsBounds = this.representationBounds.get(representationId);
       const objectBounds = localGsBounds === undefined
         ? new THREE.Box3().setFromObject(object)

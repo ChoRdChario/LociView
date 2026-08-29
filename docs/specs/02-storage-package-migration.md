@@ -1417,3 +1417,22 @@ it is never repaired as identity. The existing single-writer, snapshot-last and
 marker-last boundaries remain authoritative. No registration solver, scene
 graph, migration framework, general transaction or package/schema version is
 introduced by this slice.
+
+## 16. Bounded native per-Asset visibility (Product Owner approved 2026-08-29)
+
+Native snapshot version `1` adds only the optional
+`presentation.hiddenAssetIds` list. The list contains unique existing Asset IDs
+and is serialized in lexical order. If the field is absent, the reader supplies
+the safe legacy meaning `[]`: all retained Assets are visible. Visibility is
+project-local presentation state. It is not written into immutable source bytes,
+`Representation`, `AssetBindingRevision`, or DisplaySet, and toggling it creates
+no Asset-level marker, revision or transaction.
+
+Saving visibility uses the existing project-scoped write lock and the existing
+whole-Project generation/snapshot publication: immutable Representation bytes
+remain at their Representation-ID paths, then the new snapshot is verified, and
+the Project `active.json` marker is published last. Native portable package
+version `1` already carries the exact native snapshot text and therefore retains
+this optional field through export/restore without a new package entry or
+version. No migration framework, layer tree, scene preset, CAS, journal or
+transaction framework is introduced.

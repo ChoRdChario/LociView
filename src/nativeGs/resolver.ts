@@ -58,6 +58,10 @@ export function allActiveNativeRepresentationsV1(snapshot: NativeProjectSnapshot
   return snapshot.representations.filter((representation) => ids.has(representation.id));
 }
 
+export function isNativeAssetVisibleV1(snapshot: NativeProjectSnapshotV1, assetId: string): boolean {
+  return !(snapshot.presentation.hiddenAssetIds ?? []).includes(assetId);
+}
+
 export function resolveNativeGsSliceV1(
   snapshot: NativeProjectSnapshotV1,
   states: ReadonlyMap<string, NativeResourceStateV1>,
@@ -66,8 +70,12 @@ export function resolveNativeGsSliceV1(
   const activeRepresentations = allActiveNativeRepresentationsV1(snapshot);
   const meshRepresentations = activeRepresentations.filter((representation) => representation.role === 'meshPrimary');
   const gsRepresentations = activeRepresentations.filter((representation) => representation.role === 'gsPrimary');
-  const usableMesh = meshRepresentations.filter((representation) => isReady(states, representation));
-  const usableGs = gsRepresentations.filter((representation) => isReady(states, representation));
+  const usableMesh = meshRepresentations.filter((representation) => (
+    isNativeAssetVisibleV1(snapshot, representation.assetId) && isReady(states, representation)
+  ));
+  const usableGs = gsRepresentations.filter((representation) => (
+    isNativeAssetVisibleV1(snapshot, representation.assetId) && isReady(states, representation)
+  ));
   for (const representation of meshRepresentations) {
     const state = states.get(representation.id);
     if (state?.registration === 'unknown') issues.push(`Mesh registration is unknown: ${representation.id}`);
@@ -79,23 +87,11 @@ export function resolveNativeGsSliceV1(
     else if (state?.availability !== 'ready') issues.push(`GS resource is unavailable: ${representation.id}`);
   }
 
-  const requested = snapshot.presentation.displayMode;
-  const meshRequested = requested === 'mixed' || requested === 'mesh-only';
-  const gsRequested = requested === 'mixed' || requested === 'gs-only';
-  let showMesh = meshRequested && usableMesh.length > 0;
-  let showGs = gsRequested && usableGs.length > 0;
-  if (!showMesh && !showGs) {
-    if (usableMesh.length > 0) {
-      showMesh = true;
-      issues.push('Requested visual resources were unavailable; degraded to Mesh-only.');
-    } else if (usableGs.length > 0) {
-      showGs = true;
-      issues.push('Requested visual resources were unavailable; degraded to GS-only.');
-    }
-  }
+  const showMesh = usableMesh.length > 0;
+  const showGs = usableGs.length > 0;
   const effectiveDisplayMode: NativeSliceResolutionV1['effectiveDisplayMode'] =
     showMesh && showGs ? 'mixed' : showMesh ? 'mesh-only' : showGs ? 'gs-only' : 'none';
-  if (effectiveDisplayMode === 'none') issues.push('Both visual resource lanes are unusable; no Asset is activated.');
+  if (effectiveDisplayMode === 'none') issues.push('No visible visual Asset is currently usable.');
 
   const visibleRepresentationIds = [
     ...(showMesh ? usableMesh.map((representation) => representation.id) : []),
@@ -111,10 +107,19 @@ export function resolveNativeGsSliceV1(
       issues,
     };
   }
+  if (!isNativeAssetVisibleV1(snapshot, targetAssetId)) {
+    return {
+      effectiveDisplayMode,
+      visibleRepresentationIds,
+      proxyRendered: false,
+      interaction: { enabled: false, reason: 'The selected Asset is hidden.' },
+      issues,
+    };
+  }
   const targetRepresentations = activeNativeRepresentationsV1(snapshot, targetAssetId);
   const targetMesh = targetRepresentations.find((representation) => representation.role === 'meshPrimary');
   if (targetMesh !== undefined) {
-    if (!showMesh || !isReady(states, targetMesh)) {
+    if (!visibleRepresentationIds.includes(targetMesh.id)) {
       return {
         effectiveDisplayMode,
         visibleRepresentationIds,
@@ -138,7 +143,7 @@ export function resolveNativeGsSliceV1(
   }
 
   const targetGs = targetRepresentations.find((representation) => representation.role === 'gsPrimary');
-  if (targetGs === undefined || !showGs || !isReady(states, targetGs)) {
+  if (targetGs === undefined || !visibleRepresentationIds.includes(targetGs.id)) {
     return {
       effectiveDisplayMode,
       visibleRepresentationIds,

@@ -173,3 +173,9 @@
 
 - iOS Filesは未登録のcustom extensionを未知UTIとして扱い、HTML file inputへ拡張子/MIMEの`accept` filterがあると正しいfileまで一覧から隠すことがある。
 - 選択後にcontainer version、entry path、size、hashを厳格検証するpackageでは、picker filterを安全境界にしない。mobile互換を優先して全fileを選択可能にし、不正fileはauthoritative parserで明示拒否する。
+
+## 2026-08-29: 低リスクの実機再確認は明示的なPO判断でまとめられる
+
+- Desktop実測、既存の同系統iPhone実績、自動acceptanceが揃い、残る差分がplatform非依存でデータを破壊しない場合、Product Ownerは個別sliceの実機再確認を後日の統合回帰runへ送れる。自動的には省略せず、残るmobile固有riskと後日確認項目を平易に示して明示判断を得る。
+- この判断は「iPhone PASS」の捏造ではない。未実施を記録し、current sliceをblockしないというrisk acceptance、過去の実機evidence、release/device gateの新規creditを分離する。
+- 実機runを延期した時点で一時公開tunnelを停止し、後日のrunでは同じ最小項目だけをまとめて確認する。延期を理由に追加fixture、instrumentationやmicro-hardeningを作らない。

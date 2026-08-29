@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { MemoryFS } from '../../src/platform/fs';
 import { ProjectMutationCoordinator } from '../../src/platform/projectLock';
 import { activeNativeBindingV1 } from '../../src/nativeGs/resolver';
-import { activateNativeManualAssetTransformV1, normalizeNativeSim3 } from '../../src/nativeGs/schema';
+import {
+  activateNativeManualAssetTransformV1,
+  normalizeNativeSim3,
+  setNativeAssetVisibilityV1,
+} from '../../src/nativeGs/schema';
 import {
   assertNativeProjectDoesNotMixV1,
   createNativeProjectV1,
@@ -137,14 +141,15 @@ describe('native project blob-first/marker-last publication', () => {
         uniformScale: 0.5,
       },
     );
-    const next = await saveNativeProjectV1(session.workspace, {
-      ...aligned,
-      presentation: { ...aligned.presentation, displayMode: 'gs-only' },
-    });
+    const next = await saveNativeProjectV1(
+      session.workspace,
+      setNativeAssetVisibilityV1(aligned, NATIVE_TEST_IDS.meshAsset, false),
+    );
     expect(next.generation).toBe(2);
     expect(fs.writes.filter((path) => path.endsWith('.bin'))).toHaveLength(binaryWriteCount);
     const reopened = (await openNativeProjectV1(fs, first.project.id)).snapshot;
-    expect(reopened.presentation.displayMode).toBe('gs-only');
+    expect(reopened.presentation.hiddenAssetIds).toEqual([NATIVE_TEST_IDS.meshAsset]);
+    expect(reopened.representations).toEqual(first.representations);
     expect(activeNativeBindingV1(reopened, NATIVE_TEST_IDS.gsAsset)?.assetToProject).toEqual(normalizeNativeSim3({
       translation: [8, 1.5, -4],
       rotationXYZW: [0, Math.SQRT1_2, 0, Math.SQRT1_2],

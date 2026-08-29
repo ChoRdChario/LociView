@@ -56,9 +56,9 @@ function disposeMaterial(material: THREE.Material | THREE.Material[] | undefined
 }
 
 export class NativeSparkRuntime {
-  private splatMesh: SparkSplatMesh | null = null;
+  private readonly splatMeshes = new Map<string, SparkSplatMesh>();
+  private readonly loadGenerations = new Map<string, number>();
   private sparkRenderer: SparkRendererObject | null = null;
-  private generation = 0;
   private disposed = false;
 
   private constructor(
@@ -81,8 +81,9 @@ export class NativeSparkRuntime {
     onProgress?: (loaded: number) => void,
   ): Promise<{ readonly object: THREE.Object3D; readonly splatCount: number; readonly bounds: THREE.Box3 }> {
     if (this.disposed) throw new Error('Spark runtime is disposed');
-    this.disposeSplat();
-    const generation = ++this.generation;
+    this.disposeSplat(representationId);
+    const generation = (this.loadGenerations.get(representationId) ?? 0) + 1;
+    this.loadGenerations.set(representationId, generation);
     const candidate = new this.module.SplatMesh({
       stream: source.stream(),
       streamLength: source.size,
@@ -95,7 +96,7 @@ export class NativeSparkRuntime {
     });
     try {
       await candidate.initialized;
-      if (this.disposed || generation !== this.generation) {
+      if (this.disposed || generation !== this.loadGenerations.get(representationId)) {
         candidate.removeFromParent();
         candidate.dispose();
         throw new Error('Spark load became obsolete before activation');
@@ -111,7 +112,7 @@ export class NativeSparkRuntime {
       ) {
         throw new Error('Spark produced non-finite or empty bounds');
       }
-      this.splatMesh = candidate;
+      this.splatMeshes.set(representationId, candidate);
       return { object: candidate, splatCount, bounds };
     } catch (error) {
       candidate.removeFromParent();
@@ -120,11 +121,17 @@ export class NativeSparkRuntime {
     }
   }
 
-  disposeSplat(): void {
-    this.generation += 1;
-    this.splatMesh?.removeFromParent();
-    this.splatMesh?.dispose();
-    this.splatMesh = null;
+  disposeSplat(representationId?: string): void {
+    if (representationId !== undefined) {
+      this.loadGenerations.set(representationId, (this.loadGenerations.get(representationId) ?? 0) + 1);
+      const splat = this.splatMeshes.get(representationId);
+      splat?.removeFromParent();
+      splat?.dispose();
+      this.splatMeshes.delete(representationId);
+      return;
+    }
+    const representationIds = new Set([...this.loadGenerations.keys(), ...this.splatMeshes.keys()]);
+    for (const id of representationIds) this.disposeSplat(id);
   }
 
   dispose(): void {

@@ -2416,3 +2416,81 @@ Review — 2026-08-29:
 - No production code, test, runtime schema, fixture, dependency or new
   architecture document changed; executable verification was intentionally not
   rerun for this documentation-only correction.
+
+## Native per-Asset visibility — approved bounded production slice
+
+Checkpoint, boundary and plan:
+
+- [x] Accept `6e74e3e` as the Product Owner's corrected Asset-layer direction;
+  keep Compare outside MVP/release/current critical path and keep DisplaySet
+  separate from Asset visibility
+- [x] Read-only gap check native snapshot/resolver/viewer/runtime/storage/package
+  and existing acceptance; retain project-level lock, generation, snapshot and
+  marker-last publication
+- [x] Fix the field placement as optional
+  `presentation.hiddenAssetIds`; absence means all Assets visible, IDs are
+  unique/existing/canonical, and native snapshot/package versions remain `1`
+- [x] Add a flat visibility control for each Asset and retain the old kind
+  controls only as bulk Asset-visibility presets; add no layer tree, grouping,
+  ordering, solo/lock, opacity, DisplaySet integration or Compare UI
+- [x] Resolve rendering, picking, Proxy, Caption marker and gizmo eligibility
+  from the selected Asset's visibility, never from shared content kind
+- [x] Remove the existing one-SplatMesh runtime limitation just enough for two
+  independent GS Assets under the current Spark renderer; add no renderer
+  framework or second backend
+- [x] Add only focused backward-compatibility, same-kind independence,
+  project-save and portable-restore acceptance; reuse current package and
+  degradation coverage
+- [x] Run one independent read-only review, close only slice-blocking P0/P1, then
+  run the exact final-tree full matrix/build once and serially
+- [x] Record one targeted Desktop smoke and one physical iPhone 14 Pro smoke for
+  per-Asset visibility, Proxy exclusion and save/offline reopen; do not repeat
+  large-backup acceptance
+- [x] Commit one bounded slice, leave the worktree clean and stop before Compare,
+  DisplaySet expansion, v1/LociMyu migration or release work
+
+Implementation limits:
+
+- Visibility remains project presentation state. It creates no per-Asset
+  transaction, marker or revision and never rewrites source bytes or transforms.
+- The current single-Caption authoring UX is not generalized in this slice; its
+  existing marker/edit path must disappear when its owning Asset is hidden.
+- Same-kind runtime acceptance may use an untracked temporary native package
+  built from existing small fixtures. The 745.6 MiB representative PLY is never
+  copied into the repository or duplicated merely to create a second GS.
+
+Manual acceptance and Product Owner risk decision — 2026-08-29:
+
+- Desktop Chrome restored an untracked small package containing one Mesh and two
+  independent SH2 GS Assets, each with its own Proxy. The Product Owner reported
+  the requested simultaneous rendering, independent per-Asset visibility,
+  hidden Caption/gizmo/Proxy exclusion, snapshot reopen and portable restore
+  checks had no observed problem. The supplied console capture contained Vite
+  connection messages and browser-extension listener warnings, but no continuing
+  LociView/Spark runtime error.
+- A fresh physical iPhone 14 Pro run was prepared but not executed because the
+  Product Owner had left the test location. The Product Owner explicitly accepted
+  this remaining low-to-moderate mobile risk as non-blocking for this bounded
+  slice and moved per-Asset visibility, per-GS Proxy exclusion and save/offline
+  reopen into a later consolidated iPhone regression run. This is a documented
+  deferral, not fabricated physical-device evidence and not a release claim.
+- Both account-less Cloudflare quick tunnels were stopped when the run was
+  deferred. Neither the temporary `.lociview`, representative PLY nor OPFS
+  project data was published by the tunnel.
+
+Final verification — 2026-08-29:
+
+- Focused native schema/resolver/storage/portable acceptance passed: 27 tests.
+  Typecheck passed. The exact staged executable tree full run passed 47 test
+  files, 1,389 tests, with 21 explicit todos (1,410 total).
+- Frozen fixture verification passed with 10 Git entries / 708,867 bytes.
+  Evidence verification passed with three pending device templates and no
+  credited G0 runs, so this slice makes no G0/G0-S/G1 or release claim.
+- Normal and `/LociView/` production builds passed. Spark 2.1.0 remains an exact
+  lazy chunk referenced only by the native app chunk; the ordinary v1 app and
+  the 13-entry PWA precache do not reference it. No representative PLY filename,
+  fixed representative count or fixed byte length entered `dist`.
+- `npm audit` reported zero vulnerabilities. Independent read-only review found
+  no unresolved P0/P1. The current native authoring UI still handles one Caption
+  at a time; general multiple-Caption UX, DisplaySet integration, layer hierarchy,
+  Compare and format-specific visibility modes remain outside this slice.

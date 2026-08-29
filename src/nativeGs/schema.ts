@@ -129,6 +129,7 @@ export interface NativeProjectSnapshotV1 {
   readonly presentation: {
     readonly displayMode: NativeDisplayMode;
     readonly captionTargetAssetId: string | null;
+    readonly hiddenAssetIds?: readonly string[];
   };
   readonly captions: readonly NativeCaptionV1[];
 }
@@ -476,6 +477,13 @@ function semanticClosure(snapshot: NativeProjectSnapshotV1): void {
   }
   const target = snapshot.presentation.captionTargetAssetId;
   if (target !== null && !assets.has(target)) throw new Error('native snapshot: Caption target Asset is missing');
+  const hiddenAssetIds = snapshot.presentation.hiddenAssetIds ?? [];
+  if (new Set(hiddenAssetIds).size !== hiddenAssetIds.length) {
+    throw new Error('native snapshot: hidden Asset IDs must be unique');
+  }
+  for (const hiddenAssetId of hiddenAssetIds) {
+    if (!assets.has(hiddenAssetId)) throw new Error('native snapshot: hidden Asset is missing');
+  }
   for (const caption of snapshot.captions) {
     const asset = assets.get(caption.anchor.assetId);
     const revision = revisions.get(caption.anchor.authoredAssetRevisionId);
@@ -511,10 +519,13 @@ export function parseNativeSnapshotV1(text: string): NativeProjectSnapshotV1 {
     throw new Error('native snapshot: record collections must be arrays');
   }
   const presentation = record(parsed.presentation, 'presentation');
-  exactKeys(presentation, ['displayMode', 'captionTargetAssetId']);
+  exactKeys(presentation, ['displayMode', 'captionTargetAssetId'], ['hiddenAssetIds']);
   if (presentation.displayMode !== 'mixed' && presentation.displayMode !== 'gs-only' && presentation.displayMode !== 'mesh-only') {
     throw new Error('native snapshot: invalid display mode');
   }
+  const hiddenAssetIds = presentation.hiddenAssetIds === undefined
+    ? []
+    : stringArray(presentation.hiddenAssetIds, 'hidden Asset IDs').map((assetId) => id(assetId, 'ast', 'hidden Asset id'));
   const snapshot: NativeProjectSnapshotV1 = {
     format: NATIVE_SNAPSHOT_FORMAT,
     schemaVersion: NATIVE_SCHEMA_VERSION,
@@ -539,6 +550,7 @@ export function parseNativeSnapshotV1(text: string): NativeProjectSnapshotV1 {
       captionTargetAssetId: presentation.captionTargetAssetId === null
         ? null
         : id(presentation.captionTargetAssetId, 'ast', 'Caption target Asset id'),
+      hiddenAssetIds,
     },
     captions: parsed.captions.map(parseCaption),
   };
@@ -583,6 +595,10 @@ export function serializeNativeSnapshotV1(snapshot: NativeProjectSnapshotV1): st
     representations: [...snapshot.representations]
       .map((representation) => ({ ...representation, derivedFrom: [...representation.derivedFrom].sort() }))
       .sort((a, b) => a.id.localeCompare(b.id)),
+    presentation: {
+      ...snapshot.presentation,
+      hiddenAssetIds: [...(snapshot.presentation.hiddenAssetIds ?? [])].sort(),
+    },
     captions: [...snapshot.captions].sort((a, b) => a.id.localeCompare(b.id)),
   };
   const text = `${JSON.stringify(ordered)}\n`;
@@ -655,4 +671,23 @@ export function activateNativeManualAssetTransformV1(
     assetBindingRevisions: [...snapshot.assetBindingRevisions, nextBinding],
   };
   return parseNativeSnapshotV1(serializeNativeSnapshotV1(candidate));
+}
+
+/** Updates only project presentation state; it creates no Asset revision or marker. */
+export function setNativeAssetVisibilityV1(
+  snapshot: NativeProjectSnapshotV1,
+  assetId: string,
+  visible: boolean,
+): NativeProjectSnapshotV1 {
+  if (!snapshot.assets.some((asset) => asset.id === assetId)) {
+    throw new Error('native snapshot: visibility target Asset is missing');
+  }
+  const hiddenAssetIds = new Set(snapshot.presentation.hiddenAssetIds ?? []);
+  const changed = visible ? hiddenAssetIds.delete(assetId) : !hiddenAssetIds.has(assetId);
+  if (!visible) hiddenAssetIds.add(assetId);
+  if (!changed) return snapshot;
+  return {
+    ...snapshot,
+    presentation: { ...snapshot.presentation, hiddenAssetIds: [...hiddenAssetIds].sort() },
+  };
 }

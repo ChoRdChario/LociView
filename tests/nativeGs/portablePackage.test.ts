@@ -19,6 +19,7 @@ import {
 } from '../../src/nativeGs/portablePackage';
 import {
   activateNativeManualAssetTransformV1,
+  setNativeAssetVisibilityV1,
   type NativeProjectDraftV1,
 } from '../../src/nativeGs/schema';
 import {
@@ -170,7 +171,7 @@ async function makeSourceProject(): Promise<{
   sources.set(NATIVE_TEST_IDS.gsRepresentation, gs.source);
   const session = await acquireNew(fs);
   const created = await createNativeProjectV1(session.workspace, detailedDraft, sources);
-  const snapshot = await saveNativeProjectV1(session.workspace, activateNativeManualAssetTransformV1(
+  const aligned = activateNativeManualAssetTransformV1(
     created,
     NATIVE_TEST_IDS.gsAsset,
     testNativeId('bnd', 92),
@@ -179,7 +180,11 @@ async function makeSourceProject(): Promise<{
       rotationXYZW: [0, Math.SQRT1_2, 0, Math.SQRT1_2],
       uniformScale: 0.625,
     },
-  ));
+  );
+  const snapshot = await saveNativeProjectV1(
+    session.workspace,
+    setNativeAssetVisibilityV1(aligned, NATIVE_TEST_IDS.meshAsset, false),
+  );
   return { fs, session, snapshot };
 }
 
@@ -226,6 +231,7 @@ describe('native portable .lociview streamed backup/restore', () => {
       body: 'portable body',
       anchor: { assetId: NATIVE_TEST_IDS.gsAsset, positionAsset: [1.25, -0.5, 2.75] },
     });
+    expect(inspection.snapshot.presentation.hiddenAssetIds).toEqual([NATIVE_TEST_IDS.meshAsset]);
     const target = new ChunkedMemoryFS();
     const restoreSession = await acquireNew(target);
     const restored = await restoreNativePortablePackageV1(restoreSession.workspace, target, blob);
