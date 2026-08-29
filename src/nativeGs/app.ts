@@ -759,6 +759,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       ['rotate', el('button', { 'aria-pressed': 'false' }, '回転')],
       ['scale', el('button', { 'aria-pressed': 'false' }, 'Uniform scale')],
     ]);
+    const captionSelect = el('select', { 'aria-label': 'Caption' });
+    const newCaption = el('button', {}, '新しいCaption');
     const captionTitle = el('input', { type: 'text', maxlength: '160' });
     const captionBody = el('textarea');
 
@@ -784,10 +786,36 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const selectedCaption = () => selectedCaptionId === null
       ? undefined
       : working.captions.find((caption) => caption.id === selectedCaptionId);
+    const rebuildCaptionOptions = (): void => {
+      clear(captionSelect);
+      if (selectedCaptionId === null) {
+        captionSelect.append(el('option', { value: '' }, '新しいCaption（未配置）'));
+      }
+      for (const [index, caption] of working.captions.entries()) {
+        const owner = working.assets.find((asset) => asset.id === caption.anchor.assetId);
+        captionSelect.append(el(
+          'option',
+          { value: caption.id },
+          `${index + 1}. ${caption.title} — ${owner?.label ?? 'missing Asset'}`,
+        ));
+      }
+      if (working.captions.length === 0 && selectedCaptionId !== null) {
+        captionSelect.append(el('option', { value: '' }, 'Captionはまだありません'));
+      }
+      captionSelect.value = selectedCaptionId ?? '';
+    };
+    const populateCaptionFields = (): void => {
+      const caption = selectedCaption();
+      captionTitle.value = caption?.title ?? 'Caption';
+      captionBody.value = caption?.body ?? '';
+    };
     const commitSelectedCaption = (caption: NativeProjectSnapshotV1['captions'][number]): boolean => {
       try {
+        const previous = selectedCaption();
+        const wasNew = selectedCaptionId === null;
         working = updateSelectedNativeCaptionV1(working, selectedCaptionId, caption);
         selectedCaptionId ??= caption.id;
+        if (wasNew || previous?.title !== caption.title) rebuildCaptionOptions();
         return true;
       } catch (error) {
         runtimeStatus.className = 'ng-error';
@@ -823,6 +851,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       for (const button of assetGizmoButtons.values()) button.disabled = !editable;
       captionTitle.disabled = !editable || !captionFieldsEditable;
       captionBody.disabled = !editable || !captionFieldsEditable;
+      captionSelect.disabled = saving || working.captions.length === 0;
+      newCaption.disabled = !editable;
       display.disabled = !editable;
       for (const checkbox of visibilityInputs.values()) checkbox.disabled = !editable;
       target.disabled = !editable;
@@ -877,6 +907,10 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         ),
         el('section', { class: 'ng-card' },
           el('h2', {}, 'Two-stage Caption placement'),
+          el('div', { class: 'ng-grid' },
+            el('label', { class: 'ng-field' }, el('span', {}, '選択中のCaption'), captionSelect),
+            el('div', { class: 'ng-field' }, el('span', {}, '新規作成'), newCaption),
+          ),
           el('div', { class: 'ng-row' }, arm, editCaption, save, unload),
           el('label', { class: 'ng-field' }, el('span', {}, 'Caption title'), captionTitle),
           el('label', { class: 'ng-field' }, el('span', {}, 'Caption body'), captionBody),
@@ -912,13 +946,22 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const offlineReady = import.meta.env.DEV || await isNativeGsOfflineReady(await pwaRegistration);
     const viewer = new NativeGsViewer(canvas, working, {
       onCaptionChanged(caption) {
-        if (!canMutateWorking()) return;
+        if (!canMutateWorking()) return false;
         const titleValue = captionTitle.value.trim();
         const next = { ...caption, title: titleValue === '' ? 'Caption' : titleValue, body: captionBody.value };
-        if (!commitSelectedCaption(next)) return;
+        if (!commitSelectedCaption(next)) return false;
         captionTitle.value = next.title;
         captionBody.value = next.body;
         markDirty();
+        return true;
+      },
+      onCaptionSelected(captionId) {
+        if (!working.captions.some((caption) => caption.id === captionId)) return;
+        selectedCaptionId = captionId;
+        rebuildCaptionOptions();
+        populateCaptionFields();
+        updateAccess();
+        runtimeStatus.textContent = `Captionを選択しました：${selectedCaption()?.title ?? 'Caption'}`;
       },
       onAssetTransformCommitted(assetId, transform) {
         if (session.accessState !== 'editable' || !commitWorkingAssetTransform(assetId, transform)) return;
@@ -940,8 +983,9 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     runtimeStatus.textContent = offlineReady
       ? 'Native resources ready. Camera、表示切替、Caption配置を確認できます。'
       : 'Spark offline準備がないためGSはactivateしていません。';
-    captionTitle.value = selectedCaption()?.title ?? 'Caption';
-    captionBody.value = selectedCaption()?.body ?? '';
+    rebuildCaptionOptions();
+    populateCaptionFields();
+    viewer.selectCaption(selectedCaptionId);
     populateTransform();
     viewer.selectAlignmentAsset(transformAsset.value);
     viewer.setAssetGizmoMode(assetGizmoMode);
@@ -1049,6 +1093,33 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       viewer.setSnapshot(working);
       markDirty();
     });
+    captionSelect.addEventListener('change', () => {
+      const nextId = captionSelect.value === '' ? null : captionSelect.value;
+      if (nextId !== null && !working.captions.some((caption) => caption.id === nextId)) {
+        rebuildCaptionOptions();
+        return;
+      }
+      selectedCaptionId = nextId;
+      if (!viewer.selectCaption(nextId)) {
+        selectedCaptionId = working.captions[0]?.id ?? null;
+        viewer.selectCaption(selectedCaptionId);
+      }
+      rebuildCaptionOptions();
+      populateCaptionFields();
+      updateAccess();
+      runtimeStatus.textContent = selectedCaptionId === null
+        ? '新しいCaptionの配置先Assetを選び、初期配置を開始してください。'
+        : `Captionを選択しました：${selectedCaption()?.title ?? 'Caption'}`;
+    });
+    newCaption.addEventListener('click', () => {
+      if (!canMutateWorking()) return;
+      selectedCaptionId = null;
+      viewer.selectCaption(null);
+      rebuildCaptionOptions();
+      populateCaptionFields();
+      updateAccess();
+      runtimeStatus.textContent = '新しいCaptionです。対象Assetを確認して初期配置を開始してください。';
+    });
     arm.addEventListener('click', () => {
       runtimeStatus.textContent = viewer.armPlacement()
         ? '配置待機中：canvas上の選択対象をclick/tapしてください。'
@@ -1127,7 +1198,9 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         working = saved;
         dirty = false;
         viewer.setSnapshot(saved);
+        viewer.selectCaption(selectedCaptionId);
         syncVisibilityControls();
+        rebuildCaptionOptions();
         runtimeStatus.textContent = `保存済み：snapshot generation ${saved.generation}`;
       }).catch((error: unknown) => {
         working = durable;
@@ -1135,7 +1208,10 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
           ? selectedCaptionId
           : durable.captions[0]?.id ?? null;
         viewer.setSnapshot(durable);
+        viewer.selectCaption(selectedCaptionId);
         syncVisibilityControls();
+        rebuildCaptionOptions();
+        populateCaptionFields();
         dirty = false;
         runtimeStatus.textContent = `保存失敗：${error instanceof Error ? error.message : String(error)}。最後のdurable snapshotを再表示しました。`;
       }).finally(() => {

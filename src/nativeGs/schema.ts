@@ -693,9 +693,9 @@ export function setNativeAssetVisibilityV1(
 }
 
 /**
- * Updates only the Caption selected by the single-Caption authoring UI. A null
- * selection means the supplied Caption is new; an existing selection must
- * still resolve by its stable ID or the edit fails closed.
+ * Updates only the Caption selected by stable ID. A null selection means the
+ * supplied Caption is new; an existing selection must still resolve by its
+ * stable ID or the edit fails closed.
  */
 export function updateSelectedNativeCaptionV1(
   snapshot: NativeProjectSnapshotV1,

@@ -25,7 +25,8 @@ import { NativeSparkRuntime } from './sparkRuntime';
 import type { WorkspaceReadableFile } from '../platform/fs';
 
 export interface NativeGsViewerCallbacks {
-  onCaptionChanged(caption: NativeCaptionV1): void;
+  onCaptionChanged(caption: NativeCaptionV1): boolean;
+  onCaptionSelected(captionId: string): void;
   onAssetTransformCommitted(assetId: string, transform: NativeSim3V1): void;
   onIssuesChanged(issues: readonly string[]): void;
   onProgress(message: string): void;
@@ -132,7 +133,7 @@ export class NativeGsViewer {
   private readonly callbacks: NativeGsViewerCallbacks;
   private snapshot: NativeProjectSnapshotV1;
   private sparkRuntime: NativeSparkRuntime | null = null;
-  private captionMarker: THREE.Mesh | null = null;
+  private readonly captionMarkers = new Map<string, THREE.Mesh>();
   private currentCaption: NativeCaptionV1 | null = null;
   private gizmoTarget: NativeGizmoTarget = null;
   private assetGizmoMode: NativeAssetGizmoMode = 'translate';
@@ -242,10 +243,6 @@ export class NativeGsViewer {
       }
     }
     this.currentCaption = this.snapshot.captions[0] ?? null;
-    if (this.currentCaption !== null) {
-      this.gizmoTarget = { kind: 'caption' };
-      this.showCaption(this.currentCaption);
-    }
     this.updateResolution();
     this.fitCamera();
   }
@@ -269,14 +266,29 @@ export class NativeGsViewer {
     if (gizmoTarget?.kind === 'asset' && !snapshot.assets.some((asset) => asset.id === gizmoTarget.assetId)) {
       this.gizmoTarget = null;
     }
-    this.currentCaption = snapshot.captions[0] ?? null;
-    if (this.currentCaption === null) {
+    const selectedCaptionId = this.currentCaption?.id ?? null;
+    this.currentCaption = selectedCaptionId === null
+      ? null
+      : snapshot.captions.find((caption) => caption.id === selectedCaptionId) ?? null;
+    if (selectedCaptionId !== null && this.currentCaption === null) {
       if (this.gizmoTarget?.kind === 'caption') this.gizmoTarget = null;
-      this.hideCaption();
     }
-    else this.showCaption(this.currentCaption);
     this.placementArmed = false;
     this.updateResolution();
+  }
+
+  selectCaption(captionId: string | null): boolean {
+    const next = captionId === null
+      ? null
+      : this.snapshot.captions.find((caption) => caption.id === captionId);
+    if (next === undefined) return false;
+    const changed = this.currentCaption?.id !== next?.id;
+    this.currentCaption = next;
+    this.placementArmed = false;
+    if (changed && this.gizmoTarget?.kind === 'caption') this.gizmoTarget = null;
+    this.syncCaptionMarkers();
+    this.refreshGizmoAttachment();
+    return true;
   }
 
   setEditingEnabled(enabled: boolean): void {
@@ -309,7 +321,7 @@ export class NativeGsViewer {
   }
 
   editCaptionPosition(): boolean {
-    if (this.currentCaption === null || this.captionMarker === null) return false;
+    if (this.currentCaption === null || !this.captionMarkers.has(this.currentCaption.id)) return false;
     this.placementArmed = false;
     this.gizmoTarget = { kind: 'caption' };
     this.gizmo.setMode('translate');
@@ -362,9 +374,12 @@ export class NativeGsViewer {
     this.representationObjects.clear();
     this.representationBounds.clear();
     this.assetGroups.clear();
-    this.captionMarker?.geometry.dispose();
-    if (this.captionMarker !== null) disposeMaterial(this.captionMarker.material);
-    this.captionMarker = null;
+    for (const marker of this.captionMarkers.values()) {
+      marker.removeFromParent();
+      marker.geometry.dispose();
+      disposeMaterial(marker.material);
+    }
+    this.captionMarkers.clear();
     this.renderer.dispose();
   }
 
@@ -430,13 +445,7 @@ export class NativeGsViewer {
         object.visible = visible.has(representation.id);
       }
     }
-    if (this.captionMarker !== null && this.currentCaption !== null) {
-      const active = allActiveNativeRepresentationsV1(this.snapshot).some((representation) => (
-        representation.assetId === this.currentCaption?.anchor.assetId &&
-        representation.role !== 'interactionProxy' && visible.has(representation.id)
-      ));
-      this.captionMarker.visible = active;
-    }
+    this.syncCaptionMarkers();
     this.refreshGizmoAttachment();
     this.callbacks.onIssuesChanged(this.resolution.issues);
   }
@@ -461,9 +470,10 @@ export class NativeGsViewer {
     this.gizmoRoot.visible = false;
     if (!this.editingEnabled) return;
     if (this.gizmoTarget?.kind === 'caption') {
-      if (this.captionMarker === null || !this.captionMarker.visible) return;
+      const marker = this.currentCaption === null ? undefined : this.captionMarkers.get(this.currentCaption.id);
+      if (marker === undefined || !marker.visible) return;
       this.gizmo.setMode('translate');
-      this.gizmo.attach(this.captionMarker);
+      this.gizmo.attach(marker);
       this.gizmoRoot.visible = true;
       return;
     }
@@ -504,16 +514,26 @@ export class NativeGsViewer {
   }
 
   private readonly onCanvasClick = (event: MouseEvent): void => {
-    const interaction = this.resolution.interaction;
-    if (!this.editingEnabled || !this.placementArmed || this.gizmoDragging || !interaction.enabled) return;
-    this.placementArmed = false;
-    const surface = this.representationObjects.get(interaction.surfaceRepresentationId);
-    const group = this.assetGroups.get(interaction.targetAssetId);
-    if (surface === undefined || group === undefined) return;
+    if (this.gizmoDragging) return;
     const rect = this.canvas.getBoundingClientRect();
     this.pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
     this.scene.updateMatrixWorld(true);
     this.raycaster.setFromCamera(this.pointer, this.camera);
+    const captionHit = this.raycaster.intersectObjects(
+      [...this.captionMarkers.values()].filter((marker) => marker.visible),
+      false,
+    )[0];
+    const captionId = captionHit?.object.userData.nativeCaptionId;
+    if (typeof captionId === 'string' && this.selectCaption(captionId)) {
+      this.callbacks.onCaptionSelected(captionId);
+      return;
+    }
+    const interaction = this.resolution.interaction;
+    if (!this.editingEnabled || !this.placementArmed || !interaction.enabled) return;
+    this.placementArmed = false;
+    const surface = this.representationObjects.get(interaction.surfaceRepresentationId);
+    const group = this.assetGroups.get(interaction.targetAssetId);
+    if (surface === undefined || group === undefined) return;
     const hit = this.raycaster.intersectObject(surface, true)[0];
     if (hit === undefined) {
       this.callbacks.onIssuesChanged([...this.resolution.issues, 'No hit on the selected interaction surface.']);
@@ -544,45 +564,75 @@ export class NativeGsViewer {
         hitEvidence: { method: 'manual' },
       },
     };
-    this.currentCaption = caption;
+    if (!this.acceptCaptionChange(caption)) return;
     this.gizmoTarget = { kind: 'caption' };
-    this.showCaption(caption);
-    this.callbacks.onCaptionChanged(caption);
+    this.syncCaptionMarkers();
+    this.refreshGizmoAttachment();
     this.callbacks.onIssuesChanged([...this.resolution.issues, 'Coarse hit accepted. Adjust the gizmo, then save.']);
   };
 
-  private showCaption(caption: NativeCaptionV1): void {
-    if (this.captionMarker === null) {
-      this.captionMarker = new THREE.Mesh(
+  private syncCaptionMarkers(): void {
+    const captionIds = new Set(this.snapshot.captions.map((caption) => caption.id));
+    for (const [captionId, marker] of this.captionMarkers) {
+      if (captionIds.has(captionId)) continue;
+      if (this.gizmo.object === marker) this.gizmo.detach();
+      marker.removeFromParent();
+      marker.geometry.dispose();
+      disposeMaterial(marker.material);
+      this.captionMarkers.delete(captionId);
+    }
+    for (const caption of this.snapshot.captions) {
+      let marker = this.captionMarkers.get(caption.id);
+      if (marker === undefined) {
+        marker = new THREE.Mesh(
         new THREE.SphereGeometry(0.09, 20, 12),
         new THREE.MeshStandardMaterial({ color: 0xffd33d, emissive: 0x8a5b00, emissiveIntensity: 1.4 }),
       );
-      this.captionMarker.name = 'Caption positionAsset';
+        marker.name = 'Caption positionAsset';
+        marker.userData.nativeCaptionId = caption.id;
+        this.captionMarkers.set(caption.id, marker);
+      }
+      const group = this.assetGroups.get(caption.anchor.assetId);
+      if (group === undefined) {
+        marker.removeFromParent();
+        marker.visible = false;
+        continue;
+      }
+      group.add(marker);
+      marker.position.fromArray(caption.anchor.positionAsset);
+      marker.quaternion.identity();
+      marker.scale.setScalar(1);
+      marker.visible = this.assetIsVisible(caption.anchor.assetId);
+      const material = marker.material as THREE.MeshStandardMaterial;
+      const selected = caption.id === this.currentCaption?.id;
+      material.color.setHex(selected ? 0xffd33d : 0x66d9ff);
+      material.emissive.setHex(selected ? 0x8a5b00 : 0x075985);
+      material.emissiveIntensity = selected ? 1.4 : 0.85;
     }
-    const group = this.assetGroups.get(caption.anchor.assetId);
-    if (group === undefined) return;
-    group.add(this.captionMarker);
-    this.captionMarker.position.fromArray(caption.anchor.positionAsset);
-    this.captionMarker.quaternion.identity();
-    this.captionMarker.scale.setScalar(1);
-    this.updateResolution();
-  }
-
-  private hideCaption(): void {
-    if (this.gizmoTarget?.kind === 'caption') this.gizmo.detach();
-    this.captionMarker?.removeFromParent();
   }
 
   private syncCaptionFromMarker(): void {
+    const marker = this.currentCaption === null ? undefined : this.captionMarkers.get(this.currentCaption.id);
     if (
       !this.editingEnabled || this.gizmoTarget?.kind !== 'caption' ||
-      this.captionMarker === null || this.currentCaption === null
+      marker === undefined || this.currentCaption === null
     ) return;
-    this.currentCaption = {
+    const next = {
       ...this.currentCaption,
-      anchor: { ...this.currentCaption.anchor, positionAsset: tuple(this.captionMarker.position), hitEvidence: { method: 'manual' } },
+      anchor: { ...this.currentCaption.anchor, positionAsset: tuple(marker.position), hitEvidence: { method: 'manual' } as const },
     };
-    this.callbacks.onCaptionChanged(this.currentCaption);
+    if (!this.acceptCaptionChange(next)) marker.position.fromArray(this.currentCaption.anchor.positionAsset);
+  }
+
+  private acceptCaptionChange(caption: NativeCaptionV1): boolean {
+    if (!this.callbacks.onCaptionChanged(caption)) return false;
+    const index = this.snapshot.captions.findIndex((candidate) => candidate.id === caption.id);
+    const captions = index < 0
+      ? [...this.snapshot.captions, caption]
+      : this.snapshot.captions.map((candidate) => candidate.id === caption.id ? caption : candidate);
+    this.snapshot = { ...this.snapshot, captions };
+    this.currentCaption = caption;
+    return true;
   }
 
   private fitCamera(): void {

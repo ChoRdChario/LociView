@@ -210,6 +210,17 @@ describe('native snapshot v1 and fixed degradation outcomes', () => {
     });
     expect(updated.captions[1]).toBe(second);
     expect(parseNativeSnapshotV1(serializeNativeSnapshotV1(updated)).captions[1]).toEqual(second);
+    const third = {
+      ...first,
+      id: testNativeId('cap', 3),
+      title: 'new Caption',
+      anchor: { ...first.anchor, positionAsset: [10, 11, 12] as const },
+    };
+    const appended = updateSelectedNativeCaptionV1(updated, null, third);
+    expect(appended.captions).toEqual([updated.captions[0], second, third]);
+    const editedThird = updateSelectedNativeCaptionV1(appended, third.id, { ...third, body: 'third edited' });
+    expect(editedThird.captions.slice(0, 2)).toEqual(appended.captions.slice(0, 2));
+    expect(editedThird.captions[2]).toMatchObject({ id: third.id, body: 'third edited' });
     expect(() => updateSelectedNativeCaptionV1(snapshot, testNativeId('cap', 3), first)).toThrow(/selected Caption identity changed/);
     expect(() => updateSelectedNativeCaptionV1(
       { ...snapshot, captions: [second] },

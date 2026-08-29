@@ -2605,3 +2605,80 @@ Manual acceptance — 2026-08-29:
 - The explicitly approved account-less HTTPS tunnel served only the static app
   build; Project, package and source-model bytes were never served by it. The
   tunnel and both local servers were stopped immediately after acceptance.
+
+## Native multi-Caption authoring and navigation — bounded production slice
+
+Checkpoint and plan:
+
+- [x] Recompute the post-Asset-addition critical path and confirm that native
+  multi-Caption authoring is the next ready approved product boundary
+- [x] Confirm that snapshot v1 and portable package v1 already preserve
+  `captions[]`; reuse those records without a schema/package version change
+- [x] Add a flat Caption selector and explicit new-Caption action using stable
+  Caption IDs; keep selection as UI-only state
+- [x] Render markers for every Caption whose owning Asset is visible, allow a
+  list or marker click to select one, and edit only the selected Caption
+- [x] Preserve every unrelated Caption exactly through title/body/position
+  edits, snapshot save/close/offline reopen and `.lociview` restore
+- [x] Hide the Caption marker, pick target and gizmo whenever its owning Asset
+  is hidden, then restore them when that Asset is shown again
+- [x] Reuse existing focused schema/package acceptance; add only the smallest
+  regression that a single-marker viewer could otherwise pass falsely
+- [x] Obtain one independent read-only P0/P1 review, run final-tree typecheck,
+  full tests and both production builds once, record targeted Desktop evidence,
+  and record the Product Owner-approved consolidated-iPhone deferral truthfully
+- [x] Commit the bounded slice and leave the worktree clean
+
+Acceptance boundary and exclusions:
+
+- Caption identity, owning Asset, title/body and Asset-local `positionAsset`
+  remain the existing durable source of truth. Caption selection is not saved.
+- Caption deletion, ordering/search/filter, tags, attachments, DisplaySet,
+  material switching, ordinary points, migration, Compare, layer hierarchy,
+  CAS, Automerge, general journal/transaction and renderer frameworks remain
+  outside this slice.
+- Stop before expanding implementation if multiple markers require a new
+  persistence model or renderer architecture; neither is presently indicated.
+
+Review checkpoint:
+
+- One independent read-only review found no P0/P1. Caption-list ordinals may
+  change with canonical ID ordering, and an occluded/overlapping marker can win
+  a crowded click before the placement surface; both are P2 backlog items and
+  do not expand this slice.
+
+Automated acceptance — 2026-08-29:
+
+- Focused schema/package acceptance passed 20/20, including new-Caption append,
+  selected re-edit and exact preservation of two unrelated Captions.
+- The final executable tree passed typecheck and the full suite: 47 files,
+  1,392 tests passed with 21 existing todos (1,413 total).
+- Normal and `/LociView/` production builds passed. Spark 2.1.0 remains a lazy
+  native-route chunk; the 13-entry PWA precache does not include it.
+- Automated in-app Browser setup was unavailable in the current tool runtime,
+  so the renderer-only multi-marker proof remains the already-required focused
+  Desktop/physical-iPhone smoke; no substitute automation or new dependency was
+  added.
+
+Manual UX checkpoint — 2026-08-30:
+
+- The Product Owner confirmed Caption placement itself works on Desktop, but
+  rejected the current collection of technical controls as a comprehensible
+  production workflow. This is not a renderer/storage failure and does not
+  reopen the bounded data model; the native screen remains technical UI.
+- Final Caption authoring UX must be derived from the actual LociMyu workflow
+  and guide one user task—select/add, place, then edit—without exposing the
+  internal Asset/Proxy/snapshot sequence. That UI/UX closure remains a later
+  production workstream, not a reason to add controls to this slice.
+
+Manual acceptance — 2026-08-30:
+
+- The Product Owner reported the bounded Desktop functional smoke had no
+  problem. Caption placement and the multi-Caption production wiring are
+  accepted independently from the rejected technical-control UX.
+- The Product Owner explicitly deferred this slice's physical iPhone smoke to
+  a later consolidated mobile run because repeating low-concern manual checks
+  per slice was materially slowing completion. This is recorded as unexecuted
+  risk acceptance, not an iPhone PASS or new G0/G1/release evidence.
+- The local production preview is temporary and will be stopped after this
+  checkpoint. No Project, model, package or source bytes were published.

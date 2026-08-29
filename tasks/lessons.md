@@ -179,3 +179,21 @@
 - Desktop実測、既存の同系統iPhone実績、自動acceptanceが揃い、残る差分がplatform非依存でデータを破壊しない場合、Product Ownerは個別sliceの実機再確認を後日の統合回帰runへ送れる。自動的には省略せず、残るmobile固有riskと後日確認項目を平易に示して明示判断を得る。
 - この判断は「iPhone PASS」の捏造ではない。未実施を記録し、current sliceをblockしないというrisk acceptance、過去の実機evidence、release/device gateの新規creditを分離する。
 - 実機runを延期した時点で一時公開tunnelを停止し、後日のrunでは同じ最小項目だけをまとめて確認する。延期を理由に追加fixture、instrumentationやmicro-hardeningを作らない。
+
+## 2026-08-30: 技術acceptance用controlを本番のCaption導線へ昇格させない
+
+- Caption target、Caption選択、新規作成、初期配置、位置調整、snapshot保存を別々のtechnical controlとして並べただけでは、各機能が動いても一般利用者には操作順が分からない。本番UXの成立を機能PASSから推定しない。
+- Caption authoringの本番導線を閉じるときは、LociMyuの実際の操作を参照し、「Captionを選ぶ／追加する→モデル上へ置く→その場で内容と位置を編集する」というユーザー作業を中心に一本化する。内部のAsset／Proxy／snapshot手順をユーザーに組み立てさせない。
+- 現在のnative画面はproduction wiringを検証するtechnical UIとして扱い、最終UIとしてordinary化しない。全体UI/UX closureまで、技術acceptanceと操作性acceptanceを別々に記録する。
+
+## 2026-08-30: 低懸念の物理iPhone smokeをsliceごとに反復しない
+
+- 既存iPhone経路と同じrenderer、storage、input方式を再利用し、差分が小さくDesktop・自動acceptance・独立reviewで拘束されている場合、各sliceで同じ人力smokeを要求するとcritical-path速度を大きく落とす。
+- Product Ownerが明示的に延期した低懸念項目は未実施として記録し、mobile-sensitiveな複数sliceを一つの統合回帰runへまとめる。延期を個別iPhone PASS、release/device gate evidence、または恒久的な試験免除として扱わない。
+- 物理端末を即時blockerにするのは、新しいmobile API、storage方式、renderer/input方式、大容量memory境界、またはDesktop evidenceで代替できないP0/P1 riskがある場合に絞る。既知経路の小さなUI wiringはまとめて確認する。
+
+## 2026-08-30: 技術acceptance用controlを本番のCaption導線へ昇格させない
+
+- Caption target、Caption選択、新規作成、初期配置、位置調整、snapshot保存を別々のtechnical controlとして並べただけでは、各機能が動いても一般利用者には操作順が分からない。本番UXの成立を機能PASSから推定しない。
+- Caption authoringの本番導線を閉じるときは、LociMyuの実際の操作を参照し、「Captionを選ぶ／追加する→モデル上へ置く→その場で内容と位置を編集する」というユーザー作業を中心に一本化する。内部のAsset／Proxy／snapshot手順をユーザーに組み立てさせない。
+- 現在のnative画面はproduction wiringを検証するtechnical UIとして扱い、最終UIとしてordinary化しない。全体UI/UX closureまで、技術acceptanceと操作性acceptanceを別々に記録する。
