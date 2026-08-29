@@ -23,7 +23,7 @@ Completed v1 implementation history remains available in Git before the G-1 clea
   external acquisition, device runs, Release actions or deployment
 
 Current authority keeps G0 and G0-S as release barriers. The approved narrow
-scheduling exception permits the paired Mesh+GS/Proxy technical vertical slice
+scheduling exception permits the proxy-backed Mesh/GS technical vertical slice
 after the independent `G0S-TAB` commit, without claiming G0/G0-S completion,
 G1 adoption or release authority.
 
@@ -66,7 +66,7 @@ is complete without reconstructing or falsely crediting the missing history.
 - [x] Run focused acceptance and one independent runtime/security review
 - [x] Run typecheck, the full test suite and production build once on the final
   executable tree; commit `G0S-TAB` independently and leave a clean worktree
-- [x] Move next to the paired Mesh+GS/Proxy technical vertical slice; do not
+- [x] Move next to the proxy-backed Mesh/GS technical vertical slice; do not
   explore another G0-S micro-slice unless a direct P0/P1 makes that slice unsafe
 
 ### G0S-TAB Edit/View clarification — corrective slice
@@ -245,7 +245,7 @@ Phase B result — commit `7abb44b`:
   integrate production persistence, pass G1, complete G0/G0-S, authorize release
   or expand architecture.
 
-### Spark representative GS and conditional first production path — active
+### Spark representative GS and conditional first production path — completed
 
 - [x] Product Owner supplied one local-only representative original,
   `ki84_ver1.ply`; keep the source unchanged and do not commit or publicly upload
@@ -266,21 +266,20 @@ Phase B result — commit `7abb44b`:
   guarantee or requiring a complete offline reload of this 745.6 MiB original
 - [x] Decide `PASS`, bounded `RETRY`, or `REJECT`; only `PASS` authorizes the
   already-approved minimum production integration below
-- [ ] On `PASS`, perform one short read-only production gap check, then reuse the
+- [x] On `PASS`, perform one short read-only production gap check, then reuse the
   canonical `Asset` / `AssetRevision` / `Representation` records, explicit
   GS-to-Proxy binding and existing save path for the thinnest production GS
   runtime integration
-- [ ] Keep Spark out of the ordinary v1 route, preserve source bytes, prove
+- [x] Keep Spark out of the ordinary v1 route, preserve source bytes, prove
   save/close/offline reopen and bundle isolation, obtain one independent review,
   run the final executable-tree matrix once, commit, report and stop
 
 This slice does not adopt Spark beyond the first production GS path, set a
 performance guarantee, pass G0/G0-S/G1, authorize release, add another renderer
 or format converter, or introduce renderer/storage frameworks, CAS, Automerge,
-journals, transactions, Proxy generation or direct splat picking. The current
-production preflight is SH3-only and capped below this file's count; that gap is
-not changed before representative smoke `PASS` and must be solved only to the
-minimum extent required by the selected production path.
+journals, transactions, Proxy generation or direct splat picking. The bounded
+SH2/SH3 production preflight and first production path were completed in
+`e584266`; later backup/alignment slices remain separate commits.
 
 Desktop representative observation on 2026-08-28 (manual Chrome smoke): the
 unchanged 781,785,120-byte local file loaded without conversion as 4,766,975
@@ -407,7 +406,13 @@ Completed Product Owner physical iPhone 14 Pro minimum offline smoke:
 - animation playback remains outside MVP
 - semantic conflicts fail closed only for the affected unit and never silently choose a winner
 
-### Product-owner paired Mesh+GS decisions recorded 2026-08-26
+### Historical bounded paired Mesh+GS decisions recorded 2026-08-26
+
+These bullets preserve the acceptance used for that bounded slice. The
+Product Owner's 2026-08-29 clarification supersedes the same-logical-Asset pair
+and global kind filters as the general product display model: visual Mesh and GS
+Assets may be independent, the GS/proxy relation remains same-Asset, and each
+loaded Asset/layer is the visibility unit.
 
 - The first standard interactive configuration is one logical Asset and one
   active AssetRevision containing normal Mesh, GS and one unambiguous invisible
@@ -2107,24 +2112,23 @@ Identity-only production slice review — 2026-08-26:
 
 ## G1+ — Proposed v2 gates
 
-The sequence below still governs technology adoption and release. After the
-independent `G0S-TAB` commit, only the approved paired Mesh+GS/Proxy technical
-slice may start early on existing accepted seams; that start does not pass G0,
-pass G0-S, adopt G1, or authorize release. See
-`docs/v2/00-approved-direction.md`. Order:
+The sequence below governs formal technology adoption and release; it is not the
+active next-feature queue. The bounded native GS, backup and two-Asset alignment
+slices completed early on accepted seams without passing G0/G0-S, adopting G1 or
+authorizing release. See `docs/v2/00-approved-direction.md`. Order:
 
 1. bounded-memory streaming/CAS package PoC;
 2. Spark/Three versus PlayCanvas renderer bakeoff;
 3. Automerge durability/merge/privacy PoC;
 4. renderer/storage-neutral ports with unchanged v1 behavior;
-5. v2 persistence, canonical migration, and the proxy-backed paired Mesh+GS
-   vertical slice in one logical Asset/active AssetRevision; simple mixed,
-   GS-only and Mesh-only visibility resolve the selected GS only to its explicitly
-   related invisible proxy under the simple opaque mixed rule; coarse hit ->
-   ordinary Caption gizmo adjustment/confirmation -> source-less manual
-   AssetFrame `positionAsset` -> save/reopen without proxy reraycast. Direct-GS,
-   automatic proxy generation, ordinary points and advanced composition do not
-   close that slice.
+5. v2 persistence, canonical migration, and the proxy-backed vertical slice with
+   one independent Mesh Asset plus one GS Asset containing its explicitly related
+   invisible proxy; selected visible Mesh targets itself, selected visible GS
+   targets only that proxy, and hidden Assets/proxies cannot win under the simple
+   opaque shared-view rule. Coarse hit -> ordinary Caption gizmo
+   adjustment/confirmation -> source-less manual AssetFrame `positionAsset` ->
+   save/reopen without proxy reraycast. Direct-GS, automatic proxy generation,
+   ordinary points and advanced composition do not close that slice.
 
 ## First production GS path — approved bounded native snapshot slice
 
@@ -2359,5 +2363,56 @@ Final verification — 2026-08-29:
   not fetch it and the PWA precache excludes the Spark chunk. No representative
   GS bytes, fixed count or fixed byte length entered the build output.
 - `npm audit` reported zero vulnerabilities. Final independent review reported
-  no unresolved P0/P1; full Alignment/Compare/Integrated and migration remain
-  separate later workstreams.
+  no unresolved P0/P1; multiple Assets including same-kind Assets, per-Asset visibility, full
+  Alignment, advanced shared-view composition and migration remain separately
+  scoped. This completion record does not order or authorize the next slice.
+
+## Asset-layer display semantics — Product Owner correction
+
+Plan and boundary:
+
+- [x] Record that the product unit of visibility is each loaded Asset/layer;
+  Mesh, GS and ordinary points are representation/rendering kinds, not the
+  primary user-visible display partition
+- [x] Record the required direction as multiple formats and multiple Assets in
+  one ProjectFrame, each independently placeable, visible/hidden, editable and
+  durable
+- [x] Retain the current `mixed` / `gs-only` / `mesh-only` controls only as the
+  bounded native slice's project-wide convenience filters, not the final
+  multi-Asset interaction model
+- [x] Remove formal Compare from the MVP/release critical path; retain it only as
+  an optional later diagnostic workflow requiring a separate Product Owner
+  decision before implementation
+- [x] Preserve the LociMyu-derived DisplaySet outcome: Caption membership,
+  material appearance and an optional saved view form one coordinated
+  "appearance set". Per-Asset visibility is required, but its exact persistence
+  placement inside existing presentation/snapshot state is not decided here;
+  it is not added directly to DisplaySet
+- [x] Update only existing direction/specification/critical-path documents; add
+  no schema, renderer, mode framework, code, test or new architecture document
+- [x] Obtain one independent read-only documentation review, run diff checks,
+  commit the docs-only correction and leave the worktree clean
+
+Review — 2026-08-29:
+
+- Product visibility is now consistently per loaded Asset/layer. Mesh, ordinary
+  points and GS remain Representation/rendering kinds; the bounded native
+  `mixed` / `gs-only` / `mesh-only` values are compatibility presets only.
+- Formal Compare was traced to the earlier specification process rather than a
+  distinct Product Owner feature request. It has no MVP/release gate, control or
+  next-workstream status; any future diagnostic comparison needs a separate
+  user-visible definition and approval.
+- The GS/proxy relationship remains same-Asset, while visual Mesh and GS Assets
+  may be independent in one ProjectFrame. Runtime proxy eligibility requires an
+  explicitly selected visible GS; hiding that GS also removes its proxy from
+  interaction.
+- DisplaySet remains the LociMyu-derived Caption/material/default-view appearance
+  set. Per-Asset visibility is separate; its exact field placement inside the
+  existing presentation/snapshot state remains the next bounded design task.
+- The first independent review found three documentation P1 contradictions
+  (hidden-GS proxy eligibility, one retained same-logical Mesh/GS gate fixture,
+  and DisplaySet as a possible visibility field). All three were corrected; the
+  read-only re-review reports no remaining P0/P1. `git diff --check` passed.
+- No production code, test, runtime schema, fixture, dependency or new
+  architecture document changed; executable verification was intentionally not
+  rerun for this documentation-only correction.

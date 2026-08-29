@@ -267,7 +267,7 @@ type BackgroundIntent =
 - Adding a surface-equivalent candidate inside an unchanged VariantFamily MAY preserve that family's class ID even when its encoded RepresentationFrame differs but the validated transform maps it to the same AssetFrame contribution. Carrying a class ID into a new revision requires the exact same target-family list and verified surface equivalence for every member. An AssetFrame surface/topology change or uncertain correspondence creates a new VariantFamily and a new compatibility class; any class-membership change also requires a new class ID. Adding or removing an unrelated class does not invalidate retained classes; removing or surface-changing a patch drops/replaces only its singleton class.
 - Replacement creates a new asset revision and a new binding, verifies every required blob, then changes only `activeBindingId`.
 - The old revision and binding metadata remain available in the collaboration lineage. Their bytes remain available only while a current/conflict/retention root requires them.
-- Concurrent `activeBindingId` changes are a user-visible conflict. The asset is absent from every authoritative mode and cannot be edited or exported as resolved state until the conflict is resolved. The UI MAY offer labelled read-only previews of each candidate, selected explicitly rather than through a CRDT materialized winner.
+- Concurrent `activeBindingId` changes are a user-visible conflict. The Asset is absent from every authoritative view and cannot be edited or exported as resolved state until the conflict is resolved. The UI MAY offer labelled read-only previews of each candidate, selected explicitly rather than through a CRDT materialized winner.
 - An unresolved asset has no binding and no fabricated `BlobRef`. It remains a valid container for migrated captions and diagnosis. `pendingAssetToProject`, when present, is canonical portable placement intent only and does not activate scene content. Assigning real content stages and verifies representations, creates a revision/binding whose `assetToProject` equals that pending value unless the user explicitly chooses another transform in the same reviewed command, then replaces the complete atomic `Asset.status` with `ready`. If no pending value exists, assignment requires an explicit alignment choice rather than silently assuming identity. Concurrent status replacements retain whole-status candidates rather than mixing kind/reason/binding fields.
 - Ownership is closed over immutable records. For every `AssetBindingRevision B`, `B.assetRevisionId` resolves to an `AssetRevision R` and `B.assetId === R.assetId`. When present, `B.parentBindingId` resolves to a binding for the same asset, and `R.parentRevisionId` resolves to a revision for the same asset. A ready `Asset A` may name `B` through `activeBindingId` only when `A.id === B.assetId`. A missing or cross-asset owner/reference invalidates the affected binding/revision closure before SceneDocument; no resolver follows a foreign record by guessing.
 - Frame and compatibility ownership is also closed. `Project.frame.id` is distinct from every Asset/Representation frame, and each `Asset.assetFrameId` belongs to exactly one asset. Representations may share a `representationFrameId` only within that asset and only when their canonical persisted `representationToAsset` values have byte-identical `LociCanonicalJsonV1`; if `representationFrameId === assetFrameId`, the transform is canonical identity. An `AnchorCompatibilityId` may occur only on revision classes and anchors for one asset and at most once inside one revision. When an anchor's optional `authoredAssetRevisionId` resolves, that revision has the same asset and contains exactly one class whose ID equals `authoredAnchorCompatibilityId`; when source provenance also resolves, the class/source-family rule below applies. Validators derive these ownership/partition indexes from the document and reject collisions; no general frame graph or compatibility registry is introduced.
@@ -278,23 +278,23 @@ type BackgroundIntent =
 
 - A representation has exactly one role. If one blob serves two roles, create two immutable Representation records that share the BlobRef.
 - For a model container that contains both triangle and ordinary-point primitives, `contentKind` is also the subset selector: the `mesh` Representation exposes only triangle/cutout mesh primitives and the `pointCloud` Representation exposes only ordinary point primitives. A backend must not decode/draw the other contribution through that record. Unsupported primitive modes are diagnosed, never folded into either contribution by guess.
-- `meshPrimary`, `pointPrimary`, `gsPrimary`, and `visualPatch` are visual roles. A `visualPatch` is a human-authored or explicitly imported visual repair mesh; it is not inferred from, or silently replaced by, collision/proxy geometry. `splatExclusion` is its optional Integrated rendering control. `interactionProxy` is interaction-only.
+- `meshPrimary`, `pointPrimary`, `gsPrimary`, and `visualPatch` are visual roles. A `visualPatch` is a human-authored or explicitly imported visual repair mesh; it is not inferred from, or silently replaced by, collision/proxy geometry. `splatExclusion` is its optional shared-view composition control. `interactionProxy` is interaction-only.
 - `interactionProxy` requires `contentKind: 'mesh'` and purposes exactly `['interaction']`; it cannot be a visual or preview candidate.
 - `interactionProxy` names exactly one `proxyForGsVariantFamilyId` present in the same asset revision.
 - Relationship fields are role-closed. `proxyForGsVariantFamilyId` is required only for `interactionProxy`; `targetGsVariantFamilyIds` is required only for `splatExclusion`; and `compositeGroupId` is allowed only on `visualPatch` or `splatExclusion`. Every other role omits those members. A field on the wrong role is invalid rather than ignored.
 
-The first paired Mesh+GS vertical slice reuses this existing proxy relation and
-does not add another domain, revision, display-mode or interaction framework.
-Its fixture contains one unambiguous `interactionProxy` Representation targeting
-the paired GS family. Interaction resolves the selected GS family to exactly that
+The first proxy-backed vertical slice reuses this existing relation and does not
+add another domain, revision, display-mode or interaction framework. Its fixture
+contains an independent Mesh Asset and a GS Asset whose active AssetRevision has
+one unambiguous `interactionProxy` Representation targeting that GS family.
+Interaction resolves a selected visible GS family to exactly that same-Asset
 proxy through `proxyForGsVariantFamilyId`; zero or multiple eligible proxies are
-diagnosed rather than guessed. That same proxy remains selected while visibility
-switches among simple Mesh+GS mixed, GS-only and Mesh-only; the target GS family
-must stay in the active AssetRevision but need not be visible. Normal-
-`meshPrimary` binding is not an initial path and does not block this slice. Array
-order, labels, filenames, bounds, equal transforms, visibility, proximity,
-`derivedFrom` and compatibility classes are never substitutes for the explicit
-proxy relation.
+diagnosed rather than guessed, and hiding the GS Asset removes its proxy from
+interaction. A selected visible Mesh Asset raycasts itself. Normal-
+`meshPrimary` binding as a substitute for the GS proxy is not an initial path and
+does not block this slice. Array order, labels, filenames, bounds, equal
+transforms, visibility, proximity, `derivedFrom` and compatibility classes are
+never substitutes for the explicit proxy relation.
 - `splatExclusion` requires `contentKind: 'splatMask'`, includes `display` purpose, has a `compositeGroupId`, and names a non-empty, deduplicated, lexicographically sorted `targetGsVariantFamilyIds` list whose families are `gsPrimary` contributions in the same asset revision. Its `representationFrameId` equals the owning `Asset.assetFrameId` and its canonical `representationToAsset` is identity, so the wire predicate is already baked into AssetFrame. It never produces color by itself.
 - A source-only representation is never rendered. A visual representation is eligible only when purposes contain `display` or `preview`.
 - `variantFamilyId` groups mutually exclusive source/display/preview encodings of the same logical contribution. SceneDocument exposes all valid candidates; RenderPlan selects exactly one eligible candidate per visible family. Independent surfaces use distinct families and may draw together.
@@ -305,8 +305,8 @@ proxy relation.
 - `interactionProxy` MUST NOT contribute color, depth, screenshots, bounds used for visual fit, shadows or measurement.
 - If visual occlusion geometry is later needed, it MUST use a separate role; `interactionProxy` cannot be reused implicitly.
 - A `compositeGroupId` is asset-scoped and cannot occur on another asset. Within any resolved AssetRevision containing a `splatExclusion`, the group membership is derived only from representations in that revision and contains at least one `visualPatch` family and at least one `splatExclusion` family with that same ID. An ungrouped exclusion, a cross-asset member, a target outside the revision, or a group without both roles invalidates the complete group. An ungrouped `visualPatch` remains a valid independent surface but has no exclusion relationship.
-- In Integrated mode RenderPlan enables such a group atomically only when it can select one eligible candidate from every visual-patch and exclusion family in the group. If one family is missing, invalid or unsupported, neither patch nor mask is applied and the group produces one diagnostic; partial color or exclusion is forbidden. GS mode ignores the complete group.
-- GS mode shows the unexcluded GS representation. Integrated-only exclusions MUST NOT alter the standalone GS view.
+- When the corresponding shared-view composition feature is enabled, RenderPlan enables such a group atomically only when it can select one eligible candidate from every visual-patch and exclusion family in the group. If one family is missing, invalid or unsupported, neither patch nor mask is applied and the group produces one diagnostic; partial color or exclusion is forbidden. A standalone GS presentation ignores the complete group.
+- A standalone GS presentation shows the unexcluded GS representation. Shared-view-only exclusions MUST NOT alter it.
 - Source, display and preview purposes are orthogonal to visual role. A raw GS can be both `source` and `display`; a paged derivative can be `display` only, but the two cannot be selected simultaneously from one family.
 - Persistent `purposes` are deduplicated and serialized in `source`, `display`, `preview`, `interaction` order.
 - Derived-resource provenance records tool, exact version, parameter digest and input digests.
@@ -402,7 +402,7 @@ The `direct-splat` and `gpu-id-depth` values remain reserved for a later optiona
 path. Their wire presence does not make either method part of the first paired
 vertical slice or its renderer gate.
 
-A `surfaceRef` cannot exist without its source. When another or later path persists nonmanual pick evidence, it records only a visual Representation that the current RenderPlan made visible/pickable or the one validated interaction-only proxy selected for the active Asset. The first paired proxy path instead commits the source-less manual anchor after gizmo confirmation. Persisted nonmanual evidence validates source indices against loaded verified bytes. A proxy requires its declared GS family to belong to the same active AssetRevision, but that GS family may be hidden by the Mesh-only visibility pattern. Package/open validation always checks resolvable owner/method/content/role/surface-kind metadata; it range-checks an index when the weak source bytes are already in the validated closure. If those non-protecting bytes are absent, the source remains non-dereferenceable/unverified provenance and never invalidates the canonical anchor. A history-free package may omit the complete weak `source` while retaining method/confidence and the canonical anchor.
+A `surfaceRef` cannot exist without its source. When another or later path persists nonmanual pick evidence, it records only a visual Representation that the current RenderPlan made visible/pickable or the one validated interaction-only proxy selected for the active Asset. The first proxy-backed path instead commits the source-less manual anchor after gizmo confirmation. Persisted nonmanual evidence validates source indices against loaded verified bytes. A proxy relationship remains structurally valid when its GS family is hidden, so package/open validation does not rewrite the relation, but runtime interaction admits that proxy only while its GS Asset/family is explicitly selected and visible; a Mesh-only visibility state cannot use it. Package/open validation always checks resolvable owner/method/content/role/surface-kind metadata; it range-checks an index when the weak source bytes are already in the validated closure. If those non-protecting bytes are absent, the source remains non-dereferenceable/unverified provenance and never invalidates the canonical anchor. A history-free package may omit the complete weak `source` while retaining method/confidence and the canonical anchor.
 
 ### 4.2 Material identity and intent
 
@@ -434,11 +434,11 @@ The renderer-neutral coverage resolver is closed:
 
 An inherited effective mask uses cutoff `0.5` because source mask and hard chroma have already produced binary coverage. G0 ratifies the exact dither matrix/seed/coordinate rule used by both backends. Source/Profile color is canonical unassociated RGB. An opaque sample outputs coverage alpha one. A mask or dither sample outputs nothing when rejected and coverage alpha one when accepted. Only `smoothBlend` outputs fractional coverage alpha `appearanceAlpha`; its semantic premultiplied color is `resolvedRgb * appearanceAlpha`. A backend may use another internal blend representation only when final color/alpha matches this contract; it cannot leave source alpha on a surviving opaque/mask/dither sample.
 
-Geometry coverage composes before the final class. Triangles have binary geometry coverage. An ordinary point's profile returns radial coverage `g`: `binary` accepts exactly `g >= pickCoverageAlphaThreshold`; `ditherCoverage` applies the same ratified stable dither family to `g`; and `smoothBlend` multiplies fractional material output by `g`. Accepted binary/dither geometry samples have coverage alpha one before material evaluation. Binary geometry preserves the material class; dither geometry promotes opaque/mask/dither material to effective dither; smooth geometry promotes every non-discarded result to effective smooth. Geometry and material dither use profile-fixed independent seed domains. Thus a fractional-AA point edge is never labelled Supported opaque Integrated by looking only at its material.
+Geometry coverage composes before the final class. Triangles have binary geometry coverage. An ordinary point's profile returns radial coverage `g`: `binary` accepts exactly `g >= pickCoverageAlphaThreshold`; `ditherCoverage` applies the same ratified stable dither family to `g`; and `smoothBlend` multiplies fractional material output by `g`. Accepted binary/dither geometry samples have coverage alpha one before material evaluation. Binary geometry preserves the material class; dither geometry promotes opaque/mask/dither material to effective dither; smooth geometry promotes every non-discarded result to effective smooth. Geometry and material dither use profile-fixed independent seed domains. Thus a fractional-AA point edge is never labelled Supported opaque shared-view composition by looking only at its material.
 
 The optics resolver maps `inherit` to source optics, `surface` explicitly disables source transmission, and `transmission` is valid only when source optics is already `transmission`; material intent cannot invent missing transmission parameters. Coverage and optics remain independent, so a source transmission material may retain mask coverage.
 
-RenderPlan carries the resolved coverage class/evaluator inputs, optics, lighting and sidedness. Appearance `lighting:'inherit'`/absence and absent `doubleSided` resolve from `SourceMaterialSemantics`; explicit values replace them. Integrated is Supported only for `optics:'surface'` with `opaque`, `mask` or `ditherCoverage`; surface smooth blend is Experimental only after G1-D or otherwise redirected, while every transmission result is Unsupported and redirected until a separate later material/research gate. Backend results such as `transparent`, `depthWrite`, render queue/order, shader name or effective fallback are not persisted and may not reclassify the resolved material. Mapping an override to a new revision requires an explicit compatibility map; ambiguity creates review work.
+RenderPlan carries the resolved coverage class/evaluator inputs, optics, lighting and sidedness. Appearance `lighting:'inherit'`/absence and absent `doubleSided` resolve from `SourceMaterialSemantics`; explicit values replace them. Shared-view composition is Supported only for `optics:'surface'` with `opaque`, `mask` or `ditherCoverage`; surface smooth blend is Experimental only after G1-D or otherwise redirected, while every transmission result is Unsupported and redirected until a separate later material/research gate. Backend results such as `transparent`, `depthWrite`, render queue/order, shader name or effective fallback are not persisted and may not reclassify the resolved material. Mapping an override to a new revision requires an explicit compatibility map; ambiguity creates review work.
 
 The semantic override key is `(scope, assetId, variantFamilyId, materialLayoutId, logicalMaterialSlotId)`. At most one active MaterialOverride may own a key. Concurrent/different IDs for the same key form an explicit duplicate-key conflict; SceneResolver applies neither and resolution must tombstone/retarget all but one. For a selected display set, an exact set-scope record replaces the complete project-scope `appearance` and `compositing` records for that target; it is not a shallow/field merge. If no set record exists, the project record applies; if neither exists, source semantics apply. This precedence never orders duplicate records by ID or creation time.
 
@@ -541,10 +541,7 @@ interface SavedView {
   camera: ProjectCamera;
   background: BackgroundIntent;
   presentation?: {
-    mode?: 'mesh' | 'gs' | 'compare' | 'integrated';
     displaySetId?: DisplaySetId;
-    selectedAssetIds?: readonly AssetId[];
-    compareStyle?: 'wipe' | 'split' | 'flicker' | 'sideBySide';
   };
   lifecycle: EntityLifecycle;
 }
@@ -563,11 +560,11 @@ interface ProjectCamera {
 
 Portable string normalization and control-character policy is defined once by the storage contract. `Caption.body` is the only multiline persistent field and may preserve TAB/LF/CR exactly; structural and other known display strings are single-line/control-free. Renderers always present these values as text, never markup.
 
-A display set binds caption membership, set-scoped material appearance and an optional default saved view. It remains independent of Mesh/GS/Compare/Integrated. Every editable project has at least one active set and `Project.defaultDisplaySetId` resolves to an active set. Project-scoped material intent applies only when the selected display set has no exact-key override; an exact set record performs the whole-record replacement defined above. Duplicate-key records at either scope apply none and are never ordered by array position.
+A display set is the LociMyu-derived appearance set: it binds Caption membership, set-scoped material appearance and an optional default saved view. It is not a geometry layer or Representation-kind mode. Every editable project has at least one active set and `Project.defaultDisplaySetId` resolves to an active set. Project-scoped material intent applies only when the selected display set has no exact-key override; an exact set record performs the whole-record replacement defined above. Duplicate-key records at either scope apply none and are never ordered by array position. DisplaySet selection never infers visibility from Mesh/GS kind. Whether the required per-Asset visibility is stored directly in SavedView presentation or another existing presentation record is fixed only by the bounded multiple-Asset implementation specification.
 
 A set-selection command first changes the session set, then applies that set's `defaultViewId` once. During this application the view's optional `presentation.displaySetId` is ignored, preventing recursion. A direct saved-view command may switch to its referenced active set once and then apply the camera/presentation under the same re-entry guard. Missing/deleted defaults are diagnosed and leave the camera unchanged. The shared startup set is `Project.defaultDisplaySetId`; the momentary active set is local session state unless the user explicitly changes the project default.
 
-A saved view MAY record product mode, selected assets, display set and compare style. Temporary camera, current selection, gizmo and compare slider values are local UI state unless the user explicitly saves a view.
+A saved view MAY record its display set. Temporary camera, current selection and gizmo values are local UI state unless the user explicitly saves a view. The required durable per-Asset visibility needs one bounded field-placement decision before implementation; this amendment does not silently assign it to DisplaySet or add a second layer model. A future diagnostic comparison presentation defines its own state only after separate Product Owner approval; it is not preallocated in the base schema.
 
 ### 4.4 Untrusted media and decoder boundary
 
@@ -639,7 +636,7 @@ RenderPlan fixes integer render size as `width = max(1, floor(cssWidth*devicePix
 - opaque logical resource references;
 - visual bounds and presentation intent;
 - the resolved ordinary-point presentation intent;
-- the requested mode and display-set effects.
+- the requested per-Asset visibility and display-set effects.
 
 It MUST NOT contain `THREE.Object3D`, `THREE.Material`, PlayCanvas entities, Spark objects, OPFS paths, Blob/ArrayBuffer instances, object URLs, Automerge values, shader names or backend depth/sort flags.
 
@@ -665,8 +662,8 @@ BlobStore -> ResourceManager
 
 Responsibilities:
 
-- **ViewerController** owns product mode, project camera, selection and UI-facing commands.
-- **RenderCoordinator** diffs scenes, builds passes, coordinates Compare and schedules frames.
+- **ViewerController** owns per-Asset visibility, project camera, selection and UI-facing commands.
+- **RenderCoordinator** diffs scenes, builds passes and schedules frames.
 - **InteractionIndex** combines hits from the explicitly selected same-asset
   interaction surface and normalizes them to AssetFrame. Future direct-splat or
   GPU ID/depth paths remain optional inputs rather than first-slice dependencies.
@@ -678,55 +675,64 @@ Every asynchronous load has a generation ID and `AbortSignal`. Completion from a
 
 `SceneResolver` MUST NOT read BlobStore bytes, decoder output or device residency. Two devices given the same metadata/conflict/session/profile-registry inputs derive the same logical SceneDocument even when one lacks a required local blob; the latter receives the storage/resource degraded diagnostic and cannot realize that resource, but it does not rewrite semantic scene membership.
 
-## 7. Mode rendering contract
+## 7. Asset-layer rendering contract
 
-| Mode | Visible roles | Required behavior |
-|---|---|---|
-| Mesh | one selected candidate from each visible `meshPrimary`, `pointPrimary`, or enabled `visualPatch` family | Correct ordinary mesh/point rendering and source material semantics within backend support |
-| GS | one selected candidate from each visible `gsPrimary` family | Full GS without Integrated-only exclusion; progressive LOD is allowed |
-| Compare | independently rendered Mesh and GS outputs | Same camera, viewport, exposure and background; wipe/split/flicker/side-by-side; no cross-depth promise |
-| Integrated | `gsPrimary`, selected `meshPrimary`/`pointPrimary`, and valid patch/exclusion groups | Opaque/mask/dither coverage is Supported; smooth is Experimental only after G1-D or redirected, and transmission is Unsupported/redirected pending a separate gate |
+SceneResolver selects one eligible candidate from each visible visual
+Representation family belonging to every visible Asset. Mesh, ordinary-point and
+GS roles choose the decoder/rendering path; they do not define the user's
+visibility group. Hidden Assets contribute no color, depth, pick IDs or
+interaction surfaces. Visible Assets share the ProjectFrame, camera, viewport,
+exposure and background.
 
-The first proxy-backed vertical slice uses three visibility patterns of one
-paired active AssetRevision: simple Mesh+GS mixed, GS-only and Mesh-only. These
-are the existing Integrated, GS and Mesh requests with a bounded fixture, not a
-new persistent mode. Compare remains a later workflow. The simple mixed fixture
-uses an opaque depth-writing Mesh pass followed by ordinary GS rendering against
-that depth; smooth Mesh alpha, transmission, patch/exclusion and exact
-cross-representation multi-layer composition remain outside this first slice.
+The first proxy-backed native slice uses simple Mesh+GS mixed, GS-only and
+Mesh-only as project-wide convenience filters for one bounded one-Mesh/one-GS snapshot.
+They remain compatible initial presets, not the final per-Asset visibility
+model. The simple mixed fixture uses an opaque depth-writing Mesh pass followed
+by ordinary GS rendering against that depth; smooth Mesh alpha, transmission,
+patch/exclusion and exact cross-Representation multi-layer composition remain
+outside that slice.
 
-In Integrated, Supported material results are exactly `surface × (opaque | mask | ditherCoverage)`. Every accepted opaque, mask or dither mesh/ordinary-point sample performs the normal depth test and writes its depth; every rejected sample writes neither color, ID nor depth. Dither trades smoothness for stable order. A non-depth-writing or differently ordered variant is Experimental and cannot claim this Supported contract. Intersections MUST be tested for z-fighting, halos, visible holes and duplicate surfaces.
+Supported shared-view material results are exactly `surface × (opaque | mask | ditherCoverage)`. Every accepted opaque, mask or dither Mesh/ordinary-point sample performs the normal depth test and writes its depth; every rejected sample writes neither color, ID nor depth. Dither trades smoothness for stable order. A non-depth-writing or differently ordered variant is Experimental and cannot claim this Supported contract. Intersections MUST be tested for z-fighting, halos, visible holes and duplicate surfaces.
 
-For `smoothBlend`, the UI presents supported alternatives: Mesh only, Compare, explicit dither conversion, or—only after G1-D—an opt-in experimental compositor. For `transmission`, it presents Mesh, Compare or an explicit supported material conversion; it does not offer G1-D as transmission support. It MUST NOT silently label a queue-order approximation as correct.
+For `smoothBlend`, the UI presents supported alternatives such as hiding the
+affected contribution, explicit dither conversion or—only after G1-D—an opt-in
+experimental compositor. For `transmission`, it presents hiding the affected
+contribution or an explicit supported material conversion; it does not offer
+G1-D as transmission support. It MUST NOT silently label a queue-order
+approximation as correct. A separate diagnostic comparison UI is optional and
+requires a later Product Owner decision.
 
 WBOIT, if its optional gate passes, remains an approximation. A future exact unified triangle/GS rasterizer would replace or extend `RenderBackend` and `RenderCoordinator`; it must not require a persistent-schema change.
 
 ## 8. Picking and interaction
 
-For the first proxy-backed paired path, interaction routing precedes the
-mode-specific policies below. The user targets one GS family; the runtime admits
-only the unique same-Asset `interactionProxy` whose
-`proxyForGsVariantFamilyId` names that family. Clicks in simple Mesh+GS mixed,
-GS-only and Mesh-only visibility all raycast that same proxy. Switching
-visibility never makes the proxy visual. The resulting coarse hit is converted
-to a transient AssetFrame candidate and exposed through the ordinary Caption
-gizmo; adjustment/confirmation commits a source-less manual anchor, so no proxy
-ID or triangle is required by save/reopen. A proxy-less GS-only asset is
-view-only for new placement. Ordinary direct Mesh picking remains valid outside
-this paired proxy path and is never an automatic fallback for its selected GS.
+For the first proxy-backed path, interaction routing precedes the general
+visible-Asset policies below. The user targets one visible GS family; the runtime
+admits only the unique same-Asset `interactionProxy` whose
+`proxyForGsVariantFamilyId` names that family. Switching visibility never makes
+the proxy visual, and hiding the GS Asset makes that proxy ineligible for
+interaction. The resulting coarse hit is converted to a transient AssetFrame
+candidate and exposed through the ordinary Caption gizmo;
+adjustment/confirmation commits a source-less manual anchor, so no proxy ID or
+triangle is required by save/reopen. A proxy-less GS Asset is view-only for new
+placement. A selected visible Mesh Asset raycasts itself and is never an
+automatic fallback for a selected GS.
 
-Other and later picking policies:
+General and later picking policies:
 
-- Mesh: nearest valid visible hit across selected `meshPrimary`/enabled `visualPatch` triangle contributions and selected `pointPrimary` ordinary-point contributions. An ordinary-point hit records `hitEvidence.method: 'point-cloud'`; it records `SurfaceRef.pointSample` only when the complete source occurrence is available under the rule above. `normalAsset` is included only when a validated source normal can be transformed under the frame contract, and its absence never prevents caption creation.
-- GS: the first paired slice resolves the active Asset to its explicit same-asset
+- A selected visible Mesh/ordinary-point Asset: nearest valid visible hit across
+  its selected `meshPrimary`/enabled `visualPatch` triangle contributions and
+  selected `pointPrimary` ordinary-point contributions. An ordinary-point hit records `hitEvidence.method: 'point-cloud'`; it records `SurfaceRef.pointSample` only when the complete source occurrence is available under the rule above. `normalAsset` is included only when a validated source normal can be transformed under the frame contract, and its absence never prevents caption creation.
+- A selected visible GS Asset: the first paired slice resolves the active Asset to its explicit same-asset
   proxy for the selected GS family. Missing, duplicate or invalid proxy data
   makes that GS view-only for new placement and never triggers an inferred Mesh,
   another proxy, direct splat path or generated proxy. Existing Captions continue
   to use their canonical AssetFrame positions.
-- Compare: pick the pane or source currently under interaction.
-- Integrated: choose by effective visible depth when the backend can prove it; otherwise expose `auto`, `mesh`, or `GS` targeting and report ambiguity.
+- When multiple visible Assets overlap, Caption targeting remains explicit. The
+  runtime does not raycast every layer and silently choose the nearest unrelated
+  surface. A future automatic depth-based policy requires separate acceptance.
 
-For picking, the Mesh source means the visible non-GS `meshPrimary`, `pointPrimary` and enabled `visualPatch` contributions admitted by the active mode; it never includes an `interactionProxy`. Compare applies this rule inside its Mesh pane, and Integrated considers only non-GS contributions actually selected by its RenderPlan. Ordinary-point picking is not splat picking and cannot emit `direct-splat` or `splatSample` evidence.
+For picking, a Mesh/ordinary-point source means only the visible non-GS `meshPrimary`, `pointPrimary` and enabled `visualPatch` contributions belonging to the explicitly selected Asset and admitted by its RenderPlan; it never includes an `interactionProxy`. Ordinary-point picking is not splat picking and cannot emit `direct-splat` or `splatSample` evidence.
 
 The provisional ordinary-point click radius is 6 CSS pixels and is frozen or superseded by the later ordinary-point device/UX decision before ordinary-point display or picking support is enabled. Eligible points come only from a RenderPlan-selected `pointPrimary` candidate and must pass its current LOD, visibility, clipping and depth rules. Binary/dither accepted samples always emit pick ID; rejected samples do not. For smooth material or smooth geometry, an integer pick-ID fragment exists only when the effective final coverage alpha at that canonical sample is at least the active point profile's `pickCoverageAlphaThreshold`; a lower-alpha visible fringe does not count as a fragment hit and may proceed to radius fallback. First, visible triangle and such accepted ordinary-point fragments that actually cover the click pixel are compared by effective visible depth. Only when no Mesh-source fragment covers that pixel may the point-radius fallback consider visible points within 6 CSS pixels. The coordinator orders those candidates by screen-space distance, effective depth and stable Representation ID. For candidates still tied, it uses the lexicographic `(nodeIndex, primitiveIndex, pointIndex)` locator only when every tied candidate has the complete occurrence; if any lacks it, it compares the finite validated RepresentationFrame positions of all tied candidates lexicographically after normalizing negative zero. This position is a non-persisted tie-break. Equal final position with unavailable/distinct normal evidence yields the same canonical anchor and omits source/normal evidence. If any required position cannot be recovered deterministically, or the backend cannot prove fragment coverage, comparable depth or stable ordering under the active plan, it returns an ambiguity and asks for Triangle or Points targeting rather than silently preferring one.
 
@@ -746,7 +752,7 @@ The first simple mixed pattern does not run an `auto` competition between visual
 Mesh, GS and proxy hits: the proxy explicitly related to the selected GS family
 is the sole initial-placement surface. An unrelated whole-scene or same-asset
 visual Mesh never enters that raycast automatically. A
-later advanced Integrated picking policy requires separate acceptance and may
+later advanced shared-view picking policy requires separate acceptance and may
 not silently replace this initial rule. Exclusion applies only to its declared
 `targetGsVariantFamilyIds`; when that later feature is active, the same AssetFrame
 predicate filters proxy hits so an excluded GS region cannot remain invisibly
@@ -763,7 +769,7 @@ The MVP alignment tool MUST provide:
 - preview without modifying source bytes;
 - undo/redo, reset to identity, reset to imported default and restore previous binding;
 - residual and method metadata when a fitted method is used;
-- Mesh, GS and Compare switching without losing the pending transform.
+- per-Asset visibility changes without losing the pending transform.
 
 Repair alignment is representation-local, not a second Asset alignment. “Add visual repair” preserves the imported source, lets the user place its RepresentationFrame into the selected target AssetFrame with the same translation/quaternion/positive-uniform-scale controls, then freezes that `representationToAsset` in the new `visualPatch`. An optional hard exclusion is generated/imported already in the target AssetFrame with identity `representationToAsset`. Accepting the preview stages both resources and atomically creates one new AssetRevision/AssetBindingRevision that copies the prior `assetToProject`; cancellation changes no active revision. The new patch family receives its own singleton anchor-compatibility class, while byte- and surface-unchanged base-family classes retain their IDs. A surface-equivalent candidate added inside the same patch family may retain its class; a surface-changing patch replacement creates a new patch VariantFamily and singleton class but replaces only the old patch class within the revision partition. Deleting the patch removes only that class, so base-family pins remain compatible while affected patch-authored pins become `needsReview`. The workflow cannot group a separately aligned Asset, reuse an interaction proxy as color geometry, or commit a mask without its patch.
 
@@ -785,11 +791,13 @@ committed edit creates a new immutable `AssetBindingRevision` with
 binding, source bytes, Representation transforms and Asset-local Caption
 `positionAsset` remain unchanged. Numeric entry remains available, but
 Unity-style numeric dragging is later UX. This slice does not claim the locked
-reference, bounds-fit, undo/reset, fitted-method or Compare portions of the full
+reference, bounds-fit, undo/reset or fitted-method portions of the full
 alignment tool.
 
-`mixed`, `gs-only` and `mesh-only` remain project-wide role visibility states,
-not per-Asset eye toggles or Compare UI. Caption targeting remains explicit:
+`mixed`, `gs-only` and `mesh-only` remain project-wide role visibility states in
+the bounded native snapshot-v1 path. They are compatibility presets, not the
+final product model; general multiple-Asset work adds per-Asset visibility
+without redefining Mesh/GS kinds as modes. Caption targeting remains explicit:
 the selected visible Mesh raycasts only itself, while the selected visible GS
 raycasts only its same-Asset bound Proxy. Hidden or unusable surfaces never
 capture a raycast, and a missing/broken/cross-Asset Proxy makes only that GS
@@ -822,7 +830,7 @@ Requirements:
 
 The renderer bakeoff starts with provisional iOS settings of 0.5–1M drawn splats, 2–4M resident splats, DPR 1–1.5 and MSAA off. These are test inputs, not guarantees. The winning implementation MAY use a renderer-native paged derivative, but its generation cost, size, offline behavior and provenance are part of the decision.
 
-Under pressure the ResourceManager evicts decoded CPU/GPU residency for invisible resources, lowers draw/resident budget, lowers render scale, disables experimental targets, then requests a supported mode fallback. Runtime eviction never deletes persistent CAS bytes; persistent reachability and collection are governed only by the storage specification.
+Under pressure the ResourceManager evicts decoded CPU/GPU residency for invisible resources, lowers draw/resident budget, lowers render scale, disables experimental targets, then disables only unsupported contributions while preserving supported visible Assets. Runtime eviction never deletes persistent CAS bytes; persistent reachability and collection are governed only by the storage specification.
 
 ## 11. Renderer bakeoff
 
@@ -832,20 +840,25 @@ both candidates for:
 
 - offline/no-CDN use;
 - small, medium and large GS plus a representative Mesh;
-- Mesh, GS and the simple opaque mixed visibility pattern;
-- paired same-asset Mesh+GS interaction through one invisible proxy shared by
-  simple mixed, GS-only and Mesh-only visibility; direct GS picking and proxy
-  generation are not required;
+- Mesh, GS and the simple opaque shared-view visibility pattern;
+- one independent Mesh Asset plus one GS Asset with its same-Asset invisible
+  proxy; visible Mesh targets itself, visible GS targets that proxy, and hidden
+  Assets cannot participate in picking; direct GS picking and proxy generation
+  are not required;
 - first preview, p50/p95 frame time and resource budgets;
 - cancellation, 20 load/unload cycles, context loss and background restore;
 - dependency size, license, security audit and migration effort.
 
-The retained later packs MUST test ordinary-point display/picking, Compare and
-multiple aligned assets, complete opaque/mask/dither Integrated material and
+The retained later packs MUST test ordinary-point display/picking, multiple
+aligned Assets with per-Asset visibility, complete opaque/mask/dither shared-view material and
 intersection behavior, patch/exclusion/repair, and optional translucent-aircraft
 diagnostics before the corresponding support claim or control is enabled. A
 failure in one of those later packs does not fail base renderer adoption unless
 it exposes a shared base invariant defect.
+
+A diagnostic Compare pack is created only after a separate Product Owner
+decision defines its user-visible behavior. It is not a retained MVP/release
+acceptance pack merely because earlier specifications named it.
 
 Engine-specific optimized derivatives are allowed only if both their preprocessing and runtime costs are recorded. If both candidates pass the base pack comparably, choose the lower migration and maintenance cost. If neither passes a base hard requirement, stop at the ADR reconsideration gate rather than combining two failing backends.
 
@@ -859,7 +872,7 @@ Useful current candidate evidence:
 These IDs remain normative, but their activation follows
 `03-gates-and-delivery.md`: base G1-B closes only the Mesh, GS, simple opaque
 mixed, shared-proxy, transform/bounds and resource-lifecycle clauses exercised by
-its base pack. Ordinary-point, Compare, complete material/Integrated,
+its base pack. Ordinary-point, multiple-Asset visibility, complete material/shared-view composition,
 patch/exclusion/repair and transparency clauses are retained as later feature
 acceptance and do not block the first paired slice.
 
@@ -868,11 +881,11 @@ acceptance and do not block the first paired slice.
 - `RND-DOM-01`: property tests round-trip Representation/Asset/Project points and normals within declared tolerance.
 - `RND-DOM-02`: non-finite translation/scale, non-normalizable quaternion, non-positive user or import scale, shear and unsupported non-uniform normalization are rejected.
 - `RND-DOM-03`: new revision plus alignment activates through one binding pointer; prior immutable canonical payloads and digests remain unchanged.
-- `RND-DOM-04`: concurrent active bindings create a resolvable conflict, never a silent authoritative scene in any mode; candidate previews are labelled read-only.
+- `RND-DOM-04`: concurrent active bindings create a resolvable conflict, never a silent authoritative scene in any visibility state; candidate previews are labelled read-only.
 - `RND-DOM-05`: surface-compatible derivative addition retains anchors; incompatible or unknown replacement derives `needsReview`.
 - `RND-DOM-06`: material overrides survive nonvisual derivative and candidate LOD/preview switching through complete family slot maps and never cross a new family through a display-name guess.
 - `RND-DOM-07`: SceneDocument is deterministic and contains no forbidden backend/storage types.
-- `RND-DOM-08`: role matrices for all four modes match this specification; proxies never reach color/depth/screenshot. Reusing one VariantFamily across assets, roles, content kinds or inconsistent semantic targets is rejected, while a raw reflected source and correctly baked identity display candidate remain one selectable family. Mesh/GS/point/patch families remain independently selectable in Compare/Integrated. The paired fixture keeps its Mesh, GS and one proxy in one logical Asset and active AssetRevision, switches simple mixed/GS-only/Mesh-only visibility without changing the proxy selection, and never satisfies the row with unrelated assets or a new mode.
+- `RND-DOM-08`: per-Asset visibility and role resolution match this specification; proxies never reach color/depth/screenshot. Reusing one VariantFamily across assets, roles, content kinds or inconsistent semantic targets is rejected, while a raw reflected source and correctly baked identity display candidate remain one selectable family. Mesh/GS/point/patch families remain independently selectable contributions in the shared view. The bounded fixture keeps its visual Mesh in one Asset and its GS plus proxy in another, switches the simple mixed/GS-only/Mesh-only compatibility presets without changing either Asset's identity, resolves the proxy only for a selected visible GS, and never satisfies general per-Asset visibility with unrelated global kind filters.
 - `RND-DOM-09`: patch and exclusion activate atomically.
 - `RND-DOM-10`: a fixture with two GS families proves that proxy and exclusion records affect only their explicitly targeted family.
 - `RND-DOM-11`: ProjectFrame wire validation and camera/view/migration golden vectors agree for meters, custom scale and unknown legacy units.
@@ -885,9 +898,9 @@ acceptance and do not block the first paired slice.
 - `RND-DOM-18`: parent delete versus concurrent child add produces an orphan review item in both merge orders; explicit reassign/tombstone and restore paths preserve all candidates and required media.
 - `RND-DOM-19`: an unresolved migrated asset has no binding or `BlobRef`, preserves captions under one deterministic missing-source compatibility class and retains any valid imported `pendingAssetToProject`. It becomes ready only after verified content and one atomic status replacement; absent an explicit override, the new binding uses the pending placement exactly. None of the new content-derived classes reuses the missing-source ID, so preserved captions become `needsReview` until explicitly resolved while their ProjectFrame placement remains stable.
 - `RND-DOM-20`: missing/cross-asset `derivedFrom`, duplicate/unsorted edges, self-reference and two-/three-node cycles are rejected before SceneDocument; a valid depth-32 DAG resolves and a depth-33 graph is rejected.
-- `RND-DOM-21`: one source blob containing mesh and ordinary points resolves as two Representation records with distinct roles/families and one shared BlobRef/frame transform; Mesh mode draws both contributions once and material targets never cross families implicitly.
-- `RND-DOM-22`: syntactically valid fixtures with a ready Asset pointing to a foreign binding/revision, cross-asset binding/revision parents, reused AssetFrame/compatibility IDs across assets, one shared RepresentationFrame with unequal transforms, a nonidentity AssetFrame alias, an AssetAnchor naming another asset's frame/revision, or a ProjectAnchor/SavedView naming a foreign project frame are rejected before SceneDocument in every mode; no foreign closure is rendered or activated.
-- `RND-DOM-23`: flat, multi-primitive and two-node-instanced point fixtures select the nearest visible ordinary point in the active mode's Mesh source and persist the exact optional `(nodeIndex, primitiveIndex, pointIndex)` occurrence. They tolerate a missing normal and never expose a flattened draw/LOD index or mislabel the hit as mesh/GS/proxy evidence. Symmetric radius candidates with complete locators use them; without them they use canonical-position ordering, and equal-position/different-normal candidates collapse to one anchor with source/normal omitted.
+- `RND-DOM-21`: one source blob containing mesh and ordinary points resolves as two Representation records with distinct roles/families and one shared BlobRef/frame transform; when that Asset is visible both contributions draw once and material targets never cross families implicitly.
+- `RND-DOM-22`: syntactically valid fixtures with a ready Asset pointing to a foreign binding/revision, cross-asset binding/revision parents, reused AssetFrame/compatibility IDs across assets, one shared RepresentationFrame with unequal transforms, a nonidentity AssetFrame alias, an AssetAnchor naming another asset's frame/revision, or a ProjectAnchor/SavedView naming a foreign project frame are rejected before SceneDocument in every visibility state; no foreign closure is rendered or activated.
+- `RND-DOM-23`: flat, multi-primitive and two-node-instanced point fixtures select the nearest visible ordinary point in the explicitly selected visible Asset's ordinary-point source and persist the exact optional `(nodeIndex, primitiveIndex, pointIndex)` occurrence. They tolerate a missing normal and never expose a flattened draw/LOD index or mislabel the hit as mesh/GS/proxy evidence. Symmetric radius candidates with complete locators use them; without them they use canonical-position ordering, and equal-position/different-normal candidates collapse to one anchor with source/normal omitted.
 - `RND-DOM-24`: every resolving hit source passes the closed owner/method/content/role/surface matrix. Cross-asset source, foreign authored revision, mesh-to-proxy, point-to-triangle, splat-to-point and proxy-to-nonproxy fixtures are rejected before persistence. Two-node indexed/reflected mesh and paged/reordered splat fixtures retain source occurrence semantics across both backends; a backend that cannot recover them omits complete weak source provenance while the canonical anchor remains valid.
 - `RND-DOM-25`: each FormatProfile ID has exactly one specification digest; unknown/mismatched pairs and extension/MIME fallback are Unsupported. A decoder/library upgrade either reproduces the same inspection/goldens or creates a new profile and immutable revision.
 - `RND-DOM-26`: default-scene selection, matrix/TRS validation, node-over-mesh morph precedence, skin/inverse-bind evaluation and no-clip static pose produce identical transforms, bounds and picks; ambiguous or unsupported pose input is rejected or uses an explicit `staticPoseBake` that never absorbs `assetToProject`.
@@ -895,7 +908,7 @@ acceptance and do not block the first paired slice.
 - `RND-DOM-28`: property/golden tests transform GS means, anisotropic covariance and nonzero-degree view-dependent bases through translation, rotation, positive scale and reflection and reproduce the profile's DC/color-space/bias/activation/clamp; mean-only, reflection-blind or alternate-color output is rejected.
 - `RND-DOM-29`: the exact three-entry point-profile registry has one distinct ID/digest for binary, dither and smooth with binary as default; all three share the ratified numeric/disc rules and differ only in edge policy. Each profile plus finite intent and ViewportSnapshot deterministically produces one constant-CSS effective disc across DPR/render scale; the value is absent from SavedView/project bytes, invalid/non-finite input follows the diagnosed default path rather than a backend clamp, and fractional/dither edge coverage promotes the contribution class exactly as specified.
 - `RND-DOM-30`: source opaque/mask/blend, opacity, hard/soft chroma, every requested coverage and surface/transmission optics resolve through the closed matrix and final alpha convention. Mask+transmission remains representable, surface-to-transmission invention and opaque-with-alpha/chroma are invalid, material-less visual primitives receive the synthetic slot, catalogs are sorted one-to-one tables, candidates differing only in source semantics cannot share a family, and duplicate semantic override keys apply neither record until resolved.
-- `RND-DOM-31`: ungrouped, cross-asset, missing-patch, outside-revision, nonidentity/non-AssetFrame mask and wrong-role relationship-field exclusions fail closed. A valid same-asset patch/exclusion group enables atomically, its hard AssetFrame predicates union in every order, and raw/paged/preview GS candidates exclude identical means and color/depth/ID/direct/proxy picks. GS mode remains unexcluded; source-index, page-index, soft or partially applied masks are Unsupported.
+- `RND-DOM-31`: ungrouped, cross-asset, missing-patch, outside-revision, nonidentity/non-AssetFrame mask and wrong-role relationship-field exclusions fail closed. A valid same-asset patch/exclusion group enables atomically, its hard AssetFrame predicates union in every order, and raw/paged/preview GS candidates exclude identical means and color/depth/ID/direct/proxy picks. A standalone GS presentation remains unexcluded; source-index, page-index, soft or partially applied masks are Unsupported.
 - `RND-DOM-32`: a proxy hit produces only a finite transient AssetFrame candidate for the selected GS class. Gizmo adjustment/confirmation writes the current source-less/confidence-less/normal-less `manual` anchor and no proxy triangle locator. A later ordinary gizmo move preserves a still-active class without another prompt. A C1 anchor that becomes `needsReview` under active revision C2 can be corrected only against one explicit active family; the atomic replacement binds to C2 and that family's unique current class. Save/reopen and collaboration/review/clean use the canonical `positionAsset` without reraycasting the proxy; proxy removal/replacement alone cannot move the Caption. Coordinate-only, missing/ambiguous class and active-binding conflict fixtures refuse to clear review.
 - `RND-DOM-33`: a differently oriented/scaled external repair mesh is aligned into an existing AssetFrame, preserves its source bytes, commits its frozen `representationToAsset` plus optional identity-AssetFrame hard mask in one new revision/binding, copies prior `assetToProject`, and leaves no active half-group under cancellation or injected failure. Adding a patch preserves every unchanged base compatibility class and creates one singleton patch class; a surface-equivalent derivative preserves its family/class, while surface-changing replacement creates a new patch family/class and removal reviews only affected patch-authored pins. Class overlap, duplicate ownership and changed-family ID reuse fail closed.
 - `RND-DOM-34`: every active revision's sorted compatibility classes form an exact partition of its pickable visual families; empty/duplicate/outside-revision targets, proxy/exclusion ownership, cross-asset IDs, same-ID/different-target reuse and source/proxy-to-class mismatches are invalid. An absent historical anchor class is valid `needsReview`, never corrupted data or an invitation to choose a nearby class.
@@ -903,10 +916,10 @@ acceptance and do not block the first paired slice.
 ### Backend and browser
 
 - `RND-BE-01`: multiple assets produce correct union bounds, fit, camera and caption projection.
-- `RND-BE-02`: base golden images cover Mesh, GS and the simple opaque mixed pattern. Later feature goldens cover Compare and every claimed Integrated material class before its control is enabled.
-- `RND-BE-03`: later supported Integrated classes meet their image-difference masks/tolerances and product-owner visual acceptance for z-fighting, halo, duplicate surface and exclusion holes; a warning cannot convert a supported-class failure into a pass, but this row does not block base G1-B.
+- `RND-BE-02`: base golden images cover Mesh, GS and the simple opaque mixed pattern. Later feature goldens cover every claimed advanced shared-view material class before its control is enabled; optional Compare goldens exist only if that diagnostic workflow is separately approved.
+- `RND-BE-03`: later supported shared-view composition classes meet their image-difference masks/tolerances and product-owner visual acceptance for z-fighting, halo, duplicate surface and exclusion holes; a warning cannot convert a supported-class failure into a pass, but this row does not block base G1-B.
 - `RND-BE-04`: before experimental transparency is enabled, the translucent aircraft shows the correct support warning and every promised fallback; it does not block base G1-B.
-- `RND-BE-05`: mesh, ordinary-point and explicitly bound proxy picks are normalized to AssetFrame. In the first paired fixture, simple mixed, GS-only and Mesh-only visibility all raycast only the proxy explicitly related to the selected GS family. The initial hit falls inside the fixture's coarse target-region/depth envelope and creates a transient AssetFrame candidate. Gizmo adjustment/confirmation persists the expected source-less manual `positionAsset`; save/reopen does not raycast or depend on the proxy and requires no proxy `representationId`/triangle locator in the current anchor. Direct-GS, visual-Mesh fallback and proxy generation are not required. Point-only and mixed ordinary-point fixtures remain separate acceptance; proxy geometry has no surface-precision or measurement-grade guarantee.
+- `RND-BE-05`: mesh, ordinary-point and explicitly bound proxy picks are normalized to AssetFrame. In the first proxy fixture, a selected visible Mesh raycasts itself and a selected visible GS raycasts only its explicitly related same-Asset proxy; hidden Assets and proxies cannot win. The initial proxy hit falls inside the fixture's coarse target-region/depth envelope and creates a transient AssetFrame candidate. Gizmo adjustment/confirmation persists the expected source-less manual `positionAsset`; save/reopen does not raycast or depend on the proxy and requires no proxy `representationId`/triangle locator in the current anchor. Direct-GS, visual-Mesh fallback and proxy generation are not required. Point-only and mixed ordinary-point fixtures remain separate acceptance; proxy geometry has no surface-precision or measurement-grade guarantee.
 - `RND-BE-06`: cancellation, decode error, quota error and obsolete generation leave no attached partial resource.
 - `RND-BE-07`: backend resource ledgers return to zero live handles after unload, and repeated load/unload meets the numeric heap/resource plateau slope and tolerance fixed in G0; context restore is progressive.
 - `RND-BE-08`: physical iOS completes the G1 fixed-camera and background/restore run without reload or context loss.
@@ -915,5 +928,5 @@ acceptance and do not block the first paired slice.
 - `RND-BE-11`: both backend candidates reproduce the same ratified static pose, logical bounds, camera fit, render and pick, or return the same explicit Unsupported diagnosis.
 - `RND-BE-12`: anisotropic GS with degree-greater-than-zero view dependence and reflection matches accepted image/bounds/pick goldens in both backends.
 - `RND-BE-13`: at all G0 fractional DPR/render-scale cases, both backends derive identical integer targets, top-left sample/pointer mapping, dither coordinates and ordinary-point color/depth/ID disc coverage. Smooth pick threshold, fragment result and the separate 6-CSS-pixel fallback agree without a hidden native size clamp.
-- `RND-BE-14`: before later Integrated support is enabled, the source/material override matrix produces the same effective class, supported/redirected label and accepted image in both backends; profile summary/decode disagreement is a decode error rather than a backend reclassification. It does not block base G1-B.
-- `RND-BE-15`: one logical Asset and active AssetRevision contain the standard Mesh+GS pair and one unambiguous invisible same-asset proxy. Simple mixed -> GS-only -> Mesh-only visibility switching always raycasts only that proxy for the selected GS; no unrelated visual Mesh participates. Approximate proxy hit -> editable Caption gizmo adjustment/confirmation -> source-less manual AssetFrame `positionAsset` -> durable save/reopen preserves the Asset, active binding, both visual Representations, transforms, source bytes, visibility choice and corrected Caption without reraycast. Removing or replacing the proxy Representation after placement does not change the reopened Caption. The mixed smoke uses only the simple opaque-Mesh depth rule. Missing GS degrades to diagnosed Mesh-only; a missing or unusable proxy makes GS view-only for new placement while existing Captions remain at their saved AssetFrame positions and gizmo-editable; invalid, ambiguous or cross-asset proxy binding disables new proxy interaction and reports; unknown registration remains unregistered and neither alignment nor an interaction target is inferred; and no usable Mesh or GS excludes the asset. Mesh-only and GS-only assets remain valid schema cases but cannot substitute for this paired acceptance, and ordinary-point/direct-splat/proxy-generation/advanced-compositing behavior is not credited.
+- `RND-BE-14`: before later advanced shared-view composition support is enabled, the source/material override matrix produces the same effective class, supported/redirected label and accepted image in both backends; profile summary/decode disagreement is a decode error rather than a backend reclassification. It does not block base G1-B.
+- `RND-BE-15`: one independent visual Mesh Asset and one GS Asset whose active AssetRevision contains an unambiguous invisible same-Asset proxy coexist without any assumption that they describe the same object, extent, origin or logical Asset. A selected visible Mesh raycasts itself; a selected visible GS raycasts only that proxy; no unrelated visual Mesh participates, and hiding an Asset also removes its interaction surface. Approximate proxy hit -> editable Caption gizmo adjustment/confirmation -> source-less manual GS-AssetFrame `positionAsset` -> durable save/reopen preserves both Assets, active bindings, visual Representations, transforms, source bytes, visibility choice and corrected Caption without reraycast. Removing or replacing the proxy Representation after placement does not change the reopened Caption. The mixed smoke uses only the simple opaque-Mesh depth rule. An unusable visual Asset is diagnosed without disabling an unrelated valid Asset; a missing or unusable proxy makes GS view-only for new placement while existing Captions remain at their saved AssetFrame positions and gizmo-editable; invalid, ambiguous or cross-asset proxy binding disables new proxy interaction and reports; unknown registration remains unregistered and neither alignment nor an interaction target is inferred. Mesh-only and GS-only Assets remain valid, and ordinary-point/direct-splat/proxy-generation/advanced-compositing behavior is not credited.

@@ -1,7 +1,7 @@
 # LociView v2 approved direction
 
 > Status: `ACCEPTED DIRECTION SUMMARY / NON-NORMATIVE / NOT IMPLEMENTED`
-> Updated: 2026-08-26
+> Updated: 2026-08-29
 > Technology choices marked as candidates remain subject to the listed PoC gates.
 
 This is a navigation summary, not an independent requirements source. Rationale, decisions, rejected defaults and reconsideration triggers are normative in `docs/adr/0001-v2-foundation.md`. Review-ready implementation contracts are indexed in `docs/specs/README.md`; after product-owner approval they provide the detailed normative contract. Until then they remain proposed and do not authorize implementation.
@@ -12,10 +12,11 @@ Evolve the current offline LociView without a full rewrite so it can:
 
 - convert LociMyu XLSX/model/image datasets without Google-account or Google-API dependence while leaving selected source bytes unchanged, preserving duplicate source occurrences independently and retaining uncertain relationships for later expert review;
 - display Gaussian Splatting data;
-- support mesh and GS data in the same project, with the standard interactive
-  configuration keeping both in one logical Asset and one active AssetRevision;
-- provide reliable Mesh, GS, and comparison workflows;
-- keep Mesh-only and GS-only assets valid, while treating GS without a registered
+- support multiple formats and multiple visual Assets as independently
+  placeable, selectable and visible layers in one ProjectFrame;
+- treat Mesh, ordinary points and GS as Representation/rendering kinds rather
+  than mandatory user-visible modes;
+- keep Mesh-only, point-only and GS-only assets valid, while treating GS without a registered
   same-asset interaction surface as view-only rather than guessing a surface;
 - remain portable, local-first, and practical on iOS;
 - replace the unsafe parts of the custom persistence layer without losing v1 projects.
@@ -37,28 +38,27 @@ The current UI and useful v1 behavior remain available while renderer and storag
 
 ## Rendering scope
 
-Formal product modes:
+Each loaded visual Asset is the primary visibility unit. Users may show, hide,
+select and align Assets independently while their Representations are decoded by
+the applicable Mesh, ordinary-point or GS path. The visible Assets share one
+ProjectFrame and camera.
 
-1. Mesh
-2. GS
-3. Compare
-4. Integrated
+The first proxy-backed native slice retains simple Mesh+GS mixed, GS-only and
+Mesh-only as project-wide convenience filters for its bounded snapshot v1. They
+are not the final multi-Asset visibility model. The initial mixed pattern draws
+an opaque depth-writing Mesh contribution and then GS against that depth.
 
-The first proxy-backed vertical slice uses three visibility patterns of the same
-active AssetRevision rather than adding another mode: simple Mesh+GS mixed,
-GS-only and Mesh-only. They map to the existing Integrated, GS and Mesh requests;
-Compare remains a later comparison workflow. The initial mixed pattern draws an
-opaque depth-writing Mesh contribution and then GS against that depth. Smooth
-Mesh alpha, transmission and exact cross-representation multi-layer composition
-remain later work.
-
-Guaranteed Integrated coverage for the first release is opaque, mask/cutout, and dithered coverage. Arbitrarily intersecting smooth-alpha mesh and GS fragments are not guaranteed by separate conventional renderers.
+The first-release shared-view guarantee is opaque, mask/cutout and dithered
+coverage. Arbitrarily intersecting smooth-alpha Mesh and GS fragments are not
+guaranteed by separate conventional renderers. A separate diagnostic Compare
+presentation is optional later work, not an MVP/release prerequisite, and needs
+a new explicit Product Owner decision before implementation.
 
 GS alignment transforms means, covariance and view-dependent basis consistently; mean-only transforms are forbidden. Ordinary-point size is CSS-pixel intent resolved once into a RenderPlan, and drawing and picking use the same effective footprint.
 
 Spark/Three and PlayCanvas must be evaluated with the same disposable fixture harness. If both pass with comparable results, prefer the lower migration cost. Do not commit the persisted domain to either engine.
 
-Exact unified triangle/GS rasterization is research, not a v2 dependency. A WBOIT feasibility spike may be run after the base renderer gate; failure leaves Mesh, GS, and Compare as fully supported product paths.
+Exact unified triangle/GS rasterization is research, not a v2 dependency. A WBOIT feasibility spike may be run after the base renderer gate; failure leaves per-Asset visibility and the supported base shared view available.
 
 ## GS assets and interaction
 
@@ -69,27 +69,28 @@ An asset may carry:
 - optional preview representation;
 - optional invisible interaction proxy.
 
-The first standard interactive configuration is one `meshPrimary`, one
-`gsPrimary` and one unambiguous invisible `interactionProxy` in the same logical
-Asset and active AssetRevision. The same proxy remains the raycast target while
-the user switches among simple Mesh+GS mixed, GS-only and Mesh-only visibility;
-it is not a display mode and never contributes visual output. The existing
+The first standard interactive configuration is a GS Asset whose active
+AssetRevision contains one `gsPrimary` and one unambiguous invisible
+`interactionProxy`. Independent Mesh Assets may coexist in the same ProjectFrame
+without representing the same object, extent, origin or logical Asset. The proxy
+is not a display mode and never contributes visual output. The existing
 `interactionProxy.proxyForGsVariantFamilyId` relation is reused without another
-domain model or schema field. The selected GS family resolves only to the exact
-same-Asset proxy naming that family; an unrelated visual Mesh, nearby surface or
-another GS proxy is never inferred. A GS-only asset without a usable proxy
-remains view-only for new placement. Direct splat/GPU ID picking, normal-Mesh
-binding and automatic proxy generation are outside the first vertical
-slice and may be reconsidered later.
+domain model or schema field. A selected visible GS family resolves only to the
+exact same-Asset proxy naming that family; hiding that GS Asset also removes its
+proxy from interaction. An unrelated visual Mesh, nearby surface or another GS
+proxy is never inferred. A GS Asset without a usable proxy remains view-only for
+new placement. Direct splat/GPU ID picking, normal-Mesh binding and automatic
+proxy generation are outside the first vertical slice and may be reconsidered
+later.
 
-Degradation is fixed: a usable Mesh with missing GS opens Mesh-only with a
-diagnosis; a usable GS with no usable proxy opens GS view-only with caption
+Degradation is fixed: a usable independent Mesh remains available when a GS is
+missing or unusable and the GS issue is diagnosed; a usable GS with no usable proxy opens GS view-only with caption
 placement disabled, while existing Captions remain at their saved AssetFrame
 positions and stay gizmo-editable; an invalid, ambiguous or cross-asset proxy
 binding disables new interaction and reports the problem without guessing; unknown
-registration remains unregistered; and an asset with neither usable Mesh nor GS
-does not enter the active scene. Ordinary-point Representations remain valid but
-are not part of the first paired acceptance.
+registration remains unregistered; one damaged Asset does not disable unrelated
+valid Assets; and no unusable visual Asset enters the active scene. Ordinary-point
+Representations remain valid but are not part of the first acceptance.
 
 Prepared/imported proxies may be consumed in the first slice. Automatic proxy
 generation is later optional desktop/local preprocessing and is not an initial
@@ -131,7 +132,8 @@ Package purposes remain distinct:
 - Convert known copies to one canonical genesis/history epoch.
 - Keep deterministic v1 ID/decision/mapping continuity in collaboration packages so a reviewed later v1 copy can migrate on another device; review/share and clean copies intentionally omit that lineage.
 - Represent imported v1 assets as synthetic legacy revisions.
-- Preserve caption tags, display-set ordering and explicit per-set default views.
+- Preserve caption tags, display-set ordering, set-scoped material appearance and
+  explicit per-set default views as the LociMyu-derived appearance-set workflow.
 - Preserve ambiguous anchors/material mappings for review instead of guessing.
 - Unknown future major schemas open read-only or fail clearly; they are not auto-migrated.
 
@@ -169,12 +171,14 @@ Package purposes remain distinct:
 8. Renderer/storage-neutral ports inserted with unchanged v1 behavior.
 9. v2 binary storage and metadata productionization.
 10. Ratified byte-exact v1 migration recipe, then canonical v1 migration.
-11. Proxy-backed paired Mesh+GS vertical slice in one logical Asset/active
-    AssetRevision: import -> switch simple mixed/GS-only/Mesh-only visibility ->
-    select GS -> raycast only its explicitly related invisible proxy -> coarse
-    AssetFrame candidate -> Caption gizmo adjust/confirm -> manual
-    `positionAsset` -> save -> reload without proxy reraycast.
-12. Multiple assets, alignment, Compare, and opaque/mask/dither Integrated.
+11. Proxy-backed vertical slice with one independent Mesh Asset and one GS Asset
+    whose active AssetRevision contains its explicitly related invisible proxy:
+    import -> switch simple mixed/GS-only/Mesh-only visibility -> select visible
+    GS -> raycast only that proxy -> coarse AssetFrame candidate -> Caption gizmo
+    adjust/confirm -> manual `positionAsset` -> save -> reload without proxy
+    reraycast.
+12. Multiple Assets, including same-kind Assets, per-Asset visibility and alignment, plus the
+    required opaque/mask/dither shared-view composition classes.
 13. iOS, migration, corruption, privacy, and security hardening.
 14. Productionize an adopted smooth result only after core hardening and a separate production review; otherwise leave it off. Exact-renderer/transmission research remains later and separate.
 
@@ -191,12 +195,12 @@ Included:
 - account-independent conversion of LociMyu save datasets under one accepted compatibility contract;
 - bounded-memory package I/O;
 - v2 metadata/blob storage and v1 conversion;
-- Mesh, GS, and Compare;
-- multiple assets and coordinate alignment;
-- paired Mesh+GS interaction through one explicit invisible same-asset proxy;
+- multiple-format, multiple-Asset shared-coordinate display with per-Asset visibility and alignment;
+- GS interaction through one explicit invisible same-Asset proxy while
+  independent Mesh, point and GS Assets may coexist;
 - ordinary-point display and caption picking for v1-compatible point data;
 - captions, collaboration merge, and clean share export;
-- opaque/mask/dither Integrated rendering;
+- opaque/mask/dither shared-view composition;
 - mobile LOD and resident-budget degradation.
 
 Excluded from the MVP:
@@ -207,3 +211,4 @@ Excluded from the MVP:
 - automatic high-quality visual mesh reconstruction from GS;
 - large raw-GS preprocessing on iOS;
 - silent topology-changing caption remapping.
+- a separate diagnostic Compare presentation unless later explicitly approved.

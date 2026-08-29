@@ -1,6 +1,6 @@
 # ADR-0001: v2 foundation and staged evolution
 
-- Status: Accepted architecture direction; technology selections remain conditional on PoC gates
+- Status: Accepted architecture direction; product-display amendment recorded 2026-08-29; technology selections remain conditional on PoC gates
 - Date: 2026-08-18
 - Baseline: LociView v1 at `4f6e48196041d7ae39a11aba04f647db99deb450`
 
@@ -18,7 +18,7 @@ A full rewrite would discard working UI, legacy import, package behavior, and pr
 4. Atomically bind an asset revision and project alignment through one immutable `AssetBindingRevision` and one active pointer.
 5. Resolve persisted state into a renderer-neutral `SceneDocument`; keep renderer, storage paths, package structure, and Automerge types outside it.
 6. Separate `ViewerController`, `RenderCoordinator`, `InteractionIndex`, `ResourceManager`, and replaceable `RenderBackend` responsibilities.
-7. Support Mesh, GS, and Compare as formal product paths. Integrated initially guarantees opaque, mask/cutout, and dithered coverage. Smooth-alpha mesh/GS intersection is optional research and cannot block the base product.
+7. Treat each loaded visual Asset as an independently placeable and visible layer in one ProjectFrame. Mesh, ordinary points and GS are Representation/rendering kinds, not the primary user-visible visibility partition. The base shared view supports opaque, mask/cutout and dithered coverage; smooth-alpha cross-Representation composition and a separate diagnostic comparison workflow are optional later work and cannot block the base product.
 8. Bind every immutable Representation to one versioned semantic FormatProfile and profile-derived bounds/material summary. A backend must reproduce the profile or reject it; extensions and loader defaults are not portable interpretation. The MVP uses a deterministic static pose rather than runtime animation.
 9. Preserve original source data and store paged display derivatives, static-pose bakes and interaction proxies as derived representations with provenance.
 10. Evaluate Automerge metadata plus OPFS SHA-256 content-addressed blobs as the leading persistence candidate. Adoption is conditional on streaming, multi-tab, durability, privacy-export, and migration PoCs.
@@ -39,7 +39,7 @@ A full rewrite would discard working UI, legacy import, package behavior, and pr
 - Initial progress includes boundary and migration work before all new features are visible.
 - Persisted data remains independent of Spark, PlayCanvas, Three.js, or a future custom renderer.
 - Renderer and Automerge choices remain reversible until their gates pass.
-- Exact smooth transparency may remain unsupported while comparison and opaque-integrated workflows ship.
+- Exact smooth transparency and a separate diagnostic comparison workflow may remain unsupported while per-Asset visibility and the base shared-view workflow ship.
 - Topology-changing replacement can require explicit caption/material review rather than silent remapping.
 
 ## Reconsideration triggers

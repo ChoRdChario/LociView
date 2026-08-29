@@ -2,7 +2,7 @@
 
 > Status: `PRODUCT-OWNER APPROVED IMPLEMENTATION CONTRACT / NOT IMPLEMENTED`
 > Baseline implementation: normalized v1 commit `fc7054f`; this specification revision is identified by its own Git commit
-> Approved: 2026-08-19; Product Owner amendments recorded through 2026-08-26
+> Approved: 2026-08-19; Product Owner amendments recorded through 2026-08-29
 
 These documents turn ADR-0001 and the approved v2 direction into testable implementation contracts. They intentionally separate fixed product and domain rules from technologies that may still fail a proof-of-concept gate.
 
@@ -27,7 +27,7 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metri
 | Document | Purpose |
 |---|---|
 | [`00-product-contract.md`](00-product-contract.md) | User outcomes, support levels, MVP boundary, security and operational constraints |
-| [`01-domain-rendering.md`](01-domain-rendering.md) | Frames, asset revisions, renderer-neutral scene, modes, picking, alignment, GS/iOS lifecycle |
+| [`01-domain-rendering.md`](01-domain-rendering.md) | Frames, asset revisions, renderer-neutral scene, per-Asset visibility, composition support, picking, alignment and GS/iOS lifecycle |
 | [`02-storage-package-migration.md`](02-storage-package-migration.md) | Metadata, CAS, transaction recovery, package classes, merge semantics, v1 conversion |
 | [`03-gates-and-delivery.md`](03-gates-and-delivery.md) | G0, blocking G0-S, PoC gates, evidence, feature flags, rollback and development sequence |
 | [`04-locimyu-conversion.md`](04-locimyu-conversion.md) | Canonical LociMyu Caption identity, source-authority rules and the device-local deferred-review gate |
@@ -40,7 +40,7 @@ Fixed unless a new ADR supersedes ADR-0001:
 - `RepresentationFrame -> AssetFrame -> ProjectFrame`;
 - immutable asset revisions and atomic revision/alignment bindings;
 - renderer- and storage-neutral persistent data;
-- Mesh, GS, Compare and Integrated as distinct product modes;
+- multiple-format visual Assets as independently visible layers in one ProjectFrame; Representation kind does not define the primary user-visible mode, and Compare is optional later diagnostics;
 - exact smooth-alpha mesh/GS intersection is not an MVP dependency;
 - large package and GS paths cannot require whole-file memory materialization;
 - v1 sources are preserved and conversion is explicit.

@@ -20,7 +20,7 @@ Small deterministic fixtures and reports belong in Git. Large GS/package data, S
 
 Product Owner dependency amendment recorded 2026-08-26: G1-B may adopt the
 base renderer for Mesh, GS, the simple opaque mixed pattern and shared-proxy
-interaction without first closing advanced Integrated composition. The existing
+interaction without first closing advanced shared-view composition. The existing
 `integratedOpaque` and `integratedTransparencyExperimental` controls remain off
 until their later fixture/image acceptance passes. This is not a new gate and
 does not delete those requirements; it removes them only from the base-renderer
@@ -45,14 +45,14 @@ Required fixtures:
 - anisotropic GS with nonzero view-dependent coefficients under translation, rotation, positive scale and reflection, with profile-derived finite support bounds and mesh-axis alignment ground truth;
 - v1 captions with absent normals and with stored normals under Y-up, Z-up and transformed child nodes; migration output always omits `normalAsset` and emits the exact issue only when a source normal is present;
 - 500 MiB incompressible streaming stress data, labelled non-product-guarantee;
-- one same-logical-Asset/same-active-AssetRevision Mesh+GS pair with one
-  unambiguous invisible proxy-to-GS binding; simple mixed, GS-only and Mesh-only
-  visibility all raycast only that same selected-GS proxy, produce a coarse
-  AssetFrame placement candidate, require gizmo adjustment/confirmation and
-  preserve the resulting manual AssetFrame Caption through save/reopen without
-  proxy source/triangle authority, with the simple opaque mixed rule and all five
-  fixed incomplete-data outcomes; direct-GS and proxy generation are optional
-  later;
+- one independent Mesh Asset and one GS Asset whose active AssetRevision contains
+  an unambiguous invisible proxy-to-GS binding; a selected visible Mesh raycasts
+  itself, a selected visible GS raycasts only that same-Asset proxy, and hidden
+  Assets/proxies cannot win. The proxy produces a coarse AssetFrame placement
+  candidate, requires gizmo adjustment/confirmation and preserves the resulting
+  manual AssetFrame Caption through save/reopen without proxy source/triangle
+  authority, with the simple opaque mixed rule and all five fixed incomplete-data
+  outcomes; direct-GS and proxy generation are optional later;
 - 10,000 captions and 50,000 metadata changes;
 - deleted/private sentinel values for package privacy tests;
 - parent-delete/concurrent-child and unknown-minor-only-blob fixtures;
@@ -71,8 +71,11 @@ enabled, the same registry discipline applies to:
 - the closed translucent-aircraft scene and its later transparency evidence.
 - ordinary PLY/container-mixed/multi-node point rendering and picking, including
   profile footprint, overlap and radius-tie evidence;
-- Compare and multiple assets with different origins, axes, units and Sim(3)
-  alignment.
+- multiple Assets, including same-kind Assets, with different origins, axes, units, per-Asset
+  visibility and Sim(3) alignment.
+
+A diagnostic Compare fixture is not retained as a mandatory pack. It is created
+only after a separate Product Owner decision defines that optional workflow.
 
 G0 owns the failing characterization tests for every known G0-S defect. G0-S begins only after those tests demonstrably fail on the recorded v1 baseline, then owns the minimal fixes that make them pass. The caption-attachment row is the sole approved exception: its Product-Owner-recorded disposition is `historical reproduction unavailable` because the testable production seam and its acceptance first appeared with the fix. That disposition is not a pre-fix failure or PASS, creates no general exception for another row and does not authorize reconstructing historical evidence. Characterization work and fixture collection may proceed in parallel, but G0 does not depend on unstarted G0-S implementation.
 
@@ -120,12 +123,12 @@ GS is “unsupported” in the v1 baseline; do not invent a comparison value.
 - package bytes as well as splat counts are recorded;
 - resource-plateau and base Mesh/GS/simple-mixed image tolerances are numeric and reproducible;
 - initial base Mesh/GS FormatProfile specification/golden hashes are ratified and restorable;
-- the product owner approves base support classes, degradation behavior and provisional hard metrics. Later Integrated support claims require their separately retained feature evidence.
+- the product owner approves base support classes, degradation behavior and provisional hard metrics. Later advanced shared-view composition claims require their separately retained feature evidence.
 
 ## 3. G0-S — blocking v1 safety stabilization
 
 G0-S protects current users and remains a release barrier. After `G0S-TAB` is
-implemented, the approved proxy-backed paired Mesh+GS technical vertical slice
+implemented, the approved proxy-backed Mesh/GS technical vertical slice
 may proceed while the remaining G0 and G0-S evidence/fixes continue in parallel,
 unless an unresolved P0/P1 directly makes that slice unsafe. Starting that slice
 does not complete G0/G0-S, adopt a G1 technology, authorize release, or permit an
@@ -333,10 +336,11 @@ before any architecture expansion. Phase B ends with exactly one `ADOPT CANDIDAT
 Spark/Three and PlayCanvas use identical source fixtures, camera traces, render scale, exposure/background and hard requirements. Engine-native derivatives are allowed only when preprocessing time, output size and provenance are included.
 
 Base-adoption scenes are limited to the first supported renderer boundary: one
-same-logical-Asset/same-active-AssetRevision Mesh+GS pair with one unambiguous
-invisible proxy-to-GS interaction binding; simple Mesh+GS mixed, GS-only and
-Mesh-only visibility all resolve the selected GS family to that exact proxy and
-never include an unrelated visual Mesh. Each path produces a finite hit inside
+independent Mesh Asset and one GS Asset whose active AssetRevision contains one
+unambiguous invisible proxy-to-GS interaction binding. A selected visible Mesh
+raycasts itself; a selected visible GS resolves to that exact same-Asset proxy;
+hidden Assets/proxies cannot win and an unrelated visual Mesh is never used as a
+GS interaction surface. Each proxy path produces a finite hit inside
 the fixture's declared coarse target-region/depth envelope, exposes the ordinary
 Caption gizmo, and after user adjustment/confirmation saves a manual AssetFrame
 anchor with no proxy source/triangle authority. Save/reopen reproduces that
@@ -350,7 +354,8 @@ outcomes, context loss and twenty load/unload cycles.
 Later feature acceptance retains the following scenes but does not block G1-B
 base adoption or the first paired slice:
 
-- `compareV2`: Compare and multiple aligned assets;
+- multiple-Asset visibility/alignment: multiple Assets including same-kind Assets, independent
+  visibility, shared ProjectFrame and manual Sim(3);
 - ordinary-point support: point-only, container-mixed, profile footprint/pick and
   tie fixtures; this acceptance remains required before MVP ordinary-point
   display/picking support is claimed;
@@ -393,9 +398,11 @@ Hard functional requirements:
 - progressive paging and bounded lifecycle;
 - Mesh, GS and the simple opaque mixed visibility pattern;
 - one explicit invisible same-asset proxy selected by an exact GS-family
-  relationship across the three first-slice visibility patterns; it supplies
-  only the initial candidate, and direct-GS, visual-Mesh fallback and proxy
-  generation are not required;
+  relationship; that relationship remains structurally valid across the bounded
+  visibility presets, but the proxy is interaction-eligible only while its GS
+  Asset/family is explicitly selected and visible. It supplies only the initial
+  candidate, and direct-GS, visual-Mesh fallback and proxy generation are not
+  required;
 - context restore and explicit disposal;
 - no backend type in persistent data.
 - identical profile-derived static pose, bounds, minimal opaque material class and transformed GS footprint/color basis across both backends, or an explicit Unsupported result.
@@ -464,7 +471,7 @@ Candidate pass:
 
 - no major popping, full-surface disappearance or order-dependent inversion in accepted reference views;
 - product owner judges it useful for comparison, with “approximate” wording;
-- p95 frame-time degradation versus base Integrated is no more than 30%;
+- p95 frame-time degradation versus the base shared view is no more than 30%;
 - extra managed render-target bytes, calculated from actual resolution/formats, remain under the provisional 64 MiB budget;
 - the result still meets the absolute G1-B physical-iOS frame-time floor and the total accepted resource ceiling;
 - ten-minute iOS and background restore pass;
@@ -474,7 +481,7 @@ Passing WBOIT does not guarantee transmission, refraction or exact closed-mesh c
 
 ## 8. Exact compositor/rasterizer research
 
-A common fragment-order rasterizer is a separate research track, opened only after real user evidence shows Compare and supported Integrated are insufficient. A disposable WebGPU prototype is expected to require roughly 6–12 focused weeks; a maintainable product backend with fallbacks, mobile work and material coverage could require 12–24 or more focused weeks after that. These are uncertainty ranges, not commitments.
+A common fragment-order rasterizer is a separate research track, opened only after real user evidence shows the supported shared-view composition is insufficient. A disposable WebGPU prototype is expected to require roughly 6–12 focused weeks; a maintainable product backend with fallbacks, mobile work and material coverage could require 12–24 or more focused weeks after that. These are uncertainty ranges, not commitments.
 
 The research track requires its own material scope. Base-color alpha success does not imply glTF metallic/roughness, transmission, volume, refraction or every extension. It cannot become the default through a PoC-code merge.
 
@@ -486,7 +493,6 @@ v2WorkspaceCreation
 gsStandalone
 gsDirectPicking
 proxyGeneration
-compareV2
 integratedOpaque
 integratedTransparencyExperimental
 ```
@@ -496,15 +502,18 @@ integratedTransparencyExperimental
 | `v2WorkspaceCreation` | storage gate adopted | Hides new conversion/creation only. It never chooses a writer for an existing workspace. |
 | `rendererV2` | renderer gate adopted | v1 uses the legacy viewer. A v2 workspace opens metadata-only/read-only diagnostics; it is never handed to the v1 viewer or writer. |
 | `gsStandalone` | `rendererV2` | GS is diagnosed but not drawn. Use Mesh when available; a GS-only project remains read-only/view-metadata until enabled. |
-| `gsDirectPicking` | later optional gate after `rendererV2`, `gsStandalone` | This future control never gates the first paired slice. When disabled, the explicitly bound same-asset proxy remains available in all three visibility patterns; a GS without a usable proxy is view-only. |
+| `gsDirectPicking` | later optional gate after `rendererV2`, `gsStandalone` | This future control never gates the first proxy-backed slice. When disabled, the explicitly bound same-asset proxy remains available only for its selected visible GS; hiding that GS also removes the proxy from interaction, and a GS without a usable proxy is view-only. |
 | `proxyGeneration` | later optional desktop packer path | Prepared/imported proxies may still be consumed. Generation is outside the first slice and unavailable on iOS. |
-| `compareV2` | `rendererV2`, Mesh and GS capability, later Compare acceptance | Offer independent Mesh or GS modes without comparison. |
-| `integratedOpaque` | `rendererV2`, simple mixed base, later opaque/mask/dither Integrated acceptance | Keep the first simple mixed pattern plus Mesh, GS and any accepted Compare path; never expose unaccepted advanced Integrated classes. |
+| `integratedOpaque` | `rendererV2`, simple mixed base, later opaque/mask/dither shared-view acceptance | Keep the first simple mixed pattern and per-Asset visibility; never expose unaccepted advanced composition classes. The control name is internal compatibility terminology, not a user-visible product mode. |
 | `integratedTransparencyExperimental` | `integratedOpaque`, optional G1-D and production review | Preserve smooth intent and offer supported fallback; experimental smooth compositor stays off. Transmission/refraction remains Unsupported pending a separate future gate. |
 
 The bounded simple opaque Mesh+GS pattern is part of `rendererV2` base adoption;
 `integratedOpaque` gates the broader material/intersection/patch classes, not that
 first smoke path. No additional persisted mode or feature-control field is added.
+
+No `compareV2` control is required by the MVP or release path. If the Product
+Owner later approves a concrete diagnostic comparison workflow, its bounded
+control and acceptance are specified then rather than preallocating a mode now.
 
 `v2WorkspaceCreation` is a migration-cohort control, not a runtime `storageV2` toggle. An existing workspace selects its repository/writer by validated schema major. A build without the required v2 implementation can only diagnose/read safely; a v2-written workspace MUST NOT be opened by a v1 writer.
 
@@ -516,7 +525,7 @@ Rollback means preserving the source v1 package/workspace, opening conversion in
 
 This remains the release/adoption sequence. The Product Owner has approved one
 narrow scheduling exception: after the bounded `G0S-TAB` production root fix is
-committed, the proxy-backed paired Mesh+GS technical vertical slice in item 9 may
+committed, the proxy-backed Mesh/GS technical vertical slice in item 9 may
 start on existing accepted seams while external G0 evidence and remaining G0-S
 work continue in parallel. It earns no G0/G0-S exit, G1 adoption, support or
 release credit, and an unresolved P0/P1 that directly endangers the slice stops
@@ -532,17 +541,18 @@ below.
 6. renderer/storage-neutral domain and ports with unchanged v1 characterization.
 7. production blob journal, metadata repository and package classes.
 8. ratify the immutable `v1-migration-recipe-1` companion/golden manifest and its one-to-one descriptor, then implement canonical v1 conversion; no durable conversion exists before this sub-gate passes.
-9. Proxy-backed paired Mesh+GS vertical slice in one logical Asset/active
-   AssetRevision: import -> stream -> switch simple mixed/GS-only/Mesh-only
-   visibility -> select GS -> raycast only its explicitly related invisible
-   proxy -> coarse AssetFrame candidate -> Caption gizmo adjustment/confirmation
-   -> source-less manual `positionAsset` -> durable save -> reload without proxy
+9. Proxy-backed vertical slice with one independent Mesh Asset and one GS Asset
+   whose active AssetRevision contains its explicitly related invisible proxy:
+   import -> stream -> switch simple mixed/GS-only/Mesh-only visibility -> select
+   visible Mesh or GS -> raycast that Mesh itself or that GS's exact proxy ->
+   coarse AssetFrame candidate -> Caption gizmo adjustment/confirmation ->
+   source-less manual `positionAsset` -> durable save -> reload without proxy
    reraycast, including the simple opaque mixed rule and five fixed incomplete-
-   data outcomes. Normal-Mesh binding, direct-GS, automatic proxy generation,
-   ordinary points and advanced composition do not block this slice.
-10. ordinary-point display/picking acceptance, multiple assets, alignment and
-    Compare.
-11. opaque/mask/dither Integrated and patch/exclusion.
+   data outcomes. Normal-Mesh binding as a GS fallback, direct-GS, automatic proxy
+   generation, ordinary points and advanced composition do not block this slice.
+10. ordinary-point display/picking acceptance, multiple Assets including same-kind Assets,
+    per-Asset visibility and alignment.
+11. required opaque/mask/dither shared-view composition and patch/exclusion.
 12. iOS, migration, corruption, privacy and security hardening.
 13. after core iOS/migration/corruption/privacy/security hardening, productionize a previously adopted G1-D result only through production review; if the feasibility spike was deferred, it may instead run now. Exact-renderer research remains a separate later gate.
 

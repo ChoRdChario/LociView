@@ -1,30 +1,30 @@
 # LociView critical-path execution plan
 
-> Status: `DELIVERY REFOCUS PARTIAL / G0S-TAB AND PAIRED-SLICE SCHEDULING APPROVED`
+> Status: `CURRENT CHECKPOINT / BOUNDED NATIVE GS, BACKUP AND TWO-ASSET ALIGNMENT COMPLETE`
 >
-> Recorded: 2026-08-26 at `fa3e423` on `g0-baseline`.
+> Updated: 2026-08-29 at `9931cf0` on `g0-baseline`.
 >
-> This is an execution plan plus the Product Owner's narrow scheduling decision.
-> G0 and G0-S remain release barriers. After the independently committed
-> `G0S-TAB` root fix, the approved paired Mesh+GS/Proxy technical vertical slice
-> may start while external G0 evidence and remaining G0-S continue in parallel.
-> That start is not G0/G0-S completion, G1 adoption, a support claim or release
-> authority, and it does not authorize external acquisition, Release action,
-> upload, publication, adoption, push or deployment.
+> This is an execution plan plus the Product Owner's scheduling and display-model
+> decisions. G0 and G0-S remain release barriers. `G0S-TAB`, the first production
+> GS path, streamed native backup/restore and bounded one-Mesh/one-GS manual
+> alignment are complete without claiming G0/G0-S/G1 completion, permanent
+> renderer adoption, support or release authority.
 
 ## 1. Delivery objective and present position
 
 The target is the approved public-candidate MVP, not a perfectly characterized
-v1 codebase. G-1 and S0 are complete. G0 is active/incomplete, G0-S is a
-parallel release blocker, and G1-A/B/C plus v2 production remain unstarted.
+v1 codebase. G-1 and S0 are complete. G0 is active/incomplete and G0-S remains a
+parallel release blocker. Bounded native production slices now prove the first
+Spark GS path, streamed portable backup and two-Asset manual alignment, but do
+not themselves pass the formal G1 adoption/support gates.
 
 ```text
 G0 evidence and approval ──────────────────────────────────────┐
 G0-S current-user safety ──────────────────────────────────────┼─> release
-G0S-TAB -> paired Mesh+GS/Proxy technical vertical slice ──────┘
+bounded native GS/backup/alignment checkpoint ────────────────┘
 ```
 
-The current critical path has parallel release lanes. The paired technical slice
+The current critical path has parallel release lanes. The proxy-backed technical slice
 may begin after `G0S-TAB`; the lanes still join before release:
 
 1. **G0 evidence lane:** make inputs/instrumentation executable, acquire and
@@ -32,8 +32,10 @@ may begin after `G0S-TAB`; the lanes still join before release:
    measured limits;
 2. **G0-S safety lane:** close only the pre-fix ledger and three remaining
    production roots while external evidence proceeds;
-3. **Approved technical lane:** close `G0S-TAB`, then build the paired
-   Mesh+GS/Proxy slice without implying technology adoption or release;
+3. **Approved technical lane:** retain the completed bounded native GS,
+   backup/restore and two-Asset alignment checkpoints; the next product feature
+   boundary is multiple formats/Assets with per-Asset layer visibility, not a
+   required Compare mode;
 4. **Join:** satisfy all applicable G0/G0-S barriers and technology decisions
    before the supported release.
 
@@ -84,7 +86,7 @@ Classification:
 | `E2` | Representative GS 100k/500k/2–4M family | `EXT C P-APPROVE WAIT` | Exact source/derived relation, bytes, SHA-256, splat count, bounds, format, attribution, privacy/license approval and restorable transport for all three sizes | Exact candidate acquisition and review; current 2–4M URL is only a candidate |
 | `E3` | External fixture Release/restore/adoption | `EXT C P-APPROVE WAIT` | Approved draft, unchanged public-but-unadopted asset, indexed descriptor, verified transport under `.artifacts/acquisition/verified-transport/`, real Mode-B receipt under `.artifacts/acquisition/receipts/`, independent receipt review and separately approved registry entry | `E1` or `E2`; Mode B exists but no real descriptor/receipt/asset exists |
 | `E4-A` | G1-A I/O input pack | `R C` | Deterministic 500 MiB incompressible recipe/output/hash/restore command and bounded package round-trip input | No external bytes required; execution evidence remains G1-A |
-| `E4-B` | G1-B base-renderer input pack | `R C EXT P-APPROVE WAIT` | One same-logical-Asset/same-active-AssetRevision Mesh+GS pair using one unambiguous invisible proxy. Simple mixed, GS-only and Mesh-only visibility resolve the selected GS family only to that exact proxy, produce a coarse AssetFrame target-region/depth candidate, then require ordinary Caption gizmo adjustment/confirmation. The source-less manual `positionAsset` survives save/reopen without proxy reraycast or authority under the simple opaque mixed rule and five fixed incomplete-data outcomes. Base inputs also cover standalone Mesh/GS, required static pose/GS transforms/bounds, fixed trace/oracle, context restore and resource lifecycle. Direct-GS, automatic proxy generation, ordinary points, Compare, material/intersection/repair matrices and advanced composition are retained for later feature acceptance rather than E4-B | Candidate base-profile semantics and selected GS bytes; no normal-Mesh interaction relation is required; final base numeric/support ratification is `E9` |
+| `E4-B` | G1-B base-renderer input pack | `R C EXT P-APPROVE WAIT` | One independent Mesh Asset and one GS Asset whose active AssetRevision contains one unambiguous same-Asset invisible proxy. A selected visible Mesh raycasts itself; a selected visible GS resolves only to that exact proxy; hidden Assets/proxies cannot win. The proxy produces a coarse AssetFrame target-region/depth candidate, then requires ordinary Caption gizmo adjustment/confirmation. The source-less manual `positionAsset` survives save/reopen without proxy reraycast or authority under the simple opaque shared-view rule and five fixed incomplete-data outcomes. Base inputs also cover standalone Mesh/GS, required static pose/GS transforms/bounds, fixed trace/oracle, context restore and resource lifecycle. Direct-GS, automatic proxy generation, ordinary points, material/intersection/repair matrices and advanced composition are retained for later feature acceptance rather than E4-B; Compare receives no acceptance pack unless separately approved | Candidate base-profile semantics and selected GS bytes; no normal-Mesh interaction relation is required; final base numeric/support ratification is `E9` |
 | `E4-C` | G1-C metadata/privacy input pack | `R C P-APPROVE WAIT` | Exact divergent/interrupted/malformed v1 inputs, 10k-caption/50k-change recipe, conflict/privacy/later-copy fixtures and semantic outcomes; map the existing malicious package/model/media corpus to restorable threat/result rows without starting new corpus exploration | Collision/migration/privacy decisions |
 | `E5` | Measurement instrumentation and operator kit | `R C` | Identifiable frame samples, pick compute/gesture split, resource handle/byte ledger, load/unload samples, storage checkpoints, fixed trace and a run card that produces the existing run schema | Existing schema/runbook are ready; runtime instrumentation is incomplete |
 | `E6` | Three target-environment records | `P-DEVICE C` | Measured iPhone 14 Pro/Safari PWA, Windows 11 desktop/Edge and Windows 11 tablet-PC/Edge records under `evidence/g0/devices/`; Chrome remains secondary smoke | Device facts can start now; never record serial, hostname or account ID |
@@ -237,7 +239,7 @@ Explicit backlog/non-selections:
 
 The earlier broad dependency split remains unratified. The Product Owner instead
 approved only this narrow scheduling rule: G0/G0-S remain release barriers, but
-after `G0S-TAB` the paired Mesh+GS/Proxy technical slice may start while the
+after `G0S-TAB` the independent-Mesh plus GS/Proxy technical slice may start while the
 remaining barriers continue in parallel. No larger gate redesign is made here.
 
 Earlier read-only analysis (retained for context) proposed a dependency-based
@@ -249,7 +251,7 @@ before any G1 work. The dependency analysis found:
 | G1 gate | Actual G0 inputs it consumes | Unrelated aggregate-G0 inputs currently serializing it |
 |---|---|---|
 | G1-A streaming/CAS | 500 MiB I/O fixture, package round trip, buffer/storage/quota/cancel conditions, target environment and I/O budget | Renderer profiles/images/GS transforms/material/dither and metadata migration conflicts |
-| G1-B base renderer | Paired same-logical-Asset Mesh+GS with one invisible same-asset proxy shared by simple mixed/GS-only/Mesh-only visibility, the simple opaque mixed rule, fixed incomplete-data outcomes, representative Mesh/GS, base transforms/bounds, fixed trace, base FormatProfiles/image tolerance and physical-iOS render/resource thresholds | Ordinary-point, Compare and advanced Integrated feature packs now block only their own later support controls; divergent/later-copy metadata and Automerge privacy/conflict families remain unrelated |
+| G1-B base renderer | One independent Mesh Asset plus one GS Asset with its same-Asset invisible proxy; explicit visible-Asset interaction, the simple opaque shared-view rule, fixed incomplete-data outcomes, representative Mesh/GS, base transforms/bounds, fixed trace, base FormatProfiles/image tolerance and physical-iOS render/resource thresholds | Ordinary-point and advanced shared-view composition packs block only their own later support controls; an optional Compare workflow has no gate until separately approved; divergent/later-copy metadata and Automerge privacy/conflict families remain unrelated |
 | G1-C metadata | Real/divergent/interrupted/malformed v1, 10k/50k stress, canonical operation/collision, privacy/deletion/migration inputs and open/edit/durable/merge budgets | Renderer images, chroma/dither, translucent-aircraft rendering and backend choice |
 
 The proposed amendment, if separately approved, is:
@@ -272,11 +274,10 @@ smaller post-`G0S-TAB` paired-technical-slice exception stated at the start of
 this section; none of the READY gates above has been adopted.
 
 The Product Owner's proxy/simple-mixed decision additionally narrows G1-B here to
-base renderer adoption. Ordinary-point, Compare and Integrated feature packs are
-retained, but their evidence blocks only the corresponding later support claim or
-feature control. This is dependency removal inside the existing feature-control
-model, not a new gate and not permission to skip those checks before release of
-those features.
+base renderer adoption. Ordinary-point and advanced shared-view composition
+packs are retained, but their evidence blocks only the corresponding later
+support claim or feature control. Compare is not a retained MVP/release pack and
+requires a separate future Product Owner decision.
 
 Reasons to propose rather than maintain the monolith:
 
@@ -299,16 +300,18 @@ G0/G0-S release barriers, disposable PoCs and one writer.
 |---|---|---|---|---|---|
 | `WS1` G0 evidence inputs/acquisition | `E0`–`E5` inputs are exact/restorable; external bytes complete the approved Release/restore/adoption lifecycle | Source bytes, privacy/license, profile decisions, instrumentation | Codex / PO / external / reviewer | None, units run in parallel | `YES`, only approved repository preparation and source requests |
 | `WS2` G0 device evidence/ratification | `E6`–`E10`; three device classes, complete raw runs, reviewed artifacts and all seven G0 exit rows approved | `WS1`, physical devices, PO numeric decisions | PO/device operator / Codex / reviewer | WS1 | Environment facts only now; full runs `WAIT` |
-| `WS3` G0-S current-user safety | Ledger plus `S1`–`S4`; real-browser/iOS evidence, exact-tree matrix, no unresolved P0/P1 and PO stabilized-v1 approval | Remaining journal/quarantine decisions and physical evidence | Codex / PO / reviewer | S0 complete; S1 now; final closure also WS2 | `YES`: only approved S1; remaining roots stay parallel and are not searched before the paired slice |
-| `WS4` G1 technology decisions | G1-A, G1-B base renderer and G1-C each record reproducible `ADOPT`, `REJECT` or `RETRY` with rollback/fallback; later renderer features retain separate acceptance before their controls turn on | Applicable evidence and Product Owner adoption decisions | Codex / PO / device operator | Parallel evidence lanes; still required for adoption/release | `NO` for an adoption claim; paired technical implementation alone may start after S1 |
-| `WS5` paired slice, then v2 MVP/release | First close the approved proxy-backed paired Mesh+GS technical slice on existing accepted schema/seams. It preserves one logical Asset/active AssetRevision, Mesh+GS and one invisible proxy; simple mixed/GS-only/Mesh-only visibility resolve the selected GS only to that proxy; approximate hit -> Caption gizmo -> source-less manual AssetFrame position survives reopen. Later production storage/migration, ordinary points, multiple assets/Compare, hardening and exact release approval remain separate. | S1 for technical start; technology adoption and all release barriers for supported release | Codex / PO / external reviewer | Technical slice after S1; release after WS1–WS4 | `YES AFTER S1`, without G0/G1/release credit |
+| `WS3` G0-S current-user safety | Ledger plus remaining `S2`–`S4`; real-browser/iOS evidence, exact-tree matrix, no unresolved P0/P1 and PO stabilized-v1 approval | Remaining journal/quarantine decisions and physical evidence | Codex / PO / reviewer | S0/S1 complete; final closure also WS2 | `YES` only for an approved release-blocking root or a P0/P1 that directly blocks the next production slice; do not resume micro-slice exploration |
+| `WS4` G1 technology decisions | G1-A, G1-B base renderer and G1-C each record reproducible `ADOPT`, `REJECT` or `RETRY` with rollback/fallback; later renderer features retain separate acceptance before their controls turn on | Applicable evidence and Product Owner adoption decisions | Codex / PO / device operator | Parallel evidence lanes; still required for adoption/release | `NO` for an adoption claim; the bounded proxy-backed technical implementation alone may start after S1 |
+| `WS5` multiple-Asset layer closure, then v2 MVP/release | Generalize the completed bounded one-Mesh/one-GS path so multiple formats and multiple Assets share one ProjectFrame while each Asset is independently placeable, selectable, visible/hidden, editable and durable. Reuse existing Asset/Representation/DisplaySet/SavedView concepts; Representation kind is not the visibility group. A diagnostic Compare workflow is optional and excluded unless separately approved. | Bounded acceptance and any concrete persistence/runtime gap; technology adoption and all release barriers still apply to support/release | Codex / PO / external reviewer | Builds on completed native GS/backup/alignment checkpoints; release after WS1–WS4 | `READY FOR BOUNDED PLAN`; no G0/G1/release credit |
 
 ## 8. Current authorization boundary
 
-The Product Owner approved the caption historical-unavailable disposition and
-the project-scoped single-writer `S1` mechanism. Implement and independently
-commit `S1`, then move directly to the approved paired Mesh+GS/Proxy technical
-slice. Do not explore another G0-S micro-slice first unless an unresolved P0/P1
-directly endangers that slice. Remaining G0/G0-S and external evidence continue
-as parallel release-barrier lanes. No external acquisition, device run, Release
-action, upload, publication, adoption, push or deployment is implied.
+The completed native checkpoints remain closed unless a new P0/P1 directly
+blocks downstream production work. The Product Owner has approved the next
+product direction—multiple formats and multiple Assets as independently visible
+layers in one ProjectFrame—but not a Compare mode, new renderer framework or
+new persistence architecture. Before implementation, cut one bounded acceptance
+slice for the concrete multi-Asset/per-Asset-visibility gap. Remaining G0/G0-S
+and external evidence continue as parallel release-barrier lanes. No external
+acquisition, device run, Release action, upload, publication, adoption, push or
+deployment is implied.

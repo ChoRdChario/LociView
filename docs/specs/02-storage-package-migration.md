@@ -1390,8 +1390,10 @@ authorize release, or generalize storage, transactions, migration or renderers.
 - This version adds no CAS, cross-project dedupe, global GC, Automerge, general
   journal/transaction, encryption, network restore, converter, second package
   format or second renderer. The bounded manual-alignment subset in section 15
-  reuses this exact version; full Alignment, Compare/Integrated and v1/LociMyu
-  migration remain later workstreams.
+  reuses this exact version; multiple Assets including same-kind Assets, per-Asset visibility,
+  full Alignment and v1/LociMyu migration remain later workstreams. A separate
+  diagnostic Compare UI and advanced composition are optional and require their
+  own later Product Owner decision/support claim.
 
 ## 15. Bounded native two-Asset manual alignment (Product Owner approved 2026-08-29)
 

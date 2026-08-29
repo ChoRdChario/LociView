@@ -2,7 +2,8 @@
 
 > Status: `CURRENT` map; repository-normalization baseline `fc7054f` (2026-08-18).
 > That baseline is a historical normalization anchor, not a checkout target. Use Git `HEAD` and `tasks/todo.md` for the active checkpoint.
-> A bounded, nondefault native-GS production path now exists for one independent ordinary Mesh Asset and one Graphdeco SH2/SH3 GS Asset, with an optional explicit Proxy, streamed portable backup and per-Asset manual position/rotation/uniform-scale alignment. It does not pass G0/G0-S/G1 or adopt Spark permanently. Multiple Assets per kind, full Alignment workflows, Automerge, content-addressed storage, and renderer backends remain `PROPOSED`.
+> A bounded, nondefault native-GS production path now exists for one independent ordinary Mesh Asset and one Graphdeco SH2/SH3 GS Asset, with an optional explicit Proxy, streamed portable backup and per-Asset manual position/rotation/uniform-scale alignment. It does not pass G0/G0-S/G1 or adopt Spark permanently. Multiple Assets, including more than one Asset of the same Representation kind, full Alignment workflows, Automerge, content-addressed storage, and renderer backends remain `PROPOSED`.
+> Product visibility is per loaded Asset/layer, not per Mesh/GS kind. The current native `mixed` / `gs-only` / `mesh-only` values are bounded convenience filters; formal Compare is neither implemented nor selected as the next workstream.
 
 ## Start here
 

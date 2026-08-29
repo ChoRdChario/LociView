@@ -54,6 +54,13 @@
 - 単純なfront/back depth二層を一般解として提案せず、Mesh、GS、Compareと、保証範囲を限定したIntegratedを分ける。
 - 比較用途ではwipe、flicker、wireframe、dither等、厳密透明合成を要求しないUXも正式な解法として検討する。
 
+## 2026-08-29: renderer種別を製品の表示単位へ昇格させない
+
+- Mesh/GS合成の技術検討から、Mesh・GS・Compare・Integratedを独立した必須product modeとして仕様化したが、Product Ownerの本来の要求は、複数形式・複数Assetを共通Project座標内の独立レイヤーとして配置・表示・編集・保存することだった。
+- ルール: ユーザーが表示／非表示を切り替える一次単位は読み込んだAssetであり、Mesh、通常点群、GS等はRepresentation／描画方式として扱う。技術的fallbackや診断案を、明示要求なしにMVP modeやrelease gateへ昇格させない。
+- ルール: LociMyu由来のシート切替を単なるCaption分類とみなさず、Caption所属、set単位material appearance、任意のdefault viewを束ねる「見え方セット」として維持する。新しい表示設計で迷った場合は、正本を推測で置き換えずLociMyuの実際の操作を確認する。
+- ルール: DisplaySetをgeometry layerやper-Asset visibility fieldへ拡張しない。visibilityの永続化位置はbounded implementationで既存presentation/snapshotとの差を確認してから決める。
+
 ## 2026-08-16: audit copyを現行実装だと仮定しない
 
 - 製品名や世代が変わっている場合、最初にcanonical repository、entry point、git ref、build metadataを特定する。
