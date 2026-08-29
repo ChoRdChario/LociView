@@ -2989,3 +2989,56 @@ Review — 2026-08-30:
   workaround or new automation dependency was added. Exact-tree visual smoke
   and the physical-iPhone touch/layout regression remain unexecuted for the
   approved consolidated run and are not claimed PASS.
+
+## Native unsaved-change protection — direct P1 root fix
+
+Checkpoint and plan — 2026-08-30:
+
+- [x] Reuse the existing whole-Project `dirty` boundary and durable rollback;
+  add no draft, autosave, journal, transaction or schema field
+- [x] Let clean close/reload proceed immediately, but require an ordinary-language
+  discard confirmation before either action can drop unsaved changes
+- [x] Preserve the exact screen, working snapshot, viewer and write lock when the
+  user cancels that confirmation
+- [x] Install standard browser `beforeunload` protection only while dirty, and
+  remove it on save, durable rollback and screen disposal without listener leaks
+- [x] Keep View mode, immediate add/replace publication, snapshot/package v1,
+  storage ordering and the default-v1 route unchanged
+- [x] Add one focused lifecycle regression for clean/dirty confirmation and
+  beforeunload registration; create no UI or browser matrix
+- [x] Obtain one independent read-only P0/P1 review and run final-tree typecheck,
+  full test and normal/BASE_PATH builds once
+- [x] Defer physical-iPhone navigation regression to the approved consolidated
+  run and record it as unexecuted, not PASS
+- [x] Commit this bounded slice independently and leave the worktree clean
+
+Exclusions and stop conditions:
+
+- Default-route/native-home integration, package dispatch, Caption/Asset delete,
+  migration, renderer/storage architecture and final responsive polish remain
+  outside this root fix.
+- Stop rather than widening if preventing discard requires a new durable draft,
+  browser automation framework or change to the project write-lock lifecycle.
+
+Review — 2026-08-30:
+
+- The existing mutable whole-Project snapshot now installs one standard
+  `beforeunload` listener only after its first unsaved mutation. Successful save,
+  fail-closed rollback, immediate add/replace publication and screen disposal
+  clear it; repeated dirty/clean intervals do not accumulate listeners.
+- Clean `閉じる` / `再読み込み` remain immediate. Dirty actions use one ordinary
+  discard confirmation; cancel leaves the exact working snapshot, viewer and
+  project write lock in place. Both actions are disabled while a save is in
+  flight, and View mode cannot enter the dirty interval.
+- One focused lifecycle file (2 tests) covers clean bypass, dirty cancellation,
+  browser-event cancellation and listener removal/re-arming. One independent
+  read-only reviewer reported no actionable P0/P1.
+- Final staged executable tree `npm run typecheck`, `npm test` (48 files; 1,399
+  passed; 21 todo), `npm run build`, the `/LociView/` BASE_PATH build and
+  `git diff --check` passed. The PWA precache remains 13 entries; Spark remains
+  a separately loaded runtime-cached chunk, and the 745.6 MiB representative PLY
+  is not bundled (the existing 649,541-byte sample point cloud remains unchanged).
+- Browser-control initialization again stopped at its approved safety boundary;
+  no bypass or automation dependency was added. Exact-tree visual navigation and
+  physical-iPhone regression remain unexecuted for the approved consolidated run
+  and are not claimed PASS.

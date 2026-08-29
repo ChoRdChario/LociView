@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { detectFormat, type ModelFormat } from '../viewer/loaders';
 import { clear, el, fmtBytes } from '../ui/dom';
+import { confirmDialog } from '../ui/dialogs';
 import { OpfsFS } from '../platform/opfs';
 import type { WorkspaceFS } from '../platform/fs';
 import { ProjectMutationCoordinator, type ProjectMutationSession } from '../platform/projectLock';
@@ -47,6 +48,7 @@ import {
 } from './portablePackage';
 import { digestNativeStream } from './sha256';
 import { NativeGsViewer, type NativeAssetGizmoMode } from './viewer';
+import { NativeUnsavedChangesGuard } from './unsavedChanges';
 import './style.css';
 
 interface SelectedFiles {
@@ -325,6 +327,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
   const coordinator = ProjectMutationCoordinator.browser(navigator.locks ?? null);
   const pwaRegistration = registerPwa({ onUpdate: () => undefined });
   let activeViewer: NativeGsViewer | null = null;
+  let activeUnsavedChanges: NativeUnsavedChangesGuard | null = null;
   let activeSession: ProjectMutationSession | null = null;
   let unsubscribeAccess: (() => void) | null = null;
   let transitionInFlight = false;
@@ -334,6 +337,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
   const closeActive = (): void => {
     unsubscribeAccess?.();
     unsubscribeAccess = null;
+    activeUnsavedChanges?.dispose();
+    activeUnsavedChanges = null;
     activeViewer?.dispose();
     activeViewer = null;
     activeSession?.release();
@@ -792,7 +797,9 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     let durable = initial;
     let working = initial;
     let saving = false;
-    let dirty = false;
+    activeUnsavedChanges?.dispose();
+    const unsavedChanges = new NativeUnsavedChangesGuard(window);
+    activeUnsavedChanges = unsavedChanges;
     let selectedCaptionId = initial.captions[0]?.id ?? null;
     let captionMoveActive = false;
     let creatingCaption = false;
@@ -814,6 +821,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const save = el('button', { class: 'primary' }, 'プロジェクトを保存');
     const unload = el('button', {}, 'GSを解放');
     const close = el('button', {}, '閉じる');
+    const reload = el('button', {}, '再読み込み');
     const addKind = el('select');
     addKind.append(el('option', { value: 'mesh' }, '3Dモデル'), el('option', { value: 'gs' }, 'Gaussian Splatting'));
     const addSourceLabel = el('span', {}, '3Dモデルファイル');
@@ -998,7 +1006,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         captionMoveActive = false;
         activeViewer?.stopCaptionPositionEditing();
       }
-      save.disabled = !editable || !dirty;
+      save.disabled = !editable || !unsavedChanges.isDirty;
       applyTransformButton.disabled = !editable;
       for (const button of assetGizmoButtons.values()) button.disabled = !editable;
       captionTitle.disabled = !editable || !captionFieldsEditable;
@@ -1033,10 +1041,11 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       fitView.disabled = saving;
       for (const button of axisButtons.values()) button.disabled = saving;
       close.disabled = saving;
+      reload.disabled = saving;
       activeViewer?.setEditingEnabled(editable);
     };
     const markDirty = (): void => {
-      dirty = true;
+      unsavedChanges.markDirty();
       updateAccess();
       runtimeStatus.textContent = '未保存の変更があります。';
     };
@@ -1138,7 +1147,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
           el('summary', {}, '詳細'),
           unload,
           diagnostics,
-          el('div', { class: 'ng-row' }, close, el('button', { onclick: () => location.reload() }, '再読み込み')),
+          el('div', { class: 'ng-row' }, close, reload),
         ),
         runtimeStatus,
       ),
@@ -1362,7 +1371,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         );
         durable = saved;
         working = saved;
-        dirty = false;
+        unsavedChanges.clear();
         unsubscribeAccess?.();
         unsubscribeAccess = null;
         viewer.dispose();
@@ -1431,7 +1440,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         );
         durable = saved;
         working = saved;
-        dirty = false;
+        unsavedChanges.clear();
         unsubscribeAccess?.();
         unsubscribeAccess = null;
         viewer.dispose();
@@ -1653,7 +1662,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       void saveNativeProjectV1(session.workspace, working).then((saved) => {
         durable = saved;
         working = saved;
-        dirty = false;
+        unsavedChanges.clear();
         viewer.setSnapshot(saved);
         creatingCaption = false;
         captionMoveActive = false;
@@ -1679,14 +1688,40 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
           : durable.savedViews?.[0]?.id ?? null;
         rebuildSavedViewOptions();
         populateCaptionFields();
-        dirty = false;
+        unsavedChanges.clear();
         runtimeStatus.textContent = `保存できませんでした：${error instanceof Error ? error.message : String(error)}。最後に保存された状態へ戻しました。`;
       }).finally(() => {
         saving = false;
         updateAccess();
       });
     });
-    close.addEventListener('click', () => void renderHome());
+    let discardConfirmationInFlight = false;
+    const confirmDiscard = async (action: '閉じる' | '再読み込み'): Promise<boolean> => {
+      if (discardConfirmationInFlight) return false;
+      discardConfirmationInFlight = true;
+      try {
+        return await unsavedChanges.confirmDiscard(() => confirmDialog(
+          '未保存の変更があります',
+          `保存していないプロジェクトの変更を破棄して${action}操作を続けますか？`,
+        ));
+      } finally {
+        discardConfirmationInFlight = false;
+      }
+    };
+    close.addEventListener('click', () => {
+      void (async () => {
+        if (!await confirmDiscard('閉じる')) return;
+        unsavedChanges.clear();
+        await renderHome();
+      })();
+    });
+    reload.addEventListener('click', () => {
+      void (async () => {
+        if (!await confirmDiscard('再読み込み')) return;
+        unsavedChanges.clear();
+        location.reload();
+      })();
+    });
   };
 
   await renderHome();

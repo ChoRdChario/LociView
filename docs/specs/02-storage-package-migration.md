@@ -1609,3 +1609,26 @@ record.
   raycast and source bytes are unchanged. This slice excludes Caption deletion,
   search/order/filter, tags, media attachments, DisplaySet/material linkage,
   Proxy-less GS origin placement, responsive redesign and final visual polish.
+
+## 22. Bounded native unsaved-change protection (2026-08-30 implementation slice)
+
+The native route already distinguishes its durable snapshot from the mutable
+opened-project copy and reports unsaved changes. Leaving that screen MUST NOT
+silently discard the mutable copy through an ordinary close or reload action.
+
+- When the opened copy is clean, `閉じる` and `再読み込み` retain their existing
+  immediate behavior. When it is dirty, each action first asks whether to
+  discard the unsaved Project changes in ordinary language. Cancelling preserves
+  the same screen, mutable snapshot, viewer and held project write lock.
+- While the opened copy is dirty, browser reload, tab close and process-level
+  navigation use the browser's standard `beforeunload` protection. A successful
+  Project save, a save-failure rollback to the last durable snapshot, or disposal
+  of the opened screen clears the protection. Repeated opens MUST NOT accumulate
+  event listeners.
+- The warning protects only the existing whole-Project dirty state. It adds no
+  autosave, draft, operation log, journal, transaction, revision or recovery
+  record, and changes no native snapshot/package version, storage ordering,
+  lock behavior, renderer, source bytes or default-v1 route.
+- This slice excludes default-route/native-home integration, automatic package
+  routing, Asset/Caption deletion, migration, final responsive polish and the
+  consolidated physical-iPhone regression.
