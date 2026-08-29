@@ -25,7 +25,7 @@ import {
   type NativeSim3V1,
   type NativeSolidBackgroundV1,
 } from './schema';
-import { activeNativeRepresentationsV1, isNativeAssetVisibleV1 } from './resolver';
+import { activeNativeRepresentationsV1, isNativeAssetVisibleV1, nativeCaptionNeedsReviewV1 } from './resolver';
 import {
   addNativeAssetV1,
   assertNativeProjectDoesNotMixV1,
@@ -35,6 +35,7 @@ import {
   nativeProjectRoot,
   openNativeProjectV1,
   readNativeRepresentationV1,
+  replaceNativeAssetV1,
   saveNativeProjectV1,
   type NativeAssetImportV1,
   type NativeBinarySource,
@@ -62,6 +63,13 @@ interface DraftResult {
 interface AssetImportBuild {
   readonly imported: NativeAssetImportV1;
   readonly sources: ReadonlyMap<string, NativeBinarySource>;
+}
+
+interface ExistingAssetBuildIdentity {
+  readonly assetId: string;
+  readonly assetFrameId: string;
+  readonly label: string;
+  readonly bindingMethod: NativeAssetBindingRevisionV1['method'];
 }
 
 function backgroundHex(background: NativeSolidBackgroundV1): string {
@@ -117,10 +125,11 @@ async function buildAssetImport(
   file: File,
   proxy: File | null,
   assetToProject: NativeSim3V1,
+  existing?: ExistingAssetBuildIdentity,
 ): Promise<AssetImportBuild> {
   if (kind === 'mesh' && proxy !== null) throw new Error('Interaction Proxyは対象GSと一緒に指定してください。');
-  const assetId = newNativeId('ast');
-  const assetFrameId = newNativeId('frm');
+  const assetId = existing?.assetId ?? newNativeId('ast');
+  const assetFrameId = existing?.assetFrameId ?? newNativeId('frm');
   const revisionId = newNativeId('rev');
   const bindingId = newNativeId('bnd');
   const primaryRepresentationId = newNativeId('rep');
@@ -191,11 +200,17 @@ async function buildAssetImport(
     imported: {
       asset: {
         id: assetId,
-        label: labelFromFile(file, kind === 'mesh' ? 'ordinary Mesh' : 'partial GS'),
+        label: existing?.label ?? labelFromFile(file, kind === 'mesh' ? 'ordinary Mesh' : 'partial GS'),
         assetFrameId,
         status: { kind: 'ready', activeBindingId: bindingId },
       },
-      binding: { id: bindingId, assetId, assetRevisionId: revisionId, assetToProject, method: 'import' },
+      binding: {
+        id: bindingId,
+        assetId,
+        assetRevisionId: revisionId,
+        assetToProject,
+        method: existing?.bindingMethod ?? 'import',
+      },
       revision: {
         id: revisionId,
         assetId,
@@ -767,6 +782,13 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const addSource = el('input', { type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply' });
     const addProxy = el('input', { type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply', disabled: 'true' });
     const addAsset = el('button', { class: 'primary' }, 'モデルを追加して保存');
+    const replaceAsset = el('select');
+    const replaceKind = el('select');
+    replaceKind.append(el('option', { value: 'mesh' }, '通常Mesh Asset'), el('option', { value: 'gs' }, 'GS Asset'));
+    const replaceSourceLabel = el('span', {}, '新しい通常Mesh file');
+    const replaceSource = el('input', { type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply' });
+    const replaceProxy = el('input', { type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply', disabled: 'true' });
+    const replaceButton = el('button', { class: 'primary' }, '選択したモデルを差し替えて保存');
     const transformAsset = el('select');
     const translationInputs = [0, 1, 2].map(() => el('input', { type: 'number', step: '0.01' }));
     const rotationInputs = [0, 1, 2].map(() => el('input', { type: 'number', step: '1' }));
@@ -781,6 +803,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const captionSelect = el('select', { 'aria-label': 'Caption' });
     const captionTitle = el('input', { type: 'text', maxlength: '160' });
     const captionBody = el('textarea');
+    const captionReview = el('p', { class: 'ng-note' });
+    const repositionCaption = el('button', {}, '選択中のキャプションを再配置');
     const captionSection = el('section', { class: 'ng-card ng-caption-card' });
     const savedViewSelect = el('select', { 'aria-label': '保存済みビュー' });
     const savedViewName = el('input', { type: 'text', maxlength: '160', value: '' });
@@ -804,6 +828,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       const role = roles.includes('gsPrimary') ? 'GS' : 'Mesh';
       target.append(el('option', { value: asset.id }, `${asset.label} (${role})`));
       transformAsset.append(el('option', { value: asset.id }, `${asset.label} (${role})`));
+      replaceAsset.append(el('option', { value: asset.id }, `${asset.label} (${role})`));
       const checkbox = el('input', { type: 'checkbox', checked: isNativeAssetVisibleV1(working, asset.id) });
       visibilityInputs.set(asset.id, checkbox);
       visibilityList.append(el('label', { class: 'ng-project-row' }, checkbox, el('strong', {}, asset.label), el('span', { class: 'ng-note' }, role)));
@@ -841,10 +866,11 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       }
       for (const [index, caption] of working.captions.entries()) {
         const owner = working.assets.find((asset) => asset.id === caption.anchor.assetId);
+        const review = nativeCaptionNeedsReviewV1(working, caption) ? '［要再配置］ ' : '';
         captionSelect.append(el(
           'option',
           { value: caption.id },
-          `${index + 1}. ${caption.title} — ${owner?.label ?? 'missing Asset'}`,
+          `${review}${index + 1}. ${caption.title} — ${owner?.label ?? 'missing Asset'}`,
         ));
       }
       if (working.captions.length === 0 && selectedCaptionId !== null) {
@@ -856,14 +882,24 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       const caption = selectedCaption();
       captionTitle.value = caption?.title ?? 'Caption';
       captionBody.value = caption?.body ?? '';
+      const needsReview = caption !== undefined && nativeCaptionNeedsReviewV1(working, caption);
+      captionReview.className = needsReview ? 'ng-error' : 'ng-note';
+      captionReview.textContent = caption === undefined
+        ? ''
+        : needsReview
+          ? 'このキャプションはモデル差し替え前の表面位置です。位置は保持されていますが、現在のモデル上で再配置すると確認済みに戻ります。'
+          : '現在のモデル表面に対応しています。';
     };
     const commitSelectedCaption = (caption: NativeProjectSnapshotV1['captions'][number]): boolean => {
       try {
         const previous = selectedCaption();
+        const previousNeedsReview = previous === undefined ? false : nativeCaptionNeedsReviewV1(working, previous);
         const wasNew = selectedCaptionId === null;
         working = updateSelectedNativeCaptionV1(working, selectedCaptionId, caption);
         selectedCaptionId ??= caption.id;
-        if (wasNew || previous?.title !== caption.title) rebuildCaptionOptions();
+        const nextNeedsReview = nativeCaptionNeedsReviewV1(working, caption);
+        if (wasNew || previous?.title !== caption.title || previousNeedsReview !== nextNeedsReview) rebuildCaptionOptions();
+        populateCaptionFields();
         return true;
       } catch (error) {
         runtimeStatus.className = 'ng-error';
@@ -905,6 +941,12 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       addSource.disabled = !editable;
       addProxy.disabled = !editable || addKind.value !== 'gs';
       addAsset.disabled = !editable;
+      replaceAsset.disabled = !editable;
+      replaceKind.disabled = !editable;
+      replaceSource.disabled = !editable;
+      replaceProxy.disabled = !editable || replaceKind.value !== 'gs';
+      replaceButton.disabled = !editable;
+      repositionCaption.disabled = !editable || caption === undefined || !captionVisible;
       captureSavedView.disabled = !editable;
       overwriteSavedView.disabled = !editable || selectedSavedView() === undefined;
       deleteSavedView.disabled = !editable || selectedSavedView() === undefined;
@@ -956,6 +998,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       el('div', { class: 'ng-row' }, save),
       el('label', { class: 'ng-field' }, el('span', {}, 'タイトル'), captionTitle),
       el('label', { class: 'ng-field' }, el('span', {}, '本文'), captionBody),
+      captionReview,
+      repositionCaption,
       el('p', { class: 'ng-note' }, '配置後は黄色いマーカーのギズモで位置を調整できます。'),
     );
 
@@ -994,6 +1038,17 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
           el('label', { class: 'ng-field' }, el('span', {}, 'GS配置用の補助モデル（任意）'), addProxy),
           addAsset,
           el('p', { class: 'ng-note' }, '一回に一つのモデルを追加します。追加後に位置を調整できます。'),
+        ),
+        el('details', { class: 'ng-card' },
+          el('summary', {}, 'モデルを差し替え'),
+          el('label', { class: 'ng-field' }, el('span', {}, '差し替えるモデル'), replaceAsset),
+          el('div', { class: 'ng-grid' },
+            el('label', { class: 'ng-field' }, el('span', {}, '新しい描画形式'), replaceKind),
+            el('label', { class: 'ng-field' }, replaceSourceLabel, replaceSource),
+          ),
+          el('label', { class: 'ng-field' }, el('span', {}, '新しいGS配置用の補助モデル（任意）'), replaceProxy),
+          replaceButton,
+          el('p', { class: 'ng-note' }, 'モデルの位置とキャプション本文は保ちます。表面が同じとは推測しないため、既存キャプションは必要に応じて再配置してください。'),
         ),
         el('details', { class: 'ng-card' },
           el('summary', {}, 'モデルの位置を調整'),
@@ -1167,6 +1222,14 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       addSourceLabel.textContent = isGs ? 'Graphdeco GS PLY SH2/SH3' : '通常Mesh file';
       updateAccess();
     });
+    replaceKind.addEventListener('change', () => {
+      const isGs = replaceKind.value === 'gs';
+      replaceSource.value = '';
+      replaceProxy.value = '';
+      replaceSource.accept = isGs ? '.ply,application/octet-stream' : '.glb,.gltf,.obj,.stl,.ply';
+      replaceSourceLabel.textContent = isGs ? '新しいGraphdeco GS PLY SH2/SH3' : '新しい通常Mesh file';
+      updateAccess();
+    });
     addAsset.addEventListener('click', () => {
       if (!canMutateWorking()) return;
       const sourceFile = selectedFile(addSource);
@@ -1215,6 +1278,75 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       })().catch((error: unknown) => {
         runtimeStatus.className = 'ng-error';
         runtimeStatus.textContent = `Asset追加失敗：${error instanceof Error ? error.message : String(error)}。既存active snapshotを維持しました。`;
+      }).finally(() => {
+        if (activeViewer === viewer) {
+          saving = false;
+          updateAccess();
+        }
+      });
+    });
+    replaceButton.addEventListener('click', () => {
+      if (!canMutateWorking()) return;
+      const existing = working.assets.find((asset) => asset.id === replaceAsset.value);
+      const activeBinding = existing === undefined ? null : bindingFor(existing.id);
+      const sourceFile = selectedFile(replaceSource);
+      if (existing === undefined || activeBinding === null) {
+        runtimeStatus.className = 'ng-error';
+        runtimeStatus.textContent = '差し替えるモデルの現在状態を確認できません。';
+        return;
+      }
+      if (sourceFile === null) {
+        runtimeStatus.className = 'ng-error';
+        runtimeStatus.textContent = '新しいモデルfileを選択してください。';
+        return;
+      }
+      if (!window.confirm(`「${existing.label}」の表示内容を差し替えます。位置と既存キャプションは保持し、表面対応は自動推測しません。続行しますか？`)) return;
+      saving = true;
+      updateAccess();
+      runtimeStatus.className = 'ng-status';
+      runtimeStatus.textContent = '新しいモデルを検査しています…';
+      void (async () => {
+        const kind = replaceKind.value === 'gs' ? 'gs' : 'mesh';
+        const built = await buildAssetImport(
+          kind,
+          sourceFile,
+          kind === 'gs' ? selectedFile(replaceProxy) : null,
+          activeBinding.assetToProject,
+          {
+            assetId: existing.id,
+            assetFrameId: existing.assetFrameId,
+            label: existing.label,
+            bindingMethod: activeBinding.method,
+          },
+        );
+        const required = [...built.sources.values()].reduce((sum, source) => sum + source.size, 0);
+        const estimate = await navigator.storage.estimate?.();
+        if (
+          estimate?.quota !== undefined && estimate.usage !== undefined &&
+          Number.isFinite(estimate.quota) && Number.isFinite(estimate.usage) &&
+          estimate.quota - estimate.usage < required
+        ) {
+          throw new Error(`保存可能容量が不足しています（必要 ${fmtBytes(required)}）。現在のモデルは変更しません。`);
+        }
+        const saved = await replaceNativeAssetV1(
+          session.workspace,
+          working,
+          built.imported,
+          built.sources,
+          (message) => { runtimeStatus.textContent = message; },
+        );
+        durable = saved;
+        working = saved;
+        dirty = false;
+        unsubscribeAccess?.();
+        unsubscribeAccess = null;
+        viewer.dispose();
+        if (activeViewer === viewer) activeViewer = null;
+        saving = false;
+        await renderProject(saved, session);
+      })().catch((error: unknown) => {
+        runtimeStatus.className = 'ng-error';
+        runtimeStatus.textContent = `モデル差し替え失敗：${error instanceof Error ? error.message : String(error)}。現在の保存済みモデルを維持しました。`;
       }).finally(() => {
         if (activeViewer === viewer) {
           saving = false;
@@ -1278,6 +1410,24 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       runtimeStatus.textContent = selectedCaptionId === null
         ? '追加先モデルを選び、画面上でキャプションを追加してください。'
         : `キャプションを選択しました：${selectedCaption()?.title ?? 'Caption'}`;
+    });
+    repositionCaption.addEventListener('click', () => {
+      if (!canMutateWorking()) return;
+      const caption = selectedCaption();
+      if (caption === undefined) return;
+      if (target.value !== caption.anchor.assetId) {
+        const owner = working.assets.find((asset) => asset.id === caption.anchor.assetId);
+        runtimeStatus.className = 'ng-error';
+        runtimeStatus.textContent = `追加先モデルを「${owner?.label ?? 'キャプション所属モデル'}」へ切り替えてから再配置してください。`;
+        return;
+      }
+      if (!viewer.armCaptionReposition(caption.id)) {
+        runtimeStatus.className = 'ng-error';
+        runtimeStatus.textContent = '選択中のキャプションを再配置できません。モデルの表示と編集状態を確認してください。';
+        return;
+      }
+      runtimeStatus.className = 'ng-status';
+      runtimeStatus.textContent = 'PCは現在のモデル上でShift＋クリック、iPhoneは長押しして新しい位置を指定してください。';
     });
     unload.addEventListener('click', () => {
       viewer.disposeGs();

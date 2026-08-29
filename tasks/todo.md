@@ -2813,3 +2813,66 @@ Review — 2026-08-30:
   browser automation remains unavailable in this execution environment.
   Physical iPhone view/projection controls remain intentionally unexecuted for
   the Product Owner-approved consolidated mobile run; neither is inferred PASS.
+
+## Native Asset replacement — bounded production slice
+
+Checkpoint and plan — 2026-08-30:
+
+- [x] Reuse the existing native Asset/revision/binding/Representation records;
+  replace one selected Asset with a fresh Mesh or GS plus optional newly supplied
+  same-Asset Proxy, while retaining its ID, label, AssetFrame, visibility and
+  exact active `assetToProject`
+- [x] Stream and read-back verify only the new Representation bytes, then append
+  one new revision/binding closure and publish the whole-Project snapshot and
+  active marker last; any failure must preserve the exact prior active snapshot
+- [x] Give every topology-unknown replacement a fresh visual VariantFamily and
+  compatibility class; never reuse an old Proxy or infer surface equivalence
+- [x] Derive Caption review status from the active revision without adding a
+  durable flag; keep title/body/ownership/`positionAsset` unchanged, and clear
+  review only through explicit same-Asset re-placement on the active surface
+- [x] Preserve the exact replacement/review state through save/reopen and the
+  existing portable package v1; add no package/schema version or logical entry
+- [x] Reuse the small Mesh and GS/Proxy fixtures for focused success/failure and
+  portable round-trip acceptance; do not rerun the 745.6 MiB representative GS
+- [x] Obtain one independent read-only P0/P1 review, then run typecheck, the full
+  test suite and normal/BASE_PATH builds once on the final executable tree
+- [x] Keep physical iPhone replacement regression in the approved consolidated
+  mobile run and record it as unexecuted rather than inferred PASS
+- [x] Commit this bounded slice independently and leave the worktree clean
+
+Exclusions and stop conditions:
+
+- DisplaySet/material transfer, surface comparison, automatic Caption remapping,
+  history/rollback UI, Asset deletion, old-blob GC, ordinary points, migration,
+  renderer abstraction and final UI polish remain outside this slice.
+- Stop rather than widening if compatibility requires an inferred topology map,
+  if old immutable bytes cannot remain retained, or if snapshot/package v1 needs
+  a compatibility-breaking change.
+
+Review — 2026-08-30:
+
+- Added one bounded replacement publication path over the existing native
+  Asset/revision/binding/Representation records. It writes and read-back verifies
+  only fresh Representation-ID paths, retains every old immutable record/byte,
+  and switches only the selected Asset's active binding in the marker-last whole
+  Project snapshot.
+- Asset ID/label/frame, exact placement, visibility, other Assets and SavedViews
+  remain unchanged. A replacement always receives a fresh VariantFamily and
+  compatibility class; a GS replacement never inherits the old Proxy and is
+  view-only when no new Proxy is supplied.
+- Existing Caption title/body/ownership/`positionAsset` remain exact. Review
+  status is derived from the active revision, and only an explicit same-Asset
+  surface re-placement replaces its anchor with the current revision/class.
+- Focused native schema/storage/portable acceptance: 35/35 PASS, including exact
+  old-snapshot preservation after injected publication failure and package v1
+  round-trip with retained old/new bytes. Independent read-only review: no P0/P1.
+- Final `npm run typecheck`: PASS. Final `npm test`: all 47 test files completed
+  without failure (1,397 passed; 21 existing TODO/skipped). Normal and
+  `BASE_PATH=/LociView/` builds: PASS. `git diff --check`: PASS.
+- Spark remains the dedicated `native-gs-spark-2.1.0.js` lazy chunk, absent from
+  the 13-entry PWA precache and ordinary entry document. No representative PLY
+  was added to the repository or build.
+- Exact-tree browser automation stopped at the approved browser-control setup
+  boundary; no safety mechanism or production code was bypassed. Desktop UI
+  gesture evidence and physical-iPhone replacement regression remain unexecuted
+  for the Product Owner-approved consolidated run and are not claimed PASS.

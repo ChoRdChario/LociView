@@ -31,9 +31,18 @@ import {
   nativeRepresentationPath,
   nativeSnapshotPath,
   openNativeProjectV1,
+  replaceNativeAssetV1,
   saveNativeProjectV1,
 } from '../../src/nativeGs/storage';
-import { makeGsPlySource, makeNativeDraft, makeNativeMeshImport, NATIVE_TEST_IDS, testNativeId } from './nativeTestProject';
+import { nativeCaptionNeedsReviewV1 } from '../../src/nativeGs/resolver';
+import {
+  makeGsPlySource,
+  makeNativeDraft,
+  makeNativeGsReplacement,
+  makeNativeMeshImport,
+  NATIVE_TEST_IDS,
+  testNativeId,
+} from './nativeTestProject';
 
 class ChunkedMemoryFS extends MemoryFS {
   constructor(private readonly chunkBytes = 4096) {
@@ -200,8 +209,15 @@ async function makeSourceProject(): Promise<{
   const created = await createNativeProjectV1(session.workspace, detailedDraft, sources);
   const added = makeNativeMeshImport();
   const multiAsset = await addNativeAssetV1(session.workspace, created, added.imported, added.sources);
-  const aligned = activateNativeManualAssetTransformV1(
+  const replacement = makeNativeGsReplacement(multiAsset, NATIVE_TEST_IDS.gsAsset, 180);
+  const replaced = await replaceNativeAssetV1(
+    session.workspace,
     multiAsset,
+    replacement.imported,
+    replacement.sources,
+  );
+  const aligned = activateNativeManualAssetTransformV1(
+    replaced,
     NATIVE_TEST_IDS.gsAsset,
     testNativeId('bnd', 92),
     {
@@ -251,7 +267,7 @@ describe('native portable .lociview streamed backup/restore', () => {
         `native/representations/${representation.id}.bin`
       )),
     ].sort());
-    expect(entries).toHaveLength(6);
+    expect(entries).toHaveLength(source.snapshot.representations.length + 2);
     expect(result.metrics.packageByteLength).toBe(blob.size);
     expect(result.metrics.maxApplicationChunkBytes).toBeLessThan(result.metrics.representationByteLength);
 
@@ -267,6 +283,7 @@ describe('native portable .lociview streamed backup/restore', () => {
     });
     expect(inspection.snapshot.presentation.hiddenAssetIds).toEqual([NATIVE_TEST_IDS.meshAsset]);
     expect(inspection.snapshot.savedViews).toEqual(source.snapshot.savedViews);
+    expect(nativeCaptionNeedsReviewV1(inspection.snapshot, inspection.snapshot.captions[0]!)).toBe(true);
     const target = new ChunkedMemoryFS();
     const restoreSession = await acquireNew(target);
     const restored = await restoreNativePortablePackageV1(restoreSession.workspace, target, blob);
@@ -275,6 +292,7 @@ describe('native portable .lociview streamed backup/restore', () => {
       await source.fs.readText(nativeSnapshotPath(source.snapshot.project.id, source.snapshot.snapshotId)),
     );
     expect((await openNativeProjectV1(target, source.snapshot.project.id)).snapshot).toEqual(source.snapshot);
+    expect(nativeCaptionNeedsReviewV1(restored.snapshot, restored.snapshot.captions[0]!)).toBe(true);
     for (const representation of source.snapshot.representations) {
       expect(await target.readBytes(nativeRepresentationPath(source.snapshot.project.id, representation.id))).toEqual(
         await source.fs.readBytes(nativeRepresentationPath(source.snapshot.project.id, representation.id)),

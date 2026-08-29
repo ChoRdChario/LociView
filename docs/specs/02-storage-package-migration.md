@@ -1503,3 +1503,48 @@ camera framework or another storage publication unit.
 - This slice excludes DisplaySet/material linkage, a default-view policy,
   per-view Asset visibility, camera animation, thumbnails, arbitrary viewport
   layouts, Compare, renderer abstraction, migration and final visual polish.
+
+## 19. Bounded native Asset replacement (approved product direction; 2026-08-30 implementation slice)
+
+This slice closes the already-approved `PROD-05` replacement outcome inside the
+isolated native route. It reuses the existing `Asset`, immutable
+`Representation`, `AssetRevision`, `AssetBindingRevision`, AssetFrame Caption
+anchor and whole-Project publication boundary. It adds no second revision model,
+history UI, migration framework or package version.
+
+- One explicit Edit-mode action replaces the selected Asset's active visual
+  content with either one ordinary Mesh Representation, or one GS
+  Representation plus an optional newly supplied same-Asset Interaction Proxy.
+  The Asset ID, label, AssetFrame, visibility and current `assetToProject` are
+  copied exactly. The new visual contribution receives a fresh VariantFamily
+  and fresh singleton compatibility class because surface equivalence is not
+  inferred from filename, bounds, transform, format or user intent.
+- Every new source is streamed to its fresh Representation-ID path and verified
+  by size, SHA-256 and streamed read-back. A GS source is additionally checked
+  against the bounded SH2/SH3 profile. Only after all new bytes are durable does
+  the writer append the new immutable records, write and verify one complete
+  snapshot, and publish the active marker last. Failure preserves the exact old
+  active snapshot; no partial replacement is reported as saved.
+- Old bindings, revisions, Representations and source bytes remain retained in
+  snapshot v1. Activation changes only the selected Asset's `activeBindingId`.
+  The first slice provides no history/rollback UI and performs no obsolete-blob
+  collection, CAS, deduplication or general transaction work.
+- Existing Captions keep their Asset ownership, title/body and exact
+  `positionAsset`; replacement never reraycasts, moves or silently maps them to
+  the new surface. Compatibility is derived: a Caption needs review when its
+  saved class does not occur on the Asset's active revision. It remains visible
+  at its saved position. An explicit re-placement on that same selected Asset
+  is the only action that replaces the complete anchor with the active revision,
+  active visual class and newly confirmed `positionAsset`.
+- A replacement GS without a supplied Proxy remains view-only for new or
+  reviewed Caption placement. No old Proxy is reused. A hidden Asset, inactive
+  old Representation or old Proxy cannot render, receive a pick or take the
+  gizmo. Other Assets, SavedViews and project presentation state are unchanged.
+- Native snapshot version `1` and portable package version `1` remain unchanged.
+  Both already carry the complete retained immutable record/byte inventory, so
+  ordinary save/reopen and portable export/delete/restore preserve replacement
+  state and review status without a new logical entry.
+- This slice excludes surface/topology comparison, automatic Caption or material
+  transfer, DisplaySet/material mapping, Asset deletion, revision/history UI,
+  undo, blob GC, ordinary points, migration, a renderer framework and a second
+  renderer.

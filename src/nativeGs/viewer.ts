@@ -7,6 +7,7 @@ import {
   activeNativeBindingV1,
   activeNativeRepresentationsV1,
   allActiveNativeRepresentationsV1,
+  nativeCaptionNeedsReviewV1,
   resolveNativeGsSliceV1,
   type NativeResourceStateV1,
   type NativeSliceResolutionV1,
@@ -138,6 +139,7 @@ export class NativeGsViewer {
   private sparkRuntime: NativeSparkRuntime | null = null;
   private readonly captionMarkers = new Map<string, THREE.Mesh>();
   private currentCaption: NativeCaptionV1 | null = null;
+  private repositionCaptionId: string | null = null;
   private gizmoTarget: NativeGizmoTarget = null;
   private assetGizmoMode: NativeAssetGizmoMode = 'translate';
   private assetScaleDragStart = 1;
@@ -399,6 +401,7 @@ export class NativeGsViewer {
       : this.snapshot.captions.find((caption) => caption.id === captionId);
     if (next === undefined) return false;
     const changed = this.currentCaption?.id !== next?.id;
+    if (changed) this.repositionCaptionId = null;
     this.currentCaption = next;
     this.clearLongPress();
     if (next === null && this.gizmoTarget?.kind === 'caption') this.gizmoTarget = null;
@@ -414,6 +417,7 @@ export class NativeGsViewer {
     this.editingEnabled = enabled;
     if (!enabled) {
       this.clearLongPress();
+      this.repositionCaptionId = null;
       this.gizmoDragging = false;
       this.controls.enabled = true;
       this.applyActiveAssetTransforms();
@@ -445,6 +449,18 @@ export class NativeGsViewer {
     this.gizmo.setMode('translate');
     this.updateResolution();
     return this.gizmoRoot.visible;
+  }
+
+  armCaptionReposition(captionId: string): boolean {
+    if (!this.editingEnabled) return false;
+    const caption = this.snapshot.captions.find((candidate) => candidate.id === captionId);
+    if (caption === undefined || !this.assetIsVisible(caption.anchor.assetId)) return false;
+    this.currentCaption = caption;
+    this.repositionCaptionId = caption.id;
+    this.gizmoTarget = { kind: 'caption' };
+    this.syncCaptionMarkers();
+    this.refreshGizmoAttachment();
+    return true;
   }
 
   disposeGs(): void {
@@ -662,9 +678,23 @@ export class NativeGsViewer {
       this.callbacks.onIssuesChanged([...this.resolution.issues, 'No hit on the selected interaction surface.']);
       return;
     }
-    if (!this.callbacks.onCaptionCreationStarted()) return;
-    this.currentCaption = null;
-    this.syncCaptionMarkers();
+    const repositioned = this.repositionCaptionId === null
+      ? null
+      : this.snapshot.captions.find((caption) => caption.id === this.repositionCaptionId) ?? null;
+    if (this.repositionCaptionId !== null && repositioned === null) {
+      this.repositionCaptionId = null;
+      this.callbacks.onIssuesChanged([...this.resolution.issues, 'The Caption selected for re-placement is unavailable.']);
+      return;
+    }
+    if (repositioned !== null && repositioned.anchor.assetId !== interaction.targetAssetId) {
+      this.callbacks.onIssuesChanged([...this.resolution.issues, 'Re-placement must use the Caption owning Asset.']);
+      return;
+    }
+    if (repositioned === null) {
+      if (!this.callbacks.onCaptionCreationStarted()) return;
+      this.currentCaption = null;
+      this.syncCaptionMarkers();
+    }
     const asset = this.snapshot.assets.find((candidate) => candidate.id === interaction.targetAssetId);
     const binding = activeNativeBindingV1(this.snapshot, interaction.targetAssetId);
     const revision = this.snapshot.assetRevisions.find((candidate) => candidate.id === binding?.assetRevisionId);
@@ -677,9 +707,9 @@ export class NativeGsViewer {
     }
     const positionAsset = group.worldToLocal(hit.point.clone());
     const caption: NativeCaptionV1 = {
-      id: newNativeId('cap'),
-      title: 'Caption',
-      body: '',
+      id: repositioned?.id ?? newNativeId('cap'),
+      title: repositioned?.title ?? 'Caption',
+      body: repositioned?.body ?? '',
       anchor: {
         kind: 'asset',
         assetId: asset.id,
@@ -691,10 +721,16 @@ export class NativeGsViewer {
       },
     };
     if (!this.acceptCaptionChange(caption)) return;
+    this.repositionCaptionId = null;
     this.gizmoTarget = { kind: 'caption' };
     this.syncCaptionMarkers();
     this.refreshGizmoAttachment();
-    this.callbacks.onIssuesChanged([...this.resolution.issues, 'Coarse hit accepted. Adjust the gizmo, then save.']);
+    this.callbacks.onIssuesChanged([
+      ...this.resolution.issues,
+      repositioned === null
+        ? 'Coarse hit accepted. Adjust the gizmo, then save.'
+        : 'Caption re-placement accepted on the active surface. Adjust the gizmo, then save.',
+    ]);
   }
 
   private readonly onPointerDown = (event: PointerEvent): void => {
@@ -770,8 +806,9 @@ export class NativeGsViewer {
       marker.visible = this.assetIsVisible(caption.anchor.assetId);
       const material = marker.material as THREE.MeshStandardMaterial;
       const selected = caption.id === this.currentCaption?.id;
-      material.color.setHex(selected ? 0xffd33d : 0x66d9ff);
-      material.emissive.setHex(selected ? 0x8a5b00 : 0x075985);
+      const needsReview = nativeCaptionNeedsReviewV1(this.snapshot, caption);
+      material.color.setHex(needsReview ? (selected ? 0xff9f43 : 0xff6b6b) : selected ? 0xffd33d : 0x66d9ff);
+      material.emissive.setHex(needsReview ? 0x8f2f1f : selected ? 0x8a5b00 : 0x075985);
       material.emissiveIntensity = selected ? 1.4 : 0.85;
     }
   }

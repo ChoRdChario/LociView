@@ -161,6 +161,146 @@ export function makeNativeMeshImport(ordinal = 100): {
   };
 }
 
+export function makeNativeMeshReplacement(
+  snapshot: NativeProjectSnapshotV1,
+  assetId: string,
+  ordinal = 120,
+): {
+  readonly imported: NativeAssetImportV1;
+  readonly sources: ReadonlyMap<string, NativeBinarySource>;
+  readonly representationId: string;
+  readonly revisionId: string;
+  readonly compatibilityId: string;
+  readonly bytes: Uint8Array;
+} {
+  const candidate = makeNativeMeshImport(ordinal);
+  const asset = snapshot.assets.find((entry) => entry.id === assetId);
+  const binding = snapshot.assetBindingRevisions.find((entry) => entry.id === asset?.status.activeBindingId);
+  if (asset === undefined || binding === undefined) throw new Error('test replacement Asset is unavailable');
+  const compatibilityId = candidate.imported.revision.anchorCompatibilityClasses[0]!.id;
+  return {
+    sources: candidate.sources,
+    representationId: candidate.representationId,
+    revisionId: candidate.imported.revision.id,
+    compatibilityId,
+    bytes: candidate.bytes,
+    imported: {
+      asset: {
+        ...candidate.imported.asset,
+        id: asset.id,
+        label: asset.label,
+        assetFrameId: asset.assetFrameId,
+      },
+      binding: {
+        ...candidate.imported.binding,
+        assetId: asset.id,
+        assetToProject: binding.assetToProject,
+        method: binding.method,
+      },
+      revision: { ...candidate.imported.revision, assetId: asset.id },
+      representations: candidate.imported.representations.map((representation) => ({
+        ...representation,
+        assetId: asset.id,
+      })),
+    },
+  };
+}
+
+export function makeNativeGsReplacement(
+  snapshot: NativeProjectSnapshotV1,
+  assetId: string,
+  ordinal = 140,
+): {
+  readonly imported: NativeAssetImportV1;
+  readonly sources: ReadonlyMap<string, NativeBinarySource>;
+  readonly gsRepresentationId: string;
+  readonly proxyRepresentationId: string;
+  readonly revisionId: string;
+  readonly compatibilityId: string;
+} {
+  const asset = snapshot.assets.find((entry) => entry.id === assetId);
+  const activeBinding = snapshot.assetBindingRevisions.find((entry) => entry.id === asset?.status.activeBindingId);
+  if (asset === undefined || activeBinding === undefined) throw new Error('test replacement Asset is unavailable');
+  const gs = makeGsPlySource(2, 2);
+  const proxyBytes = new TextEncoder().encode(`o proxy-${ordinal}\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n`);
+  const proxyBlob = new Blob([proxyBytes], { type: 'text/plain' });
+  const gsRepresentationId = testNativeId('rep', ordinal);
+  const proxyRepresentationId = testNativeId('rep', ordinal + 1);
+  const gsFamilyId = testNativeId('fam', ordinal);
+  const proxyFamilyId = testNativeId('fam', ordinal + 1);
+  const revisionId = testNativeId('rev', ordinal);
+  const bindingId = testNativeId('bnd', ordinal);
+  const compatibilityId = testNativeId('cls', ordinal);
+  const identity = {
+    translation: [0, 0, 0] as const,
+    rotationXYZW: [0, 0, 0, 1] as const,
+    uniformScale: 1,
+    reflection: 'none' as const,
+  };
+  return {
+    gsRepresentationId,
+    proxyRepresentationId,
+    revisionId,
+    compatibilityId,
+    sources: new Map([
+      [gsRepresentationId, gs.source],
+      [proxyRepresentationId, {
+        size: proxyBlob.size,
+        mediaType: proxyBlob.type,
+        stream: () => proxyBlob.stream(),
+      }],
+    ]),
+    imported: {
+      asset: {
+        id: asset.id,
+        label: asset.label,
+        assetFrameId: asset.assetFrameId,
+        status: { kind: 'ready', activeBindingId: bindingId },
+      },
+      binding: {
+        id: bindingId,
+        assetId: asset.id,
+        assetRevisionId: revisionId,
+        assetToProject: activeBinding.assetToProject,
+        method: activeBinding.method,
+      },
+      revision: {
+        id: revisionId,
+        assetId: asset.id,
+        representationIds: [gsRepresentationId, proxyRepresentationId],
+        anchorCompatibilityClasses: [{ id: compatibilityId, targetVariantFamilyIds: [gsFamilyId] }],
+      },
+      representations: [{
+        id: gsRepresentationId,
+        assetId: asset.id,
+        representationFrameId: testNativeId('frm', ordinal + 200),
+        contentKind: 'gaussianSplat',
+        purposes: ['source', 'display'],
+        role: 'gsPrimary',
+        variantFamilyId: gsFamilyId,
+        formatProfile: { id: NATIVE_GS_PROFILE_ID },
+        representationToAsset: identity,
+        derivedFrom: [],
+        gsPly: gs.facts,
+        mediaType: 'application/octet-stream',
+      }, {
+        id: proxyRepresentationId,
+        assetId: asset.id,
+        representationFrameId: testNativeId('frm', ordinal + 201),
+        contentKind: 'mesh',
+        purposes: ['interaction'],
+        role: 'interactionProxy',
+        variantFamilyId: proxyFamilyId,
+        formatProfile: { id: nativeModelProfileId('obj') },
+        representationToAsset: identity,
+        derivedFrom: [gsRepresentationId],
+        proxyForGsVariantFamilyId: gsFamilyId,
+        mediaType: 'text/plain',
+      }],
+    },
+  };
+}
+
 export function makeNativeDraft(shDegree: 2 | 3 = 3): {
   readonly draft: NativeProjectDraftV1;
   readonly sources: ReadonlyMap<string, NativeBinarySource>;

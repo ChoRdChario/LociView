@@ -3,6 +3,7 @@ import {
   activeNativeBindingV1,
   activeNativeRepresentationsV1,
   isNativeAssetVisibleV1,
+  nativeCaptionNeedsReviewV1,
   resolveNativeGsSliceV1,
   type NativeResourceStateV1,
 } from '../../src/nativeGs/resolver';
@@ -293,6 +294,85 @@ describe('native snapshot v1 and fixed degradation outcomes', () => {
       first.id,
       first,
     )).toThrow(/selected Caption is missing/);
+  });
+
+  it('derives replacement review status and clears it only with an explicit active-class anchor', () => {
+    const ids = NATIVE_TEST_IDS;
+    const original = snapshotFromDraft(makeNativeDraft().draft);
+    const caption = {
+      id: ids.caption,
+      title: 'keep title',
+      body: 'keep body',
+      anchor: {
+        kind: 'asset' as const,
+        assetId: ids.gsAsset,
+        assetFrameId: ids.gsFrame,
+        positionAsset: [1, 2, 3] as const,
+        authoredAssetRevisionId: ids.gsRevision,
+        authoredAnchorCompatibilityId: ids.gsClass,
+        hitEvidence: { method: 'manual' as const },
+      },
+    };
+    const current = { ...original, captions: [caption] };
+    expect(nativeCaptionNeedsReviewV1(current, caption)).toBe(false);
+
+    const oldBinding = activeNativeBindingV1(current, ids.gsAsset)!;
+    const oldGs = current.representations.find((entry) => entry.id === ids.gsRepresentation)!;
+    const oldProxy = current.representations.find((entry) => entry.id === ids.proxyRepresentation)!;
+    const replacementBindingId = testNativeId('bnd', 170);
+    const replacementRevisionId = testNativeId('rev', 170);
+    const replacementGsId = testNativeId('rep', 170);
+    const replacementProxyId = testNativeId('rep', 171);
+    const replacementFamilyId = testNativeId('fam', 170);
+    const replacementClassId = testNativeId('cls', 170);
+    const replacement = parseNativeSnapshotV1(serializeNativeSnapshotV1({
+      ...current,
+      assets: current.assets.map((asset) => asset.id === ids.gsAsset
+        ? { ...asset, status: { kind: 'ready' as const, activeBindingId: replacementBindingId } }
+        : asset),
+      assetBindingRevisions: [...current.assetBindingRevisions, {
+        ...oldBinding,
+        id: replacementBindingId,
+        assetRevisionId: replacementRevisionId,
+      }],
+      assetRevisions: [...current.assetRevisions, {
+        id: replacementRevisionId,
+        assetId: ids.gsAsset,
+        representationIds: [replacementGsId, replacementProxyId],
+        anchorCompatibilityClasses: [{ id: replacementClassId, targetVariantFamilyIds: [replacementFamilyId] }],
+      }],
+      representations: [...current.representations, {
+        ...oldGs,
+        id: replacementGsId,
+        representationFrameId: testNativeId('frm', 170),
+        variantFamilyId: replacementFamilyId,
+      }, {
+        ...oldProxy,
+        id: replacementProxyId,
+        representationFrameId: testNativeId('frm', 171),
+        variantFamilyId: testNativeId('fam', 171),
+        derivedFrom: [replacementGsId],
+        proxyForGsVariantFamilyId: replacementFamilyId,
+      }],
+    }));
+    expect(replacement.captions[0]).toEqual(caption);
+    expect(nativeCaptionNeedsReviewV1(replacement, replacement.captions[0]!)).toBe(true);
+
+    const rebound = updateSelectedNativeCaptionV1(replacement, caption.id, {
+      ...caption,
+      anchor: {
+        ...caption.anchor,
+        positionAsset: [-4, 5, 6],
+        authoredAssetRevisionId: replacementRevisionId,
+        authoredAnchorCompatibilityId: replacementClassId,
+      },
+    });
+    expect(nativeCaptionNeedsReviewV1(rebound, rebound.captions[0]!)).toBe(false);
+    expect(rebound.captions[0]).toMatchObject({
+      title: 'keep title',
+      body: 'keep body',
+      anchor: { positionAsset: [-4, 5, 6] },
+    });
   });
 
   it('appends one manual binding and activates only the selected Asset transform', () => {

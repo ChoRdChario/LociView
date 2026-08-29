@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { MemoryFS } from '../../src/platform/fs';
 import { ProjectMutationCoordinator } from '../../src/platform/projectLock';
-import { activeNativeBindingV1, isNativeAssetVisibleV1 } from '../../src/nativeGs/resolver';
+import {
+  activeNativeBindingV1,
+  activeNativeRepresentationsV1,
+  isNativeAssetVisibleV1,
+  nativeCaptionNeedsReviewV1,
+} from '../../src/nativeGs/resolver';
 import {
   activateNativeManualAssetTransformV1,
   normalizeNativeSim3,
@@ -17,9 +22,17 @@ import {
   nativeProjectRoot,
   nativeRepresentationPath,
   openNativeProjectV1,
+  replaceNativeAssetV1,
   saveNativeProjectV1,
 } from '../../src/nativeGs/storage';
-import { makeNativeDraft, makeNativeMeshImport, NATIVE_TEST_IDS, testNativeId } from './nativeTestProject';
+import {
+  makeNativeDraft,
+  makeNativeGsReplacement,
+  makeNativeMeshImport,
+  makeNativeMeshReplacement,
+  NATIVE_TEST_IDS,
+  testNativeId,
+} from './nativeTestProject';
 
 class RecordingMemoryFS extends MemoryFS {
   readonly writes: string[] = [];
@@ -217,6 +230,98 @@ describe('native project blob-first/marker-last publication', () => {
       representations: first.representations,
     });
     expect(await fs.exists(nativeRepresentationPath(first.project.id, added.representationId))).toBe(false);
+    session.release();
+  });
+
+  it('replaces Mesh and GS content while preserving Asset identity, placement and reviewable Captions', async () => {
+    const fs = new RecordingMemoryFS();
+    const session = await editable(fs);
+    const base = makeNativeDraft(2);
+    const draft = {
+      ...base.draft,
+      captions: [{
+        id: NATIVE_TEST_IDS.caption,
+        title: 'Retained GS Caption',
+        body: 'body and position must not move',
+        anchor: {
+          kind: 'asset' as const,
+          assetId: NATIVE_TEST_IDS.gsAsset,
+          assetFrameId: NATIVE_TEST_IDS.gsFrame,
+          positionAsset: [1.25, -0.5, 2.75] as const,
+          authoredAssetRevisionId: NATIVE_TEST_IDS.gsRevision,
+          authoredAnchorCompatibilityId: NATIVE_TEST_IDS.gsClass,
+          hitEvidence: { method: 'manual' as const },
+        },
+      }],
+    };
+    const first = await createNativeProjectV1(session.workspace, draft, base.sources);
+    const meshBindingBefore = activeNativeBindingV1(first, NATIVE_TEST_IDS.meshAsset)!;
+    const gsBindingBefore = activeNativeBindingV1(first, NATIVE_TEST_IDS.gsAsset)!;
+    const oldRepresentationIds = first.representations.map((entry) => entry.id);
+
+    const meshReplacement = makeNativeMeshReplacement(first, NATIVE_TEST_IDS.meshAsset);
+    const afterMesh = await replaceNativeAssetV1(
+      session.workspace,
+      first,
+      meshReplacement.imported,
+      meshReplacement.sources,
+    );
+    expect(afterMesh.assets.find((asset) => asset.id === NATIVE_TEST_IDS.meshAsset)).toMatchObject({
+      id: NATIVE_TEST_IDS.meshAsset,
+      label: 'ordinary Mesh',
+      assetFrameId: NATIVE_TEST_IDS.meshFrame,
+      status: { activeBindingId: meshReplacement.imported.binding.id },
+    });
+    expect(activeNativeBindingV1(afterMesh, NATIVE_TEST_IDS.meshAsset)?.assetToProject).toEqual(meshBindingBefore.assetToProject);
+    expect(activeNativeBindingV1(afterMesh, NATIVE_TEST_IDS.gsAsset)).toEqual(gsBindingBefore);
+    expect(activeNativeRepresentationsV1(afterMesh, NATIVE_TEST_IDS.meshAsset).map((entry) => entry.id)).toEqual([
+      meshReplacement.representationId,
+    ]);
+    expect(afterMesh.representations.map((entry) => entry.id)).toEqual(expect.arrayContaining(oldRepresentationIds));
+
+    const gsReplacement = makeNativeGsReplacement(afterMesh, NATIVE_TEST_IDS.gsAsset);
+    const afterGs = await replaceNativeAssetV1(
+      session.workspace,
+      afterMesh,
+      gsReplacement.imported,
+      gsReplacement.sources,
+    );
+    expect(activeNativeBindingV1(afterGs, NATIVE_TEST_IDS.gsAsset)?.assetToProject).toEqual(gsBindingBefore.assetToProject);
+    expect(activeNativeRepresentationsV1(afterGs, NATIVE_TEST_IDS.gsAsset).map((entry) => entry.id).sort()).toEqual([
+      gsReplacement.gsRepresentationId,
+      gsReplacement.proxyRepresentationId,
+    ].sort());
+    expect(afterGs.captions).toEqual(first.captions);
+    expect(nativeCaptionNeedsReviewV1(afterGs, afterGs.captions[0]!)).toBe(true);
+    for (const representationId of [
+      ...oldRepresentationIds,
+      meshReplacement.representationId,
+      gsReplacement.gsRepresentationId,
+      gsReplacement.proxyRepresentationId,
+    ]) {
+      expect(await fs.exists(nativeRepresentationPath(afterGs.project.id, representationId))).toBe(true);
+    }
+    expect(fs.writes.at(-1)).toBe(nativeActiveMarkerPath(afterGs.project.id));
+    session.release();
+  });
+
+  it('keeps the prior active snapshot when replacement publication fails', async () => {
+    const fs = new RecordingMemoryFS();
+    const session = await editable(fs);
+    const base = makeNativeDraft();
+    const first = await createNativeProjectV1(session.workspace, base.draft, base.sources);
+    const durableBefore = (await openNativeProjectV1(fs, first.project.id)).snapshot;
+    const replacement = makeNativeMeshReplacement(first, NATIVE_TEST_IDS.meshAsset, 160);
+    fs.failBeforePath = '/snapshots/';
+
+    await expect(replaceNativeAssetV1(
+      session.workspace,
+      first,
+      replacement.imported,
+      replacement.sources,
+    )).rejects.toThrow('injected');
+    expect((await openNativeProjectV1(fs, first.project.id)).snapshot).toEqual(durableBefore);
+    expect(await fs.exists(nativeRepresentationPath(first.project.id, replacement.representationId))).toBe(false);
     session.release();
   });
 

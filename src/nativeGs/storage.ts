@@ -277,21 +277,24 @@ export async function createNativeProjectV1(
   return snapshot;
 }
 
-/**
- * Adds one Asset to an existing native project. New immutable bytes are
- * verified first; one whole-project snapshot and the active marker follow.
- */
-export async function addNativeAssetV1(
+interface NativeAssetPublicationOptions {
+  readonly nextAssets: readonly NativeAssetV1[];
+  readonly staleAction: string;
+  readonly successMessage: string;
+}
+
+async function publishNativeAssetClosureV1(
   fs: ProjectWorkspaceFS,
   current: NativeProjectSnapshotV1,
   imported: NativeAssetImportV1,
   sources: ReadonlyMap<string, NativeBinarySource>,
+  options: NativeAssetPublicationOptions,
   onStatus?: (message: string) => void,
 ): Promise<NativeProjectSnapshotV1> {
   assertProjectWorkspace(fs, current.project.id);
   const durable = await openNativeProjectV1(fs, current.project.id);
   if (durable.snapshot.generation !== current.generation || durable.snapshot.snapshotId !== current.snapshotId) {
-    throw new Error('native project: durable snapshot changed; reload before adding an Asset');
+    throw new Error(`native project: durable snapshot changed; reload before ${options.staleAction}`);
   }
   for (const representation of current.representations) {
     const source = await fs.readStream(nativeRepresentationPath(current.project.id, representation.id));
@@ -322,7 +325,7 @@ export async function addNativeAssetV1(
     ...current,
     snapshotId,
     generation: current.generation + 1,
-    assets: [...current.assets, imported.asset],
+    assets: options.nextAssets,
     assetBindingRevisions: [...current.assetBindingRevisions, imported.binding],
     assetRevisions: [...current.assetRevisions, imported.revision],
     representations: [...current.representations, ...provisionalRepresentations],
@@ -355,7 +358,7 @@ export async function addNativeAssetV1(
       ...current,
       snapshotId,
       generation: current.generation + 1,
-      assets: [...current.assets, imported.asset],
+      assets: options.nextAssets,
       assetBindingRevisions: [...current.assetBindingRevisions, imported.binding],
       assetRevisions: [...current.assetRevisions, imported.revision],
       representations: [...current.representations, ...verifiedRepresentations],
@@ -365,7 +368,7 @@ export async function addNativeAssetV1(
     const verified = await writeVerifiedSnapshot(fs, next);
     onStatus?.('Publishing active receipt…');
     await publishActiveMarker(fs, next, verified.digest);
-    onStatus?.('Asset added and native project saved.');
+    onStatus?.(options.successMessage);
     return next;
   } catch (error) {
     // If publication committed immediately before an authority error, the
@@ -389,6 +392,70 @@ export async function addNativeAssetV1(
     }
     throw error;
   }
+}
+
+/**
+ * Adds one Asset to an existing native project. New immutable bytes are
+ * verified first; one whole-project snapshot and the active marker follow.
+ */
+export async function addNativeAssetV1(
+  fs: ProjectWorkspaceFS,
+  current: NativeProjectSnapshotV1,
+  imported: NativeAssetImportV1,
+  sources: ReadonlyMap<string, NativeBinarySource>,
+  onStatus?: (message: string) => void,
+): Promise<NativeProjectSnapshotV1> {
+  return publishNativeAssetClosureV1(fs, current, imported, sources, {
+    nextAssets: [...current.assets, imported.asset],
+    staleAction: 'adding an Asset',
+    successMessage: 'Asset added and native project saved.',
+  }, onStatus);
+}
+
+function sameSim3(left: NativeAssetBindingRevisionV1['assetToProject'], right: NativeAssetBindingRevisionV1['assetToProject']): boolean {
+  return left.uniformScale === right.uniformScale &&
+    left.translation.every((value, index) => value === right.translation[index]) &&
+    left.rotationXYZW.every((value, index) => value === right.rotationXYZW[index]);
+}
+
+/**
+ * Replaces one Asset's active content without changing its identity, placement,
+ * visibility, Captions, or any retained immutable record. Surface equivalence
+ * is deliberately outside this publication boundary.
+ */
+export async function replaceNativeAssetV1(
+  fs: ProjectWorkspaceFS,
+  current: NativeProjectSnapshotV1,
+  imported: NativeAssetImportV1,
+  sources: ReadonlyMap<string, NativeBinarySource>,
+  onStatus?: (message: string) => void,
+): Promise<NativeProjectSnapshotV1> {
+  const existing = current.assets.find((asset) => asset.id === imported.asset.id);
+  if (existing === undefined) {
+    throw new Error('native project: replacement Asset or active binding is unavailable');
+  }
+  const activeBinding = current.assetBindingRevisions.find((binding) => (
+    binding.id === existing.status.activeBindingId && binding.assetId === existing.id
+  ));
+  if (activeBinding === undefined) {
+    throw new Error('native project: replacement Asset or active binding is unavailable');
+  }
+  if (
+    imported.asset.label !== existing.label || imported.asset.assetFrameId !== existing.assetFrameId ||
+    imported.asset.status.activeBindingId !== imported.binding.id ||
+    imported.binding.assetId !== existing.id || imported.binding.assetRevisionId !== imported.revision.id ||
+    imported.revision.assetId !== existing.id || imported.representations.some((entry) => entry.assetId !== existing.id)
+  ) {
+    throw new Error('native project: replacement must preserve the selected Asset identity and frame');
+  }
+  if (imported.binding.method !== activeBinding.method || !sameSim3(imported.binding.assetToProject, activeBinding.assetToProject)) {
+    throw new Error('native project: replacement must copy the exact active Asset placement');
+  }
+  return publishNativeAssetClosureV1(fs, current, imported, sources, {
+    nextAssets: current.assets.map((asset) => asset.id === existing.id ? imported.asset : asset),
+    staleAction: 'replacing an Asset',
+    successMessage: 'Asset replaced and native project saved.',
+  }, onStatus);
 }
 
 /**

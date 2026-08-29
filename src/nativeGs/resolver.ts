@@ -1,5 +1,6 @@
 import type {
   NativeAssetBindingRevisionV1,
+  NativeCaptionV1,
   NativeDisplayMode,
   NativeProjectSnapshotV1,
   NativeRepresentationV1,
@@ -49,6 +50,21 @@ export function activeNativeRepresentationsV1(
   if (binding?.assetId !== assetId || revision?.assetId !== assetId) return [];
   const ids = new Set(revision.representationIds);
   return snapshot.representations.filter((candidate) => candidate.assetId === assetId && ids.has(candidate.id));
+}
+
+/**
+ * Replacement never guesses surface equivalence. A retained Caption needs
+ * review exactly when its saved compatibility class is absent from the active
+ * revision of the same Asset.
+ */
+export function nativeCaptionNeedsReviewV1(
+  snapshot: NativeProjectSnapshotV1,
+  caption: NativeCaptionV1,
+): boolean {
+  const binding = activeNativeBindingV1(snapshot, caption.anchor.assetId);
+  const revision = snapshot.assetRevisions.find((candidate) => candidate.id === binding?.assetRevisionId);
+  return revision?.assetId !== caption.anchor.assetId ||
+    !revision.anchorCompatibilityClasses.some((entry) => entry.id === caption.anchor.authoredAnchorCompatibilityId);
 }
 
 export function allActiveNativeRepresentationsV1(snapshot: NativeProjectSnapshotV1): NativeRepresentationV1[] {
