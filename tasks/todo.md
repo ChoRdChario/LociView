@@ -2494,3 +2494,44 @@ Final verification — 2026-08-29:
   no unresolved P0/P1. The current native authoring UI still handles one Caption
   at a time; general multiple-Caption UX, DisplaySet integration, layer hierarchy,
   Compare and format-specific visibility modes remain outside this slice.
+
+## Native multi-Caption preservation — direct P1 root fix
+
+Checkpoint and bounded plan:
+
+- [x] Recompute the post-visibility critical path and select native multi-Asset
+  authoring as the next approved product boundary; do not resume Compare,
+  DisplaySet, ordinary-point profiles, migration or G0-S policy work
+- [x] Confirm the direct P1: native snapshot/package accepts multiple Captions,
+  but the current single-Caption UI replaces `captions` with a one-entry array
+  when editing and can silently discard every unrelated Caption
+- [x] Track the one UI-selected Caption by its stable Caption ID and update only
+  that exact record; append only when authoring a genuinely new Caption and fail
+  closed if the selected record disappears
+- [x] Preserve every unrelated Caption byte-for-byte through position, title and
+  body edits, snapshot save/reopen and native portable export/restore
+- [x] Add only focused two-Caption regression acceptance; do not add Caption
+  list/navigation UX, DisplaySet membership, attachments or a new domain model
+- [x] Obtain one independent read-only P0/P1 review, run focused verification,
+  commit this root fix independently and return to a clean worktree before the
+  multi-Asset authoring storage change
+
+This root fix is required because data loss in an already-valid restored native
+snapshot directly endangers the next production authoring workstream. It does
+not claim a general multiple-Caption UI or reopen completed GS/visibility work.
+
+Review and verification — 2026-08-29:
+
+- The single-Caption UI now retains one stable selected Caption ID. Position,
+  title and body changes replace only that exact record; a new ID is appended
+  only when no Caption is selected, while a duplicate, changed or missing
+  selected identity fails closed. Save failure restores the last durable
+  snapshot and revalidates the selected ID before the viewer is refreshed.
+- Focused schema and portable acceptance passed 20 tests, including two-Caption
+  edit/serialization and package restore. The full suite passed 47 files / 1,390
+  tests with 21 explicit todos (1,411 total); typecheck and production build
+  passed. One independent read-only review found no P0/P1.
+- No schema/package version, multiple-Caption navigation UX, DisplaySet,
+  attachment, renderer, storage architecture or dependency changed. No new
+  physical-device run is required for this platform-neutral data-preservation
+  correction; the later consolidated iPhone regression remains unchanged.

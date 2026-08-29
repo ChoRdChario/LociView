@@ -15,6 +15,7 @@ import {
   newNativeId,
   normalizeNativeSim3,
   setNativeAssetVisibilityV1,
+  updateSelectedNativeCaptionV1,
   type NativeAssetBindingRevisionV1,
   type NativeDisplayMode,
   type NativeProjectDraftV1,
@@ -698,6 +699,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     let working = initial;
     let saving = false;
     let dirty = false;
+    let selectedCaptionId = initial.captions[0]?.id ?? null;
     const canvas = el('canvas', { 'aria-label': 'Native Mesh and Gaussian Splatting project' });
     const accessBadge = el('span', { class: 'ng-badge' });
     const visibilityBadge = el('span', { class: 'ng-badge' });
@@ -750,6 +752,20 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       clear(diagnostics);
       for (const message of messages) diagnostics.append(el('li', {}, message));
     };
+    const selectedCaption = () => selectedCaptionId === null
+      ? undefined
+      : working.captions.find((caption) => caption.id === selectedCaptionId);
+    const commitSelectedCaption = (caption: NativeProjectSnapshotV1['captions'][number]): boolean => {
+      try {
+        working = updateSelectedNativeCaptionV1(working, selectedCaptionId, caption);
+        selectedCaptionId ??= caption.id;
+        return true;
+      } catch (error) {
+        runtimeStatus.className = 'ng-error';
+        runtimeStatus.textContent = error instanceof Error ? error.message : String(error);
+        return false;
+      }
+    };
     const canMutateWorking = (): boolean => session.accessState === 'editable' && !saving;
     const syncVisibilityControls = (): void => {
       let visibleCount = 0;
@@ -768,7 +784,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
           ? 'Edit mode · write lock held'
           : `Edit mode · ${session.accessState}`;
       const editable = canMutateWorking();
-      const caption = working.captions[0];
+      const caption = selectedCaption();
       const captionVisible = caption !== undefined && isNativeAssetVisibleV1(working, caption.anchor.assetId);
       const captionFieldsEditable = caption === undefined || captionVisible;
       save.disabled = !editable || !dirty;
@@ -856,7 +872,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         if (!canMutateWorking()) return;
         const titleValue = captionTitle.value.trim();
         const next = { ...caption, title: titleValue === '' ? 'Caption' : titleValue, body: captionBody.value };
-        working = { ...working, captions: [next] };
+        if (!commitSelectedCaption(next)) return;
         captionTitle.value = next.title;
         captionBody.value = next.body;
         markDirty();
@@ -881,8 +897,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     runtimeStatus.textContent = offlineReady
       ? 'Native resources ready. Camera、表示切替、Caption配置を確認できます。'
       : 'Spark offline準備がないためGSはactivateしていません。';
-    captionTitle.value = working.captions[0]?.title ?? 'Caption';
-    captionBody.value = working.captions[0]?.body ?? '';
+    captionTitle.value = selectedCaption()?.title ?? 'Caption';
+    captionBody.value = selectedCaption()?.body ?? '';
     populateTransform();
     viewer.selectAlignmentAsset(transformAsset.value);
     viewer.setAssetGizmoMode(assetGizmoMode);
@@ -982,16 +998,16 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     });
     captionTitle.addEventListener('input', () => {
       if (!canMutateWorking()) return;
-      const caption = working.captions[0];
+      const caption = selectedCaption();
       if (caption === undefined) return;
-      working = { ...working, captions: [{ ...caption, title: captionTitle.value.trim() || 'Caption' }] };
+      if (!commitSelectedCaption({ ...caption, title: captionTitle.value.trim() || 'Caption' })) return;
       markDirty();
     });
     captionBody.addEventListener('input', () => {
       if (!canMutateWorking()) return;
-      const caption = working.captions[0];
+      const caption = selectedCaption();
       if (caption === undefined) return;
-      working = { ...working, captions: [{ ...caption, body: captionBody.value }] };
+      if (!commitSelectedCaption({ ...caption, body: captionBody.value })) return;
       markDirty();
     });
     save.addEventListener('click', () => {
@@ -1008,6 +1024,9 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         runtimeStatus.textContent = `保存済み：snapshot generation ${saved.generation}`;
       }).catch((error: unknown) => {
         working = durable;
+        selectedCaptionId = durable.captions.some((caption) => caption.id === selectedCaptionId)
+          ? selectedCaptionId
+          : durable.captions[0]?.id ?? null;
         viewer.setSnapshot(durable);
         syncVisibilityControls();
         dirty = false;

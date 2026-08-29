@@ -691,3 +691,32 @@ export function setNativeAssetVisibilityV1(
     presentation: { ...snapshot.presentation, hiddenAssetIds: [...hiddenAssetIds].sort() },
   };
 }
+
+/**
+ * Updates only the Caption selected by the single-Caption authoring UI. A null
+ * selection means the supplied Caption is new; an existing selection must
+ * still resolve by its stable ID or the edit fails closed.
+ */
+export function updateSelectedNativeCaptionV1(
+  snapshot: NativeProjectSnapshotV1,
+  selectedCaptionId: string | null,
+  caption: NativeCaptionV1,
+): NativeProjectSnapshotV1 {
+  if (selectedCaptionId === null) {
+    if (snapshot.captions.some((candidate) => candidate.id === caption.id)) {
+      throw new Error('native snapshot: new Caption ID already exists');
+    }
+    return { ...snapshot, captions: [...snapshot.captions, caption] };
+  }
+  if (caption.id !== selectedCaptionId) {
+    throw new Error('native snapshot: selected Caption identity changed');
+  }
+  let found = false;
+  const captions = snapshot.captions.map((candidate) => {
+    if (candidate.id !== selectedCaptionId) return candidate;
+    found = true;
+    return caption;
+  });
+  if (!found) throw new Error('native snapshot: selected Caption is missing');
+  return { ...snapshot, captions };
+}

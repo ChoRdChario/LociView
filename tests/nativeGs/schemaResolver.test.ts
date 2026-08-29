@@ -15,6 +15,7 @@ import {
   setNativeAssetVisibilityV1,
   serializeNativeActiveMarkerV1,
   serializeNativeSnapshotV1,
+  updateSelectedNativeCaptionV1,
   type NativeProjectSnapshotV1,
 } from '../../src/nativeGs/schema';
 import { makeNativeDraft, NATIVE_TEST_IDS, snapshotFromDraft, testNativeId } from './nativeTestProject';
@@ -164,6 +165,57 @@ describe('native snapshot v1 and fixed degradation outcomes', () => {
       positionAsset: [1.25, -0.5, 2.75],
       hitEvidence: { method: 'manual' },
     });
+  });
+
+  it('updates only the selected Caption and fails closed if its stable ID disappears', () => {
+    const ids = NATIVE_TEST_IDS;
+    const first = {
+      id: ids.caption,
+      title: 'first',
+      body: 'before',
+      anchor: {
+        kind: 'asset' as const,
+        assetId: ids.gsAsset,
+        assetFrameId: ids.gsFrame,
+        positionAsset: [1, 2, 3] as const,
+        authoredAssetRevisionId: ids.gsRevision,
+        authoredAnchorCompatibilityId: ids.gsClass,
+        hitEvidence: { method: 'manual' as const },
+      },
+    };
+    const second = {
+      ...first,
+      id: testNativeId('cap', 2),
+      title: 'unrelated',
+      body: 'must survive exactly',
+      anchor: { ...first.anchor, positionAsset: [-4, 5, 6] as const },
+    };
+    const snapshot: NativeProjectSnapshotV1 = {
+      ...snapshotFromDraft(makeNativeDraft().draft),
+      captions: [first, second],
+    };
+    const updated = updateSelectedNativeCaptionV1(snapshot, first.id, {
+      ...first,
+      title: 'edited',
+      body: 'after',
+      anchor: { ...first.anchor, positionAsset: [7, 8, 9] },
+    });
+
+    expect(updated.captions).toHaveLength(2);
+    expect(updated.captions[0]).toMatchObject({
+      id: first.id,
+      title: 'edited',
+      body: 'after',
+      anchor: { positionAsset: [7, 8, 9] },
+    });
+    expect(updated.captions[1]).toBe(second);
+    expect(parseNativeSnapshotV1(serializeNativeSnapshotV1(updated)).captions[1]).toEqual(second);
+    expect(() => updateSelectedNativeCaptionV1(snapshot, testNativeId('cap', 3), first)).toThrow(/selected Caption identity changed/);
+    expect(() => updateSelectedNativeCaptionV1(
+      { ...snapshot, captions: [second] },
+      first.id,
+      first,
+    )).toThrow(/selected Caption is missing/);
   });
 
   it('appends one manual binding and activates only the selected Asset transform', () => {

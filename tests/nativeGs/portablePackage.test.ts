@@ -165,6 +165,19 @@ async function makeSourceProject(): Promise<{
         authoredAnchorCompatibilityId: NATIVE_TEST_IDS.gsClass,
         hitEvidence: { method: 'manual' },
       },
+    }, {
+      id: testNativeId('cap', 93),
+      title: 'Unrelated Caption',
+      body: 'must survive portable restore',
+      anchor: {
+        kind: 'asset',
+        assetId: NATIVE_TEST_IDS.meshAsset,
+        assetFrameId: NATIVE_TEST_IDS.meshFrame,
+        positionAsset: [-2, 0.25, 4],
+        authoredAssetRevisionId: NATIVE_TEST_IDS.meshRevision,
+        authoredAnchorCompatibilityId: NATIVE_TEST_IDS.meshClass,
+        hitEvidence: { method: 'manual' },
+      },
     }],
   };
   const sources = new Map(base.sources);
@@ -230,6 +243,11 @@ describe('native portable .lociview streamed backup/restore', () => {
     expect(inspection.snapshot.captions[0]).toMatchObject({
       body: 'portable body',
       anchor: { assetId: NATIVE_TEST_IDS.gsAsset, positionAsset: [1.25, -0.5, 2.75] },
+    });
+    expect(inspection.snapshot.captions[1]).toMatchObject({
+      title: 'Unrelated Caption',
+      body: 'must survive portable restore',
+      anchor: { assetId: NATIVE_TEST_IDS.meshAsset, positionAsset: [-2, 0.25, 4] },
     });
     expect(inspection.snapshot.presentation.hiddenAssetIds).toEqual([NATIVE_TEST_IDS.meshAsset]);
     const target = new ChunkedMemoryFS();
