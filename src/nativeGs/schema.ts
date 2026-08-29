@@ -825,3 +825,19 @@ export function updateSelectedNativeCaptionV1(
   if (!found) throw new Error('native snapshot: selected Caption is missing');
   return { ...snapshot, captions };
 }
+
+/** Removes only the Caption selected by stable ID from the mutable snapshot. */
+export function removeSelectedNativeCaptionV1(
+  snapshot: NativeProjectSnapshotV1,
+  selectedCaptionId: string,
+): NativeProjectSnapshotV1 {
+  const index = snapshot.captions.findIndex((caption) => caption.id === selectedCaptionId);
+  if (index < 0) throw new Error('native snapshot: selected Caption is missing');
+  return {
+    ...snapshot,
+    captions: [
+      ...snapshot.captions.slice(0, index),
+      ...snapshot.captions.slice(index + 1),
+    ],
+  };
+}

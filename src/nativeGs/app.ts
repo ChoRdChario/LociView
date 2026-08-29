@@ -15,6 +15,7 @@ import {
   nativeModelProfileId,
   newNativeId,
   normalizeNativeSim3,
+  removeSelectedNativeCaptionV1,
   setNativeAssetVisibilityV1,
   updateSelectedNativeCaptionV1,
   type NativeAssetBindingRevisionV1,
@@ -804,6 +805,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     let selectedCaptionId = initial.captions[0]?.id ?? null;
     let captionMoveActive = false;
     let creatingCaption = false;
+    let captionDeleteConfirmationInFlight = false;
     let selectedSavedViewId = initial.savedViews?.[0]?.id ?? null;
     const canvas = el('canvas', { 'aria-label': '3DモデルとGaussian Splattingのプロジェクト' });
     const accessBadge = el('span', { class: 'ng-badge' });
@@ -855,6 +857,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const captionReview = el('p', { class: 'ng-note' });
     const moveCaption = el('button', { 'aria-pressed': 'false' }, 'ピンを移動');
     const repositionCaption = el('button', {}, '表面へ置き直す');
+    const deleteCaption = el('button', { class: 'danger' }, '削除');
     const captionSection = el('section', { class: 'ng-card ng-caption-card' });
     const savedViewSelect = el('select', { 'aria-label': '保存済みビュー' });
     const savedViewName = el('input', { type: 'text', maxlength: '160', value: '' });
@@ -1031,6 +1034,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       replaceProxy.disabled = !editable || replaceKind.value !== 'gs';
       replaceButton.disabled = !editable;
       repositionCaption.disabled = !editable || caption === undefined || !captionVisible;
+      deleteCaption.disabled = !editable || caption === undefined || captionDeleteConfirmationInFlight;
       captureSavedView.disabled = !editable;
       overwriteSavedView.disabled = !editable || selectedSavedView() === undefined;
       deleteSavedView.disabled = !editable || selectedSavedView() === undefined;
@@ -1083,7 +1087,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       el('label', { class: 'ng-field' }, el('span', {}, 'タイトル'), captionTitle),
       el('label', { class: 'ng-field' }, el('span', {}, '本文'), captionBody),
       captionReview,
-      el('div', { class: 'ng-row' }, moveCaption, repositionCaption),
+      el('div', { class: 'ng-row' }, moveCaption, repositionCaption, deleteCaption),
     );
 
     savedViewSection.append(
@@ -1588,6 +1592,44 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       updateAccess();
       runtimeStatus.className = 'ng-status';
       runtimeStatus.textContent = `「${owner.label}」の表面で、PCはShift＋クリック、iPhoneは長押しして新しい位置を指定してください。`;
+    });
+    deleteCaption.addEventListener('click', () => {
+      if (activeViewer !== viewer || !canMutateWorking() || captionDeleteConfirmationInFlight) return;
+      const caption = selectedCaption();
+      if (caption === undefined) return;
+      const captionId = caption.id;
+      const captionLabel = caption.title || '（無題）';
+      const captionIndex = working.captions.findIndex((candidate) => candidate.id === captionId);
+      captionDeleteConfirmationInFlight = true;
+      updateAccess();
+      void confirmDialog(
+        'キャプションの削除',
+        `「${captionLabel}」をこのプロジェクトから削除しますか？ プロジェクトを保存するまでは確定しません。`,
+      ).then((confirmed) => {
+        if (
+          !confirmed || activeViewer !== viewer || !canMutateWorking() ||
+          selectedCaptionId !== captionId || selectedCaption()?.id !== captionId
+        ) return;
+        working = removeSelectedNativeCaptionV1(working, captionId);
+        creatingCaption = false;
+        captionMoveActive = false;
+        viewer.stopCaptionPositionEditing();
+        const nextCaptionIndex = Math.min(captionIndex, working.captions.length - 1);
+        selectedCaptionId = nextCaptionIndex < 0 ? null : working.captions[nextCaptionIndex]!.id;
+        viewer.setSnapshot(working);
+        viewer.selectCaption(selectedCaptionId);
+        rebuildCaptionList();
+        populateCaptionFields();
+        markDirty();
+        runtimeStatus.className = 'ng-status';
+        runtimeStatus.textContent = `「${captionLabel}」を保存対象から削除しました。プロジェクトを保存すると確定します。`;
+      }).catch((error: unknown) => {
+        runtimeStatus.className = 'ng-error';
+        runtimeStatus.textContent = `キャプションを削除できませんでした：${error instanceof Error ? error.message : String(error)}`;
+      }).finally(() => {
+        captionDeleteConfirmationInFlight = false;
+        updateAccess();
+      });
     });
     unload.addEventListener('click', () => {
       viewer.disposeGs();

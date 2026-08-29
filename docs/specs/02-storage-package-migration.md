@@ -1670,3 +1670,32 @@ Product Owner decision.
   merge, overwrite, migration, default-format change, package format, schema,
   storage architecture or UI framework. Physical-iPhone regression remains part
   of the Product Owner-approved consolidated run and is not credited here.
+
+## 24. Bounded native Caption deletion (approved LociMyu interaction; 2026-08-30 implementation slice)
+
+The ordinary native Caption task MUST let an Edit-mode user remove an unwanted
+saved Caption. This is a bounded edit of the existing whole-Project mutable
+snapshot; it is not a separate Asset operation, revision system or transaction.
+
+- Deletion acts only on the explicitly selected stable Caption ID and requires
+  an ordinary-language confirmation. Cancelling, losing the project write lock,
+  or changing selection while confirmation is open leaves the Project unchanged.
+  View mode cannot start or complete deletion.
+- Confirmed deletion removes only that Caption record from the mutable snapshot.
+  The viewer marker, Caption-position gizmo and pending Caption placement state
+  are cleared for the removed record. A remaining Caption may be selected for
+  continuity, but selection is UI-only.
+- Other Captions, Assets, immutable revision/binding/Representation records,
+  transforms, visibility, SavedViews, presentation state and source bytes remain
+  exact. No owner Asset or binary is deleted as a side effect.
+- The removal remains an unsaved Project change until the existing explicit
+  whole-Project save succeeds. Save failure restores the last durable snapshot,
+  including the removed Caption. Save/reopen and portable export/delete/restore
+  preserve the absence only after successful Project save.
+- Native snapshot version `1` and portable package version `1` already permit an
+  empty or shorter `captions` array and remain unchanged. This slice adds no
+  tombstone, undo/history framework, journal, transaction, blob collection,
+  schema/package field, renderer path or migration behavior.
+- Desktop executable verification is required for this slice. Touch/layout and
+  physical-iPhone deletion regression remain in the Product Owner-approved
+  consolidated physical run and are not credited as PASS here.

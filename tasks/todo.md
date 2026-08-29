@@ -3103,3 +3103,58 @@ Review — 2026-08-30:
 - No browser-control workaround or new automation dependency was added. The
   ordinary-entry visual regression and physical-iPhone regression remain for the
   Product Owner-approved consolidated run and are not claimed PASS here.
+
+## Native Caption deletion — bounded production slice
+
+Checkpoint and plan — 2026-08-30:
+
+- [x] Reuse the existing mutable whole-Project snapshot, explicit save and
+  durable rollback; add no tombstone, history, journal or transaction
+- [x] Add one confirmation-gated Edit-mode action that removes only the selected
+  stable Caption ID and cannot complete after lock loss or selection change
+- [x] Clear the removed Caption marker/gizmo and pending placement state, then
+  select one remaining Caption deterministically without making selection durable
+- [x] Preserve every unrelated Caption, Asset, revision, Representation,
+  transform, visibility, SavedView, presentation field and source byte
+- [x] Keep the deletion dirty until explicit Project save; prove save failure can
+  continue to restore the complete last durable snapshot
+- [x] Reuse snapshot/package v1 and existing save/reopen/portable paths without a
+  new schema field, package entry or package version
+- [x] Add one focused pure-state regression only, obtain one independent read-only
+  P0/P1 review and run final-tree verification once
+- [x] Defer touch/layout and physical-iPhone deletion regression to the approved
+  consolidated run and record it as unexecuted, not PASS
+- [x] Commit this bounded slice independently and leave the worktree clean
+
+Exclusions and stop conditions:
+
+- Asset deletion, cascade behavior, undo/history UI, trash, blob GC, Caption
+  search/order/filter, media, DisplaySet/material linkage, schema/package changes,
+  migration, responsive redesign and final visual polish remain outside.
+- Stop rather than widening if safe deletion requires an Asset/source-byte
+  mutation, a second publication unit or a new durable lifecycle state.
+
+Review — 2026-08-30:
+
+- Added one confirmation-gated `削除` action for the explicitly selected native
+  Caption. Confirmation completion rechecks the active screen, held Edit-mode
+  write access and exact stable selection; cancel, lock loss, screen replacement
+  or selection change therefore leaves the mutable Project unchanged.
+- Confirmed deletion filters only the selected Caption from the existing mutable
+  snapshot, clears its position gizmo/pending placement state and selects the
+  next surviving Caption by list position. It becomes durable only through the
+  existing whole-Project save. The existing save-failure path still restores the
+  complete prior durable snapshot, including a just-removed Caption.
+- One pure regression proves selected-only removal, zero-Caption validity,
+  serialization round-trip, missing-ID fail-closed behavior and exact retention
+  of unrelated Asset/revision/Representation/presentation/SavedView records. No
+  schema field, package entry/version, tombstone, history or source-byte action
+  was added. One independent read-only review found no actionable P0/P1.
+- Final staged-tree `npm run typecheck`, `npm test` (50 files; 1,404 passed; 21
+  todo), `npm run build`, the `/LociView/` BASE_PATH build and `git diff --check`
+  passed. The PWA precache remains 15 entries; Spark remains the separate
+  runtime-cached `native-gs-spark-2.1.0.js` and no representative PLY is bundled.
+- The approved Browser-control connection was unavailable at its initialization
+  boundary, so no workaround or alternate automation framework was introduced.
+  Desktop visual deletion smoke and physical-iPhone touch/layout regression are
+  unexecuted for the approved consolidated run and are not claimed PASS here.

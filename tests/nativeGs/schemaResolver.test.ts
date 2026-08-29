@@ -13,6 +13,7 @@ import {
   normalizeNativeSim3,
   parseNativeActiveMarkerV1,
   parseNativeSnapshotV1,
+  removeSelectedNativeCaptionV1,
   setNativeAssetVisibilityV1,
   serializeNativeActiveMarkerV1,
   serializeNativeSnapshotV1,
@@ -294,6 +295,21 @@ describe('native snapshot v1 and fixed degradation outcomes', () => {
       first.id,
       first,
     )).toThrow(/selected Caption is missing/);
+
+    const removed = removeSelectedNativeCaptionV1(snapshot, first.id);
+    expect(removed.captions).toEqual([second]);
+    expect(removed.captions[0]).toBe(second);
+    expect(removed.assets).toBe(snapshot.assets);
+    expect(removed.assetBindingRevisions).toBe(snapshot.assetBindingRevisions);
+    expect(removed.assetRevisions).toBe(snapshot.assetRevisions);
+    expect(removed.representations).toBe(snapshot.representations);
+    expect(removed.presentation).toBe(snapshot.presentation);
+    expect(removed.savedViews).toBe(snapshot.savedViews);
+    expect(parseNativeSnapshotV1(serializeNativeSnapshotV1(removed)).captions).toEqual([second]);
+    const emptied = removeSelectedNativeCaptionV1({ ...snapshot, captions: [first] }, first.id);
+    expect(emptied.captions).toEqual([]);
+    expect(parseNativeSnapshotV1(serializeNativeSnapshotV1(emptied)).captions).toEqual([]);
+    expect(() => removeSelectedNativeCaptionV1(removed, first.id)).toThrow(/selected Caption is missing/);
   });
 
   it('derives replacement review status and clears it only with an explicit active-class anchor', () => {
