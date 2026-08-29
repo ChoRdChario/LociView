@@ -737,9 +737,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const visibilityList = el('div', { class: 'ng-list' });
     const visibilityInputs = new Map<string, HTMLInputElement>();
     const target = el('select');
-    const arm = el('button', { class: 'primary' }, '1. Caption初期配置');
-    const editCaption = el('button', {}, 'Caption位置を調整');
-    const save = el('button', { class: 'primary' }, '2. Snapshot保存');
+    const save = el('button', { class: 'primary' }, 'プロジェクトを保存');
     const unload = el('button', {}, 'GSを解放');
     const close = el('button', {}, '閉じる');
     const addKind = el('select');
@@ -747,7 +745,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const addSourceLabel = el('span', {}, '通常Mesh file');
     const addSource = el('input', { type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply' });
     const addProxy = el('input', { type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply', disabled: 'true' });
-    const addAsset = el('button', { class: 'primary' }, 'Assetを追加してSnapshot保存');
+    const addAsset = el('button', { class: 'primary' }, 'モデルを追加して保存');
     const transformAsset = el('select');
     const translationInputs = [0, 1, 2].map(() => el('input', { type: 'number', step: '0.01' }));
     const rotationInputs = [0, 1, 2].map(() => el('input', { type: 'number', step: '1' }));
@@ -760,9 +758,9 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       ['scale', el('button', { 'aria-pressed': 'false' }, 'Uniform scale')],
     ]);
     const captionSelect = el('select', { 'aria-label': 'Caption' });
-    const newCaption = el('button', {}, '新しいCaption');
     const captionTitle = el('input', { type: 'text', maxlength: '160' });
     const captionBody = el('textarea');
+    const captionSection = el('section', { class: 'ng-card ng-caption-card' });
 
     const rolesByAsset = new Map(working.assets.map((asset) => [
       asset.id,
@@ -846,13 +844,10 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       const captionFieldsEditable = caption === undefined || captionVisible;
       save.disabled = !editable || !dirty;
       applyTransformButton.disabled = !editable;
-      arm.disabled = !editable;
-      editCaption.disabled = !editable || !captionVisible;
       for (const button of assetGizmoButtons.values()) button.disabled = !editable;
       captionTitle.disabled = !editable || !captionFieldsEditable;
       captionBody.disabled = !editable || !captionFieldsEditable;
       captionSelect.disabled = saving || working.captions.length === 0;
-      newCaption.disabled = !editable;
       display.disabled = !editable;
       for (const checkbox of visibilityInputs.values()) checkbox.disabled = !editable;
       target.disabled = !editable;
@@ -866,7 +861,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const markDirty = (): void => {
       dirty = true;
       updateAccess();
-      runtimeStatus.textContent = '未保存のNative snapshot変更があります。';
+      runtimeStatus.textContent = '未保存の変更があります。';
     };
     const bindingFor = (assetId: string): NativeAssetBindingRevisionV1 | null => {
       const asset = working.assets.find((entry) => entry.id === assetId);
@@ -891,68 +886,89 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       return true;
     };
 
+    captionSection.append(
+      el('h2', {}, 'Caption'),
+      el('p', { class: 'ng-note' }, '追加先を選び、PCはモデル上でShift＋クリック、iPhoneは長押しします。既存のマーカーはクリック／タップで選択できます。'),
+      el('div', { class: 'ng-grid' },
+        el('label', { class: 'ng-field' }, el('span', {}, '追加先モデル'), target),
+        el('label', { class: 'ng-field' }, el('span', {}, 'キャプション'), captionSelect),
+      ),
+      el('div', { class: 'ng-row' }, save),
+      el('label', { class: 'ng-field' }, el('span', {}, 'タイトル'), captionTitle),
+      el('label', { class: 'ng-field' }, el('span', {}, '本文'), captionBody),
+      el('p', { class: 'ng-note' }, '配置後は黄色いマーカーのギズモで位置を調整できます。'),
+    );
+
     root.append(el('main', { class: 'ng-view' },
       el('section', { class: 'ng-stage' }, canvas, el('div', { class: 'ng-stage-badges' }, accessBadge, visibilityBadge)),
       el('aside', { class: 'ng-panel' },
-        el('div', {}, el('h1', {}, working.project.title), el('p', { class: 'ng-note' }, `Native snapshot v1 · generation ${working.generation}`)),
-        el('section', { class: 'ng-card' },
-          el('h2', {}, 'Display and Caption target'),
-          el('div', { class: 'ng-grid' },
-            el('label', { class: 'ng-field' }, el('span', {}, '一括表示プリセット'), display),
-            el('label', { class: 'ng-field' }, el('span', {}, 'Caption対象Asset'), target),
-          ),
+        el('div', {}, el('h1', {}, working.project.title)),
+        captionSection,
+        el('details', { class: 'ng-card' },
+          el('summary', {}, 'モデルの表示設定'),
+          el('label', { class: 'ng-field' }, el('span', {}, '一括表示'), display),
           el('span', { class: 'ng-note' }, 'Assetごとの表示／非表示'),
           visibilityList,
-          el('p', { class: 'ng-note' }, '各Assetは形式に関係なく独立して表示します。Meshは自身、GSは同じGS Asset内の明示Proxyだけへraycastします。'),
+          el('p', { class: 'ng-note' }, '読み込んだ各モデルは、形式に関係なく個別に表示／非表示を切り替えられます。'),
         ),
-        el('section', { class: 'ng-card' },
-          el('h2', {}, 'Two-stage Caption placement'),
-          el('div', { class: 'ng-grid' },
-            el('label', { class: 'ng-field' }, el('span', {}, '選択中のCaption'), captionSelect),
-            el('div', { class: 'ng-field' }, el('span', {}, '新規作成'), newCaption),
-          ),
-          el('div', { class: 'ng-row' }, arm, editCaption, save, unload),
-          el('label', { class: 'ng-field' }, el('span', {}, 'Caption title'), captionTitle),
-          el('label', { class: 'ng-field' }, el('span', {}, 'Caption body'), captionBody),
-          el('p', { class: 'ng-note' }, 'Proxy/Mesh hit後にギズモで調整し、最終positionAssetだけを保存します。'),
-        ),
-        el('section', { class: 'ng-card' },
-          el('h2', {}, 'Assetを追加'),
+        el('details', { class: 'ng-card' },
+          el('summary', {}, 'モデルを追加'),
           el('div', { class: 'ng-grid' },
             el('label', { class: 'ng-field' }, el('span', {}, '描画形式'), addKind),
             el('label', { class: 'ng-field' }, addSourceLabel, addSource),
           ),
-          el('label', { class: 'ng-field' }, el('span', {}, 'GS専用Interaction Proxy（GSのみ・任意）'), addProxy),
+          el('label', { class: 'ng-field' }, el('span', {}, 'GS配置用の補助モデル（任意）'), addProxy),
           addAsset,
-          el('p', { class: 'ng-note' }, '一回に一つのAssetを追加します。自動registrationは行わず、Project原点から既存gizmoで配置します。'),
+          el('p', { class: 'ng-note' }, '一回に一つのモデルを追加します。追加後に位置を調整できます。'),
         ),
-        el('section', { class: 'ng-card' },
-          el('h2', {}, 'Asset placement adjustment'),
-          el('label', { class: 'ng-field' }, el('span', {}, '現在選択中のAsset（Proxyは選択対象外）'), transformAsset),
-          el('span', { class: 'ng-note' }, 'Asset gizmo'),
+        el('details', { class: 'ng-card' },
+          el('summary', {}, 'モデルの位置を調整'),
+          el('label', { class: 'ng-field' }, el('span', {}, '調整するモデル'), transformAsset),
+          el('span', { class: 'ng-note' }, 'ギズモ操作'),
           el('div', { class: 'ng-row ng-gizmo-modes' }, ...assetGizmoButtons.values()),
-          el('span', { class: 'ng-note' }, 'Translation X/Y/Z'), el('div', { class: 'ng-three' }, ...translationInputs),
-          el('span', { class: 'ng-note' }, 'Rotation X/Y/Z (degrees)'), el('div', { class: 'ng-three' }, ...rotationInputs),
-          el('label', { class: 'ng-field' }, el('span', {}, 'Uniform scale'), scaleInput),
+          el('span', { class: 'ng-note' }, '位置 X/Y/Z'), el('div', { class: 'ng-three' }, ...translationInputs),
+          el('span', { class: 'ng-note' }, '回転 X/Y/Z（度）'), el('div', { class: 'ng-three' }, ...rotationInputs),
+          el('label', { class: 'ng-field' }, el('span', {}, '均一スケール'), scaleInput),
           applyTransformButton,
-          el('p', { class: 'ng-note' }, '元bytesは変更せず、Asset placementとして保存します。'),
+          el('p', { class: 'ng-note' }, '元のモデルファイルは変更しません。'),
+        ),
+        el('details', { class: 'ng-card' },
+          el('summary', {}, '詳細'),
+          unload,
+          diagnostics,
+          el('div', { class: 'ng-row' }, close, el('button', { onclick: () => location.reload() }, '再読み込み')),
         ),
         runtimeStatus,
-        diagnostics,
-        el('div', { class: 'ng-row' }, close, el('button', { onclick: () => location.reload() }, 'page reload')),
       ),
     ));
 
     const offlineReady = import.meta.env.DEV || await isNativeGsOfflineReady(await pwaRegistration);
     const viewer = new NativeGsViewer(canvas, working, {
+      onCaptionCreationStarted() {
+        if (!canMutateWorking()) return false;
+        selectedCaptionId = null;
+        rebuildCaptionOptions();
+        populateCaptionFields();
+        updateAccess();
+        return true;
+      },
       onCaptionChanged(caption) {
         if (!canMutateWorking()) return false;
+        const wasNew = selectedCaptionId === null;
         const titleValue = captionTitle.value.trim();
         const next = { ...caption, title: titleValue === '' ? 'Caption' : titleValue, body: captionBody.value };
         if (!commitSelectedCaption(next)) return false;
         captionTitle.value = next.title;
         captionBody.value = next.body;
         markDirty();
+        if (wasNew) {
+          queueMicrotask(() => {
+            captionSection.scrollIntoView({ block: 'nearest' });
+            captionTitle.focus();
+            captionTitle.select();
+            runtimeStatus.textContent = 'キャプションを追加しました。タイトルと本文を編集し、プロジェクトを保存してください。';
+          });
+        }
         return true;
       },
       onCaptionSelected(captionId) {
@@ -961,7 +977,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         rebuildCaptionOptions();
         populateCaptionFields();
         updateAccess();
-        runtimeStatus.textContent = `Captionを選択しました：${selectedCaption()?.title ?? 'Caption'}`;
+        runtimeStatus.textContent = `キャプションを選択しました：${selectedCaption()?.title ?? 'Caption'}`;
       },
       onAssetTransformCommitted(assetId, transform) {
         if (session.accessState !== 'editable' || !commitWorkingAssetTransform(assetId, transform)) return;
@@ -981,13 +997,12 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     );
     syncVisibilityControls();
     runtimeStatus.textContent = offlineReady
-      ? 'Native resources ready. Camera、表示切替、Caption配置を確認できます。'
+      ? 'モデルを読み込みました。表示切替とキャプション編集を利用できます。'
       : 'Spark offline準備がないためGSはactivateしていません。';
     rebuildCaptionOptions();
     populateCaptionFields();
     viewer.selectCaption(selectedCaptionId);
     populateTransform();
-    viewer.selectAlignmentAsset(transformAsset.value);
     viewer.setAssetGizmoMode(assetGizmoMode);
     updateAccess();
 
@@ -1108,27 +1123,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       populateCaptionFields();
       updateAccess();
       runtimeStatus.textContent = selectedCaptionId === null
-        ? '新しいCaptionの配置先Assetを選び、初期配置を開始してください。'
-        : `Captionを選択しました：${selectedCaption()?.title ?? 'Caption'}`;
-    });
-    newCaption.addEventListener('click', () => {
-      if (!canMutateWorking()) return;
-      selectedCaptionId = null;
-      viewer.selectCaption(null);
-      rebuildCaptionOptions();
-      populateCaptionFields();
-      updateAccess();
-      runtimeStatus.textContent = '新しいCaptionです。対象Assetを確認して初期配置を開始してください。';
-    });
-    arm.addEventListener('click', () => {
-      runtimeStatus.textContent = viewer.armPlacement()
-        ? '配置待機中：canvas上の選択対象をclick/tapしてください。'
-        : '選択対象ではCaption配置を開始できません。';
-    });
-    editCaption.addEventListener('click', () => {
-      runtimeStatus.textContent = viewer.editCaptionPosition()
-        ? 'Caption位置gizmoを表示しました。'
-        : '調整できるCaptionがありません。';
+        ? '追加先モデルを選び、画面上でキャプションを追加してください。'
+        : `キャプションを選択しました：${selectedCaption()?.title ?? 'Caption'}`;
     });
     unload.addEventListener('click', () => {
       viewer.disposeGs();
@@ -1179,6 +1175,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       const caption = selectedCaption();
       if (caption === undefined) return;
       if (!commitSelectedCaption({ ...caption, title: captionTitle.value.trim() || 'Caption' })) return;
+      viewer.setSnapshot(working);
+      viewer.selectCaption(selectedCaptionId);
       markDirty();
     });
     captionBody.addEventListener('input', () => {
@@ -1186,13 +1184,15 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       const caption = selectedCaption();
       if (caption === undefined) return;
       if (!commitSelectedCaption({ ...caption, body: captionBody.value })) return;
+      viewer.setSnapshot(working);
+      viewer.selectCaption(selectedCaptionId);
       markDirty();
     });
     save.addEventListener('click', () => {
       if (saving || session.accessState !== 'editable') return;
       saving = true;
       updateAccess();
-      runtimeStatus.textContent = 'Native snapshotを保存しています…';
+      runtimeStatus.textContent = 'プロジェクトを保存しています…';
       void saveNativeProjectV1(session.workspace, working).then((saved) => {
         durable = saved;
         working = saved;
@@ -1201,7 +1201,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         viewer.selectCaption(selectedCaptionId);
         syncVisibilityControls();
         rebuildCaptionOptions();
-        runtimeStatus.textContent = `保存済み：snapshot generation ${saved.generation}`;
+        runtimeStatus.textContent = 'プロジェクトを保存しました。';
       }).catch((error: unknown) => {
         working = durable;
         selectedCaptionId = durable.captions.some((caption) => caption.id === selectedCaptionId)
@@ -1213,7 +1213,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         rebuildCaptionOptions();
         populateCaptionFields();
         dirty = false;
-        runtimeStatus.textContent = `保存失敗：${error instanceof Error ? error.message : String(error)}。最後のdurable snapshotを再表示しました。`;
+        runtimeStatus.textContent = `保存できませんでした：${error instanceof Error ? error.message : String(error)}。最後に保存された状態へ戻しました。`;
       }).finally(() => {
         saving = false;
         updateAccess();

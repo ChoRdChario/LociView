@@ -1,8 +1,8 @@
 # LociView critical-path execution plan
 
-> Status: `CURRENT CHECKPOINT / BOUNDED NATIVE GS, BACKUP AND TWO-ASSET ALIGNMENT COMPLETE`
+> Status: `CURRENT CHECKPOINT / NATIVE CAPTION WORKFLOW IMPLEMENTED; CONSOLIDATED UI ACCEPTANCE PENDING`
 >
-> Updated: 2026-08-29 at `9931cf0` on `g0-baseline`.
+> Updated: 2026-08-30 after `4159103` on `g0-baseline`.
 >
 > This is an execution plan plus the Product Owner's scheduling and display-model
 > decisions. G0 and G0-S remain release barriers. `G0S-TAB`, the first production
@@ -302,16 +302,18 @@ G0/G0-S release barriers, disposable PoCs and one writer.
 | `WS2` G0 device evidence/ratification | `E6`–`E10`; three device classes, complete raw runs, reviewed artifacts and all seven G0 exit rows approved | `WS1`, physical devices, PO numeric decisions | PO/device operator / Codex / reviewer | WS1 | Environment facts only now; full runs `WAIT` |
 | `WS3` G0-S current-user safety | Ledger plus remaining `S2`–`S4`; real-browser/iOS evidence, exact-tree matrix, no unresolved P0/P1 and PO stabilized-v1 approval | Remaining journal/quarantine decisions and physical evidence | Codex / PO / reviewer | S0/S1 complete; final closure also WS2 | `YES` only for an approved release-blocking root or a P0/P1 that directly blocks the next production slice; do not resume micro-slice exploration |
 | `WS4` G1 technology decisions | G1-A, G1-B base renderer and G1-C each record reproducible `ADOPT`, `REJECT` or `RETRY` with rollback/fallback; later renderer features retain separate acceptance before their controls turn on | Applicable evidence and Product Owner adoption decisions | Codex / PO / device operator | Parallel evidence lanes; still required for adoption/release | `NO` for an adoption claim; the bounded proxy-backed technical implementation alone may start after S1 |
-| `WS5` multiple-Asset layer closure, then v2 MVP/release | Generalize the completed bounded native path so multiple formats and multiple Assets share one ProjectFrame while each Asset is independently placeable, selectable, visible/hidden, editable and durable. Reuse existing Asset/Representation records; Representation kind is not the visibility group. A diagnostic Compare workflow is optional and excluded unless separately approved. | Opened-project Asset addition is complete; the active bounded gap is multi-Caption authoring/navigation. Technology adoption and all release barriers still apply to support/release | Codex / PO / external reviewer | Builds on completed native GS/backup/alignment/visibility/Asset-addition checkpoints; release after WS1–WS4 | `IN PROGRESS` as bounded native multi-Caption authoring; no G0/G1/release credit |
+| `WS5` multiple-Asset layer closure, then v2 MVP/release | Generalize the completed bounded native path so multiple formats and multiple Assets share one ProjectFrame while each Asset is independently placeable, selectable, visible/hidden, editable and durable. Reuse existing Asset/Representation records; Representation kind is not the visibility group. A diagnostic Compare workflow is optional and excluded unless separately approved. | The production data/render/storage boundary, multi-Caption authoring and ordinaryized Caption control flow are implemented. Exact-tree Desktop gesture/layout and physical-iPhone long-press evidence are intentionally batched; technology adoption and all release barriers still apply to support/release | Codex / PO / external reviewer | Builds on completed native GS/backup/alignment/visibility/Asset-addition/multi-Caption checkpoints; release after WS1–WS4 | `IMPLEMENTED / ACCEPTANCE PENDING` for the native Caption workflow; continue only independent bounded work, no G0/G1/release credit |
 
 ## 8. Current authorization boundary
 
 The completed native checkpoints remain closed unless a new P0/P1 directly
-blocks downstream production work. Opened-project Asset addition is complete.
-The active bounded slice closes native multi-Caption creation, selection and
-editing by reusing existing `captions[]`, per-Asset visibility, snapshot v1 and
-portable package v1 records. It does not add DisplaySet behavior, attachments,
-ordinary-point support, a Compare mode, new renderer framework or new
-persistence architecture. Remaining G0/G0-S and external evidence continue as
+blocks downstream production work. Multi-Caption data, rendering, durable
+round-trip and the LociMyu-style select/add -> place -> edit wiring are
+implemented inside the still-isolated native route. Exact-tree Desktop gesture
+and physical-iPhone long-press evidence remain explicitly accumulated for one
+consolidated run, not inferred as PASS. This checkpoint changes no
+snapshot/package schema, renderer, storage architecture or v1 route. DisplaySet,
+attachments, ordinary points, migration, Compare and final visual polish remain
+outside it. Remaining G0/G0-S and external evidence continue as
 parallel release-barrier lanes. No external acquisition, device run, Release
 action, upload, publication, adoption, push or deployment is implied.

@@ -4,6 +4,10 @@
 .ng-head h1 { margin: 0; font-size: 22px; }
 .ng-card { border: 1px solid #29364a; background: #111927; border-radius: 12px; padding: 14px; display: grid; gap: 10px; }
 .ng-card h2 { margin: 0; font-size: 15px; color: #bfdbfe; }
+details.ng-card:not([open]) { display: block; }
+details.ng-card > summary { cursor: pointer; color: #bfdbfe; font-size: 15px; font-weight: 700; }
+details.ng-card[open] > summary { margin-bottom: 2px; }
+.ng-caption-card textarea { min-height: 92px; resize: vertical; }
 .ng-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .ng-field { display: grid; gap: 5px; min-width: 0; }
 .ng-field > span { color: #a9b6c8; font-size: 12px; }

@@ -2682,3 +2682,75 @@ Manual acceptance — 2026-08-30:
   risk acceptance, not an iPhone PASS or new G0/G1/release evidence.
 - The local production preview is temporary and will be stopped after this
   checkpoint. No Project, model, package or source bytes were published.
+
+## Native Caption authoring workflow — bounded production slice
+
+Checkpoint and plan — 2026-08-30:
+
+- [x] Keep the nondefault native route and its existing snapshot/package,
+  renderer, lock and storage boundaries; do not merge it into the ordinary v1
+  `ProjectStore` or introduce another persistence model
+- [x] Reuse the approved LociMyu interaction: on Desktop Shift+click starts a
+  new Caption on the explicitly selected visible Asset, while clicking a marker
+  or flat-list entry selects an existing Caption for editing
+- [x] Preserve the current exact interaction routing: a Mesh targets itself and
+  a GS targets only its explicitly bound Proxy; a hidden Asset or Proxy-less GS
+  cannot receive a surface placement
+- [x] Turn creation into one guided flow—choose target, place, then immediately
+  edit title/body/position—without requiring the user to assemble internal
+  Asset/Proxy/snapshot steps
+- [x] Remove numbered technical-action wording and internal resource language
+  from the ordinary Caption task while retaining explicit Project save and the
+  advanced Asset controls outside that task
+- [x] Keep stable Caption IDs, all-marker selection, exact unrelated-Caption
+  preservation and Asset-local `positionAsset`; change no schema or package
+  version
+- [x] Reuse the existing focused acceptance because no missing schema/storage
+  boundary was found, obtain one independent read-only P0/P1 review, and run
+  the final executable-tree
+  typecheck/full test/build once
+- [ ] Record one targeted Desktop smoke. Carry touch/long-press and the already
+  deferred native regressions into one later consolidated physical-iPhone run;
+  record them as unexecuted rather than claiming PASS
+- [x] Commit the bounded slice and leave the worktree clean
+
+Exclusions and stop conditions:
+
+- Visual polish, final responsive layout, DisplaySet/material/view behavior,
+  attachments, Caption deletion/order/search, Proxy-less origin placement,
+  ordinary points, migration, default-route integration, renderer/storage
+  architecture and G0/G0-S evidence expansion remain outside this slice.
+- Stop before implementation expansion if the approved interaction requires a
+  schema, renderer or persistence change; the read-only gap audit found none.
+
+Implementation and review — 2026-08-30:
+
+- The ordinary Caption task is now first in the native side panel. A successful
+  Desktop Shift+click or touch long-press creates a new stable Caption on the
+  explicitly selected target, focuses its title editor and attaches the Caption
+  position gizmo. Clicking/tapping any visible marker or choosing the flat-list
+  entry selects that existing Caption and its gizmo without an arm/apply step.
+- Model visibility, addition, placement and runtime diagnostics remain available
+  as collapsed advanced sections. This is workflow ordinaryization, not final
+  responsive visual polish or a new domain/storage model.
+- The independent read-only re-review found and then confirmed closure of three
+  P1s: stale viewer data could overwrite edited text after a gizmo move; the
+  rejected arm-mode button/copy still remained; and initial Asset selection
+  could replace the Caption gizmo. No P0/P1 remains in the bounded diff.
+- Native snapshot v1, portable package v1, Asset/Representation records,
+  `positionAsset`, project lock and Spark/Three runtime boundaries are unchanged.
+
+Verification — 2026-08-30:
+
+- `npm run typecheck`: PASS.
+- Focused native schema/storage/portable-package suite: 30/30 PASS.
+- Final `npm test`: 47 files, 1,392 tests passed with 21 existing todos
+  (1,413 total).
+- Normal and `/LociView/` production builds: PASS. Spark remains in the lazy
+  `native-gs-spark-2.1.0.js` chunk and outside the 13-entry PWA precache.
+- Automated local-browser connection was unavailable in the current execution
+  environment. No browser safety bypass, production debug hook or new automation
+  dependency was added. Therefore the exact-tree Desktop gesture/layout smoke
+  above remains unchecked, and touch/long-press remains explicitly deferred to
+  the Product Owner-approved consolidated physical-iPhone run; neither is
+  inferred as PASS.
