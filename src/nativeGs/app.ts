@@ -794,6 +794,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     let saving = false;
     let dirty = false;
     let selectedCaptionId = initial.captions[0]?.id ?? null;
+    let captionMoveActive = false;
+    let creatingCaption = false;
     let selectedSavedViewId = initial.savedViews?.[0]?.id ?? null;
     const canvas = el('canvas', { 'aria-label': '3DモデルとGaussian Splattingのプロジェクト' });
     const accessBadge = el('span', { class: 'ng-badge' });
@@ -836,11 +838,14 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       ['rotate', el('button', { 'aria-pressed': 'false' }, '回転')],
       ['scale', el('button', { 'aria-pressed': 'false' }, '均一スケール')],
     ]);
-    const captionSelect = el('select', { 'aria-label': 'Caption' });
+    const captionList = el('div', { class: 'ng-list ng-caption-list', 'aria-label': 'キャプション一覧' });
+    const newCaption = el('button', { class: 'primary' }, '＋ 新しいキャプション');
     const captionTitle = el('input', { type: 'text', maxlength: '160' });
     const captionBody = el('textarea');
+    const captionGuide = el('p', { class: 'ng-note' });
     const captionReview = el('p', { class: 'ng-note' });
-    const repositionCaption = el('button', {}, '選択中のキャプションを再配置');
+    const moveCaption = el('button', { 'aria-pressed': 'false' }, 'ピンを移動');
+    const repositionCaption = el('button', {}, '表面へ置き直す');
     const captionSection = el('section', { class: 'ng-card ng-caption-card' });
     const savedViewSelect = el('select', { 'aria-label': '保存済みビュー' });
     const savedViewName = el('input', { type: 'text', maxlength: '160', value: '' });
@@ -895,30 +900,48 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         savedViewName.value = selectedSavedView()?.name ?? '';
       }
     };
-    const rebuildCaptionOptions = (): void => {
-      clear(captionSelect);
-      if (selectedCaptionId === null) {
-        captionSelect.append(el('option', { value: '' }, '新しいCaption（未配置）'));
+    const rebuildCaptionList = (): void => {
+      clear(captionList);
+      if (working.captions.length === 0) {
+        captionList.append(el('p', { class: 'ng-note' }, 'キャプションはまだありません。'));
+        return;
       }
-      for (const [index, caption] of working.captions.entries()) {
+      for (const caption of working.captions) {
         const owner = working.assets.find((asset) => asset.id === caption.anchor.assetId);
         const review = nativeCaptionNeedsReviewV1(working, caption) ? '［要再配置］ ' : '';
-        captionSelect.append(el(
-          'option',
-          { value: caption.id },
-          `${review}${index + 1}. ${caption.title} — ${owner?.label ?? '所属モデル不明'}`,
-        ));
+        const button = el(
+          'button',
+          {
+            class: 'ng-caption-row',
+            'aria-current': String(caption.id === selectedCaptionId),
+          },
+          el('strong', {}, `${review}${caption.title || '（無題）'}`),
+          el('span', { class: 'ng-note' }, owner?.label ?? '所属モデル不明'),
+        );
+        button.addEventListener('click', () => {
+          creatingCaption = false;
+          selectedCaptionId = caption.id;
+          captionMoveActive = false;
+          activeViewer?.selectCaption(caption.id);
+          rebuildCaptionList();
+          populateCaptionFields();
+          updateAccess();
+          runtimeStatus.className = 'ng-status';
+          runtimeStatus.textContent = `キャプションを選択しました：${caption.title || '（無題）'}`;
+        });
+        captionList.append(button);
       }
-      if (working.captions.length === 0 && selectedCaptionId !== null) {
-        captionSelect.append(el('option', { value: '' }, 'Captionはまだありません'));
-      }
-      captionSelect.value = selectedCaptionId ?? '';
     };
     const populateCaptionFields = (): void => {
       const caption = selectedCaption();
-      captionTitle.value = caption?.title ?? 'Caption';
+      captionTitle.value = caption?.title ?? '';
       captionBody.value = caption?.body ?? '';
       const needsReview = caption !== undefined && nativeCaptionNeedsReviewV1(working, caption);
+      captionGuide.textContent = caption === undefined
+        ? creatingCaption
+          ? '配置先モデルを選び、PCは画面上でShift＋クリック、iPhoneは長押ししてください。配置が決まるまでデータは作成されません。'
+          : '「＋ 新しいキャプション」を押すか、一覧・画面上のマーカーから既存のキャプションを選んでください。'
+        : 'タイトルと本文を編集できます。位置を変えるときだけ「ピンを移動」を使います。';
       captionReview.className = needsReview ? 'ng-error' : 'ng-note';
       captionReview.textContent = caption === undefined
         ? ''
@@ -934,7 +957,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         working = updateSelectedNativeCaptionV1(working, selectedCaptionId, caption);
         selectedCaptionId ??= caption.id;
         const nextNeedsReview = nativeCaptionNeedsReviewV1(working, caption);
-        if (wasNew || previous?.title !== caption.title || previousNeedsReview !== nextNeedsReview) rebuildCaptionOptions();
+        if (wasNew || previous?.title !== caption.title || previousNeedsReview !== nextNeedsReview) rebuildCaptionList();
         populateCaptionFields();
         return true;
       } catch (error) {
@@ -966,13 +989,26 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       const editable = canMutateWorking();
       const caption = selectedCaption();
       const captionVisible = caption !== undefined && isNativeAssetVisibleV1(working, caption.anchor.assetId);
-      const captionFieldsEditable = caption === undefined || captionVisible;
+      const captionFieldsEditable = caption !== undefined && captionVisible;
+      if (!editable && creatingCaption) {
+        creatingCaption = false;
+        populateCaptionFields();
+      }
+      if ((!editable || !captionVisible) && captionMoveActive) {
+        captionMoveActive = false;
+        activeViewer?.stopCaptionPositionEditing();
+      }
       save.disabled = !editable || !dirty;
       applyTransformButton.disabled = !editable;
       for (const button of assetGizmoButtons.values()) button.disabled = !editable;
       captionTitle.disabled = !editable || !captionFieldsEditable;
       captionBody.disabled = !editable || !captionFieldsEditable;
-      captionSelect.disabled = saving || working.captions.length === 0;
+      newCaption.disabled = !editable;
+      newCaption.textContent = creatingCaption ? '新規配置をやめる' : '＋ 新しいキャプション';
+      newCaption.setAttribute('aria-pressed', String(creatingCaption));
+      moveCaption.disabled = !editable || caption === undefined || !captionVisible;
+      moveCaption.textContent = captionMoveActive ? 'ピン移動を終了' : 'ピンを移動';
+      moveCaption.setAttribute('aria-pressed', String(captionMoveActive));
       display.disabled = !editable;
       for (const checkbox of visibilityInputs.values()) checkbox.disabled = !editable;
       target.disabled = !editable;
@@ -1028,18 +1064,16 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     };
 
     captionSection.append(
-      el('h2', {}, 'Caption'),
-      el('p', { class: 'ng-note' }, '追加先を選び、PCはモデル上でShift＋クリック、iPhoneは長押しします。既存のマーカーはクリック／タップで選択できます。'),
-      el('div', { class: 'ng-grid' },
-        el('label', { class: 'ng-field' }, el('span', {}, '追加先モデル'), target),
-        el('label', { class: 'ng-field' }, el('span', {}, 'キャプション'), captionSelect),
-      ),
-      el('div', { class: 'ng-row' }, save),
+      el('h2', {}, 'キャプション'),
+      el('p', { class: 'ng-note' }, '新しく置くか、一覧や画面上のマーカーから既存のキャプションを選びます。'),
+      newCaption,
+      el('label', { class: 'ng-field' }, el('span', {}, '新しいキャプションの配置先'), target),
+      captionGuide,
+      captionList,
       el('label', { class: 'ng-field' }, el('span', {}, 'タイトル'), captionTitle),
       el('label', { class: 'ng-field' }, el('span', {}, '本文'), captionBody),
       captionReview,
-      repositionCaption,
-      el('p', { class: 'ng-note' }, '配置後は黄色いマーカーのギズモで位置を調整できます。'),
+      el('div', { class: 'ng-row' }, moveCaption, repositionCaption),
     );
 
     savedViewSection.append(
@@ -1058,7 +1092,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     root.append(el('main', { class: 'ng-view' },
       el('section', { class: 'ng-stage' }, canvas, el('div', { class: 'ng-stage-badges' }, accessBadge, visibilityBadge)),
       el('aside', { class: 'ng-panel' },
-        el('div', {}, el('h1', {}, working.project.title)),
+        el('div', {}, el('h1', {}, working.project.title), el('div', { class: 'ng-row ng-project-actions' }, save)),
         captionSection,
         savedViewSection,
         el('details', { class: 'ng-card' },
@@ -1114,18 +1148,37 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const viewer = new NativeGsViewer(canvas, working, {
       onCaptionCreationStarted() {
         if (!canMutateWorking()) return false;
+        if (!creatingCaption) {
+          runtimeStatus.className = 'ng-status';
+          runtimeStatus.textContent = '先に「＋ 新しいキャプション」を押してください。';
+          return false;
+        }
         selectedCaptionId = null;
-        rebuildCaptionOptions();
+        captionMoveActive = false;
+        rebuildCaptionList();
         populateCaptionFields();
         updateAccess();
         return true;
       },
       onCaptionChanged(caption) {
-        if (!canMutateWorking()) return false;
+        if (!canMutateWorking()) {
+          creatingCaption = false;
+          rebuildCaptionList();
+          populateCaptionFields();
+          updateAccess();
+          return false;
+        }
         const wasNew = selectedCaptionId === null;
         const titleValue = captionTitle.value.trim();
         const next = { ...caption, title: titleValue === '' ? 'Caption' : titleValue, body: captionBody.value };
-        if (!commitSelectedCaption(next)) return false;
+        if (!commitSelectedCaption(next)) {
+          creatingCaption = false;
+          rebuildCaptionList();
+          populateCaptionFields();
+          updateAccess();
+          return false;
+        }
+        captionMoveActive = true;
         captionTitle.value = next.title;
         captionBody.value = next.body;
         markDirty();
@@ -1142,7 +1195,9 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       onCaptionSelected(captionId) {
         if (!working.captions.some((caption) => caption.id === captionId)) return;
         selectedCaptionId = captionId;
-        rebuildCaptionOptions();
+        if (!creatingCaption) captionMoveActive = false;
+        creatingCaption = false;
+        rebuildCaptionList();
         populateCaptionFields();
         updateAccess();
         runtimeStatus.textContent = `キャプションを選択しました：${selectedCaption()?.title ?? 'Caption'}`;
@@ -1183,7 +1238,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     runtimeStatus.textContent = offlineReady
       ? 'モデルを読み込みました。表示切替とキャプション編集を利用できます。'
       : 'GSのオフライン準備がないため、Gaussian Splattingは表示していません。';
-    rebuildCaptionOptions();
+    rebuildCaptionList();
     populateCaptionFields();
     viewer.selectCaption(selectedCaptionId);
     populateTransform();
@@ -1432,60 +1487,122 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       viewer.setSnapshot(working);
       markDirty();
     });
-    captionSelect.addEventListener('change', () => {
-      const nextId = captionSelect.value === '' ? null : captionSelect.value;
-      if (nextId !== null && !working.captions.some((caption) => caption.id === nextId)) {
-        rebuildCaptionOptions();
-        return;
-      }
-      selectedCaptionId = nextId;
-      if (!viewer.selectCaption(nextId)) {
+    newCaption.addEventListener('click', () => {
+      if (!canMutateWorking()) return;
+      if (creatingCaption) {
+        creatingCaption = false;
         selectedCaptionId = working.captions[0]?.id ?? null;
         viewer.selectCaption(selectedCaptionId);
+        rebuildCaptionList();
+        populateCaptionFields();
+        updateAccess();
+        runtimeStatus.className = 'ng-status';
+        runtimeStatus.textContent = '新しいキャプションの配置をやめました。';
+        return;
       }
-      rebuildCaptionOptions();
+      creatingCaption = true;
+      captionMoveActive = false;
+      selectedCaptionId = null;
+      viewer.selectCaption(null);
+      rebuildCaptionList();
       populateCaptionFields();
       updateAccess();
-      runtimeStatus.textContent = selectedCaptionId === null
-        ? '追加先モデルを選び、画面上でキャプションを追加してください。'
-        : `キャプションを選択しました：${selectedCaption()?.title ?? 'Caption'}`;
+      runtimeStatus.className = 'ng-status';
+      runtimeStatus.textContent = '配置先モデルを選び、PCは画面上でShift＋クリック、iPhoneは長押ししてください。';
+    });
+    moveCaption.addEventListener('click', () => {
+      if (!canMutateWorking()) return;
+      creatingCaption = false;
+      if (captionMoveActive) {
+        viewer.stopCaptionPositionEditing();
+        captionMoveActive = false;
+        updateAccess();
+        runtimeStatus.className = 'ng-status';
+        runtimeStatus.textContent = 'ピンの移動を終了しました。';
+        return;
+      }
+      if (!viewer.editCaptionPosition()) {
+        runtimeStatus.className = 'ng-error';
+        runtimeStatus.textContent = '選択中のキャプションを移動できません。所属モデルの表示と編集状態を確認してください。';
+        return;
+      }
+      captionMoveActive = true;
+      updateAccess();
+      runtimeStatus.className = 'ng-status';
+      runtimeStatus.textContent = '黄色いピンのギズモをドラッグして位置を調整してください。';
     });
     repositionCaption.addEventListener('click', () => {
       if (!canMutateWorking()) return;
       const caption = selectedCaption();
       if (caption === undefined) return;
-      if (target.value !== caption.anchor.assetId) {
-        const owner = working.assets.find((asset) => asset.id === caption.anchor.assetId);
+      const owner = working.assets.find((asset) => asset.id === caption.anchor.assetId);
+      if (owner === undefined || !isNativeAssetVisibleV1(working, owner.id)) {
         runtimeStatus.className = 'ng-error';
-        runtimeStatus.textContent = `追加先モデルを「${owner?.label ?? 'キャプション所属モデル'}」へ切り替えてから再配置してください。`;
+        runtimeStatus.textContent = '所属モデルが見つからないか非表示のため、表面へ置き直せません。キャプションの位置は変更していません。';
+        return;
+      }
+      creatingCaption = false;
+      captionMoveActive = false;
+      viewer.stopCaptionPositionEditing();
+      const previousTargetAssetId = working.presentation.captionTargetAssetId;
+      const targetChanged = previousTargetAssetId !== owner.id;
+      if (targetChanged) {
+        working = { ...working, presentation: { ...working.presentation, captionTargetAssetId: owner.id } };
+        target.value = owner.id;
+        viewer.setSnapshot(working);
+      }
+      const interaction = viewer.getResolution().interaction;
+      if (!interaction.enabled || interaction.targetAssetId !== owner.id) {
+        if (targetChanged) {
+          working = { ...working, presentation: { ...working.presentation, captionTargetAssetId: previousTargetAssetId } };
+          target.value = previousTargetAssetId ?? '';
+          viewer.setSnapshot(working);
+        }
+        updateAccess();
+        runtimeStatus.className = 'ng-error';
+        runtimeStatus.textContent = '所属モデルの配置用表面を利用できないため、置き直しを開始できません。キャプションの位置は変更していません。';
         return;
       }
       if (!viewer.armCaptionReposition(caption.id)) {
+        if (targetChanged) {
+          working = { ...working, presentation: { ...working.presentation, captionTargetAssetId: previousTargetAssetId } };
+          target.value = previousTargetAssetId ?? '';
+          viewer.setSnapshot(working);
+        }
+        updateAccess();
         runtimeStatus.className = 'ng-error';
         runtimeStatus.textContent = '選択中のキャプションを再配置できません。モデルの表示と編集状態を確認してください。';
         return;
       }
+      if (targetChanged) markDirty();
+      updateAccess();
       runtimeStatus.className = 'ng-status';
-      runtimeStatus.textContent = 'PCは現在のモデル上でShift＋クリック、iPhoneは長押しして新しい位置を指定してください。';
+      runtimeStatus.textContent = `「${owner.label}」の表面で、PCはShift＋クリック、iPhoneは長押しして新しい位置を指定してください。`;
     });
     unload.addEventListener('click', () => {
       viewer.disposeGs();
       runtimeStatus.textContent = 'Gaussian Splattingをメモリから解放しました。もう一度表示するにはプロジェクトを開き直してください。';
     });
     transformAsset.addEventListener('change', () => {
+      creatingCaption = false;
+      captionMoveActive = false;
       populateTransform();
       runtimeStatus.textContent = viewer.selectAlignmentAsset(transformAsset.value)
         ? '選択したモデルの位置調整ギズモを表示しました。'
         : '選択したモデルは非表示のため、位置調整ギズモを表示できません。';
+      updateAccess();
     });
     for (const [mode, button] of assetGizmoButtons) {
       button.addEventListener('click', () => {
+        creatingCaption = false;
+        captionMoveActive = false;
         assetGizmoMode = mode;
         for (const [candidate, candidateButton] of assetGizmoButtons) {
           candidateButton.setAttribute('aria-pressed', String(candidate === mode));
         }
         viewer.selectAlignmentAsset(transformAsset.value);
         viewer.setAssetGizmoMode(mode);
+        updateAccess();
         runtimeStatus.textContent = `モデルの位置調整：${button.textContent}`;
       });
     }
@@ -1518,7 +1635,6 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       if (caption === undefined) return;
       if (!commitSelectedCaption({ ...caption, title: captionTitle.value.trim() || 'Caption' })) return;
       viewer.setSnapshot(working);
-      viewer.selectCaption(selectedCaptionId);
       markDirty();
     });
     captionBody.addEventListener('input', () => {
@@ -1527,7 +1643,6 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       if (caption === undefined) return;
       if (!commitSelectedCaption({ ...caption, body: captionBody.value })) return;
       viewer.setSnapshot(working);
-      viewer.selectCaption(selectedCaptionId);
       markDirty();
     });
     save.addEventListener('click', () => {
@@ -1540,9 +1655,12 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         working = saved;
         dirty = false;
         viewer.setSnapshot(saved);
+        creatingCaption = false;
+        captionMoveActive = false;
         viewer.selectCaption(selectedCaptionId);
         syncVisibilityControls();
-        rebuildCaptionOptions();
+        rebuildCaptionList();
+        populateCaptionFields();
         rebuildSavedViewOptions();
         runtimeStatus.textContent = 'プロジェクトを保存しました。';
       }).catch((error: unknown) => {
@@ -1551,9 +1669,11 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
           ? selectedCaptionId
           : durable.captions[0]?.id ?? null;
         viewer.setSnapshot(durable);
+        creatingCaption = false;
+        captionMoveActive = false;
         viewer.selectCaption(selectedCaptionId);
         syncVisibilityControls();
-        rebuildCaptionOptions();
+        rebuildCaptionList();
         selectedSavedViewId = durable.savedViews?.some((view) => view.id === selectedSavedViewId)
           ? selectedSavedViewId
           : durable.savedViews?.[0]?.id ?? null;

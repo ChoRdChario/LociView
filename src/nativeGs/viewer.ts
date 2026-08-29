@@ -375,6 +375,7 @@ export class NativeGsViewer {
 
   setSnapshot(snapshot: NativeProjectSnapshotV1): void {
     this.snapshot = snapshot;
+    this.repositionCaptionId = null;
     for (const asset of snapshot.assets) {
       const binding = activeNativeBindingV1(snapshot, asset.id);
       const group = this.assetGroups.get(asset.id);
@@ -400,13 +401,10 @@ export class NativeGsViewer {
       ? null
       : this.snapshot.captions.find((caption) => caption.id === captionId);
     if (next === undefined) return false;
-    const changed = this.currentCaption?.id !== next?.id;
-    if (changed) this.repositionCaptionId = null;
+    this.repositionCaptionId = null;
     this.currentCaption = next;
     this.clearLongPress();
-    if (next === null && this.gizmoTarget?.kind === 'caption') this.gizmoTarget = null;
-    else if (next !== null && this.editingEnabled) this.gizmoTarget = { kind: 'caption' };
-    else if (changed && this.gizmoTarget?.kind === 'caption') this.gizmoTarget = null;
+    this.gizmoTarget = null;
     this.syncCaptionMarkers();
     this.refreshGizmoAttachment();
     return true;
@@ -418,11 +416,10 @@ export class NativeGsViewer {
     if (!enabled) {
       this.clearLongPress();
       this.repositionCaptionId = null;
+      this.gizmoTarget = null;
       this.gizmoDragging = false;
       this.controls.enabled = true;
       this.applyActiveAssetTransforms();
-    } else if (this.gizmoTarget === null && this.currentCaption !== null) {
-      this.gizmoTarget = { kind: 'caption' };
     }
     this.updateResolution();
   }
@@ -431,6 +428,7 @@ export class NativeGsViewer {
     const visual = activeNativeRepresentationsV1(this.snapshot, assetId)
       .some((representation) => representation.role === 'meshPrimary' || representation.role === 'gsPrimary');
     if (!visual || !this.assetGroups.has(assetId)) return false;
+    this.repositionCaptionId = null;
     this.gizmoTarget = { kind: 'asset', assetId };
     this.gizmo.setMode(this.assetGizmoMode);
     this.updateResolution();
@@ -445,10 +443,18 @@ export class NativeGsViewer {
 
   editCaptionPosition(): boolean {
     if (this.currentCaption === null || !this.captionMarkers.has(this.currentCaption.id)) return false;
+    this.repositionCaptionId = null;
     this.gizmoTarget = { kind: 'caption' };
     this.gizmo.setMode('translate');
     this.updateResolution();
     return this.gizmoRoot.visible;
+  }
+
+  stopCaptionPositionEditing(): boolean {
+    if (this.gizmoTarget?.kind !== 'caption') return false;
+    this.gizmoTarget = null;
+    this.refreshGizmoAttachment();
+    return true;
   }
 
   armCaptionReposition(captionId: string): boolean {
@@ -457,7 +463,7 @@ export class NativeGsViewer {
     if (caption === undefined || !this.assetIsVisible(caption.anchor.assetId)) return false;
     this.currentCaption = caption;
     this.repositionCaptionId = caption.id;
-    this.gizmoTarget = { kind: 'caption' };
+    this.gizmoTarget = null;
     this.syncCaptionMarkers();
     this.refreshGizmoAttachment();
     return true;

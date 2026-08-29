@@ -17,6 +17,11 @@ details.ng-card[open] > summary { margin-bottom: 2px; }
 .ng-warn { color: #fbbf24; }
 .ng-error { color: #fca5a5; white-space: pre-wrap; }
 .ng-list { display: grid; gap: 8px; }
+.ng-caption-row { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; }
+.ng-caption-row strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ng-caption-row[aria-current="true"] { outline: 2px solid #60a5fa; outline-offset: 1px; }
+.ng-caption-card button[aria-pressed="true"] { outline: 2px solid #60a5fa; outline-offset: 1px; }
+.ng-project-actions { margin-top: 8px; }
 .ng-project-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; border: 1px solid #26354b; border-radius: 9px; padding: 10px; }
 .ng-project-row strong { flex: 1; min-width: 180px; }
 .ng-view { height: 100%; min-height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr) minmax(330px, 410px); }

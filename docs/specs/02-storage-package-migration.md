@@ -1578,3 +1578,34 @@ merge v1/native registries or change any durable behavior.
   bundle isolation are unchanged. This slice excludes default-route integration,
   automatic package dispatch, migration, Caption features, responsive redesign,
   schema/storage/renderer changes and final visual polish.
+
+## 21. Bounded native Caption task closure (approved LociMyu interaction; 2026-08-30 implementation slice)
+
+This slice corrects the still-confusing control sequence reported after the
+functional Caption path passed. It follows the existing v1/LociMyu interaction
+already approved for the native route; it adds no Caption capability or durable
+record.
+
+- The ordinary task presents one explicit `＋新しいキャプション` action, a flat
+  list of existing Captions and the selected Caption editor. Starting a new item
+  creates no durable placeholder: the existing Desktop Shift+click or touch
+  long-press first supplies a valid target-surface hit, after which that Caption
+  is selected and its title/body can be edited.
+- Selecting a marker or list item selects the same stable Caption without
+  automatically entering position-edit mode. `ピンを移動` explicitly shows or
+  hides the existing translation gizmo for the selected visible Caption. Initial
+  placement may enter that adjustment state directly as the accepted second
+  stage of coarse hit -> ordinary gizmo adjustment.
+- `表面へ置き直す` routes to the Caption's owning visible Asset automatically
+  before arming the existing Mesh/self or same-GS-Proxy path. It never chooses a
+  different surface, invents a Proxy or changes ownership. A missing/hidden or
+  unusable owning surface leaves the Caption unchanged and reports the bounded
+  failure.
+- Project save remains explicit but is presented as a Project action outside the
+  Caption editing sequence. Selection, pending-new state and gizmo visibility
+  remain UI-only. Caption ID, ownership, title/body and Asset-local
+  `positionAsset` remain the current durable source of truth.
+- Native snapshot/package versions, project lock, storage publication, renderer,
+  raycast and source bytes are unchanged. This slice excludes Caption deletion,
+  search/order/filter, tags, media attachments, DisplaySet/material linkage,
+  Proxy-less GS origin placement, responsive redesign and final visual polish.

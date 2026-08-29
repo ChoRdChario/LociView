@@ -2932,3 +2932,60 @@ Review — 2026-08-30:
   was introduced. Exact-tree visual smoke and the physical-iPhone open/layout
   regression remain unexecuted for the approved consolidated run and are not
   claimed PASS.
+
+## Native Caption task closure — bounded production slice
+
+Checkpoint and plan — 2026-08-30:
+
+- [x] Reuse the approved Desktop Shift+click / touch long-press placement and
+  existing Mesh-self / explicit same-GS-Proxy raycast; change no durable model
+- [x] Present one explicit new-Caption action, a visible flat Caption list and a
+  selected-item editor; never create a durable unplaced placeholder
+- [x] Keep list/marker selection UI-only and stop it from automatically enabling
+  a gizmo; expose one explicit `ピンを移動` toggle for the selected visible item
+- [x] Route surface re-placement to the selected Caption's owning Asset
+  automatically, without guessing another surface or changing Caption ownership
+- [x] Move explicit Project save outside the Caption task while preserving the
+  same whole-Project save, rollback and lock behavior
+- [x] Preserve read-only selection and viewing while disabling only mutation,
+  placement and position-edit actions
+- [x] Reuse existing schema/storage/package acceptance, add no fixture matrix,
+  obtain one independent read-only P0/P1 review and run final-tree verification
+- [x] Defer touch/layout regression to the approved consolidated physical-iPhone
+  run and record it as unexecuted, not PASS
+- [x] Commit this bounded slice independently and leave the worktree clean
+
+Exclusions and stop conditions:
+
+- Caption deletion/search/order/filter, tags, media, DisplaySet/material,
+  Proxy-less GS origin placement, schema/package changes, renderer/storage work,
+  migration, responsive redesign and final visual polish remain outside.
+- Stop rather than widening if the corrected flow needs a new durable Caption
+  state, surface inference, a new input gesture or a second gizmo framework.
+
+Review — 2026-08-30:
+
+- The ordinary native task is now explicit: `＋ 新しいキャプション` arms the
+  existing valid-surface gesture without creating a placeholder; the same action
+  cancels the pending UI-only state. Existing Captions appear in a flat list and
+  remain selectable from either the list or their marker without showing a
+  gizmo automatically.
+- `ピンを移動` alone toggles the existing Caption translation gizmo. Surface
+  re-placement routes to the selected Caption's visible owning Asset, verifies
+  its already-resolved Mesh/self or same-GS-Proxy surface before arming, and
+  restores the prior target if arming fails. Explicit selection, snapshot
+  changes and Asset-gizmo work cancel any pending re-placement.
+- Project save moved outside the Caption card, but still saves and rolls back the
+  same whole-Project snapshot under the existing lock. Caption ID, owner,
+  title/body, Asset-local `positionAsset`, schema v1 and package v1 are unchanged.
+- Focused existing native schema/storage/package verification passed (3 files,
+  35 tests). Final staged-tree `npm run typecheck`, `npm test` (47 files; 1,397
+  passed; 21 todo), `npm run build`, the `/LociView/` BASE_PATH build and
+  `git diff --check` passed. The PWA precache remains 13 entries; Spark remains a
+  separately loaded `native-gs-spark-2.1.0.js` chunk and no representative PLY
+  is bundled.
+- One independent read-only reviewer reported no actionable P0/P1. The approved
+  Browser control path could not initialize at its safety boundary, so no
+  workaround or new automation dependency was added. Exact-tree visual smoke
+  and the physical-iPhone touch/layout regression remain unexecuted for the
+  approved consolidated run and are not claimed PASS.
