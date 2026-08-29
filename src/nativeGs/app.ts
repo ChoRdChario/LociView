@@ -49,6 +49,7 @@ import {
 import { digestNativeStream } from './sha256';
 import { NativeGsViewer, type NativeAssetGizmoMode } from './viewer';
 import { NativeUnsavedChangesGuard } from './unsavedChanges';
+import { resolveNativeInitialProjectRoute } from './initialRoute';
 import './style.css';
 
 interface SelectedFiles {
@@ -1724,5 +1725,21 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     });
   };
 
-  await renderHome();
+  const summaries = await listNativeProjectsV1(fs);
+  const initialRoute = resolveNativeInitialProjectRoute(
+    window.location.search,
+    new Set(summaries.map((summary) => summary.projectId)),
+  );
+  if (initialRoute.kind !== 'none') {
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete('project');
+    cleanUrl.searchParams.delete('session');
+    window.history.replaceState(null, '', cleanUrl);
+  }
+  if (initialRoute.kind === 'open') {
+    await openProject(initialRoute.projectId, initialRoute.mode);
+  } else {
+    if (initialRoute.kind === 'invalid') homeNotice = initialRoute.message;
+    await renderHome();
+  }
 }

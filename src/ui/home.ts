@@ -5,7 +5,7 @@ import { importNewProject, inspectZip } from '../assets/package';
 import { applyImportPlan, buildImportPlan } from '../assets/importWizard';
 import { optimizeGlbBytes } from '../assets/glbOptimize';
 import { addModelAsset } from '../assets/modelAsset';
-import { readZipEntries } from '../assets/zipio';
+import { inspectZipContainerIdentity, readZipEntries } from '../assets/zipio';
 import { createManifest, parseManifest } from '../core/manifest';
 import { entityIdFor, ProjectStore, type Identity } from '../core/store';
 import type { ProjectSessionMode, ProjectWorkspaceFS, WorkspaceFS } from '../platform/fs';
@@ -31,6 +31,9 @@ export interface HomeDeps {
   ) => Promise<WritableProjectSession | null>;
   openProfile: () => void;
   storageWarning: string | null;
+  listNativeProjects: () => Promise<NativeProjectListItem[]>;
+  openNativeProjects: (projectId?: string, mode?: ProjectSessionMode) => void;
+  restoreNativePackage: (file: File, onStatus: (message: string) => void) => Promise<string>;
 }
 
 export interface WritableProjectSession {
@@ -44,6 +47,11 @@ interface ProjectListItem {
   name: string;
   projectId: string;
   createdAt: string;
+}
+
+export interface NativeProjectListItem {
+  readonly projectId: string;
+  readonly title: string;
 }
 
 async function listProjects(fs: WorkspaceFS): Promise<ProjectListItem[]> {
@@ -69,10 +77,11 @@ async function listProjects(fs: WorkspaceFS): Promise<ProjectListItem[]> {
 
 export function mountHome(root: HTMLElement, deps: HomeDeps): void {
   const listEl = el('div', { class: 'lv-home-list' });
+  const nativeListEl = el('div', { class: 'lv-home-list' });
+  const fileStatus = el('div', { class: 'lv-dim lv-pad', role: 'status' });
 
   const fileInput = el('input', {
     type: 'file',
-    accept: '.zip,.lociview,.glb,.gltf,.obj,.stl,.ply',
     style: 'display:none',
   }) as HTMLInputElement;
   fileInput.addEventListener('change', () => {
@@ -127,9 +136,15 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
       deps.storageWarning !== null
         ? el('div', { class: 'lv-warn lv-pad' }, `⚠ ${deps.storageWarning}`)
         : null,
-      dropZone,
       el('div', { class: 'lv-row lv-space', style: 'margin-top:14px' },
-        el('div', { class: 'lv-hint' }, '最近のプロジェクト（この端末に自動保存済み）'),
+        el('div', { class: 'lv-hint' }, 'LociViewプロジェクト（複数モデル・点群対応）'),
+        el('button', { class: 'primary', onclick: () => deps.openNativeProjects() }, '開く／新しく作る'),
+      ),
+      nativeListEl,
+      dropZone,
+      fileStatus,
+      el('div', { class: 'lv-row lv-space', style: 'margin-top:14px' },
+        el('div', { class: 'lv-hint' }, '従来形式のプロジェクト（この端末に自動保存済み）'),
         el('button', {
           onclick: () => {
             void promptDialog('新規プロジェクト', 'プロジェクト名').then(async (name) => {
@@ -166,35 +181,49 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
   );
 
   async function handleFile(file: File): Promise<void> {
-    const bytes = new Uint8Array(await file.arrayBuffer());
     const lower = file.name.toLowerCase();
+    const archiveLike = lower.endsWith('.zip') || lower.endsWith('.lociview');
 
-    // モデル単体 → 新規プロジェクト作成
-    const fmt = detectFormat(file.name, bytes);
-    if (fmt !== null && !lower.endsWith('.zip') && !lower.endsWith('.lociview')) {
-      const name = file.name.replace(/\.[^.]+$/, '');
-      const dir = `projects/${entityIdFor('meta')}`;
-      const manifest = createManifest(name);
-      const session = await deps.startProjectMutation(dir, manifest.projectId, false);
-      if (session === null) throw new Error('書込みロックを取得できないため作成を開始できません');
-      let handedOff = false;
-      try {
-        const store = await ProjectStore.createWithManifest(session.fs, dir, manifest, deps.identity);
-        session.store = store;
-        await addModelAsset(session.fs, dir, store, file.name, bytes);
-        await store.flush();
-        await deps.openProject(dir, 'edit', session);
-        handedOff = true;
-      } catch (error) {
-        await infoDialog('モデル取込失敗', error instanceof Error ? error.message : String(error));
-      } finally {
-        if (!handedOff) session.access.release();
-      }
-      return;
-    }
-
-    // ZIP → lociview判定
     try {
+      if (archiveLike) {
+        fileStatus.className = 'lv-dim lv-pad';
+        fileStatus.textContent = 'バックアップの種類を確認しています…';
+        const identity = await inspectZipContainerIdentity(file);
+        if (identity === 'native-portable') {
+          const projectId = await deps.restoreNativePackage(file, (message) => {
+            fileStatus.textContent = message;
+          });
+          fileStatus.textContent = '復元が完了しました。プロジェクトを開きます…';
+          deps.openNativeProjects(projectId, 'edit');
+          return;
+        }
+      }
+
+      const bytes = new Uint8Array(await file.arrayBuffer());
+
+      // モデル単体 → 新規プロジェクト作成
+      const fmt = detectFormat(file.name, bytes);
+      if (fmt !== null && !archiveLike) {
+        const name = file.name.replace(/\.[^.]+$/, '');
+        const dir = `projects/${entityIdFor('meta')}`;
+        const manifest = createManifest(name);
+        const session = await deps.startProjectMutation(dir, manifest.projectId, false);
+        if (session === null) throw new Error('書込みロックを取得できないため作成を開始できません');
+        let handedOff = false;
+        try {
+          const store = await ProjectStore.createWithManifest(session.fs, dir, manifest, deps.identity);
+          session.store = store;
+          await addModelAsset(session.fs, dir, store, file.name, bytes);
+          await store.flush();
+          await deps.openProject(dir, 'edit', session);
+          handedOff = true;
+        } finally {
+          if (!handedOff) session.access.release();
+        }
+        return;
+      }
+
+      // ZIP → lociview判定
       const insp = await inspectZip(bytes);
       if (insp.kind !== 'lociview' || insp.manifest === null) {
         // LociViewプロジェクトでないZIP → インポートウィザード（Drive フォルダZIP等）
@@ -238,6 +267,8 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
         if (!handedOff) session.access.release();
       }
     } catch (e) {
+      fileStatus.className = 'lv-warn lv-pad';
+      fileStatus.textContent = 'ファイルを開けませんでした。詳しい内容を確認してください。';
       await infoDialog('取込失敗', e instanceof Error ? e.message : String(e));
     }
   }
@@ -333,5 +364,28 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
     }
   }
 
+  async function renderNativeList(): Promise<void> {
+    clear(nativeListEl);
+    try {
+      const items = await deps.listNativeProjects();
+      if (items.length === 0) {
+        nativeListEl.append(el('div', { class: 'lv-dim lv-pad' }, '保存済みの対応プロジェクトはありません'));
+        return;
+      }
+      for (const item of items) {
+        nativeListEl.append(el('div', { class: 'lv-home-item' },
+          el('b', {}, item.title),
+          el('span', { class: 'lv-flex1' }),
+          el('button', { class: 'primary', onclick: () => deps.openNativeProjects(item.projectId, 'edit') }, '編集して開く'),
+          el('button', { onclick: () => deps.openNativeProjects(item.projectId, 'view') }, '閲覧のみで開く'),
+        ));
+      }
+    } catch (error) {
+      nativeListEl.append(el('div', { class: 'lv-warn lv-pad' },
+        `対応プロジェクトの一覧を読み込めませんでした：${error instanceof Error ? error.message : String(error)}`));
+    }
+  }
+
+  void renderNativeList();
   void renderList();
 }

@@ -3042,3 +3042,64 @@ Review — 2026-08-30:
   no bypass or automation dependency was added. Exact-tree visual navigation and
   physical-iPhone regression remain unexecuted for the approved consolidated run
   and are not claimed PASS.
+
+## Ordinary native entry and exact package dispatch — direct P1 closure
+
+Checkpoint and plan — 2026-08-30:
+
+- [x] Keep default new-project creation and the complete frozen-v1 open/merge
+  path unchanged; do not merge native/v1 registries or choose a new default
+- [x] List existing active native Projects separately on the ordinary home and
+  open Edit/View only through a full-page native route
+- [x] Validate a URL Project ID by exact native-list membership before any path
+  resolution or Project open
+- [x] Classify archive input from bounded Blob/random-access ZIP metadata before
+  any package-wide `arrayBuffer()`, with exact root v1 marker precedence
+- [x] Route an exact native marker to strict native inspection and the existing
+  streamed lock/verified/marker-last restore; never fall through on corruption
+- [x] Keep no-marker ZIPs and single models on their existing paths, and remove
+  custom-extension picker filtering as a mobile safety dependency
+- [x] Navigate to the restored native Project only after successful publication;
+  partial/error state must remain inactive and existing Projects unchanged
+- [x] Add only focused identity/routing/open tests, obtain one independent
+  read-only P0/P1 review and run final-tree verification once
+- [x] Keep Spark lazy and absent from default-home listing/inspection/restore;
+  defer physical-iPhone regression to the approved consolidated run
+- [x] Commit this bounded slice independently and leave the worktree clean
+
+Exclusions and stop conditions:
+
+- Native-default creation, registry unification, native/v1 merge or overwrite,
+  migration, package/schema versions, renderer/storage architecture, responsive
+  redesign and final visual polish remain outside this slice.
+- Stop rather than widening if one-selection native restore cannot reuse the
+  existing package inspector, project lock and marker-last restore, or if safe
+  Project opening would require trusting a URL-derived filesystem path.
+
+Review — 2026-08-30:
+
+- The ordinary home now lists validated active native Projects separately from
+  frozen-v1 Projects. Edit/View uses one full-page native handoff; its URL ID is
+  checked against `listNativeProjectsV1()` before `nativeProjectRoot()` or open,
+  and malformed, duplicate or absent-list values remain on the safe home screen.
+- Archive dispatch now reads bounded ZIP central-directory slices before any
+  home-level package-wide `arrayBuffer()`. Exact root `lociview.json` preserves
+  frozen-v1 precedence; exact `native/package.json` alone selects strict native
+  inspection and the existing streamed, locked, verified, marker-last restore.
+  Corrupt/unknown native input cannot fall through to the foreign wizard.
+- The selected `File` is never copied into the repository or build and is passed
+  unchanged to native restore. No-OPFS environments refuse native restore rather
+  than publishing data in a temporary workspace. Native/v1 registries, default
+  creation, snapshot/package versions, migration and renderer are unchanged.
+- Focused routing evidence passed (3 files, 13 tests), including a Blob whose
+  package-wide `arrayBuffer()` throws, v1/native/foreign identity, namespace
+  rejection and URL-list membership. One independent read-only reviewer reported
+  no actionable P0/P1.
+- Final staged executable tree `npm run typecheck`, `npm test` (50 files; 1,404
+  passed; 21 todo), `npm run build`, the `/LociView/` BASE_PATH build and
+  `git diff --check` passed. The PWA precache has 15 entries; Spark remains the
+  separate runtime-cached `native-gs-spark-2.1.0.js` and is absent from precache.
+  No 745.6 MiB representative PLY is bundled.
+- No browser-control workaround or new automation dependency was added. The
+  ordinary-entry visual regression and physical-iPhone regression remain for the
+  Product Owner-approved consolidated run and are not claimed PASS here.

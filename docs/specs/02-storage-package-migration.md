@@ -1632,3 +1632,41 @@ silently discard the mutable copy through an ordinary close or reload action.
 - This slice excludes default-route/native-home integration, automatic package
   routing, Asset/Caption deletion, migration, final responsive polish and the
   consolidated physical-iPhone regression.
+
+## 23. Bounded ordinary entry and exact package dispatch (2026-08-30 implementation slice)
+
+The ordinary home MUST expose already-active native Projects without merging
+their registry or storage with frozen-v1 Projects. The existing default new
+Project action remains v1; choosing a new default format requires a separate
+Product Owner decision.
+
+- The ordinary home lists valid active native Projects in a separate user-facing
+  section. Edit/View actions use a full-page native-route navigation. A Project
+  ID from the URL is untrusted and may be opened only after exact membership in
+  `listNativeProjectsV1()` has been confirmed; it is never converted directly to
+  a filesystem path.
+- ZIP-like input is classified before any package-wide `arrayBuffer()`. A bounded
+  random-access central-directory preflight applies the existing entry-count,
+  declared-size, path, type and ambiguity guards. Exact root `lociview.json`
+  retains frozen-v1 precedence, including its existing future-schema parsing,
+  even if unrelated native-named entries also exist. Only when that root marker
+  is absent does exact `native/package.json` select the native portable path.
+  No marker selects the existing foreign-ZIP wizard.
+- A reserved native marker is only a route candidate. Its exact format/version,
+  snapshot and declared Representation closure are checked by the existing
+  native portable inspector. Invalid or unknown native input stops with a native
+  package error and never falls through to the foreign wizard.
+- The original selected `File` is streamed through the existing native
+  inspect/restore, project-scoped write lock, quota preflight, verified staging
+  and marker-last publication. Full-page navigation to that exact restored
+  Project happens only after successful publication. Failure does not activate
+  a partial Project or change an existing v1/native Project.
+- The ordinary file picker does not depend on a custom-extension `accept` filter;
+  content inspection remains authoritative on iOS and Desktop. Default-home
+  listing, classification and restore load no Spark runtime. The existing native
+  route may load its already-approved lazy Spark path only after navigation.
+- Native snapshot/package version 1, frozen-v1 package behavior, source bytes,
+  renderer and both registries remain unchanged. This slice adds no native/v1
+  merge, overwrite, migration, default-format change, package format, schema,
+  storage architecture or UI framework. Physical-iPhone regression remains part
+  of the Product Owner-approved consolidated run and is not credited here.

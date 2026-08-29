@@ -18,7 +18,7 @@ import { AppContext } from './context';
 import { el, clear, fmtBytes } from './dom';
 import { infoDialog, promptDialog } from './dialogs';
 import { fNum, fStr } from './fields';
-import { mountHome, type WritableProjectSession } from './home';
+import { mountHome, type NativeProjectListItem, type WritableProjectSession } from './home';
 import { mountViewerScreen } from './viewerScreen';
 import type { PackageExportStatus } from './saveStatus';
 
@@ -209,6 +209,68 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     }
   }
 
+  function openNativeProjects(projectId?: string, mode?: ProjectSessionMode): void {
+    const url = new URL(import.meta.env.BASE_URL, window.location.origin);
+    url.searchParams.set('mode', 'native-gs');
+    if (projectId !== undefined && mode !== undefined) {
+      url.searchParams.set('project', projectId);
+      url.searchParams.set('session', mode);
+    }
+    window.location.assign(url);
+  }
+
+  async function listNativeProjects(): Promise<NativeProjectListItem[]> {
+    if (!persistentWorkspace) return [];
+    const { listNativeProjectsV1 } = await import('../nativeGs/storage');
+    return (await listNativeProjectsV1(fs)).map(({ projectId, title }) => ({ projectId, title }));
+  }
+
+  async function restoreNativePackage(file: File, onStatus: (message: string) => void): Promise<string> {
+    if (!persistentWorkspace) {
+      throw new Error('このブラウザでは対応プロジェクトを端末へ保存できないため、バックアップを復元できません。');
+    }
+    const [{ inspectNativePortablePackageV1, restoreNativePortablePackageV1 }, { nativeProjectRoot }] = await Promise.all([
+      import('../nativeGs/portablePackage'),
+      import('../nativeGs/storage'),
+    ]);
+    onStatus('バックアップの内容を確認しています…');
+    const inspection = await inspectNativePortablePackageV1(file);
+    const required = inspection.representationByteLength + inspection.manifest.nativeSnapshot.byteLength + 64 * 1024;
+    const estimate = await navigator.storage.estimate?.();
+    if (
+      estimate?.quota !== undefined && estimate.usage !== undefined &&
+      Number.isFinite(estimate.quota) && Number.isFinite(estimate.usage) &&
+      estimate.quota - estimate.usage < required
+    ) {
+      throw new Error(`保存容量が不足しています（モデル ${fmtBytes(inspection.representationByteLength)}）。プロジェクトは復元されていません。`);
+    }
+
+    const projectId = inspection.snapshot.project.id;
+    const access = await mutationCoordinator.tryAcquire(fs, nativeProjectRoot(projectId), projectId);
+    if (!access.holdsWriteLock) {
+      const detail = access.accessDetail;
+      access.release();
+      throw new Error(detail);
+    }
+    const abort = new AbortController();
+    let unsubscribe = (): void => {};
+    try {
+      access.activateNewProject();
+      unsubscribe = access.subscribeAccess((state) => {
+        if (state !== 'editable') abort.abort(new Error(access.accessDetail));
+      });
+      onStatus('モデルデータをこの端末へ復元しています…');
+      await restoreNativePortablePackageV1(access.workspace, fs, file, {
+        signal: abort.signal,
+        onStatus: () => onStatus('モデルデータを確認しながら復元しています…'),
+      });
+      return projectId;
+    } finally {
+      unsubscribe();
+      access.release();
+    }
+  }
+
   function renderHome(): void {
     clear(root);
     mountHome(root, {
@@ -218,6 +280,9 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       startProjectMutation,
       openProfile: () => void openProfile(),
       storageWarning,
+      listNativeProjects,
+      openNativeProjects,
+      restoreNativePackage,
     });
   }
 

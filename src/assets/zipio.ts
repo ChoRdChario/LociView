@@ -2,6 +2,7 @@
 // zip.js を使用。ガード: パストラバーサル / エントリ数 / 展開サイズ / ネストアーカイブ
 
 import {
+  BlobReader,
   configure,
   Uint8ArrayReader,
   Uint8ArrayWriter,
@@ -61,6 +62,29 @@ const ZIP_HOST_SYSTEM_UNIX = 3;
 const UNIX_ENTRY_TYPE_MASK = 0o170000;
 const UNIX_ENTRY_TYPE_FIFO = 0o010000;
 const UNIX_ENTRY_TYPE_SYMLINK = 0o120000;
+const MAX_ZIP_IDENTITY_READ_BYTES = 64 * 1024 * 1024;
+const V1_MANIFEST_ENTRY = 'lociview.json';
+const NATIVE_PORTABLE_MANIFEST_ENTRY = 'native/package.json';
+
+class BoundedIdentityBlobReader extends BlobReader {
+  constructor(private readonly sourceBlob: Blob) {
+    super(sourceBlob);
+  }
+
+  override async readUint8Array(index: number, length: number): Promise<Uint8Array> {
+    if (length > MAX_ZIP_IDENTITY_READ_BYTES) {
+      throw new ZipGuardError(
+        'entry-too-large',
+        `ZIP identity metadata read exceeds ${MAX_ZIP_IDENTITY_READ_BYTES} bytes`,
+      );
+    }
+    // Always slice first. BlobReader otherwise calls the selected File's own
+    // arrayBuffer() when a read spans the whole Blob, which defeats the
+    // ordinary-entry guarantee for small archives and makes it hard to prove
+    // that package-wide materialization is not part of dispatch.
+    return new Uint8Array(await this.sourceBlob.slice(index, index + length).arrayBuffer());
+  }
+}
 
 function rawUnixEntryType(versionMadeBy: number, externalFileAttributes: number): number | null {
   const hostSystem = (versionMadeBy >>> 8) & 0xff;
@@ -131,6 +155,67 @@ function hasZipSignature(data: Uint8Array): boolean {
 export interface ZipEntryData {
   path: string;
   data: Uint8Array;
+}
+
+export type ZipContainerIdentity = 'v1' | 'native-portable' | 'foreign';
+
+/**
+ * Classifies a selected archive from bounded random-access metadata only. The
+ * format-specific parser remains authoritative after routing; Representation
+ * or other entry bodies are never materialized here.
+ */
+export async function inspectZipContainerIdentity(
+  blob: Blob,
+  limits: ZipLimits = DEFAULT_ZIP_LIMITS,
+): Promise<ZipContainerIdentity> {
+  if (!Number.isSafeInteger(blob.size) || blob.size < 1) {
+    throw new Error('ZIP identity: file is empty or too large');
+  }
+  const reader = new ZipReader(new BoundedIdentityBlobReader(blob), { strictness: 'strict' });
+  try {
+    const entries = await reader.getEntries({ strictness: 'strict', checkAmbiguity: true });
+    if (entries.length > limits.maxEntries) {
+      throw new ZipGuardError('too-many-entries', `entries: ${entries.length} > ${limits.maxEntries}`);
+    }
+
+    let declaredTotal = 0;
+    const normalizedEntries: { path: string; directory: boolean }[] = [];
+    for (const entry of entries) {
+      if (entry.bitFlag?.languageEncodingFlag === true) fatalUtf8Decoder.decode(entry.rawFilename);
+      const path = normalizedEntryPath(entry.filename, entry.directory);
+      if (path === null) {
+        throw new ZipGuardError('unsafe-path', `unsafe entry path: ${entry.filename}`);
+      }
+      const unixEntryType = rawUnixEntryType(entry.versionMadeBy, entry.externalFileAttributes);
+      if (unixEntryType === UNIX_ENTRY_TYPE_SYMLINK || unixEntryType === UNIX_ENTRY_TYPE_FIFO) {
+        throw new ZipGuardError(
+          'unsafe-entry-type',
+          `unsupported Unix entry type: ${entry.filename}`,
+        );
+      }
+      if (!Number.isSafeInteger(entry.uncompressedSize) || entry.uncompressedSize < 0) {
+        throw new ZipGuardError('entry-too-large', `invalid declared size: ${entry.filename}`);
+      }
+      if (entry.uncompressedSize > limits.maxEntryBytes) {
+        throw new ZipGuardError('entry-too-large', `${entry.filename}: ${entry.uncompressedSize}B`);
+      }
+      declaredTotal += entry.uncompressedSize;
+      if (!Number.isSafeInteger(declaredTotal) || declaredTotal > limits.maxTotalBytes) {
+        throw new ZipGuardError('total-too-large', `declared total exceeds ${limits.maxTotalBytes}B`);
+      }
+      normalizedEntries.push({ path, directory: entry.directory });
+    }
+    assertUnambiguousNamespace(normalizedEntries);
+
+    const files = new Set(normalizedEntries.filter((entry) => !entry.directory).map((entry) => entry.path));
+    // Frozen v1 says the exact root manifest is authoritative. Preserve that
+    // precedence even when forward-compatible/unknown extra entries exist.
+    if (files.has(V1_MANIFEST_ENTRY)) return 'v1';
+    if (files.has(NATIVE_PORTABLE_MANIFEST_ENTRY)) return 'native-portable';
+    return 'foreign';
+  } finally {
+    await reader.close().catch(() => {});
+  }
 }
 
 /** ZIP全体を読み、ガードを適用してエントリ配列を返す */
