@@ -376,6 +376,8 @@ export class NativeGsViewer {
   setSnapshot(snapshot: NativeProjectSnapshotV1): void {
     this.snapshot = snapshot;
     this.repositionCaptionId = null;
+    const retainedAssetIds = new Set(snapshot.assets.map((asset) => asset.id));
+    for (const [assetId, group] of this.assetGroups) group.visible = retainedAssetIds.has(assetId);
     for (const asset of snapshot.assets) {
       const binding = activeNativeBindingV1(snapshot, asset.id);
       const group = this.assetGroups.get(asset.id);
@@ -394,6 +396,30 @@ export class NativeGsViewer {
     }
     this.clearLongPress();
     this.updateResolution();
+  }
+
+  /** Releases loaded objects that are absent from an already-published snapshot. */
+  setSnapshotAndReleaseAbsentResources(snapshot: NativeProjectSnapshotV1): void {
+    this.setSnapshot(snapshot);
+    const retainedRepresentationIds = new Set(snapshot.representations.map((representation) => representation.id));
+    for (const [representationId, object] of this.representationObjects) {
+      if (retainedRepresentationIds.has(representationId)) continue;
+      if (object.userData.nativeSpark === true) {
+        object.removeFromParent();
+        this.sparkRuntime?.disposeSplat(representationId);
+      } else {
+        disposeObject(object);
+      }
+      this.representationObjects.delete(representationId);
+      this.representationBounds.delete(representationId);
+      this.resourceStates.delete(representationId);
+    }
+    const retainedAssetIds = new Set(snapshot.assets.map((asset) => asset.id));
+    for (const [assetId, group] of this.assetGroups) {
+      if (retainedAssetIds.has(assetId)) continue;
+      group.removeFromParent();
+      this.assetGroups.delete(assetId);
+    }
   }
 
   selectCaption(captionId: string | null): boolean {

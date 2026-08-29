@@ -13,6 +13,7 @@ import {
   normalizeNativeSim3,
   parseNativeActiveMarkerV1,
   parseNativeSnapshotV1,
+  removeNativeAssetV1,
   removeSelectedNativeCaptionV1,
   setNativeAssetVisibilityV1,
   serializeNativeActiveMarkerV1,
@@ -310,6 +311,116 @@ describe('native snapshot v1 and fixed degradation outcomes', () => {
     expect(emptied.captions).toEqual([]);
     expect(parseNativeSnapshotV1(serializeNativeSnapshotV1(emptied)).captions).toEqual([]);
     expect(() => removeSelectedNativeCaptionV1(removed, first.id)).toThrow(/selected Caption is missing/);
+  });
+
+  it('removes one unreferenced Asset complete retained closure and preserves every survivor', () => {
+    const original = snapshotFromDraft(makeNativeDraft(2).draft);
+    const gsBinding = activeNativeBindingV1(original, NATIVE_TEST_IDS.gsAsset)!;
+    const gsRevision = original.assetRevisions.find((revision) => revision.id === NATIVE_TEST_IDS.gsRevision)!;
+    const gs = original.representations.find((representation) => representation.id === NATIVE_TEST_IDS.gsRepresentation)!;
+    const proxy = original.representations.find((representation) => representation.id === NATIVE_TEST_IDS.proxyRepresentation)!;
+    const inactiveBindingId = testNativeId('bnd', 210);
+    const inactiveRevisionId = testNativeId('rev', 210);
+    const inactiveGsId = testNativeId('rep', 210);
+    const inactiveProxyId = testNativeId('rep', 211);
+    const inactiveFamilyId = testNativeId('fam', 210);
+    const withInactiveHistory: NativeProjectSnapshotV1 = {
+      ...original,
+      assetBindingRevisions: [...original.assetBindingRevisions, {
+        ...gsBinding,
+        id: inactiveBindingId,
+        assetRevisionId: inactiveRevisionId,
+      }],
+      assetRevisions: [...original.assetRevisions, {
+        ...gsRevision,
+        id: inactiveRevisionId,
+        representationIds: [inactiveGsId, inactiveProxyId],
+        anchorCompatibilityClasses: [{
+          id: testNativeId('cls', 210),
+          targetVariantFamilyIds: [inactiveFamilyId],
+        }],
+      }],
+      representations: [...original.representations, {
+        ...gs,
+        id: inactiveGsId,
+        representationFrameId: testNativeId('frm', 210),
+        variantFamilyId: inactiveFamilyId,
+      }, {
+        ...proxy,
+        id: inactiveProxyId,
+        representationFrameId: testNativeId('frm', 211),
+        variantFamilyId: testNativeId('fam', 211),
+        derivedFrom: [inactiveGsId],
+        proxyForGsVariantFamilyId: inactiveFamilyId,
+      }],
+      presentation: {
+        ...original.presentation,
+        displayMode: 'gs-only',
+        captionTargetAssetId: NATIVE_TEST_IDS.gsAsset,
+        hiddenAssetIds: [NATIVE_TEST_IDS.meshAsset, NATIVE_TEST_IDS.gsAsset],
+      },
+      savedViews: [{
+        id: NATIVE_TEST_IDS.savedView,
+        name: 'Surviving view',
+        orderKey: '0001',
+        projectFrameId: NATIVE_TEST_IDS.projectFrame,
+        camera: {
+          position: [5, 4, 8],
+          target: [0, 0, 0],
+          up: [0, 1, 0],
+          projection: { kind: 'perspective', verticalFovRadians: Math.PI / 3 },
+        },
+        background: { kind: 'solid', colorSrgb: [0.1, 0.2, 0.3] },
+      }],
+    };
+
+    const removed = removeNativeAssetV1(withInactiveHistory, NATIVE_TEST_IDS.gsAsset);
+    expect(removed.assets).toEqual(withInactiveHistory.assets.filter((asset) => asset.id !== NATIVE_TEST_IDS.gsAsset));
+    expect(removed.assetBindingRevisions).toEqual(
+      withInactiveHistory.assetBindingRevisions.filter((binding) => binding.assetId !== NATIVE_TEST_IDS.gsAsset),
+    );
+    expect(removed.assetRevisions).toEqual(
+      withInactiveHistory.assetRevisions.filter((revision) => revision.assetId !== NATIVE_TEST_IDS.gsAsset),
+    );
+    expect(removed.representations).toEqual(
+      withInactiveHistory.representations.filter((representation) => representation.assetId !== NATIVE_TEST_IDS.gsAsset),
+    );
+    expect(removed.presentation).toEqual({
+      displayMode: 'gs-only',
+      captionTargetAssetId: null,
+      hiddenAssetIds: [NATIVE_TEST_IDS.meshAsset],
+    });
+    expect(removed.project).toBe(withInactiveHistory.project);
+    expect(removed.captions).toBe(withInactiveHistory.captions);
+    expect(removed.savedViews).toBe(withInactiveHistory.savedViews);
+    expect(parseNativeSnapshotV1(serializeNativeSnapshotV1(removed))).toEqual(removed);
+
+    expect(() => removeNativeAssetV1(original, testNativeId('ast', 999))).toThrow(/selected Asset is missing/);
+    expect(() => removeNativeAssetV1({
+      ...original,
+      assets: original.assets.filter((asset) => asset.id === NATIVE_TEST_IDS.meshAsset),
+      assetBindingRevisions: original.assetBindingRevisions.filter((binding) => binding.assetId === NATIVE_TEST_IDS.meshAsset),
+      assetRevisions: original.assetRevisions.filter((revision) => revision.assetId === NATIVE_TEST_IDS.meshAsset),
+      representations: original.representations.filter((representation) => representation.assetId === NATIVE_TEST_IDS.meshAsset),
+      presentation: { ...original.presentation, captionTargetAssetId: NATIVE_TEST_IDS.meshAsset },
+    }, NATIVE_TEST_IDS.meshAsset)).toThrow(/final Asset/);
+    const ownedCaption = {
+      id: NATIVE_TEST_IDS.caption,
+      title: 'Owned Caption',
+      body: '',
+      anchor: {
+        kind: 'asset' as const,
+        assetId: NATIVE_TEST_IDS.gsAsset,
+        assetFrameId: NATIVE_TEST_IDS.gsFrame,
+        positionAsset: [1, 2, 3] as const,
+        authoredAssetRevisionId: NATIVE_TEST_IDS.gsRevision,
+        authoredAnchorCompatibilityId: NATIVE_TEST_IDS.gsClass,
+        hitEvidence: { method: 'manual' as const },
+      },
+    };
+    expect(() => removeNativeAssetV1({ ...original, captions: [ownedCaption] }, NATIVE_TEST_IDS.gsAsset)).toThrow(/owns 1 Caption/);
+    expect(original.assets).toHaveLength(2);
+    expect(original.representations).toHaveLength(3);
   });
 
   it('derives replacement review status and clears it only with an explicit active-class anchor', () => {

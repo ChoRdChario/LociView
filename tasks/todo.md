@@ -3158,3 +3158,56 @@ Review — 2026-08-30:
   boundary, so no workaround or alternate automation framework was introduced.
   Desktop visual deletion smoke and physical-iPhone touch/layout regression are
   unexecuted for the approved consolidated run and are not claimed PASS here.
+
+## Native Asset deletion — bounded production slice
+
+Checkpoint and plan — 2026-08-30:
+
+- [x] Reuse the approved non-cascade parent/child rule, existing mutable
+  whole-Project snapshot, explicit save and durable rollback
+- [x] Add one confirmation-gated Edit-mode action for an explicitly selected
+  Asset; recheck active screen, stable selection and write access after confirm
+- [x] Block deletion of the final Asset and any Asset owning Captions; report the
+  bounded reason without cascade, re-anchor or target inference
+- [x] Remove only the selected Asset's complete binding/revision/Representation
+  closure and clean only its hidden/Caption-target presentation references
+- [x] Soft-hide removed runtime objects before save, revive them on rollback and
+  release only absent runtime resources after successful save
+- [x] Keep source bytes and old inactive snapshots locally; add no GC, secure
+  erase, tombstone, history, schema/package field or version
+- [x] Prove selected-only pruning, refusal cases, valid round-trip, viewer
+  removal/revival and existing save/package behavior with minimal acceptance
+- [x] Obtain one independent read-only P0/P1 review and run final-tree typecheck,
+  full test, normal and BASE_PATH builds once
+- [x] Defer physical-iPhone deletion regression to the approved consolidated run
+  and record it as unexecuted, not PASS
+- [x] Commit this bounded slice independently and leave the worktree clean
+
+Exclusions and stop conditions:
+
+- Caption cascade/re-anchor, empty Project, Asset trash/undo/history, binary GC,
+  secure erase, capacity recovery, CAS, journal/transaction, migration and final
+  responsive polish remain outside.
+- Stop rather than widening if survivor records legally reference the removed
+  Asset, or if rollback-safe soft-hide needs a new resource architecture.
+
+Review — 2026-08-30:
+
+- Implemented one explicit Edit-mode deletion action. The UI and schema helper
+  independently block the final Asset and every Asset owning a Caption, then
+  prune the selected Asset's complete retained binding/revision/Representation
+  closure without cascade or target inference.
+- Before save, the absent Asset group is soft-hidden so render, pick, gizmo,
+  Caption markers and fit bounds exclude it while durable rollback can revive
+  the loaded objects. Successful publication releases only absent Mesh/Proxy/GS
+  runtime objects and groups. Project-local immutable source bytes are retained.
+- Focused schema/storage/package tests passed 37/37. The independent reviewer
+  found no actionable P0/P1 and ran the full suite: 50 files, 1,405 passed and
+  21 todo. Typecheck, normal production build, `/LociView/` BASE_PATH build and
+  `git diff --check` passed. Spark remains a separate lazy chunk and outside the
+  15-entry PWA precache; no representative PLY entered the build.
+- The Browser integration stopped at its own approved initialization boundary,
+  so no alternate automation dependency or browser-security workaround was
+  added. Desktop visual deletion and physical-iPhone touch/layout regression
+  remain unexecuted for the Product Owner-approved consolidated run and are not
+  claimed PASS here.

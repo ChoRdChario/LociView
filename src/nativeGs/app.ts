@@ -15,6 +15,7 @@ import {
   nativeModelProfileId,
   newNativeId,
   normalizeNativeSim3,
+  removeNativeAssetV1,
   removeSelectedNativeCaptionV1,
   setNativeAssetVisibilityV1,
   updateSelectedNativeCaptionV1,
@@ -806,6 +807,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     let captionMoveActive = false;
     let creatingCaption = false;
     let captionDeleteConfirmationInFlight = false;
+    let assetDeleteConfirmationInFlight = false;
+    let assetClosureChanged = false;
     let selectedSavedViewId = initial.savedViews?.[0]?.id ?? null;
     const canvas = el('canvas', { 'aria-label': '3DモデルとGaussian Splattingのプロジェクト' });
     const accessBadge = el('span', { class: 'ng-badge' });
@@ -838,6 +841,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const replaceSource = el('input', { type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply' });
     const replaceProxy = el('input', { type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply', disabled: 'true' });
     const replaceButton = el('button', { class: 'primary' }, '選択したモデルを差し替えて保存');
+    const deleteAsset = el('select');
+    const deleteAssetButton = el('button', { class: 'danger' }, '選択したモデルをプロジェクトから削除');
     const transformAsset = el('select');
     const translationInputs = [0, 1, 2].map(() => el('input', { type: 'number', step: '0.01' }));
     const rotationInputs = [0, 1, 2].map(() => el('input', { type: 'number', step: '1' }));
@@ -876,17 +881,45 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       asset.id,
       activeNativeRepresentationsV1(working, asset.id).map((representation) => representation.role),
     ]));
+    const targetOptions = new Map<string, HTMLOptionElement>();
+    const transformOptions = new Map<string, HTMLOptionElement>();
+    const replaceOptions = new Map<string, HTMLOptionElement>();
+    const deleteOptions = new Map<string, HTMLOptionElement>();
+    const visibilityRows = new Map<string, HTMLElement>();
     for (const asset of working.assets) {
       const roles = rolesByAsset.get(asset.id) ?? [];
       const role = roles.includes('gsPrimary') ? 'Gaussian Splatting' : '3Dモデル';
-      target.append(el('option', { value: asset.id }, `${asset.label} (${role})`));
-      transformAsset.append(el('option', { value: asset.id }, `${asset.label} (${role})`));
-      replaceAsset.append(el('option', { value: asset.id }, `${asset.label} (${role})`));
+      targetOptions.set(asset.id, el('option', { value: asset.id }, `${asset.label} (${role})`));
+      transformOptions.set(asset.id, el('option', { value: asset.id }, `${asset.label} (${role})`));
+      replaceOptions.set(asset.id, el('option', { value: asset.id }, `${asset.label} (${role})`));
+      deleteOptions.set(asset.id, el('option', { value: asset.id }, `${asset.label} (${role})`));
       const checkbox = el('input', { type: 'checkbox', checked: isNativeAssetVisibleV1(working, asset.id) });
       visibilityInputs.set(asset.id, checkbox);
-      visibilityList.append(el('label', { class: 'ng-project-row' }, checkbox, el('strong', {}, asset.label), el('span', { class: 'ng-note' }, role)));
+      visibilityRows.set(asset.id, el('label', { class: 'ng-project-row' }, checkbox, el('strong', {}, asset.label), el('span', { class: 'ng-note' }, role)));
     }
-    target.value = working.presentation.captionTargetAssetId ?? '';
+    const syncAssetControlMembership = (): void => {
+      const previousTransform = transformAsset.value;
+      const previousReplacement = replaceAsset.value;
+      const previousDeletion = deleteAsset.value;
+      clear(target);
+      clear(transformAsset);
+      clear(replaceAsset);
+      clear(deleteAsset);
+      clear(visibilityList);
+      for (const asset of working.assets) {
+        target.append(targetOptions.get(asset.id)!);
+        transformAsset.append(transformOptions.get(asset.id)!);
+        replaceAsset.append(replaceOptions.get(asset.id)!);
+        deleteAsset.append(deleteOptions.get(asset.id)!);
+        visibilityList.append(visibilityRows.get(asset.id)!);
+      }
+      target.value = working.presentation.captionTargetAssetId ?? '';
+      const fallbackAssetId = working.assets[0]!.id;
+      transformAsset.value = working.assets.some((asset) => asset.id === previousTransform) ? previousTransform : fallbackAssetId;
+      replaceAsset.value = working.assets.some((asset) => asset.id === previousReplacement) ? previousReplacement : fallbackAssetId;
+      deleteAsset.value = working.assets.some((asset) => asset.id === previousDeletion) ? previousDeletion : fallbackAssetId;
+    };
+    syncAssetControlMembership();
 
     const setDiagnostics = (messages: readonly string[]): void => {
       clear(diagnostics);
@@ -1033,6 +1066,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       replaceSource.disabled = !editable;
       replaceProxy.disabled = !editable || replaceKind.value !== 'gs';
       replaceButton.disabled = !editable;
+      deleteAsset.disabled = !editable || assetDeleteConfirmationInFlight;
+      deleteAssetButton.disabled = !editable || assetDeleteConfirmationInFlight;
       repositionCaption.disabled = !editable || caption === undefined || !captionVisible;
       deleteCaption.disabled = !editable || caption === undefined || captionDeleteConfirmationInFlight;
       captureSavedView.disabled = !editable;
@@ -1136,6 +1171,12 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
           el('label', { class: 'ng-field' }, el('span', {}, '新しいGSのキャプション配置用補助モデル（任意）'), replaceProxy),
           replaceButton,
           el('p', { class: 'ng-note' }, 'モデルの位置とキャプション本文は保ちます。表面が同じとは推測しないため、既存キャプションは必要に応じて再配置してください。'),
+        ),
+        el('details', { class: 'ng-card' },
+          el('summary', {}, 'モデルをプロジェクトから削除'),
+          el('label', { class: 'ng-field' }, el('span', {}, '削除するモデル'), deleteAsset),
+          deleteAssetButton,
+          el('p', { class: 'ng-note' }, 'このモデルにキャプションがある場合は、先にそのキャプションを削除してください。元のモデルファイルは変更しません。'),
         ),
         el('details', { class: 'ng-card' },
           el('summary', {}, 'モデルの位置を調整'),
@@ -1462,6 +1503,54 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         }
       });
     });
+    deleteAssetButton.addEventListener('click', () => {
+      if (activeViewer !== viewer || !canMutateWorking() || assetDeleteConfirmationInFlight) return;
+      const asset = working.assets.find((candidate) => candidate.id === deleteAsset.value);
+      if (asset === undefined) return;
+      if (working.assets.length === 1) {
+        runtimeStatus.className = 'ng-error';
+        runtimeStatus.textContent = '最後のモデルは削除できません。プロジェクト全体を削除する場合は、一覧画面の「この端末から削除」を使用してください。';
+        return;
+      }
+      const ownedCaptionCount = working.captions.filter((caption) => caption.anchor.assetId === asset.id).length;
+      if (ownedCaptionCount > 0) {
+        runtimeStatus.className = 'ng-error';
+        runtimeStatus.textContent = `このモデルには${ownedCaptionCount}件のキャプションがあります。先にそのキャプションを削除してください。`;
+        return;
+      }
+      const assetId = asset.id;
+      const assetLabel = asset.label;
+      assetDeleteConfirmationInFlight = true;
+      updateAccess();
+      void confirmDialog(
+        'モデルをプロジェクトから削除',
+        `「${assetLabel}」をこのプロジェクトから削除しますか？ 元ファイルは変更しません。プロジェクトを保存するまでは確定しません。`,
+      ).then((confirmed) => {
+        if (
+          !confirmed || activeViewer !== viewer || !canMutateWorking() ||
+          deleteAsset.value !== assetId || !working.assets.some((candidate) => candidate.id === assetId)
+        ) return;
+        working = removeNativeAssetV1(working, assetId);
+        assetClosureChanged = true;
+        creatingCaption = false;
+        captionMoveActive = false;
+        viewer.stopCaptionPositionEditing();
+        viewer.setSnapshot(working);
+        syncAssetControlMembership();
+        syncVisibilityControls();
+        populateTransform();
+        populateCaptionFields();
+        markDirty();
+        runtimeStatus.className = 'ng-status';
+        runtimeStatus.textContent = `「${assetLabel}」を保存対象から削除しました。プロジェクトを保存すると確定します。`;
+      }).catch((error: unknown) => {
+        runtimeStatus.className = 'ng-error';
+        runtimeStatus.textContent = `モデルを削除できませんでした：${error instanceof Error ? error.message : String(error)}`;
+      }).finally(() => {
+        assetDeleteConfirmationInFlight = false;
+        updateAccess();
+      });
+    });
 
     display.addEventListener('change', () => {
       if (!canMutateWorking()) return;
@@ -1706,17 +1795,22 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         durable = saved;
         working = saved;
         unsavedChanges.clear();
-        viewer.setSnapshot(saved);
+        if (assetClosureChanged) viewer.setSnapshotAndReleaseAbsentResources(saved);
+        else viewer.setSnapshot(saved);
+        assetClosureChanged = false;
         creatingCaption = false;
         captionMoveActive = false;
         viewer.selectCaption(selectedCaptionId);
+        syncAssetControlMembership();
         syncVisibilityControls();
         rebuildCaptionList();
         populateCaptionFields();
+        populateTransform();
         rebuildSavedViewOptions();
         runtimeStatus.textContent = 'プロジェクトを保存しました。';
       }).catch((error: unknown) => {
         working = durable;
+        assetClosureChanged = false;
         selectedCaptionId = durable.captions.some((caption) => caption.id === selectedCaptionId)
           ? selectedCaptionId
           : durable.captions[0]?.id ?? null;
@@ -1724,6 +1818,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         creatingCaption = false;
         captionMoveActive = false;
         viewer.selectCaption(selectedCaptionId);
+        syncAssetControlMembership();
         syncVisibilityControls();
         rebuildCaptionList();
         selectedSavedViewId = durable.savedViews?.some((view) => view.id === selectedSavedViewId)
@@ -1731,6 +1826,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
           : durable.savedViews?.[0]?.id ?? null;
         rebuildSavedViewOptions();
         populateCaptionFields();
+        populateTransform();
         unsavedChanges.clear();
         runtimeStatus.textContent = `保存できませんでした：${error instanceof Error ? error.message : String(error)}。最後に保存された状態へ戻しました。`;
       }).finally(() => {

@@ -1699,3 +1699,44 @@ snapshot; it is not a separate Asset operation, revision system or transaction.
 - Desktop executable verification is required for this slice. Touch/layout and
   physical-iPhone deletion regression remain in the Product Owner-approved
   consolidated physical run and are not credited as PASS here.
+
+## 25. Bounded native Asset deletion (approved Asset lifecycle; 2026-08-30 implementation slice)
+
+An Edit-mode user MUST be able to remove one explicitly selected unwanted Asset
+from the current native Project. The operation edits the existing mutable
+whole-Project snapshot and requires ordinary-language confirmation. It adds no
+Asset transaction, lifecycle record, trash or history system.
+
+- Deletion is blocked while the Asset owns any Caption, including hidden or
+  review-needed Captions. The UI reports the count and asks the user to remove
+  those Captions first; it never cascades, re-anchors them, chooses another Asset
+  or recomputes a position from a Proxy. Deleting the final remaining Asset is
+  also blocked because snapshot v1 requires at least one Asset.
+- Confirmation completion rechecks the active screen, Edit-mode project write
+  access and exact selected Asset ID. Cancel, lock loss, screen replacement or
+  selection change leaves the Project unchanged. View mode cannot start or
+  complete deletion.
+- The mutable snapshot removes the selected Asset and every retained
+  `AssetBindingRevision`, `AssetRevision` and `Representation` owned by that
+  Asset, including inactive replacement history and any same-Asset Interaction
+  Proxy. It removes the ID from `hiddenAssetIds` and changes
+  `captionTargetAssetId` to `null` only when that exact Asset was targeted. It
+  preserves Project identity, display preset, all other Assets, records,
+  transforms, visibility, Captions, SavedViews and source bytes exactly.
+- Until explicit Project save, the removed Asset's already-loaded viewer objects
+  are retained but excluded from render, pick, gizmo and fit bounds so a failed
+  save or discard can restore the durable snapshot without rereading bytes. A
+  successful save releases the absent Asset's Mesh/GS objects and group from the
+  current viewer; no removed runtime resource remains active.
+- Save uses the existing project-scoped writer and snapshot-last/marker-last
+  publication. Removed Representation files are not deleted in this slice; old
+  snapshots and unreferenced immutable bytes may remain locally for rollback and
+  crash safety. No capacity-recovery or secure-erasure claim is made.
+- Native portable package version `1` continues to enumerate only the saved
+  snapshot's Representation closure, so a later export omits removed records and
+  bytes while preserving every survivor. Native snapshot/package versions and
+  fields remain unchanged.
+- This slice excludes Caption cascade/re-anchor, empty Projects, undo/trash,
+  revision UI, blob garbage collection, secure erase, CAS, journal/transaction,
+  migration and final responsive polish. Physical-iPhone regression remains in
+  the Product Owner-approved consolidated run and is not credited as PASS here.

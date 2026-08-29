@@ -841,3 +841,37 @@ export function removeSelectedNativeCaptionV1(
     ],
   };
 }
+
+/**
+ * Removes one unreferenced Asset and its complete retained record closure from
+ * the mutable snapshot. Source bytes are intentionally outside this helper.
+ */
+export function removeNativeAssetV1(
+  snapshot: NativeProjectSnapshotV1,
+  assetId: string,
+): NativeProjectSnapshotV1 {
+  if (!snapshot.assets.some((asset) => asset.id === assetId)) {
+    throw new Error('native snapshot: selected Asset is missing');
+  }
+  if (snapshot.assets.length === 1) {
+    throw new Error('native snapshot: the final Asset cannot be removed');
+  }
+  const ownedCaptionCount = snapshot.captions.filter((caption) => caption.anchor.assetId === assetId).length;
+  if (ownedCaptionCount > 0) {
+    throw new Error(`native snapshot: selected Asset owns ${ownedCaptionCount} Caption(s)`);
+  }
+  return {
+    ...snapshot,
+    assets: snapshot.assets.filter((asset) => asset.id !== assetId),
+    assetBindingRevisions: snapshot.assetBindingRevisions.filter((binding) => binding.assetId !== assetId),
+    assetRevisions: snapshot.assetRevisions.filter((revision) => revision.assetId !== assetId),
+    representations: snapshot.representations.filter((representation) => representation.assetId !== assetId),
+    presentation: {
+      ...snapshot.presentation,
+      captionTargetAssetId: snapshot.presentation.captionTargetAssetId === assetId
+        ? null
+        : snapshot.presentation.captionTargetAssetId,
+      hiddenAssetIds: (snapshot.presentation.hiddenAssetIds ?? []).filter((hiddenAssetId) => hiddenAssetId !== assetId),
+    },
+  };
+}

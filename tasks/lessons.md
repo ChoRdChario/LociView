@@ -192,6 +192,12 @@
 - Product Ownerが明示的に延期した低懸念項目は未実施として記録し、mobile-sensitiveな複数sliceを一つの統合回帰runへまとめる。延期を個別iPhone PASS、release/device gate evidence、または恒久的な試験免除として扱わない。
 - 物理端末を即時blockerにするのは、新しいmobile API、storage方式、renderer/input方式、大容量memory境界、またはDesktop evidenceで代替できないP0/P1 riskがある場合に絞る。既知経路の小さなUI wiringはまとめて確認する。
 
+## 2026-08-30: release計測よりユーザー機能の完成を先にする
+
+- Product Ownerがユーザー機能完成を優先した段階では、G0/E5の計測器、trace kit、evidence収集UIを次のproduction workstreamへ繰り上げない。これらはrelease前laneへ戻し、通常利用者が作成・編集・保存・交換するために不足する機能を先に閉じる。
+- gate/evidence toolingがcritical path上に存在しても、それだけでuser-visible product workを中断しない。割り込ませるのは、未解決P0/P1がデータ損失・重大security・重大互換性を生む場合、または後続機能の実装を直接危険にする場合に限る。
+- 次sliceは小さい件数を消せることではなく、Product Contract上の未成立なuser outcomeを最も大きく閉じるものから選ぶ。計測の延期をrelease PASSやevidence免除とは扱わず、最終候補treeの実機・gate laneとして明示的に残す。
+
 ## 2026-08-30: 技術acceptance用controlを本番のCaption導線へ昇格させない
 
 - Caption target、Caption選択、新規作成、初期配置、位置調整、snapshot保存を別々のtechnical controlとして並べただけでは、各機能が動いても一般利用者には操作順が分からない。本番UXの成立を機能PASSから推定しない。

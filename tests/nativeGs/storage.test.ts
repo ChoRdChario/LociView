@@ -10,6 +10,7 @@ import {
 import {
   activateNativeManualAssetTransformV1,
   normalizeNativeSim3,
+  removeNativeAssetV1,
   setNativeAssetVisibilityV1,
 } from '../../src/nativeGs/schema';
 import {
@@ -185,6 +186,35 @@ describe('native project blob-first/marker-last publication', () => {
     expect(activeNativeBindingV1(reopened, NATIVE_TEST_IDS.meshAsset)?.assetToProject).toEqual(
       activeNativeBindingV1(first, NATIVE_TEST_IDS.meshAsset)?.assetToProject,
     );
+    session.release();
+  });
+
+  it('publishes an Asset removal without rewriting or deleting immutable source bytes', async () => {
+    const fs = new RecordingMemoryFS();
+    const session = await editable(fs);
+    const { draft, sources } = makeNativeDraft(2);
+    const first = await createNativeProjectV1(session.workspace, draft, sources);
+    const removedRepresentationIds = first.representations
+      .filter((representation) => representation.assetId === NATIVE_TEST_IDS.gsAsset)
+      .map((representation) => representation.id);
+    const binaryWriteCount = fs.writes.filter((path) => path.endsWith('.bin')).length;
+
+    const saved = await saveNativeProjectV1(
+      session.workspace,
+      removeNativeAssetV1(first, NATIVE_TEST_IDS.gsAsset),
+    );
+    const reopened = (await openNativeProjectV1(fs, first.project.id)).snapshot;
+
+    expect(saved.generation).toBe(first.generation + 1);
+    expect(reopened.assets.map((asset) => asset.id)).toEqual([NATIVE_TEST_IDS.meshAsset]);
+    expect(reopened.representations.map((representation) => representation.id)).toEqual([
+      NATIVE_TEST_IDS.meshRepresentation,
+    ]);
+    expect(fs.writes.filter((path) => path.endsWith('.bin'))).toHaveLength(binaryWriteCount);
+    for (const representationId of removedRepresentationIds) {
+      expect(await fs.exists(nativeRepresentationPath(first.project.id, representationId))).toBe(true);
+    }
+    expect(await fs.exists(nativeRepresentationPath(first.project.id, NATIVE_TEST_IDS.meshRepresentation))).toBe(true);
     session.release();
   });
 
