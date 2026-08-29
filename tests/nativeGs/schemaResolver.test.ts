@@ -167,6 +167,72 @@ describe('native snapshot v1 and fixed degradation outcomes', () => {
     });
   });
 
+  it('defaults old snapshots to no SavedViews and round-trips valid perspective and orthographic views', () => {
+    const base = snapshotFromDraft(makeNativeDraft().draft);
+    const oldRecord = JSON.parse(serializeNativeSnapshotV1(base)) as Record<string, unknown>;
+    delete oldRecord.savedViews;
+    expect(parseNativeSnapshotV1(`${JSON.stringify(oldRecord)}\n`).savedViews).toEqual([]);
+
+    const perspective = {
+      id: NATIVE_TEST_IDS.savedView,
+      name: 'Overview',
+      orderKey: '0001',
+      projectFrameId: NATIVE_TEST_IDS.projectFrame,
+      camera: {
+        position: [5, 4, 8] as const,
+        target: [0, 0, 0] as const,
+        up: [0, 1, 0] as const,
+        projection: { kind: 'perspective' as const, verticalFovRadians: Math.PI / 3 },
+      },
+      background: { kind: 'solid' as const, colorSrgb: [16 / 255, 23 / 255, 37 / 255] as const },
+    };
+    const orthographic = {
+      ...perspective,
+      id: testNativeId('view', 2),
+      name: 'Plan',
+      orderKey: '0002',
+      camera: {
+        position: [0, 10, 0] as const,
+        target: [0, 0, 0] as const,
+        up: [0, 0, -1] as const,
+        projection: { kind: 'orthographic' as const, verticalSpan: 12 },
+      },
+    };
+    const parsed = parseNativeSnapshotV1(serializeNativeSnapshotV1({
+      ...base,
+      savedViews: [orthographic, perspective],
+    }));
+    expect(parsed.savedViews).toEqual([perspective, orthographic]);
+  });
+
+  it('rejects invalid or foreign SavedView camera records instead of repairing them', () => {
+    const base = snapshotFromDraft(makeNativeDraft().draft);
+    const valid = {
+      id: NATIVE_TEST_IDS.savedView,
+      name: 'Overview',
+      orderKey: '0001',
+      projectFrameId: NATIVE_TEST_IDS.projectFrame,
+      camera: {
+        position: [2, 2, 2] as const,
+        target: [0, 0, 0] as const,
+        up: [0, 1, 0] as const,
+        projection: { kind: 'perspective' as const, verticalFovRadians: Math.PI / 4 },
+      },
+      background: { kind: 'solid' as const, colorSrgb: [0, 0.25, 1] as const },
+    };
+    const parseWith = (savedViews: readonly unknown[]) => parseNativeSnapshotV1(JSON.stringify({ ...base, savedViews }));
+
+    expect(() => parseWith([{ ...valid, projectFrameId: testNativeId('frm', 99) }])).toThrow(/ProjectFrame is foreign/);
+    expect(() => parseWith([{ ...valid, camera: { ...valid.camera, target: valid.camera.position } }])).toThrow(/position and target must differ/);
+    expect(() => parseWith([{ ...valid, camera: { ...valid.camera, up: [-2, -2, -2] } }])).toThrow(/must not be parallel/);
+    expect(() => parseWith([{
+      ...valid,
+      camera: { ...valid.camera, projection: { kind: 'perspective', verticalFovRadians: Math.PI } },
+    }])).toThrow(/between zero and pi/);
+    expect(() => parseWith([{ ...valid, background: { kind: 'solid', colorSrgb: [0, 1.01, 0] } }])).toThrow(/must be normalized/);
+    expect(() => parseWith([valid, valid])).toThrow(/duplicate SavedView id/);
+  });
+
   it('updates only the selected Caption and fails closed if its stable ID disappears', () => {
     const ids = NATIVE_TEST_IDS;
     const first = {

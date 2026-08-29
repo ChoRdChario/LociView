@@ -2754,3 +2754,62 @@ Verification — 2026-08-30:
   above remains unchecked, and touch/long-press remains explicitly deferred to
   the Product Owner-approved consolidated physical-iPhone run; neither is
   inferred as PASS.
+
+## Native SavedView and camera — bounded production slice
+
+Checkpoint and plan — 2026-08-30:
+
+- [x] Add one optional `savedViews` collection to native snapshot v1; an absent
+  field opens as no saved views, and package v1 entry/manifest structure remains
+  unchanged
+- [x] Reuse the approved ProjectFrame camera shape: position, target, up and
+  exactly one perspective vertical FOV or orthographic vertical span; reject
+  invalid/non-finite/degenerate camera records rather than repairing them
+- [x] Store one stable ID, plain-language name, stable order, ProjectFrame ID,
+  complete camera and solid background per named view; do not add DisplaySet,
+  lifecycle/revision, default-view or per-view visibility semantics
+- [x] Let users capture, overwrite, apply and delete named views; provide the
+  existing LociMyu-style ±X/Y/Z, fit, perspective/orthographic and background
+  controls without exposing renderer or frame terminology in the ordinary UI
+- [x] Keep Asset transforms/visibility and Caption ownership/`positionAsset`
+  unchanged when camera/projection/background/view selection changes
+- [x] Prove old-snapshot defaulting, camera validation and exact
+  save/reopen/portable export-delete-restore round-trip using the existing native
+  fixture; add no new matrix or media/renderer fixture
+- [x] Obtain one independent read-only P0/P1 review and run final typecheck/full
+  test/build once on the executable tree
+- [x] Defer physical-iPhone view/projection controls to the approved consolidated
+  mobile run and record them as unexecuted, not PASS
+- [x] Commit this bounded slice independently and leave the worktree clean
+
+Exclusions and stop conditions:
+
+- DisplaySet/material linkage, default-route integration, attachments, ordinary
+  points, migration, view animation/thumbnail, per-view Asset visibility,
+  Compare, renderer abstraction and final responsive polish remain outside.
+- Stop rather than widening if orthographic switching requires a renderer
+  architecture change, or if the optional snapshot field cannot round-trip
+  through portable package v1 without changing its logical entry structure.
+
+Review — 2026-08-30:
+
+- Added only optional native snapshot `savedViews`; an absent field normalizes
+  to `[]`. Native portable package v1 retains the same manifest and logical
+  entries because it already carries the exact snapshot entry.
+- Named views capture/apply one complete ProjectFrame camera plus solid sRGB
+  background. ±XYZ, fit, perspective/orthographic and background controls use
+  the current visible-Asset union without changing Asset visibility/transform
+  or Caption ownership/`positionAsset`.
+- Independent review found one P1: OrbitControls orthographic wheel/pinch zoom
+  was initially outside the stored span. Capture/switch now uses effective
+  `(top-bottom)/zoom`, and every applied span normalizes zoom to `1`.
+  Targeted re-review: PASS, no remaining P0/P1.
+- `npm run typecheck`: PASS. Focused native schema/storage/portable tests:
+  32/32 PASS. Final `npm test`: PASS (47 files, 1,394 passed and 21 existing
+  TODO/skipped). Normal and `BASE_PATH=/LociView/` builds: PASS.
+- Spark remains the dedicated `native-gs-spark-2.1.0.js` lazy chunk, absent
+  from the 13-entry PWA precache and from the ordinary route entry document.
+- Exact-tree browser gesture/layout evidence was not executed because safe
+  browser automation remains unavailable in this execution environment.
+  Physical iPhone view/projection controls remain intentionally unexecuted for
+  the Product Owner-approved consolidated mobile run; neither is inferred PASS.

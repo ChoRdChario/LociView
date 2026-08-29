@@ -142,14 +142,27 @@ describe('native project blob-first/marker-last publication', () => {
         uniformScale: 0.5,
       },
     );
-    const next = await saveNativeProjectV1(
-      session.workspace,
-      setNativeAssetVisibilityV1(aligned, NATIVE_TEST_IDS.meshAsset, false),
-    );
+    const next = await saveNativeProjectV1(session.workspace, {
+      ...setNativeAssetVisibilityV1(aligned, NATIVE_TEST_IDS.meshAsset, false),
+      savedViews: [{
+        id: NATIVE_TEST_IDS.savedView,
+        name: 'Overview',
+        orderKey: '0001',
+        projectFrameId: NATIVE_TEST_IDS.projectFrame,
+        camera: {
+          position: [6, 4, 8],
+          target: [0, 0, 0],
+          up: [0, 1, 0],
+          projection: { kind: 'perspective', verticalFovRadians: Math.PI / 3 },
+        },
+        background: { kind: 'solid', colorSrgb: [0.1, 0.2, 0.3] },
+      }],
+    });
     expect(next.generation).toBe(2);
     expect(fs.writes.filter((path) => path.endsWith('.bin'))).toHaveLength(binaryWriteCount);
     const reopened = (await openNativeProjectV1(fs, first.project.id)).snapshot;
     expect(reopened.presentation.hiddenAssetIds).toEqual([NATIVE_TEST_IDS.meshAsset]);
+    expect(reopened.savedViews).toEqual(next.savedViews);
     expect(reopened.representations).toEqual(first.representations);
     expect(activeNativeBindingV1(reopened, NATIVE_TEST_IDS.gsAsset)?.assetToProject).toEqual(normalizeNativeSim3({
       translation: [8, 1.5, -4],

@@ -180,6 +180,19 @@ async function makeSourceProject(): Promise<{
         hitEvidence: { method: 'manual' },
       },
     }],
+    savedViews: [{
+      id: NATIVE_TEST_IDS.savedView,
+      name: 'Portable overview',
+      orderKey: '0001',
+      projectFrameId: NATIVE_TEST_IDS.projectFrame,
+      camera: {
+        position: [8, 6, 10],
+        target: [1, 0, -2],
+        up: [0, 1, 0],
+        projection: { kind: 'orthographic', verticalSpan: 14 },
+      },
+      background: { kind: 'solid', colorSrgb: [0.05, 0.1, 0.2] },
+    }],
   };
   const sources = new Map(base.sources);
   sources.set(NATIVE_TEST_IDS.gsRepresentation, gs.source);
@@ -253,6 +266,7 @@ describe('native portable .lociview streamed backup/restore', () => {
       anchor: { assetId: NATIVE_TEST_IDS.meshAsset, positionAsset: [-2, 0.25, 4] },
     });
     expect(inspection.snapshot.presentation.hiddenAssetIds).toEqual([NATIVE_TEST_IDS.meshAsset]);
+    expect(inspection.snapshot.savedViews).toEqual(source.snapshot.savedViews);
     const target = new ChunkedMemoryFS();
     const restoreSession = await acquireNew(target);
     const restored = await restoreNativePortablePackageV1(restoreSession.workspace, target, blob);

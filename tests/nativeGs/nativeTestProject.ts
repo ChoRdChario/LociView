@@ -93,6 +93,7 @@ export const NATIVE_TEST_IDS = Object.freeze({
   proxyRepresentationFrame: testNativeId('frm', 6),
   proxyFamily: testNativeId('fam', 3),
   caption: testNativeId('cap', 1),
+  savedView: testNativeId('view', 1),
   snapshot: testNativeId('snp', 1),
 });
 
@@ -300,5 +301,6 @@ export function snapshotFromDraft(draft: NativeProjectDraftV1): NativeProjectSna
     })),
     presentation: draft.presentation,
     captions: draft.captions,
+    savedViews: draft.savedViews ?? [],
   };
 }

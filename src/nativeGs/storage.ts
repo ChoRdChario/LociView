@@ -266,6 +266,7 @@ export async function createNativeProjectV1(
     representations,
     presentation: draft.presentation,
     captions: draft.captions,
+    savedViews: draft.savedViews ?? [],
   };
   onStatus?.('Writing and verifying native snapshot v1…');
   const verified = await writeVerifiedSnapshot(fs, snapshot);

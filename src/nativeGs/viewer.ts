@@ -17,9 +17,11 @@ import {
   normalizeNativeSim3,
   type NativeCaptionV1,
   type NativeCanonicalTransformV1,
+  type NativeProjectCameraV1,
   type NativeProjectSnapshotV1,
   type NativeRepresentationV1,
   type NativeSim3V1,
+  type NativeSolidBackgroundV1,
 } from './schema';
 import { NativeSparkRuntime } from './sparkRuntime';
 import type { WorkspaceReadableFile } from '../platform/fs';
@@ -119,9 +121,10 @@ function errorMessage(error: unknown): string {
 
 export class NativeGsViewer {
   private readonly scene = new THREE.Scene();
-  private readonly camera = new THREE.PerspectiveCamera(48, 1, 0.01, 100_000);
+  private readonly perspectiveCamera = new THREE.PerspectiveCamera(48, 1, 0.01, 100_000);
+  private camera: THREE.PerspectiveCamera | THREE.OrthographicCamera = this.perspectiveCamera;
   private readonly renderer: THREE.WebGLRenderer;
-  private readonly controls: OrbitControls;
+  private controls: OrbitControls;
   private readonly gizmo: TransformControls;
   private readonly gizmoRoot: THREE.Object3D;
   private readonly raycaster = new THREE.Raycaster();
@@ -145,6 +148,7 @@ export class NativeGsViewer {
   private disposed = false;
   private animationFrame = 0;
   private resolution: NativeSliceResolutionV1;
+  private backgroundSrgb: readonly [number, number, number] = [16 / 255, 23 / 255, 37 / 255];
 
   private static readonly LONG_PRESS_MS = 500;
   private static readonly LONG_PRESS_MOVE_PX = 10;
@@ -157,7 +161,7 @@ export class NativeGsViewer {
     this.snapshot = snapshot;
     this.callbacks = callbacks;
     this.resolution = resolveNativeGsSliceV1(snapshot, this.resourceStates);
-    this.scene.background = new THREE.Color(0x101725);
+    this.scene.background = new THREE.Color().setRGB(...this.backgroundSrgb, THREE.SRGBColorSpace);
     this.camera.position.set(5.5, 4.2, 8.5);
     this.camera.lookAt(0, 0.4, 0);
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false });
@@ -260,6 +264,111 @@ export class NativeGsViewer {
 
   getResolution(): NativeSliceResolutionV1 {
     return this.resolution;
+  }
+
+  getProjectCamera(): NativeProjectCameraV1 {
+    const projection = this.camera instanceof THREE.PerspectiveCamera
+      ? { kind: 'perspective' as const, verticalFovRadians: THREE.MathUtils.degToRad(this.camera.fov) }
+      : { kind: 'orthographic' as const, verticalSpan: (this.camera.top - this.camera.bottom) / this.camera.zoom };
+    return {
+      position: tuple(this.camera.position),
+      target: tuple(this.controls.target),
+      up: tuple(this.camera.up),
+      projection,
+    };
+  }
+
+  applyProjectCamera(camera: NativeProjectCameraV1): void {
+    this.setOrthographic(camera.projection.kind === 'orthographic');
+    this.camera.position.fromArray(camera.position);
+    this.camera.up.fromArray(camera.up);
+    this.controls.target.fromArray(camera.target);
+    if (this.camera instanceof THREE.PerspectiveCamera && camera.projection.kind === 'perspective') {
+      this.camera.fov = THREE.MathUtils.radToDeg(camera.projection.verticalFovRadians);
+    } else if (this.camera instanceof THREE.OrthographicCamera && camera.projection.kind === 'orthographic') {
+      this.setOrthographicVerticalSpan(camera.projection.verticalSpan);
+    }
+    this.updateCameraClipping();
+    this.resize();
+    this.controls.update();
+    this.camera.updateMatrixWorld(true);
+  }
+
+  getBackground(): NativeSolidBackgroundV1 {
+    return { kind: 'solid', colorSrgb: [...this.backgroundSrgb] as [number, number, number] };
+  }
+
+  setBackground(background: NativeSolidBackgroundV1): void {
+    this.backgroundSrgb = [...background.colorSrgb] as [number, number, number];
+    this.scene.background = new THREE.Color().setRGB(...this.backgroundSrgb, THREE.SRGBColorSpace);
+  }
+
+  isOrthographic(): boolean {
+    return this.camera instanceof THREE.OrthographicCamera;
+  }
+
+  setOrthographic(on: boolean): void {
+    if (on === this.isOrthographic()) return;
+    const previous = this.camera;
+    const target = this.controls.target.clone();
+    const distance = Math.max(previous.position.distanceTo(target), 0.001);
+    const verticalSpan = previous instanceof THREE.PerspectiveCamera
+      ? Math.max(2 * Math.tan(THREE.MathUtils.degToRad(previous.fov) / 2) * distance, 0.001)
+      : (previous.top - previous.bottom) / previous.zoom;
+    if (on) {
+      const orthographic = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.001, Math.max(previous.far, 100));
+      orthographic.position.copy(previous.position);
+      orthographic.up.copy(previous.up);
+      orthographic.quaternion.copy(previous.quaternion);
+      this.camera = orthographic;
+      this.setOrthographicVerticalSpan(verticalSpan);
+    } else {
+      const fov = THREE.MathUtils.radToDeg(2 * Math.atan(verticalSpan / (2 * distance)));
+      this.perspectiveCamera.fov = THREE.MathUtils.clamp(fov, 1, 179);
+      this.perspectiveCamera.position.copy(previous.position);
+      this.perspectiveCamera.up.copy(previous.up);
+      this.perspectiveCamera.quaternion.copy(previous.quaternion);
+      this.camera = this.perspectiveCamera;
+    }
+    this.controls.dispose();
+    this.controls = new OrbitControls(this.camera, this.canvas);
+    this.controls.enableDamping = true;
+    this.controls.target.copy(target);
+    this.gizmo.camera = this.camera;
+    this.updateCameraClipping();
+    this.resize();
+    this.controls.update();
+    this.refreshGizmoAttachment();
+  }
+
+  viewAxis(axis: '+x' | '-x' | '+y' | '-y' | '+z' | '-z'): void {
+    const bounds = this.visibleBounds();
+    if (bounds === null) return;
+    const center = bounds.getCenter(new THREE.Vector3());
+    const radius = Math.max(bounds.getSize(new THREE.Vector3()).length() / 2, 0.5);
+    const dirs: Record<typeof axis, readonly [number, number, number]> = {
+      '+x': [1, 0, 0], '-x': [-1, 0, 0],
+      '+y': [0, 1, 0], '-y': [0, -1, 0],
+      '+z': [0, 0, 1], '-z': [0, 0, -1],
+    };
+    const distance = this.camera instanceof THREE.PerspectiveCamera
+      ? radius * 1.25 / Math.sin(THREE.MathUtils.degToRad(this.camera.fov) / 2)
+      : radius * 3;
+    const direction = dirs[axis];
+    this.camera.position.set(
+      center.x + direction[0] * distance,
+      center.y + direction[1] * distance,
+      center.z + direction[2] * distance,
+    );
+    if (axis === '+y') this.camera.up.set(0, 0, -1);
+    else if (axis === '-y') this.camera.up.set(0, 0, 1);
+    else this.camera.up.set(0, 1, 0);
+    if (this.camera instanceof THREE.OrthographicCamera) this.setOrthographicVerticalSpan(radius * 2.5);
+    this.controls.target.copy(center);
+    this.updateCameraClipping();
+    this.resize();
+    this.controls.update();
+    this.camera.updateMatrixWorld(true);
   }
 
   setSnapshot(snapshot: NativeProjectSnapshotV1): void {
@@ -692,7 +801,26 @@ export class NativeGsViewer {
     return true;
   }
 
-  private fitCamera(): void {
+  fitCamera(): void {
+    const bounds = this.visibleBounds();
+    if (bounds === null) return;
+    const center = bounds.getCenter(new THREE.Vector3());
+    const radius = Math.max(bounds.getSize(new THREE.Vector3()).length() / 2, 0.5);
+    const direction = new THREE.Vector3(1.4, 0.9, 1.8).normalize();
+    const distance = this.camera instanceof THREE.PerspectiveCamera
+      ? radius * 1.25 / Math.sin(THREE.MathUtils.degToRad(this.camera.fov) / 2)
+      : radius * 3;
+    this.controls.target.copy(center);
+    this.camera.position.copy(center).addScaledVector(direction, distance);
+    this.camera.up.set(0, 1, 0);
+    if (this.camera instanceof THREE.OrthographicCamera) this.setOrthographicVerticalSpan(radius * 2.5);
+    this.updateCameraClipping();
+    this.resize();
+    this.controls.update();
+    this.camera.updateMatrixWorld(true);
+  }
+
+  private visibleBounds(): THREE.Box3 | null {
     this.scene.updateMatrixWorld(true);
     const bounds = new THREE.Box3();
     const visible = new Set(this.resolution.visibleRepresentationIds);
@@ -705,22 +833,41 @@ export class NativeGsViewer {
         : localGsBounds.clone().applyMatrix4(object.matrixWorld);
       if (!objectBounds.isEmpty()) bounds.union(objectBounds);
     }
-    if (bounds.isEmpty()) return;
-    const center = bounds.getCenter(new THREE.Vector3());
-    const radius = Math.max(bounds.getSize(new THREE.Vector3()).length() / 2, 0.5);
-    this.controls.target.copy(center);
-    this.camera.near = Math.max(radius / 10_000, 0.001);
-    this.camera.far = Math.max(radius * 100, 100);
-    this.camera.position.copy(center).add(new THREE.Vector3(radius * 1.4, radius * 0.9, radius * 1.8));
+    return bounds.isEmpty() ? null : bounds;
+  }
+
+  private setOrthographicVerticalSpan(verticalSpan: number): void {
+    if (!(this.camera instanceof THREE.OrthographicCamera)) return;
+    const aspect = Math.max(1, this.canvas.clientWidth) / Math.max(1, this.canvas.clientHeight);
+    const halfHeight = verticalSpan / 2;
+    const halfWidth = halfHeight * aspect;
+    this.camera.left = -halfWidth;
+    this.camera.right = halfWidth;
+    this.camera.top = halfHeight;
+    this.camera.bottom = -halfHeight;
+    this.camera.zoom = 1;
     this.camera.updateProjectionMatrix();
-    this.controls.update();
+  }
+
+  private updateCameraClipping(): void {
+    const distance = Math.max(this.camera.position.distanceTo(this.controls.target), 0.001);
+    this.camera.near = Math.max(distance / 100_000, 0.0001);
+    this.camera.far = Math.max(distance * 1_000, 100);
+    this.camera.updateProjectionMatrix();
   }
 
   private resize(): void {
     const width = Math.max(1, this.canvas.clientWidth);
     const height = Math.max(1, this.canvas.clientHeight);
     this.renderer.setSize(width, height, false);
-    this.camera.aspect = width / height;
+    if (this.camera instanceof THREE.PerspectiveCamera) {
+      this.camera.aspect = width / height;
+    } else {
+      const halfHeight = (this.camera.top - this.camera.bottom) / 2;
+      const halfWidth = halfHeight * (width / height);
+      this.camera.left = -halfWidth;
+      this.camera.right = halfWidth;
+    }
     this.camera.updateProjectionMatrix();
   }
 

@@ -1470,3 +1470,36 @@ both already store arrays of Assets and Representations, and the package writer
 already enumerates every Representation. Save/reopen and portable
 export/delete/restore/reopen must retain all old and newly added Assets,
 bindings, transforms, visibility and Captions without changing source bytes.
+
+## 18. Bounded native SavedView/camera closure (approved product direction; 2026-08-30 implementation slice)
+
+This slice implements the already-approved LociMyu-style named-view outcome
+inside the isolated native route. It reuses the domain `SavedView` and
+ProjectFrame `ProjectCamera` meanings from `01-domain-rendering.md`, but does not
+introduce DisplaySet, material appearance, collaboration lifecycle, a second
+camera framework or another storage publication unit.
+
+- Native snapshot version `1` adds only the optional top-level `savedViews`
+  array. Absence means `[]`. Each active bounded record has one stable `view_`
+  ID, name, stable ordering key, the current ProjectFrame ID, one finite valid
+  perspective or orthographic ProjectCamera, and one solid sRGB background.
+  Position, target and up are ProjectFrame values; the target differs from the
+  position, up is non-zero/non-parallel, perspective vertical FOV is strictly
+  between zero and pi, and orthographic vertical span is positive.
+- The current transient camera, current view selection and unsaved background
+  remain UI state. A user action creates or updates a complete named view; apply
+  replaces camera and background together. Deleting a bounded native view
+  removes that record because this path has no collaboration history or
+  DisplaySet reference. No view is inferred as a default.
+- Axis shortcuts and fit operate on the current visible-Asset union. Projection
+  switching preserves the current ProjectFrame pose and approximate visible
+  span. Applying or navigating a view never changes Asset visibility,
+  transforms, Caption ownership or `positionAsset`.
+- Saving uses the existing project-scoped writer and whole-Project
+  snapshot-last/marker-last publication. Native portable package version `1`
+  already carries the exact snapshot entry, so no package entry or manifest
+  change is made. A current reader opens an older snapshot with no views as an
+  empty list; unknown fields/versions still fail closed.
+- This slice excludes DisplaySet/material linkage, a default-view policy,
+  per-view Asset visibility, camera animation, thumbnails, arbitrary viewport
+  layouts, Compare, renderer abstraction, migration and final visual polish.

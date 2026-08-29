@@ -11,7 +11,7 @@ export type NativeDisplayMode = 'mixed' | 'gs-only' | 'mesh-only';
 export type NativeModelFormat = 'glb' | 'gltf' | 'obj' | 'stl' | 'ply';
 export type NativeRepresentationRole = 'meshPrimary' | 'gsPrimary' | 'interactionProxy';
 
-export type NativeIdPrefix = 'prj' | 'snp' | 'ast' | 'rev' | 'bnd' | 'rep' | 'frm' | 'fam' | 'cls' | 'cap';
+export type NativeIdPrefix = 'prj' | 'snp' | 'ast' | 'rev' | 'bnd' | 'rep' | 'frm' | 'fam' | 'cls' | 'cap' | 'view';
 
 export function newNativeId(prefix: NativeIdPrefix): string {
   return `${prefix}_${ulid()}`;
@@ -107,6 +107,31 @@ export interface NativeCaptionV1 {
   };
 }
 
+export type NativeProjectCameraProjectionV1 =
+  | { readonly kind: 'perspective'; readonly verticalFovRadians: number }
+  | { readonly kind: 'orthographic'; readonly verticalSpan: number };
+
+export interface NativeProjectCameraV1 {
+  readonly position: readonly [number, number, number];
+  readonly target: readonly [number, number, number];
+  readonly up: readonly [number, number, number];
+  readonly projection: NativeProjectCameraProjectionV1;
+}
+
+export interface NativeSolidBackgroundV1 {
+  readonly kind: 'solid';
+  readonly colorSrgb: readonly [number, number, number];
+}
+
+export interface NativeSavedViewV1 {
+  readonly id: string;
+  readonly name: string;
+  readonly orderKey: string;
+  readonly projectFrameId: string;
+  readonly camera: NativeProjectCameraV1;
+  readonly background: NativeSolidBackgroundV1;
+}
+
 export interface NativeProjectSnapshotV1 {
   readonly format: typeof NATIVE_SNAPSHOT_FORMAT;
   readonly schemaVersion: typeof NATIVE_SCHEMA_VERSION;
@@ -132,6 +157,7 @@ export interface NativeProjectSnapshotV1 {
     readonly hiddenAssetIds?: readonly string[];
   };
   readonly captions: readonly NativeCaptionV1[];
+  readonly savedViews?: readonly NativeSavedViewV1[];
 }
 
 export interface NativeActiveMarkerV1 {
@@ -174,6 +200,14 @@ function exactKeys(value: Record<string, unknown>, required: readonly string[], 
 function string(value: unknown, label: string): string {
   if (typeof value !== 'string' || value.length === 0) throw new Error(`native snapshot: ${label} must be a non-empty string`);
   return value;
+}
+
+function singleLineString(value: unknown, label: string): string {
+  const text = string(value, label);
+  if (/[\u0000-\u001f\u007f]/u.test(text)) {
+    throw new Error(`native snapshot: ${label} must be single-line text without controls`);
+  }
+  return text;
 }
 
 function id(value: unknown, prefix: NativeIdPrefix, label: string): string {
@@ -424,12 +458,75 @@ function parseCaption(value: unknown): NativeCaptionV1 {
   };
 }
 
+function parseProjectCamera(value: unknown): NativeProjectCameraV1 {
+  const input = record(value, 'SavedView camera');
+  exactKeys(input, ['position', 'target', 'up', 'projection']);
+  const position = vec3(input.position, 'SavedView camera position');
+  const target = vec3(input.target, 'SavedView camera target');
+  const up = vec3(input.up, 'SavedView camera up');
+  const direction = target.map((component, index) => component - position[index]!) as unknown as readonly [number, number, number];
+  const directionLength = Math.hypot(...direction);
+  const upLength = Math.hypot(...up);
+  if (!Number.isFinite(directionLength) || directionLength === 0) {
+    throw new Error('native snapshot: SavedView camera position and target must differ finitely');
+  }
+  if (!Number.isFinite(upLength) || upLength === 0) {
+    throw new Error('native snapshot: SavedView camera up must be finite and non-zero');
+  }
+  const crossLength = Math.hypot(
+    direction[1] * up[2] - direction[2] * up[1],
+    direction[2] * up[0] - direction[0] * up[2],
+    direction[0] * up[1] - direction[1] * up[0],
+  );
+  const normalizedCross = crossLength / (directionLength * upLength);
+  if (!Number.isFinite(normalizedCross) || normalizedCross <= 1e-12) {
+    throw new Error('native snapshot: SavedView camera up must not be parallel to its view direction');
+  }
+  const projection = record(input.projection, 'SavedView camera projection');
+  if (projection.kind === 'perspective') {
+    exactKeys(projection, ['kind', 'verticalFovRadians']);
+    const verticalFovRadians = finite(projection.verticalFovRadians, 'SavedView vertical FOV');
+    if (verticalFovRadians <= 0 || verticalFovRadians >= Math.PI) {
+      throw new Error('native snapshot: SavedView vertical FOV must be between zero and pi');
+    }
+    return { position, target, up, projection: { kind: 'perspective', verticalFovRadians } };
+  }
+  if (projection.kind === 'orthographic') {
+    exactKeys(projection, ['kind', 'verticalSpan']);
+    const verticalSpan = finite(projection.verticalSpan, 'SavedView orthographic vertical span');
+    if (verticalSpan <= 0) throw new Error('native snapshot: SavedView orthographic vertical span must be positive');
+    return { position, target, up, projection: { kind: 'orthographic', verticalSpan } };
+  }
+  throw new Error('native snapshot: unsupported SavedView camera projection');
+}
+
+function parseSavedView(value: unknown): NativeSavedViewV1 {
+  const input = record(value, 'SavedView');
+  exactKeys(input, ['id', 'name', 'orderKey', 'projectFrameId', 'camera', 'background']);
+  const background = record(input.background, 'SavedView background');
+  exactKeys(background, ['kind', 'colorSrgb']);
+  if (background.kind !== 'solid') throw new Error('native snapshot: bounded SavedView background must be solid');
+  const colorSrgb = vec3(background.colorSrgb, 'SavedView background color');
+  if (colorSrgb.some((component) => component < 0 || component > 1)) {
+    throw new Error('native snapshot: SavedView background color must be normalized');
+  }
+  return {
+    id: id(input.id, 'view', 'SavedView id'),
+    name: singleLineString(input.name, 'SavedView name'),
+    orderKey: singleLineString(input.orderKey, 'SavedView orderKey'),
+    projectFrameId: id(input.projectFrameId, 'frm', 'SavedView ProjectFrame id'),
+    camera: parseProjectCamera(input.camera),
+    background: { kind: 'solid', colorSrgb },
+  };
+}
+
 function semanticClosure(snapshot: NativeProjectSnapshotV1): void {
   uniqueIds(snapshot.assets, 'Asset');
   uniqueIds(snapshot.assetBindingRevisions, 'AssetBindingRevision');
   uniqueIds(snapshot.assetRevisions, 'AssetRevision');
   uniqueIds(snapshot.representations, 'Representation');
   uniqueIds(snapshot.captions, 'Caption');
+  uniqueIds(snapshot.savedViews ?? [], 'SavedView');
   const assets = new Map(snapshot.assets.map((asset) => [asset.id, asset]));
   const bindings = new Map(snapshot.assetBindingRevisions.map((binding) => [binding.id, binding]));
   const revisions = new Map(snapshot.assetRevisions.map((revision) => [revision.id, revision]));
@@ -494,6 +591,11 @@ function semanticClosure(snapshot: NativeProjectSnapshotV1): void {
       throw new Error('native snapshot: Caption compatibility class is not active');
     }
   }
+  for (const savedView of snapshot.savedViews ?? []) {
+    if (savedView.projectFrameId !== snapshot.project.frame.id) {
+      throw new Error('native snapshot: SavedView ProjectFrame is foreign');
+    }
+  }
 }
 
 export function parseNativeSnapshotV1(text: string): NativeProjectSnapshotV1 {
@@ -501,7 +603,7 @@ export function parseNativeSnapshotV1(text: string): NativeProjectSnapshotV1 {
   exactKeys(parsed, [
     'format', 'schemaVersion', 'snapshotId', 'generation', 'project', 'assets',
     'assetBindingRevisions', 'assetRevisions', 'representations', 'presentation', 'captions',
-  ]);
+  ], ['savedViews']);
   if (parsed.format !== NATIVE_SNAPSHOT_FORMAT || parsed.schemaVersion !== NATIVE_SCHEMA_VERSION) {
     throw new Error('native snapshot: unsupported format or schema version');
   }
@@ -515,7 +617,7 @@ export function parseNativeSnapshotV1(text: string): NativeProjectSnapshotV1 {
     throw new Error('native snapshot: unsupported project unit');
   }
   if (frame.handedness !== 'right' || frame.upAxis !== '+Y') throw new Error('native snapshot: unsupported project frame');
-  if (!Array.isArray(parsed.assets) || !Array.isArray(parsed.assetBindingRevisions) || !Array.isArray(parsed.assetRevisions) || !Array.isArray(parsed.representations) || !Array.isArray(parsed.captions)) {
+  if (!Array.isArray(parsed.assets) || !Array.isArray(parsed.assetBindingRevisions) || !Array.isArray(parsed.assetRevisions) || !Array.isArray(parsed.representations) || !Array.isArray(parsed.captions) || (parsed.savedViews !== undefined && !Array.isArray(parsed.savedViews))) {
     throw new Error('native snapshot: record collections must be arrays');
   }
   const presentation = record(parsed.presentation, 'presentation');
@@ -553,6 +655,7 @@ export function parseNativeSnapshotV1(text: string): NativeProjectSnapshotV1 {
       hiddenAssetIds,
     },
     captions: parsed.captions.map(parseCaption),
+    savedViews: parsed.savedViews === undefined ? [] : parsed.savedViews.map(parseSavedView),
   };
   if (snapshot.assets.length < 1) throw new Error('native snapshot: at least one Asset is required');
   semanticClosure(snapshot);
@@ -600,6 +703,8 @@ export function serializeNativeSnapshotV1(snapshot: NativeProjectSnapshotV1): st
       hiddenAssetIds: [...(snapshot.presentation.hiddenAssetIds ?? [])].sort(),
     },
     captions: [...snapshot.captions].sort((a, b) => a.id.localeCompare(b.id)),
+    savedViews: [...(snapshot.savedViews ?? [])]
+      .sort((a, b) => a.orderKey.localeCompare(b.orderKey) || a.id.localeCompare(b.id)),
   };
   const text = `${JSON.stringify(ordered)}\n`;
   parseNativeSnapshotV1(text);

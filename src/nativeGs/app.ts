@@ -21,7 +21,9 @@ import {
   type NativeProjectDraftV1,
   type NativeProjectSnapshotV1,
   type NativeRepresentationDraftV1,
+  type NativeSavedViewV1,
   type NativeSim3V1,
+  type NativeSolidBackgroundV1,
 } from './schema';
 import { activeNativeRepresentationsV1, isNativeAssetVisibleV1 } from './resolver';
 import {
@@ -60,6 +62,24 @@ interface DraftResult {
 interface AssetImportBuild {
   readonly imported: NativeAssetImportV1;
   readonly sources: ReadonlyMap<string, NativeBinarySource>;
+}
+
+function backgroundHex(background: NativeSolidBackgroundV1): string {
+  return `#${background.colorSrgb.map((component) => (
+    Math.round(THREE.MathUtils.clamp(component, 0, 1) * 255).toString(16).padStart(2, '0')
+  )).join('')}`;
+}
+
+function backgroundFromHex(hex: string): NativeSolidBackgroundV1 {
+  if (!/^#[0-9a-f]{6}$/iu.test(hex)) throw new Error('背景色が不正です。');
+  return {
+    kind: 'solid',
+    colorSrgb: [
+      Number.parseInt(hex.slice(1, 3), 16) / 255,
+      Number.parseInt(hex.slice(3, 5), 16) / 255,
+      Number.parseInt(hex.slice(5, 7), 16) / 255,
+    ],
+  };
 }
 
 function fileSource(file: File, mediaType: string): NativeBinarySource {
@@ -723,6 +743,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     let saving = false;
     let dirty = false;
     let selectedCaptionId = initial.captions[0]?.id ?? null;
+    let selectedSavedViewId = initial.savedViews?.[0]?.id ?? null;
     const canvas = el('canvas', { 'aria-label': 'Native Mesh and Gaussian Splatting project' });
     const accessBadge = el('span', { class: 'ng-badge' });
     const visibilityBadge = el('span', { class: 'ng-badge' });
@@ -761,6 +782,18 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const captionTitle = el('input', { type: 'text', maxlength: '160' });
     const captionBody = el('textarea');
     const captionSection = el('section', { class: 'ng-card ng-caption-card' });
+    const savedViewSelect = el('select', { 'aria-label': '保存済みビュー' });
+    const savedViewName = el('input', { type: 'text', maxlength: '160', value: '' });
+    const captureSavedView = el('button', { class: 'primary' }, '現在のビューを保存');
+    const overwriteSavedView = el('button', {}, '選択中を更新');
+    const applySavedView = el('button', {}, '表示');
+    const deleteSavedView = el('button', {}, '削除');
+    const orthographic = el('input', { type: 'checkbox' });
+    const backgroundColor = el('input', { type: 'color', value: '#101725', 'aria-label': '背景色' });
+    const fitView = el('button', {}, '全体表示');
+    const axes = ['+x', '-x', '+y', '-y', '+z', '-z'] as const;
+    const axisButtons = new Map(axes.map((axis) => [axis, el('button', {}, axis.toUpperCase())]));
+    const savedViewSection = el('section', { class: 'ng-card' });
 
     const rolesByAsset = new Map(working.assets.map((asset) => [
       asset.id,
@@ -784,6 +817,23 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const selectedCaption = () => selectedCaptionId === null
       ? undefined
       : working.captions.find((caption) => caption.id === selectedCaptionId);
+    const savedViews = (): readonly NativeSavedViewV1[] => working.savedViews ?? [];
+    const selectedSavedView = (): NativeSavedViewV1 | undefined => selectedSavedViewId === null
+      ? undefined
+      : savedViews().find((view) => view.id === selectedSavedViewId);
+    const rebuildSavedViewOptions = (): void => {
+      clear(savedViewSelect);
+      if (savedViews().length === 0) {
+        savedViewSelect.append(el('option', { value: '' }, '保存済みビューはありません'));
+        selectedSavedViewId = null;
+        savedViewName.value = '';
+      } else {
+        if (!savedViews().some((view) => view.id === selectedSavedViewId)) selectedSavedViewId = savedViews()[0]!.id;
+        for (const view of savedViews()) savedViewSelect.append(el('option', { value: view.id }, view.name));
+        savedViewSelect.value = selectedSavedViewId ?? '';
+        savedViewName.value = selectedSavedView()?.name ?? '';
+      }
+    };
     const rebuildCaptionOptions = (): void => {
       clear(captionSelect);
       if (selectedCaptionId === null) {
@@ -855,6 +905,16 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       addSource.disabled = !editable;
       addProxy.disabled = !editable || addKind.value !== 'gs';
       addAsset.disabled = !editable;
+      captureSavedView.disabled = !editable;
+      overwriteSavedView.disabled = !editable || selectedSavedView() === undefined;
+      deleteSavedView.disabled = !editable || selectedSavedView() === undefined;
+      applySavedView.disabled = saving || selectedSavedView() === undefined;
+      savedViewSelect.disabled = saving || savedViews().length === 0;
+      savedViewName.disabled = !editable;
+      orthographic.disabled = saving;
+      backgroundColor.disabled = saving;
+      fitView.disabled = saving;
+      for (const button of axisButtons.values()) button.disabled = saving;
       close.disabled = saving;
       activeViewer?.setEditingEnabled(editable);
     };
@@ -899,11 +959,25 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       el('p', { class: 'ng-note' }, '配置後は黄色いマーカーのギズモで位置を調整できます。'),
     );
 
+    savedViewSection.append(
+      el('h2', {}, 'ビュー'),
+      el('p', { class: 'ng-note' }, '見やすい向き・投影方法・背景色を名前付きで保存できます。モデルの位置や表示状態は変更しません。'),
+      el('div', { class: 'ng-grid' },
+        el('label', { class: 'ng-field' }, el('span', {}, '保存済みビュー'), savedViewSelect),
+        el('label', { class: 'ng-field' }, el('span', {}, '名前'), savedViewName),
+      ),
+      el('div', { class: 'ng-row' }, captureSavedView, overwriteSavedView, applySavedView, deleteSavedView),
+      el('label', { class: 'ng-row' }, orthographic, el('span', {}, '平行投影')),
+      el('div', { class: 'ng-axis-grid' }, ...axisButtons.values()),
+      el('div', { class: 'ng-row' }, fitView, el('span', { class: 'ng-note' }, '背景'), backgroundColor),
+    );
+
     root.append(el('main', { class: 'ng-view' },
       el('section', { class: 'ng-stage' }, canvas, el('div', { class: 'ng-stage-badges' }, accessBadge, visibilityBadge)),
       el('aside', { class: 'ng-panel' },
         el('div', {}, el('h1', {}, working.project.title)),
         captionSection,
+        savedViewSection,
         el('details', { class: 'ng-card' },
           el('summary', {}, 'モデルの表示設定'),
           el('label', { class: 'ng-field' }, el('span', {}, '一括表示'), display),
@@ -989,6 +1063,22 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       onProgress(message) { runtimeStatus.textContent = message; },
       onRuntimeError(message) { setDiagnostics([...viewer.getResolution().issues, message]); },
     });
+    const syncCurrentViewControls = (): void => {
+      orthographic.checked = viewer.isOrthographic();
+      backgroundColor.value = backgroundHex(viewer.getBackground());
+    };
+    const captureViewRecord = (existing?: NativeSavedViewV1): NativeSavedViewV1 => {
+      const id = existing?.id ?? newNativeId('view');
+      const fallbackName = existing?.name ?? `ビュー ${savedViews().length + 1}`;
+      return {
+        id,
+        name: savedViewName.value.trim() || fallbackName,
+        orderKey: existing?.orderKey ?? id.slice('view_'.length),
+        projectFrameId: working.project.frame.id,
+        camera: viewer.getProjectCamera(),
+        background: viewer.getBackground(),
+      };
+    };
     activeViewer = viewer;
     unsubscribeAccess = session.subscribeAccess(() => updateAccess());
     await viewer.load(
@@ -1004,7 +1094,70 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     viewer.selectCaption(selectedCaptionId);
     populateTransform();
     viewer.setAssetGizmoMode(assetGizmoMode);
+    rebuildSavedViewOptions();
+    syncCurrentViewControls();
     updateAccess();
+
+    savedViewSelect.addEventListener('change', () => {
+      selectedSavedViewId = savedViewSelect.value === '' ? null : savedViewSelect.value;
+      savedViewName.value = selectedSavedView()?.name ?? '';
+      updateAccess();
+    });
+    captureSavedView.addEventListener('click', () => {
+      if (!canMutateWorking()) return;
+      const view = captureViewRecord();
+      working = { ...working, savedViews: [...savedViews(), view] };
+      selectedSavedViewId = view.id;
+      rebuildSavedViewOptions();
+      markDirty();
+      runtimeStatus.textContent = `現在のビューを「${view.name}」として保存対象に追加しました。`;
+    });
+    overwriteSavedView.addEventListener('click', () => {
+      if (!canMutateWorking()) return;
+      const existing = selectedSavedView();
+      if (existing === undefined) return;
+      const view = captureViewRecord(existing);
+      working = {
+        ...working,
+        savedViews: savedViews().map((candidate) => candidate.id === view.id ? view : candidate),
+      };
+      rebuildSavedViewOptions();
+      markDirty();
+      runtimeStatus.textContent = `「${view.name}」を現在のビューで更新しました。`;
+    });
+    applySavedView.addEventListener('click', () => {
+      const view = selectedSavedView();
+      if (view === undefined) return;
+      viewer.applyProjectCamera(view.camera);
+      viewer.setBackground(view.background);
+      syncCurrentViewControls();
+      runtimeStatus.textContent = `「${view.name}」を表示しました。`;
+    });
+    deleteSavedView.addEventListener('click', () => {
+      if (!canMutateWorking()) return;
+      const view = selectedSavedView();
+      if (view === undefined) return;
+      working = { ...working, savedViews: savedViews().filter((candidate) => candidate.id !== view.id) };
+      selectedSavedViewId = null;
+      rebuildSavedViewOptions();
+      markDirty();
+      runtimeStatus.textContent = `「${view.name}」を保存対象から削除しました。`;
+    });
+    orthographic.addEventListener('change', () => {
+      viewer.setOrthographic(orthographic.checked);
+      syncCurrentViewControls();
+    });
+    backgroundColor.addEventListener('input', () => viewer.setBackground(backgroundFromHex(backgroundColor.value)));
+    fitView.addEventListener('click', () => {
+      viewer.fitCamera();
+      syncCurrentViewControls();
+    });
+    for (const [axis, button] of axisButtons) {
+      button.addEventListener('click', () => {
+        viewer.viewAxis(axis);
+        syncCurrentViewControls();
+      });
+    }
 
     addKind.addEventListener('change', () => {
       const isGs = addKind.value === 'gs';
@@ -1201,6 +1354,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         viewer.selectCaption(selectedCaptionId);
         syncVisibilityControls();
         rebuildCaptionOptions();
+        rebuildSavedViewOptions();
         runtimeStatus.textContent = 'プロジェクトを保存しました。';
       }).catch((error: unknown) => {
         working = durable;
@@ -1211,6 +1365,10 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         viewer.selectCaption(selectedCaptionId);
         syncVisibilityControls();
         rebuildCaptionOptions();
+        selectedSavedViewId = durable.savedViews?.some((view) => view.id === selectedSavedViewId)
+          ? selectedSavedViewId
+          : durable.savedViews?.[0]?.id ?? null;
+        rebuildSavedViewOptions();
         populateCaptionFields();
         dirty = false;
         runtimeStatus.textContent = `保存できませんでした：${error instanceof Error ? error.message : String(error)}。最後に保存された状態へ戻しました。`;
