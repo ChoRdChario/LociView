@@ -1548,3 +1548,33 @@ history UI, migration framework or package version.
   transfer, DisplaySet/material mapping, Asset deletion, revision/history UI,
   undo, blob GC, ordinary points, migration, a renderer framework and a second
   renderer.
+
+## 20. Bounded native home/open ordinaryization (approved product direction; 2026-08-30 implementation slice)
+
+This slice advances `PROD-12` only inside the existing nondefault native route.
+It changes the order and wording of existing tasks so a non-specialist can open,
+create, back up, restore or remove a project without reading storage, renderer or
+gate terminology. It does not make the native route the default application,
+merge v1/native registries or change any durable behavior.
+
+- The first home task is the list of projects saved on this device. Its actions
+  are `編集して開く`, `閲覧のみで開く`, `バックアップを書き出す` and
+  `この端末から削除`. The legacy-route link is named explicitly rather than
+  presented as a generic home link.
+- Backup restore and new-project creation remain separate ordinary file tasks.
+  Mesh, GS and optional same-GS interaction input are described as `3Dモデル`,
+  `Gaussian Splatting` and `GSのキャプション配置用補助モデル`; `Asset`,
+  `Representation`, `snapshot`, `workspace` and package internals are not
+  primary-user labels.
+- GS offline preparation remains one explicit device action, but primary status
+  describes whether GS can be used offline without exposing Spark, runtime or
+  cache terminology. Diagnostic detail may remain available outside the ordinary
+  task wording.
+- Existing project-scoped Edit/View lock semantics, offline-cache preparation,
+  streamed package verification, snapshot-last/marker-last publication, failure
+  cleanup and source bytes are unchanged. Failure messages remain truthful and
+  actionable; no incomplete project or backup is reported as complete.
+- Native snapshot v1, portable package v1, the default v1 route and Spark lazy
+  bundle isolation are unchanged. This slice excludes default-route integration,
+  automatic package dispatch, migration, Caption features, responsive redesign,
+  schema/storage/renderer changes and final visual polish.

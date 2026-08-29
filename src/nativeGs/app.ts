@@ -127,7 +127,7 @@ async function buildAssetImport(
   assetToProject: NativeSim3V1,
   existing?: ExistingAssetBuildIdentity,
 ): Promise<AssetImportBuild> {
-  if (kind === 'mesh' && proxy !== null) throw new Error('Interaction Proxyは対象GSと一緒に指定してください。');
+  if (kind === 'mesh' && proxy !== null) throw new Error('キャプション配置用の補助モデルは、対象のGaussian Splattingと一緒に指定してください。');
   const assetId = existing?.assetId ?? newNativeId('ast');
   const assetFrameId = existing?.assetFrameId ?? newNativeId('frm');
   const revisionId = newNativeId('rev');
@@ -139,7 +139,7 @@ async function buildAssetImport(
   const representationIds = [primaryRepresentationId];
 
   if (kind === 'mesh') {
-    const format = await inspectModelFile(file, '通常Mesh');
+    const format = await inspectModelFile(file, '3Dモデル');
     representations.push({
       id: primaryRepresentationId,
       assetId,
@@ -175,7 +175,7 @@ async function buildAssetImport(
     });
     sources.set(primaryRepresentationId, fileSource(file, 'application/octet-stream'));
     if (proxy !== null) {
-      const proxyFormat = await inspectModelFile(proxy, 'Interaction Proxy');
+      const proxyFormat = await inspectModelFile(proxy, 'キャプション配置用の補助モデル');
       const proxyRepresentationId = newNativeId('rep');
       representationIds.push(proxyRepresentationId);
       representations.push({
@@ -200,7 +200,7 @@ async function buildAssetImport(
     imported: {
       asset: {
         id: assetId,
-        label: existing?.label ?? labelFromFile(file, kind === 'mesh' ? 'ordinary Mesh' : 'partial GS'),
+        label: existing?.label ?? labelFromFile(file, kind === 'mesh' ? '3Dモデル' : 'Gaussian Splatting'),
         assetFrameId,
         status: { kind: 'ready', activeBindingId: bindingId },
       },
@@ -224,8 +224,8 @@ async function buildAssetImport(
 }
 
 async function buildDraft(title: string, files: SelectedFiles): Promise<DraftResult> {
-  if (files.mesh === null && files.gs === null) throw new Error('通常MeshまたはGSを少なくとも一つ選択してください。');
-  if (files.proxy !== null && files.gs === null) throw new Error('Interaction Proxyは対象GSと一緒に指定してください。');
+  if (files.mesh === null && files.gs === null) throw new Error('3DモデルまたはGaussian Splattingを少なくとも一つ選択してください。');
+  if (files.proxy !== null && files.gs === null) throw new Error('キャプション配置用の補助モデルは、対象のGaussian Splattingと一緒に指定してください。');
   const projectId = newNativeId('prj');
   const projectFrameId = newNativeId('frm');
   const builtAssets: AssetImportBuild[] = [];
@@ -248,7 +248,7 @@ async function buildDraft(title: string, files: SelectedFiles): Promise<DraftRes
     draft: {
       project: {
         id: projectId,
-        title: title.trim() === '' ? 'Native GS project' : title.trim().slice(0, 160),
+        title: title.trim() === '' ? '新しいプロジェクト' : title.trim().slice(0, 160),
         frame: { id: projectFrameId, handedness: 'right', upAxis: '+Y', unit: { kind: 'unknown' } },
       },
       assets: builtAssets.map((built) => built.imported.asset),
@@ -284,7 +284,7 @@ function requestNativeBackupDestination(suggestedName: string): Promise<FileSyst
     ? Promise.resolve(null)
     : picker.call(window, {
         suggestedName,
-        types: [{ description: 'LociView native portable backup', accept: { 'application/zip': ['.lociview'] } }],
+        types: [{ description: 'LociViewプロジェクトのバックアップ', accept: { 'application/zip': ['.lociview'] } }],
       });
 }
 
@@ -295,7 +295,7 @@ function nativeBackupFileName(title: string): string {
     .replace(/[. ]+$/g, '')
     .trim()
     .slice(0, 120);
-  return `${safe === '' ? 'LociView-native-project' : safe}.lociview`;
+  return `${safe === '' ? 'LociView-project' : safe}.lociview`;
 }
 
 function nativeBackupStagePath(projectId: string, snapshotId: string): string {
@@ -303,17 +303,17 @@ function nativeBackupStagePath(projectId: string, snapshotId: string): string {
 }
 
 function errorMessage(error: unknown): string {
-  if (error instanceof DOMException && error.name === 'AbortError') return '操作を中止しました。完成backup／active projectは公開していません。';
+  if (error instanceof DOMException && error.name === 'AbortError') return '操作を中止しました。未完成のバックアップやプロジェクトは保存されていません。';
   return error instanceof Error ? error.message : String(error);
 }
 
 export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
   clear(root);
   root.className = 'ng-app';
-  root.append(el('main', { class: 'ng-home' }, el('p', {}, 'Native project storageを初期化しています…')));
+  root.append(el('main', { class: 'ng-home' }, el('p', {}, 'プロジェクトの保存領域を準備しています…')));
   if (!(await OpfsFS.isAvailable())) {
     clear(root);
-    root.append(el('main', { class: 'ng-home' }, el('p', { class: 'ng-error' }, 'このブラウザではNative projectに必要なOPFSを利用できません。')));
+    root.append(el('main', { class: 'ng-home' }, el('p', { class: 'ng-error' }, 'このブラウザではプロジェクトを端末内へ保存できません。別の対応ブラウザをお試しください。')));
     return;
   }
   const fs: WorkspaceFS = await OpfsFS.open();
@@ -347,22 +347,25 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
   const renderHome = async (): Promise<void> => {
     closeActive();
     clear(root);
-    const status = el('p', { class: 'ng-note' }, 'offline状態を確認しています…');
-    const prepare = el('button', { class: 'primary' }, 'GS offline準備');
-    const title = el('input', { type: 'text', value: 'Native GS project', maxlength: '160' });
+    const status = el('p', { class: 'ng-note' }, 'GSをオフラインで利用できるか確認しています…');
+    const offlineDetail = el('p', { class: 'ng-note' });
+    const prepare = el('button', { class: 'primary' }, 'GSをオフラインで使えるようにする');
+    const title = el('input', { type: 'text', value: '新しいプロジェクト', maxlength: '160' });
     const mesh = el('input', { type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply' });
     const gs = el('input', { type: 'file', accept: '.ply,application/octet-stream' });
     const proxy = el('input', { type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply' });
     const createStatus = el('p', { class: 'ng-status' });
-    const create = el('button', { class: 'primary' }, 'Native projectを作成');
+    const createDetail = el('p', { class: 'ng-note' });
+    const create = el('button', { class: 'primary' }, 'プロジェクトを作成');
     const projectList = el('div', { class: 'ng-list' });
     // iOS Files may classify a custom .lociview extension as an unknown UTI and
     // hide it when an accept filter is present. Selection is only a UI hint;
     // the strict package/version/path/size/hash checks below are authoritative.
     const restoreInput = el('input', { type: 'file' });
-    const restore = el('button', { class: 'primary' }, '.lociviewから復元');
+    const restore = el('button', { class: 'primary' }, 'バックアップから復元');
     const cancelPortable = el('button', { disabled: 'true' }, '処理を中止');
-    const portableStatus = el('p', { class: 'ng-status' }, homeNotice ?? 'backup／restore待機中');
+    const portableStatus = el('p', { class: 'ng-status' }, homeNotice ?? '');
+    const portableDetail = el('p', { class: 'ng-note' });
     const portableResult = el('div', { class: 'ng-row' });
     let portableAbort: AbortController | null = null;
     homeNotice = null;
@@ -379,19 +382,24 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       const ready = await isNativeGsOfflineReady(await pwaRegistration);
       status.className = ready ? 'ng-note ng-ok' : 'ng-note ng-warn';
       status.textContent = ready
-        ? 'Spark 2.1.0 runtime: offline-ready'
+        ? 'この端末ではGSをオフラインで利用できます。'
         : import.meta.env.DEV
-          ? '開発server: runtime確認は可能ですがoffline-ready証拠にはなりません。'
-          : 'Spark runtimeはまだoffline-readyではありません。GSをofflineで開く前に準備してください。';
+          ? '開発用画面ではオフライン保存の完了確認は行いません。'
+          : 'オンラインのうちに準備すると、GSをオフラインでも表示できます。';
+      offlineDetail.textContent = ready ? 'オフライン保存を確認済みです。' : '';
     };
     prepare.addEventListener('click', () => {
       setButtonDisabled(prepare, true);
-      status.textContent = 'Spark runtimeを初期化しoffline cacheを検証しています…';
+      status.textContent = 'GS表示機能をこの端末へ保存し、確認しています…';
       void pwaRegistration.then((registration) => prepareNativeGsOffline(registration)).then((result) => {
-        status.textContent = result.detail;
+        status.textContent = result.offlineReady
+          ? 'GSをオフラインで利用する準備ができました。'
+          : '準備を完了できませんでした。オンラインでページを再読み込みしてから、もう一度お試しください。';
+        offlineDetail.textContent = result.detail;
         status.className = result.offlineReady ? 'ng-note ng-ok' : 'ng-note ng-warn';
       }).catch((error: unknown) => {
-        status.textContent = error instanceof Error ? error.message : String(error);
+        status.textContent = 'GSのオフライン準備を完了できませんでした。詳しい情報を確認してください。';
+        offlineDetail.textContent = error instanceof Error ? error.message : String(error);
         status.className = 'ng-error';
       }).finally(() => setButtonDisabled(prepare, false));
     });
@@ -401,7 +409,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       transitionInFlight = true;
       setButtonDisabled(create, true);
       createStatus.className = 'ng-status';
-      createStatus.textContent = '入力を検査しています…';
+      createStatus.textContent = '選んだファイルを確認しています…';
+      createDetail.textContent = '';
       void (async () => {
         const built = await buildDraft(title.value, {
           mesh: selectedFile(mesh),
@@ -415,7 +424,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
           Number.isFinite(estimate.quota) && Number.isFinite(estimate.usage) &&
           estimate.quota - estimate.usage < required
         ) {
-          throw new Error(`保存可能容量が不足しています（必要 ${fmtBytes(required)}）。不完全projectはactiveにしません。`);
+          throw new Error(`保存容量が不足しています（必要 ${fmtBytes(required)}）。プロジェクトは作成されていません。`);
         }
         await assertNativeProjectDoesNotMixV1(fs, built.draft.project.id);
         const session = await coordinator.tryAcquire(fs, nativeProjectRoot(built.draft.project.id), built.draft.project.id);
@@ -423,7 +432,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         session.activateNewProject();
         try {
           const snapshot = await createNativeProjectV1(session.workspace, built.draft, built.sources, (message) => {
-            createStatus.textContent = message;
+            createStatus.textContent = 'モデルとプロジェクトをこの端末へ保存しています…';
+            createDetail.textContent = message;
           });
           activeSession = session;
           await renderProject(snapshot, session);
@@ -434,7 +444,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         }
       })().catch((error: unknown) => {
         createStatus.className = 'ng-error';
-        createStatus.textContent = error instanceof Error ? error.message : String(error);
+        createStatus.textContent = 'プロジェクトを作成できませんでした。詳しい情報を確認してください。';
+        createDetail.textContent = error instanceof Error ? error.message : String(error);
       }).finally(() => {
         transitionInFlight = false;
         setButtonDisabled(create, false);
@@ -446,7 +457,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       const packageFile = selectedFile(restoreInput);
       if (packageFile === null) {
         portableStatus.className = 'ng-error';
-        portableStatus.textContent = '復元する .lociview fileを選択してください。';
+        portableStatus.textContent = '復元するバックアップファイルを選択してください。';
         return;
       }
       transitionInFlight = true;
@@ -454,7 +465,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       setPortableBusy(true);
       clear(portableResult);
       portableStatus.className = 'ng-status';
-      portableStatus.textContent = 'package version、entry、snapshot整合性を検査しています…';
+      portableStatus.textContent = 'バックアップファイルを確認しています…';
+      portableDetail.textContent = '';
       void (async () => {
         const signal = portableAbort!.signal;
         const inspection = await inspectNativePortablePackageV1(packageFile, signal);
@@ -465,7 +477,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
           Number.isFinite(estimate.quota) && Number.isFinite(estimate.usage) &&
           estimate.quota - estimate.usage < required
         ) {
-          throw new Error(`復元先の保存可能容量が不足しています（Representation ${fmtBytes(inspection.representationByteLength)}）。不完全projectはactiveにしません。`);
+          throw new Error(`保存容量が不足しています（モデル ${fmtBytes(inspection.representationByteLength)}）。プロジェクトは復元されていません。`);
         }
         const projectId = inspection.snapshot.project.id;
         const session = await coordinator.tryAcquire(fs, nativeProjectRoot(projectId), projectId);
@@ -481,9 +493,12 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         try {
           const restored = await restoreNativePortablePackageV1(session.workspace, fs, packageFile, {
             signal,
-            onStatus(message) { portableStatus.textContent = message; },
+            onStatus(message) {
+              portableStatus.textContent = 'バックアップからプロジェクトを復元しています…';
+              portableDetail.textContent = message;
+            },
           });
-          homeNotice = `復元完了：${restored.snapshot.project.title}（snapshot ${restored.snapshot.generation}、最大application chunk ${fmtBytes(restored.maxApplicationChunkBytes)}）。`;
+          homeNotice = `「${restored.snapshot.project.title}」をこの端末へ復元しました。`;
         } finally {
           unsubscribeRestore();
           session.release();
@@ -491,7 +506,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         await renderHome();
       })().catch((error: unknown) => {
         portableStatus.className = 'ng-error';
-        portableStatus.textContent = `復元失敗：${errorMessage(error)}`;
+        portableStatus.textContent = 'バックアップを復元できませんでした。別のファイルを選ぶか、詳しい情報を確認してください。';
+        portableDetail.textContent = errorMessage(error);
       }).finally(() => {
         portableAbort = null;
         transitionInFlight = false;
@@ -500,19 +516,19 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     });
 
     const summaries = await listNativeProjectsV1(fs);
-    if (summaries.length === 0) projectList.append(el('p', { class: 'ng-note' }, 'activeなNative projectはまだありません。'));
+    if (summaries.length === 0) projectList.append(el('p', { class: 'ng-note' }, 'この端末に保存されたプロジェクトはありません。'));
     for (const summary of summaries) {
-      const view = el('button', {}, 'View mode');
-      const edit = el('button', { class: 'primary' }, 'Edit mode');
-      const backup = el('button', {}, '.lociview backup');
-      const remove = el('button', {}, 'local削除');
+      const view = el('button', {}, '閲覧のみで開く');
+      const edit = el('button', { class: 'primary' }, '編集して開く');
+      const backup = el('button', {}, 'バックアップを書き出す');
+      const remove = el('button', {}, 'この端末から削除');
       view.addEventListener('click', () => void openProject(summary.projectId, 'view'));
       edit.addEventListener('click', () => void openProject(summary.projectId, 'edit'));
       backup.addEventListener('click', () => {
         if (transitionInFlight) return;
         if (portableResult.childElementCount > 0) {
           portableStatus.className = 'ng-error';
-          portableStatus.textContent = '先に検証済み一時backupを外部へ保存し、「端末内の一時backupを削除」で片付けてください。';
+          portableStatus.textContent = '先に作成済みのバックアップをファイルへ保存し、「この端末の一時ファイルを削除」で片付けてください。';
           return;
         }
         const suggestedName = nativeBackupFileName(summary.title);
@@ -522,7 +538,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
           destinationHandle = requestNativeBackupDestination(suggestedName);
         } catch (error) {
           portableStatus.className = 'ng-error';
-          portableStatus.textContent = `backup開始失敗：${errorMessage(error)}`;
+          portableStatus.textContent = 'バックアップの保存先を開けませんでした。詳しい情報を確認してください。';
+          portableDetail.textContent = errorMessage(error);
           return;
         }
         transitionInFlight = true;
@@ -531,6 +548,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         clear(portableResult);
         portableStatus.className = 'ng-status';
         portableStatus.textContent = '保存先を確認しています…';
+        portableDetail.textContent = '';
         void (async () => {
           const signal = portableAbort!.signal;
           const handle = await destinationHandle;
@@ -552,7 +570,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
               if (state !== 'editable') portableAbort?.abort(new Error(session.accessDetail));
             });
             if (handle !== null) {
-              portableStatus.textContent = '選択した .lociview fileへstream出力しています…';
+              portableStatus.textContent = '選択したファイルへバックアップを書き出しています…';
               const writable = await handle.createWritable();
               destination = writable as unknown as WritableStream<Uint8Array>;
             } else {
@@ -567,7 +585,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
                 Number.isFinite(estimate.quota) && Number.isFinite(estimate.usage) &&
                 estimate.quota - estimate.usage < required
               ) {
-                throw new Error(`download準備用の端末保存容量が不足しています（Representation ${fmtBytes(representationBytes)}）。`);
+                throw new Error(`ダウンロード準備用の保存容量が不足しています（モデル ${fmtBytes(representationBytes)}）。`);
               }
               stagedPath = nativeBackupStagePath(summary.projectId, durable.snapshot.snapshotId);
               await fs.remove(stagedPath).catch(() => {});
@@ -575,11 +593,14 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
               stagedWrite = fs.writeStream(stagedPath, bridge.readable);
               void stagedWrite.catch(() => {});
               destination = bridge.writable;
-              portableStatus.textContent = '端末内の検証用Fileへstream出力しています…';
+              portableStatus.textContent = 'この端末でバックアップファイルを準備しています…';
             }
             const exported = await exportNativePortablePackageV1(session.workspace, summary.projectId, destination, {
               signal,
-              onStatus(message) { portableStatus.textContent = message; },
+              onStatus(message) {
+                portableStatus.textContent = 'バックアップを書き出しています…';
+                portableDetail.textContent = message;
+              },
             });
             await stagedWrite;
             let completedFile: Blob;
@@ -588,11 +609,11 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
             } else {
               const staged = stagedPath === null ? null : await fs.readStream(stagedPath);
               if (staged === null || staged.blob === undefined) {
-                throw new Error('検証済みbackupをbrowser downloadへ渡せません。');
+                throw new Error('確認済みのバックアップをダウンロードへ渡せません。');
               }
               completedFile = await staged.blob();
             }
-            portableStatus.textContent = '完成した .lociview fileをstreamでread-back検証しています…';
+            portableStatus.textContent = '書き出したバックアップを確認しています…';
             const readBack = await digestNativeStream(completedFile.stream(), signal);
             if (
               readBack.byteLength !== exported.metrics.packageByteLength ||
@@ -603,22 +624,23 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
             if (handle === null) {
               if (activeDownloadUrl !== null) URL.revokeObjectURL(activeDownloadUrl);
               activeDownloadUrl = URL.createObjectURL(completedFile);
-              const download = el('a', { href: activeDownloadUrl, download: suggestedName }, '検証済み .lociview を保存');
+              const download = el('a', { href: activeDownloadUrl, download: suggestedName }, 'バックアップファイルを保存');
               download.addEventListener('click', () => {
-                portableStatus.textContent = '検証済みbackupのdownloadを開始しました。端末のFiles／download先で保存完了を確認してください。';
+                portableStatus.textContent = 'ダウンロードを開始しました。端末のファイル／ダウンロード先で保存完了を確認してください。';
               });
-              const discard = el('button', {}, '端末内の一時backupを削除');
+              const discard = el('button', {}, 'この端末の一時ファイルを削除');
               discard.addEventListener('click', () => {
-                if (transitionInFlight || stagedPath === null || !window.confirm('Files／download先への保存完了を確認しましたか？ 端末内の一時backupを削除します。')) return;
+                if (transitionInFlight || stagedPath === null || !window.confirm('ファイル／ダウンロード先への保存完了を確認しましたか？ この端末の一時ファイルを削除します。')) return;
                 transitionInFlight = true;
                 void fs.remove(stagedPath).then(() => {
                   if (activeDownloadUrl !== null) URL.revokeObjectURL(activeDownloadUrl);
                   activeDownloadUrl = null;
                   clear(portableResult);
-                  portableStatus.textContent = '端末内の一時backupを削除しました。外部へ保存した .lociview は変更していません。';
+                  portableStatus.textContent = 'この端末の一時ファイルを削除しました。保存先のバックアップは変更していません。';
                 }).catch((error: unknown) => {
                   portableStatus.className = 'ng-error';
-                  portableStatus.textContent = `一時backup削除失敗：${errorMessage(error)}`;
+                  portableStatus.textContent = 'この端末の一時ファイルを削除できませんでした。詳しい情報を確認してください。';
+                  portableDetail.textContent = errorMessage(error);
                 }).finally(() => { transitionInFlight = false; });
               });
               portableResult.append(download, discard);
@@ -628,8 +650,9 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
               : `観測heap peak ${fmtBytes(exported.metrics.jsHeapPeakBytes)}`;
             portableStatus.className = 'ng-status ng-ok';
             portableStatus.textContent = handle === null
-              ? `package生成・read-back検証完了（${fmtBytes(exported.metrics.packageByteLength)}、最大chunk ${fmtBytes(exported.metrics.maxApplicationChunkBytes)}、${heap}）。上のlinkから端末外へ保存してください。`
-              : `backup完了・read-back検証済み（${fmtBytes(exported.metrics.packageByteLength)}、最大chunk ${fmtBytes(exported.metrics.maxApplicationChunkBytes)}、${heap}）。`;
+              ? 'バックアップの確認が完了しました。上のリンクからファイルを保存してください。'
+              : 'バックアップを保存しました。';
+            portableDetail.textContent = `package ${fmtBytes(exported.metrics.packageByteLength)}、最大chunk ${fmtBytes(exported.metrics.maxApplicationChunkBytes)}、${heap}`;
           } catch (error) {
             await destination?.abort(error).catch(() => {});
             await stagedWrite?.catch(() => {});
@@ -641,7 +664,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
           }
         })().catch((error: unknown) => {
           portableStatus.className = 'ng-error';
-          portableStatus.textContent = `backup失敗：${errorMessage(error)}`;
+          portableStatus.textContent = 'バックアップを作成できませんでした。元のプロジェクトは変更されていません。詳しい情報を確認してください。';
+          portableDetail.textContent = errorMessage(error);
         }).finally(() => {
           portableAbort = null;
           transitionInFlight = false;
@@ -649,10 +673,11 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         });
       });
       remove.addEventListener('click', () => {
-        if (transitionInFlight || !window.confirm(`「${summary.title}」の端末内projectを削除します。復元用 .lociview を確認してから続行してください。`)) return;
+        if (transitionInFlight || !window.confirm(`「${summary.title}」をこの端末から削除します。必要な場合は先にバックアップを保存してください。`)) return;
         transitionInFlight = true;
         portableStatus.className = 'ng-status';
-        portableStatus.textContent = '書込みロック取得後に端末保存済みprojectを再読込しています…';
+        portableStatus.textContent = '削除前に最新の保存状態を確認しています…';
+        portableDetail.textContent = '';
         void (async () => {
           const session = await coordinator.tryAcquire(fs, nativeProjectRoot(summary.projectId), summary.projectId);
           if (!session.holdsWriteLock) {
@@ -666,23 +691,23 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
               durable.snapshot.snapshotId !== summary.snapshotId ||
               durable.snapshot.generation !== summary.generation
             ) {
-              throw new Error('確認後にprojectが更新されました。最新状態を再表示してから、もう一度削除を確認してください。');
+              throw new Error('確認後にプロジェクトが更新されました。最新状態を再表示してから、もう一度削除を確認してください。');
             }
             session.activateAfterDurableReload();
             await deleteNativeProjectV1(session.workspace, summary.projectId, summary);
-            homeNotice = `端末内project「${summary.title}」を削除しました。.lociviewから復元できます。`;
+            homeNotice = `「${summary.title}」をこの端末から削除しました。保存済みのバックアップから復元できます。`;
           } finally {
             session.release();
           }
           await renderHome();
         })().catch((error: unknown) => {
           portableStatus.className = 'ng-error';
-          portableStatus.textContent = `local削除失敗：${errorMessage(error)}`;
+          portableStatus.textContent = 'この端末からプロジェクトを削除できませんでした。詳しい情報を確認してください。';
+          portableDetail.textContent = errorMessage(error);
         }).finally(() => { transitionInFlight = false; });
       });
       projectList.append(el('div', { class: 'ng-project-row' },
         el('strong', {}, summary.title),
-        el('span', { class: 'ng-note' }, `snapshot ${summary.generation}`),
         view,
         edit,
         backup,
@@ -692,33 +717,40 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
 
     root.append(el('main', { class: 'ng-home' },
       el('header', { class: 'ng-head' },
-        el('div', {}, el('h1', {}, 'LociView Native GS'), el('p', { class: 'ng-note' }, 'First production GS path — G0/G0-S/G1・releaseは未完了')),
-        el('a', { href: import.meta.env.BASE_URL }, '通常v1へ戻る'),
+        el('div', {}, el('h1', {}, 'LociView プロジェクト'), el('p', { class: 'ng-note' }, 'この端末で3Dモデルとキャプションをオフライン利用できます。')),
+        el('a', { href: import.meta.env.BASE_URL }, '従来形式のプロジェクト画面'),
       ),
-      el('section', { class: 'ng-card' }, el('h2', {}, 'GS offline準備'), status, prepare),
       el('section', { class: 'ng-card' },
-        el('h2', {}, 'Native projectを作成'),
-        el('p', { class: 'ng-note' }, '通常MeshとGSは独立Assetです。ProxyはGS Asset内の非表示interaction representationです。Mesh-only／GS-onlyも作成できます。'),
-        el('label', { class: 'ng-field' }, el('span', {}, 'Project名'), title),
-        el('div', { class: 'ng-grid' },
-          el('label', { class: 'ng-field' }, el('span', {}, '通常Mesh（任意）'), mesh),
-          el('label', { class: 'ng-field' }, el('span', {}, 'Graphdeco GS PLY SH2/SH3（任意）'), gs),
-          el('label', { class: 'ng-field' }, el('span', {}, 'GS専用Interaction Proxy（GS指定時のみ任意）'), proxy),
-        ),
-        create,
-        createStatus,
-      ),
-      el('section', { class: 'ng-card' }, el('h2', {}, '保存済みNative projects'), projectList),
-      el('section', { class: 'ng-card' },
-        el('h2', {}, 'Portable .lociview backup／restore'),
-        el('p', { class: 'ng-note' }, 'snapshotと全Mesh／GS／Proxy source bytesを変換せず保存します。復元は同じproject IDが存在しないworkspaceだけへ行います。'),
-        el('label', { class: 'ng-field' }, el('span', {}, '復元する .lociview'), restoreInput),
-        el('p', { class: 'ng-note' }, 'iPhoneを含め全fileを選択候補へ表示し、選択後にLociView packageとして厳格検証します。'),
+        el('h2', {}, 'この端末のプロジェクト'),
+        projectList,
+        el('h3', {}, 'バックアップから復元'),
+        el('p', { class: 'ng-note' }, 'LociViewのバックアップファイルを選ぶと、モデルとキャプションをこの端末へ復元します。'),
+        el('label', { class: 'ng-field' }, el('span', {}, 'バックアップファイル'), restoreInput),
+        el('p', { class: 'ng-note' }, 'iPhoneを含め、ファイル選択後に内容を厳密に確認します。'),
         el('div', { class: 'ng-row' }, restore, cancelPortable),
         portableStatus,
         portableResult,
+        el('details', {}, el('summary', {}, '詳しい情報'), portableDetail),
       ),
-      el('p', { class: 'ng-note' }, '高度なAlignment workflow、DisplaySet連携、v1／LociMyu migrationは後続workstreamです。'),
+      el('section', { class: 'ng-card' },
+        el('h2', {}, '新しいプロジェクトを作成'),
+        el('p', { class: 'ng-note' }, '3DモデルとGaussian Splattingは別々のモデルとして読み込み、あとから位置や表示を調整できます。どちらか一方だけでも作成できます。'),
+        el('label', { class: 'ng-field' }, el('span', {}, 'プロジェクト名'), title),
+        el('div', { class: 'ng-grid' },
+          el('label', { class: 'ng-field' }, el('span', {}, '3Dモデル（任意）'), mesh),
+          el('label', { class: 'ng-field' }, el('span', {}, 'Gaussian Splatting（PLY、任意）'), gs),
+          el('label', { class: 'ng-field' }, el('span', {}, 'GSのキャプション配置用補助モデル（任意）'), proxy),
+        ),
+        create,
+        createStatus,
+        el('details', {}, el('summary', {}, '詳しい情報'), createDetail),
+      ),
+      el('section', { class: 'ng-card' },
+        el('h2', {}, 'GSをオフラインで使う準備'),
+        status,
+        prepare,
+        el('details', {}, el('summary', {}, '詳しい情報'), offlineDetail),
+      ),
     ));
     await refreshOffline();
   };
@@ -743,7 +775,11 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       else openingSession?.release();
       clear(root);
       root.append(el('main', { class: 'ng-home' },
-        el('p', { class: 'ng-error' }, error instanceof Error ? error.message : String(error)),
+        el('p', { class: 'ng-error' }, 'プロジェクトを開けませんでした。保存状態または編集状態を確認してください。'),
+        el('details', {},
+          el('summary', {}, '詳しい情報'),
+          el('p', { class: 'ng-note' }, error instanceof Error ? error.message : String(error)),
+        ),
         el('button', { onclick: () => void renderHome() }, '一覧へ戻る'),
       ));
     } finally {
@@ -759,14 +795,14 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     let dirty = false;
     let selectedCaptionId = initial.captions[0]?.id ?? null;
     let selectedSavedViewId = initial.savedViews?.[0]?.id ?? null;
-    const canvas = el('canvas', { 'aria-label': 'Native Mesh and Gaussian Splatting project' });
+    const canvas = el('canvas', { 'aria-label': '3DモデルとGaussian Splattingのプロジェクト' });
     const accessBadge = el('span', { class: 'ng-badge' });
     const visibilityBadge = el('span', { class: 'ng-badge' });
-    const runtimeStatus = el('p', { class: 'ng-status' }, 'resourcesを読み込んでいます…');
+    const runtimeStatus = el('p', { class: 'ng-status' }, 'モデルを読み込んでいます…');
     const diagnostics = el('ul', { class: 'ng-diagnostics' });
     const display = el('select');
     display.append(el('option', { value: '' }, '一括表示を選択'));
-    for (const [value, label] of [['mixed', 'すべてのAsset'], ['gs-only', 'GS Assetのみ'], ['mesh-only', 'Mesh Assetのみ']] as const) {
+    for (const [value, label] of [['mixed', 'すべてのモデル'], ['gs-only', 'Gaussian Splattingのみ'], ['mesh-only', '3Dモデルのみ']] as const) {
       display.append(el('option', { value }, label));
     }
     display.value = '';
@@ -777,15 +813,15 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const unload = el('button', {}, 'GSを解放');
     const close = el('button', {}, '閉じる');
     const addKind = el('select');
-    addKind.append(el('option', { value: 'mesh' }, '通常Mesh Asset'), el('option', { value: 'gs' }, 'GS Asset'));
-    const addSourceLabel = el('span', {}, '通常Mesh file');
+    addKind.append(el('option', { value: 'mesh' }, '3Dモデル'), el('option', { value: 'gs' }, 'Gaussian Splatting'));
+    const addSourceLabel = el('span', {}, '3Dモデルファイル');
     const addSource = el('input', { type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply' });
     const addProxy = el('input', { type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply', disabled: 'true' });
     const addAsset = el('button', { class: 'primary' }, 'モデルを追加して保存');
     const replaceAsset = el('select');
     const replaceKind = el('select');
-    replaceKind.append(el('option', { value: 'mesh' }, '通常Mesh Asset'), el('option', { value: 'gs' }, 'GS Asset'));
-    const replaceSourceLabel = el('span', {}, '新しい通常Mesh file');
+    replaceKind.append(el('option', { value: 'mesh' }, '3Dモデル'), el('option', { value: 'gs' }, 'Gaussian Splatting'));
+    const replaceSourceLabel = el('span', {}, '新しい3Dモデルファイル');
     const replaceSource = el('input', { type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply' });
     const replaceProxy = el('input', { type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply', disabled: 'true' });
     const replaceButton = el('button', { class: 'primary' }, '選択したモデルを差し替えて保存');
@@ -793,12 +829,12 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const translationInputs = [0, 1, 2].map(() => el('input', { type: 'number', step: '0.01' }));
     const rotationInputs = [0, 1, 2].map(() => el('input', { type: 'number', step: '1' }));
     const scaleInput = el('input', { type: 'number', step: '0.01', min: '0.000001' });
-    const applyTransformButton = el('button', {}, '位置・回転・scaleを適用');
+    const applyTransformButton = el('button', {}, '位置・回転・スケールを適用');
     let assetGizmoMode: NativeAssetGizmoMode = 'translate';
     const assetGizmoButtons = new Map<NativeAssetGizmoMode, HTMLButtonElement>([
       ['translate', el('button', { 'aria-pressed': 'true' }, '移動')],
       ['rotate', el('button', { 'aria-pressed': 'false' }, '回転')],
-      ['scale', el('button', { 'aria-pressed': 'false' }, 'Uniform scale')],
+      ['scale', el('button', { 'aria-pressed': 'false' }, '均一スケール')],
     ]);
     const captionSelect = el('select', { 'aria-label': 'Caption' });
     const captionTitle = el('input', { type: 'text', maxlength: '160' });
@@ -825,7 +861,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     ]));
     for (const asset of working.assets) {
       const roles = rolesByAsset.get(asset.id) ?? [];
-      const role = roles.includes('gsPrimary') ? 'GS' : 'Mesh';
+      const role = roles.includes('gsPrimary') ? 'Gaussian Splatting' : '3Dモデル';
       target.append(el('option', { value: asset.id }, `${asset.label} (${role})`));
       transformAsset.append(el('option', { value: asset.id }, `${asset.label} (${role})`));
       replaceAsset.append(el('option', { value: asset.id }, `${asset.label} (${role})`));
@@ -870,7 +906,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         captionSelect.append(el(
           'option',
           { value: caption.id },
-          `${review}${index + 1}. ${caption.title} — ${owner?.label ?? 'missing Asset'}`,
+          `${review}${index + 1}. ${caption.title} — ${owner?.label ?? '所属モデル不明'}`,
         ));
       }
       if (working.captions.length === 0 && selectedCaptionId !== null) {
@@ -915,15 +951,18 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         visibilityInputs.get(asset.id)!.checked = visible;
         if (visible) visibleCount += 1;
       }
-      visibilityBadge.textContent = `${visibleCount}/${working.assets.length} Assets visible`;
+      visibilityBadge.textContent = `${visibleCount}/${working.assets.length}モデルを表示中`;
       display.value = '';
     };
     const updateAccess = (): void => {
       accessBadge.textContent = session.sessionMode === 'view'
-        ? 'View mode · read-only'
+        ? '閲覧のみ'
         : session.accessState === 'editable'
-          ? 'Edit mode · write lock held'
-          : `Edit mode · ${session.accessState}`;
+          ? '編集中'
+          : session.accessState === 'lock-lost'
+            ? '書き込み停止・閲覧のみ'
+            : '編集できないため閲覧のみ';
+      accessBadge.title = session.accessDetail;
       const editable = canMutateWorking();
       const caption = selectedCaption();
       const captionVisible = caption !== undefined && isNativeAssetVisibleV1(working, caption.anchor.assetId);
@@ -1025,7 +1064,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         el('details', { class: 'ng-card' },
           el('summary', {}, 'モデルの表示設定'),
           el('label', { class: 'ng-field' }, el('span', {}, '一括表示'), display),
-          el('span', { class: 'ng-note' }, 'Assetごとの表示／非表示'),
+          el('span', { class: 'ng-note' }, 'モデルごとの表示／非表示'),
           visibilityList,
           el('p', { class: 'ng-note' }, '読み込んだ各モデルは、形式に関係なく個別に表示／非表示を切り替えられます。'),
         ),
@@ -1035,7 +1074,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
             el('label', { class: 'ng-field' }, el('span', {}, '描画形式'), addKind),
             el('label', { class: 'ng-field' }, addSourceLabel, addSource),
           ),
-          el('label', { class: 'ng-field' }, el('span', {}, 'GS配置用の補助モデル（任意）'), addProxy),
+          el('label', { class: 'ng-field' }, el('span', {}, 'GSのキャプション配置用補助モデル（任意）'), addProxy),
           addAsset,
           el('p', { class: 'ng-note' }, '一回に一つのモデルを追加します。追加後に位置を調整できます。'),
         ),
@@ -1046,7 +1085,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
             el('label', { class: 'ng-field' }, el('span', {}, '新しい描画形式'), replaceKind),
             el('label', { class: 'ng-field' }, replaceSourceLabel, replaceSource),
           ),
-          el('label', { class: 'ng-field' }, el('span', {}, '新しいGS配置用の補助モデル（任意）'), replaceProxy),
+          el('label', { class: 'ng-field' }, el('span', {}, '新しいGSのキャプション配置用補助モデル（任意）'), replaceProxy),
           replaceButton,
           el('p', { class: 'ng-note' }, 'モデルの位置とキャプション本文は保ちます。表面が同じとは推測しないため、既存キャプションは必要に応じて再配置してください。'),
         ),
@@ -1143,7 +1182,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     syncVisibilityControls();
     runtimeStatus.textContent = offlineReady
       ? 'モデルを読み込みました。表示切替とキャプション編集を利用できます。'
-      : 'Spark offline準備がないためGSはactivateしていません。';
+      : 'GSのオフライン準備がないため、Gaussian Splattingは表示していません。';
     rebuildCaptionOptions();
     populateCaptionFields();
     viewer.selectCaption(selectedCaptionId);
@@ -1219,7 +1258,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       addSource.value = '';
       addProxy.value = '';
       addSource.accept = isGs ? '.ply,application/octet-stream' : '.glb,.gltf,.obj,.stl,.ply';
-      addSourceLabel.textContent = isGs ? 'Graphdeco GS PLY SH2/SH3' : '通常Mesh file';
+      addSourceLabel.textContent = isGs ? 'Gaussian Splatting（PLY）' : '3Dモデルファイル';
       updateAccess();
     });
     replaceKind.addEventListener('change', () => {
@@ -1227,7 +1266,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       replaceSource.value = '';
       replaceProxy.value = '';
       replaceSource.accept = isGs ? '.ply,application/octet-stream' : '.glb,.gltf,.obj,.stl,.ply';
-      replaceSourceLabel.textContent = isGs ? '新しいGraphdeco GS PLY SH2/SH3' : '新しい通常Mesh file';
+      replaceSourceLabel.textContent = isGs ? '新しいGaussian Splatting（PLY）' : '新しい3Dモデルファイル';
       updateAccess();
     });
     addAsset.addEventListener('click', () => {
@@ -1235,13 +1274,13 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       const sourceFile = selectedFile(addSource);
       if (sourceFile === null) {
         runtimeStatus.className = 'ng-error';
-        runtimeStatus.textContent = '追加するAsset fileを選択してください。';
+        runtimeStatus.textContent = '追加するモデルファイルを選択してください。';
         return;
       }
       saving = true;
       updateAccess();
       runtimeStatus.className = 'ng-status';
-      runtimeStatus.textContent = '追加Assetを検査しています…';
+      runtimeStatus.textContent = '追加するモデルを確認しています…';
       void (async () => {
         const kind = addKind.value === 'gs' ? 'gs' : 'mesh';
         const built = await buildAssetImport(
@@ -1257,7 +1296,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
           Number.isFinite(estimate.quota) && Number.isFinite(estimate.usage) &&
           estimate.quota - estimate.usage < required
         ) {
-          throw new Error(`保存可能容量が不足しています（必要 ${fmtBytes(required)}）。既存snapshotは変更しません。`);
+          throw new Error(`保存容量が不足しています（必要 ${fmtBytes(required)}）。現在のプロジェクトは変更しません。`);
         }
         const saved = await addNativeAssetV1(
           session.workspace,
@@ -1277,7 +1316,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         await renderProject(saved, session);
       })().catch((error: unknown) => {
         runtimeStatus.className = 'ng-error';
-        runtimeStatus.textContent = `Asset追加失敗：${error instanceof Error ? error.message : String(error)}。既存active snapshotを維持しました。`;
+        runtimeStatus.textContent = `モデルを追加できませんでした：${error instanceof Error ? error.message : String(error)}。最後に保存されたプロジェクトを維持しました。`;
       }).finally(() => {
         if (activeViewer === viewer) {
           saving = false;
@@ -1297,7 +1336,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       }
       if (sourceFile === null) {
         runtimeStatus.className = 'ng-error';
-        runtimeStatus.textContent = '新しいモデルfileを選択してください。';
+        runtimeStatus.textContent = '新しいモデルファイルを選択してください。';
         return;
       }
       if (!window.confirm(`「${existing.label}」の表示内容を差し替えます。位置と既存キャプションは保持し、表面対応は自動推測しません。続行しますか？`)) return;
@@ -1346,7 +1385,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         await renderProject(saved, session);
       })().catch((error: unknown) => {
         runtimeStatus.className = 'ng-error';
-        runtimeStatus.textContent = `モデル差し替え失敗：${error instanceof Error ? error.message : String(error)}。現在の保存済みモデルを維持しました。`;
+        runtimeStatus.textContent = `モデルを差し替えられませんでした：${error instanceof Error ? error.message : String(error)}。現在の保存済みモデルを維持しました。`;
       }).finally(() => {
         if (activeViewer === viewer) {
           saving = false;
@@ -1431,13 +1470,13 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     });
     unload.addEventListener('click', () => {
       viewer.disposeGs();
-      runtimeStatus.textContent = 'GS runtime resourceを解放しました。再読込はprojectを閉じて開き直してください。';
+      runtimeStatus.textContent = 'Gaussian Splattingをメモリから解放しました。もう一度表示するにはプロジェクトを開き直してください。';
     });
     transformAsset.addEventListener('change', () => {
       populateTransform();
       runtimeStatus.textContent = viewer.selectAlignmentAsset(transformAsset.value)
-        ? '選択Assetのalignment gizmoを表示しました。'
-        : '選択Assetは現在非表示のためgizmoを表示できません。';
+        ? '選択したモデルの位置調整ギズモを表示しました。'
+        : '選択したモデルは非表示のため、位置調整ギズモを表示できません。';
     });
     for (const [mode, button] of assetGizmoButtons) {
       button.addEventListener('click', () => {
@@ -1447,7 +1486,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         }
         viewer.selectAlignmentAsset(transformAsset.value);
         viewer.setAssetGizmoMode(mode);
-        runtimeStatus.textContent = `Asset gizmo: ${button.textContent}`;
+        runtimeStatus.textContent = `モデルの位置調整：${button.textContent}`;
       });
     }
     applyTransformButton.addEventListener('click', () => {

@@ -2876,3 +2876,59 @@ Review — 2026-08-30:
   boundary; no safety mechanism or production code was bypassed. Desktop UI
   gesture evidence and physical-iPhone replacement regression remain unexecuted
   for the Product Owner-approved consolidated run and are not claimed PASS.
+
+## Native project home/open ordinaryization — bounded production slice
+
+Checkpoint and plan — 2026-08-30:
+
+- [x] Keep the current nondefault native route and every existing create/open,
+  lock, offline preparation, backup/restore and delete boundary unchanged
+- [x] Put projects saved on this device first and rename their actions to
+  ordinary task language: edit, view only, write backup and remove from device
+- [x] Present backup restore, new-project creation and GS offline preparation as
+  separate user tasks without exposing Native/Spark/OPFS/snapshot/workspace or
+  G0/G1 terminology in primary UI
+- [x] Describe inputs as 3D model, Gaussian Splatting and GS Caption placement
+  helper; keep exact file admission and same-Asset Proxy semantics unchanged
+- [x] Keep truthful actionable failure states and all existing success/failure
+  handlers; change no schema, package, source byte, lock or renderer behavior
+- [x] Reuse existing acceptance, obtain one independent read-only P0/P1 review,
+  and run typecheck/full test/normal and BASE_PATH builds once on the final tree
+- [x] Carry physical-iPhone layout/open regression into the approved consolidated
+  run and record it as unexecuted, not PASS
+- [x] Commit this bounded slice independently and leave the worktree clean
+
+Exclusions and stop conditions:
+
+- Default-route integration, v1/native registry unification, automatic package
+  dispatch, migration, Caption additions, DisplaySet/material, ordinary points,
+  responsive redesign and final visual polish remain outside this slice.
+- Stop rather than widening if ordinary wording requires changing file admission,
+  project identity, lock semantics, package contents or offline-cache behavior.
+
+Review — 2026-08-30:
+
+- Reordered only the existing nondefault native home: saved projects and their
+  ordinary open/backup/delete actions come first, followed by restore, creation
+  and explicit GS offline preparation. The opened-project shell now uses the
+  same user-facing model/edit/view terminology without changing its controls.
+- Existing create/open lock acquisition, durable reload, streamed backup and
+  restore verification, delete preflight, failure cleanup and publication order
+  are unchanged. Exact diagnostics remain available under `詳しい情報`; primary
+  messages no longer require storage, renderer or gate vocabulary.
+- Independent read-only review of the final executable diff found no P0/P1 and
+  no event-wiring or safety-boundary regression. `npm run typecheck`: PASS.
+- The exact-index full test run reached 46/47 files and 1,396 passing tests; one
+  unrelated G0 CLI test exceeded its existing 5-second timeout by 296 ms. The
+  same case had passed in the immediately preceding full run and passed a
+  targeted exact-tree rerun in 0.845 seconds, so this is recorded as an existing
+  load-sensitive timeout, not silently claimed as a green full invocation.
+- Normal and `BASE_PATH=/LociView/` production builds: PASS. Spark remains the
+  dedicated lazy `native-gs-spark-2.1.0.js` chunk and is absent from both the
+  ordinary entry document and the 13-entry PWA precache. No representative PLY
+  was added; the only built PLY remains the existing small sample.
+- Safe Desktop browser automation could not initialize in the supplied browser
+  execution environment, so no security bypass or alternate automation framework
+  was introduced. Exact-tree visual smoke and the physical-iPhone open/layout
+  regression remain unexecuted for the approved consolidated run and are not
+  claimed PASS.
