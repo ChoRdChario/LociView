@@ -13,9 +13,12 @@ import {
   analyzeLociMyuSheets,
   countLociMyuCaptionSourceRows,
   isLociMyuCaptionSheet,
+  LociMyuIdentityCollisionError,
   LociMyuSourceValidationError,
   lociMyuTrimV1,
+  type LociMyuIdentityCollisionCode,
   type LociMyuMigration,
+  type LociMyuSourceValidationCode,
   type SheetTable,
 } from '../io/locimyu';
 import { parseCsv } from '../io/csv';
@@ -78,10 +81,27 @@ function snapshotSheetTables(tables: readonly SheetTable[]): SheetTable[] {
 export interface SpreadsheetSource {
   /** ZIP内のファイル名 */
   fileName: string;
+  /** ZIP内のexact entry path。直接Native変換のsource accounting用。 */
+  archivePath: string;
+  /** 選択workbook/table entryのexact bytes。Projectへは保存しない。 */
+  sourceBytes: Uint8Array;
   tables: SheetTable[];
   /** バックアップと推定されるか（ファイル名に backup/コピー 等を含む） */
   looksLikeBackup: boolean;
   captionCount: number;
+  /** direct-native preflightだけが参照する、候補固有のtyped rejection。 */
+  validationFailure?: {
+    readonly code: LociMyuSourceValidationCode | LociMyuIdentityCollisionCode | 'workbook-unreadable';
+    readonly message: string;
+  };
+}
+
+export interface FileIdMapSourceRow {
+  readonly archivePath: string;
+  /** Headerを1行目とするdecoded logical row number。 */
+  readonly rowNumber: number;
+  readonly fileId: string;
+  readonly fileName: string;
 }
 
 export interface ImportPlan {
@@ -97,6 +117,8 @@ export interface ImportPlan {
   migration: LociMyuMigration | null;
   /** fileId→filename 対応表（あれば未リンク画像を自動解決できる） */
   fileIdMap: Map<string, string>;
+  /** last-wins Mapでは失われる重複・不完全行をdirect adapterが判定する。 */
+  fileIdMapRows?: FileIdMapSourceRow[];
   /** ZIP全体・候補拒否・現在の候補を混同しないための構造化診断。 */
   diagnostics: {
     archive: string[];
@@ -106,6 +128,14 @@ export interface ImportPlan {
   };
   /** diagnostics と現在選択中のファイル名から生成するUI用の平坦な一覧。 */
   warnings: string[];
+  /** legacy v1取込では使わず、direct-native preflightだけが拒否候補を保持する。 */
+  allowBlockedLociMyuSource?: true;
+  blockedLociMyuSource?: SpreadsheetSource['validationFailure'] | null;
+}
+
+export interface BuildImportPlanOptions {
+  /** typed source failureをreportするため、LociMyu候補を選択状態として保持する。 */
+  readonly preserveBlockedLociMyuSource?: boolean;
 }
 
 const BACKUP_HINT = /(backup|バックアップ|コピー|copy|_old|旧)/i;
@@ -141,7 +171,22 @@ function commitSourceSelection(
   plan.selectedSourceIndex = index;
   plan.tables = tables;
   plan.migration = migration.sets.length > 0 ? migration : null;
+  if (plan.allowBlockedLociMyuSource === true) plan.blockedLociMyuSource = null;
   plan.diagnostics.selectedSource = [...migration.warnings];
+  refreshImportPlanWarnings(plan);
+}
+
+function commitBlockedSourceSelection(
+  plan: ImportPlan,
+  index: number,
+  tables: SheetTable[],
+  failure: NonNullable<SpreadsheetSource['validationFailure']>,
+): void {
+  plan.selectedSourceIndex = index;
+  plan.tables = tables;
+  plan.migration = null;
+  plan.blockedLociMyuSource = failure;
+  plan.diagnostics.selectedSource = [`${failure.message}。Native変換はProjectを作らずreportします`];
   refreshImportPlanWarnings(plan);
 }
 
@@ -172,7 +217,30 @@ export async function selectSource(plan: ImportPlan, index: number): Promise<voi
   const revision = (sourceSelectionRevisions.get(plan) ?? 0) + 1;
   sourceSelectionRevisions.set(plan, revision);
   const tables = snapshotSheetTables(source.tables);
-  const migration = await analyzeLociMyuSheets(tables);
+  if (source.validationFailure?.code === 'workbook-unreadable') {
+    if (plan.allowBlockedLociMyuSource !== true) throw new Error(IMPORT_SOURCE_ANALYSIS_FAILURE_NOTICE);
+    commitBlockedSourceSelection(plan, index, tables, source.validationFailure);
+    return;
+  }
+  let migration: LociMyuMigration;
+  try {
+    migration = await analyzeLociMyuSheets(tables);
+    delete source.validationFailure;
+  } catch (error) {
+    if (
+      plan.allowBlockedLociMyuSource === true && source.captionCount > 0 &&
+      (error instanceof LociMyuSourceValidationError || error instanceof LociMyuIdentityCollisionError)
+    ) {
+      if (sourceSelectionRevisions.get(plan) !== revision) {
+        throw new Error('import plan: spreadsheet selection was superseded');
+      }
+      const failure = { code: error.code, message: error.message } as const;
+      source.validationFailure = failure;
+      commitBlockedSourceSelection(plan, index, tables, failure);
+      return;
+    }
+    throw error;
+  }
   if (sourceSelectionRevisions.get(plan) !== revision) {
     throw new Error('import plan: spreadsheet selection was superseded');
   }
@@ -185,7 +253,10 @@ function baseName(path: string): string {
 }
 
 /** ZIPエントリ群を分類し、表形式データを解析する */
-export async function buildImportPlan(entries: readonly ZipEntryData[]): Promise<ImportPlan> {
+export async function buildImportPlan(
+  entries: readonly ZipEntryData[],
+  options: BuildImportPlanOptions = {},
+): Promise<ImportPlan> {
   const plan: ImportPlan = {
     models: [],
     images: [],
@@ -195,6 +266,7 @@ export async function buildImportPlan(entries: readonly ZipEntryData[]): Promise
     selectedSourceIndex: 0,
     migration: null,
     fileIdMap: new Map(),
+    fileIdMapRows: [],
     diagnostics: {
       archive: [],
       rejectedCandidates: [],
@@ -202,6 +274,9 @@ export async function buildImportPlan(entries: readonly ZipEntryData[]): Promise
       selectedSource: [],
     },
     warnings: [],
+    ...(options.preserveBlockedLociMyuSource
+      ? { allowBlockedLociMyuSource: true as const, blockedLociMyuSource: null }
+      : {}),
   };
 
   for (const e of entries) {
@@ -226,17 +301,34 @@ export async function buildImportPlan(entries: readonly ZipEntryData[]): Promise
       plan.images.push({ path: e.path, name, data: e.data });
       continue;
     }
-    if (looksLikeXlsx(name, e.data)) {
+    if (/\.xlsx$/i.test(name)) {
       try {
+        if (!looksLikeXlsx(name, e.data)) throw new Error('not an XLSX ZIP container');
         const tables = await readXlsx(e.data);
         plan.sources.push({
           fileName: name,
+          archivePath: e.path,
+          sourceBytes: e.data,
           tables,
           looksLikeBackup: BACKUP_HINT.test(name),
           captionCount: countLociMyuCaptionSourceRows(tables),
         });
       } catch {
         plan.diagnostics.archive.push(`${name} を安全に読み取れませんでした`);
+        if (options.preserveBlockedLociMyuSource && /locimyu/iu.test(name)) {
+          plan.sources.push({
+            fileName: name,
+            archivePath: e.path,
+            sourceBytes: e.data,
+            tables: [],
+            looksLikeBackup: BACKUP_HINT.test(name),
+            captionCount: 0,
+            validationFailure: {
+              code: 'workbook-unreadable',
+              message: 'The LociMyu workbook could not be decoded safely',
+            },
+          });
+        }
       }
       continue;
     }
@@ -252,19 +344,29 @@ export async function buildImportPlan(entries: readonly ZipEntryData[]): Promise
       if (isLociMyuCaptionSheet(rows)) {
         plan.sources.push({
           fileName: name,
+          archivePath: e.path,
+          sourceBytes: e.data,
           tables: [table],
           looksLikeBackup: BACKUP_HINT.test(name),
           captionCount: countLociMyuCaptionSourceRows([table]),
         });
       } else if (isFileIdMap) {
-        for (const row of rows.slice(1)) {
+        for (const [index, row] of rows.slice(1).entries()) {
           const id = lociMyuTrimV1(row[0] ?? '');
           const fname = lociMyuTrimV1(row[1] ?? '');
+          plan.fileIdMapRows!.push({
+            archivePath: e.path,
+            rowNumber: index + 2,
+            fileId: id,
+            fileName: fname,
+          });
           if (id !== '' && fname !== '') plan.fileIdMap.set(id, fname);
         }
       } else {
         plan.sources.push({
           fileName: name,
+          archivePath: e.path,
+          sourceBytes: e.data,
           tables: [table],
           looksLikeBackup: BACKUP_HINT.test(name),
           captionCount: countLociMyuCaptionSourceRows([table]),
@@ -300,20 +402,65 @@ export async function buildImportPlan(entries: readonly ZipEntryData[]): Promise
     for (let candidateIndex = 0; candidateIndex < plan.sources.length; candidateIndex++) {
       const source = plan.sources[candidateIndex]!;
       const tables = snapshotSheetTables(source.tables);
+      if (source.validationFailure?.code === 'workbook-unreadable') {
+        plan.diagnostics.rejectedCandidates.push(
+          `${source.fileName} は取り込めませんでした: ${source.validationFailure.message}`,
+        );
+        continue;
+      }
       try {
         const migration = await analyzeLociMyuSheets(tables);
+        delete source.validationFailure;
         const captionCount = migration.sets.reduce((count, set) => count + set.captions.length, 0);
         source.captionCount = captionCount;
         const candidate = { index: candidateIndex, tables, migration, captionCount };
         if (best === null || compareCandidates(candidate, best) < 0) best = candidate;
       } catch (error) {
         if (error instanceof LociMyuSourceValidationError) {
+          source.validationFailure = { code: error.code, message: error.message };
           plan.diagnostics.rejectedCandidates.push(
             `${source.fileName} は取り込めませんでした: ${error.message}`,
           );
           continue;
         }
+        if (options.preserveBlockedLociMyuSource && error instanceof LociMyuIdentityCollisionError) {
+          const failure = { code: error.code, message: error.message } as const;
+          source.validationFailure = failure;
+          plan.diagnostics.rejectedCandidates.push(
+            `${source.fileName} はidentity collisionのため変換を停止しました: ${error.message}`,
+          );
+          commitBlockedSourceSelection(plan, candidateIndex, tables, failure);
+          return plan;
+        }
         throw new Error(IMPORT_SOURCE_ANALYSIS_FAILURE_NOTICE, { cause: error });
+      }
+    }
+    if (
+      options.preserveBlockedLociMyuSource &&
+      (best === null || best.migration.sets.length === 0)
+    ) {
+      const rejected = plan.sources
+        .map((source, index) => ({ source, index }))
+        .filter((candidate) => candidate.source.validationFailure !== undefined && (
+          candidate.source.captionCount > 0 || candidate.source.validationFailure.code === 'workbook-unreadable'
+        ))
+        .sort((left, right) => {
+          if (left.source.looksLikeBackup !== right.source.looksLikeBackup) {
+            return left.source.looksLikeBackup ? 1 : -1;
+          }
+          if (left.source.captionCount !== right.source.captionCount) {
+            return right.source.captionCount - left.source.captionCount;
+          }
+          return left.index - right.index;
+        })[0];
+      if (rejected !== undefined) {
+        commitBlockedSourceSelection(
+          plan,
+          rejected.index,
+          snapshotSheetTables(rejected.source.tables),
+          rejected.source.validationFailure!,
+        );
+        return plan;
       }
     }
     if (best === null) {

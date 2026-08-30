@@ -17,6 +17,11 @@ export interface ImportWizardResult {
   imageLinks: Map<string, string>;
 }
 
+export interface ImportWizardOptions {
+  /** LociMyu ZIPを中間v1なしでNative projectへ変換するbounded lane。 */
+  readonly directNative?: boolean;
+}
+
 export function importWizardRetentionNotice(plan: Pick<ImportPlan, 'migration'>): string | null {
   return plan.migration === null ? null : `⚠ ${LOCIMYU_SOURCE_RETENTION_NOTICE}`;
 }
@@ -53,7 +58,11 @@ export function importWizardVisibleDiagnostics(
 }
 
 /** キャプション → 画像ファイル名 の手動リンクを含むウィザード。キャンセル時はnull */
-export function importWizardDialog(plan: ImportPlan, defaultName: string): Promise<ImportWizardResult | null> {
+export function importWizardDialog(
+  plan: ImportPlan,
+  defaultName: string,
+  options: ImportWizardOptions = {},
+): Promise<ImportWizardResult | null> {
   return new Promise((resolve) => {
     const backdrop = el('div', { class: 'lv-modal-backdrop' });
     const nameInput = el('input', { type: 'text', value: defaultName, placeholder: 'プロジェクト名' }) as HTMLInputElement;
@@ -116,9 +125,17 @@ export function importWizardDialog(plan: ImportPlan, defaultName: string): Promi
           el('div', { class: 'lv-mr-detail' }, summarizeMigration(plan.migration)),
           el('div', { class: 'lv-mr-detail' }, 'キャプションシートは表示セットとして引き継がれます'),
         );
-        const retentionNotice = importWizardRetentionNotice(plan);
-        if (retentionNotice !== null) {
-          summary.append(el('div', { class: 'lv-mr-detail warn' }, retentionNotice));
+        if (options.directNative) {
+          summary.append(
+            el('div', { class: 'lv-mr-detail' }, '新しいNative LociView projectへ直接変換します。中間のv1 projectは作りません。'),
+            el('div', { class: 'lv-mr-detail warn' },
+              '元のLociMyu ZIPは別途保管してください。exactに確定できない画像・見え方・視点は自動推測せずconversion reportへ記録します。'),
+          );
+        } else {
+          const retentionNotice = importWizardRetentionNotice(plan);
+          if (retentionNotice !== null) {
+            summary.append(el('div', { class: 'lv-mr-detail warn' }, retentionNotice));
+          }
         }
         // マテリアル・ビューの割り当て（gidが推定の場合は明示する）
         if (plan.migration.gidToSetName.size > 0) {
@@ -132,6 +149,15 @@ export function importWizardDialog(plan: ImportPlan, defaultName: string): Promi
             ),
           );
         }
+      } else if (plan.blockedLociMyuSource !== null && plan.blockedLociMyuSource !== undefined) {
+        summary.append(
+          el('div', { class: 'lv-mr-row' },
+            el('span', { class: 'lv-mr-ico warn' }, '⚠'),
+            'LociMyuデータを検出しましたが、安全なCaption IDを作れない行があります',
+          ),
+          el('div', { class: 'lv-mr-detail warn' },
+            '元のLociMyu ZIPは別途保管してください。「取り込み内容を確認」を押すとconversion reportを保存し、不完全なNative projectは作りません。'),
+        );
       } else if (plan.tables.length > 0) {
         summary.append(
           el('div', { class: 'lv-mr-row' },
@@ -169,6 +195,7 @@ export function importWizardDialog(plan: ImportPlan, defaultName: string): Promi
     function renderLinkSection(): void {
       clear(linkSection);
       imageLinks.clear();
+      if (options.directNative) return;
       const unlinked = plan.migration?.unlinkedImages ?? new Map<string, string[]>();
       // fileId対応表で解決できるものを除外
       const needLink = [...unlinked.entries()].filter(([fileId]) => !plan.fileIdMap.has(fileId));
@@ -219,11 +246,11 @@ export function importWizardDialog(plan: ImportPlan, defaultName: string): Promi
           imageLinks,
         });
       },
-    }, '取り込む') as HTMLButtonElement;
+    }, options.directNative ? '取り込み内容を確認' : '取り込む') as HTMLButtonElement;
     okButton = ok;
 
     const card = el('div', { class: 'lv-modal-card', role: 'dialog', 'aria-label': 'インポート' },
-      el('div', { class: 'lv-modal-title' }, 'ZIPの取り込み'),
+      el('div', { class: 'lv-modal-title' }, options.directNative ? 'LociMyu ZIPをNative projectへ変換' : 'ZIPの取り込み'),
       el('div', { class: 'lv-grp' },
         el('div', { class: 'lv-hint' }, 'プロジェクト名'),
         nameInput,

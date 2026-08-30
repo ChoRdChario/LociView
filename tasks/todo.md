@@ -1,6 +1,6 @@
 # LociView active work
 
-> Baseline checkpoint: `56698f2ee0f13f6a716b5a4ceff53c8bc94af0ab` on
+> Baseline checkpoint: `7575240d87229e536847310696c922639e3b3600` on
 > `g0-baseline` (2026-08-31). The first frozen-v1 -> native implementation is
 > complete at `9d973cd8f84e14cc1d72562a01034754e3a1ed42`; Desktop and
 > physical-iPhone acceptance both passed.
@@ -101,6 +101,41 @@ Required conversion invariants:
 - DisplaySet remains Caption membership + set-scoped material appearance + an
   optional Saved View; it never owns Asset visibility or transforms.
 
+## Completed implementation / representative retry — direct LociMyu ZIP -> native adapter
+
+- [x] Product Owner approved the bounded direct adapter and the
+  `LM-ADAPT-*` acceptance in `docs/specs/04-locimyu-conversion.md`.
+- [x] Select one private representative outer ZIP read-only and record its path,
+  bytes, SHA-256, workbook/model/media inventory without copying it into the
+  repository or build.
+- [x] Replace the superseded device-local sidecar requirement with the
+  separately retained original ZIP plus exportable conversion report. Add no
+  sidecar, quarantine/review database or portable review continuity.
+- [x] Implement one direct in-memory LociMyu projection into the existing native
+  receiver. Do not persist an intermediate v1 workspace or activate ordinal,
+  first/last, case-folded or fuzzy relationships.
+- [x] Preserve every otherwise-valid non-empty Caption occurrence with
+  `locimyu-caption-id-2`; block before publication on identity
+  impossibility/collision and report every converted, inactive/unlinked or
+  blocking item.
+- [x] Reuse verified binary/media writes, snapshot-last/marker-last publication,
+  project write lock and portable package; verify the source ZIP unchanged.
+- [x] Run one independent migration/input review and focused checks. The review
+  found no remaining implementation P0/P1.
+- [x] Run the final typecheck/full test/build matrix once on the completed tree.
+- [x] Run the private representative preflight read-only. It found 109 non-empty
+  Caption rows and stopped before publication because six rows on
+  `モデル確認用（透過）` lack stable legacy IDs; all six are reported, converted
+  counts are zero and the source hash is unchanged.
+- [x] Classify the bounded result as `FIRST LOCIMYU NATIVE ADAPTER: RETRY`.
+  Converted-project Desktop/iPhone and portable-restore acceptance cannot run
+  and are not inferred while no Project is published.
+
+Required next input action: supply a source in which logical rows 43–48 on
+`モデル確認用（透過）` have stable legacy Caption IDs, or make a row genuinely
+empty only if it was intentionally deleted. Do not auto-generate IDs or edit the
+private source on the user's behalf.
+
 ## P2 backlog — not a completion blocker
 
 - Replace format-specific Mesh/GS/Point input controls with one model-file
@@ -148,5 +183,21 @@ Required conversion invariants:
 - Desktop conversion/restore and physical-iPhone `.lociview` restore,
   DisplaySet/Caption/image, save and completely offline-reopen checks were
   accepted by the Product Owner. No unresolved P0/P1 was reported.
-- This result-only documentation synchronization does not trigger another full
-  matrix under the approved stop rule.
+- The direct LociMyu adapter reuses the exact identity/source-authority parser,
+  native receiver, verified binary/media writes and marker-last publication;
+  it adds no durable intermediate v1 workspace, sidecar or generalized
+  migration system.
+- The private representative retained 94,063,937 bytes and SHA-256
+  `3736aa3bb5cffcf9b9aaffb70cc210878069d4876b63ced8441f79da8a9da01c`.
+  Preflight accounted for 396 source mappings: six blocking and 390 reported.
+  No Project became active and all representative converted counts are zero.
+- Independent read-only review found no remaining adapter P0/P1. The six
+  missing stable source IDs are a bounded external-data correction and make the
+  representative result `RETRY`, not PASS and not missing-source blocked.
+- Final adapter tree verification passed: typecheck; 54 full-suite files with
+  1,431 tests passing and 21 existing todo; normal production build; and the
+  `/LociView/` base-path build. Spark remains outside the service-worker
+  precache and the representative PLY bytes are absent from repository/build.
+- The stale current-action wording found by final documentation review was
+  corrected after executable verification; this result-only synchronization
+  does not trigger a second full matrix under the approved stop rule.

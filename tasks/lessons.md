@@ -220,3 +220,10 @@
 - Caption target、Caption選択、新規作成、初期配置、位置調整、snapshot保存を別々のtechnical controlとして並べただけでは、各機能が動いても一般利用者には操作順が分からない。本番UXの成立を機能PASSから推定しない。
 - Caption authoringの本番導線を閉じるときは、LociMyuの実際の操作を参照し、「Captionを選ぶ／追加する→モデル上へ置く→その場で内容と位置を編集する」というユーザー作業を中心に一本化する。内部のAsset／Proxy／snapshot手順をユーザーに組み立てさせない。
 - 現在のnative画面はproduction wiringを検証するtechnical UIとして扱い、最終UIとしてordinary化しない。全体UI/UX closureまで、技術acceptanceと操作性acceptanceを別々に記録する。
+## 2026-08-31: scope mechanisms must remain Product Owner choices
+
+- Do not promote a proposed audit/review storage mechanism into product scope
+  merely because later specifications reference it. When a separately retained
+  source plus bounded exportable report satisfies the approved user outcome,
+  keep sidecars, quarantine databases and portable review workflows out unless
+  the Product Owner separately approves them.

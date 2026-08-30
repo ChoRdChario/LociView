@@ -4,6 +4,7 @@
 > That baseline is a historical normalization anchor, not a checkout target. Use Git `HEAD` and `tasks/todo.md` for the active checkpoint.
 > A bounded, nondefault native production path now supports repeated ordinary Mesh, exact ASCII XYZ+RGB Point, or Graphdeco SH2/SH3 GS Asset imports, optional explicit per-GS Proxies, streamed portable backup, independent visibility and per-Asset manual position/rotation/uniform-scale alignment. It does not pass G0/G0-S/G1 or adopt Spark permanently. Additional point profiles, full Alignment workflows, Automerge, content-addressed storage, and renderer backends remain `PROPOSED`.
 > Product visibility is per loaded Asset/layer, not per Mesh/GS kind. The current native `mixed` / `gs-only` / `mesh-only` values are bounded convenience filters; formal Compare is neither implemented nor selected as the next workstream.
+> The bounded direct LociMyu ZIP -> native adapter is implemented with exact Caption identity/source authority, a separately retained report and marker-last publication. Its first private representative run is `RETRY`: six non-empty Caption rows lack stable legacy IDs, so no native Project was published and the source remained unchanged.
 
 ## Start here
 

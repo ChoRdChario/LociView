@@ -11,12 +11,13 @@ The current application remains the migration base. v2 replaces storage and rend
 When a deterministic non-lossy default can preserve every source record, the
 product MUST apply that default without asking an ordinary user to decide
 technical identity, storage or migration details. Uncertainty that does not
-prevent safe preservation is retained as a bounded review item and disclosed in
-a concise summary; a knowledgeable user or support operator can inspect and
-resolve such items in batches later. The product blocks only the affected unit or
-commit when continuing would lose a record, guess a semantic relationship or
-violate an invariant. Exclusion, destructive merge and silent guessed linkage
-are never defaults.
+prevent safe preservation is retained in the bounded, adapter-specific form
+approved for that conversion and disclosed in a concise summary. For the first
+LociMyu adapter that form is the separately retained original ZIP plus an
+exportable conversion report; it is not project-local review storage. The
+product blocks only the affected unit or commit when continuing would lose a
+record, guess a semantic relationship or violate an invariant. Exclusion,
+destructive merge and silent guessed linkage are never defaults.
 
 ## 2. Non-negotiable user outcomes
 
@@ -34,8 +35,8 @@ are never defaults.
 | `PROD-10` | Unsupported schema, renderer capability, material policy or missing blob produces an actionable diagnosis, not a blank viewer. |
 | `PROD-11` | The same validated static source produces the same pose, logical bounds, material class and canonical pick anchor/method across supported backends; candidate-local weak provenance may differ or be absent, and a decoder upgrade cannot reinterpret an existing Representation silently. |
 | `PROD-12` | A non-specialist can complete ordinary open/import, caption, merge, export and recovery flows using familiar file/task language, without a Google/LociView account or exposure to actor, HLC, hash, CAS, OPFS, renderer-profile or similar implementation terminology. |
-| `PROD-13` | A LociMyu save dataset consisting of an XLSX save, associated model and images, and an optional file-ID map remains convertible into a new LociView project without a Google account or Google API. Conversion never overwrites the selected source artifacts. Every non-empty LociMyu caption data-row occurrence is preserved independently. Duplicate legacy caption identifiers do not identify one target entity: every otherwise valid occurrence becomes a distinct Caption, and no occurrence is dropped, merged or selected as a winner. A uniquely source-authoritative relationship may be applied automatically. An inferred or ambiguous sheet relationship and an unresolved or ambiguous media relationship remain non-authoritative while the source row, reference, candidates and provenance are preserved in the durable expert-review backlog. Such issues do not block the conversion while a bounded, durable and deterministic preserved result can be committed. The ordinary-user flow reports the aggregate result and permits later review; it does not require item-by-item dispositions. Transient caller buffers may be consumed or cleared after ownership transfer; they are not the durable source artifact. |
-| `PROD-14` | When an import or conversion can preserve all source facts and isolate uncertain semantics, it MUST continue with the safe preserved result and a durable expert-review item instead of asking an ordinary user for fine-grained decisions. It MUST NOT silently drop, merge, choose a winner, invent a relationship or activate a guessed relationship. An ordinary-user choice is permitted only for a coarse source/target-authority decision, a destructive or irreversible action, or a condition that the accepted contract identifies as preventing any safe preserved result. |
+| `PROD-13` | A LociMyu save dataset consisting of an XLSX save, associated model and images, and an optional file-ID map remains convertible into a new LociView project without a Google account or Google API. Conversion never overwrites the selected source artifacts. Every otherwise-valid non-empty LociMyu caption data-row occurrence is preserved independently. Duplicate legacy caption identifiers do not identify one target entity: every occurrence becomes a distinct Caption, and no occurrence is dropped, merged or selected as a winner. Only a uniquely source-authoritative relationship may be activated automatically. An inferred or ambiguous sheet relationship and an unresolved or ambiguous media relationship remain inactive or unlinked; an exportable conversion report records the source sheet, row, ID, affected field, reason and impact. The original outer ZIP remains outside the Project under user control, and that ZIP plus the report are the audit record. The new native Project is the working source of truth. Stable-identity impossibility or collision blocks publication rather than inventing an ID. The ordinary-user flow reports aggregate results and does not require item-by-item decisions. |
+| `PROD-14` | When an import or conversion can preserve every otherwise-valid record and isolate uncertain semantics, it MUST continue with the safe preserved result and the bounded accounting approved for that adapter instead of asking an ordinary user for fine-grained decisions. It MUST NOT silently drop, merge, choose a winner, invent a relationship or activate a guessed relationship. The first LociMyu adapter uses an exportable report and separately retained source ZIP; it adds no project-local sidecar, quarantine or review database. An ordinary-user choice is permitted only for a coarse source/target-authority decision, a destructive or irreversible action, or a condition that the accepted contract identifies as preventing any safe preserved result. |
 
 ## 3. Asset visibility and composition support
 
@@ -266,6 +267,18 @@ Recorded on 2026-08-26:
   Compare has no required support claim/control unless separately approved;
 - the five incomplete-data outcomes in section 4.5 are fixed product behavior;
   no implementation may infer registration or interaction binding.
+
+Recorded on 2026-08-31, superseding only the 2026-08-26 local review-stock
+delivery mechanism (not its identity or source-authority rules):
+
+- the user retains the exact outer LociMyu ZIP separately and the converter
+  emits an exportable accounting report;
+- the first direct adapter does not copy the ZIP into the native Project and
+  does not add a device-local sidecar, quarantine/review database or portable
+  review continuity;
+- an otherwise-valid Caption remains active while an ambiguous relationship is
+  inactive or unlinked and reported. Missing stable identity, duplicate
+  canonical identity or a digest collision still blocks publication.
 
 Recorded on 2026-08-29:
 

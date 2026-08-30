@@ -264,7 +264,7 @@ export async function createNativeProjectV1(
   sources: ReadonlyMap<string, NativeBinarySource>,
   onStatus?: (message: string) => void,
   mediaSources: ReadonlyMap<string, NativeBinarySource> = new Map(),
-  assertPublicationAllowed?: () => void,
+  assertPublicationAllowed?: () => void | Promise<void>,
 ): Promise<NativeProjectSnapshotV1> {
   assertProjectWorkspace(fs, draft.project.id);
   if (await fs.exists(nativeActiveMarkerPath(draft.project.id))) {
@@ -324,11 +324,11 @@ export async function createNativeProjectV1(
     ...(draft.meshMaterialAppearances === undefined ? {} : { meshMaterialAppearances: draft.meshMaterialAppearances }),
     ...(draft.mediaResources === undefined ? {} : { mediaResources }),
   };
-  assertPublicationAllowed?.();
+  await assertPublicationAllowed?.();
   onStatus?.('Writing and verifying native snapshot v1…');
   const verified = await writeVerifiedSnapshot(fs, snapshot);
   // Publication boundary: no active project exists before this final write.
-  assertPublicationAllowed?.();
+  await assertPublicationAllowed?.();
   onStatus?.('Publishing active receipt…');
   await publishActiveMarker(fs, snapshot, verified.digest);
   onStatus?.('Native project saved and active.');

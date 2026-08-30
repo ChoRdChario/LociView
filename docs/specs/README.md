@@ -30,7 +30,7 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metri
 | [`01-domain-rendering.md`](01-domain-rendering.md) | Frames, asset revisions, renderer-neutral scene, per-Asset visibility, composition support, picking, alignment and GS/iOS lifecycle |
 | [`02-storage-package-migration.md`](02-storage-package-migration.md) | Metadata, CAS, transaction recovery, package classes, merge semantics, v1 conversion |
 | [`03-gates-and-delivery.md`](03-gates-and-delivery.md) | G0, blocking G0-S, PoC gates, evidence, feature flags, rollback and development sequence |
-| [`04-locimyu-conversion.md`](04-locimyu-conversion.md) | Canonical LociMyu Caption identity, source-authority rules and the device-local deferred-review gate |
+| [`04-locimyu-conversion.md`](04-locimyu-conversion.md) | Canonical LociMyu Caption identity, source-authority rules and the direct-adapter conversion-report boundary |
 
 ## Fixed versus conditional decisions
 
@@ -44,7 +44,11 @@ Fixed unless a new ADR supersedes ADR-0001:
 - exact smooth-alpha mesh/GS intersection is not an MVP dependency;
 - large package and GS paths cannot require whole-file memory materialization;
 - v1 sources are preserved and conversion is explicit.
-- LociMyu conversion uses the versioned preserve-all identity and approved deferred-review direction; guessed sheet/media relationships are never activated, and durable local review waits for its separate capability/wire gate.
+- LociMyu conversion uses the versioned preserve-all identity; guessed
+  sheet/media relationships are never activated. For the first direct adapter
+  the user retains the original ZIP and an exportable report accounts for
+  inactive/unlinked information; no project-local sidecar or portable review
+  continuity is required.
 - caption tags and ordered display sets with explicit default views remain portable;
 - review snapshots carry no editable lineage identity, while clean editable copies re-key into a new lineage.
 

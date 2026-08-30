@@ -21,6 +21,7 @@ import { fNum, fStr } from './fields';
 import { mountHome, type NativeProjectListItem, type WritableProjectSession } from './home';
 import { mountViewerScreen } from './viewerScreen';
 import type { PackageExportStatus } from './saveStatus';
+import type { ImportPlan } from '../assets/importWizard';
 
 /** これを超えるモデルは開いた時点で自動読み込みせず、手動表示に委ねる（iOSメモリ対策） */
 const AUTO_LOAD_LIMIT = 25 * 1024 * 1024;
@@ -73,6 +74,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
   let projectNavigationEpoch = 0;
   let packageExportStatus: PackageExportStatus = Object.freeze({ phase: 'idle' });
   let v1ConversionInProgress = false;
+  let lociMyuConversionInProgress = false;
 
   // ---- 保存状態（書き出し済みop数をプロジェクトごとに記録） -----------------------------
   const exportedKey = (dir: string): string => `lv-package-covered:${dir}`;
@@ -357,6 +359,113 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     return (await listNativeProjectsV1(fs)).map(({ projectId, title }) => ({ projectId, title }));
   }
 
+  async function convertLociMyuZipToNative(
+    sourceFile: File,
+    importPlan: ImportPlan,
+    projectName: string,
+    onStatus: (message: string) => void,
+  ): Promise<string | null> {
+    if (!persistentWorkspace) {
+      throw new Error('このブラウザではNative projectを端末へ永続保存できないため、LociMyu変換を開始できません。');
+    }
+    if (lociMyuConversionInProgress) throw new Error('LociMyu変換はすでに進行中です。');
+    lociMyuConversionInProgress = true;
+    const progressText = el('p', { role: 'status' }, '元のLociMyu ZIPをread-onlyで確認しています…');
+    const progressDialog = el('dialog', { class: 'lv-dialog' },
+      el('h2', {}, 'LociMyu ZIPをNative projectへ変換'),
+      el('p', {}, '元ZIPには書き戻しません。変換不能な項目はconversion reportへ記録します。'),
+      progressText,
+    ) as HTMLDialogElement;
+    document.body.append(progressDialog);
+    progressDialog.showModal();
+    let progressClosed = false;
+    const closeProgress = (): void => {
+      if (progressClosed) return;
+      progressClosed = true;
+      progressDialog.close();
+      progressDialog.remove();
+    };
+    const status = (message: string): void => {
+      progressText.textContent = message;
+      onStatus(message);
+    };
+    let targetAccess: ProjectMutationSession | null = null;
+    let created: import('../nativeGs/schema').NativeProjectSnapshotV1 | null = null;
+    try {
+      const conversion = await import('../nativeGs/locimyuConversion');
+      status('workbook、Caption identity、model、mediaを照合しています…');
+      const plan = await conversion.planLociMyuZipToNative(sourceFile, importPlan, projectName);
+      const reportStem = sourceFile.name.replace(/\.(zip|lociview)$/iu, '') || 'locimyu';
+      if (plan.blockingIssueCount > 0) {
+        status('元ZIPが変化していないことを再確認しています…');
+        const sourceAfter = await conversion.assertLociMyuSourceUnchanged(plan, sourceFile);
+        const report = conversion.completeBlockedLociMyuNativeConversionReport(plan, sourceAfter);
+        downloadBlob(
+          conversion.serializeLociMyuNativeConversionReport(report),
+          `${reportStem}-native-conversion-preflight.json`,
+          'application/json',
+        );
+        closeProgress();
+        await infoDialog(
+          'Native変換を開始しませんでした',
+          `${plan.blockingIssueCount}件のblocking項目があります。元ZIPは変更せず、不完全なNative projectも作成していません。詳細をconversion reportへ保存しました。`,
+        );
+        return null;
+      }
+      const storage = await import('../nativeGs/storage');
+      status('元ZIPが変化していないことを確認しています…');
+      await conversion.assertLociMyuSourceUnchanged(plan, sourceFile);
+      status('新しいNative projectの書込みロックを取得しています…');
+      targetAccess = await mutationCoordinator.tryAcquire(
+        fs,
+        storage.nativeProjectRoot(plan.draft.project.id),
+        plan.draft.project.id,
+      );
+      if (!targetAccess.holdsWriteLock) throw new Error(targetAccess.accessDetail);
+      targetAccess.activateNewProject();
+      status('modelと画像を検証しながらNative projectへ保存しています…');
+      created = await conversion.createLociMyuNativeProject(
+        targetAccess.workspace,
+        plan,
+        sourceFile,
+        status,
+      );
+      const sourceAfter = await conversion.assertLociMyuSourceUnchanged(plan, sourceFile);
+      const report = conversion.completeLociMyuNativeConversionReport(plan, created, sourceAfter);
+      downloadBlob(
+        conversion.serializeLociMyuNativeConversionReport(report),
+        `${reportStem}-to-${created.project.id}-conversion-report.json`,
+        'application/json',
+      );
+      targetAccess.release();
+      targetAccess = null;
+      closeProgress();
+      await infoDialog(
+        'Native変換が完了しました',
+        `元のLociMyu ZIPは変更されていません。新しいNative projectを作成し、${report.issues.length}件の注記をconversion reportへ保存しました。`,
+      );
+      return created.project.id;
+    } catch (error) {
+      if (created !== null && targetAccess !== null) {
+        try {
+          const storage = await import('../nativeGs/storage');
+          await storage.deleteNativeProjectV1(targetAccess.workspace, created.project.id, created);
+          created = null;
+        } catch (cleanupError) {
+          throw new Error(
+            `${error instanceof Error ? error.message : String(error)}\n` +
+            `新規Native projectのcleanupにも失敗しました: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+          );
+        }
+      }
+      throw error;
+    } finally {
+      targetAccess?.release();
+      closeProgress();
+      lociMyuConversionInProgress = false;
+    }
+  }
+
   async function restoreNativePackage(file: File, onStatus: (message: string) => void): Promise<string> {
     if (!persistentWorkspace) {
       throw new Error('このブラウザでは対応プロジェクトを端末へ保存できないため、バックアップを復元できません。');
@@ -415,6 +524,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       listNativeProjects,
       openNativeProjects,
       restoreNativePackage,
+      convertLociMyuZipToNative,
     });
   }
 

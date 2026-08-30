@@ -1,17 +1,18 @@
-# LociMyu conversion and deferred-review contract
+# LociMyu conversion identity, source authority and report contract
 
-> Status: `APPROVED IDENTITY/SOURCE AUTHORITY / LOCAL RETENTION SPECIFICATION BLOCKED / NOT IMPLEMENTED`
+> Status: `PRODUCT-OWNER APPROVED / BOUNDED DIRECT ADAPTER IMPLEMENTED / REPRESENTATIVE RETRY`
 > Approved: 2026-08-26
+> Direct-adapter boundary approved: 2026-08-31
 > Identity recipe: `locimyu-caption-id-2`
 
 ## 1. Scope and authority
 
 This specification is the normative companion for converting one selected
 LociMyu workbook plus the model, media and optional file-ID map found in its
-outer ZIP into a new current LociView project. It closes the identity and
-source-authority portions of `PROD-13` and `PROD-14`; it does not close their
-local-retention or portable-review portions, and it is separate from LociView
-v1-package to v2 migration.
+outer ZIP directly into a new native LociView Project. It closes the identity,
+source-authority, source-retention and conversion-accounting boundary for the
+first adapter under `PROD-13` and `PROD-14`. It is separate from LociView
+v1-package-to-native migration.
 
 For this conversion path only, this document supersedes the frozen
 `02-data-format.md` statement that a Caption ID is derived from the legacy ID
@@ -21,29 +22,24 @@ adds only the closed historical-reader exception recorded in
 `cap_LM...` Caption ID. Historical fixtures containing `cap_LM...` remain
 evidence of the pre-recipe converter, not accepted output for a new conversion.
 
-The approved delivery is split deliberately:
+The approved delivery is bounded deliberately:
 
-1. freeze and implement canonical Caption identity plus preservation of every
-   duplicate occurrence, including the pure section-4.1 authority projection
-   needed to choose `legacyGid` versus `sheetName` for identity only;
-2. close the device-local wire, parser-admission and storage-capability contract;
-3. reuse that same projection to implement source-authority activation decisions
-   and the device-local deferred-review sidecar together, so rejected guesses
-   have a durable review destination;
-4. specify portable review/resolution exchange separately before any package
-   includes private source or review evidence.
+1. reuse the implemented canonical Caption identity and preserve every
+   duplicate occurrence;
+2. preflight one selected workbook and the outer ZIP, applying only the exact
+   one-to-one authority projections in section 4;
+3. create a new native Project through the existing verified
+   binary/media-write, snapshot-last and marker-last publication boundary;
+4. emit an exportable conversion report. The outer ZIP remains separately
+   retained by the user and is not copied into the Project.
 
-Completing step 1 alone does not claim complete `PROD-13` implementation.
+The first adapter adds no device-local sidecar, quarantine/review database or
+portable review continuity. Its native output is the working source of truth;
+the separately retained ZIP plus report are the audit/reconversion inputs.
 
 ## 2. Ordinary-user behavior
 
-This is the completed-converter behavior. The identity-only first slice changes
-Caption identity and duplicate preservation only; it does not claim or expose a
-review backlog, and it does not change guessed relationship behavior before
-steps 2 and 3 above pass. It does implement section 4.1 as a pure ID-planning
-projection, without applying that projection to views/materials yet. During the
-transition it uses the stricter preflight stop in section 4.3 rather than
-silently dropping a row that needs the missing review destination.
+This is the first direct-adapter behavior.
 
 - The user may choose one workbook when several candidate workbooks exist.
   That is a coarse source-authority choice. The importer MUST NOT ask the user
@@ -53,16 +49,18 @@ silently dropping a row that needs the missing review destination.
   row into another row's identity.
 - A source-authoritative sheet or media relationship is applied automatically.
   An inferred, conflicting, missing or ambiguous relationship remains inactive
-  or unlinked and produces a deferred-review item.
-- The ordinary result reports imported counts and aggregate deferred-review
-  counts. Raw IDs, hashes, source paths and internal storage terms are shown
-  only in an explicit expert detail view.
-- After the device-local gate passes, conversion blocks before project
-  publication only when the bounded source and review evidence cannot be
-  preserved, a deterministic identity collision is detected, the container
-  cannot be read safely, or a verified write/publication invariant fails.
+  or unlinked and is recorded in the conversion report. The Caption itself
+  remains active when its identity and content are otherwise valid.
+- The ordinary result reports imported and reported counts. The exportable
+  report records the source sheet, physical/logical row where available, source
+  ID, affected field, reason and impact.
+- Conversion blocks before Project publication when stable identity cannot be
+  produced, a duplicate canonical key or full/truncated digest collision is
+  detected, the selected source cannot be read safely, or a verified
+  write/publication invariant fails. A report is still made available for a
+  blocked preflight.
 
-For the identity-only transition, default workbook selection is deterministic
+Default workbook selection is deterministic
 and uses the same decoded snapshots that identity analysis uses. Candidates
 recognized as LociMyu precede unrelated tables; candidates with at least one
 admitted non-empty Caption precede recognized-but-empty candidates; then a
@@ -211,13 +209,12 @@ is authoritative only when all of these are true:
 Only then may view/material rows bearing that GID be applied to the matched set.
 Conflicting map rows, an absent mapping, a non-unique title, ordinal position,
 GID first-seen order and the first available set are non-authoritative. Each
-affected view/material row remains backlog-only with its candidates; unrelated
-sets and Captions continue.
+affected view/material row remains inactive and is recorded in the conversion
+report with its candidates; unrelated sets and Captions continue.
 
-Step 1 implements this exact order-independent projection only to choose each
-Caption sheet's identity key. It does not change current view/material
-activation. Step 3 MUST call the same projection result rather than copy or fork
-its semantics when activation and backlog behavior are implemented.
+The direct adapter MUST reuse this exact order-independent projection both for
+Caption-sheet identity and for view/material activation. It MUST NOT consume the
+legacy importer's ordinal or first-available guessed mapping.
 
 ### 4.2 Media relationships
 
@@ -232,79 +229,58 @@ overrides or selects it.
 
 Zero matches, multiple map values, multiple file IDs for one filename, or
 multiple archive entries with the same mapped basename remain unlinked and
-become review items. Directory order, first/last entry, case folding, substring
-and fuzzy/basename winner selection are forbidden. The Caption remains active
-with an empty attachment list.
+are recorded in the conversion report. Directory order, first/last entry, case
+folding, substring and fuzzy/basename winner selection are forbidden. The
+Caption remains active with an empty attachment list.
 
-### 4.3 Caption-row disposition and identity-only transition
-
-After the device-local gate passes:
+### 4.3 Caption-row disposition
 
 - A completely empty trailing/soft-delete row may be ignored.
-- A non-empty row with no usable legacy ID is retained only in source evidence
-  plus a review item; it does not create a guessed Caption ID.
+- A non-empty otherwise-valid row with no usable stable legacy ID does not
+  create a guessed Caption ID. It blocks the whole conversion before Project
+  publication and is recorded in the report.
 - A valid Caption with an invalid coordinate remains active without an anchor
-  and receives a review item. Invalid optional color may use the documented UI
-  default while retaining the raw source and a diagnosis.
-- A duplicate legacy-ID occurrence creates its own Caption plus one review item
-  that binds it to the duplicate group. No whole-import stop is required.
+  and receives a report entry. Invalid optional color may use the documented UI
+  default while the report records the affected field and impact.
+- Every duplicate legacy-ID occurrence creates its own Caption and is accounted
+  for. No winner is selected and no occurrence is merged.
+- A duplicate canonical identity key, invalid or over-limit selected sheet
+  identity, non-unique fallback sheet name, or full/truncated digest collision
+  rejects the whole conversion before any Project write. The report records the
+  blocking item; this is not permission to discard it.
 
-Until that gate passes, the identity-only slice performs one complete preflight
-of all selected Caption sheets before the first workspace write. A completely
-empty row may still be ignored. Any other row with a missing, invalid or
-over-limit legacy ID, any invalid/over-limit selected sheet identity, a
-non-unique fallback sheet name, a duplicate identity key, or a full/truncated
-digest collision rejects the whole conversion with no partial project. This is
-a temporary non-loss stop, not permission to discard the unread row. Once the
-local source/review destination passes, the completed dispositions above replace
-this temporary stop.
+### 4.4 Initial model and coordinate owner
 
-## 5. Device-local deferred-review direction
+The first direct adapter admits exactly one supported model entry. Its local
+frame is the LociMyu dataset's model/Caption frame and is declared as the native
+Project frame with an identity Asset binding; this is the source adapter's frame
+definition, not inferred registration between independent models. That Asset
+owns valid source Caption positions and is the only material target.
 
-The Product Owner approved a private device-local stock as the first delivery
-boundary: keep the exact outer source ZIP plus immutable review facts under a
-fresh unpublished project, show ordinary users only an aggregate, and exclude
-that private stock from ordinary package export. A later expert can inspect it;
-review/share remains source-free. Adding it to collaboration or clean packages
-requires a separate package/privacy contract.
+Zero supported models or multiple candidate models block publication rather
+than choosing one or placing unrelated models at guessed identity transforms.
+Every candidate is listed in the report. Images remain Caption media and never
+become visual Assets.
 
-That direction is **not yet an implementable storage or wire specification**.
-The current `WorkspaceFS` cannot prove exclusive creation, a held single-writer
-lock, quota reserve, sync/durability or no-clobber publication. The current
-entry point also materializes the outer file before a LociMyu-specific bound,
-and the XLSX parser does not retain an unambiguous physical-row locator. No code
-may claim a durable/write-once local backlog from this section until a reviewed
-amendment closes all of the following:
+## 5. Source retention and conversion-report boundary
 
-- exact pre-allocation ZIP, filename/path, XML/shared-string/relationship,
-  workbook/sheet/row/cell/scalar, CSV and JSON/JSONL depth/node/string/byte/CPU
-  budgets;
-- one closed canonical issue-key/record union, duplicate-member rejection,
-  candidate derivation and ordering, zero-item bytes, collision rules and
-  receipt-to-inventory closure;
-- exact source-entry/workbook/physical-row locators, selected-workbook digest,
-  identity-plan digest and their binding to the exact outer-source digest;
-- a code-owned storage-capability contract covering lock acquisition/loss,
-  no-clobber writes, quota/free-space reserve, exact read-back, commit-then-throw,
-  receipt-last/root-marker-last publication and interruption recovery;
-- explicit export-start/export-complete disclosure, deletion ordering,
-  absence verification and truthful partial-deletion reporting.
+The user retains the exact outer source ZIP separately. The converter reads it
+without changing, moving or overwriting it and does not embed or copy the ZIP
+into the native Project. Model and source-authoritative image bytes admitted by
+the conversion become ordinary native Representation or media content; they are
+not a second LociMyu source authority.
 
-The intended namespace remains private `.local/locimyu-v1/**`; v1 operations,
-assets and `lociview.json` never reference it, current export allowlists exclude
-it, and crafted package entries never become device-local authority. These are
-privacy/authority constraints on the future design, not authority to write the
-sidecar now. The local-only bridge does not complete `PROD-01` or portable
-`PROD-13`.
+The report is a separate exportable JSON document. It accounts for converted,
+inactive/unlinked and blocking source information, but it is not a sidecar,
+quarantine database or review subsystem. No `.local/locimyu-v1/**` namespace,
+generic issue store or portable review continuity is added by this adapter.
+`.lociview` backup contains the working native Project and its admitted bytes;
+it does not contain the outer ZIP or the report.
 
-The identity-only slice may land and be integration-tested before this gate, but
-it is not a release-complete reviewable conversion. It does not retain the outer
-source ZIP or enough provenance to reconstruct later review evidence from the
-project/package alone. If that transitional build is exposed to a user, the
-import confirmation and completed full-export flow MUST plainly say that the
-original outer ZIP must be kept and that a LociView export is not its backup.
-No release may claim “what could not be read is available later” until the local
-gate and its acceptance pass.
+Before conversion the UI MUST tell the user to retain the original ZIP. After a
+successful or blocked preflight it MUST offer the report and state that the ZIP
+plus report are required for audit or reconversion. The product MUST NOT claim
+that unconverted source data can be recovered from the native Project alone.
 
 ## 6. Acceptance
 
@@ -327,8 +303,8 @@ gate and its acceptance pass.
 - `LM-ID-08`: every invalid non-empty-row/key and collision case rejects the
   complete identity-only conversion before any workspace write, while a
   completely empty decoded row is ignored.
-- `LM-ID-09`: until local retention passes, any user-reachable transitional
-  flow carries the source-retention/export limitation in section 5.
+- `LM-ID-09`: every user-reachable direct-conversion flow carries the
+  source-retention/export limitation in section 5.
 - `LM-ID-10`: raw XLSX fixtures carry exact duplicate, incomplete, GID-to-title
   conflict, reverse title-to-GID conflict and permuted sheet-map rows through
   section 4.1 to the expected `legacyGid`/`sheetName` key and final Caption ID.
@@ -348,6 +324,29 @@ gate and its acceptance pass.
   manual switch leaves diagnostics, selected preview and manual media links
   consistent with the current workbook.
 
-The exact `LM-REV-*` acceptance set is specification-blocked by section 5 and
-must be added in the same reviewed amendment as the local wire/capability
-contract, before implementation.
+### Initial LociMyu ZIP -> native adapter
+
+- `LM-ADAPT-01`: the outer ZIP is unchanged and is neither embedded nor copied
+  into the Project. A new Project becomes active only after the existing
+  verified-write, snapshot-last and marker-last publication sequence.
+- `LM-ADAPT-02`: every non-empty Caption row is reconciled. Exact
+  source-authoritative relations activate; ambiguous or invalid relations
+  remain inactive/unlinked and are reported; an invalid coordinate produces an
+  active unplaced Caption.
+- `LM-ADAPT-03`: missing stable Caption identity, a duplicate canonical key or
+  full/truncated digest collision aborts all Project publication. The blocking
+  item remains in an exportable report.
+- `LM-ADAPT-04`: successful and blocked preflights produce complete
+  accounting with source sheet, physical/logical row where available, source
+  ID, affected field, reason, impact and final disposition.
+- `LM-ADAPT-05`: snapshot and `.lociview` contain no source ZIP, report,
+  sidecar or review database. The UI discloses that the original ZIP and report
+  must be retained separately.
+- `LM-ADAPT-06`: converted native state survives save/offline reopen and
+  `.lociview` export, local deletion, restore and offline reopen; the native
+  Project is the working source of truth.
+- `LM-ADAPT-07`: one representative direct-LociMyu source proves reconciled
+  counts and canonical IDs for DisplaySets, Captions, source-authoritative
+  materials/views/media, unplaced and unlinked outcomes, unchanged admitted
+  bytes and complete report accounting. The source ZIP hash is equal before and
+  after conversion.

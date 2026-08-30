@@ -2,7 +2,7 @@
 // 投入物の自動判別（docs/02 §6.2）: lociview.json有 → 開く or 取込 / モデル単体 → 新規作成
 
 import { importNewProject, inspectZip } from '../assets/package';
-import { applyImportPlan, buildImportPlan } from '../assets/importWizard';
+import { applyImportPlan, buildImportPlan, type ImportPlan } from '../assets/importWizard';
 import { optimizeGlbBytes } from '../assets/glbOptimize';
 import { addModelAsset } from '../assets/modelAsset';
 import { inspectZipContainerIdentity, readZipEntries } from '../assets/zipio';
@@ -34,6 +34,12 @@ export interface HomeDeps {
   listNativeProjects: () => Promise<NativeProjectListItem[]>;
   openNativeProjects: (projectId?: string, mode?: ProjectSessionMode) => void;
   restoreNativePackage: (file: File, onStatus: (message: string) => void) => Promise<string>;
+  convertLociMyuZipToNative: (
+    file: File,
+    plan: ImportPlan,
+    projectName: string,
+    onStatus: (message: string) => void,
+  ) => Promise<string | null>;
 }
 
 export interface WritableProjectSession {
@@ -227,7 +233,7 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
       const insp = await inspectZip(bytes);
       if (insp.kind !== 'lociview' || insp.manifest === null) {
         // LociViewプロジェクトでないZIP → インポートウィザード（Drive フォルダZIP等）
-        await runImportWizard(bytes, file.name);
+        await runImportWizard(file, bytes);
         return;
       }
       const existing = (await listProjects(deps.fs)).find((p) => p.projectId === insp.manifest!.projectId);
@@ -274,18 +280,33 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
   }
 
   /** Drive フォルダZIP等の取り込み（FR-02） */
-  async function runImportWizard(bytes: Uint8Array, fileName: string): Promise<void> {
-    const plan = await buildImportPlan(await readZipEntries(bytes));
-    if (plan.models.length === 0 && plan.images.length === 0 && plan.migration === null) {
+  async function runImportWizard(file: File, bytes: Uint8Array): Promise<void> {
+    const plan = await buildImportPlan(await readZipEntries(bytes), { preserveBlockedLociMyuSource: true });
+    const directNative = plan.migration !== null || plan.blockedLociMyuSource !== null && plan.blockedLociMyuSource !== undefined;
+    if (plan.models.length === 0 && plan.images.length === 0 && !directNative) {
       await infoDialog(
         '取込',
         'このZIPにはLociViewが扱えるデータ（3Dモデル・画像・LociMyuのスプレッドシート）が見つかりませんでした。',
       );
       return;
     }
-    const defaultName = fileName.replace(/\.(zip|lociview)$/i, '');
-    const answer = await importWizardDialog(plan, defaultName);
+    const defaultName = file.name.replace(/\.(zip|lociview)$/i, '');
+    const answer = await importWizardDialog(plan, defaultName, { directNative });
     if (answer === null) return;
+    if (directNative) {
+      const projectId = await deps.convertLociMyuZipToNative(file, plan, answer.projectName, (message) => {
+        fileStatus.className = 'lv-dim lv-pad';
+        fileStatus.textContent = message;
+      });
+      if (projectId !== null) {
+        fileStatus.textContent = 'Native変換が完了しました。プロジェクトを開きます…';
+        deps.openNativeProjects(projectId, 'edit');
+      } else {
+        fileStatus.className = 'lv-warn lv-pad';
+        fileStatus.textContent = 'Native変換は開始されませんでした。conversion reportを確認してください。';
+      }
+      return;
+    }
     const manifest = createManifest(answer.projectName);
     const dir = `projects/${entityIdFor('meta')}`;
     const session = await deps.startProjectMutation(dir, manifest.projectId, false);

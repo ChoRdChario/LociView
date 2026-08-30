@@ -90,6 +90,26 @@ export class LociMyuSourceValidationError extends Error {
   }
 }
 
+export type LociMyuIdentityCollisionCode =
+  | 'full-digest-collision'
+  | 'portable-id-collision';
+
+/**
+ * A cryptographic identity collision is not a bad workbook candidate that may
+ * fall through to another candidate.  It stops the whole selected conversion,
+ * while the direct-native adapter still needs a typed reason for its report.
+ */
+export class LociMyuIdentityCollisionError extends Error {
+  override readonly name = 'LociMyuIdentityCollisionError';
+
+  constructor(
+    readonly code: LociMyuIdentityCollisionCode,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 export interface LociMyuView {
   name: string;
   sheetGid: string;
@@ -471,11 +491,17 @@ function registerIdentityPlan(
   const fullDigest = digestHex(identity.fullDigest);
   const fullOwner = registry.fullDigestOwners.get(fullDigest);
   if (fullOwner !== undefined && fullOwner !== identity.preimage) {
-    throw new Error('locimyu identity: full SHA-256 collision');
+    throw new LociMyuIdentityCollisionError(
+      'full-digest-collision',
+      'locimyu identity: full SHA-256 collision',
+    );
   }
   const portableOwner = registry.portableOwners.get(identity.captionId);
   if (portableOwner !== undefined && portableOwner !== identity.preimage) {
-    throw new Error('locimyu identity: truncated Caption ID collision');
+    throw new LociMyuIdentityCollisionError(
+      'portable-id-collision',
+      'locimyu identity: truncated Caption ID collision',
+    );
   }
   registry.preimages.add(identity.preimage);
   registry.fullDigestOwners.set(fullDigest, identity.preimage);

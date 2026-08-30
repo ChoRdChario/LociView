@@ -308,6 +308,24 @@ describe('複数スプレッドシート（実データで判明した問題の�
     expect(message).toContain('他1件の候補');
   });
 
+  it('direct-native preflightだけは全候補拒否時もtyped source failureを保持する', async () => {
+    const plan = await buildImportPlan([
+      {
+        path: 'LociMyu Save.xlsx.csv',
+        data: captionCsvBytes([['', 'missing stable ID', '', '', '', '', '', '', '', '']]),
+      },
+      {
+        path: 'LociMyu Save backup.xlsx.csv',
+        data: captionCsvBytes([['', 'backup missing stable ID', '', '', '', '', '', '', '', '']]),
+      },
+    ], { preserveBlockedLociMyuSource: true });
+
+    expect(plan.migration).toBeNull();
+    expect(plan.sources[plan.selectedSourceIndex]!.fileName).toBe('LociMyu Save.xlsx.csv');
+    expect(plan.blockedLociMyuSource).toEqual(expect.objectContaining({ code: 'missing-legacy-id' }));
+    expect(plan.tables[0]!.rows[1]![1]).toBe('missing stable ID');
+  });
+
   it('予約シートと完全空行を件数に数えず、実CaptionのあるLociMyu候補をgeneric/空候補より先にする', async () => {
     const emptyCurrent = await makeXlsx([
       {

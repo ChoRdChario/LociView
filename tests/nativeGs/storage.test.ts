@@ -119,12 +119,14 @@ describe('native project blob-first/marker-last publication', () => {
       sources,
       undefined,
       new Map(),
-      () => {
-        publicationChecks += 1;
-        if (publicationChecks === 2) throw new Error('injected source lock loss');
+      async () => {
+        const ordinal = ++publicationChecks;
+        await Promise.resolve();
+        if (ordinal === 2) throw new Error('injected source fingerprint mismatch');
       },
-    )).rejects.toThrow(/source lock loss/);
+    )).rejects.toThrow(/source fingerprint mismatch/);
     expect(publicationChecks).toBe(2);
+    expect(fs.writes.some((path) => path.includes('/snapshots/'))).toBe(true);
     expect(await fs.exists(nativeActiveMarkerPath(draft.project.id))).toBe(false);
     expect(await listNativeProjectsV1(fs)).toEqual([]);
     session.release();

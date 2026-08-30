@@ -1,8 +1,8 @@
 # LociView critical-path execution plan
 
-> Status: `CURRENT CHECKPOINT / FIRST FROZEN-V1 -> NATIVE LANE PASS; NEXT PRODUCT OWNER DECISION`
+> Status: `CURRENT CHECKPOINT / FIRST FROZEN-V1 -> NATIVE LANE PASS; DIRECT LOCIMYU ADAPTER IMPLEMENTED, REPRESENTATIVE RETRY`
 >
-> Updated: 2026-08-31 after `9d973cd` on `g0-baseline`.
+> Updated: 2026-08-31 at `7575240` on `g0-baseline`.
 >
 > This is an execution plan plus the Product Owner's scheduling and display-model
 > decisions. G0 and G0-S remain release barriers. `G0S-TAB`, the first production
@@ -38,15 +38,19 @@ the lanes still join before release:
 3. **Approved technical lane:** retain the consolidated native checkpoint at
    `a2708cf` and the first non-destructive frozen-v1 -> native lane at
    `9d973cd`. Both passed Desktop and physical-iPhone acceptance without
-   creating a Compare mode; the separate LociMyu adapter remains unstarted and
-   requires the next Product Owner decision;
+   creating a Compare mode. The separately approved direct LociMyu ZIP ->
+   native adapter is implemented with the original ZIP plus exportable report;
+   its first private representative is a bounded retry because six non-empty
+   Caption rows lack stable legacy IDs, so no Project was published;
 4. **Join:** satisfy all applicable G0/G0-S barriers and technology decisions
    before the supported release.
 
 The completed LociMyu identity slice stays closed. Its separate browser-vector
 evidence was not part of this native consolidated acceptance and remains in the
-legacy-conversion/release evidence lane. Local review storage, portable review
-and additional identity hardening do not reopen that slice.
+legacy-conversion/release evidence lane. The approved first direct adapter does
+not require local review storage or portable review continuity; those are not
+pending prerequisites and additional identity hardening does not reopen the
+closed slice.
 
 ## 2. Operating rules
 
@@ -307,7 +311,7 @@ G0/G0-S release barriers, disposable PoCs and one writer.
 | `WS2` G0 device evidence/ratification | `E6`–`E10`; three device classes, complete raw runs, reviewed artifacts and all seven G0 exit rows approved | `WS1`, physical devices, PO numeric decisions | PO/device operator / Codex / reviewer | WS1 | Environment facts only now; full runs `WAIT` |
 | `WS3` G0-S current-user safety | Ledger plus remaining `S2`–`S4`; real-browser/iOS evidence, exact-tree matrix, no unresolved P0/P1 and PO stabilized-v1 approval | Remaining journal/quarantine decisions and physical evidence | Codex / PO / reviewer | S0/S1 complete; final closure also WS2 | `YES` only for an approved release-blocking root or a P0/P1 that directly blocks the next production slice; do not resume micro-slice exploration |
 | `WS4` G1 technology decisions | G1-A, G1-B base renderer and G1-C each record reproducible `ADOPT`, `REJECT` or `RETRY` with rollback/fallback; later renderer features retain separate acceptance before their controls turn on | Applicable evidence and Product Owner adoption decisions | Codex / PO / device operator | Parallel evidence lanes; still required for adoption/release | `NO` for an adoption claim; the bounded proxy-backed technical implementation alone may start after S1 |
-| `WS5` native product closure, then non-destructive legacy conversion | Preserve the consolidated native Project as the durable source of truth, then convert frozen-v1 and LociMyu inputs without changing their source bytes or inventing a general migration framework. Compare remains excluded. | The opened frozen-v1 first lane is complete and accepted on Desktop/iPhone. LociMyu stays a separate unstarted adapter. Technology adoption and release barriers still apply. | Codex / PO / external reviewer | Native checkpoint and first frozen-v1 lane complete; release after WS1–WS4 | `FIRST FROZEN-V1 LANE: PASS`; await Product Owner direction before LociMyu |
+| `WS5` native product closure, then non-destructive legacy conversion | Preserve the consolidated native Project as the durable source of truth, then convert frozen-v1 and LociMyu inputs without changing their source bytes or inventing a general migration framework. Compare remains excluded. | The frozen-v1 lane is accepted. The direct LociMyu adapter is implemented, but its first private representative cannot publish until six non-empty Caption rows receive stable legacy IDs. Technology adoption and release barriers still apply. | Codex / PO / external reviewer | Native checkpoint and frozen-v1 lane complete; representative source correction precedes LociMyu end-to-end acceptance; release after WS1–WS4 | `FIRST FROZEN-V1 LANE: PASS`; `FIRST LOCIMYU NATIVE ADAPTER: RETRY` |
 
 ## 8. Current authorization boundary
 
@@ -323,8 +327,11 @@ The first non-destructive input lane converts an already-opened frozen-v1
 workspace to a separate native Project. Its bounded receiver and converter are
 implemented, independently reviewed and accepted on Desktop and physical
 iPhone. The source is never overwritten or embedded and every unsupported
-value is reported. The separate LociMyu adapter remains unstarted and is not
-authorized automatically.
+value is reported. The separate direct LociMyu adapter is now implemented and
+independently reviewed. Its representative preflight found six non-empty rows
+without stable Caption IDs and therefore produced only a report: it wrote no
+native Project, preserved the private source bytes and awaits a corrected input
+before end-to-end Desktop/iPhone acceptance.
 Compare remains excluded; attachment/media UX and final visual polish remain
 later work.
 Remaining G0/G0-S and external evidence continue as parallel release barriers.
@@ -361,6 +368,25 @@ is implied.
 - **Review/P0/P1:** independent read-only review complete; none open.
 - **Lane result:** `FIRST NATIVE MIGRATION: PASS`. This is not G0/G0-S/G1 or
   release evidence.
-- **Stop boundary:** after this lane's result, do not start the separate LociMyu
-  adapter, Compare, generalized migration/appearance infrastructure or another
-  UI workstream without the next Product Owner decision.
+- **Historical stop boundary:** subsequent Product Owner approval lifted this
+  stop only for the bounded direct LociMyu adapter now recorded below. Compare,
+  generalized migration/appearance infrastructure and unrelated UI workstreams
+  remain outside automatic continuation.
+
+## 11. First direct LociMyu ZIP -> native adapter status
+
+- **Implementation baseline:** `7575240d87229e536847310696c922639e3b3600`.
+- **Adapter:** direct in-memory source projection into the existing native
+  receiver; no durable intermediate v1 workspace, sidecar, quarantine database
+  or source copy.
+- **Representative:** private 94,063,937-byte outer ZIP with one selected
+  workbook, eight sheets, 109 non-empty Caption rows, one model, 78 images,
+  81 file-ID-map rows, four view rows and 111 material rows.
+- **Blocking result:** six non-empty rows on `モデル確認用（透過）` lack stable
+  legacy IDs. All six are reported and publication stops before snapshot/active
+  marker; converted counts are zero and the source hash is unchanged.
+- **Review/P0:** independent read-only review found no implementation P0/P1.
+  The correctable source-identity gap is the only end-to-end P1 condition.
+- **Lane result:** `FIRST LOCIMYU NATIVE ADAPTER: RETRY`. Desktop/iPhone
+  converted-project and portable-restore acceptance are not inferred while no
+  Project can be published.
