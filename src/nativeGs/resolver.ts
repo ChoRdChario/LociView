@@ -20,7 +20,7 @@ export interface NativeSliceResolutionV1 {
         readonly enabled: true;
         readonly targetAssetId: string;
         readonly surfaceRepresentationId: string;
-        readonly targetRole: 'meshPrimary' | 'gsPrimary';
+        readonly targetRole: 'meshPrimary' | 'pointPrimary' | 'gsPrimary';
       }
     | { readonly enabled: false; readonly reason: string };
   readonly issues: readonly string[];
@@ -85,11 +85,15 @@ export function resolveNativeGsSliceV1(
   const issues: string[] = [];
   const activeRepresentations = allActiveNativeRepresentationsV1(snapshot);
   const meshRepresentations = activeRepresentations.filter((representation) => representation.role === 'meshPrimary');
+  const pointRepresentations = activeRepresentations.filter((representation) => representation.role === 'pointPrimary');
   const gsRepresentations = activeRepresentations.filter((representation) => representation.role === 'gsPrimary');
   const usableMesh = meshRepresentations.filter((representation) => (
     isNativeAssetVisibleV1(snapshot, representation.assetId) && isReady(states, representation)
   ));
   const usableGs = gsRepresentations.filter((representation) => (
+    isNativeAssetVisibleV1(snapshot, representation.assetId) && isReady(states, representation)
+  ));
+  const usablePoints = pointRepresentations.filter((representation) => (
     isNativeAssetVisibleV1(snapshot, representation.assetId) && isReady(states, representation)
   ));
   for (const representation of meshRepresentations) {
@@ -102,8 +106,13 @@ export function resolveNativeGsSliceV1(
     if (state?.registration === 'unknown') issues.push(`GS registration is unknown: ${representation.id}`);
     else if (state?.availability !== 'ready') issues.push(`GS resource is unavailable: ${representation.id}`);
   }
+  for (const representation of pointRepresentations) {
+    const state = states.get(representation.id);
+    if (state?.registration === 'unknown') issues.push(`Point registration is unknown: ${representation.id}`);
+    else if (state?.availability !== 'ready') issues.push(`Point resource is unavailable: ${representation.id}`);
+  }
 
-  const showMesh = usableMesh.length > 0;
+  const showMesh = usableMesh.length > 0 || usablePoints.length > 0;
   const showGs = usableGs.length > 0;
   const effectiveDisplayMode: NativeSliceResolutionV1['effectiveDisplayMode'] =
     showMesh && showGs ? 'mixed' : showMesh ? 'mesh-only' : showGs ? 'gs-only' : 'none';
@@ -111,6 +120,7 @@ export function resolveNativeGsSliceV1(
 
   const visibleRepresentationIds = [
     ...(showMesh ? usableMesh.map((representation) => representation.id) : []),
+    ...(showMesh ? usablePoints.map((representation) => representation.id) : []),
     ...(showGs ? usableGs.map((representation) => representation.id) : []),
   ].sort();
   const targetAssetId = snapshot.presentation.captionTargetAssetId;
@@ -153,6 +163,31 @@ export function resolveNativeGsSliceV1(
         targetAssetId,
         surfaceRepresentationId: targetMesh.id,
         targetRole: 'meshPrimary',
+      },
+      issues,
+    };
+  }
+
+  const targetPoint = targetRepresentations.find((representation) => representation.role === 'pointPrimary');
+  if (targetPoint !== undefined) {
+    if (!visibleRepresentationIds.includes(targetPoint.id)) {
+      return {
+        effectiveDisplayMode,
+        visibleRepresentationIds,
+        proxyRendered: false,
+        interaction: { enabled: false, reason: 'The selected Point Asset is not visible and usable.' },
+        issues,
+      };
+    }
+    return {
+      effectiveDisplayMode,
+      visibleRepresentationIds,
+      proxyRendered: false,
+      interaction: {
+        enabled: true,
+        targetAssetId,
+        surfaceRepresentationId: targetPoint.id,
+        targetRole: 'pointPrimary',
       },
       issues,
     };

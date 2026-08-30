@@ -3211,3 +3211,66 @@ Review — 2026-08-30:
   added. Desktop visual deletion and physical-iPhone touch/layout regression
   remain unexecuted for the Product Owner-approved consolidated run and are not
   claimed PASS here.
+
+## Native ordinary-point support — bounded production slice
+
+Checkpoint and plan — 2026-08-30:
+
+- [x] Record the approved point-only PLY profile and additive snapshot-v1
+  compatibility boundary in the existing storage specification
+- [x] Stream-validate the exact ASCII XYZ+RGB PLY profile and never infer a
+  near-miss vertex-only PLY, Mesh PLY or GS PLY as an ordinary Point Asset
+- [x] Add only `pointCloud` / `pointPrimary` and exact point facts to the current
+  native snapshot-v1 closure; keep old snapshots readable and package v1 generic
+- [x] Reuse existing Asset visibility, transform, Caption ownership,
+  `positionAsset`, save/offline reopen and portable backup/restore paths
+- [x] Render Point Assets with one native-only circular CSS-pixel footprint and
+  provide an immediate session-local 1–20 px point-size control without opacity
+  or a material framework
+- [x] Pick only the explicitly selected visible Point Asset in screen space and
+  keep hidden/unselected Point Assets out of draw, pick, gizmo and Caption paths
+- [x] Add only focused profile/schema/resolver/storage/package/pick regressions,
+  then obtain one independent read-only P0/P1 review
+- [x] Run final-tree typecheck, full test and normal/BASE_PATH builds once;
+  attempt Desktop rendering evidence, record the environment block and defer
+  physical iPhone to the approved combined run without claiming visual PASS
+- [x] Commit the bounded slice independently and leave the worktree clean
+
+Exclusions and stop conditions:
+
+- Binary point PLY, mixed Mesh+point containers, PCD/LAS/LAZ, converter, LOD,
+  spatial index, opacity, DisplaySet/material persistence, renderer framework,
+  new display mode, new package version and generic migration remain outside.
+- Stop rather than widening if exact Point import needs whole-file buffering in
+  storage, a second renderer/backend, or a compatibility-breaking change beyond
+  the Product Owner-approved one-way additive snapshot-v1 boundary.
+
+Review — 2026-08-30:
+
+- Added one honest `pointCloud` / `pointPrimary` native Representation using an
+  exact point-only ASCII PLY profile (`float` XYZ + `uchar` RGB). Profile bytes
+  are stream-validated before create/add/replace/restore publication; source
+  bytes still use the existing verified project-local write and package paths.
+- Existing Asset visibility, manual transform, Caption ownership and Asset-local
+  `positionAsset` are reused. Native Point Assets render as circular,
+  non-distance-attenuated points and use selected-Asset-only screen-space pick.
+  Point diameter is an immediate per-session 1–20 CSS-pixel control; no project,
+  SavedView, package, opacity or material-framework field was added.
+- Snapshot version 1 remains additive: this build reads all earlier records;
+  earlier strict readers reject Point-containing snapshots rather than guessing.
+  Portable package version 1 remains generic and round-trips Point bytes without
+  a new entry type or migration framework.
+- One independent reviewer found four bounded P1 admission defects. Content
+  magic now precedes filename extension, payload rows have an ASCII/1024-byte
+  bound and closed decimal grammar, and any positive-face PLY remains on the
+  Mesh path even when it has GS-like property names. Focused re-review found no
+  remaining P0/P1.
+- Focused profile/schema/resolver/storage/package/pick acceptance passed 51/51.
+  Final-tree typecheck, full suite (51 files; 1,414 passed; 21 todo), normal
+  production build, `/LociView/` BASE_PATH build and `git diff --check` passed.
+  The PWA precache remains 15 entries, Spark remains a separate lazy chunk and
+  no representative GS PLY entered the build.
+- Browser control stopped at its own initialization boundary, so no alternative
+  automation dependency or browser-security workaround was added. Desktop
+  render/size/pick/Caption evidence and physical-iPhone Point smoke remain
+  unexecuted for the consolidated Product Owner run and are not claimed PASS.

@@ -21,7 +21,7 @@ import {
   updateSelectedNativeCaptionV1,
   type NativeProjectSnapshotV1,
 } from '../../src/nativeGs/schema';
-import { makeNativeDraft, NATIVE_TEST_IDS, snapshotFromDraft, testNativeId } from './nativeTestProject';
+import { makeNativeDraft, makeNativePointImport, NATIVE_TEST_IDS, snapshotFromDraft, testNativeId } from './nativeTestProject';
 
 function healthyStates(snapshot: NativeProjectSnapshotV1): Map<string, NativeResourceStateV1> {
   return new Map(snapshot.representations.map((representation) => [
@@ -137,6 +137,52 @@ function withSecondSameKindAssets(snapshot: NativeProjectSnapshotV1): {
 }
 
 describe('native snapshot v1 and fixed degradation outcomes', () => {
+  it('round-trips an additive pointPrimary snapshot and resolves only the selected visible Point Asset', () => {
+    const base = snapshotFromDraft(makeNativeDraft().draft);
+    const point = makeNativePointImport();
+    const representation = point.imported.representations[0]!;
+    const { mediaType, ...pointRecord } = representation;
+    const pointOnly: NativeProjectSnapshotV1 = {
+      ...base,
+      assets: [point.imported.asset],
+      assetBindingRevisions: [point.imported.binding],
+      assetRevisions: [point.imported.revision],
+      representations: [{
+        ...pointRecord,
+        blob: { algorithm: 'sha256', digest: '0'.repeat(64), byteLength: point.bytes.byteLength, mediaType },
+      }],
+      presentation: { displayMode: 'mesh-only', captionTargetAssetId: point.assetId, hiddenAssetIds: [] },
+      captions: [],
+      savedViews: [],
+    };
+    const parsed = parseNativeSnapshotV1(serializeNativeSnapshotV1(pointOnly));
+    expect(parsed.representations[0]).toMatchObject({
+      contentKind: 'pointCloud',
+      role: 'pointPrimary',
+      pointPly: { pointCount: 3, encoding: 'ascii' },
+    });
+    expect(resolveNativeGsSliceV1(parsed, healthyStates(parsed))).toMatchObject({
+      effectiveDisplayMode: 'mesh-only',
+      visibleRepresentationIds: [point.representationId],
+      interaction: {
+        enabled: true,
+        targetAssetId: point.assetId,
+        surfaceRepresentationId: point.representationId,
+        targetRole: 'pointPrimary',
+      },
+    });
+
+    const hidden = setNativeAssetVisibilityV1(parsed, point.assetId, false);
+    expect(resolveNativeGsSliceV1(hidden, healthyStates(hidden))).toMatchObject({
+      effectiveDisplayMode: 'none',
+      visibleRepresentationIds: [],
+      interaction: { enabled: false, reason: 'The selected Asset is hidden.' },
+    });
+    expect(() => parseNativeSnapshotV1(serializeNativeSnapshotV1({
+      ...parsed,
+      representations: parsed.representations.map((entry) => ({ ...entry, role: 'meshPrimary' as const })),
+    }))).toThrow(/invalid meshPrimary fields/);
+  });
   it('round-trips the approved records, nonidentity transform and GS-local Caption position', () => {
     const { draft } = makeNativeDraft(2);
     const ids = NATIVE_TEST_IDS;

@@ -43,7 +43,7 @@ If observed code conflicts with the applicable compatibility or accepted future 
 | `specs/README.md` | `PRODUCT-OWNER APPROVED CONTRACT / NOT IMPLEMENTED` | Index and authority for the gated v2 implementation contract |
 | `specs/00-product-contract.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | Product guarantees, MVP boundary, privacy and mobile behavior |
 | `specs/01-domain-rendering.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | Frames, revisions, SceneDocument, modes, picking and renderer gates |
-| `specs/02-storage-package-migration.md` | `PRODUCT-OWNER APPROVED / §13 + §15 BOUNDED PATHS IMPLEMENTED / GENERAL V2 NOT IMPLEMENTED` | General metadata/CAS candidate boundaries plus the implemented native snapshot/package and two-Asset manual-alignment boundaries |
+| `specs/02-storage-package-migration.md` | `PRODUCT-OWNER APPROVED / BOUNDED NATIVE PATHS THROUGH §26 IMPLEMENTED / GENERAL V2 NOT IMPLEMENTED` | General metadata/CAS candidate boundaries plus the implemented native snapshot/package, multi-Asset and exact ordinary-point boundaries |
 | `specs/03-gates-and-delivery.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | G0/G0-S/G1 evidence, thresholds, feature flags, rollback and schedule |
 | `specs/04-locimyu-conversion.md` | `APPROVED IDENTITY/SOURCE AUTHORITY / LOCAL RETENTION SPECIFICATION BLOCKED / NOT IMPLEMENTED` | Exact LociMyu Caption identity/source-authority and the bounded local-review design stop |
 
@@ -53,7 +53,7 @@ If observed code conflicts with the applicable compatibility or accepted future 
 - Current XLSX reading is the local minimal reader in `src/io/xlsx.ts`, not SheetJS.
 - Strict CSP and single-file distribution are goals, not current implemented controls.
 - Current export is download-based; File System Access/Web Share flows described in older documents are incomplete.
-- Default-v1 viewer holds one model and its PLY support is not Gaussian Splatting; the isolated `?mode=native-gs` production path has its own exact SH2/SH3 admission and remains bounded.
+- Default-v1 viewer holds one model and its PLY support is not Gaussian Splatting; the isolated `?mode=native-gs` production path has separate exact ASCII ordinary-point and SH2/SH3 GS admission and remains bounded.
 - Current material identity and loader behavior differ from parts of `04-formats-rendering.md`.
 
 Do not repair these documents opportunistically during unrelated code changes. Update the relevant current contract or v2 specification in a dedicated documentation change with code evidence.

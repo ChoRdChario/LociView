@@ -40,6 +40,7 @@ import {
   makeNativeDraft,
   makeNativeGsReplacement,
   makeNativeMeshImport,
+  makeNativePointImport,
   NATIVE_TEST_IDS,
   testNativeId,
 } from './nativeTestProject';
@@ -209,10 +210,12 @@ async function makeSourceProject(): Promise<{
   const created = await createNativeProjectV1(session.workspace, detailedDraft, sources);
   const added = makeNativeMeshImport();
   const multiAsset = await addNativeAssetV1(session.workspace, created, added.imported, added.sources);
-  const replacement = makeNativeGsReplacement(multiAsset, NATIVE_TEST_IDS.gsAsset, 180);
+  const point = makeNativePointImport();
+  const withPoint = await addNativeAssetV1(session.workspace, multiAsset, point.imported, point.sources);
+  const replacement = makeNativeGsReplacement(withPoint, NATIVE_TEST_IDS.gsAsset, 180);
   const replaced = await replaceNativeAssetV1(
     session.workspace,
-    multiAsset,
+    withPoint,
     replacement.imported,
     replacement.sources,
   );
@@ -256,7 +259,7 @@ async function expectInactive(fs: MemoryFS, projectId = NATIVE_TEST_IDS.project)
 }
 
 describe('native portable .lociview streamed backup/restore', () => {
-  it('round-trips the exact snapshot and every same-kind Mesh/GS/Proxy byte through STORE entries', async () => {
+  it('round-trips the exact snapshot and every Mesh/Point/GS/Proxy byte through STORE entries', async () => {
     const source = await makeSourceProject();
     const { blob, result } = await exportBlob(source);
     const entries = await storedZipEntries(blob);

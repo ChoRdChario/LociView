@@ -1,15 +1,16 @@
 import { ulid } from '../core/ids';
 import { parseJsonWithoutDuplicateMembers } from '../core/json';
-import type { NativeGsPlyFactsV1 } from './plyProfile';
+import type { NativeGsPlyFactsV1, NativePointPlyFactsV1 } from './plyProfile';
 
 export const NATIVE_SNAPSHOT_FORMAT = 'lociview-native-project-snapshot' as const;
 export const NATIVE_ACTIVE_FORMAT = 'lociview-native-project-active' as const;
 export const NATIVE_SCHEMA_VERSION = 1 as const;
 export const NATIVE_GS_PROFILE_ID = 'lociview-native-graphdeco-ply-le-sh2-sh3-v1' as const;
+export const NATIVE_POINT_PROFILE_ID = 'lociview-native-point-ply-ascii-xyz-rgb-v1' as const;
 
 export type NativeDisplayMode = 'mixed' | 'gs-only' | 'mesh-only';
 export type NativeModelFormat = 'glb' | 'gltf' | 'obj' | 'stl' | 'ply';
-export type NativeRepresentationRole = 'meshPrimary' | 'gsPrimary' | 'interactionProxy';
+export type NativeRepresentationRole = 'meshPrimary' | 'pointPrimary' | 'gsPrimary' | 'interactionProxy';
 
 export type NativeIdPrefix = 'prj' | 'snp' | 'ast' | 'rev' | 'bnd' | 'rep' | 'frm' | 'fam' | 'cls' | 'cap' | 'view';
 
@@ -80,7 +81,7 @@ export interface NativeRepresentationV1 {
   readonly id: string;
   readonly assetId: string;
   readonly representationFrameId: string;
-  readonly contentKind: 'mesh' | 'gaussianSplat';
+  readonly contentKind: 'mesh' | 'pointCloud' | 'gaussianSplat';
   readonly purposes: readonly ('source' | 'display' | 'interaction')[];
   readonly role: NativeRepresentationRole;
   readonly variantFamilyId: string;
@@ -90,6 +91,7 @@ export interface NativeRepresentationV1 {
   readonly derivedFrom: readonly string[];
   readonly proxyForGsVariantFamilyId?: string;
   readonly gsPly?: NativeGsPlyFactsV1;
+  readonly pointPly?: NativePointPlyFactsV1;
 }
 
 export interface NativeCaptionV1 {
@@ -319,6 +321,17 @@ function parseGsFacts(value: unknown): NativeGsPlyFactsV1 {
   };
 }
 
+function parsePointFacts(value: unknown): NativePointPlyFactsV1 {
+  const input = record(value, 'pointPly');
+  exactKeys(input, ['pointCount', 'headerByteLength', 'encoding']);
+  const pointCount = safeNonNegative(input.pointCount, 'Point count');
+  const headerByteLength = safeNonNegative(input.headerByteLength, 'Point headerByteLength');
+  if (pointCount < 1 || headerByteLength < 1 || input.encoding !== 'ascii') {
+    throw new Error('native snapshot: unsupported ordinary-point PLY facts');
+  }
+  return { pointCount, headerByteLength, encoding: 'ascii' };
+}
+
 function parseAsset(value: unknown): NativeAssetV1 {
   const input = record(value, 'asset');
   exactKeys(input, ['id', 'label', 'assetFrameId', 'status']);
@@ -381,12 +394,12 @@ function parseRepresentation(value: unknown): NativeRepresentationV1 {
   exactKeys(
     input,
     ['id', 'assetId', 'representationFrameId', 'contentKind', 'purposes', 'role', 'variantFamilyId', 'formatProfile', 'blob', 'representationToAsset', 'derivedFrom'],
-    ['proxyForGsVariantFamilyId', 'gsPly'],
+    ['proxyForGsVariantFamilyId', 'gsPly', 'pointPly'],
   );
-  if (input.contentKind !== 'mesh' && input.contentKind !== 'gaussianSplat') {
+  if (input.contentKind !== 'mesh' && input.contentKind !== 'pointCloud' && input.contentKind !== 'gaussianSplat') {
     throw new Error('native snapshot: unsupported Representation contentKind');
   }
-  if (input.role !== 'meshPrimary' && input.role !== 'gsPrimary' && input.role !== 'interactionProxy') {
+  if (input.role !== 'meshPrimary' && input.role !== 'pointPrimary' && input.role !== 'gsPrimary' && input.role !== 'interactionProxy') {
     throw new Error('native snapshot: unsupported Representation role');
   }
   const purposes = stringArray(input.purposes, 'Representation purposes');
@@ -413,21 +426,36 @@ function parseRepresentation(value: unknown): NativeRepresentationV1 {
       ? {}
       : { proxyForGsVariantFamilyId: id(input.proxyForGsVariantFamilyId, 'fam', 'Proxy target family id') }),
     ...(input.gsPly === undefined ? {} : { gsPly: parseGsFacts(input.gsPly) }),
+    ...(input.pointPly === undefined ? {} : { pointPly: parsePointFacts(input.pointPly) }),
   };
   if (result.role === 'gsPrimary') {
-    if (result.contentKind !== 'gaussianSplat' || result.formatProfile.id !== NATIVE_GS_PROFILE_ID || result.gsPly === undefined) {
+    if (
+      result.contentKind !== 'gaussianSplat' || result.formatProfile.id !== NATIVE_GS_PROFILE_ID ||
+      result.gsPly === undefined || result.pointPly !== undefined
+    ) {
       throw new Error('native snapshot: gsPrimary must use the supported GS PLY profile and facts');
     }
     if (result.purposes.join(',') !== 'source,display' || result.proxyForGsVariantFamilyId !== undefined) {
       throw new Error('native snapshot: invalid gsPrimary purpose/relationship fields');
     }
   } else if (result.role === 'meshPrimary') {
-    if (result.contentKind !== 'mesh' || result.purposes.join(',') !== 'source,display' || result.gsPly !== undefined || result.proxyForGsVariantFamilyId !== undefined) {
+    if (
+      result.contentKind !== 'mesh' || result.purposes.join(',') !== 'source,display' ||
+      result.gsPly !== undefined || result.pointPly !== undefined || result.proxyForGsVariantFamilyId !== undefined
+    ) {
       throw new Error('native snapshot: invalid meshPrimary fields');
+    }
+  } else if (result.role === 'pointPrimary') {
+    if (
+      result.contentKind !== 'pointCloud' || result.purposes.join(',') !== 'source,display' ||
+      result.formatProfile.id !== NATIVE_POINT_PROFILE_ID || result.pointPly === undefined ||
+      result.gsPly !== undefined || result.proxyForGsVariantFamilyId !== undefined
+    ) {
+      throw new Error('native snapshot: pointPrimary must use the supported ordinary-point PLY profile and facts');
     }
   } else if (
     result.contentKind !== 'mesh' || result.purposes.join(',') !== 'interaction' ||
-    result.proxyForGsVariantFamilyId === undefined || result.gsPly !== undefined
+    result.proxyForGsVariantFamilyId === undefined || result.gsPly !== undefined || result.pointPly !== undefined
   ) {
     throw new Error('native snapshot: invalid interactionProxy fields');
   }
@@ -552,7 +580,9 @@ function semanticClosure(snapshot: NativeProjectSnapshotV1): void {
     }
     const visualFamilies = revision.representationIds
       .map((representationId) => representations.get(representationId)!)
-      .filter((representation) => representation.role === 'meshPrimary' || representation.role === 'gsPrimary')
+      .filter((representation) => (
+        representation.role === 'meshPrimary' || representation.role === 'pointPrimary' || representation.role === 'gsPrimary'
+      ))
       .map((representation) => representation.variantFamilyId)
       .sort();
     const classFamilies = revision.anchorCompatibilityClasses.flatMap((entry) => entry.targetVariantFamilyIds).sort();
@@ -570,6 +600,9 @@ function semanticClosure(snapshot: NativeProjectSnapshotV1): void {
     if (representation.gsPly !== undefined) {
       const expectedLength = representation.gsPly.headerByteLength + representation.gsPly.payloadByteLength;
       if (expectedLength !== representation.blob.byteLength) throw new Error('native snapshot: GS facts disagree with blob length');
+    }
+    if (representation.pointPly !== undefined && representation.pointPly.headerByteLength >= representation.blob.byteLength) {
+      throw new Error('native snapshot: ordinary-point PLY facts disagree with blob length');
     }
   }
   const target = snapshot.presentation.captionTargetAssetId;

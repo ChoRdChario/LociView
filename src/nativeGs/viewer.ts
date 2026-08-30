@@ -2,7 +2,13 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { loadModel } from '../viewer/loaders';
-import { inspectNativeGsPlyV1 } from './plyProfile';
+import { inspectNativeGsPlyV1, inspectNativePointPlyV1 } from './plyProfile';
+import {
+  clampNativePointDiameterCssPixels,
+  NATIVE_POINT_DIAMETER_DEFAULT_CSS_PX,
+  selectNativeProjectedPoint,
+  type NativeProjectedPointPick,
+} from './pointPresentation';
 import {
   activeNativeBindingV1,
   activeNativeRepresentationsV1,
@@ -116,6 +122,31 @@ function makeProxyInvisible(root: THREE.Object3D): void {
   });
 }
 
+function pointMaterials(object: THREE.Points): THREE.PointsMaterial[] {
+  const materials = Array.isArray(object.material) ? object.material : [object.material];
+  return materials.filter((material): material is THREE.PointsMaterial => material instanceof THREE.PointsMaterial);
+}
+
+function preparePointPresentation(root: THREE.Object3D, diameterCssPixels: number): void {
+  root.traverse((object) => {
+    if (!(object instanceof THREE.Points)) return;
+    for (const material of pointMaterials(object)) {
+      material.size = diameterCssPixels;
+      material.sizeAttenuation = false;
+      material.onBeforeCompile = (shader) => {
+        shader.fragmentShader = shader.fragmentShader.replace(
+          '#include <clipping_planes_fragment>',
+          '#include <clipping_planes_fragment>\n' +
+          'vec2 lociviewPointDelta = gl_PointCoord - vec2(0.5);\n' +
+          'if (dot(lociviewPointDelta, lociviewPointDelta) > 0.25) discard;',
+        );
+      };
+      material.customProgramCacheKey = () => 'lociview-native-point-disc-v1';
+      material.needsUpdate = true;
+    }
+  });
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -134,6 +165,7 @@ export class NativeGsViewer {
   private readonly representationObjects = new Map<string, THREE.Object3D>();
   private readonly representationBounds = new Map<string, THREE.Box3>();
   private readonly resourceStates = new Map<string, NativeResourceStateV1>();
+  private readonly pointDiameters = new Map<string, number>();
   private readonly callbacks: NativeGsViewerCallbacks;
   private snapshot: NativeProjectSnapshotV1;
   private sparkRuntime: NativeSparkRuntime | null = null;
@@ -229,7 +261,9 @@ export class NativeGsViewer {
       this.scene.add(group);
     }
     const ordered = allActiveNativeRepresentationsV1(this.snapshot).sort((left, right) => {
-      const rank = (role: NativeRepresentationV1['role']): number => role === 'meshPrimary' ? 0 : role === 'interactionProxy' ? 1 : 2;
+      const rank = (role: NativeRepresentationV1['role']): number => (
+        role === 'meshPrimary' ? 0 : role === 'pointPrimary' ? 1 : role === 'interactionProxy' ? 2 : 3
+      );
       return rank(left.role) - rank(right.role) || left.id.localeCompare(right.id);
     });
     for (const representation of ordered) {
@@ -246,6 +280,8 @@ export class NativeGsViewer {
         if (representation.role === 'gsPrimary') {
           if (!offlineReady) throw new Error('GS runtime is not offline-ready on this device');
           await this.loadGs(representation, source);
+        } else if (representation.role === 'pointPrimary') {
+          await this.loadPoint(representation, source);
         } else {
           await this.loadMeshLike(representation, source);
         }
@@ -266,6 +302,28 @@ export class NativeGsViewer {
 
   getResolution(): NativeSliceResolutionV1 {
     return this.resolution;
+  }
+
+  getPointDiameterCssPixels(assetId: string): number {
+    return this.pointDiameters.get(assetId) ?? NATIVE_POINT_DIAMETER_DEFAULT_CSS_PX;
+  }
+
+  setPointDiameterCssPixels(assetId: string, requested: number): number {
+    const hasPoint = activeNativeRepresentationsV1(this.snapshot, assetId)
+      .some((representation) => representation.role === 'pointPrimary');
+    const diameter = clampNativePointDiameterCssPixels(requested);
+    if (!hasPoint) return diameter;
+    this.pointDiameters.set(assetId, diameter);
+    for (const representation of activeNativeRepresentationsV1(this.snapshot, assetId)) {
+      if (representation.role !== 'pointPrimary') continue;
+      const root = this.representationObjects.get(representation.id);
+      if (root === undefined) continue;
+      root.traverse((object) => {
+        if (!(object instanceof THREE.Points)) return;
+        for (const material of pointMaterials(object)) material.size = diameter;
+      });
+    }
+    return diameter;
   }
 
   getProjectCamera(): NativeProjectCameraV1 {
@@ -452,7 +510,9 @@ export class NativeGsViewer {
 
   selectAlignmentAsset(assetId: string): boolean {
     const visual = activeNativeRepresentationsV1(this.snapshot, assetId)
-      .some((representation) => representation.role === 'meshPrimary' || representation.role === 'gsPrimary');
+      .some((representation) => (
+        representation.role === 'meshPrimary' || representation.role === 'pointPrimary' || representation.role === 'gsPrimary'
+      ));
     if (!visual || !this.assetGroups.has(assetId)) return false;
     this.repositionCaptionId = null;
     this.gizmoTarget = { kind: 'asset', assetId };
@@ -553,6 +613,32 @@ export class NativeGsViewer {
     applyCanonicalTransform(loaded.root, representation.representationToAsset);
     const group = this.assetGroups.get(representation.assetId);
     if (group === undefined) throw new Error('Representation Asset group is unavailable');
+    group.add(loaded.root);
+    this.representationObjects.set(representation.id, loaded.root);
+  }
+
+  private async loadPoint(representation: NativeRepresentationV1, source: WorkspaceReadableFile): Promise<void> {
+    if (representation.pointPly === undefined) throw new Error('ordinary-point PLY facts are absent');
+    const inspection = await inspectNativePointPlyV1(source);
+    if (
+      inspection.kind !== 'supported-point' ||
+      inspection.facts.pointCount !== representation.pointPly.pointCount ||
+      inspection.facts.headerByteLength !== representation.pointPly.headerByteLength ||
+      inspection.facts.encoding !== representation.pointPly.encoding
+    ) {
+      throw new Error('ordinary-point PLY no longer matches its admitted profile facts');
+    }
+    const loaded = await loadModel('ply', await collectStream(source));
+    if (loaded.kind !== 'points' || loaded.stats.points !== representation.pointPly.pointCount || loaded.stats.triangles !== 0) {
+      throw new Error('ordinary-point decoder output does not match the admitted point-only profile');
+    }
+    const diameter = this.getPointDiameterCssPixels(representation.assetId);
+    preparePointPresentation(loaded.root, diameter);
+    loaded.root.name = representation.id;
+    loaded.root.userData.representationId = representation.id;
+    applyCanonicalTransform(loaded.root, representation.representationToAsset);
+    const group = this.assetGroups.get(representation.assetId);
+    if (group === undefined) throw new Error('Point Asset group is unavailable');
     group.add(loaded.root);
     this.representationObjects.set(representation.id, loaded.root);
   }
@@ -678,6 +764,53 @@ export class NativeGsViewer {
     );
   }
 
+  private pickPointAt(
+    surface: THREE.Object3D,
+    representationId: string,
+    pointer: THREE.Vector2,
+    diameterCssPixels: number,
+  ): THREE.Vector3 | null {
+    const rect = this.canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0 || !surface.visible) return null;
+    const pointerCss = {
+      xCss: (pointer.x + 1) * 0.5 * rect.width,
+      yCss: (1 - pointer.y) * 0.5 * rect.height,
+    };
+    const pointObjects: THREE.Points[] = [];
+    surface.traverse((object) => {
+      if (object instanceof THREE.Points && object.visible) pointObjects.push(object);
+    });
+    const camera = this.camera;
+    function* projectedPoints(): Generator<NativeProjectedPointPick> {
+      const local = new THREE.Vector3();
+      const world = new THREE.Vector3();
+      const projected = new THREE.Vector3();
+      for (const object of pointObjects) {
+        const positions = object.geometry.getAttribute('position');
+        if (positions === undefined) continue;
+        for (let index = 0; index < positions.count; index += 1) {
+          local.set(positions.getX(index), positions.getY(index), positions.getZ(index));
+          world.copy(local).applyMatrix4(object.matrixWorld);
+          projected.copy(world).project(camera);
+          if (
+            !Number.isFinite(projected.x) || !Number.isFinite(projected.y) || !Number.isFinite(projected.z) ||
+            projected.z < -1 || projected.z > 1
+          ) continue;
+          yield {
+            representationId,
+            pointIndex: index,
+            xCss: (projected.x + 1) * 0.5 * rect.width,
+            yCss: (1 - projected.y) * 0.5 * rect.height,
+            depth: projected.z,
+            world: tuple(world),
+          };
+        }
+      }
+    }
+    const selected = selectNativeProjectedPoint(projectedPoints(), pointerCss, diameterCssPixels);
+    return selected === null ? null : new THREE.Vector3().fromArray(selected.world);
+  }
+
   private selectCaptionAt(pointer: THREE.Vector2): boolean {
     this.scene.updateMatrixWorld(true);
     this.raycaster.setFromCamera(pointer, this.camera);
@@ -705,8 +838,15 @@ export class NativeGsViewer {
     const surface = this.representationObjects.get(interaction.surfaceRepresentationId);
     const group = this.assetGroups.get(interaction.targetAssetId);
     if (surface === undefined || group === undefined) return;
-    const hit = this.raycaster.intersectObject(surface, true)[0];
-    if (hit === undefined) {
+    const hitPoint = interaction.targetRole === 'pointPrimary'
+      ? this.pickPointAt(
+          surface,
+          interaction.surfaceRepresentationId,
+          pointer,
+          this.getPointDiameterCssPixels(interaction.targetAssetId),
+        )
+      : this.raycaster.intersectObject(surface, true)[0]?.point ?? null;
+    if (hitPoint === null) {
       this.callbacks.onIssuesChanged([...this.resolution.issues, 'No hit on the selected interaction surface.']);
       return;
     }
@@ -737,7 +877,7 @@ export class NativeGsViewer {
       this.callbacks.onIssuesChanged([...this.resolution.issues, 'Caption target closure is invalid.']);
       return;
     }
-    const positionAsset = group.worldToLocal(hit.point.clone());
+    const positionAsset = group.worldToLocal(hitPoint.clone());
     const caption: NativeCaptionV1 = {
       id: repositioned?.id ?? newNativeId('cap'),
       title: repositioned?.title ?? 'Caption',

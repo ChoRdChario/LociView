@@ -6,12 +6,14 @@ import { OpfsFS } from '../platform/opfs';
 import type { WorkspaceFS } from '../platform/fs';
 import { ProjectMutationCoordinator, type ProjectMutationSession } from '../platform/projectLock';
 import { registerPwa } from '../platform/pwa';
-import { inspectNativeGsPlyV1 } from './plyProfile';
+import { inspectNativeGsPlyV1, inspectNativePointPlyV1, type NativePointPlyFactsV1 } from './plyProfile';
 import { isNativeGsOfflineReady, prepareNativeGsOffline } from './offline';
+import { NATIVE_POINT_DIAMETER_DEFAULT_CSS_PX } from './pointPresentation';
 import {
   activateNativeManualAssetTransformV1,
   NATIVE_GS_PROFILE_ID,
   NATIVE_IDENTITY_TRANSFORM,
+  NATIVE_POINT_PROFILE_ID,
   nativeModelProfileId,
   newNativeId,
   normalizeNativeSim3,
@@ -109,15 +111,25 @@ function modelMediaType(format: ModelFormat): string {
   }
 }
 
-async function inspectModelFile(file: File, label: string): Promise<ModelFormat> {
+interface InspectedModelFile {
+  readonly format: ModelFormat;
+  readonly pointPly?: NativePointPlyFactsV1;
+}
+
+async function inspectModelFile(file: File, label: string, pointAllowed = true): Promise<InspectedModelFile> {
   const head = new Uint8Array(await file.slice(0, Math.min(file.size, 64 * 1024)).arrayBuffer());
   const format = detectFormat(file.name, head);
   if (format === null) throw new Error(`${label}はGLB/GLTF/OBJ/STL/通常PLYのいずれでもありません。`);
   if (format === 'ply') {
     const inspection = await inspectNativeGsPlyV1(file);
     if (inspection.kind === 'supported-gs') throw new Error(`${label}にGS PLYが選ばれています。GS欄へ指定してください。`);
+    const pointInspection = await inspectNativePointPlyV1(file);
+    if (pointInspection.kind === 'supported-point') {
+      if (!pointAllowed) throw new Error(`${label}には三角形を持つ3Dモデルを指定してください。通常点群は補助面にできません。`);
+      return { format, pointPly: pointInspection.facts };
+    }
   }
-  return format;
+  return { format };
 }
 
 function labelFromFile(file: File, fallback: string): string {
@@ -144,21 +156,23 @@ async function buildAssetImport(
   const representationIds = [primaryRepresentationId];
 
   if (kind === 'mesh') {
-    const format = await inspectModelFile(file, '3Dモデル');
+    const inspected = await inspectModelFile(file, '3Dモデル／通常点群');
+    const pointPly = inspected.pointPly;
     representations.push({
       id: primaryRepresentationId,
       assetId,
       representationFrameId: newNativeId('frm'),
-      contentKind: 'mesh',
+      contentKind: pointPly === undefined ? 'mesh' : 'pointCloud',
       purposes: ['source', 'display'],
-      role: 'meshPrimary',
+      role: pointPly === undefined ? 'meshPrimary' : 'pointPrimary',
       variantFamilyId: primaryFamilyId,
-      formatProfile: { id: nativeModelProfileId(format) },
+      formatProfile: { id: pointPly === undefined ? nativeModelProfileId(inspected.format) : NATIVE_POINT_PROFILE_ID },
       representationToAsset: NATIVE_IDENTITY_TRANSFORM,
       derivedFrom: [],
-      mediaType: modelMediaType(format),
+      ...(pointPly === undefined ? {} : { pointPly }),
+      mediaType: modelMediaType(inspected.format),
     });
-    sources.set(primaryRepresentationId, fileSource(file, modelMediaType(format)));
+    sources.set(primaryRepresentationId, fileSource(file, modelMediaType(inspected.format)));
   } else {
     const inspection = await inspectNativeGsPlyV1(file);
     if (inspection.kind !== 'supported-gs') {
@@ -180,7 +194,7 @@ async function buildAssetImport(
     });
     sources.set(primaryRepresentationId, fileSource(file, 'application/octet-stream'));
     if (proxy !== null) {
-      const proxyFormat = await inspectModelFile(proxy, 'キャプション配置用の補助モデル');
+      const proxyFormat = await inspectModelFile(proxy, 'キャプション配置用の補助モデル', false);
       const proxyRepresentationId = newNativeId('rep');
       representationIds.push(proxyRepresentationId);
       representations.push({
@@ -191,13 +205,13 @@ async function buildAssetImport(
         purposes: ['interaction'],
         role: 'interactionProxy',
         variantFamilyId: newNativeId('fam'),
-        formatProfile: { id: nativeModelProfileId(proxyFormat) },
+        formatProfile: { id: nativeModelProfileId(proxyFormat.format) },
         representationToAsset: NATIVE_IDENTITY_TRANSFORM,
         derivedFrom: [primaryRepresentationId],
         proxyForGsVariantFamilyId: primaryFamilyId,
-        mediaType: modelMediaType(proxyFormat),
+        mediaType: modelMediaType(proxyFormat.format),
       });
-      sources.set(proxyRepresentationId, fileSource(proxy, modelMediaType(proxyFormat)));
+      sources.set(proxyRepresentationId, fileSource(proxy, modelMediaType(proxyFormat.format)));
     }
   }
 
@@ -229,7 +243,7 @@ async function buildAssetImport(
 }
 
 async function buildDraft(title: string, files: SelectedFiles): Promise<DraftResult> {
-  if (files.mesh === null && files.gs === null) throw new Error('3DモデルまたはGaussian Splattingを少なくとも一つ選択してください。');
+  if (files.mesh === null && files.gs === null) throw new Error('3Dモデル、通常点群、Gaussian Splattingのいずれかを少なくとも一つ選択してください。');
   if (files.proxy !== null && files.gs === null) throw new Error('キャプション配置用の補助モデルは、対象のGaussian Splattingと一緒に指定してください。');
   const projectId = newNativeId('prj');
   const projectFrameId = newNativeId('frm');
@@ -246,9 +260,11 @@ async function buildDraft(title: string, files: SelectedFiles): Promise<DraftRes
     }));
   }
   for (const built of builtAssets) for (const [id, source] of built.sources) sources.set(id, source);
-  const meshAssetId = builtAssets.find((built) => built.imported.representations.some((entry) => entry.role === 'meshPrimary'))?.imported.asset.id ?? null;
+  const modelAssetId = builtAssets.find((built) => built.imported.representations.some((entry) => (
+    entry.role === 'meshPrimary' || entry.role === 'pointPrimary'
+  )))?.imported.asset.id ?? null;
   const gsAssetId = builtAssets.find((built) => built.imported.representations.some((entry) => entry.role === 'gsPrimary'))?.imported.asset.id ?? null;
-  const displayMode: NativeDisplayMode = meshAssetId !== null && gsAssetId !== null ? 'mixed' : gsAssetId !== null ? 'gs-only' : 'mesh-only';
+  const displayMode: NativeDisplayMode = modelAssetId !== null && gsAssetId !== null ? 'mixed' : gsAssetId !== null ? 'gs-only' : 'mesh-only';
   return {
     draft: {
       project: {
@@ -260,7 +276,7 @@ async function buildDraft(title: string, files: SelectedFiles): Promise<DraftRes
       assetBindingRevisions: builtAssets.map((built) => built.imported.binding),
       assetRevisions: builtAssets.map((built) => built.imported.revision),
       representations: builtAssets.flatMap((built) => built.imported.representations),
-      presentation: { displayMode, captionTargetAssetId: gsAssetId ?? meshAssetId, hiddenAssetIds: [] },
+      presentation: { displayMode, captionTargetAssetId: gsAssetId ?? modelAssetId, hiddenAssetIds: [] },
       captions: [],
     },
     sources,
@@ -742,10 +758,10 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       ),
       el('section', { class: 'ng-card' },
         el('h2', {}, '新しいプロジェクトを作成'),
-        el('p', { class: 'ng-note' }, '3DモデルとGaussian Splattingは別々のモデルとして読み込み、あとから位置や表示を調整できます。どちらか一方だけでも作成できます。'),
+        el('p', { class: 'ng-note' }, '3Dモデル、通常点群、Gaussian Splattingは別々のモデルとして読み込み、あとから位置や表示を調整できます。一種類だけでも作成できます。'),
         el('label', { class: 'ng-field' }, el('span', {}, 'プロジェクト名'), title),
         el('div', { class: 'ng-grid' },
-          el('label', { class: 'ng-field' }, el('span', {}, '3Dモデル（任意）'), mesh),
+          el('label', { class: 'ng-field' }, el('span', {}, '3Dモデル／通常点群（任意）'), mesh),
           el('label', { class: 'ng-field' }, el('span', {}, 'Gaussian Splatting（PLY、任意）'), gs),
           el('label', { class: 'ng-field' }, el('span', {}, 'GSのキャプション配置用補助モデル（任意）'), proxy),
         ),
@@ -817,7 +833,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const diagnostics = el('ul', { class: 'ng-diagnostics' });
     const display = el('select');
     display.append(el('option', { value: '' }, '一括表示を選択'));
-    for (const [value, label] of [['mixed', 'すべてのモデル'], ['gs-only', 'Gaussian Splattingのみ'], ['mesh-only', '3Dモデルのみ']] as const) {
+    for (const [value, label] of [['mixed', 'すべてのモデル'], ['gs-only', 'Gaussian Splattingのみ'], ['mesh-only', '3Dモデル／通常点群のみ']] as const) {
       display.append(el('option', { value }, label));
     }
     display.value = '';
@@ -829,15 +845,15 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const close = el('button', {}, '閉じる');
     const reload = el('button', {}, '再読み込み');
     const addKind = el('select');
-    addKind.append(el('option', { value: 'mesh' }, '3Dモデル'), el('option', { value: 'gs' }, 'Gaussian Splatting'));
-    const addSourceLabel = el('span', {}, '3Dモデルファイル');
+    addKind.append(el('option', { value: 'mesh' }, '3Dモデル／通常点群'), el('option', { value: 'gs' }, 'Gaussian Splatting'));
+    const addSourceLabel = el('span', {}, '3Dモデル／通常点群ファイル');
     const addSource = el('input', { type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply' });
     const addProxy = el('input', { type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply', disabled: 'true' });
     const addAsset = el('button', { class: 'primary' }, 'モデルを追加して保存');
     const replaceAsset = el('select');
     const replaceKind = el('select');
-    replaceKind.append(el('option', { value: 'mesh' }, '3Dモデル'), el('option', { value: 'gs' }, 'Gaussian Splatting'));
-    const replaceSourceLabel = el('span', {}, '新しい3Dモデルファイル');
+    replaceKind.append(el('option', { value: 'mesh' }, '3Dモデル／通常点群'), el('option', { value: 'gs' }, 'Gaussian Splatting'));
+    const replaceSourceLabel = el('span', {}, '新しい3Dモデル／通常点群ファイル');
     const replaceSource = el('input', { type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply' });
     const replaceProxy = el('input', { type: 'file', accept: '.glb,.gltf,.obj,.stl,.ply', disabled: 'true' });
     const replaceButton = el('button', { class: 'primary' }, '選択したモデルを差し替えて保存');
@@ -848,6 +864,16 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const rotationInputs = [0, 1, 2].map(() => el('input', { type: 'number', step: '1' }));
     const scaleInput = el('input', { type: 'number', step: '0.01', min: '0.000001' });
     const applyTransformButton = el('button', {}, '位置・回転・スケールを適用');
+    const pointAppearance = el('div', { class: 'ng-field', hidden: 'true' });
+    const pointDiameter = el('input', {
+      type: 'range', min: '1', max: '20', step: '0.5', value: String(NATIVE_POINT_DIAMETER_DEFAULT_CSS_PX),
+    });
+    const pointDiameterValue = el('output', {}, `${NATIVE_POINT_DIAMETER_DEFAULT_CSS_PX} px`);
+    pointAppearance.append(
+      el('span', {}, '点の大きさ（現在の表示）'),
+      el('div', { class: 'ng-row' }, pointDiameter, pointDiameterValue),
+      el('span', { class: 'ng-note' }, 'すぐに画面へ反映します。正式な見え方セットへの保存は後続です。'),
+    );
     let assetGizmoMode: NativeAssetGizmoMode = 'translate';
     const assetGizmoButtons = new Map<NativeAssetGizmoMode, HTMLButtonElement>([
       ['translate', el('button', { 'aria-pressed': 'true' }, '移動')],
@@ -888,7 +914,9 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const visibilityRows = new Map<string, HTMLElement>();
     for (const asset of working.assets) {
       const roles = rolesByAsset.get(asset.id) ?? [];
-      const role = roles.includes('gsPrimary') ? 'Gaussian Splatting' : '3Dモデル';
+      const role = roles.includes('gsPrimary')
+        ? 'Gaussian Splatting'
+        : roles.includes('pointPrimary') ? '通常点群' : '3Dモデル';
       targetOptions.set(asset.id, el('option', { value: asset.id }, `${asset.label} (${role})`));
       transformOptions.set(asset.id, el('option', { value: asset.id }, `${asset.label} (${role})`));
       replaceOptions.set(asset.id, el('option', { value: asset.id }, `${asset.label} (${role})`));
@@ -1045,6 +1073,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       }
       save.disabled = !editable || !unsavedChanges.isDirty;
       applyTransformButton.disabled = !editable;
+      pointDiameter.disabled = saving || pointAppearance.hidden;
       for (const button of assetGizmoButtons.values()) button.disabled = !editable;
       captionTitle.disabled = !editable || !captionFieldsEditable;
       captionBody.disabled = !editable || !captionFieldsEditable;
@@ -1101,6 +1130,14 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       const euler = new THREE.Euler().setFromQuaternion(q, 'XYZ');
       [euler.x, euler.y, euler.z].forEach((value, index) => { rotationInputs[index]!.value = String(THREE.MathUtils.radToDeg(value)); });
       scaleInput.value = String(binding.assetToProject.uniformScale);
+      const pointAsset = activeNativeRepresentationsV1(working, transformAsset.value)
+        .some((representation) => representation.role === 'pointPrimary');
+      pointAppearance.hidden = !pointAsset;
+      if (pointAsset) {
+        const diameter = activeViewer?.getPointDiameterCssPixels(transformAsset.value) ?? NATIVE_POINT_DIAMETER_DEFAULT_CSS_PX;
+        pointDiameter.value = String(diameter);
+        pointDiameterValue.textContent = `${diameter.toLocaleString()} px`;
+      }
     };
     const commitWorkingAssetTransform = (assetId: string, transform: NativeSim3V1): boolean => {
       if (!canMutateWorking()) return false;
@@ -1187,6 +1224,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
           el('span', { class: 'ng-note' }, '回転 X/Y/Z（度）'), el('div', { class: 'ng-three' }, ...rotationInputs),
           el('label', { class: 'ng-field' }, el('span', {}, '均一スケール'), scaleInput),
           applyTransformButton,
+          pointAppearance,
           el('p', { class: 'ng-note' }, '元のモデルファイルは変更しません。'),
         ),
         el('details', { class: 'ng-card' },
@@ -1368,7 +1406,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       addSource.value = '';
       addProxy.value = '';
       addSource.accept = isGs ? '.ply,application/octet-stream' : '.glb,.gltf,.obj,.stl,.ply';
-      addSourceLabel.textContent = isGs ? 'Gaussian Splatting（PLY）' : '3Dモデルファイル';
+      addSourceLabel.textContent = isGs ? 'Gaussian Splatting（PLY）' : '3Dモデル／通常点群ファイル';
       updateAccess();
     });
     replaceKind.addEventListener('change', () => {
@@ -1376,7 +1414,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       replaceSource.value = '';
       replaceProxy.value = '';
       replaceSource.accept = isGs ? '.ply,application/octet-stream' : '.glb,.gltf,.obj,.stl,.ply';
-      replaceSourceLabel.textContent = isGs ? '新しいGaussian Splatting（PLY）' : '新しい3Dモデルファイル';
+      replaceSourceLabel.textContent = isGs ? '新しいGaussian Splatting（PLY）' : '新しい3Dモデル／通常点群ファイル';
       updateAccess();
     });
     addAsset.addEventListener('click', () => {
@@ -1564,7 +1602,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         const roles = rolesByAsset.get(asset.id) ?? [];
         const visible = preset === 'mixed' ||
           (preset === 'gs-only' && roles.includes('gsPrimary')) ||
-          (preset === 'mesh-only' && roles.includes('meshPrimary'));
+          (preset === 'mesh-only' && (roles.includes('meshPrimary') || roles.includes('pointPrimary')));
         next = setNativeAssetVisibilityV1(next, asset.id, visible);
       }
       working = next;
@@ -1732,6 +1770,13 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         ? '選択したモデルの位置調整ギズモを表示しました。'
         : '選択したモデルは非表示のため、位置調整ギズモを表示できません。';
       updateAccess();
+    });
+    pointDiameter.addEventListener('input', () => {
+      const diameter = viewer.setPointDiameterCssPixels(transformAsset.value, Number(pointDiameter.value));
+      pointDiameter.value = String(diameter);
+      pointDiameterValue.textContent = `${diameter.toLocaleString()} px`;
+      runtimeStatus.className = 'ng-status';
+      runtimeStatus.textContent = '点の大きさを現在の表示へ反映しました。プロジェクトデータは変更していません。';
     });
     for (const [mode, button] of assetGizmoButtons) {
       button.addEventListener('click', () => {

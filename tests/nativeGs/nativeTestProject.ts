@@ -1,6 +1,7 @@
 import type { NativeAssetImportV1, NativeBinarySource } from '../../src/nativeGs/storage';
 import {
   NATIVE_GS_PROFILE_ID,
+  NATIVE_POINT_PROFILE_ID,
   NATIVE_SCHEMA_VERSION,
   NATIVE_SNAPSHOT_FORMAT,
   nativeModelProfileId,
@@ -9,7 +10,7 @@ import {
   type NativeProjectSnapshotV1,
   type NativeRepresentationDraftV1,
 } from '../../src/nativeGs/schema';
-import type { NativeGsPlyFactsV1 } from '../../src/nativeGs/plyProfile';
+import type { NativeGsPlyFactsV1, NativePointPlyFactsV1 } from '../../src/nativeGs/plyProfile';
 
 const B32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
@@ -62,6 +63,29 @@ export function makeGsPlySource(
     recordStrideBytes,
     payloadByteLength,
   };
+  const blob = new Blob([bytes], { type: 'application/octet-stream' });
+  return {
+    bytes,
+    facts,
+    source: { size: blob.size, mediaType: blob.type, stream: () => blob.stream() },
+  };
+}
+
+export function makePointPlySource(pointCount = 3): {
+  readonly source: NativeBinarySource;
+  readonly facts: NativePointPlyFactsV1;
+  readonly bytes: Uint8Array;
+} {
+  const header = [
+    'ply', 'format ascii 1.0', `element vertex ${pointCount}`,
+    'property float x', 'property float y', 'property float z',
+    'property uchar red', 'property uchar green', 'property uchar blue',
+    'end_header', '',
+  ].join('\n');
+  const rows = Array.from({ length: pointCount }, (_, index) => `${index} ${index / 2} ${-index} ${index % 256} 64 255`).join('\n');
+  const bytes = new TextEncoder().encode(`${header}${rows}\n`);
+  const headerByteLength = new TextEncoder().encode(header).byteLength;
+  const facts: NativePointPlyFactsV1 = { pointCount, headerByteLength, encoding: 'ascii' };
   const blob = new Blob([bytes], { type: 'application/octet-stream' });
   return {
     bytes,
@@ -156,6 +180,64 @@ export function makeNativeMeshImport(ordinal = 100): {
         representationToAsset: { translation: [0, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1, reflection: 'none' },
         derivedFrom: [],
         mediaType: 'text/plain',
+      }],
+    },
+  };
+}
+
+export function makeNativePointImport(ordinal = 300, pointCount = 3): {
+  readonly imported: NativeAssetImportV1;
+  readonly sources: ReadonlyMap<string, NativeBinarySource>;
+  readonly assetId: string;
+  readonly representationId: string;
+  readonly bytes: Uint8Array;
+} {
+  const assetId = testNativeId('ast', ordinal);
+  const assetFrameId = testNativeId('frm', ordinal + 100);
+  const revisionId = testNativeId('rev', ordinal);
+  const bindingId = testNativeId('bnd', ordinal);
+  const representationId = testNativeId('rep', ordinal);
+  const familyId = testNativeId('fam', ordinal);
+  const compatibilityId = testNativeId('cls', ordinal);
+  const point = makePointPlySource(pointCount);
+  return {
+    assetId,
+    representationId,
+    bytes: point.bytes,
+    sources: new Map([[representationId, point.source]]),
+    imported: {
+      asset: {
+        id: assetId,
+        label: `ordinary Point Asset ${ordinal}`,
+        assetFrameId,
+        status: { kind: 'ready', activeBindingId: bindingId },
+      },
+      binding: {
+        id: bindingId,
+        assetId,
+        assetRevisionId: revisionId,
+        assetToProject: { translation: [0, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 },
+        method: 'import',
+      },
+      revision: {
+        id: revisionId,
+        assetId,
+        representationIds: [representationId],
+        anchorCompatibilityClasses: [{ id: compatibilityId, targetVariantFamilyIds: [familyId] }],
+      },
+      representations: [{
+        id: representationId,
+        assetId,
+        representationFrameId: testNativeId('frm', ordinal + 200),
+        contentKind: 'pointCloud',
+        purposes: ['source', 'display'],
+        role: 'pointPrimary',
+        variantFamilyId: familyId,
+        formatProfile: { id: NATIVE_POINT_PROFILE_ID },
+        representationToAsset: { translation: [0, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1, reflection: 'none' },
+        derivedFrom: [],
+        pointPly: point.facts,
+        mediaType: point.source.mediaType,
       }],
     },
   };
@@ -431,13 +513,19 @@ export function snapshotFromDraft(draft: NativeProjectDraftV1): NativeProjectSna
     assetRevisions: draft.assetRevisions,
     representations: draft.representations.map(({ mediaType, ...representation }) => ({
       ...representation,
-      blob: representation.gsPly === undefined
-        ? { ...TEST_BLOB, mediaType }
-        : {
+      blob: representation.gsPly !== undefined
+        ? {
             ...TEST_BLOB,
             mediaType,
             byteLength: representation.gsPly.headerByteLength + representation.gsPly.payloadByteLength,
-          },
+          }
+        : representation.pointPly !== undefined
+          ? {
+              ...TEST_BLOB,
+              mediaType,
+              byteLength: Math.max(representation.pointPly.headerByteLength + 1, TEST_BLOB.byteLength),
+            }
+          : { ...TEST_BLOB, mediaType },
     })),
     presentation: draft.presentation,
     captions: draft.captions,

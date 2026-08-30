@@ -2,7 +2,7 @@
 
 > Status: `CURRENT` map; repository-normalization baseline `fc7054f` (2026-08-18).
 > That baseline is a historical normalization anchor, not a checkout target. Use Git `HEAD` and `tasks/todo.md` for the active checkpoint.
-> A bounded, nondefault native-GS production path now supports repeated ordinary Mesh or Graphdeco SH2/SH3 GS Asset imports, optional explicit per-GS Proxies, streamed portable backup, independent visibility and per-Asset manual position/rotation/uniform-scale alignment. It does not pass G0/G0-S/G1 or adopt Spark permanently. Ordinary-point production profiles, full Alignment workflows, Automerge, content-addressed storage, and renderer backends remain `PROPOSED`.
+> A bounded, nondefault native production path now supports repeated ordinary Mesh, exact ASCII XYZ+RGB Point, or Graphdeco SH2/SH3 GS Asset imports, optional explicit per-GS Proxies, streamed portable backup, independent visibility and per-Asset manual position/rotation/uniform-scale alignment. It does not pass G0/G0-S/G1 or adopt Spark permanently. Additional point profiles, full Alignment workflows, Automerge, content-addressed storage, and renderer backends remain `PROPOSED`.
 > Product visibility is per loaded Asset/layer, not per Mesh/GS kind. The current native `mixed` / `gs-only` / `mesh-only` values are bounded convenience filters; formal Compare is neither implemented nor selected as the next workstream.
 
 ## Start here
@@ -32,7 +32,7 @@ For a normal task, read only the target file, its matching tests, and direct imp
 | `src/assets` | ZIP/package handling, model asset registration/replacement, GLB optimization, import wizard |
 | `src/io` | CSV, minimal XLSX reader, and legacy LociMyu conversion |
 | `src/viewer` | Three.js loaders, material shader patch, single-model `ViewerCore` |
-| `src/nativeGs` | Version-1 native snapshot, streamed project-local binaries/package, exact SH2/SH3 admission, lazy Spark runtime, repeated Asset import, per-Asset visibility/alignment, and nondefault production UI |
+| `src/nativeGs` | Version-1 native snapshot, streamed project-local binaries/package, exact ASCII Point and SH2/SH3 GS admission, lazy Spark runtime, repeated Asset import, per-Asset visibility/alignment, and nondefault production UI |
 | `src/ui` | App shell, home, viewer screen, dialogs, tabs, and UI-only state |
 | `tests` | Executable contracts for core, assets, I/O, and UI logic |
 | `public/samples` | Small deterministic files used by the manual viewer and iOS runbook |
@@ -91,7 +91,7 @@ For v1, distinguish:
 ## Current constraints and known risks
 
 - The default v1 `ViewerCore` keeps one active model and treats PLY as ordinary mesh/points.
-- The separate `?mode=native-gs` path can add repeated Mesh and GS Assets with an optional same-GS-Asset Proxy, but does not yet claim ordinary-point production profiles, DisplaySet integration or a general v2 scene/layer implementation.
+- The separate `?mode=native-gs` path can add repeated Mesh, one exact ordinary-Point profile and GS Assets with an optional same-GS-Asset Proxy. It does not claim other point profiles, DisplaySet integration or a general v2 scene/layer implementation.
 - ZIP import/export and OPFS reads can materialize complete buffers in memory.
 - Viewer, OPFS, PWA, and physical-iOS behavior are not fully covered by automated tests.
 - Some 2026-07 documents describe intended behavior that the code never implemented. Consult `docs/README.md` before treating prose as current.

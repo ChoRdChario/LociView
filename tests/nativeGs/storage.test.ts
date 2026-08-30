@@ -31,6 +31,7 @@ import {
   makeNativeGsReplacement,
   makeNativeMeshImport,
   makeNativeMeshReplacement,
+  makeNativePointImport,
   NATIVE_TEST_IDS,
   testNativeId,
 } from './nativeTestProject';
@@ -241,6 +242,42 @@ describe('native project blob-first/marker-last publication', () => {
       missingRepresentationIds: [],
       sizeMismatchRepresentationIds: [],
     });
+    session.release();
+  });
+
+  it('publishes an exact ordinary-point Asset and rejects an invalid point payload before writing it', async () => {
+    const fs = new RecordingMemoryFS();
+    const session = await editable(fs);
+    const { draft, sources } = makeNativeDraft(2);
+    const first = await createNativeProjectV1(session.workspace, draft, sources);
+    const added = makeNativePointImport();
+    const next = await addNativeAssetV1(session.workspace, first, added.imported, added.sources);
+
+    expect(next.representations.find((entry) => entry.id === added.representationId)).toMatchObject({
+      role: 'pointPrimary',
+      contentKind: 'pointCloud',
+      pointPly: { pointCount: 3, encoding: 'ascii' },
+    });
+    expect(await fs.readBytes(nativeRepresentationPath(next.project.id, added.representationId))).toEqual(added.bytes);
+    expect((await openNativeProjectV1(fs, next.project.id)).snapshot).toEqual(next);
+
+    const invalid = makeNativePointImport(301);
+    const invalidBytes = new TextEncoder().encode(
+      new TextDecoder().decode(invalid.bytes).replace(' 255\n', ' 256\n'),
+    );
+    expect(invalidBytes.byteLength).toBe(invalid.bytes.byteLength);
+    const invalidBlob = new Blob([invalidBytes], { type: 'application/octet-stream' });
+    const invalidSources = new Map([[invalid.representationId, {
+      size: invalidBlob.size,
+      mediaType: invalidBlob.type,
+      stream: () => invalidBlob.stream(),
+    }]]);
+
+    await expect(addNativeAssetV1(session.workspace, next, invalid.imported, invalidSources)).rejects.toMatchObject({
+      code: 'PLY_POINT_PAYLOAD_INVALID',
+    });
+    expect(await fs.exists(nativeRepresentationPath(next.project.id, invalid.representationId))).toBe(false);
+    expect((await openNativeProjectV1(fs, next.project.id)).snapshot).toEqual(next);
     session.release();
   });
 

@@ -1740,3 +1740,53 @@ Asset transaction, lifecycle record, trash or history system.
   revision UI, blob garbage collection, secure erase, CAS, journal/transaction,
   migration and final responsive polish. Physical-iPhone regression remains in
   the Product Owner-approved consolidated run and is not credited as PASS here.
+
+## 26. Bounded native ordinary-point path (Product Owner approved 2026-08-30)
+
+The first native ordinary-point path adds one honest visual Representation kind
+to the existing snapshot-v1 Project. It MUST NOT save ordinary points as Mesh.
+The additive wire values are `contentKind: "pointCloud"` and
+`role: "pointPrimary"`; all pre-point snapshot-v1 records remain readable by the
+new build. An older build is expected to reject a Project containing either new
+value rather than guessing, while portable package version `1` remains unchanged
+because it already carries Representation bytes by stable ID, size, digest and
+media type.
+
+- The one admitted source profile is point-only PLY 1.0 ASCII with exactly one
+  non-empty vertex element and the ordered properties `float x`, `float y`,
+  `float z`, `uchar red`, `uchar green`, `uchar blue`. Import validates every
+  streamed row as bounded ASCII decimal text (at most 1024 bytes per row), finite
+  XYZ values, RGB integer range, exact row count and absence of trailing records
+  before publication. PLY content detection precedes filename-extension routing,
+  so renaming a Point source cannot save it as Mesh or use it as a Proxy. A Mesh
+  PLY with any positive face element remains a Mesh; another vertex-only profile
+  is rejected explicitly rather than mislabeled.
+- A `pointPrimary` Representation has `source,display` purposes, one ordinary
+  point profile, no GS facts and no Proxy relationship. Its VariantFamily enters
+  the same active revision compatibility partition as Mesh and GS visual
+  families. Point-only Assets and independent Point/Mesh/GS Assets in one Project
+  are valid; no renderer kind becomes a user visibility group or display mode.
+- Point Assets reuse existing per-Asset visibility, ProjectFrame transform,
+  explicit Caption target, Asset-local `positionAsset`, whole-Project save,
+  offline reopen and portable backup/restore. A selected visible Point Asset is
+  picked only against its own visible points. A hidden or unselected Point Asset
+  contributes no draw, pick, gizmo or Caption marker.
+- The bounded runtime uses a circular, non-distance-attenuated point footprint.
+  The ordinary UI offers a live point-diameter control from 1 to 20 CSS pixels,
+  default 3, only while a Point Asset is selected. This value is session-local
+  presentation intent and is not written into snapshot, SavedView or portable
+  package bytes. Opacity, dither/smooth profiles and durable DisplaySet/material
+  integration remain later work.
+- Caption point picking uses the displayed circular footprint plus the approved
+  6-CSS-pixel coarse click allowance, ordered by screen distance, visible depth,
+  Representation ID and source point index. It saves only the existing manual
+  Asset-local anchor; no point index, normal, source occurrence or new anchor
+  schema is persisted.
+- Creation, Asset addition, replacement and portable restore run the same exact
+  point-profile inspection before publishing a snapshot or active marker. Binary
+  little-endian point PLY, mixed Mesh+point containers, PCD/LAS/LAZ, converter,
+  LOD, spatial index, opacity/compositing work, renderer framework and new
+  package/schema version are outside this slice.
+- Desktop executable rendering evidence is required. Physical-iPhone point
+  rendering and touch picking remain in the Product Owner-approved consolidated
+  run and are recorded as pending rather than credited as PASS in this slice.

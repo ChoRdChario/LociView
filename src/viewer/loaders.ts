@@ -38,13 +38,16 @@ const decoder = new TextDecoder();
 /** 拡張子 + マジックバイトでフォーマット判定 */
 export function detectFormat(fileName: string, bytes: Uint8Array): ModelFormat | null {
   const ext = fileName.toLowerCase().split('.').pop() ?? '';
+  if (bytes.length >= 4 && decoder.decode(bytes.subarray(0, 4)) === 'glTF') return 'glb';
+  if (
+    bytes.length >= 4 && bytes[0] === 0x70 && bytes[1] === 0x6c && bytes[2] === 0x79 &&
+    (bytes[3] === 0x0a || bytes[3] === 0x0d)
+  ) return 'ply';
   if (ext === 'glb') return 'glb';
   if (ext === 'gltf') return 'gltf';
   if (ext === 'obj') return 'obj';
   if (ext === 'stl') return 'stl';
   if (ext === 'ply') return 'ply';
-  if (bytes.length >= 4 && decoder.decode(bytes.subarray(0, 4)) === 'glTF') return 'glb';
-  if (bytes.length >= 3 && decoder.decode(bytes.subarray(0, 3)) === 'ply') return 'ply';
   return null;
 }
 

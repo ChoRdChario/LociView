@@ -1,9 +1,10 @@
 import type { ProjectWorkspaceFS, WorkspaceFS, WorkspaceReadableFile } from '../platform/fs';
 import { parseManifest } from '../core/manifest';
-import { inspectNativeGsPlyV1, type RestartableByteSource } from './plyProfile';
+import { inspectNativeGsPlyV1, inspectNativePointPlyV1, type RestartableByteSource } from './plyProfile';
 import {
   NATIVE_ACTIVE_FORMAT,
   NATIVE_GS_PROFILE_ID,
+  NATIVE_POINT_PROFILE_ID,
   NATIVE_SCHEMA_VERSION,
   NATIVE_SNAPSHOT_FORMAT,
   newNativeId,
@@ -100,6 +101,38 @@ function sameGsFacts(
     left.headerByteLength === right.headerByteLength && left.recordStrideBytes === right.recordStrideBytes &&
     left.payloadByteLength === right.payloadByteLength
   );
+}
+
+function samePointFacts(
+  left: NonNullable<NativeProjectSnapshotV1['representations'][number]['pointPly']>,
+  right: NonNullable<NativeProjectSnapshotV1['representations'][number]['pointPly']>,
+): boolean {
+  return left.pointCount === right.pointCount &&
+    left.headerByteLength === right.headerByteLength && left.encoding === right.encoding;
+}
+
+async function validateRepresentationSourceProfile(
+  representation: NativeRepresentationDraftV1 | NativeRepresentationV1,
+  source: RestartableByteSource,
+  label: string,
+): Promise<void> {
+  if (representation.role === 'gsPrimary') {
+    if (representation.formatProfile.id !== NATIVE_GS_PROFILE_ID || representation.gsPly === undefined) {
+      throw new Error(`native project: ${label} GS Representation lacks the approved profile facts`);
+    }
+    const inspection = await inspectNativeGsPlyV1(source);
+    if (inspection.kind !== 'supported-gs' || !sameGsFacts(inspection.facts, representation.gsPly)) {
+      throw new Error(`native project: ${label} GS profile facts do not match the selected source`);
+    }
+  } else if (representation.role === 'pointPrimary') {
+    if (representation.formatProfile.id !== NATIVE_POINT_PROFILE_ID || representation.pointPly === undefined) {
+      throw new Error(`native project: ${label} Point Representation lacks the approved profile facts`);
+    }
+    const inspection = await inspectNativePointPlyV1(source);
+    if (inspection.kind !== 'supported-point' || !samePointFacts(inspection.facts, representation.pointPly)) {
+      throw new Error(`native project: ${label} Point profile facts do not match the selected source`);
+    }
+  }
 }
 
 function throwIfAborted(signal?: AbortSignal): void {
@@ -235,15 +268,9 @@ export async function createNativeProjectV1(
     const source = sources.get(representation.id);
     if (source === undefined) throw new Error(`native project: missing source for ${representation.id}`);
     if (source.size < 1) throw new Error(`native project: empty source for ${representation.id}`);
-    if (representation.role === 'gsPrimary') {
-      onStatus?.(`Inspecting ${representation.role} header…`);
-      if (representation.formatProfile.id !== NATIVE_GS_PROFILE_ID || representation.gsPly === undefined) {
-        throw new Error('native project: GS Representation lacks the approved profile facts');
-      }
-      const inspection = await inspectNativeGsPlyV1(source);
-      if (inspection.kind !== 'supported-gs' || !sameGsFacts(inspection.facts, representation.gsPly)) {
-        throw new Error('native project: stored GS profile facts do not match the selected source');
-      }
+    if (representation.role === 'gsPrimary' || representation.role === 'pointPrimary') {
+      onStatus?.(`Inspecting ${representation.role} source…`);
+      await validateRepresentationSourceProfile(representation, source, 'stored');
     }
     onStatus?.(`Streaming ${representation.role} bytes to project-local storage…`);
     const blob = await writeAndVerifyBinary(
@@ -337,15 +364,9 @@ async function publishNativeAssetClosureV1(
   try {
     for (const representation of [...imported.representations].sort((a, b) => a.id.localeCompare(b.id))) {
       const source = sources.get(representation.id)!;
-      if (representation.role === 'gsPrimary') {
-        onStatus?.('Inspecting gsPrimary header…');
-        if (representation.formatProfile.id !== NATIVE_GS_PROFILE_ID || representation.gsPly === undefined) {
-          throw new Error('native project: imported GS Representation lacks the approved profile facts');
-        }
-        const inspection = await inspectNativeGsPlyV1(source);
-        if (inspection.kind !== 'supported-gs' || !sameGsFacts(inspection.facts, representation.gsPly)) {
-          throw new Error('native project: imported GS profile facts do not match the selected source');
-        }
+      if (representation.role === 'gsPrimary' || representation.role === 'pointPrimary') {
+        onStatus?.(`Inspecting ${representation.role} source…`);
+        await validateRepresentationSourceProfile(representation, source, 'imported');
       }
       const path = nativeRepresentationPath(current.project.id, representation.id);
       stagedPaths.push(path);
@@ -510,15 +531,10 @@ export async function restoreNativeProjectV1(
       ) {
         throw new Error(`native restore: Representation size/SHA-256 mismatch for ${representation.id}`);
       }
-      if (representation.role === 'gsPrimary') {
+      if (representation.role === 'gsPrimary' || representation.role === 'pointPrimary') {
         const stored = await fs.readStream(path);
-        if (stored === null || representation.gsPly === undefined) {
-          throw new Error('native restore: verified GS staging bytes are unavailable');
-        }
-        const inspection = await inspectNativeGsPlyV1(stored);
-        if (inspection.kind !== 'supported-gs' || !sameGsFacts(inspection.facts, representation.gsPly)) {
-          throw new Error('native restore: GS bytes do not match snapshot profile facts');
-        }
+        if (stored === null) throw new Error('native restore: verified profile staging bytes are unavailable');
+        await validateRepresentationSourceProfile(representation, stored, 'restored');
       }
       onStatus?.(`Verified ${representation.role} size and SHA-256 by streamed read-back.`);
     }
