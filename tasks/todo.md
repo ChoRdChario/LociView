@@ -2,8 +2,8 @@
 
 > Baseline checkpoint: `56698f2ee0f13f6a716b5a4ceff53c8bc94af0ab` on
 > `g0-baseline` (2026-08-31). The first frozen-v1 -> native implementation is
-> complete; its exact production commit is recorded after physical-iPhone
-> acceptance.
+> complete at `9d973cd8f84e14cc1d72562a01034754e3a1ed42`; Desktop and
+> physical-iPhone acceptance both passed.
 >
 > The completed task ledger through `d32a6a0` is preserved at
 > `docs/history/task-ledger-through-d32a6a0.md`. This file contains only the
@@ -49,7 +49,7 @@ modes. Compare remains outside the MVP/release critical path. Native LociView
 project data is the durable source of truth; LociMyu is a read-only legacy input
 path whose source is never overwritten.
 
-## Active critical path — first native migration
+## Completed critical path — first native migration
 
 - [x] Inspect the existing frozen-v1 readers, LociMyu adapters, `ImportPlan`,
   native snapshot and storage boundaries without implementing migration.
@@ -84,9 +84,12 @@ path whose source is never overwritten.
   full suite passed 1,370 tests; two fixture suites failed only because their
   provenance specification was not yet indexed and passed 53/53 after staging,
   while one existing 5-second CLI timeout passed alone in 0.83 seconds.
-- [ ] Physical iPhone 14 Pro minimal smoke: open the converted native result,
-  check DisplaySet/Caption/image use, save and completely offline reopen; then
-  stop after the first lane.
+- [x] Physical iPhone 14 Pro minimal smoke: `.lociview` restore,
+  DisplaySet switching, Caption list/selection, migrated image display, save
+  and completely offline reopen all passed Product Owner confirmation.
+- [x] Classify the first bounded input lane as `FIRST NATIVE MIGRATION: PASS` at
+  production commit `9d973cd8f84e14cc1d72562a01034754e3a1ed42`, with no
+  unresolved P0/P1. Stop before the separate LociMyu adapter.
 
 Required conversion invariants:
 
@@ -138,10 +141,12 @@ Required conversion invariants:
 - Independent read-only review found no remaining P0/P1. P2 remains whole-buffer
   legacy Mesh material inspection, report-download completion polish and
   inactive staged-byte cleanup after a publication guard failure.
-- Final executable tree verification for `a2708cf`: typecheck and builds passed;
-  the full suite passed except one unrelated verifier CLI timeout that passed on
-  immediate isolated rerun.
-- Desktop and physical iPhone 14 Pro consolidated checks were accepted by the
-  Product Owner. No unresolved P0/P1 was reported.
+- Final executable tree verification for `9d973cd`: typecheck and both
+  production builds passed. The full suite passed 1,370 tests; two fixture
+  suites passed 53/53 after the modified provenance specification was staged,
+  and one unrelated verifier timeout passed on immediate isolated rerun.
+- Desktop conversion/restore and physical-iPhone `.lociview` restore,
+  DisplaySet/Caption/image, save and completely offline-reopen checks were
+  accepted by the Product Owner. No unresolved P0/P1 was reported.
 - This result-only documentation synchronization does not trigger another full
   matrix under the approved stop rule.

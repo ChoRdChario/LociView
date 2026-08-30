@@ -1,8 +1,8 @@
 # LociView critical-path execution plan
 
-> Status: `CURRENT CHECKPOINT / CONSOLIDATED NATIVE ACCEPTANCE PASS; CONVERSION GAP DECISION NEXT`
+> Status: `CURRENT CHECKPOINT / FIRST FROZEN-V1 -> NATIVE LANE PASS; NEXT PRODUCT OWNER DECISION`
 >
-> Updated: 2026-08-30 after `a2708cf` on `g0-baseline`.
+> Updated: 2026-08-31 after `9d973cd` on `g0-baseline`.
 >
 > This is an execution plan plus the Product Owner's scheduling and display-model
 > decisions. G0 and G0-S remain release barriers. `G0S-TAB`, the first production
@@ -36,10 +36,10 @@ the lanes still join before release:
 2. **G0-S safety lane:** close only the pre-fix ledger and three remaining
    production roots while external evidence proceeds;
 3. **Approved technical lane:** retain the consolidated native checkpoint at
-   `a2708cf`, which closes the current multi-format/multi-Asset product flow on
-   Desktop and iPhone without creating a Compare mode; the next candidate is a
-   read-only gap/decision pass for non-destructive frozen-v1 and LociMyu-to-native
-   conversion, not migration implementation;
+   `a2708cf` and the first non-destructive frozen-v1 -> native lane at
+   `9d973cd`. Both passed Desktop and physical-iPhone acceptance without
+   creating a Compare mode; the separate LociMyu adapter remains unstarted and
+   requires the next Product Owner decision;
 4. **Join:** satisfy all applicable G0/G0-S barriers and technology decisions
    before the supported release.
 
@@ -307,7 +307,7 @@ G0/G0-S release barriers, disposable PoCs and one writer.
 | `WS2` G0 device evidence/ratification | `E6`–`E10`; three device classes, complete raw runs, reviewed artifacts and all seven G0 exit rows approved | `WS1`, physical devices, PO numeric decisions | PO/device operator / Codex / reviewer | WS1 | Environment facts only now; full runs `WAIT` |
 | `WS3` G0-S current-user safety | Ledger plus remaining `S2`–`S4`; real-browser/iOS evidence, exact-tree matrix, no unresolved P0/P1 and PO stabilized-v1 approval | Remaining journal/quarantine decisions and physical evidence | Codex / PO / reviewer | S0/S1 complete; final closure also WS2 | `YES` only for an approved release-blocking root or a P0/P1 that directly blocks the next production slice; do not resume micro-slice exploration |
 | `WS4` G1 technology decisions | G1-A, G1-B base renderer and G1-C each record reproducible `ADOPT`, `REJECT` or `RETRY` with rollback/fallback; later renderer features retain separate acceptance before their controls turn on | Applicable evidence and Product Owner adoption decisions | Codex / PO / device operator | Parallel evidence lanes; still required for adoption/release | `NO` for an adoption claim; the bounded proxy-backed technical implementation alone may start after S1 |
-| `WS5` native product closure, then non-destructive legacy conversion | Preserve the consolidated native Project as the durable source of truth, then convert frozen-v1 and LociMyu inputs without changing their source bytes or inventing a general migration framework. Compare remains excluded. | The opened frozen-v1 first lane is implemented, independently reviewed and Desktop-accepted; only its bounded physical-iPhone open/use/save/offline-reopen check remains. LociMyu stays a separate unstarted adapter. Technology adoption and release barriers still apply. | Codex / PO / external reviewer | Native checkpoint complete; first lane follows the approved receiver/conversion specification; release after WS1–WS4 | `FIRST FROZEN-V1 LANE: IPHONE ACCEPTANCE WAIT`; do not start LociMyu automatically |
+| `WS5` native product closure, then non-destructive legacy conversion | Preserve the consolidated native Project as the durable source of truth, then convert frozen-v1 and LociMyu inputs without changing their source bytes or inventing a general migration framework. Compare remains excluded. | The opened frozen-v1 first lane is complete and accepted on Desktop/iPhone. LociMyu stays a separate unstarted adapter. Technology adoption and release barriers still apply. | Codex / PO / external reviewer | Native checkpoint and first frozen-v1 lane complete; release after WS1–WS4 | `FIRST FROZEN-V1 LANE: PASS`; await Product Owner direction before LociMyu |
 
 ## 8. Current authorization boundary
 
@@ -319,12 +319,12 @@ Saved Views, offline snapshot reopen and portable backup/restore operate as one
 native product path. No unresolved P0/P1 was reported. This acceptance does not
 change snapshot/package schema, renderer, storage architecture or the v1 route.
 
-The first non-destructive input lane is now the already-opened frozen-v1
+The first non-destructive input lane converts an already-opened frozen-v1
 workspace to a separate native Project. Its bounded receiver and converter are
-implemented, independently reviewed and Desktop-accepted; physical iPhone only
-needs to open/use/save/offline-reopen the converted native result. The source is
-never overwritten or embedded and every unsupported value is reported. The
-separate LociMyu adapter remains unstarted and is not authorized automatically.
+implemented, independently reviewed and accepted on Desktop and physical
+iPhone. The source is never overwritten or embedded and every unsupported
+value is reported. The separate LociMyu adapter remains unstarted and is not
+authorized automatically.
 Compare remains excluded; attachment/media UX and final visual polish remain
 later work.
 Remaining G0/G0-S and external evidence continue as parallel release barriers.
@@ -345,8 +345,8 @@ is implied.
 
 ## 10. First frozen-v1 -> native lane status
 
-- **Baseline:** `56698f2ee0f13f6a716b5a4ceff53c8bc94af0ab`; completion commit is
-  recorded after the physical-iPhone result.
+- **Baseline:** `56698f2ee0f13f6a716b5a4ceff53c8bc94af0ab`; exact production
+  completion commit: `9d973cd8f84e14cc1d72562a01034754e3a1ed42`.
 - **Receiver:** optional/defaultable snapshot-v1 DisplaySets, exact set-scoped
   Mesh appearance, placed/unplaced Captions and separately stored Caption image
   media. Portable packages with media use v2; v1 remains readable.
@@ -355,10 +355,12 @@ is implied.
   are never flushed, overwritten or embedded as a second authority.
 - **Desktop:** Product Owner PASS for conversion, DisplaySet/Caption/image use,
   save/reopen and portable backup/delete/restore.
+- **Physical iPhone 14 Pro:** Product Owner PASS for `.lociview` restore,
+  DisplaySet switching, Caption list/selection, migrated image display, save
+  and completely offline reopen.
 - **Review/P0/P1:** independent read-only review complete; none open.
-- **Remaining acceptance:** physical iPhone 14 Pro open, DisplaySet/Caption/image
-  use, save and completely offline reopen. This is not G0/G0-S/G1 or release
-  evidence.
+- **Lane result:** `FIRST NATIVE MIGRATION: PASS`. This is not G0/G0-S/G1 or
+  release evidence.
 - **Stop boundary:** after this lane's result, do not start the separate LociMyu
   adapter, Compare, generalized migration/appearance infrastructure or another
   UI workstream without the next Product Owner decision.
