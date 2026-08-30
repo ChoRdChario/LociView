@@ -1,7 +1,9 @@
 # LociView active work
 
-> Current checkpoint: `a2708cf3e1163eeca98113a4166ce6345fa9e723` on
-> `g0-baseline` (2026-08-30).
+> Baseline checkpoint: `56698f2ee0f13f6a716b5a4ceff53c8bc94af0ab` on
+> `g0-baseline` (2026-08-31). The first frozen-v1 -> native implementation is
+> complete; its exact production commit is recorded after physical-iPhone
+> acceptance.
 >
 > The completed task ledger through `d32a6a0` is preserved at
 > `docs/history/task-ledger-through-d32a6a0.md`. This file contains only the
@@ -47,21 +49,44 @@ modes. Compare remains outside the MVP/release critical path. Native LociView
 project data is the durable source of truth; LociMyu is a read-only legacy input
 path whose source is never overwritten.
 
-## Next critical-path candidate — read-only conversion gap
+## Active critical path — first native migration
 
 - [x] Inspect the existing frozen-v1 readers, LociMyu adapters, `ImportPlan`,
   native snapshot and storage boundaries without implementing migration.
-- [ ] Product Owner decision: make the first conversion slice accept one opened
-  frozen-v1 project, one valid v1 package, or both in the first boundary.
-- [ ] Product Owner decision: choose the smallest non-lossy native destination
-  for legacy DisplaySet/material/media/tag/unplaced-Caption/provenance fields;
-  the current snapshot v1 has no complete home for all of them.
-- [ ] Product Owner decision: retain the exact outer LociMyu ZIP privately inside
-  the converted project for broad-user recovery/audit, or require the user to
-  retain it externally.
-- [ ] After those decisions, specify one non-destructive conversion slice. Do
-  not start implementation automatically and do not add Compare, CAS,
-  Automerge or a generalized migration framework.
+- [x] Select opened frozen-v1 -> new native as the first input lane. The checked-in
+  representative v1 package can use the existing validated import/open path;
+  direct package conversion would duplicate that boundary. LociMyu remains a
+  separate second adapter.
+- [x] Keep the original v1 package/LociMyu ZIP outside the converted native
+  project. The source remains read-only and the first converter emits an
+  accounting report; it adds no automatic source copy or review sidecar.
+- [x] Reproduce the concrete receiver gap with the representative v1 fixture:
+  two DisplaySets, set-scoped material state, set views, image attachment and an
+  unplaced Caption have no complete native snapshot-v1 destination today.
+- [x] Verify the bounded implementation plan with the Product Owner. First add
+  only the usable native receiver required by that input (DisplaySet,
+  set-scoped Mesh appearance, Caption membership/media and unplaced Caption),
+  then convert one opened frozen-v1 project end-to-end.
+- [x] Keep snapshot v1 additions optional/defaultable, following the existing
+  `savedViews` / `hiddenAssetIds` precedent. Image bytes require portable
+  package v2, which the Product Owner approved; import remains dual-read v1/v2
+  and media-free exports may remain v1.
+- [x] Implement the native receiver: DisplaySet membership, exact set-scoped
+  Mesh appearance, unplaced Captions and project-local Caption image media.
+- [x] Implement the opened frozen-v1 -> new native converter and explicit
+  accounting report for one representative fixture without changing the source.
+- [x] Independent review: no open P0/P1 after fail-closed source-lock,
+  DisplaySet-relation, media-closure, MIME and full-report fixes.
+- [x] Desktop end-to-end: representative frozen-v1 import -> Edit open -> new
+  native conversion -> DisplaySet/Caption/image use -> save/reopen -> portable
+  backup/delete/restore passed Product Owner confirmation.
+- [x] Final automated tree: typecheck and both production builds passed. The
+  full suite passed 1,370 tests; two fixture suites failed only because their
+  provenance specification was not yet indexed and passed 53/53 after staging,
+  while one existing 5-second CLI timeout passed alone in 0.83 seconds.
+- [ ] Physical iPhone 14 Pro minimal smoke: open the converted native result,
+  check DisplaySet/Caption/image use, save and completely offline reopen; then
+  stop after the first lane.
 
 Required conversion invariants:
 
@@ -70,6 +95,8 @@ Required conversion invariants:
 - the converted native project becomes the new durable source of truth;
 - reuse canonical LociMyu Caption identity and duplicate-retention behavior;
 - unknown/unrepresentable source data is reported rather than guessed away.
+- DisplaySet remains Caption membership + set-scoped material appearance + an
+  optional Saved View; it never owns Asset visibility or transforms.
 
 ## P2 backlog — not a completion blocker
 
@@ -98,6 +125,19 @@ Required conversion invariants:
 
 ## Review record
 
+- The first converter reads an already-opened, durable frozen-v1 workspace and
+  creates a separate native Project. It does not flush, overwrite or embed the
+  source, and publication is guarded immediately before snapshot and marker.
+- Native snapshot v1 retains optional/defaultable DisplaySet, exact Mesh
+  appearance, unplaced Caption and image-media metadata. Image bytes remain
+  separate project-local media inside the same user-visible package; packages
+  containing media use portable package v2 while v1 remains readable.
+- Supported first image media are PNG, JPEG, WebP and GIF. Explicit unsupported
+  or conflicting MIME blocks conversion; unknown/unrepresentable values remain
+  complete in the accounting report rather than being guessed or truncated.
+- Independent read-only review found no remaining P0/P1. P2 remains whole-buffer
+  legacy Mesh material inspection, report-download completion polish and
+  inactive staged-byte cleanup after a publication guard failure.
 - Final executable tree verification for `a2708cf`: typecheck and builds passed;
   the full suite passed except one unrelated verifier CLI timeout that passed on
   immediate isolated rerun.

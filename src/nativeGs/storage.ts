@@ -7,6 +7,7 @@ import {
   NATIVE_POINT_PROFILE_ID,
   NATIVE_SCHEMA_VERSION,
   NATIVE_SNAPSHOT_FORMAT,
+  isNativeImageMediaType,
   newNativeId,
   parseNativeActiveMarkerV1,
   parseNativeSnapshotV1,
@@ -19,6 +20,7 @@ import {
   type NativeBlobRefV1,
   type NativeProjectDraftV1,
   type NativeProjectSnapshotV1,
+  type NativeMediaResourceV1,
   type NativeRepresentationDraftV1,
   type NativeRepresentationV1,
 } from './schema';
@@ -41,6 +43,8 @@ export interface NativeOpenProject {
   readonly snapshot: NativeProjectSnapshotV1;
   readonly missingRepresentationIds: readonly string[];
   readonly sizeMismatchRepresentationIds: readonly string[];
+  readonly missingMediaIds: readonly string[];
+  readonly sizeMismatchMediaIds: readonly string[];
 }
 
 /** Transient input for one opened-project import; no new durable record type. */
@@ -65,6 +69,10 @@ export function nativeSnapshotPath(projectId: string, snapshotId: string): strin
 
 export function nativeRepresentationPath(projectId: string, representationId: string): string {
   return `${nativeProjectRoot(projectId)}/representations/${representationId}.bin`;
+}
+
+export function nativeMediaPath(projectId: string, mediaId: string): string {
+  return `${nativeProjectRoot(projectId)}/media/${mediaId}.bin`;
 }
 
 export async function assertNativeProjectDoesNotMixV1(fs: WorkspaceFS, projectId: string): Promise<void> {
@@ -147,7 +155,7 @@ async function writeAndVerifyBinary(
   signal?: AbortSignal,
 ): Promise<NativeBlobRefV1> {
   throwIfAborted(signal);
-  if (await fs.exists(path)) throw new Error(`native project: immutable Representation path already exists: ${path}`);
+  if (await fs.exists(path)) throw new Error(`native project: immutable binary path already exists: ${path}`);
   let writeDigest: NativeStreamDigest | null = null;
   await fs.writeStream(path, hashingNativeStream(source.stream(), (digest) => {
     writeDigest = digest;
@@ -255,6 +263,8 @@ export async function createNativeProjectV1(
   draft: NativeProjectDraftV1,
   sources: ReadonlyMap<string, NativeBinarySource>,
   onStatus?: (message: string) => void,
+  mediaSources: ReadonlyMap<string, NativeBinarySource> = new Map(),
+  assertPublicationAllowed?: () => void,
 ): Promise<NativeProjectSnapshotV1> {
   assertProjectWorkspace(fs, draft.project.id);
   if (await fs.exists(nativeActiveMarkerPath(draft.project.id))) {
@@ -262,6 +272,10 @@ export async function createNativeProjectV1(
   }
   if (sources.size !== draft.representations.length) {
     throw new Error('native project: every Representation requires exactly one local source');
+  }
+  const mediaDrafts = draft.mediaResources ?? [];
+  if (mediaSources.size !== mediaDrafts.length) {
+    throw new Error('native project: every media resource requires exactly one local source');
   }
   const representations = [];
   for (const representation of [...draft.representations].sort((a, b) => a.id.localeCompare(b.id))) {
@@ -281,6 +295,18 @@ export async function createNativeProjectV1(
     onStatus?.(`Verified ${representation.role} size and SHA-256 by streamed read-back.`);
     representations.push((({ mediaType: _mediaType, ...record }) => ({ ...record, blob }))(representation));
   }
+  const mediaResources: NativeMediaResourceV1[] = [];
+  for (const media of [...mediaDrafts].sort((a, b) => a.id.localeCompare(b.id))) {
+    const source = mediaSources.get(media.id);
+    if (source === undefined) throw new Error(`native project: missing media source for ${media.id}`);
+    if (source.size < 1 || !isNativeImageMediaType(source.mediaType) || source.mediaType !== media.mediaType) {
+      throw new Error(`native project: unsupported or empty image media source for ${media.id}`);
+    }
+    onStatus?.(`Streaming Caption image ${media.label} to project-local storage…`);
+    const blob = await writeAndVerifyBinary(fs, nativeMediaPath(draft.project.id, media.id), source);
+    mediaResources.push((({ mediaType: _mediaType, ...record }) => ({ ...record, blob }))(media));
+    onStatus?.(`Verified Caption image ${media.label} size and SHA-256 by streamed read-back.`);
+  }
   const snapshot: NativeProjectSnapshotV1 = {
     format: NATIVE_SNAPSHOT_FORMAT,
     schemaVersion: NATIVE_SCHEMA_VERSION,
@@ -294,10 +320,15 @@ export async function createNativeProjectV1(
     presentation: draft.presentation,
     captions: draft.captions,
     savedViews: draft.savedViews ?? [],
+    ...(draft.displaySets === undefined ? {} : { displaySets: draft.displaySets }),
+    ...(draft.meshMaterialAppearances === undefined ? {} : { meshMaterialAppearances: draft.meshMaterialAppearances }),
+    ...(draft.mediaResources === undefined ? {} : { mediaResources }),
   };
+  assertPublicationAllowed?.();
   onStatus?.('Writing and verifying native snapshot v1…');
   const verified = await writeVerifiedSnapshot(fs, snapshot);
   // Publication boundary: no active project exists before this final write.
+  assertPublicationAllowed?.();
   onStatus?.('Publishing active receipt…');
   await publishActiveMarker(fs, snapshot, verified.digest);
   onStatus?.('Native project saved and active.');
@@ -322,6 +353,9 @@ async function publishNativeAssetClosureV1(
   const durable = await openNativeProjectV1(fs, current.project.id);
   if (durable.snapshot.generation !== current.generation || durable.snapshot.snapshotId !== current.snapshotId) {
     throw new Error(`native project: durable snapshot changed; reload before ${options.staleAction}`);
+  }
+  if (durable.missingMediaIds.length > 0 || durable.sizeMismatchMediaIds.length > 0) {
+    throw new Error('native project: active Caption media bytes are unavailable');
   }
   for (const representation of current.representations) {
     const source = await fs.readStream(nativeRepresentationPath(current.project.id, representation.id));
@@ -400,7 +434,9 @@ async function publishNativeAssetClosureV1(
       active?.snapshot.snapshotId === snapshotId &&
       active.snapshot.generation === current.generation + 1 &&
       active.missingRepresentationIds.length === 0 &&
-      active.sizeMismatchRepresentationIds.length === 0
+      active.sizeMismatchRepresentationIds.length === 0 &&
+      active.missingMediaIds.length === 0 &&
+      active.sizeMismatchMediaIds.length === 0
     ) {
       return active.snapshot;
     }
@@ -492,6 +528,7 @@ export async function restoreNativeProjectV1(
   onStatus?: (message: string) => void,
   signal?: AbortSignal,
   exactSnapshotText?: string,
+  mediaSources: ReadonlyMap<string, NativeBinarySource> = new Map(),
 ): Promise<NativeProjectSnapshotV1> {
   const snapshot = parseNativeSnapshotV1(exactSnapshotText ?? serializeNativeSnapshotV1(candidate));
   assertProjectWorkspace(fs, snapshot.project.id);
@@ -507,6 +544,9 @@ export async function restoreNativeProjectV1(
   }
   if (sources.size !== snapshot.representations.length) {
     throw new Error('native restore: every Representation requires exactly one package source');
+  }
+  if (mediaSources.size !== (snapshot.mediaResources ?? []).length) {
+    throw new Error('native restore: every media resource requires exactly one package source');
   }
 
   const stagedPaths: string[] = [];
@@ -537,6 +577,26 @@ export async function restoreNativeProjectV1(
         await validateRepresentationSourceProfile(representation, stored, 'restored');
       }
       onStatus?.(`Verified ${representation.role} size and SHA-256 by streamed read-back.`);
+    }
+    for (const media of [...(snapshot.mediaResources ?? [])].sort((a, b) => a.id.localeCompare(b.id))) {
+      throwIfAborted(signal);
+      const source = mediaSources.get(media.id);
+      if (source === undefined) throw new Error(`native restore: missing package media source for ${media.id}`);
+      if (source.size !== media.blob.byteLength || source.mediaType !== media.blob.mediaType) {
+        throw new Error(`native restore: package media metadata mismatch for ${media.id}`);
+      }
+      const path = nativeMediaPath(snapshot.project.id, media.id);
+      if (await fs.exists(path)) throw new Error(`native restore: destination staging path already exists: ${path}`);
+      stagedPaths.push(path);
+      onStatus?.(`Streaming Caption image ${media.label} from portable backup…`);
+      const blob = await writeAndVerifyBinary(fs, path, source, signal);
+      if (
+        blob.byteLength !== media.blob.byteLength || blob.digest !== media.blob.digest ||
+        blob.mediaType !== media.blob.mediaType
+      ) {
+        throw new Error(`native restore: media size/SHA-256 mismatch for ${media.id}`);
+      }
+      onStatus?.(`Verified Caption image ${media.label} size and SHA-256 by streamed read-back.`);
     }
     throwIfAborted(signal);
     onStatus?.('Writing and verifying restored native snapshot v1…');
@@ -571,6 +631,12 @@ export async function saveNativeProjectV1(
       throw new Error(`native project: active Representation bytes are unavailable: ${representation.id}`);
     }
   }
+  for (const media of current.mediaResources ?? []) {
+    const source = await fs.readStream(nativeMediaPath(current.project.id, media.id));
+    if (source === null || source.size !== media.blob.byteLength) {
+      throw new Error(`native project: active media bytes are unavailable: ${media.id}`);
+    }
+  }
   const next: NativeProjectSnapshotV1 = {
     ...current,
     snapshotId: newNativeId('snp'),
@@ -601,15 +667,24 @@ export async function openNativeProjectV1(fs: WorkspaceFS, projectId: string): P
   }
   const missingRepresentationIds: string[] = [];
   const sizeMismatchRepresentationIds: string[] = [];
+  const missingMediaIds: string[] = [];
+  const sizeMismatchMediaIds: string[] = [];
   for (const representation of snapshot.representations) {
     const source = await fs.readStream(nativeRepresentationPath(projectId, representation.id));
     if (source === null) missingRepresentationIds.push(representation.id);
     else if (source.size !== representation.blob.byteLength) sizeMismatchRepresentationIds.push(representation.id);
   }
+  for (const media of snapshot.mediaResources ?? []) {
+    const source = await fs.readStream(nativeMediaPath(projectId, media.id));
+    if (source === null) missingMediaIds.push(media.id);
+    else if (source.size !== media.blob.byteLength) sizeMismatchMediaIds.push(media.id);
+  }
   return {
     snapshot,
     missingRepresentationIds,
     sizeMismatchRepresentationIds,
+    missingMediaIds,
+    sizeMismatchMediaIds,
   };
 }
 
@@ -619,6 +694,14 @@ export async function readNativeRepresentationV1(
   representationId: string,
 ): Promise<WorkspaceReadableFile | null> {
   return fs.readStream(nativeRepresentationPath(projectId, representationId));
+}
+
+export async function readNativeMediaV1(
+  fs: WorkspaceFS,
+  projectId: string,
+  mediaId: string,
+): Promise<WorkspaceReadableFile | null> {
+  return fs.readStream(nativeMediaPath(projectId, mediaId));
 }
 
 /** Marker-first removal ensures an interrupted delete is never listed active. */

@@ -1790,3 +1790,61 @@ media type.
 - Desktop executable rendering evidence is required. Physical-iPhone point
   rendering and touch picking remain in the Product Owner-approved consolidated
   run and are recorded as pending rather than credited as PASS in this slice.
+
+## 27. Bounded native DisplaySet/material/media receiver and first frozen-v1 conversion (Product Owner approved 2026-08-30)
+
+This slice creates the smallest usable native destination required before the
+first backward-compatible input lane can be converted. It then converts one
+already-opened frozen-v1 Project into a new native Project without modifying or
+embedding the source. LociMyu ZIP remains a separate later input adapter.
+
+- DisplaySet is Caption membership plus set-scoped Mesh material appearance and
+  an optional Saved View. It does not own Asset visibility, transforms, layers,
+  groups or scene presets. Switching a DisplaySet changes only those three
+  concerns. Existing snapshots with no DisplaySet fields open with one
+  deterministic default set containing their current Captions and Saved Views.
+- The bounded Mesh appearance is opacity, double-sided, unlit and optional
+  chroma key color/tolerance/feather. It targets one exact material slot in one
+  active Mesh Representation. Native code does not broadcast by display name.
+  Roughness, metalness, emissive, GS/Point appearance, a generalized material
+  graph and new renderer architecture are outside this slice.
+- A Caption may be unplaced. An unplaced Caption remains editable and in its
+  DisplaySet but has no viewport marker or hit target until the user explicitly
+  places it. A placed Caption retains the current Asset-local manual anchor.
+- Image attachment metadata is stored in the native snapshot and Caption records
+  reference stable media IDs. Image bytes are separate project-local media
+  entries inside the same user-visible `.lociview` file; they are not spatial
+  Assets or 3D Representations and are loaded only when their Caption needs them.
+  This first receiver accepts PNG, JPEG, WebP and GIF only. An explicit source
+  MIME outside that set or one that conflicts with a known filename extension
+  blocks conversion instead of being replaced by a guessed type.
+- Snapshot schema version `1` gains only optional/defaultable receiver fields.
+  Existing snapshot-v1 Projects remain readable. A portable package containing
+  media uses package version `2`, with exact declared media entries in addition
+  to the existing snapshot and Representation entries. Import dual-reads package
+  versions `1` and `2`; an export with no media may remain version `1`.
+- Conversion starts from an opened frozen-v1 workspace after the normal package
+  validation/import boundary. It obtains the existing Project write lock,
+  reloads durable state, requires no source load errors or pending writes, and
+  validates every referenced source binary before creating the destination.
+  The source workspace and outer package remain unchanged and are not embedded
+  as a second authority. Referenced model and image bytes are streamed unchanged
+  into the new native Project.
+- The converter uses stable source IDs when they satisfy native ID rules and
+  otherwise records an explicit correspondence. A legacy material key maps
+  only when exactly one material slot in the target Mesh matches; zero or
+  multiple matches are reported and never guessed. Unsupported or malformed
+  source records are reported rather than silently omitted, and the accounting
+  report retains the complete source value for every reported field.
+- Destination publication reuses the existing project-scoped writer,
+  verified binary/media staging, snapshot-last and active-marker-last order.
+  Conversion failure never activates an incomplete native Project. The
+  conversion report is shown/exportable at the end; this slice adds no source
+  sidecar, expert backlog, CAS, journal, generalized transaction or migration
+  framework.
+- Acceptance uses one representative frozen-v1 Project end to end: DisplaySets,
+  material state, Saved Views, placed and unplaced Captions, image attachment,
+  source-ID correspondence and all source binary bytes must be either converted
+  or explicitly accounted for. Desktop performs conversion/save/offline reopen
+  and portable export/delete/restore. Physical iPhone only opens the converted
+  native result and checks visibility, Caption use, save and offline reopen.

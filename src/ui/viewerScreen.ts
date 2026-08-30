@@ -23,6 +23,7 @@ export interface ViewerScreenDeps {
   setPackageExportStatus: (status: PackageExportStatus) => void;
   openProfile: () => void;
   requestEditMode: () => void;
+  convertOpenedV1ToNative: (onStatus: (message: string) => void) => Promise<void>;
 }
 
 const TABS = [
@@ -196,6 +197,7 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
         refreshers.set('data', mountDataTab(containerEl, ctx, {
           loadModelAsset: deps.loadModelAsset,
           setPackageExportStatus: deps.setPackageExportStatus,
+          convertOpenedV1ToNative: deps.convertOpenedV1ToNative,
         }));
         break;
     }

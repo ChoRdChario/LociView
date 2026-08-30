@@ -12,7 +12,13 @@ export type NativeDisplayMode = 'mixed' | 'gs-only' | 'mesh-only';
 export type NativeModelFormat = 'glb' | 'gltf' | 'obj' | 'stl' | 'ply';
 export type NativeRepresentationRole = 'meshPrimary' | 'pointPrimary' | 'gsPrimary' | 'interactionProxy';
 
-export type NativeIdPrefix = 'prj' | 'snp' | 'ast' | 'rev' | 'bnd' | 'rep' | 'frm' | 'fam' | 'cls' | 'cap' | 'view';
+export type NativeIdPrefix = 'prj' | 'snp' | 'ast' | 'rev' | 'bnd' | 'rep' | 'frm' | 'fam' | 'cls' | 'cap' | 'view' | 'set' | 'mat' | 'med';
+
+export const NATIVE_DEFAULT_DISPLAY_SET_ID = 'set_00000000000000000000000000' as const;
+
+export function isNativeImageMediaType(value: unknown): value is 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif' {
+  return value === 'image/png' || value === 'image/jpeg' || value === 'image/webp' || value === 'image/gif';
+}
 
 export function newNativeId(prefix: NativeIdPrefix): string {
   return `${prefix}_${ulid()}`;
@@ -98,6 +104,10 @@ export interface NativeCaptionV1 {
   readonly id: string;
   readonly title: string;
   readonly body: string;
+  readonly displaySetId?: string;
+  readonly color?: string;
+  readonly tags?: readonly string[];
+  readonly attachmentMediaIds?: readonly string[];
   readonly anchor: {
     readonly kind: 'asset';
     readonly assetId: string;
@@ -106,7 +116,7 @@ export interface NativeCaptionV1 {
     readonly authoredAssetRevisionId: string;
     readonly authoredAnchorCompatibilityId: string;
     readonly hitEvidence: { readonly method: 'manual' };
-  };
+  } | null;
 }
 
 export type NativeProjectCameraProjectionV1 =
@@ -132,6 +142,41 @@ export interface NativeSavedViewV1 {
   readonly projectFrameId: string;
   readonly camera: NativeProjectCameraV1;
   readonly background: NativeSolidBackgroundV1;
+  readonly displaySetId?: string;
+}
+
+export interface NativeDisplaySetV1 {
+  readonly id: string;
+  readonly name: string;
+  readonly orderKey: string;
+  readonly defaultSavedViewId: string | null;
+}
+
+export interface NativeChromaAppearanceV1 {
+  readonly enabled: boolean;
+  readonly colorSrgb: readonly [number, number, number];
+  readonly tolerance: number;
+  readonly feather: number;
+}
+
+export interface NativeMeshMaterialAppearanceV1 {
+  readonly id: string;
+  readonly displaySetId: string;
+  readonly assetId: string;
+  readonly authoredAssetRevisionId: string;
+  readonly representationId: string;
+  readonly materialSlotKey: string;
+  readonly opacity: number;
+  readonly doubleSided: boolean;
+  readonly unlit: boolean;
+  readonly chroma: NativeChromaAppearanceV1;
+}
+
+export interface NativeMediaResourceV1 {
+  readonly id: string;
+  readonly label: string;
+  readonly kind: 'image';
+  readonly blob: NativeBlobRefV1;
 }
 
 export interface NativeProjectSnapshotV1 {
@@ -157,9 +202,13 @@ export interface NativeProjectSnapshotV1 {
     readonly displayMode: NativeDisplayMode;
     readonly captionTargetAssetId: string | null;
     readonly hiddenAssetIds?: readonly string[];
+    readonly activeDisplaySetId?: string;
   };
   readonly captions: readonly NativeCaptionV1[];
   readonly savedViews?: readonly NativeSavedViewV1[];
+  readonly displaySets?: readonly NativeDisplaySetV1[];
+  readonly meshMaterialAppearances?: readonly NativeMeshMaterialAppearanceV1[];
+  readonly mediaResources?: readonly NativeMediaResourceV1[];
 }
 
 export interface NativeActiveMarkerV1 {
@@ -176,8 +225,30 @@ export interface NativeRepresentationDraftV1 extends Omit<NativeRepresentationV1
   readonly mediaType: string;
 }
 
-export interface NativeProjectDraftV1 extends Omit<NativeProjectSnapshotV1, 'format' | 'schemaVersion' | 'snapshotId' | 'generation' | 'representations'> {
+export interface NativeMediaResourceDraftV1 extends Omit<NativeMediaResourceV1, 'blob'> {
+  readonly mediaType: string;
+}
+
+export interface NativeProjectDraftV1 extends Omit<NativeProjectSnapshotV1, 'format' | 'schemaVersion' | 'snapshotId' | 'generation' | 'representations' | 'mediaResources'> {
   readonly representations: readonly NativeRepresentationDraftV1[];
+  readonly mediaResources?: readonly NativeMediaResourceDraftV1[];
+}
+
+export function nativeDisplaySetsV1(snapshot: NativeProjectSnapshotV1): readonly NativeDisplaySetV1[] {
+  return snapshot.displaySets ?? [{
+    id: NATIVE_DEFAULT_DISPLAY_SET_ID,
+    name: 'Default',
+    orderKey: '000000',
+    defaultSavedViewId: null,
+  }];
+}
+
+export function nativeCaptionDisplaySetIdV1(caption: NativeCaptionV1): string {
+  return caption.displaySetId ?? NATIVE_DEFAULT_DISPLAY_SET_ID;
+}
+
+export function nativeSavedViewDisplaySetIdV1(savedView: NativeSavedViewV1): string {
+  return savedView.displaySetId ?? NATIVE_DEFAULT_DISPLAY_SET_ID;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -464,25 +535,46 @@ function parseRepresentation(value: unknown): NativeRepresentationV1 {
 
 function parseCaption(value: unknown): NativeCaptionV1 {
   const input = record(value, 'Caption');
-  exactKeys(input, ['id', 'title', 'body', 'anchor']);
-  const anchor = record(input.anchor, 'Caption anchor');
-  exactKeys(anchor, ['kind', 'assetId', 'assetFrameId', 'positionAsset', 'authoredAssetRevisionId', 'authoredAnchorCompatibilityId', 'hitEvidence']);
-  const hit = record(anchor.hitEvidence, 'Caption hitEvidence');
-  exactKeys(hit, ['method']);
-  if (anchor.kind !== 'asset' || hit.method !== 'manual') throw new Error('native snapshot: Caption must use a manual Asset anchor');
+  exactKeys(input, ['id', 'title', 'body', 'anchor'], ['displaySetId', 'color', 'tags', 'attachmentMediaIds']);
+  let anchor: NativeCaptionV1['anchor'] = null;
+  if (input.anchor !== null) {
+    const sourceAnchor = record(input.anchor, 'Caption anchor');
+    exactKeys(sourceAnchor, ['kind', 'assetId', 'assetFrameId', 'positionAsset', 'authoredAssetRevisionId', 'authoredAnchorCompatibilityId', 'hitEvidence']);
+    const hit = record(sourceAnchor.hitEvidence, 'Caption hitEvidence');
+    exactKeys(hit, ['method']);
+    if (sourceAnchor.kind !== 'asset' || hit.method !== 'manual') {
+      throw new Error('native snapshot: Caption anchor must be null or a manual Asset anchor');
+    }
+    anchor = {
+      kind: 'asset',
+      assetId: id(sourceAnchor.assetId, 'ast', 'Caption Asset id'),
+      assetFrameId: id(sourceAnchor.assetFrameId, 'frm', 'Caption Asset frame id'),
+      positionAsset: vec3(sourceAnchor.positionAsset, 'Caption positionAsset'),
+      authoredAssetRevisionId: id(sourceAnchor.authoredAssetRevisionId, 'rev', 'Caption revision id'),
+      authoredAnchorCompatibilityId: id(sourceAnchor.authoredAnchorCompatibilityId, 'cls', 'Caption compatibility class id'),
+      hitEvidence: { method: 'manual' },
+    };
+  }
+  const tags = input.tags === undefined ? [] : stringArray(input.tags, 'Caption tags').map((tag) => singleLineString(tag, 'Caption tag'));
+  if (new Set(tags).size !== tags.length) throw new Error('native snapshot: Caption tags must be unique');
+  const attachmentMediaIds = input.attachmentMediaIds === undefined
+    ? []
+    : stringArray(input.attachmentMediaIds, 'Caption attachment media IDs')
+      .map((mediaId) => id(mediaId, 'med', 'Caption attachment media id'));
+  if (new Set(attachmentMediaIds).size !== attachmentMediaIds.length) {
+    throw new Error('native snapshot: Caption attachment media IDs must be unique');
+  }
+  const color = input.color === undefined ? '#ffffff' : singleLineString(input.color, 'Caption color');
+  if (!/^#[0-9a-fA-F]{6}$/.test(color)) throw new Error('native snapshot: Caption color must be #RRGGBB');
   return {
     id: id(input.id, 'cap', 'Caption id'),
     title: string(input.title, 'Caption title'),
     body: typeof input.body === 'string' ? input.body : (() => { throw new Error('native snapshot: Caption body must be text'); })(),
-    anchor: {
-      kind: 'asset',
-      assetId: id(anchor.assetId, 'ast', 'Caption Asset id'),
-      assetFrameId: id(anchor.assetFrameId, 'frm', 'Caption Asset frame id'),
-      positionAsset: vec3(anchor.positionAsset, 'Caption positionAsset'),
-      authoredAssetRevisionId: id(anchor.authoredAssetRevisionId, 'rev', 'Caption revision id'),
-      authoredAnchorCompatibilityId: id(anchor.authoredAnchorCompatibilityId, 'cls', 'Caption compatibility class id'),
-      hitEvidence: { method: 'manual' },
-    },
+    anchor,
+    ...(input.displaySetId === undefined ? {} : { displaySetId: id(input.displaySetId, 'set', 'Caption DisplaySet id') }),
+    ...(input.color === undefined ? {} : { color: color.toLowerCase() }),
+    ...(input.tags === undefined ? {} : { tags }),
+    ...(input.attachmentMediaIds === undefined ? {} : { attachmentMediaIds }),
   };
 }
 
@@ -530,7 +622,7 @@ function parseProjectCamera(value: unknown): NativeProjectCameraV1 {
 
 function parseSavedView(value: unknown): NativeSavedViewV1 {
   const input = record(value, 'SavedView');
-  exactKeys(input, ['id', 'name', 'orderKey', 'projectFrameId', 'camera', 'background']);
+  exactKeys(input, ['id', 'name', 'orderKey', 'projectFrameId', 'camera', 'background'], ['displaySetId']);
   const background = record(input.background, 'SavedView background');
   exactKeys(background, ['kind', 'colorSrgb']);
   if (background.kind !== 'solid') throw new Error('native snapshot: bounded SavedView background must be solid');
@@ -545,6 +637,77 @@ function parseSavedView(value: unknown): NativeSavedViewV1 {
     projectFrameId: id(input.projectFrameId, 'frm', 'SavedView ProjectFrame id'),
     camera: parseProjectCamera(input.camera),
     background: { kind: 'solid', colorSrgb },
+    ...(input.displaySetId === undefined ? {} : { displaySetId: id(input.displaySetId, 'set', 'SavedView DisplaySet id') }),
+  };
+}
+
+function parseDisplaySet(value: unknown): NativeDisplaySetV1 {
+  const input = record(value, 'DisplaySet');
+  exactKeys(input, ['id', 'name', 'orderKey', 'defaultSavedViewId']);
+  return {
+    id: id(input.id, 'set', 'DisplaySet id'),
+    name: singleLineString(input.name, 'DisplaySet name'),
+    orderKey: singleLineString(input.orderKey, 'DisplaySet orderKey'),
+    defaultSavedViewId: input.defaultSavedViewId === null
+      ? null
+      : id(input.defaultSavedViewId, 'view', 'DisplaySet default SavedView id'),
+  };
+}
+
+function parseMediaResource(value: unknown): NativeMediaResourceV1 {
+  const input = record(value, 'media resource');
+  exactKeys(input, ['id', 'label', 'kind', 'blob']);
+  if (input.kind !== 'image') throw new Error('native snapshot: unsupported media resource kind');
+  const blob = parseBlobRef(input.blob);
+  if (!isNativeImageMediaType(blob.mediaType)) {
+    throw new Error('native snapshot: image media must use a valid image media type');
+  }
+  return {
+    id: id(input.id, 'med', 'media resource id'),
+    label: singleLineString(input.label, 'media resource label'),
+    kind: 'image',
+    blob,
+  };
+}
+
+function normalizedUnitInterval(value: unknown, label: string): number {
+  const result = finite(value, label);
+  if (result < 0 || result > 1) throw new Error(`native snapshot: ${label} must be between zero and one`);
+  return result;
+}
+
+function parseMeshMaterialAppearance(value: unknown): NativeMeshMaterialAppearanceV1 {
+  const input = record(value, 'Mesh material appearance');
+  exactKeys(input, [
+    'id', 'displaySetId', 'assetId', 'authoredAssetRevisionId', 'representationId',
+    'materialSlotKey', 'opacity', 'doubleSided', 'unlit', 'chroma',
+  ]);
+  if (typeof input.doubleSided !== 'boolean' || typeof input.unlit !== 'boolean') {
+    throw new Error('native snapshot: Mesh material flags must be boolean');
+  }
+  const chroma = record(input.chroma, 'Mesh material chroma');
+  exactKeys(chroma, ['enabled', 'colorSrgb', 'tolerance', 'feather']);
+  if (typeof chroma.enabled !== 'boolean') throw new Error('native snapshot: chroma enabled must be boolean');
+  const colorSrgb = vec3(chroma.colorSrgb, 'Mesh material chroma color');
+  if (colorSrgb.some((component) => component < 0 || component > 1)) {
+    throw new Error('native snapshot: Mesh material chroma color must be normalized');
+  }
+  return {
+    id: id(input.id, 'mat', 'Mesh material appearance id'),
+    displaySetId: id(input.displaySetId, 'set', 'Mesh material DisplaySet id'),
+    assetId: id(input.assetId, 'ast', 'Mesh material Asset id'),
+    authoredAssetRevisionId: id(input.authoredAssetRevisionId, 'rev', 'Mesh material revision id'),
+    representationId: id(input.representationId, 'rep', 'Mesh material Representation id'),
+    materialSlotKey: singleLineString(input.materialSlotKey, 'Mesh material slot key'),
+    opacity: normalizedUnitInterval(input.opacity, 'Mesh material opacity'),
+    doubleSided: input.doubleSided,
+    unlit: input.unlit,
+    chroma: {
+      enabled: chroma.enabled,
+      colorSrgb,
+      tolerance: normalizedUnitInterval(chroma.tolerance, 'Mesh material chroma tolerance'),
+      feather: normalizedUnitInterval(chroma.feather, 'Mesh material chroma feather'),
+    },
   };
 }
 
@@ -555,10 +718,16 @@ function semanticClosure(snapshot: NativeProjectSnapshotV1): void {
   uniqueIds(snapshot.representations, 'Representation');
   uniqueIds(snapshot.captions, 'Caption');
   uniqueIds(snapshot.savedViews ?? [], 'SavedView');
+  uniqueIds(nativeDisplaySetsV1(snapshot), 'DisplaySet');
+  uniqueIds(snapshot.meshMaterialAppearances ?? [], 'Mesh material appearance');
+  uniqueIds(snapshot.mediaResources ?? [], 'media resource');
   const assets = new Map(snapshot.assets.map((asset) => [asset.id, asset]));
   const bindings = new Map(snapshot.assetBindingRevisions.map((binding) => [binding.id, binding]));
   const revisions = new Map(snapshot.assetRevisions.map((revision) => [revision.id, revision]));
   const representations = new Map(snapshot.representations.map((representation) => [representation.id, representation]));
+  const displaySets = new Map(nativeDisplaySetsV1(snapshot).map((displaySet) => [displaySet.id, displaySet]));
+  const savedViews = new Map((snapshot.savedViews ?? []).map((savedView) => [savedView.id, savedView]));
+  const mediaResources = new Map((snapshot.mediaResources ?? []).map((media) => [media.id, media]));
   for (const binding of snapshot.assetBindingRevisions) {
     const asset = assets.get(binding.assetId);
     const revision = revisions.get(binding.assetRevisionId);
@@ -607,6 +776,8 @@ function semanticClosure(snapshot: NativeProjectSnapshotV1): void {
   }
   const target = snapshot.presentation.captionTargetAssetId;
   if (target !== null && !assets.has(target)) throw new Error('native snapshot: Caption target Asset is missing');
+  const activeDisplaySetId = snapshot.presentation.activeDisplaySetId ?? NATIVE_DEFAULT_DISPLAY_SET_ID;
+  if (!displaySets.has(activeDisplaySetId)) throw new Error('native snapshot: active DisplaySet is missing');
   const hiddenAssetIds = snapshot.presentation.hiddenAssetIds ?? [];
   if (new Set(hiddenAssetIds).size !== hiddenAssetIds.length) {
     throw new Error('native snapshot: hidden Asset IDs must be unique');
@@ -615,19 +786,54 @@ function semanticClosure(snapshot: NativeProjectSnapshotV1): void {
     if (!assets.has(hiddenAssetId)) throw new Error('native snapshot: hidden Asset is missing');
   }
   for (const caption of snapshot.captions) {
-    const asset = assets.get(caption.anchor.assetId);
-    const revision = revisions.get(caption.anchor.authoredAssetRevisionId);
-    if (asset === undefined || asset.assetFrameId !== caption.anchor.assetFrameId || revision?.assetId !== asset.id) {
-      throw new Error('native snapshot: Caption anchor ownership is invalid');
+    if (!displaySets.has(nativeCaptionDisplaySetIdV1(caption))) {
+      throw new Error('native snapshot: Caption DisplaySet is missing');
     }
-    if (!revision.anchorCompatibilityClasses.some((entry) => entry.id === caption.anchor.authoredAnchorCompatibilityId)) {
-      throw new Error('native snapshot: Caption compatibility class is not active');
+    for (const mediaId of caption.attachmentMediaIds ?? []) {
+      if (!mediaResources.has(mediaId)) throw new Error('native snapshot: Caption attachment media is missing');
+    }
+    if (caption.anchor !== null) {
+      const asset = assets.get(caption.anchor.assetId);
+      const revision = revisions.get(caption.anchor.authoredAssetRevisionId);
+      if (asset === undefined || asset.assetFrameId !== caption.anchor.assetFrameId || revision?.assetId !== asset.id) {
+        throw new Error('native snapshot: Caption anchor ownership is invalid');
+      }
+      if (!revision.anchorCompatibilityClasses.some((entry) => entry.id === caption.anchor!.authoredAnchorCompatibilityId)) {
+        throw new Error('native snapshot: Caption compatibility class is not active');
+      }
     }
   }
   for (const savedView of snapshot.savedViews ?? []) {
     if (savedView.projectFrameId !== snapshot.project.frame.id) {
       throw new Error('native snapshot: SavedView ProjectFrame is foreign');
     }
+    if (!displaySets.has(nativeSavedViewDisplaySetIdV1(savedView))) {
+      throw new Error('native snapshot: SavedView DisplaySet is missing');
+    }
+  }
+  for (const displaySet of nativeDisplaySetsV1(snapshot)) {
+    if (displaySet.defaultSavedViewId === null) continue;
+    const savedView = savedViews.get(displaySet.defaultSavedViewId);
+    if (savedView === undefined || nativeSavedViewDisplaySetIdV1(savedView) !== displaySet.id) {
+      throw new Error('native snapshot: DisplaySet default SavedView is missing or foreign');
+    }
+  }
+  const materialTargets = new Set<string>();
+  for (const appearance of snapshot.meshMaterialAppearances ?? []) {
+    if (!displaySets.has(appearance.displaySetId)) throw new Error('native snapshot: Mesh material DisplaySet is missing');
+    const revision = revisions.get(appearance.authoredAssetRevisionId);
+    const representation = representations.get(appearance.representationId);
+    if (
+      revision === undefined || revision.assetId !== appearance.assetId ||
+      !revision.representationIds.includes(appearance.representationId) ||
+      representation === undefined || representation.assetId !== appearance.assetId ||
+      representation.role !== 'meshPrimary'
+    ) {
+      throw new Error('native snapshot: Mesh material target is missing or foreign');
+    }
+    const targetKey = `${appearance.displaySetId}\0${appearance.representationId}\0${appearance.materialSlotKey}`;
+    if (materialTargets.has(targetKey)) throw new Error('native snapshot: duplicate Mesh material target');
+    materialTargets.add(targetKey);
   }
 }
 
@@ -636,7 +842,7 @@ export function parseNativeSnapshotV1(text: string): NativeProjectSnapshotV1 {
   exactKeys(parsed, [
     'format', 'schemaVersion', 'snapshotId', 'generation', 'project', 'assets',
     'assetBindingRevisions', 'assetRevisions', 'representations', 'presentation', 'captions',
-  ], ['savedViews']);
+  ], ['savedViews', 'displaySets', 'meshMaterialAppearances', 'mediaResources']);
   if (parsed.format !== NATIVE_SNAPSHOT_FORMAT || parsed.schemaVersion !== NATIVE_SCHEMA_VERSION) {
     throw new Error('native snapshot: unsupported format or schema version');
   }
@@ -650,11 +856,18 @@ export function parseNativeSnapshotV1(text: string): NativeProjectSnapshotV1 {
     throw new Error('native snapshot: unsupported project unit');
   }
   if (frame.handedness !== 'right' || frame.upAxis !== '+Y') throw new Error('native snapshot: unsupported project frame');
-  if (!Array.isArray(parsed.assets) || !Array.isArray(parsed.assetBindingRevisions) || !Array.isArray(parsed.assetRevisions) || !Array.isArray(parsed.representations) || !Array.isArray(parsed.captions) || (parsed.savedViews !== undefined && !Array.isArray(parsed.savedViews))) {
+  if (
+    !Array.isArray(parsed.assets) || !Array.isArray(parsed.assetBindingRevisions) ||
+    !Array.isArray(parsed.assetRevisions) || !Array.isArray(parsed.representations) ||
+    !Array.isArray(parsed.captions) || (parsed.savedViews !== undefined && !Array.isArray(parsed.savedViews)) ||
+    (parsed.displaySets !== undefined && !Array.isArray(parsed.displaySets)) ||
+    (parsed.meshMaterialAppearances !== undefined && !Array.isArray(parsed.meshMaterialAppearances)) ||
+    (parsed.mediaResources !== undefined && !Array.isArray(parsed.mediaResources))
+  ) {
     throw new Error('native snapshot: record collections must be arrays');
   }
   const presentation = record(parsed.presentation, 'presentation');
-  exactKeys(presentation, ['displayMode', 'captionTargetAssetId'], ['hiddenAssetIds']);
+  exactKeys(presentation, ['displayMode', 'captionTargetAssetId'], ['hiddenAssetIds', 'activeDisplaySetId']);
   if (presentation.displayMode !== 'mixed' && presentation.displayMode !== 'gs-only' && presentation.displayMode !== 'mesh-only') {
     throw new Error('native snapshot: invalid display mode');
   }
@@ -686,9 +899,17 @@ export function parseNativeSnapshotV1(text: string): NativeProjectSnapshotV1 {
         ? null
         : id(presentation.captionTargetAssetId, 'ast', 'Caption target Asset id'),
       hiddenAssetIds,
+      ...(presentation.activeDisplaySetId === undefined
+        ? {}
+        : { activeDisplaySetId: id(presentation.activeDisplaySetId, 'set', 'active DisplaySet id') }),
     },
     captions: parsed.captions.map(parseCaption),
     savedViews: parsed.savedViews === undefined ? [] : parsed.savedViews.map(parseSavedView),
+    ...(parsed.displaySets === undefined ? {} : { displaySets: parsed.displaySets.map(parseDisplaySet) }),
+    ...(parsed.meshMaterialAppearances === undefined
+      ? {}
+      : { meshMaterialAppearances: parsed.meshMaterialAppearances.map(parseMeshMaterialAppearance) }),
+    ...(parsed.mediaResources === undefined ? {} : { mediaResources: parsed.mediaResources.map(parseMediaResource) }),
   };
   if (snapshot.assets.length < 1) throw new Error('native snapshot: at least one Asset is required');
   semanticClosure(snapshot);
@@ -738,6 +959,16 @@ export function serializeNativeSnapshotV1(snapshot: NativeProjectSnapshotV1): st
     captions: [...snapshot.captions].sort((a, b) => a.id.localeCompare(b.id)),
     savedViews: [...(snapshot.savedViews ?? [])]
       .sort((a, b) => a.orderKey.localeCompare(b.orderKey) || a.id.localeCompare(b.id)),
+    ...(snapshot.displaySets === undefined ? {} : {
+      displaySets: [...snapshot.displaySets]
+        .sort((a, b) => a.orderKey.localeCompare(b.orderKey) || a.id.localeCompare(b.id)),
+    }),
+    ...(snapshot.meshMaterialAppearances === undefined ? {} : {
+      meshMaterialAppearances: [...snapshot.meshMaterialAppearances].sort((a, b) => a.id.localeCompare(b.id)),
+    }),
+    ...(snapshot.mediaResources === undefined ? {} : {
+      mediaResources: [...snapshot.mediaResources].sort((a, b) => a.id.localeCompare(b.id)),
+    }),
   };
   const text = `${JSON.stringify(ordered)}\n`;
   parseNativeSnapshotV1(text);
@@ -889,7 +1120,7 @@ export function removeNativeAssetV1(
   if (snapshot.assets.length === 1) {
     throw new Error('native snapshot: the final Asset cannot be removed');
   }
-  const ownedCaptionCount = snapshot.captions.filter((caption) => caption.anchor.assetId === assetId).length;
+  const ownedCaptionCount = snapshot.captions.filter((caption) => caption.anchor?.assetId === assetId).length;
   if (ownedCaptionCount > 0) {
     throw new Error(`native snapshot: selected Asset owns ${ownedCaptionCount} Caption(s)`);
   }
@@ -899,6 +1130,9 @@ export function removeNativeAssetV1(
     assetBindingRevisions: snapshot.assetBindingRevisions.filter((binding) => binding.assetId !== assetId),
     assetRevisions: snapshot.assetRevisions.filter((revision) => revision.assetId !== assetId),
     representations: snapshot.representations.filter((representation) => representation.assetId !== assetId),
+    ...(snapshot.meshMaterialAppearances === undefined ? {} : {
+      meshMaterialAppearances: snapshot.meshMaterialAppearances.filter((appearance) => appearance.assetId !== assetId),
+    }),
     presentation: {
       ...snapshot.presentation,
       captionTargetAssetId: snapshot.presentation.captionTargetAssetId === assetId

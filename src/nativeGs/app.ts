@@ -12,10 +12,14 @@ import { NATIVE_POINT_DIAMETER_DEFAULT_CSS_PX } from './pointPresentation';
 import { filterNativeCaptionListV1 } from './captionList';
 import {
   activateNativeManualAssetTransformV1,
+  NATIVE_DEFAULT_DISPLAY_SET_ID,
   NATIVE_GS_PROFILE_ID,
   NATIVE_IDENTITY_TRANSFORM,
   NATIVE_POINT_PROFILE_ID,
   nativeModelProfileId,
+  nativeCaptionDisplaySetIdV1,
+  nativeDisplaySetsV1,
+  nativeSavedViewDisplaySetIdV1,
   newNativeId,
   normalizeNativeSim3,
   removeNativeAssetV1,
@@ -26,12 +30,13 @@ import {
   type NativeDisplayMode,
   type NativeProjectDraftV1,
   type NativeProjectSnapshotV1,
+  type NativeMeshMaterialAppearanceV1,
   type NativeRepresentationDraftV1,
   type NativeSavedViewV1,
   type NativeSim3V1,
   type NativeSolidBackgroundV1,
 } from './schema';
-import { activeNativeRepresentationsV1, isNativeAssetVisibleV1, nativeCaptionNeedsReviewV1 } from './resolver';
+import { activeNativeBindingV1, activeNativeRepresentationsV1, isNativeAssetVisibleV1, nativeCaptionNeedsReviewV1 } from './resolver';
 import {
   addNativeAssetV1,
   assertNativeProjectDoesNotMixV1,
@@ -41,6 +46,7 @@ import {
   nativeProjectRoot,
   openNativeProjectV1,
   readNativeRepresentationV1,
+  readNativeMediaV1,
   replaceNativeAssetV1,
   saveNativeProjectV1,
   type NativeAssetImportV1,
@@ -96,6 +102,21 @@ function backgroundFromHex(hex: string): NativeSolidBackgroundV1 {
       Number.parseInt(hex.slice(5, 7), 16) / 255,
     ],
   };
+}
+
+function srgbTupleFromHex(hex: string): readonly [number, number, number] {
+  if (!/^#[0-9a-f]{6}$/iu.test(hex)) throw new Error('色指定が不正です。');
+  return [
+    Number.parseInt(hex.slice(1, 3), 16) / 255,
+    Number.parseInt(hex.slice(3, 5), 16) / 255,
+    Number.parseInt(hex.slice(5, 7), 16) / 255,
+  ];
+}
+
+function srgbHexFromTuple(color: readonly [number, number, number]): string {
+  return `#${color.map((component) => (
+    Math.round(THREE.MathUtils.clamp(component, 0, 1) * 255).toString(16).padStart(2, '0')
+  )).join('')}`;
 }
 
 function fileSource(file: File, mediaType: string): NativeBinarySource {
@@ -495,14 +516,14 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       void (async () => {
         const signal = portableAbort!.signal;
         const inspection = await inspectNativePortablePackageV1(packageFile, signal);
-        const required = inspection.representationByteLength + inspection.manifest.nativeSnapshot.byteLength + 64 * 1024;
+        const required = inspection.representationByteLength + inspection.mediaByteLength + inspection.manifest.nativeSnapshot.byteLength + 64 * 1024;
         const estimate = await navigator.storage.estimate?.();
         if (
           estimate?.quota !== undefined && estimate.usage !== undefined &&
           Number.isFinite(estimate.quota) && Number.isFinite(estimate.usage) &&
           estimate.quota - estimate.usage < required
         ) {
-          throw new Error(`保存容量が不足しています（モデル ${fmtBytes(inspection.representationByteLength)}）。プロジェクトは復元されていません。`);
+          throw new Error(`保存容量が不足しています（データ ${fmtBytes(inspection.representationByteLength + inspection.mediaByteLength)}）。プロジェクトは復元されていません。`);
         }
         const projectId = inspection.snapshot.project.id;
         const session = await coordinator.tryAcquire(fs, nativeProjectRoot(projectId), projectId);
@@ -816,11 +837,14 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     clear(root);
     let durable = initial;
     let working = initial;
+    let activeDisplaySetIdValue = initial.presentation.activeDisplaySetId ?? NATIVE_DEFAULT_DISPLAY_SET_ID;
     let saving = false;
     activeUnsavedChanges?.dispose();
     const unsavedChanges = new NativeUnsavedChangesGuard(window);
     activeUnsavedChanges = unsavedChanges;
-    let selectedCaptionId = initial.captions[0]?.id ?? null;
+    let selectedCaptionId = initial.captions.find((caption) => (
+      nativeCaptionDisplaySetIdV1(caption) === (initial.presentation.activeDisplaySetId ?? NATIVE_DEFAULT_DISPLAY_SET_ID)
+    ))?.id ?? null;
     let captionMoveActive = false;
     let creatingCaption = false;
     let captionDeleteConfirmationInFlight = false;
@@ -910,6 +934,21 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const axes = ['+x', '-x', '+y', '-y', '+z', '-z'] as const;
     const axisButtons = new Map(axes.map((axis) => [axis, el('button', {}, axis.toUpperCase())]));
     const savedViewSection = el('section', { class: 'ng-card' });
+    const displaySetSelect = el('select', { 'aria-label': '表示セット' });
+    const materialAsset = el('select', { 'aria-label': 'マテリアルを調整するモデル' });
+    const materialSlot = el('select', { 'aria-label': '調整するマテリアル' });
+    const materialOpacity = el('input', { type: 'range', min: '0', max: '1', step: '0.01', value: '1' });
+    const materialOpacityValue = el('output', {}, '1.00');
+    const materialDoubleSided = el('input', { type: 'checkbox' });
+    const materialUnlit = el('input', { type: 'checkbox' });
+    const materialChromaEnabled = el('input', { type: 'checkbox' });
+    const materialChromaColor = el('input', { type: 'color', value: '#000000' });
+    const materialChromaTolerance = el('input', { type: 'range', min: '0', max: '1', step: '0.01', value: '0.1' });
+    const materialChromaFeather = el('input', { type: 'range', min: '0', max: '1', step: '0.01', value: '0' });
+    const resetMaterialAppearance = el('button', {}, '元の見え方へ戻す');
+    const materialStatus = el('p', { class: 'ng-note' });
+    const materialSection = el('section', { class: 'ng-card' });
+    const captionMedia = el('div', { class: 'ng-list' });
 
     const rolesByAsset = new Map(working.assets.map((asset) => [
       asset.id,
@@ -971,10 +1010,20 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const selectedCaption = () => selectedCaptionId === null
       ? undefined
       : working.captions.find((caption) => caption.id === selectedCaptionId);
-    const savedViews = (): readonly NativeSavedViewV1[] => working.savedViews ?? [];
+    const activeDisplaySetId = (): string => activeDisplaySetIdValue;
+    const displaySets = () => nativeDisplaySetsV1(working);
+    const savedViews = (): readonly NativeSavedViewV1[] => (working.savedViews ?? [])
+      .filter((view) => nativeSavedViewDisplaySetIdV1(view) === activeDisplaySetId());
     const selectedSavedView = (): NativeSavedViewV1 | undefined => selectedSavedViewId === null
       ? undefined
       : savedViews().find((view) => view.id === selectedSavedViewId);
+    const rebuildDisplaySetOptions = (): void => {
+      clear(displaySetSelect);
+      for (const displaySet of displaySets()) {
+        displaySetSelect.append(el('option', { value: displaySet.id }, displaySet.name));
+      }
+      displaySetSelect.value = activeDisplaySetId();
+    };
     const rebuildSavedViewOptions = (): void => {
       clear(savedViewSelect);
       if (savedViews().length === 0) {
@@ -990,22 +1039,25 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     };
     const rebuildCaptionList = (): void => {
       clear(captionList);
-      if (working.captions.length === 0) {
+      const setCaptions = working.captions.filter((caption) => (
+        nativeCaptionDisplaySetIdV1(caption) === activeDisplaySetId()
+      ));
+      if (setCaptions.length === 0) {
         captionResultCount.textContent = '0件';
-        captionList.append(el('p', { class: 'ng-note' }, 'キャプションはまだありません。'));
+        captionList.append(el('p', { class: 'ng-note' }, 'この表示セットにキャプションはまだありません。'));
         return;
       }
-      const filtered = filterNativeCaptionListV1(working.captions, {
+      const filtered = filterNativeCaptionListV1(setCaptions, {
         query: captionSearch.value,
         assetId: captionAssetFilter.value === '' ? null : captionAssetFilter.value,
       });
-      captionResultCount.textContent = `${filtered.length} / ${working.captions.length}件`;
+      captionResultCount.textContent = `${filtered.length} / ${setCaptions.length}件`;
       if (filtered.length === 0) {
         captionList.append(el('p', { class: 'ng-note' }, '条件に一致するキャプションはありません。'));
         return;
       }
       for (const caption of filtered) {
-        const owner = working.assets.find((asset) => asset.id === caption.anchor.assetId);
+        const owner = working.assets.find((asset) => asset.id === caption.anchor?.assetId);
         const review = nativeCaptionNeedsReviewV1(working, caption) ? '［要再配置］ ' : '';
         const button = el(
           'button',
@@ -1014,7 +1066,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
             'aria-current': String(caption.id === selectedCaptionId),
           },
           el('strong', {}, `${review}${caption.title || '（無題）'}`),
-          el('span', { class: 'ng-note' }, owner?.label ?? '所属モデル不明'),
+          el('span', { class: 'ng-note' }, caption.anchor === null ? '未配置' : owner?.label ?? '所属モデル不明'),
         );
         button.addEventListener('click', () => {
           creatingCaption = false;
@@ -1046,6 +1098,33 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         : needsReview
           ? 'このキャプションはモデル差し替え前の表面位置です。位置は保持されていますが、現在のモデル上で再配置すると確認済みに戻ります。'
           : '現在のモデル表面に対応しています。';
+      clear(captionMedia);
+      for (const mediaId of caption?.attachmentMediaIds ?? []) {
+        const media = (working.mediaResources ?? []).find((candidate) => candidate.id === mediaId);
+        if (media === undefined) continue;
+        const open = el('button', {}, `画像を表示：${media.label}`);
+        open.addEventListener('click', () => {
+          open.disabled = true;
+          void readNativeMediaV1(fs, working.project.id, media.id).then(async (source) => {
+            if (source === null) throw new Error('添付画像を端末内から読み込めません。');
+            const blob = await new Response(source.stream(), {
+              headers: { 'Content-Type': media.blob.mediaType },
+            }).blob();
+            const url = URL.createObjectURL(blob);
+            const image = el('img', {
+              src: url,
+              alt: media.label,
+              style: 'display:block;max-width:100%;max-height:20rem;object-fit:contain',
+            });
+            image.addEventListener('load', () => URL.revokeObjectURL(url), { once: true });
+            captionMedia.append(image);
+          }).catch((error: unknown) => {
+            runtimeStatus.className = 'ng-error';
+            runtimeStatus.textContent = error instanceof Error ? error.message : String(error);
+          }).finally(() => { open.disabled = false; });
+        });
+        captionMedia.append(open);
+      }
     };
     const commitSelectedCaption = (caption: NativeProjectSnapshotV1['captions'][number]): boolean => {
       try {
@@ -1089,7 +1168,9 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       accessBadge.title = session.accessDetail;
       const editable = canMutateWorking();
       const caption = selectedCaption();
-      const captionVisible = caption !== undefined && isNativeAssetVisibleV1(working, caption.anchor.assetId);
+      const captionVisible = caption !== undefined && (
+        caption.anchor === null || isNativeAssetVisibleV1(working, caption.anchor.assetId)
+      );
       const captionFieldsEditable = caption !== undefined && captionVisible;
       if (!editable && creatingCaption) {
         creatingCaption = false;
@@ -1108,7 +1189,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       newCaption.disabled = !editable;
       newCaption.textContent = creatingCaption ? '新規配置をやめる' : '＋ 新しいキャプション';
       newCaption.setAttribute('aria-pressed', String(creatingCaption));
-      moveCaption.disabled = !editable || caption === undefined || !captionVisible;
+      moveCaption.disabled = !editable || caption?.anchor === null || caption === undefined || !captionVisible;
       moveCaption.textContent = captionMoveActive ? 'ピン移動を終了' : 'ピンを移動';
       moveCaption.setAttribute('aria-pressed', String(captionMoveActive));
       display.disabled = !editable;
@@ -1124,6 +1205,17 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       replaceProxy.disabled = !editable || replaceKind.value !== 'gs';
       replaceButton.disabled = !editable;
       deleteAsset.disabled = !editable || assetDeleteConfirmationInFlight;
+      displaySetSelect.disabled = saving || displaySets().length < 2;
+      materialAsset.disabled = !editable || materialAsset.options.length === 0;
+      materialSlot.disabled = !editable || materialSlot.options.length === 0;
+      materialOpacity.disabled = !editable || materialSlot.options.length === 0;
+      materialDoubleSided.disabled = !editable || materialSlot.options.length === 0;
+      materialUnlit.disabled = !editable || materialSlot.options.length === 0;
+      materialChromaEnabled.disabled = !editable || materialSlot.options.length === 0;
+      materialChromaColor.disabled = !editable || materialSlot.options.length === 0;
+      materialChromaTolerance.disabled = !editable || materialSlot.options.length === 0;
+      materialChromaFeather.disabled = !editable || materialSlot.options.length === 0;
+      resetMaterialAppearance.disabled = !editable || materialSlot.options.length === 0;
       deleteAssetButton.disabled = !editable || assetDeleteConfirmationInFlight;
       repositionCaption.disabled = !editable || caption === undefined || !captionVisible;
       deleteCaption.disabled = !editable || caption === undefined || captionDeleteConfirmationInFlight;
@@ -1191,8 +1283,35 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       captionList,
       el('label', { class: 'ng-field' }, el('span', {}, 'タイトル'), captionTitle),
       el('label', { class: 'ng-field' }, el('span', {}, '本文'), captionBody),
+      captionMedia,
       captionReview,
       el('div', { class: 'ng-row' }, moveCaption, repositionCaption, deleteCaption),
+    );
+
+    materialSection.append(
+      el('h2', {}, '表示セットと見え方'),
+      el('p', { class: 'ng-note' }, '表示セットはキャプション群・3Dモデルのマテリアル設定・任意のビューを一緒に切り替えます。モデルの表示／非表示や位置は変えません。'),
+      el('label', { class: 'ng-field' }, el('span', {}, '表示セット'), displaySetSelect),
+      el('div', { class: 'ng-grid' },
+        el('label', { class: 'ng-field' }, el('span', {}, '3Dモデル'), materialAsset),
+        el('label', { class: 'ng-field' }, el('span', {}, 'マテリアル'), materialSlot),
+      ),
+      el('label', { class: 'ng-field' },
+        el('span', {}, '不透明度'),
+        el('div', { class: 'ng-row' }, materialOpacity, materialOpacityValue),
+      ),
+      el('div', { class: 'ng-row' },
+        el('label', { class: 'ng-row' }, materialDoubleSided, el('span', {}, '両面表示')),
+        el('label', { class: 'ng-row' }, materialUnlit, el('span', {}, 'ライトの影響を受けない')),
+        el('label', { class: 'ng-row' }, materialChromaEnabled, el('span', {}, 'クロマキー')),
+      ),
+      el('div', { class: 'ng-grid' },
+        el('label', { class: 'ng-field' }, el('span', {}, '抜く色'), materialChromaColor),
+        el('label', { class: 'ng-field' }, el('span', {}, '許容幅'), materialChromaTolerance),
+        el('label', { class: 'ng-field' }, el('span', {}, '境界のぼかし'), materialChromaFeather),
+      ),
+      resetMaterialAppearance,
+      materialStatus,
     );
 
     savedViewSection.append(
@@ -1207,11 +1326,13 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       el('div', { class: 'ng-axis-grid' }, ...axisButtons.values()),
       el('div', { class: 'ng-row' }, fitView, el('span', { class: 'ng-note' }, '背景'), backgroundColor),
     );
+    rebuildDisplaySetOptions();
 
     root.append(el('main', { class: 'ng-view' },
       el('section', { class: 'ng-stage' }, canvas, el('div', { class: 'ng-stage-badges' }, accessBadge, visibilityBadge)),
       el('aside', { class: 'ng-panel' },
         el('div', {}, el('h1', {}, working.project.title), el('div', { class: 'ng-row ng-project-actions' }, save)),
+        materialSection,
         captionSection,
         savedViewSection,
         el('details', { class: 'ng-card' },
@@ -1296,7 +1417,12 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         }
         const wasNew = selectedCaptionId === null;
         const titleValue = captionTitle.value.trim();
-        const next = { ...caption, title: titleValue === '' ? 'Caption' : titleValue, body: captionBody.value };
+        const next = {
+          ...caption,
+          title: titleValue === '' ? 'Caption' : titleValue,
+          body: captionBody.value,
+          displaySetId: caption.displaySetId ?? activeDisplaySetId(),
+        };
         if (!commitSelectedCaption(next)) {
           creatingCaption = false;
           rebuildCaptionList();
@@ -1338,6 +1464,104 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       onProgress(message) { runtimeStatus.textContent = message; },
       onRuntimeError(message) { setDiagnostics([...viewer.getResolution().issues, message]); },
     });
+    const syncMaterialAssetOptions = (): void => {
+      const previous = materialAsset.value;
+      clear(materialAsset);
+      for (const asset of working.assets) {
+        if (!activeNativeRepresentationsV1(working, asset.id).some((representation) => representation.role === 'meshPrimary')) continue;
+        materialAsset.append(el('option', { value: asset.id }, asset.label));
+      }
+      if (materialAsset.options.length > 0) {
+        materialAsset.value = [...materialAsset.options].some((option) => option.value === previous)
+          ? previous
+          : materialAsset.options[0]!.value;
+      }
+    };
+    const selectedMaterialSlot = () => {
+      const separator = materialSlot.value.indexOf(':');
+      if (separator < 0) return undefined;
+      const representationId = materialSlot.value.slice(0, separator);
+      const key = materialSlot.value.slice(separator + 1);
+      return viewer.listMeshMaterialSlots(materialAsset.value)
+        .find((slot) => slot.representationId === representationId && slot.key === key);
+    };
+    const syncMaterialControls = (): void => {
+      const previous = materialSlot.value;
+      clear(materialSlot);
+      for (const slot of viewer.listMeshMaterialSlots(materialAsset.value)) {
+        const value = `${slot.representationId}:${slot.key}`;
+        materialSlot.append(el('option', { value }, slot.name));
+      }
+      if (materialSlot.options.length > 0) {
+        materialSlot.value = [...materialSlot.options].some((option) => option.value === previous)
+          ? previous
+          : materialSlot.options[0]!.value;
+      }
+      const slot = selectedMaterialSlot();
+      const appearance = slot === undefined ? undefined : (working.meshMaterialAppearances ?? []).find((candidate) => (
+        candidate.displaySetId === activeDisplaySetId() && candidate.assetId === materialAsset.value &&
+        candidate.representationId === slot.representationId && candidate.materialSlotKey === slot.key
+      ));
+      const baseline = slot?.baseline;
+      materialOpacity.value = String(appearance?.opacity ?? baseline?.opacity ?? 1);
+      materialOpacityValue.textContent = Number(materialOpacity.value).toFixed(2);
+      materialDoubleSided.checked = appearance?.doubleSided ?? baseline?.doubleSided ?? false;
+      materialUnlit.checked = appearance?.unlit ?? baseline?.unlit ?? false;
+      materialChromaEnabled.checked = appearance?.chroma.enabled ?? baseline?.chroma.enabled ?? false;
+      materialChromaColor.value = srgbHexFromTuple(appearance?.chroma.colorSrgb ?? baseline?.chroma.colorSrgb ?? [0, 0, 0]);
+      materialChromaTolerance.value = String(appearance?.chroma.tolerance ?? baseline?.chroma.tolerance ?? 0.1);
+      materialChromaFeather.value = String(appearance?.chroma.feather ?? baseline?.chroma.feather ?? 0);
+      resetMaterialAppearance.hidden = appearance === undefined;
+      materialStatus.textContent = slot === undefined
+        ? 'マテリアルを持つ3Dモデルがありません。GS・通常点群・配置用補助モデルはこの設定の対象外です。'
+        : slot.supportsUnlitAndChroma
+          ? '変更はすぐ画面へ反映され、プロジェクト保存時にこの表示セットへ保存されます。'
+          : 'このマテリアルでは不透明度と両面表示だけを利用できます。';
+      updateAccess();
+      if (slot !== undefined && !slot.supportsUnlitAndChroma) {
+        materialUnlit.disabled = true;
+        materialChromaEnabled.disabled = true;
+        materialChromaColor.disabled = true;
+        materialChromaTolerance.disabled = true;
+        materialChromaFeather.disabled = true;
+      }
+    };
+    const commitMaterialAppearance = (): void => {
+      if (!canMutateWorking()) return;
+      const slot = selectedMaterialSlot();
+      const binding = activeNativeBindingV1(working, materialAsset.value);
+      if (slot === undefined || binding === null) return;
+      const existing = (working.meshMaterialAppearances ?? []).find((candidate) => (
+        candidate.displaySetId === activeDisplaySetId() && candidate.assetId === materialAsset.value &&
+        candidate.representationId === slot.representationId && candidate.materialSlotKey === slot.key
+      ));
+      const appearance: NativeMeshMaterialAppearanceV1 = {
+        id: existing?.id ?? newNativeId('mat'),
+        displaySetId: activeDisplaySetId(),
+        assetId: materialAsset.value,
+        authoredAssetRevisionId: binding.assetRevisionId,
+        representationId: slot.representationId,
+        materialSlotKey: slot.key,
+        opacity: Number(materialOpacity.value),
+        doubleSided: materialDoubleSided.checked,
+        unlit: slot.supportsUnlitAndChroma && materialUnlit.checked,
+        chroma: {
+          enabled: slot.supportsUnlitAndChroma && materialChromaEnabled.checked,
+          colorSrgb: srgbTupleFromHex(materialChromaColor.value),
+          tolerance: Number(materialChromaTolerance.value),
+          feather: Number(materialChromaFeather.value),
+        },
+      };
+      working = {
+        ...working,
+        meshMaterialAppearances: existing === undefined
+          ? [...(working.meshMaterialAppearances ?? []), appearance]
+          : (working.meshMaterialAppearances ?? []).map((candidate) => candidate.id === existing.id ? appearance : candidate),
+      };
+      materialOpacityValue.textContent = appearance.opacity.toFixed(2);
+      viewer.setSnapshot(working);
+      markDirty();
+    };
     const syncCurrentViewControls = (): void => {
       orthographic.checked = viewer.isOrthographic();
       backgroundColor.value = backgroundHex(viewer.getBackground());
@@ -1352,6 +1576,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         projectFrameId: working.project.frame.id,
         camera: viewer.getProjectCamera(),
         background: viewer.getBackground(),
+        displaySetId: activeDisplaySetId(),
       };
     };
     activeViewer = viewer;
@@ -1360,6 +1585,9 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       (representationId) => readNativeRepresentationV1(fs, working.project.id, representationId),
       offlineReady,
     );
+    viewer.setActiveDisplaySet(activeDisplaySetId());
+    syncMaterialAssetOptions();
+    syncMaterialControls();
     syncVisibilityControls();
     runtimeStatus.textContent = offlineReady
       ? 'モデルを読み込みました。表示切替とキャプション編集を利用できます。'
@@ -1374,6 +1602,57 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     syncCurrentViewControls();
     updateAccess();
 
+    displaySetSelect.addEventListener('change', () => {
+      if (!displaySets().some((displaySet) => displaySet.id === displaySetSelect.value)) return;
+      activeDisplaySetIdValue = displaySetSelect.value;
+      const activeCaptions = working.captions.filter((caption) => nativeCaptionDisplaySetIdV1(caption) === activeDisplaySetId());
+      selectedCaptionId = activeCaptions[0]?.id ?? null;
+      creatingCaption = false;
+      captionMoveActive = false;
+      const defaultSavedViewId = displaySets().find((displaySet) => displaySet.id === activeDisplaySetId())?.defaultSavedViewId ?? null;
+      selectedSavedViewId = defaultSavedViewId;
+      viewer.setActiveDisplaySet(activeDisplaySetId());
+      viewer.selectCaption(selectedCaptionId);
+      rebuildCaptionList();
+      populateCaptionFields();
+      rebuildSavedViewOptions();
+      syncMaterialControls();
+      const defaultView = defaultSavedViewId === null
+        ? undefined
+        : savedViews().find((view) => view.id === defaultSavedViewId);
+      if (defaultView !== undefined) {
+        viewer.applyProjectCamera(defaultView.camera);
+        viewer.setBackground(defaultView.background);
+        syncCurrentViewControls();
+      }
+      runtimeStatus.className = 'ng-status';
+      runtimeStatus.textContent = `表示セット「${displaySets().find((displaySet) => displaySet.id === activeDisplaySetId())?.name ?? ''}」へ切り替えました。`;
+    });
+    materialAsset.addEventListener('change', syncMaterialControls);
+    materialSlot.addEventListener('change', syncMaterialControls);
+    for (const control of [materialOpacity, materialChromaTolerance, materialChromaFeather]) {
+      control.addEventListener('input', commitMaterialAppearance);
+    }
+    for (const control of [materialDoubleSided, materialUnlit, materialChromaEnabled, materialChromaColor]) {
+      control.addEventListener('change', commitMaterialAppearance);
+    }
+    materialChromaColor.addEventListener('input', commitMaterialAppearance);
+    resetMaterialAppearance.addEventListener('click', () => {
+      if (!canMutateWorking()) return;
+      const slot = selectedMaterialSlot();
+      if (slot === undefined) return;
+      const previous = working.meshMaterialAppearances ?? [];
+      const retained = previous.filter((candidate) => !(
+        candidate.displaySetId === activeDisplaySetId() && candidate.assetId === materialAsset.value &&
+        candidate.representationId === slot.representationId && candidate.materialSlotKey === slot.key
+      ));
+      if (retained.length === previous.length) return;
+      working = { ...working, meshMaterialAppearances: retained };
+      viewer.setSnapshot(working);
+      syncMaterialControls();
+      markDirty();
+    });
+
     savedViewSelect.addEventListener('change', () => {
       selectedSavedViewId = savedViewSelect.value === '' ? null : savedViewSelect.value;
       savedViewName.value = selectedSavedView()?.name ?? '';
@@ -1382,7 +1661,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     captureSavedView.addEventListener('click', () => {
       if (!canMutateWorking()) return;
       const view = captureViewRecord();
-      working = { ...working, savedViews: [...savedViews(), view] };
+      working = { ...working, savedViews: [...(working.savedViews ?? []), view] };
       selectedSavedViewId = view.id;
       rebuildSavedViewOptions();
       markDirty();
@@ -1395,7 +1674,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       const view = captureViewRecord(existing);
       working = {
         ...working,
-        savedViews: savedViews().map((candidate) => candidate.id === view.id ? view : candidate),
+        savedViews: (working.savedViews ?? []).map((candidate) => candidate.id === view.id ? view : candidate),
       };
       rebuildSavedViewOptions();
       markDirty();
@@ -1413,7 +1692,15 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       if (!canMutateWorking()) return;
       const view = selectedSavedView();
       if (view === undefined) return;
-      working = { ...working, savedViews: savedViews().filter((candidate) => candidate.id !== view.id) };
+      working = {
+        ...working,
+        savedViews: (working.savedViews ?? []).filter((candidate) => candidate.id !== view.id),
+        ...(working.displaySets === undefined ? {} : {
+          displaySets: working.displaySets.map((displaySet) => displaySet.defaultSavedViewId === view.id
+            ? { ...displaySet, defaultSavedViewId: null }
+            : displaySet),
+        }),
+      };
       selectedSavedViewId = null;
       rebuildSavedViewOptions();
       markDirty();
@@ -1584,7 +1871,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         runtimeStatus.textContent = '最後のモデルは削除できません。プロジェクト全体を削除する場合は、一覧画面の「この端末から削除」を使用してください。';
         return;
       }
-      const ownedCaptionCount = working.captions.filter((caption) => caption.anchor.assetId === asset.id).length;
+      const ownedCaptionCount = working.captions.filter((caption) => caption.anchor?.assetId === asset.id).length;
       if (ownedCaptionCount > 0) {
         runtimeStatus.className = 'ng-error';
         runtimeStatus.textContent = `このモデルには${ownedCaptionCount}件のキャプションがあります。先にそのキャプションを削除してください。`;
@@ -1609,6 +1896,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         viewer.stopCaptionPositionEditing();
         viewer.setSnapshot(working);
         syncAssetControlMembership();
+        syncMaterialAssetOptions();
+        syncMaterialControls();
         syncVisibilityControls();
         rebuildCaptionList();
         populateTransform();
@@ -1713,7 +2002,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       if (!canMutateWorking()) return;
       const caption = selectedCaption();
       if (caption === undefined) return;
-      const owner = working.assets.find((asset) => asset.id === caption.anchor.assetId);
+      const ownerId = caption.anchor?.assetId ?? working.presentation.captionTargetAssetId;
+      const owner = working.assets.find((asset) => asset.id === ownerId);
       if (owner === undefined || !isNativeAssetVisibleV1(working, owner.id)) {
         runtimeStatus.className = 'ng-error';
         runtimeStatus.textContent = '所属モデルが見つからないか非表示のため、表面へ置き直せません。キャプションの位置は変更していません。';
@@ -1884,6 +2174,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         captionMoveActive = false;
         viewer.selectCaption(selectedCaptionId);
         syncAssetControlMembership();
+        syncMaterialAssetOptions();
+        syncMaterialControls();
         syncVisibilityControls();
         rebuildCaptionList();
         populateCaptionFields();
@@ -1901,6 +2193,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         captionMoveActive = false;
         viewer.selectCaption(selectedCaptionId);
         syncAssetControlMembership();
+        syncMaterialAssetOptions();
+        syncMaterialControls();
         syncVisibilityControls();
         rebuildCaptionList();
         selectedSavedViewId = durable.savedViews?.some((view) => view.id === selectedSavedViewId)

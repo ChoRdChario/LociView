@@ -61,10 +61,12 @@ export function nativeCaptionNeedsReviewV1(
   snapshot: NativeProjectSnapshotV1,
   caption: NativeCaptionV1,
 ): boolean {
-  const binding = activeNativeBindingV1(snapshot, caption.anchor.assetId);
+  if (caption.anchor === null) return false;
+  const anchor = caption.anchor;
+  const binding = activeNativeBindingV1(snapshot, anchor.assetId);
   const revision = snapshot.assetRevisions.find((candidate) => candidate.id === binding?.assetRevisionId);
-  return revision?.assetId !== caption.anchor.assetId ||
-    !revision.anchorCompatibilityClasses.some((entry) => entry.id === caption.anchor.authoredAnchorCompatibilityId);
+  return revision?.assetId !== anchor.assetId ||
+    !revision.anchorCompatibilityClasses.some((entry) => entry.id === anchor.authoredAnchorCompatibilityId);
 }
 
 export function allActiveNativeRepresentationsV1(snapshot: NativeProjectSnapshotV1): NativeRepresentationV1[] {

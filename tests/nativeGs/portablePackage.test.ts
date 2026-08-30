@@ -28,6 +28,7 @@ import {
   listNativeProjectsV1,
   nativeActiveMarkerPath,
   nativeProjectRoot,
+  nativeMediaPath,
   nativeRepresentationPath,
   nativeSnapshotPath,
   openNativeProjectV1,
@@ -148,14 +149,19 @@ async function acquireNew(fs: MemoryFS, projectId = NATIVE_TEST_IDS.project): Pr
   return session;
 }
 
-async function makeSourceProject(): Promise<{
+async function makeSourceProject(withMedia = false): Promise<{
   readonly fs: ChunkedMemoryFS;
   readonly session: ProjectMutationSession;
   readonly snapshot: Awaited<ReturnType<typeof createNativeProjectV1>>;
+  readonly mediaId: string | null;
+  readonly mediaBytes: Uint8Array | null;
 }> {
   const fs = new ChunkedMemoryFS();
   const base = makeNativeDraft(2);
   const gs = makeGsPlySource(2, 512);
+  const mediaId = testNativeId('med', 94);
+  const mediaBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
+  const mediaBlob = new Blob([mediaBytes], { type: 'image/png' });
   const detailedDraft: NativeProjectDraftV1 = {
     ...base.draft,
     representations: base.draft.representations.map((representation) => (
@@ -176,6 +182,7 @@ async function makeSourceProject(): Promise<{
         authoredAnchorCompatibilityId: NATIVE_TEST_IDS.gsClass,
         hitEvidence: { method: 'manual' },
       },
+      ...(withMedia ? { attachmentMediaIds: [mediaId] } : {}),
     }, {
       id: testNativeId('cap', 93),
       title: 'Unrelated Caption',
@@ -203,11 +210,21 @@ async function makeSourceProject(): Promise<{
       },
       background: { kind: 'solid', colorSrgb: [0.05, 0.1, 0.2] },
     }],
+    ...(withMedia ? {
+      mediaResources: [{ id: mediaId, label: 'Caption photo', kind: 'image', mediaType: 'image/png' }],
+    } : {}),
   };
   const sources = new Map(base.sources);
   sources.set(NATIVE_TEST_IDS.gsRepresentation, gs.source);
   const session = await acquireNew(fs);
-  const created = await createNativeProjectV1(session.workspace, detailedDraft, sources);
+  const mediaSources = withMedia
+    ? new Map([[mediaId, {
+      size: mediaBlob.size,
+      mediaType: mediaBlob.type,
+      stream: () => mediaBlob.stream(),
+    }]])
+    : new Map();
+  const created = await createNativeProjectV1(session.workspace, detailedDraft, sources, undefined, mediaSources);
   const added = makeNativeMeshImport();
   const multiAsset = await addNativeAssetV1(session.workspace, created, added.imported, added.sources);
   const point = makeNativePointImport();
@@ -233,7 +250,13 @@ async function makeSourceProject(): Promise<{
     session.workspace,
     setNativeAssetVisibilityV1(aligned, NATIVE_TEST_IDS.meshAsset, false),
   );
-  return { fs, session, snapshot };
+  return {
+    fs,
+    session,
+    snapshot,
+    mediaId: withMedia ? mediaId : null,
+    mediaBytes: withMedia ? mediaBytes : null,
+  };
 }
 
 async function exportBlob(source: Awaited<ReturnType<typeof makeSourceProject>>): Promise<{
@@ -259,6 +282,31 @@ async function expectInactive(fs: MemoryFS, projectId = NATIVE_TEST_IDS.project)
 }
 
 describe('native portable .lociview streamed backup/restore', () => {
+  it('uses package v2 only when Caption image media is present and restores exact STORE bytes', async () => {
+    const source = await makeSourceProject(true);
+    const mediaId = source.mediaId!;
+    const { blob, result } = await exportBlob(source);
+    expect(result.manifest.packageVersion).toBe(2);
+    expect(result.manifest.media).toEqual([expect.objectContaining({ mediaId, mediaType: 'image/png' })]);
+    expect(result.metrics.mediaByteLength).toBe(source.mediaBytes!.byteLength);
+
+    const entries = await storedZipEntries(blob);
+    const mediaEntry = entries.find((entry) => entry.path === `native/media/${mediaId}.bin`);
+    expect(mediaEntry?.bytes).toEqual(source.mediaBytes);
+
+    const inspection = await inspectNativePortablePackageV1(blob);
+    expect(inspection.manifest.packageVersion).toBe(2);
+    expect(inspection.snapshot.captions[0]?.attachmentMediaIds).toEqual([mediaId]);
+
+    const target = new ChunkedMemoryFS();
+    const restoreSession = await acquireNew(target);
+    const restored = await restoreNativePortablePackageV1(restoreSession.workspace, target, blob);
+    expect(restored.snapshot).toEqual(source.snapshot);
+    expect(await target.readBytes(nativeMediaPath(restored.snapshot.project.id, mediaId))).toEqual(source.mediaBytes);
+    restoreSession.release();
+    source.session.release();
+  });
+
   it('round-trips the exact snapshot and every Mesh/Point/GS/Proxy byte through STORE entries', async () => {
     const source = await makeSourceProject();
     const { blob, result } = await exportBlob(source);

@@ -20,6 +20,7 @@ import {
   deleteNativeProjectV1,
   listNativeProjectsV1,
   nativeActiveMarkerPath,
+  nativeMediaPath,
   nativeProjectRoot,
   nativeRepresentationPath,
   openNativeProjectV1,
@@ -104,6 +105,28 @@ describe('native project blob-first/marker-last publication', () => {
       generation: 1,
       snapshotId: snapshot.snapshotId,
     }]);
+    session.release();
+  });
+
+  it('checks an external source authority immediately before snapshot and marker publication', async () => {
+    const fs = new RecordingMemoryFS();
+    const session = await editable(fs);
+    const { draft, sources } = makeNativeDraft();
+    let publicationChecks = 0;
+    await expect(createNativeProjectV1(
+      session.workspace,
+      draft,
+      sources,
+      undefined,
+      new Map(),
+      () => {
+        publicationChecks += 1;
+        if (publicationChecks === 2) throw new Error('injected source lock loss');
+      },
+    )).rejects.toThrow(/source lock loss/);
+    expect(publicationChecks).toBe(2);
+    expect(await fs.exists(nativeActiveMarkerPath(draft.project.id))).toBe(false);
+    expect(await listNativeProjectsV1(fs)).toEqual([]);
     session.release();
   });
 
@@ -242,6 +265,41 @@ describe('native project blob-first/marker-last publication', () => {
       missingRepresentationIds: [],
       sizeMismatchRepresentationIds: [],
     });
+    session.release();
+  });
+
+  it('refuses Asset publication when existing Caption media bytes are unavailable', async () => {
+    const fs = new RecordingMemoryFS();
+    const session = await editable(fs);
+    const base = makeNativeDraft(2);
+    const mediaId = testNativeId('med', 95);
+    const mediaBlob = new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3])], { type: 'image/png' });
+    const draft = {
+      ...base.draft,
+      mediaResources: [{ id: mediaId, label: 'Caption image', kind: 'image' as const, mediaType: 'image/png' }],
+    };
+    const first = await createNativeProjectV1(
+      session.workspace,
+      draft,
+      base.sources,
+      undefined,
+      new Map([[mediaId, {
+        size: mediaBlob.size,
+        mediaType: mediaBlob.type,
+        stream: () => mediaBlob.stream(),
+      }]]),
+    );
+    await fs.remove(nativeMediaPath(first.project.id, mediaId));
+    const added = makeNativeMeshImport();
+    await expect(addNativeAssetV1(session.workspace, first, added.imported, added.sources)).rejects.toThrow(/media bytes are unavailable/);
+    expect((await openNativeProjectV1(fs, first.project.id)).snapshot).toMatchObject({
+      snapshotId: first.snapshotId,
+      generation: first.generation,
+      assets: first.assets,
+      representations: first.representations,
+      mediaResources: first.mediaResources,
+    });
+    expect(await fs.exists(nativeRepresentationPath(first.project.id, added.representationId))).toBe(false);
     session.release();
   });
 

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { loadModel } from '../viewer/loaders';
+import { patchMaterial, setChroma, setUnlit } from '../viewer/shaderPatch';
 import { inspectNativeGsPlyV1, inspectNativePointPlyV1 } from './plyProfile';
 import {
   clampNativePointDiameterCssPixels,
@@ -19,19 +20,23 @@ import {
   type NativeSliceResolutionV1,
 } from './resolver';
 import {
+  NATIVE_DEFAULT_DISPLAY_SET_ID,
   nativeModelFormat,
+  nativeCaptionDisplaySetIdV1,
   newNativeId,
   normalizeNativeSim3,
   type NativeCaptionV1,
   type NativeCanonicalTransformV1,
   type NativeProjectCameraV1,
   type NativeProjectSnapshotV1,
+  type NativeMeshMaterialAppearanceV1,
   type NativeRepresentationV1,
   type NativeSim3V1,
   type NativeSolidBackgroundV1,
 } from './schema';
 import { NativeSparkRuntime } from './sparkRuntime';
 import type { WorkspaceReadableFile } from '../platform/fs';
+import { nativeMaterialSlotKey } from './materialSlots';
 
 export interface NativeGsViewerCallbacks {
   onCaptionCreationStarted(): boolean;
@@ -49,6 +54,38 @@ type NativeGizmoTarget =
   | { readonly kind: 'caption' }
   | { readonly kind: 'asset'; readonly assetId: string }
   | null;
+
+interface NativeMeshMaterialSlot {
+  readonly representationId: string;
+  readonly key: string;
+  readonly name: string;
+  readonly material: THREE.Material;
+  readonly patchSupported: boolean;
+  readonly baseline: {
+    readonly opacity: number;
+    readonly transparent: boolean;
+    readonly depthWrite: boolean;
+    readonly side: THREE.Side;
+  };
+}
+
+export interface NativeMeshMaterialSlotInfo {
+  readonly representationId: string;
+  readonly key: string;
+  readonly name: string;
+  readonly supportsUnlitAndChroma: boolean;
+  readonly baseline: {
+    readonly opacity: number;
+    readonly doubleSided: boolean;
+    readonly unlit: boolean;
+    readonly chroma: {
+      readonly enabled: boolean;
+      readonly colorSrgb: readonly [number, number, number];
+      readonly tolerance: number;
+      readonly feather: number;
+    };
+  };
+}
 
 function applySim3(object: THREE.Object3D, transform: NativeSim3V1): void {
   object.position.fromArray(transform.translation);
@@ -147,6 +184,49 @@ function preparePointPresentation(root: THREE.Object3D, diameterCssPixels: numbe
   });
 }
 
+function registerNativeMeshMaterialSlots(
+  root: THREE.Object3D,
+  representationId: string,
+): NativeMeshMaterialSlot[] {
+  const slots: NativeMeshMaterialSlot[] = [];
+  const nameCounts = new Map<string, number>();
+  const originalsToDispose = new Set<THREE.Material>();
+  const visit = (object: THREE.Object3D, path: readonly number[]): void => {
+    if (object instanceof THREE.Mesh) {
+      const original = Array.isArray(object.material) ? object.material : [object.material];
+      const cloned = original.map((material) => material.clone());
+      for (const material of original) originalsToDispose.add(material);
+      object.material = Array.isArray(object.material) ? cloned : cloned[0]!;
+      cloned.forEach((material, slot) => {
+        const baseName = material.name === '' ? '(unnamed)' : material.name;
+        const occurrence = (nameCounts.get(baseName) ?? 0) + 1;
+        nameCounts.set(baseName, occurrence);
+        slots.push({
+          representationId,
+          key: nativeMaterialSlotKey(path, slot),
+          name: occurrence === 1 ? baseName : `${baseName} (${occurrence})`,
+          material,
+          patchSupported: patchMaterial(material),
+          baseline: {
+            opacity: material.opacity,
+            transparent: material.transparent,
+            depthWrite: material.depthWrite,
+            side: material.side,
+          },
+        });
+      });
+    }
+    object.children.forEach((child, index) => visit(child, [...path, index]));
+  };
+  visit(root, []);
+  for (const material of originalsToDispose) material.dispose();
+  return slots;
+}
+
+function chromaHex(color: readonly [number, number, number]): string {
+  return `#${new THREE.Color().setRGB(...color, THREE.SRGBColorSpace).getHexString()}`;
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -166,8 +246,11 @@ export class NativeGsViewer {
   private readonly representationBounds = new Map<string, THREE.Box3>();
   private readonly resourceStates = new Map<string, NativeResourceStateV1>();
   private readonly pointDiameters = new Map<string, number>();
+  private readonly meshMaterialSlots = new Map<string, NativeMeshMaterialSlot[]>();
+  private materialIssues: string[] = [];
   private readonly callbacks: NativeGsViewerCallbacks;
   private snapshot: NativeProjectSnapshotV1;
+  private activeDisplaySetOverride: string | null = null;
   private sparkRuntime: NativeSparkRuntime | null = null;
   private readonly captionMarkers = new Map<string, THREE.Mesh>();
   private currentCaption: NativeCaptionV1 | null = null;
@@ -453,6 +536,41 @@ export class NativeGsViewer {
       if (this.gizmoTarget?.kind === 'caption') this.gizmoTarget = null;
     }
     this.clearLongPress();
+    this.applyActiveMeshMaterialAppearances();
+    this.updateResolution();
+  }
+
+  listMeshMaterialSlots(assetId: string): readonly NativeMeshMaterialSlotInfo[] {
+    const activeIds = new Set(activeNativeRepresentationsV1(this.snapshot, assetId)
+      .filter((representation) => representation.role === 'meshPrimary')
+      .map((representation) => representation.id));
+    return [...this.meshMaterialSlots.entries()]
+      .filter(([representationId]) => activeIds.has(representationId))
+      .flatMap(([, slots]) => slots.map((slot) => ({
+        representationId: slot.representationId,
+        key: slot.key,
+        name: slot.name,
+        supportsUnlitAndChroma: slot.patchSupported,
+        baseline: {
+          opacity: slot.baseline.opacity,
+          doubleSided: slot.baseline.side === THREE.DoubleSide,
+          unlit: false,
+          chroma: {
+            enabled: false,
+            colorSrgb: [0, 0, 0] as const,
+            tolerance: 0.1,
+            feather: 0,
+          },
+        },
+      })))
+      .sort((a, b) => a.representationId.localeCompare(b.representationId) || a.key.localeCompare(b.key));
+  }
+
+  /** DisplaySet selection is viewing state. It may change in View mode without
+   * mutating the durable Project snapshot. */
+  setActiveDisplaySet(displaySetId: string): void {
+    this.activeDisplaySetOverride = displaySetId;
+    this.applyActiveMeshMaterialAppearances();
     this.updateResolution();
   }
 
@@ -471,6 +589,7 @@ export class NativeGsViewer {
       this.representationObjects.delete(representationId);
       this.representationBounds.delete(representationId);
       this.resourceStates.delete(representationId);
+      this.meshMaterialSlots.delete(representationId);
     }
     const retainedAssetIds = new Set(snapshot.assets.map((asset) => asset.id));
     for (const [assetId, group] of this.assetGroups) {
@@ -546,7 +665,8 @@ export class NativeGsViewer {
   armCaptionReposition(captionId: string): boolean {
     if (!this.editingEnabled) return false;
     const caption = this.snapshot.captions.find((candidate) => candidate.id === captionId);
-    if (caption === undefined || !this.assetIsVisible(caption.anchor.assetId)) return false;
+    const targetAssetId = caption?.anchor?.assetId ?? this.snapshot.presentation.captionTargetAssetId;
+    if (caption === undefined || targetAssetId === null || !this.assetIsVisible(targetAssetId)) return false;
     this.currentCaption = caption;
     this.repositionCaptionId = caption.id;
     this.gizmoTarget = null;
@@ -590,6 +710,7 @@ export class NativeGsViewer {
     }
     this.representationObjects.clear();
     this.representationBounds.clear();
+    this.meshMaterialSlots.clear();
     this.assetGroups.clear();
     for (const marker of this.captionMarkers.values()) {
       marker.removeFromParent();
@@ -607,6 +728,11 @@ export class NativeGsViewer {
     if (representation.role === 'interactionProxy') {
       if (loaded.stats.triangles < 1) throw new Error('Interaction Proxy must contain triangles');
       makeProxyInvisible(loaded.root);
+    } else if (representation.role === 'meshPrimary') {
+      this.meshMaterialSlots.set(
+        representation.id,
+        registerNativeMeshMaterialSlots(loaded.root, representation.id),
+      );
     }
     loaded.root.name = representation.id;
     loaded.root.userData.representationId = representation.id;
@@ -615,6 +741,51 @@ export class NativeGsViewer {
     if (group === undefined) throw new Error('Representation Asset group is unavailable');
     group.add(loaded.root);
     this.representationObjects.set(representation.id, loaded.root);
+    this.applyActiveMeshMaterialAppearances();
+  }
+
+  private applyActiveMeshMaterialAppearances(): void {
+    this.materialIssues = [];
+    for (const slots of this.meshMaterialSlots.values()) {
+      for (const slot of slots) {
+        slot.material.opacity = slot.baseline.opacity;
+        slot.material.transparent = slot.baseline.transparent;
+        slot.material.depthWrite = slot.baseline.depthWrite;
+        slot.material.side = slot.baseline.side;
+        setUnlit(slot.material, false);
+        setChroma(slot.material, null);
+        slot.material.needsUpdate = true;
+      }
+    }
+    const activeSetId = this.activeDisplaySetOverride ?? this.snapshot.presentation.activeDisplaySetId ?? NATIVE_DEFAULT_DISPLAY_SET_ID;
+    for (const appearance of this.snapshot.meshMaterialAppearances ?? []) {
+      if (appearance.displaySetId !== activeSetId) continue;
+      const issue = this.applyMeshMaterialAppearance(appearance);
+      if (issue !== null) this.materialIssues.push(issue);
+    }
+  }
+
+  private applyMeshMaterialAppearance(appearance: NativeMeshMaterialAppearanceV1): string | null {
+    const slot = this.meshMaterialSlots.get(appearance.representationId)
+      ?.find((candidate) => candidate.key === appearance.materialSlotKey);
+    if (slot === undefined) {
+      return `Material setting ${appearance.id} was not applied because its exact surface is unavailable.`;
+    }
+    slot.material.opacity = appearance.opacity;
+    slot.material.side = appearance.doubleSided ? THREE.DoubleSide : THREE.FrontSide;
+    slot.material.transparent = slot.baseline.transparent || appearance.opacity < 1 || appearance.chroma.enabled;
+    slot.material.depthWrite = slot.baseline.depthWrite && appearance.opacity >= 1 && !appearance.chroma.enabled;
+    setUnlit(slot.material, appearance.unlit && slot.patchSupported);
+    setChroma(slot.material, appearance.chroma.enabled && slot.patchSupported ? {
+      enable: true,
+      color: chromaHex(appearance.chroma.colorSrgb),
+      tolerance: appearance.chroma.tolerance,
+      feather: appearance.chroma.feather,
+    } : null);
+    slot.material.needsUpdate = true;
+    return !slot.patchSupported && (appearance.unlit || appearance.chroma.enabled)
+      ? `Material setting ${appearance.id} applied opacity/sidedness only; this surface does not support unlit or chroma.`
+      : null;
   }
 
   private async loadPoint(representation: NativeRepresentationV1, source: WorkspaceReadableFile): Promise<void> {
@@ -690,7 +861,7 @@ export class NativeGsViewer {
     }
     this.syncCaptionMarkers();
     this.refreshGizmoAttachment();
-    this.callbacks.onIssuesChanged(this.resolution.issues);
+    this.callbacks.onIssuesChanged([...this.resolution.issues, ...this.materialIssues]);
   }
 
   private applyActiveAssetTransforms(): void {
@@ -858,7 +1029,7 @@ export class NativeGsViewer {
       this.callbacks.onIssuesChanged([...this.resolution.issues, 'The Caption selected for re-placement is unavailable.']);
       return;
     }
-    if (repositioned !== null && repositioned.anchor.assetId !== interaction.targetAssetId) {
+    if (repositioned?.anchor !== null && repositioned?.anchor !== undefined && repositioned.anchor.assetId !== interaction.targetAssetId) {
       this.callbacks.onIssuesChanged([...this.resolution.issues, 'Re-placement must use the Caption owning Asset.']);
       return;
     }
@@ -879,6 +1050,7 @@ export class NativeGsViewer {
     }
     const positionAsset = group.worldToLocal(hitPoint.clone());
     const caption: NativeCaptionV1 = {
+      ...(repositioned ?? {}),
       id: repositioned?.id ?? newNativeId('cap'),
       title: repositioned?.title ?? 'Caption',
       body: repositioned?.body ?? '',
@@ -945,7 +1117,9 @@ export class NativeGsViewer {
   }
 
   private syncCaptionMarkers(): void {
-    const captionIds = new Set(this.snapshot.captions.map((caption) => caption.id));
+    const activeDisplaySetId = this.activeDisplaySetOverride ?? this.snapshot.presentation.activeDisplaySetId ?? NATIVE_DEFAULT_DISPLAY_SET_ID;
+    const activeCaptions = this.snapshot.captions.filter((caption) => nativeCaptionDisplaySetIdV1(caption) === activeDisplaySetId);
+    const captionIds = new Set(activeCaptions.map((caption) => caption.id));
     for (const [captionId, marker] of this.captionMarkers) {
       if (captionIds.has(captionId)) continue;
       if (this.gizmo.object === marker) this.gizmo.detach();
@@ -954,7 +1128,18 @@ export class NativeGsViewer {
       disposeMaterial(marker.material);
       this.captionMarkers.delete(captionId);
     }
-    for (const caption of this.snapshot.captions) {
+    for (const caption of activeCaptions) {
+      if (caption.anchor === null) {
+        const existing = this.captionMarkers.get(caption.id);
+        if (existing !== undefined) {
+          if (this.gizmo.object === existing) this.gizmo.detach();
+          existing.removeFromParent();
+          existing.geometry.dispose();
+          disposeMaterial(existing.material);
+          this.captionMarkers.delete(caption.id);
+        }
+        continue;
+      }
       let marker = this.captionMarkers.get(caption.id);
       if (marker === undefined) {
         marker = new THREE.Mesh(
@@ -989,7 +1174,7 @@ export class NativeGsViewer {
     const marker = this.currentCaption === null ? undefined : this.captionMarkers.get(this.currentCaption.id);
     if (
       !this.editingEnabled || this.gizmoTarget?.kind !== 'caption' ||
-      marker === undefined || this.currentCaption === null
+      marker === undefined || this.currentCaption === null || this.currentCaption.anchor === null
     ) return;
     const next = {
       ...this.currentCaption,

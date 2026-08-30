@@ -14,12 +14,14 @@ import { parseJsonWithoutDuplicateMembers } from '../core/json';
 import type { ProjectWorkspaceFS, WorkspaceFS } from '../platform/fs';
 import {
   NATIVE_SCHEMA_VERSION,
+  isNativeImageMediaType,
   parseNativeSnapshotV1,
   type NativeProjectSnapshotV1,
 } from './schema';
 import {
   nativeSnapshotPath,
   nativeProjectRoot,
+  nativeMediaPath,
   nativeRepresentationPath,
   openNativeProjectV1,
   restoreNativeProjectV1,
@@ -35,6 +37,7 @@ configure({ useWebWorkers: false });
 
 export const NATIVE_PORTABLE_PACKAGE_FORMAT = 'lociview-native-portable-backup' as const;
 export const NATIVE_PORTABLE_PACKAGE_VERSION = 1 as const;
+export const NATIVE_PORTABLE_PACKAGE_VERSION_WITH_MEDIA = 2 as const;
 export const NATIVE_PORTABLE_MANIFEST_ENTRY = 'native/package.json' as const;
 export const NATIVE_PORTABLE_SNAPSHOT_ENTRY = 'native/snapshot.json' as const;
 
@@ -52,9 +55,18 @@ export interface NativePortableRepresentationManifestV1 {
   readonly mediaType: string;
 }
 
+export interface NativePortableMediaManifestV2 {
+  readonly mediaId: string;
+  readonly entry: string;
+  readonly byteLength: number;
+  readonly algorithm: 'sha256';
+  readonly digest: string;
+  readonly mediaType: string;
+}
+
 export interface NativePortableManifestV1 {
   readonly format: typeof NATIVE_PORTABLE_PACKAGE_FORMAT;
-  readonly packageVersion: typeof NATIVE_PORTABLE_PACKAGE_VERSION;
+  readonly packageVersion: typeof NATIVE_PORTABLE_PACKAGE_VERSION | typeof NATIVE_PORTABLE_PACKAGE_VERSION_WITH_MEDIA;
   readonly nativeSnapshot: {
     readonly schemaVersion: typeof NATIVE_SCHEMA_VERSION;
     readonly projectId: string;
@@ -66,6 +78,7 @@ export interface NativePortableManifestV1 {
     readonly digest: string;
   };
   readonly representations: readonly NativePortableRepresentationManifestV1[];
+  readonly media?: readonly NativePortableMediaManifestV2[];
 }
 
 export interface NativePortableInspectionV1 {
@@ -73,10 +86,12 @@ export interface NativePortableInspectionV1 {
   readonly snapshot: NativeProjectSnapshotV1;
   readonly packageByteLength: number;
   readonly representationByteLength: number;
+  readonly mediaByteLength: number;
 }
 
 export interface NativePortableStreamMetrics {
   readonly representationByteLength: number;
+  readonly mediaByteLength: number;
   readonly packageByteLength: number;
   readonly packageSha256: string;
   readonly maxApplicationChunkBytes: number;
@@ -161,7 +176,7 @@ function digest(value: unknown, label: string): string {
   return result;
 }
 
-function nativeId(value: unknown, prefix: 'prj' | 'snp' | 'rep', label: string): string {
+function nativeId(value: unknown, prefix: 'prj' | 'snp' | 'rep' | 'med', label: string): string {
   const result = nonEmptyString(value, label);
   if (!new RegExp(`^${prefix}_[0-9A-HJKMNPQRSTVWXYZ]{26}$`).test(result)) {
     throw new Error(`native portable package: invalid ${label}`);
@@ -173,12 +188,25 @@ function representationEntry(representationId: string): string {
   return `native/representations/${representationId}.bin`;
 }
 
+function mediaEntry(mediaId: string): string {
+  return `native/media/${mediaId}.bin`;
+}
+
 function parsePortableManifestV1(text: string): NativePortableManifestV1 {
   const input = record(parseJsonWithoutDuplicateMembers(text), 'manifest');
-  exactKeys(input, ['format', 'packageVersion', 'nativeSnapshot', 'representations'], 'manifest');
-  if (input.format !== NATIVE_PORTABLE_PACKAGE_FORMAT || input.packageVersion !== NATIVE_PORTABLE_PACKAGE_VERSION) {
+  if (input.format !== NATIVE_PORTABLE_PACKAGE_FORMAT || (
+    input.packageVersion !== NATIVE_PORTABLE_PACKAGE_VERSION &&
+    input.packageVersion !== NATIVE_PORTABLE_PACKAGE_VERSION_WITH_MEDIA
+  )) {
     throw new Error('native portable package: unsupported package format or version');
   }
+  exactKeys(
+    input,
+    input.packageVersion === NATIVE_PORTABLE_PACKAGE_VERSION
+      ? ['format', 'packageVersion', 'nativeSnapshot', 'representations']
+      : ['format', 'packageVersion', 'nativeSnapshot', 'representations', 'media'],
+    'manifest',
+  );
   const nativeSnapshot = record(input.nativeSnapshot, 'nativeSnapshot');
   exactKeys(
     nativeSnapshot,
@@ -217,9 +245,43 @@ function parsePortableManifestV1(text: string): NativePortableManifestV1 {
   if (representations.some((value, index) => value.representationId !== sorted[index]!.representationId)) {
     throw new Error('native portable package: Representation manifest must be sorted');
   }
+  const mediaSeen = new Set<string>();
+  const media = input.packageVersion === NATIVE_PORTABLE_PACKAGE_VERSION
+    ? []
+    : (() => {
+        if (!Array.isArray(input.media) || input.media.length < 1) {
+          throw new Error('native portable package: version 2 requires media entries');
+        }
+        return input.media.map((value) => {
+          const item = record(value, 'media entry');
+          exactKeys(item, ['mediaId', 'entry', 'byteLength', 'algorithm', 'digest', 'mediaType'], 'media entry');
+          const mediaId = nativeId(item.mediaId, 'med', 'media id');
+          if (mediaSeen.has(mediaId)) throw new Error(`native portable package: duplicate media ${mediaId}`);
+          mediaSeen.add(mediaId);
+          if (item.entry !== mediaEntry(mediaId) || item.algorithm !== 'sha256') {
+            throw new Error(`native portable package: invalid logical entry for ${mediaId}`);
+          }
+          const mediaType = nonEmptyString(item.mediaType, 'media type');
+          if (!isNativeImageMediaType(mediaType)) {
+            throw new Error('native portable package: unsupported media type');
+          }
+          return {
+            mediaId,
+            entry: item.entry,
+            byteLength: safeNonNegative(item.byteLength, 'media byteLength'),
+            algorithm: 'sha256' as const,
+            digest: digest(item.digest, 'media digest'),
+            mediaType,
+          };
+        });
+      })();
+  const sortedMedia = [...media].sort((a, b) => a.mediaId.localeCompare(b.mediaId));
+  if (media.some((value, index) => value.mediaId !== sortedMedia[index]!.mediaId)) {
+    throw new Error('native portable package: media manifest must be sorted');
+  }
   return {
     format: NATIVE_PORTABLE_PACKAGE_FORMAT,
-    packageVersion: NATIVE_PORTABLE_PACKAGE_VERSION,
+    packageVersion: input.packageVersion,
     nativeSnapshot: {
       schemaVersion: NATIVE_SCHEMA_VERSION,
       projectId: nativeId(nativeSnapshot.projectId, 'prj', 'project id'),
@@ -231,6 +293,7 @@ function parsePortableManifestV1(text: string): NativePortableManifestV1 {
       digest: digest(nativeSnapshot.digest, 'snapshot digest'),
     },
     representations,
+    ...(media.length === 0 ? {} : { media }),
   };
 }
 
@@ -306,7 +369,7 @@ function crossCheckManifestAndSnapshot(
   manifest: NativePortableManifestV1,
   snapshot: NativeProjectSnapshotV1,
   files: ReadonlyMap<string, FileEntry>,
-): number {
+): { readonly representationByteLength: number; readonly mediaByteLength: number } {
   if (
     snapshot.schemaVersion !== manifest.nativeSnapshot.schemaVersion ||
     snapshot.project.id !== manifest.nativeSnapshot.projectId ||
@@ -338,15 +401,43 @@ function crossCheckManifestAndSnapshot(
       throw new Error('native portable package: Representation total exceeds safe integer range');
     }
   }
+  const snapshotMedia = new Map((snapshot.mediaResources ?? []).map((media) => [media.id, media]));
+  const manifestMedia = manifest.media ?? [];
+  if (snapshotMedia.size !== manifestMedia.length) {
+    throw new Error('native portable package: manifest and snapshot media sets disagree');
+  }
+  if (manifest.packageVersion === 1 && snapshotMedia.size > 0) {
+    throw new Error('native portable package: package version 1 cannot contain media');
+  }
+  let mediaByteLength = 0;
+  for (const item of manifestMedia) {
+    const media = snapshotMedia.get(item.mediaId);
+    if (
+      media === undefined || media.blob.algorithm !== item.algorithm ||
+      media.blob.byteLength !== item.byteLength || media.blob.digest !== item.digest ||
+      media.blob.mediaType !== item.mediaType
+    ) {
+      throw new Error(`native portable package: media integrity record disagrees for ${item.mediaId}`);
+    }
+    const entry = files.get(item.entry);
+    if (entry === undefined || entry.uncompressedSize !== item.byteLength) {
+      throw new Error(`native portable package: missing or wrong-sized entry ${item.entry}`);
+    }
+    mediaByteLength += item.byteLength;
+    if (!Number.isSafeInteger(mediaByteLength)) {
+      throw new Error('native portable package: media total exceeds safe integer range');
+    }
+  }
   const expectedPaths = new Set([
     NATIVE_PORTABLE_MANIFEST_ENTRY,
     NATIVE_PORTABLE_SNAPSHOT_ENTRY,
     ...manifest.representations.map((item) => item.entry),
+    ...manifestMedia.map((item) => item.entry),
   ]);
   if (files.size !== expectedPaths.size || [...files.keys()].some((path) => !expectedPaths.has(path))) {
     throw new Error('native portable package: package contains an extra or undeclared entry');
   }
-  return representationByteLength;
+  return { representationByteLength, mediaByteLength };
 }
 
 async function openPortablePackage(blob: Blob, signal?: AbortSignal): Promise<OpenPortablePackage> {
@@ -372,11 +463,11 @@ async function openPortablePackage(blob: Blob, signal?: AbortSignal): Promise<Op
     }
     const snapshotText = fatalUtf8Decoder.decode(snapshotBytes);
     const snapshot = parseNativeSnapshotV1(snapshotText);
-    const representationByteLength = crossCheckManifestAndSnapshot(manifest, snapshot, files);
+    const lengths = crossCheckManifestAndSnapshot(manifest, snapshot, files);
     return {
       reader,
       files,
-      inspection: { manifest, snapshot, packageByteLength: blob.size, representationByteLength },
+      inspection: { manifest, snapshot, packageByteLength: blob.size, ...lengths },
       snapshotText,
     };
   } catch (error) {
@@ -431,7 +522,9 @@ function buildManifest(snapshot: NativeProjectSnapshotV1, snapshotText: string):
   const snapshotDigest = digestNativeBytes(new TextEncoder().encode(snapshotText));
   return {
     format: NATIVE_PORTABLE_PACKAGE_FORMAT,
-    packageVersion: NATIVE_PORTABLE_PACKAGE_VERSION,
+    packageVersion: (snapshot.mediaResources ?? []).length === 0
+      ? NATIVE_PORTABLE_PACKAGE_VERSION
+      : NATIVE_PORTABLE_PACKAGE_VERSION_WITH_MEDIA,
     nativeSnapshot: {
       schemaVersion: NATIVE_SCHEMA_VERSION,
       projectId: snapshot.project.id,
@@ -452,6 +545,18 @@ function buildManifest(snapshot: NativeProjectSnapshotV1, snapshotText: string):
         digest: representation.blob.digest,
         mediaType: representation.blob.mediaType,
       })),
+    ...((snapshot.mediaResources ?? []).length === 0 ? {} : {
+      media: [...(snapshot.mediaResources ?? [])]
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .map((media) => ({
+          mediaId: media.id,
+          entry: mediaEntry(media.id),
+          byteLength: media.blob.byteLength,
+          algorithm: 'sha256' as const,
+          digest: media.blob.digest,
+          mediaType: media.blob.mediaType,
+        })),
+    }),
   };
 }
 
@@ -462,7 +567,7 @@ function assertExportFitsImportBoundary(
   const manifestText = serializePortableManifestV1(manifest);
   const manifestBytes = new TextEncoder().encode(manifestText).byteLength;
   const snapshotBytes = new TextEncoder().encode(snapshotText).byteLength;
-  if (manifest.representations.length + 2 > DEFAULT_ZIP_LIMITS.maxEntries) {
+  if (manifest.representations.length + (manifest.media?.length ?? 0) + 2 > DEFAULT_ZIP_LIMITS.maxEntries) {
     throw new Error('native portable export: entry count exceeds the supported import boundary');
   }
   if (manifestBytes > METADATA_ENTRY_LIMIT_BYTES || snapshotBytes > METADATA_ENTRY_LIMIT_BYTES) {
@@ -472,6 +577,15 @@ function assertExportFitsImportBoundary(
   for (const item of manifest.representations) {
     if (item.byteLength > DEFAULT_ZIP_LIMITS.maxEntryBytes) {
       throw new Error(`native portable export: ${item.representationId} exceeds the supported entry boundary`);
+    }
+    total += item.byteLength;
+    if (!Number.isSafeInteger(total) || total > DEFAULT_ZIP_LIMITS.maxTotalBytes) {
+      throw new Error('native portable export: project exceeds the supported package boundary');
+    }
+  }
+  for (const item of manifest.media ?? []) {
+    if (item.byteLength > DEFAULT_ZIP_LIMITS.maxEntryBytes) {
+      throw new Error(`native portable export: ${item.mediaId} exceeds the supported entry boundary`);
     }
     total += item.byteLength;
     if (!Number.isSafeInteger(total) || total > DEFAULT_ZIP_LIMITS.maxTotalBytes) {
@@ -512,8 +626,11 @@ export async function exportNativePortablePackageV1(
     }
     fs.mutationAuthority.assertEditable();
     const opened = await openNativeProjectV1(fs, projectId);
-    if (opened.missingRepresentationIds.length > 0 || opened.sizeMismatchRepresentationIds.length > 0) {
-      throw new Error('native portable export: active project has unavailable Representation bytes');
+    if (
+      opened.missingRepresentationIds.length > 0 || opened.sizeMismatchRepresentationIds.length > 0 ||
+      opened.missingMediaIds.length > 0 || opened.sizeMismatchMediaIds.length > 0
+    ) {
+      throw new Error('native portable export: active project has unavailable binary bytes');
     }
     snapshot = opened.snapshot;
     snapshotText = await fs.readText(nativeSnapshotPath(projectId, snapshot.snapshotId)) ?? '';
@@ -573,6 +690,26 @@ export async function exportNativePortablePackageV1(
         throw new Error(`native portable export: source size/SHA-256 mismatch for ${item.representationId}`);
       }
     }
+    for (const item of manifest.media ?? []) {
+      fs.mutationAuthority.assertEditable();
+      if (options.signal?.aborted) throw options.signal.reason ?? new DOMException('Operation aborted', 'AbortError');
+      const source = await fs.readStream(nativeMediaPath(projectId, item.mediaId));
+      if (source === null || source.size !== item.byteLength) {
+        throw new Error(`native portable export: media bytes are unavailable for ${item.mediaId}`);
+      }
+      options.onStatus?.(`Streaming Caption image ${item.mediaId} to portable backup…`);
+      let sourceDigest: NativeStreamDigest | null = null;
+      const stream = hashingNativeStream(observation.stream(source.stream()), (value) => { sourceDigest = value; });
+      const knownSizeReader = { readable: stream, size: item.byteLength } as ReadableReader & { size: number };
+      await writer.add(item.entry, knownSizeReader, storedEntryOptions(options.signal));
+      const completedSourceDigest = sourceDigest as NativeStreamDigest | null;
+      if (
+        completedSourceDigest === null || completedSourceDigest.byteLength !== item.byteLength ||
+        completedSourceDigest.sha256 !== item.digest
+      ) {
+        throw new Error(`native portable export: media size/SHA-256 mismatch for ${item.mediaId}`);
+      }
+    }
     fs.mutationAuthority.assertEditable();
     options.onStatus?.('Finalizing portable backup central directory…');
     await writer.close(undefined, { zip64: false });
@@ -589,6 +726,7 @@ export async function exportNativePortablePackageV1(
     manifest,
     metrics: {
       representationByteLength: manifest.representations.reduce((sum, item) => sum + item.byteLength, 0),
+      mediaByteLength: (manifest.media ?? []).reduce((sum, item) => sum + item.byteLength, 0),
       packageByteLength: finalDigest.byteLength,
       packageSha256: finalDigest.sha256,
       maxApplicationChunkBytes: observation.maxChunkBytes,
@@ -635,10 +773,16 @@ export async function restoreNativePortablePackageV1(
   const opened = await openPortablePackage(blob, options.signal);
   try {
     const sources = new Map<string, NativeBinarySource>();
+    const mediaSources = new Map<string, NativeBinarySource>();
     for (const item of opened.inspection.manifest.representations) {
       const entry = opened.files.get(item.entry);
       if (entry === undefined) throw new Error(`native portable restore: missing entry ${item.entry}`);
       sources.set(item.representationId, streamedEntrySource(entry, item.mediaType, observation, options.signal));
+    }
+    for (const item of opened.inspection.manifest.media ?? []) {
+      const entry = opened.files.get(item.entry);
+      if (entry === undefined) throw new Error(`native portable restore: missing entry ${item.entry}`);
+      mediaSources.set(item.mediaId, streamedEntrySource(entry, item.mediaType, observation, options.signal));
     }
     const snapshot = await restoreNativeProjectV1(
       fs,
@@ -648,6 +792,7 @@ export async function restoreNativePortablePackageV1(
       options.onStatus,
       options.signal,
       opened.snapshotText,
+      mediaSources,
     );
     return {
       snapshot,

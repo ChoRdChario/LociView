@@ -15,7 +15,7 @@ import {
 import { detectFormat, loadModel } from '../viewer/loaders';
 import { ViewerCore } from '../viewer/viewer';
 import { AppContext } from './context';
-import { el, clear, fmtBytes } from './dom';
+import { el, clear, downloadBlob, fmtBytes } from './dom';
 import { infoDialog, promptDialog } from './dialogs';
 import { fNum, fStr } from './fields';
 import { mountHome, type NativeProjectListItem, type WritableProjectSession } from './home';
@@ -72,6 +72,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
   let projectOpening = false;
   let projectNavigationEpoch = 0;
   let packageExportStatus: PackageExportStatus = Object.freeze({ phase: 'idle' });
+  let v1ConversionInProgress = false;
 
   // ---- 保存状態（書き出し済みop数をプロジェクトごとに記録） -----------------------------
   const exportedKey = (dir: string): string => `lv-package-covered:${dir}`;
@@ -219,6 +220,137 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     window.location.assign(url);
   }
 
+  async function convertOpenedV1ToNative(onStatus: (message: string) => void): Promise<void> {
+    const activeCtx = ctx;
+    const sourceAccess = projectAccess;
+    if (
+      activeCtx === null || sourceAccess === null || !sourceAccess.holdsWriteLock ||
+      sourceAccess.accessState !== 'editable' || !activeCtx.store.canMutate
+    ) {
+      throw new Error('Native変換には、元のv1 projectをEdit modeで開いて書込みロックを保持する必要があります。');
+    }
+    if (v1ConversionInProgress) throw new Error('Native変換はすでに進行中です。');
+    v1ConversionInProgress = true;
+    const progressText = el('p', { role: 'status' }, '元のv1 projectを確認しています…');
+    const progressDialog = el('dialog', { class: 'lv-dialog' },
+      el('h2', {}, 'Native projectへ変換'),
+      el('p', {}, '元のv1 projectは変更しません。変換が完了するまで、この画面で他の編集はできません。'),
+      progressText,
+    ) as HTMLDialogElement;
+    document.body.append(progressDialog);
+    progressDialog.showModal();
+    let progressClosed = false;
+    const closeProgress = (): void => {
+      if (progressClosed) return;
+      progressClosed = true;
+      progressDialog.close();
+      progressDialog.remove();
+    };
+    const status = (message: string): void => {
+      progressText.textContent = message;
+      onStatus(message);
+    };
+    let targetAccess: ProjectMutationSession | null = null;
+    let created: import('../nativeGs/schema').NativeProjectSnapshotV1 | null = null;
+    let sourceAuthorityLost = false;
+    const unsubscribeSourceAccess = sourceAccess.subscribeAccess((state) => {
+      if (state !== 'editable') sourceAuthorityLost = true;
+    });
+    const assertSourceAuthority = (): void => {
+      if (
+        sourceAuthorityLost || !sourceAccess.holdsWriteLock || sourceAccess.accessState !== 'editable' ||
+        !activeCtx.store.canMutate
+      ) {
+        throw new Error('変換中に元のv1 projectの書込みロックを失ったため、新しいprojectの公開を中止しました。');
+      }
+      activeCtx.store.assertMutationAllowed();
+    };
+    try {
+      status('v1 projectが保存済みであることを確認しています…');
+      await sourceAccess.waitForWorkspaceIdle();
+      assertSourceAuthority();
+      if (activeCtx.store.durabilityStatus.phase !== 'durable' || activeCtx.store.durabilityStatus.pending !== 0) {
+        throw new Error('元のv1 projectに未保存または失敗中の変更があります。保存完了後に再実行してください。');
+      }
+      const conversion = await import('../nativeGs/frozenV1Conversion');
+      status('v1の全recordとsource bytesを照合しています…');
+      const plan = await conversion.planOpenedFrozenV1ToNative(activeCtx.fs, activeCtx.dir, activeCtx.store);
+      assertSourceAuthority();
+      if (plan.blockingIssueCount > 0) {
+        downloadBlob(
+          conversion.serializeFrozenV1ConversionPreflight(plan),
+          `${plan.sourceProjectId}-native-conversion-preflight.json`,
+          'application/json',
+        );
+        closeProgress();
+        await infoDialog(
+          'Native変換を開始しませんでした',
+          `${plan.blockingIssueCount}件のblocking項目があります。不完全なNative projectは作成していません。理由をconversion reportへ保存しました。`,
+        );
+        return;
+      }
+      const storage = await import('../nativeGs/storage');
+      await conversion.assertOpenedFrozenV1SourceUnchanged(plan, activeCtx.fs, activeCtx.store);
+      assertSourceAuthority();
+      status('新しいNative projectの書込みロックを取得しています…');
+      targetAccess = await mutationCoordinator.tryAcquire(
+        fs,
+        storage.nativeProjectRoot(plan.draft.project.id),
+        plan.draft.project.id,
+      );
+      if (!targetAccess.holdsWriteLock) throw new Error(targetAccess.accessDetail);
+      targetAccess.activateNewProject();
+      assertSourceAuthority();
+      status('modelと画像を検証しながら新しいNative projectへ保存しています…');
+      created = await storage.createNativeProjectV1(
+        targetAccess.workspace,
+        plan.draft,
+        plan.representationSources,
+        status,
+        plan.mediaSources,
+        assertSourceAuthority,
+      );
+      assertSourceAuthority();
+      const sourceAfter = await conversion.assertOpenedFrozenV1SourceUnchanged(plan, activeCtx.fs, activeCtx.store);
+      assertSourceAuthority();
+      const report = conversion.completeOpenedFrozenV1ConversionReport(plan, created, sourceAfter);
+      downloadBlob(
+        conversion.serializeFrozenV1ConversionReport(report),
+        `${plan.sourceProjectId}-to-${created.project.id}-conversion-report.json`,
+        'application/json',
+      );
+      targetAccess.release();
+      targetAccess = null;
+      closeProgress();
+      const reported = report.issues.length;
+      await infoDialog(
+        'Native変換が完了しました',
+        `元のv1 projectは変更されていません。新しいNative projectを作成しました。${reported}件の変換上の注記をreportへ保存しました。`,
+      );
+      if (!(await closeProjectAndShowHome())) return;
+      openNativeProjects(created.project.id, 'edit');
+    } catch (error) {
+      if (created !== null && targetAccess !== null) {
+        try {
+          const storage = await import('../nativeGs/storage');
+          await storage.deleteNativeProjectV1(targetAccess.workspace, created.project.id, created);
+          created = null;
+        } catch (cleanupError) {
+          throw new Error(
+            `${error instanceof Error ? error.message : String(error)}\n` +
+            `新規Native projectのcleanupにも失敗しました: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+          );
+        }
+      }
+      throw error;
+    } finally {
+      unsubscribeSourceAccess();
+      targetAccess?.release();
+      closeProgress();
+      v1ConversionInProgress = false;
+    }
+  }
+
   async function listNativeProjects(): Promise<NativeProjectListItem[]> {
     if (!persistentWorkspace) return [];
     const { listNativeProjectsV1 } = await import('../nativeGs/storage');
@@ -235,14 +367,14 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     ]);
     onStatus('バックアップの内容を確認しています…');
     const inspection = await inspectNativePortablePackageV1(file);
-    const required = inspection.representationByteLength + inspection.manifest.nativeSnapshot.byteLength + 64 * 1024;
+    const required = inspection.representationByteLength + inspection.mediaByteLength + inspection.manifest.nativeSnapshot.byteLength + 64 * 1024;
     const estimate = await navigator.storage.estimate?.();
     if (
       estimate?.quota !== undefined && estimate.usage !== undefined &&
       Number.isFinite(estimate.quota) && Number.isFinite(estimate.usage) &&
       estimate.quota - estimate.usage < required
     ) {
-      throw new Error(`保存容量が不足しています（モデル ${fmtBytes(inspection.representationByteLength)}）。プロジェクトは復元されていません。`);
+      throw new Error(`保存容量が不足しています（データ ${fmtBytes(inspection.representationByteLength + inspection.mediaByteLength)}）。プロジェクトは復元されていません。`);
     }
 
     const projectId = inspection.snapshot.project.id;
@@ -467,6 +599,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       setPackageExportStatus: (status) => setPackageExportStatus(dir, status),
       openProfile: () => void openProfile(),
       requestEditMode: () => void requestEditMode(),
+      convertOpenedV1ToNative,
     });
     // 最初のモデルを自動表示。ただし大きいモデルは自動で読まない。
     // （iOSはタブのメモリ上限が厳しく、開くたびに巨大モデルを読むとクラッシュが繰り返す。
@@ -502,6 +635,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
   // ---- キーボード ---------------------------------------------------------------
   document.addEventListener('keydown', (ev) => {
     if (ctx === null) return;
+    if (v1ConversionInProgress) return;
     const editing = (ev.target as HTMLElement).tagName === 'INPUT' || (ev.target as HTMLElement).tagName === 'TEXTAREA';
     if (editing) return;
     if (!ctx.store.canMutate) return;

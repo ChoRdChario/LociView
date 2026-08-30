@@ -15,6 +15,7 @@ import type { PackageExportStatus } from '../saveStatus';
 export interface DataTabDeps {
   loadModelAsset: (assetId: string) => Promise<void>;
   setPackageExportStatus: (status: PackageExportStatus) => void;
+  convertOpenedV1ToNative: (onStatus: (message: string) => void) => Promise<void>;
 }
 
 export function packageExportCompletionMessage(
@@ -27,6 +28,7 @@ export function packageExportCompletionMessage(
 }
 
 export function mountDataTab(container: HTMLElement, ctx: AppContext, deps: DataTabDeps): () => void {
+  let conversionInFlight = false;
   // ---- 取込 / マージ ---------------------------------------------------------
 
   const zipInput = el('input', { 'data-project-mutation': '', type: 'file', accept: '.zip,.lociview', style: 'display:none' }) as HTMLInputElement;
@@ -148,6 +150,26 @@ export function mountDataTab(container: HTMLElement, ctx: AppContext, deps: Data
     }
   }
 
+  const conversionStatus = el('p', { class: 'lv-dim', role: 'status' }, '元のv1プロジェクトは変更せず、新しいnativeプロジェクトを作ります。');
+  const convertToNative = el('button', {
+    'data-project-mutation': '',
+    class: 'primary',
+    onclick: () => {
+      if (conversionInFlight) return;
+      conversionInFlight = true;
+      convertToNative.setAttribute('disabled', 'true');
+      void deps.convertOpenedV1ToNative((message) => { conversionStatus.textContent = message; })
+        .catch(async (error) => {
+          conversionStatus.textContent = error instanceof Error ? error.message : String(error);
+          await infoDialog('Native変換', conversionStatus.textContent);
+        })
+        .finally(() => {
+          conversionInFlight = false;
+          convertToNative.removeAttribute('disabled');
+        });
+    },
+  }, '新しいNative projectへ変換');
+
   // ---- 画面 -------------------------------------------------------------------
 
   container.append(
@@ -173,6 +195,11 @@ export function mountDataTab(container: HTMLElement, ctx: AppContext, deps: Data
       el('div', { class: 'lv-row' },
         el('button', { 'data-project-mutation': '', onclick: () => modelInput.click() }, 'モデルファイルを追加（GLB/OBJ/STL/PLY）'),
       ),
+    ),
+    el('div', { class: 'lv-grp' },
+      el('div', { class: 'lv-hint' }, '後方互換データをNativeへ移す'),
+      el('div', { class: 'lv-row' }, convertToNative),
+      conversionStatus,
     ),
     el('div', { class: 'lv-grp' },
       el('div', { class: 'lv-hint' }, 'プロジェクト情報'),

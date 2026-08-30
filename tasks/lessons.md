@@ -1,5 +1,16 @@
 # Lessons
 
+## 2026-08-30: legacy conversion needs a usable native receiver first
+
+- A conversion report is not a substitute for a native product capability when
+  the source feature is an approved everyday workflow. For LociMyu/frozen-v1,
+  DisplaySet material appearance must have a usable native destination before
+  the converter is called complete.
+- Rule: prove the missing destination with one representative input, then add
+  only that receiver by reusing the existing product behavior. Do not turn the
+  correction into a generalized appearance framework, renderer abstraction or
+  DisplaySet/Asset-visibility coupling.
+
 ## 2026-07-16: 既存機能の廃止提案は運用ヒアリングを先にする
 
 - 設計初版で「シート切替はタグで代替・廃止」と提案したが、実運用ではシート切替が「マテリアルの見え方（半透明/Unlit）× キャプション位置 × ビュー」を束ねた**見え方セット**として使われており、単なる分類機能ではなかった
