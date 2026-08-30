@@ -1,47 +1,52 @@
 # LociView critical-path execution plan
 
-> Status: `CURRENT CHECKPOINT / NATIVE CAPTION WORKFLOW IMPLEMENTED; CONSOLIDATED UI ACCEPTANCE PENDING`
+> Status: `CURRENT CHECKPOINT / CONSOLIDATED NATIVE ACCEPTANCE PASS; CONVERSION GAP DECISION NEXT`
 >
-> Updated: 2026-08-30 after `4159103` on `g0-baseline`.
+> Updated: 2026-08-30 after `a2708cf` on `g0-baseline`.
 >
 > This is an execution plan plus the Product Owner's scheduling and display-model
 > decisions. G0 and G0-S remain release barriers. `G0S-TAB`, the first production
-> GS path, streamed native backup/restore and bounded one-Mesh/one-GS manual
-> alignment are complete without claiming G0/G0-S/G1 completion, permanent
-> renderer adoption, support or release authority.
+> GS path, streamed native backup/restore, multi-Asset editing and consolidated
+> Desktop/iPhone native product acceptance are complete without claiming
+> G0/G0-S/G1 completion, permanent renderer adoption, support or release
+> authority.
 
 ## 1. Delivery objective and present position
 
 The target is the approved public-candidate MVP, not a perfectly characterized
 v1 codebase. G-1 and S0 are complete. G0 is active/incomplete and G0-S remains a
-parallel release blocker. Bounded native production slices now prove the first
-Spark GS path, streamed portable backup and two-Asset manual alignment, but do
-not themselves pass the formal G1 adoption/support gates.
+parallel release blocker. Consolidated native production acceptance now proves
+the multi-format/multi-Asset path, streamed portable backup and ordinary product
+flow on Desktop and iPhone, but does not pass the formal G1 adoption/support
+gates.
 
 ```text
 G0 evidence and approval ──────────────────────────────────────┐
 G0-S current-user safety ──────────────────────────────────────┼─> release
-bounded native GS/backup/alignment checkpoint ────────────────┘
+consolidated native product checkpoint ──────────────────────┘
 ```
 
-The current critical path has parallel release lanes. The proxy-backed technical slice
-may begin after `G0S-TAB`; the lanes still join before release:
+The current critical path has parallel release lanes. The bounded native
+technical lane authorized after `G0S-TAB` has reached consolidated acceptance;
+the lanes still join before release:
 
 1. **G0 evidence lane:** make inputs/instrumentation executable, acquire and
    adopt exact external bytes, run the three device classes, then ratify the
    measured limits;
 2. **G0-S safety lane:** close only the pre-fix ledger and three remaining
    production roots while external evidence proceeds;
-3. **Approved technical lane:** retain the completed bounded native GS,
-   backup/restore and two-Asset alignment checkpoints; the next product feature
-   boundary is multiple formats/Assets with per-Asset layer visibility, not a
-   required Compare mode;
+3. **Approved technical lane:** retain the consolidated native checkpoint at
+   `a2708cf`, which closes the current multi-format/multi-Asset product flow on
+   Desktop and iPhone without creating a Compare mode; the next candidate is a
+   read-only gap/decision pass for non-destructive frozen-v1 and LociMyu-to-native
+   conversion, not migration implementation;
 4. **Join:** satisfy all applicable G0/G0-S barriers and technology decisions
    before the supported release.
 
-The completed LociMyu identity slice stays closed. Browser vector evidence is
-collected with the next consolidated browser/device run. Local review storage,
-portable review and additional identity hardening do not reopen that slice.
+The completed LociMyu identity slice stays closed. Its separate browser-vector
+evidence was not part of this native consolidated acceptance and remains in the
+legacy-conversion/release evidence lane. Local review storage, portable review
+and additional identity hardening do not reopen that slice.
 
 ## 2. Operating rules
 
@@ -302,18 +307,35 @@ G0/G0-S release barriers, disposable PoCs and one writer.
 | `WS2` G0 device evidence/ratification | `E6`–`E10`; three device classes, complete raw runs, reviewed artifacts and all seven G0 exit rows approved | `WS1`, physical devices, PO numeric decisions | PO/device operator / Codex / reviewer | WS1 | Environment facts only now; full runs `WAIT` |
 | `WS3` G0-S current-user safety | Ledger plus remaining `S2`–`S4`; real-browser/iOS evidence, exact-tree matrix, no unresolved P0/P1 and PO stabilized-v1 approval | Remaining journal/quarantine decisions and physical evidence | Codex / PO / reviewer | S0/S1 complete; final closure also WS2 | `YES` only for an approved release-blocking root or a P0/P1 that directly blocks the next production slice; do not resume micro-slice exploration |
 | `WS4` G1 technology decisions | G1-A, G1-B base renderer and G1-C each record reproducible `ADOPT`, `REJECT` or `RETRY` with rollback/fallback; later renderer features retain separate acceptance before their controls turn on | Applicable evidence and Product Owner adoption decisions | Codex / PO / device operator | Parallel evidence lanes; still required for adoption/release | `NO` for an adoption claim; the bounded proxy-backed technical implementation alone may start after S1 |
-| `WS5` multiple-Asset layer closure, then v2 MVP/release | Generalize the completed bounded native path so multiple formats and multiple Assets share one ProjectFrame while each Asset is independently placeable, selectable, visible/hidden, editable and durable. Reuse existing Asset/Representation records; Representation kind is not the visibility group. A diagnostic Compare workflow is optional and excluded unless separately approved. | The production data/render/storage boundary, multi-Caption authoring and ordinaryized Caption control flow are implemented. Exact-tree Desktop gesture/layout and physical-iPhone long-press evidence are intentionally batched; technology adoption and all release barriers still apply to support/release | Codex / PO / external reviewer | Builds on completed native GS/backup/alignment/visibility/Asset-addition/multi-Caption checkpoints; release after WS1–WS4 | `IMPLEMENTED / ACCEPTANCE PENDING` for the native Caption workflow; continue only independent bounded work, no G0/G1/release credit |
+| `WS5` native product closure, then non-destructive legacy conversion | Preserve the consolidated native Project as the durable source of truth, then convert frozen-v1 and LociMyu inputs without changing their source bytes or inventing a general migration framework. Compare remains excluded. | Current native flow is Product Owner-accepted on Desktop/iPhone with no unresolved P0/P1. Conversion still needs decisions on its first input boundary, non-lossy homes for legacy-only fields and exact-source retention. Technology adoption and release barriers still apply. | Codex / PO / external reviewer | Native checkpoint complete; conversion specification follows PO decisions; release after WS1–WS4 | `NATIVE ACCEPTANCE COMPLETE`; `CONVERSION READ-ONLY GAP COMPLETE / PO DECISIONS WAIT` |
 
 ## 8. Current authorization boundary
 
 The completed native checkpoints remain closed unless a new P0/P1 directly
-blocks downstream production work. Multi-Caption data, rendering, durable
-round-trip and the LociMyu-style select/add -> place -> edit wiring are
-implemented inside the still-isolated native route. Exact-tree Desktop gesture
-and physical-iPhone long-press evidence remain explicitly accumulated for one
-consolidated run, not inferred as PASS. This checkpoint changes no
-snapshot/package schema, renderer, storage architecture or v1 route. DisplaySet,
-attachments, ordinary points, migration, Compare and final visual polish remain
-outside it. Remaining G0/G0-S and external evidence continue as
-parallel release-barrier lanes. No external acquisition, device run, Release
-action, upload, publication, adoption, push or deployment is implied.
+blocks downstream production work. At exact production checkpoint `a2708cf`,
+the consolidated flow passed Product Owner Desktop and physical-iPhone checks:
+multi-format/multi-Asset rendering, transforms, visibility, Caption work,
+Saved Views, offline snapshot reopen and portable backup/restore operate as one
+native product path. No unresolved P0/P1 was reported. This acceptance does not
+change snapshot/package schema, renderer, storage architecture or the v1 route.
+
+The next candidate is specification work for non-destructive frozen-v1 and
+LociMyu-to-native conversion. Implementation waits for Product Owner decisions
+on the first input boundary, the minimum non-lossy destination for legacy-only
+fields, and exact outer-source retention. Compare remains excluded; DisplaySet
+extension, attachment/media UX and final visual polish remain later work.
+Remaining G0/G0-S and external evidence continue as parallel release barriers.
+Spark remains only the provisional first production GS path. No external
+acquisition, Release action, upload, publication, adoption, push or deployment
+is implied.
+
+## 9. Consolidated native acceptance checkpoint
+
+- **Exact executable checkpoint:** `a2708cf3e1163eeca98113a4166ce6345fa9e723`.
+- **Desktop:** PASS, including clearly visible GS rendering and selected-Asset
+  transform gizmo after the bounded initial-target fix.
+- **Physical iPhone 14 Pro:** PASS for the consolidated native product flow.
+- **P0/P1:** none open from this acceptance.
+- **P2:** input/section naming and grouping, LociMyu-like authoring flow polish,
+  clearer Asset-inclusive wording and visually stronger acceptance fixtures.
+- **Non-claims:** no G0, G0-S, G1, permanent renderer or release credit.

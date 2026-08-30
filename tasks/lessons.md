@@ -180,11 +180,17 @@
 - この判断は「iPhone PASS」の捏造ではない。未実施を記録し、current sliceをblockしないというrisk acceptance、過去の実機evidence、release/device gateの新規creditを分離する。
 - 実機runを延期した時点で一時公開tunnelを停止し、後日のrunでは同じ最小項目だけをまとめて確認する。延期を理由に追加fixture、instrumentationやmicro-hardeningを作らない。
 
-## 2026-08-30: 技術acceptance用controlを本番のCaption導線へ昇格させない
+## 2026-08-30: consolidated acceptanceでは内部状態と見える証拠を同期する
 
-- Caption target、Caption選択、新規作成、初期配置、位置調整、snapshot保存を別々のtechnical controlとして並べただけでは、各機能が動いても一般利用者には操作順が分からない。本番UXの成立を機能PASSから推定しない。
-- Caption authoringの本番導線を閉じるときは、LociMyuの実際の操作を参照し、「Captionを選ぶ／追加する→モデル上へ置く→その場で内容と位置を編集する」というユーザー作業を中心に一本化する。内部のAsset／Proxy／snapshot手順をユーザーに組み立てさせない。
-- 現在のnative画面はproduction wiringを検証するtechnical UIとして扱い、最終UIとしてordinary化しない。全体UI/UX closureまで、技術acceptanceと操作性acceptanceを別々に記録する。
+- format parserとround-trip用の1/8-splat fixtureは、rendererがユーザーに判別できる像を出したという視覚oracleではない。Product Ownerへvisual acceptanceを依頼する前に、fixtureが肉眼で判定可能かを確認し、必要なら既存の代表データを使う。fixture matrixを増やす理由にはしない。
+- select要素が「現在編集対象」を示すUIでは、表示値とviewer内部のgizmo targetを同時に更新する。Caption選択等が内部targetをclearする場合、位置調整を開始・復帰する境界で明示的に再接続し、見た目だけ選択済みのfalse greenを作らない。
+- Asset visibility件数はresource ready件数ではない。表示チェック、decoder/runtime readiness、描画結果とinteraction targetを別々に観測し、`4/4表示中`のようなmetadataだけからrenderer成功を推定しない。
+
+## 2026-08-30: format判定をユーザー入力UIの分裂へ持ち込まない
+
+- production UIではMesh/GS/Pointごとにfile pickerを選ばせず、一つの「モデルを追加」操作からcontentを検査して対応経路を決める。拡張子だけを権威にせず、未対応・曖昧な内容は明示拒否する。
+- add、replace、delete、placementは内部serviceが別でもユーザーにとって同じモデル管理作業である。最終UI closureでは一つの分かりやすい管理領域へまとめ、technical sliceのsection構造をそのまま製品導線へ固定しない。
+- consolidated acceptance中に得たこの種の操作性修正はP2として記録し、P0/P1の成立確認を終える前に別UI sliceへ展開しない。
 
 ## 2026-08-30: 低懸念の物理iPhone smokeをsliceごとに反復しない
 
