@@ -3274,3 +3274,48 @@ Review — 2026-08-30:
   automation dependency or browser-security workaround was added. Desktop
   render/size/pick/Caption evidence and physical-iPhone Point smoke remain
   unexecuted for the consolidated Product Owner run and are not claimed PASS.
+
+## Native Caption finding — bounded user-feature slice
+
+Checkpoint and plan — 2026-08-30:
+
+- [x] Keep Caption finding as local UI state; change no native snapshot,
+  portable package, Project publication, renderer or Caption record
+- [x] Add title/body substring search matching the existing ordinary-v1
+  behavior, plus an explicit owning-Asset filter and visible result count
+- [x] Keep the current stable Caption order, marker/list selection and editor;
+  filtering must not delete, move, retarget or silently change selection
+- [x] Rebuild the owner choices from the current Asset list so Asset deletion
+  safely falls back to all Assets without retaining a dangling filter
+- [x] Add only focused pure filtering acceptance, then obtain one independent
+  read-only P0/P1 review
+- [x] Run final-tree typecheck, full test and normal/BASE_PATH builds once;
+  carry touch/layout into the already approved consolidated physical-iPhone run
+- [x] Commit this bounded slice independently and leave the worktree clean
+
+Exclusions and stop conditions:
+
+- Caption ordering/tags/media, DisplaySet/material linkage, automatic camera
+  movement, Asset visibility changes, schema/package versions, migration and
+  final responsive polish remain outside this slice.
+- Stop rather than persisting search/filter state or inventing a second Caption
+  collection if the existing flat list cannot support the bounded workflow.
+
+Review — 2026-08-30:
+
+- Added ordinary title/body substring search, an explicit owning-Asset filter
+  and `result / total` count to the existing flat native Caption list. Search and
+  filter are session-only UI state and remain usable in View mode.
+- Filtering preserves snapshot order and never changes the selected Caption,
+  marker, editor, owner, anchor or source bytes. Asset choices rebuild from the
+  working Project; deleting an empty filtered Asset falls back to all Assets.
+- Added one pure filtering file with two tests covering ordinary-v1-compatible
+  case-insensitive title/body matching, Japanese text, owning-Asset composition,
+  stable order and empty results. One independent read-only review found no
+  P0/P1. Result-count live announcements and a DOM lifecycle test remain P2.
+- Final-tree typecheck and full suite passed (52 files; 1,416 passed; 21 todo).
+  Normal and `/LociView/` builds passed (114 modules; 15 PWA precache entries);
+  Spark remains a separate lazy chunk and no representative PLY is bundled.
+- No native snapshot/package/Project publication/renderer record changed.
+  Exact-tree Desktop layout and touch behavior remain for the already approved
+  consolidated manual run and are not claimed as physical-iPhone evidence.

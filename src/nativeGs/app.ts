@@ -9,6 +9,7 @@ import { registerPwa } from '../platform/pwa';
 import { inspectNativeGsPlyV1, inspectNativePointPlyV1, type NativePointPlyFactsV1 } from './plyProfile';
 import { isNativeGsOfflineReady, prepareNativeGsOffline } from './offline';
 import { NATIVE_POINT_DIAMETER_DEFAULT_CSS_PX } from './pointPresentation';
+import { filterNativeCaptionListV1 } from './captionList';
 import {
   activateNativeManualAssetTransformV1,
   NATIVE_GS_PROFILE_ID,
@@ -881,6 +882,13 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       ['scale', el('button', { 'aria-pressed': 'false' }, '均一スケール')],
     ]);
     const captionList = el('div', { class: 'ng-list ng-caption-list', 'aria-label': 'キャプション一覧' });
+    const captionSearch = el('input', {
+      type: 'search',
+      placeholder: '検索（タイトル・本文）',
+      'aria-label': 'キャプションをタイトルまたは本文で検索',
+    });
+    const captionAssetFilter = el('select', { 'aria-label': 'キャプションを所属モデルで絞り込み' });
+    const captionResultCount = el('span', { class: 'ng-note' });
     const newCaption = el('button', { class: 'primary' }, '＋ 新しいキャプション');
     const captionTitle = el('input', { type: 'text', maxlength: '160' });
     const captionBody = el('textarea');
@@ -929,23 +937,30 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       const previousTransform = transformAsset.value;
       const previousReplacement = replaceAsset.value;
       const previousDeletion = deleteAsset.value;
+      const previousCaptionAssetFilter = captionAssetFilter.value;
       clear(target);
       clear(transformAsset);
       clear(replaceAsset);
       clear(deleteAsset);
       clear(visibilityList);
+      clear(captionAssetFilter);
+      captionAssetFilter.append(el('option', { value: '' }, 'すべてのモデル'));
       for (const asset of working.assets) {
         target.append(targetOptions.get(asset.id)!);
         transformAsset.append(transformOptions.get(asset.id)!);
         replaceAsset.append(replaceOptions.get(asset.id)!);
         deleteAsset.append(deleteOptions.get(asset.id)!);
         visibilityList.append(visibilityRows.get(asset.id)!);
+        captionAssetFilter.append(el('option', { value: asset.id }, asset.label));
       }
       target.value = working.presentation.captionTargetAssetId ?? '';
       const fallbackAssetId = working.assets[0]!.id;
       transformAsset.value = working.assets.some((asset) => asset.id === previousTransform) ? previousTransform : fallbackAssetId;
       replaceAsset.value = working.assets.some((asset) => asset.id === previousReplacement) ? previousReplacement : fallbackAssetId;
       deleteAsset.value = working.assets.some((asset) => asset.id === previousDeletion) ? previousDeletion : fallbackAssetId;
+      captionAssetFilter.value = working.assets.some((asset) => asset.id === previousCaptionAssetFilter)
+        ? previousCaptionAssetFilter
+        : '';
     };
     syncAssetControlMembership();
 
@@ -976,10 +991,20 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const rebuildCaptionList = (): void => {
       clear(captionList);
       if (working.captions.length === 0) {
+        captionResultCount.textContent = '0件';
         captionList.append(el('p', { class: 'ng-note' }, 'キャプションはまだありません。'));
         return;
       }
-      for (const caption of working.captions) {
+      const filtered = filterNativeCaptionListV1(working.captions, {
+        query: captionSearch.value,
+        assetId: captionAssetFilter.value === '' ? null : captionAssetFilter.value,
+      });
+      captionResultCount.textContent = `${filtered.length} / ${working.captions.length}件`;
+      if (filtered.length === 0) {
+        captionList.append(el('p', { class: 'ng-note' }, '条件に一致するキャプションはありません。'));
+        return;
+      }
+      for (const caption of filtered) {
         const owner = working.assets.find((asset) => asset.id === caption.anchor.assetId);
         const review = nativeCaptionNeedsReviewV1(working, caption) ? '［要再配置］ ' : '';
         const button = el(
@@ -1030,7 +1055,10 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         working = updateSelectedNativeCaptionV1(working, selectedCaptionId, caption);
         selectedCaptionId ??= caption.id;
         const nextNeedsReview = nativeCaptionNeedsReviewV1(working, caption);
-        if (wasNew || previous?.title !== caption.title || previousNeedsReview !== nextNeedsReview) rebuildCaptionList();
+        if (
+          wasNew || previous?.title !== caption.title || previousNeedsReview !== nextNeedsReview ||
+          (captionSearch.value.trim() !== '' && previous?.body !== caption.body)
+        ) rebuildCaptionList();
         populateCaptionFields();
         return true;
       } catch (error) {
@@ -1155,6 +1183,11 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       newCaption,
       el('label', { class: 'ng-field' }, el('span', {}, '新しいキャプションの配置先'), target),
       captionGuide,
+      el('div', { class: 'ng-grid' },
+        el('label', { class: 'ng-field' }, el('span', {}, 'キャプションを検索'), captionSearch),
+        el('label', { class: 'ng-field' }, el('span', {}, '所属モデルで絞り込み'), captionAssetFilter),
+      ),
+      captionResultCount,
       captionList,
       el('label', { class: 'ng-field' }, el('span', {}, 'タイトル'), captionTitle),
       el('label', { class: 'ng-field' }, el('span', {}, '本文'), captionBody),
@@ -1576,6 +1609,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         viewer.setSnapshot(working);
         syncAssetControlMembership();
         syncVisibilityControls();
+        rebuildCaptionList();
         populateTransform();
         populateCaptionFields();
         markDirty();
@@ -1628,6 +1662,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       viewer.setSnapshot(working);
       markDirty();
     });
+    captionSearch.addEventListener('input', rebuildCaptionList);
+    captionAssetFilter.addEventListener('change', rebuildCaptionList);
     newCaption.addEventListener('click', () => {
       if (!canMutateWorking()) return;
       if (creatingCaption) {
