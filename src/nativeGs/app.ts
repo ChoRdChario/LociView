@@ -1368,6 +1368,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     populateCaptionFields();
     viewer.selectCaption(selectedCaptionId);
     populateTransform();
+    viewer.selectAlignmentAsset(transformAsset.value);
     viewer.setAssetGizmoMode(assetGizmoMode);
     rebuildSavedViewOptions();
     syncCurrentViewControls();
