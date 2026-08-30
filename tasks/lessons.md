@@ -1,5 +1,16 @@
 # Lessons
 
+## 2026-08-31: IDのないLociMyu Caption行を破損と決めつけない
+
+- 実運用LociMyuでは、他セルに値が残っていても安定Caption IDが空の行が
+  正当に存在し得る。これを自動的に「source修正が必要な破損」と分類しない。
+- Product Ownerが空行扱いを批准したdirect adapterでは、trim後のIDセルが
+  空の行だけをCaption生成・duplicate occurrence・digest計算から除外し、元
+  sourceを変更せずreportへ残す。
+- この例外を不正な非空ID、duplicate canonical key、digest collisionへ広げ
+  ない。後続Captionと元rowの対応も同じfilterで維持し、行ずれによる画像・
+  座標の誤所属を防ぐ。
+
 ## 2026-08-30: legacy conversion needs a usable native receiver first
 
 - A conversion report is not a substitute for a native product capability when

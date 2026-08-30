@@ -150,13 +150,18 @@ export function importWizardDialog(
           );
         }
       } else if (plan.blockedLociMyuSource !== null && plan.blockedLociMyuSource !== undefined) {
+        const skipsMissingIdRows = options.directNative && plan.blockedLociMyuSource.code === 'missing-legacy-id';
         summary.append(
           el('div', { class: 'lv-mr-row' },
             el('span', { class: 'lv-mr-ico warn' }, '⚠'),
-            'LociMyuデータを検出しましたが、安全なCaption IDを作れない行があります',
+            skipsMissingIdRows
+              ? 'Caption IDが空の行は空行として扱います'
+              : 'LociMyuデータを検出しましたが、安全なCaption IDを作れない行があります',
           ),
           el('div', { class: 'lv-mr-detail warn' },
-            '元のLociMyu ZIPは別途保管してください。「取り込み内容を確認」を押すとconversion reportを保存し、不完全なNative projectは作りません。'),
+            skipsMissingIdRows
+              ? '元のLociMyu ZIPは別途保管してください。その行からCaptionは作らずconversion reportへ記録します。元ZIPは変更せず、残りの有効なデータをNative projectへ変換します。'
+              : '元のLociMyu ZIPは別途保管してください。「取り込み内容を確認」を押すとconversion reportを保存し、不完全なNative projectは作りません。'),
         );
       } else if (plan.tables.length > 0) {
         summary.append(

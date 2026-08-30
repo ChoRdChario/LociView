@@ -1,6 +1,6 @@
 # LociMyu conversion identity, source authority and report contract
 
-> Status: `PRODUCT-OWNER APPROVED / BOUNDED DIRECT ADAPTER IMPLEMENTED / REPRESENTATIVE RETRY`
+> Status: `PRODUCT-OWNER APPROVED / BOUNDED DIRECT ADAPTER IMPLEMENTED / MISSING-ID EMPTY-ROW RULE IMPLEMENTED / REPRESENTATIVE AUTOMATED PASS; PRODUCT ACCEPTANCE PENDING`
 > Approved: 2026-08-26
 > Direct-adapter boundary approved: 2026-08-31
 > Identity recipe: `locimyu-caption-id-2`
@@ -44,9 +44,12 @@ This is the first direct-adapter behavior.
 - The user may choose one workbook when several candidate workbooks exist.
   That is a coarse source-authority choice. The importer MUST NOT ask the user
   to decide individual IDs, duplicate winners, guessed sheets or media matches.
-- Every otherwise-valid non-empty Caption row becomes a distinct active
-  Caption. Duplicate legacy IDs never select a winner and never fan one source
-  row into another row's identity.
+- Every otherwise-valid non-empty Caption row with a non-empty trimmed legacy
+  ID becomes a distinct active Caption. A row whose trimmed legacy-ID cell is
+  empty is treated as an empty Caption row: no Caption is created, it affects no
+  occurrence ordinal, and the disposition is recorded in the report. Duplicate
+  non-empty legacy IDs never select a winner and never fan one source row into
+  another row's identity.
 - A source-authoritative sheet or media relationship is applied automatically.
   An inferred, conflicting, missing or ambiguous relationship remains inactive
   or unlinked and is recorded in the conversion report. The Caption itself
@@ -54,11 +57,12 @@ This is the first direct-adapter behavior.
 - The ordinary result reports imported and reported counts. The exportable
   report records the source sheet, physical/logical row where available, source
   ID, affected field, reason and impact.
-- Conversion blocks before Project publication when stable identity cannot be
-  produced, a duplicate canonical key or full/truncated digest collision is
+- Conversion blocks before Project publication when a non-empty identity is
+  invalid, a duplicate canonical key or full/truncated digest collision is
   detected, the selected source cannot be read safely, or a verified
-  write/publication invariant fails. A report is still made available for a
-  blocked preflight.
+  write/publication invariant fails. A missing legacy ID alone follows the
+  reported empty-row rule above and does not block. A report is still made
+  available for a blocked preflight.
 
 Default workbook selection is deterministic
 and uses the same decoded snapshots that identity analysis uses. Candidates
@@ -117,8 +121,11 @@ are forbidden. The fields are determined as follows:
 - `occurrence` is the zero-based ordinal in that decoded data-row sequence among
   rows with the same trimmed `legacyId` in the same Caption sheet. Rows with
   another ID do not affect it. A completely empty row—every decoded cell is
-  empty after `LociMyuTrimV1`—does not affect it. Every other row must pass the
-  identity-only preflight in section 4.3 before any identity plan is accepted.
+  empty after `LociMyuTrimV1`—does not affect it. For the direct adapter, a row
+  with an empty trimmed legacy-ID cell is projected to that same empty-row
+  disposition before identity planning and is reported. Every other row must
+  pass the identity-only preflight in section 4.3 before any identity plan is
+  accepted.
 - `sheetIdentity.kind = legacyGid` only when section 4 admits one exact,
   conflict-free, one-to-one `__LM_SHEET_NAMES` mapping for that Caption sheet.
   `value` is its trimmed GID.
@@ -236,9 +243,10 @@ Caption remains active with an empty attachment list.
 ### 4.3 Caption-row disposition
 
 - A completely empty trailing/soft-delete row may be ignored.
-- A non-empty otherwise-valid row with no usable stable legacy ID does not
-  create a guessed Caption ID. It blocks the whole conversion before Project
-  publication and is recorded in the report.
+- A non-empty row whose trimmed legacy-ID cell is empty creates no guessed
+  Caption ID and is treated as an empty Caption row. It is recorded in the
+  report, does not affect duplicate occurrence numbering and does not block the
+  remaining conversion.
 - A valid Caption with an invalid coordinate remains active without an anchor
   and receives a report entry. Invalid optional color may use the documented UI
   default while the report records the affected field and impact.
@@ -300,9 +308,10 @@ that unconverted source data can be recovered from the native Project alone.
   identity-only production slice.
 - `LM-ID-07`: the exact trim boundary is exercised; interior trim code points
   remain, and NFC/NFD-distinct scalar sequences produce distinct preimages/IDs.
-- `LM-ID-08`: every invalid non-empty-row/key and collision case rejects the
-  complete identity-only conversion before any workspace write, while a
-  completely empty decoded row is ignored.
+- `LM-ID-08`: every invalid non-empty identity/key and collision case rejects
+  the complete identity-only conversion before any workspace write. A fully
+  empty decoded row is ignored; the direct adapter additionally reports and
+  skips a row whose trimmed legacy-ID cell is empty.
 - `LM-ID-09`: every user-reachable direct-conversion flow carries the
   source-retention/export limitation in section 5.
 - `LM-ID-10`: raw XLSX fixtures carry exact duplicate, incomplete, GID-to-title
@@ -329,13 +338,15 @@ that unconverted source data can be recovered from the native Project alone.
 - `LM-ADAPT-01`: the outer ZIP is unchanged and is neither embedded nor copied
   into the Project. A new Project becomes active only after the existing
   verified-write, snapshot-last and marker-last publication sequence.
-- `LM-ADAPT-02`: every non-empty Caption row is reconciled. Exact
-  source-authoritative relations activate; ambiguous or invalid relations
-  remain inactive/unlinked and are reported; an invalid coordinate produces an
-  active unplaced Caption.
-- `LM-ADAPT-03`: missing stable Caption identity, a duplicate canonical key or
+- `LM-ADAPT-02`: every non-empty Caption row is reconciled. A row with an empty
+  trimmed legacy-ID cell is reported and treated as empty; every admitted row
+  becomes a Caption. Exact source-authoritative relations activate; ambiguous
+  or invalid relations remain inactive/unlinked and are reported; an invalid
+  coordinate produces an active unplaced Caption.
+- `LM-ADAPT-03`: an invalid non-empty identity, a duplicate canonical key or
   full/truncated digest collision aborts all Project publication. The blocking
-  item remains in an exportable report.
+  item remains in an exportable report; a missing legacy ID alone does not
+  block under `LM-ADAPT-02`.
 - `LM-ADAPT-04`: successful and blocked preflights produce complete
   accounting with source sheet, physical/logical row where available, source
   ID, affected field, reason, impact and final disposition.

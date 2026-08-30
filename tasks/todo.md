@@ -123,18 +123,35 @@ Required conversion invariants:
 - [x] Run one independent migration/input review and focused checks. The review
   found no remaining implementation P0/P1.
 - [x] Run the final typecheck/full test/build matrix once on the completed tree.
-- [x] Run the private representative preflight read-only. It found 109 non-empty
+- [x] Historical pre-correction private representative preflight found 109 non-empty
   Caption rows and stopped before publication because six rows on
   `モデル確認用（透過）` lack stable legacy IDs; all six are reported, converted
   counts are zero and the source hash is unchanged.
-- [x] Classify the bounded result as `FIRST LOCIMYU NATIVE ADAPTER: RETRY`.
+- [x] Classify that pre-correction result as `FIRST LOCIMYU NATIVE ADAPTER: RETRY`.
   Converted-project Desktop/iPhone and portable-restore acceptance cannot run
   and are not inferred while no Project is published.
 
-Required next input action: supply a source in which logical rows 43–48 on
-`モデル確認用（透過）` have stable legacy Caption IDs, or make a row genuinely
-empty only if it was intentionally deleted. Do not auto-generate IDs or edit the
-private source on the user's behalf.
+The earlier source-correction requirement is superseded by the Product Owner
+decision below. The private source must remain unchanged.
+
+## Active approved correction — ID-less Caption rows are empty input
+
+- [x] Product Owner confirmed that the representative six-row condition is a
+  valid real-world case and approved treating such rows as empty.
+- [x] Freeze the narrow rule before implementation: only a Caption row whose
+  legacy-ID cell is empty after `LociMyuTrimV1` is skipped and reported. Invalid
+  non-empty IDs, duplicate canonical keys and digest collisions still block.
+- [x] Implement the direct-adapter projection without changing source bytes,
+  guessing an ID or shifting later Caption row/attachment/position alignment.
+- [x] Update the focused regression from blocked publication to one valid
+  Caption plus two explicitly reported/skipped ID-less rows.
+- [x] Rerun the one private representative through publication and portable
+  restore: 109 source rows produced 103 Captions, all six skipped rows were
+  explicit, no Representation/media was missing after restore, and source
+  byte/hash identity held.
+- [x] Complete one independent review and the final matrix. The review's one P1
+  source-retention notice was fixed and re-reviewed; no P0/P1 remains.
+- [ ] Request only the resulting bounded Desktop/iPhone product acceptance.
 
 ## P2 backlog — not a completion blocker
 
@@ -189,12 +206,14 @@ private source on the user's behalf.
   migration system.
 - The private representative retained 94,063,937 bytes and SHA-256
   `3736aa3bb5cffcf9b9aaffb70cc210878069d4876b63ced8441f79da8a9da01c`.
-  Preflight accounted for 396 source mappings: six blocking and 390 reported.
-  No Project became active and all representative converted counts are zero.
-- Independent read-only review found no remaining adapter P0/P1. The six
-  missing stable source IDs are a bounded external-data correction and make the
-  representative result `RETRY`, not PASS and not missing-source blocked.
-- Final adapter tree verification passed: typecheck; 54 full-suite files with
+  Under the approved correction, 109 source Caption rows produce 103 Captions;
+  rows 43–48 are explicit reported empty input. Native publication and portable
+  package-v2 restore pass with no missing Representation or media.
+- Independent read-only review found and closed one P1: the missing-ID wizard
+  branch now repeats that the original ZIP must be retained. No P0/P1 remains;
+  media-attachment-specific row-alignment coverage stays P2 because position,
+  source-row and representative restore evidence already exercise the seam.
+- Final correction-tree verification passed: typecheck; 54 full-suite files with
   1,431 tests passing and 21 existing todo; normal production build; and the
   `/LociView/` base-path build. Spark remains outside the service-worker
   precache and the representative PLY bytes are absent from repository/build.

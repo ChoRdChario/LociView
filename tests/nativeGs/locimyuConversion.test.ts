@@ -5,7 +5,7 @@ import { buildImportPlan } from '../../src/assets/importWizard';
 import { readZipEntries, writeZipEntries } from '../../src/assets/zipio';
 import {
   assertLociMyuSourceUnchanged,
-  completeBlockedLociMyuNativeConversionReport,
+  completeLociMyuNativeConversionReport,
   createLociMyuNativeProject,
   planLociMyuZipToNative,
 } from '../../src/nativeGs/locimyuConversion';
@@ -62,7 +62,7 @@ describe('LociMyu ZIP to native direct adapter', () => {
     session.release();
   });
 
-  it('reports every non-empty missing-ID row and exposes no publishable bytes', async () => {
+  it('treats ID-less rows as reported empty input without shifting the valid Caption row', async () => {
     const zip = await writeZipEntries([
       {
         path: 'LociMyu Save.csv',
@@ -74,23 +74,35 @@ describe('LociMyu ZIP to native direct adapter', () => {
       },
       { path: 'models/tri.glb', data: new Uint8Array(await readFile(resolve('public/samples/tri.glb'))) },
     ]);
-    const file = new File([Uint8Array.from(zip)], 'blocked-locimyu.zip', { type: 'application/zip' });
+    const file = new File([Uint8Array.from(zip)], 'idless-rows-locimyu.zip', { type: 'application/zip' });
     const importPlan = await buildImportPlan(await readZipEntries(zip), { preserveBlockedLociMyuSource: true });
-    const plan = await planLociMyuZipToNative(file, importPlan, 'Blocked direct fixture');
-    expect(plan.blockingIssueCount).toBe(2);
+    const plan = await planLociMyuZipToNative(file, importPlan, 'ID-less rows direct fixture');
+    expect(plan.blockingIssueCount).toBe(0);
     expect(plan.inventory.captionRowCount).toBe(3);
-    expect(plan.issues.filter((entry) => entry.code === 'missing-legacy-id')).toEqual([
+    expect(plan.issues.filter((entry) => entry.code === 'caption-row-skipped-missing-id')).toEqual([
       expect.objectContaining({ sourceSheet: 'LociMyu Save', sourceRow: 2, field: 'legacyCaptionId' }),
       expect.objectContaining({ sourceSheet: 'LociMyu Save', sourceRow: 4, field: 'legacyCaptionId' }),
     ]);
-    expect(plan.representationSources.size).toBe(0);
+    expect(plan.mappings.filter((entry) =>
+      entry.sourceKind === 'Caption row' && entry.disposition === 'reported')).toEqual([
+      expect.objectContaining({ sourceId: 'LociMyu Save:2:(missing legacy ID)' }),
+      expect.objectContaining({ sourceId: 'LociMyu Save:4:(missing legacy ID)' }),
+    ]);
+    expect(plan.draft.captions).toEqual([
+      expect.objectContaining({
+        title: 'valid row',
+        anchor: expect.objectContaining({ positionAsset: [0, 1, 2] }),
+      }),
+    ]);
+    expect(plan.mappings).toContainEqual(expect.objectContaining({
+      sourceKind: 'Caption row',
+      sourceId: 'LociMyu Save:3:c_valid',
+      disposition: 'converted',
+    }));
+    expect(plan.representationSources.size).toBe(1);
     expect(plan.mediaSources.size).toBe(0);
-    expect(plan.draft.assets).toEqual([]);
+    expect(plan.draft.assets).toHaveLength(1);
     const after = await assertLociMyuSourceUnchanged(plan, file);
-    const report = completeBlockedLociMyuNativeConversionReport(plan, after);
-    expect(report.source.unchanged).toBe(true);
-    expect(report.convertedCounts.assets).toBe(0);
-    expect(report.target.snapshotId).toBeNull();
 
     const fs = new MemoryFS();
     const session = await ProjectMutationCoordinator.local().tryAcquire(
@@ -99,8 +111,14 @@ describe('LociMyu ZIP to native direct adapter', () => {
       plan.draft.project.id,
     );
     session.activateNewProject();
-    await expect(createLociMyuNativeProject(session.workspace, plan, file)).rejects.toThrow(/blocked preflight/);
-    expect(await listNativeProjectsV1(fs)).toEqual([]);
+    const snapshot = await createLociMyuNativeProject(session.workspace, plan, file);
+    const report = completeLociMyuNativeConversionReport(plan, snapshot, after);
+    expect(report.source.unchanged).toBe(true);
+    expect(report.convertedCounts.assets).toBe(1);
+    expect(report.convertedCounts.captions).toBe(1);
+    expect(report.target.snapshotId).toBe(snapshot.snapshotId);
+    expect(await listNativeProjectsV1(fs)).toHaveLength(1);
+    expect((await openNativeProjectV1(fs, snapshot.project.id)).snapshot.captions).toEqual(snapshot.captions);
     session.release();
   });
 

@@ -1,8 +1,8 @@
 # LociView critical-path execution plan
 
-> Status: `CURRENT CHECKPOINT / FIRST FROZEN-V1 -> NATIVE LANE PASS; DIRECT LOCIMYU ADAPTER IMPLEMENTED, REPRESENTATIVE RETRY`
+> Status: `CURRENT CHECKPOINT / FIRST FROZEN-V1 -> NATIVE LANE PASS; DIRECT LOCIMYU REPRESENTATIVE AUTOMATED PASS, PRODUCT ACCEPTANCE PENDING`
 >
-> Updated: 2026-08-31 at `7575240` on `g0-baseline`.
+> Updated: 2026-08-31 after checkpoint `98d91f4` on `g0-baseline`.
 >
 > This is an execution plan plus the Product Owner's scheduling and display-model
 > decisions. G0 and G0-S remain release barriers. `G0S-TAB`, the first production
@@ -311,7 +311,7 @@ G0/G0-S release barriers, disposable PoCs and one writer.
 | `WS2` G0 device evidence/ratification | `E6`–`E10`; three device classes, complete raw runs, reviewed artifacts and all seven G0 exit rows approved | `WS1`, physical devices, PO numeric decisions | PO/device operator / Codex / reviewer | WS1 | Environment facts only now; full runs `WAIT` |
 | `WS3` G0-S current-user safety | Ledger plus remaining `S2`–`S4`; real-browser/iOS evidence, exact-tree matrix, no unresolved P0/P1 and PO stabilized-v1 approval | Remaining journal/quarantine decisions and physical evidence | Codex / PO / reviewer | S0/S1 complete; final closure also WS2 | `YES` only for an approved release-blocking root or a P0/P1 that directly blocks the next production slice; do not resume micro-slice exploration |
 | `WS4` G1 technology decisions | G1-A, G1-B base renderer and G1-C each record reproducible `ADOPT`, `REJECT` or `RETRY` with rollback/fallback; later renderer features retain separate acceptance before their controls turn on | Applicable evidence and Product Owner adoption decisions | Codex / PO / device operator | Parallel evidence lanes; still required for adoption/release | `NO` for an adoption claim; the bounded proxy-backed technical implementation alone may start after S1 |
-| `WS5` native product closure, then non-destructive legacy conversion | Preserve the consolidated native Project as the durable source of truth, then convert frozen-v1 and LociMyu inputs without changing their source bytes or inventing a general migration framework. Compare remains excluded. | The frozen-v1 lane is accepted. The direct LociMyu adapter is implemented, but its first private representative cannot publish until six non-empty Caption rows receive stable legacy IDs. Technology adoption and release barriers still apply. | Codex / PO / external reviewer | Native checkpoint and frozen-v1 lane complete; representative source correction precedes LociMyu end-to-end acceptance; release after WS1–WS4 | `FIRST FROZEN-V1 LANE: PASS`; `FIRST LOCIMYU NATIVE ADAPTER: RETRY` |
+| `WS5` native product closure, then non-destructive legacy conversion | Preserve the consolidated native Project as the durable source of truth, then convert frozen-v1 and LociMyu inputs without changing their source bytes or inventing a general migration framework. Compare remains excluded. | The frozen-v1 lane is accepted. The direct LociMyu representative now publishes and survives automated portable restore under the approved empty-ID-row rule; bounded Desktop/iPhone product acceptance remains. Technology adoption and release barriers still apply. | Codex / PO / external reviewer | Native checkpoint and frozen-v1 lane complete; one representative product acceptance remains before closing the LociMyu lane; release after WS1–WS4 | `FIRST FROZEN-V1 LANE: PASS`; `FIRST LOCIMYU NATIVE ADAPTER: PRODUCT ACCEPTANCE PENDING` |
 
 ## 8. Current authorization boundary
 
@@ -327,11 +327,13 @@ The first non-destructive input lane converts an already-opened frozen-v1
 workspace to a separate native Project. Its bounded receiver and converter are
 implemented, independently reviewed and accepted on Desktop and physical
 iPhone. The source is never overwritten or embedded and every unsupported
-value is reported. The separate direct LociMyu adapter is now implemented and
-independently reviewed. Its representative preflight found six non-empty rows
-without stable Caption IDs and therefore produced only a report: it wrote no
-native Project, preserved the private source bytes and awaits a corrected input
-before end-to-end Desktop/iPhone acceptance.
+value is reported. The separate direct LociMyu adapter is now implemented.
+Under the subsequent Product Owner rule, the representative's six rows with an
+empty trimmed ID are reported as empty input and do not consume Caption
+identity or row alignment. Automated publication and portable restore now pass
+with 103 Captions while the private source remains byte-identical.
+Desktop/iPhone product acceptance is not inferred from that automated result
+and remains the only product-lane check.
 Compare remains excluded; attachment/media UX and final visual polish remain
 later work.
 Remaining G0/G0-S and external evidence continue as parallel release barriers.
@@ -382,11 +384,17 @@ is implied.
 - **Representative:** private 94,063,937-byte outer ZIP with one selected
   workbook, eight sheets, 109 non-empty Caption rows, one model, 78 images,
   81 file-ID-map rows, four view rows and 111 material rows.
-- **Blocking result:** six non-empty rows on `モデル確認用（透過）` lack stable
-  legacy IDs. All six are reported and publication stops before snapshot/active
-  marker; converted counts are zero and the source hash is unchanged.
-- **Review/P0:** independent read-only review found no implementation P0/P1.
-  The correctable source-identity gap is the only end-to-end P1 condition.
-- **Lane result:** `FIRST LOCIMYU NATIVE ADAPTER: RETRY`. Desktop/iPhone
-  converted-project and portable-restore acceptance are not inferred while no
-  Project can be published.
+- **Approved empty-row result:** rows 43–48 on `モデル確認用（透過）` have an
+  empty trimmed legacy ID and are each reported as empty input. They create no
+  Caption, guessed ID or occurrence ordinal. Invalid non-empty identities and
+  collisions remain publication blockers.
+- **Automated representative:** all 109 source rows are accounted for; 103
+  Captions, one Asset/Representation, four DisplaySets, two material
+  appearances and 24 image resources publish. Portable package v2 restores
+  with no missing Representation or media. The 94,063,937-byte source remains
+  SHA-256 `3736aa3bb5cffcf9b9aaffb70cc210878069d4876b63ced8441f79da8a9da01c`.
+- **Review/P0/P1:** independent review found one missing source-retention notice;
+  the bounded wording fix was re-reviewed and closed it. The final matrix is
+  green and no correction P0/P1 remains.
+- **Lane result:** `FIRST LOCIMYU NATIVE ADAPTER: PRODUCT ACCEPTANCE PENDING`.
+  Desktop/iPhone acceptance is not inferred from automated publication/restore.

@@ -731,19 +731,35 @@ export async function planLociMyuZipToNative(
   const projectId = newNativeId('prj');
   const projectFrameId = newNativeId('frm');
   const resolvedProjectTitle = cleanSingleLine(projectTitle, sourceFile.name.replace(/\.(zip|lociview)$/iu, ''));
-  const captionTables = input.tables.filter((table) =>
+  const sourceCaptionTables = input.tables.filter((table) =>
+    !INTERNAL_SHEETS.has(lociMyuTrimV1(table.name)) && isLociMyuCaptionSheet(table.rows));
+  const sourceCaptionTableSet = new Set(sourceCaptionTables);
+  const missingLegacyIdRows = captionRowsWithLocations(sourceCaptionTables)
+    .filter(({ row }) => cell(row, 0) === '');
+  const conversionTables = input.tables.map((table): SheetTable => ({
+    name: table.name,
+    ...(table.gid === undefined ? {} : { gid: table.gid }),
+    rows: table.rows.map((row, index) =>
+      sourceCaptionTableSet.has(table) && index > 0 && !isEmptyRow(row) && cell(row, 0) === ''
+        ? row.map(() => '')
+        : [...row]),
+  }));
+  const captionTables = conversionTables.filter((table) =>
     !INTERNAL_SHEETS.has(lociMyuTrimV1(table.name)) && isLociMyuCaptionSheet(table.rows));
   for (const candidate of input.workbookCandidates) {
     if (candidate.archivePath === input.workbookPath) continue;
+    const missingIdOnly = candidate.validationFailure?.code === 'missing-legacy-id';
     mappings.push({
       sourceKind: 'workbook candidate',
       sourceId: candidate.archivePath,
       disposition: 'reported',
       note: candidate.validationFailure === undefined
         ? 'not selected by the deterministic coarse workbook rule'
+        : missingIdOnly
+          ? 'not selected; ID-less Caption rows would be treated as empty if this workbook were selected'
         : `rejected candidate: ${candidate.validationFailure.code}: ${candidate.validationFailure.message}`,
     });
-    if (candidate.validationFailure !== undefined) {
+    if (candidate.validationFailure !== undefined && !missingIdOnly) {
       issue(issues, 'warning', 'workbook-candidate-rejected', { id: candidate.archivePath, field: 'workbook' },
         candidate.validationFailure.message,
         'The candidate is not mixed with the selected workbook and remains only in the retained source ZIP/report.');
@@ -753,29 +769,22 @@ export async function planLociMyuZipToNative(
     issue(issues, 'warning', 'archive-entry-reported', { field: 'archive entry' }, message,
       'The entry is not copied into native state and remains in the retained source ZIP/report.');
   }
-  const missingLegacyIdRows = captionRowsWithLocations(captionTables)
-    .filter(({ row }) => cell(row, 0) === '');
   for (const entry of missingLegacyIdRows) {
-    issue(issues, 'blocking', 'missing-legacy-id', {
+    const sheet = lociMyuTrimV1(entry.table.name);
+    issue(issues, 'warning', 'caption-row-skipped-missing-id', {
       sheet: lociMyuTrimV1(entry.table.name),
       row: entry.rowNumber,
       field: 'legacyCaptionId',
-    }, 'The non-empty Caption row has no legacy ID required by locimyu-caption-id-2.',
-    'No ID is guessed and no native Project is published; the row remains in the retained source ZIP and this report.');
-  }
-  if (missingLegacyIdRows.length > 0) {
-    return blockedPreflightPlan({
-      snapshot: input,
-      sourceBefore,
-      selectedWorkbook,
-      captionTables,
-      projectId,
-      projectFrameId,
-      projectTitle: resolvedProjectTitle,
-      issues,
+    }, 'The non-empty source row has no trimmed legacy ID and is treated as an empty Caption row by the approved direct-adapter rule.',
+    'No Caption or guessed ID is created; the unchanged row remains in the retained source ZIP and is explicit in this report.');
+    mappings.push({
+      sourceKind: 'Caption row',
+      sourceId: `${sheet}:${entry.rowNumber}:(missing legacy ID)`,
+      disposition: 'reported',
+      note: 'treated as empty input; no Caption created and no occurrence ordinal consumed',
     });
   }
-  if (input.selectedValidationFailure !== undefined) {
+  if (input.selectedValidationFailure !== undefined && input.selectedValidationFailure.code !== 'missing-legacy-id') {
     issue(issues, 'blocking', input.selectedValidationFailure.code, {
       id: input.workbookPath,
       field: 'Caption identity',
@@ -785,7 +794,7 @@ export async function planLociMyuZipToNative(
       snapshot: input,
       sourceBefore,
       selectedWorkbook,
-      captionTables,
+      captionTables: sourceCaptionTables,
       projectId,
       projectFrameId,
       projectTitle: resolvedProjectTitle,
@@ -794,7 +803,7 @@ export async function planLociMyuZipToNative(
   }
   let migration;
   try {
-    migration = await analyzeLociMyuSheets(input.tables);
+    migration = await analyzeLociMyuSheets(conversionTables);
   } catch (error) {
     if (!(error instanceof LociMyuSourceValidationError) && !(error instanceof LociMyuIdentityCollisionError)) throw error;
     issue(issues, 'blocking', error.code, { id: input.workbookPath, field: 'Caption identity' },
@@ -804,7 +813,7 @@ export async function planLociMyuZipToNative(
       snapshot: input,
       sourceBefore,
       selectedWorkbook,
-      captionTables,
+      captionTables: sourceCaptionTables,
       projectId,
       projectFrameId,
       projectTitle: resolvedProjectTitle,
@@ -817,7 +826,7 @@ export async function planLociMyuZipToNative(
       'No native Project is published.');
   }
 
-  const identityProjection = projectLociMyuCaptionSheetIdentities(input.tables);
+  const identityProjection = projectLociMyuCaptionSheetIdentities(conversionTables);
   const authoritativeSetNameByGid = new Map<string, string>();
   for (const table of captionTables) {
     const identity = identityProjection.get(table);
@@ -825,7 +834,7 @@ export async function planLociMyuZipToNative(
   }
   const candidateTitlesByGid = new Map<string, Set<string>>();
   const candidateGidsByTitle = new Map<string, Set<string>>();
-  const sheetMap = input.tables.find((table) => lociMyuTrimV1(table.name) === LM_SHEET_NAMES_SHEET);
+  const sheetMap = conversionTables.find((table) => lociMyuTrimV1(table.name) === LM_SHEET_NAMES_SHEET);
   for (const row of sheetMap?.rows.slice(1) ?? []) {
     const gid = cell(row, 0);
     const title = cell(row, 2) !== '' ? cell(row, 2) : cell(row, 1);
@@ -879,7 +888,7 @@ export async function planLociMyuZipToNative(
       ]);
     }
   }
-  for (const table of input.tables) {
+  for (const table of conversionTables) {
     const name = lociMyuTrimV1(table.name);
     if (captionTables.includes(table)) {
       mappings.push({ sourceKind: 'workbook sheet', sourceId: name, disposition: 'converted', note: 'Caption DisplaySet source' });
@@ -922,7 +931,6 @@ export async function planLociMyuZipToNative(
   const mediaIdByPath = new Map<string, string>();
   const linkedImagePaths = new Set<string>();
   const captions: NativeCaptionV1[] = [];
-  let convertedCaptionRows = 0;
   for (const [setIndex, set] of migration.sets.entries()) {
     const table = captionTables.find((candidate) => lociMyuTrimV1(candidate.name) === set.name);
     const sourceRows = table?.rows.slice(1).map((row, index) => ({ row, rowNumber: index + 2 })).filter(({ row }) => !isEmptyRow(row)) ?? [];
@@ -933,7 +941,6 @@ export async function planLociMyuZipToNative(
     }
     const displaySetId = displaySets[setIndex]!.id;
     for (const [captionIndex, caption] of set.captions.entries()) {
-      convertedCaptionRows++;
       const sourceRow = sourceRows[captionIndex];
       const locator = { sheet: set.name, row: sourceRow?.rowNumber ?? null, id: caption.legacyId };
       const attachments: string[] = [];
@@ -1068,7 +1075,7 @@ export async function planLociMyuZipToNative(
 
   const savedViews: NativeSavedViewV1[] = [];
   const viewIdsByDisplaySet = new Map<string, string[]>();
-  const viewTable = input.tables.find((table) => lociMyuTrimV1(table.name) === LM_VIEWS_SHEET);
+  const viewTable = conversionTables.find((table) => lociMyuTrimV1(table.name) === LM_VIEWS_SHEET);
   for (const [index, row] of (viewTable?.rows.slice(1) ?? []).entries()) {
     if (isEmptyRow(row)) continue;
     const rowNumber = index + 2;
@@ -1156,7 +1163,7 @@ export async function planLociMyuZipToNative(
         'The source model cannot be established as the native visual/coordinate owner, so no Project is published.');
     }
   }
-  const materialTable = input.tables.find((table) => lociMyuTrimV1(table.name) === LM_MATERIALS_SHEET);
+  const materialTable = conversionTables.find((table) => lociMyuTrimV1(table.name) === LM_MATERIALS_SHEET);
   const materialRows = (materialTable?.rows.slice(1) ?? []).map((row, index) => ({ row, rowNumber: index + 2 }))
     .filter(({ row }) => !isEmptyRow(row));
   const latestMaterialRow = new Map<string, number>();
@@ -1262,8 +1269,8 @@ export async function planLociMyuZipToNative(
     workbookCandidateCount: input.workbookCandidateCount,
     selectedWorkbook,
     sheetCount: input.tables.length,
-    captionRowCount: convertedCaptionRows,
-    duplicateOccurrenceCount: duplicateLegacyIdOccurrences(captionTables),
+    captionRowCount: captionRowsWithLocations(sourceCaptionTables).length,
+    duplicateOccurrenceCount: duplicateLegacyIdOccurrences(sourceCaptionTables),
     modelCount: input.models.length,
     imageCount: input.images.length,
     videoCount: input.videos.length,
@@ -1276,7 +1283,7 @@ export async function planLociMyuZipToNative(
       snapshot: input,
       sourceBefore,
       selectedWorkbook,
-      captionTables,
+      captionTables: sourceCaptionTables,
       projectId,
       projectFrameId,
       projectTitle: resolvedProjectTitle,

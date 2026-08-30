@@ -186,7 +186,9 @@ function commitBlockedSourceSelection(
   plan.tables = tables;
   plan.migration = null;
   plan.blockedLociMyuSource = failure;
-  plan.diagnostics.selectedSource = [`${failure.message}。Native変換はProjectを作らずreportします`];
+  plan.diagnostics.selectedSource = [failure.code === 'missing-legacy-id'
+    ? `${failure.message}。Native変換ではIDのない行を空行としてreportし、残りを変換します`
+    : `${failure.message}。Native変換はProjectを作らずreportします`];
   refreshImportPlanWarnings(plan);
 }
 
