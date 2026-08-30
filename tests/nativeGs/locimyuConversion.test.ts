@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { buildImportPlan } from '../../src/assets/importWizard';
+import { serializeGlb } from '../../src/assets/glbOptimize';
 import { readZipEntries, writeZipEntries } from '../../src/assets/zipio';
 import {
   assertLociMyuSourceUnchanged,
@@ -12,10 +13,27 @@ import {
 import { listNativeProjectsV1, nativeProjectRoot, openNativeProjectV1 } from '../../src/nativeGs/storage';
 import { MemoryFS } from '../../src/platform/fs';
 import { ProjectMutationCoordinator } from '../../src/platform/projectLock';
+import { makeXlsx } from '../helpers/makeXlsx';
 
 const fixturePath = resolve('fixtures/v1-migration/locimyu-drive-exact-v1.zip');
 const captionHeader = ['id', 'title', 'body', 'color', 'posX', 'posY', 'posZ', 'imageFileId', 'createdAt', 'updatedAt'];
+const materialHeader = ['materialKey', 'opacity', 'doubleSided', 'unlitLike', 'chromaEnable', 'chromaColor', 'chromaTolerance', 'chromaFeather', 'roughness', 'metalness', 'emissiveHex', 'updatedAt', 'updatedBy', 'sheetGid'];
 const encoder = new TextEncoder();
+
+function duplicateNamedMaterialGlb(): Uint8Array {
+  const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+  return serializeGlb({
+    asset: { version: '2.0' },
+    scene: 0,
+    scenes: [{ nodes: [0, 1] }],
+    nodes: [{ mesh: 0 }, { mesh: 0, translation: [2, 0, 0] }],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 }, material: 0 }] }],
+    materials: [{ name: '  Shared  ', pbrMetallicRoughness: { baseColorFactor: [1, 1, 1, 1] } }],
+    buffers: [{ byteLength: positions.byteLength }],
+    bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: positions.byteLength, target: 34962 }],
+    accessors: [{ bufferView: 0, byteOffset: 0, componentType: 5126, count: 3, type: 'VEC3', min: [0, 0, 0], max: [1, 1, 0] }],
+  }, new Uint8Array(positions.buffer));
+}
 
 function csvCell(value: string): string {
   return /[",\r\n]/u.test(value) ? `"${value.replace(/"/gu, '""')}"` : value;
@@ -44,6 +62,8 @@ describe('LociMyu ZIP to native direct adapter', () => {
     expect(plan.inventory.duplicateOccurrenceCount).toBe(0);
     expect(plan.draft.mediaResources).toHaveLength(1);
     expect(plan.issues).toContainEqual(expect.objectContaining({ code: 'orthographic-view-reported' }));
+    expect(plan.issues).toContainEqual(expect.objectContaining({ code: 'sheet-authority-fields-reported', field: 'updatedAt' }));
+    expect(plan.issues).toContainEqual(expect.objectContaining({ code: 'view-fields-reported' }));
     expect(plan.mappings.some((entry) => entry.sourceKind === 'image' && entry.disposition === 'reported')).toBe(true);
     await expect(assertLociMyuSourceUnchanged(plan, file)).resolves.toEqual(plan.sourceBefore);
 
@@ -60,6 +80,45 @@ describe('LociMyu ZIP to native direct adapter', () => {
     expect(opened.missingMediaIds).toEqual([]);
     expect(opened.snapshot.captions.map((caption) => caption.id)).toEqual(plan.draft.captions.map((caption) => caption.id));
     session.release();
+  });
+
+  it('broadcasts one exact-name material row to every matching slot and preserves source chroma', async () => {
+    const workbook = await makeXlsx([
+      { name: 'S', rows: [captionHeader, ['c_1', 'A', '', '#eab308', '0', '0', '0', '', '', '']] },
+      {
+        name: '__LM_SHEET_NAMES',
+        rows: [['sheetGid', 'displayName', 'sheetTitle', 'updatedAt'], ['55', 'S', 'S', '']],
+      },
+      {
+        name: '__LM_MATERIALS',
+        rows: [
+          materialHeader,
+          ['Shared', '0.35', 'TRUE', 'FALSE', 'TRUE', '#00ff00', '', '0.05', '', '', '', '', '', '55'],
+        ],
+      },
+    ]);
+    const zip = await writeZipEntries([
+      { path: 'LociMyu Save.xlsx', data: workbook },
+      { path: 'models/duplicate-material.glb', data: duplicateNamedMaterialGlb() },
+    ]);
+    const file = new File([Uint8Array.from(zip)], 'duplicate-material-locimyu.zip', { type: 'application/zip' });
+    const importPlan = await buildImportPlan(await readZipEntries(zip), { preserveBlockedLociMyuSource: true });
+    const plan = await planLociMyuZipToNative(file, importPlan, 'Duplicate material fixture');
+
+    expect(plan.blockingIssueCount).toBe(0);
+    expect(plan.draft.meshMaterialAppearances).toHaveLength(2);
+    expect(new Set(plan.draft.meshMaterialAppearances?.map((appearance) => appearance.materialSlotKey)).size).toBe(2);
+    expect(plan.draft.meshMaterialAppearances).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        opacity: 0.35,
+        doubleSided: true,
+        unlit: false,
+        chroma: { enabled: true, colorSrgb: [0, 1, 0], tolerance: 0, feather: 0.05 },
+      }),
+    ]));
+    expect(plan.issues.some((entry) => entry.code === 'material-relation-inactive')).toBe(false);
+    expect(plan.issues.some((entry) => entry.code === 'material-chroma-disabled-for-parity')).toBe(false);
+    expect(plan.mappings.filter((entry) => entry.sourceKind === 'material row' && entry.disposition === 'converted')).toHaveLength(2);
   });
 
   it('treats ID-less rows as reported empty input without shifting the valid Caption row', async () => {

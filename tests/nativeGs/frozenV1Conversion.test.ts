@@ -44,9 +44,9 @@ describe('opened frozen-v1 to native conversion', () => {
       'material-key-unresolved',
       'orthographic-view-reported',
       'source-field-reported',
-      'pin-scale-reported',
       'deleted-records-reported',
     ]));
+    expect(plan.draft.assets[0]?.pinScale).toBe(1);
     expect(plan.issues.find((entry) => entry.code === 'material-key-unresolved')?.sourceValue).toContain('"opacity"');
 
     const placed = plan.draft.captions.find((caption) => caption.id === 'cap_01J00000000000000000000030');

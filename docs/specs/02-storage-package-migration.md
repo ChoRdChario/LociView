@@ -1848,3 +1848,45 @@ embedding the source. LociMyu ZIP remains a separate later input adapter.
   or explicitly accounted for. Desktop performs conversion/save/offline reopen
   and portable export/delete/restore. Physical iPhone only opens the converted
   native result and checks visibility, Caption use, save and offline reopen.
+
+## 28. Bounded native Caption appearance receiver (Product Owner approved 2026-08-31)
+
+The first backward-compatible input lanes MUST consume the user-visible Caption
+appearance they preserve. This closes two bounded receiver gaps without adding a
+general styling, renderer or history subsystem.
+
+- `NativeCaptionV1.color` remains the per-Caption durable color. The viewer uses
+  that color for the marker and the native Caption editor can change it. A
+  missing color uses the established `#eab308` default. Selection and
+  replacement-review state use scale/emphasis rather than replacing the saved
+  color with a fixed status color.
+- Caption marker size is a per-Asset presentation value named `pinScale`. It is
+  an optional/defaultable field on `NativeAssetV1`; omission means exactly `1`.
+  The admitted durable range is `0.001` through `1000`, inclusive. The editor
+  provides a synchronized positive numeric input and logarithmic slider across
+  that range and applies valid changes immediately to every Caption owned by the
+  selected Asset. It does not create per-Caption, per-view or screen-space size
+  state.
+- Snapshot schema version `1` admits only this optional/defaultable Asset field.
+  Existing snapshot-v1 Projects remain readable with scale `1`; portable
+  package versions remain unchanged because they already preserve the complete
+  snapshot. Asset replacement preserves the selected Asset's `pinScale`.
+- A valid frozen-v1 model `pinScale` is converted into the native Asset. An
+  absent value uses `1`; an invalid/out-of-range value is reported and does not
+  invent another scale. Direct LociMyu workbooks have no pin-scale field and
+  therefore start at `1` for later user adjustment.
+- LociMyu Caption/view/material timestamps, sheet-registry timestamps and legacy
+  Drive IDs remain report/source metadata rather than becoming a native history
+  or identity system. The direct conversion report names every non-empty field
+  that is not durably converted. Orthographic legacy views remain report-only
+  because the source has no exact vertical span; no camera value is guessed.
+- The representative source has no effective roughness, metalness, emissive,
+  updated-by or video value. Those capabilities, Caption tags, a pin-adjacent
+  Caption window, HEIC conversion, generalized media/style state and new
+  material controls remain outside this receiver slice.
+- Acceptance proves color render/edit and per-Asset scale independence, then
+  save/offline reopen and portable export/restore preserve both values. Frozen-v1
+  conversion preserves one valid `pinScale`; direct-LociMyu conversion preserves
+  Caption colors and explicitly accounts for non-durable timestamp fields.
+  Desktop executable evidence is required; no new physical-iPhone matrix is
+  added before the consolidated product acceptance.

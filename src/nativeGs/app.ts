@@ -12,11 +12,15 @@ import { NATIVE_POINT_DIAMETER_DEFAULT_CSS_PX } from './pointPresentation';
 import { filterNativeCaptionListV1 } from './captionList';
 import {
   activateNativeManualAssetTransformV1,
+  NATIVE_CAPTION_PIN_SCALE_DEFAULT,
+  NATIVE_CAPTION_PIN_SCALE_MAX,
+  NATIVE_CAPTION_PIN_SCALE_MIN,
   NATIVE_DEFAULT_DISPLAY_SET_ID,
   NATIVE_GS_PROFILE_ID,
   NATIVE_IDENTITY_TRANSFORM,
   NATIVE_POINT_PROFILE_ID,
   nativeModelProfileId,
+  nativeAssetPinScaleV1,
   nativeCaptionDisplaySetIdV1,
   nativeDisplaySetsV1,
   nativeSavedViewDisplaySetIdV1,
@@ -25,6 +29,7 @@ import {
   removeNativeAssetV1,
   removeSelectedNativeCaptionV1,
   setNativeAssetVisibilityV1,
+  setNativeAssetPinScaleV1,
   updateSelectedNativeCaptionV1,
   type NativeAssetBindingRevisionV1,
   type NativeDisplayMode,
@@ -889,6 +894,19 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const rotationInputs = [0, 1, 2].map(() => el('input', { type: 'number', step: '1' }));
     const scaleInput = el('input', { type: 'number', step: '0.01', min: '0.000001' });
     const applyTransformButton = el('button', {}, '位置・回転・スケールを適用');
+    const pinScaleNumber = el('input', {
+      type: 'number',
+      min: String(NATIVE_CAPTION_PIN_SCALE_MIN),
+      max: String(NATIVE_CAPTION_PIN_SCALE_MAX),
+      step: 'any',
+      value: String(NATIVE_CAPTION_PIN_SCALE_DEFAULT),
+      'aria-label': '選択したモデルのキャプションピン倍率',
+    });
+    const pinScaleSlider = el('input', {
+      type: 'range', min: '-3', max: '3', step: '0.01', value: '0',
+      'aria-label': '選択したモデルのキャプションピン倍率スライダー',
+    });
+    const pinScaleValue = el('output', {}, `${NATIVE_CAPTION_PIN_SCALE_DEFAULT}×`);
     const pointAppearance = el('div', { class: 'ng-field', hidden: 'true' });
     const pointDiameter = el('input', {
       type: 'range', min: '1', max: '20', step: '0.5', value: String(NATIVE_POINT_DIAMETER_DEFAULT_CSS_PX),
@@ -916,6 +934,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const newCaption = el('button', { class: 'primary' }, '＋ 新しいキャプション');
     const captionTitle = el('input', { type: 'text', maxlength: '160' });
     const captionBody = el('textarea');
+    const captionColor = el('input', { type: 'color', value: '#eab308', 'aria-label': 'キャプションピンの色' });
     const captionGuide = el('p', { class: 'ng-note' });
     const captionReview = el('p', { class: 'ng-note' });
     const moveCaption = el('button', { 'aria-pressed': 'false' }, 'ピンを移動');
@@ -1086,6 +1105,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       const caption = selectedCaption();
       captionTitle.value = caption?.title ?? '';
       captionBody.value = caption?.body ?? '';
+      captionColor.value = caption?.color ?? '#eab308';
       const needsReview = caption !== undefined && nativeCaptionNeedsReviewV1(working, caption);
       captionGuide.textContent = caption === undefined
         ? creatingCaption
@@ -1186,6 +1206,9 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       for (const button of assetGizmoButtons.values()) button.disabled = !editable;
       captionTitle.disabled = !editable || !captionFieldsEditable;
       captionBody.disabled = !editable || !captionFieldsEditable;
+      captionColor.disabled = !editable || !captionFieldsEditable;
+      pinScaleNumber.disabled = !editable;
+      pinScaleSlider.disabled = !editable;
       newCaption.disabled = !editable;
       newCaption.textContent = creatingCaption ? '新規配置をやめる' : '＋ 新しいキャプション';
       newCaption.setAttribute('aria-pressed', String(creatingCaption));
@@ -1245,11 +1268,16 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const populateTransform = (): void => {
       const binding = bindingFor(transformAsset.value);
       if (binding === null) return;
+      const asset = working.assets.find((candidate) => candidate.id === transformAsset.value);
+      const pinScale = asset === undefined ? NATIVE_CAPTION_PIN_SCALE_DEFAULT : nativeAssetPinScaleV1(asset);
       binding.assetToProject.translation.forEach((value, index) => { translationInputs[index]!.value = String(value); });
       const q = new THREE.Quaternion().fromArray(binding.assetToProject.rotationXYZW);
       const euler = new THREE.Euler().setFromQuaternion(q, 'XYZ');
       [euler.x, euler.y, euler.z].forEach((value, index) => { rotationInputs[index]!.value = String(THREE.MathUtils.radToDeg(value)); });
       scaleInput.value = String(binding.assetToProject.uniformScale);
+      pinScaleNumber.value = String(pinScale);
+      pinScaleSlider.value = String(Math.log10(pinScale));
+      pinScaleValue.textContent = `${pinScale.toLocaleString()}×`;
       const pointAsset = activeNativeRepresentationsV1(working, transformAsset.value)
         .some((representation) => representation.role === 'pointPrimary');
       pointAppearance.hidden = !pointAsset;
@@ -1283,6 +1311,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       captionList,
       el('label', { class: 'ng-field' }, el('span', {}, 'タイトル'), captionTitle),
       el('label', { class: 'ng-field' }, el('span', {}, '本文'), captionBody),
+      el('label', { class: 'ng-field' }, el('span', {}, 'ピンの色'), captionColor),
       captionMedia,
       captionReview,
       el('div', { class: 'ng-row' }, moveCaption, repositionCaption, deleteCaption),
@@ -1378,6 +1407,12 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
           el('span', { class: 'ng-note' }, '回転 X/Y/Z（度）'), el('div', { class: 'ng-three' }, ...rotationInputs),
           el('label', { class: 'ng-field' }, el('span', {}, '均一スケール'), scaleInput),
           applyTransformButton,
+          el('label', { class: 'ng-field' },
+            el('span', {}, 'キャプションピンの大きさ（このモデル）'),
+            el('div', { class: 'ng-row' }, pinScaleNumber, pinScaleValue),
+            pinScaleSlider,
+            el('span', { class: 'ng-note' }, '0.001～1000倍。数値とスライダーは連動し、すぐ画面へ反映します。'),
+          ),
           pointAppearance,
           el('p', { class: 'ng-note' }, '元のモデルファイルは変更しません。'),
         ),
@@ -2142,6 +2177,32 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         runtimeStatus.textContent = error instanceof Error ? error.message : String(error);
       }
     });
+    const commitPinScale = (value: number): void => {
+      if (!canMutateWorking()) return;
+      try {
+        const next = setNativeAssetPinScaleV1(working, transformAsset.value, value);
+        if (next === working) return;
+        working = next;
+        pinScaleNumber.value = String(value);
+        pinScaleSlider.value = String(Math.log10(value));
+        pinScaleValue.textContent = `${value.toLocaleString()}×`;
+        viewer.setSnapshot(working);
+        markDirty();
+      } catch (error) {
+        runtimeStatus.className = 'ng-error';
+        runtimeStatus.textContent = error instanceof Error ? error.message : String(error);
+      }
+    };
+    pinScaleNumber.addEventListener('input', () => {
+      if (pinScaleNumber.value === '') return;
+      const value = Number(pinScaleNumber.value);
+      if (!Number.isFinite(value) || value < NATIVE_CAPTION_PIN_SCALE_MIN || value > NATIVE_CAPTION_PIN_SCALE_MAX) return;
+      commitPinScale(value);
+    });
+    pinScaleNumber.addEventListener('change', populateTransform);
+    pinScaleSlider.addEventListener('input', () => {
+      commitPinScale(Number((10 ** Number(pinScaleSlider.value)).toPrecision(6)));
+    });
     captionTitle.addEventListener('input', () => {
       if (!canMutateWorking()) return;
       const caption = selectedCaption();
@@ -2155,6 +2216,14 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       const caption = selectedCaption();
       if (caption === undefined) return;
       if (!commitSelectedCaption({ ...caption, body: captionBody.value })) return;
+      viewer.setSnapshot(working);
+      markDirty();
+    });
+    captionColor.addEventListener('input', () => {
+      if (!canMutateWorking()) return;
+      const caption = selectedCaption();
+      if (caption === undefined) return;
+      if (!commitSelectedCaption({ ...caption, color: captionColor.value })) return;
       viewer.setSnapshot(working);
       markDirty();
     });

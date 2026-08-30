@@ -6,6 +6,8 @@ import { detectFormat, loadModel, type ModelFormat } from '../viewer/loaders';
 import { legacyV1MaterialSlotKey, nativeMaterialSlotKey } from './materialSlots';
 import { inspectNativeGsPlyV1, inspectNativePointPlyV1 } from './plyProfile';
 import {
+  NATIVE_CAPTION_PIN_SCALE_MAX,
+  NATIVE_CAPTION_PIN_SCALE_MIN,
   NATIVE_DEFAULT_DISPLAY_SET_ID,
   NATIVE_GS_PROFILE_ID,
   NATIVE_IDENTITY_TRANSFORM,
@@ -581,11 +583,22 @@ export async function planOpenedFrozenV1ToNative(
         }
       }
     }
+    const sourcePinScale = record.fields.pinScale;
+    const pinScale = typeof sourcePinScale === 'number' && Number.isFinite(sourcePinScale) &&
+      sourcePinScale >= NATIVE_CAPTION_PIN_SCALE_MIN && sourcePinScale <= NATIVE_CAPTION_PIN_SCALE_MAX
+      ? sourcePinScale
+      : undefined;
+    if (sourcePinScale !== undefined && pinScale === undefined) {
+      issue(issues, 'warning', 'pin-scale-invalid', record, 'pinScale',
+        `v1 pinScale must be between ${NATIVE_CAPTION_PIN_SCALE_MIN} and ${NATIVE_CAPTION_PIN_SCALE_MAX}; the native Asset uses its default scale.`,
+        sourcePinScale);
+    }
     const asset: NativeAssetV1 = {
       id: assetId,
       label: singleLine(record.fields.originalName, `Model ${assets.length + 1}`).replace(/\.[^.]+$/u, ''),
       assetFrameId,
       status: { kind: 'ready', activeBindingId: bindingId },
+      ...(pinScale === undefined ? {} : { pinScale }),
     };
     const binding: NativeAssetBindingRevisionV1 = {
       id: bindingId,
@@ -624,7 +637,6 @@ export async function planOpenedFrozenV1ToNative(
     mappings.push({ sourceKind: 'asset-bytes', sourceId: record.id, targetKind: 'Representation', targetId: representationId, note: `${sourceFile.size} bytes, unchanged` });
     recordUnknownFields(record, new Set(['kind', 'path', 'optimizedPath', 'originalName', 'mime', 'size', 'transform', 'pinScale']), issues);
     if (record.fields.optimizedPath !== undefined) issue(issues, 'info', 'optimized-copy-reported', record, 'optimizedPath', 'The original source bytes were preserved; the derived display copy was reported rather than becoming a second authority.', record.fields.optimizedPath);
-    if (record.fields.pinScale !== undefined) issue(issues, 'info', 'pin-scale-reported', record, 'pinScale', 'v1 pinScale has no first-lane native durable field and was recorded.', record.fields.pinScale);
   }
 
   const mediaResources: NativeMediaResourceDraftV1[] = [];

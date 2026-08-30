@@ -366,6 +366,9 @@ describe('native project blob-first/marker-last publication', () => {
     const base = makeNativeDraft(2);
     const draft = {
       ...base.draft,
+      assets: base.draft.assets.map((asset) => asset.id === NATIVE_TEST_IDS.gsAsset
+        ? { ...asset, pinScale: 100 }
+        : asset),
       captions: [{
         id: NATIVE_TEST_IDS.caption,
         title: 'Retained GS Caption',
@@ -387,11 +390,18 @@ describe('native project blob-first/marker-last publication', () => {
     const oldRepresentationIds = first.representations.map((entry) => entry.id);
 
     const meshReplacement = makeNativeMeshReplacement(first, NATIVE_TEST_IDS.meshAsset);
+    const meshReplacementWithIncomingPinScale = {
+      ...meshReplacement,
+      imported: {
+        ...meshReplacement.imported,
+        asset: { ...meshReplacement.imported.asset, pinScale: 50 },
+      },
+    };
     const afterMesh = await replaceNativeAssetV1(
       session.workspace,
       first,
-      meshReplacement.imported,
-      meshReplacement.sources,
+      meshReplacementWithIncomingPinScale.imported,
+      meshReplacementWithIncomingPinScale.sources,
     );
     expect(afterMesh.assets.find((asset) => asset.id === NATIVE_TEST_IDS.meshAsset)).toMatchObject({
       id: NATIVE_TEST_IDS.meshAsset,
@@ -400,6 +410,7 @@ describe('native project blob-first/marker-last publication', () => {
       status: { activeBindingId: meshReplacement.imported.binding.id },
     });
     expect(activeNativeBindingV1(afterMesh, NATIVE_TEST_IDS.meshAsset)?.assetToProject).toEqual(meshBindingBefore.assetToProject);
+    expect(afterMesh.assets.find((asset) => asset.id === NATIVE_TEST_IDS.meshAsset)?.pinScale).toBeUndefined();
     expect(activeNativeBindingV1(afterMesh, NATIVE_TEST_IDS.gsAsset)).toEqual(gsBindingBefore);
     expect(activeNativeRepresentationsV1(afterMesh, NATIVE_TEST_IDS.meshAsset).map((entry) => entry.id)).toEqual([
       meshReplacement.representationId,
@@ -419,6 +430,7 @@ describe('native project blob-first/marker-last publication', () => {
       gsReplacement.proxyRepresentationId,
     ].sort());
     expect(afterGs.captions).toEqual(first.captions);
+    expect(afterGs.assets.find((asset) => asset.id === NATIVE_TEST_IDS.gsAsset)?.pinScale).toBe(100);
     expect(nativeCaptionNeedsReviewV1(afterGs, afterGs.captions[0]!)).toBe(true);
     for (const representationId of [
       ...oldRepresentationIds,

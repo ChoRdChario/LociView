@@ -223,6 +223,15 @@ The direct adapter MUST reuse this exact order-independent projection both for
 Caption-sheet identity and for view/material activation. It MUST NOT consume the
 legacy importer's ordinal or first-available guessed mapping.
 
+Within an authoritative DisplaySet relation, a LociMyu material key means the
+exact `LociMyuTrimV1` material name and intentionally applies to every decoded
+Mesh material slot with that same exact trimmed name. Multiple exact matches are
+therefore a source-defined one-to-many relation, not an ambiguity from which the
+adapter may choose one winner. The adapter expands the row into one native
+slot-targeted appearance per match. It MUST NOT add native slot/path aliases,
+case folding, fuzzy matching or positional inference to this lookup. Zero exact
+matches remain inactive and reportable.
+
 ### 4.2 Media relationships
 
 The optional file-ID map is source-authoritative for one Caption attachment
@@ -269,6 +278,29 @@ Zero supported models or multiple candidate models block publication rather
 than choosing one or placing unrelated models at guessed identity transforms.
 Every candidate is listed in the report. Images remain Caption media and never
 become visual Assets.
+
+### 4.5 Native receiver completeness
+
+The direct adapter is complete only when a converted user-visible value is also
+consumed by the native product. Caption `color` is therefore rendered and
+editable after conversion, not merely retained in snapshot bytes. LociMyu has no
+durable pin-size field; a converted Asset starts with the native per-Asset
+`pinScale` default of `1` and may be adjusted later without changing source
+bytes.
+
+For every source-authoritative material row, the native receiver applies the
+supported visual values rather than merely retaining them: opacity,
+double-sided, unlit-like, chroma enabled state, chroma color, tolerance and
+feather. The adapter MUST NOT force a source-enabled chroma setting off. Name
+fan-out occurs only while converting LociMyu semantics; durable native state and
+runtime application remain explicit stable material-slot records.
+
+The initial adapter does not create native history or provenance records for
+`createdAt`, `updatedAt`, `updatedBy`, sheet-registry timestamps or legacy Drive
+IDs. Every non-empty value in those fields is named in the conversion report.
+Likewise, an orthographic view without the source span required by the native
+camera remains reported rather than receiving a guessed span. These are explicit
+report/source-retention outcomes, not silent receiver omissions.
 
 ## 5. Source retention and conversion-report boundary
 
@@ -361,3 +393,12 @@ that unconverted source data can be recovered from the native Project alone.
   materials/views/media, unplaced and unlinked outcomes, unchanged admitted
   bytes and complete report accounting. The source ZIP hash is equal before and
   after conversion.
+- `LM-ADAPT-08`: every converted Caption color is visible and editable in the
+  native product and survives save/offline reopen plus portable export/restore.
+  Every non-empty view or sheet-registry timestamp not converted into native
+  state has a field-level report entry; no history or camera span is invented.
+- `LM-ADAPT-09`: one exact source material name matching multiple decoded slots
+  creates one explicit native appearance per slot. Supported opacity and chroma
+  values are visibly applied and survive save/offline reopen plus portable
+  export/restore. Missing GID authority and zero exact name matches remain
+  inactive/report-only; ordinal mapping and winner selection are not inferred.

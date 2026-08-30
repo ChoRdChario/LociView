@@ -1,5 +1,22 @@
 # Lessons
 
+## 2026-08-31: manual acceptanceでは正しい入力laneまで案内する
+
+- `.lociview` backup restoreとLociMyu ZIP conversionは別入力である。単に
+  「ZIPを入れる」と案内すると、native homeのbackup欄へ入れて失敗させる。
+- acceptance手順には開始画面、押すlink、drop先の表示名まで書く。UIが旧画面
+  を経由させる場合はP2へ記録し、変換失敗と誤診させない。
+
+## 2026-08-31: legacyの意図された一対多を曖昧候補と誤認しない
+
+- LociMyuのmaterialKeyはtrim後のマテリアル名であり、同名material全件へ
+  意図的に適用される。複数一致をwinner選択が必要な曖昧さとして拒否しない。
+- legacy名のfan-outは変換時だけに行い、各一致先をstableなnative slot record
+  へ展開する。native/path aliasや曖昧一致を同じ索引へ混ぜない。
+- converterが値を保存しても、sourceで有効な表示設定を強制OFFにすれば互換
+  ではない。source-authority不足によるinactiveとreceiver側の欠落を分けて
+  診断する。
+
 ## 2026-08-31: IDのないLociMyu Caption行を破損と決めつけない
 
 - 実運用LociMyuでは、他セルに値が残っていても安定Caption IDが空の行が
@@ -238,3 +255,15 @@
   source plus bounded exportable report satisfies the approved user outcome,
   keep sidecars, quarantine databases and portable review workflows out unless
   the Product Owner separately approves them.
+
+## 2026-08-31: 変換済みfieldはuser-visibleな消費まで確認する
+
+- schema、converter、snapshot/package round-tripが値を保持していても、rendererと編集UIがその値を使用しなければ製品上の互換性は成立していない。LociMyu受入ではCaption色のような見える意味を、source→native record→render→edit→save/reopenまで一続きで確認する。
+- 3D authoring tool間の単位差を調整する倍率UIへ、1付近だけの狭い線形rangeを置かない。桁違いの値は数値入力と対数的なsliderを併用し、複数Assetでは既存のper-Asset意味を優先する。
+- selection色や要再配置警告のために、ユーザーが選んだCaption色を固定色で上書きしない。選択状態はscale、発光、輪郭等の別の視覚channelで示す。
+
+## 2026-08-31: legacy adapterの前にreceiver completenessを閉じる
+
+- 代表ZIPが変換・保存できたことだけでlegacy受入完了としない。sourceのuser-visibleな保存項目を一度inventoryし、native側のrecord、renderer/editor、save/reopen、portable backupまで対応先があるかを表で確認する。
+- receiverがない項目は、承認済みユーザー機能ならconverterのreport-only処理を既成事実にせず先に最小receiverを作る。timestamp等の非表示metadataや未承認機能は、理由を明記してsource/report保持のままbacklogへ送る。
+- receiver auditを口実に一般化されたmedia、history、appearance、migration frameworkへ拡張しない。現存するLociMyu意味と最小native製品能力の交差だけをproduction scopeへ入れる。

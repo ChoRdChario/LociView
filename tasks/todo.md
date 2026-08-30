@@ -153,8 +153,72 @@ decision below. The private source must remain unchanged.
   source-retention notice was fixed and re-reviewed; no P0/P1 remains.
 - [ ] Request only the resulting bounded Desktop/iPhone product acceptance.
 
+## Active bounded receiver closure — native Caption and material appearance
+
+- [x] Confirm the current native renderer uses one fixed Asset-local Caption
+  marker radius and has no native pin-size control or durable pin-scale field.
+- [x] Product Owner rejected the narrow `0.3`–`3.0` slider: model-authoring
+  units can differ by roughly two orders of magnitude, so numeric and wide-range
+  slider input are both required.
+- [x] Confirm native Caption color is already converted, validated and portable,
+  but the native renderer ignores it and the native editor has no color control.
+- [x] Product Owner confirmed a logarithmic `0.001`–`1000` multiplier
+  slider plus synchronized positive numeric input for the selected Asset.
+- [x] The initial receiver audit found the Caption color/pin-scale gap. Product
+  Owner visual acceptance then exposed a separate P1 in the direct material
+  adapter; the native material receiver itself already exists.
+- [x] Record the compatibility boundary: optional/defaultable `pinScale` on
+  native Asset in snapshot v1, omission means `1`, portable package unchanged.
+- [x] Render and edit the existing per-Caption `color` without changing Caption
+  schema or package version. Preserve source color; show selection/review state
+  through scale/emphasis rather than replacing it with a fixed color.
+- [x] Persist and render per-Asset `pinScale`, preserve it across Asset
+  replacement and map valid frozen-v1 values into the native Asset.
+- [x] Add field-level report entries for non-durable view/sheet-registry
+  timestamps; do not create native history records.
+- [x] Do not add per-Caption pin size, screen-space marker architecture,
+  per-view appearance or generalized styling state in this slice.
+- [x] Add only the focused clamp/render wiring coverage genuinely missing from
+  existing acceptance, then run typecheck, full test and production build once.
+- [x] Product Owner confirmed native Caption color and pin scale visually.
+- [x] Trace the material P1: exact same-name source rows were rejected when they
+  matched multiple slots, and source-enabled chroma was forced off.
+- [x] Preserve the approved no-guess GID boundary. The representative source has
+  exact authority only for GID `0`; rows for the other three Caption sheets stay
+  inactive/report-only rather than using sheet order or first-seen inference.
+- [x] Correct only the source-defined exact-name fan-out, source chroma enabled
+  value and LociMyu blank-tolerance default; do not add a generalized material
+  system or inferred mapping workflow.
+- [x] Re-run the representative conversion: the one authoritative DisplaySet
+  now has 18 explicit slot appearances, including 13 transparent and 3
+  chroma-enabled slots; 17 source rows without exact GID authority remain
+  inactive/report-only.
+- [x] Product Owner confirmed the re-converted representative Desktop Project
+  visibly applies the authoritative set's inherited opacity and chroma.
+- [x] Stop after independent review and final verification. Native Caption
+  overlay/window migration remains a separate UI/UX closure item.
+
+Review: Caption-focused schema/storage/converter coverage was 45/45 green and
+the Product Owner accepted the visible pin result. Representative material
+inspection then found all 14 transparent groups and all 3 chroma-enabled groups
+inactive: four authoritative rows were blocked by the converter's repeated-name
+bug, while 17 rows lack exact GID authority in the source. The latter remains an
+explicit compatibility limitation under the approved no-guess rule. The bounded
+fix produces 18 explicit appearances (13 transparent, 3 chroma-enabled) for the
+authoritative set, passed focused 46/46, typecheck, production build and the
+final failing-suite reruns; one independent reviewer found no P0/P1. Product
+Owner then confirmed the inherited opacity/chroma in the re-converted Project.
+
+Stop condition: stop before expanding into HEIC/video conversion, Caption tags,
+legacy history, orthographic fallback, inferred GID mapping, new material
+controls or a generalized appearance system. Those are not required by this
+approved receiver closure.
+
 ## P2 backlog — not a completion blocker
 
+- Give the native home one clear LociMyu ZIP conversion entry (or unified file
+  intake) and distinguish it from `.lociview` backup restore; users should not
+  need to enter the conventional-project screen to discover the correct lane.
 - Replace format-specific Mesh/GS/Point input controls with one model-file
   picker; determine the supported format from file contents after selection.
 - Group add, replace, remove and placement under one user-facing model-management

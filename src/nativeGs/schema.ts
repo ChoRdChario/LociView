@@ -7,6 +7,9 @@ export const NATIVE_ACTIVE_FORMAT = 'lociview-native-project-active' as const;
 export const NATIVE_SCHEMA_VERSION = 1 as const;
 export const NATIVE_GS_PROFILE_ID = 'lociview-native-graphdeco-ply-le-sh2-sh3-v1' as const;
 export const NATIVE_POINT_PROFILE_ID = 'lociview-native-point-ply-ascii-xyz-rgb-v1' as const;
+export const NATIVE_CAPTION_PIN_SCALE_MIN = 0.001 as const;
+export const NATIVE_CAPTION_PIN_SCALE_MAX = 1000 as const;
+export const NATIVE_CAPTION_PIN_SCALE_DEFAULT = 1 as const;
 
 export type NativeDisplayMode = 'mixed' | 'gs-only' | 'mesh-only';
 export type NativeModelFormat = 'glb' | 'gltf' | 'obj' | 'stl' | 'ply';
@@ -57,6 +60,7 @@ export interface NativeAssetV1 {
   readonly label: string;
   readonly assetFrameId: string;
   readonly status: { readonly kind: 'ready'; readonly activeBindingId: string };
+  readonly pinScale?: number;
 }
 
 export interface NativeAssetBindingRevisionV1 {
@@ -405,15 +409,20 @@ function parsePointFacts(value: unknown): NativePointPlyFactsV1 {
 
 function parseAsset(value: unknown): NativeAssetV1 {
   const input = record(value, 'asset');
-  exactKeys(input, ['id', 'label', 'assetFrameId', 'status']);
+  exactKeys(input, ['id', 'label', 'assetFrameId', 'status'], ['pinScale']);
   const status = record(input.status, 'asset status');
   exactKeys(status, ['kind', 'activeBindingId']);
   if (status.kind !== 'ready') throw new Error('native snapshot: only ready Assets are persisted in snapshot v1');
+  const pinScale = input.pinScale === undefined ? undefined : finite(input.pinScale, 'Asset pinScale');
+  if (pinScale !== undefined && (pinScale < NATIVE_CAPTION_PIN_SCALE_MIN || pinScale > NATIVE_CAPTION_PIN_SCALE_MAX)) {
+    throw new Error(`native snapshot: Asset pinScale must be between ${NATIVE_CAPTION_PIN_SCALE_MIN} and ${NATIVE_CAPTION_PIN_SCALE_MAX}`);
+  }
   return {
     id: id(input.id, 'ast', 'Asset id'),
     label: string(input.label, 'Asset label'),
     assetFrameId: id(input.assetFrameId, 'frm', 'Asset frame id'),
     status: { kind: 'ready', activeBindingId: id(status.activeBindingId, 'bnd', 'active binding id') },
+    ...(pinScale === undefined ? {} : { pinScale }),
   };
 }
 
@@ -1058,6 +1067,28 @@ export function setNativeAssetVisibilityV1(
   return {
     ...snapshot,
     presentation: { ...snapshot.presentation, hiddenAssetIds: [...hiddenAssetIds].sort() },
+  };
+}
+
+export function nativeAssetPinScaleV1(asset: NativeAssetV1): number {
+  return asset.pinScale ?? NATIVE_CAPTION_PIN_SCALE_DEFAULT;
+}
+
+/** Updates only the selected Asset's durable Caption-marker scale. */
+export function setNativeAssetPinScaleV1(
+  snapshot: NativeProjectSnapshotV1,
+  assetId: string,
+  pinScale: number,
+): NativeProjectSnapshotV1 {
+  if (!Number.isFinite(pinScale) || pinScale < NATIVE_CAPTION_PIN_SCALE_MIN || pinScale > NATIVE_CAPTION_PIN_SCALE_MAX) {
+    throw new Error(`native snapshot: Asset pinScale must be between ${NATIVE_CAPTION_PIN_SCALE_MIN} and ${NATIVE_CAPTION_PIN_SCALE_MAX}`);
+  }
+  const asset = snapshot.assets.find((candidate) => candidate.id === assetId);
+  if (asset === undefined) throw new Error('native snapshot: pin-scale target Asset is missing');
+  if (nativeAssetPinScaleV1(asset) === pinScale && asset.pinScale !== undefined) return snapshot;
+  return {
+    ...snapshot,
+    assets: snapshot.assets.map((candidate) => candidate.id === assetId ? { ...candidate, pinScale } : candidate),
   };
 }
 

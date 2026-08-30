@@ -21,6 +21,7 @@ import {
 } from './resolver';
 import {
   NATIVE_DEFAULT_DISPLAY_SET_ID,
+  nativeAssetPinScaleV1,
   nativeModelFormat,
   nativeCaptionDisplaySetIdV1,
   newNativeId,
@@ -1054,6 +1055,7 @@ export class NativeGsViewer {
       id: repositioned?.id ?? newNativeId('cap'),
       title: repositioned?.title ?? 'Caption',
       body: repositioned?.body ?? '',
+      color: repositioned?.color ?? '#eab308',
       anchor: {
         kind: 'asset',
         assetId: asset.id,
@@ -1159,14 +1161,17 @@ export class NativeGsViewer {
       group.add(marker);
       marker.position.fromArray(caption.anchor.positionAsset);
       marker.quaternion.identity();
-      marker.scale.setScalar(1);
       marker.visible = this.assetIsVisible(caption.anchor.assetId);
       const material = marker.material as THREE.MeshStandardMaterial;
       const selected = caption.id === this.currentCaption?.id;
       const needsReview = nativeCaptionNeedsReviewV1(this.snapshot, caption);
-      material.color.setHex(needsReview ? (selected ? 0xff9f43 : 0xff6b6b) : selected ? 0xffd33d : 0x66d9ff);
-      material.emissive.setHex(needsReview ? 0x8f2f1f : selected ? 0x8a5b00 : 0x075985);
-      material.emissiveIntensity = selected ? 1.4 : 0.85;
+      const asset = this.snapshot.assets.find((candidate) => candidate.id === caption.anchor?.assetId);
+      const stateScale = selected ? 1.35 : needsReview ? 1.15 : 1;
+      marker.scale.setScalar((asset === undefined ? 1 : nativeAssetPinScaleV1(asset)) * stateScale);
+      material.color.set(caption.color ?? '#eab308');
+      material.emissive.copy(material.color);
+      material.emissiveIntensity = selected ? 0.7 : needsReview ? 0.45 : 0.2;
+      material.wireframe = needsReview;
     }
   }
 

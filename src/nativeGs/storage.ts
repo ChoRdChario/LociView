@@ -508,8 +508,15 @@ export async function replaceNativeAssetV1(
   if (imported.binding.method !== activeBinding.method || !sameSim3(imported.binding.assetToProject, activeBinding.assetToProject)) {
     throw new Error('native project: replacement must copy the exact active Asset placement');
   }
+  const replacementAsset: NativeAssetV1 = {
+    id: imported.asset.id,
+    label: imported.asset.label,
+    assetFrameId: imported.asset.assetFrameId,
+    status: imported.asset.status,
+    ...(existing.pinScale === undefined ? {} : { pinScale: existing.pinScale }),
+  };
   return publishNativeAssetClosureV1(fs, current, imported, sources, {
-    nextAssets: current.assets.map((asset) => asset.id === existing.id ? imported.asset : asset),
+    nextAssets: current.assets.map((asset) => asset.id === existing.id ? replacementAsset : asset),
     staleAction: 'replacing an Asset',
     successMessage: 'Asset replaced and native project saved.',
   }, onStatus);

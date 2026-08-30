@@ -22,7 +22,7 @@ import {
 } from '../io/locimyu';
 import { detectFormat, loadModel, type ModelFormat } from '../viewer/loaders';
 import type { ProjectWorkspaceFS } from '../platform/fs';
-import { legacyV1MaterialSlotKey, nativeMaterialSlotKey } from './materialSlots';
+import { nativeMaterialSlotKey } from './materialSlots';
 import { inspectNativeGsPlyV1, inspectNativePointPlyV1 } from './plyProfile';
 import {
   NATIVE_GS_PROFILE_ID,
@@ -165,8 +165,6 @@ interface ConvertedModel {
 
 interface MaterialTarget {
   readonly nativeKey: string;
-  readonly opacity: number;
-  readonly doubleSided: boolean;
 }
 
 interface MediaResolution {
@@ -469,12 +467,12 @@ async function inspectMaterialTargets(model: ConvertedModel): Promise<Map<string
       materials.forEach((material, slot) => {
         const target = {
           nativeKey: nativeMaterialSlotKey(path, slot),
-          opacity: material.opacity,
-          doubleSided: material.side === THREE.DoubleSide,
         };
-        add(target.nativeKey, target);
-        add(legacyV1MaterialSlotKey(object, loaded.root, slot), target);
-        add(material.name, target);
+        // LociMyu's durable materialKey is the trimmed material name. Its
+        // renderer broadcasts one row to every exact same-name material
+        // instance; repeated slots are therefore valid targets, not an
+        // ambiguity from which a winner must be guessed.
+        add(lociMyuTrimV1(material.name), target);
       });
     }
     object.children.forEach((child, index) => visit(child, [...path, index]));
@@ -864,6 +862,12 @@ export async function planLociMyuZipToNative(
     const title = cell(row, 2) !== '' ? cell(row, 2) : cell(row, 1);
     const targetSetName = gid === '' ? undefined : authoritativeSetNameByGid.get(gid);
     const targetSetId = targetSetName === undefined ? undefined : displaySetIdByName.get(targetSetName);
+    if (cell(row, 3) !== '') {
+      issue(issues, 'info', 'sheet-authority-fields-reported', {
+        sheet: LM_SHEET_NAMES_SHEET, row: rowNumber, id: gid || null, field: 'updatedAt',
+      }, 'The first native DisplaySet schema has no durable sheet-registry timestamp.',
+      'The DisplaySet authority relation is evaluated normally; updatedAt remains in the report/source ZIP.');
+    }
     const exact = gid !== '' && title !== '' && targetSetName === title &&
       candidateTitlesByGid.get(gid)?.size === 1 && candidateGidsByTitle.get(title)?.size === 1 &&
       targetSetId !== undefined;
@@ -1081,6 +1085,16 @@ export async function planLociMyuZipToNative(
     const rowNumber = index + 2;
     const sourceId = cell(row, 0);
     const gid = cell(row, 1);
+    const unsupportedViewFields = [
+      cell(row, 15) === '' ? null : 'createdAt',
+      cell(row, 16) === '' ? null : 'updatedAt',
+    ].filter((field): field is string => field !== null);
+    if (unsupportedViewFields.length > 0) {
+      issue(issues, 'info', 'view-fields-reported', {
+        sheet: LM_VIEWS_SHEET, row: rowNumber, id: sourceId || null, field: unsupportedViewFields.join(','),
+      }, 'The first native Saved View schema has no durable source timestamps.',
+      'The view is evaluated normally; these fields remain in the report/source ZIP.');
+    }
     const setName = authoritativeSetNameByGid.get(gid);
     const displaySetId = setName === undefined ? undefined : displaySetIdByName.get(setName);
     if (sourceId === '' || displaySetId === undefined) {
@@ -1185,11 +1199,11 @@ export async function planLociMyuZipToNative(
     const setName = authoritativeSetNameByGid.get(gid);
     const displaySetId = setName === undefined ? undefined : displaySetIdByName.get(setName);
     const targets = materialTargets.get(key) ?? [];
-    if (displaySetId === undefined || model === null || model.representation.contentKind !== 'mesh' || targets.length !== 1) {
+    if (displaySetId === undefined || model === null || model.representation.contentKind !== 'mesh' || targets.length === 0) {
       issue(issues, 'warning', 'material-relation-inactive', { sheet: LM_MATERIALS_SHEET, row: entry.rowNumber, id: key, field: displaySetId === undefined ? 'sheetGid' : 'materialKey' },
         displaySetId === undefined
           ? 'The material GID has no exact one-to-one Caption-sheet authority.'
-          : targets.length === 0 ? 'No exact Mesh material slot matches the source key.' : 'The source key matches multiple Mesh material slots.',
+          : 'No Mesh material slot has the exact trimmed LociMyu material name.',
         'No material appearance is activated.', displaySetId === undefined ? [...(candidateTitlesByGid.get(gid) ?? [])] : targets.map((target) => target.nativeKey));
       mappings.push({ sourceKind: 'material row', sourceId, disposition: 'reported' });
       continue;
@@ -1201,7 +1215,7 @@ export async function planLociMyuZipToNative(
     const chromaEnabled = booleanCell(cell(entry.row, 4));
     const toleranceRaw = cell(entry.row, 6);
     const featherRaw = cell(entry.row, 7);
-    const tolerance = toleranceRaw === '' ? 0.1 : finiteNumber(toleranceRaw);
+    const tolerance = toleranceRaw === '' ? 0 : finiteNumber(toleranceRaw);
     const feather = featherRaw === '' ? 0 : finiteNumber(featherRaw);
     const chromaColor = cell(entry.row, 5) === '' ? [0, 0, 0] as const : hexColor(cell(entry.row, 5));
     if (opacity === null || opacity < 0 || opacity > 1 || doubleSided === null || unlit === null || chromaEnabled === null ||
@@ -1211,23 +1225,22 @@ export async function planLociMyuZipToNative(
       mappings.push({ sourceKind: 'material row', sourceId, disposition: 'reported' });
       continue;
     }
-    const appearanceId = newNativeId('mat');
-    meshMaterialAppearances.push({
-      id: appearanceId,
-      displaySetId,
-      assetId: model.asset.id,
-      authoredAssetRevisionId: model.revision.id,
-      representationId: model.representation.id,
-      materialSlotKey: targets[0]!.nativeKey,
-      opacity,
-      doubleSided,
-      unlit,
-      chroma: { enabled: false, colorSrgb: chromaColor, tolerance, feather },
-    });
-    if (chromaEnabled) {
-      issue(issues, 'info', 'material-chroma-disabled-for-parity', { sheet: LM_MATERIALS_SHEET, row: entry.rowNumber, id: key, field: 'chromaEnable' },
-        'The LociMyu renderer did not apply this chroma setting in its established path.',
-        'Values are preserved in native appearance, but activation stays off for visual parity and can be enabled later.');
+    const appearanceIds: string[] = [];
+    for (const target of targets) {
+      const appearanceId = newNativeId('mat');
+      appearanceIds.push(appearanceId);
+      meshMaterialAppearances.push({
+        id: appearanceId,
+        displaySetId,
+        assetId: model.asset.id,
+        authoredAssetRevisionId: model.revision.id,
+        representationId: model.representation.id,
+        materialSlotKey: target.nativeKey,
+        opacity,
+        doubleSided,
+        unlit,
+        chroma: { enabled: chromaEnabled, colorSrgb: chromaColor, tolerance, feather },
+      });
     }
     const unsupported = entry.row.slice(8, 13).map((value, offset) => lociMyuTrimV1(value) === '' ? null : cell(materialTable?.rows[0], offset + 8) || `column${offset + 9}`)
       .filter((value): value is string => value !== null);
@@ -1236,7 +1249,16 @@ export async function planLociMyuZipToNative(
         'These LociMyu material fields have no first native appearance destination.',
         'The supported appearance is activated; remaining values stay in the report/source ZIP.');
     }
-    mappings.push({ sourceKind: 'material row', sourceId, disposition: 'converted', targetKind: 'MeshMaterialAppearance', targetId: appearanceId });
+    for (const [index, appearanceId] of appearanceIds.entries()) {
+      mappings.push({
+        sourceKind: 'material row',
+        sourceId,
+        disposition: 'converted',
+        targetKind: 'MeshMaterialAppearance',
+        targetId: appearanceId,
+        note: `exact trimmed material name -> slot ${targets[index]!.nativeKey}`,
+      });
+    }
   }
 
   const assets = model === null ? [] : [model.asset];

@@ -10,12 +10,15 @@ import {
 import {
   activateNativeManualAssetTransformV1,
   NATIVE_ACTIVE_FORMAT,
+  NATIVE_CAPTION_PIN_SCALE_DEFAULT,
   normalizeNativeSim3,
+  nativeAssetPinScaleV1,
   parseNativeActiveMarkerV1,
   parseNativeSnapshotV1,
   removeNativeAssetV1,
   removeSelectedNativeCaptionV1,
   setNativeAssetVisibilityV1,
+  setNativeAssetPinScaleV1,
   serializeNativeActiveMarkerV1,
   serializeNativeSnapshotV1,
   updateSelectedNativeCaptionV1,
@@ -647,6 +650,18 @@ describe('native snapshot v1 and fixed degradation outcomes', () => {
       effectiveDisplayMode: 'mixed',
       interaction: { enabled: true, surfaceRepresentationId: NATIVE_TEST_IDS.proxyRepresentation },
     });
+  });
+
+  it('defaults, persists and independently updates per-Asset Caption pin scale', () => {
+    const original = snapshotFromDraft(makeNativeDraft().draft);
+    expect(nativeAssetPinScaleV1(original.assets[0]!)).toBe(NATIVE_CAPTION_PIN_SCALE_DEFAULT);
+
+    const scaled = setNativeAssetPinScaleV1(original, NATIVE_TEST_IDS.gsAsset, 100);
+    const roundTripped = parseNativeSnapshotV1(serializeNativeSnapshotV1(scaled));
+    expect(nativeAssetPinScaleV1(roundTripped.assets.find((asset) => asset.id === NATIVE_TEST_IDS.gsAsset)!)).toBe(100);
+    expect(nativeAssetPinScaleV1(roundTripped.assets.find((asset) => asset.id === NATIVE_TEST_IDS.meshAsset)!)).toBe(1);
+    expect(() => setNativeAssetPinScaleV1(original, NATIVE_TEST_IDS.gsAsset, 0.0001)).toThrow(/pinScale/);
+    expect(() => setNativeAssetPinScaleV1(original, NATIVE_TEST_IDS.gsAsset, 1001)).toThrow(/pinScale/);
   });
 
   it('keeps same-kind GS visibility and dedicated Proxy eligibility independent', () => {

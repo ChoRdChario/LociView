@@ -89,16 +89,11 @@ docs/02 §5 のanchor構造の運用:
 - **Unlit**: ライティングを無視し、素の拡散色を出力する。図面的な確認・テクスチャ色の確認用
 - **クロマキー**: 指定色との距離を `smoothstep(tolerance, tolerance+feather, dist)` で評価し透過させる
 
-**移植時に修正した元実装のバグ**: LociMyuは `#include <dithering_fragment>` の直後で `diffuseColor.a` を
-変更していたが、その時点では `opaque_fragment` により `gl_FragColor` が確定済みのため透過が反映されない。
-LociViewでは (1) `color_fragment` 直後にライティング前の色を `lvBaseColor` へ退避し、
-(2) `tonemapping_fragment` の直前で `gl_FragColor.a` を直接操作する形に変更した。
-これにより「指定色が実際に透明になる」ことをピクセル実測で確認済み。
-
-**移行時の扱い**: LociMyu時代のクロマキー設定は「設定しても効かなかった」ため、当時の見え方は
-クロマキーOFFの状態である。修正版でそのまま有効化すると移行後に見た目が激変してしまうので、
-**設定値は保持したまま `enable: false` で取り込み**、取込完了ダイアログでその旨を伝える。
-ユーザーはMaterialタブから任意に有効化できる。
+LociMyuのproduction entryはruntime material patchを読み込み、同名material
+すべてへクロマキー設定を適用していた。したがって移行時は、source-authority
+が確立したmaterial rowの`enable`、色、tolerance、featherを強制OFFにせず
+native appearanceへ継承する。LociView側のshader実装方法が異なっても、変換
+時にLociMyuの有効状態を失わせてはならない。
 
 ## 7. レンダリングパイプライン共通
 
