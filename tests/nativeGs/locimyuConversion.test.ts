@@ -62,7 +62,31 @@ describe('LociMyu ZIP to native direct adapter', () => {
     ]));
     expect(plan.inventory.duplicateOccurrenceCount).toBe(0);
     expect(plan.draft.mediaResources).toHaveLength(1);
-    expect(plan.issues).toContainEqual(expect.objectContaining({ code: 'orthographic-view-reported' }));
+    expect(plan.draft.savedViews).toHaveLength(1);
+    const approximatedView = plan.draft.savedViews![0]!;
+    expect(approximatedView.camera.projection.kind).toBe('orthographic');
+    if (approximatedView.camera.projection.kind !== 'orthographic') throw new Error('expected orthographic view');
+    expect(approximatedView.camera.projection.verticalSpan).toBeCloseTo(5.85786437626905, 12);
+    expect(plan.draft.displaySets?.find((set) => set.id === approximatedView.displaySetId)?.defaultSavedViewId)
+      .toBe(approximatedView.id);
+    expect(plan.issues).toContainEqual(expect.objectContaining({
+      code: 'orthographic-view-span-approximated',
+      severity: 'warning',
+      candidates: expect.arrayContaining([
+        'fovDegrees=45',
+        'fovSource=legacy-default',
+        'upSource=legacy-default-y-up',
+        'verticalSpan=5.85786437626905',
+      ]),
+    }));
+    expect(plan.mappings).toContainEqual(expect.objectContaining({
+      sourceKind: 'view row',
+      sourceId: 'v_SYNTH_LAST',
+      disposition: 'converted',
+      targetKind: 'SavedView',
+      targetId: approximatedView.id,
+      note: 'orthographic span uses approved legacy compatibility approximation',
+    }));
     expect(plan.issues).toContainEqual(expect.objectContaining({ code: 'sheet-authority-fields-reported', field: 'updatedAt' }));
     expect(plan.issues).toContainEqual(expect.objectContaining({ code: 'view-fields-reported' }));
     expect(plan.mappings.some((entry) => entry.sourceKind === 'image' && entry.disposition === 'reported')).toBe(true);
@@ -80,7 +104,66 @@ describe('LociMyu ZIP to native direct adapter', () => {
     expect(opened.missingRepresentationIds).toEqual([]);
     expect(opened.missingMediaIds).toEqual([]);
     expect(opened.snapshot.captions.map((caption) => caption.id)).toEqual(plan.draft.captions.map((caption) => caption.id));
+    expect(opened.snapshot.savedViews).toEqual(plan.draft.savedViews);
+    expect(opened.snapshot.displaySets).toEqual(plan.draft.displaySets);
     session.release();
+  });
+
+  it('approximates only admitted orthographic rows and does not default malformed values', async () => {
+    const sheetNames = ['Valid', 'Invalid FOV', 'Same eye target', 'Parallel up', 'Overflow span', 'Partial up'];
+    const workbook = await makeXlsx([
+      ...sheetNames.map((name, index) => ({
+        name,
+        rows: [captionHeader, [`c_${index + 1}`, name, '', '#eab308', '0', '0', '0', '', '', '']],
+      })),
+      {
+        name: '__LM_SHEET_NAMES',
+        rows: [
+          ['sheetGid', 'displayName', 'sheetTitle', 'updatedAt'],
+          ...sheetNames.map((name, index) => [String(index + 1), name, name, '']),
+        ],
+      },
+      {
+        name: '__LM_VIEWS',
+        rows: [
+          viewHeader,
+          ['v_valid', '1', 'valid', '', 'orthographic', '0', '0', '10', '0', '0', '0', '0', '1', '0', '60', '', ''],
+          ['v_invalid_fov', '2', 'invalid fov', '', 'orthographic', '0', '0', '10', '0', '0', '0', '0', '1', '0', '0', '', ''],
+          ['v_same', '3', 'same', '', 'orthographic', '0', '0', '0', '0', '0', '0', '0', '1', '0', '', '', ''],
+          ['v_parallel', '4', 'parallel', '', 'orthographic', '0', '0', '10', '0', '0', '0', '0', '0', '1', '', '', ''],
+          ['v_overflow', '5', 'overflow', '', 'orthographic', '1e307', '0', '0', '0', '0', '0', '0', '1', '0', '178', '', ''],
+          ['v_partial_up', '6', 'partial up', '', 'orthographic', '0', '0', '10', '0', '0', '0', '', '1', '0', '', '', ''],
+        ],
+      },
+    ]);
+    const zip = await writeZipEntries([
+      { path: 'LociMyu Save.xlsx', data: workbook },
+      { path: 'models/tri.glb', data: new Uint8Array(await readFile(resolve('public/samples/tri.glb'))) },
+    ]);
+    const file = new File([Uint8Array.from(zip)], 'orthographic-locimyu.zip', { type: 'application/zip' });
+    const importPlan = await buildImportPlan(await readZipEntries(zip), { preserveBlockedLociMyuSource: true });
+    const plan = await planLociMyuZipToNative(file, importPlan, 'Orthographic compatibility fixture');
+
+    expect(plan.blockingIssueCount).toBe(0);
+    expect(plan.draft.savedViews).toHaveLength(1);
+    const view = plan.draft.savedViews![0]!;
+    expect(view.name).toBe('valid');
+    expect(view.camera.projection.kind).toBe('orthographic');
+    if (view.camera.projection.kind !== 'orthographic') throw new Error('expected orthographic view');
+    expect(view.camera.projection.verticalSpan).toBeCloseTo(11.547005383792515, 12);
+    expect(plan.draft.displaySets?.find((set) => set.id === view.displaySetId)?.defaultSavedViewId).toBe(view.id);
+    expect(plan.issues).toContainEqual(expect.objectContaining({
+      code: 'orthographic-view-span-approximated',
+      sourceId: 'v_valid',
+      candidates: expect.arrayContaining(['fovDegrees=60', 'fovSource=source', 'upSource=source']),
+    }));
+    expect(plan.issues).toContainEqual(expect.objectContaining({ code: 'view-camera-values-reported', sourceId: 'v_invalid_fov' }));
+    expect(plan.issues).toContainEqual(expect.objectContaining({ code: 'view-camera-basis-reported', sourceId: 'v_same' }));
+    expect(plan.issues).toContainEqual(expect.objectContaining({ code: 'view-camera-basis-reported', sourceId: 'v_parallel' }));
+    expect(plan.issues).toContainEqual(expect.objectContaining({ code: 'orthographic-view-span-reported', sourceId: 'v_overflow' }));
+    expect(plan.issues).toContainEqual(expect.objectContaining({ code: 'view-camera-values-reported', sourceId: 'v_partial_up' }));
+    expect(plan.mappings.filter((entry) => entry.sourceKind === 'view row' && entry.disposition === 'converted'))
+      .toHaveLength(1);
   });
 
   it('broadcasts one exact-name material row to every matching slot and preserves source chroma', async () => {

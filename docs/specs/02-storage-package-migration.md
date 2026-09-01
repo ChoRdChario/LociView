@@ -1878,8 +1878,11 @@ general styling, renderer or history subsystem.
 - LociMyu Caption/view/material timestamps, sheet-registry timestamps and legacy
   Drive IDs remain report/source metadata rather than becoming a native history
   or identity system. The direct conversion report names every non-empty field
-  that is not durably converted. Orthographic legacy views remain report-only
-  because the source has no exact vertical span; no camera value is guessed.
+  that is not durably converted. For direct-LociMyu orthographic views only, the
+  bounded compatibility formula approved in `04-locimyu-conversion.md` derives
+  a reported native vertical span from eye-target distance and an admitted FOV.
+  Frozen-v1 orthographic views and any source lacking those admitted inputs
+  remain report-only; this does not add a general camera inference rule.
 - The representative source has no effective roughness, metalness, emissive,
   updated-by or video value. Those capabilities, Caption tags, a pin-adjacent
   Caption window, HEIC conversion, generalized media/style state and new

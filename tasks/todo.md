@@ -38,6 +38,26 @@
 Stop conditions: do not add a generalized mapping framework, editable per-row
 GID UI, media inference, HEIC conversion or Caption-content synthesis.
 
+## Active receiver gap — LociMyu orthographic Saved View
+
+- [x] Confirm the source gap: LociMyu saves orthographic camera kind, eye,
+  target and up but not its runtime orthographic height.
+- [x] Product Owner approved the bounded compatibility approximation used by
+  the legacy runtime projection toggle: `2 * eye-target distance * tan(FOV/2)`;
+  use a valid source FOV or exactly 45 degrees when the cell is empty. Reuse the
+  established all-empty up-vector default `[0, 1, 0]`; partial invalid vectors
+  remain report-only.
+- [x] Convert a valid orthographic row into the existing native Saved View and
+  record the chosen FOV/span as an explicit compatibility approximation.
+- [x] Keep non-empty invalid FOV, invalid camera basis and invalid computed span
+  report-only; do not silently apply the 45-degree default to malformed input.
+- [ ] Prove immediate DisplaySet application plus snapshot/package round trip
+  with focused coverage, one independent review and the existing final matrix.
+
+Stop conditions: no camera migration framework, per-import span editor,
+existing-Project retrofit, schema/package version change or generalized
+projection inference.
+
 ## Consolidated native Product Owner acceptance
 
 - [x] Desktop: exact-tree native route opened and the consolidated product flow
@@ -383,3 +403,18 @@ direct-LociMyu acceptance rather than repeated for this slice alone.
   `/LociView/` build on a root-mounted local preview was separately identified
   as an invalid acceptance server configuration; the corrected root build was
   verified to serve its entry JavaScript before the successful smoke.
+- The approved orthographic Saved-View receiver uses the deterministic legacy
+  compatibility formula with blank-FOV 45 degrees and the established all-empty
+  Y-up default. The private representative now produces four orthographic Saved
+  Views, four matching default-view links, 65 material appearances and 103
+  Captions with zero blocking issues; source-specific IDs/bytes remain unchanged.
+- Orthographic focused coverage passed 45/45, including explicit/default FOV,
+  default/invalid up, invalid basis, overflow and create/reopen persistence.
+  Existing schema/portable coverage already round-trips exact orthographic
+  projection state. Independent review found no P0/P1/P2; final browser visual
+  acceptance remains before closing this receiver item.
+- Final executable verification passed typecheck, production build and all
+  1,443 executable tests with 21 existing todo. The first full run passed 1,390
+  tests before the two registry suites intentionally rejected unstaged
+  specification bytes; staging the exact final tree made the affected 53/53
+  pass. This result-only note does not trigger a duplicate full run.

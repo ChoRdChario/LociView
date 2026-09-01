@@ -559,6 +559,22 @@ function validCameraBasis(
   return Number.isFinite(crossLength) && crossLength / (directionLength * upLength) > 1e-12;
 }
 
+const LOCIMYU_LEGACY_DEFAULT_VERTICAL_FOV_DEGREES = 45;
+
+function orthographicVerticalSpan(
+  position: readonly [number, number, number],
+  target: readonly [number, number, number],
+  verticalFovDegrees: number,
+): number | null {
+  const distance = Math.hypot(
+    target[0] - position[0],
+    target[1] - position[1],
+    target[2] - position[2],
+  );
+  const span = 2 * distance * Math.tan(THREE.MathUtils.degToRad(verticalFovDegrees) / 2);
+  return Number.isFinite(span) && span > 0 ? span : null;
+}
+
 function countRows(table: SheetTable | undefined, predicate: (row: readonly string[]) => boolean): number {
   return table === undefined ? 0 : table.rows.slice(1).filter(predicate).length;
 }
@@ -1181,35 +1197,72 @@ export async function planLociMyuZipToNative(
       continue;
     }
     const cameraKind = cell(row, 4).toLowerCase();
-    if (cameraKind === 'orthographic') {
-      issue(issues, 'warning', 'orthographic-view-reported', { sheet: LM_VIEWS_SHEET, row: rowNumber, id: sourceId, field: 'cameraType' },
-        'LociMyu does not provide the orthographic span required by the native Saved View.',
-        'The view is reported without inventing a span.');
-      mappings.push({ sourceKind: 'view row', sourceId, disposition: 'reported' });
-      continue;
-    }
-    if (cameraKind !== '' && cameraKind !== 'perspective') {
+    if (cameraKind !== '' && cameraKind !== 'perspective' && cameraKind !== 'orthographic') {
       issue(issues, 'warning', 'view-camera-kind-reported', { sheet: LM_VIEWS_SHEET, row: rowNumber, id: sourceId, field: 'cameraType' },
-        'The camera type is not an admitted perspective source value.', 'The view is not activated.');
+        'The camera type is not an admitted source value.', 'The view is not activated.');
       mappings.push({ sourceKind: 'view row', sourceId, disposition: 'reported' });
       continue;
     }
-    const values = [5, 6, 7, 8, 9, 10, 11, 12, 13].map((column) => finiteNumber(cell(row, column)));
-    const fov = finiteNumber(cell(row, 14));
-    if (values.some((value) => value === null) || fov === null || fov <= 1 || fov >= 179) {
+    const positionAndTargetValues = [5, 6, 7, 8, 9, 10].map((column) => finiteNumber(cell(row, column)));
+    const rawUp = [11, 12, 13].map((column) => cell(row, column));
+    const usesLegacyDefaultUp = cameraKind === 'orthographic' && rawUp.every((value) => value === '');
+    const parsedUp = usesLegacyDefaultUp
+      ? [0, 1, 0]
+      : rawUp.map((value) => finiteNumber(value));
+    const rawFov = cell(row, 14);
+    const parsedFov = finiteNumber(rawFov);
+    const verticalFovDegrees = cameraKind === 'orthographic' && rawFov === ''
+      ? LOCIMYU_LEGACY_DEFAULT_VERTICAL_FOV_DEGREES
+      : parsedFov;
+    if (positionAndTargetValues.some((value) => value === null) || parsedUp.some((value) => value === null) ||
+      verticalFovDegrees === null ||
+      verticalFovDegrees <= 1 || verticalFovDegrees >= 179) {
       issue(issues, 'warning', 'view-camera-values-reported', { sheet: LM_VIEWS_SHEET, row: rowNumber, id: sourceId, field: 'camera' },
-        'The camera vectors or field of view are incomplete or invalid.', 'The view is not activated.');
+        cameraKind === 'orthographic' && rawFov !== ''
+          ? 'The orthographic camera vectors or non-empty field of view are invalid.'
+          : 'The camera vectors or field of view are incomplete or invalid.',
+        'The view is not activated.');
       mappings.push({ sourceKind: 'view row', sourceId, disposition: 'reported' });
       continue;
     }
-    const position = values.slice(0, 3) as [number, number, number];
-    const target = values.slice(3, 6) as [number, number, number];
-    const up = values.slice(6, 9) as [number, number, number];
+    const position = positionAndTargetValues.slice(0, 3) as [number, number, number];
+    const target = positionAndTargetValues.slice(3, 6) as [number, number, number];
+    const up = parsedUp as [number, number, number];
     if (!validCameraBasis(position, target, up)) {
       issue(issues, 'warning', 'view-camera-basis-reported', { sheet: LM_VIEWS_SHEET, row: rowNumber, id: sourceId, field: 'camera' },
         'The camera direction and up vector do not form a valid basis.', 'The view is not activated.');
       mappings.push({ sourceKind: 'view row', sourceId, disposition: 'reported' });
       continue;
+    }
+    let projection: NativeSavedViewV1['camera']['projection'];
+    if (cameraKind === 'orthographic') {
+      const verticalSpan = orthographicVerticalSpan(position, target, verticalFovDegrees);
+      if (verticalSpan === null) {
+        issue(issues, 'warning', 'orthographic-view-span-reported', {
+          sheet: LM_VIEWS_SHEET,
+          row: rowNumber,
+          id: sourceId,
+          field: 'projection.verticalSpan',
+        }, 'The approved orthographic compatibility formula did not produce a finite positive span.',
+        'The view is not activated.');
+        mappings.push({ sourceKind: 'view row', sourceId, disposition: 'reported' });
+        continue;
+      }
+      projection = { kind: 'orthographic', verticalSpan };
+      issue(issues, 'warning', 'orthographic-view-span-approximated', {
+        sheet: LM_VIEWS_SHEET,
+        row: rowNumber,
+        id: sourceId,
+        field: 'projection.verticalSpan',
+      }, 'LociMyu did not persist the runtime orthographic height.',
+      'The active native Saved View uses the Product Owner-approved compatibility approximation and may differ in scale from the original LociMyu view.', [
+        `fovDegrees=${verticalFovDegrees}`,
+        `fovSource=${rawFov === '' ? 'legacy-default' : 'source'}`,
+        `upSource=${usesLegacyDefaultUp ? 'legacy-default-y-up' : 'source'}`,
+        `verticalSpan=${verticalSpan}`,
+      ]);
+    } else {
+      projection = { kind: 'perspective', verticalFovRadians: THREE.MathUtils.degToRad(verticalFovDegrees) };
     }
     const rawBackground = cell(row, 3);
     const background = hexColor(rawBackground) ?? [16 / 255, 16 / 255, 16 / 255] as const;
@@ -1224,14 +1277,21 @@ export async function planLociMyuZipToNative(
       name: cleanSingleLine(rawName === LAST_VIEW_NAME ? '前回の視点' : rawName, `ビュー ${savedViews.length + 1}`),
       orderKey: String(savedViews.length).padStart(6, '0'),
       projectFrameId,
-      camera: { position, target, up, projection: { kind: 'perspective', verticalFovRadians: THREE.MathUtils.degToRad(fov) } },
+      camera: { position, target, up, projection },
       background: { kind: 'solid', colorSrgb: background },
       displaySetId,
     });
     const setViews = viewIdsByDisplaySet.get(displaySetId) ?? [];
     setViews.push(viewId);
     viewIdsByDisplaySet.set(displaySetId, setViews);
-    mappings.push({ sourceKind: 'view row', sourceId, disposition: 'converted', targetKind: 'SavedView', targetId: viewId });
+    mappings.push({
+      sourceKind: 'view row',
+      sourceId,
+      disposition: 'converted',
+      targetKind: 'SavedView',
+      targetId: viewId,
+      ...(cameraKind === 'orthographic' ? { note: 'orthographic span uses approved legacy compatibility approximation' } : {}),
+    });
   }
   const displaySetsWithViews = displaySets.map((set) => {
     const viewIds = viewIdsByDisplaySet.get(set.id) ?? [];

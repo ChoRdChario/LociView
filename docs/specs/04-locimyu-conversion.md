@@ -1,9 +1,10 @@
 # LociMyu conversion identity, source authority and report contract
 
-> Status: `PRODUCT-OWNER APPROVED / BOUNDED DIRECT ADAPTER IMPLEMENTED / CORROBORATED DISPLAYSET RELATION CONFIRMATION APPROVED; P1 FIX IN PROGRESS`
+> Status: `PRODUCT-OWNER APPROVED / BOUNDED DIRECT ADAPTER IMPLEMENTED / ORTHOGRAPHIC SAVED-VIEW COMPATIBILITY APPROXIMATION IMPLEMENTED; DESKTOP VISUAL ACCEPTANCE PENDING`
 > Approved: 2026-08-26
 > Direct-adapter boundary approved: 2026-08-31
 > Corroborated DisplaySet relation confirmation approved: 2026-09-01
+> Orthographic Saved-View compatibility approximation approved: 2026-09-02
 > Identity recipe: `locimyu-caption-id-2`
 
 ## 1. Scope and authority
@@ -317,9 +318,28 @@ runtime application remain explicit stable material-slot records.
 The initial adapter does not create native history or provenance records for
 `createdAt`, `updatedAt`, `updatedBy`, sheet-registry timestamps or legacy Drive
 IDs. Every non-empty value in those fields is named in the conversion report.
-Likewise, an orthographic view without the source span required by the native
-camera remains reported rather than receiving a guessed span. These are explicit
-report/source-retention outcomes, not silent receiver omissions.
+
+LociMyu records an orthographic camera kind, eye, target and up vector but does
+not persist the runtime orthographic height required by a native Saved View.
+For this legacy reader only, the Product Owner approved one deterministic
+compatibility approximation matching LociMyu's projection-toggle geometry:
+
+```text
+verticalSpan = 2 * distance(eye, target) * tan(verticalFovDegrees / 2)
+```
+
+The adapter uses the row's finite `fov` only when it lies strictly between 1 and
+179 degrees. When that cell is empty, it uses the legacy runtime default of
+exactly 45 degrees. When all three source up-vector cells are empty, it likewise
+uses the established LociMyu Y-up default `[0, 1, 0]`; partially empty or
+non-finite up vectors are invalid and do not receive component-wise defaults. A
+non-empty invalid FOV, invalid camera basis, non-finite result or non-positive
+span keeps the view report-only; such input is not treated as absent. Every
+converted orthographic view receives an explicit report issue stating the
+chosen FOV and computed span, whether Y-up was defaulted, and its mapping remains
+distinguishable from a source-exact perspective Saved View. This bounded
+compatibility rule does not change the native camera schema, add a general
+camera migration framework or claim an exact source-authored span.
 
 ## 5. Source retention and conversion-report boundary
 
@@ -416,7 +436,7 @@ that unconverted source data can be recovered from the native Project alone.
 - `LM-ADAPT-08`: every converted Caption color is visible and editable in the
   native product and survives save/offline reopen plus portable export/restore.
   Every non-empty view or sheet-registry timestamp not converted into native
-  state has a field-level report entry; no history or camera span is invented.
+  state has a field-level report entry; no history state is invented.
 - `LM-ADAPT-09`: one exact source material name matching multiple decoded slots
   creates one explicit native appearance per slot. Supported opacity and chroma
   values are visibly applied and survive save/offline reopen plus portable
@@ -429,3 +449,13 @@ that unconverted source data can be recovered from the native Project alone.
   labels the three added relations as user-confirmed, while Caption IDs and
   source bytes remain unchanged. A mismatched, partial or injected confirmation
   blocks publication.
+- `LM-ADAPT-11`: a valid orthographic view becomes a native orthographic Saved
+  View using the approved deterministic span formula. Blank FOV uses exactly 45
+  degrees; a valid explicit FOV is honored; a wholly blank up vector uses the
+  established `[0, 1, 0]` default. Partially empty/non-finite up values,
+  non-empty invalid FOV and invalid camera geometry remain report-only.
+  DisplaySet switching applies the Saved View immediately, and the
+  projection/span survive snapshot and portable package round trips without a
+  schema or package-version change. The report identifies the result as a
+  compatibility approximation and records the FOV, up-vector basis and computed
+  span.
