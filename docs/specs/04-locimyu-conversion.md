@@ -341,6 +341,24 @@ distinguishable from a source-exact perspective Saved View. This bounded
 compatibility rule does not change the native camera schema, add a general
 camera migration framework or claim an exact source-authored span.
 
+### 4.6 Bounded iPhone texture activation
+
+The representative source GLB remains the exact native Representation content
+and the exact byte sequence exported in portable backup. On iPhone/iPad only,
+the viewer MAY decode core glTF embedded JPEG/PNG textures with an aspect-
+preserving maximum edge of 4096 pixels. This is an ephemeral runtime decode
+policy, not a stored derivative, source rewrite, format conversion result,
+Representation revision or Desktop quality policy. Desktop continues to decode
+the admitted source dimensions.
+
+An over-limit image MUST NOT silently fall back to a full-size mobile decode if
+the bounded decode fails. Texture activation failure or WebGL context loss is a
+visible model-load failure; requested Asset visibility MUST NOT be presented as
+renderer readiness. Conversion-time material identity inspection MUST NOT
+decode texture pixels because it consumes material names and mesh-slot identity
+only. Loaded material, texture and ImageBitmap resources are released once when
+their inspection or viewer lifetime ends.
+
 ## 5. Source retention and conversion-report boundary
 
 The user retains the exact outer source ZIP separately. The converter reads it
@@ -459,3 +477,11 @@ that unconverted source data can be recovered from the native Project alone.
   schema or package-version change. The report identifies the result as a
   compatibility approximation and records the FOV, up-vector basis and computed
   span.
+- `LM-ADAPT-12`: on physical iPhone 14 Pro, the representative GLB with two
+  8192-square and one 4096-square embedded textures opens with its model and
+  grid remaining rendered. Runtime decode never exceeds a 4096-pixel edge,
+  while the stored Representation and `.lociview` export retain the exact
+  source size/hash and Desktop retains source-resolution rendering. A failed
+  texture decode or WebGL context loss produces a persistent visible error and
+  never a false `1/1` ready/success indication. DisplaySet switching, save and
+  completely offline reopen remain functional after the bounded decode.

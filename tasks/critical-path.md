@@ -2,8 +2,8 @@
 
 > Status: `CURRENT CHECKPOINT / FIRST FROZEN-V1 -> NATIVE LANE PASS; DIRECT LOCIMYU DESKTOP ACCEPTANCE PASS; BATCHED IPHONE ACCEPTANCE PENDING`
 >
-> Updated: 2026-09-02 after Product Owner Desktop acceptance of the bounded
-> LociMyu DisplaySet linkage correction at `0c651b6` on `g0-baseline`.
+> Updated: 2026-09-02 after Product Owner Desktop acceptance through the
+> Saved-View/DisplaySet authoring correction at `809ab63` on `g0-baseline`.
 >
 > This is an execution plan plus the Product Owner's scheduling and display-model
 > decisions. G0 and G0-S remain release barriers. `G0S-TAB`, the first production
@@ -333,7 +333,8 @@ implemented, independently reviewed and accepted on Desktop and physical
 iPhone. The source is never overwritten or embedded and every unsupported
 value is reported. The separate direct LociMyu adapter and its bounded native
 appearance receiver are complete at `0bcb636`, with the confirmed missing
-DisplaySet-relation correction at `0c651b6`. The representative's six rows with
+DisplaySet-relation correction at `0c651b6` and the Saved-View/DisplaySet
+authoring correction at `809ab63`. The representative's six rows with
 an empty trimmed ID are reported as empty input; 103 Captions, 65 explicit
 material-slot appearances and 24 image resources publish and survive automated
 portable restore while the source remains byte-identical. Product Owner Desktop
@@ -342,8 +343,9 @@ sheet-linked material switching. The
 bounded Caption overlay now selects existing placed Captions from marker or
 list, presents saved content and project-local images, and supports temporary
 stage-clamped move and resize without adding durable state. Product Owner
-Desktop acceptance passed; one consolidated Desktop/iPhone product acceptance
-remains.
+Desktop acceptance passed through sheet-linked Caption/material/camera
+switching and temporary Caption-overlay move/resize; one consolidated physical-
+iPhone product acceptance remains.
 Compare remains excluded; attachment/media UX and final visual polish remain
 later work.
 Remaining G0/G0-S and external evidence continue as parallel release barriers.
@@ -408,6 +410,15 @@ is implied.
   the bounded wording fix was re-reviewed and closed it. The final matrix is
   green and no correction P0/P1 remains.
 - **Lane result:** Desktop direct-LociMyu product acceptance passes through the
-  DisplaySet linkage correction at `0c651b6`; the affected physical-iPhone
-  DisplaySet/save/offline-reopen smoke remains deliberately batched and is not
-  inferred from Desktop or automated publication/restore.
+  Saved-View/DisplaySet authoring correction at `809ab63`; the affected
+  physical-iPhone DisplaySet/Caption-overlay/save/offline-reopen smoke remains
+  deliberately batched and is not inferred from Desktop or automated
+  publication/restore.
+- **Completed runtime correction:** physical iPhone reproduced a WebGL resource
+  failure with the representative GLB's two 8192-square and one 4096-square
+  embedded textures. The source bytes remain exact. An iPhone/iPad-only 4096px
+  runtime decode cap, deterministic Texture/ImageBitmap release and truthful
+  readiness/context-loss reporting are implemented and reviewed. The Product
+  Owner accepted the affected physical-iPhone open/DisplaySet/save/offline-
+  reopen smoke with the representative model remaining rendered; no P0/P1
+  remains in this correction.

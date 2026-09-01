@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { visibleEntities, type EntityRecord, type ProjectState } from '../core/reduce';
 import type { ProjectStore } from '../core/store';
 import type { ProjectWorkspaceFS, WorkspaceReadableFile } from '../platform/fs';
-import { detectFormat, loadModel, type ModelFormat } from '../viewer/loaders';
+import { detectFormat, disposeModelResources, loadModel, type ModelFormat } from '../viewer/loaders';
 import { legacyV1MaterialSlotKey, nativeMaterialSlotKey } from './materialSlots';
 import { inspectNativeGsPlyV1, inspectNativePointPlyV1 } from './plyProfile';
 import {
@@ -365,20 +365,6 @@ function recordUnknownFields(
   }
 }
 
-function disposeLoadedModel(root: THREE.Object3D): void {
-  const geometries = new Set<THREE.BufferGeometry>();
-  const materials = new Set<THREE.Material>();
-  root.traverse((object) => {
-    if (object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.Line) {
-      geometries.add(object.geometry);
-      const source = Array.isArray(object.material) ? object.material : [object.material];
-      for (const material of source) materials.add(material);
-    }
-  });
-  for (const geometry of geometries) geometry.dispose();
-  for (const material of materials) material.dispose();
-}
-
 async function materialTargets(asset: ConvertedAsset): Promise<Map<string, MaterialSlotTarget[]>> {
   const format = detectFormat(
     typeof asset.sourceRecord.fields.originalName === 'string'
@@ -387,7 +373,7 @@ async function materialTargets(asset: ConvertedAsset): Promise<Map<string, Mater
     await readPrefix(asset.sourceFile),
   );
   if (format === null || asset.representation.contentKind !== 'mesh') return new Map();
-  const loaded = await loadModel(format, await collectBytes(asset.sourceFile));
+  const loaded = await loadModel(format, await collectBytes(asset.sourceFile), { gltfTextures: { kind: 'skip' } });
   const result = new Map<string, MaterialSlotTarget[]>();
   const add = (key: string, target: MaterialSlotTarget): void => {
     const current = result.get(key) ?? [];
@@ -413,7 +399,7 @@ async function materialTargets(asset: ConvertedAsset): Promise<Map<string, Mater
     visit(loaded.root, []);
     return result;
   } finally {
-    disposeLoadedModel(loaded.root);
+    disposeModelResources(loaded.root);
   }
 }
 

@@ -36,6 +36,34 @@ function duplicateNamedMaterialGlb(): Uint8Array {
   }, new Uint8Array(positions.buffer));
 }
 
+function texturedNamedMaterialGlb(): Uint8Array {
+  const positions = new Uint8Array(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]).buffer);
+  const image = new Uint8Array(24);
+  image.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  image.set([0x49, 0x48, 0x44, 0x52], 12);
+  new DataView(image.buffer).setUint32(16, 8192);
+  new DataView(image.buffer).setUint32(20, 4096);
+  const bin = new Uint8Array(positions.byteLength + image.byteLength);
+  bin.set(positions);
+  bin.set(image, positions.byteLength);
+  return serializeGlb({
+    asset: { version: '2.0' },
+    scene: 0,
+    scenes: [{ nodes: [0] }],
+    nodes: [{ mesh: 0 }],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 }, material: 0 }] }],
+    materials: [{ name: 'Shared', pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }],
+    textures: [{ source: 0 }],
+    images: [{ bufferView: 1, mimeType: 'image/png' }],
+    buffers: [{ byteLength: bin.byteLength }],
+    bufferViews: [
+      { buffer: 0, byteOffset: 0, byteLength: positions.byteLength, target: 34962 },
+      { buffer: 0, byteOffset: positions.byteLength, byteLength: image.byteLength },
+    ],
+    accessors: [{ bufferView: 0, byteOffset: 0, componentType: 5126, count: 3, type: 'VEC3', min: [0, 0, 0], max: [1, 1, 0] }],
+  }, bin);
+}
+
 function csvCell(value: string): string {
   return /[",\r\n]/u.test(value) ? `"${value.replace(/"/gu, '""')}"` : value;
 }
@@ -203,6 +231,37 @@ describe('LociMyu ZIP to native direct adapter', () => {
     expect(plan.issues.some((entry) => entry.code === 'material-relation-inactive')).toBe(false);
     expect(plan.issues.some((entry) => entry.code === 'material-chroma-disabled-for-parity')).toBe(false);
     expect(plan.mappings.filter((entry) => entry.sourceKind === 'material row' && entry.disposition === 'converted')).toHaveLength(2);
+  });
+
+  it('inspects textured GLB material identity without decoding its pixels', async () => {
+    const workbook = await makeXlsx([
+      { name: 'S', rows: [captionHeader, ['c_1', 'A', '', '#eab308', '0', '0', '0', '', '', '']] },
+      {
+        name: '__LM_SHEET_NAMES',
+        rows: [['sheetGid', 'displayName', 'sheetTitle', 'updatedAt'], ['55', 'S', 'S', '']],
+      },
+      {
+        name: '__LM_MATERIALS',
+        rows: [materialHeader, ['Shared', '0.5', 'FALSE', 'FALSE', 'FALSE', '', '', '', '', '', '', '', '', '55']],
+      },
+    ]);
+    const zip = await writeZipEntries([
+      { path: 'LociMyu Save.xlsx', data: workbook },
+      { path: 'models/textured.glb', data: texturedNamedMaterialGlb() },
+    ]);
+    const file = new File([Uint8Array.from(zip)], 'textured-locimyu.zip', { type: 'application/zip' });
+    const importPlan = await buildImportPlan(await readZipEntries(zip), { preserveBlockedLociMyuSource: true });
+    const decode = vi.fn(() => Promise.reject(new Error('pixel decode must not run')));
+    vi.stubGlobal('self', globalThis);
+    vi.stubGlobal('createImageBitmap', decode);
+    try {
+      const plan = await planLociMyuZipToNative(file, importPlan, 'Textured material inspection');
+      expect(plan.blockingIssueCount).toBe(0);
+      expect(plan.draft.meshMaterialAppearances).toContainEqual(expect.objectContaining({ opacity: 0.5 }));
+      expect(decode).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('activates only a complete user-confirmed relation while preserving Caption identity', async () => {

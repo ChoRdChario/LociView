@@ -307,3 +307,10 @@
 
 - Saved View recordへ正しい`displaySetId`を保存しただけでは、シート切替時の視点復元は成立しない。authoring操作がそのDisplaySetの`defaultSavedViewId`まで更新し、切替側が同じpointerを消費するところまで確認する。
 - converter由来のdefault linkageだけで受入を終えず、ユーザーが各シートで新しい視点を保存し、別シートへ切り替えて戻ったときにcamera/backgroundが変わるproduct flowをfocused acceptanceに含める。
+
+## 2026-09-02: source byte健全性とruntime texture健全性を分ける
+
+- GLBのsize/hash/read-back一致だけでは、埋め込み画像がbrowserでdecode・GPU確保できたことにならない。`GLTFLoader: Couldn't load texture blob:`はpath欠落ではなく、埋め込みbufferViewの実行時読込失敗として扱う。
+- Three.jsの`Material.dispose()`は参照Textureを解放しない。モデルclose/reopenや変換時inspectionでは、共有Textureを重複なく列挙してgeometry/materialと一緒に解放する必要がある。
+- 8K textureを複数含むモデルはmipmapと複数tabで資源使用量が急増する。原本破損や変換lossと決めつけずfresh single-tabで再現確認し、source bytesの再圧縮・軽量化へ勝手に広げない。
+- Asset visibilityの件数をrenderer readinessとして表示しない。物理iPhoneでgridが一瞬描画された後canvas全体が消える場合は、cameraや保存状態ではなくWebGL context/resource failureを第一に扱い、成功文言でactivation errorを上書きしない。

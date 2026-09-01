@@ -80,6 +80,38 @@ export function isNativeAssetVisibleV1(snapshot: NativeProjectSnapshotV1, assetI
   return !(snapshot.presentation.hiddenAssetIds ?? []).includes(assetId);
 }
 
+export interface NativeVisibleAssetReadinessV1 {
+  readonly totalAssetCount: number;
+  readonly requestedVisibleAssetCount: number;
+  readonly readyVisibleAssetCount: number;
+  readonly fullyReady: boolean;
+}
+
+/** Asset visibilityと実際にreadyなprimary Representationを混同しないための表示用集計。 */
+export function summarizeNativeVisibleAssetReadinessV1(
+  snapshot: NativeProjectSnapshotV1,
+  readyRepresentationIds: Iterable<string>,
+): NativeVisibleAssetReadinessV1 {
+  const ready = new Set(readyRepresentationIds);
+  let requestedVisibleAssetCount = 0;
+  let readyVisibleAssetCount = 0;
+  for (const asset of snapshot.assets) {
+    if (!isNativeAssetVisibleV1(snapshot, asset.id)) continue;
+    requestedVisibleAssetCount += 1;
+    const primaryRepresentations = activeNativeRepresentationsV1(snapshot, asset.id)
+      .filter((representation) => representation.role !== 'interactionProxy');
+    const primaryReady = primaryRepresentations.length > 0 &&
+      primaryRepresentations.every((representation) => ready.has(representation.id));
+    if (primaryReady) readyVisibleAssetCount += 1;
+  }
+  return {
+    totalAssetCount: snapshot.assets.length,
+    requestedVisibleAssetCount,
+    readyVisibleAssetCount,
+    fullyReady: readyVisibleAssetCount === requestedVisibleAssetCount,
+  };
+}
+
 export function resolveNativeGsSliceV1(
   snapshot: NativeProjectSnapshotV1,
   states: ReadonlyMap<string, NativeResourceStateV1>,

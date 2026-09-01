@@ -1,7 +1,12 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
-import { loadModel } from '../viewer/loaders';
+import {
+  disposeMaterialResources,
+  disposeModelResources,
+  loadModel,
+  uploadModelTexturesAndReleaseBitmaps,
+} from '../viewer/loaders';
 import { patchMaterial, setChroma, setUnlit } from '../viewer/shaderPatch';
 import { inspectNativeGsPlyV1, inspectNativePointPlyV1 } from './plyProfile';
 import {
@@ -97,6 +102,10 @@ export interface NativeMeshMaterialSlotInfo {
   };
 }
 
+export interface NativeGsViewerOptions {
+  readonly gltfTextureMaxEdge?: number;
+}
+
 function applySim3(object: THREE.Object3D, transform: NativeSim3V1): void {
   object.position.fromArray(transform.translation);
   object.quaternion.fromArray(transform.rotationXYZW);
@@ -144,20 +153,15 @@ function disposeMaterial(material: THREE.Material | THREE.Material[]): void {
 }
 
 function disposeObject(root: THREE.Object3D): void {
-  root.traverse((object) => {
-    if (object.userData.nativeSpark === true) return;
-    if (object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.Line) {
-      object.geometry.dispose();
-      disposeMaterial(object.material);
-    }
-  });
-  root.removeFromParent();
+  disposeModelResources(root);
 }
 
 function makeProxyInvisible(root: THREE.Object3D): void {
+  const materials = new Set<THREE.Material>();
   root.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
-    disposeMaterial(object.material);
+    const current = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of current) materials.add(material);
     object.material = new THREE.MeshBasicMaterial({
       transparent: true,
       opacity: 0,
@@ -167,6 +171,7 @@ function makeProxyInvisible(root: THREE.Object3D): void {
     });
     object.userData.interactionOnly = true;
   });
+  disposeMaterialResources(materials);
 }
 
 function pointMaterials(object: THREE.Points): THREE.PointsMaterial[] {
@@ -258,6 +263,7 @@ export class NativeGsViewer {
   private readonly pointDiameters = new Map<string, number>();
   private readonly meshMaterialSlots = new Map<string, NativeMeshMaterialSlot[]>();
   private materialIssues: string[] = [];
+  private readonly runtimeIssues: string[] = [];
   private readonly callbacks: NativeGsViewerCallbacks;
   private snapshot: NativeProjectSnapshotV1;
   private activeDisplaySetOverride: string | null = null;
@@ -273,6 +279,7 @@ export class NativeGsViewer {
   private emptyTapStart: { readonly pointerId: number; readonly x: number; readonly y: number } | null = null;
   private editingEnabled = false;
   private gizmoDragging = false;
+  private contextLost = false;
   private disposed = false;
   private animationFrame = 0;
   private resolution: NativeSliceResolutionV1;
@@ -285,6 +292,7 @@ export class NativeGsViewer {
     private readonly canvas: HTMLCanvasElement,
     snapshot: NativeProjectSnapshotV1,
     callbacks: NativeGsViewerCallbacks,
+    private readonly options: NativeGsViewerOptions = {},
   ) {
     this.snapshot = snapshot;
     this.callbacks = callbacks;
@@ -361,7 +369,15 @@ export class NativeGsViewer {
       return rank(left.role) - rank(right.role) || left.id.localeCompare(right.id);
     });
     for (const representation of ordered) {
+      if (this.contextLost) {
+        this.resourceStates.set(representation.id, { availability: 'failed', registration: 'known' });
+        continue;
+      }
       const source = await openRepresentation(representation.id);
+      if (this.contextLost) {
+        this.resourceStates.set(representation.id, { availability: 'failed', registration: 'known' });
+        continue;
+      }
       if (source === null) {
         this.resourceStates.set(representation.id, { availability: 'missing', registration: 'known' });
         continue;
@@ -379,10 +395,18 @@ export class NativeGsViewer {
         } else {
           await this.loadMeshLike(representation, source);
         }
+        if (this.contextLost) {
+          this.releaseRepresentation(representation.id);
+          this.resourceStates.set(representation.id, { availability: 'failed', registration: 'known' });
+          continue;
+        }
         this.resourceStates.set(representation.id, { availability: 'ready', registration: 'known' });
       } catch (error) {
         this.resourceStates.set(representation.id, { availability: 'failed', registration: 'known' });
-        this.callbacks.onRuntimeError(`${representation.role} activation failed: ${errorMessage(error)}`);
+        this.recordRuntimeIssue(
+          `${representation.role} activation failed: ${errorMessage(error)}`,
+          representation.role !== 'interactionProxy',
+        );
       }
     }
     this.currentCaption = this.snapshot.captions[0] ?? null;
@@ -750,24 +774,38 @@ export class NativeGsViewer {
   private async loadMeshLike(representation: NativeRepresentationV1, source: WorkspaceReadableFile): Promise<void> {
     const format = nativeModelFormat(representation.formatProfile.id);
     if (format === null) throw new Error(`unsupported model profile ${representation.formatProfile.id}`);
-    const loaded = await loadModel(format, await collectStream(source));
-    if (representation.role === 'interactionProxy') {
-      if (loaded.stats.triangles < 1) throw new Error('Interaction Proxy must contain triangles');
-      makeProxyInvisible(loaded.root);
-    } else if (representation.role === 'meshPrimary') {
-      this.meshMaterialSlots.set(
-        representation.id,
-        registerNativeMeshMaterialSlots(loaded.root, representation.id),
-      );
+    const gltfTextures = format !== 'glb' && format !== 'gltf'
+      ? undefined
+      : representation.role === 'interactionProxy'
+        ? { kind: 'skip' as const }
+        : this.options.gltfTextureMaxEdge === undefined
+          ? undefined
+          : { kind: 'max-edge' as const, maxEdge: this.options.gltfTextureMaxEdge };
+    const loaded = await loadModel(format, await collectStream(source), { gltfTextures });
+    try {
+      let slots: NativeMeshMaterialSlot[] | null = null;
+      if (representation.role === 'interactionProxy') {
+        if (loaded.stats.triangles < 1) throw new Error('Interaction Proxy must contain triangles');
+        makeProxyInvisible(loaded.root);
+      } else if (representation.role === 'meshPrimary') {
+        slots = registerNativeMeshMaterialSlots(loaded.root, representation.id);
+      }
+      loaded.root.name = representation.id;
+      loaded.root.userData.representationId = representation.id;
+      applyCanonicalTransform(loaded.root, representation.representationToAsset);
+      const group = this.assetGroups.get(representation.assetId);
+      if (group === undefined) throw new Error('Representation Asset group is unavailable');
+      uploadModelTexturesAndReleaseBitmaps(this.renderer, loaded.root);
+      group.add(loaded.root);
+      this.representationObjects.set(representation.id, loaded.root);
+      if (slots !== null) this.meshMaterialSlots.set(representation.id, slots);
+      this.applyActiveMeshMaterialAppearances();
+    } catch (error) {
+      this.representationObjects.delete(representation.id);
+      this.meshMaterialSlots.delete(representation.id);
+      disposeModelResources(loaded.root);
+      throw error;
     }
-    loaded.root.name = representation.id;
-    loaded.root.userData.representationId = representation.id;
-    applyCanonicalTransform(loaded.root, representation.representationToAsset);
-    const group = this.assetGroups.get(representation.assetId);
-    if (group === undefined) throw new Error('Representation Asset group is unavailable');
-    group.add(loaded.root);
-    this.representationObjects.set(representation.id, loaded.root);
-    this.applyActiveMeshMaterialAppearances();
   }
 
   private applyActiveMeshMaterialAppearances(): void {
@@ -887,7 +925,25 @@ export class NativeGsViewer {
     }
     this.syncCaptionMarkers();
     this.refreshGizmoAttachment();
-    this.callbacks.onIssuesChanged([...this.resolution.issues, ...this.materialIssues]);
+    this.callbacks.onIssuesChanged([...this.resolution.issues, ...this.materialIssues, ...this.runtimeIssues]);
+  }
+
+  private recordRuntimeIssue(message: string, notify = true): void {
+    if (!this.runtimeIssues.includes(message)) this.runtimeIssues.push(message);
+    if (notify) this.callbacks.onRuntimeError(message);
+  }
+
+  private releaseRepresentation(representationId: string): void {
+    const object = this.representationObjects.get(representationId);
+    if (object?.userData.nativeSpark === true) {
+      object.removeFromParent();
+      this.sparkRuntime?.disposeSplat(representationId);
+    } else if (object !== undefined) {
+      disposeModelResources(object);
+    }
+    this.representationObjects.delete(representationId);
+    this.representationBounds.delete(representationId);
+    this.meshMaterialSlots.delete(representationId);
   }
 
   private applyActiveAssetTransforms(): void {
@@ -1355,14 +1411,25 @@ export class NativeGsViewer {
   }
 
   private animate = (): void => {
-    if (this.disposed) return;
+    if (this.disposed || this.contextLost) return;
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
+    if (this.disposed || this.contextLost) return;
     this.animationFrame = requestAnimationFrame(this.animate);
   };
 
   private readonly onContextLost = (event: Event): void => {
     event.preventDefault();
-    this.callbacks.onRuntimeError('WebGL context was lost. New GS writes remain disabled until the project is reopened.');
+    this.contextLost = true;
+    cancelAnimationFrame(this.animationFrame);
+    for (const [representationId, state] of this.resourceStates) {
+      if (state.availability === 'ready') {
+        this.resourceStates.set(representationId, { availability: 'failed', registration: state.registration });
+      }
+    }
+    const message = 'WebGL context was lost. Model display is unavailable until the project is reopened.';
+    if (!this.runtimeIssues.includes(message)) this.runtimeIssues.push(message);
+    this.updateResolution();
+    this.callbacks.onRuntimeError(message);
   };
 }

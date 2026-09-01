@@ -42,7 +42,13 @@ import {
   type NativeSim3V1,
   type NativeSolidBackgroundV1,
 } from './schema';
-import { activeNativeBindingV1, activeNativeRepresentationsV1, isNativeAssetVisibleV1, nativeCaptionNeedsReviewV1 } from './resolver';
+import {
+  activeNativeBindingV1,
+  activeNativeRepresentationsV1,
+  isNativeAssetVisibleV1,
+  nativeCaptionNeedsReviewV1,
+  summarizeNativeVisibleAssetReadinessV1,
+} from './resolver';
 import {
   addNativeAssetV1,
   assertNativeProjectDoesNotMixV1,
@@ -65,6 +71,7 @@ import {
 } from './portablePackage';
 import { digestNativeStream } from './sha256';
 import { NativeGsViewer, type NativeAssetGizmoMode } from './viewer';
+import { nativeRuntimeGltfTextureMaxEdge } from './mobileTexturePolicy';
 import {
   mountNativeCaptionOverlayV1,
   type NativeCaptionOverlayControllerV1,
@@ -869,12 +876,15 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const canvas = el('canvas', { 'aria-label': '3DモデルとGaussian Splattingのプロジェクト' });
     const accessBadge = el('span', { class: 'ng-badge' });
     const visibilityBadge = el('span', { class: 'ng-badge' });
+    const runtimeErrorBadge = el('span', { class: 'ng-badge ng-error' }, 'モデル表示エラー');
+    runtimeErrorBadge.hidden = true;
     const stage = el('section', { class: 'ng-stage' },
       canvas,
-      el('div', { class: 'ng-stage-badges' }, accessBadge, visibilityBadge),
+      el('div', { class: 'ng-stage-badges' }, accessBadge, visibilityBadge, runtimeErrorBadge),
     );
     const runtimeStatus = el('p', { class: 'ng-status' }, 'モデルを読み込んでいます…');
     const diagnostics = el('ul', { class: 'ng-diagnostics' });
+    const runtimeErrors: string[] = [];
     const display = el('select');
     display.append(el('option', { value: '' }, '一括表示を選択'));
     for (const [value, label] of [['mixed', 'すべてのモデル'], ['gs-only', 'Gaussian Splattingのみ'], ['mesh-only', '3Dモデル／通常点群のみ']] as const) {
@@ -1199,13 +1209,19 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     };
     const canMutateWorking = (): boolean => session.accessState === 'editable' && !saving;
     const syncVisibilityControls = (): void => {
-      let visibleCount = 0;
       for (const asset of working.assets) {
         const visible = isNativeAssetVisibleV1(working, asset.id);
         visibilityInputs.get(asset.id)!.checked = visible;
-        if (visible) visibleCount += 1;
       }
-      visibilityBadge.textContent = `${visibleCount}/${working.assets.length}モデルを表示中`;
+      const readiness = summarizeNativeVisibleAssetReadinessV1(
+        working,
+        activeViewer?.getResolution().visibleRepresentationIds ?? [],
+      );
+      visibilityBadge.textContent = readiness.fullyReady
+        ? `${readiness.requestedVisibleAssetCount}/${readiness.totalAssetCount}モデルを表示中`
+        : `${readiness.readyVisibleAssetCount}/${readiness.requestedVisibleAssetCount}モデルを読込済み`;
+      visibilityBadge.className = readiness.fullyReady ? 'ng-badge' : 'ng-badge ng-error';
+      visibilityBadge.title = readiness.fullyReady ? '' : '表示指定と、実際に描画できるモデル数が一致していません。';
       display.value = '';
     };
     const updateAccess = (): void => {
@@ -1458,6 +1474,11 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     ));
 
     const offlineReady = import.meta.env.DEV || await isNativeGsOfflineReady(await pwaRegistration);
+    const gltfTextureMaxEdge = nativeRuntimeGltfTextureMaxEdge({
+      userAgent: navigator.userAgent,
+      platform: navigator.platform,
+      maxTouchPoints: navigator.maxTouchPoints,
+    });
     const viewer = new NativeGsViewer(canvas, working, {
       onCaptionCreationStarted() {
         if (!canMutateWorking()) return false;
@@ -1536,10 +1557,18 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         viewer.selectAlignmentAsset(assetId);
         markDirty();
       },
-      onIssuesChanged: setDiagnostics,
+      onIssuesChanged(issues) { setDiagnostics([...new Set([...issues, ...runtimeErrors])]); },
       onProgress(message) { runtimeStatus.textContent = message; },
-      onRuntimeError(message) { setDiagnostics([...viewer.getResolution().issues, message]); },
-    });
+      onRuntimeError(message) {
+        if (!runtimeErrors.includes(message)) runtimeErrors.push(message);
+        runtimeErrorBadge.hidden = false;
+        runtimeErrorBadge.title = message;
+        runtimeStatus.className = 'ng-error';
+        runtimeStatus.textContent = `モデルを表示できません：${message}`;
+        setDiagnostics([...new Set([...runtimeErrors, ...(activeViewer?.getResolution().issues ?? [])])]);
+        syncVisibilityControls();
+      },
+    }, gltfTextureMaxEdge === null ? {} : { gltfTextureMaxEdge });
     const syncMaterialAssetOptions = (): void => {
       const previous = materialAsset.value;
       clear(materialAsset);
@@ -1665,9 +1694,27 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     syncMaterialAssetOptions();
     syncMaterialControls();
     syncVisibilityControls();
-    runtimeStatus.textContent = offlineReady
-      ? 'モデルを読み込みました。表示切替とキャプション編集を利用できます。'
-      : 'GSのオフライン準備がないため、Gaussian Splattingは表示していません。';
+    const requestedPrimaryRepresentations = working.assets
+      .filter((asset) => isNativeAssetVisibleV1(working, asset.id))
+      .flatMap((asset) => activeNativeRepresentationsV1(working, asset.id))
+      .filter((representation) => representation.role !== 'interactionProxy');
+    const readyRepresentationIds = new Set(viewer.getResolution().visibleRepresentationIds);
+    const unavailableRequested = requestedPrimaryRepresentations.filter((representation) => (
+      !readyRepresentationIds.has(representation.id)
+    ));
+    if (runtimeErrors.length > 0 || unavailableRequested.length > 0) {
+      runtimeErrorBadge.hidden = false;
+      runtimeStatus.className = 'ng-error';
+      runtimeStatus.textContent = runtimeErrors.length > 0
+        ? `モデルを表示できません：${runtimeErrors[0]}`
+        : `${unavailableRequested.length}件のモデルを表示できません。詳しい情報を確認してください。`;
+    } else {
+      runtimeErrorBadge.hidden = true;
+      runtimeStatus.className = 'ng-status';
+      runtimeStatus.textContent = gltfTextureMaxEdge === null
+        ? 'モデルを読み込みました。表示切替とキャプション編集を利用できます。'
+        : `モデルをiPhone/iPad用の最大${gltfTextureMaxEdge}px画像で読み込みました。`;
+    }
     rebuildCaptionList();
     populateCaptionFields();
     viewer.selectCaption(selectedCaptionId);
@@ -2185,6 +2232,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     });
     unload.addEventListener('click', () => {
       viewer.disposeGs();
+      syncVisibilityControls();
       runtimeStatus.textContent = 'Gaussian Splattingをメモリから解放しました。もう一度表示するにはプロジェクトを開き直してください。';
     });
     transformAsset.addEventListener('change', () => {

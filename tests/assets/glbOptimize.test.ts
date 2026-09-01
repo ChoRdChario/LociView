@@ -149,6 +149,7 @@ describe('画像サイズ読取', () => {
   it('pngSize: IHDRから幅高さを読む', () => {
     const b = new Uint8Array(24);
     b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+    b.set([0x49, 0x48, 0x44, 0x52], 12);
     const dv = new DataView(b.buffer);
     dv.setUint32(16, 4096);
     dv.setUint32(20, 2048);

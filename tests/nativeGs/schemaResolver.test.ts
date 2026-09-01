@@ -5,6 +5,7 @@ import {
   isNativeAssetVisibleV1,
   nativeCaptionNeedsReviewV1,
   resolveNativeGsSliceV1,
+  summarizeNativeVisibleAssetReadinessV1,
   type NativeResourceStateV1,
 } from '../../src/nativeGs/resolver';
 import {
@@ -835,6 +836,42 @@ describe('native snapshot v1 and fixed degradation outcomes', () => {
       effectiveDisplayMode: 'none',
       interaction: { enabled: false },
     });
+  });
+
+  it('does not present requested visibility as renderer readiness', () => {
+    const snapshot = snapshotFromDraft(makeNativeDraft().draft);
+    expect(summarizeNativeVisibleAssetReadinessV1(snapshot, [
+      NATIVE_TEST_IDS.meshRepresentation,
+      NATIVE_TEST_IDS.gsRepresentation,
+    ])).toEqual({
+      totalAssetCount: 2,
+      requestedVisibleAssetCount: 2,
+      readyVisibleAssetCount: 2,
+      fullyReady: true,
+    });
+    expect(summarizeNativeVisibleAssetReadinessV1(snapshot, [NATIVE_TEST_IDS.meshRepresentation])).toEqual({
+      totalAssetCount: 2,
+      requestedVisibleAssetCount: 2,
+      readyVisibleAssetCount: 1,
+      fullyReady: false,
+    });
+
+    const secondPrimaryId = testNativeId('rep', 98);
+    const meshBinding = activeNativeBindingV1(snapshot, NATIVE_TEST_IDS.meshAsset)!;
+    const multiPrimary: NativeProjectSnapshotV1 = {
+      ...snapshot,
+      assetRevisions: snapshot.assetRevisions.map((revision) => revision.id === meshBinding.assetRevisionId
+        ? { ...revision, representationIds: [...revision.representationIds, secondPrimaryId] }
+        : revision),
+      representations: [...snapshot.representations, {
+        ...snapshot.representations.find((entry) => entry.id === NATIVE_TEST_IDS.meshRepresentation)!,
+        id: secondPrimaryId,
+      }],
+    };
+    expect(summarizeNativeVisibleAssetReadinessV1(multiPrimary, [
+      NATIVE_TEST_IDS.meshRepresentation,
+      NATIVE_TEST_IDS.gsRepresentation,
+    ])).toMatchObject({ readyVisibleAssetCount: 1, fullyReady: false });
   });
 
   it('keeps GS visible but disables interaction for missing Proxy, broken binding or unknown registration', () => {

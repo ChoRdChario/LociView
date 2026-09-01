@@ -7,6 +7,7 @@ import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+import { fitRasterWithinMaxEdge, rasterDimensions } from './rasterDimensions';
 
 export type ModelFormat = 'glb' | 'gltf' | 'obj' | 'stl' | 'ply';
 
@@ -54,7 +55,13 @@ export function detectFormat(fileName: string, bytes: Uint8Array): ModelFormat |
 export interface LoadDeps {
   /** OBJの.mtlテキスト（ZIP内の随伴ファイル解決。無ければ既定マテリアル） */
   mtlText?: string;
+  /** GLB/GLTFの画像処理方針。未指定時はThree.js標準のfull-resolution decode。 */
+  gltfTextures?: GltfTexturePolicy;
 }
+
+export type GltfTexturePolicy =
+  | { readonly kind: 'skip' }
+  | { readonly kind: 'max-edge'; readonly maxEdge: number };
 
 export async function loadModel(
   format: ModelFormat,
@@ -67,7 +74,7 @@ export async function loadModel(
   switch (format) {
     case 'glb':
     case 'gltf': {
-      root = await loadGltf(bytes, warnings);
+      root = await loadGltf(bytes, warnings, deps.gltfTextures);
       break;
     }
     case 'obj': {
@@ -93,7 +100,239 @@ export async function loadModel(
 
 // ---- 各フォーマット --------------------------------------------------------------
 
-function loadGltf(bytes: Uint8Array, warnings: string[]): Promise<THREE.Object3D> {
+interface CloseableBitmap {
+  readonly width: number;
+  readonly height: number;
+  close(): void;
+}
+
+const closedBitmaps = new WeakSet<object>();
+
+function closeBitmapOnce(bitmap: CloseableBitmap): void {
+  if (closedBitmaps.has(bitmap)) return;
+  closedBitmaps.add(bitmap);
+  bitmap.close();
+}
+
+function closeableBitmap(value: unknown): CloseableBitmap | null {
+  if (value === null || typeof value !== 'object') return null;
+  const candidate = value as Partial<CloseableBitmap>;
+  return typeof candidate.width === 'number' && typeof candidate.height === 'number' &&
+    typeof candidate.close === 'function'
+    ? candidate as CloseableBitmap
+    : null;
+}
+
+function materialTextures(material: THREE.Material): THREE.Texture[] {
+  const textures = new Set<THREE.Texture>();
+  const collect = (value: unknown): void => {
+    if (value instanceof THREE.Texture) {
+      textures.add(value);
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (const entry of value) collect(entry);
+      return;
+    }
+    if (value !== null && typeof value === 'object' && 'value' in value) {
+      collect((value as { readonly value?: unknown }).value);
+    }
+  };
+  for (const value of Object.values(material as unknown as Record<string, unknown>)) collect(value);
+  return [...textures];
+}
+
+function modelResources(root: THREE.Object3D): {
+  readonly geometries: Set<THREE.BufferGeometry>;
+  readonly materials: Set<THREE.Material>;
+  readonly textures: Set<THREE.Texture>;
+  readonly bitmaps: Set<CloseableBitmap>;
+} {
+  const geometries = new Set<THREE.BufferGeometry>();
+  const materials = new Set<THREE.Material>();
+  const textures = new Set<THREE.Texture>();
+  const bitmaps = new Set<CloseableBitmap>();
+  root.traverse((object) => {
+    if (!(object instanceof THREE.Mesh) && !(object instanceof THREE.Points) && !(object instanceof THREE.Line)) return;
+    geometries.add(object.geometry as THREE.BufferGeometry);
+    const entries = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of entries) {
+      materials.add(material);
+      for (const texture of materialTextures(material)) {
+        textures.add(texture);
+        const bitmap = closeableBitmap(texture.source.data);
+        if (bitmap !== null) bitmaps.add(bitmap);
+      }
+    }
+  });
+  return { geometries, materials, textures, bitmaps };
+}
+
+/**
+ * GLTFなどの通常Three.jsモデルが所有するGPU/decoded-image資源を重複なく解放する。
+ * Spark objectはこのhelperの対象外。
+ */
+export function disposeModelResources(root: THREE.Object3D): void {
+  const resources = modelResources(root);
+  root.removeFromParent();
+  for (const texture of resources.textures) texture.dispose();
+  for (const bitmap of resources.bitmaps) closeBitmapOnce(bitmap);
+  for (const material of resources.materials) material.dispose();
+  for (const geometry of resources.geometries) geometry.dispose();
+}
+
+export function disposeMaterialResources(materials: Iterable<THREE.Material>): void {
+  const uniqueMaterials = new Set(materials);
+  const textures = new Set<THREE.Texture>();
+  const bitmaps = new Set<CloseableBitmap>();
+  for (const material of uniqueMaterials) {
+    for (const texture of materialTextures(material)) {
+      textures.add(texture);
+      const bitmap = closeableBitmap(texture.source.data);
+      if (bitmap !== null) bitmaps.add(bitmap);
+    }
+  }
+  for (const texture of textures) texture.dispose();
+  for (const bitmap of bitmaps) closeBitmapOnce(bitmap);
+  for (const material of uniqueMaterials) material.dispose();
+}
+
+/**
+ * TextureをGPUへ明示uploadした後、decode済みImageBitmapだけを閉じる。
+ * Texture自体は表示中なので保持する。
+ */
+export function uploadModelTexturesAndReleaseBitmaps(
+  renderer: THREE.WebGLRenderer,
+  root: THREE.Object3D,
+): void {
+  const resources = modelResources(root);
+  const texturesByBitmap = new Map<CloseableBitmap, THREE.Texture[]>();
+  const texturesWithoutBitmap: THREE.Texture[] = [];
+  for (const texture of resources.textures) {
+    const bitmap = closeableBitmap(texture.source.data);
+    if (bitmap === null) {
+      texturesWithoutBitmap.push(texture);
+      continue;
+    }
+    const group = texturesByBitmap.get(bitmap) ?? [];
+    group.push(texture);
+    texturesByBitmap.set(bitmap, group);
+  }
+  try {
+    for (const texture of texturesWithoutBitmap) renderer.initTexture(texture);
+    for (const [bitmap, textures] of texturesByBitmap) {
+      try {
+        for (const texture of textures) renderer.initTexture(texture);
+      } finally {
+        // Close each decoded source as soon as every Texture sharing it is on GPU,
+        // instead of retaining every bitmap until all uploads have completed.
+        closeBitmapOnce(bitmap);
+      }
+    }
+  } finally {
+    // If an upload fails, release the current and not-yet-uploaded decoded sources.
+    for (const bitmap of resources.bitmaps) closeBitmapOnce(bitmap);
+  }
+}
+
+export async function decodeImageBitmapWithinMaxEdge(
+  blob: Blob,
+  maxEdge: number,
+  decode: typeof createImageBitmap = globalThis.createImageBitmap,
+): Promise<ImageBitmap> {
+  if (typeof decode !== 'function') throw new Error('ImageBitmap decode is unavailable on this device');
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const dimensions = rasterDimensions(bytes, blob.type);
+  if (dimensions === null) throw new Error(`unsupported embedded raster type: ${blob.type || 'unknown'}`);
+  const fitted = fitRasterWithinMaxEdge(dimensions, maxEdge);
+  const options: ImageBitmapOptions = {
+    premultiplyAlpha: 'none',
+    colorSpaceConversion: 'none',
+  };
+  if (fitted.width !== dimensions.width || fitted.height !== dimensions.height) {
+    options.resizeWidth = fitted.width;
+    options.resizeHeight = fitted.height;
+    options.resizeQuality = 'high';
+  }
+  const bitmap = await decode(blob, options);
+  if (Math.max(bitmap.width, bitmap.height) > maxEdge) {
+    const closeable = closeableBitmap(bitmap);
+    if (closeable !== null) closeBitmapOnce(closeable);
+    throw new Error(`embedded texture exceeded the ${maxEdge}px runtime limit after decode`);
+  }
+  return bitmap;
+}
+
+class BoundedImageBitmapLoader extends THREE.ImageBitmapLoader {
+  private decodeTail: Promise<void> = Promise.resolve();
+
+  constructor(
+    manager: THREE.LoadingManager,
+    private readonly maxEdge: number,
+    private readonly onFailure: (error: Error) => void,
+    private readonly onDecoded: (bitmap: ImageBitmap) => void,
+  ) {
+    super(manager);
+  }
+
+  override load(
+    requestedUrl: string,
+    onLoad?: (data: ImageBitmap) => void,
+    _onProgress?: (event: ProgressEvent) => void,
+    onError?: (err: unknown) => void,
+  ): void {
+    const withPath = this.path === undefined ? requestedUrl : `${this.path}${requestedUrl}`;
+    const url = this.manager.resolveURL(withPath);
+    this.manager.itemStart(url);
+    const credentials: RequestCredentials = this.crossOrigin === 'anonymous' ? 'same-origin' : 'include';
+    const pending = this.decodeTail.then(() => fetch(url, { credentials, headers: this.requestHeader }))
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`embedded texture request failed (${response.status})`);
+        return decodeImageBitmapWithinMaxEdge(await response.blob(), this.maxEdge);
+      });
+    this.decodeTail = pending.then(() => undefined, () => undefined);
+    void pending
+      .then((bitmap) => {
+        this.onDecoded(bitmap);
+        onLoad?.(bitmap);
+      })
+      .catch((reason: unknown) => {
+        const error = reason instanceof Error ? reason : new Error(String(reason));
+        this.onFailure(error);
+        if (url.startsWith('blob:')) globalThis.URL.revokeObjectURL(url);
+        onError?.(error);
+        this.manager.itemError(url);
+      })
+      .finally(() => this.manager.itemEnd(url));
+  }
+}
+
+class MetadataOnlyImageBitmapLoader extends THREE.Loader<ImageBitmap> {
+  readonly isImageBitmapLoader = true as const;
+
+  override load(
+    requestedUrl: string,
+    onLoad?: (data: ImageBitmap) => void,
+    _onProgress?: (event: ProgressEvent) => void,
+    _onError?: (err: unknown) => void,
+  ): void {
+    const withPath = this.path === undefined ? requestedUrl : `${this.path}${requestedUrl}`;
+    const url = this.manager.resolveURL(withPath);
+    this.manager.itemStart(url);
+    queueMicrotask(() => {
+      // Material inspection needs slot identity/name only. A non-rendered shape
+      // placeholder lets GLTFLoader finish without fetching or decoding pixels.
+      onLoad?.({ width: 1, height: 1 } as ImageBitmap);
+      this.manager.itemEnd(url);
+    });
+  }
+}
+
+function loadGltf(
+  bytes: Uint8Array,
+  warnings: string[],
+  texturePolicy?: GltfTexturePolicy,
+): Promise<THREE.Object3D> {
   // 外部URI参照はオフライン原則により拒否する（docs/03 §5）。
   // data:/blob: 以外の参照は空データに差し替え、警告として報告する。
   const manager = new THREE.LoadingManager();
@@ -103,6 +342,42 @@ function loadGltf(bytes: Uint8Array, warnings: string[]): Promise<THREE.Object3D
     return 'data:application/octet-stream;base64,';
   });
   const loader = new GLTFLoader(manager);
+  const textureFailures: Error[] = [];
+  const decodedBitmaps = new Set<CloseableBitmap>();
+  let parseSettled = false;
+  const releaseDecodedBitmaps = (): void => {
+    for (const bitmap of decodedBitmaps) closeBitmapOnce(bitmap);
+    decodedBitmaps.clear();
+  };
+  if (texturePolicy?.kind === 'skip') {
+    loader.register((parser) => ({
+      name: 'LOCIVIEW_skip_texture_decode',
+      beforeRoot: async () => {
+        parser.textureLoader = new MetadataOnlyImageBitmapLoader(manager) as unknown as THREE.ImageBitmapLoader;
+      },
+    }));
+  } else if (texturePolicy?.kind === 'max-edge') {
+    const maxEdge = texturePolicy.maxEdge;
+    fitRasterWithinMaxEdge({ width: 1, height: 1 }, maxEdge);
+    loader.register((parser) => ({
+      name: 'LOCIVIEW_bounded_texture_decode',
+      beforeRoot: async () => {
+        parser.textureLoader = new BoundedImageBitmapLoader(
+          manager,
+          maxEdge,
+          (error) => textureFailures.push(error),
+          (bitmap) => {
+            const closeable = closeableBitmap(bitmap);
+            if (closeable === null) return;
+            if (parseSettled) closeBitmapOnce(closeable);
+            else decodedBitmaps.add(closeable);
+          },
+        )
+          .setCrossOrigin(parser.options.crossOrigin)
+          .setRequestHeader(parser.options.requestHeader) as THREE.ImageBitmapLoader;
+      },
+    }));
+  }
   // バッファをコピーせずそのまま渡す（38MBのGLBで38MBの無駄なコピーが発生していた。
   // iOSのメモリ上限に直結するため重要）。GLTFLoaderはバッファを破棄しない。
   const buf =
@@ -113,8 +388,21 @@ function loadGltf(bytes: Uint8Array, warnings: string[]): Promise<THREE.Object3D
     loader.parse(
       buf as ArrayBuffer,
       '',
-      (gltf) => resolve(gltf.scene),
-      (err) => reject(err instanceof Error ? err : new Error('GLTF parse error')),
+      (gltf) => {
+        parseSettled = true;
+        if (textureFailures.length > 0) {
+          disposeModelResources(gltf.scene);
+          releaseDecodedBitmaps();
+          reject(new Error(`embedded texture activation failed: ${textureFailures[0]!.message}`));
+          return;
+        }
+        resolve(gltf.scene);
+      },
+      (err) => {
+        parseSettled = true;
+        releaseDecodedBitmaps();
+        reject(err instanceof Error ? err : new Error('GLTF parse error'));
+      },
     );
   });
 }

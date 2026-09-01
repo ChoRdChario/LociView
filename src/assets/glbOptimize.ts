@@ -7,6 +7,8 @@
 // 依存ゼロ。中核（GLBの解析・再パック）はNodeでテスト可能な純関数。
 // 画像のデコード/縮小のみブラウザAPI（createImageBitmap/Canvas）を使う。
 
+import { jpegDimensions, pngDimensions } from '../viewer/rasterDimensions';
+
 const GLB_MAGIC = 0x46546c67; // 'glTF'
 const CHUNK_JSON = 0x4e4f534a; // 'JSON'
 const CHUNK_BIN = 0x004e4942; // 'BIN\0'
@@ -149,32 +151,13 @@ export async function repackGlbImages(glb: Uint8Array, transform: ImageTransform
 // ---- 画像サイズの軽量読取（フルデコードを避けるため） -------------------------------
 
 export function pngSize(b: Uint8Array): { w: number; h: number } | null {
-  if (b.length < 24 || b[0] !== 0x89 || b[1] !== 0x50) return null;
-  const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
-  return { w: dv.getUint32(16), h: dv.getUint32(20) }; // IHDR: 8(sig)+4(len)+4('IHDR')
+  const dimensions = pngDimensions(b);
+  return dimensions === null ? null : { w: dimensions.width, h: dimensions.height };
 }
 
 export function jpegSize(b: Uint8Array): { w: number; h: number } | null {
-  if (b.length < 4 || b[0] !== 0xff || b[1] !== 0xd8) return null;
-  const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
-  let i = 2;
-  while (i + 9 < b.length) {
-    if (b[i] !== 0xff) {
-      i++;
-      continue;
-    }
-    const marker = b[i + 1]!;
-    // SOF0-15（DHT/JPG/DAC を除く）に幅高さがある
-    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
-      return { w: dv.getUint16(i + 7), h: dv.getUint16(i + 5) };
-    }
-    if (marker === 0xd8 || marker === 0xd9 || (marker >= 0xd0 && marker <= 0xd7)) {
-      i += 2; // スタンドアロンマーカー
-      continue;
-    }
-    i += 2 + dv.getUint16(i + 2); // セグメント長でスキップ
-  }
-  return null;
+  const dimensions = jpegDimensions(b);
+  return dimensions === null ? null : { w: dimensions.width, h: dimensions.height };
 }
 
 function scaleTo(w: number, h: number, maxSize: number): { w: number; h: number } {

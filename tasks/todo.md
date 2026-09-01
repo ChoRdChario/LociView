@@ -1,15 +1,52 @@
 # LociView active work
 
-> Baseline checkpoint: `485451a19603180daf69365da68e8770dea503f3` on
-> `g0-baseline` (2026-09-01). Consolidated direct-LociMyu acceptance exposed one
-> active P1: later Caption sheets retain material/view rows but lack exact
-> `__LM_SHEET_NAMES` entries. The bounded confirmed-relation fix below is active.
+> Baseline checkpoint: `809ab63df1f419a1dc0bb0892819baf87b83d435` on
+> `g0-baseline` (2026-09-02). Direct-LociMyu Desktop corrections for confirmed
+> sheet linkage, material state, orthographic Saved Views and user-authored
+> DisplaySet defaults are complete. The affected physical-iPhone texture,
+> DisplaySet and offline-reopen acceptance is complete.
 >
 > The completed task ledger through `d32a6a0` is preserved at
 > `docs/history/task-ledger-through-d32a6a0.md`. This file contains only the
 > active delivery boundary, open decisions and non-blocking backlog.
 
-## Active P1 — restore LociMyu sheet/material/view linkage
+## Completed P1 — iPhone direct-LociMyu model activation
+
+- [x] Reproduce on physical iPhone after a fresh reload: the grid appears
+  briefly, then the WebGL canvas becomes blank while the durable Project,
+  Caption list/overlay and requested `1/1` Asset visibility remain available.
+- [x] Exclude Saved View framing and intentional material visibility. The
+  representative cameras target the model, its bounds are normal and the
+  active material state does not hide the whole model.
+- [x] Identify the resource boundary: the source GLB embeds two 8192-square and
+  one 4096-square textures (about 576 MiB decoded RGBA and roughly 768 MiB with
+  mipmaps). Requested visibility currently masks Representation activation and
+  WebGL-context failure.
+- [x] Obtain Product Owner approval for one source-preserving mobile runtime
+  texture cap; keep stored/exported source bytes and Desktop full-resolution
+  rendering unchanged. The approved maximum edge is 4096 pixels on iPhone/iPad.
+- [x] Implement the approved bounded runtime path, deduplicated Texture/
+  ImageBitmap cleanup and truthful ready/error status without a new renderer,
+  schema, package version or stored derivative.
+- [x] Run focused tests, typecheck, production build and independent review.
+  The 55 affected tests pass. The full matrix reached 1455 passes and only
+  crossed the unrelated G0 verifier's fixed five-second timeout; each affected
+  verifier case passes when isolated, so no product regression is inferred.
+- [x] Repeat only the affected physical-iPhone open/DisplaySet/offline smoke.
+  The Product Owner confirmed on physical iPhone that the representative model
+  remains rendered under the bounded runtime path and accepted the requested
+  smoke as having no observed problem.
+
+Review: no unresolved P0/P1 remains after physical-device acceptance.
+The representative JPEG/PNG path is bounded. WebP/AVIF dimension inspection
+and pre-Safari-17 behavior are non-blocking compatibility backlog, not claims
+of support added by this slice.
+
+Stop conditions: no source-byte rewrite, persisted lightweight copy, automatic
+asset replacement, new renderer, general LOD system or silent success after a
+failed visible Representation.
+
+## Completed correction — restore LociMyu sheet/material/view linkage
 
 - [x] Reproduce the representative symptom read-only and distinguish source
   Caption content from conversion loss. The selected 39-Caption sheet has 38
@@ -32,13 +69,13 @@
   conversion restored all four DisplaySets and the Product Owner confirmed that
   switching sheets immediately applies their material settings without any
   per-sheet re-save.
-- [ ] After Desktop PASS, run only the affected physical-iPhone DisplaySet,
+- [x] After Desktop PASS, run only the affected physical-iPhone DisplaySet,
   save/offline-reopen check and resume consolidated acceptance.
 
 Stop conditions: do not add a generalized mapping framework, editable per-row
 GID UI, media inference, HEIC conversion or Caption-content synthesis.
 
-## Active receiver gap — LociMyu orthographic Saved View
+## Completed receiver gap — LociMyu orthographic Saved View
 
 - [x] Confirm the source gap: LociMyu saves orthographic camera kind, eye,
   target and up but not its runtime orthographic height.
@@ -51,14 +88,14 @@ GID UI, media inference, HEIC conversion or Caption-content synthesis.
   record the chosen FOV/span as an explicit compatibility approximation.
 - [x] Keep non-empty invalid FOV, invalid camera basis and invalid computed span
   report-only; do not silently apply the 45-degree default to malformed input.
-- [ ] Prove immediate DisplaySet application plus snapshot/package round trip
+- [x] Prove immediate DisplaySet application plus snapshot/package round trip
   with focused coverage, one independent review and the existing final matrix.
 
 Stop conditions: no camera migration framework, per-import span editor,
 existing-Project retrofit, schema/package version change or generalized
 projection inference.
 
-## Active P1 — Saved View authoring must drive DisplaySet switching
+## Completed P1 — Saved View authoring must drive DisplaySet switching
 
 - [x] Reproduce the product flow and distinguish old-preview provenance from a
   current runtime defect. The defect exists independently of the preview URL:
@@ -72,7 +109,7 @@ projection inference.
 - [x] Prove two DisplaySets retain independent defaults, switching resolves the
   newly captured view, and snapshot save/reopen preserves the links.
 - [x] Run focused checks, final matrix, production build and independent review.
-- [ ] Provide a fresh exact-tree Desktop acceptance URL and confirm the
+- [x] Provide a fresh exact-tree Desktop acceptance URL and confirm the
   save-in-Set-A -> switch-to-B -> return-to-A camera/background product flow.
 
 Stop conditions: no camera schema/package version change, active-sheet
@@ -349,6 +386,11 @@ direct-LociMyu acceptance rather than repeated for this slice alone.
   double-omission case where both `displaySets` and a Saved View's
   `displaySetId` are absent. The production resolver already maps both to the
   deterministic default set; this is coverage polish, not an open behavior bug.
+- Make native/conversion model cleanup dispose deduplicated Texture resources as
+  well as materials and geometry, and surface embedded-texture decode failure
+  instead of silently treating a partly untextured GLB as fully ready. The
+  representative cockpit image is byte-valid and recovered in one fresh tab;
+  this is non-blocking runtime hardening unless it reproduces there.
 
 ## Parallel release barriers
 
@@ -435,8 +477,8 @@ direct-LociMyu acceptance rather than repeated for this slice alone.
 - Orthographic focused coverage passed 45/45, including explicit/default FOV,
   default/invalid up, invalid basis, overflow and create/reopen persistence.
   Existing schema/portable coverage already round-trips exact orthographic
-  projection state. Independent review found no P0/P1/P2; final browser visual
-  acceptance remains before closing this receiver item.
+  projection state. Independent review found no P0/P1/P2; Product Owner Desktop
+  acceptance confirmed sheet-linked camera switching.
 - Final executable verification passed typecheck, production build and all
   1,443 executable tests with 21 existing todo. The first full run passed 1,390
   tests before the two registry suites intentionally rejected unstaged

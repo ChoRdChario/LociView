@@ -22,7 +22,7 @@ import {
   type LociMyuDisplaySetRelationConfirmation,
   type SheetTable,
 } from '../io/locimyu';
-import { detectFormat, loadModel, type ModelFormat } from '../viewer/loaders';
+import { detectFormat, disposeModelResources, loadModel, type ModelFormat } from '../viewer/loaders';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import { nativeMaterialSlotKey } from './materialSlots';
 import { inspectNativeGsPlyV1, inspectNativePointPlyV1 } from './plyProfile';
@@ -445,22 +445,9 @@ async function inspectModel(
   return { source: file, format, asset, binding, revision, representation, anchorCompatibilityId };
 }
 
-function disposeLoadedModel(root: THREE.Object3D): void {
-  const geometries = new Set<THREE.BufferGeometry>();
-  const materials = new Set<THREE.Material>();
-  root.traverse((object) => {
-    if (object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.Line) {
-      geometries.add(object.geometry);
-      for (const material of Array.isArray(object.material) ? object.material : [object.material]) materials.add(material);
-    }
-  });
-  for (const geometry of geometries) geometry.dispose();
-  for (const material of materials) material.dispose();
-}
-
 async function inspectMaterialTargets(model: ConvertedModel): Promise<Map<string, MaterialTarget[]>> {
   if (model.representation.contentKind !== 'mesh') return new Map();
-  const loaded = await loadModel(model.format, model.source.data);
+  const loaded = await loadModel(model.format, model.source.data, { gltfTextures: { kind: 'skip' } });
   const result = new Map<string, MaterialTarget[]>();
   const add = (key: string, target: MaterialTarget): void => {
     if (key === '') return;
@@ -488,7 +475,7 @@ async function inspectMaterialTargets(model: ConvertedModel): Promise<Map<string
     visit(loaded.root, []);
     return result;
   } finally {
-    disposeLoadedModel(loaded.root);
+    disposeModelResources(loaded.root);
   }
 }
 
