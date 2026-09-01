@@ -88,6 +88,7 @@ describe('LociMyu ZIP to native direct adapter', () => {
       'cap_0TVSSJ69V3DJPVB0ZMWRGZ7J40',
       'cap_4BAEWJVQTVNFB6FNH23E4ZGCVB',
     ]));
+    expect(plan.draft.captions.every((caption) => caption.ownerAssetId === plan.draft.assets[0]!.id)).toBe(true);
     expect(plan.inventory.duplicateOccurrenceCount).toBe(0);
     expect(plan.draft.mediaResources).toHaveLength(1);
     expect(plan.draft.savedViews).toHaveLength(1);

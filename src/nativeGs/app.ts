@@ -23,6 +23,7 @@ import {
   nativeModelProfileId,
   nativeAssetPinScaleV1,
   nativeCaptionDisplaySetIdV1,
+  nativeCaptionOwnerAssetIdV1,
   nativeDisplaySetsV1,
   nativeSavedViewDisplaySetIdV1,
   newNativeId,
@@ -51,6 +52,7 @@ import {
 } from './resolver';
 import {
   addNativeAssetV1,
+  addNativeCaptionImageV1,
   assertNativeProjectDoesNotMixV1,
   createNativeProjectV1,
   deleteNativeProjectV1,
@@ -63,12 +65,22 @@ import {
   saveNativeProjectV1,
   type NativeAssetImportV1,
   type NativeBinarySource,
+  type NativeProjectSummary,
 } from './storage';
 import {
   exportNativePortablePackageV1,
   inspectNativePortablePackageV1,
   restoreNativePortablePackageV1,
 } from './portablePackage';
+import {
+  detectNativePackageContainerKindV1,
+  exportNativeExchangePackageV1,
+  inspectNativeExchangePackageV1,
+  mergeNativeCollaborationPackageV1,
+  nativeExchangeDefaultOpenModeV1,
+  restoreNativeExchangePackageV1,
+  type NativeExchangePurposeV1,
+} from './packageExchange';
 import { digestNativeStream } from './sha256';
 import { NativeGsViewer, type NativeAssetGizmoMode } from './viewer';
 import { nativeRuntimeGltfTextureMaxEdge } from './mobileTexturePolicy';
@@ -338,32 +350,56 @@ type NativeSavePicker = (options: {
   }];
 }) => Promise<FileSystemFileHandle>;
 
-function requestNativeBackupDestination(suggestedName: string): Promise<FileSystemFileHandle | null> {
+function requestNativePackageDestination(
+  suggestedName: string,
+  description: string,
+): Promise<FileSystemFileHandle | null> {
   const picker = (window as typeof window & { showSaveFilePicker?: NativeSavePicker }).showSaveFilePicker;
   return picker === undefined
     ? Promise.resolve(null)
     : picker.call(window, {
         suggestedName,
-        types: [{ description: 'LociViewプロジェクトのバックアップ', accept: { 'application/zip': ['.lociview'] } }],
+        types: [{ description, accept: { 'application/zip': ['.lociview'] } }],
       });
 }
 
-function nativeBackupFileName(title: string): string {
+function nativePackageFileName(title: string, purpose: 'backup' | NativeExchangePurposeV1): string {
   const safe = title
     .normalize('NFC')
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
     .replace(/[. ]+$/g, '')
     .trim()
     .slice(0, 120);
-  return `${safe === '' ? 'LociView-project' : safe}.lociview`;
+  const suffix = purpose === 'backup'
+    ? 'backup'
+    : purpose === 'collaboration'
+      ? 'collaboration'
+      : purpose === 'review' ? 'review' : 'editable-copy';
+  return `${safe === '' ? 'LociView-project' : safe}-${suffix}.lociview`;
+}
+
+function nativePackageStagePath(
+  projectId: string,
+  snapshotId: string,
+  purpose: 'backup' | NativeExchangePurposeV1,
+): string {
+  return `native-backup-staging/${projectId}/${snapshotId}-${purpose}.lociview`;
+}
+
+function requestNativeBackupDestination(suggestedName: string): Promise<FileSystemFileHandle | null> {
+  return requestNativePackageDestination(suggestedName, 'LociViewプロジェクトの完全バックアップ');
+}
+
+function nativeBackupFileName(title: string): string {
+  return nativePackageFileName(title, 'backup');
 }
 
 function nativeBackupStagePath(projectId: string, snapshotId: string): string {
-  return `native-backup-staging/${projectId}/${snapshotId}.lociview`;
+  return nativePackageStagePath(projectId, snapshotId, 'backup');
 }
 
 function errorMessage(error: unknown): string {
-  if (error instanceof DOMException && error.name === 'AbortError') return '操作を中止しました。未完成のバックアップやプロジェクトは保存されていません。';
+  if (error instanceof DOMException && error.name === 'AbortError') return '操作を中止しました。未完成のpackageやプロジェクトは保存されていません。';
   return error instanceof Error ? error.message : String(error);
 }
 
@@ -428,7 +464,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     // hide it when an accept filter is present. Selection is only a UI hint;
     // the strict package/version/path/size/hash checks below are authoritative.
     const restoreInput = el('input', { type: 'file' });
-    const restore = el('button', { class: 'primary' }, 'バックアップから復元');
+    const restore = el('button', { class: 'primary' }, 'packageを読み込む');
     const cancelPortable = el('button', { disabled: 'true' }, '処理を中止');
     const portableStatus = el('p', { class: 'ng-status' }, homeNotice ?? '');
     const portableDetail = el('p', { class: 'ng-note' });
@@ -523,7 +559,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       const packageFile = selectedFile(restoreInput);
       if (packageFile === null) {
         portableStatus.className = 'ng-error';
-        portableStatus.textContent = '復元するバックアップファイルを選択してください。';
+        portableStatus.textContent = '読み込むLociView packageを選択してください。';
         return;
       }
       transitionInFlight = true;
@@ -531,12 +567,20 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       setPortableBusy(true);
       clear(portableResult);
       portableStatus.className = 'ng-status';
-      portableStatus.textContent = 'バックアップファイルを確認しています…';
+      portableStatus.textContent = 'LociView packageを確認しています…';
       portableDetail.textContent = '';
       void (async () => {
         const signal = portableAbort!.signal;
-        const inspection = await inspectNativePortablePackageV1(packageFile, signal);
-        const required = inspection.representationByteLength + inspection.mediaByteLength + inspection.manifest.nativeSnapshot.byteLength + 64 * 1024;
+        const containerKind = await detectNativePackageContainerKindV1(packageFile, signal);
+        let exchangePurpose: NativeExchangePurposeV1 | null = null;
+        const inspection = containerKind === 'backup'
+          ? await inspectNativePortablePackageV1(packageFile, signal)
+          : await inspectNativeExchangePackageV1(packageFile, signal).then((value) => {
+              exchangePurpose = value.manifest.purpose;
+              return value;
+            });
+        const required = inspection.representationByteLength + inspection.mediaByteLength +
+          inspection.manifest.nativeSnapshot.byteLength + 64 * 1024;
         const estimate = await navigator.storage.estimate?.();
         if (
           estimate?.quota !== undefined && estimate.usage !== undefined &&
@@ -546,6 +590,12 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
           throw new Error(`保存容量が不足しています（データ ${fmtBytes(inspection.representationByteLength + inspection.mediaByteLength)}）。プロジェクトは復元されていません。`);
         }
         const projectId = inspection.snapshot.project.id;
+        if (exchangePurpose === 'collaboration') {
+          const currentProjects = await listNativeProjectsV1(fs);
+          if (currentProjects.some((project) => project.projectId === projectId)) {
+            throw new Error('この共同編集用packageと同じProjectが既にあります。対象Projectを「編集して開く」から開き、共同編集packageを統合してください。');
+          }
+        }
         const session = await coordinator.tryAcquire(fs, nativeProjectRoot(projectId), projectId);
         if (!session.holdsWriteLock) {
           const detail = session.accessDetail;
@@ -556,23 +606,44 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         const unsubscribeRestore = session.subscribeAccess((state) => {
           if (state !== 'editable') portableAbort?.abort(new Error(session.accessDetail));
         });
+        let openMode: 'view' | 'edit' | null = null;
         try {
-          const restored = await restoreNativePortablePackageV1(session.workspace, fs, packageFile, {
-            signal,
-            onStatus(message) {
-              portableStatus.textContent = 'バックアップからプロジェクトを復元しています…';
-              portableDetail.textContent = message;
-            },
-          });
-          homeNotice = `「${restored.snapshot.project.title}」をこの端末へ復元しました。`;
+          if (containerKind === 'backup') {
+            const restored = await restoreNativePortablePackageV1(session.workspace, fs, packageFile, {
+              signal,
+              onStatus(message) {
+                portableStatus.textContent = '完全バックアップからプロジェクトを復元しています…';
+                portableDetail.textContent = message;
+              },
+            });
+            homeNotice = `「${restored.snapshot.project.title}」を完全バックアップからこの端末へ復元しました。`;
+          } else {
+            const restored = await restoreNativeExchangePackageV1(session.workspace, fs, packageFile, {
+              signal,
+              onStatus(message) {
+                portableStatus.textContent = 'packageからプロジェクトを復元しています…';
+                portableDetail.textContent = message;
+              },
+            });
+            openMode = nativeExchangeDefaultOpenModeV1(restored.purpose);
+            const purposeLabel = restored.purpose === 'review'
+              ? '閲覧共有用package'
+              : restored.purpose === 'cleanCopy' ? '編集用コピー' : '共同編集用package';
+            homeNotice = `「${restored.snapshot.project.title}」を${purposeLabel}からこの端末へ復元しました。`;
+          }
         } finally {
           unsubscribeRestore();
           session.release();
         }
-        await renderHome();
+        if (openMode === null) {
+          await renderHome();
+        } else {
+          transitionInFlight = false;
+          await openProject(projectId, openMode);
+        }
       })().catch((error: unknown) => {
         portableStatus.className = 'ng-error';
-        portableStatus.textContent = 'バックアップを復元できませんでした。別のファイルを選ぶか、詳しい情報を確認してください。';
+        portableStatus.textContent = 'LociView packageを読み込めませんでした。別のファイルを選ぶか、詳しい情報を確認してください。';
         portableDetail.textContent = errorMessage(error);
       }).finally(() => {
         portableAbort = null;
@@ -581,15 +652,208 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       });
     });
 
+    const beginPackageExport = (
+      summary: NativeProjectSummary,
+      purpose: 'backup' | NativeExchangePurposeV1,
+    ): void => {
+      if (transitionInFlight) return;
+      if (portableResult.childElementCount > 0) {
+        portableStatus.className = 'ng-error';
+        portableStatus.textContent = '先に作成済みのファイルを保存し、「この端末の一時ファイルを削除」で片付けてください。';
+        return;
+      }
+      const labels = purpose === 'backup'
+        ? { noun: '完全バックアップ', description: 'LociViewプロジェクトの完全バックアップ' }
+        : purpose === 'collaboration'
+          ? { noun: '共同編集用package', description: 'LociView共同編集用package' }
+          : purpose === 'review'
+            ? { noun: '閲覧共有用package', description: 'LociView閲覧共有用package' }
+            : { noun: '編集用コピー', description: 'LociView編集用コピー' };
+      const suggestedName = nativePackageFileName(summary.title, purpose);
+      let destinationHandle: Promise<FileSystemFileHandle | null>;
+      try {
+        // File pickers require this call in the original user gesture.
+        destinationHandle = requestNativePackageDestination(suggestedName, labels.description);
+      } catch (error) {
+        portableStatus.className = 'ng-error';
+        portableStatus.textContent = `${labels.noun}の保存先を開けませんでした。詳しい情報を確認してください。`;
+        portableDetail.textContent = errorMessage(error);
+        return;
+      }
+      transitionInFlight = true;
+      portableAbort = new AbortController();
+      setPortableBusy(true);
+      clear(portableResult);
+      portableStatus.className = 'ng-status';
+      portableStatus.textContent = '保存先を確認しています…';
+      portableDetail.textContent = '';
+      void (async () => {
+        const signal = portableAbort!.signal;
+        const handle = await destinationHandle;
+        if (signal.aborted) throw signal.reason;
+        const session = await coordinator.tryAcquire(fs, nativeProjectRoot(summary.projectId), summary.projectId);
+        if (!session.holdsWriteLock) {
+          const detail = session.accessDetail;
+          session.release();
+          throw new Error(detail);
+        }
+        let stagedPath: string | null = null;
+        let stagedWrite: Promise<void> | null = null;
+        let unsubscribeExport: (() => void) | null = null;
+        let destination: WritableStream<Uint8Array> | null = null;
+        try {
+          const durable = await openNativeProjectV1(session.workspace, summary.projectId);
+          session.activateAfterDurableReload();
+          unsubscribeExport = session.subscribeAccess((state) => {
+            if (state !== 'editable') portableAbort?.abort(new Error(session.accessDetail));
+          });
+          if (handle !== null) {
+            portableStatus.textContent = `選択したファイルへ${labels.noun}を書き出しています…`;
+            const writable = await handle.createWritable();
+            destination = writable as unknown as WritableStream<Uint8Array>;
+          } else {
+            const binaryBytes = [
+              ...durable.snapshot.representations.map((entry) => entry.blob.byteLength),
+              ...(durable.snapshot.mediaResources ?? []).map((entry) => entry.blob.byteLength),
+            ].reduce((sum, bytes) => sum + bytes, 0);
+            const estimate = await navigator.storage.estimate?.();
+            const required = binaryBytes + 32 * 1024 * 1024;
+            if (
+              estimate?.quota !== undefined && estimate.usage !== undefined &&
+              Number.isFinite(estimate.quota) && Number.isFinite(estimate.usage) &&
+              estimate.quota - estimate.usage < required
+            ) {
+              throw new Error(`ダウンロード準備用の保存容量が不足しています（データ ${fmtBytes(binaryBytes)}）。`);
+            }
+            stagedPath = nativePackageStagePath(summary.projectId, durable.snapshot.snapshotId, purpose);
+            await fs.remove(stagedPath).catch(() => {});
+            const bridge = new TransformStream<Uint8Array, Uint8Array>();
+            stagedWrite = fs.writeStream(stagedPath, bridge.readable);
+            void stagedWrite.catch(() => {});
+            destination = bridge.writable;
+            portableStatus.textContent = `この端末で${labels.noun}を準備しています…`;
+          }
+          let metrics: {
+            readonly packageByteLength: number;
+            readonly packageSha256: string;
+            readonly maxApplicationChunkBytes: number;
+            readonly memoryDetail: string;
+          };
+          if (purpose === 'backup') {
+            const exported = await exportNativePortablePackageV1(session.workspace, summary.projectId, destination, {
+              signal,
+              onStatus(message) {
+                portableStatus.textContent = `${labels.noun}を書き出しています…`;
+                portableDetail.textContent = message;
+              },
+            });
+            metrics = {
+              ...exported.metrics,
+              memoryDetail: exported.metrics.jsHeapPeakBytes === null
+                ? 'heap値はこのbrowserでは取得不可'
+                : `観測heap peak ${fmtBytes(exported.metrics.jsHeapPeakBytes)}`,
+            };
+          } else {
+            const exported = await exportNativeExchangePackageV1(
+              session.workspace,
+              summary.projectId,
+              purpose,
+              destination,
+              {
+                signal,
+                onStatus(message) {
+                  portableStatus.textContent = `${labels.noun}を書き出しています…`;
+                  portableDetail.textContent = message;
+                },
+              },
+            );
+            metrics = { ...exported.metrics, memoryDetail: 'binaryはSTORE方式でstream出力' };
+          }
+          await stagedWrite;
+          let completedFile: Blob;
+          if (handle !== null) {
+            completedFile = await handle.getFile();
+          } else {
+            const staged = stagedPath === null ? null : await fs.readStream(stagedPath);
+            if (staged === null || staged.blob === undefined) {
+              throw new Error(`確認済みの${labels.noun}をダウンロードへ渡せません。`);
+            }
+            completedFile = await staged.blob();
+          }
+          portableStatus.textContent = `書き出した${labels.noun}を確認しています…`;
+          const readBack = await digestNativeStream(completedFile.stream(), signal);
+          if (readBack.byteLength !== metrics.packageByteLength || readBack.sha256 !== metrics.packageSha256) {
+            throw new Error('完成 .lociview fileのsize／SHA-256 read-backが一致しません。');
+          }
+          if (handle === null) {
+            if (activeDownloadUrl !== null) URL.revokeObjectURL(activeDownloadUrl);
+            activeDownloadUrl = URL.createObjectURL(completedFile);
+            const download = el('a', { href: activeDownloadUrl, download: suggestedName }, `${labels.noun}を保存`);
+            download.addEventListener('click', () => {
+              portableStatus.textContent = 'ダウンロードを開始しました。端末のファイル／ダウンロード先で保存完了を確認してください。';
+            });
+            const discard = el('button', {}, 'この端末の一時ファイルを削除');
+            discard.addEventListener('click', () => {
+              if (transitionInFlight || stagedPath === null || !window.confirm('保存完了を確認しましたか？ この端末の一時ファイルを削除します。')) return;
+              transitionInFlight = true;
+              void fs.remove(stagedPath).then(() => {
+                if (activeDownloadUrl !== null) URL.revokeObjectURL(activeDownloadUrl);
+                activeDownloadUrl = null;
+                clear(portableResult);
+                portableStatus.textContent = 'この端末の一時ファイルを削除しました。保存先の .lociview は変更していません。';
+              }).catch((error: unknown) => {
+                portableStatus.className = 'ng-error';
+                portableStatus.textContent = 'この端末の一時ファイルを削除できませんでした。詳しい情報を確認してください。';
+                portableDetail.textContent = errorMessage(error);
+              }).finally(() => { transitionInFlight = false; });
+            });
+            portableResult.append(download, discard);
+          }
+          portableStatus.className = 'ng-status ng-ok';
+          portableStatus.textContent = handle === null
+            ? `${labels.noun}の確認が完了しました。上のリンクからファイルを保存してください。`
+            : `${labels.noun}を保存しました。`;
+          portableDetail.textContent = `package ${fmtBytes(metrics.packageByteLength)}、最大chunk ${fmtBytes(metrics.maxApplicationChunkBytes)}、${metrics.memoryDetail}`;
+        } catch (error) {
+          await destination?.abort(error).catch(() => {});
+          await stagedWrite?.catch(() => {});
+          if (stagedPath !== null) await fs.remove(stagedPath).catch(() => {});
+          throw error;
+        } finally {
+          unsubscribeExport?.();
+          session.release();
+        }
+      })().catch((error: unknown) => {
+        portableStatus.className = 'ng-error';
+        portableStatus.textContent = `${labels.noun}を作成できませんでした。未完成ファイルは完成packageとして扱いません。`;
+        portableDetail.textContent = errorMessage(error);
+      }).finally(() => {
+        portableAbort = null;
+        transitionInFlight = false;
+        setPortableBusy(false);
+      });
+    };
+
     const summaries = await listNativeProjectsV1(fs);
     if (summaries.length === 0) projectList.append(el('p', { class: 'ng-note' }, 'この端末に保存されたプロジェクトはありません。'));
     for (const summary of summaries) {
       const view = el('button', {}, '閲覧のみで開く');
       const edit = el('button', { class: 'primary' }, '編集して開く');
       const backup = el('button', {}, 'バックアップを書き出す');
+      const collaborationExport = el('button', {}, '共同編集用を書き出す');
+      const reviewExport = el('button', {}, '閲覧共有用を書き出す');
+      const cleanCopyExport = el('button', {}, '編集用コピーを書き出す');
+      const exchangeDisclosure = el('details', { class: 'ng-package-actions' },
+        el('summary', {}, '共有・コピー…'),
+        el('p', { class: 'ng-note' }, '共同編集用は同じProjectへ統合できます。閲覧共有用は閲覧開始、編集用コピーは別Projectとして編集開始します。'),
+        el('div', { class: 'ng-row' }, collaborationExport, reviewExport, cleanCopyExport),
+      );
       const remove = el('button', {}, 'この端末から削除');
       view.addEventListener('click', () => void openProject(summary.projectId, 'view'));
       edit.addEventListener('click', () => void openProject(summary.projectId, 'edit'));
+      collaborationExport.addEventListener('click', () => beginPackageExport(summary, 'collaboration'));
+      reviewExport.addEventListener('click', () => beginPackageExport(summary, 'review'));
+      cleanCopyExport.addEventListener('click', () => beginPackageExport(summary, 'cleanCopy'));
       backup.addEventListener('click', () => {
         if (transitionInFlight) return;
         if (portableResult.childElementCount > 0) {
@@ -777,6 +1041,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         view,
         edit,
         backup,
+        exchangeDisclosure,
         remove,
       ));
     }
@@ -789,9 +1054,9 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       el('section', { class: 'ng-card' },
         el('h2', {}, 'この端末のプロジェクト'),
         projectList,
-        el('h3', {}, 'バックアップから復元'),
-        el('p', { class: 'ng-note' }, 'LociViewのバックアップファイルを選ぶと、モデルとキャプションをこの端末へ復元します。'),
-        el('label', { class: 'ng-field' }, el('span', {}, 'バックアップファイル'), restoreInput),
+        el('h3', {}, 'LociView packageを読み込む'),
+        el('p', { class: 'ng-note' }, '完全バックアップ、共同編集用、閲覧共有用、編集用コピーを内容から判定して読み込みます。共同編集用は、同じProjectがある場合、そのProject内の統合操作を使います。'),
+        el('label', { class: 'ng-field' }, el('span', {}, 'LociView package（.lociview）'), restoreInput),
         el('p', { class: 'ng-note' }, 'iPhoneを含め、ファイル選択後に内容を厳密に確認します。'),
         el('div', { class: 'ng-row' }, restore, cancelPortable),
         portableStatus,
@@ -992,6 +1257,13 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const materialStatus = el('p', { class: 'ng-note' });
     const materialSection = el('section', { class: 'ng-card' });
     const captionMedia = el('div', { class: 'ng-list' });
+    const captionImageInput = el('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp,image/gif' });
+    const addCaptionImage = el('button', {}, '画像を添付して保存');
+    const captionImageStatus = el('p', { class: 'ng-note' });
+    const collaborationInput = el('input', { type: 'file' });
+    const collaborationMerge = el('button', { class: 'primary' }, '共同編集packageを統合');
+    const collaborationStatus = el('p', { class: 'ng-note' });
+    const collaborationDetail = el('p', { class: 'ng-note' });
     let captionMediaGeneration = 0;
     const captionMediaUrls = new Set<string>();
 
@@ -1102,7 +1374,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         return;
       }
       for (const caption of filtered) {
-        const owner = working.assets.find((asset) => asset.id === caption.anchor?.assetId);
+        const owner = working.assets.find((asset) => asset.id === nativeCaptionOwnerAssetIdV1(caption));
         const review = nativeCaptionNeedsReviewV1(working, caption) ? '［要再配置］ ' : '';
         const button = el(
           'button',
@@ -1235,8 +1507,9 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       accessBadge.title = session.accessDetail;
       const editable = canMutateWorking();
       const caption = selectedCaption();
+      const captionOwnerAssetId = caption === undefined ? null : nativeCaptionOwnerAssetIdV1(caption);
       const captionVisible = caption !== undefined && (
-        caption.anchor === null || isNativeAssetVisibleV1(working, caption.anchor.assetId)
+        captionOwnerAssetId === null || isNativeAssetVisibleV1(working, captionOwnerAssetId)
       );
       const captionFieldsEditable = caption !== undefined && captionVisible;
       if (!editable && creatingCaption) {
@@ -1254,6 +1527,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       captionTitle.disabled = !editable || !captionFieldsEditable;
       captionBody.disabled = !editable || !captionFieldsEditable;
       captionColor.disabled = !editable || !captionFieldsEditable;
+      captionImageInput.disabled = !editable || !captionFieldsEditable || unsavedChanges.isDirty;
+      addCaptionImage.disabled = !editable || !captionFieldsEditable || unsavedChanges.isDirty;
       pinScaleNumber.disabled = !editable;
       pinScaleSlider.disabled = !editable;
       newCaption.disabled = !editable;
@@ -1301,6 +1576,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       for (const button of axisButtons.values()) button.disabled = saving;
       close.disabled = saving;
       reload.disabled = saving;
+      collaborationInput.disabled = !editable || unsavedChanges.isDirty;
+      collaborationMerge.disabled = !editable || unsavedChanges.isDirty;
       activeViewer?.setEditingEnabled(editable);
     };
     const markDirty = (): void => {
@@ -1348,7 +1625,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       el('h2', {}, 'キャプション'),
       el('p', { class: 'ng-note' }, '新しく置くか、一覧や画面上のマーカーから既存のキャプションを選びます。'),
       newCaption,
-      el('label', { class: 'ng-field' }, el('span', {}, '新しいキャプションの配置先'), target),
+      el('label', { class: 'ng-field' }, el('span', {}, 'キャプションの配置先モデル'), target),
       captionGuide,
       el('div', { class: 'ng-grid' },
         el('label', { class: 'ng-field' }, el('span', {}, 'キャプションを検索'), captionSearch),
@@ -1360,6 +1637,9 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       el('label', { class: 'ng-field' }, el('span', {}, '本文'), captionBody),
       el('label', { class: 'ng-field' }, el('span', {}, 'ピンの色'), captionColor),
       captionMedia,
+      el('label', { class: 'ng-field' }, el('span', {}, '画像を追加（PNG／JPEG／WebP／GIF）'), captionImageInput),
+      addCaptionImage,
+      captionImageStatus,
       captionReview,
       el('div', { class: 'ng-row' }, moveCaption, repositionCaption, deleteCaption),
     );
@@ -1462,6 +1742,14 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
           ),
           pointAppearance,
           el('p', { class: 'ng-note' }, '元のモデルファイルは変更しません。'),
+        ),
+        el('details', { class: 'ng-card' },
+          el('summary', {}, '共同編集packageを統合'),
+          el('p', { class: 'ng-note' }, 'このProjectと同じlineage／baselineから分岐したCaption変更だけを統合します。未保存変更がある間は実行できません。'),
+          el('label', { class: 'ng-field' }, el('span', {}, '共同編集用 .lociview'), collaborationInput),
+          collaborationMerge,
+          collaborationStatus,
+          el('details', {}, el('summary', {}, '統合の詳しい情報'), collaborationDetail),
         ),
         el('details', { class: 'ng-card' },
           el('summary', {}, '詳細'),
@@ -2018,7 +2306,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         runtimeStatus.textContent = '最後のモデルは削除できません。プロジェクト全体を削除する場合は、一覧画面の「この端末から削除」を使用してください。';
         return;
       }
-      const ownedCaptionCount = working.captions.filter((caption) => caption.anchor?.assetId === asset.id).length;
+      const ownedCaptionCount = working.captions.filter((caption) => nativeCaptionOwnerAssetIdV1(caption) === asset.id).length;
       if (ownedCaptionCount > 0) {
         runtimeStatus.className = 'ng-error';
         runtimeStatus.textContent = `このモデルには${ownedCaptionCount}件のキャプションがあります。先にそのキャプションを削除してください。`;
@@ -2149,13 +2437,21 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       if (!canMutateWorking()) return;
       const caption = selectedCaption();
       if (caption === undefined) return;
-      const ownerId = caption.anchor?.assetId ?? working.presentation.captionTargetAssetId;
+      const durableOwnerId = nativeCaptionOwnerAssetIdV1(caption);
+      const ownerId = durableOwnerId ?? working.presentation.captionTargetAssetId;
       const owner = working.assets.find((asset) => asset.id === ownerId);
       if (owner === undefined || !isNativeAssetVisibleV1(working, owner.id)) {
         runtimeStatus.className = 'ng-error';
         runtimeStatus.textContent = '所属モデルが見つからないか非表示のため、表面へ置き直せません。キャプションの位置は変更していません。';
         return;
       }
+      if (
+        durableOwnerId === null &&
+        !window.confirm(
+          `この旧キャプションには所属モデル情報がありません。現在選択中の「${owner.label}」へ所属させ、` +
+          'その表面へ置き直しますか？ 実際の変更は表面を指定してプロジェクトを保存した時に確定します。',
+        )
+      ) return;
       creatingCaption = false;
       captionMoveActive = false;
       viewer.stopCaptionPositionEditing();
@@ -2178,7 +2474,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         runtimeStatus.textContent = '所属モデルの配置用表面を利用できないため、置き直しを開始できません。キャプションの位置は変更していません。';
         return;
       }
-      if (!viewer.armCaptionReposition(caption.id)) {
+      if (!viewer.armCaptionReposition(caption.id, owner.id)) {
         if (targetChanged) {
           working = { ...working, presentation: { ...working.presentation, captionTargetAssetId: previousTargetAssetId } };
           target.value = previousTargetAssetId ?? '';
@@ -2337,6 +2633,118 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       if (!commitSelectedCaption({ ...caption, color: captionColor.value })) return;
       viewer.setSnapshot(working);
       markDirty();
+    });
+    addCaptionImage.addEventListener('click', () => {
+      if (saving || session.accessState !== 'editable') return;
+      const caption = selectedCaption();
+      const image = selectedFile(captionImageInput);
+      if (caption === undefined || image === null) {
+        captionImageStatus.className = 'ng-error';
+        captionImageStatus.textContent = '保存済みのキャプションと添付する画像を選択してください。';
+        return;
+      }
+      if (unsavedChanges.isDirty) {
+        captionImageStatus.className = 'ng-error';
+        captionImageStatus.textContent = '先に現在の変更を保存してから画像を添付してください。';
+        return;
+      }
+      saving = true;
+      updateAccess();
+      captionImageStatus.className = 'ng-status';
+      captionImageStatus.textContent = '画像を確認しています…';
+      const source: NativeBinarySource = {
+        size: image.size,
+        mediaType: image.type.toLowerCase(),
+        stream: () => image.stream(),
+      };
+      void addNativeCaptionImageV1(
+        session.workspace,
+        durable,
+        caption.id,
+        image.name,
+        source,
+        (message) => { captionImageStatus.textContent = message; },
+      ).then((saved) => {
+        durable = saved;
+        working = saved;
+        unsavedChanges.clear();
+        viewer.setSnapshot(working);
+        viewer.selectCaption(selectedCaptionId);
+        populateCaptionFields();
+        captionImageInput.value = '';
+        captionImageStatus.className = 'ng-status ng-ok';
+        captionImageStatus.textContent = '画像をキャプションへ添付して保存しました。';
+      }).catch((error: unknown) => {
+        captionImageStatus.className = 'ng-error';
+        captionImageStatus.textContent = errorMessage(error);
+      }).finally(() => {
+        saving = false;
+        updateAccess();
+      });
+    });
+    collaborationMerge.addEventListener('click', () => {
+      if (saving || session.accessState !== 'editable') return;
+      if (unsavedChanges.isDirty) {
+        collaborationStatus.className = 'ng-error';
+        collaborationStatus.textContent = '先に現在の変更を保存してから統合してください。';
+        return;
+      }
+      const packageFile = selectedFile(collaborationInput);
+      if (packageFile === null) {
+        collaborationStatus.className = 'ng-error';
+        collaborationStatus.textContent = '共同編集用 .lociview を選択してください。';
+        return;
+      }
+      saving = true;
+      updateAccess();
+      collaborationStatus.className = 'ng-status';
+      collaborationStatus.textContent = 'packageを検証しています…';
+      collaborationDetail.textContent = '';
+      void mergeNativeCollaborationPackageV1(
+        session.workspace,
+        durable.project.id,
+        packageFile,
+        {
+          onStatus(message) {
+            collaborationStatus.textContent = '共同編集packageを検証・統合しています…';
+            collaborationDetail.textContent = message;
+          },
+        },
+      ).then((result) => {
+        if (result.kind === 'conflict') {
+          collaborationStatus.className = 'ng-error';
+          collaborationStatus.textContent = `統合を中止しました（${result.conflicts.length}件）。このProjectは変更していません。`;
+          collaborationDetail.textContent = result.conflicts.map((conflict) => conflict.message).join('\n');
+          return;
+        }
+        if (result.kind === 'noop') {
+          collaborationStatus.className = 'ng-status ng-ok';
+          collaborationStatus.textContent = 'このpackageの変更はすでに反映済みです。新しい保存状態は作りませんでした。';
+          collaborationDetail.textContent = '';
+          return;
+        }
+        durable = result.snapshot;
+        working = result.snapshot;
+        unsavedChanges.clear();
+        creatingCaption = false;
+        captionMoveActive = false;
+        if (!working.captions.some((caption) => caption.id === selectedCaptionId)) selectedCaptionId = null;
+        viewer.setSnapshot(working);
+        viewer.selectCaption(selectedCaptionId);
+        rebuildCaptionList();
+        populateCaptionFields();
+        syncVisibilityControls();
+        collaborationStatus.className = 'ng-status ng-ok';
+        collaborationStatus.textContent = 'Caption変更と必要な新規画像を統合し、Projectへ保存しました。';
+        collaborationDetail.textContent = `snapshot generation ${working.generation}`;
+      }).catch((error: unknown) => {
+        collaborationStatus.className = 'ng-error';
+        collaborationStatus.textContent = '共同編集packageを統合できませんでした。このProjectは変更していません。';
+        collaborationDetail.textContent = errorMessage(error);
+      }).finally(() => {
+        saving = false;
+        updateAccess();
+      });
     });
     save.addEventListener('click', () => {
       if (saving || session.accessState !== 'editable') return;

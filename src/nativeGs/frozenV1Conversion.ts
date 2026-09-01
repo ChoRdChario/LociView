@@ -670,10 +670,12 @@ export async function planOpenedFrozenV1ToNative(
     }
     const displaySetId = explicitSetId ?? fallbackDisplaySetId;
     let anchor: NativeCaptionV1['anchor'] = null;
+    let ownerAssetId: string | undefined;
     const rawAnchor = record.fields.anchor;
     if (typeof rawAnchor === 'object' && rawAnchor !== null && !Array.isArray(rawAnchor)) {
       const sourceAnchor = rawAnchor as Record<string, unknown>;
       const owner = typeof sourceAnchor.modelAssetId === 'string' ? sourceAssetToTarget.get(sourceAnchor.modelAssetId) : undefined;
+      ownerAssetId = owner?.asset.id;
       const position = vec3(sourceAnchor.position);
       if (owner !== undefined && position !== null) {
         const compatibility = owner.revision.anchorCompatibilityClasses[0]!;
@@ -747,6 +749,7 @@ export async function planOpenedFrozenV1ToNative(
       id: nativeId(record.id, 'cap'),
       title,
       body: sourceBody,
+      ...(ownerAssetId === undefined ? {} : { ownerAssetId }),
       displaySetId,
       color,
       tags,

@@ -1,4 +1,4 @@
-import type { NativeCaptionV1 } from './schema';
+import { nativeCaptionOwnerAssetIdV1, type NativeCaptionV1 } from './schema';
 
 export interface NativeCaptionListFilter {
   readonly query: string;
@@ -12,7 +12,7 @@ export function filterNativeCaptionListV1(
 ): NativeCaptionV1[] {
   const query = filter.query.trim().toLowerCase();
   return captions.filter((caption) => {
-    if (filter.assetId !== null && caption.anchor?.assetId !== filter.assetId) return false;
+    if (filter.assetId !== null && nativeCaptionOwnerAssetIdV1(caption) !== filter.assetId) return false;
     if (query === '') return true;
     return caption.title.toLowerCase().includes(query) || caption.body.toLowerCase().includes(query);
   });

@@ -27,6 +27,7 @@ import {
 import {
   NATIVE_DEFAULT_DISPLAY_SET_ID,
   nativeAssetPinScaleV1,
+  nativeCaptionOwnerAssetIdV1,
   nativeModelFormat,
   nativeCaptionDisplaySetIdV1,
   newNativeId,
@@ -711,10 +712,12 @@ export class NativeGsViewer {
     return true;
   }
 
-  armCaptionReposition(captionId: string): boolean {
+  armCaptionReposition(captionId: string, explicitTargetAssetId?: string): boolean {
     if (!this.editingEnabled) return false;
     const caption = this.snapshot.captions.find((candidate) => candidate.id === captionId);
-    const targetAssetId = caption?.anchor?.assetId ?? this.snapshot.presentation.captionTargetAssetId;
+    const targetAssetId = caption === undefined
+      ? null
+      : nativeCaptionOwnerAssetIdV1(caption) ?? explicitTargetAssetId ?? null;
     if (caption === undefined || targetAssetId === null || !this.assetIsVisible(targetAssetId)) return false;
     this.currentCaption = caption;
     this.repositionCaptionId = caption.id;
@@ -1147,7 +1150,8 @@ export class NativeGsViewer {
       this.callbacks.onIssuesChanged([...this.resolution.issues, 'The Caption selected for re-placement is unavailable.']);
       return;
     }
-    if (repositioned?.anchor !== null && repositioned?.anchor !== undefined && repositioned.anchor.assetId !== interaction.targetAssetId) {
+    const repositionedOwnerAssetId = repositioned === null ? null : nativeCaptionOwnerAssetIdV1(repositioned);
+    if (repositionedOwnerAssetId !== null && repositionedOwnerAssetId !== interaction.targetAssetId) {
       this.callbacks.onIssuesChanged([...this.resolution.issues, 'Re-placement must use the Caption owning Asset.']);
       return;
     }
@@ -1173,6 +1177,7 @@ export class NativeGsViewer {
       title: repositioned?.title ?? 'Caption',
       body: repositioned?.body ?? '',
       color: repositioned?.color ?? '#eab308',
+      ownerAssetId: asset.id,
       anchor: {
         kind: 'asset',
         assetId: asset.id,

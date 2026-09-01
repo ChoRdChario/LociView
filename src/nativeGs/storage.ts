@@ -25,6 +25,10 @@ import {
   type NativeRepresentationV1,
 } from './schema';
 import { digestNativeBytes, digestNativeStream, hashingNativeStream, type NativeStreamDigest } from './sha256';
+import {
+  nativeUnsupportedStateSha256V1,
+  validateNativeCollaborationBaselineV1,
+} from './captionThreeWayMerge';
 
 export const NATIVE_PROJECTS_ROOT = 'native-projects';
 
@@ -652,6 +656,204 @@ export async function saveNativeProjectV1(
   const verified = await writeVerifiedSnapshot(fs, next);
   await publishActiveMarker(fs, next, verified.digest);
   return next;
+}
+
+interface NativeCaptionMediaPublicationLabels {
+  readonly action: string;
+  readonly staging: string;
+  readonly writing: string;
+  readonly publishing: string;
+  readonly success: string;
+}
+
+async function publishNativeCaptionMediaChangeV1(
+  fs: ProjectWorkspaceFS,
+  current: NativeProjectSnapshotV1,
+  candidate: NativeProjectSnapshotV1,
+  newMediaSources: ReadonlyMap<string, NativeBinarySource>,
+  labels: NativeCaptionMediaPublicationLabels,
+  onStatus?: (message: string) => void,
+  signal?: AbortSignal,
+): Promise<NativeProjectSnapshotV1> {
+  assertProjectWorkspace(fs, current.project.id);
+  if (
+    candidate.project.id !== current.project.id || candidate.snapshotId !== current.snapshotId ||
+    candidate.generation !== current.generation
+  ) {
+    throw new Error(`native ${labels.action}: candidate changed the durable Project envelope`);
+  }
+  const durable = await openNativeProjectV1(fs, current.project.id);
+  if (durable.snapshot.generation !== current.generation || durable.snapshot.snapshotId !== current.snapshotId) {
+    throw new Error(`native ${labels.action}: durable snapshot changed; reload before saving`);
+  }
+  if (
+    durable.missingRepresentationIds.length > 0 || durable.sizeMismatchRepresentationIds.length > 0 ||
+    durable.missingMediaIds.length > 0 || durable.sizeMismatchMediaIds.length > 0
+  ) {
+    throw new Error(`native ${labels.action}: active binary bytes are unavailable`);
+  }
+  const currentMedia = new Map((current.mediaResources ?? []).map((media) => [media.id, media]));
+  const candidateMedia = new Map((candidate.mediaResources ?? []).map((media) => [media.id, media]));
+  const newMediaIds = [...candidateMedia.keys()].filter((mediaId) => !currentMedia.has(mediaId)).sort();
+  if (
+    newMediaSources.size !== newMediaIds.length ||
+    [...newMediaSources.keys()].some((mediaId) => !newMediaIds.includes(mediaId))
+  ) {
+    throw new Error(`native ${labels.action}: every and only new media resource requires one source`);
+  }
+  for (const [mediaId, media] of currentMedia) {
+    const retained = candidateMedia.get(mediaId);
+    if (retained === undefined || JSON.stringify(retained) !== JSON.stringify(media)) {
+      throw new Error(`native ${labels.action}: existing media metadata changed for ${mediaId}`);
+    }
+  }
+  const captionsUnchanged = JSON.stringify([...candidate.captions].sort((a, b) => a.id.localeCompare(b.id))) ===
+    JSON.stringify([...current.captions].sort((a, b) => a.id.localeCompare(b.id)));
+  if (captionsUnchanged && newMediaIds.length === 0) return current;
+
+  const stagedPaths: string[] = [];
+  const next: NativeProjectSnapshotV1 = {
+    ...candidate,
+    snapshotId: newNativeId('snp'),
+    generation: current.generation + 1,
+  };
+  try {
+    for (const mediaId of newMediaIds) {
+      throwIfAborted(signal);
+      const media = candidateMedia.get(mediaId)!;
+      const source = newMediaSources.get(mediaId)!;
+      if (
+        source.size !== media.blob.byteLength || source.mediaType !== media.blob.mediaType ||
+        !isNativeImageMediaType(source.mediaType)
+      ) {
+        throw new Error(`native ${labels.action}: media metadata mismatch for ${mediaId}`);
+      }
+      const path = nativeMediaPath(current.project.id, mediaId);
+      if (await fs.exists(path)) throw new Error(`native ${labels.action}: new media path already exists for ${mediaId}`);
+      stagedPaths.push(path);
+      onStatus?.(`${labels.staging} ${media.label}…`);
+      const stored = await writeAndVerifyBinary(fs, path, source, signal);
+      if (
+        stored.byteLength !== media.blob.byteLength || stored.digest !== media.blob.digest ||
+        stored.mediaType !== media.blob.mediaType
+      ) {
+        throw new Error(`native ${labels.action}: media size/SHA-256 mismatch for ${mediaId}`);
+      }
+    }
+    throwIfAborted(signal);
+    onStatus?.(labels.writing);
+    const snapshotPath = nativeSnapshotPath(next.project.id, next.snapshotId);
+    stagedPaths.push(snapshotPath);
+    const verified = await writeVerifiedSnapshot(fs, next);
+    throwIfAborted(signal);
+    onStatus?.(labels.publishing);
+    await publishActiveMarker(fs, next, verified.digest);
+    onStatus?.(labels.success);
+    return next;
+  } catch (error) {
+    // A post-marker authority/status failure may occur after the exact candidate
+    // is already durable. Treat that state as success. Clean staged paths only
+    // while the former snapshot is still provably active; an ambiguous marker
+    // leaves harmless unreferenced bytes instead of risking active data.
+    const active = await openNativeProjectV1(fs, current.project.id).catch(() => null);
+    if (
+      active?.snapshot.snapshotId === next.snapshotId &&
+      active.snapshot.generation === next.generation &&
+      active.missingRepresentationIds.length === 0 &&
+      active.sizeMismatchRepresentationIds.length === 0 &&
+      active.missingMediaIds.length === 0 &&
+      active.sizeMismatchMediaIds.length === 0
+    ) {
+      return active.snapshot;
+    }
+    if (
+      active?.snapshot.snapshotId === durable.snapshot.snapshotId &&
+      active.snapshot.generation === durable.snapshot.generation &&
+      fs.mutationAuthority.accessState === 'editable'
+    ) {
+      for (const path of [...stagedPaths].reverse()) await fs.remove(path).catch(() => {});
+    }
+    throw error;
+  }
+}
+
+/**
+ * Publishes one already conflict-free collaboration Caption/media merge. New
+ * image bytes are verified before the snapshot and active marker remains last.
+ */
+export async function publishNativeCaptionMergeV1(
+  fs: ProjectWorkspaceFS,
+  current: NativeProjectSnapshotV1,
+  candidate: NativeProjectSnapshotV1,
+  newMediaSources: ReadonlyMap<string, NativeBinarySource>,
+  onStatus?: (message: string) => void,
+  signal?: AbortSignal,
+): Promise<NativeProjectSnapshotV1> {
+  validateNativeCollaborationBaselineV1(current);
+  validateNativeCollaborationBaselineV1(candidate);
+  if (
+    candidate.collaborationBaseline?.baselineId !== current.collaborationBaseline?.baselineId ||
+    nativeUnsupportedStateSha256V1(candidate) !== nativeUnsupportedStateSha256V1(current)
+  ) {
+    throw new Error('native collaboration: merged candidate changed unsupported Project state');
+  }
+  return publishNativeCaptionMediaChangeV1(fs, current, candidate, newMediaSources, {
+    action: 'collaboration',
+    staging: 'Staging and verifying Caption image',
+    writing: 'Writing and verifying merged native snapshot v1…',
+    publishing: 'Publishing merged active receipt…',
+    success: 'Collaboration changes merged and active.',
+  }, onStatus, signal);
+}
+
+/** Adds one exact user-selected image to one saved Caption and publishes it. */
+export async function addNativeCaptionImageV1(
+  fs: ProjectWorkspaceFS,
+  current: NativeProjectSnapshotV1,
+  captionId: string,
+  label: string,
+  source: NativeBinarySource,
+  onStatus?: (message: string) => void,
+  signal?: AbortSignal,
+): Promise<NativeProjectSnapshotV1> {
+  const caption = current.captions.find((entry) => entry.id === captionId);
+  if (caption === undefined) throw new Error('native Caption image: selected Caption is unavailable');
+  if (source.size < 1 || !isNativeImageMediaType(source.mediaType)) {
+    throw new Error('native Caption image: select a PNG, JPEG, WebP or GIF image');
+  }
+  throwIfAborted(signal);
+  onStatus?.('Verifying selected Caption image…');
+  const digest = await digestNativeStream(source.stream(), signal);
+  if (digest.byteLength !== source.size) throw new Error('native Caption image: selected image size changed while reading');
+  const mediaId = newNativeId('med');
+  const candidate = parseNativeSnapshotV1(serializeNativeSnapshotV1({
+    ...current,
+    captions: current.captions.map((entry) => entry.id === captionId ? {
+      ...entry,
+      attachmentMediaIds: [...(entry.attachmentMediaIds ?? []), mediaId],
+    } : entry),
+    mediaResources: [
+      ...(current.mediaResources ?? []),
+      {
+        id: mediaId,
+        label: label.trim() || 'Caption image',
+        kind: 'image',
+        blob: {
+          algorithm: 'sha256',
+          digest: digest.sha256,
+          byteLength: digest.byteLength,
+          mediaType: source.mediaType,
+        },
+      },
+    ],
+  }));
+  return publishNativeCaptionMediaChangeV1(fs, current, candidate, new Map([[mediaId, source]]), {
+    action: 'Caption image',
+    staging: 'Staging and verifying Caption image',
+    writing: 'Writing and verifying Caption image snapshot…',
+    publishing: 'Publishing Caption image receipt…',
+    success: 'Caption image attached and active.',
+  }, onStatus, signal);
 }
 
 export async function openNativeProjectV1(fs: WorkspaceFS, projectId: string): Promise<NativeOpenProject> {

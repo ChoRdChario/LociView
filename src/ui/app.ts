@@ -470,16 +470,32 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     }
   }
 
-  async function restoreNativePackage(file: File, onStatus: (message: string) => void): Promise<string> {
+  async function restoreNativePackage(
+    file: File,
+    onStatus: (message: string) => void,
+  ): Promise<{ readonly projectId: string; readonly openMode: ProjectSessionMode }> {
     if (!persistentWorkspace) {
       throw new Error('このブラウザでは対応プロジェクトを端末へ保存できないため、バックアップを復元できません。');
     }
-    const [{ inspectNativePortablePackageV1, restoreNativePortablePackageV1 }, { nativeProjectRoot }] = await Promise.all([
+    const [
+      { inspectNativePortablePackageV1, restoreNativePortablePackageV1 },
+      {
+        detectNativePackageContainerKindV1,
+        inspectNativeExchangePackageV1,
+        nativeExchangeDefaultOpenModeV1,
+        restoreNativeExchangePackageV1,
+      },
+      { listNativeProjectsV1, nativeProjectRoot },
+    ] = await Promise.all([
       import('../nativeGs/portablePackage'),
+      import('../nativeGs/packageExchange'),
       import('../nativeGs/storage'),
     ]);
-    onStatus('バックアップの内容を確認しています…');
-    const inspection = await inspectNativePortablePackageV1(file);
+    onStatus('LociView packageの内容を確認しています…');
+    const containerKind = await detectNativePackageContainerKindV1(file);
+    const inspection = containerKind === 'backup'
+      ? await inspectNativePortablePackageV1(file)
+      : await inspectNativeExchangePackageV1(file);
     const required = inspection.representationByteLength + inspection.mediaByteLength + inspection.manifest.nativeSnapshot.byteLength + 64 * 1024;
     const estimate = await navigator.storage.estimate?.();
     if (
@@ -491,6 +507,16 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     }
 
     const projectId = inspection.snapshot.project.id;
+    if (
+      containerKind === 'exchange' && 'purpose' in inspection.manifest &&
+      inspection.manifest.purpose === 'collaboration' &&
+      (await listNativeProjectsV1(fs)).some((project) => project.projectId === projectId)
+    ) {
+      throw new Error(
+        'この共同編集用packageと同じProjectが既にあります。対象Projectを「編集して開く」から開き、' +
+        '共同編集packageを統合してください。',
+      );
+    }
     const access = await mutationCoordinator.tryAcquire(fs, nativeProjectRoot(projectId), projectId);
     if (!access.holdsWriteLock) {
       const detail = access.accessDetail;
@@ -505,11 +531,18 @@ export async function bootApp(root: HTMLElement): Promise<void> {
         if (state !== 'editable') abort.abort(new Error(access.accessDetail));
       });
       onStatus('モデルデータをこの端末へ復元しています…');
-      await restoreNativePortablePackageV1(access.workspace, fs, file, {
+      if (containerKind === 'backup') {
+        await restoreNativePortablePackageV1(access.workspace, fs, file, {
+          signal: abort.signal,
+          onStatus: () => onStatus('モデルデータを確認しながら完全バックアップを復元しています…'),
+        });
+        return { projectId, openMode: 'edit' };
+      }
+      const restored = await restoreNativeExchangePackageV1(access.workspace, fs, file, {
         signal: abort.signal,
-        onStatus: () => onStatus('モデルデータを確認しながら復元しています…'),
+        onStatus: () => onStatus('モデルデータを確認しながらpackageを復元しています…'),
       });
-      return projectId;
+      return { projectId, openMode: nativeExchangeDefaultOpenModeV1(restored.purpose) };
     } finally {
       unsubscribe();
       access.release();

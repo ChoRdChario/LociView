@@ -108,6 +108,8 @@ export interface NativeCaptionV1 {
   readonly id: string;
   readonly title: string;
   readonly body: string;
+  /** Durable Caption ownership; older placed Captions derive this from anchor.assetId. */
+  readonly ownerAssetId?: string;
   readonly displaySetId?: string;
   readonly color?: string;
   readonly tags?: readonly string[];
@@ -183,6 +185,15 @@ export interface NativeMediaResourceV1 {
   readonly blob: NativeBlobRefV1;
 }
 
+export interface NativeCollaborationBaselineV1 {
+  readonly version: 1;
+  readonly lineageProjectId: string;
+  readonly baselineId: string;
+  readonly unsupportedStateSha256: string;
+  readonly captions: readonly NativeCaptionV1[];
+  readonly mediaResources: readonly NativeMediaResourceV1[];
+}
+
 export interface NativeProjectSnapshotV1 {
   readonly format: typeof NATIVE_SNAPSHOT_FORMAT;
   readonly schemaVersion: typeof NATIVE_SCHEMA_VERSION;
@@ -213,6 +224,7 @@ export interface NativeProjectSnapshotV1 {
   readonly displaySets?: readonly NativeDisplaySetV1[];
   readonly meshMaterialAppearances?: readonly NativeMeshMaterialAppearanceV1[];
   readonly mediaResources?: readonly NativeMediaResourceV1[];
+  readonly collaborationBaseline?: NativeCollaborationBaselineV1;
 }
 
 export interface NativeActiveMarkerV1 {
@@ -249,6 +261,10 @@ export function nativeDisplaySetsV1(snapshot: NativeProjectSnapshotV1): readonly
 
 export function nativeCaptionDisplaySetIdV1(caption: NativeCaptionV1): string {
   return caption.displaySetId ?? NATIVE_DEFAULT_DISPLAY_SET_ID;
+}
+
+export function nativeCaptionOwnerAssetIdV1(caption: NativeCaptionV1): string | null {
+  return caption.ownerAssetId ?? caption.anchor?.assetId ?? null;
 }
 
 export function nativeSavedViewDisplaySetIdV1(savedView: NativeSavedViewV1): string {
@@ -577,7 +593,7 @@ function parseRepresentation(value: unknown): NativeRepresentationV1 {
 
 function parseCaption(value: unknown): NativeCaptionV1 {
   const input = record(value, 'Caption');
-  exactKeys(input, ['id', 'title', 'body', 'anchor'], ['displaySetId', 'color', 'tags', 'attachmentMediaIds']);
+  exactKeys(input, ['id', 'title', 'body', 'anchor'], ['ownerAssetId', 'displaySetId', 'color', 'tags', 'attachmentMediaIds']);
   let anchor: NativeCaptionV1['anchor'] = null;
   if (input.anchor !== null) {
     const sourceAnchor = record(input.anchor, 'Caption anchor');
@@ -613,6 +629,7 @@ function parseCaption(value: unknown): NativeCaptionV1 {
     title: string(input.title, 'Caption title'),
     body: typeof input.body === 'string' ? input.body : (() => { throw new Error('native snapshot: Caption body must be text'); })(),
     anchor,
+    ...(input.ownerAssetId === undefined ? {} : { ownerAssetId: id(input.ownerAssetId, 'ast', 'Caption owner Asset id') }),
     ...(input.displaySetId === undefined ? {} : { displaySetId: id(input.displaySetId, 'set', 'Caption DisplaySet id') }),
     ...(input.color === undefined ? {} : { color: color.toLowerCase() }),
     ...(input.tags === undefined ? {} : { tags }),
@@ -709,6 +726,31 @@ function parseMediaResource(value: unknown): NativeMediaResourceV1 {
     label: singleLineString(input.label, 'media resource label'),
     kind: 'image',
     blob,
+  };
+}
+
+function sha256(value: unknown, label: string): string {
+  const result = string(value, label);
+  if (!/^[0-9a-f]{64}$/.test(result)) throw new Error(`native snapshot: invalid ${label}`);
+  return result;
+}
+
+function parseCollaborationBaseline(value: unknown): NativeCollaborationBaselineV1 {
+  const input = record(value, 'collaboration baseline');
+  exactKeys(input, [
+    'version', 'lineageProjectId', 'baselineId', 'unsupportedStateSha256', 'captions', 'mediaResources',
+  ]);
+  if (input.version !== 1) throw new Error('native snapshot: unsupported collaboration baseline version');
+  if (!Array.isArray(input.captions) || !Array.isArray(input.mediaResources)) {
+    throw new Error('native snapshot: collaboration baseline collections must be arrays');
+  }
+  return {
+    version: 1,
+    lineageProjectId: id(input.lineageProjectId, 'prj', 'collaboration lineage Project id'),
+    baselineId: sha256(input.baselineId, 'collaboration baseline id'),
+    unsupportedStateSha256: sha256(input.unsupportedStateSha256, 'collaboration unsupported-state digest'),
+    captions: input.captions.map(parseCaption),
+    mediaResources: input.mediaResources.map(parseMediaResource),
   };
 }
 
@@ -828,6 +870,13 @@ function semanticClosure(snapshot: NativeProjectSnapshotV1): void {
     if (!assets.has(hiddenAssetId)) throw new Error('native snapshot: hidden Asset is missing');
   }
   for (const caption of snapshot.captions) {
+    const ownerAssetId = nativeCaptionOwnerAssetIdV1(caption);
+    if (ownerAssetId !== null && !assets.has(ownerAssetId)) {
+      throw new Error('native snapshot: Caption owner Asset is missing');
+    }
+    if (caption.ownerAssetId !== undefined && caption.anchor !== null && caption.ownerAssetId !== caption.anchor.assetId) {
+      throw new Error('native snapshot: Caption owner and anchor Assets disagree');
+    }
     if (!displaySets.has(nativeCaptionDisplaySetIdV1(caption))) {
       throw new Error('native snapshot: Caption DisplaySet is missing');
     }
@@ -877,6 +926,25 @@ function semanticClosure(snapshot: NativeProjectSnapshotV1): void {
     if (materialTargets.has(targetKey)) throw new Error('native snapshot: duplicate Mesh material target');
     materialTargets.add(targetKey);
   }
+  const baseline = snapshot.collaborationBaseline;
+  if (baseline !== undefined) {
+    if (baseline.lineageProjectId !== snapshot.project.id) {
+      throw new Error('native snapshot: collaboration lineage does not match the Project');
+    }
+    uniqueIds(baseline.captions, 'baseline Caption');
+    uniqueIds(baseline.mediaResources, 'baseline media resource');
+    const baselineMedia = new Map(baseline.mediaResources.map((media) => [media.id, media]));
+    for (const caption of baseline.captions) {
+      if (caption.ownerAssetId !== undefined && caption.anchor !== null && caption.ownerAssetId !== caption.anchor.assetId) {
+        throw new Error('native snapshot: baseline Caption owner and anchor Assets disagree');
+      }
+      for (const mediaId of caption.attachmentMediaIds ?? []) {
+        if (!baselineMedia.has(mediaId)) {
+          throw new Error('native snapshot: baseline Caption attachment media is missing');
+        }
+      }
+    }
+  }
 }
 
 export function parseNativeSnapshotV1(text: string): NativeProjectSnapshotV1 {
@@ -884,7 +952,7 @@ export function parseNativeSnapshotV1(text: string): NativeProjectSnapshotV1 {
   exactKeys(parsed, [
     'format', 'schemaVersion', 'snapshotId', 'generation', 'project', 'assets',
     'assetBindingRevisions', 'assetRevisions', 'representations', 'presentation', 'captions',
-  ], ['savedViews', 'displaySets', 'meshMaterialAppearances', 'mediaResources']);
+  ], ['savedViews', 'displaySets', 'meshMaterialAppearances', 'mediaResources', 'collaborationBaseline']);
   if (parsed.format !== NATIVE_SNAPSHOT_FORMAT || parsed.schemaVersion !== NATIVE_SCHEMA_VERSION) {
     throw new Error('native snapshot: unsupported format or schema version');
   }
@@ -952,6 +1020,9 @@ export function parseNativeSnapshotV1(text: string): NativeProjectSnapshotV1 {
       ? {}
       : { meshMaterialAppearances: parsed.meshMaterialAppearances.map(parseMeshMaterialAppearance) }),
     ...(parsed.mediaResources === undefined ? {} : { mediaResources: parsed.mediaResources.map(parseMediaResource) }),
+    ...(parsed.collaborationBaseline === undefined
+      ? {}
+      : { collaborationBaseline: parseCollaborationBaseline(parsed.collaborationBaseline) }),
   };
   if (snapshot.assets.length < 1) throw new Error('native snapshot: at least one Asset is required');
   semanticClosure(snapshot);
@@ -1010,6 +1081,13 @@ export function serializeNativeSnapshotV1(snapshot: NativeProjectSnapshotV1): st
     }),
     ...(snapshot.mediaResources === undefined ? {} : {
       mediaResources: [...snapshot.mediaResources].sort((a, b) => a.id.localeCompare(b.id)),
+    }),
+    ...(snapshot.collaborationBaseline === undefined ? {} : {
+      collaborationBaseline: {
+        ...snapshot.collaborationBaseline,
+        captions: [...snapshot.collaborationBaseline.captions].sort((a, b) => a.id.localeCompare(b.id)),
+        mediaResources: [...snapshot.collaborationBaseline.mediaResources].sort((a, b) => a.id.localeCompare(b.id)),
+      },
     }),
   };
   const text = `${JSON.stringify(ordered)}\n`;
@@ -1184,7 +1262,7 @@ export function removeNativeAssetV1(
   if (snapshot.assets.length === 1) {
     throw new Error('native snapshot: the final Asset cannot be removed');
   }
-  const ownedCaptionCount = snapshot.captions.filter((caption) => caption.anchor?.assetId === assetId).length;
+  const ownedCaptionCount = snapshot.captions.filter((caption) => nativeCaptionOwnerAssetIdV1(caption) === assetId).length;
   if (ownedCaptionCount > 0) {
     throw new Error(`native snapshot: selected Asset owns ${ownedCaptionCount} Caption(s)`);
   }

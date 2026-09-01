@@ -10,6 +10,46 @@
 > `docs/history/task-ledger-through-d32a6a0.md`. This file contains only the
 > active delivery boundary, open decisions and non-blocking backlog.
 
+## Active production slice — Native Package Exchange
+
+- [x] Record completion-gap audit: ordinary streamed backup/restore exists;
+  collaboration merge, conflict reporting/idempotence, review/share, clean
+  editable copy and purpose-aware UI do not yet exist.
+- [x] Freeze the bounded package/baseline/merge/privacy contract in
+  `docs/specs/02-storage-package-migration.md` §30. Keep backup v1/v2 unchanged.
+- [x] Add optional snapshot-v1 collaboration baseline with Project ID lineage,
+  canonical baseline ID and unsupported-state digest; old snapshots remain
+  readable and first collaboration export freezes one fixed baseline.
+- [x] Add one exchange manifest v1 with explicit collaboration/review/clean-copy
+  purpose and strict entry/path/size/hash validation over streamed stored ZIP
+  entries.
+- [x] Implement pure Caption/new-media three-way merge and complete conflict
+  reporting, including same-field, delete/edit, duplicate ID/media and
+  unsupported non-Caption state.
+- [x] Publish a successful merge by verified new-media staging, merged
+  snapshot-last and active-marker-last; conflicts and failures perform no active
+  Project write.
+- [x] Build allowlisted fully re-keyed review snapshots and full clean-copy
+  snapshots with a fresh Project ID, excluding collaboration/source/report
+  metadata and preserving required Representation/media bytes.
+- [x] Add purpose-clear export/import controls. Merge only into an explicit
+  clean Edit target; review opens View, collaboration copy/clean copy open Edit.
+- [x] Reuse one representative two-workspace acceptance for non-conflict merge,
+  image media, reopen, backup/restore, idempotence, conflict zero-write,
+  lineage, review and clean copy. Add no broad merge matrix.
+- [ ] Run focused checks while developing, one independent read-only review,
+  then one final serial typecheck/test/build matrix on the final executable
+  tree. Do not rerun it for result-only docs.
+- [ ] Ask only the minimal physical-iPhone smoke after Desktop PASS: restore the
+  merged Project, inspect Caption/images and DisplaySet switching, save and
+  completely offline reopen.
+
+Stop conditions: stop for Product Owner judgment only if one fixed baseline is
+insufficient for normal use, Caption-only merge cannot stand without merging
+other Project metadata, backup compatibility would break, review disclosure
+needs a new privacy decision, or a general history/CAS/journal/CRDT becomes
+necessary. Do not main-merge, adopt a license or deploy after this slice.
+
 ## Completed P1 — iPhone direct-LociMyu model activation
 
 - [x] Reproduce on physical iPhone after a fresh reload: the grid appears

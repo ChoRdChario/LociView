@@ -54,6 +54,7 @@ describe('opened frozen-v1 to native conversion', () => {
     expect(placed).toMatchObject({
       title: 'Synthetic surface pin',
       body: 'base body',
+      ownerAssetId: 'ast_01J00000000000000000000020',
       displaySetId: 'set_01J00000000000000000000010',
       color: '#eab308',
       tags: ['synthetic'],
@@ -61,6 +62,7 @@ describe('opened frozen-v1 to native conversion', () => {
     });
     expect(placed?.attachmentMediaIds).toHaveLength(1);
     expect(unplaced?.anchor).toBeNull();
+    expect(unplaced?.ownerAssetId).toBeUndefined();
 
     const targetSession = await ProjectMutationCoordinator.local().tryAcquire(
       fs,
@@ -94,6 +96,31 @@ describe('opened frozen-v1 to native conversion', () => {
     expect(await fs.readBytes(`${sourceDir}/models/ast_01J00000000000000000000020.glb`)).toEqual(sourceModelBefore);
     expect(await fs.readBytes(`${sourceDir}/media/ast_01J00000000000000000000021.png`)).toEqual(sourceImageBefore);
     targetSession.release();
+  });
+
+  it('retains an explicit model owner when an imported Caption position is invalid', async () => {
+    const fs = new MemoryFS();
+    const inspection = await inspectZip(new Uint8Array(await readFile(fixturePath)));
+    await importNewProject(fs, sourceDir, inspection);
+    const store = await ProjectStore.open(fs, sourceDir, {
+      userId: 'usr_01J00000000000000000000999',
+      deviceId: 'dev_01J00000000000000000000999',
+      displayName: 'Migration test',
+    });
+    store.updateEntity('caption', 'cap_01J00000000000000000000031', {
+      anchor: {
+        modelAssetId: 'ast_01J00000000000000000000020',
+        position: ['invalid', 0, 0],
+      },
+    });
+    await store.flush();
+
+    const plan = await planOpenedFrozenV1ToNative(fs, sourceDir, store);
+    expect(plan.draft.captions.find((caption) => caption.id === 'cap_01J00000000000000000000031')).toMatchObject({
+      ownerAssetId: 'ast_01J00000000000000000000020',
+      anchor: null,
+    });
+    expect(plan.issues).toContainEqual(expect.objectContaining({ code: 'caption-anchor-unresolved' }));
   });
 
   it('blocks an explicit Caption reference to an unavailable DisplaySet instead of guessing a fallback', async () => {

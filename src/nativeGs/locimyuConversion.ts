@@ -1102,6 +1102,7 @@ export async function planLociMyuZipToNative(
         id: caption.captionId,
         title,
         body: caption.body,
+        ...(model === null ? {} : { ownerAssetId: model.asset.id }),
         displaySetId,
         color: caption.color,
         ...(attachments.length === 0 ? {} : { attachmentMediaIds: attachments }),

@@ -1951,3 +1951,130 @@ anchor, storage or package authority.
   persistence coverage, adds only focused overlay resolution/stale-load
   coverage, records Desktop visual evidence, and defers one physical-iPhone
   check to the already planned consolidated direct-LociMyu product acceptance.
+
+## 30. Bounded native package exchange (Product Owner approved 2026-09-02)
+
+The first public candidate MUST distinguish four user purposes without
+reinterpreting the existing portable backup. Backup keeps its exact
+`lociview-native-portable-backup` v1/v2 manifest and restore behavior. The other
+three purposes share one separately discriminated exchange format,
+`lociview-native-package-exchange` package version `1`, whose manifest records
+exactly one of `collaboration`, `review` or `cleanCopy`. Renaming the file never
+changes its purpose.
+
+All exchange packages use the existing streamed ZIP, stored binary entries,
+strict path/duplicate/version checks, size/SHA-256 verification and bounded
+metadata reads. They contain `native/package.json`, `native/snapshot.json`, the
+declared Representation entries and declared media entries only. Review and
+clean-copy snapshots are generated allowlisted snapshots, not redacted source
+snapshot text. The package is immutable input and an incomplete export is never
+reported as complete.
+
+### 30.1 Fixed collaboration baseline and lineage
+
+- Native snapshot schema version `1` gains one optional
+  `collaborationBaseline` record. Its absence remains valid for all older native
+  snapshots and ordinary backup/restore. Its presence contains version `1`, the
+  lineage Project ID, a baseline ID, an unsupported-state SHA-256, the sorted
+  baseline Caption records and the sorted baseline media records.
+- The lineage identifier is the native Project ID. The baseline ID is the
+  SHA-256 of the canonical lineage ID, unsupported-state digest, baseline
+  Captions and baseline media records. The unsupported-state digest covers the
+  complete canonical native snapshot except snapshot ID/generation, Captions,
+  media records and the baseline record itself.
+- The first collaboration export from a Project without a baseline freezes its
+  current state as that baseline and publishes the new snapshot under the
+  existing project-scoped writer, snapshot-last/marker-last ordering. Later
+  collaboration exports reuse the same baseline; this slice adds no rebase,
+  history graph or automatic baseline advancement.
+- A collaboration package includes the complete current snapshot and verified
+  Representation/media byte closure. In an empty workspace it restores an
+  editable same-lineage copy. If the same Project already exists, import is
+  available only from that explicit clean Edit session and uses three-way merge;
+  it never guesses another Project as the target.
+- Missing or unequal lineage/baseline records reject merge. A difference in
+  Asset, Representation, transform, visibility, DisplaySet definition, Saved
+  View, material appearance, pin scale, project presentation or any other
+  unsupported state rejects the whole merge and is reported; it is never
+  ignored or selected by package order.
+
+### 30.2 Caption/media three-way merge
+
+The only mutable first-slice domain is Caption state plus new image media needed
+by those Captions. For each Caption ID the implementation compares
+local/baseline/incoming and treats title, body, color, anchor or unplaced state,
+durable owning Asset, DisplaySet membership and ordered attachment-media IDs as
+independent atomic fields. Snapshot v1 therefore gains the optional
+`Caption.ownerAssetId` field without changing its version. For older placed
+Captions, `anchor.assetId` is the compatible effective owner. An explicit owner
+and a non-null anchor MUST name the same Asset. An older unplaced Caption has no
+recoverable owner: import preserves it, but review export fails closed instead
+of guessing from the current Caption target. Caption tags are preserved but are
+not mergeable in this slice: a tag change or a new non-empty tag set is an
+explicit unsupported conflict.
+
+- local equals baseline and only incoming changed: incoming field wins;
+- incoming equals baseline and only local changed: local field remains;
+- both changed to the same semantic value: one value remains;
+- both changed one field differently: conflict;
+- delete versus unchanged applies the deletion; delete versus edit conflicts;
+- distinct Caption IDs combine; a new equal Caption ID with different content
+  conflicts;
+- every baseline media record must remain byte-metadata-identical; new media IDs
+  union only when their kind, label, media type, size and SHA-256 agree;
+- the same media ID with different metadata or verified bytes conflicts;
+- an incoming-only media record not referenced by the merged Caption set is an
+  explicit conflict rather than silently extending the Project;
+- reimporting a package whose semantic result is already present is a no-op and
+  creates no snapshot.
+
+All conflicts are collected before writing. Any conflict or unsupported
+difference means zero project writes. On success, every package entry is
+stream-verified first, only genuinely new media bytes are staged and read back,
+then one merged snapshot is written and the active marker is published last.
+Failure removes only paths staged by that attempt and leaves the previous active
+snapshot, package and local Project unchanged. There is no per-conflict chooser;
+the user corrects a source copy and exports again.
+
+### 30.3 Review/share and clean editable copy
+
+- `review` contains only currently visible Assets, the active DisplaySet's
+  placed/unplaced Captions belonging to those Assets, their referenced images,
+  applicable material appearances and Saved Views, plus required interaction
+  Proxies and source/display Representations. Every included nominal Project,
+  frame, Asset, revision, binding, Representation, family, compatibility,
+  DisplaySet, view, material, Caption and media ID is remapped through one fresh
+  package-local map. It contains no collaboration baseline/lineage metadata,
+  local path, source ZIP, conversion report, editor identity or private evidence.
+  Import opens it in View mode by default and it cannot merge to the source.
+- `cleanCopy` contains the complete current Project state and required bytes
+  under one new Project ID/lineage, generation `1`, a fresh snapshot ID and no
+  collaboration baseline. Existing subordinate IDs remain only where their
+  references remain internally valid; Project-lineage mismatch makes merging
+  back impossible. Import opens it in Edit mode.
+- Embedded model/image metadata and media labels are user content and are not
+  silently scrubbed. A future privacy scrubber, subset editor or permanent
+  review lock is outside this slice. Review's initial View route is durable
+  package purpose behavior, not a new general access-control framework.
+
+### 30.4 Product UI and acceptance boundary
+
+The native Project list keeps backup as a separate action and exposes one
+plain-language share/copy disclosure for the three exchange exports. The single
+unfiltered import picker inspects manifest purpose after selection so iOS Files
+does not hide custom extensions. Collaboration merge is offered only inside the
+explicit target Project in clean Edit state. Review opens View; clean copy and a
+same-lineage collaboration copy restored into an empty workspace open Edit.
+The ordinary home uses the same strict second-stage purpose dispatcher and does
+not whole-buffer a native package or route it into v1 merge.
+
+Acceptance uses one baseline and two isolated workspace copies. It proves
+non-conflicting edit/edit/add-with-image merge, durable reopen and ordinary
+backup/restore, semantic idempotence, same-field and delete/edit conflicts with
+zero writes, lineage rejection, review View/nonmergeable behavior, clean-copy
+new identity/editability, and no regression to backup, frozen-v1, direct
+LociMyu conversion or Spark lazy loading. Physical iPhone need only restore the
+Desktop-merged result, inspect Caption/images and DisplaySet switching, save and
+completely offline reopen. Automerge, CRDT/HLC logs, CAS, general history,
+journal/transaction frameworks, cloud sync and conflict-resolution UI remain
+outside this bounded slice.

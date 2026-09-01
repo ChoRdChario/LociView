@@ -34,7 +34,10 @@ export interface HomeDeps {
   storageWarning: string | null;
   listNativeProjects: () => Promise<NativeProjectListItem[]>;
   openNativeProjects: (projectId?: string, mode?: ProjectSessionMode) => void;
-  restoreNativePackage: (file: File, onStatus: (message: string) => void) => Promise<string>;
+  restoreNativePackage: (
+    file: File,
+    onStatus: (message: string) => void,
+  ) => Promise<{ readonly projectId: string; readonly openMode: ProjectSessionMode }>;
   convertLociMyuZipToNative: (
     file: File,
     plan: ImportPlan,
@@ -198,11 +201,11 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
         fileStatus.textContent = 'バックアップの種類を確認しています…';
         const identity = await inspectZipContainerIdentity(file);
         if (identity === 'native-portable') {
-          const projectId = await deps.restoreNativePackage(file, (message) => {
+          const restored = await deps.restoreNativePackage(file, (message) => {
             fileStatus.textContent = message;
           });
           fileStatus.textContent = '復元が完了しました。プロジェクトを開きます…';
-          deps.openNativeProjects(projectId, 'edit');
+          deps.openNativeProjects(restored.projectId, restored.openMode);
           return;
         }
       }
