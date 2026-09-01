@@ -1,8 +1,9 @@
 # LociView critical-path execution plan
 
-> Status: `CURRENT CHECKPOINT / FIRST FROZEN-V1 -> NATIVE LANE PASS; DIRECT LOCIMYU RECEIVER COMPLETE; CAPTION OVERLAY COMPLETE; CONSOLIDATED PRODUCT ACCEPTANCE PENDING`
+> Status: `CURRENT CHECKPOINT / FIRST FROZEN-V1 -> NATIVE LANE PASS; DIRECT LOCIMYU DESKTOP ACCEPTANCE PASS; BATCHED IPHONE ACCEPTANCE PENDING`
 >
-> Updated: 2026-09-01 after Product Owner Desktop acceptance of the bounded Caption overlay on `g0-baseline`.
+> Updated: 2026-09-02 after Product Owner Desktop acceptance of the bounded
+> LociMyu DisplaySet linkage correction at `0c651b6` on `g0-baseline`.
 >
 > This is an execution plan plus the Product Owner's scheduling and display-model
 > decisions. G0 and G0-S remain release barriers. `G0S-TAB`, the first production
@@ -37,10 +38,12 @@ the lanes still join before release:
    production roots while external evidence proceeds;
 3. **Approved technical lane:** retain the consolidated native checkpoint at
    `a2708cf`, the accepted frozen-v1 lane at `9d973cd`, and the completed direct
-   LociMyu receiver at `0bcb636`. The representative publishes 103 Captions,
-   four DisplaySets, 24 image resources and 18 explicit material-slot
-   appearances while the source remains byte-identical. Product Owner Desktop
-   checks confirmed Caption color/pin scale and authoritative opacity/chroma.
+   LociMyu receiver at `0bcb636` plus the confirmed relation correction at
+   `0c651b6`. The representative publishes 103 Captions, four DisplaySets, 24
+   image resources and 65 explicit material-slot appearances while the source
+   remains byte-identical. Product Owner Desktop checks confirmed Caption
+   color/pin scale, authoritative opacity/chroma and immediate sheet-linked
+   material switching without per-sheet re-save.
    The bounded native Caption overlay is complete with Product Owner Desktop
    acceptance; one consolidated Desktop/iPhone product acceptance remains;
 4. **Join:** satisfy all applicable G0/G0-S barriers and technology decisions
@@ -329,11 +332,13 @@ workspace to a separate native Project. Its bounded receiver and converter are
 implemented, independently reviewed and accepted on Desktop and physical
 iPhone. The source is never overwritten or embedded and every unsupported
 value is reported. The separate direct LociMyu adapter and its bounded native
-appearance receiver are complete at `0bcb636`. The representative's six rows
-with an empty trimmed ID are reported as empty input; 103 Captions, 18 explicit
+appearance receiver are complete at `0bcb636`, with the confirmed missing
+DisplaySet-relation correction at `0c651b6`. The representative's six rows with
+an empty trimmed ID are reported as empty input; 103 Captions, 65 explicit
 material-slot appearances and 24 image resources publish and survive automated
 portable restore while the source remains byte-identical. Product Owner Desktop
-checks confirmed Caption color/pin scale and authoritative opacity/chroma. The
+checks confirmed Caption color/pin scale, authoritative opacity/chroma and
+sheet-linked material switching. The
 bounded Caption overlay now selects existing placed Captions from marker or
 list, presents saved content and project-local images, and supports temporary
 stage-clamped move and resize without adding durable state. Product Owner
@@ -394,12 +399,15 @@ is implied.
   Caption, guessed ID or occurrence ordinal. Invalid non-empty identities and
   collisions remain publication blockers.
 - **Automated representative:** all 109 source rows are accounted for; 103
-  Captions, one Asset/Representation, four DisplaySets, two material
-  appearances and 24 image resources publish. Portable package v2 restores
+  Captions, one Asset/Representation, four DisplaySets, 65 material
+  appearances and 24 image resources publish after the bounded confirmed
+  relation step. Portable package v2 restores
   with no missing Representation or media. The 94,063,937-byte source remains
   SHA-256 `3736aa3bb5cffcf9b9aaffb70cc210878069d4876b63ced8441f79da8a9da01c`.
 - **Review/P0/P1:** independent review found one missing source-retention notice;
   the bounded wording fix was re-reviewed and closed it. The final matrix is
   green and no correction P0/P1 remains.
-- **Lane result:** `FIRST LOCIMYU NATIVE ADAPTER: PRODUCT ACCEPTANCE PENDING`.
-  Desktop/iPhone acceptance is not inferred from automated publication/restore.
+- **Lane result:** Desktop direct-LociMyu product acceptance passes through the
+  DisplaySet linkage correction at `0c651b6`; the affected physical-iPhone
+  DisplaySet/save/offline-reopen smoke remains deliberately batched and is not
+  inferred from Desktop or automated publication/restore.

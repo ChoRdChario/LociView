@@ -180,9 +180,10 @@ decision below. The private source must remain unchanged.
   byte/hash identity held.
 - [x] Complete one independent review and the final matrix. The review's one P1
   source-retention notice was fixed and re-reviewed; no P0/P1 remains.
-- [ ] Complete the approved Caption overlay slice below, then request one
-  resulting bounded Desktop/iPhone product acceptance for the direct LociMyu
-  result.
+- [x] Complete the approved Caption overlay and bounded Desktop product
+  acceptance for the direct LociMyu result. The affected physical-iPhone
+  DisplaySet/save/offline-reopen check remains explicitly batched in the active
+  P1 above and is not recorded as PASS.
 
 ## Completed bounded receiver closure — native Caption and material appearance
 
