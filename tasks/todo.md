@@ -1,10 +1,10 @@
 # LociView active work
 
-> Baseline checkpoint: `809ab63df1f419a1dc0bb0892819baf87b83d435` on
-> `g0-baseline` (2026-09-02). Direct-LociMyu Desktop corrections for confirmed
-> sheet linkage, material state, orthographic Saved Views and user-authored
-> DisplaySet defaults are complete. The affected physical-iPhone texture,
-> DisplaySet and offline-reopen acceptance is complete.
+> Baseline checkpoint: `a83aa09869bd373280860dce7a5e6181ea70628d` on
+> `g0-baseline` (2026-09-02). Direct-LociMyu DisplaySet/material/Saved-View,
+> Caption-overlay and bounded iOS texture corrections are complete. Product
+> Owner Desktop and physical-iPhone product acceptance, including save and
+> completely offline reopen, passed with no unresolved P0/P1.
 >
 > The completed task ledger through `d32a6a0` is preserved at
 > `docs/history/task-ledger-through-d32a6a0.md`. This file contains only the
@@ -258,9 +258,11 @@ decision below. The private source must remain unchanged.
 - [x] Complete one independent review and the final matrix. The review's one P1
   source-retention notice was fixed and re-reviewed; no P0/P1 remains.
 - [x] Complete the approved Caption overlay and bounded Desktop product
-  acceptance for the direct LociMyu result. The affected physical-iPhone
-  DisplaySet/save/offline-reopen check remains explicitly batched in the active
-  P1 above and is not recorded as PASS.
+  acceptance for the direct LociMyu result.
+- [x] Complete the consolidated physical-iPhone product acceptance. The Product
+  Owner found no problem in marker/list Caption selection, saved title/body/
+  color/images, image-viewer navigation, temporary card move/resize, clear and
+  reset behavior, DisplaySet switching, save and completely offline reopen.
 
 ## Completed bounded receiver closure — native Caption and material appearance
 
@@ -360,8 +362,8 @@ Stop condition: stop before attachment add/remove/reorder, video/HEIC, image
 processing/zoom tooling, durable overlay placement or size, multiple overlays,
 tags/history,
 inferred GID mapping, generalized responsive redesign or unrelated Caption
-authoring polish. Physical iPhone is batched into the single consolidated
-direct-LociMyu acceptance rather than repeated for this slice alone.
+authoring polish. Physical-iPhone confirmation is recorded once in the
+consolidated direct-LociMyu acceptance rather than repeated per sub-slice.
 
 ## P2 backlog — not a completion blocker
 
@@ -386,11 +388,9 @@ direct-LociMyu acceptance rather than repeated for this slice alone.
   double-omission case where both `displaySets` and a Saved View's
   `displaySetId` are absent. The production resolver already maps both to the
   deterministic default set; this is coverage polish, not an open behavior bug.
-- Make native/conversion model cleanup dispose deduplicated Texture resources as
-  well as materials and geometry, and surface embedded-texture decode failure
-  instead of silently treating a partly untextured GLB as fully ready. The
-  representative cockpit image is byte-valid and recovered in one fresh tab;
-  this is non-blocking runtime hardening unless it reproduces there.
+- Refresh the public-candidate README only after the release feature set,
+  version and exact release SHA are fixed; its present implementation summary
+  is intentionally not rewritten during this result-only synchronization.
 
 ## Parallel release barriers
 
@@ -452,8 +452,12 @@ direct-LociMyu acceptance rather than repeated for this slice alone.
   stopped at their intentional index/worktree identity guard because this
   specification was partly staged. Staging the exact final bytes resolved that
   condition and the two affected suites passed 53/53. Independent read-only
-  review found no P0/P1; physical iPhone remains batched into consolidated
-  direct-LociMyu product acceptance.
+  review found no P0/P1. Product Owner physical-iPhone acceptance subsequently
+  passed marker/list selection, overlay content and images, viewer navigation,
+  touch move/resize, reset/clear behavior, DisplaySet switching, save and
+  completely offline reopen.
+
+`DIRECT LOCIMYU PRODUCT ACCEPTANCE: PASS`
 - The bounded missing DisplaySet-relation correction converts LociMyu material
   rows during ZIP import; it does not retrofit existing Native Projects or ask
   the user to recreate/save each sheet. The representative confirmed draft

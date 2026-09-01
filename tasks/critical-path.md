@@ -1,9 +1,10 @@
 # LociView critical-path execution plan
 
-> Status: `CURRENT CHECKPOINT / FIRST FROZEN-V1 -> NATIVE LANE PASS; DIRECT LOCIMYU DESKTOP ACCEPTANCE PASS; BATCHED IPHONE ACCEPTANCE PENDING`
+> Status: `CURRENT CHECKPOINT / FIRST FROZEN-V1 -> NATIVE LANE PASS; DIRECT LOCIMYU PRODUCT ACCEPTANCE PASS`
 >
-> Updated: 2026-09-02 after Product Owner Desktop acceptance through the
-> Saved-View/DisplaySet authoring correction at `809ab63` on `g0-baseline`.
+> Updated: 2026-09-02 after Product Owner Desktop and physical-iPhone
+> acceptance through the iOS native texture correction at `a83aa09` on
+> `g0-baseline`.
 >
 > This is an execution plan plus the Product Owner's scheduling and display-model
 > decisions. G0 and G0-S remain release barriers. `G0S-TAB`, the first production
@@ -39,13 +40,14 @@ the lanes still join before release:
 3. **Approved technical lane:** retain the consolidated native checkpoint at
    `a2708cf`, the accepted frozen-v1 lane at `9d973cd`, and the completed direct
    LociMyu receiver at `0bcb636` plus the confirmed relation correction at
-   `0c651b6`. The representative publishes 103 Captions, four DisplaySets, 24
+   `0c651b6` and physical-iPhone correction at `a83aa09`. The representative
+   publishes 103 Captions, four DisplaySets, 24
    image resources and 65 explicit material-slot appearances while the source
    remains byte-identical. Product Owner Desktop checks confirmed Caption
    color/pin scale, authoritative opacity/chroma and immediate sheet-linked
    material switching without per-sheet re-save.
-   The bounded native Caption overlay is complete with Product Owner Desktop
-   acceptance; one consolidated Desktop/iPhone product acceptance remains;
+   The bounded native Caption overlay and consolidated direct-LociMyu flow are
+   accepted by the Product Owner on Desktop and physical iPhone;
 4. **Join:** satisfy all applicable G0/G0-S barriers and technology decisions
    before the supported release.
 
@@ -315,7 +317,7 @@ G0/G0-S release barriers, disposable PoCs and one writer.
 | `WS2` G0 device evidence/ratification | `E6`–`E10`; three device classes, complete raw runs, reviewed artifacts and all seven G0 exit rows approved | `WS1`, physical devices, PO numeric decisions | PO/device operator / Codex / reviewer | WS1 | Environment facts only now; full runs `WAIT` |
 | `WS3` G0-S current-user safety | Ledger plus remaining `S2`–`S4`; real-browser/iOS evidence, exact-tree matrix, no unresolved P0/P1 and PO stabilized-v1 approval | Remaining journal/quarantine decisions and physical evidence | Codex / PO / reviewer | S0/S1 complete; final closure also WS2 | `YES` only for an approved release-blocking root or a P0/P1 that directly blocks the next production slice; do not resume micro-slice exploration |
 | `WS4` G1 technology decisions | G1-A, G1-B base renderer and G1-C each record reproducible `ADOPT`, `REJECT` or `RETRY` with rollback/fallback; later renderer features retain separate acceptance before their controls turn on | Applicable evidence and Product Owner adoption decisions | Codex / PO / device operator | Parallel evidence lanes; still required for adoption/release | `NO` for an adoption claim; the bounded proxy-backed technical implementation alone may start after S1 |
-| `WS5` native product closure, then non-destructive legacy conversion | Preserve the consolidated native Project as the durable source of truth, then convert frozen-v1 and LociMyu inputs without changing source bytes or inventing a general migration framework. Compare remains excluded. | Frozen-v1 and the direct LociMyu receiver are accepted; the bounded Caption overlay has Product Owner Desktop acceptance. One consolidated Desktop/iPhone acceptance remains. Technology adoption and release barriers still apply. | Codex / PO / external reviewer | Receiver and Caption overlay complete; consolidated acceptance remains; release remains after WS1–WS4 | `FIRST FROZEN-V1 LANE: PASS`; `DIRECT LOCIMYU RECEIVER: COMPLETE`; `CAPTION OVERLAY: COMPLETE`; `PRODUCT ACCEPTANCE: PENDING` |
+| `WS5` native product closure, then non-destructive legacy conversion | Preserve the consolidated native Project as the durable source of truth, then convert frozen-v1 and LociMyu inputs without changing source bytes or inventing a general migration framework. Compare remains excluded. | Frozen-v1 and direct LociMyu conversion, Caption overlay and consolidated Desktop/physical-iPhone acceptance are complete. Native collaboration/share/copy package exchange is the next major public-candidate product gap. Technology adoption and release barriers still apply. | Codex / PO / external reviewer | Receiver, Caption overlay and product acceptance complete; package exchange remains; release remains after WS1–WS4 | `FIRST FROZEN-V1 LANE: PASS`; `DIRECT LOCIMYU PRODUCT ACCEPTANCE: PASS`; `NATIVE PACKAGE EXCHANGE: ACTIVE` |
 
 ## 8. Current authorization boundary
 
@@ -343,9 +345,10 @@ sheet-linked material switching. The
 bounded Caption overlay now selects existing placed Captions from marker or
 list, presents saved content and project-local images, and supports temporary
 stage-clamped move and resize without adding durable state. Product Owner
-Desktop acceptance passed through sheet-linked Caption/material/camera
-switching and temporary Caption-overlay move/resize; one consolidated physical-
-iPhone product acceptance remains.
+Desktop and physical-iPhone acceptance passed through sheet-linked Caption/
+material/camera switching, marker/list Caption selection, saved content and
+images, temporary Caption-overlay move/resize, selection reset, save and
+completely offline reopen.
 Compare remains excluded; attachment/media UX and final visual polish remain
 later work.
 Remaining G0/G0-S and external evidence continue as parallel release barriers.
@@ -409,11 +412,11 @@ is implied.
 - **Review/P0/P1:** independent review found one missing source-retention notice;
   the bounded wording fix was re-reviewed and closed it. The final matrix is
   green and no correction P0/P1 remains.
-- **Lane result:** Desktop direct-LociMyu product acceptance passes through the
-  Saved-View/DisplaySet authoring correction at `809ab63`; the affected
-  physical-iPhone DisplaySet/Caption-overlay/save/offline-reopen smoke remains
-  deliberately batched and is not inferred from Desktop or automated
-  publication/restore.
+- **Lane result:** `DIRECT LOCIMYU PRODUCT ACCEPTANCE: PASS` through the iOS
+  native texture correction at `a83aa09`. Product Owner Desktop and physical-
+  iPhone checks passed for DisplaySet/material/Saved-View switching, Caption
+  marker/list selection and overlay content/images, temporary move/resize and
+  reset/clear behavior, save and completely offline reopen.
 - **Completed runtime correction:** physical iPhone reproduced a WebGL resource
   failure with the representative GLB's two 8192-square and one 4096-square
   embedded textures. The source bytes remain exact. An iPhone/iPad-only 4096px
