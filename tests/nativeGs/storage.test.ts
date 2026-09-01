@@ -9,6 +9,8 @@ import {
 } from '../../src/nativeGs/resolver';
 import {
   activateNativeManualAssetTransformV1,
+  appendNativeSavedViewAsDisplaySetDefaultV1,
+  NATIVE_DEFAULT_DISPLAY_SET_ID,
   normalizeNativeSim3,
   removeNativeAssetV1,
   setNativeAssetVisibilityV1,
@@ -182,27 +184,31 @@ describe('native project blob-first/marker-last publication', () => {
         uniformScale: 0.5,
       },
     );
-    const next = await saveNativeProjectV1(session.workspace, {
-      ...setNativeAssetVisibilityV1(aligned, NATIVE_TEST_IDS.meshAsset, false),
-      savedViews: [{
-        id: NATIVE_TEST_IDS.savedView,
-        name: 'Overview',
-        orderKey: '0001',
-        projectFrameId: NATIVE_TEST_IDS.projectFrame,
-        camera: {
-          position: [6, 4, 8],
-          target: [0, 0, 0],
-          up: [0, 1, 0],
-          projection: { kind: 'perspective', verticalFovRadians: Math.PI / 3 },
-        },
-        background: { kind: 'solid', colorSrgb: [0.1, 0.2, 0.3] },
-      }],
-    });
+    const savedView = {
+      id: NATIVE_TEST_IDS.savedView,
+      name: 'Overview',
+      orderKey: '0001',
+      projectFrameId: NATIVE_TEST_IDS.projectFrame,
+      camera: {
+        position: [6, 4, 8] as const,
+        target: [0, 0, 0] as const,
+        up: [0, 1, 0] as const,
+        projection: { kind: 'perspective' as const, verticalFovRadians: Math.PI / 3 },
+      },
+      background: { kind: 'solid' as const, colorSrgb: [0.1, 0.2, 0.3] as const },
+    };
+    const next = await saveNativeProjectV1(session.workspace, appendNativeSavedViewAsDisplaySetDefaultV1(
+      setNativeAssetVisibilityV1(aligned, NATIVE_TEST_IDS.meshAsset, false),
+      NATIVE_DEFAULT_DISPLAY_SET_ID,
+      savedView,
+    ));
     expect(next.generation).toBe(2);
     expect(fs.writes.filter((path) => path.endsWith('.bin'))).toHaveLength(binaryWriteCount);
     const reopened = (await openNativeProjectV1(fs, first.project.id)).snapshot;
     expect(reopened.presentation.hiddenAssetIds).toEqual([NATIVE_TEST_IDS.meshAsset]);
     expect(reopened.savedViews).toEqual(next.savedViews);
+    expect(reopened.displaySets).toEqual(next.displaySets);
+    expect(reopened.displaySets?.[0]?.defaultSavedViewId).toBe(savedView.id);
     expect(reopened.representations).toEqual(first.representations);
     expect(activeNativeBindingV1(reopened, NATIVE_TEST_IDS.gsAsset)?.assetToProject).toEqual(normalizeNativeSim3({
       translation: [8, 1.5, -4],

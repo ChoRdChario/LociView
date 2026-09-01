@@ -255,6 +255,39 @@ export function nativeSavedViewDisplaySetIdV1(savedView: NativeSavedViewV1): str
   return savedView.displaySetId ?? NATIVE_DEFAULT_DISPLAY_SET_ID;
 }
 
+/**
+ * Captures one new named view for a DisplaySet and makes it the view applied
+ * when that DisplaySet is selected. Existing named views and other DisplaySet
+ * defaults remain untouched.
+ */
+export function appendNativeSavedViewAsDisplaySetDefaultV1(
+  snapshot: NativeProjectSnapshotV1,
+  displaySetId: string,
+  savedView: NativeSavedViewV1,
+): NativeProjectSnapshotV1 {
+  if ((snapshot.savedViews ?? []).some((candidate) => candidate.id === savedView.id)) {
+    throw new Error('native snapshot: new SavedView ID already exists');
+  }
+  if (savedView.projectFrameId !== snapshot.project.frame.id) {
+    throw new Error('native snapshot: SavedView ProjectFrame is foreign');
+  }
+  if (nativeSavedViewDisplaySetIdV1(savedView) !== displaySetId) {
+    throw new Error('native snapshot: SavedView belongs to a different DisplaySet');
+  }
+  let found = false;
+  const displaySets = nativeDisplaySetsV1(snapshot).map((displaySet) => {
+    if (displaySet.id !== displaySetId) return displaySet;
+    found = true;
+    return { ...displaySet, defaultSavedViewId: savedView.id };
+  });
+  if (!found) throw new Error('native snapshot: SavedView target DisplaySet is missing');
+  return {
+    ...snapshot,
+    savedViews: [...(snapshot.savedViews ?? []), savedView],
+    displaySets,
+  };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

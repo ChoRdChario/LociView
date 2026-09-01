@@ -302,3 +302,8 @@
 
 - `/LociView/`用buildをroot mountの`vite preview`で配ると、HTMLはfallbackで200でも`/LociView/assets/*`へHTMLが返り、画面は真っ白になる。ページのHTTP 200だけで起動確認を終えず、entry JavaScriptのstatus、Content-Type、byte数まで確認する。
 - local acceptanceはroot base + root URL、GitHub Pages確認は`BASE_PATH=/LociView/` +対応するmountとして分離する。queryやService Worker操作でbase不一致を回避しない。
+
+## 2026-09-02: 保存済みrecordと製品上の切替pointerを一続きで確認する
+
+- Saved View recordへ正しい`displaySetId`を保存しただけでは、シート切替時の視点復元は成立しない。authoring操作がそのDisplaySetの`defaultSavedViewId`まで更新し、切替側が同じpointerを消費するところまで確認する。
+- converter由来のdefault linkageだけで受入を終えず、ユーザーが各シートで新しい視点を保存し、別シートへ切り替えて戻ったときにcamera/backgroundが変わるproduct flowをfocused acceptanceに含める。

@@ -12,6 +12,7 @@ import { NATIVE_POINT_DIAMETER_DEFAULT_CSS_PX } from './pointPresentation';
 import { filterNativeCaptionListV1 } from './captionList';
 import {
   activateNativeManualAssetTransformV1,
+  appendNativeSavedViewAsDisplaySetDefaultV1,
   NATIVE_CAPTION_PIN_SCALE_DEFAULT,
   NATIVE_CAPTION_PIN_SCALE_MAX,
   NATIVE_CAPTION_PIN_SCALE_MIN,
@@ -1756,11 +1757,11 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     captureSavedView.addEventListener('click', () => {
       if (!canMutateWorking()) return;
       const view = captureViewRecord();
-      working = { ...working, savedViews: [...(working.savedViews ?? []), view] };
+      working = appendNativeSavedViewAsDisplaySetDefaultV1(working, activeDisplaySetId(), view);
       selectedSavedViewId = view.id;
       rebuildSavedViewOptions();
       markDirty();
-      runtimeStatus.textContent = `現在のビューを「${view.name}」として保存対象に追加しました。`;
+      runtimeStatus.textContent = `現在のビューを「${view.name}」として保存し、この表示セットの切替ビューにしました。`;
     });
     overwriteSavedView.addEventListener('click', () => {
       if (!canMutateWorking()) return;

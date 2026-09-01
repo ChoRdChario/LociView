@@ -1488,9 +1488,11 @@ camera framework or another storage publication unit.
   between zero and pi, and orthographic vertical span is positive.
 - The current transient camera, current view selection and unsaved background
   remain UI state. A user action creates or updates a complete named view; apply
-  replaces camera and background together. Deleting a bounded native view
-  removes that record because this path has no collaboration history or
-  DisplaySet reference. No view is inferred as a default.
+  replaces camera and background together. In this pre-DisplaySet slice no view
+  is inferred as a default. Section 27 later adds the bounded DisplaySet
+  reference: capture establishes that set's explicit default, while deletion
+  removes the record and clears any such reference. Neither path adds
+  collaboration history.
 - Axis shortcuts and fit operate on the current visible-Asset union. Projection
   switching preserves the current ProjectFrame pose and approximate visible
   span. Applying or navigating a view never changes Asset visibility,
@@ -1803,6 +1805,16 @@ embedding the source. LociMyu ZIP remains a separate later input adapter.
   groups or scene presets. Switching a DisplaySet changes only those three
   concerns. Existing snapshots with no DisplaySet fields open with one
   deterministic default set containing their current Captions and Saved Views.
+- The primary native authoring action `現在のビューを保存` appends one complete
+  Saved View to the active DisplaySet and atomically makes that record the
+  DisplaySet's `defaultSavedViewId`. The previous named view remains available,
+  and no other DisplaySet's default changes. Switching away and back applies
+  that default camera and background immediately. If an older snapshot omits
+  `displaySets`, this action materializes only the established deterministic
+  default set. Updating an existing view preserves its stable ID and therefore
+  preserves an existing default link; transiently displaying another named view
+  does not rewrite the default. This DisplaySet-specific extension adds no new
+  camera or package schema.
 - The bounded Mesh appearance is opacity, double-sided, unlit and optional
   chroma key color/tolerance/feather. It targets one exact material slot in one
   active Mesh Representation. Native code does not broadcast by display name.

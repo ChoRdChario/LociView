@@ -9,8 +9,10 @@ import {
 } from '../../src/nativeGs/resolver';
 import {
   activateNativeManualAssetTransformV1,
+  appendNativeSavedViewAsDisplaySetDefaultV1,
   NATIVE_ACTIVE_FORMAT,
   NATIVE_CAPTION_PIN_SCALE_DEFAULT,
+  NATIVE_DEFAULT_DISPLAY_SET_ID,
   normalizeNativeSim3,
   nativeAssetPinScaleV1,
   parseNativeActiveMarkerV1,
@@ -283,6 +285,89 @@ describe('native snapshot v1 and fixed degradation outcomes', () => {
     }])).toThrow(/between zero and pi/);
     expect(() => parseWith([{ ...valid, background: { kind: 'solid', colorSrgb: [0, 1.01, 0] } }])).toThrow(/must be normalized/);
     expect(() => parseWith([valid, valid])).toThrow(/duplicate SavedView id/);
+  });
+
+  it('captures a new SavedView as only its DisplaySet default and materializes the legacy default set', () => {
+    const base = snapshotFromDraft(makeNativeDraft().draft);
+    const viewFor = (id: string, displaySetId: string, x: number) => ({
+      id,
+      name: `View ${x}`,
+      orderKey: String(x).padStart(4, '0'),
+      projectFrameId: NATIVE_TEST_IDS.projectFrame,
+      camera: {
+        position: [x, 2, 3] as const,
+        target: [0, 0, 0] as const,
+        up: [0, 1, 0] as const,
+        projection: { kind: 'perspective' as const, verticalFovRadians: Math.PI / 4 },
+      },
+      background: { kind: 'solid' as const, colorSrgb: [0, 0.25, 1] as const },
+      displaySetId,
+    });
+    const legacyView = viewFor(NATIVE_TEST_IDS.savedView, NATIVE_DEFAULT_DISPLAY_SET_ID, 1);
+    const materialized = appendNativeSavedViewAsDisplaySetDefaultV1(
+      { ...base, savedViews: [] },
+      NATIVE_DEFAULT_DISPLAY_SET_ID,
+      legacyView,
+    );
+    expect(materialized.displaySets).toEqual([{
+      id: NATIVE_DEFAULT_DISPLAY_SET_ID,
+      name: 'Default',
+      orderKey: '000000',
+      defaultSavedViewId: legacyView.id,
+    }]);
+    const parsedMaterialized = parseNativeSnapshotV1(serializeNativeSnapshotV1(materialized));
+    expect(parsedMaterialized.savedViews).toEqual(materialized.savedViews);
+    expect(parsedMaterialized.displaySets).toEqual(materialized.displaySets);
+
+    const secondSetId = testNativeId('set', 2);
+    const firstDefault = viewFor(testNativeId('view', 10), NATIVE_DEFAULT_DISPLAY_SET_ID, 10);
+    const previousSecondDefault = viewFor(testNativeId('view', 11), secondSetId, 11);
+    const nextSecondDefault = viewFor(testNativeId('view', 12), secondSetId, 12);
+    const twoSets: NativeProjectSnapshotV1 = {
+      ...base,
+      savedViews: [firstDefault, previousSecondDefault],
+      displaySets: [{
+        id: NATIVE_DEFAULT_DISPLAY_SET_ID,
+        name: 'First',
+        orderKey: '000001',
+        defaultSavedViewId: firstDefault.id,
+      }, {
+        id: secondSetId,
+        name: 'Second',
+        orderKey: '000002',
+        defaultSavedViewId: previousSecondDefault.id,
+      }],
+    };
+    const updated = appendNativeSavedViewAsDisplaySetDefaultV1(twoSets, secondSetId, nextSecondDefault);
+    expect(updated.savedViews).toEqual([firstDefault, previousSecondDefault, nextSecondDefault]);
+    expect(updated.displaySets).toEqual([
+      twoSets.displaySets![0],
+      { ...twoSets.displaySets![1], defaultSavedViewId: nextSecondDefault.id },
+    ]);
+    expect(updated.displaySets?.[0]?.defaultSavedViewId).toBe(firstDefault.id);
+    expect(updated.savedViews?.find((view) => view.id === updated.displaySets?.[1]?.defaultSavedViewId)?.camera)
+      .toEqual(nextSecondDefault.camera);
+    const parsedUpdated = parseNativeSnapshotV1(serializeNativeSnapshotV1(updated));
+    expect(parsedUpdated.savedViews).toEqual(updated.savedViews);
+    expect(parsedUpdated.displaySets).toEqual(updated.displaySets);
+
+    expect(() => appendNativeSavedViewAsDisplaySetDefaultV1(updated, secondSetId, nextSecondDefault))
+      .toThrow(/new SavedView ID already exists/);
+    expect(() => appendNativeSavedViewAsDisplaySetDefaultV1(updated, secondSetId, {
+      ...nextSecondDefault,
+      id: testNativeId('view', 15),
+      projectFrameId: testNativeId('frm', 99),
+    })).toThrow(/ProjectFrame is foreign/);
+    expect(() => appendNativeSavedViewAsDisplaySetDefaultV1(updated, secondSetId, {
+      ...nextSecondDefault,
+      id: testNativeId('view', 13),
+      displaySetId: NATIVE_DEFAULT_DISPLAY_SET_ID,
+    })).toThrow(/different DisplaySet/);
+    expect(() => appendNativeSavedViewAsDisplaySetDefaultV1(updated, testNativeId('set', 99), {
+      ...nextSecondDefault,
+      id: testNativeId('view', 14),
+      displaySetId: testNativeId('set', 99),
+    })).toThrow(/target DisplaySet is missing/);
   });
 
   it('updates only the selected Caption and fails closed if its stable ID disappears', () => {

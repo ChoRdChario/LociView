@@ -58,6 +58,26 @@ Stop conditions: no camera migration framework, per-import span editor,
 existing-Project retrofit, schema/package version change or generalized
 projection inference.
 
+## Active P1 — Saved View authoring must drive DisplaySet switching
+
+- [x] Reproduce the product flow and distinguish old-preview provenance from a
+  current runtime defect. The defect exists independently of the preview URL:
+  a newly captured view has the active `displaySetId` but is not linked as that
+  DisplaySet's default.
+- [x] Confirm the switch path applies only `defaultSavedViewId`; camera capture,
+  explicit view application and updating an already-default view are intact.
+- [x] Add one bounded domain action that appends the captured view and updates
+  only the active DisplaySet's default pointer, including the legacy omitted
+  `displaySets` case.
+- [x] Prove two DisplaySets retain independent defaults, switching resolves the
+  newly captured view, and snapshot save/reopen preserves the links.
+- [x] Run focused checks, final matrix, production build and independent review.
+- [ ] Provide a fresh exact-tree Desktop acceptance URL and confirm the
+  save-in-Set-A -> switch-to-B -> return-to-A camera/background product flow.
+
+Stop conditions: no camera schema/package version change, active-sheet
+persistence, view animation, multi-view framework or new default-selection UI.
+
 ## Consolidated native Product Owner acceptance
 
 - [x] Desktop: exact-tree native route opened and the consolidated product flow
@@ -325,6 +345,10 @@ direct-LociMyu acceptance rather than repeated for this slice alone.
   selections; do not reopen the accepted renderer path solely for this polish.
 - Use visually judgeable representative data for future visual acceptance;
   retain tiny GS fixtures for format and round-trip characterization only.
+- When Saved View compatibility tests next change, add the non-blocking legacy
+  double-omission case where both `displaySets` and a Saved View's
+  `displaySetId` are absent. The production resolver already maps both to the
+  deterministic default set; this is coverage polish, not an open behavior bug.
 
 ## Parallel release barriers
 
@@ -418,3 +442,14 @@ direct-LociMyu acceptance rather than repeated for this slice alone.
   tests before the two registry suites intentionally rejected unstaged
   specification bytes; staging the exact final tree made the affected 53/53
   pass. This result-only note does not trigger a duplicate full run.
+- Saved View authoring now appends the captured record and changes only the
+  active DisplaySet's `defaultSavedViewId` in one domain action. Two-set
+  independence, legacy default-set materialization and actual save/reopen passed
+  35/35 focused checks; typecheck and production build passed. Independent
+  review found no P0/P1 and one coverage-only P2 for the double-omission legacy
+  form. The final suite passed 1,438 tests with 21 existing todo; five unrelated
+  lock/CLI timeout failures passed in their isolated 7/7 and 82/82 suites. One
+  acquisition free-space boundary test remains environment-blocked by the C
+  drive's approximately 2.9 GB free space (`ENOSPC`), not by this product path.
+  Per the approved result-recording rule, this note does not trigger another
+  full matrix.
