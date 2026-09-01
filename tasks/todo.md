@@ -1,9 +1,9 @@
 # LociView active work
 
-> Baseline checkpoint: `7575240d87229e536847310696c922639e3b3600` on
-> `g0-baseline` (2026-08-31). The first frozen-v1 -> native implementation is
-> complete at `9d973cd8f84e14cc1d72562a01034754e3a1ed42`; Desktop and
-> physical-iPhone acceptance both passed.
+> Baseline checkpoint: `0bcb63652e93294007baaf6e40174c328502fe18` on
+> `g0-baseline` (2026-08-31). Frozen-v1 -> native is accepted; the direct
+> LociMyu receiver is complete, and its consolidated Desktop/iPhone product
+> acceptance follows the active Caption-overlay slice below.
 >
 > The completed task ledger through `d32a6a0` is preserved at
 > `docs/history/task-ledger-through-d32a6a0.md`. This file contains only the
@@ -101,7 +101,7 @@ Required conversion invariants:
 - DisplaySet remains Caption membership + set-scoped material appearance + an
   optional Saved View; it never owns Asset visibility or transforms.
 
-## Completed implementation / representative retry — direct LociMyu ZIP -> native adapter
+## Completed direct LociMyu ZIP -> native adapter
 
 - [x] Product Owner approved the bounded direct adapter and the
   `LM-ADAPT-*` acceptance in `docs/specs/04-locimyu-conversion.md`.
@@ -134,7 +134,7 @@ Required conversion invariants:
 The earlier source-correction requirement is superseded by the Product Owner
 decision below. The private source must remain unchanged.
 
-## Active approved correction — ID-less Caption rows are empty input
+## Completed approved correction — ID-less Caption rows are empty input
 
 - [x] Product Owner confirmed that the representative six-row condition is a
   valid real-world case and approved treating such rows as empty.
@@ -151,9 +151,11 @@ decision below. The private source must remain unchanged.
   byte/hash identity held.
 - [x] Complete one independent review and the final matrix. The review's one P1
   source-retention notice was fixed and re-reviewed; no P0/P1 remains.
-- [ ] Request only the resulting bounded Desktop/iPhone product acceptance.
+- [ ] Complete the approved Caption overlay slice below, then request one
+  resulting bounded Desktop/iPhone product acceptance for the direct LociMyu
+  result.
 
-## Active bounded receiver closure — native Caption and material appearance
+## Completed bounded receiver closure — native Caption and material appearance
 
 - [x] Confirm the current native renderer uses one fixed Asset-local Caption
   marker radius and has no native pin-size control or durable pin-scale field.
@@ -195,8 +197,8 @@ decision below. The private source must remain unchanged.
   inactive/report-only.
 - [x] Product Owner confirmed the re-converted representative Desktop Project
   visibly applies the authoritative set's inherited opacity and chroma.
-- [x] Stop after independent review and final verification. Native Caption
-  overlay/window migration remains a separate UI/UX closure item.
+- [x] Stop receiver work after independent review and final verification. The
+  native Caption overlay/window is the separate approved UI/UX slice below.
 
 Review: Caption-focused schema/storage/converter coverage was 45/45 green and
 the Product Owner accepted the visible pin result. Representative material
@@ -213,6 +215,46 @@ Stop condition: stop before expanding into HEIC/video conversion, Caption tags,
 legacy history, orthographic fallback, inferred GID mapping, new material
 controls or a generalized appearance system. Those are not required by this
 approved receiver closure.
+
+## Active approved UI/UX closure — native Caption selection overlay
+
+- [x] Product Owner selected the native Caption overlay/window as the next slice
+  after receiver completeness.
+- [x] Record the bounded contract before implementation in
+  `docs/specs/02-storage-package-migration.md` §29.
+- [x] Selecting a placed Caption from its marker or list shows one stage card
+  for that same stable Caption with saved color, title, body, up to three
+  available image thumbnails and a visual connection to the marker.
+- [x] Keep `selectedCaptionId` and the existing side editor as the single
+  selection/edit source. Add no snapshot/package/converter, Caption, anchor,
+  media or material schema.
+- [x] Empty-stage click/tap clears selection. DisplaySet change, deletion,
+  hidden owning Asset, unplaced Caption or missing marker closes/hides the card
+  without creating, moving or guessing data.
+- [x] Reuse project-local image reads for a simple fit/previous/next/close
+  viewer and discard stale asynchronous results after selection changes.
+- [x] Allow the selected card header to move the card temporarily within the
+  stage, resetting on selection change, and let image previews use the available
+  card width without changing stored bytes or project state.
+- [x] Allow a bottom-right handle to resize the selected card temporarily in
+  both dimensions, clamp it to the current stage, keep content scrollable, and
+  reset to automatic size when the selection changes or closes.
+- [x] Cover View/Edit and bounded Desktop/mobile layout. Reuse existing
+  selection, visibility and media persistence acceptance; add only focused
+  overlay-resolution/stale-load coverage and Desktop visual evidence.
+- [x] Complete one independent read-only review and the final
+  typecheck/test/production-build matrix with no unresolved P0/P1.
+- [x] Close the Desktop visual regression found before acceptance: a visibly
+  rendered Caption pin must remain selectable with a small CSS-pixel hit
+  tolerance, and a pin that is only partially inside the stage must not cause
+  the selected card to disappear. Do not change Caption data or persistence.
+
+Stop condition: stop before attachment add/remove/reorder, video/HEIC, image
+processing/zoom tooling, durable overlay placement or size, multiple overlays,
+tags/history,
+inferred GID mapping, generalized responsive redesign or unrelated Caption
+authoring polish. Physical iPhone is batched into the single consolidated
+direct-LociMyu acceptance rather than repeated for this slice alone.
 
 ## P2 backlog — not a completion blocker
 
@@ -284,3 +326,15 @@ approved receiver closure.
 - The stale current-action wording found by final documentation review was
   corrected after executable verification; this result-only synchronization
   does not trigger a second full matrix under the approved stop rule.
+- The bounded native Caption overlay now reuses the existing Caption selection
+  authority for marker/list selection, saved title/body/color and on-demand
+  project-local images. Product Owner Desktop acceptance passed for selection,
+  header drag, responsive images and temporary bottom-right resize; size and
+  position reset with selection and add no snapshot/package state.
+- Overlay verification passed typecheck, focused 4/4 and production build. The
+  one final full run passed 53 files/1,384 tests before two registry suites
+  stopped at their intentional index/worktree identity guard because this
+  specification was partly staged. Staging the exact final bytes resolved that
+  condition and the two affected suites passed 53/53. Independent read-only
+  review found no P0/P1; physical iPhone remains batched into consolidated
+  direct-LociMyu product acceptance.

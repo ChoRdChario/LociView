@@ -64,6 +64,10 @@ import {
 } from './portablePackage';
 import { digestNativeStream } from './sha256';
 import { NativeGsViewer, type NativeAssetGizmoMode } from './viewer';
+import {
+  mountNativeCaptionOverlayV1,
+  type NativeCaptionOverlayControllerV1,
+} from './captionOverlay';
 import { NativeUnsavedChangesGuard } from './unsavedChanges';
 import { resolveNativeInitialProjectRoute } from './initialRoute';
 import './style.css';
@@ -373,6 +377,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
   const coordinator = ProjectMutationCoordinator.browser(navigator.locks ?? null);
   const pwaRegistration = registerPwa({ onUpdate: () => undefined });
   let activeViewer: NativeGsViewer | null = null;
+  let activeCaptionOverlay: NativeCaptionOverlayControllerV1 | null = null;
   let activeUnsavedChanges: NativeUnsavedChangesGuard | null = null;
   let activeSession: ProjectMutationSession | null = null;
   let unsubscribeAccess: (() => void) | null = null;
@@ -385,6 +390,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     unsubscribeAccess = null;
     activeUnsavedChanges?.dispose();
     activeUnsavedChanges = null;
+    activeCaptionOverlay?.dispose();
+    activeCaptionOverlay = null;
     activeViewer?.dispose();
     activeViewer = null;
     activeSession?.release();
@@ -839,6 +846,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
   };
 
   const renderProject = async (initial: NativeProjectSnapshotV1, session: ProjectMutationSession): Promise<void> => {
+    activeCaptionOverlay?.dispose();
+    activeCaptionOverlay = null;
     clear(root);
     let durable = initial;
     let working = initial;
@@ -859,6 +868,10 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const canvas = el('canvas', { 'aria-label': '3DモデルとGaussian Splattingのプロジェクト' });
     const accessBadge = el('span', { class: 'ng-badge' });
     const visibilityBadge = el('span', { class: 'ng-badge' });
+    const stage = el('section', { class: 'ng-stage' },
+      canvas,
+      el('div', { class: 'ng-stage-badges' }, accessBadge, visibilityBadge),
+    );
     const runtimeStatus = el('p', { class: 'ng-status' }, 'モデルを読み込んでいます…');
     const diagnostics = el('ul', { class: 'ng-diagnostics' });
     const display = el('select');
@@ -968,6 +981,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const materialStatus = el('p', { class: 'ng-note' });
     const materialSection = el('section', { class: 'ng-card' });
     const captionMedia = el('div', { class: 'ng-list' });
+    let captionMediaGeneration = 0;
+    const captionMediaUrls = new Set<string>();
 
     const rolesByAsset = new Map(working.assets.map((asset) => [
       asset.id,
@@ -1103,6 +1118,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     };
     const populateCaptionFields = (): void => {
       const caption = selectedCaption();
+      const generation = ++captionMediaGeneration;
+      const captionId = caption?.id ?? null;
       captionTitle.value = caption?.title ?? '';
       captionBody.value = caption?.body ?? '';
       captionColor.value = caption?.color ?? '#eab308';
@@ -1118,6 +1135,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         : needsReview
           ? 'このキャプションはモデル差し替え前の表面位置です。位置は保持されていますが、現在のモデル上で再配置すると確認済みに戻ります。'
           : '現在のモデル表面に対応しています。';
+      for (const url of captionMediaUrls) URL.revokeObjectURL(url);
+      captionMediaUrls.clear();
       clear(captionMedia);
       for (const mediaId of caption?.attachmentMediaIds ?? []) {
         const media = (working.mediaResources ?? []).find((candidate) => candidate.id === mediaId);
@@ -1131,14 +1150,25 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
               headers: { 'Content-Type': media.blob.mediaType },
             }).blob();
             const url = URL.createObjectURL(blob);
+            if (generation !== captionMediaGeneration || selectedCaptionId !== captionId) {
+              URL.revokeObjectURL(url);
+              return;
+            }
+            captionMediaUrls.add(url);
             const image = el('img', {
               src: url,
               alt: media.label,
               style: 'display:block;max-width:100%;max-height:20rem;object-fit:contain',
             });
-            image.addEventListener('load', () => URL.revokeObjectURL(url), { once: true });
+            const release = (): void => {
+              if (!captionMediaUrls.delete(url)) return;
+              URL.revokeObjectURL(url);
+            };
+            image.addEventListener('load', release, { once: true });
+            image.addEventListener('error', release, { once: true });
             captionMedia.append(image);
           }).catch((error: unknown) => {
+            if (generation !== captionMediaGeneration || selectedCaptionId !== captionId) return;
             runtimeStatus.className = 'ng-error';
             runtimeStatus.textContent = error instanceof Error ? error.message : String(error);
           }).finally(() => { open.disabled = false; });
@@ -1358,7 +1388,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     rebuildDisplaySetOptions();
 
     root.append(el('main', { class: 'ng-view' },
-      el('section', { class: 'ng-stage' }, canvas, el('div', { class: 'ng-stage-badges' }, accessBadge, visibilityBadge)),
+      stage,
       el('aside', { class: 'ng-panel' },
         el('div', {}, el('h1', {}, working.project.title), el('div', { class: 'ng-row ng-project-actions' }, save)),
         materialSection,
@@ -1488,6 +1518,16 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         populateCaptionFields();
         updateAccess();
         runtimeStatus.textContent = `キャプションを選択しました：${selectedCaption()?.title ?? 'Caption'}`;
+      },
+      onCaptionDeselected() {
+        selectedCaptionId = null;
+        creatingCaption = false;
+        captionMoveActive = false;
+        rebuildCaptionList();
+        populateCaptionFields();
+        updateAccess();
+        runtimeStatus.className = 'ng-status';
+        runtimeStatus.textContent = 'キャプションの選択を解除しました。';
       },
       onAssetTransformCommitted(assetId, transform) {
         if (session.accessState !== 'editable' || !commitWorkingAssetTransform(assetId, transform)) return;
@@ -1630,6 +1670,27 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     rebuildCaptionList();
     populateCaptionFields();
     viewer.selectCaption(selectedCaptionId);
+    activeCaptionOverlay = mountNativeCaptionOverlayV1({
+      stage,
+      getSnapshot: () => working,
+      getSelectedCaptionId: () => selectedCaptionId,
+      getActiveDisplaySetId: activeDisplaySetId,
+      projectCaption: (captionId) => viewer.projectCaption(captionId),
+      readMedia: (mediaId) => readNativeMediaV1(fs, working.project.id, mediaId),
+      onDismiss: () => {
+        if (!viewer.selectCaption(null)) return;
+        selectedCaptionId = null;
+        creatingCaption = false;
+        captionMoveActive = false;
+        rebuildCaptionList();
+        populateCaptionFields();
+        updateAccess();
+      },
+      onError: (message) => {
+        runtimeStatus.className = 'ng-error';
+        runtimeStatus.textContent = message;
+      },
+    });
     populateTransform();
     viewer.selectAlignmentAsset(transformAsset.value);
     viewer.setAssetGizmoMode(assetGizmoMode);
@@ -1640,8 +1701,7 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     displaySetSelect.addEventListener('change', () => {
       if (!displaySets().some((displaySet) => displaySet.id === displaySetSelect.value)) return;
       activeDisplaySetIdValue = displaySetSelect.value;
-      const activeCaptions = working.captions.filter((caption) => nativeCaptionDisplaySetIdV1(caption) === activeDisplaySetId());
-      selectedCaptionId = activeCaptions[0]?.id ?? null;
+      selectedCaptionId = null;
       creatingCaption = false;
       captionMoveActive = false;
       const defaultSavedViewId = displaySets().find((displaySet) => displaySet.id === activeDisplaySetId())?.defaultSavedViewId ?? null;
@@ -1814,6 +1874,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         unsavedChanges.clear();
         unsubscribeAccess?.();
         unsubscribeAccess = null;
+        activeCaptionOverlay?.dispose();
+        activeCaptionOverlay = null;
         viewer.dispose();
         if (activeViewer === viewer) activeViewer = null;
         saving = false;
@@ -1883,6 +1945,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         unsavedChanges.clear();
         unsubscribeAccess?.();
         unsubscribeAccess = null;
+        activeCaptionOverlay?.dispose();
+        activeCaptionOverlay = null;
         viewer.dispose();
         if (activeViewer === viewer) activeViewer = null;
         saving = false;
@@ -2088,7 +2152,6 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       if (caption === undefined) return;
       const captionId = caption.id;
       const captionLabel = caption.title || '（無題）';
-      const captionIndex = working.captions.findIndex((candidate) => candidate.id === captionId);
       captionDeleteConfirmationInFlight = true;
       updateAccess();
       void confirmDialog(
@@ -2103,10 +2166,9 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
         creatingCaption = false;
         captionMoveActive = false;
         viewer.stopCaptionPositionEditing();
-        const nextCaptionIndex = Math.min(captionIndex, working.captions.length - 1);
-        selectedCaptionId = nextCaptionIndex < 0 ? null : working.captions[nextCaptionIndex]!.id;
+        selectedCaptionId = null;
         viewer.setSnapshot(working);
-        viewer.selectCaption(selectedCaptionId);
+        viewer.selectCaption(null);
         rebuildCaptionList();
         populateCaptionFields();
         markDirty();

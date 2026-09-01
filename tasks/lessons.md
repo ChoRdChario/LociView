@@ -267,3 +267,19 @@
 - 代表ZIPが変換・保存できたことだけでlegacy受入完了としない。sourceのuser-visibleな保存項目を一度inventoryし、native側のrecord、renderer/editor、save/reopen、portable backupまで対応先があるかを表で確認する。
 - receiverがない項目は、承認済みユーザー機能ならconverterのreport-only処理を既成事実にせず先に最小receiverを作る。timestamp等の非表示metadataや未承認機能は、理由を明記してsource/report保持のままbacklogへ送る。
 - receiver auditを口実に一般化されたmedia、history、appearance、migration frameworkへ拡張しない。現存するLociMyu意味と最小native製品能力の交差だけをproduction scopeへ入れる。
+
+## 2026-09-01: Caption overlayは内容が読める面積と一時調整を受入時に確認する
+
+- データが表示されたことだけでCaption overlayの閲覧UXを完了扱いにしない。画像が固定小サイズで余白だけ残る場合は、元bytesやaspect ratioを変えず、利用可能なcard幅へresponsiveに拡縮する。
+- 3D上のピンへ自動追従するcardでも、モデルや視点によって内容を隠し得る。Product Ownerが求めた場合はheader dragによる表示中だけの位置調整を優先し、Project schemaやSaved Viewへ永続位置を追加しない。
+- 自動配置、手動の一時位置、durable project stateを区別する。小さな閲覧改善からdrag framework、複数window、永続layoutへscopeを広げない。
+
+## 2026-09-01: 見えるCaptionピンと実際の選択領域を一致させる
+
+- 小さな3DピンへMesh形状の厳密raycastだけを使うと、画面では見えていても少し外しただけで空画面クリックとして選択解除される。CaptionピンにはboundedなCSS-pixel選択許容を持たせ、モデル単位やカメラ距離で操作性を崩さない。
+- overlayの画面内判定はピン中心だけで即座に切らず、ピンが一部見える範囲の小さな余白を許容してcard本体をstage内へclampする。完全に画面外のCaptionを表示する挙動へは広げない。
+
+## 2026-09-01: PWA acceptanceではserver生存と表示buildを分けて確認する
+
+- ローカルpreviewが停止していてもService Workerの旧cacheだけで画面が開くため、「URLが表示できた」ことを現在treeの証拠にしない。手動確認を依頼する直前にserverのHTTP応答と配信assetを確認する。
+- prompt更新型Service Workerではhard reloadだけで待機中workerが必ず有効になるとは限らない。旧UIが見える場合は、serverを先に復旧し、全controlled tabを閉じて再openするか、承認済みの更新導線でworkerを切り替えてからvisual regressionを判定する。

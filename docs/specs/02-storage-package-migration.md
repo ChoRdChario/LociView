@@ -1890,3 +1890,49 @@ general styling, renderer or history subsystem.
   Caption colors and explicitly accounts for non-durable timestamp fields.
   Desktop executable evidence is required; no new physical-iPhone matrix is
   added before the consolidated product acceptance.
+
+## 29. Bounded native Caption selection overlay (Product Owner approved 2026-08-31; resize extension 2026-09-01)
+
+The native Project viewer MUST expose the Caption data already preserved by the
+receiver as one ordinary viewing interaction. This is a UI closure over the
+existing stable Caption/media records; it does not introduce another selection,
+anchor, storage or package authority.
+
+- Selecting a placed Caption from its visible marker or the Caption list shows
+  one stage overlay for that exact stable Caption. The overlay displays its saved
+  color, title, body and up to three existing image thumbnails, and visually
+  connects the card to the selected marker. The existing side editor and
+  `selectedCaptionId` remain the single selection/edit source.
+- Selecting empty stage space clears the Caption selection and closes the
+  overlay without creating, moving or editing data. DisplaySet changes,
+  deletion, an unplaced Caption, a hidden owning Asset or an unavailable marker
+  hide the overlay rather than guessing a screen position.
+- Selecting a thumbnail opens one simple image viewer with contain/fit display,
+  previous/next controls when applicable and an explicit close action. Existing
+  project-local media bytes are read on demand. A missing or unsupported image
+  degrades to an unavailable message; an asynchronous result from a former
+  Caption selection is discarded.
+- The behavior applies in View and Edit mode on Desktop and mobile. Overlay
+  placement is clamped to the current stage and follows the projected marker;
+  it is UI-only and is not written to snapshot, Saved View or portable package.
+- The card header may be dragged to a temporary stage position for the current
+  Caption selection. The position remains clamped inside the stage, keeps its
+  visual connection to the marker, and resets when the selection changes or is
+  closed. It is deliberately not durable project state. A single image preview
+  fills the available card width without changing its aspect ratio; multiple
+  previews use the same width as a compact responsive grid.
+- A bottom-right handle may resize the selected card's width and height within
+  the current stage. The temporary size follows the same selection lifetime as
+  the temporary position, remains clamped after stage resize, and is not written
+  to snapshot, Saved View or portable package. Card content scrolls when the
+  chosen height is smaller than its contents, and images continue to fit the
+  available card width without changing stored bytes or aspect ratio.
+- Snapshot schema `1`, portable package versions, Caption/anchor/media records,
+  conversion and source bytes remain unchanged. Attachment add/remove/reorder,
+  video/HEIC, image processing, zoom tooling, multiple overlays, durable overlay
+  placement, durable card size, tags/history and generalized responsive redesign
+  are outside this slice.
+- Acceptance reuses existing selection, visibility, DisplaySet and media
+  persistence coverage, adds only focused overlay resolution/stale-load
+  coverage, records Desktop visual evidence, and defers one physical-iPhone
+  check to the already planned consolidated direct-LociMyu product acceptance.

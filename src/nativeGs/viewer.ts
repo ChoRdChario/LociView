@@ -39,10 +39,19 @@ import { NativeSparkRuntime } from './sparkRuntime';
 import type { WorkspaceReadableFile } from '../platform/fs';
 import { nativeMaterialSlotKey } from './materialSlots';
 
+const NATIVE_CAPTION_PICK_DIAMETER_CSS_PX = 20;
+
+export interface NativeCaptionScreenPointV1 {
+  readonly xCss: number;
+  readonly yCss: number;
+  readonly visible: boolean;
+}
+
 export interface NativeGsViewerCallbacks {
   onCaptionCreationStarted(): boolean;
   onCaptionChanged(caption: NativeCaptionV1): boolean;
   onCaptionSelected(captionId: string): void;
+  onCaptionDeselected(): void;
   onAssetTransformCommitted(assetId: string, transform: NativeSim3V1): void;
   onIssuesChanged(issues: readonly string[]): void;
   onProgress(message: string): void;
@@ -261,6 +270,7 @@ export class NativeGsViewer {
   private assetScaleDragStart = 1;
   private longPressTimer: ReturnType<typeof setTimeout> | null = null;
   private longPressStart: { readonly x: number; readonly y: number } | null = null;
+  private emptyTapStart: { readonly pointerId: number; readonly x: number; readonly y: number } | null = null;
   private editingEnabled = false;
   private gizmoDragging = false;
   private disposed = false;
@@ -322,7 +332,7 @@ export class NativeGsViewer {
     this.canvas.addEventListener('pointerdown', this.onPointerDown);
     this.canvas.addEventListener('pointermove', this.onPointerMove);
     this.canvas.addEventListener('pointerup', this.onPointerUp);
-    this.canvas.addEventListener('pointercancel', this.onPointerUp);
+    this.canvas.addEventListener('pointercancel', this.onPointerCancel);
     this.canvas.addEventListener('webglcontextlost', this.onContextLost);
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(canvas);
@@ -614,6 +624,20 @@ export class NativeGsViewer {
     return true;
   }
 
+  projectCaption(captionId: string): NativeCaptionScreenPointV1 | null {
+    const marker = this.captionMarkers.get(captionId);
+    if (marker === undefined || !marker.visible) return null;
+    this.scene.updateMatrixWorld(true);
+    this.camera.updateMatrixWorld(true);
+    const projected = marker.getWorldPosition(new THREE.Vector3()).project(this.camera);
+    if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y) || !Number.isFinite(projected.z)) return null;
+    return {
+      xCss: (projected.x + 1) * 0.5 * this.canvas.clientWidth,
+      yCss: (1 - projected.y) * 0.5 * this.canvas.clientHeight,
+      visible: projected.z >= -1 && projected.z <= 1,
+    };
+  }
+
   setEditingEnabled(enabled: boolean): void {
     if (this.editingEnabled === enabled) return;
     this.editingEnabled = enabled;
@@ -693,12 +717,13 @@ export class NativeGsViewer {
     if (this.disposed) return;
     this.disposed = true;
     cancelAnimationFrame(this.animationFrame);
+    this.emptyTapStart = null;
     this.clearLongPress();
     this.resizeObserver.disconnect();
     this.canvas.removeEventListener('pointerdown', this.onPointerDown);
     this.canvas.removeEventListener('pointermove', this.onPointerMove);
     this.canvas.removeEventListener('pointerup', this.onPointerUp);
-    this.canvas.removeEventListener('pointercancel', this.onPointerUp);
+    this.canvas.removeEventListener('pointercancel', this.onPointerCancel);
     this.canvas.removeEventListener('webglcontextlost', this.onContextLost);
     this.gizmo.detach();
     this.gizmo.dispose();
@@ -985,17 +1010,53 @@ export class NativeGsViewer {
 
   private selectCaptionAt(pointer: THREE.Vector2): boolean {
     this.scene.updateMatrixWorld(true);
+    this.camera.updateMatrixWorld(true);
     this.raycaster.setFromCamera(pointer, this.camera);
     const captionHit = this.raycaster.intersectObjects(
       [...this.captionMarkers.values()].filter((marker) => marker.visible),
       false,
     )[0];
-    const captionId = captionHit?.object.userData.nativeCaptionId;
+    const exactCaptionId = captionHit?.object.userData.nativeCaptionId;
+    const captionId = typeof exactCaptionId === 'string'
+      ? exactCaptionId
+      : this.pickCaptionIdInScreenSpace(pointer);
     if (typeof captionId === 'string' && this.selectCaption(captionId)) {
       this.callbacks.onCaptionSelected(captionId);
       return true;
     }
     return false;
+  }
+
+  private pickCaptionIdInScreenSpace(pointer: THREE.Vector2): string | null {
+    const rect = this.canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    const pointerCss = {
+      xCss: (pointer.x + 1) * 0.5 * rect.width,
+      yCss: (1 - pointer.y) * 0.5 * rect.height,
+    };
+    const candidates: NativeProjectedPointPick[] = [];
+    for (const [captionId, marker] of this.captionMarkers) {
+      if (!marker.visible) continue;
+      const world = marker.getWorldPosition(new THREE.Vector3());
+      const projected = world.clone().project(this.camera);
+      if (
+        !Number.isFinite(projected.x) || !Number.isFinite(projected.y) || !Number.isFinite(projected.z) ||
+        projected.z < -1 || projected.z > 1
+      ) continue;
+      candidates.push({
+        representationId: captionId,
+        pointIndex: 0,
+        xCss: (projected.x + 1) * 0.5 * rect.width,
+        yCss: (1 - projected.y) * 0.5 * rect.height,
+        depth: projected.z,
+        world: [world.x, world.y, world.z],
+      });
+    }
+    return selectNativeProjectedPoint(
+      candidates,
+      pointerCss,
+      NATIVE_CAPTION_PICK_DIAMETER_CSS_PX,
+    )?.representationId ?? null;
   }
 
   private placeCaptionAt(pointer: THREE.Vector2): void {
@@ -1085,12 +1146,14 @@ export class NativeGsViewer {
     if (this.selectCaptionAt(pointer)) return;
 
     if (event.pointerType === 'touch') {
+      this.emptyTapStart = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
       if (!this.editingEnabled) return;
       this.clearLongPress();
       this.longPressStart = { x: event.clientX, y: event.clientY };
       this.longPressTimer = setTimeout(() => {
         this.longPressTimer = null;
         this.longPressStart = null;
+        this.emptyTapStart = null;
         this.placeCaptionAt(pointer);
       }, NativeGsViewer.LONG_PRESS_MS);
       return;
@@ -1098,19 +1161,40 @@ export class NativeGsViewer {
 
     if (event.shiftKey) {
       this.placeCaptionAt(pointer);
+    } else {
+      this.clearCaptionSelection();
     }
   };
 
   private readonly onPointerMove = (event: PointerEvent): void => {
-    if (this.longPressTimer === null || this.longPressStart === null) return;
-    const dx = event.clientX - this.longPressStart.x;
-    const dy = event.clientY - this.longPressStart.y;
-    if (dx * dx + dy * dy > NativeGsViewer.LONG_PRESS_MOVE_PX ** 2) this.clearLongPress();
+    if (this.emptyTapStart?.pointerId === event.pointerId) {
+      const dx = event.clientX - this.emptyTapStart.x;
+      const dy = event.clientY - this.emptyTapStart.y;
+      if (dx * dx + dy * dy > NativeGsViewer.LONG_PRESS_MOVE_PX ** 2) this.emptyTapStart = null;
+    }
+    if (this.longPressTimer !== null && this.longPressStart !== null) {
+      const dx = event.clientX - this.longPressStart.x;
+      const dy = event.clientY - this.longPressStart.y;
+      if (dx * dx + dy * dy > NativeGsViewer.LONG_PRESS_MOVE_PX ** 2) this.clearLongPress();
+    }
   };
 
-  private readonly onPointerUp = (): void => {
+  private readonly onPointerUp = (event: PointerEvent): void => {
+    if (this.emptyTapStart?.pointerId === event.pointerId) this.clearCaptionSelection();
+    this.emptyTapStart = null;
     this.clearLongPress();
   };
+
+  private readonly onPointerCancel = (): void => {
+    this.emptyTapStart = null;
+    this.clearLongPress();
+  };
+
+  private clearCaptionSelection(): void {
+    if (this.currentCaption === null) return;
+    this.selectCaption(null);
+    this.callbacks.onCaptionDeselected();
+  }
 
   private clearLongPress(): void {
     if (this.longPressTimer !== null) clearTimeout(this.longPressTimer);
