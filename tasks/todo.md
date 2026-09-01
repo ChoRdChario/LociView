@@ -1,13 +1,42 @@
 # LociView active work
 
-> Baseline checkpoint: `0bcb63652e93294007baaf6e40174c328502fe18` on
-> `g0-baseline` (2026-08-31). Frozen-v1 -> native is accepted; the direct
-> LociMyu receiver is complete, and its consolidated Desktop/iPhone product
-> acceptance follows the active Caption-overlay slice below.
+> Baseline checkpoint: `485451a19603180daf69365da68e8770dea503f3` on
+> `g0-baseline` (2026-09-01). Consolidated direct-LociMyu acceptance exposed one
+> active P1: later Caption sheets retain material/view rows but lack exact
+> `__LM_SHEET_NAMES` entries. The bounded confirmed-relation fix below is active.
 >
 > The completed task ledger through `d32a6a0` is preserved at
 > `docs/history/task-ledger-through-d32a6a0.md`. This file contains only the
 > active delivery boundary, open decisions and non-blocking backlog.
+
+## Active P1 — restore LociMyu sheet/material/view linkage
+
+- [x] Reproduce the representative symptom read-only and distinguish source
+  Caption content from conversion loss. The selected 39-Caption sheet has 38
+  literal source `(untitled)` titles and no source image references.
+- [x] Confirm the material gap: one exact relation activates 18 native slot
+  appearances while 17 current source material rows and three views remain
+  inactive for the other three sheets.
+- [x] Product Owner confirmed the LociMyu invariant: selecting one Caption sheet
+  switches that sheet's Caption group, material values and optional view as one
+  native DisplaySet.
+- [x] Approve one all-or-nothing confirmation of a relation proposal only when
+  `__LM_VIEWS` and `__LM_MATERIALS` have the same unique GID order, it matches
+  Caption-sheet count/order, and every exact registry row agrees.
+- [x] Implement the confirmation UI and pass only the confirmed complete map to
+  the direct converter. Keep Caption identity exact/fallback and unchanged.
+- [x] Record source-exact versus user-confirmed relations in the conversion
+  report; reject partial, stale or injected confirmations before publication.
+- [x] Run focused conversion/UI checks, representative Desktop re-conversion and
+  DisplaySet switching, then the final exact-tree matrix once. A fresh-origin
+  conversion restored all four DisplaySets and the Product Owner confirmed that
+  switching sheets immediately applies their material settings without any
+  per-sheet re-save.
+- [ ] After Desktop PASS, run only the affected physical-iPhone DisplaySet,
+  save/offline-reopen check and resume consolidated acceptance.
+
+Stop conditions: do not add a generalized mapping framework, editable per-row
+GID UI, media inference, HEIC conversion or Caption-content synthesis.
 
 ## Consolidated native Product Owner acceptance
 
@@ -338,3 +367,18 @@ direct-LociMyu acceptance rather than repeated for this slice alone.
   condition and the two affected suites passed 53/53. Independent read-only
   review found no P0/P1; physical iPhone remains batched into consolidated
   direct-LociMyu product acceptance.
+- The bounded missing DisplaySet-relation correction converts LociMyu material
+  rows during ZIP import; it does not retrofit existing Native Projects or ask
+  the user to recreate/save each sheet. The representative confirmed draft
+  produced 65 set-scoped material appearances across four DisplaySets while
+  preserving Caption identity.
+- Focused conversion coverage passed 44/44 and the independent reviewer ran the
+  affected 49/49 checks. Typecheck, normal build, `/LociView/` build and
+  `git diff --check` passed. The full run passed 1,441 tests with 21 existing
+  todo; one unrelated five-second verifier timeout passed immediately in
+  isolation.
+- Desktop acceptance on a fresh origin passed: selecting the imported LociMyu
+  sheets switched their converted material settings immediately. A reused
+  `/LociView/` build on a root-mounted local preview was separately identified
+  as an invalid acceptance server configuration; the corrected root build was
+  verified to serve its entry JavaScript before the successful smoke.

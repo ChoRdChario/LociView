@@ -17,6 +17,7 @@ import { makeXlsx } from '../helpers/makeXlsx';
 
 const fixturePath = resolve('fixtures/v1-migration/locimyu-drive-exact-v1.zip');
 const captionHeader = ['id', 'title', 'body', 'color', 'posX', 'posY', 'posZ', 'imageFileId', 'createdAt', 'updatedAt'];
+const viewHeader = ['id', 'captionSheetGid', 'name', 'bgColor', 'cameraType', 'eyeX', 'eyeY', 'eyeZ', 'targetX', 'targetY', 'targetZ', 'upX', 'upY', 'upZ', 'fov', 'createdAt', 'updatedAt'];
 const materialHeader = ['materialKey', 'opacity', 'doubleSided', 'unlitLike', 'chromaEnable', 'chromaColor', 'chromaTolerance', 'chromaFeather', 'roughness', 'metalness', 'emissiveHex', 'updatedAt', 'updatedBy', 'sheetGid'];
 const encoder = new TextEncoder();
 
@@ -119,6 +120,116 @@ describe('LociMyu ZIP to native direct adapter', () => {
     expect(plan.issues.some((entry) => entry.code === 'material-relation-inactive')).toBe(false);
     expect(plan.issues.some((entry) => entry.code === 'material-chroma-disabled-for-parity')).toBe(false);
     expect(plan.mappings.filter((entry) => entry.sourceKind === 'material row' && entry.disposition === 'converted')).toHaveLength(2);
+  });
+
+  it('activates only a complete user-confirmed relation while preserving Caption identity', async () => {
+    const workbook = await makeXlsx([
+      { name: 'S1', rows: [captionHeader, ['c_1', 'one', '', '#eab308', '0', '0', '0', '', '', '']] },
+      { name: 'S2', rows: [captionHeader, ['c_2', 'two', '', '#eab308', '1', '0', '0', '', '', '']] },
+      { name: 'S3', rows: [captionHeader, ['c_3', 'three', '', '#eab308', '2', '0', '0', '', '', '']] },
+      {
+        name: '__LM_SHEET_NAMES',
+        rows: [['sheetGid', 'displayName', 'sheetTitle', 'updatedAt'], ['11', 'S1', 'S1', '']],
+      },
+      {
+        name: '__LM_VIEWS',
+        rows: [
+          viewHeader,
+          ['v_1', '11', 'view one', '', 'perspective', '1', '2', '3', '0', '0', '0', '0', '1', '0', '45', '', ''],
+          ['v_2', '22', 'view two', '', 'perspective', '2', '2', '3', '0', '0', '0', '0', '1', '0', '45', '', ''],
+          ['v_3', '33', 'view three', '', 'perspective', '3', '2', '3', '0', '0', '0', '0', '1', '0', '45', '', ''],
+        ],
+      },
+      {
+        name: '__LM_MATERIALS',
+        rows: [
+          materialHeader,
+          ['Shared', '1', 'FALSE', 'FALSE', 'FALSE', '', '', '', '', '', '', '', '', '11'],
+          ['Shared', '0.5', 'FALSE', 'TRUE', 'FALSE', '', '', '', '', '', '', '', '', '22'],
+          ['Shared', '0.25', 'TRUE', 'FALSE', 'TRUE', '#00ff00', '0.1', '0.2', '', '', '', '', '', '33'],
+        ],
+      },
+    ]);
+    const zip = await writeZipEntries([
+      { path: 'LociMyu Save.xlsx', data: workbook },
+      { path: 'models/duplicate-material.glb', data: duplicateNamedMaterialGlb() },
+    ]);
+    const file = new File([Uint8Array.from(zip)], 'corroborated-display-set-locimyu.zip', { type: 'application/zip' });
+    const importPlan = await buildImportPlan(await readZipEntries(zip), { preserveBlockedLociMyuSource: true });
+
+    const unconfirmed = await planLociMyuZipToNative(file, importPlan, 'Unconfirmed relation');
+    expect(unconfirmed.blockingIssueCount).toBe(0);
+    expect(unconfirmed.draft.savedViews).toHaveLength(1);
+    expect(unconfirmed.draft.meshMaterialAppearances).toHaveLength(2);
+    expect(unconfirmed.issues).toContainEqual(expect.objectContaining({
+      code: 'display-set-relation-confirmation-required',
+      severity: 'info',
+      candidates: ['22:S2', '33:S3'],
+    }));
+    expect(unconfirmed.issues.filter((entry) => entry.code === 'view-relation-inactive')).toHaveLength(2);
+    expect(unconfirmed.issues.filter((entry) => entry.code === 'material-relation-inactive')).toHaveLength(2);
+
+    const confirmation = {
+      workbookArchivePath: 'LociMyu Save.xlsx',
+      relations: [
+        { sheetGid: '22', sheetName: 'S2' },
+        { sheetGid: '33', sheetName: 'S3' },
+      ],
+    } as const;
+    const confirmed = await planLociMyuZipToNative(file, importPlan, 'Confirmed relation', {
+      confirmedDisplaySetRelation: confirmation,
+    });
+    expect(confirmed.blockingIssueCount).toBe(0);
+    expect(confirmed.draft.savedViews).toHaveLength(3);
+    expect(confirmed.draft.meshMaterialAppearances).toHaveLength(6);
+    expect(confirmed.draft.captions.map((caption) => caption.id)).toEqual(
+      unconfirmed.draft.captions.map((caption) => caption.id),
+    );
+    expect(confirmed.issues).toContainEqual(expect.objectContaining({
+      code: 'display-set-relation-user-confirmed',
+      severity: 'info',
+      candidates: ['22:S2', '33:S3'],
+    }));
+    expect(confirmed.mappings.filter((entry) =>
+      entry.sourceKind === 'DisplaySet relation confirmation')).toEqual([
+      expect.objectContaining({
+        sourceId: '22:S2',
+        disposition: 'converted',
+        relationBasis: 'user-confirmed-corroborated-order',
+      }),
+      expect.objectContaining({
+        sourceId: '33:S3',
+        disposition: 'converted',
+        relationBasis: 'user-confirmed-corroborated-order',
+      }),
+    ]);
+    expect(confirmed.mappings).toContainEqual(expect.objectContaining({
+      sourceKind: 'sheet authority row',
+      disposition: 'converted',
+      relationBasis: 'source-exact',
+    }));
+    expect(confirmed.issues.some((entry) => entry.code === 'view-relation-inactive')).toBe(false);
+    expect(confirmed.issues.some((entry) => entry.code === 'material-relation-inactive')).toBe(false);
+
+    const invalidConfirmations = [
+      { ...confirmation, workbookArchivePath: 'stale/LociMyu Save.xlsx' },
+      { ...confirmation, relations: confirmation.relations.slice(0, 1) },
+      { ...confirmation, relations: [...confirmation.relations].reverse() },
+      { ...confirmation, relations: [...confirmation.relations, { sheetGid: '44', sheetName: 'injected' }] },
+    ];
+    for (const invalid of invalidConfirmations) {
+      const blocked = await planLociMyuZipToNative(file, importPlan, 'Invalid relation confirmation', {
+        confirmedDisplaySetRelation: invalid,
+      });
+      expect(blocked.blockingIssueCount).toBe(1);
+      expect(blocked.issues).toContainEqual(expect.objectContaining({
+        code: 'display-set-relation-confirmation-invalid',
+        severity: 'blocking',
+      }));
+      expect(blocked.draft.assets).toEqual([]);
+      expect(blocked.draft.displaySets).toEqual([]);
+      expect(blocked.representationSources.size).toBe(0);
+    }
   });
 
   it('treats ID-less rows as reported empty input without shifting the valid Caption row', async () => {

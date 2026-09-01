@@ -22,6 +22,7 @@ import { mountHome, type NativeProjectListItem, type WritableProjectSession } fr
 import { mountViewerScreen } from './viewerScreen';
 import type { PackageExportStatus } from './saveStatus';
 import type { ImportPlan } from '../assets/importWizard';
+import type { LociMyuDisplaySetRelationConfirmation } from '../io/locimyu';
 
 /** これを超えるモデルは開いた時点で自動読み込みせず、手動表示に委ねる（iOSメモリ対策） */
 const AUTO_LOAD_LIMIT = 25 * 1024 * 1024;
@@ -363,6 +364,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     sourceFile: File,
     importPlan: ImportPlan,
     projectName: string,
+    confirmedDisplaySetRelation: LociMyuDisplaySetRelationConfirmation | null,
     onStatus: (message: string) => void,
   ): Promise<string | null> {
     if (!persistentWorkspace) {
@@ -394,7 +396,9 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     try {
       const conversion = await import('../nativeGs/locimyuConversion');
       status('workbook、Caption identity、model、mediaを照合しています…');
-      const plan = await conversion.planLociMyuZipToNative(sourceFile, importPlan, projectName);
+      const plan = await conversion.planLociMyuZipToNative(sourceFile, importPlan, projectName, {
+        confirmedDisplaySetRelation,
+      });
       const reportStem = sourceFile.name.replace(/\.(zip|lociview)$/iu, '') || 'locimyu';
       if (plan.blockingIssueCount > 0) {
         status('元ZIPが変化していないことを再確認しています…');

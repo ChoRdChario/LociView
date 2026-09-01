@@ -154,6 +154,42 @@ export interface LociMyuMigration {
   warnings: string[];
 }
 
+/**
+ * One legacy sheet relation proposed for explicit, all-or-nothing confirmation.
+ * This relation is activation-only: it must never enter Caption identity.
+ */
+export interface LociMyuConfirmedDisplaySetRelation {
+  readonly sheetGid: string;
+  readonly sheetName: string;
+}
+
+export interface LociMyuDisplaySetRelationConfirmation {
+  readonly workbookArchivePath: string;
+  readonly relations: readonly LociMyuConfirmedDisplaySetRelation[];
+}
+
+export type LociMyuDisplaySetRelationConfirmationPlan =
+  | {
+      readonly kind: 'not-needed';
+      readonly relations: readonly [];
+      readonly reason: null;
+    }
+  | {
+      readonly kind: 'confirmation-required';
+      readonly relations: readonly LociMyuConfirmedDisplaySetRelation[];
+      readonly reason: null;
+    }
+  | {
+      readonly kind: 'unavailable';
+      readonly relations: readonly [];
+      readonly reason:
+        | 'missing-corroborating-table'
+        | 'incomplete-relation-row'
+        | 'gid-order-mismatch'
+        | 'relation-count-mismatch'
+        | 'registry-conflict';
+    };
+
 // ---- ヘルパ --------------------------------------------------------------------
 
 function isLociMyuTrimCodeUnit(code: number): boolean {
@@ -353,9 +389,9 @@ export function countLociMyuCaptionSourceRows(tables: readonly SheetTable[]): nu
 export type LociMyuCaptionSheetIdentity = LociMyuCaptionIdentityKeyV2['sheetIdentity'];
 
 /**
- * Pure, order-independent __LM_SHEET_NAMES authority projection used by ID
- * planning. View/material activation intentionally keeps its historical path
- * until the reviewed deferred-review destination exists.
+ * Pure, order-independent __LM_SHEET_NAMES authority projection used by
+ * Caption ID planning and exact DisplaySet activation. The separately planned
+ * corroborated relation must never modify this projection.
  */
 export function projectLociMyuCaptionSheetIdentities(
   tables: readonly SheetTable[],
@@ -423,6 +459,101 @@ export function projectLociMyuCaptionSheetIdentities(
     projection.set(table, identity);
   }
   return projection;
+}
+
+function orderedRelationGids(
+  table: SheetTable | undefined,
+  idColumn: number,
+  gidColumn: number,
+): { readonly kind: 'ok'; readonly gids: readonly string[] } | { readonly kind: 'incomplete' } | null {
+  if (table === undefined) return null;
+  const gids: string[] = [];
+  for (const row of table.rows.slice(1)) {
+    if (isCompletelyEmptyRow(row)) continue;
+    const sourceId = cell(row, idColumn);
+    const gid = cell(row, gidColumn);
+    if (sourceId === '' || gid === '') return { kind: 'incomplete' };
+    if (!gids.includes(gid)) gids.push(gid);
+  }
+  return { kind: 'ok', gids };
+}
+
+/**
+ * Build the sole approved non-exact DisplaySet relation proposal.
+ *
+ * Both independent LociMyu state tables must carry the same complete GID order,
+ * that order must cover every Caption sheet, and every existing registry row
+ * must agree with the same indexed pair. The caller still needs one explicit
+ * confirmation of the complete returned relation list.
+ */
+export function planLociMyuDisplaySetRelationConfirmation(
+  tables: readonly SheetTable[],
+): LociMyuDisplaySetRelationConfirmationPlan {
+  const captionTables = tables.filter((table) =>
+    !INTERNAL_SHEETS.has(lociMyuTrimV1(table.name)) && isLociMyuCaptionSheet(table.rows),
+  );
+  const projection = projectLociMyuCaptionSheetIdentities(tables);
+  const unresolvedTables = captionTables.filter((table) => projection.get(table)?.kind !== 'legacyGid');
+  if (unresolvedTables.length === 0) return { kind: 'not-needed', relations: [], reason: null };
+
+  const viewTable = tables.find((table) => lociMyuTrimV1(table.name) === LM_VIEWS_SHEET);
+  const materialTable = tables.find((table) => lociMyuTrimV1(table.name) === LM_MATERIALS_SHEET);
+  const viewOrder = orderedRelationGids(viewTable, 0, 1);
+  const materialOrder = orderedRelationGids(materialTable, 0, 13);
+  if (viewOrder === null && materialOrder === null) {
+    return { kind: 'not-needed', relations: [], reason: null };
+  }
+  if (viewOrder?.kind === 'incomplete' || materialOrder?.kind === 'incomplete') {
+    return { kind: 'unavailable', relations: [], reason: 'incomplete-relation-row' };
+  }
+  if (viewOrder === null || materialOrder === null) {
+    const presentOrder = viewOrder ?? materialOrder;
+    if (presentOrder?.kind === 'ok' && presentOrder.gids.length === 0) {
+      return { kind: 'not-needed', relations: [], reason: null };
+    }
+    return { kind: 'unavailable', relations: [], reason: 'missing-corroborating-table' };
+  }
+  if (viewOrder.gids.length !== materialOrder.gids.length ||
+      viewOrder.gids.some((gid, index) => gid !== materialOrder.gids[index])) {
+    return { kind: 'unavailable', relations: [], reason: 'gid-order-mismatch' };
+  }
+  if (viewOrder.gids.length === 0) return { kind: 'not-needed', relations: [], reason: null };
+  if (viewOrder.gids.length !== captionTables.length) {
+    return { kind: 'unavailable', relations: [], reason: 'relation-count-mismatch' };
+  }
+
+  const indexedRelations = captionTables.map((table, index): LociMyuConfirmedDisplaySetRelation => ({
+    sheetGid: viewOrder.gids[index]!,
+    sheetName: lociMyuTrimV1(table.name),
+  }));
+  const relationByGid = new Map(indexedRelations.map((relation) => [relation.sheetGid, relation]));
+  const registry = tables.find((table) => lociMyuTrimV1(table.name) === LM_SHEET_NAMES_SHEET);
+  for (const row of registry?.rows.slice(1) ?? []) {
+    if (isCompletelyEmptyRow(row)) continue;
+    const gid = cell(row, 0);
+    const sheetName = cell(row, 2) !== '' ? cell(row, 2) : cell(row, 1);
+    if (gid === '' || sheetName === '') {
+      return { kind: 'unavailable', relations: [], reason: 'registry-conflict' };
+    }
+    const indexed = relationByGid.get(gid);
+    if (indexed === undefined || indexed.sheetName !== sheetName) {
+      return { kind: 'unavailable', relations: [], reason: 'registry-conflict' };
+    }
+  }
+
+  for (const [index, table] of captionTables.entries()) {
+    const identity = projection.get(table);
+    if (identity?.kind === 'legacyGid' && identity.value !== indexedRelations[index]!.sheetGid) {
+      return { kind: 'unavailable', relations: [], reason: 'registry-conflict' };
+    }
+  }
+
+  const relations = indexedRelations.filter((_relation, index) =>
+    projection.get(captionTables[index]!)?.kind !== 'legacyGid',
+  );
+  return relations.length === 0
+    ? { kind: 'not-needed', relations: [], reason: null }
+    : { kind: 'confirmation-required', relations, reason: null };
 }
 
 function preflightLociMyuCaptionIdentityKeys(

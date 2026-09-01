@@ -15,6 +15,7 @@ import { el, clear } from './dom';
 import { confirmDialog, infoDialog, promptDialog } from './dialogs';
 import { importWizardDialog } from './importDialog';
 import { isStandalone, onInstallAvailability, promptInstall } from '../platform/pwa';
+import type { LociMyuDisplaySetRelationConfirmation } from '../io/locimyu';
 
 export interface HomeDeps {
   fs: WorkspaceFS;
@@ -38,6 +39,7 @@ export interface HomeDeps {
     file: File,
     plan: ImportPlan,
     projectName: string,
+    confirmedDisplaySetRelation: LociMyuDisplaySetRelationConfirmation | null,
     onStatus: (message: string) => void,
   ) => Promise<string | null>;
 }
@@ -294,7 +296,7 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
     const answer = await importWizardDialog(plan, defaultName, { directNative });
     if (answer === null) return;
     if (directNative) {
-      const projectId = await deps.convertLociMyuZipToNative(file, plan, answer.projectName, (message) => {
+      const projectId = await deps.convertLociMyuZipToNative(file, plan, answer.projectName, answer.confirmedDisplaySetRelation, (message) => {
         fileStatus.className = 'lv-dim lv-pad';
         fileStatus.textContent = message;
       });

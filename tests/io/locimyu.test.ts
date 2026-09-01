@@ -5,6 +5,7 @@ import {
   analyzeLociMyuSheets,
   isLociMyuCaptionSheet,
   lociMyuTrimV1,
+  planLociMyuDisplaySetRelationConfirmation,
   planLociMyuCaptionIdentity,
   projectLociMyuCaptionSheetIdentities,
   type LociMyuCaptionIdentityKeyV2,
@@ -304,6 +305,64 @@ describe('LociMyu Caption identity source authority', () => {
     await expect(analyzeLociMyuSheets([
       captionSheet('A', '1', [['x'.repeat(129), 'too long', '', '', '', '', '', '', '', '']]),
     ])).rejects.toThrow(/128 Unicode scalars/);
+  });
+});
+
+describe('LociMyu DisplaySet relation confirmation proposal', () => {
+  const viewHeader = ['id', 'captionSheetGid', 'name'];
+  const materialHeader = Array.from({ length: 14 }, (_value, index) => `column${index}`);
+
+  function relationTables(viewGids: readonly string[], materialGids: readonly string[]): SheetTable[] {
+    return [
+      captionSheet('A', 'worksheet-a', [['c_a', 'A', '', '', '0', '0', '0', '', '', '']]),
+      captionSheet('B', 'worksheet-b', [['', 'source ID-less row', '', '', '', '', '', '', '', '']]),
+      sheetNames([['11', '', 'A', '']]),
+      {
+        name: '__LM_VIEWS',
+        rows: [viewHeader, ...viewGids.map((gid, index) => [`view-${index}`, gid, `view ${index}`])],
+      },
+      {
+        name: '__LM_MATERIALS',
+        rows: [materialHeader, ...materialGids.map((gid, index) => {
+          const row = Array<string>(14).fill('');
+          row[0] = `material-${index}`;
+          row[13] = gid;
+          return row;
+        })],
+      },
+    ];
+  }
+
+  it('二つの状態表と既存exact rowが同じ完全順序を示す場合だけ不足関係を提案する', () => {
+    expect(planLociMyuDisplaySetRelationConfirmation(relationTables(['11', '22'], ['11', '22']))).toEqual({
+      kind: 'confirmation-required',
+      relations: [{ sheetGid: '22', sheetName: 'B' }],
+      reason: null,
+    });
+  });
+
+  it('適用対象のview/material行がないworkbookには確認を要求しない', () => {
+    expect(planLociMyuDisplaySetRelationConfirmation([
+      captionSheet('A', 'worksheet-a', [['c_a', 'A', '', '', '0', '0', '0', '', '', '']]),
+    ])).toEqual({ kind: 'not-needed', relations: [], reason: null });
+  });
+
+  it('二つの状態表のGID順序が違う場合は提案しない', () => {
+    expect(planLociMyuDisplaySetRelationConfirmation(relationTables(['11', '22'], ['22', '11']))).toEqual({
+      kind: 'unavailable',
+      relations: [],
+      reason: 'gid-order-mismatch',
+    });
+  });
+
+  it('registry rowがindexed pairと矛盾する場合は提案しない', () => {
+    const tables = relationTables(['11', '22'], ['11', '22']);
+    tables[2]!.rows.push(['22', '', 'A', '']);
+    expect(planLociMyuDisplaySetRelationConfirmation(tables)).toEqual({
+      kind: 'unavailable',
+      relations: [],
+      reason: 'registry-conflict',
+    });
   });
 });
 

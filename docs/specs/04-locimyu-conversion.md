@@ -1,8 +1,9 @@
 # LociMyu conversion identity, source authority and report contract
 
-> Status: `PRODUCT-OWNER APPROVED / BOUNDED DIRECT ADAPTER IMPLEMENTED / MISSING-ID EMPTY-ROW RULE IMPLEMENTED / REPRESENTATIVE AUTOMATED PASS; PRODUCT ACCEPTANCE PENDING`
+> Status: `PRODUCT-OWNER APPROVED / BOUNDED DIRECT ADAPTER IMPLEMENTED / CORROBORATED DISPLAYSET RELATION CONFIRMATION APPROVED; P1 FIX IN PROGRESS`
 > Approved: 2026-08-26
 > Direct-adapter boundary approved: 2026-08-31
+> Corroborated DisplaySet relation confirmation approved: 2026-09-01
 > Identity recipe: `locimyu-caption-id-2`
 
 ## 1. Scope and authority
@@ -43,7 +44,9 @@ This is the first direct-adapter behavior.
 
 - The user may choose one workbook when several candidate workbooks exist.
   That is a coarse source-authority choice. The importer MUST NOT ask the user
-  to decide individual IDs, duplicate winners, guessed sheets or media matches.
+  to decide individual IDs, duplicate winners or media matches. Section 4.1
+  permits one bounded, all-or-nothing confirmation of a fully corroborated
+  DisplaySet relation proposal; it is not an editable per-row mapping workflow.
 - Every otherwise-valid non-empty Caption row with a non-empty trimmed legacy
   ID becomes a distinct active Caption. A row whose trimmed legacy-ID cell is
   empty is treated as an empty Caption row: no Caption is created, it affects no
@@ -213,15 +216,31 @@ is authoritative only when all of these are true:
 3. the title exactly and case-sensitively matches one Caption sheet;
 4. no second Caption sheet has the same `LociMyuTrimV1` fallback name.
 
-Only then may view/material rows bearing that GID be applied to the matched set.
-Conflicting map rows, an absent mapping, a non-unique title, ordinal position,
-GID first-seen order and the first available set are non-authoritative. Each
-affected view/material row remains inactive and is recorded in the conversion
-report with its candidates; unrelated sets and Captions continue.
+This exact order-independent projection remains the only authority for
+Caption-sheet identity. Confirmed or inferred relations never enter the Caption
+identity key.
 
-The direct adapter MUST reuse this exact order-independent projection both for
-Caption-sheet identity and for view/material activation. It MUST NOT consume the
-legacy importer's ordinal or first-available guessed mapping.
+For view/material activation only, the direct adapter may offer one bounded
+legacy relation proposal when an exported XLSX lacks otherwise-required
+`__LM_SHEET_NAMES` rows. The proposal is available only when all of these are
+true:
+
+1. the unique non-empty GIDs in `__LM_VIEWS` encounter order and the unique
+   non-empty GIDs in `__LM_MATERIALS` encounter order are identical;
+2. that sequence has exactly the same length as the Caption sheets in workbook
+   encounter order;
+3. every exact relationship admitted above occurs at the same sequence index;
+4. every non-empty `__LM_SHEET_NAMES` row is complete, conflict-free and agrees
+   with that same indexed pair; and
+5. the user explicitly confirms the complete proposed relation set before
+   conversion. Partial confirmation or editing individual GIDs is unsupported.
+
+The confirmed relation applies the matched sheet's Caption group, material
+appearance and optional Saved View as one native DisplaySet. The report MUST
+distinguish `source exact` relations from `user-confirmed corroborated order`
+relations. Without confirmation, or when any condition above fails, unresolved
+view/material rows remain inactive and reportable. First-available, one-table
+ordinal, fuzzy, case-folded and silent winner selection remain forbidden.
 
 Within an authoritative DisplaySet relation, a LociMyu material key means the
 exact `LociMyuTrimV1` material name and intentionally applies to every decoded
@@ -357,8 +376,9 @@ that unconverted source data can be recovered from the native Project alone.
 
 - `LM-AUTH-01`: every exact/conflicting/missing sheet-map, incomplete/duplicate
   map row, zero/one/many media entry and reverse filename-to-file-ID conflict
-  produces the section-4 outcome with no row-order, ordinal, first-set,
-  first-file or fuzzy winner.
+  produces the section-4 outcome. The sole order-based exception is the
+  all-or-nothing, two-table-corroborated, user-confirmed activation relation in
+  section 4.1; first-set, first-file and fuzzy winners remain forbidden.
 - `LM-AUTH-02`: multiple workbook candidates use the transition ordering above;
   only typed candidate-local source validation may fall through to an alternate.
   Provider/internal/collision failures remain fatal, and a successful or failed
@@ -400,5 +420,12 @@ that unconverted source data can be recovered from the native Project alone.
 - `LM-ADAPT-09`: one exact source material name matching multiple decoded slots
   creates one explicit native appearance per slot. Supported opacity and chroma
   values are visibly applied and survive save/offline reopen plus portable
-  export/restore. Missing GID authority and zero exact name matches remain
-  inactive/report-only; ordinal mapping and winner selection are not inferred.
+  export/restore. Zero exact material-name matches remain inactive/report-only.
+- `LM-ADAPT-10`: when the representative workbook has one exact sheet relation
+  and three missing registry rows, the UI shows one complete corroborated
+  relation proposal. Without confirmation, the later view/material rows remain
+  inactive. After one explicit confirmation, all four DisplaySets switch their
+  own Caption group, material state and admitted Saved View together; the report
+  labels the three added relations as user-confirmed, while Caption IDs and
+  source bytes remain unchanged. A mismatched, partial or injected confirmation
+  blocks publication.

@@ -5,7 +5,13 @@ import {
   IMPORT_DIAGNOSTIC_DISPLAY_LIMIT,
   type ImportPlan,
 } from '../assets/importWizard';
-import { LOCIMYU_SOURCE_RETENTION_NOTICE, summarizeMigration } from '../io/locimyu';
+import {
+  LOCIMYU_SOURCE_RETENTION_NOTICE,
+  planLociMyuDisplaySetRelationConfirmation,
+  summarizeMigration,
+  type LociMyuConfirmedDisplaySetRelation,
+  type LociMyuDisplaySetRelationConfirmation,
+} from '../io/locimyu';
 import { el, clear, fmtBytes } from './dom';
 import {
   ImportSourceSelectionController,
@@ -15,6 +21,7 @@ import {
 export interface ImportWizardResult {
   projectName: string;
   imageLinks: Map<string, string>;
+  confirmedDisplaySetRelation: LociMyuDisplaySetRelationConfirmation | null;
 }
 
 export interface ImportWizardOptions {
@@ -67,6 +74,7 @@ export function importWizardDialog(
     const backdrop = el('div', { class: 'lv-modal-backdrop' });
     const nameInput = el('input', { type: 'text', value: defaultName, placeholder: 'プロジェクト名' }) as HTMLInputElement;
     const imageLinks = new Map<string, string>();
+    let confirmedDisplaySetRelation: LociMyuDisplaySetRelationConfirmation | null = null;
     const sourceSelection = new ImportSourceSelectionController();
     let okButton: HTMLButtonElement | null = null;
 
@@ -85,6 +93,7 @@ export function importWizardDialog(
           if (okButton !== null) okButton.disabled = !sourceSelection.canConfirm;
           renderSummary();
           if (shouldRebuildImportLinks(outcome)) renderLinkSection();
+          renderDisplaySetRelationSection();
         },
       }) as HTMLSelectElement;
       plan.sources.forEach((s, i) => {
@@ -138,7 +147,7 @@ export function importWizardDialog(
           }
         }
         // マテリアル・ビューの割り当て（gidが推定の場合は明示する）
-        if (plan.migration.gidToSetName.size > 0) {
+        if (!options.directNative && plan.migration.gidToSetName.size > 0) {
           const assign = [...plan.migration.gidToSetName.values()].join('、');
           summary.append(
             el('div', { class: 'lv-mr-detail' },
@@ -195,6 +204,60 @@ export function importWizardDialog(
     }
     renderSummary();
 
+    // ---- LociMyu Caption sheet / material / view linkage ----
+    const displaySetRelationSection = el('div', { class: 'lv-grp' });
+    function renderDisplaySetRelationSection(): void {
+      clear(displaySetRelationSection);
+      confirmedDisplaySetRelation = null;
+      if (!options.directNative || plan.tables.length === 0) return;
+      let relationPlan;
+      try {
+        relationPlan = planLociMyuDisplaySetRelationConfirmation(plan.tables);
+      } catch {
+        displaySetRelationSection.append(
+          el('div', { class: 'lv-mr-detail warn' },
+            'Captionシートと見え方設定の対応候補を安全に確認できませんでした。未解決のマテリアル・視点は適用せずconversion reportへ記録します。'),
+        );
+        return;
+      }
+      if (relationPlan.kind === 'not-needed') return;
+      if (relationPlan.kind === 'unavailable') {
+        displaySetRelationSection.append(
+          el('div', { class: 'lv-hint' }, '表示セットの連動'),
+          el('div', { class: 'lv-mr-detail warn' },
+            '元ZIPの対応表が不足し、Captionシートとマテリアル・視点の順序も安全に照合できません。未解決の設定は適用せずconversion reportへ記録します。'),
+        );
+        return;
+      }
+
+      const confirmation = el('input', {
+        type: 'checkbox',
+        'aria-label': 'LociMyuの表示セット対応を一括確認',
+        onchange: (event) => {
+          confirmedDisplaySetRelation = (event.target as HTMLInputElement).checked
+            ? {
+                workbookArchivePath: plan.sources[plan.selectedSourceIndex]?.archivePath ?? '',
+                relations: relationPlan.relations.map((relation): LociMyuConfirmedDisplaySetRelation => ({ ...relation })),
+              }
+            : null;
+        },
+      }) as HTMLInputElement;
+      displaySetRelationSection.append(
+        el('div', { class: 'lv-hint' }, '表示セットの連動を確認'),
+        el('div', { class: 'lv-mr-detail' },
+          'LociMyuではCaptionシートとマテリアル・視点が連動します。正式な対応表が一部不足していますが、保存されたマテリアルと視点が同じ完全な順序を示しています。'),
+        el('div', { class: 'lv-mr-detail' },
+          `対応候補: ${relationPlan.relations.map((relation) => relation.sheetName).join('、')}`),
+        el('label', { class: 'lv-row' },
+          confirmation,
+          el('span', {}, 'この候補を一括確認し、Caption群・マテリアル・視点を表示セットとして引き継ぐ'),
+        ),
+        el('div', { class: 'lv-mr-detail warn' },
+          '確認しない場合、未解決のマテリアル・視点は適用せずconversion reportへ記録します。'),
+      );
+    }
+    renderDisplaySetRelationSection();
+
     // ---- 画像の手動リンク ----
     const linkSection = el('div', { class: 'lv-grp' });
     function renderLinkSection(): void {
@@ -249,6 +312,7 @@ export function importWizardDialog(
         resolve({
           projectName: nameInput.value.trim() !== '' ? nameInput.value.trim() : defaultName,
           imageLinks,
+          confirmedDisplaySetRelation,
         });
       },
     }, options.directNative ? '取り込み内容を確認' : '取り込む') as HTMLButtonElement;
@@ -262,6 +326,7 @@ export function importWizardDialog(
       ),
       sourceSection,
       summary,
+      displaySetRelationSection,
       linkSection,
       el('div', { class: 'lv-modal-actions' }, cancel, ok),
     );

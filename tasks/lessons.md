@@ -1,5 +1,14 @@
 # Lessons
 
+## 2026-09-01: LociMyuのCaption sheetとmaterialを別々に移行しない
+
+- LociMyuではactive `sheetGid`がCaption群、material current-state、任意の
+  viewを一緒に切り替える。DisplaySet受入では各recordの件数だけでなく、sheet
+  切替時にこの連動がuser-visibleに復元されるところまで確認する。
+- XLSXでexact GID registryが欠ける実データを、全件report-onlyのまま互換完了
+  としない。一方で無言のordinal推測も行わず、複数source表が同じ完全な順序を
+  示す場合だけ一括確認候補にし、不一致・未確認はfail closedにする。
+
 ## 2026-08-31: manual acceptanceでは正しい入力laneまで案内する
 
 - `.lociview` backup restoreとLociMyu ZIP conversionは別入力である。単に
@@ -283,3 +292,13 @@
 
 - ローカルpreviewが停止していてもService Workerの旧cacheだけで画面が開くため、「URLが表示できた」ことを現在treeの証拠にしない。手動確認を依頼する直前にserverのHTTP応答と配信assetを確認する。
 - prompt更新型Service Workerではhard reloadだけで待機中workerが必ず有効になるとは限らない。旧UIが見える場合は、serverを先に復旧し、全controlled tabを閉じて再openするか、承認済みの更新導線でworkerを切り替えてからvisual regressionを判定する。
+
+## 2026-09-01: converter修正のacceptanceでは既存Projectを再利用しない
+
+- import時だけ適用される変換修正は、既存Native Projectを後から書き換えない。修正後の確認で旧Projectを開くと、変換値の欠落がruntime不具合に見えるため、fresh originと一意なProject名で新規変換した結果を確認する。
+- query stringや同名Projectだけでは、Service Worker cache・OPFS・変換世代を区別できない。source→confirmation→draft→generation-1 snapshot→表示値のprovenanceを明示し、既存Projectに対する手作業の再保存を回避策にしない。
+
+## 2026-09-02: local previewのbase pathを配信URLと一致させる
+
+- `/LociView/`用buildをroot mountの`vite preview`で配ると、HTMLはfallbackで200でも`/LociView/assets/*`へHTMLが返り、画面は真っ白になる。ページのHTTP 200だけで起動確認を終えず、entry JavaScriptのstatus、Content-Type、byte数まで確認する。
+- local acceptanceはroot base + root URL、GitHub Pages確認は`BASE_PATH=/LociView/` +対応するmountとして分離する。queryやService Worker操作でbase不一致を回避しない。

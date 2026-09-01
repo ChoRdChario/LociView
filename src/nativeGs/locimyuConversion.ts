@@ -16,8 +16,10 @@ import {
   analyzeLociMyuSheets,
   isLociMyuCaptionSheet,
   lociMyuTrimV1,
+  planLociMyuDisplaySetRelationConfirmation,
   projectLociMyuCaptionSheetIdentities,
   type LociMyuCaption,
+  type LociMyuDisplaySetRelationConfirmation,
   type SheetTable,
 } from '../io/locimyu';
 import { detectFormat, loadModel, type ModelFormat } from '../viewer/loaders';
@@ -67,7 +69,12 @@ export interface LociMyuNativeConversionMapping {
   readonly disposition: LociMyuNativeDisposition;
   readonly targetKind?: string;
   readonly targetId?: string;
+  readonly relationBasis?: 'source-exact' | 'user-confirmed-corroborated-order';
   readonly note?: string;
+}
+
+export interface PlanLociMyuZipToNativeOptions {
+  readonly confirmedDisplaySetRelation?: LociMyuDisplaySetRelationConfirmation | null;
 }
 
 export interface LociMyuSourceFingerprint {
@@ -715,8 +722,19 @@ export async function planLociMyuZipToNative(
   sourceFile: File,
   inputPlan: ImportPlan,
   projectTitle: string,
+  options: PlanLociMyuZipToNativeOptions = {},
 ): Promise<LociMyuNativeConversionPlan> {
   const input = snapshotSelectedInput(inputPlan);
+  const suppliedDisplaySetConfirmation = options.confirmedDisplaySetRelation === undefined ||
+      options.confirmedDisplaySetRelation === null
+    ? null
+    : {
+        workbookArchivePath: options.confirmedDisplaySetRelation.workbookArchivePath,
+        relations: options.confirmedDisplaySetRelation.relations.map((relation) => ({
+          sheetGid: relation.sheetGid,
+          sheetName: relation.sheetName,
+        })),
+      };
   const sourceBefore = await fingerprintFile(sourceFile);
   const workbookDigest = digestNativeBytes(input.workbookBytes);
   const selectedWorkbook: LociMyuWorkbookFingerprint = {
@@ -830,6 +848,49 @@ export async function planLociMyuZipToNative(
     const identity = identityProjection.get(table);
     if (identity?.kind === 'legacyGid') authoritativeSetNameByGid.set(identity.value, lociMyuTrimV1(table.name));
   }
+  const relationPlan = planLociMyuDisplaySetRelationConfirmation(conversionTables);
+  const confirmedRelations = relationPlan.kind === 'confirmation-required' &&
+      suppliedDisplaySetConfirmation !== null &&
+      suppliedDisplaySetConfirmation.workbookArchivePath === input.workbookPath &&
+      suppliedDisplaySetConfirmation.relations.length === relationPlan.relations.length &&
+      suppliedDisplaySetConfirmation.relations.every((relation, index) => {
+        const expected = relationPlan.relations[index];
+        return expected !== undefined && relation.sheetGid === expected.sheetGid && relation.sheetName === expected.sheetName;
+      })
+    ? relationPlan.relations
+    : null;
+  if (suppliedDisplaySetConfirmation !== null && confirmedRelations === null) {
+    issue(issues, 'blocking', 'display-set-relation-confirmation-invalid', {
+      id: input.workbookPath,
+      field: 'DisplaySet relation confirmation',
+    }, 'The supplied DisplaySet relation confirmation is stale, partial, reordered, or does not match the selected workbook.',
+    'No relation is guessed and no native Project is published.', relationPlan.kind === 'confirmation-required'
+      ? relationPlan.relations.map((relation) => `${relation.sheetGid}:${relation.sheetName}`)
+      : []);
+  } else if (relationPlan.kind === 'confirmation-required' && confirmedRelations === null) {
+    issue(issues, 'info', 'display-set-relation-confirmation-required', {
+      id: input.workbookPath,
+      field: 'DisplaySet relation confirmation',
+    }, 'Two source state tables corroborate one complete relation proposal, but the user did not confirm it.',
+    'Caption identity remains unchanged; unresolved Saved Views and material appearances stay inactive.',
+    relationPlan.relations.map((relation) => `${relation.sheetGid}:${relation.sheetName}`));
+  } else if (confirmedRelations !== null) {
+    issue(issues, 'info', 'display-set-relation-user-confirmed', {
+      id: input.workbookPath,
+      field: 'DisplaySet relation confirmation',
+    }, 'The user confirmed the complete relation proposal corroborated by the view and material tables.',
+    'The confirmed relations may activate Saved Views and material appearances only; Caption identity remains source-exact or sheet-name fallback.',
+    confirmedRelations.map((relation) => `${relation.sheetGid}:${relation.sheetName}`));
+  }
+  const activationSetNameByGid = new Map(authoritativeSetNameByGid);
+  for (const relation of confirmedRelations ?? []) {
+    activationSetNameByGid.set(relation.sheetGid, relation.sheetName);
+  }
+  const corroboratedCandidateByGid = new Map(
+    relationPlan.kind === 'confirmation-required'
+      ? relationPlan.relations.map((relation) => [relation.sheetGid, relation.sheetName] as const)
+      : [],
+  );
   const candidateTitlesByGid = new Map<string, Set<string>>();
   const candidateGidsByTitle = new Map<string, Set<string>>();
   const sheetMap = conversionTables.find((table) => lociMyuTrimV1(table.name) === LM_SHEET_NAMES_SHEET);
@@ -855,6 +916,17 @@ export async function planLociMyuZipToNative(
   for (const [index, set] of migration.sets.entries()) {
     mappings.push({ sourceKind: 'Caption sheet', sourceId: set.name, disposition: 'converted', targetKind: 'DisplaySet', targetId: displaySets[index]!.id });
   }
+  for (const relation of confirmedRelations ?? []) {
+    mappings.push({
+      sourceKind: 'DisplaySet relation confirmation',
+      sourceId: `${relation.sheetGid}:${relation.sheetName}`,
+      disposition: 'converted',
+      targetKind: 'DisplaySet activation relation',
+      targetId: displaySetIdByName.get(relation.sheetName),
+      relationBasis: 'user-confirmed-corroborated-order',
+      note: 'activation-only; Caption identity is unchanged',
+    });
+  }
   for (const [index, row] of (sheetMap?.rows.slice(1) ?? []).entries()) {
     if (isEmptyRow(row)) continue;
     const rowNumber = index + 2;
@@ -876,6 +948,7 @@ export async function planLociMyuZipToNative(
       sourceId: `${LM_SHEET_NAMES_SHEET}:${rowNumber}`,
       disposition: exact ? 'converted' : 'reported',
       ...(exact ? { targetKind: 'DisplaySet authority', targetId: targetSetId } : {}),
+      ...(exact ? { relationBasis: 'source-exact' as const } : {}),
     });
     if (!exact) {
       issue(issues, 'warning', gid === '' || title === '' ? 'sheet-authority-row-incomplete' : 'sheet-authority-row-inactive', {
@@ -1095,12 +1168,15 @@ export async function planLociMyuZipToNative(
       }, 'The first native Saved View schema has no durable source timestamps.',
       'The view is evaluated normally; these fields remain in the report/source ZIP.');
     }
-    const setName = authoritativeSetNameByGid.get(gid);
+    const setName = activationSetNameByGid.get(gid);
     const displaySetId = setName === undefined ? undefined : displaySetIdByName.get(setName);
     if (sourceId === '' || displaySetId === undefined) {
       issue(issues, 'warning', 'view-relation-inactive', { sheet: LM_VIEWS_SHEET, row: rowNumber, id: sourceId || null, field: sourceId === '' ? 'id' : 'captionSheetGid' },
         sourceId === '' ? 'The view row has no stable source ID.' : 'The view GID has no exact one-to-one Caption-sheet authority.',
-        'No Saved View is activated.', [...(candidateTitlesByGid.get(gid) ?? [])]);
+        'No Saved View is activated.', [
+          ...(candidateTitlesByGid.get(gid) ?? []),
+          ...(corroboratedCandidateByGid.has(gid) ? [corroboratedCandidateByGid.get(gid)!] : []),
+        ]);
       mappings.push({ sourceKind: 'view row', sourceId: `${LM_VIEWS_SHEET}:${rowNumber}`, disposition: 'reported' });
       continue;
     }
@@ -1196,7 +1272,7 @@ export async function planLociMyuZipToNative(
       mappings.push({ sourceKind: 'material row', sourceId, disposition: 'reported', note: 'superseded by the source append-only current-state row' });
       continue;
     }
-    const setName = authoritativeSetNameByGid.get(gid);
+    const setName = activationSetNameByGid.get(gid);
     const displaySetId = setName === undefined ? undefined : displaySetIdByName.get(setName);
     const targets = materialTargets.get(key) ?? [];
     if (displaySetId === undefined || model === null || model.representation.contentKind !== 'mesh' || targets.length === 0) {
@@ -1204,7 +1280,10 @@ export async function planLociMyuZipToNative(
         displaySetId === undefined
           ? 'The material GID has no exact one-to-one Caption-sheet authority.'
           : 'No Mesh material slot has the exact trimmed LociMyu material name.',
-        'No material appearance is activated.', displaySetId === undefined ? [...(candidateTitlesByGid.get(gid) ?? [])] : targets.map((target) => target.nativeKey));
+        'No material appearance is activated.', displaySetId === undefined ? [
+          ...(candidateTitlesByGid.get(gid) ?? []),
+          ...(corroboratedCandidateByGid.has(gid) ? [corroboratedCandidateByGid.get(gid)!] : []),
+        ] : targets.map((target) => target.nativeKey));
       mappings.push({ sourceKind: 'material row', sourceId, disposition: 'reported' });
       continue;
     }
