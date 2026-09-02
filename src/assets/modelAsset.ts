@@ -19,6 +19,7 @@ export async function addModelAsset(
   bytes: Uint8Array,
 ): Promise<string> {
   store.assertWorkspace(fs, dir);
+  store.assertMutationAllowed();
   const astId = entityIdFor('asset');
   const ext = (name.split('.').pop() ?? 'bin').toLowerCase();
   const path = `models/${astId}.${ext}`;
@@ -73,6 +74,7 @@ export async function replaceModelAsset(
   bytes: Uint8Array,
 ): Promise<void> {
   store.assertWorkspace(fs, dir);
+  store.assertMutationAllowed();
   const asset = store.state.byKind.asset?.[assetId];
   if (asset === undefined) throw new Error(`replaceModelAsset: asset not found: ${assetId}`);
   const ext = (name.split('.').pop() ?? 'bin').toLowerCase();

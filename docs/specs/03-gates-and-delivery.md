@@ -1,6 +1,6 @@
 # Gates, evidence and delivery plan
 
-> Status: `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED`
+> Status: `PRODUCT-OWNER APPROVED CONTRACT / IMPLEMENTATION AND GATE STATUS ARE SECTION-SPECIFIC`
 
 ## 1. Gate discipline
 
@@ -127,7 +127,9 @@ GS is “unsupported” in the v1 baseline; do not invent a comparison value.
 
 ## 3. G0-S — blocking v1 safety stabilization
 
-G0-S protects current users and remains a release barrier. After `G0S-TAB` is
+G0-S protects writable-v1 users and remains a barrier for any candidate that
+exposes those writes. Section 3.8 defines the narrower exception for the first
+Native-only public candidate. After `G0S-TAB` is
 implemented, the approved proxy-backed Mesh/GS technical vertical slice
 may proceed while the remaining G0 and G0-S evidence/fixes continue in parallel,
 unless an unresolved P0/P1 directly makes that slice unsafe. Starting that slice
@@ -261,6 +263,56 @@ candidate as stable: redeploy the retained prior-known-good branch/tag by an
 approved manual run, or create and verify a non-destructive revert commit, and
 record the rollback run/head SHA. Release assets and fixture-only Release assets
 remain separate.
+
+### 3.8 Native-only first public candidate boundary (Product Owner approved 2026-09-03; implementation authorized)
+
+Section 3.7 remains the release boundary for any candidate that permits legacy
+v1 writes. The Product Owner selected a separate first-candidate boundary:
+Native is the sole user-writable Project authority, and legacy v1 is limited to
+safe import, explicit View and non-destructive conversion under
+`02-storage-package-migration.md` section 31.
+
+This selection does not mark `S2`, `S3`, `S4` or G0-S complete and does not waive
+their requirements for a future writable-v1 candidate. The general S2
+journal/recovery design for legacy mutation, and S3 durable quarantine plus
+keep-A/keep-B resolution, are deferred while those mutation paths are
+unreachable. For the Native-only candidate, the reachable compatibility ingress
+still MUST prove after every characterized import interruption that a legacy
+import is inactive or exact-complete and safely retryable. Reportable malformed
+or invalid operations never become active; divergent operations produce neither
+an authoritative View nor a Native Project; and no ambiguous subset can publish
+as Native. These are bounded ingress conditions, not the deferred general
+journal or resolution workflows. Passing these
+checks grants no `S2 PASS`, `S3 PASS`, `S4 PASS`, G0-S exit or stabilized-v1
+release claim.
+
+For this first Native-only candidate only, this section replaces the broad
+release-eligibility statement above that would otherwise require completion of
+all writable-v1 G0-S work. It does not change the meaning of a G0, G0-S or G1
+PASS and does not make those unpassed gates prerequisites by document inertia.
+
+The exact Native-only candidate tree is eligible for Product Owner release
+review only after all `RC-A-*` acceptance rows and release-hygiene requirements
+pass, clean-tree typecheck/tests and
+both root/Pages-path builds pass, independent read-only review has no P0/P1, and
+the Product Owner separately approves the exact SHA and deployment method. A's
+selection alone does not authorize license adoption, version assignment, main
+integration, Release creation or Pages deployment. Candidate designation,
+rollback retention and post-deploy verification remain governed by section 3.7.
+
+G0S-S2 remains split for this candidate. Multi-file legacy writer recovery,
+legacy merge publication recovery and a writer journal are deferred. Retained
+ingress work is limited to verified manifest-last source registration,
+inactive-or-exact-complete interruption behavior, safe retry, source fingerprint
+checks and publication stop on source/guard change. None of those claims `S2
+PASS`.
+
+G0S-S3 is likewise split. Durable quarantine lifecycle, typed issue persistence
+for editing, keep-A/keep-B UI and legacy merge resolution are deferred. Retained
+ingress work is duplicate-aware parsing, field/resource validation, malformed
+non-activation with a report, exact source preservation, divergent-key detection,
+conversion blocking and package-purpose dispatch. None of those claims `S3
+PASS`.
 
 ## 4. G1-A — bounded streaming and CAS PoC
 

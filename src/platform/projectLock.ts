@@ -9,6 +9,28 @@ import type {
 import { ProjectMutationDeniedError } from './fs';
 
 type ReleaseLock = () => void;
+type ProjectLockPurpose = 'none' | 'mutation' | 'source-snapshot';
+
+export interface ProjectNamespaceReader {
+  readBytes(path: string): Promise<Uint8Array | null>;
+  list(prefix: string): Promise<string[]>;
+}
+
+const namespaceReaders = new WeakMap<ProjectWorkspaceFS, ProjectNamespaceReader>();
+
+/**
+ * Return the read-only whole-workspace view paired with a scoped project
+ * capability. This lets storage enforce cross-format identity exclusions
+ * without giving a project writer a namespace-wide mutation capability.
+ */
+export function projectNamespaceReader(fs: ProjectWorkspaceFS): ProjectNamespaceReader {
+  if (fs.projectRoot === null) return fs;
+  const reader = namespaceReaders.get(fs);
+  if (reader === undefined) {
+    throw new Error('project lock: scoped workspace has no whole-workspace reader');
+  }
+  return reader;
+}
 
 function deferred(): { promise: Promise<void>; resolve: () => void } {
   let resolve!: () => void;
@@ -34,6 +56,10 @@ class ScopedProjectWorkspace implements ProjectWorkspaceFS {
       throw new Error(`project lock: invalid project root ${projectRoot}`);
     }
     this.mutationAuthority = authority;
+    namespaceReaders.set(this, Object.freeze({
+      readBytes: (path: string) => base.readBytes(path),
+      list: (prefix: string) => base.list(prefix),
+    }));
   }
 
   private assertPath(path: string): void {
@@ -129,11 +155,14 @@ export class ProjectMutationSession implements ProjectMutationAuthority {
     readonly projectRoot: string,
     readonly projectId: string,
     readonly sessionMode: ProjectSessionMode,
+    private readonly lockPurpose: ProjectLockPurpose = sessionMode === 'edit' ? 'mutation' : 'none',
   ) {
-    this.detailValue = sessionMode === 'view'
-      ? 'View modeは書込みロックを要求しません'
-      : '別のEdit modeタブがこのプロジェクトの書込みロックを使用しています';
-    this.writesSealed = sessionMode === 'view';
+    this.detailValue = lockPurpose === 'source-snapshot'
+      ? '別の画面がこの従来形式を使用しているため、変換元を保護できません'
+      : sessionMode === 'view'
+        ? '従来形式は閲覧専用です'
+        : '別のEdit modeタブがこのプロジェクトの書込みロックを使用しています';
+    this.writesSealed = lockPurpose !== 'mutation';
     this.workspace = new ScopedProjectWorkspace(base, projectRoot, this);
   }
 
@@ -146,11 +175,31 @@ export class ProjectMutationSession implements ProjectMutationAuthority {
   }
 
   get holdsWriteLock(): boolean {
-    return this.held && !this.released;
+    return this.lockPurpose === 'mutation' && this.held && !this.released;
+  }
+
+  get holdsSourceSnapshotLock(): boolean {
+    return this.lockPurpose === 'source-snapshot' && this.held && !this.released;
+  }
+
+  get holdsExclusiveLock(): boolean {
+    return this.lockPurpose !== 'none' && this.held && !this.released;
   }
 
   assertEditable(): void {
-    if (!this.activated || this.closing || this.stateValue !== 'editable' || !this.held || this.released) {
+    if (
+      this.lockPurpose !== 'mutation' || !this.activated || this.closing ||
+      this.stateValue !== 'editable' || !this.held || this.released
+    ) {
+      throw new ProjectMutationDeniedError(this.stateValue, this.detailValue);
+    }
+  }
+
+  assertSourceSnapshotProtected(): void {
+    if (
+      this.lockPurpose !== 'source-snapshot' || !this.activated || this.closing ||
+      !this.held || this.released || this.stateValue === 'lock-lost'
+    ) {
       throw new ProjectMutationDeniedError(this.stateValue, this.detailValue);
     }
   }
@@ -191,6 +240,20 @@ export class ProjectMutationSession implements ProjectMutationAuthority {
     this.activate('Edit mode（新規プロジェクトの書込みロック取得済み）');
   }
 
+  /** A fresh durable reload may activate protection, but never workspace writes. */
+  activateSourceSnapshotAfterDurableReload(): void {
+    if (
+      this.lockPurpose !== 'source-snapshot' || !this.held || this.released ||
+      this.stateValue === 'lock-lost'
+    ) {
+      throw new ProjectMutationDeniedError(this.stateValue, this.detailValue);
+    }
+    this.activated = true;
+    this.closing = false;
+    this.writesSealed = true;
+    this.publish('read-only', '変換元を変更から保護しています');
+  }
+
   /** Stop accepting new writes while queued writes are flushed before release. */
   beginClose(): void {
     this.closing = true;
@@ -200,7 +263,10 @@ export class ProjectMutationSession implements ProjectMutationAuthority {
   }
 
   resumeAfterCloseFailure(): void {
-    if (this.held && !this.released && this.stateValue !== 'lock-lost') {
+    if (
+      this.lockPurpose === 'mutation' && this.held && !this.released &&
+      this.stateValue !== 'lock-lost'
+    ) {
       this.closing = false;
       this.writesSealed = false;
       this.publish('editable', '保存に失敗したためEdit modeと書込みロックを維持しています');
@@ -252,7 +318,12 @@ export class ProjectMutationSession implements ProjectMutationAuthority {
     const release = this.releaseLock;
     this.releaseLock = null;
     release?.();
-    this.publish('read-only', this.sessionMode === 'view' ? 'View modeを終了しました' : 'Edit modeを終了しました');
+    this.publish(
+      'read-only',
+      this.lockPurpose === 'source-snapshot'
+        ? '変換元の保護を終了しました'
+        : this.sessionMode === 'view' ? '閲覧を終了しました' : 'Edit modeを終了しました',
+    );
   }
 
   /** @internal coordinator grant hook */
@@ -264,13 +335,21 @@ export class ProjectMutationSession implements ProjectMutationAuthority {
     this.held = true;
     this.activated = false;
     this.closing = false;
-    this.writesSealed = false;
+    this.writesSealed = this.lockPurpose !== 'mutation';
     this.releaseLock = release;
-    this.publish('read-only', '書込みロックを取得しました。端末保存済みデータを再読込しています');
+    this.publish(
+      'read-only',
+      this.lockPurpose === 'source-snapshot'
+        ? '変換元を保護しました。端末保存済みデータを再確認しています'
+        : '書込みロックを取得しました。端末保存済みデータを再読込しています',
+    );
   }
 
   private activate(detail: string): void {
-    if (!this.held || this.released || this.stateValue === 'lock-lost') {
+    if (
+      this.lockPurpose !== 'mutation' || !this.held || this.released ||
+      this.stateValue === 'lock-lost'
+    ) {
       throw new ProjectMutationDeniedError(this.stateValue, this.detailValue);
     }
     this.activated = true;
@@ -322,7 +401,30 @@ export class ProjectMutationCoordinator {
     projectRoot: string,
     projectId: string,
   ): Promise<ProjectMutationSession> {
-    const session = new ProjectMutationSession(base, projectRoot, projectId, 'edit');
+    return this.tryAcquireExclusive(base, projectRoot, projectId, 'mutation');
+  }
+
+  async tryAcquireSourceSnapshot(
+    base: WorkspaceFS,
+    projectRoot: string,
+    projectId: string,
+  ): Promise<ProjectMutationSession> {
+    return this.tryAcquireExclusive(base, projectRoot, projectId, 'source-snapshot');
+  }
+
+  private async tryAcquireExclusive(
+    base: WorkspaceFS,
+    projectRoot: string,
+    projectId: string,
+    purpose: 'mutation' | 'source-snapshot',
+  ): Promise<ProjectMutationSession> {
+    const session = new ProjectMutationSession(
+      base,
+      projectRoot,
+      projectId,
+      purpose === 'mutation' ? 'edit' : 'view',
+      purpose,
+    );
     const lockName = `lociview:project:${projectId}:mutation`;
 
     if (this.localHolders !== null) {
@@ -333,7 +435,11 @@ export class ProjectMutationCoordinator {
     }
 
     if (this.lockManager === null) {
-      session.denyWriteLock('Web Locks APIを利用できないためEdit modeは読み取り専用です');
+      session.denyWriteLock(
+        purpose === 'source-snapshot'
+          ? 'このブラウザでは変換元を排他的に保護できません'
+          : 'Web Locks APIを利用できないためEdit modeは読み取り専用です',
+      );
       return session;
     }
 
@@ -348,7 +454,11 @@ export class ProjectMutationCoordinator {
         async (lock) => {
           callbackStarted = true;
           if (lock === null) {
-            session.denyWriteLock('別のEdit modeタブが書込みロックを使用しているため読み取り専用です');
+            session.denyWriteLock(
+              purpose === 'source-snapshot'
+                ? '別の画面がこの従来形式を使用しているため変換を開始できません'
+                : '別のEdit modeタブが書込みロックを使用しているため読み取り専用です',
+            );
             started.resolve();
             return;
           }
@@ -362,22 +472,38 @@ export class ProjectMutationCoordinator {
       );
       void request.then(
         () => {
-          if (session.holdsWriteLock && !intentionalRelease) {
-            session.failClosed('書込みロックが予期せず終了したため新規書込みを停止しました');
+          if (session.holdsExclusiveLock && !intentionalRelease) {
+            session.failClosed(
+              purpose === 'source-snapshot'
+                ? '変換元の保護が予期せず終了したため変換を停止しました'
+                : '書込みロックが予期せず終了したため新規書込みを停止しました',
+            );
           }
         },
         () => {
           if (!callbackStarted) started.resolve();
-          if (session.holdsWriteLock) {
-            session.failClosed('書込みロックの維持に失敗したため新規書込みを停止しました');
+          if (session.holdsExclusiveLock) {
+            session.failClosed(
+              purpose === 'source-snapshot'
+                ? '変換元の保護を維持できないため変換を停止しました'
+                : '書込みロックの維持に失敗したため新規書込みを停止しました',
+            );
           } else {
-            session.denyWriteLock('書込みロックを取得できないためEdit modeは読み取り専用です');
+            session.denyWriteLock(
+              purpose === 'source-snapshot'
+                ? '変換元を保護できないため変換を開始できません'
+                : '書込みロックを取得できないためEdit modeは読み取り専用です',
+            );
           }
         },
       );
       await started.promise;
     } catch {
-      session.denyWriteLock('書込みロックを利用できないためEdit modeは読み取り専用です');
+      session.denyWriteLock(
+        purpose === 'source-snapshot'
+          ? '変換元を保護できないため変換を開始できません'
+          : '書込みロックを利用できないためEdit modeは読み取り専用です',
+      );
     }
     return session;
   }

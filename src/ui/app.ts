@@ -2,7 +2,10 @@
 
 import { ProjectStore, type Identity } from '../core/store';
 import { newId } from '../core/ids';
-import { parseManifest } from '../core/manifest';
+import {
+  parseCandidateV1ManifestBytes,
+  readPublishedCandidateV1ManifestBytes,
+} from '../core/manifest';
 import { MemoryFS, type ProjectSessionMode, type WorkspaceFS } from '../platform/fs';
 import { OpfsFS } from '../platform/opfs';
 import { ProjectMutationCoordinator, type ProjectMutationSession } from '../platform/projectLock';
@@ -18,7 +21,9 @@ import { AppContext } from './context';
 import { el, clear, downloadBlob, fmtBytes } from './dom';
 import { infoDialog, promptDialog } from './dialogs';
 import { fNum, fStr } from './fields';
-import { mountHome, type NativeProjectListItem, type WritableProjectSession } from './home';
+import { mountHome, type NativeProjectListItem } from './home';
+import type { ZipInspection } from '../assets/package';
+import { serializeConventionalSourceReport } from './conventionalSourceReport';
 import { mountViewerScreen } from './viewerScreen';
 import type { PackageExportStatus } from './saveStatus';
 import type { ImportPlan } from '../assets/importWizard';
@@ -51,7 +56,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
   } else {
     fs = new MemoryFS();
     storageWarning =
-      'このブラウザは永続ワークスペース(OPFS)に未対応です。作業内容はタブを閉じると消えます。必ず「書き出し」で保存してください。';
+      'このブラウザでは端末への永続保存を利用できません。従来形式の登録・変換は開始できません。';
   }
   // View mode never needs this coordinator. Edit mode always requires the real
   // browser cross-context primitive, even when the workspace itself is tab-local.
@@ -100,10 +105,10 @@ export async function bootApp(root: HTMLElement): Promise<void> {
   // ---- プロファイル -------------------------------------------------------------
   async function openProfile(): Promise<void> {
     if (ctx !== null && !ctx.store.canMutate) {
-      await infoDialog('読み取り専用', 'Edit modeで書込みロックを取得し、端末保存済みデータを再読込するまで、プロファイル変更は記録できません。');
+      await infoDialog('閲覧専用', '従来形式を開いている間はプロファイルを変更できません。');
       return;
     }
-    const name = await promptDialog('プロファイル', '表示名（マージ時に相手へ見える名前）', identity.displayName ?? '');
+    const name = await promptDialog('プロファイル', '表示名', identity.displayName ?? '');
     if (name === null) return;
     identity.displayName = name;
     localStorage.setItem('lv-displayName', name);
@@ -166,38 +171,50 @@ export async function bootApp(root: HTMLElement): Promise<void> {
 
   // ---- project session / 画面遷移 ----------------------------------------------
   async function readProjectManifest(dir: string) {
-    const text = await fs.readText(`${dir}/lociview.json`);
-    if (text === null) throw new Error(`project: no manifest in ${dir}`);
-    return parseManifest(text);
+    const bytes = await readPublishedCandidateV1ManifestBytes(fs, dir);
+    if (bytes === null) throw new Error(`project: no manifest in ${dir}`);
+    return parseCandidateV1ManifestBytes(bytes);
   }
 
-  async function startProjectMutation(
-    dir: string,
-    projectId: string,
-    existing: boolean,
-  ): Promise<WritableProjectSession | null> {
-    const access = await mutationCoordinator.tryAcquire(fs, dir, projectId);
+  async function registerConventionalPackage(inspection: ZipInspection): Promise<string> {
+    if (!persistentWorkspace) {
+      throw new Error('このブラウザでは従来形式を端末へ保存できないため、取込を開始できません。');
+    }
+    if (inspection.kind !== 'lociview' || inspection.manifest === null) {
+      throw new Error('従来形式として確認できませんでした。');
+    }
+    const dir = `projects/${inspection.manifest.projectId}`;
+    const access = await mutationCoordinator.tryAcquire(fs, dir, inspection.manifest.projectId);
     if (!access.holdsWriteLock) {
+      const detail = access.accessDetail;
       access.release();
-      return null;
+      throw new Error(detail);
     }
     try {
-      if (!existing) {
-        if (await fs.exists(`${dir}/lociview.json`)) {
-          throw new Error(`project: target is already active (${dir})`);
+      access.activateNewProject();
+      const { importNewProject } = await import('../assets/package');
+      try {
+        await importNewProject(access.workspace, dir, inspection, {
+          rejectPublishedTarget: true,
+          namespaceFs: fs,
+        });
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('target is already published')) {
+          throw new Error(
+            '同じ識別情報の従来形式が端末に保存済みです。選択したファイルは統合・上書きしていません。ホームから保存済みのコピーを閲覧専用で開いてください。',
+          );
         }
-        access.activateNewProject();
-        return { access, fs: access.workspace, store: null };
+        if (error instanceof Error && error.message.includes('new-format project')) {
+          throw new Error(
+            '同じ識別情報の新しい形式のプロジェクトが端末にあるため、選択した従来形式は保存していません。' +
+            'ホームから既存の新しい形式のプロジェクトを開いてください。',
+          );
+        }
+        throw error;
       }
-      const store = await ProjectStore.open(access.workspace, dir, identity);
-      if (store.manifest.projectId !== projectId) {
-        throw new Error('project: manifest identity changed during lock acquisition');
-      }
-      access.activateAfterDurableReload();
-      return { access, fs: access.workspace, store };
-    } catch (error) {
+      return dir;
+    } finally {
       access.release();
-      throw error;
     }
   }
 
@@ -225,19 +242,15 @@ export async function bootApp(root: HTMLElement): Promise<void> {
 
   async function convertOpenedV1ToNative(onStatus: (message: string) => void): Promise<void> {
     const activeCtx = ctx;
-    const sourceAccess = projectAccess;
-    if (
-      activeCtx === null || sourceAccess === null || !sourceAccess.holdsWriteLock ||
-      sourceAccess.accessState !== 'editable' || !activeCtx.store.canMutate
-    ) {
-      throw new Error('Native変換には、元のv1 projectをEdit modeで開いて書込みロックを保持する必要があります。');
-    }
-    if (v1ConversionInProgress) throw new Error('Native変換はすでに進行中です。');
+    const viewAccess = projectAccess;
+    if (activeCtx === null || viewAccess === null) throw new Error('変換する従来形式を先に開いてください。');
+    if (!persistentWorkspace) throw new Error('このブラウザでは新しい形式を端末へ保存できないため、変換を開始できません。');
+    if (v1ConversionInProgress) throw new Error('新しい形式への変換はすでに進行中です。');
     v1ConversionInProgress = true;
-    const progressText = el('p', { role: 'status' }, '元のv1 projectを確認しています…');
+    const progressText = el('p', { role: 'status' }, '変換元を確認しています…');
     const progressDialog = el('dialog', { class: 'lv-dialog' },
-      el('h2', {}, 'Native projectへ変換'),
-      el('p', {}, '元のv1 projectは変更しません。変換が完了するまで、この画面で他の編集はできません。'),
+      el('h2', {}, '新しい形式へ変換'),
+      el('p', {}, '従来形式は変更しません。変換が完了すると、編集できる新しいプロジェクトを開きます。'),
       progressText,
     ) as HTMLDialogElement;
     document.body.append(progressDialog);
@@ -253,49 +266,73 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       progressText.textContent = message;
       onStatus(message);
     };
+    let sourceGuard: ProjectMutationSession | null = null;
     let targetAccess: ProjectMutationSession | null = null;
     let created: import('../nativeGs/schema').NativeProjectSnapshotV1 | null = null;
     let sourceAuthorityLost = false;
-    const unsubscribeSourceAccess = sourceAccess.subscribeAccess((state) => {
-      if (state !== 'editable') sourceAuthorityLost = true;
-    });
-    const assertSourceAuthority = (): void => {
-      if (
-        sourceAuthorityLost || !sourceAccess.holdsWriteLock || sourceAccess.accessState !== 'editable' ||
-        !activeCtx.store.canMutate
-      ) {
-        throw new Error('変換中に元のv1 projectの書込みロックを失ったため、新しいprojectの公開を中止しました。');
-      }
-      activeCtx.store.assertMutationAllowed();
-    };
+    let unsubscribeSourceAccess = (): void => {};
     try {
-      status('v1 projectが保存済みであることを確認しています…');
-      await sourceAccess.waitForWorkspaceIdle();
-      assertSourceAuthority();
-      if (activeCtx.store.durabilityStatus.phase !== 'durable' || activeCtx.store.durabilityStatus.pending !== 0) {
-        throw new Error('元のv1 projectに未保存または失敗中の変更があります。保存完了後に再実行してください。');
+      status('変換中に元データが変わらないよう保護しています…');
+      sourceGuard = await mutationCoordinator.tryAcquireSourceSnapshot(
+        fs,
+        activeCtx.dir,
+        activeCtx.store.manifest.projectId,
+      );
+      if (!sourceGuard.holdsSourceSnapshotLock) {
+        throw new Error(sourceGuard.accessDetail);
       }
+      const sourceStore = await ProjectStore.openLegacySource(sourceGuard.workspace, activeCtx.dir, identity);
+      if (sourceStore.manifest.projectId !== activeCtx.store.manifest.projectId) {
+        throw new Error('変換元の識別情報が変わったため、変換を開始しませんでした。');
+      }
+      sourceGuard.activateSourceSnapshotAfterDurableReload();
+      unsubscribeSourceAccess = sourceGuard.subscribeAccess((state) => {
+        if (state === 'lock-lost') sourceAuthorityLost = true;
+      });
+      const assertSourceAuthority = (): void => {
+        if (
+          sourceAuthorityLost || !sourceGuard?.holdsSourceSnapshotLock ||
+          ctx !== activeCtx || projectAccess !== viewAccess
+        ) {
+          throw new Error('変換元の保護を維持できないため、新しいプロジェクトの公開を中止しました。');
+        }
+        sourceStore.assertSourceSnapshotProtected();
+      };
+      assertSourceAuthority();
       const conversion = await import('../nativeGs/frozenV1Conversion');
-      status('v1の全recordとsource bytesを照合しています…');
-      const plan = await conversion.planOpenedFrozenV1ToNative(activeCtx.fs, activeCtx.dir, activeCtx.store);
+      status('内容と元ファイルを照合しています…');
+      const plan = await conversion.planOpenedFrozenV1ToNative(
+        sourceGuard.workspace,
+        activeCtx.dir,
+        sourceStore,
+      );
       assertSourceAuthority();
       if (plan.blockingIssueCount > 0) {
         downloadBlob(
           conversion.serializeFrozenV1ConversionPreflight(plan),
-          `${plan.sourceProjectId}-native-conversion-preflight.json`,
+          `${plan.sourceProjectId}-new-format-conversion-details.json`,
           'application/json',
         );
         closeProgress();
         await infoDialog(
-          'Native変換を開始しませんでした',
-          `${plan.blockingIssueCount}件のblocking項目があります。不完全なNative projectは作成していません。理由をconversion reportへ保存しました。`,
+          '変換を開始しませんでした',
+          `${plan.blockingIssueCount}件の変換できない項目があります。不完全なプロジェクトは作成していません。理由の説明を保存しました。`,
         );
         return;
       }
       const storage = await import('../nativeGs/storage');
-      await conversion.assertOpenedFrozenV1SourceUnchanged(plan, activeCtx.fs, activeCtx.store);
+      const assertSourceUnchanged = async (): Promise<void> => {
+        assertSourceAuthority();
+        await conversion.assertOpenedFrozenV1SourceUnchanged(
+          plan,
+          sourceGuard!.workspace,
+          sourceStore,
+        );
+        assertSourceAuthority();
+      };
+      await assertSourceUnchanged();
       assertSourceAuthority();
-      status('新しいNative projectの書込みロックを取得しています…');
+      status('新しいプロジェクトの保存準備をしています…');
       targetAccess = await mutationCoordinator.tryAcquire(
         fs,
         storage.nativeProjectRoot(plan.draft.project.id),
@@ -304,22 +341,26 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       if (!targetAccess.holdsWriteLock) throw new Error(targetAccess.accessDetail);
       targetAccess.activateNewProject();
       assertSourceAuthority();
-      status('modelと画像を検証しながら新しいNative projectへ保存しています…');
+      status('モデルと画像を検証しながら新しいプロジェクトへ保存しています…');
       created = await storage.createNativeProjectV1(
         targetAccess.workspace,
         plan.draft,
         plan.representationSources,
-        status,
+        () => status('新しいプロジェクトを保存しています…'),
         plan.mediaSources,
-        assertSourceAuthority,
+        assertSourceUnchanged,
       );
       assertSourceAuthority();
-      const sourceAfter = await conversion.assertOpenedFrozenV1SourceUnchanged(plan, activeCtx.fs, activeCtx.store);
+      const sourceAfter = await conversion.assertOpenedFrozenV1SourceUnchanged(
+        plan,
+        sourceGuard.workspace,
+        sourceStore,
+      );
       assertSourceAuthority();
       const report = conversion.completeOpenedFrozenV1ConversionReport(plan, created, sourceAfter);
       downloadBlob(
         conversion.serializeFrozenV1ConversionReport(report),
-        `${plan.sourceProjectId}-to-${created.project.id}-conversion-report.json`,
+        `${plan.sourceProjectId}-to-${created.project.id}-new-format-details.json`,
         'application/json',
       );
       targetAccess.release();
@@ -327,8 +368,8 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       closeProgress();
       const reported = report.issues.length;
       await infoDialog(
-        'Native変換が完了しました',
-        `元のv1 projectは変更されていません。新しいNative projectを作成しました。${reported}件の変換上の注記をreportへ保存しました。`,
+        '新しい形式への変換が完了しました',
+        `従来形式は変更されていません。編集できる新しいプロジェクトを作成しました。${reported}件の注記を説明ファイルへ保存しました。`,
       );
       if (!(await closeProjectAndShowHome())) return;
       openNativeProjects(created.project.id, 'edit');
@@ -341,13 +382,24 @@ export async function bootApp(root: HTMLElement): Promise<void> {
         } catch (cleanupError) {
           throw new Error(
             `${error instanceof Error ? error.message : String(error)}\n` +
-            `新規Native projectのcleanupにも失敗しました: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+            `作成途中の新しいプロジェクトを片付けられませんでした: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
           );
         }
+      }
+      const detail = error instanceof Error ? error.message : String(error);
+      if (/source (?:file )?(?:changed|disappeared)|source changed while hashing/iu.test(detail)) {
+        throw new Error('変換中に元データが変わったため、新しいプロジェクトは公開していません。もう一度開き直して確認してください。');
+      }
+      if (/malformed operation|unsupported source schema/iu.test(detail)) {
+        throw new Error('従来形式に安全に変換できない記録があるため、新しいプロジェクトは作成していません。');
+      }
+      if (/legacy|\bv1\b|writer|operation log|native project/iu.test(detail)) {
+        throw new Error('新しい形式への変換を完了できませんでした。元の従来形式は変更されていません。');
       }
       throw error;
     } finally {
       unsubscribeSourceAccess();
+      sourceGuard?.release();
       targetAccess?.release();
       closeProgress();
       v1ConversionInProgress = false;
@@ -368,14 +420,14 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     onStatus: (message: string) => void,
   ): Promise<string | null> {
     if (!persistentWorkspace) {
-      throw new Error('このブラウザではNative projectを端末へ永続保存できないため、LociMyu変換を開始できません。');
+      throw new Error('このブラウザでは新しいプロジェクトを端末へ保存できないため、LociMyu変換を開始できません。');
     }
     if (lociMyuConversionInProgress) throw new Error('LociMyu変換はすでに進行中です。');
     lociMyuConversionInProgress = true;
-    const progressText = el('p', { role: 'status' }, '元のLociMyu ZIPをread-onlyで確認しています…');
+    const progressText = el('p', { role: 'status' }, '元のLociMyu ZIPを読み取り専用で確認しています…');
     const progressDialog = el('dialog', { class: 'lv-dialog' },
-      el('h2', {}, 'LociMyu ZIPをNative projectへ変換'),
-      el('p', {}, '元ZIPには書き戻しません。変換不能な項目はconversion reportへ記録します。'),
+      el('h2', {}, 'LociMyu ZIPを新しいプロジェクトへ変換'),
+      el('p', {}, '元ZIPには書き戻しません。変換できない項目は説明ファイルへ記録します。'),
       progressText,
     ) as HTMLDialogElement;
     document.body.append(progressDialog);
@@ -395,7 +447,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     let created: import('../nativeGs/schema').NativeProjectSnapshotV1 | null = null;
     try {
       const conversion = await import('../nativeGs/locimyuConversion');
-      status('workbook、Caption identity、model、mediaを照合しています…');
+      status('表、キャプション、モデル、画像を照合しています…');
       const plan = await conversion.planLociMyuZipToNative(sourceFile, importPlan, projectName, {
         confirmedDisplaySetRelation,
       });
@@ -411,15 +463,15 @@ export async function bootApp(root: HTMLElement): Promise<void> {
         );
         closeProgress();
         await infoDialog(
-          'Native変換を開始しませんでした',
-          `${plan.blockingIssueCount}件のblocking項目があります。元ZIPは変更せず、不完全なNative projectも作成していません。詳細をconversion reportへ保存しました。`,
+          '変換を開始しませんでした',
+          `${plan.blockingIssueCount}件の変換できない項目があります。元ZIPは変更せず、不完全なプロジェクトも作成していません。詳細を説明ファイルへ保存しました。`,
         );
         return null;
       }
       const storage = await import('../nativeGs/storage');
       status('元ZIPが変化していないことを確認しています…');
       await conversion.assertLociMyuSourceUnchanged(plan, sourceFile);
-      status('新しいNative projectの書込みロックを取得しています…');
+      status('新しいプロジェクトの保存準備をしています…');
       targetAccess = await mutationCoordinator.tryAcquire(
         fs,
         storage.nativeProjectRoot(plan.draft.project.id),
@@ -427,12 +479,12 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       );
       if (!targetAccess.holdsWriteLock) throw new Error(targetAccess.accessDetail);
       targetAccess.activateNewProject();
-      status('modelと画像を検証しながらNative projectへ保存しています…');
+      status('モデルと画像を検証しながら新しいプロジェクトへ保存しています…');
       created = await conversion.createLociMyuNativeProject(
         targetAccess.workspace,
         plan,
         sourceFile,
-        status,
+        () => status('新しいプロジェクトを保存しています…'),
       );
       const sourceAfter = await conversion.assertLociMyuSourceUnchanged(plan, sourceFile);
       const report = conversion.completeLociMyuNativeConversionReport(plan, created, sourceAfter);
@@ -445,8 +497,8 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       targetAccess = null;
       closeProgress();
       await infoDialog(
-        'Native変換が完了しました',
-        `元のLociMyu ZIPは変更されていません。新しいNative projectを作成し、${report.issues.length}件の注記をconversion reportへ保存しました。`,
+        '変換が完了しました',
+        `元のLociMyu ZIPは変更されていません。編集できる新しいプロジェクトを作成し、${report.issues.length}件の注記を説明ファイルへ保存しました。`,
       );
       return created.project.id;
     } catch (error) {
@@ -458,7 +510,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
         } catch (cleanupError) {
           throw new Error(
             `${error instanceof Error ? error.message : String(error)}\n` +
-            `新規Native projectのcleanupにも失敗しました: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+            `作成途中の新しいプロジェクトを片付けられませんでした: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
           );
         }
       }
@@ -555,7 +607,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       fs,
       identity,
       openProject,
-      startProjectMutation,
+      registerConventionalPackage,
       openProfile: () => void openProfile(),
       storageWarning,
       listNativeProjects,
@@ -600,45 +652,22 @@ export async function bootApp(root: HTMLElement): Promise<void> {
 
   async function openProject(
     dir: string,
-    mode: ProjectSessionMode,
-    prepared?: WritableProjectSession,
   ): Promise<void> {
     if (projectOpening) {
-      // A plain home-list double click does not own anything that needs cleanup.
-      // Prepared mutation sessions must reject so their caller releases the unused lock.
-      if (prepared === undefined) return;
-      throw new Error('project: another project is already opening');
+      return;
     }
     if (ctx !== null || projectAccess !== null) {
       throw new Error('project: close the current session before opening another project');
     }
     projectOpening = true;
     const navigationEpoch = ++projectNavigationEpoch;
-    let access: ProjectMutationSession | null = prepared?.access ?? null;
+    let access: ProjectMutationSession | null = null;
     try {
-      let store = prepared?.store ?? null;
-      if (access === null) {
-        const manifest = await readProjectManifest(dir);
-        access = mode === 'view'
-          ? mutationCoordinator.openView(fs, dir, manifest.projectId)
-          : await mutationCoordinator.tryAcquire(fs, dir, manifest.projectId);
-        store = await ProjectStore.open(access.workspace, dir, identity);
-        if (store.manifest.projectId !== manifest.projectId) {
-          throw new Error('project: manifest identity changed during open');
-        }
-        if (access.holdsWriteLock) access.activateAfterDurableReload();
-      } else {
-        if (mode !== 'edit' || access.sessionMode !== 'edit') {
-          throw new Error('project: prepared mutation session requires Edit mode');
-        }
-        if (access.projectRoot !== dir) throw new Error('project: prepared session root mismatch');
-        store ??= await ProjectStore.open(access.workspace, dir, identity);
-        if (store.workspace !== access.workspace || store.manifest.projectId !== access.projectId) {
-          throw new Error('project: prepared session identity mismatch');
-        }
-        if (access.holdsWriteLock && access.accessState !== 'editable') {
-          access.activateAfterDurableReload();
-        }
+      const manifest = await readProjectManifest(dir);
+      access = mutationCoordinator.openView(fs, dir, manifest.projectId);
+      const store = await ProjectStore.openLegacySource(access.workspace, dir, identity);
+      if (store.manifest.projectId !== manifest.projectId) {
+        throw new Error('project: manifest identity changed during open');
       }
       if (navigationEpoch !== projectNavigationEpoch) {
         throw new Error('project: opening was superseded by another navigation');
@@ -657,51 +686,6 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     }
   }
 
-  async function requestEditMode(): Promise<void> {
-    const activeCtx = ctx;
-    const oldAccess = projectAccess;
-    if (activeCtx === null || oldAccess === null || activeCtx.store.canMutate) return;
-    const navigationEpoch = projectNavigationEpoch;
-    const next = await mutationCoordinator.tryAcquire(
-      fs,
-      activeCtx.dir,
-      activeCtx.store.manifest.projectId,
-    );
-    if (!next.holdsWriteLock) {
-      const detail = next.accessDetail;
-      next.release();
-      await infoDialog('読み取り専用', `書込みロックをまだ取得できません。\n\n${detail}`);
-      return;
-    }
-    try {
-      const store = await ProjectStore.open(next.workspace, activeCtx.dir, identity);
-      if (
-        navigationEpoch !== projectNavigationEpoch ||
-        ctx !== activeCtx ||
-        projectAccess !== oldAccess
-      ) {
-        next.release();
-        return;
-      }
-      if (store.manifest.projectId !== activeCtx.store.manifest.projectId) {
-        throw new Error('project: manifest identity changed before ownership transfer');
-      }
-      next.activateAfterDurableReload();
-      oldAccess.release();
-      projectAccess = null;
-      disposeViewer();
-      await mountOpenedProject(activeCtx.dir, next, store, navigationEpoch);
-    } catch (error) {
-      next.release();
-      if (projectAccess === next) {
-        projectAccess = null;
-        disposeViewer();
-        if (navigationEpoch === projectNavigationEpoch) renderHome();
-      }
-      await infoDialog('Edit modeへの切替', error instanceof Error ? error.message : String(error));
-    }
-  }
-
   async function mountOpenedProject(
     dir: string,
     access: ProjectMutationSession,
@@ -712,7 +696,16 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     packageExportStatus = Object.freeze({ phase: 'idle' });
     if (store.loadErrors.length > 0) {
       const total = store.loadErrors.reduce((s, e) => s + e.errors.length, 0);
-      await infoDialog('警告', `ログに破損行が ${total} 行あり、スキップしました（他のデータは無事です）`);
+      downloadBlob(
+        serializeConventionalSourceReport(store.loadErrors.flatMap(({ file, errors }) =>
+          errors.map(({ line, reason }) => ({ path: file, line, reason })))),
+        `${store.manifest.projectId}-source-report.json`,
+        'application/json',
+      );
+      await infoDialog(
+        '従来形式の確認結果',
+        `安全に表示できない記録が ${total} 件あり、その内容は表示に反映していません。ファイル、行番号、理由を説明ファイルへ保存しました。新しい形式への変換は開始できません。`,
+      );
     }
     if (navigationEpoch !== projectNavigationEpoch || projectAccess !== access) {
       throw new Error('project: opening was superseded by another navigation');
@@ -745,7 +738,6 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       packageExportStatus: () => packageExportStatus,
       setPackageExportStatus: (status) => setPackageExportStatus(dir, status),
       openProfile: () => void openProfile(),
-      requestEditMode: () => void requestEditMode(),
       convertOpenedV1ToNative,
     });
     // 最初のモデルを自動表示。ただし大きいモデルは自動で読まない。

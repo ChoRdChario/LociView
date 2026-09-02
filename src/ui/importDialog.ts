@@ -136,9 +136,9 @@ export function importWizardDialog(
         );
         if (options.directNative) {
           summary.append(
-            el('div', { class: 'lv-mr-detail' }, '新しいNative LociView projectへ直接変換します。中間のv1 projectは作りません。'),
+            el('div', { class: 'lv-mr-detail' }, '編集できる新しいLociViewプロジェクトへ直接変換します。'),
             el('div', { class: 'lv-mr-detail warn' },
-              '元のLociMyu ZIPは別途保管してください。exactに確定できない画像・見え方・視点は自動推測せずconversion reportへ記録します。'),
+              '元のLociMyu ZIPは別途保管してください。正確に確定できない画像・見え方・視点は自動推測せず、説明ファイルへ記録します。'),
           );
         } else {
           const retentionNotice = importWizardRetentionNotice(plan);
@@ -169,8 +169,8 @@ export function importWizardDialog(
           ),
           el('div', { class: 'lv-mr-detail warn' },
             skipsMissingIdRows
-              ? '元のLociMyu ZIPは別途保管してください。その行からCaptionは作らずconversion reportへ記録します。元ZIPは変更せず、残りの有効なデータをNative projectへ変換します。'
-              : '元のLociMyu ZIPは別途保管してください。「取り込み内容を確認」を押すとconversion reportを保存し、不完全なNative projectは作りません。'),
+              ? '元のLociMyu ZIPは別途保管してください。その行からキャプションは作らず説明ファイルへ記録します。元ZIPは変更せず、残りの有効なデータを新しいプロジェクトへ変換します。'
+              : '元のLociMyu ZIPは別途保管してください。「取り込み内容を確認」を押すと説明ファイルを保存し、不完全なプロジェクトは作りません。'),
         );
       } else if (plan.tables.length > 0) {
         summary.append(
@@ -319,7 +319,7 @@ export function importWizardDialog(
     okButton = ok;
 
     const card = el('div', { class: 'lv-modal-card', role: 'dialog', 'aria-label': 'インポート' },
-      el('div', { class: 'lv-modal-title' }, options.directNative ? 'LociMyu ZIPをNative projectへ変換' : 'ZIPの取り込み'),
+      el('div', { class: 'lv-modal-title' }, options.directNative ? 'LociMyu ZIPを新しいプロジェクトへ変換' : 'ZIPの取り込み'),
       el('div', { class: 'lv-grp' },
         el('div', { class: 'lv-hint' }, 'プロジェクト名'),
         nameInput,

@@ -5,9 +5,16 @@
 // - mergeFromInspection: 開いているプロジェクトへの取込
 
 import { parseHlc } from '../core/hlc';
-import { parseOpsJsonl } from '../core/jsonl';
-import { parseManifest, type ProjectManifest } from '../core/manifest';
+import { parseOpsJsonl, v1OperationLogActor } from '../core/jsonl';
+import {
+  candidateV1ImportReceiptPath,
+  parseCandidateV1Manifest,
+  parseCandidateV1ManifestBytes,
+  parsePublishedCandidateV1ManifestBytes,
+  type ProjectManifest,
+} from '../core/manifest';
 import { mergeOps, type MergeReport } from '../core/merge';
+import { admitNonDivergentV1Operations, type LocatedV1Operation } from '../core/operationAdmission';
 import { reduce, versionVector, visibleEntities, type ProjectState } from '../core/reduce';
 import type { Op } from '../core/schema';
 import type { ProjectStore } from '../core/store';
@@ -22,20 +29,22 @@ import {
 } from './zipio';
 import { writeVerifiedBytes } from './verifiedWrite';
 
-const decoder = new TextDecoder();
 const fatalUtf8Decoder = new TextDecoder('utf-8', { fatal: true });
 const encoder = new TextEncoder();
-const ACTOR_ID_PATTERN = /^a_[0-9A-HJKMNP-TV-Z]{13}$/u;
 
 /** ZIP内の分類結果 */
 export interface ZipInspection {
   kind: 'lociview' | 'foreign';
   manifest: ProjectManifest | null;
+  /** lociview.json 原文bytes（新規展開時の無改変保存用） */
+  manifestData: Uint8Array | null;
   /** ops原文（無改変保存用） */
-  opsFiles: { path: string; text: string }[];
+  opsFiles: { path: string; text: string; data?: Uint8Array }[];
   /** パース済みop（マージ・表示用）。破損行はスキップ済み */
   ops: Op[];
   opsErrorCount: number;
+  /** Safe locations for malformed or ambiguous source records. */
+  opsIssues?: { path: string; line: number; reason: string }[];
   /** models/ media/ thumbs/ のバイナリ */
   binaries: ZipEntryData[];
   /** 上記以外（foreign判定時のウィザード用材料） */
@@ -46,11 +55,12 @@ export async function inspectZip(bytes: Uint8Array, limits?: ZipLimits): Promise
   const entries = await readZipEntries(bytes, limits);
   const manifestEntry = entries.find((e) => e.path === 'lociview.json');
   const manifest = manifestEntry !== undefined
-    ? parseManifest(fatalUtf8Decoder.decode(manifestEntry.data))
+    ? parseCandidateV1ManifestBytes(manifestEntry.data)
     : null;
 
-  const opsFiles: { path: string; text: string }[] = [];
-  const ops: Op[] = [];
+  const opsFiles: { path: string; text: string; data?: Uint8Array }[] = [];
+  const locatedOps: LocatedV1Operation[] = [];
+  const opsIssues: { path: string; line: number; reason: string }[] = [];
   let opsErrorCount = 0;
   const binaries: ZipEntryData[] = [];
   const others: ZipEntryData[] = [];
@@ -58,10 +68,25 @@ export async function inspectZip(bytes: Uint8Array, limits?: ZipLimits): Promise
   for (const e of entries) {
     if (e.path === 'lociview.json' || e.path === 'snapshot.json' || e.path === 'captions.csv') continue;
     if (e.path.startsWith('ops/') && e.path.endsWith('.jsonl')) {
-      const text = decoder.decode(e.data);
-      const parsed = parseOpsJsonl(text);
-      opsFiles.push({ path: e.path, text });
-      ops.push(...parsed.ops);
+      const data = new Uint8Array(e.data);
+      const text = fatalUtf8Decoder.decode(data);
+      const parsed = parseOpsJsonl(text, { candidateReadOnly: true });
+      const actor = v1OperationLogActor(e.path, 'ops/');
+      opsFiles.push({ path: e.path, text, data });
+      if (actor === null) {
+        opsIssues.push({ path: e.path, line: 1, reason: 'operation actor/path mismatch' });
+        opsErrorCount += 1;
+      } else {
+        for (const entry of parsed.entries) {
+          if (entry.op.actor !== actor) {
+            opsIssues.push({ path: e.path, line: entry.line, reason: 'operation actor/path mismatch' });
+            opsErrorCount += 1;
+          } else {
+            locatedOps.push({ op: entry.op, line: entry.line, source: e.path });
+          }
+        }
+      }
+      opsIssues.push(...parsed.errors.map(({ line, reason }) => ({ path: e.path, line, reason })));
       opsErrorCount += parsed.errors.length;
     } else if (e.path.startsWith('models/') || e.path.startsWith('media/') || e.path.startsWith('thumbs/')) {
       binaries.push(e);
@@ -70,46 +95,85 @@ export async function inspectZip(bytes: Uint8Array, limits?: ZipLimits): Promise
     }
   }
 
+  const admitted = admitNonDivergentV1Operations(locatedOps);
+  opsIssues.push(...admitted.divergent.map(({ source, line }) => ({
+    path: source,
+    line,
+    reason: 'divergent operation identity',
+  })));
+  opsErrorCount += admitted.divergent.length;
   return {
     kind: manifest !== null ? 'lociview' : 'foreign',
     manifest,
+    manifestData: manifestEntry === undefined ? null : new Uint8Array(manifestEntry.data),
     opsFiles,
-    ops,
+    ops: admitted.accepted.map(({ op }) => op),
     opsErrorCount,
+    opsIssues,
     binaries,
     others,
   };
 }
 
+export interface ImportNewProjectOptions {
+  /** Normal package registration must never alias an already-published source. */
+  rejectPublishedTarget?: boolean;
+  /** Whole workspace reader used to reserve the cross-format Project identity. */
+  namespaceFs?: WorkspaceFS;
+}
+
 /** 新規プロジェクトとしてワークスペースへ展開する。dirは 'projects/<projectId>' 想定 */
-export async function importNewProject(fs: ProjectWorkspaceFS, dir: string, insp: ZipInspection): Promise<string> {
-  if (insp.kind !== 'lociview' || insp.manifest === null) {
+export async function importNewProject(
+  fs: ProjectWorkspaceFS,
+  dir: string,
+  insp: ZipInspection,
+  options: ImportNewProjectOptions = {},
+): Promise<string> {
+  if (insp.kind !== 'lociview' || insp.manifest === null || insp.manifestData === null) {
     throw new Error('importNewProject: not a lociview package');
   }
 
   // Snapshot every caller-owned value before the first await. The raw JSONL is
   // the imported authority; insp.ops is only an inspection convenience.
-  const manifest = parseManifest(JSON.stringify(structuredClone(insp.manifest)));
-  const markerBytes = encoder.encode(JSON.stringify(manifest, null, 2));
+  const manifest = parseCandidateV1Manifest(JSON.stringify(structuredClone(insp.manifest)));
+  const markerBytes = new Uint8Array(insp.manifestData);
+  const rawManifest = parseCandidateV1ManifestBytes(markerBytes);
+  if (!sameManifest(manifest, rawManifest)) {
+    throw new Error('importNewProject: manifest bytes/inspection mismatch');
+  }
+  const rejectPublishedTarget = options.rejectPublishedTarget === true;
+  const namespaceFs = options.namespaceFs ?? (fs.projectRoot === null ? fs : null);
+  if (namespaceFs === null) {
+    throw new Error('importNewProject: whole-workspace namespace reader is required');
+  }
   const reportedOpsErrorCount = insp.opsErrorCount;
   const opsFiles = insp.opsFiles.map((file) => ({
     path: file.path,
     text: file.text,
-    bytes: encoder.encode(file.text),
+    bytes: file.data === undefined ? encoder.encode(file.text) : new Uint8Array(file.data),
   }));
   const binaries = uniqueBinaryRegistry(
     insp.binaries.map((entry) => ({ path: entry.path, data: new Uint8Array(entry.data) })),
     'importNewProject',
   );
-  const parsedOps: Op[] = [];
+  const locatedOps: LocatedV1Operation[] = [];
   const opsPaths = new Set<string>();
   for (const file of opsFiles) {
-    const actor = importOpsActor(file.path);
+    const actor = v1OperationLogActor(file.path, 'ops/');
     if (actor === null || opsPaths.has(file.path)) {
       throw new Error(`importNewProject: invalid or duplicate operation log ${file.path}`);
     }
     opsPaths.add(file.path);
-    const parsed = parseOpsJsonl(file.text);
+    let decoded: string;
+    try {
+      decoded = fatalUtf8Decoder.decode(file.bytes);
+    } catch {
+      throw new Error(`importNewProject: invalid UTF-8 operation log ${file.path}`);
+    }
+    if (decoded !== file.text) {
+      throw new Error(`importNewProject: operation bytes/text mismatch ${file.path}`);
+    }
+    const parsed = parseOpsJsonl(decoded, { candidateReadOnly: true });
     if (parsed.errors.length > 0) {
       throw new Error(`importNewProject: malformed operation log ${file.path}`);
     }
@@ -122,7 +186,7 @@ export async function importNewProject(fs: ProjectWorkspaceFS, dir: string, insp
     })) {
       throw new Error(`importNewProject: operation actor does not match ${file.path}`);
     }
-    parsedOps.push(...parsed.ops);
+    locatedOps.push(...parsed.entries.map(({ op, line }) => ({ op, line, source: file.path })));
   }
   if (reportedOpsErrorCount !== 0) {
     throw new Error('importNewProject: inspection contains malformed operations');
@@ -137,6 +201,11 @@ export async function importNewProject(fs: ProjectWorkspaceFS, dir: string, insp
     }
   }
 
+  const admitted = admitNonDivergentV1Operations(locatedOps);
+  if (admitted.divergent.length > 0) {
+    throw new Error('importNewProject: divergent operation identity');
+  }
+  const parsedOps = admitted.accepted.map(({ op }) => op);
   const required = requiredImportBlobClosure(reduce(parsedOps));
   for (const [path, expectedSize] of required) {
     const source = binaries.get(path);
@@ -146,10 +215,44 @@ export async function importNewProject(fs: ProjectWorkspaceFS, dir: string, insp
     }
   }
 
+  await assertNewFormatNamespaceAvailable(namespaceFs, manifest.projectId);
+
   const markerPath = `${dir}/lociview.json`;
-  if (await fs.readBytes(markerPath) !== null) {
-    throw new Error(`importNewProject: target is already active (${dir})`);
+  const receiptPath = candidateV1ImportReceiptPath(dir);
+  const existingMarker = await fs.readBytes(markerPath);
+  const existingReceipt = await fs.readBytes(receiptPath);
+  const receiptAlreadyComplete = existingReceipt !== null && bytesEqual(existingReceipt, markerBytes);
+  let publishedManifest: ProjectManifest | null = null;
+  if (existingMarker !== null) {
+    try {
+      publishedManifest = parsePublishedCandidateV1ManifestBytes(existingMarker, existingReceipt);
+    } catch {
+      // A marker that disagrees with its durable import receipt is staging even
+      // when the byte prefix happens to be parseable JSON.
+    }
   }
+  if (publishedManifest !== null && rejectPublishedTarget) {
+    throw new Error(`importNewProject: target is already published (${dir})`);
+  }
+  const markerAlreadyPublished = publishedManifest !== null &&
+    existingMarker !== null && bytesEqual(existingMarker, markerBytes);
+  if (publishedManifest !== null && !markerAlreadyPublished) {
+    throw new Error(`importNewProject: target contains a conflicting published marker (${dir})`);
+  }
+  if (
+    existingMarker !== null &&
+    !markerAlreadyPublished &&
+    !bytesArePrefix(existingMarker, markerBytes)
+  ) throw new Error(`importNewProject: target contains a conflicting marker (${dir})`);
+  if (existingMarker !== null && !markerAlreadyPublished && !receiptAlreadyComplete) {
+    throw new Error(`importNewProject: target marker belongs to another raw source (${dir})`);
+  }
+  if (
+    existingReceipt !== null &&
+    !markerAlreadyPublished &&
+    !bytesEqual(existingReceipt, markerBytes) &&
+    !bytesArePrefix(existingReceipt, markerBytes)
+  ) throw new Error(`importNewProject: target contains a conflicting import receipt (${dir})`);
   const expectedActiveLogs = [...opsPaths].map((path) => `${dir}/${path}`).sort();
   const expectedActiveLogSet = new Set(expectedActiveLogs);
   const existingActiveLogs = (await fs.list(`${dir}/ops/`))
@@ -158,11 +261,17 @@ export async function importNewProject(fs: ProjectWorkspaceFS, dir: string, insp
     throw new Error(`importNewProject: target contains an unexpected active log (${dir})`);
   }
 
-  for (const file of opsFiles) {
-    await writeVerifiedBytes(fs, `${dir}/${file.path}`, file.bytes); // raw bytes preserve unknown fields
-  }
-  for (const [path, data] of binaries) {
-    await writeVerifiedBytes(fs, `${dir}/${path}`, data);
+  if (!markerAlreadyPublished) {
+    // A complete receipt is the durable guard for a possibly prefix-written
+    // marker. Rewriting it could itself stop at that same marker prefix and
+    // make two incomplete byte strings look equal to readers.
+    if (!receiptAlreadyComplete) await writeVerifiedBytes(fs, receiptPath, markerBytes);
+    for (const file of opsFiles) {
+      await writeVerifiedBytes(fs, `${dir}/${file.path}`, file.bytes); // raw bytes preserve unknown fields
+    }
+    for (const [path, data] of binaries) {
+      await writeVerifiedBytes(fs, `${dir}/${path}`, data);
+    }
   }
 
   const activeLogs = (await fs.list(`${dir}/ops/`))
@@ -179,7 +288,13 @@ export async function importNewProject(fs: ProjectWorkspaceFS, dir: string, insp
     if (stored === null || !bytesEqual(stored, file.bytes)) {
       throw new Error(`importNewProject: operation log verification failed for ${file.path}`);
     }
-    const parsed = parseOpsJsonl(decoder.decode(stored));
+    let storedText: string;
+    try {
+      storedText = fatalUtf8Decoder.decode(stored);
+    } catch {
+      throw new Error(`importNewProject: stored operation log has invalid UTF-8 ${file.path}`);
+    }
+    const parsed = parseOpsJsonl(storedText, { candidateReadOnly: true });
     if (parsed.errors.length > 0) {
       throw new Error(`importNewProject: stored operation log is malformed ${file.path}`);
     }
@@ -202,23 +317,41 @@ export async function importNewProject(fs: ProjectWorkspaceFS, dir: string, insp
     }
   }
 
-  await writeVerifiedBytes(fs, markerPath, markerBytes);
+  if (!markerAlreadyPublished) {
+    const durableReceipt = await fs.readBytes(receiptPath);
+    if (durableReceipt === null || !bytesEqual(durableReceipt, markerBytes)) {
+      throw new Error(`importNewProject: import receipt verification failed (${dir})`);
+    }
+    // The production caller holds the same Project-ID exclusion lock used by
+    // Native creation. Recheck at the publication edge so a bypassed or lost
+    // preflight still leaves this source inactive.
+    await assertNewFormatNamespaceAvailable(namespaceFs, manifest.projectId);
+    await writeVerifiedBytes(fs, markerPath, markerBytes);
+  }
+  if (await fs.exists(receiptPath)) await fs.remove(receiptPath).catch(() => {});
   return manifest.projectId;
 }
 
-function importOpsActor(path: string): string | null {
-  if (
-    path === '' ||
-    sanitizeZipPath(path) !== path ||
-    !path.startsWith('ops/') ||
-    !path.endsWith('.jsonl')
-  ) {
-    return null;
+async function assertNewFormatNamespaceAvailable(
+  namespaceFs: WorkspaceFS,
+  projectId: string,
+): Promise<void> {
+  if ((await namespaceFs.list(`native-projects/${projectId}/`)).length > 0) {
+    throw new Error('importNewProject: target identity is reserved by a new-format project');
   }
-  const filename = path.slice('ops/'.length);
-  if (filename.length <= '.jsonl'.length || filename.includes('/')) return null;
-  const actor = filename.slice(0, -'.jsonl'.length);
-  return ACTOR_ID_PATTERN.test(actor) ? actor : null;
+}
+
+function sameManifest(left: ProjectManifest, right: ProjectManifest): boolean {
+  return left.format === right.format &&
+    left.schemaVersion === right.schemaVersion &&
+    left.projectId === right.projectId &&
+    left.name === right.name &&
+    left.createdAt === right.createdAt &&
+    left.generator === right.generator;
+}
+
+function bytesArePrefix(prefix: Uint8Array, complete: Uint8Array): boolean {
+  return prefix.length < complete.length && prefix.every((value, index) => value === complete[index]);
 }
 
 function requiredImportBlobClosure(state: ProjectState): Map<string, number | null> {
@@ -268,6 +401,7 @@ export async function mergeFromInspection(
   insp: ZipInspection,
 ): Promise<MergeReport> {
   store.assertWorkspace(fs, dir);
+  store.assertMutationAllowed();
   if (insp.kind !== 'lociview' || insp.manifest === null) {
     throw new Error('merge: not a lociview package');
   }

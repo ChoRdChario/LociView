@@ -792,9 +792,9 @@ describe.sequential('G0S-WRITE status and package checkpoints', () => {
     expect(failed.detailText).not.toContain('書き込み完了');
     expect(failed.canRetry).toBe(true);
     expect(viewAccess).toMatchObject({
-      compactText: 'View mode（読み取り専用）',
-      canRetry: true,
-      actionLabel: 'Edit modeへ切替',
+      compactText: '従来形式・閲覧専用',
+      canRetry: false,
+      actionLabel: null,
     });
     expect(editableAccess).toMatchObject({ compactText: 'Edit mode（書込み可能）', canRetry: false });
     expect(readOnlyAccess).toMatchObject({

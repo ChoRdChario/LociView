@@ -1,5 +1,10 @@
 import type { ProjectWorkspaceFS, WorkspaceFS, WorkspaceReadableFile } from '../platform/fs';
-import { parseManifest } from '../core/manifest';
+import { projectNamespaceReader, type ProjectNamespaceReader } from '../platform/projectLock';
+import {
+  CandidateV1PublicationIncompleteError,
+  parseCandidateV1ManifestBytes,
+  readPublishedCandidateV1ManifestBytes,
+} from '../core/manifest';
 import { inspectNativeGsPlyV1, inspectNativePointPlyV1, type RestartableByteSource } from './plyProfile';
 import {
   NATIVE_ACTIVE_FORMAT,
@@ -79,19 +84,33 @@ export function nativeMediaPath(projectId: string, mediaId: string): string {
   return `${nativeProjectRoot(projectId)}/media/${mediaId}.bin`;
 }
 
-export async function assertNativeProjectDoesNotMixV1(fs: WorkspaceFS, projectId: string): Promise<void> {
+export async function assertNativeProjectDoesNotMixV1(
+  fs: ProjectNamespaceReader,
+  projectId: string,
+): Promise<void> {
   for (const path of await fs.list('projects/')) {
     if (!/^projects\/[^/]+\/lociview\.json$/.test(path)) continue;
-    const text = await fs.readText(path);
-    if (text === null) continue;
+    const dir = path.slice(0, -'/lociview.json'.length);
+    let bytes: Uint8Array | null;
+    try {
+      bytes = await readPublishedCandidateV1ManifestBytes(fs, dir);
+    } catch (error) {
+      // A byte-incomplete private import prefix is inactive. Unstable reads and
+      // I/O failures remain authority failures and must stop Native publication.
+      if (error instanceof CandidateV1PublicationIncompleteError) continue;
+      throw error;
+    }
+    if (bytes === null) continue;
     let existingProjectId: string;
     try {
-      existingProjectId = parseManifest(text).projectId;
+      existingProjectId = parseCandidateV1ManifestBytes(bytes).projectId;
     } catch {
+      // Invalid compatibility-source staging does not suppress an otherwise
+      // healthy Native Project with the same candidate identity.
       continue;
     }
     if (existingProjectId === projectId) {
-      throw new Error('native project: a v1 project with the same ID exists; mixed state is refused');
+      throw new Error('同じ識別情報の従来形式が端末にあるため、このプロジェクトは開けません。');
     }
   }
 }
@@ -271,6 +290,15 @@ export async function createNativeProjectV1(
   assertPublicationAllowed?: () => void | Promise<void>,
 ): Promise<NativeProjectSnapshotV1> {
   assertProjectWorkspace(fs, draft.project.id);
+  const namespaceReader = projectNamespaceReader(fs);
+  const assertNativePublicationAllowed = async (): Promise<void> => {
+    await assertNativeProjectDoesNotMixV1(namespaceReader, draft.project.id);
+    await assertPublicationAllowed?.();
+  };
+  // The caller already holds the shared Project-ID exclusion lock. Recheck
+  // through the read-only whole namespace after that acquisition and before
+  // the first Native write so a preflight-to-lock race cannot mix purposes.
+  await assertNativeProjectDoesNotMixV1(namespaceReader, draft.project.id);
   if (await fs.exists(nativeActiveMarkerPath(draft.project.id))) {
     throw new Error('native project: project is already active');
   }
@@ -328,11 +356,11 @@ export async function createNativeProjectV1(
     ...(draft.meshMaterialAppearances === undefined ? {} : { meshMaterialAppearances: draft.meshMaterialAppearances }),
     ...(draft.mediaResources === undefined ? {} : { mediaResources }),
   };
-  await assertPublicationAllowed?.();
+  await assertNativePublicationAllowed();
   onStatus?.('Writing and verifying native snapshot v1…');
   const verified = await writeVerifiedSnapshot(fs, snapshot);
   // Publication boundary: no active project exists before this final write.
-  await assertPublicationAllowed?.();
+  await assertNativePublicationAllowed();
   onStatus?.('Publishing active receipt…');
   await publishActiveMarker(fs, snapshot, verified.digest);
   onStatus?.('Native project saved and active.');

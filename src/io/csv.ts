@@ -339,6 +339,7 @@ export function planCaptionsCsvImport(csvText: string, state: ProjectState): Csv
  * deleteCandidatesはここでは実行しない（UIで確認後、明示的にdeleteEntityを呼ぶ）。
  */
 export function applyCsvPlan(store: ProjectStore, plan: CsvImportPlan): void {
+  store.assertMutationAllowed();
   const newSetIds = new Map<string, string>();
   for (const name of plan.newSetNames) {
     newSetIds.set(name, store.createEntity('set', { name, order: 999 }));

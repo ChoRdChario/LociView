@@ -274,6 +274,43 @@ describe.sequential('G0S-TAB View/Edit mode boundary', () => {
     editAccess.release();
     viewAccess.release();
   });
+
+  it('uses the mutation lock domain for an exclusive write-sealed source snapshot', async () => {
+    const fs = new MemoryFS();
+    const dir = 'projects/g0s-source-snapshot';
+    const projectId = 'prj_00000000000000000000000010';
+    await seedEmptyProject(fs, dir);
+    const coordinator = ProjectMutationCoordinator.local();
+    const guard = await coordinator.tryAcquireSourceSnapshot(fs, dir, projectId);
+    const store = await ProjectStore.openLegacySource(guard.workspace, dir, USER_A);
+
+    expect(guard.sessionMode).toBe('view');
+    expect(guard.holdsSourceSnapshotLock).toBe(true);
+    expect(guard.holdsWriteLock).toBe(false);
+    expect(store.canMutate).toBe(false);
+    expect(() => store.assertSourceSnapshotProtected()).toThrow(ProjectMutationDeniedError);
+    expect(() => guard.activateAfterDurableReload()).toThrow(ProjectMutationDeniedError);
+    guard.activateSourceSnapshotAfterDurableReload();
+    expect(() => store.assertSourceSnapshotProtected()).not.toThrow();
+    expect(() => store.dispatch({
+      t: 'create', e: 'caption', id: captionId(7, 0, 2), v: { title: 'forbidden' },
+    })).toThrow(ProjectMutationDeniedError);
+    await expect(guard.workspace.writeText(`${dir}/media/forbidden.bin`, 'forbidden'))
+      .rejects.toBeInstanceOf(ProjectMutationDeniedError);
+
+    const editWhileGuarded = await coordinator.tryAcquire(fs, dir, projectId);
+    expect(editWhileGuarded.holdsWriteLock).toBe(false);
+    editWhileGuarded.release();
+    guard.release();
+    expect(() => store.assertSourceSnapshotProtected()).toThrow(ProjectMutationDeniedError);
+
+    const edit = await coordinator.tryAcquire(fs, dir, projectId);
+    expect(edit.holdsWriteLock).toBe(true);
+    const guardWhileEditing = await coordinator.tryAcquireSourceSnapshot(fs, dir, projectId);
+    expect(guardWhileEditing.holdsSourceSnapshotLock).toBe(false);
+    guardWhileEditing.release();
+    edit.release();
+  });
 });
 
 describe.sequential('G0S-TAB fail-closed ownership loss', () => {

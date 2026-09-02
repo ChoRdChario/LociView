@@ -12,7 +12,7 @@ import { ProjectStore, type Identity } from '../../src/core/store';
 import { MemoryFS } from '../../src/platform/fs';
 import { makeXlsx } from '../helpers/makeXlsx';
 
-const USER: Identity = { userId: 'usr_M', deviceId: 'dev_M', displayName: '移行者' };
+const USER: Identity = { userId: 'usr_00000000000000000000000003', deviceId: 'dev_M', displayName: '移行者' };
 const enc = new TextEncoder();
 
 const CAP_HEADER = ['id', 'title', 'body', 'color', 'posX', 'posY', 'posZ', 'imageFileId', 'createdAt', 'updatedAt'];

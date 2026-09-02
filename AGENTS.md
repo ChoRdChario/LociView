@@ -55,7 +55,7 @@
 - For architecture, storage schema, renderer, migration, security, or package changes: write or update the specification and acceptance criteria before implementation.
 - Keep changes small and reversible. Do not combine dependency upgrades, refactors, and features in one change.
 - When v2 migration is implemented, preserve v1 input and use dual-read/v2-only-write unless a later accepted specification says otherwise. This does not prohibit maintenance of the current v1 writer before that migration exists.
-- Do not describe Gaussian Splatting, Automerge, CAS, multiple simultaneous models, or renderer ports as implemented until their gate has passed and the code exists.
+- Do not describe Gaussian Splatting, Automerge, CAS, multiple simultaneous models, or renderer ports as adopted, generally supported or gate-passed until the applicable gate has passed and the code exists. `Implemented` may describe only an exact bounded production path whose code and executed evidence exist; it must state the tested scope and must not imply aggregate gate, adoption, broader support or release credit.
 
 ## Verification
 

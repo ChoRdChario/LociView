@@ -22,7 +22,6 @@ export interface ViewerScreenDeps {
   packageExportStatus: () => PackageExportStatus;
   setPackageExportStatus: (status: PackageExportStatus) => void;
   openProfile: () => void;
-  requestEditMode: () => void;
   convertOpenedV1ToNative: (onStatus: (message: string) => void) => Promise<void>;
 }
 
@@ -45,11 +44,6 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
 
   const saveStatus = el('span', { class: 'lv-dim lv-savestatus' });
   const accessStatus = el('span', { class: 'lv-badge' });
-  const retryAccessBtn = el('button', {
-    class: 'mini',
-    onclick: deps.requestEditMode,
-  });
-  retryAccessBtn.hidden = true;
   const retrySaveBtn = el('button', {
     class: 'mini',
     title: '端末ワークスペースへの保存を再試行',
@@ -70,7 +64,6 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
     el('button', { onclick: deps.goHome, title: 'ホームへ' }, '☰'),
     el('b', { class: 'lv-projname' }, ctx.store.manifest.name),
     accessStatus,
-    retryAccessBtn,
     saveStatus,
     retrySaveBtn,
     el('span', { class: 'lv-flex1' }),
@@ -195,8 +188,6 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
         break;
       case 'data':
         refreshers.set('data', mountDataTab(containerEl, ctx, {
-          loadModelAsset: deps.loadModelAsset,
-          setPackageExportStatus: deps.setPackageExportStatus,
           convertOpenedV1ToNative: deps.convertOpenedV1ToNative,
         }));
         break;
@@ -303,19 +294,22 @@ export function mountViewerScreen(root: HTMLElement, ctx: AppContext, deps: View
     accessStatus.textContent = access.compactText;
     accessStatus.title = access.detailText;
     accessStatus.classList.toggle('lv-warn', ctx.store.accessState === 'lock-lost');
-    retryAccessBtn.hidden = !access.canRetry;
-    retryAccessBtn.textContent = access.actionLabel ?? '';
-    retryAccessBtn.title = access.actionTitle ?? '';
-    const status = describeSaveStatus(
-      ctx.store.durabilityStatus,
-      deps.unexportedCount(),
-      deps.persistentWorkspace,
-      deps.packageExportStatus(),
-    );
-    saveStatus.textContent = status.compactText;
-    saveStatus.title = status.detailText;
-    retrySaveBtn.hidden = !status.canRetry;
-    retrySaveBtn.disabled = !ctx.store.canMutate;
+    if (ctx.store.canMutate) {
+      const status = describeSaveStatus(
+        ctx.store.durabilityStatus,
+        deps.unexportedCount(),
+        deps.persistentWorkspace,
+        deps.packageExportStatus(),
+      );
+      saveStatus.textContent = status.compactText;
+      saveStatus.title = status.detailText;
+      retrySaveBtn.hidden = !status.canRetry;
+      retrySaveBtn.disabled = false;
+    } else {
+      saveStatus.textContent = '';
+      saveStatus.title = '';
+      retrySaveBtn.hidden = true;
+    }
     undoBtn.disabled = !ctx.store.canMutate || !ctx.undo.canUndo;
     redoBtn.disabled = !ctx.store.canMutate || !ctx.undo.canRedo;
     profileBtn.disabled = !ctx.store.canMutate;

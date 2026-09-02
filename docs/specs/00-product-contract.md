@@ -1,6 +1,6 @@
 # Product and release contract
 
-> Status: `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED`
+> Status: `PRODUCT-OWNER APPROVED CONTRACT / IMPLEMENTATION AND GATE STATUS ARE SECTION-SPECIFIC`
 
 ## 1. Product outcome
 
@@ -37,6 +37,7 @@ destructive merge and silent guessed linkage are never defaults.
 | `PROD-12` | A non-specialist can complete ordinary open/import, caption, merge, export and recovery flows using familiar file/task language, without a Google/LociView account or exposure to actor, HLC, hash, CAS, OPFS, renderer-profile or similar implementation terminology. |
 | `PROD-13` | A LociMyu save dataset consisting of an XLSX save, associated model and images, and an optional file-ID map remains convertible into a new LociView project without a Google account or Google API. Conversion never overwrites the selected source artifacts. Every otherwise-valid non-empty LociMyu caption data-row occurrence with a non-empty stable legacy ID is preserved independently. A row whose trimmed legacy-ID cell is empty is treated as an empty Caption row: it creates no Caption, affects no occurrence ordinal and is explicitly reported while the unchanged source remains available. Duplicate non-empty legacy caption identifiers do not identify one target entity: every occurrence becomes a distinct Caption, and no occurrence is dropped, merged or selected as a winner. Only a uniquely source-authoritative relationship may be activated automatically. An inferred or ambiguous sheet relationship and an unresolved or ambiguous media relationship remain inactive or unlinked; an exportable conversion report records the source sheet, row, ID, affected field, reason and impact. The original outer ZIP remains outside the Project under user control, and that ZIP plus the report are the audit record. The new native Project is the working source of truth. Invalid non-empty identity or collision blocks publication rather than inventing an ID. The ordinary-user flow reports aggregate results and does not require item-by-item decisions. |
 | `PROD-14` | When an import or conversion can preserve every otherwise-valid record and isolate uncertain semantics, it MUST continue with the safe preserved result and the bounded accounting approved for that adapter instead of asking an ordinary user for fine-grained decisions. It MUST NOT silently drop, merge, choose a winner, invent a relationship or activate a guessed relationship. The first LociMyu adapter uses an exportable report and separately retained source ZIP; it adds no project-local sidecar, quarantine or review database. An ordinary-user choice is permitted only for a coarse source/target-authority decision, a destructive or irreversible action, or a condition that the accepted contract identifies as preventing any safe preserved result. |
+| `PROD-15` | In the first public candidate, a Native Project is the only user-writable Project authority. Legacy v1 remains a compatibility source that can be safely inspected, imported without rewriting its operation text, opened explicitly in View, or converted non-destructively into a separate Native Project. The candidate exposes no legacy project creation, Edit mode, operation dispatch, CSV application, model/media mutation, legacy package/CSV export or ZIP merge. This restriction does not remove Native editing, Native backup/restore or Native Package Exchange, including its bounded Caption/new-image collaboration merge. |
 
 ## 3. Asset visibility and composition support
 
@@ -206,7 +207,8 @@ It MUST NOT evict the only source copy, an attachment, or an irreplaceable displ
 ## 8. Compatibility and rollback
 
 - LociMyu dataset conversion and LociView v1-package-to-v2 migration are distinct compatibility paths. The user outcome in `PROD-13` is required; whether it is delivered by the integrated importer or a separately packaged tool is an implementation decision, but implementations MUST share one accepted conversion contract rather than silently diverging.
-- v1 input remains readable after v2 ships.
+- v1 input remains readable after v2 ships. In the first public candidate it is
+  not a user-writable Project format.
 - LociView v1-package-to-v2 conversion writes a new v2 project and never overwrites the selected v1 source.
 - After explicit v1-package-to-v2 conversion the new project is v2-only-write; no reverse synchronization to v1 is implied.
 - Unknown future major versions are read-only or rejected clearly.
@@ -215,7 +217,10 @@ It MUST NOT evict the only source copy, an attachment, or an irreplaceable displ
 
 ## 9. Planning envelope
 
-For one developer working with AI, the current public-candidate envelope is **28–44 focused weeks**; one focused week means roughly 25–30 hours of concentrated work. A closed alpha may be reachable after roughly **14–22 focused weeks** if the first candidates pass. These are planning ranges, not delivery promises, and are re-estimated after G0-S and the renderer decision.
+The historical broader v2/support-planning envelope was **28–44 focused
+weeks**; one focused week meant roughly 25–30 hours of concentrated work. That
+estimate does not govern the separately approved Native-only first public
+candidate in `PROD-15` and is not a delivery promise.
 
 Productionizing an acceptable WBOIT approximation may add roughly 3–7 focused weeks. A general exact mesh/GS rasterizer is a separate research programme and cannot be scheduled as an MVP task from the current evidence.
 
@@ -303,6 +308,24 @@ Recorded on 2026-08-29:
   layer model or force its exact persistence placement without the bounded
   implementation design.
 
+Recorded on 2026-09-03:
+
+- the first public candidate uses option A: Native is the sole user-writable
+  Project authority, while legacy v1 is limited to safe import, explicit View
+  and non-destructive conversion into a separate Native Project;
+- legacy v1 new-project creation, Edit, operation dispatch, CSV application,
+  model/media mutation, package/CSV export and ZIP merge are not
+  public-candidate functions. Native
+  backup/restore and Native Package Exchange remain available, including the
+  accepted Caption/new-image collaboration merge;
+- this decision defers rather than completes or waives the remaining writable-v1
+  G0S-S2/S3 work. Re-enabling legacy writes requires a later Product Owner
+  decision and completion of the applicable gates;
+- the Product Owner's selection and follow-up confirmation authorize only the
+  bounded `RC-A-01`–`RC-A-07` implementation and verification. They do not
+  adopt a license, choose an application/package version or release SHA,
+  integrate `main`, create a Release or deploy GitHub Pages.
+
 Still required later:
 
 - a scripted Product Owner usability walkthrough before public release, using the intended non-specialist persona to complete open/import, caption, merge, export and recovery without implementation terminology; `PROD-12` remains unaccepted until this succeeds;
@@ -310,4 +333,5 @@ Still required later:
 - G0 performance, memory, package-size, support-class and degradation guarantees after baseline measurement;
 - adoption, wording and default behavior for experimental smooth transparency only if G1-D passes, and a separate future decision before any transmission/refraction claim;
 - final merge-conflict interaction design and privacy labels; the fail-closed behavior itself is accepted;
-- approval of the v1-to-v2 conversion report, stabilized-v1 release and public release.
+- approval of the exact Native-only candidate and public release; stabilized-v1
+  approval remains required before any future candidate re-enables legacy writes.

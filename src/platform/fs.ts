@@ -50,6 +50,8 @@ export interface ProjectMutationAuthority {
   readonly accessState: ProjectAccessState;
   readonly accessDetail: string;
   assertEditable(): void;
+  /** Proves an exclusive, write-sealed source snapshot for non-destructive conversion. */
+  assertSourceSnapshotProtected(): void;
   beginWorkspaceWrite(): () => void;
   assertWorkspaceWriteAuthorized(): void;
   subscribeAccess(fn: (state: ProjectAccessState) => void): () => void;
@@ -70,6 +72,12 @@ export const LOCAL_PROJECT_MUTATION_AUTHORITY: ProjectMutationAuthority = Object
   accessState: 'editable' as const,
   accessDetail: 'tab-local workspace',
   assertEditable: () => undefined,
+  assertSourceSnapshotProtected: () => {
+    throw new ProjectMutationDeniedError(
+      'read-only',
+      'exclusive source snapshot protection is not active',
+    );
+  },
   beginWorkspaceWrite: () => () => undefined,
   assertWorkspaceWriteAuthorized: () => undefined,
   subscribeAccess: () => () => undefined,

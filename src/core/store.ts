@@ -4,12 +4,30 @@
 
 import { formatHlc, HlcClock } from './hlc';
 import { newActorId, newId, type IdPrefix } from './ids';
-import { MAX_LINE_CHARS, parseOpsJsonl, serializeOps, type JsonlParseError } from './jsonl';
-import { createManifest, parseManifest, type ProjectManifest } from './manifest';
+import {
+  MAX_LINE_CHARS,
+  parseOpsJsonl,
+  serializeOps,
+  v1OperationLogActor,
+  type JsonlParseError,
+} from './jsonl';
+import {
+  createManifest,
+  parseCandidateV1ManifestBytes,
+  parseManifest,
+  readPublishedCandidateV1ManifestBytes,
+  type ProjectManifest,
+} from './manifest';
 import { mergeOps, type MergeReport } from './merge';
+import { admitNonDivergentV1Operations, type LocatedV1Operation } from './operationAdmission';
 import { reduce, versionVector, type ProjectState } from './reduce';
 import { cloneValidatedDispatchOp, type Op, type OpType } from './schema';
-import type { ProjectAccessState, ProjectSessionMode, ProjectWorkspaceFS } from '../platform/fs';
+import {
+  ProjectMutationDeniedError,
+  type ProjectAccessState,
+  type ProjectSessionMode,
+  type ProjectWorkspaceFS,
+} from '../platform/fs';
 
 export interface Identity {
   userId: string;
@@ -49,6 +67,9 @@ class DurableAppendDivergedError extends Error {
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
+const fatalTextDecoder = new TextDecoder('utf-8', { fatal: true });
+
+export type ProjectWritePolicy = 'writable' | 'read-only-source';
 
 const ENTITY_PREFIX: Record<string, IdPrefix> = {
   caption: 'cap',
@@ -91,6 +112,7 @@ export class ProjectStore {
     readonly dir: string,
     readonly manifest: ProjectManifest,
     readonly identity: Identity,
+    readonly writePolicy: ProjectWritePolicy = 'writable',
   ) {
     if (workspace.projectRoot !== null && workspace.projectRoot !== dir) {
       throw new Error(`store: project workspace root mismatch (${workspace.projectRoot} !== ${dir})`);
@@ -108,7 +130,7 @@ export class ProjectStore {
     manifest: ProjectManifest,
     identity: Identity,
   ): ProjectStore {
-    const store = new ProjectStore(fs, dir, manifest, identity);
+    const store = new ProjectStore(fs, dir, manifest, identity, 'writable');
     store.createEntity('set', { name: '標準', order: 1 });
     store.dispatch({
       t: 'create',
@@ -160,24 +182,84 @@ export class ProjectStore {
 
   /** 既存プロジェクトを開く。全opsを読み、時計を観測済み最大値まで進める */
   static async open(fs: ProjectWorkspaceFS, dir: string, identity: Identity): Promise<ProjectStore> {
-    const manifestText = await fs.readText(`${dir}/lociview.json`);
-    if (manifestText === null) throw new Error(`store: no manifest in ${dir}`);
-    const manifest = parseManifest(manifestText);
-    const store = new ProjectStore(fs, dir, manifest, identity);
+    return ProjectStore.openWithPolicy(fs, dir, identity, 'writable');
+  }
+
+  /** Public-candidate compatibility source: readable/convertible, never writable. */
+  static async openLegacySource(
+    fs: ProjectWorkspaceFS,
+    dir: string,
+    identity: Identity,
+  ): Promise<ProjectStore> {
+    return ProjectStore.openWithPolicy(fs, dir, identity, 'read-only-source');
+  }
+
+  private static async openWithPolicy(
+    fs: ProjectWorkspaceFS,
+    dir: string,
+    identity: Identity,
+    writePolicy: ProjectWritePolicy,
+  ): Promise<ProjectStore> {
+    const manifestBytes = await readPublishedCandidateV1ManifestBytes(fs, dir);
+    if (manifestBytes === null) throw new Error(`store: no manifest in ${dir}`);
+    let manifest: ProjectManifest;
+    if (writePolicy === 'read-only-source') {
+      manifest = parseCandidateV1ManifestBytes(manifestBytes);
+    } else {
+      manifest = parseManifest(textDecoder.decode(manifestBytes));
+    }
+    const store = new ProjectStore(fs, dir, manifest, identity, writePolicy);
 
     const opsFiles = await fs.list(`${dir}/ops/`);
-    const all: Op[] = [];
+    const located: LocatedV1Operation[] = [];
     for (const file of opsFiles) {
       if (!file.endsWith('.jsonl')) continue;
       const bytes = await fs.readBytes(file);
       if (bytes === null) continue;
       store.durableLogLengths.set(file, bytes.length);
-      const text = textDecoder.decode(bytes);
-      const { ops, errors } = parseOpsJsonl(text);
+      let text: string;
+      try {
+        text = fatalTextDecoder.decode(bytes);
+      } catch {
+        throw new Error(`store: invalid UTF-8 operation log ${file}`);
+      }
+      const { entries, errors } = parseOpsJsonl(text, {
+        candidateReadOnly: writePolicy === 'read-only-source',
+      });
+      if (writePolicy === 'read-only-source') {
+        const actor = v1OperationLogActor(file, `${dir}/ops/`);
+        if (actor === null) {
+          errors.push({ line: 1, reason: 'operation actor/path mismatch' });
+        } else {
+          for (const entry of entries) {
+            if (entry.op.actor !== actor) {
+              errors.push({ line: entry.line, reason: 'operation actor/path mismatch' });
+            } else {
+              located.push({ op: entry.op, line: entry.line, source: file });
+            }
+          }
+        }
+      } else {
+        located.push(...entries.map(({ op, line }) => ({ op, line, source: file })));
+      }
       if (errors.length > 0) store.loadErrors.push({ file, errors });
-      all.push(...ops);
     }
-    store.ingest(all);
+    if (writePolicy === 'writable') {
+      store.ingest(located.map(({ op }) => op));
+      return store;
+    }
+    const admitted = admitNonDivergentV1Operations(located);
+    for (const record of admitted.divergent) {
+      let issue = store.loadErrors.find(({ file }) => file === record.source);
+      if (issue === undefined) {
+        issue = { file: record.source, errors: [] };
+        store.loadErrors.push(issue);
+      }
+      if (!issue.errors.some(({ line }) => line === record.line)) {
+        issue.errors.push({ line: record.line, reason: 'divergent operation identity' });
+      }
+    }
+    store.ingest(admitted.accepted.map(({ op }) => op));
     return store;
   }
 
@@ -212,7 +294,7 @@ export class ProjectStore {
   }
 
   get canMutate(): boolean {
-    return this.accessState === 'editable';
+    return this.writePolicy === 'writable' && this.accessState === 'editable';
   }
 
   subscribe(fn: (state: ProjectState) => void): () => void {
@@ -230,7 +312,17 @@ export class ProjectStore {
   }
 
   assertMutationAllowed(): void {
+    if (this.writePolicy !== 'writable') {
+      throw new ProjectMutationDeniedError(
+        'read-only',
+        '従来形式は閲覧専用です。新しい形式へ変換して編集してください。',
+      );
+    }
     this.workspace.mutationAuthority.assertEditable();
+  }
+
+  assertSourceSnapshotProtected(): void {
+    this.workspace.mutationAuthority.assertSourceSnapshotProtected();
   }
 
   assertWorkspace(fs: ProjectWorkspaceFS, dir: string): void {

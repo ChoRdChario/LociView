@@ -37,6 +37,18 @@ function isPlainObject(x: unknown): x is Record<string, unknown> {
 }
 
 const ACTOR_PATTERN = /^a_[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{13}$/u;
+const ULID_PATTERN = /^[0-7][0123456789ABCDEFGHJKMNPQRSTVWXYZ]{25}$/u;
+const USER_PATTERN = /^usr_[0-7][0123456789ABCDEFGHJKMNPQRSTVWXYZ]{25}$/u;
+const LOCIMYU_CAPTION_PATTERN = /^cap_LM[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{24}$/u;
+const KNOWN_KIND_PREFIX: Readonly<Record<KnownEntityKind, string>> = Object.freeze({
+  set: 'set',
+  caption: 'cap',
+  view: 'view',
+  material: 'mat',
+  asset: 'ast',
+  meta: 'meta',
+  profile: 'usr',
+});
 const HLC_COUNTER_PATTERN = /^[0-9a-f]{4}$/u;
 const DANGEROUS_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 const COMMON_KEYS = ['op', 'hlc', 'actor', 'user', 't', 'e', 'id'] as const;
@@ -158,7 +170,7 @@ function hasCanonicalHlc(hlc: string, actor: string): boolean {
  */
 export function cloneValidatedOp(x: unknown): Op | null {
   try {
-    const o = cloneValidatedJsonObject(x);
+    const o = cloneValidatedJsonObject(x, true);
     if (o === null) return null;
     if (o.t !== 'create' && o.t !== 'update' && o.t !== 'delete') return null;
     const expectedKeys = o.t === 'delete' ? COMMON_KEYS : VALUE_KEYS;
@@ -185,6 +197,105 @@ export function cloneValidatedOp(x: unknown): Op | null {
     return o as unknown as Op;
   } catch {
     return null;
+  }
+}
+
+const DISALLOWED_SINGLE_LINE = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u;
+const DISALLOWED_CAPTION_BODY = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u2028\u2029]/u;
+
+export function isPortableSingleLineText(value: unknown): value is string {
+  return typeof value === 'string' && !DISALLOWED_SINGLE_LINE.test(value);
+}
+
+export function isPortableCaptionBodyText(value: unknown): value is string {
+  return typeof value === 'string' && !DISALLOWED_CAPTION_BODY.test(value);
+}
+
+export function replacePortableSingleLineControls(value: string, replacement: string): string {
+  return value.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/gu, replacement);
+}
+
+function optionalSingleLine(fields: Readonly<Record<string, unknown>>, key: string): boolean {
+  return !Object.hasOwn(fields, key) || isPortableSingleLineText(fields[key]);
+}
+
+function optionalSingleLineArray(fields: Readonly<Record<string, unknown>>, key: string): boolean {
+  if (!Object.hasOwn(fields, key)) return true;
+  const value = fields[key];
+  return Array.isArray(value) && value.every(isPortableSingleLineText);
+}
+
+function finiteVec3(value: unknown): value is readonly [number, number, number] {
+  return Array.isArray(value) && value.length === 3 &&
+    value.every((entry) => typeof entry === 'number' && Number.isFinite(entry));
+}
+
+function optionalCaptionAnchor(fields: Readonly<Record<string, unknown>>): boolean {
+  if (!Object.hasOwn(fields, 'anchor') || fields.anchor === null) return true;
+  if (!isPlainObject(fields.anchor)) return false;
+  const anchor = fields.anchor;
+  if (Object.hasOwn(anchor, 'modelAssetId') && !isPortableSingleLineText(anchor.modelAssetId)) return false;
+  if (Object.hasOwn(anchor, 'position') && !finiteVec3(anchor.position)) return false;
+  if (Object.hasOwn(anchor, 'normal') && !finiteVec3(anchor.normal)) return false;
+  return true;
+}
+
+function optionalCameraState(fields: Readonly<Record<string, unknown>>): boolean {
+  if (!Object.hasOwn(fields, 'cameraState')) return true;
+  const value = fields.cameraState;
+  if (!isPlainObject(value)) return false;
+  if (!finiteVec3(value.eye) || !finiteVec3(value.target) || !finiteVec3(value.up)) return false;
+  if (typeof value.fov !== 'number' || !Number.isFinite(value.fov) || value.fov <= 1 || value.fov >= 179) return false;
+  return typeof value.ortho === 'boolean';
+}
+
+/**
+ * Active-state policy for known v1 fields. Unknown fields remain exact forward-
+ * compatible evidence and are deliberately not filtered recursively.
+ */
+export function isCandidateV1OperationActive(op: Op): boolean {
+  if (op.user !== '' && !USER_PATTERN.test(op.user)) return false;
+  if (KNOWN_ENTITY_KINDS.includes(op.e as KnownEntityKind)) {
+    const prefix = KNOWN_KIND_PREFIX[op.e as KnownEntityKind];
+    const historicalLociMyu = op.e === 'caption' && LOCIMYU_CAPTION_PATTERN.test(op.id);
+    const canonicalPrefix = `${prefix}_`;
+    if (!historicalLociMyu && (
+      !op.id.startsWith(canonicalPrefix) ||
+      !ULID_PATTERN.test(op.id.slice(canonicalPrefix.length))
+    )) return false;
+  }
+  if (op.v === undefined) return true;
+  switch (op.e) {
+    case 'set':
+      return optionalSingleLine(op.v, 'name');
+    case 'caption':
+      return optionalSingleLine(op.v, 'setId') &&
+        optionalSingleLine(op.v, 'title') &&
+        (!Object.hasOwn(op.v, 'body') || isPortableCaptionBodyText(op.v.body)) &&
+        optionalSingleLine(op.v, 'color') &&
+        optionalSingleLineArray(op.v, 'tags') &&
+        optionalSingleLineArray(op.v, 'attachments') &&
+        optionalCaptionAnchor(op.v);
+    case 'view':
+      return optionalSingleLine(op.v, 'setId') &&
+        optionalSingleLine(op.v, 'name') &&
+        optionalSingleLine(op.v, 'background') &&
+        optionalCameraState(op.v);
+    case 'material':
+      return optionalSingleLine(op.v, 'setId') &&
+        optionalSingleLine(op.v, 'modelAssetId') &&
+        optionalSingleLine(op.v, 'materialKey');
+    case 'asset':
+      return optionalSingleLine(op.v, 'kind') &&
+        optionalSingleLine(op.v, 'path') &&
+        optionalSingleLine(op.v, 'optimizedPath') &&
+        optionalSingleLine(op.v, 'originalName') &&
+        optionalSingleLine(op.v, 'mime');
+    case 'profile':
+      return optionalSingleLine(op.v, 'displayName') &&
+        optionalSingleLine(op.v, 'defaultPinColor');
+    default:
+      return true;
   }
 }
 

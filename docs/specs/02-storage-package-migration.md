@@ -1,6 +1,6 @@
 # Storage, package and migration specification
 
-> Status: `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED`
+> Status: `PRODUCT-OWNER APPROVED CONTRACT / IMPLEMENTATION AND GATE STATUS ARE SECTION-SPECIFIC`
 
 ## 1. Scope and candidate status
 
@@ -2078,3 +2078,151 @@ Desktop-merged result, inspect Caption/images and DisplaySet switching, save and
 completely offline reopen. Automerge, CRDT/HLC logs, CAS, general history,
 journal/transaction frameworks, cloud sync and conflict-resolution UI remain
 outside this bounded slice.
+
+## 31. Native-only write authority for the first public candidate (Product Owner approved 2026-09-03; implementation authorized)
+
+For the first public candidate, this section supersedes section 23 only where
+section 23 retains v1 as the default new-Project format or exposes legacy Edit.
+For conversion it also supersedes section 27's source Project write-lock wording:
+the same exclusion domain remains mandatory, but holding its source-snapshot
+guard does not grant mutation authority.
+A Native Project is the sole user-writable Project authority. The ordinary new
+Project action creates Native state. Legacy v1 is an immutable compatibility
+source after import and may be inspected, opened explicitly in View or converted
+into a separate Native Project. Frozen-v1 wire semantics, Native snapshot v1,
+Native portable package v1/v2 and Native Package Exchange v1 do not change.
+
+Import may persist an exact legacy source locally so it can be viewed and
+converted; that ingestion does not grant user mutation authority. A selected
+package whose Project ID already exists MUST NOT merge into, overwrite or
+substitute for the retained source. The UI may offer to open the separately
+retained source in View only while clearly stating that the selected package
+was not integrated and that identity between the two copies is not being
+claimed. Both copies remain unchanged. Legacy new-project creation, Edit or
+Edit escalation, operation
+dispatch, CSV application, model/media mutation, full/diff package export, CSV
+export and ZIP merge are unavailable from every public-candidate route. The
+first candidate adds no replacement source-download function. Native creation,
+editing, backup/restore and all accepted Native Package Exchange purposes remain
+unchanged, including the bounded Caption/new-image collaboration merge.
+A selected legacy package whose Project ID is already reserved by any Native
+Project staging or active path is rejected before its first workspace write
+while holding the shared Project-ID exclusion lock. Conversely, an incomplete
+legacy import marker is not an active identity collision and cannot hide an
+otherwise healthy Native Project from its list.
+Native creation obtains the same Project-ID exclusion lock and then repeats the
+whole-workspace legacy identity check before its first write and immediately
+before active-marker publication. Its project-scoped writer receives only a
+read-only namespace view for this check. A caller that cannot prove that view
+fails closed rather than publishing potentially mixed-purpose state.
+Only an explicitly incomplete or syntactically invalid inactive legacy marker
+may be skipped; a changing publication sample or namespace I/O failure stops
+Native publication.
+Removal of an entire device-local legacy source is also unavailable in this
+candidate. This avoids introducing a separate destructive storage-lifecycle
+exception while the ordinary contract is open, view and convert only. The
+user-selected outer package is never removed or changed.
+
+Legacy import is still a persistent source-ingestion boundary. At every durable
+write prefix, including an interrupted prefix write of `lociview.json`, restart
+and listing expose either no Project or the exact complete verified source. An
+incomplete source is not listed, opened or converted and does not prevent a safe
+retry. This closes only the already-characterized new-package import publication
+boundary; it does not introduce the general S2 journal/recovery design.
+The existence of a `lociview.json` path alone is not activation: the complete
+manifest must parse, and the entry inventory captured by side-effect-free package
+inspection must match the exact operation entries and required binary closure
+verified before manifest-last publication. An invalid prefix remains inactive
+staging and may be removed or replaced only by a retry holding the same Project
+exclusion lock; a complete retained source is never cleaned as staging. No
+additional v1 package entry or general journal is introduced.
+
+The importer may use one private workspace staging receipt containing the exact
+raw manifest bytes. The receipt is written and verified before source entries,
+must equal the completion marker byte-for-byte whenever it remains present, and
+is removed best-effort only after exact marker publication. A retry reuses an
+already complete receipt rather than rewriting it. Once a marker exists, a
+retry with different raw manifest bytes is rejected even when both forms decode
+to the same manifest. Readers require a stable repeated marker/receipt sample,
+so a concurrent retry cannot pair a stale parseable marker prefix with a newer
+receipt state. The receipt is never a ZIP entry, exported source content,
+operation authority or general recovery journal.
+
+Persistent legacy import and Native conversion require the durable workspace
+backend used by the Native route. When that backend is unavailable, a MemoryFS
+fallback may inspect the selected package only to explain the limitation; it
+does not register a legacy Project or start conversion, and navigation cannot
+claim that an in-memory Native result was saved. The selected package remains
+unchanged.
+
+Reportable malformed or schema-invalid operation lines in an already retained
+source do not become active state and do not cause otherwise-valid sibling
+lines to be rewritten. The open report identifies file, one-based line and
+reason while the stored source bytes remain exact. A selected package containing
+such a line is rejected before local publication; the selected package remains
+unchanged. Container/manifest/path/integrity failures that make the package
+unsafe are likewise fatal and publish no active workspace. Safe unknown v1
+content retains the frozen forward-compatibility behavior.
+
+Two individually valid operations with the same `(actor, op)` and different
+content make the active state ambiguous. A diagnosed inspection View may remain
+open, but neither candidate becomes active and the result is not represented as
+an authoritative editable Project. Native conversion is blocked. The candidate
+adds no keep-A/keep-B chooser or durable quarantine lifecycle.
+
+Conversion does not borrow legacy Edit authority. It holds an exclusive
+source-snapshot guard using the same Project exclusion domain as a mutation
+lock, then reloads durable source state without exposing `canMutate`, dispatch or
+filesystem write capability. It verifies the source manifest, operation logs and
+binary inventory before and after conversion. Lock failure or loss, a changed
+source fingerprint, any load error, or an unresolved divergent `(actor, op)`
+candidate stops before publication of a Native active marker and leaves the
+legacy source unchanged. It never converts only a valid subset, chooses a
+first-wins operation or invents keep-A/keep-B resolution.
+
+Acceptance for this boundary is:
+
+- `RC-A-01`: Home, direct URL, restored state and every mode transition expose
+  no legacy creation, Edit, package/CSV export or merge path; unambiguous legacy
+  projects open in View. Ordinary UI says 「従来形式」「閲覧専用」 and
+  「新しい形式へ変換して編集」; it does not expose `legacy`, `v1`, `writer`
+  or operation-log terminology.
+- `RC-A-02`: legacy dispatch, merge, CSV apply and model/media mutation are
+  rejected at the store/service/filesystem boundary before the first write, not
+  merely hidden by UI. Legacy export builders are unreachable from the
+  production route.
+- `RC-A-03`: a valid legacy package imports without source rewriting, remains
+  viewable and converts to a different Native Project ID; manifest, operation-log
+  entry bytes and binary fingerprints are identical before and after conversion.
+  Invalid UTF-8 operation text is fatal rather than decode/re-encode normalized.
+  The existing import fault matrix, including a prefix-written completion manifest,
+  proves restart/listing is inactive-or-exact-complete and a safe retry succeeds.
+  A same-ID selected package is never merged into or substituted for the retained
+  source; the UI directs the user to the separately retained View without changing
+  either copy.
+- `RC-A-04`: a reportable malformed line is retained and location-reported but
+  non-active. A divergent operation pair produces no active authoritative View;
+  any load error or divergence blocks Native publication.
+- `RC-A-05`: an exclusive source-snapshot guard conflicts with legacy mutation
+  locks, survives a fresh durable reload through final source verification and
+  fails closed if exclusivity cannot be proved. Without the durable workspace
+  backend, legacy registration and conversion are unavailable with a clear
+  diagnosis; no transient result is presented as saved.
+- `RC-A-06`: Native create/edit/save, complete backup/restore, collaboration
+  merge, review/share, clean copy and direct LociMyu conversion do not regress.
+  A converted Native Project opens in Edit, saves and reopens. Desktop covers
+  the complete open/View/convert/Edit flow. Physical iPhone acceptance is limited
+  to restore/save/completely-offline reopen of an already converted Native Project.
+- `RC-A-07`: no v1/Native wire or package version changes, general journal,
+  durable quarantine/resolution workflow, reverse sync, Compare feature or new
+  foreign-ZIP importer is introduced. Device-local legacy source deletion is not
+  exposed by the first candidate.
+
+The reachable import-publication and open-ingress checks above do not complete
+S2 or S3. The remaining legacy-mutation G0S-S2/S3 work is deferred, not completed
+or waived, and is required before legacy writes may be exposed by a future
+candidate.
+Stop and return to the Product Owner if this boundary requires legacy mutation,
+a v1 wire change, journal/quarantine/resolution infrastructure, a Native schema
+or Package Exchange change, or a fallback that converts without proven source
+exclusivity.

@@ -22,11 +22,11 @@ export function describeProjectAccess(
 ): ProjectAccessPresentation {
   if (mode === 'view') {
     return {
-      compactText: 'View mode（読み取り専用）',
-      detailText: detail,
-      canRetry: true,
-      actionLabel: 'Edit modeへ切替',
-      actionTitle: '書込みロックを取得し、端末に保存された最新状態を再読込してEdit modeへ切り替えます',
+      compactText: '従来形式・閲覧専用',
+      detailText: `${detail} 編集するには新しい形式へ変換してください。`,
+      canRetry: false,
+      actionLabel: null,
+      actionTitle: null,
     };
   }
   if (state === 'editable') {

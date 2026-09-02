@@ -1,7 +1,7 @@
 # LociView v2 approved direction
 
 > Status: `ACCEPTED DIRECTION SUMMARY / NON-NORMATIVE / NOT IMPLEMENTED`
-> Updated: 2026-08-29
+> Updated: 2026-09-03
 > Technology choices marked as candidates remain subject to the listed PoC gates.
 
 This is a navigation summary, not an independent requirements source. Rationale, decisions, rejected defaults and reconsideration triggers are normative in `docs/adr/0001-v2-foundation.md`. Review-ready implementation contracts are indexed in `docs/specs/README.md`; after product-owner approval they provide the detailed normative contract. Until then they remain proposed and do not authorize implementation.
@@ -21,7 +21,10 @@ Evolve the current offline LociView without a full rewrite so it can:
 - remain portable, local-first, and practical on iOS;
 - replace the unsafe parts of the custom persistence layer without losing v1 projects.
 
-The current UI and useful v1 behavior remain available while renderer and storage internals are replaced behind explicit ports.
+The current application remains the migration base. For the first public
+candidate, Native is the sole user-writable Project authority; useful v1
+compatibility is retained as safe import, View and non-destructive conversion,
+not as legacy Edit or merge.
 
 ## Fixed domain direction
 
@@ -129,6 +132,12 @@ Package purposes remain distinct:
 - New LociMyu conversions use `locimyu-caption-id-2` from `specs/04-locimyu-conversion.md`. For the first adapter the user retains the original ZIP and the report separately; the native Project contains neither a source/review sidecar nor portable review continuity.
 - Read v1 and v2; write only v2 after explicit conversion.
 - Never overwrite the source v1 package.
+- The first public candidate exposes no legacy new-project, Edit, CSV/model/media
+  mutation, package/CSV export or ZIP-merge path. Native editing and Native
+  Package Exchange remain available. Reachable legacy import/open must remain
+  inactive-or-complete and fail closed on divergent operations, but the general
+  writable-v1 G0S-S2/S3 work is deferred and becomes a required gate again
+  before any future candidate re-enables legacy writes.
 - Convert known copies to one canonical genesis/history epoch.
 - Keep deterministic v1 ID/decision/mapping continuity in collaboration packages so a reviewed later v1 copy can migrate on another device; review/share and clean copies intentionally omit that lineage.
 - Represent imported v1 assets as synthetic legacy revisions.

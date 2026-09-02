@@ -8,13 +8,16 @@ import {
 } from '../../src/assets/package';
 import { addModelAsset } from '../../src/assets/modelAsset';
 import { readZipEntries, sanitizeZipPath, writeZipEntries, ZipGuardError } from '../../src/assets/zipio';
+import { createManifest } from '../../src/core/manifest';
 import { visibleEntities } from '../../src/core/reduce';
 import { ProjectStore, type Identity } from '../../src/core/store';
 import { MemoryFS } from '../../src/platform/fs';
+import { ProjectMutationCoordinator } from '../../src/platform/projectLock';
+import { nativeActiveMarkerPath } from '../../src/nativeGs/storage';
 import { FaultInjectingMemoryFS } from '../helpers/faultFs';
 
-const USER_A: Identity = { userId: 'usr_AAA', deviceId: 'dev_A1', displayName: '田中' };
-const USER_B: Identity = { userId: 'usr_BBB', deviceId: 'dev_B1', displayName: '鈴木' };
+const USER_A: Identity = { userId: 'usr_00000000000000000000000001', deviceId: 'dev_A1', displayName: '田中' };
+const USER_B: Identity = { userId: 'usr_00000000000000000000000002', deviceId: 'dev_B1', displayName: '鈴木' };
 
 const encoder = new TextEncoder();
 
@@ -176,6 +179,63 @@ describe('プロジェクトZIP往復', () => {
     const insp = await inspectZip(zip);
     const futureFile = insp.opsFiles.find((f) => f.path === 'ops/a_FUTURE.jsonl');
     expect(futureFile!.text).toBe(futureLine);
+  });
+
+  it('選択した従来形式のmanifest原文をbyte単位で新規保存する', async () => {
+    const manifest = createManifest('manifest raw bytes');
+    const rawManifest = encoder.encode(`${JSON.stringify({
+      ...manifest,
+      futureManifestField: { preserved: true },
+    }, null, 4)}\n`);
+    const zip = await writeZipEntries([{ path: 'lociview.json', data: rawManifest }]);
+    const inspection = await inspectZip(zip);
+    const fs = new MemoryFS();
+    const dir = `projects/${manifest.projectId}`;
+
+    await importNewProject(fs, dir, inspection, { rejectPublishedTarget: true });
+
+    expect(await fs.readBytes(`${dir}/lociview.json`)).toEqual(rawManifest);
+  });
+
+  it('通常登録では公開済みの同一IDをservice境界で無変更拒否する', async () => {
+    const source = await makeProject();
+    const inspection = await inspectZip(await exportProjectZip(source.fs, source.dir, source.store));
+    const fs = new MemoryFS();
+    const dir = `projects/${inspection.manifest!.projectId}`;
+    await importNewProject(fs, dir, inspection, { rejectPublishedTarget: true });
+    const beforePaths = await fs.list(`${dir}/`);
+    const before = await Promise.all(beforePaths.map(async (path) => [path, await fs.readBytes(path)] as const));
+
+    await expect(importNewProject(fs, dir, inspection, { rejectPublishedTarget: true }))
+      .rejects.toThrow(/already published/iu);
+
+    expect(await fs.list(`${dir}/`)).toEqual(beforePaths);
+    for (const [path, bytes] of before) expect(await fs.readBytes(path)).toEqual(bytes);
+  });
+
+  it('新しい形式と同一IDの従来形式をscoped service境界で無変更拒否する', async () => {
+    const source = await makeProject();
+    const inspection = await inspectZip(await exportProjectZip(source.fs, source.dir, source.store));
+    const projectId = inspection.manifest!.projectId;
+    const dir = `projects/${projectId}`;
+    const fs = new MemoryFS();
+    await fs.writeText(nativeActiveMarkerPath(projectId), '{}');
+    const beforePaths = await fs.list('');
+    const before = await Promise.all(beforePaths.map(async (path) => [path, await fs.readBytes(path)] as const));
+    const coordinator = ProjectMutationCoordinator.local();
+    const access = await coordinator.tryAcquire(fs, dir, projectId);
+    access.activateNewProject();
+
+    await expect(importNewProject(access.workspace, dir, inspection, { rejectPublishedTarget: true }))
+      .rejects.toThrow(/namespace reader/iu);
+    await expect(importNewProject(access.workspace, dir, inspection, {
+      rejectPublishedTarget: true,
+      namespaceFs: fs,
+    })).rejects.toThrow(/new-format project/iu);
+
+    expect(await fs.list('')).toEqual(beforePaths);
+    for (const [path, bytes] of before) expect(await fs.readBytes(path)).toEqual(bytes);
+    access.release();
   });
 });
 

@@ -45,6 +45,7 @@ export async function addCaptionAttachments(
   publishAttachments: (allAttachmentIds: readonly string[]) => void,
 ): Promise<readonly string[]> {
   store.assertWorkspace(fs, dir);
+  store.assertMutationAllowed();
   const sourceSnapshots = sources.map((source) => ({
     name: source.name,
     mime: source.mime,

@@ -2549,11 +2549,11 @@ describe('G0 characterization: malicious ZIP envelope', () => {
       );
     }
 
-    it.fails('future-schema: edit-mode import rejects a future schema boundary', () => {
+    it('future-schema: edit-mode import rejects a future schema boundary', () => {
       expect(rejectedBeforeActivation(outcomes['future-schema'])).toBe(true);
     });
 
-    it.fails('future-schema: edit-mode import never publishes a completion marker', () => {
+    it('future-schema: edit-mode import never publishes a completion marker', () => {
       expect(candidateIsInactive(outcomes['future-schema'])).toBe(true);
     });
 

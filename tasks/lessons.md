@@ -314,3 +314,9 @@
 - Three.jsの`Material.dispose()`は参照Textureを解放しない。モデルclose/reopenや変換時inspectionでは、共有Textureを重複なく列挙してgeometry/materialと一緒に解放する必要がある。
 - 8K textureを複数含むモデルはmipmapと複数tabで資源使用量が急増する。原本破損や変換lossと決めつけずfresh single-tabで再現確認し、source bytesの再圧縮・軽量化へ勝手に広げない。
 - Asset visibilityの件数をrenderer readinessとして表示しない。物理iPhoneでgridが一瞬描画された後canvas全体が消える場合は、cameraや保存状態ではなくWebGL context/resource failureを第一に扱い、成功文言でactivation errorを上書きしない。
+
+## 2026-09-03: Product Owner向け選択肢はユーザー機能から説明する
+
+- `legacy v1編集／merge`のような内部構造の短縮語だけでは、どの画面・操作が残るか判断できない。最初に「旧形式のプロジェクト」と「Nativeプロジェクト」を区別し、新規作成、編集、共同作業、閲覧、変換のどれが変わるかを平易に示す。
+- 同じ「merge」でもlegacy ZIP mergeとNative Package ExchangeのCaption／画像mergeは別機能である。選択肢では、なくなる機能と残る機能をそれぞれ明記し、片方を止める判断がもう片方まで止めるように読めないようにする。
+- A/Bのラベルやgate番号は説明の後に置く。完成速度や安全性だけでなく、利用者が実際にできること／できなくなることを先に比較してからProduct Owner判断を求める。

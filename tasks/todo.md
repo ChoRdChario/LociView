@@ -77,11 +77,59 @@ other Project metadata, backup compatibility would break, review disclosure
 needs a new privacy decision, or a general history/CAS/journal/CRDT becomes
 necessary. Do not main-merge, adopt a license or deploy after this slice.
 
-## Next decision — release-candidate preparation
+## Active production plan — Native-only first public candidate
 
-- [ ] Product Owner: approve Native-only writes with legacy v1 limited to
-  open/view/non-destructive Native conversion, or explicitly retain v1 editing
-  and its remaining S2/S3 release blockers. Native-only writes are recommended.
+> Status: `OPTION A BOUNDED IMPLEMENTATION COMPLETE / INDEXED-TREE AUTOMATION PASS / PRODUCT UI EVIDENCE PENDING`.
+
+- [x] Product Owner selected option A on 2026-09-03: Native is the sole
+  user-writable Project authority. Legacy v1 is safe import, View and
+  non-destructive Native conversion only; Native collaboration merge remains.
+- [x] Record the bounded product, storage/conversion and release-gate contract in
+  `docs/specs/00-product-contract.md` PROD-15,
+  `docs/specs/02-storage-package-migration.md` section 31 and
+  `docs/specs/03-gates-and-delivery.md` section 3.8.
+- [x] Product Owner confirmed the bounded production implementation plan and
+  `RC-A-01` through `RC-A-07` before code changes begin.
+- [x] Add one production policy/service boundary that never grants legacy
+  mutation capability, plus an exclusive source-snapshot guard for conversion.
+- [x] Reconcile new-package v1 import with the frozen contract: retain and
+  location-report malformed source lines, keep them non-active, and block Native
+  conversion whenever load errors or divergent operations remain. Close the
+  existing open-ingress known-field cases without building durable quarantine;
+  divergent same-key input must open no authoritative View.
+- [x] Close the existing bounded v1-package import completion-manifest-prefix
+  failure so every restart/listing sees either no Project or the exact complete
+  source and the same package can be retried safely. Treat the marker path as a
+  candidate until parse plus exact closure verification; add no general journal.
+- [x] Remove every public legacy creation/Edit/escalation/dispatch/CSV/model/
+  media/package-export/CSV-export/ZIP-merge route. Same-ID v1 re-import must not
+  merge or overwrite; add no replacement source-download feature.
+- [x] Remove device-local legacy-source deletion from the candidate UI; open,
+  view and non-destructive conversion are its only public purposes.
+- [x] Disable legacy registration and conversion when durable OPFS is
+  unavailable; update the current MemoryFS/export warning so no transient result
+  is presented as saved. Preserve exact operation entry bytes and reject invalid
+  UTF-8 rather than normalizing it through decode/re-encode.
+- [x] Keep valid v1 View/conversion. Add one short ordinary-home label/help route
+  that makes the existing direct LociMyu conversion discoverable without adding
+  an importer. Do not change Native backup/restore, Package Exchange or Spark
+  loading.
+- [x] Prove in automated coverage the service-level zero-write enforcement,
+  source-byte identity, bounded import interruption/retry, invalid/divergent
+  non-activation, conversion lock/loss failure and Native non-regression.
+- [ ] Record one fresh Desktop open -> View -> conversion -> Native Edit/save/
+  reopen flow. Reuse or obtain physical-iPhone evidence only for an already
+  converted Native Project's restore, save and completely offline reopen.
+- [x] Run independent read-only review with no P0/P1, then the indexed-tree
+  typecheck/full-test/root-build/Pages-path-build matrix: typecheck PASS, 61
+  files / 1,501 tests PASS with 21 existing todo, both builds PASS, and three
+  independent reviews report no remaining code P0/P1.
+- [x] Classify one later Windows parallel-load-only 5.296-second timeout in the
+  old G0 evidence-verifier suite: there was no assertion failure, the same tree
+  had already passed twice, and immediate single-test plus full-file reruns
+  passed (1/1 and 82/82). Change only that test's timeout if exact-commit clean
+  CI reproduces the failure; do not reopen the old G0 workstream now.
+- [ ] Record the exact candidate implementation SHA only after its commit exists.
 - [ ] Adopt the project license and third-party/built-output notices.
 - [ ] Choose the public-candidate application version and exact release SHA.
 - [ ] Decide the main integration/deployment gate and create a named rollback
@@ -89,11 +137,21 @@ necessary. Do not main-merge, adopt a license or deploy after this slice.
 - [ ] Run clean-tree CI and verify Pages/base-path/service-worker delivery,
   including Spark absence from the normal route/precache and absence of private
   representative source bytes.
+- [ ] Remove the manifest's advertised POST share target before the candidate,
+  unless a separate Product Owner decision authorizes and accepts its missing
+  Service Worker/application handler. Do not implement a new share feature as
+  release hygiene.
 - [ ] Refresh README and ordinary-home LociMyu discovery after the candidate
   contents are fixed; decide whether private-artifact fingerprint/name metadata
   may remain public.
 
-`RELEASE CANDIDATE PREPARATION: READY FOR PRODUCT OWNER DECISION`
+Option A does not complete G0S-S2/S3, adopt a license/version, authorize `main`
+integration or authorize GitHub Pages deployment. Writable-v1 gates return if a
+future candidate re-enables legacy writes. Stop if RC-A requires a v1 wire
+change, journal/quarantine/resolution framework, Native schema/Package Exchange
+change, unguarded conversion fallback or a newly reproduced P0/P1.
+
+`RELEASE CANDIDATE OPTION A: AUTOMATION PASS / PRODUCT EVIDENCE PENDING`
 
 ## Completed P1 — iPhone direct-LociMyu model activation
 
@@ -477,13 +535,18 @@ consolidated direct-LociMyu acceptance rather than repeated per sub-slice.
   version and exact release SHA are fixed; its present implementation summary
   is intentionally not rewritten during this result-only synchronization.
 
-## Parallel release barriers
+## Historical broader-support gate state — not first Native-only candidate blockers
 
-- G0 external evidence and numeric/support ratification remain incomplete.
-- G0-S remaining crash-consistency/quarantine closure remains incomplete.
+- G0 external evidence and numeric/support ratification remain incomplete for
+  later broader support claims.
+- G0-S writable-v1 crash-consistency/quarantine closure remains incomplete and
+  returns only if legacy writes are re-enabled.
 - G1 adoption decisions remain incomplete; Spark is only the provisional first
-  production GS path unless a new hard blocker appears.
-- Release/device evidence is not inferred from this consolidated product smoke.
+  production GS path, without making those decisions a blocker for this first
+  candidate.
+- Broader release/device evidence is not inferred from the consolidated product
+  smoke; the bounded candidate reuses the accepted Desktop/iPhone scope recorded
+  in section 3.8.
 
 ## Review record
 

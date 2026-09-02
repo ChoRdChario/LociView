@@ -79,12 +79,7 @@ class RecordingMemoryFS extends MemoryFS {
 
 type TestMode = 'pass' | 'xfail';
 
-const OPEN_KNOWN_DEFECTS = new Set([
-  'opaque-known-title-control',
-  'opaque-known-kind-wrong-id-prefix',
-  'opaque-noncanonical-user',
-  'opaque-known-kind-malformed-ulid',
-]);
+const OPEN_KNOWN_DEFECTS = new Set<string>();
 
 const INTRINSIC_KNOWN_DEFECTS = new Set<string>();
 
@@ -248,7 +243,7 @@ async function characterizeOpen(fixture: OpCorpusCase): Promise<IngestOutcome> {
   try {
     let store: ProjectStore | null = null;
     try {
-      store = await ProjectStore.open(fs, dir, USER);
+      store = await ProjectStore.openLegacySource(fs, dir, USER);
     } catch {
       // A product open failure is part of the unsafe baseline outcome.
     }
@@ -1200,7 +1195,7 @@ async function relationCandidateAcceptedThroughOpen(
   await ProjectStore.create(fs, dir, relation.id, USER);
   const logPath = `${dir}/ops/${relation.subject.actor}.jsonl`;
   await fs.writeText(logPath, `${wireJson}\n`);
-  const store = await ProjectStore.open(fs, dir, USER);
+  const store = await ProjectStore.openLegacySource(fs, dir, USER);
   return (
     (await fs.readText(logPath)) === `${wireJson}\n` &&
     !store.loadErrors.some(({ file }) => file === logPath) &&
@@ -1261,7 +1256,7 @@ async function characterizeOpenRelation(
   await fs.writeText(logPath, `${first}\n${second}\n`);
   let store: ProjectStore | null = null;
   try {
-    store = await ProjectStore.open(fs, dir, USER);
+    store = await ProjectStore.openLegacySource(fs, dir, USER);
   } catch {
     // Product open failure is captured as opened=false.
   }
@@ -1523,7 +1518,7 @@ describe.sequential('G0S-OP same-key relations', () => {
         outcome = await openRelationOutcome(relation);
       });
       defineFinalAssertion(
-        relation.expected.decision === 'collision' ? 'xfail' : 'pass',
+        'pass',
         'is order-independent and never silently resolves divergence',
         () => relationDecision(outcome),
         relationDecision(expectedRelation(relation)),
@@ -1554,7 +1549,7 @@ describe.sequential('G0S-OP same-key relations', () => {
         outcome = await packageRelationOutcome(relation);
       });
       defineFinalAssertion(
-        relation.expected.decision === 'collision' ? 'xfail' : 'pass',
+        'pass',
         'uses the same relation decision in both input orders',
         () => relationDecision(outcome),
         relationDecision(expectedRelation(relation)),

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MemoryFS } from '../../src/platform/fs';
 import { ProjectMutationCoordinator } from '../../src/platform/projectLock';
+import { candidateV1ImportReceiptPath } from '../../src/core/manifest';
 import {
   activeNativeBindingV1,
   activeNativeRepresentationsV1,
@@ -74,6 +75,21 @@ class LoseLockAfterMarkerCommitFS extends RecordingMemoryFS {
   override async writeText(path: string, text: string): Promise<void> {
     await super.writeText(path, text);
     if (path.endsWith('/active.json')) this.onMarkerCommitted?.();
+  }
+}
+
+class ChangingCandidatePublicationFS extends RecordingMemoryFS {
+  private markerReadCount = 0;
+
+  override async readBytes(path: string): Promise<Uint8Array | null> {
+    const bytes = await super.readBytes(path);
+    if (!path.endsWith('/lociview.json') || bytes === null) return bytes;
+    this.markerReadCount += 1;
+    if (this.markerReadCount % 2 === 1) return bytes;
+    const changed = new Uint8Array(bytes.length + 1);
+    changed.set(bytes);
+    changed[bytes.length] = 0x20;
+    return changed;
   }
 }
 
@@ -472,6 +488,8 @@ describe('native project blob-first/marker-last publication', () => {
 
   it('refuses v1/native identity mixing and immutable path overwrite', async () => {
     const fs = new RecordingMemoryFS();
+    const { draft, sources } = makeNativeDraft();
+    await expect(assertNativeProjectDoesNotMixV1(fs, NATIVE_TEST_IDS.project)).resolves.toBeUndefined();
     await fs.writeText('projects/meta_01ARZ3NDEKTSV4RRFFQ69G5FAV/lociview.json', JSON.stringify({
       format: 'lociview-project',
       schemaVersion: 1,
@@ -480,11 +498,72 @@ describe('native project blob-first/marker-last publication', () => {
       createdAt: '2026-08-28T00:00:00.000Z',
       generator: 'test',
     }));
-    await expect(assertNativeProjectDoesNotMixV1(fs, NATIVE_TEST_IDS.project)).rejects.toThrow(/mixed/);
+    await expect(assertNativeProjectDoesNotMixV1(fs, NATIVE_TEST_IDS.project)).rejects.toThrow(
+      /同じ識別情報の従来形式/,
+    );
     const session = await editable(fs);
-    const { draft, sources } = makeNativeDraft();
+    const writesBeforeCollisionCheck = [...fs.writes];
+    await expect(createNativeProjectV1(session.workspace, draft, sources)).rejects.toThrow(
+      /同じ識別情報の従来形式/,
+    );
+    expect(fs.writes).toEqual(writesBeforeCollisionCheck);
+    expect(await fs.exists(nativeActiveMarkerPath(draft.project.id))).toBe(false);
+
+    await fs.remove('projects/meta_01ARZ3NDEKTSV4RRFFQ69G5FAV/lociview.json');
     await fs.writeBytes(nativeRepresentationPath(draft.project.id, NATIVE_TEST_IDS.meshRepresentation), new Uint8Array([1]));
     await expect(createNativeProjectV1(session.workspace, draft, sources)).rejects.toThrow(/already exists/);
+    expect(await fs.exists(nativeActiveMarkerPath(draft.project.id))).toBe(false);
+    session.release();
+  });
+
+  it('keeps an active Native Project listed beside an incomplete conventional-source marker', async () => {
+    const fs = new RecordingMemoryFS();
+    const session = await editable(fs);
+    const { draft, sources } = makeNativeDraft();
+    const snapshot = await createNativeProjectV1(session.workspace, draft, sources);
+    const sourceDir = 'projects/incomplete-collision-source';
+    const manifestBytes = new TextEncoder().encode(`${JSON.stringify({
+      format: 'lociview-project',
+      schemaVersion: 1,
+      projectId: snapshot.project.id,
+      name: 'incomplete conventional source',
+      createdAt: '2026-09-03T00:00:00.000Z',
+      generator: 'test',
+    })}\n`);
+    await fs.writeBytes(candidateV1ImportReceiptPath(sourceDir), manifestBytes);
+    await fs.writeBytes(`${sourceDir}/lociview.json`, manifestBytes.slice(0, -1));
+
+    await expect(assertNativeProjectDoesNotMixV1(fs, snapshot.project.id)).resolves.toBeUndefined();
+    expect(await listNativeProjectsV1(fs)).toEqual([{
+      projectId: snapshot.project.id,
+      title: snapshot.project.title,
+      generation: snapshot.generation,
+      snapshotId: snapshot.snapshotId,
+    }]);
+    session.release();
+  });
+
+  it('fails closed before Native writes when a conventional publication changes during namespace inspection', async () => {
+    const fs = new ChangingCandidatePublicationFS();
+    await fs.writeText('projects/changing-source/lociview.json', JSON.stringify({
+      format: 'lociview-project',
+      schemaVersion: 1,
+      projectId: NATIVE_TEST_IDS.project,
+      name: 'changing conventional source',
+      createdAt: '2026-09-03T00:00:00.000Z',
+      generator: 'test',
+    }));
+    await expect(assertNativeProjectDoesNotMixV1(fs, NATIVE_TEST_IDS.project)).rejects.toThrow(
+      /publication changed while reading/,
+    );
+
+    const session = await editable(fs);
+    const { draft, sources } = makeNativeDraft();
+    const writesBeforeCreate = [...fs.writes];
+    await expect(createNativeProjectV1(session.workspace, draft, sources)).rejects.toThrow(
+      /publication changed while reading/,
+    );
+    expect(fs.writes).toEqual(writesBeforeCreate);
     expect(await fs.exists(nativeActiveMarkerPath(draft.project.id))).toBe(false);
     session.release();
   });

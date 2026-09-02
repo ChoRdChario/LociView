@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { visibleEntities, type EntityRecord, type ProjectState } from '../core/reduce';
+import { replacePortableSingleLineControls } from '../core/schema';
 import type { ProjectStore } from '../core/store';
 import type { ProjectWorkspaceFS, WorkspaceReadableFile } from '../platform/fs';
 import { detectFormat, disposeModelResources, loadModel, type ModelFormat } from '../viewer/loaders';
@@ -175,7 +176,7 @@ function nativeId(sourceId: string, prefix: Parameters<typeof newNativeId>[0]): 
 
 function singleLine(value: unknown, fallback: string): string {
   if (typeof value !== 'string') return fallback;
-  const cleaned = value.replace(/[\u0000-\u001f\u007f]+/gu, ' ').trim();
+  const cleaned = replacePortableSingleLineControls(value, ' ').trim();
   return cleaned === '' ? fallback : cleaned.slice(0, 160);
 }
 
@@ -467,7 +468,10 @@ export async function planOpenedFrozenV1ToNative(
   store: ProjectStore,
 ): Promise<FrozenV1ConversionPlan> {
   store.assertWorkspace(fs, dir);
-  store.assertMutationAllowed();
+  store.assertSourceSnapshotProtected();
+  if (store.manifest.schemaVersion !== 1) {
+    throw new Error('v1 conversion: unsupported source schema version');
+  }
   if (store.durabilityStatus.phase !== 'durable' || store.durabilityStatus.pending !== 0) {
     throw new Error('v1 conversion: source must already be durably saved before conversion begins');
   }
@@ -579,9 +583,15 @@ export async function planOpenedFrozenV1ToNative(
         `v1 pinScale must be between ${NATIVE_CAPTION_PIN_SCALE_MIN} and ${NATIVE_CAPTION_PIN_SCALE_MAX}; the native Asset uses its default scale.`,
         sourcePinScale);
     }
+    const sourceAssetLabel = singleLine(record.fields.originalName, `Model ${assets.length + 1}`);
+    const labelWithoutExtension = sourceAssetLabel.replace(/\.[^.]+$/u, '');
+    const assetLabel = labelWithoutExtension === '' ? `Model ${assets.length + 1}` : labelWithoutExtension;
+    if (typeof record.fields.originalName !== 'string' || sourceAssetLabel !== record.fields.originalName || labelWithoutExtension === '') {
+      issue(issues, 'warning', 'model-label-repaired', record, 'originalName', 'The invalid or non-displayable model name was reported and replaced with a safe visible label.', record.fields.originalName);
+    }
     const asset: NativeAssetV1 = {
       id: assetId,
-      label: singleLine(record.fields.originalName, `Model ${assets.length + 1}`).replace(/\.[^.]+$/u, ''),
+      label: assetLabel,
       assetFrameId,
       status: { kind: 'ready', activeBindingId: bindingId },
       ...(pinScale === undefined ? {} : { pinScale }),
@@ -649,9 +659,13 @@ export async function planOpenedFrozenV1ToNative(
       continue;
     }
     const mediaId = nativeId(record.id.replace(/^ast_/u, 'med_'), 'med');
+    const imageLabel = singleLine(record.fields.originalName, `Image ${mediaResources.length + 1}`);
+    if (typeof record.fields.originalName !== 'string' || imageLabel !== record.fields.originalName) {
+      issue(issues, 'warning', 'image-label-repaired', record, 'originalName', 'The invalid or non-displayable image name was reported and replaced with a safe visible label.', record.fields.originalName);
+    }
     mediaResources.push({
       id: mediaId,
-      label: singleLine(record.fields.originalName, `Image ${mediaResources.length + 1}`),
+      label: imageLabel,
       kind: 'image',
       mediaType,
     });
@@ -794,9 +808,13 @@ export async function planOpenedFrozenV1ToNative(
     const background = hexColor(record.fields.background) ?? [16 / 255, 16 / 255, 16 / 255] as const;
     if (hexColor(record.fields.background) === null) issue(issues, 'warning', 'saved-view-background-invalid', record, 'background', 'The background color was invalid; the established dark default was used.', record.fields.background);
     const targetId = nativeId(record.id, 'view');
+    const viewName = singleLine(record.fields.name, `ビュー ${index + 1}`);
+    if (typeof record.fields.name !== 'string' || viewName !== record.fields.name) {
+      issue(issues, 'warning', 'saved-view-name-repaired', record, 'name', 'The invalid or non-displayable Saved View name was reported and replaced with a safe visible name.', record.fields.name);
+    }
     savedViews.push({
       id: targetId,
-      name: singleLine(record.fields.name, `ビュー ${index + 1}`),
+      name: viewName,
       orderKey: String(index).padStart(6, '0'),
       projectFrameId,
       camera: {
@@ -873,10 +891,23 @@ export async function planOpenedFrozenV1ToNative(
   }
   const gsAssetId = assets.find((asset) => asset.representation.role === 'gsPrimary')?.asset.id ?? null;
   const modelAssetId = assets.find((asset) => asset.representation.role !== 'gsPrimary')?.asset.id ?? null;
+  const sourceProjectTitle = singleLine(store.manifest.name, 'LociView project');
+  const nativeProjectTitle = `${sourceProjectTitle.slice(0, 151)} (新しい形式)`;
+  if (sourceProjectTitle !== store.manifest.name || sourceProjectTitle.length > 151) {
+    issues.push({
+      severity: 'warning',
+      code: 'project-title-repaired',
+      sourceKind: 'project',
+      sourceId: store.manifest.projectId,
+      field: 'name',
+      message: 'The invalid or overlong source Project name was reported and replaced with a safe visible Native title.',
+      sourceValue: sourceValue(store.manifest.name),
+    });
+  }
   const draft: NativeProjectDraftV1 = {
     project: {
       id: projectId,
-      title: `${singleLine(store.manifest.name, 'LociView project')} (Native)`.slice(0, 160),
+      title: nativeProjectTitle,
       frame: { id: projectFrameId, handedness: 'right', upAxis: '+Y', unit: { kind: 'unknown' } },
     },
     assets: assets.map((asset) => asset.asset),
@@ -895,7 +926,7 @@ export async function planOpenedFrozenV1ToNative(
     meshMaterialAppearances,
     mediaResources,
   };
-  store.assertMutationAllowed();
+  store.assertSourceSnapshotProtected();
   return {
     sourceProjectId: store.manifest.projectId,
     sourceTitle: store.manifest.name,
@@ -918,9 +949,9 @@ export async function assertOpenedFrozenV1SourceUnchanged(
   store: ProjectStore,
 ): Promise<FrozenV1SourceInventory> {
   store.assertWorkspace(fs, plan.sourceDir);
-  store.assertMutationAllowed();
+  store.assertSourceSnapshotProtected();
   const after = await sourceInventory(fs, plan.sourceDir, [...store.allOps]);
-  store.assertMutationAllowed();
+  store.assertSourceSnapshotProtected();
   if (!inventoriesEqual(plan.sourceBefore, after)) {
     throw new Error('v1 conversion: source changed during conversion; the native result must not be kept active');
   }
@@ -962,25 +993,77 @@ export function completeOpenedFrozenV1ConversionReport(
 }
 
 export function serializeFrozenV1ConversionReport(report: FrozenV1ConversionReport): string {
-  return `${JSON.stringify(report, null, 2)}\n`;
+  return `${JSON.stringify({
+    format: 'lociview-conventional-to-new-project-report',
+    version: 1,
+    completedAt: report.completedAt,
+    source: userFacingSourceSummary(report.source.projectId, report.source.title, report.source.after),
+    target: report.target,
+    sourceVisibleCounts: report.sourceVisibleCounts,
+    sourceDeletedCounts: report.sourceDeletedCounts,
+    convertedCounts: report.convertedCounts,
+    mappings: report.mappings.map(userFacingMapping),
+    issues: report.issues.map(userFacingIssue),
+    sourceUnchanged: report.source.unchanged,
+  }, null, 2)}\n`;
 }
 
 export function serializeFrozenV1ConversionPreflight(plan: FrozenV1ConversionPlan): string {
   return `${JSON.stringify({
-    format: 'lociview-frozen-v1-to-native-preflight-report',
+    format: 'lociview-conventional-to-new-project-preflight-report',
     version: 1,
     createdAt: new Date().toISOString(),
-    source: {
-      projectId: plan.sourceProjectId,
-      title: plan.sourceTitle,
-      projectDir: plan.sourceDir,
-      fingerprint: plan.sourceBefore,
-    },
+    source: userFacingSourceSummary(plan.sourceProjectId, plan.sourceTitle, plan.sourceBefore),
     plannedTarget: { projectId: plan.draft.project.id, title: plan.draft.project.title },
     sourceVisibleCounts: plan.sourceVisibleCounts,
     sourceDeletedCounts: plan.sourceDeletedCounts,
-    mappings: plan.mappings,
-    issues: plan.issues,
+    mappings: plan.mappings.map(userFacingMapping),
+    issues: plan.issues.map(userFacingIssue),
     blockingIssueCount: plan.blockingIssueCount,
   }, null, 2)}\n`;
+}
+
+function userFacingSourceSummary(
+  projectId: string,
+  title: string,
+  inventory: FrozenV1SourceInventory,
+): Record<string, unknown> {
+  return {
+    projectId,
+    title,
+    aggregateSha256: inventory.aggregateSha256,
+    totalBytes: inventory.files.reduce((total, file) => total + file.byteLength, 0),
+    fileCount: inventory.files.length,
+    recordCount: inventory.operationCount,
+    recordSha256: inventory.operationSha256,
+  };
+}
+
+function userFacingMapping(mapping: FrozenV1ConversionMapping): Record<string, unknown> {
+  return {
+    sourceKind: mapping.sourceKind,
+    sourceId: mapping.sourceId,
+    targetKind: mapping.targetKind,
+    targetId: mapping.targetId,
+    ...(mapping.note === undefined ? {} : { note: userFacingConversionText(mapping.note) }),
+  };
+}
+
+function userFacingIssue(issue: FrozenV1ConversionIssue): Record<string, unknown> {
+  return {
+    severity: issue.severity,
+    code: issue.code,
+    sourceKind: issue.sourceKind,
+    sourceId: issue.sourceId,
+    field: issue.field,
+    message: userFacingConversionText(issue.message),
+    ...(issue.sourceValue === undefined ? {} : { sourceValue: issue.sourceValue }),
+  };
+}
+
+function userFacingConversionText(value: string): string {
+  return value
+    .replace(/frozen[- ]?v1|legacy|\bv1\b/giu, '従来形式')
+    .replace(/operation[- ]log/giu, '記録ファイル')
+    .replace(/\bnative\b/giu, '新しい形式');
 }

@@ -10,7 +10,12 @@ import {
 import { addModelAsset } from '../../src/assets/modelAsset';
 import { formatHlc, parseHlc } from '../../src/core/hlc';
 import { parseOpsJsonl, serializeOps } from '../../src/core/jsonl';
-import { parseManifest, type ProjectManifest } from '../../src/core/manifest';
+import {
+  candidateV1ImportReceiptPath,
+  parseManifest,
+  readPublishedCandidateV1ManifestBytes,
+  type ProjectManifest,
+} from '../../src/core/manifest';
 import { mergeOps } from '../../src/core/merge';
 import { reduce, versionVector, visibleEntities } from '../../src/core/reduce';
 import type { Op } from '../../src/core/schema';
@@ -170,11 +175,44 @@ class PausingWriteMemoryFS extends FaultInjectingMemoryFS {
   }
 }
 
+class PausingReadMemoryFS extends FaultInjectingMemoryFS {
+  private pausedPath: string | null = null;
+  private reachedResolve: (() => void) | null = null;
+  private releaseResolve: (() => void) | null = null;
+  private releasePromise: Promise<void> = Promise.resolve();
+
+  pauseNextReadAfterSnapshot(path: string): { reached: Promise<void>; release: () => void } {
+    if (this.pausedPath !== null) throw new Error(`read pause already armed for ${this.pausedPath}`);
+    this.pausedPath = path;
+    const reached = new Promise<void>((resolve) => {
+      this.reachedResolve = resolve;
+    });
+    this.releasePromise = new Promise<void>((resolve) => {
+      this.releaseResolve = resolve;
+    });
+    return {
+      reached,
+      release: () => this.releaseResolve?.(),
+    };
+  }
+
+  override async readBytes(path: string): Promise<Uint8Array | null> {
+    const bytes = await super.readBytes(path);
+    if (path === this.pausedPath) {
+      this.pausedPath = null;
+      this.reachedResolve?.();
+      await this.releasePromise;
+    }
+    return bytes;
+  }
+}
+
 interface ImportFixture {
   inspection: ZipInspection;
   expectedState: ProjectStore['state'];
   expectedVector: Readonly<Record<string, number>>;
   expectedManifest: ProjectManifest;
+  expectedManifestBytes: Uint8Array;
   expectedOperationObjects: readonly Op[];
   expectedOps: ReadonlyMap<string, string>;
   expectedBinaries: ReadonlyMap<string, Uint8Array>;
@@ -264,10 +302,12 @@ function importFixtureFromInspection(
   expectedState: ProjectStore['state'],
 ): ImportFixture {
   if (inspection.manifest === null) throw new Error('import fixture lacks a manifest');
+  if (inspection.manifestData === null) throw new Error('import fixture lacks manifest bytes');
+  const expectedManifestBytes = new Uint8Array(inspection.manifestData);
   const healthyEntries: ZipEntryData[] = [
     {
       path: 'lociview.json',
-      data: encoder.encode(JSON.stringify(inspection.manifest, null, 2)),
+      data: new Uint8Array(expectedManifestBytes),
     },
     ...inspection.opsFiles.map((file) => ({ path: file.path, data: encoder.encode(file.text) })),
     ...inspection.binaries.map((binary) => ({
@@ -280,6 +320,7 @@ function importFixtureFromInspection(
     expectedState,
     expectedVector: versionVector(inspection.ops),
     expectedManifest: structuredClone(inspection.manifest),
+    expectedManifestBytes,
     expectedOperationObjects: operationsByKey(structuredClone(inspection.ops)),
     expectedOps: new Map(inspection.opsFiles.map((file) => [file.path, file.text])),
     expectedBinaries: new Map(
@@ -299,6 +340,7 @@ function importInspectionWithOperations(
   return {
     ...source,
     manifest: source.manifest === null ? null : structuredClone(source.manifest),
+    manifestData: source.manifestData === null ? null : new Uint8Array(source.manifestData),
     ops: copiedOperations,
     opsFiles: source.opsFiles.map((file) => {
       if (!file.path.startsWith('ops/') || !file.path.endsWith('.jsonl')) {
@@ -404,17 +446,29 @@ async function inspectImportedClosure(
   const markerPaths = (await fs.list('projects/'))
     .filter((path) => path.endsWith('/lociview.json'))
     .sort();
-  const manifestText = await fs.readText(`${dir}/lociview.json`);
-  if (manifestText === null) {
-    const active = markerPaths.length > 0;
-    return { active, complete: false, safe: !active };
+  let manifestBytes: Uint8Array | null;
+  try {
+    manifestBytes = await readPublishedCandidateV1ManifestBytes(fs, dir);
+  } catch {
+    manifestBytes = null;
+  }
+  if (manifestBytes === null) {
+    return { active: false, complete: false, safe: true };
   }
 
   let manifestComplete = false;
   try {
-    manifestComplete = isDeepStrictEqual(parseManifest(manifestText), fixture.expectedManifest);
+    const manifest = parseManifest(decoder.decode(manifestBytes));
+    manifestComplete =
+      isDeepStrictEqual(manifest, fixture.expectedManifest) &&
+      bytesEqual(manifestBytes, fixture.expectedManifestBytes);
   } catch {
     manifestComplete = false;
+  }
+  if (!manifestComplete) {
+    // A path containing only a partial/invalid completion manifest is staging,
+    // not an active project. Product listing and ProjectStore.open both reject it.
+    return { active: false, complete: false, safe: true };
   }
   const opsComplete = (
     await Promise.all(
@@ -491,9 +545,20 @@ async function importMarkerHistoryIsSafe(
     const activeLog = event.path.startsWith(`${dir}/ops/`) && event.path.endsWith('.jsonl');
     if (publishedBeforeEvent && (activeLog || requiredBlobPaths.has(event.path))) safe = false;
 
+    let markerClosure: ImportClosure | null = null;
     if (event.path.startsWith('projects/') && event.path.endsWith('/lociview.json')) {
-      if (event.method === 'remove') presentMarkers.delete(event.path);
-      else presentMarkers.add(event.path);
+      if (event.method === 'remove') {
+        presentMarkers.delete(event.path);
+      } else {
+        const snapshot = snapshotByEvent.get(event.commitIndex);
+        if (snapshot === undefined) {
+          safe = false;
+        } else {
+          markerClosure = await inspectImportedClosure(await materializeSnapshot(snapshot), dir, fixture);
+          if (markerClosure.active) presentMarkers.add(event.path);
+          else presentMarkers.delete(event.path);
+        }
+      }
       if (event.path !== markerPath && event.method !== 'remove') safe = false;
     }
     if (activeLog) {
@@ -502,22 +567,20 @@ async function importMarkerHistoryIsSafe(
     }
 
     if (event.path === markerPath && event.method !== 'remove') {
-      const lastClosureCommitInSegment = Math.max(
-        lastDirectMarkerRemoval,
-        ...closureCommits
-          .filter((candidate) =>
-            candidate.commitIndex > lastDirectMarkerRemoval &&
-            candidate.commitIndex <= event.commitIndex)
-          .map((candidate) => candidate.commitIndex),
-      );
-      if (event.startIndex <= lastClosureCommitInSegment) safe = false;
-      if (!isDeepStrictEqual([...presentMarkers].sort(), [markerPath])) safe = false;
-      if (!isDeepStrictEqual([...presentActiveLogs].sort(), expectedLogPaths)) safe = false;
-      const snapshot = snapshotByEvent.get(event.commitIndex);
-      if (
-        snapshot === undefined ||
-        !(await inspectImportedClosure(await materializeSnapshot(snapshot), dir, fixture)).complete
-      ) {
+      if (markerClosure?.active) {
+        const lastClosureCommitInSegment = Math.max(
+          lastDirectMarkerRemoval,
+          ...closureCommits
+            .filter((candidate) =>
+              candidate.commitIndex > lastDirectMarkerRemoval &&
+              candidate.commitIndex <= event.commitIndex)
+            .map((candidate) => candidate.commitIndex),
+        );
+        if (event.startIndex <= lastClosureCommitInSegment) safe = false;
+        if (!isDeepStrictEqual([...presentMarkers].sort(), [markerPath])) safe = false;
+        if (!isDeepStrictEqual([...presentActiveLogs].sort(), expectedLogPaths)) safe = false;
+        if (!markerClosure.complete) safe = false;
+      } else if (markerClosure?.safe !== true) {
         safe = false;
       }
     }
@@ -1826,6 +1889,7 @@ describe.sequential('G0S-BLOB native import preflight controls', () => {
 
     if (fixture.inspection.manifest === null) throw new Error('optimized import control lost its manifest');
     (fixture.inspection.manifest as ProjectManifest & { name: string }).name = 'caller-mutated name';
+    fixture.inspection.manifestData?.fill(0);
     fixture.inspection.opsFiles[0]!.text = '{"callerMutation":';
     fixture.inspection.ops.length = 0;
     for (const binary of fixture.inspection.binaries) binary.data.fill(0);
@@ -1924,7 +1988,7 @@ describe.sequential('G0S-BLOB native import preflight controls', () => {
     expect(results).toEqual([true, true, true, true]);
   });
 
-  it('rejects an already-active target and a canonical unexpected active log without mutation', async () => {
+  it('treats an exact already-published retry as idempotent and rejects an unexpected active log without mutation', async () => {
     const fixture = await makeImportFixture();
     const results: boolean[] = [];
     for (const mode of ['marker', 'extra-log'] as const) {
@@ -1963,7 +2027,7 @@ describe.sequential('G0S-BLOB native import preflight controls', () => {
       const outcome = await settleValue(importNewProject(fs, dir, fixture.inspection));
       const closure = await inspectImportedClosure(fs, dir, fixture);
       results.push(
-        outcome.rejected &&
+        (mode === 'marker' ? outcome.value === fixture.expectedManifest.projectId : outcome.rejected) &&
         fs.events.length === eventOffset &&
         (mode === 'marker'
           ? closure.complete
@@ -1988,6 +2052,7 @@ describe.sequential('G0S-BLOB native import preflight controls', () => {
     const markerToken = 'resolved-import-log-marker';
     fs.watchFilesAfterCommit(markerToken, markerPath, [
       markerPath,
+      candidateV1ImportReceiptPath(dir),
       ...[...fixture.expectedOps.keys()].map((path) => `${dir}/${path}`),
       ...[...fixture.expectedBinaries.keys()].map((path) => `${dir}/${path}`),
     ]);
@@ -2045,7 +2110,7 @@ const IMPORT_FAULT_ROWS: Array<{
   expectedOutcome: FaultOutcome;
 }> = [
   { boundary: 'manifest-before', baselineSafe: true, expectedOutcome: 'throw-before' },
-  { boundary: 'manifest-prefix', baselineSafe: false, expectedOutcome: 'write-prefix-then-throw' },
+  { boundary: 'manifest-prefix', baselineSafe: true, expectedOutcome: 'write-prefix-then-throw' },
   { boundary: 'manifest-after', baselineSafe: true, expectedOutcome: 'commit-then-throw' },
   { boundary: 'actor-prefix', baselineSafe: true, expectedOutcome: 'write-prefix-then-throw' },
   { boundary: 'first-blob-prefix', baselineSafe: true, expectedOutcome: 'write-prefix-then-throw' },
@@ -2103,6 +2168,7 @@ for (const row of IMPORT_FAULT_ROWS) {
       const markerToken = `import-fault-marker-${row.boundary}`;
       target.watchFilesAfterCommit(markerToken, markerPath, [
         markerPath,
+        candidateV1ImportReceiptPath(targetDir),
         ...[...fixture.expectedOps.keys()].map((path) => `${targetDir}/${path}`),
         ...[...fixture.expectedBinaries.keys()].map((path) => `${targetDir}/${path}`),
       ]);
@@ -2139,6 +2205,185 @@ for (const row of IMPORT_FAULT_ROWS) {
   });
 }
 
+it('retries an inactive prefix-written completion manifest to an exact complete source', async () => {
+  const fixture = await makeImportFixture();
+  const fs = new FaultInjectingMemoryFS();
+  const dir = 'projects/import-manifest-prefix-retry';
+  armImportFault(fs, dir, fixture, 'manifest-prefix', 'injected manifest prefix');
+  await expect(importNewProject(fs, dir, fixture.inspection)).rejects.toThrow('injected manifest prefix');
+  await expect(ProjectStore.open(fs, dir, USER_C)).rejects.toThrow();
+  await expect(importNewProject(fs, dir, fixture.inspection))
+    .resolves.toBe(fixture.expectedManifest.projectId);
+  expect((await inspectImportedClosure(fs, dir, fixture)).complete).toBe(true);
+});
+
+it('keeps a parse-valid marker prefix inactive and retries exact trailing manifest bytes', async () => {
+  const base = await makeImportFixture();
+  if (base.inspection.manifestData === null) throw new Error('import fixture lacks raw manifest bytes');
+  const manifestData = new Uint8Array(base.inspection.manifestData.length + 1);
+  manifestData.set(base.inspection.manifestData);
+  manifestData[manifestData.length - 1] = 0x0a;
+  const inspection: ZipInspection = { ...base.inspection, manifestData };
+  const fixture = importFixtureFromInspection(inspection, base.expectedState);
+  const fs = new FaultInjectingMemoryFS();
+  const dir = 'projects/import-parseable-manifest-prefix-retry';
+  const markerPath = `${dir}/lociview.json`;
+  fs.failNextWriteAfterPrefix(markerPath, manifestData.length - 1, 'injected trailing-byte prefix');
+
+  await expect(importNewProject(fs, dir, inspection, { rejectPublishedTarget: true }))
+    .rejects.toThrow('injected trailing-byte prefix');
+  const prefix = await fs.readBytes(markerPath);
+  expect(prefix).not.toBeNull();
+  expect(parseManifest(decoder.decode(prefix!))).toEqual(fixture.expectedManifest);
+  expect(bytesEqual(prefix, manifestData)).toBe(false);
+  expect(await fs.readBytes(candidateV1ImportReceiptPath(dir))).toEqual(manifestData);
+  expect(await inspectImportedClosure(fs, dir, fixture)).toEqual({
+    active: false,
+    complete: false,
+    safe: true,
+  });
+  await expect(ProjectStore.openLegacySource(fs, dir, USER_C))
+    .rejects.toThrow(/incomplete conventional import publication/iu);
+
+  const receiptPath = candidateV1ImportReceiptPath(dir);
+  fs.failNextWriteAfterPrefix(
+    receiptPath,
+    manifestData.length - 1,
+    'complete receipt must not be rewritten',
+  );
+  await expect(importNewProject(fs, dir, inspection, { rejectPublishedTarget: true }))
+    .resolves.toBe(fixture.expectedManifest.projectId);
+  expect(fs.discardPendingFault()).toBe(true);
+  expect(await fs.readBytes(markerPath)).toEqual(manifestData);
+  expect(await fs.readBytes(receiptPath)).toBeNull();
+  expect((await inspectImportedClosure(fs, dir, fixture)).complete).toBe(true);
+});
+
+it('keeps an interrupted import-receipt prefix inactive and safely retries', async () => {
+  const base = await makeImportFixture();
+  if (base.inspection.manifestData === null) throw new Error('import fixture lacks raw manifest bytes');
+  const manifestData = new Uint8Array(base.inspection.manifestData.length + 1);
+  manifestData.set(base.inspection.manifestData);
+  manifestData[manifestData.length - 1] = 0x0a;
+  const inspection: ZipInspection = { ...base.inspection, manifestData };
+  const fixture = importFixtureFromInspection(inspection, base.expectedState);
+  const fs = new FaultInjectingMemoryFS();
+  const dir = 'projects/import-manifest-receipt-prefix-retry';
+  const markerPath = `${dir}/lociview.json`;
+  const receiptPath = candidateV1ImportReceiptPath(dir);
+  fs.failNextWriteAfterPrefix(receiptPath, manifestData.length - 1, 'injected receipt prefix');
+
+  await expect(importNewProject(fs, dir, inspection, { rejectPublishedTarget: true }))
+    .rejects.toThrow('injected receipt prefix');
+  expect(await fs.readBytes(markerPath)).toBeNull();
+  expect(await fs.readBytes(receiptPath)).toEqual(manifestData.slice(0, -1));
+  expect(await inspectImportedClosure(fs, dir, fixture)).toEqual({
+    active: false,
+    complete: false,
+    safe: true,
+  });
+
+  await expect(importNewProject(fs, dir, inspection, { rejectPublishedTarget: true }))
+    .resolves.toBe(fixture.expectedManifest.projectId);
+  expect(await fs.readBytes(markerPath)).toEqual(manifestData);
+  expect(await fs.readBytes(receiptPath)).toBeNull();
+  expect((await inspectImportedClosure(fs, dir, fixture)).complete).toBe(true);
+});
+
+it('does not replace a complete receipt for a partial marker with another raw manifest', async () => {
+  const base = await makeImportFixture();
+  if (base.inspection.manifestData === null) throw new Error('import fixture lacks raw manifest bytes');
+  const sourceA = new Uint8Array(base.inspection.manifestData.length + 1);
+  sourceA.set(base.inspection.manifestData);
+  sourceA[sourceA.length - 1] = 0x0a;
+  const sourceB = new Uint8Array(sourceA.length + 1);
+  sourceB.set(sourceA);
+  sourceB[sourceB.length - 1] = 0x20;
+  const inspectionA: ZipInspection = { ...base.inspection, manifestData: sourceA };
+  const inspectionB: ZipInspection = { ...base.inspection, manifestData: sourceB };
+  const fixtureA = importFixtureFromInspection(inspectionA, base.expectedState);
+  const fs = new FaultInjectingMemoryFS();
+  const dir = 'projects/import-different-raw-manifest-retry';
+  const markerPath = `${dir}/lociview.json`;
+  const receiptPath = candidateV1ImportReceiptPath(dir);
+  fs.failNextWriteAfterPrefix(markerPath, sourceA.length - 1, 'injected source-a marker prefix');
+
+  await expect(importNewProject(fs, dir, inspectionA, { rejectPublishedTarget: true }))
+    .rejects.toThrow('injected source-a marker prefix');
+  fs.failNextWriteAfterPrefix(receiptPath, sourceA.length - 1, 'receipt replacement must not start');
+  await expect(importNewProject(fs, dir, inspectionB, { rejectPublishedTarget: true }))
+    .rejects.toThrow(/marker belongs to another raw source/iu);
+  expect(fs.discardPendingFault()).toBe(true);
+  expect(await fs.readBytes(markerPath)).toEqual(sourceA.slice(0, -1));
+  expect(await fs.readBytes(receiptPath)).toEqual(sourceA);
+  expect(await inspectImportedClosure(fs, dir, fixtureA)).toEqual({
+    active: false,
+    complete: false,
+    safe: true,
+  });
+  await expect(ProjectStore.openLegacySource(fs, dir, USER_C))
+    .rejects.toThrow(/incomplete conventional import publication/iu);
+
+  await expect(importNewProject(fs, dir, inspectionA, { rejectPublishedTarget: true }))
+    .resolves.toBe(fixtureA.expectedManifest.projectId);
+  expect(await fs.readBytes(markerPath)).toEqual(sourceA);
+  expect(await fs.readBytes(receiptPath)).toBeNull();
+});
+
+it('rejects a stale marker snapshot when retry completes between publication reads', async () => {
+  const base = await makeImportFixture();
+  if (base.inspection.manifestData === null) throw new Error('import fixture lacks raw manifest bytes');
+  const manifestData = new Uint8Array(base.inspection.manifestData.length + 1);
+  manifestData.set(base.inspection.manifestData);
+  manifestData[manifestData.length - 1] = 0x0a;
+  const inspection: ZipInspection = { ...base.inspection, manifestData };
+  const fs = new PausingReadMemoryFS();
+  const dir = 'projects/import-marker-read-retry-race';
+  const markerPath = `${dir}/lociview.json`;
+  fs.failNextWriteAfterPrefix(markerPath, manifestData.length - 1, 'injected stale marker prefix');
+
+  await expect(importNewProject(fs, dir, inspection, { rejectPublishedTarget: true }))
+    .rejects.toThrow('injected stale marker prefix');
+  const pause = fs.pauseNextReadAfterSnapshot(markerPath);
+  const staleOpen = ProjectStore.openLegacySource(fs, dir, USER_C);
+  await pause.reached;
+  await expect(importNewProject(fs, dir, inspection, { rejectPublishedTarget: true }))
+    .resolves.toBe(base.expectedManifest.projectId);
+  pause.release();
+
+  await expect(staleOpen).rejects.toThrow(/publication changed while reading/iu);
+  const reopened = await ProjectStore.openLegacySource(fs, dir, USER_C);
+  expect(reopened.manifest).toEqual(base.expectedManifest);
+  expect(await fs.readBytes(markerPath)).toEqual(manifestData);
+});
+
+it('rejects a stale empty receipt snapshot when initial marker publication starts', async () => {
+  const base = await makeImportFixture();
+  if (base.inspection.manifestData === null) throw new Error('import fixture lacks raw manifest bytes');
+  const manifestData = new Uint8Array(base.inspection.manifestData.length + 1);
+  manifestData.set(base.inspection.manifestData);
+  manifestData[manifestData.length - 1] = 0x0a;
+  const inspection: ZipInspection = { ...base.inspection, manifestData };
+  const fs = new PausingReadMemoryFS();
+  const dir = 'projects/import-receipt-read-initial-race';
+  const markerPath = `${dir}/lociview.json`;
+  const receiptPath = candidateV1ImportReceiptPath(dir);
+  const pause = fs.pauseNextReadAfterSnapshot(receiptPath);
+  const staleOpen = ProjectStore.openLegacySource(fs, dir, USER_C);
+  await pause.reached;
+  fs.failNextWriteAfterPrefix(markerPath, manifestData.length - 1, 'injected initial marker prefix');
+  await expect(importNewProject(fs, dir, inspection, { rejectPublishedTarget: true }))
+    .rejects.toThrow('injected initial marker prefix');
+  pause.release();
+
+  await expect(staleOpen).rejects.toThrow(/publication changed while reading/iu);
+  await expect(ProjectStore.openLegacySource(fs, dir, USER_C))
+    .rejects.toThrow(/incomplete conventional import publication/iu);
+  await expect(importNewProject(fs, dir, inspection, { rejectPublishedTarget: true }))
+    .resolves.toBe(base.expectedManifest.projectId);
+  expect(await fs.readBytes(markerPath)).toEqual(manifestData);
+});
+
 for (const mode of ['bitflip', 'truncate'] as const satisfies readonly ResolvedCorruptionMode[]) {
   describe.sequential(`G0S-BLOB resolved import corruption: ${mode}`, () => {
     let fixtureValid = false;
@@ -2170,6 +2415,7 @@ for (const mode of ['bitflip', 'truncate'] as const satisfies readonly ResolvedC
       const markerToken = `resolved-import-marker-${mode}`;
       const closurePaths = [
         markerPath,
+        candidateV1ImportReceiptPath(targetDir),
         ...[...fixture.expectedOps.keys()].map((path) => `${targetDir}/${path}`),
         ...[...fixture.expectedBinaries.keys()].map((path) => `${targetDir}/${path}`),
       ];
@@ -2611,6 +2857,7 @@ describe.sequential('G0S-BLOB native package with one omitted required binary', 
     const newMarkerPath = `${newDir}/lociview.json`;
     const newClosurePaths = [
       newMarkerPath,
+      candidateV1ImportReceiptPath(newDir),
       ...[...healthyImport.expectedOps.keys()].map((path) => `${newDir}/${path}`),
       ...[...healthyImport.expectedBinaries.keys()].map((path) => `${newDir}/${path}`),
     ];

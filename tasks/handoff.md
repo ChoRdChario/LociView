@@ -1,7 +1,9 @@
 # Fresh-session handoff — release-candidate preparation
 
-> Status: `CURRENT HANDOFF`; prepared after Native Package Exchange Product
-> Owner acceptance on 2026-09-03.
+> Status: `CURRENT HANDOFF`; updated after the Product Owner selected and
+> authorized the bounded Native-only write-authority implementation (option A)
+> on 2026-09-03. The bounded implementation and indexed-tree automated matrix
+> are complete; fresh product UI evidence and clean-checkout CI remain pending.
 >
 > This file is navigation and handoff context, not a product specification.
 > Code/tests define observed behavior; accepted specifications define product
@@ -16,8 +18,11 @@
   `0b5dd461d761fc0669b1c0c80b3d6549cd01b1e6`
 - Direct-LociMyu acceptance synchronization:
   `aa3a55b67a220c222c0ad503413a5a706e636cfe`
-- Verification on the final executable tree: typecheck, 60 test files / 1,478
-  passing tests with 21 existing todo, and production build all PASS.
+- Accepted Native Package Exchange tree verification: typecheck, 60 test files /
+  1,478 passing tests with 21 existing todo, and production build all PASS.
+- Current uncommitted candidate index: typecheck, 61 test files / 1,501 passing
+  tests with 21 existing todo, production build and `/LociView/` Pages build all
+  PASS; three independent read-only reviews found no remaining code P0/P1.
 - Product Owner acceptance: Desktop PASS; physical iPhone PASS; no unresolved
   P0/P1.
 - At handoff preparation, `origin/g0-baseline` matched the local branch, the
@@ -38,8 +43,9 @@ Read only these before the first Product Owner decision:
 5. the top current boundary in `tasks/todo.md`
 6. `tasks/critical-path.md` sections 7, 8 and 12
 7. `tasks/lessons.md` section “長期プロジェクトと長期Codexセッションを分離する”
-8. `docs/specs/02-storage-package-migration.md` §30 only if package detail is
-   needed
+8. `docs/specs/02-storage-package-migration.md` §31 and
+   `docs/specs/03-gates-and-delivery.md` §3.8 for the selected Native-only
+   candidate boundary; read §30 only if package detail is needed
 
 Do not reconstruct current scope from chat history, the superseded roadmap or
 old unchecked gate prose.
@@ -89,16 +95,31 @@ This checkpoint does not complete G0/G0-S/G1, permanently adopt Spark or any
 renderer, integrate `main`, or approve a release. Applicable gates remain
 governed by `tasks/critical-path.md` until the Product Owner decides otherwise.
 
-## 5. Next Product Owner decision
+## 5. Selected candidate boundary and authorized implementation
 
-The next work is release-candidate preparation, not feature exploration.
+The Product Owner selected option A on 2026-09-03. Native Project is the only
+user-writable authority in the first public candidate. Legacy v1 remains safe
+import, explicit View and non-destructive conversion into a separate Native
+Project only. This does **not** remove Native Package Exchange or its accepted
+Caption/new-image collaboration merge.
 
-Present and compare only:
-
-- **A — recommended:** Native Project is the only writable public-candidate
-  format. Legacy v1 remains open/view/non-destructive-Native-convert only.
-- **B:** retain legacy-v1 edit/merge in the public candidate and keep its
-  remaining G0S-S2/S3 roots as release blockers.
+The Product Owner authorized the bounded `RC-A-01`–`RC-A-07` implementation on
+2026-09-03; post-implementation acceptance remains pending. The resulting
+implementation enforces the restriction at service/store/filesystem boundaries,
+not only by hiding controls, and converts under an exclusive source-snapshot
+guard without granting legacy Edit authority. Reportable malformed source lines remain exact
+and non-active; a divergent operation opens no authoritative View and blocks
+Native publication. The bounded v1 import must also remain inactive or exact
+complete across an interrupted completion-manifest write and allow safe retry.
+Legacy package/CSV export and device-local legacy-source deletion are absent.
+Without durable OPFS,
+legacy registration/conversion is unavailable rather than presented as
+transiently saved. General journal, quarantine/resolution, writable-v1 S2/S3
+work, package permutations, UI polish and Compare remain excluded. A bounded
+private staging receipt closes only exact import-marker publication; it is not
+a package entry, source authority or general journal. One short ordinary-home
+LociMyu discovery label/help route is release hygiene, not a new
+importer or general UI-polish workstream.
 
 Also surface these genuine release decisions/blockers:
 
@@ -110,13 +131,16 @@ Also surface these genuine release decisions/blockers:
 - `g0-baseline` to `main` integration method;
 - named rollback point and previous-build rollback procedure;
 - GitHub Pages/base-path/Service Worker update verification;
+- remove the advertised POST share target unless a separately approved handler
+  is implemented; the generated Service Worker currently has no POST handler;
 - Spark absence from the normal v1 route and precache;
 - absence of representative private source bytes from Git/build;
 - whether public docs may retain private-source-derived fingerprint/name
   metadata.
 
-Until the Product Owner chooses, do not implement the mode change, adopt a
-license, set the release version, merge `main` or deploy Pages.
+Option A does not authorize license adoption, version/SHA selection, `main`
+integration, Release creation or Pages deployment. Those remain separate Product
+Owner decisions after RC-A implementation and exact-tree verification.
 
 ## 6. First message for the fresh session
 
@@ -148,19 +172,22 @@ Package Exchangeは完了済みです。新しいrelease-blocking P0／P1がな�
 追加hardening、package permutation、UI polishへ戻らないでください。
 CompareはMVP／release gate／critical pathから除外済みです。
 
-次は追加機能実装ではなく、初回public candidateのProduct Owner判断です。
-read-only監査後、次の2案を完成速度、安全性、既存データ、UI複雑性で比較し、
-Aを原則推奨してください。
+Product Ownerは初回public candidateについてAを選択済みです。Nativeだけを
+ユーザー書込み可能とし、legacy v1はsafe import／View／非破壊Native変換専用に
+します。Native Package ExchangeのCaption／new-image mergeは残します。
 
-A. Nativeだけを書込み可能とし、legacy v1はopen／view／Native変換専用
-B. legacy v1編集／mergeを維持し、残るG0S-S2／S3をrelease blockerにする
+production実装前に、`docs/specs/02-storage-package-migration.md` §31の
+`RC-A-01`〜`RC-A-07`と`tasks/todo.md`のbounded planを確認してください。
+一般S2／S3 hardening、package permutation、UI polish、Compareへ戻らないで
+ください。
 
 併せてlicense／notices、version／exact release SHA、README、clean CI、
 main統合、rollback、Pages／Service Worker、LociMyu変換の発見性、
 private-source由来metadataの公開可否だけを整理してください。
 
-Product Owner判断まではproduction実装、license採用、version確定、main merge、
-Pages deploymentを行わず、最大2案と推奨を報告して停止してください。
+計画確認まではproduction実装を行わず、確認後もlicense採用、version／exact
+release SHA確定、main merge、Release作成、Pages deploymentは別承認まで
+行わないでください。
 
-`RELEASE CANDIDATE PREPARATION: READY FOR PRODUCT OWNER DECISION`
+`RELEASE CANDIDATE OPTION A: BOUNDED IMPLEMENTATION COMPLETE / EVIDENCE PENDING`
 ```

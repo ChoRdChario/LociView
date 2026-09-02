@@ -1,13 +1,19 @@
 # LociView critical-path execution plan
 
-> Status: `CURRENT CHECKPOINT / DIRECT LOCIMYU PRODUCT ACCEPTANCE PASS; NATIVE PACKAGE EXCHANGE PASS`
+> Status: `CURRENT CHECKPOINT / OPTION A INDEXED-TREE AUTOMATION PASS; PRODUCT UI EVIDENCE PENDING`
 >
 > Updated: 2026-09-03 after Product Owner Desktop and physical-iPhone Native
 > Package Exchange acceptance. Exact executable implementation: `0b5dd46`;
 > accepted result synchronization: `5f2a19d` on `g0-baseline`.
 >
 > This is an execution plan plus the Product Owner's scheduling and display-model
-> decisions. G0 and G0-S remain release barriers. `G0S-TAB`, the first production
+> decisions. For the first Native-only public candidate,
+> `docs/specs/03-gates-and-delivery.md` section 3.8 supersedes older aggregate
+> G0/G0-S/G1 release-barrier wording in this file. Those gates remain future
+> support/adoption work and non-claims; they are not automatically restored as
+> blockers for this candidate. Legacy-mutation-only S2/S3 work is deferred
+> without claiming those gates pass.
+> `G0S-TAB`, the first production
 > GS path, streamed native backup/restore, multi-Asset editing and consolidated
 > Desktop/iPhone native product acceptance are complete without claiming
 > G0/G0-S/G1 completion, permanent renderer adoption, support or release
@@ -15,43 +21,44 @@
 
 ## 1. Delivery objective and present position
 
-The target is the approved public-candidate MVP, not a perfectly characterized
-v1 codebase. G-1 and S0 are complete. G0 is active/incomplete and G0-S remains a
-parallel release blocker. Consolidated native production acceptance now proves
+The target is the approved Native-only public-candidate MVP, not a perfectly
+characterized writable-v1 codebase. G-1 and S0 are complete. G0, aggregate
+G0-S and G1 remain incomplete future support/adoption lanes, but are not current
+first-candidate blockers under the approved section 3.8 exception. Consolidated
+native production acceptance now proves
 the multi-format/multi-Asset path, streamed portable backup and ordinary product
 flow on Desktop and iPhone, but does not pass the formal G1 adoption/support
 gates.
 
 ```text
-G0 evidence and approval ──────────────────────────────────────┐
-G0-S current-user safety ──────────────────────────────────────┼─> release
-consolidated native product checkpoint ──────────────────────┘
+RC-A reachable read/conversion safety ───────────────┐
+release hygiene + clean exact-tree evidence ─────────┼─> Product Owner candidate decision
+accepted native product checkpoint ──────────────────┘
 ```
 
-The current critical path has parallel release lanes. The bounded native
-technical lane authorized after `G0S-TAB` has reached consolidated acceptance;
-the lanes still join before release:
+The current first-candidate critical path is:
 
-1. **G0 evidence lane:** make inputs/instrumentation executable, acquire and
-   adopt exact external bytes, run the three device classes, then ratify the
-   measured limits;
-2. **G0-S safety lane:** close only the pre-fix ledger and three remaining
-   production roots while external evidence proceeds;
-3. **Approved technical lane:** retain the consolidated native checkpoint at
-   `a2708cf`, the accepted frozen-v1 lane at `9d973cd`, and the completed direct
-   LociMyu receiver at `0bcb636` plus the confirmed relation correction at
-   `0c651b6` and physical-iPhone correction at `a83aa09`. The representative
-   publishes 103 Captions, four DisplaySets, 24
-   image resources and 65 explicit material-slot appearances while the source
-   remains byte-identical. Product Owner Desktop checks confirmed Caption
-   color/pin scale, authoritative opacity/chroma and immediate sheet-linked
-   material switching without per-sheet re-save.
-   The bounded native Caption overlay and consolidated direct-LociMyu flow are
-   accepted by the Product Owner on Desktop and physical iPhone. Caption-only
-   collaboration merge, non-mergeable review/share, clean editable copy and
-   the distinct complete-backup purpose are also implemented and accepted;
-4. **Join:** satisfy all applicable G0/G0-S barriers and technology decisions
-   before the supported release.
+1. **Native-only safety:** close `RC-A-01`–`RC-A-07`, including bounded import
+   inactive-or-complete publication and invalid/divergent operation
+   non-activation. Do not claim S2/S3/S4 or build their general writable-v1
+   journal/quarantine/resolution mechanisms;
+2. **Release hygiene and exact tree:** resolve license/notices, version/SHA,
+   README, clean CI, rollback, Pages/Service Worker and public metadata choices;
+3. **Product Owner decision:** designate or reject one exact candidate before
+   `main` integration or deployment.
+
+Retain the already accepted technical lane at
+`a2708cf`, the accepted frozen-v1 lane at `9d973cd`, and the completed direct
+LociMyu receiver at `0bcb636` plus the confirmed relation correction at
+`0c651b6` and physical-iPhone correction at `a83aa09`. The representative
+publishes 103 Captions, four DisplaySets, 24 image resources and 65 explicit
+material-slot appearances while the source remains byte-identical. Product
+Owner Desktop checks confirmed Caption color/pin scale, authoritative
+opacity/chroma and immediate sheet-linked material switching without per-sheet
+re-save. The bounded native Caption overlay and consolidated direct-LociMyu flow
+are accepted by the Product Owner on Desktop and physical iPhone. Caption-only
+collaboration merge, non-mergeable review/share, clean editable copy and the
+distinct complete-backup purpose are also implemented and accepted.
 
 The completed LociMyu identity slice stays closed. Its separate browser-vector
 evidence was not part of this native consolidated acceptance and remains in the
@@ -252,12 +259,13 @@ Explicit backlog/non-selections:
   the root defect;
 - any slice justified only by reducing expected-failure/todo counts.
 
-## 6. Read-only G0/G1 dependency assessment
+## 6. Historical G0/G1 dependency assessment — not current candidate blockers
 
-The earlier broad dependency split remains unratified. The Product Owner instead
-approved only this narrow scheduling rule: G0/G0-S remain release barriers, but
-after `G0S-TAB` the independent-Mesh plus GS/Proxy technical slice may start while the
-remaining barriers continue in parallel. No larger gate redesign is made here.
+This retained analysis predates the approved Native-only candidate exception in
+`docs/specs/03-gates-and-delivery.md` section 3.8. It governs only future
+technology adoption or broader support claims and must not be used to restore
+aggregate G0/G0-S/G1, a fixed device matrix, CAS or Automerge as blockers for
+the first candidate.
 
 Earlier read-only analysis (retained for context) proposed a dependency-based
 split:
@@ -306,20 +314,20 @@ Reasons to propose rather than maintain the monolith:
 - exact digests and existing invalidation rules already provide a safe way to
   rerun only a lane affected by a semantic change.
 
-Risks retained by the proposal: profile changes can invalidate prior evidence,
-READY may be confused with completion, and parallel lanes can duplicate harness
-work. Mitigations are exact digest binding, explicit `READY` language, aggregate
-G0/G0-S release barriers, disposable PoCs and one writer.
+Risks retained by the historical proposal: profile changes can invalidate prior
+evidence, READY may be confused with completion, and parallel lanes can
+duplicate harness work. Mitigations are exact digest binding, explicit `READY`
+language, disposable PoCs and one writer.
 
 ## 7. Major workstreams to completion
 
 | Workstream | Completion condition | Blocker | Owner | Dependency | Start now? |
 |---|---|---|---|---|---|
-| `WS1` G0 evidence inputs/acquisition | `E0`–`E5` inputs are exact/restorable; external bytes complete the approved Release/restore/adoption lifecycle | Source bytes, privacy/license, profile decisions, instrumentation | Codex / PO / external / reviewer | None, units run in parallel | `YES`, only approved repository preparation and source requests |
-| `WS2` G0 device evidence/ratification | `E6`–`E10`; three device classes, complete raw runs, reviewed artifacts and all seven G0 exit rows approved | `WS1`, physical devices, PO numeric decisions | PO/device operator / Codex / reviewer | WS1 | Environment facts only now; full runs `WAIT` |
-| `WS3` G0-S current-user safety | Ledger plus remaining `S2`–`S4`; real-browser/iOS evidence, exact-tree matrix, no unresolved P0/P1 and PO stabilized-v1 approval | Remaining journal/quarantine decisions and physical evidence | Codex / PO / reviewer | S0/S1 complete; final closure also WS2 | `YES` only for an approved release-blocking root or a P0/P1 that directly blocks the next production slice; do not resume micro-slice exploration |
-| `WS4` G1 technology decisions | G1-A, G1-B base renderer and G1-C each record reproducible `ADOPT`, `REJECT` or `RETRY` with rollback/fallback; later renderer features retain separate acceptance before their controls turn on | Applicable evidence and Product Owner adoption decisions | Codex / PO / device operator | Parallel evidence lanes; still required for adoption/release | `NO` for an adoption claim; the bounded proxy-backed technical implementation alone may start after S1 |
-| `WS5` native product closure, then non-destructive legacy conversion | Preserve the consolidated native Project as the durable source of truth, then convert frozen-v1 and LociMyu inputs without changing source bytes or inventing a general migration framework. Compare remains excluded. | Frozen-v1 and direct LociMyu conversion, Caption overlay, consolidated Desktop/physical-iPhone acceptance and Native collaboration/share/copy package exchange are complete. Technology adoption and release barriers still apply. | Codex / PO / external reviewer | Bounded WS5 implementation and acceptance complete; release preparation remains after Product Owner decisions and WS1–WS4 | `FIRST FROZEN-V1 LANE: PASS`; `DIRECT LOCIMYU PRODUCT ACCEPTANCE: PASS`; `NATIVE PACKAGE EXCHANGE: PASS` |
+| `WS1` G0 evidence inputs/acquisition | Future broader support evidence; not an automatic blocker for the first Native-only candidate | Source bytes, privacy/license, profile decisions, instrumentation | Codex / PO / external / reviewer | None | `NO` unless separately authorized for a broader support claim |
+| `WS2` G0 device evidence/ratification | Future three-class support/limit ratification; not the fixed device matrix for this candidate | `WS1`, physical devices, PO numeric decisions | PO/device operator / Codex / reviewer | WS1 | `NO` for this candidate; reuse accepted Desktop/iPhone evidence as section 3.8 permits |
+| `WS3` Native-only reachable safety | Close `RC-A-01`–`RC-A-07` with exact-tree review/evidence and no unresolved P0/P1. Writable-v1 `S2`–`S4` remains deferred and receives no PASS. | Fresh bounded Desktop/iPhone product UI evidence | Codex / PO / reviewer | S0/S1 complete | Indexed-tree automation and review PASS; `IN PROGRESS` for product evidence only; do not resume general S2/S3 hardening |
+| `WS4` G1 technology decisions | Future technology adoption or broader supported-release claims | Applicable evidence and Product Owner adoption decisions | Codex / PO / device operator | Separate future evidence lanes | `NO`; not a blocker for this first candidate |
+| `WS5` accepted native product + non-destructive compatibility conversion | Preserve the accepted Native Project product and conversion lanes; Compare remains excluded | Product functions are accepted; RC-A product evidence and release preparation remain | Codex / PO / external reviewer | Accepted native checkpoints | `FIRST FROZEN-V1 LANE: PASS`; `DIRECT LOCIMYU PRODUCT ACCEPTANCE: PASS`; `NATIVE PACKAGE EXCHANGE: PASS`; `RC-A AUTOMATION PASS / PRODUCT EVIDENCE PENDING` |
 
 ## 8. Current authorization boundary
 
@@ -353,10 +361,21 @@ images, temporary Caption-overlay move/resize, selection reset, save and
 completely offline reopen.
 Compare remains excluded; attachment/media UX and final visual polish remain
 later work.
-Remaining G0/G0-S and external evidence continue as parallel release barriers.
-Spark remains only the provisional first production GS path. No external
+Remaining aggregate G0/G0-S/G1 and external evidence continue as future
+support/adoption lanes, not first Native-only candidate blockers. Spark remains
+only the provisional first production GS path. No external
 acquisition, Release action, upload, publication, adoption or deployment
 is implied.
+
+On 2026-09-03 the Product Owner selected option A for the first public candidate
+and authorized its bounded implementation. The active slice is only the
+`RC-A-01`–`RC-A-07` Native-only authority boundary: remove public legacy
+mutation capability while retaining safe View and non-destructive Native
+conversion. Native collaboration merge remains. General
+S2/S3 hardening, package permutations, UI polish and Compare stay outside this
+slice unless a newly reproduced release-blocking P0/P1 requires them. License,
+version, exact release SHA, `main` integration and deployment remain separate
+decisions.
 
 ## 9. Consolidated native acceptance checkpoint
 
@@ -445,11 +464,14 @@ is implied.
   DisplaySet-switch evidence was reused rather than repeated for the one-set
   merge fixture.
 - **Review/P0/P1:** independent read-only review complete; none open.
-- **Next boundary:** release-candidate preparation requires Product Owner
-  decisions on Native-only writes versus legacy-v1 editing, license/notices,
-  candidate version/SHA, main/deploy gating, rollback and public metadata, plus
-  clean-tree CI and Pages/base-path/service-worker/private-source verification.
+- **Next boundary:** the Product Owner selected Native-only writes and
+  authorized the bounded `RC-A-01`–`RC-A-07` implementation. The bounded
+  implementation, indexed-tree matrix and independent review are complete;
+  fresh Desktop/iPhone product UI evidence remains. After it passes, the remaining decisions are
+  license/notices, candidate version/SHA,
+  main/deploy gating, rollback and public metadata, plus clean-tree CI and
+  Pages/base-path/service-worker/private-source verification.
 
 `NATIVE PACKAGE EXCHANGE: PASS`
 
-`RELEASE CANDIDATE PREPARATION: READY FOR PRODUCT OWNER DECISION`
+`RELEASE CANDIDATE OPTION A: AUTOMATION PASS / PRODUCT EVIDENCE PENDING`
