@@ -12,6 +12,7 @@ This index prevents current v1 behavior, historical plans, and the proposed v2 a
 | Accepted architecture/product invariants | Accepted ADR; constrains PoCs and specifications immediately |
 | Candidate technology and performance guarantees | Adopted specification only after the relevant gate passes |
 | Navigation and known current risks | `PROJECT_MAP.md` |
+| Fresh-session checkpoint and stop boundary | `tasks/handoff.md`; navigation only, never a product specification |
 | Active work sequencing | `tasks/todo.md`; never a product specification |
 | Recurrent failure patterns | Task-relevant entries in `tasks/lessons.md`; advisory until promoted to a rule/ADR |
 
@@ -44,13 +45,13 @@ If observed code conflicts with the applicable compatibility or accepted future 
 | `specs/README.md` | `PRODUCT-OWNER APPROVED CONTRACT / NOT IMPLEMENTED` | Index and authority for the gated v2 implementation contract |
 | `specs/00-product-contract.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | Product guarantees, MVP boundary, privacy and mobile behavior |
 | `specs/01-domain-rendering.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | Frames, revisions, SceneDocument, modes, picking and renderer gates |
-| `specs/02-storage-package-migration.md` | `PRODUCT-OWNER APPROVED / BOUNDED NATIVE PATHS THROUGH §26 IMPLEMENTED / GENERAL V2 NOT IMPLEMENTED` | General metadata/CAS candidate boundaries plus the implemented native snapshot/package, multi-Asset and exact ordinary-point boundaries |
+| `specs/02-storage-package-migration.md` | `PRODUCT-OWNER APPROVED / BOUNDED NATIVE PATHS THROUGH §30 IMPLEMENTED / GENERAL V2 NOT IMPLEMENTED` | General metadata/CAS candidate boundaries plus implemented native snapshot/package, multi-Asset, DisplaySet/media receiver and package-exchange boundaries |
 | `specs/03-gates-and-delivery.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | G0/G0-S/G1 evidence, thresholds, feature flags, rollback and schedule |
-| `specs/04-locimyu-conversion.md` | `PRODUCT-OWNER APPROVED / BOUNDED DIRECT ADAPTER IMPLEMENTED / REPRESENTATIVE AUTOMATED PASS` | Exact LociMyu identity/source authority and report boundary; six representative rows with an empty trimmed ID are reported as empty input, while 103 Captions publish and survive portable restore without changing the source |
+| `specs/04-locimyu-conversion.md` | `PRODUCT-OWNER APPROVED / BOUNDED DIRECT ADAPTER IMPLEMENTED / PRODUCT ACCEPTANCE PASS` | Exact LociMyu identity/source authority and report boundary; six representative rows with an empty trimmed ID are reported as empty input, while 103 Captions publish and survive portable restore without changing the source; Desktop and physical-iPhone acceptance passed |
 
 ## Known implementation drift
 
-- Current ZIP/package code is not bounded-memory streaming despite older architecture text.
+- Legacy-v1 ZIP/package code is not bounded-memory streaming despite older architecture text. The bounded Native portable and exchange packages use their separate streamed path.
 - Current XLSX reading is the local minimal reader in `src/io/xlsx.ts`, not SheetJS.
 - Strict CSP and single-file distribution are goals, not current implemented controls.
 - Current export is download-based; File System Access/Web Share flows described in older documents are incomplete.

@@ -2,9 +2,17 @@
 
 LociView is the local-first successor to LociMyu: an offline browser application for viewing 3D data, attaching captions, and exchanging mergeable project packages.
 
-> Current status (2026-08-18): a v1 build is implemented and deployed, but several documented v1 targets, physical-iOS acceptance, and public-release hardening remain incomplete. Gaussian Splatting and the proposed v2 storage/renderer architecture are not implemented yet.
+> Current status (2026-09-03): the legacy-v1 build remains deployed. On
+> `g0-baseline`, the bounded Native production candidate implements multi-format
+> Assets including Gaussian Splatting, DisplaySet/material/Caption conversion,
+> streamed backup/restore and purpose-separated package exchange; Product Owner
+> Desktop and physical-iPhone acceptance passed. Public-release integration,
+> licensing/notices and remaining release gates are incomplete. Spark remains a
+> provisional GS path, and the general proposed v2 storage/renderer architecture
+> is not implemented.
 >
 > Public build: https://chordchario.github.io/LociView/
+> Fresh-session checkpoint: [`tasks/handoff.md`](tasks/handoff.md)
 
 ## Current v1
 

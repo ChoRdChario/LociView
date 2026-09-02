@@ -1,14 +1,18 @@
 # LociView active work
 
-> Executable checkpoint: `0b5dd461d761fc0669b1c0c80b3d6549cd01b1e6` on
-> `g0-baseline` (2026-09-03). Direct-LociMyu product acceptance and Native
+> Accepted result/document checkpoint:
+> `5f2a19df9fcfd50215d1313c1265e6cdf82872b4`; exact executable checkpoint:
+> `0b5dd461d761fc0669b1c0c80b3d6549cd01b1e6` on `g0-baseline` (2026-09-03).
+> Direct-LociMyu product acceptance and Native
 > Package Exchange are complete. Product Owner Desktop and physical-iPhone
 > acceptance, including save and completely offline reopen, passed with no
 > unresolved P0/P1.
 >
 > The completed task ledger through `d32a6a0` is preserved at
 > `docs/history/task-ledger-through-d32a6a0.md`. This file contains only the
-> active delivery boundary, open decisions and non-blocking backlog.
+> active delivery boundary first; later completed post-checkpoint notes remain
+> below as provenance and are not an active plan. Fresh sessions start at
+> `tasks/handoff.md` and the “Next decision” section below.
 
 ## Completed production slice — Native Package Exchange
 
@@ -406,7 +410,7 @@ legacy history, orthographic fallback, inferred GID mapping, new material
 controls or a generalized appearance system. Those are not required by this
 approved receiver closure.
 
-## Active approved UI/UX closure — native Caption selection overlay
+## Completed approved UI/UX closure — native Caption selection overlay
 
 - [x] Product Owner selected the native Caption overlay/window as the next slice
   after receiver completeness.

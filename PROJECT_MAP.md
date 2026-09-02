@@ -2,11 +2,15 @@
 
 > Status: `CURRENT` map; repository-normalization baseline `fc7054f` (2026-08-18).
 > That baseline is a historical normalization anchor, not a checkout target. Use Git `HEAD` and `tasks/todo.md` for the active checkpoint.
-> A bounded, nondefault native production path now supports repeated ordinary Mesh, exact ASCII XYZ+RGB Point, or Graphdeco SH2/SH3 GS Asset imports, optional explicit per-GS Proxies, streamed portable backup, independent visibility and per-Asset manual position/rotation/uniform-scale alignment. It does not pass G0/G0-S/G1 or adopt Spark permanently. Additional point profiles, full Alignment workflows, Automerge, content-addressed storage, and renderer backends remain `PROPOSED`.
+> A bounded, nondefault native production path now supports repeated ordinary Mesh, exact ASCII XYZ+RGB Point, or Graphdeco SH2/SH3 GS Asset imports, optional explicit per-GS Proxies, streamed portable backup, independent visibility and per-Asset manual position/rotation/uniform-scale alignment. It also supports DisplaySet-linked Caption/material/Saved-View state and purpose-separated collaboration/review/clean-copy package exchange. It does not pass G0/G0-S/G1 or adopt Spark permanently. Additional point profiles, full Alignment workflows, Automerge, content-addressed storage, and renderer backends remain `PROPOSED`.
 > Product visibility is per loaded Asset/layer, not per Mesh/GS kind. The current native `mixed` / `gs-only` / `mesh-only` values are bounded convenience filters; formal Compare is neither implemented nor selected as the next workstream.
-> The bounded direct LociMyu ZIP -> native adapter is implemented with exact Caption identity/source authority, a separately retained report and marker-last publication. On the private representative, six rows with an empty trimmed Caption ID are explicitly treated as empty input under the approved rule: 103 of 109 source rows became Captions, the source remained unchanged, and automated native publication plus portable restore passed. Product Owner Desktop and physical-iPhone acceptance, including the Caption overlay and completely offline reopen, passed at checkpoint `a83aa09`; no P0/P1 remains in this lane.
+> The bounded direct LociMyu ZIP -> native adapter is implemented with exact Caption identity/source authority, a separately retained report and marker-last publication. On the private representative, six rows with an empty trimmed Caption ID are explicitly treated as empty input under the approved rule: 103 of 109 source rows became Captions, the source remained unchanged, and automated native publication plus portable restore passed. Product Owner Desktop and physical-iPhone acceptance, including Native Package Exchange restore and completely offline reopen, passed through checkpoint `5f2a19d`; no P0/P1 remains in these bounded Native lanes.
 
 ## Start here
+
+For a fresh Codex session, read `tasks/handoff.md` after this map and the
+documentation authority index. It records the accepted checkpoint, closed
+scope and next Product Owner decision without relying on chat history.
 
 ```text
 index.html
@@ -33,7 +37,7 @@ For a normal task, read only the target file, its matching tests, and direct imp
 | `src/assets` | ZIP/package handling, model asset registration/replacement, GLB optimization, import wizard |
 | `src/io` | CSV, minimal XLSX reader, and legacy LociMyu conversion |
 | `src/viewer` | Three.js loaders, material shader patch, single-model `ViewerCore` |
-| `src/nativeGs` | Version-1 native snapshot, streamed project-local binaries/package, exact ASCII Point and SH2/SH3 GS admission, lazy Spark runtime, repeated Asset import, per-Asset visibility/alignment, and nondefault production UI |
+| `src/nativeGs` | Version-1 native snapshot, streamed project-local binaries/packages, exact ASCII Point and SH2/SH3 GS admission, lazy Spark runtime, repeated Asset import, per-Asset visibility/alignment, DisplaySet/material/Caption/media state, legacy conversion and bounded package exchange |
 | `src/ui` | App shell, home, viewer screen, dialogs, tabs, and UI-only state |
 | `tests` | Executable contracts for core, assets, I/O, and UI logic |
 | `public/samples` | Small deterministic files used by the manual viewer and iOS runbook |
@@ -66,7 +70,7 @@ interactive entity edit
   -> AppContext
   -> UI and ViewerCore
 
-.lociview package import as a new workspace
+legacy-v1 .lociview package import as a new workspace
   -> inspect and validate package
   -> package/project service writes manifest, raw operations, and binaries through WorkspaceFS
   -> ProjectStore.open
@@ -74,7 +78,7 @@ interactive entity edit
   -> AppContext
   -> UI and ViewerCore
 
-.lociview merge into an opened workspace
+legacy-v1 .lociview merge into an opened workspace
   -> inspect and validate external package
   -> ProjectStore.mergeExternal immediately reduces/notifies and enqueues per-actor log appends
   -> package service copies accepted binaries
@@ -89,11 +93,20 @@ For v1, distinguish:
 - active durable workspace: OPFS through `WorkspaceFS`;
 - exchange/backup container: `.lociview` ZIP.
 
+For the bounded Native path, distinguish complete backup from exchange purpose:
+
+```text
+complete backup -> streamed exact Project restore
+collaboration   -> purpose/lineage/baseline validation -> Caption/media 3-way merge
+review/share    -> re-keyed non-mergeable Project, View mode by default
+clean copy      -> new Project ID/lineage, editable independent Project
+```
+
 ## Current constraints and known risks
 
 - The default v1 `ViewerCore` keeps one active model and treats PLY as ordinary mesh/points.
-- The separate `?mode=native-gs` path can add repeated Mesh, one exact ordinary-Point profile and GS Assets with an optional same-GS-Asset Proxy. It does not claim other point profiles, DisplaySet integration or a general v2 scene/layer implementation.
-- ZIP import/export and OPFS reads can materialize complete buffers in memory.
+- The separate `?mode=native-gs` path can add repeated Mesh, one exact ordinary-Point profile and GS Assets with an optional same-GS-Asset Proxy. It includes the bounded Native DisplaySet/material/Caption receiver but does not claim other point profiles or a general v2 scene/layer implementation.
+- Legacy-v1 ZIP import/export and some asset paths can materialize complete buffers in memory. Native portable backup and Native Package Exchange use the bounded streamed ZIP path; do not generalize that guarantee to legacy v1.
 - Viewer, OPFS, PWA, and physical-iOS behavior are not fully covered by automated tests.
 - Some 2026-07 documents describe intended behavior that the code never implemented. Consult `docs/README.md` before treating prose as current.
 

@@ -3,7 +3,8 @@
 > Status: `CURRENT CHECKPOINT / DIRECT LOCIMYU PRODUCT ACCEPTANCE PASS; NATIVE PACKAGE EXCHANGE PASS`
 >
 > Updated: 2026-09-03 after Product Owner Desktop and physical-iPhone Native
-> Package Exchange acceptance at `0b5dd46` on `g0-baseline`.
+> Package Exchange acceptance. Exact executable implementation: `0b5dd46`;
+> accepted result synchronization: `5f2a19d` on `g0-baseline`.
 >
 > This is an execution plan plus the Product Owner's scheduling and display-model
 > decisions. G0 and G0-S remain release barriers. `G0S-TAB`, the first production
