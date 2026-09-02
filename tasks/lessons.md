@@ -320,3 +320,8 @@
 - `legacy v1編集／merge`のような内部構造の短縮語だけでは、どの画面・操作が残るか判断できない。最初に「旧形式のプロジェクト」と「Nativeプロジェクト」を区別し、新規作成、編集、共同作業、閲覧、変換のどれが変わるかを平易に示す。
 - 同じ「merge」でもlegacy ZIP mergeとNative Package ExchangeのCaption／画像mergeは別機能である。選択肢では、なくなる機能と残る機能をそれぞれ明記し、片方を止める判断がもう片方まで止めるように読めないようにする。
 - A/Bのラベルやgate番号は説明の後に置く。完成速度や安全性だけでなく、利用者が実際にできること／できなくなることを先に比較してからProduct Owner判断を求める。
+
+## 2026-09-03: 保存前のworking stateまで視覚acceptanceする
+
+- Caption追加のacceptanceは保存・再open後だけで終えず、配置した直後にピン、選択、overlayがworking stateから表示されることを確認する。保存後だけ正常になる状態は、作業中snapshotとViewer snapshotの同期漏れとして扱う。
+- DisplaySetのような表示filterに使う所属情報をUI callbackだけで補正しない。Viewerが未保存recordを先に保持する場合も、同じ正規化済み値を作成時点から共有し、durable snapshotの再投入を表示更新の代用にしない。

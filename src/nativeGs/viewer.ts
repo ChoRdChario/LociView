@@ -44,6 +44,7 @@ import {
 import { NativeSparkRuntime } from './sparkRuntime';
 import type { WorkspaceReadableFile } from '../platform/fs';
 import { nativeMaterialSlotKey } from './materialSlots';
+import { createNativePlacedCaptionV1 } from './captionPlacement';
 
 const NATIVE_CAPTION_PICK_DIAMETER_CSS_PX = 20;
 
@@ -1171,13 +1172,11 @@ export class NativeGsViewer {
       return;
     }
     const positionAsset = group.worldToLocal(hitPoint.clone());
-    const caption: NativeCaptionV1 = {
-      ...(repositioned ?? {}),
-      id: repositioned?.id ?? newNativeId('cap'),
-      title: repositioned?.title ?? 'Caption',
-      body: repositioned?.body ?? '',
-      color: repositioned?.color ?? '#eab308',
-      ownerAssetId: asset.id,
+    const caption = createNativePlacedCaptionV1({
+      existing: repositioned,
+      captionId: repositioned?.id ?? newNativeId('cap'),
+      activeDisplaySetId: this.activeDisplaySetOverride ??
+        this.snapshot.presentation.activeDisplaySetId ?? NATIVE_DEFAULT_DISPLAY_SET_ID,
       anchor: {
         kind: 'asset',
         assetId: asset.id,
@@ -1187,7 +1186,7 @@ export class NativeGsViewer {
         authoredAnchorCompatibilityId: compatibility.id,
         hitEvidence: { method: 'manual' },
       },
-    };
+    });
     if (!this.acceptCaptionChange(caption)) return;
     this.repositionCaptionId = null;
     this.gizmoTarget = { kind: 'caption' };
