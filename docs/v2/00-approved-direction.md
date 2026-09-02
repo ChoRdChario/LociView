@@ -14,6 +14,10 @@ Evolve the current offline LociView without a full rewrite so it can:
 - display Gaussian Splatting data;
 - support multiple formats and multiple visual Assets as independently
   placeable, selectable and visible layers in one ProjectFrame;
+- include Caption image, video and audio in LociView product scope. The first
+  public candidate is image-first; video/audio are required later development,
+  not current-candidate blockers. This makes no claim that LociMyu itself
+  provides video/audio;
 - treat Mesh, ordinary points and GS as Representation/rendering kinds rather
   than mandatory user-visible modes;
 - keep Mesh-only, point-only and GS-only assets valid, while treating GS without a registered

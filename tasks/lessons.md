@@ -1,5 +1,15 @@
 # Lessons
 
+## 2026-09-03: representative sampleの不在を製品scopeの不在とみなさない
+
+- 一つのrepresentative sourceに動画・音声が含まれないことは、そのsourceでの
+  回帰証拠に限られる。将来の通常利用で必要な製品機能を不要とする根拠には
+  しない。
+- 「初回public candidateでは延期する」と「製品scopeから外す」を分ける。
+  Captionの動画・音声はpost-candidateの必須開発範囲として維持し、exact
+  format／codec、schema／package version、viewer、privacy、iPhone acceptanceは
+  実装前に別のbounded contractとして確定する。
+
 ## 2026-09-01: LociMyuのCaption sheetとmaterialを別々に移行しない
 
 - LociMyuではactive `sheetGid`がCaption群、material current-state、任意の

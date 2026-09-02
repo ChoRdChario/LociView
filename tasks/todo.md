@@ -161,6 +161,37 @@ change, unguarded conversion fallback or a newly reproduced P0/P1.
 
 `RELEASE CANDIDATE OPTION A: PRODUCT OWNER ACCEPTANCE PASS`
 
+## Approved post-candidate product scope — Caption video and audio
+
+> Status: `PRODUCT OWNER REQUIRED FUTURE SCOPE / NOT CURRENT RC IMPLEMENTATION`.
+
+- [x] Record the Product Owner clarification that the current representative's
+  lack of video/audio is accidental sample coverage, not evidence that those
+  capabilities are unnecessary.
+- [x] Keep the first public candidate and later product scope distinct: an
+  image-first candidate does not cancel Caption video/audio development.
+- [ ] Before production implementation, freeze one bounded media contract for
+  exact containers/codecs, sniff/decode budgets, versioned Native schema and
+  portable/exchange packages, collaboration/review/clean-copy behavior,
+  mixed-media viewer UX, privacy and physical-iPhone/offline acceptance.
+- [ ] Implement Caption video/audio after the first-candidate boundary is
+  closed, or earlier only after a separate Product Owner reprioritization and
+  approved implementation plan. Reuse the accepted future `MediaResource` and
+  `CaptionAttachment` direction; do not widen snapshot schema 1 in place.
+- [x] Verify this scope-only synchronization with typecheck, 62 test files /
+  1,503 passing tests with 21 existing todo, production build and independent
+  read-only review; no P0/P1 remains in the wording.
+
+This future requirement is not a new blocker for the already accepted
+Native-only release mode. The current media audit's image/HEIC and unsupported-
+media reporting decisions remain a separate candidate-scope decision; sample
+absence must not be used to waive the later video/audio lane.
+
+Review: only the accepted product contract, its non-normative direction summary,
+the active task plan and this correction lesson changed. Production code,
+dependencies, Native schema/package versions, license, application version,
+`main` and deployment were untouched.
+
 ## Completed P1 — iPhone direct-LociMyu model activation
 
 - [x] Reproduce on physical iPhone after a fresh reload: the grid appears
