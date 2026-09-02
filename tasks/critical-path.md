@@ -1,10 +1,9 @@
 # LociView critical-path execution plan
 
-> Status: `CURRENT CHECKPOINT / FIRST FROZEN-V1 -> NATIVE LANE PASS; DIRECT LOCIMYU PRODUCT ACCEPTANCE PASS`
+> Status: `CURRENT CHECKPOINT / DIRECT LOCIMYU PRODUCT ACCEPTANCE PASS; NATIVE PACKAGE EXCHANGE PASS`
 >
-> Updated: 2026-09-02 after Product Owner Desktop and physical-iPhone
-> acceptance through the iOS native texture correction at `a83aa09` on
-> `g0-baseline`.
+> Updated: 2026-09-03 after Product Owner Desktop and physical-iPhone Native
+> Package Exchange acceptance at `0b5dd46` on `g0-baseline`.
 >
 > This is an execution plan plus the Product Owner's scheduling and display-model
 > decisions. G0 and G0-S remain release barriers. `G0S-TAB`, the first production
@@ -47,7 +46,9 @@ the lanes still join before release:
    color/pin scale, authoritative opacity/chroma and immediate sheet-linked
    material switching without per-sheet re-save.
    The bounded native Caption overlay and consolidated direct-LociMyu flow are
-   accepted by the Product Owner on Desktop and physical iPhone;
+   accepted by the Product Owner on Desktop and physical iPhone. Caption-only
+   collaboration merge, non-mergeable review/share, clean editable copy and
+   the distinct complete-backup purpose are also implemented and accepted;
 4. **Join:** satisfy all applicable G0/G0-S barriers and technology decisions
    before the supported release.
 
@@ -317,7 +318,7 @@ G0/G0-S release barriers, disposable PoCs and one writer.
 | `WS2` G0 device evidence/ratification | `E6`–`E10`; three device classes, complete raw runs, reviewed artifacts and all seven G0 exit rows approved | `WS1`, physical devices, PO numeric decisions | PO/device operator / Codex / reviewer | WS1 | Environment facts only now; full runs `WAIT` |
 | `WS3` G0-S current-user safety | Ledger plus remaining `S2`–`S4`; real-browser/iOS evidence, exact-tree matrix, no unresolved P0/P1 and PO stabilized-v1 approval | Remaining journal/quarantine decisions and physical evidence | Codex / PO / reviewer | S0/S1 complete; final closure also WS2 | `YES` only for an approved release-blocking root or a P0/P1 that directly blocks the next production slice; do not resume micro-slice exploration |
 | `WS4` G1 technology decisions | G1-A, G1-B base renderer and G1-C each record reproducible `ADOPT`, `REJECT` or `RETRY` with rollback/fallback; later renderer features retain separate acceptance before their controls turn on | Applicable evidence and Product Owner adoption decisions | Codex / PO / device operator | Parallel evidence lanes; still required for adoption/release | `NO` for an adoption claim; the bounded proxy-backed technical implementation alone may start after S1 |
-| `WS5` native product closure, then non-destructive legacy conversion | Preserve the consolidated native Project as the durable source of truth, then convert frozen-v1 and LociMyu inputs without changing source bytes or inventing a general migration framework. Compare remains excluded. | Frozen-v1 and direct LociMyu conversion, Caption overlay and consolidated Desktop/physical-iPhone acceptance are complete. Native collaboration/share/copy package exchange is the next major public-candidate product gap. Technology adoption and release barriers still apply. | Codex / PO / external reviewer | Receiver, Caption overlay and product acceptance complete; package exchange remains; release remains after WS1–WS4 | `FIRST FROZEN-V1 LANE: PASS`; `DIRECT LOCIMYU PRODUCT ACCEPTANCE: PASS`; `NATIVE PACKAGE EXCHANGE: ACTIVE` |
+| `WS5` native product closure, then non-destructive legacy conversion | Preserve the consolidated native Project as the durable source of truth, then convert frozen-v1 and LociMyu inputs without changing source bytes or inventing a general migration framework. Compare remains excluded. | Frozen-v1 and direct LociMyu conversion, Caption overlay, consolidated Desktop/physical-iPhone acceptance and Native collaboration/share/copy package exchange are complete. Technology adoption and release barriers still apply. | Codex / PO / external reviewer | Bounded WS5 implementation and acceptance complete; release preparation remains after Product Owner decisions and WS1–WS4 | `FIRST FROZEN-V1 LANE: PASS`; `DIRECT LOCIMYU PRODUCT ACCEPTANCE: PASS`; `NATIVE PACKAGE EXCHANGE: PASS` |
 
 ## 8. Current authorization boundary
 
@@ -353,7 +354,7 @@ Compare remains excluded; attachment/media UX and final visual polish remain
 later work.
 Remaining G0/G0-S and external evidence continue as parallel release barriers.
 Spark remains only the provisional first production GS path. No external
-acquisition, Release action, upload, publication, adoption, push or deployment
+acquisition, Release action, upload, publication, adoption or deployment
 is implied.
 
 ## 9. Consolidated native acceptance checkpoint
@@ -425,3 +426,29 @@ is implied.
   Owner accepted the affected physical-iPhone open/DisplaySet/save/offline-
   reopen smoke with the representative model remaining rendered; no P0/P1
   remains in this correction.
+
+## 12. Native Package Exchange status
+
+- **Executable checkpoint:** `0b5dd461d761fc0669b1c0c80b3d6549cd01b1e6`.
+- **Purposes:** existing complete backup remains distinct; exchange manifest v1
+  identifies collaboration, non-mergeable review/share and clean editable copy.
+- **Merge boundary:** one fixed Project-lineage baseline and three-way merge for
+  Caption add/edit/delete plus newly referenced image media. Unsupported
+  non-Caption differences and every conflict stop before Project writes.
+- **Publication:** streamed entry validation, staged and read-back-verified media,
+  snapshot-last and active-marker-last; same package re-import is a no-op.
+- **Desktop:** Product Owner PASS for non-conflict merge, image, idempotence,
+  conflict zero-write, lineage rejection, review/share and clean copy.
+- **Physical iPhone:** Product Owner PASS for restore of merged content,
+  Caption image, save and completely offline reopen. Existing accepted
+  DisplaySet-switch evidence was reused rather than repeated for the one-set
+  merge fixture.
+- **Review/P0/P1:** independent read-only review complete; none open.
+- **Next boundary:** release-candidate preparation requires Product Owner
+  decisions on Native-only writes versus legacy-v1 editing, license/notices,
+  candidate version/SHA, main/deploy gating, rollback and public metadata, plus
+  clean-tree CI and Pages/base-path/service-worker/private-source verification.
+
+`NATIVE PACKAGE EXCHANGE: PASS`
+
+`RELEASE CANDIDATE PREPARATION: READY FOR PRODUCT OWNER DECISION`

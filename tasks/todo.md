@@ -1,16 +1,16 @@
 # LociView active work
 
-> Baseline checkpoint: `a83aa09869bd373280860dce7a5e6181ea70628d` on
-> `g0-baseline` (2026-09-02). Direct-LociMyu DisplaySet/material/Saved-View,
-> Caption-overlay and bounded iOS texture corrections are complete. Product
-> Owner Desktop and physical-iPhone product acceptance, including save and
-> completely offline reopen, passed with no unresolved P0/P1.
+> Executable checkpoint: `0b5dd461d761fc0669b1c0c80b3d6549cd01b1e6` on
+> `g0-baseline` (2026-09-03). Direct-LociMyu product acceptance and Native
+> Package Exchange are complete. Product Owner Desktop and physical-iPhone
+> acceptance, including save and completely offline reopen, passed with no
+> unresolved P0/P1.
 >
 > The completed task ledger through `d32a6a0` is preserved at
 > `docs/history/task-ledger-through-d32a6a0.md`. This file contains only the
 > active delivery boundary, open decisions and non-blocking backlog.
 
-## Active production slice — Native Package Exchange
+## Completed production slice — Native Package Exchange
 
 - [x] Record completion-gap audit: ordinary streamed backup/restore exists;
   collaboration merge, conflict reporting/idempotence, review/share, clean
@@ -37,18 +37,59 @@
 - [x] Reuse one representative two-workspace acceptance for non-conflict merge,
   image media, reopen, backup/restore, idempotence, conflict zero-write,
   lineage, review and clean copy. Add no broad merge matrix.
-- [ ] Run focused checks while developing, one independent read-only review,
+- [x] Run focused checks while developing, one independent read-only review,
   then one final serial typecheck/test/build matrix on the final executable
-  tree. Do not rerun it for result-only docs.
-- [ ] Ask only the minimal physical-iPhone smoke after Desktop PASS: restore the
+  tree. The exact implementation tree passed typecheck, 60 files / 1,478 tests
+  with 21 existing todo, production build and independent targeted re-review.
+  Do not rerun it for result-only docs.
+- [x] Ask only the minimal physical-iPhone smoke after Desktop PASS: restore the
   merged Project, inspect Caption/images and DisplaySet switching, save and
-  completely offline reopen.
+  completely offline reopen. The Product Owner accepted restore, merged
+  Caption/image state, save and completely offline reopen on physical iPhone;
+  the already accepted DisplaySet smoke was reused because the merge fixture
+  has one DisplaySet.
+
+### Result
+
+- Start checkpoint: `a83aa09869bd373280860dce7a5e6181ea70628d`.
+- Direct-LociMyu acceptance synchronization: `aa3a55b`.
+- Exact implementation commit: `0b5dd461d761fc0669b1c0c80b3d6549cd01b1e6`.
+- Desktop PASS: non-conflict Caption/image merge, idempotent re-import,
+  conflict zero-write, lineage rejection, purpose-aware review/share and clean
+  editable copy, backup/restore and offline reopen.
+- Physical iPhone PASS: restored merged content, Caption image, save and
+  completely offline reopen; prior accepted DisplaySet switching remains
+  applicable and was not repeated.
+- For Native Package Exchange, no P0/P1 is open; its P2 is wording/visual
+  polish only.
+- Existing streamed complete backup remains a distinct compatible purpose;
+  package exchange uses explicit collaboration/review/clean-copy purpose v1.
+
+`NATIVE PACKAGE EXCHANGE: PASS`
 
 Stop conditions: stop for Product Owner judgment only if one fixed baseline is
 insufficient for normal use, Caption-only merge cannot stand without merging
 other Project metadata, backup compatibility would break, review disclosure
 needs a new privacy decision, or a general history/CAS/journal/CRDT becomes
 necessary. Do not main-merge, adopt a license or deploy after this slice.
+
+## Next decision — release-candidate preparation
+
+- [ ] Product Owner: approve Native-only writes with legacy v1 limited to
+  open/view/non-destructive Native conversion, or explicitly retain v1 editing
+  and its remaining S2/S3 release blockers. Native-only writes are recommended.
+- [ ] Adopt the project license and third-party/built-output notices.
+- [ ] Choose the public-candidate application version and exact release SHA.
+- [ ] Decide the main integration/deployment gate and create a named rollback
+  point before integration.
+- [ ] Run clean-tree CI and verify Pages/base-path/service-worker delivery,
+  including Spark absence from the normal route/precache and absence of private
+  representative source bytes.
+- [ ] Refresh README and ordinary-home LociMyu discovery after the candidate
+  contents are fixed; decide whether private-artifact fingerprint/name metadata
+  may remain public.
+
+`RELEASE CANDIDATE PREPARATION: READY FOR PRODUCT OWNER DECISION`
 
 ## Completed P1 — iPhone direct-LociMyu model activation
 
