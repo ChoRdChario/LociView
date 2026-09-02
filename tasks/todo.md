@@ -79,7 +79,7 @@ necessary. Do not main-merge, adopt a license or deploy after this slice.
 
 ## Active production plan — Native-only first public candidate
 
-> Status: `OPTION A BOUNDED IMPLEMENTATION COMPLETE / INDEXED-TREE AUTOMATION PASS / PRODUCT UI EVIDENCE PENDING`.
+> Status: `OPTION A BOUNDED IMPLEMENTATION / AUTOMATION / PRODUCT OWNER ACCEPTANCE PASS`.
 
 - [x] Product Owner selected option A on 2026-09-03: Native is the sole
   user-writable Project authority. Legacy v1 is safe import, View and
@@ -117,9 +117,12 @@ necessary. Do not main-merge, adopt a license or deploy after this slice.
 - [x] Prove in automated coverage the service-level zero-write enforcement,
   source-byte identity, bounded import interruption/retry, invalid/divergent
   non-activation, conversion lock/loss failure and Native non-regression.
-- [ ] Record one fresh Desktop open -> View -> conversion -> Native Edit/save/
-  reopen flow. Reuse or obtain physical-iPhone evidence only for an already
-  converted Native Project's restore, save and completely offline reopen.
+- [x] Record one fresh Desktop open -> View -> conversion -> Native Edit/save/
+  reopen flow. The Product Owner accepted the normal Desktop flow and then
+  confirmed the corrective exact tree shows a newly placed Caption pin and
+  overlay before save. Reuse the accepted physical-iPhone evidence for an
+  already converted Native Project's restore, save and completely offline
+  reopen; this correction changes no mobile API, renderer or storage path.
 - [x] Run independent read-only review with no P0/P1, then the indexed-tree
   typecheck/full-test/root-build/Pages-path-build matrix: typecheck PASS, 61
   files / 1,501 tests PASS with 21 existing todo, both builds PASS, and three
@@ -129,7 +132,10 @@ necessary. Do not main-merge, adopt a license or deploy after this slice.
   had already passed twice, and immediate single-test plus full-file reruns
   passed (1/1 and 82/82). Change only that test's timeout if exact-commit clean
   CI reproduces the failure; do not reopen the old G0 workstream now.
-- [ ] Record the exact candidate implementation SHA only after its commit exists.
+- [x] Record the exact candidate implementation SHA only after its commit exists:
+  bounded option-A implementation `9c5596b6df712df0105904c9f2e0ecc62e1440a0`;
+  accepted corrective executable commit
+  `f6c88967155b0c83d4bcdd4fec6b4a78d9caf772`.
 - [ ] Adopt the project license and third-party/built-output notices.
 - [ ] Choose the public-candidate application version and exact release SHA.
 - [ ] Decide the main integration/deployment gate and create a named rollback
@@ -151,7 +157,9 @@ future candidate re-enables legacy writes. Stop if RC-A requires a v1 wire
 change, journal/quarantine/resolution framework, Native schema/Package Exchange
 change, unguarded conversion fallback or a newly reproduced P0/P1.
 
-`RELEASE CANDIDATE OPTION A: AUTOMATION PASS / PRODUCT EVIDENCE PENDING`
+`LEGACY V1 RELEASE MODE: PASS`
+
+`RELEASE CANDIDATE OPTION A: PRODUCT OWNER ACCEPTANCE PASS`
 
 ## Completed P1 — iPhone direct-LociMyu model activation
 

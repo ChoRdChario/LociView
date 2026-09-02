@@ -2,8 +2,9 @@
 
 > Status: `CURRENT HANDOFF`; updated after the Product Owner selected and
 > authorized the bounded Native-only write-authority implementation (option A)
-> on 2026-09-03. The bounded implementation and indexed-tree automated matrix
-> are complete; fresh product UI evidence and clean-checkout CI remain pending.
+> on 2026-09-03. The bounded implementation, indexed-tree automated matrix and
+> Product Owner Desktop acceptance are complete; clean-checkout CI remains
+> pending.
 >
 > This file is navigation and handoff context, not a product specification.
 > Code/tests define observed behavior; accepted specifications define product
@@ -18,13 +19,21 @@
   `0b5dd461d761fc0669b1c0c80b3d6549cd01b1e6`
 - Direct-LociMyu acceptance synchronization:
   `aa3a55b67a220c222c0ad503413a5a706e636cfe`
+- Option-A bounded implementation:
+  `9c5596b6df712df0105904c9f2e0ecc62e1440a0`
+- Accepted corrective executable commit:
+  `f6c88967155b0c83d4bcdd4fec6b4a78d9caf772`
 - Accepted Native Package Exchange tree verification: typecheck, 60 test files /
   1,478 passing tests with 21 existing todo, and production build all PASS.
-- Current uncommitted candidate index: typecheck, 61 test files / 1,501 passing
-  tests with 21 existing todo, production build and `/LociView/` Pages build all
-  PASS; three independent read-only reviews found no remaining code P0/P1.
-- Product Owner acceptance: Desktop PASS; physical iPhone PASS; no unresolved
-  P0/P1.
+- Current executable candidate: the option-A indexed tree passed typecheck,
+  61 test files / 1,501 tests with 21 existing todo and both production builds.
+  The corrective tree adds two focused passing tests; its one unrelated
+  five-second verifier timeout passed on immediate single-test and full-file
+  reruns (1/1 and 82/82). Independent read-only reviews found no remaining
+  code P0/P1.
+- Product Owner acceptance: option-A Desktop PASS, including immediate unsaved
+  Caption pin/overlay display; accepted physical-iPhone Native restore/save/
+  completely-offline-reopen evidence remains applicable; no unresolved P0/P1.
 - At handoff preparation, `origin/g0-baseline` matched the local branch, the
   worktree was clean, and temporary preview/Cloudflare Tunnel were stopped.
 
@@ -104,7 +113,8 @@ Project only. This does **not** remove Native Package Exchange or its accepted
 Caption/new-image collaboration merge.
 
 The Product Owner authorized the bounded `RC-A-01`–`RC-A-07` implementation on
-2026-09-03; post-implementation acceptance remains pending. The resulting
+2026-09-03 and accepted its Desktop product flow after the bounded corrective
+commit. The resulting
 implementation enforces the restriction at service/store/filesystem boundaries,
 not only by hiding controls, and converts under an exclusive source-snapshot
 guard without granting legacy Edit authority. Reportable malformed source lines remain exact

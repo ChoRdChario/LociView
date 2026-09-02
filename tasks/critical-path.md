@@ -325,9 +325,9 @@ language, disposable PoCs and one writer.
 |---|---|---|---|---|---|
 | `WS1` G0 evidence inputs/acquisition | Future broader support evidence; not an automatic blocker for the first Native-only candidate | Source bytes, privacy/license, profile decisions, instrumentation | Codex / PO / external / reviewer | None | `NO` unless separately authorized for a broader support claim |
 | `WS2` G0 device evidence/ratification | Future three-class support/limit ratification; not the fixed device matrix for this candidate | `WS1`, physical devices, PO numeric decisions | PO/device operator / Codex / reviewer | WS1 | `NO` for this candidate; reuse accepted Desktop/iPhone evidence as section 3.8 permits |
-| `WS3` Native-only reachable safety | Close `RC-A-01`–`RC-A-07` with exact-tree review/evidence and no unresolved P0/P1. Writable-v1 `S2`–`S4` remains deferred and receives no PASS. | Fresh bounded Desktop/iPhone product UI evidence | Codex / PO / reviewer | S0/S1 complete | Indexed-tree automation and review PASS; `IN PROGRESS` for product evidence only; do not resume general S2/S3 hardening |
+| `WS3` Native-only reachable safety | Close `RC-A-01`–`RC-A-07` with exact-tree review/evidence and no unresolved P0/P1. Writable-v1 `S2`–`S4` remains deferred and receives no PASS. | None in the bounded candidate scope; clean candidate CI remains a release-preparation item | Codex / PO / reviewer | S0/S1 complete | `PASS` for bounded implementation, review and Product Owner Desktop evidence; do not resume general S2/S3 hardening |
 | `WS4` G1 technology decisions | Future technology adoption or broader supported-release claims | Applicable evidence and Product Owner adoption decisions | Codex / PO / device operator | Separate future evidence lanes | `NO`; not a blocker for this first candidate |
-| `WS5` accepted native product + non-destructive compatibility conversion | Preserve the accepted Native Project product and conversion lanes; Compare remains excluded | Product functions are accepted; RC-A product evidence and release preparation remain | Codex / PO / external reviewer | Accepted native checkpoints | `FIRST FROZEN-V1 LANE: PASS`; `DIRECT LOCIMYU PRODUCT ACCEPTANCE: PASS`; `NATIVE PACKAGE EXCHANGE: PASS`; `RC-A AUTOMATION PASS / PRODUCT EVIDENCE PENDING` |
+| `WS5` accepted native product + non-destructive compatibility conversion | Preserve the accepted Native Project product and conversion lanes; Compare remains excluded | Product functions and RC-A evidence are accepted; release preparation remains | Codex / PO / external reviewer | Accepted native checkpoints | `FIRST FROZEN-V1 LANE: PASS`; `DIRECT LOCIMYU PRODUCT ACCEPTANCE: PASS`; `NATIVE PACKAGE EXCHANGE: PASS`; `RC-A PRODUCT OWNER ACCEPTANCE: PASS` |
 
 ## 8. Current authorization boundary
 
@@ -368,7 +368,10 @@ acquisition, Release action, upload, publication, adoption or deployment
 is implied.
 
 On 2026-09-03 the Product Owner selected option A for the first public candidate
-and authorized its bounded implementation. The active slice is only the
+and authorized its bounded implementation. The Product Owner subsequently
+accepted the Desktop product flow, including immediate display of a newly
+placed Caption before save, at corrective executable commit `f6c8896`. The
+closed slice is only the
 `RC-A-01`–`RC-A-07` Native-only authority boundary: remove public legacy
 mutation capability while retaining safe View and non-destructive Native
 conversion. Native collaboration merge remains. General
@@ -466,12 +469,15 @@ decisions.
 - **Review/P0/P1:** independent read-only review complete; none open.
 - **Next boundary:** the Product Owner selected Native-only writes and
   authorized the bounded `RC-A-01`–`RC-A-07` implementation. The bounded
-  implementation, indexed-tree matrix and independent review are complete;
-  fresh Desktop/iPhone product UI evidence remains. After it passes, the remaining decisions are
+  implementation, indexed-tree matrix, independent review and Product Owner
+  Desktop acceptance are complete. Accepted physical-iPhone Native restore,
+  save and completely-offline reopen evidence remains applicable. The remaining decisions are
   license/notices, candidate version/SHA,
   main/deploy gating, rollback and public metadata, plus clean-tree CI and
   Pages/base-path/service-worker/private-source verification.
 
 `NATIVE PACKAGE EXCHANGE: PASS`
 
-`RELEASE CANDIDATE OPTION A: AUTOMATION PASS / PRODUCT EVIDENCE PENDING`
+`LEGACY V1 RELEASE MODE: PASS`
+
+`RELEASE CANDIDATE OPTION A: PRODUCT OWNER ACCEPTANCE PASS`
