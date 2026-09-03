@@ -1952,6 +1952,47 @@ anchor, storage or package authority.
   coverage, records Desktop visual evidence, and defers one physical-iPhone
   check to the already planned consolidated direct-LociMyu product acceptance.
 
+### 29.1 First-candidate attachment-media direction (Product Owner approved 2026-09-03; implementation pending)
+
+The first public candidate extends the completed still-image path to
+single-still HEIC/HEIF. This decision supersedes only section 29's HEIC
+exclusion; it does not retroactively describe HEIC as implemented or change the
+accepted evidence for the existing four image formats. The exact decoder and
+snapshot/package version require Product Owner selection before production
+implementation.
+
+Sections 30 and 31 below remain the accepted record of the pre-HEIC
+implementation and its current package versions; their `v1`/`v2` statements do
+not decide the HEIC target version. The approved version choice must explicitly
+supersede only the affected HEIC read/write and compatibility clauses before
+implementation. Snapshot schema 1 MUST NOT be widened silently.
+
+- The ordinary-user section is `添付メディア`, with the current action
+  `画像を追加` and a concise supported-format indication. Attachment identity
+  and ordering stay media-neutral and impose no three-item domain maximum.
+  A compact first-three preview plus an explicit remaining count may be used
+  only when every attachment remains reachable and the count is accessible.
+- One media-neutral stage owns previous/next/close and lifecycle cleanup. In
+  this candidate it mounts only a still-image presenter. Video/audio controls
+  and permanently reserved blank transport space appear only when those kinds
+  are implemented.
+- HEIC/HEIF admission is content-validated at the service boundary rather than
+  trusted from filename or declared MIME. Direct add and LociMyu conversion
+  preserve original bytes, fail before publication on an unsafe input and
+  report a source item that cannot be promoted. Display decoding and any
+  regenerable runtime cache do not replace the stored/package source bytes.
+- Candidate acceptance covers direct add and LociMyu exact-file-ID linkage,
+  source preservation, orientation, ordinary viewer navigation, complete
+  backup, collaboration/review/clean-copy package purposes, Edge, physical
+  iPhone and completely offline reopen. Live Photo video, animated HEIF/HEIF
+  image sequences, burst/depth/auxiliary selection, RAW/ProRAW, strict HDR/
+  10-bit fidelity, image editing and cloud/server conversion remain excluded.
+- Caption video/audio remain the first required major post-candidate media
+  workstream. The later implementation reuses the attachment ordering and one
+  media stage but must add its own streamed storage/player, package, privacy,
+  Desktop and physical-iPhone/offline contract rather than treating the current
+  full-Blob image loader as a streaming API.
+
 ## 30. Bounded native package exchange (Product Owner approved 2026-09-02)
 
 The first public candidate MUST distinguish four user purposes without

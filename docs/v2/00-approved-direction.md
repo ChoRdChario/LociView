@@ -15,9 +15,11 @@ Evolve the current offline LociView without a full rewrite so it can:
 - support multiple formats and multiple visual Assets as independently
   placeable, selectable and visible layers in one ProjectFrame;
 - include Caption image, video and audio in LociView product scope. The first
-  public candidate is image-first; video/audio are required later development,
-  not current-candidate blockers. This makes no claim that LociMyu itself
-  provides video/audio;
+  public candidate completes supported still images, including single-still
+  HEIC/HEIF, while video/audio are the first required major post-candidate media
+  workstream rather than current-candidate blockers. The user-facing concept is
+  media-neutral `添付メディア`, but unavailable video/audio controls are not
+  exposed. This makes no claim that LociMyu itself provides video/audio;
 - treat Mesh, ordinary points and GS as Representation/rendering kinds rather
   than mandatory user-visible modes;
 - keep Mesh-only, point-only and GS-only assets valid, while treating GS without a registered

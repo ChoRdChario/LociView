@@ -161,6 +161,42 @@ change, unguarded conversion fallback or a newly reproduced P0/P1.
 
 `RELEASE CANDIDATE OPTION A: PRODUCT OWNER ACCEPTANCE PASS`
 
+## Active decision gate — first-candidate single-still HEIC/HEIF
+
+> Status: `PRODUCT SCOPE APPROVED / DEPENDENCY AND SNAPSHOT VERSION DECISIONS REQUIRED`.
+
+- [x] Record the Product Owner boundary: the first public candidate completes
+  still-image attachments including single-still HEIC/HEIF. The ordinary UI is
+  `添付メディア` with an image-add action and one extensible media stage; it does
+  not expose unavailable video/audio controls.
+- [x] Confirm read-only that the existing exact file-ID association, original-
+  byte publication path, source-change lock and generic ordered attachment IDs
+  are reusable. Current HEIC inventory does not promote HEIC into Native media,
+  and both direct add and the viewer are limited to the four accepted image
+  MIME types.
+- [x] Test representative HEIC locally in the current Windows Edge without
+  uploading it. Native `<img>`, `createImageBitmap` and `ImageDecoder` paths do
+  not decode it, so browser-native support cannot close the candidate.
+- [x] Confirm that silently widening Native snapshot schema 1 would cause the
+  old reader to reject the Project and would also disturb the fixed
+  collaboration baseline digest. A dual-read/new-write snapshot version and a
+  defined baseline compatibility rule require Product Owner approval.
+- [ ] Product Owner selects one exact locally bundled decoder dependency and
+  accepts its embedded-codec license/notice boundary. Do not install, implement
+  or adopt a license before that decision.
+- [ ] Product Owner selects the bounded version strategy. Do not widen snapshot
+  schema 1 in place or implement video/audio schema at the same time.
+- [ ] After both decisions, freeze focused acceptance and implement only the
+  single-still HEIC/HEIF end-to-end path: original-byte identity, bounded
+  content admission, lazy/offline decoding with orientation and cleanup,
+  direct/LociMyu import, Native packages, Edge and physical-iPhone evidence.
+
+Exclusions: Live Photo MOV, animated HEIF/HEIF image sequences, burst, depth/
+auxiliary UI, RAW/ProRAW, strict HDR/10-bit fidelity, image editing, cloud/
+server conversion, and simultaneous video/audio implementation. Stop at this
+decision gate; do not change production, dependencies or versions until both
+selections exist.
+
 ## Approved post-candidate product scope — Caption video and audio
 
 > Status: `PRODUCT OWNER REQUIRED FUTURE SCOPE / NOT CURRENT RC IMPLEMENTATION`.
@@ -174,13 +210,15 @@ change, unguarded conversion fallback or a newly reproduced P0/P1.
   exact containers/codecs, sniff/decode budgets, versioned Native schema and
   portable/exchange packages, collaboration/review/clean-copy behavior,
   mixed-media viewer UX, privacy and physical-iPhone/offline acceptance.
-- [ ] Implement Caption video/audio after the first-candidate boundary is
-  closed, or earlier only after a separate Product Owner reprioritization and
-  approved implementation plan. Reuse the accepted future `MediaResource` and
-  `CaptionAttachment` direction; do not widen snapshot schema 1 in place.
-- [x] Verify this scope-only synchronization with typecheck, 62 test files /
+- [ ] Begin Caption video/audio as the first major media workstream after the
+  first-candidate boundary closes, or earlier only after a separate Product
+  Owner reprioritization and approved implementation plan. Reuse the accepted
+  future `MediaResource`, `CaptionAttachment` and media-stage direction; do not
+  widen snapshot schema 1 in place.
+- [x] Verify the prior video/audio scope-only synchronization recorded in commit
+  `7668c21e573153e67f4885ab036e278397ced660` with typecheck, 62 test files /
   1,503 passing tests with 21 existing todo, production build and independent
-  read-only review; no P0/P1 remains in the wording.
+  read-only review; no P0/P1 remained in that wording.
 
 This future requirement is not a new blocker for the already accepted
 Native-only release mode. The current media audit's image/HEIC and unsupported-

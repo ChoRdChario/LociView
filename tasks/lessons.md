@@ -9,6 +9,12 @@
   Captionの動画・音声はpost-candidateの必須開発範囲として維持し、exact
   format／codec、schema／package version、viewer、privacy、iPhone acceptanceは
   実装前に別のbounded contractとして確定する。
+- 段階実装でも、現在の対応形式を恒久的な情報設計へ焼き付けない。利用者には
+  `添付メディア`という共通概念を示し、ID・順序・viewer stageはmedia-neutralに
+  保つ一方、未実装の動画・音声controlや空の再生領域は先に表示しない。
+- private representativeで確認できた形式は、その形式だけの実行証拠である。
+  browser-native decode、特定dependency、orientationやphysical-iPhone対応は
+  representativeを使った各targetの実行結果なしに一般対応と主張しない。
 
 ## 2026-09-01: LociMyuのCaption sheetとmaterialを別々に移行しない
 
