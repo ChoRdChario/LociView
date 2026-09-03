@@ -161,9 +161,9 @@ change, unguarded conversion fallback or a newly reproduced P0/P1.
 
 `RELEASE CANDIDATE OPTION A: PRODUCT OWNER ACCEPTANCE PASS`
 
-## Active decision gate — first-candidate single-still HEIC/HEIF
+## Active implementation — first-candidate single-still HEIC/HEIF
 
-> Status: `PRODUCT SCOPE APPROVED / DEPENDENCY AND SNAPSHOT VERSION DECISIONS REQUIRED`.
+> Status: `PRODUCT OWNER BOUNDARY APPROVED / NATIVE SAFARI SMOKE BEFORE LOCAL DECODER BUILD`.
 
 - [x] Record the Product Owner boundary: the first public candidate completes
   still-image attachments including single-still HEIC/HEIF. The ordinary UI is
@@ -181,21 +181,41 @@ change, unguarded conversion fallback or a newly reproduced P0/P1.
   old reader to reject the Project and would also disturb the fixed
   collaboration baseline digest. A dual-read/new-write snapshot version and a
   defined baseline compatibility rule require Product Owner approval.
-- [ ] Product Owner selects one exact locally bundled decoder dependency and
-  accepts its embedded-codec license/notice boundary. Do not install, implement
-  or adopt a license before that decision.
-- [ ] Product Owner selects the bounded version strategy. Do not widen snapshot
-  schema 1 in place or implement video/audio schema at the same time.
-- [ ] After both decisions, freeze focused acceptance and implement only the
-  single-still HEIC/HEIF end-to-end path: original-byte identity, bounded
-  content admission, lazy/offline decoding with orientation and cleanup,
-  direct/LociMyu import, Native packages, Edge and physical-iPhone evidence.
+- [x] Product Owner selected a reproducible LociView-managed candidate build
+  from exact libheif `v1.23.3` and libde265 `v1.1.1`, without approving codec
+  invention, LGPL distribution compliance or HEVC patent disposition.
+- [x] Product Owner selected dual-read Native snapshot schemas `1`/`2` with
+  schema-1 preservation for non-HEIC projects, monotonic upgrade on first HEIC
+  admission and no automatic downgrade.
+- [x] Freeze the original-source-byte authority, content inspection, Worker
+  lifecycle, package/baseline, media-stage, offline and focused acceptance
+  boundary in section 29.1 before production implementation.
+- [x] Perform the one-time current formal-wrapper check. `heic-to@1.5.2`
+  remains on libheif `1.22.2` / libde265 `1.0.16`, `@discourse/heic@1.0.0`
+  remains on `1.19.7` / `1.0.15`, and upstream `@jsquash/heic` has no formal
+  release. None meets the required codec baseline or complete request cancel,
+  Worker, transfer, budget, primary-still and cleanup contract, so none is
+  adopted.
+- [ ] Run the physical-iPhone 14 Pro local-only native HEIC smoke before any
+  WASM build and select native-first or WASM-fallback behavior from the result.
+- [ ] Build the isolated exact-source decoder PoC and close focused Edge plus
+  applicable iPhone acceptance. Stop before production integration on a public-
+  distribution blocker, iPhone memory crash, nondeterministic output, incorrect
+  orientation or inability to cancel safely.
+- [ ] If no hard blocker remains, implement only the single-still HEIC/HEIF
+  end-to-end path: original-byte identity, bounded content admission, lazy/
+  offline decoding with orientation and cleanup, direct/LociMyu import, Native
+  packages, Edge and physical-iPhone evidence.
+- [ ] Obtain at most two independent read-only reviews for decoder/security and
+  distribution/license risk, then run one final executable-tree matrix and one
+  final physical-iPhone acceptance.
 
 Exclusions: Live Photo MOV, animated HEIF/HEIF image sequences, burst, depth/
 auxiliary UI, RAW/ProRAW, strict HDR/10-bit fidelity, image editing, cloud/
-server conversion, and simultaneous video/audio implementation. Stop at this
-decision gate; do not change production, dependencies or versions until both
-selections exist.
+server conversion, and simultaneous video/audio implementation. Do not adopt a
+public license position, finalize application/package release versions, merge
+`main`, create a Release, deploy Pages, implement video/audio or begin general
+UI/UX closure in this slice.
 
 ## Approved post-candidate product scope — Caption video and audio
 

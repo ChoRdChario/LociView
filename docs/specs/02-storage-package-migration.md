@@ -1952,20 +1952,85 @@ anchor, storage or package authority.
   coverage, records Desktop visual evidence, and defers one physical-iPhone
   check to the already planned consolidated direct-LociMyu product acceptance.
 
-### 29.1 First-candidate attachment-media direction (Product Owner approved 2026-09-03; implementation pending)
+### 29.1 First-candidate single-still HEIC/HEIF boundary (Product Owner approved 2026-09-03; implementation pending)
 
 The first public candidate extends the completed still-image path to
 single-still HEIC/HEIF. This decision supersedes only section 29's HEIC
 exclusion; it does not retroactively describe HEIC as implemented or change the
-accepted evidence for the existing four image formats. The exact decoder and
-snapshot/package version require Product Owner selection before production
-implementation.
+accepted evidence for the existing four image formats. The Product Owner has
+selected the exact bounded authority, version and decoder-candidate rules
+below. Public distribution, formal license adoption and HEVC patent disposition
+remain separate stops.
+
+The stored original HEIC/HEIF bytes are the sole durable `MediaResource`
+authority. Their byte length and SHA-256 determine binary identity. A decoded
+RGBA buffer, `ImageBitmap`, object URL or other display derivative is a
+discardable runtime resource: it is never written to a snapshot, backup,
+collaboration package, review/share package or clean copy and may always be
+regenerated. Original EXIF/location metadata is not silently stripped; an
+export that carries the original media must explain this to the user.
 
 Sections 30 and 31 below remain the accepted record of the pre-HEIC
-implementation and its current package versions; their `v1`/`v2` statements do
-not decide the HEIC target version. The approved version choice must explicitly
-supersede only the affected HEIC read/write and compatibility clauses before
-implementation. Snapshot schema 1 MUST NOT be widened silently.
+implementation and its current package versions. Snapshot schema `2` adds only
+the bounded single-still HEVC HEIC/HEIF capability. The new application
+dual-reads schemas `1` and `2`; schema `1` is never widened silently. A schema-1
+Project that adds only JPEG/PNG/WebP/GIF remains schema 1. First successful HEIC
+admission, including a LociMyu conversion with an admitted HEIC relation,
+monotonically upgrades that Project to schema 2. A schema-2 Project never
+automatically downgrades, even after its last HEIC is removed. An unsupported
+future schema remains visible in the Project list with an explicit `新しい形式`
+diagnosis instead of disappearing as an ordinary open failure.
+
+The existing portable-backup and Package-Exchange outer versions may remain
+unchanged only if their nested snapshot discriminator, parsers, exact binary
+closure and restore/import acceptance safely transport schema 2. If an outer
+contract fixes nested schema 1, implementation stops and presents the smallest
+outer-version bump instead of weakening validation. Collaboration does not
+treat the schema envelope alone as an unsupported Project change. Acceptance
+must prove two common-baseline schema-1 copies, a HEIC attachment added to one
+copy, merge into the other with a schema-2 upgrade, exact source-byte/relation
+retention, idempotent re-import, conflict zero-write and unchanged lineage/
+baseline validation. Any version-aware canonicalization must be documented and
+must not silently remove previously covered Project state from the baseline
+digest.
+
+The decoder candidate is a reproducible local build from exact libheif
+`v1.23.3`, exact libde265 `v1.1.1` and one exact pinned Emscripten version.
+Upstream source is used without modification where possible. The repository
+owns only the build recipe, any recorded minimal upstream patch, a small
+JavaScript/C++ bridge, Worker lifecycle, admission budgets and package/offline
+integration. Encoder, x265, AVIF/AOM, JPEG 2000, VVC, AVC, FFmpeg, uncompressed
+codec, image-sequence playback, plugin loading, experimental APIs,
+multithreading, dynamic execution and server/cloud conversion are disabled.
+
+Before that build, implementation performs exactly one current formal-wrapper
+check and a local-only physical-iPhone Safari native smoke. A wrapper is usable
+only if it combines libheif >= 1.23.3 and libde265 >= 1.1.1 with per-request
+cancel, explicit Worker termination, transferable large buffers, no
+`unsafe-eval`, same-origin offline assets, size/pixel/time budgets, orientation,
+primary-still restriction, explicit corrupt-input failure and resource cleanup.
+A version number alone is insufficient. If iPhone Safari successfully decodes
+the representative HEIC natively, its browser-native path is tried first and
+WASM is a fallback; otherwise iPhone uses the same bounded WASM path. The native
+smoke is not production acceptance.
+
+The WASM path uses a same-origin module Worker, separate lazy-loaded `.wasm`
+asset and no Blob Worker. Input `ArrayBuffer` and output RGBA/ImageBitmap are
+transferable. Requests are individually identified; cancel or timeout
+terminates the Worker. Only one HEIC decodes at a time, and Caption selection,
+viewer close or Project close invalidates the request and releases all output.
+A late result may not replace the current selection, and decoder failure cannot
+be represented as a successful image-without-content state.
+
+Admission trusts neither extension, declared MIME nor an ISO-BMFF major brand.
+libheif inspection must establish a valid HEIF container, a primary image, a
+HEVC-coded non-sequence still, positive dimensions within pixel/output budgets
+and a supported codec. Invalid, truncated, oversized, sequence and unsupported
+codec inputs fail explicitly before publication. Ordinary iPhone thumbnail,
+alpha, depth and other auxiliary items are ignored rather than selected, but
+their mere presence does not reject an otherwise valid primary still. The
+canonical `image/heic` or `image/heif` value is derived from validated container
+and primary-codec evidence rather than the filename.
 
 - The ordinary-user section is `添付メディア`, with the current action
   `画像を追加` and a concise supported-format indication. Attachment identity
@@ -1976,11 +2041,15 @@ implementation. Snapshot schema 1 MUST NOT be widened silently.
   this candidate it mounts only a still-image presenter. Video/audio controls
   and permanently reserved blank transport space appear only when those kinds
   are implemented.
-- HEIC/HEIF admission is content-validated at the service boundary rather than
-  trusted from filename or declared MIME. Direct add and LociMyu conversion
-  preserve original bytes, fail before publication on an unsafe input and
-  report a source item that cannot be promoted. Display decoding and any
-  regenerable runtime cache do not replace the stored/package source bytes.
+- Every production ingress—direct Caption image add, LociMyu conversion,
+  complete backup restore, collaboration import, review/share import and clean-
+  copy import—uses one authoritative HEIC admission result. LociMyu exact file-
+  ID relations attach an admitted HEIC; ambiguous relations remain unlinked and
+  reported. The source-change lock and final verification still prevent
+  publication if the selected source changes during conversion.
+  This slice adds no new frozen-v1 HEIC promotion rule: an unsupported legacy
+  media value remains unpromoted and explicitly reported without changing the
+  source, under the already accepted legacy-to-Native conversion boundary.
 - Candidate acceptance covers direct add and LociMyu exact-file-ID linkage,
   source preservation, orientation, ordinary viewer navigation, complete
   backup, collaboration/review/clean-copy package purposes, Edge, physical
@@ -1992,6 +2061,15 @@ implementation. Snapshot schema 1 MUST NOT be widened silently.
   media stage but must add its own streamed storage/player, package, privacy,
   Desktop and physical-iPhone/offline contract rather than treating the current
   full-Blob image loader as a streaming API.
+
+The decoder Worker/glue/WASM are same-origin precacheable assets with no runtime
+CDN or external fetch. They stay out of the initial main JavaScript and load
+only on the HEIC path. Offline-ready is true only after required decoder assets
+have been cached and read back successfully. The candidate records exact
+upstream archive/commit/digest, build recipe, Emscripten version, generated
+asset digests, modifications, source/relink materials, third-party notice and
+built-output notice candidates. LGPL compliance and HEVC patent treatment are
+reported to the Product Owner and are not self-approved by implementation.
 
 ## 30. Bounded native package exchange (Product Owner approved 2026-09-02)
 

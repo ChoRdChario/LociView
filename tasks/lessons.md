@@ -341,3 +341,9 @@
 
 - Caption追加のacceptanceは保存・再open後だけで終えず、配置した直後にピン、選択、overlayがworking stateから表示されることを確認する。保存後だけ正常になる状態は、作業中snapshotとViewer snapshotの同期漏れとして扱う。
 - DisplaySetのような表示filterに使う所属情報をUI callbackだけで補正しない。Viewerが未保存recordを先に保持する場合も、同じ正規化済み値を作成時点から共有し、durable snapshotの再投入を表示更新の代用にしない。
+
+## 2026-09-03: stale wrapper待ちとlocal upstream buildを同じ判断にしない
+
+- security修正版を含まない既存wrapperを却下しても、更新wrapperを無期限に待つことを自動的な結論にしない。Product Ownerがexact upstreamとbounded local buildを承認した場合は、公開wrapperの名前ではなくsource tag、toolchain、build recipe、bridge、Worker lifecycleと生成物digestを固定して再現可能性を作る。
+- technical decode成立、LGPL配布要件、HEVC patent判断を別々のgateにする。PoCが動いたことをlicense採用やpublic distribution承認へ読み替えず、対応source/relink資料とbuilt-output notice候補まで準備してProduct Ownerへ返す。
+- browser-native media supportはDesktop結果からiPhoneへ一般化しない。物理端末でnative経路をWASM build前に一度だけ測り、成功時はnative-first、失敗時だけfallback対象にする。native smokeと最終production acceptanceも分離する。
