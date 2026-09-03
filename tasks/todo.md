@@ -161,9 +161,9 @@ change, unguarded conversion fallback or a newly reproduced P0/P1.
 
 `RELEASE CANDIDATE OPTION A: PRODUCT OWNER ACCEPTANCE PASS`
 
-## Active implementation — first-candidate single-still HEIC/HEIF
+## Active investigation — first-candidate single-still HEIC/HEIF
 
-> Status: `ISOLATED POC TECHNICAL PASS / DISTRIBUTION DECISION REQUIRED / PRODUCTION NOT STARTED`.
+> Status: `NATIVE/WEBCODECS SPIKE ACTIVE / LIBDE265 LOCAL POC ONLY / PRODUCTION NOT STARTED`.
 
 - [x] Record the Product Owner boundary: the first public candidate completes
   still-image attachments including single-still HEIC/HEIF. The ordinary UI is
@@ -235,6 +235,57 @@ change, unguarded conversion fallback or a newly reproduced P0/P1.
   and a separate HEVC patent decision.
 - [ ] After production integration is authorized and implemented, run one final
   executable-tree matrix and one final physical-iPhone production acceptance.
+
+### Approved public-codec isolation follow-up
+
+- [x] Record the Product Owner decision in section 29.2: retain HEIC as a
+  product requirement, keep the exact libheif+libde265 Wasm only as a local
+  PoC, and do not publish or automatically fall back to it.
+- [x] Read-only inventory Git, dependencies, decoder/build inputs, production
+  imports, Vite, `public`/`dist`, Service Worker, Pages and CI. The tracked PoC
+  recipe/bridge is public source but unreachable and unbuilt by ordinary UI/CI;
+  generated decoder inputs/outputs are ignored and local-only. No decoder
+  package dependency or public binary artifact exists.
+- [x] Add the smallest CI/release-path guard that detects a libde265 PoC import,
+  known decoder output/digest or libde265-specific symbol in public build
+  output. Keep the approved tracked PoC source/build recipe allowed while its
+  generated output remains local-only. The guard runs after the Pages build and
+  before upload, and on `g0-baseline`/PR CI.
+- [x] Verify the final local PoC link/output contains libde265 as intended but
+  no x265, kvazaar, unwanted AV1/VVC encoder, GPL dependency or codec plugin.
+  The link graph has no external encoder/GPL codec backend or plugin loader;
+  generic libheif encoder/container objects remain, so encoder-code absence is
+  `PARTIAL`, not claimed. Do not infer this from CMake option names alone.
+- [x] Preserve the accepted iPhone native evidence and classify Display P3,
+  ICC/HDR and any unexecuted input class honestly as `NOT TESTED`.
+- [x] Implement and execute one isolated Windows Edge WebCodecs/OS-codec spike
+  without libde265 or an encoder. Record `isConfigSupported()` separately
+  from actual decode, extension-present/absent evidence actually available on
+  this host, offline behavior and explicit unsupported failure. The bounded
+  capability/provider spike contains no codec binary: Edge 152 exposes
+  WebCodecs but reports both tested HEVC configurations unsupported, the
+  current-user HEVC extension is absent, and actual decode is blocked. The
+  pinned experimental libheif backend also has reproduced codec-string,
+  multi-VCL and cleanup gaps, so no parser-only build was adopted or connected
+  to production. Extension-present Windows remains `NOT TESTED`.
+- [x] Express native Safari, WebCodecs and local-only libde265 as explicit
+  provider responsibilities inside the spike; production registration and PoC
+  fallback remain absent.
+- [x] Re-run the existing regression boundary and final executable builds. The
+  final local full suite reached 1,514 passing tests with 21 todo; seven existing
+  filesystem/evidence tests failed only while removing Windows temporary
+  directories with `EBUSY`. The 49-test restore suite then passed in an isolated
+  single-worker run; the G0 evidence suite still showed three nondeterministic
+  post-test `rmdir` failures (79 tests passed), so clean Ubuntu CI is the release
+  verdict rather than a product-code workaround. Typecheck, ordinary build,
+  Pages-base build, harness build and the public-path isolation verifier passed.
+  No Project schema/package code changed; the generated Service Worker still
+  omits the Spark chunk from precache and contains no HEIC PoC or libde265 asset.
+- [x] Classify technical, security, LGPL, patent and device blockers separately.
+  Outcome `D — additional device testing required`: Safari native decode is a
+  viable bounded provider, while this Edge host has no supported HEVC WebCodecs
+  configuration and no current-user HEVC extension; an extension-present Edge
+  test remains missing. Stop before libde265 production integration.
 
 Exclusions: Live Photo MOV, animated HEIF/HEIF image sequences, burst, depth/
 auxiliary UI, RAW/ProRAW, strict HDR/10-bit fidelity, image editing, cloud/

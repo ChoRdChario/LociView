@@ -1,0 +1,31 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+  background: #101216;
+  color: #f4f5f7;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  box-sizing: border-box;
+  max-width: 60rem;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+button {
+  padding: 0.7rem 1rem;
+}
+
+pre {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  padding: 1rem;
+  border: 1px solid #454b55;
+  border-radius: 0.5rem;
+  background: #171a20;
+}

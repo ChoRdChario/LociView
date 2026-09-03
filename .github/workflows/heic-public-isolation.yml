@@ -1,0 +1,32 @@
+name: HEIC public-path isolation
+
+on:
+  push:
+    branches: [g0-baseline]
+  pull_request:
+    branches: [main, g0-baseline]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: heic-public-isolation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+      - run: npm run verify:heic-isolation

@@ -2016,9 +2016,11 @@ are:
 Upstream source is used without modification where possible. The repository
 owns only the build recipe, any recorded minimal upstream patch, a small
 JavaScript/C++ bridge, Worker lifecycle, admission budgets and package/offline
-integration. Encoder, x265, AVIF/AOM, JPEG 2000, VVC, AVC, FFmpeg, uncompressed
-codec, image-sequence playback, plugin loading, experimental APIs,
-multithreading, dynamic execution and server/cloud conversion are disabled.
+integration. The exposed bridge is decode-only, and external encoder/codec
+backends (including x265 and kvazaar), plugin loading, multithreading, dynamic
+execution and server/cloud conversion are disabled. Generic libheif
+encoder/container objects remain in the static link, so total absence of
+encoder-side code is not claimed.
 
 Before that build, implementation performs exactly one current formal-wrapper
 check and a local-only physical-iPhone Safari native smoke. A wrapper is usable
@@ -2027,9 +2029,10 @@ cancel, explicit Worker termination, transferable large buffers, no
 `unsafe-eval`, same-origin offline assets, size/pixel/time budgets, orientation,
 primary-still restriction, explicit corrupt-input failure and resource cleanup.
 A version number alone is insufficient. If iPhone Safari successfully decodes
-the representative HEIC natively, its browser-native path is tried first and
-WASM is a fallback; otherwise iPhone uses the same bounded WASM path. The native
-smoke is not production acceptance.
+the representative HEIC natively, its browser-native path is tried first. The
+earlier fallback to the bounded libde265 Wasm is superseded and prohibited by
+section 29.2; native failure remains an unsupported presentation state. The
+native smoke is not production acceptance.
 
 The WASM path uses a same-origin module Worker, separate lazy-loaded `.wasm`
 asset and no Blob Worker. Input `ArrayBuffer` and output RGBA/ImageBitmap are
@@ -2079,14 +2082,66 @@ and primary-codec evidence rather than the filename.
   Desktop and physical-iPhone/offline contract rather than treating the current
   full-Blob image loader as a streaming API.
 
-The decoder Worker/glue/WASM are same-origin precacheable assets with no runtime
-CDN or external fetch. They stay out of the initial main JavaScript and load
-only on the HEIC path. Offline-ready is true only after required decoder assets
-have been cached and read back successfully. The candidate records exact
-upstream archive/commit/digest, build recipe, Emscripten version, generated
-asset digests, modifications, source/relink materials, third-party notice and
+Any future separately approved public decoder Worker/glue/Wasm must use
+same-origin assets with no runtime CDN or external fetch, stay out of the
+initial main JavaScript and prove cache read-back before offline-ready. The
+current libde265 PoC is not such an asset and section 29.2 prohibits its
+precache, runtime cache and public delivery. The PoC records exact upstream
+archive/commit/digest, build recipe, Emscripten version, generated asset
+digests, modifications, source/relink materials, third-party notice and
 built-output notice candidates. LGPL compliance and HEVC patent treatment are
 reported to the Product Owner and are not self-approved by implementation.
+
+### 29.2 Public-codec isolation and native/WebCodecs investigation (Product Owner approved 2026-09-03)
+
+Section 29.1 continues to define original-byte authority, snapshot-version and
+eventual product behavior. This section specifically supersedes its earlier
+libde265 fallback, decoder-precache/public-asset and total encoder-disablement
+language. The libheif+libde265 decoder is no longer a production-integration
+candidate pending external HEVC-patent and LGPL distribution decisions. That
+exact build remains a reproducible local PoC
+only. It MUST NOT be imported by production code, produced by the ordinary CI
+build, copied to `public`/`dist`, uploaded to GitHub Pages or a public Release,
+or included in Service Worker precache/runtime caching. Production feature
+flags MUST NOT register it, and native/WebCodecs failure MUST NOT fall back to
+it. A release-path CI guard fails if its known artifacts, imports, symbols or
+digests enter a public build.
+
+The first public-candidate investigation instead uses decoder providers (or an
+equivalent existing-architecture responsibility split) selected by explicit
+capability evidence:
+
+- iPhone Safari tries browser-native HEIC image decode first;
+- Windows Edge may use libheif only as the HEIF container/parser layer while
+  delegating HEVC decode to WebCodecs/the OS codec, with
+  `WITH_LIBDE265=OFF`, `WITH_WEBCODECS=ON`, `WITH_X265=OFF` and
+  `WITH_KVAZAAR=OFF`; and
+- the libde265 provider exists only inside the local PoC and is never present
+  in the production provider registry.
+
+The Edge route is experimental until an isolated spike proves both
+`VideoDecoder.isConfigSupported()` and actual decode on the same environment.
+The spike records codec configuration, Windows HEVC-extension state when it can
+be determined without inference, 8/10-bit behavior, orientation, color,
+offline behavior, large/multi-image/Live-Photo rejection and failure cleanup.
+Unexecuted device/file classes remain `NOT TESTED`; a capability query alone is
+not decode evidence. No production route is connected during this spike.
+
+Original HEIC bytes remain the sole Project authority even on a device with no
+decoder. A missing provider is an unsupported presentation state, not data
+corruption, and is reported equivalently to: `HEIC source preserved, but no
+supported decoder is available on this device.` No provider silently replaces
+the original with JPEG/WebP. Existing Native save/reopen and package behavior
+does not change until the separately approved schema-2 production
+implementation exists.
+
+The investigation closes by classifying the public path as: native Safari plus
+Edge WebCodecs adoptable; only some environments adoptable; technically
+unavailable and temporarily withheld from the first candidate; or requiring
+more physical-device evidence. Technical success does not approve LGPL
+distribution or HEVC patent coverage, and the local libde265 decoder remains
+blocked from public distribution in every outcome until those independent
+decisions close.
 
 ## 30. Bounded native package exchange (Product Owner approved 2026-09-02)
 

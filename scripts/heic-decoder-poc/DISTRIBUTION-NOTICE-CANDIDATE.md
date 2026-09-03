@@ -11,7 +11,7 @@
 
 | Component | Exact source | Observed license | PoC use |
 |---|---|---|---|
-| libheif | tag `v1.23.3`, commit `78c9746aea226b22885e8d35241353ce669c4ea5`, release archive SHA-256 `11c1179e0e4bec33624b87f22ec42c1e993a40d946d44d26f9c431cf1456a863` | library files state GNU LGPL version 3 or later; the archive's `COPYING` is the controlling local evidence | statically linked, decode-only HEIF container layer |
+| libheif | tag `v1.23.3`, commit `78c9746aea226b22885e8d35241353ce669c4ea5`, release archive SHA-256 `11c1179e0e4bec33624b87f22ec42c1e993a40d946d44d26f9c431cf1456a863` | library files state GNU LGPL version 3 or later; the archive's `COPYING` is the controlling local evidence | statically linked HEIF container/decode API; no external encoder backend is linked, but generic upstream encoder/container objects remain |
 | libde265 | tag `v1.1.2`, commit `d0bcab76380c079358a3156b3e3b37d17c00a078`, release archive SHA-256 `eaacd1943ab0c452c19f6136a36ca227e6b761b39a81eaca8454d48c147e1f67` | library files state GNU LGPL version 3 or later; the archive's `COPYING` is the controlling local evidence | statically linked HEVC decoder |
 | Emscripten | release `3.1.61`; emsdk commit `ca7b40ae222a2d8763b6ac845388744b0e57cfb7`; Emscripten source commit `67fa4c16496b157a7fc3377afd69ee0445e8a6e3`; source archive SHA-256 `88232dd77f0efe45327c29091c39e260d69469d2128b752c61e4c8c98d47a6ef`; release compiler revision `28e4a74b579b4157bda5fc34f23c7d3905a8bd6c` | source is dual-licensed MIT or University of Illinois/NCSA; generated JavaScript carries the Emscripten MIT notice | pinned local compiler/runtime glue |
 

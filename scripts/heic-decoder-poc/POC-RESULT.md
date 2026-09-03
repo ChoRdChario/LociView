@@ -17,11 +17,15 @@
 | Generated JavaScript | 38,978 bytes; SHA-256 `58988b61e5067c388cbc20609af1e186450a3d3e07f894cdcfcc1d053cab73b0` |
 | Generated Wasm | 1,182,825 bytes; SHA-256 `99823b33ca6ff71d97dc6afbc79692394dd8e24c6b7c44dd9869e7ada8dade5d` |
 
-The build enables only bounded HEVC still decode and RGBA8 output. Encoders,
-x265, AOM/AVIF, JPEG 2000, VVC, AVC, FFmpeg, uncompressed codecs, plugin
-loading, experimental APIs and multithreading are disabled. Every build
-re-verifies the downloaded archives, removes the extracted working trees and
-re-extracts from those verified archives before compiling.
+The exposed bridge enables only bounded HEVC still decode and RGBA8 output.
+libde265 is the only linked external codec backend; x265, kvazaar, external
+AV1/VVC/JPEG/AVC/FFmpeg backends and dynamic plugin loading are absent from the
+final link graph. Upstream libheif still contributes generic encoder/container
+objects (including its built-in mask encoder), so this output must not be
+described as containing no encoder-side code. Experimental APIs and
+multithreading are disabled. Every build re-verifies the downloaded archives,
+removes the extracted working trees and re-extracts from those verified
+archives before compiling.
 
 ## Executed browser evidence
 

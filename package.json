@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "preview:harness": "vite preview --outDir dev-dist --port 4181 --strictPort",
     "evidence:verify": "node scripts/verify-g0-evidence.mjs",
+    "verify:heic-isolation": "node scripts/verify-heic-public-isolation.mjs",
     "fixtures:verify": "node scripts/fixtures/verify.mjs",
     "fixtures:release:restore": "node scripts/fixtures/restore-release-fixture.mjs",
     "fixtures:receipt:verify": "node scripts/fixtures/verify-acquisition-receipt.mjs",

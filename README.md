@@ -14,6 +14,27 @@ LociView is the local-first successor to LociMyu: an offline browser application
 > Public build: https://chordchario.github.io/LociView/
 > Fresh-session checkpoint: [`tasks/handoff.md`](tasks/handoff.md)
 
+## HEIC investigation boundary
+
+HEIC/HEIF still-image support remains a product requirement, but it is not yet
+production functionality. The checked-in PoC recipe and bridge for a
+libheif+libde265 build are an isolated local experiment only. Its generated
+JavaScript/Wasm must not enter the normal application build, GitHub Pages, a
+public binary Release or Service Worker cache, and production must not register
+or fall back to that decoder.
+
+The repository currently contains the PoC source, bridge and reproducible build
+recipe; generated decoder files and private representative source bytes are not
+tracked. Public distribution of the generated decoder has not been approved:
+HEVC patent review is incomplete, the recipient-facing LGPL source/relink and
+notice kit is incomplete, and production security hardening is incomplete.
+Technical PoC success is not a license, patent or release decision. Any public
+codec path requires a separate Product Owner approval after independent review.
+
+The active candidate investigation is limited to browser-native HEIC decode on
+Safari and an isolated Windows Edge WebCodecs/OS-codec spike. Neither path is
+connected to Native Project storage, conversion, backup or the product UI yet.
+
 ## Current v1
 
 - `.lociview` ZIP packages contain models, images, and project records for exchange and backup.

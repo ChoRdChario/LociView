@@ -36,6 +36,13 @@
   completely-offline-reopen evidence remains applicable; no unresolved P0/P1.
 - At handoff preparation, `origin/g0-baseline` matched the local branch, the
   worktree was clean, and temporary preview/Cloudflare Tunnel were stopped.
+- The later HEIC legal/security boundary keeps the existing libheif+libde265
+  decoder as a local PoC only. Generated decoder output remains outside the
+  application/Pages/Service Worker graph. A public-path isolation check now
+  guards the Pages artifact; the Windows Edge OS/WebCodecs path is not yet an
+  adoptable cross-platform replacement because the tested host has no HEVC
+  capability and extension-present Windows remains untested. Safari native
+  decode passed only the recorded iPhone/file scope; P3/ICC/HDR remain untested.
 
 Do not hard-code this document's own commit as the checkout target. At the
 start of a fresh session, verify that current `g0-baseline` is a clean descendant

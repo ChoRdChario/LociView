@@ -347,6 +347,7 @@
 - security修正版を含まない既存wrapperを却下しても、更新wrapperを無期限に待つことを自動的な結論にしない。Product Ownerがexact upstreamとbounded local buildを承認した場合は、公開wrapperの名前ではなくsource tag、toolchain、build recipe、bridge、Worker lifecycleと生成物digestを固定して再現可能性を作る。
 - technical decode成立、LGPL配布要件、HEVC patent判断を別々のgateにする。PoCが動いたことをlicense採用やpublic distribution承認へ読み替えず、対応source/relink資料とbuilt-output notice候補まで準備してProduct Ownerへ返す。
 - browser-native media supportはDesktop結果からiPhoneへ一般化しない。物理端末でnative経路をWASM build前に一度だけ測り、成功時はnative-first、失敗時だけfallback対象にする。native smokeと最終production acceptanceも分離する。
+- 後続の法務判断でdecoder同梱が止まった場合、技術PoCを削除したりproductionへ隠しfallbackしたりせず、生成物をpublic build／Pages／Service Workerからpost-build CIで隔離する。native／OS codecのcapability照会と実decodeを分け、未確認端末を成功扱いしない。
 
 ## 2026-09-03: exact dependency approvalもbuild直前に再検証する
 

@@ -2,6 +2,12 @@
 
 Status: `DISPOSABLE POC / NOT PRODUCTION / NOT DISTRIBUTION APPROVED`.
 
+This is a local technical experiment only. Production use and public
+deployment are prohibited. HEVC patent review is incomplete, the LGPL public
+distribution/relink kit is incomplete, and production security hardening is
+incomplete. A separate independent review and Product Owner approval are
+required before any generated decoder output may be distributed externally.
+
 This directory proves only the bounded local decoder candidate accepted in
 `docs/specs/02-storage-package-migration.md` section 29.1. It is intentionally
 outside the application TypeScript, Vite and Service Worker graphs. Generated
@@ -60,8 +66,10 @@ Input paths are not included in its JSON result.
 the exact emsdk release into the ignored artifact directory. `build.ps1`
 requires those verified inputs, discards and re-extracts the source/build trees
 from the verified archives on every run, uses the detected Visual Studio
-CMake/Ninja, builds static decode-only libraries without source patches, then
+CMake/Ninja, disables external encoder/codec backends and plugin loading, then
 records the generated JS/WASM size and SHA-256 in an ignored result manifest.
+The exposed bridge is decode-only; generic libheif encoder/container objects
+remain in the static link and are not claimed to be absent.
 
 The official libheif example files may be used transiently from the verified
 source tree. No private representative source and no upstream test image is
