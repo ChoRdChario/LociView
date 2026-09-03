@@ -7,3 +7,4 @@ dev-dist/
 .artifacts/fixtures/
 .artifacts/traces/
 /.artifacts/acquisition/
+/.artifacts/heic-decoder-poc/

@@ -1,0 +1,37 @@
+{
+  "status": "poc-only-not-approved-for-public-distribution",
+  "libheif": {
+    "version": "1.23.3",
+    "tag": "v1.23.3",
+    "commit": "78c9746aea226b22885e8d35241353ce669c4ea5",
+    "archiveUrl": "https://github.com/strukturag/libheif/releases/download/v1.23.3/libheif-1.23.3.tar.gz",
+    "archiveSha256": "11c1179e0e4bec33624b87f22ec42c1e993a40d946d44d26f9c431cf1456a863",
+    "license": "LGPL-3.0-or-later",
+    "licensePathInArchive": "COPYING"
+  },
+  "libde265": {
+    "version": "1.1.2",
+    "tag": "v1.1.2",
+    "commit": "d0bcab76380c079358a3156b3e3b37d17c00a078",
+    "archiveUrl": "https://github.com/strukturag/libde265/releases/download/v1.1.2/libde265-1.1.2.tar.gz",
+    "archiveSha256": "eaacd1943ab0c452c19f6136a36ca227e6b761b39a81eaca8454d48c147e1f67",
+    "license": "LGPL-3.0-or-later",
+    "licensePathInArchive": "COPYING"
+  },
+  "emscripten": {
+    "version": "3.1.61",
+    "emsdkTag": "3.1.61",
+    "emsdkCommit": "ca7b40ae222a2d8763b6ac845388744b0e57cfb7",
+    "emscriptenSourceCommit": "67fa4c16496b157a7fc3377afd69ee0445e8a6e3",
+    "sourceArchiveUrl": "https://github.com/emscripten-core/emscripten/archive/67fa4c16496b157a7fc3377afd69ee0445e8a6e3.tar.gz",
+    "sourceArchiveSha256": "88232dd77f0efe45327c29091c39e260d69469d2128b752c61e4c8c98d47a6ef",
+    "releaseCompilerRevision": "28e4a74b579b4157bda5fc34f23c7d3905a8bd6c",
+    "repositoryUrl": "https://github.com/emscripten-core/emsdk.git",
+    "license": "MIT OR NCSA",
+    "licensePathInSourceArchive": "LICENSE"
+  },
+  "observedBuildTools": {
+    "cmake": "3.31.6-msvc6",
+    "ninja": "1.12.1"
+  }
+}

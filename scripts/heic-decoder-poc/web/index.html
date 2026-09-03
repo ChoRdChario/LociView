@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; worker-src 'self'; connect-src 'self'; img-src 'self' blob: data:; style-src 'self';"
+    />
+    <title>LociView isolated HEIC decoder PoC</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">DISPOSABLE LOCAL POC</p>
+        <h1>HEIC decoder isolation check</h1>
+        <p>選択した画像は端末内だけで処理され、upload・filename記録・永続保存を行いません。</p>
+      </header>
+
+      <section class="controls" aria-label="decoder controls">
+        <label>
+          HEIC / HEIF
+          <input id="source" type="file" accept=".heic,.heif,image/heic,image/heif" />
+        </label>
+        <div class="buttons">
+          <button id="decode" type="button">Decode</button>
+          <button id="cancel" type="button">Cancel</button>
+          <button id="repeat" type="button">Open / close ×3</button>
+          <button id="stale" type="button">Selection-change check</button>
+          <button id="truncated" type="button">Reject ftyp-only</button>
+          <button id="corrupt" type="button">Reject corrupt</button>
+          <button id="timeout" type="button">Timeout check</button>
+          <button id="oversized" type="button">Reject oversized</button>
+          <button id="clear" type="button">Clear</button>
+        </div>
+        <p id="status" role="status">Choose a HEIC/HEIF file.</p>
+      </section>
+
+      <section class="output" aria-label="decode output">
+        <div class="canvas-shell"><canvas id="preview" width="1" height="1"></canvas></div>
+        <pre id="result"></pre>
+      </section>
+    </main>
+    <script type="module" src="./main.mjs"></script>
+  </body>
+</html>

@@ -163,7 +163,7 @@ change, unguarded conversion fallback or a newly reproduced P0/P1.
 
 ## Active implementation — first-candidate single-still HEIC/HEIF
 
-> Status: `PRODUCT OWNER BOUNDARY APPROVED / NATIVE SAFARI SMOKE BEFORE LOCAL DECODER BUILD`.
+> Status: `ISOLATED POC TECHNICAL PASS / DISTRIBUTION DECISION REQUIRED / PRODUCTION NOT STARTED`.
 
 - [x] Record the Product Owner boundary: the first public candidate completes
   still-image attachments including single-still HEIC/HEIF. The ordinary UI is
@@ -209,17 +209,32 @@ change, unguarded conversion fallback or a newly reproduced P0/P1.
   revocation. Therefore physical iPhone uses browser-native decode first; WASM
   is not an unconditional iPhone path. The local-only LAN server was stopped
   after the smoke and no source bytes entered Git, docs, fixtures or build.
-- [ ] Build the isolated exact-source decoder PoC and close focused Edge plus
+- [x] Build the isolated exact-source decoder PoC and close focused Edge plus
   applicable iPhone acceptance. Stop before production integration on a public-
   distribution blocker, iPhone memory crash, nondeterministic output, incorrect
-  orientation or inability to cancel safely.
-- [ ] If no hard blocker remains, implement only the single-still HEIC/HEIF
+  orientation or inability to cancel safely. The pinned libheif `v1.23.3` /
+  libde265 `v1.1.2` / Emscripten `3.1.61` build passed bounded Wasm decode,
+  orientation, same-origin offline reload, deterministic repeat, cancel,
+  timeout, stale-selection and fail-closed malformed/unsupported/sequence
+  checks in Edge. The native-first iPhone smoke also passed restart, complete-
+  offline reopen and resource release. Exact evidence and generated output
+  digests are recorded in `scripts/heic-decoder-poc/POC-RESULT.md`. The final
+  project regression passed typecheck, all 62 test files / 1,503 tests (21
+  existing todo), and the production build without adding a dependency or
+  shipping decoder assets.
+- [ ] **BLOCKED — distribution decision required.** If the public-distribution
+  blockers are resolved, implement only the single-still HEIC/HEIF
   end-to-end path: original-byte identity, bounded content admission, lazy/
   offline decoding with orientation and cleanup, direct/LociMyu import, Native
-  packages, Edge and physical-iPhone evidence.
-- [ ] Obtain at most two independent read-only reviews for decoder/security and
-  distribution/license risk, then run one final executable-tree matrix and one
-  final physical-iPhone acceptance.
+  packages, Edge and physical-iPhone evidence. Production schema/UI/package
+  code has not started.
+- [x] Obtain at most two independent read-only reviews for decoder/security and
+  distribution/license risk. No isolated technical P0/P1 remains. Production
+  and public distribution remain blocked on an approved LGPL corresponding-
+  source/relink/notice kit, exact Windows compiler payload/runtime inventory,
+  and a separate HEVC patent decision.
+- [ ] After production integration is authorized and implemented, run one final
+  executable-tree matrix and one final physical-iPhone production acceptance.
 
 Exclusions: Live Photo MOV, animated HEIF/HEIF image sequences, burst, depth/
 auxiliary UI, RAW/ProRAW, strict HDR/10-bit fidelity, image editing, cloud/
