@@ -199,8 +199,16 @@ change, unguarded conversion fallback or a newly reproduced P0/P1.
   release. None meets the required codec baseline or complete request cancel,
   Worker, transfer, budget, primary-still and cleanup contract, so none is
   adopted.
-- [ ] Run the physical-iPhone 14 Pro local-only native HEIC smoke before any
+- [x] Run the physical-iPhone 14 Pro local-only native HEIC smoke before any
   WASM build and select native-first or WASM-fallback behavior from the result.
+  Safari decoded an actual HEIC selected from Files through both `<img>` and
+  `createImageBitmap` at `3024 x 4032`; orientation and mirror/rotation were
+  correct. Structurally truncated and corrupt probes failed explicitly. A
+  same-session IndexedDB copy decoded after Safari restart and while fully
+  offline, and the final Blob-URL registry check confirmed release after
+  revocation. Therefore physical iPhone uses browser-native decode first; WASM
+  is not an unconditional iPhone path. The local-only LAN server was stopped
+  after the smoke and no source bytes entered Git, docs, fixtures or build.
 - [ ] Build the isolated exact-source decoder PoC and close focused Edge plus
   applicable iPhone acceptance. Stop before production integration on a public-
   distribution blocker, iPhone memory crash, nondeterministic output, incorrect

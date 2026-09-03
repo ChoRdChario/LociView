@@ -352,3 +352,9 @@
 
 - Product Ownerがexact versionを批准しても、untrusted-input parser／decoderはdownloadやbuildの直前にupstream releaseとsecurity advisoryを再確認する。批准直後に修正版が公開された場合、古いpinを惰性でbuildせず、影響、互換性、exact replacementを示して最小の再承認を得る。
 - security releaseがABI/API-compatibleなfull replacementなら、個別patchの寄せ集めやprivate forkを優先しない。拒否版、replacement tag/commit/archive digestと承認時点を記録し、technical buildとdistribution/license判断は引き続き分離する。
+
+## 2026-09-03: media smokeは失敗fixtureとresource authorityを分離する
+
+- 元fileを一定割合で切っただけでは、先頭側にprimary imageのdecodeに必要なbytesが残り、malformed inputにならない場合がある。truncated拒否のsmokeは、container構造を保ちながらprimary payloadを欠落させる等、失敗理由を構造的に固定する。
+- `URL.revokeObjectURL()`後もdecode済み`HTMLImageElement`が表示できることは、Blob URL registryの解放失敗を意味しない。解放確認は新しいconsumerから同じURLを再取得できないことを確認し、既にdecode済みの画像cacheやDOM参照の寿命とは分けて記録する。
+- local smokeの一時serverは結果取得後すぐ停止し、port listenerが消えたことまで確認する。端末内の一時IndexedDB copy、Blob URL、repositoryへのsource混入も別々のauthorityとして扱う。
