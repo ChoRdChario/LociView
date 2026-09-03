@@ -182,8 +182,11 @@ change, unguarded conversion fallback or a newly reproduced P0/P1.
   collaboration baseline digest. A dual-read/new-write snapshot version and a
   defined baseline compatibility rule require Product Owner approval.
 - [x] Product Owner selected a reproducible LociView-managed candidate build
-  from exact libheif `v1.23.3` and libde265 `v1.1.1`, without approving codec
-  invention, LGPL distribution compliance or HEVC patent disposition.
+  from exact libheif `v1.23.3`, libde265 `v1.1.2` and Emscripten `3.1.61`,
+  without approving codec invention, LGPL distribution compliance or HEVC
+  patent disposition. This supersedes the same-day `v1.1.1` selection after an
+  upstream security release disclosed two memory-safety fixes; do not build or
+  cherry-pick onto the rejected version.
 - [x] Product Owner selected dual-read Native snapshot schemas `1`/`2` with
   schema-1 preservation for non-HEIC projects, monotonic upgrade on first HEIC
   admission and no automatic downgrade.

@@ -1995,7 +1995,24 @@ must not silently remove previously covered Project state from the baseline
 digest.
 
 The decoder candidate is a reproducible local build from exact libheif
-`v1.23.3`, exact libde265 `v1.1.1` and one exact pinned Emscripten version.
+`v1.23.3`, exact libde265 `v1.1.2` and exact Emscripten `3.1.61`. The libde265
+`v1.1.2` selection supersedes the earlier same-day `v1.1.1` approval: upstream
+published it as an ABI/API-compatible security and bugfix replacement covering
+two memory-safety defects in `v1.1.1`; no vulnerable pin or private cherry-pick
+is retained. The approved source pins, subject to local archive verification,
+are:
+
+- libheif tag commit `78c9746aea226b22885e8d35241353ce669c4ea5`,
+  release-archive SHA-256
+  `11c1179e0e4bec33624b87f22ec42c1e993a40d946d44d26f9c431cf1456a863`;
+- libde265 tag commit `d0bcab76380c079358a3156b3e3b37d17c00a078`,
+  release-archive SHA-256
+  `eaacd1943ab0c452c19f6136a36ca227e6b761b39a81eaca8454d48c147e1f67`;
+- emsdk tag commit `ca7b40ae222a2d8763b6ac845388744b0e57cfb7`,
+  Emscripten source tag `67fa4c16496b157a7fc3377afd69ee0445e8a6e3`
+  and registry compiler revision
+  `28e4a74b579b4157bda5fc34f23c7d3905a8bd6c`.
+
 Upstream source is used without modification where possible. The repository
 owns only the build recipe, any recorded minimal upstream patch, a small
 JavaScript/C++ bridge, Worker lifecycle, admission budgets and package/offline
@@ -2005,7 +2022,7 @@ multithreading, dynamic execution and server/cloud conversion are disabled.
 
 Before that build, implementation performs exactly one current formal-wrapper
 check and a local-only physical-iPhone Safari native smoke. A wrapper is usable
-only if it combines libheif >= 1.23.3 and libde265 >= 1.1.1 with per-request
+only if it combines libheif >= 1.23.3 and libde265 >= 1.1.2 with per-request
 cancel, explicit Worker termination, transferable large buffers, no
 `unsafe-eval`, same-origin offline assets, size/pixel/time budgets, orientation,
 primary-still restriction, explicit corrupt-input failure and resource cleanup.

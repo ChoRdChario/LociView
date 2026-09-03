@@ -339,10 +339,13 @@ Recorded on 2026-09-03:
   schema 1 until HEIC/HEIF is first admitted, then upgrades monotonically to
   schema 2 and never automatically downgrades, including after HEIC removal;
 - the approved decoder candidate is a reproducible LociView-managed local build
-  from exact libheif `v1.23.3` and libde265 `v1.1.1` upstream sources with an
-  exact pinned Emscripten toolchain, a small bridge and a same-origin module
+  from exact libheif `v1.23.3` and libde265 `v1.1.2` upstream sources with exact
+  Emscripten `3.1.61`, a small bridge and a same-origin module
   Worker. This is not approval to implement a codec, adopt an LGPL compliance
   position, resolve HEVC patent exposure or distribute the resulting binary;
+- this `v1.1.2` pin supersedes the earlier same-day `v1.1.1` approval after the
+  upstream security release disclosed two memory-safety fixes affecting
+  `v1.1.1`; the candidate does not retain or cherry-pick onto the rejected pin;
 - a one-time current-wrapper check and a physical-iPhone native-HEIC smoke
   precede the local WASM build. A successful iPhone Safari native path remains
   first choice there; failure makes iPhone part of the WASM fallback path.
