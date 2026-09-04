@@ -4,7 +4,9 @@
 > authorized the bounded Native-only write-authority implementation (option A)
 > on 2026-09-03. The bounded implementation, indexed-tree automated matrix and
 > Product Owner Desktop acceptance are complete; clean-checkout CI remains
-> pending.
+> pending. The later first-candidate device-side HEIC compatibility tree has
+> completed automated, Edge and independent-review acceptance; its physical
+> iPhone JPEG-export flow and exact implementation commit are still pending.
 >
 > This file is navigation and handoff context, not a product specification.
 > Code/tests define observed behavior; accepted specifications define product
@@ -23,6 +25,9 @@
   `9c5596b6df712df0105904c9f2e0ecc62e1440a0`
 - Accepted corrective executable commit:
   `f6c88967155b0c83d4bcdd4fec6b4a78d9caf772`
+- First-candidate device-side HEIC compatibility start HEAD:
+  `14257e0a13526f7233e474c0f61b259cd443933d`; the implementation is currently
+  staged but not yet committed.
 - Accepted Native Package Exchange tree verification: typecheck, 60 test files /
   1,478 passing tests with 21 existing todo, and production build all PASS.
 - Current executable candidate: the option-A indexed tree passed typecheck,
@@ -36,13 +41,16 @@
   completely-offline-reopen evidence remains applicable; no unresolved P0/P1.
 - At handoff preparation, `origin/g0-baseline` matched the local branch, the
   worktree was clean, and temporary preview/Cloudflare Tunnel were stopped.
-- The later HEIC legal/security boundary keeps the existing libheif+libde265
-  decoder as a local PoC only. Generated decoder output remains outside the
-  application/Pages/Service Worker graph. A public-path isolation check now
-  guards the Pages artifact; the Windows Edge OS/WebCodecs path is not yet an
-  adoptable cross-platform replacement because the tested host has no HEVC
-  capability and extension-present Windows remains untested. Safari native
-  decode passed only the recorded iPhone/file scope; P3/ICC/HDR remain untested.
+- The first candidate does not require Windows HEIF/HEVC extensions and does
+  not ship a decoder. Users make a separate JPEG on their device and attach
+  that JPEG; direct original-byte HEIC/HEIF remains required post-candidate
+  work. The existing libheif+libde265 decoder stays an isolated local PoC, and
+  generated output remains outside the application/Pages/Service Worker graph.
+  On the staged tree, typecheck, 65 files / 1,542 tests with 21 existing todo,
+  ordinary and Pages-path builds, public-codec isolation and Edge 152 actual
+  JPEG/PNG/GIF/WebP decode all pass. Two independent reviews found no P0/P1.
+  The new physical-iPhone local-JPEG-add/save/offline-reopen flow is not yet
+  accepted and must not inherit credit from the earlier Native restore smoke.
 
 Do not hard-code this document's own commit as the checkout target. At the
 start of a fresh session, verify that current `g0-baseline` is a clean descendant
@@ -61,7 +69,9 @@ Read only these before the first Product Owner decision:
 7. `tasks/lessons.md` section “長期プロジェクトと長期Codexセッションを分離する”
 8. `docs/specs/02-storage-package-migration.md` §31 and
    `docs/specs/03-gates-and-delivery.md` §3.8 for the selected Native-only
-   candidate boundary; read §30 only if package detail is needed
+   candidate boundary; read `docs/specs/02-storage-package-migration.md` §29.3
+   for current first-candidate HEIC compatibility; read §30 only if package
+   detail is needed
 
 Do not reconstruct current scope from chat history, the superseded roadmap or
 old unchecked gate prose.
@@ -137,6 +147,15 @@ private staging receipt closes only exact import-marker publication; it is not
 a package entry, source authority or general journal. One short ordinary-home
 LociMyu discovery label/help route is release hygiene, not a new
 importer or general UI-polish workstream.
+
+For first-candidate Caption images, Native writes PNG/JPEG/WebP/GIF only.
+Direct HEIC/HEIF selection fails closed before publication and explains how to
+make a separate JPEG locally on the device. LociMyu HEIC/HEIF remains in the
+conversion inventory/report but is not automatically attached; only an exact
+source relation names the corresponding DisplaySet and Caption, and an unknown
+relation is never guessed. The original HEIC and source ZIP stay with the user;
+the manually added JPEG is the only Native media authority. This policy does
+not delete the isolated decoder PoC or cancel post-candidate direct HEIC work.
 
 Also surface these genuine release decisions/blockers:
 

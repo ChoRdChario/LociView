@@ -359,3 +359,9 @@
 - 元fileを一定割合で切っただけでは、先頭側にprimary imageのdecodeに必要なbytesが残り、malformed inputにならない場合がある。truncated拒否のsmokeは、container構造を保ちながらprimary payloadを欠落させる等、失敗理由を構造的に固定する。
 - `URL.revokeObjectURL()`後もdecode済み`HTMLImageElement`が表示できることは、Blob URL registryの解放失敗を意味しない。解放確認は新しいconsumerから同じURLを再取得できないことを確認し、既にdecode済みの画像cacheやDOM参照の寿命とは分けて記録する。
 - local smokeの一時serverは結果取得後すぐ停止し、port listenerが消えたことまで確認する。端末内の一時IndexedDB copy、Blob URL、repositoryへのsource混入も別々のauthorityとして扱う。
+
+## 2026-09-04: 必要なmedia形式と初回candidateの直接decodeを分ける
+
+- 製品として将来必要なHEIC／動画／音声を、初回candidateでdecoderを同梱できるかという配布判断と混同しない。直接HEICを延期しても要件から削除せず、隔離PoCをproduction fallbackへ読み替えない。
+- 端末側で別JPEGへ変換する互換フローでは、Native Projectが保持するのは追加したJPEGだけである。LociViewが元HEICも保存する、または別JPEGを元のfile-IDへ自動再関連付けすると誤解させず、元写真／元ZIPの別保管と変換後Captionへの手動添付を明記する。
+- 拡張子や`File.type`だけで形式を信用すると、HEIC bytesをJPEGとして永続化できる。直接追加、legacy変換、restore／merge等のpublication境界で同じbyte-derived admissionを使い、拒否はsnapshot／marker公開前にfail closedとする。

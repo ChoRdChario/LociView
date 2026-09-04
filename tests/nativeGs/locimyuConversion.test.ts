@@ -138,6 +138,80 @@ describe('LociMyu ZIP to native direct adapter', () => {
     session.release();
   });
 
+  it('reports exact and corrupt HEIC inventory without attaching or changing the source ZIP', async () => {
+    const fixtureEntries = await readZipEntries(new Uint8Array(await readFile(fixturePath)));
+    const heicBytes = new Uint8Array([
+      0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63,
+      0, 0, 0, 0, 0x6d, 0x69, 0x66, 0x31, 0x68, 0x65, 0x69, 0x63,
+    ]);
+    const zip = await writeZipEntries([
+      ...fixtureEntries.map((entry) => {
+        if (entry.path === 'images/linked.png') return { path: 'images/linked.heic', data: heicBytes };
+        if (entry.path === 'fileid-map.csv') {
+          return {
+            ...entry,
+            data: encoder.encode(new TextDecoder().decode(entry.data).replace('linked.png', 'linked.heic')),
+          };
+        }
+        return entry;
+      }),
+      { path: 'images/unlinked-corrupt.heif', data: new Uint8Array([1, 2, 3, 4]) },
+    ]);
+    const file = new File([Uint8Array.from(zip)], 'heic-inventory-locimyu.zip', { type: 'application/zip' });
+    const importPlan = await buildImportPlan(await readZipEntries(zip), { preserveBlockedLociMyuSource: true });
+    const plan = await planLociMyuZipToNative(file, importPlan, 'HEIC inventory fixture');
+
+    expect(importPlan.images.map((entry) => entry.path)).toEqual(expect.arrayContaining([
+      'images/linked.heic',
+      'images/unlinked-corrupt.heif',
+    ]));
+    expect(plan.issues).toContainEqual(expect.objectContaining({
+      code: 'media-heic-device-conversion-required',
+      severity: 'warning',
+      candidates: ['images/linked.heic'],
+    }));
+    const linkedHeicMapping = plan.mappings.find((entry) => entry.sourceId === 'images/linked.heic');
+    expect(linkedHeicMapping).toEqual(expect.objectContaining({
+      sourceKind: 'image',
+      sourceId: 'images/linked.heic',
+      disposition: 'reported',
+      targetKind: 'Caption',
+      targetId: expect.stringMatching(/^cap_/u),
+      relationBasis: 'source-exact',
+      note: expect.stringContaining('device-side JPEG conversion'),
+    }));
+    const targetCaption = plan.draft.captions.find((entry) => entry.id === linkedHeicMapping?.targetId);
+    const targetDisplaySet = plan.draft.displaySets?.find((entry) => entry.id === targetCaption?.displaySetId);
+    expect(linkedHeicMapping?.note).toContain(`Caption "${targetCaption?.title}"`);
+    expect(linkedHeicMapping?.note).toContain(`DisplaySet "${targetDisplaySet?.name}"`);
+    expect(plan.mappings).toContainEqual(expect.objectContaining({
+      sourceKind: 'image',
+      sourceId: 'images/unlinked-corrupt.heif',
+      disposition: 'reported',
+      note: expect.stringContaining('HEIC/HEIF inventory candidate'),
+    }));
+    expect(plan.draft.mediaResources).toEqual([]);
+    expect(plan.mediaSources.size).toBe(0);
+    expect(plan.draft.captions.every((caption) => caption.attachmentMediaIds === undefined)).toBe(true);
+    await expect(assertLociMyuSourceUnchanged(plan, file)).resolves.toEqual(plan.sourceBefore);
+
+    const fs = new MemoryFS();
+    const session = await ProjectMutationCoordinator.local().tryAcquire(
+      fs,
+      nativeProjectRoot(plan.draft.project.id),
+      plan.draft.project.id,
+    );
+    session.activateNewProject();
+    const snapshot = await createLociMyuNativeProject(session.workspace, plan, file);
+    const sourceAfter = await assertLociMyuSourceUnchanged(plan, file);
+    const report = completeLociMyuNativeConversionReport(plan, snapshot, sourceAfter);
+    expect(snapshot.mediaResources).toEqual([]);
+    expect(report.source.unchanged).toBe(true);
+    expect(report.source.originalZipEmbedded).toBe(false);
+    expect((await openNativeProjectV1(fs, snapshot.project.id)).snapshot).toEqual(snapshot);
+    session.release();
+  });
+
   it('approximates only admitted orthographic rows and does not default malformed values', async () => {
     const sheetNames = ['Valid', 'Invalid FOV', 'Same eye target', 'Parallel up', 'Overflow span', 'Partial up'];
     const workbook = await makeXlsx([

@@ -269,6 +269,14 @@ are recorded in the conversion report. Directory order, first/last entry, case
 folding, substring and fuzzy/basename winner selection are forbidden. The
 Caption remains active with an empty attachment list.
 
+For the first public candidate the admitted image profiles are PNG, JPEG, WebP
+and GIF. HEIC/HEIF content is still inventoried. An exact file-ID relationship
+to HEIC/HEIF is reported explicitly, but no media record is published and the
+Caption remains active without that attachment. The ordinary-user flow explains
+that a separate JPEG can be exported locally on the source device and attached
+after conversion; the adapter does not infer that this new file has the original
+Drive file ID. The selected outer ZIP remains unchanged and must be retained.
+
 ### 4.3 Caption-row disposition
 
 - A completely empty trailing/soft-delete row may be ignored.
@@ -440,6 +448,11 @@ that unconverted source data can be recovered from the native Project alone.
 - `LM-ADAPT-04`: successful and blocked preflights produce complete
   accounting with source sheet, physical/logical row where available, source
   ID, affected field, reason, impact and final disposition.
+- `LM-ADAPT-04A`: every HEIC/HEIF entry is identifiable in the candidate
+  preflight/report. An exact file-ID relation produces a specific device-side
+  conversion warning and no attachment; an unrelated entry remains a reported
+  media mapping. Neither case mutates the source ZIP or guesses a JPEG
+  replacement relation.
 - `LM-ADAPT-05`: snapshot and `.lociview` contain no source ZIP, report,
   sidecar or review database. The UI discloses that the original ZIP and report
   must be retained separately.

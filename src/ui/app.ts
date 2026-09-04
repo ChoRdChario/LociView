@@ -488,6 +488,9 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       );
       const sourceAfter = await conversion.assertLociMyuSourceUnchanged(plan, sourceFile);
       const report = conversion.completeLociMyuNativeConversionReport(plan, created, sourceAfter);
+      const heicAttachmentCount = report.issues.filter(
+        (entry) => entry.code === 'media-heic-device-conversion-required',
+      ).length;
       downloadBlob(
         conversion.serializeLociMyuNativeConversionReport(report),
         `${reportStem}-to-${created.project.id}-conversion-report.json`,
@@ -498,7 +501,10 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       closeProgress();
       await infoDialog(
         '変換が完了しました',
-        `元のLociMyu ZIPは変更されていません。編集できる新しいプロジェクトを作成し、${report.issues.length}件の注記を説明ファイルへ保存しました。`,
+        `元のLociMyu ZIPは変更されていません。編集できる新しいプロジェクトを作成し、${report.issues.length}件の注記を説明ファイルへ保存しました。` +
+        (heicAttachmentCount > 0
+          ? ` HEIC／HEIF画像${heicAttachmentCount}件は添付していません。端末でJPEGへ書き出し、説明ファイルに表示セット名とキャプション名で示した場所へ追加してください。`
+          : ''),
       );
       return created.project.id;
     } catch (error) {

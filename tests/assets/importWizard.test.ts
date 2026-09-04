@@ -129,7 +129,7 @@ describe('buildImportPlan', () => {
     ]);
   });
 
-  it('拡張子のない画像をマジックバイトで取り込む（Drive由来のHEIC等）', async () => {
+  it('拡張子のない画像をマジックバイトで検出してinventory対象にする（Drive由来のHEIC等）', async () => {
     // 先頭がJPEGマジックの拡張子なしファイル
     const jpeg = new Uint8Array(16);
     jpeg.set([0xff, 0xd8, 0xff, 0xe0], 0);
@@ -145,11 +145,23 @@ describe('buildImportPlan', () => {
     expect(plan.images.map((i) => i.name).sort()).toEqual(['202506-16-17', 'IMG_9592']);
   });
 
+  it('壊れたHEIC名のfileも黙って落とさずinventory対象にする', async () => {
+    const plan = await buildImportPlan([
+      { path: 'images/corrupt.heic', data: new Uint8Array([1, 2, 3, 4]) },
+    ]);
+    expect(plan.images).toEqual([expect.objectContaining({ path: 'images/corrupt.heic' })]);
+  });
+
   it('sniffImageExt: マジックバイトから拡張子を判定', () => {
     expect(sniffImageExt(new Uint8Array([0xff, 0xd8, 0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0]))).toBe('jpg');
     expect(sniffImageExt(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0, 0, 0, 0, 0]))).toBe('png');
     const heic = new Uint8Array([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63]);
     expect(sniffImageExt(heic)).toBe('heic');
+    const compatibleHeic = new Uint8Array([
+      0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x78, 0x78, 0x78, 0x78,
+      0, 0, 0, 0, 0x68, 0x65, 0x69, 0x63,
+    ]);
+    expect(sniffImageExt(compatibleHeic)).toBe('heic');
     expect(sniffImageExt(new TextEncoder().encode('plain text!!'))).toBeNull();
   });
 

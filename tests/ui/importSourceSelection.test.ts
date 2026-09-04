@@ -7,6 +7,7 @@ import { LOCIMYU_SOURCE_RETENTION_NOTICE } from '../../src/io/locimyu';
 import {
   importWizardRetentionNotice,
   importWizardVisibleDiagnostics,
+  lociMyuHeicDeviceConversionNotice,
   shouldRebuildImportLinks,
 } from '../../src/ui/importDialog';
 import { ImportSourceSelectionController } from '../../src/ui/importSourceSelection';
@@ -150,5 +151,23 @@ describe('LociMyu source-retention notices', () => {
     expect(importWizardRetentionNotice({ migration: null })).toBeNull();
     expect(packageExportCompletionMessage('full', 1024)).toContain(LOCIMYU_SOURCE_RETENTION_NOTICE);
     expect(packageExportCompletionMessage('diff', 1024)).not.toContain(LOCIMYU_SOURCE_RETENTION_NOTICE);
+  });
+
+  it('HEIC inventoryを非添付・元ZIP保持・手動JPEG追加として案内する', async () => {
+    const heic = new Uint8Array([
+      0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63,
+      0, 0, 0, 0, 0x6d, 0x69, 0x66, 0x31, 0x68, 0x65, 0x69, 0x63,
+    ]);
+    const plan = await buildImportPlan([
+      { path: 'main.csv', data: captionCsv('c_main', '現行') },
+      { path: 'images/photo.heic', data: heic },
+    ]);
+
+    const notice = lociMyuHeicDeviceConversionNotice(plan);
+    expect(notice).toContain('添付せず説明ファイルへ記録');
+    expect(notice).toContain('元ZIPを保管');
+    expect(notice).toContain('別のJPEG');
+    expect(notice).toContain('表示セット名とキャプション名が示された画像だけ');
+    expect(notice).toContain('対応先を確認できない画像は自動で関連付けません');
   });
 });

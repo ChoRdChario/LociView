@@ -28,7 +28,9 @@ import { detectFormat } from '../viewer/loaders';
 import { writeVerifiedBytes } from './verifiedWrite';
 import type { ZipEntryData } from './zipio';
 
-const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|avif)$/i;
+// HEIC/HEIF extensions enter inventory even when corrupt so the conversion
+// report can account for them. Native admission remains a separate byte check.
+const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|avif|heic|heif|heix)$/i;
 const VIDEO_EXT = /\.(mp4|mov|webm|m4v)$/i;
 const encoder = new TextEncoder();
 const sourceSelectionRevisions = new WeakMap<ImportPlan, number>();
@@ -204,10 +206,15 @@ export function sniffImageExt(b: Uint8Array): string | null {
   if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return 'gif';
   // RIFF....WEBP
   if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'webp';
-  // ISO-BMFF: ....ftyp[heic|heif|heix|hevc|mif1|msf1]
+  // ISO-BMFF: inspect the major and available compatible brands. This only
+  // inventories a HEIF-family candidate; it is not decoder admission.
   if (b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) {
-    const brand = String.fromCharCode(b[8]!, b[9]!, b[10]!, b[11]!);
-    if (/hei|hev|mif1|msf1/.test(brand)) return 'heic';
+    const boxLength = (((b[0]! * 0x1000000) + (b[1]! << 16) + (b[2]! << 8) + b[3]!) >>> 0);
+    const available = Math.min(boxLength, b.byteLength);
+    for (let offset = 8; offset + 4 <= available; offset += offset === 8 ? 8 : 4) {
+      const brand = String.fromCharCode(b[offset]!, b[offset + 1]!, b[offset + 2]!, b[offset + 3]!);
+      if (/^(?:heic|heix|hevc|hevx|heim|heis|hevm|hevs|mif1|msf1)$/u.test(brand)) return 'heic';
+    }
   }
   return null;
 }

@@ -161,14 +161,70 @@ change, unguarded conversion fallback or a newly reproduced P0/P1.
 
 `RELEASE CANDIDATE OPTION A: PRODUCT OWNER ACCEPTANCE PASS`
 
+## Active implementation — first-candidate device-side HEIC compatibility
+
+> Status: `BOUNDED IMPLEMENTATION COMPLETE / AUTOMATED + EDGE ACCEPTANCE PASS / PHYSICAL IPHONE FLOW PENDING / COMMIT PENDING`.
+
+- [x] Supersede direct HEIC/HEIF candidate admission with a documented local
+  device-side JPEG-export compatibility flow. Keep direct original-byte HEIC as
+  required post-candidate work; do not require Windows extensions or ship the
+  isolated decoder PoC.
+- [x] Update the accepted product/storage/LociMyu contracts before production
+  work. No Native snapshot/package version, dependency, license or provider
+  registry changes belong to this slice.
+- [x] Make direct Native Caption-image admission derive the supported image
+  kind from bytes, reject HEIC/HEIF (including disguised declarations) before
+  any write, and return concise Japanese device-side JPEG guidance.
+- [x] Show the same compatibility boundary in the ordinary Caption and
+  LociMyu-conversion flows without requiring a global camera setting.
+- [x] Give every LociMyu HEIC/HEIF entry an explicit reported disposition; an
+  exact file-ID relation keeps its Caption active with no attachment and never
+  guesses the converted JPEG relation.
+- [x] Reuse the content boundary for Native media publication so a renamed HEIC
+  cannot enter through a direct add or package restore/merge path.
+- [x] Add only focused direct-add, disguised-content, zero-write and LociMyu
+  report tests, then run typecheck, focused tests, full tests, ordinary/Pages
+  builds and the existing public-codec isolation verifier.
+- [x] Obtain independent read-only security and UI final diff/risk reviews;
+  both report no remaining P0/P1.
+- [ ] Commit this verified tree and record its exact implementation SHA. Stop
+  before application-version selection, license adoption, `main` integration
+  or Pages deployment.
+
+### Result
+
+- Start HEAD: `14257e0a13526f7233e474c0f61b259cd443933d`.
+- PNG/JPEG/WebP/GIF admission is byte-derived and rejects empty-payload or
+  declaration-conflicting containers before publication. HEIC/HEIF, including
+  JPEG-disguised input, fails closed before any Native write with local
+  device-side JPEG-export guidance.
+- LociMyu HEIC/HEIF remains inventoried and reportable. An exact source relation
+  names its DisplaySet and Caption but creates no attachment; an unknown
+  relation is not guessed. The source ZIP remains unchanged and separately
+  retained, and only a user-added JPEG becomes Native authority.
+- Snapshot/package versions, dependencies, license, decoder, Service Worker and
+  provider registry are unchanged. The isolated libheif/libde265 PoC remains
+  outside production and built output.
+- Verification PASS: typecheck; 65 test files / 1,542 passing tests with 21
+  existing todo; ordinary and Pages-path builds; public-codec isolation check.
+  Edge `152.0.4191.62` decoded the representative 1x1 JPEG/PNG/GIF/WebP through
+  both `HTMLImageElement.decode()` and `createImageBitmap()`.
+- Independent security and UI reviews report no remaining P0/P1. The physical
+  iPhone flow—local JPEG export, Caption addition, save/close and completely
+  offline reopen—has not yet been executed on this tree. Exact implementation
+  commit is also pending.
+
+`FIRST-CANDIDATE HEIC COMPATIBILITY: IMPLEMENTATION PASS / PHYSICAL IPHONE ACCEPTANCE PENDING`
+
 ## Active investigation — first-candidate single-still HEIC/HEIF
 
-> Status: `NATIVE/WEBCODECS SPIKE ACTIVE / LIBDE265 LOCAL POC ONLY / PRODUCTION NOT STARTED`.
+> Status: `INVESTIGATION CLOSED / LOCAL POC ISOLATED / DIRECT PRODUCTION DEFERRED`.
 
-- [x] Record the Product Owner boundary: the first public candidate completes
-  still-image attachments including single-still HEIC/HEIF. The ordinary UI is
-  `添付メディア` with an image-add action and one extensible media stage; it does
-  not expose unavailable video/audio controls.
+- [x] Record the earlier Product Owner direct-HEIC boundary and its later
+  supersession. Section 29.3 now governs the first candidate: users make a
+  separate JPEG on their device, while direct original-byte HEIC/HEIF support
+  is deferred. The ordinary UI remains `添付メディア` with an image-add action
+  and no unavailable video/audio controls.
 - [x] Confirm read-only that the existing exact file-ID association, original-
   byte publication path, source-change lock and generic ordered attachment IDs
   are reusable. Current HEIC inventory does not promote HEIC into Native media,
@@ -222,8 +278,9 @@ change, unguarded conversion fallback or a newly reproduced P0/P1.
   project regression passed typecheck, all 62 test files / 1,503 tests (21
   existing todo), and the production build without adding a dependency or
   shipping decoder assets.
-- [ ] **BLOCKED — distribution decision required.** If the public-distribution
-  blockers are resolved, implement only the single-still HEIC/HEIF
+- [ ] **DEFERRED — distribution decision required before direct HEIC.** If the
+  public-distribution blockers are resolved after the first candidate,
+  implement only the single-still HEIC/HEIF
   end-to-end path: original-byte identity, bounded content admission, lazy/
   offline decoding with orientation and cleanup, direct/LociMyu import, Native
   packages, Edge and physical-iPhone evidence. Production schema/UI/package
@@ -233,8 +290,9 @@ change, unguarded conversion fallback or a newly reproduced P0/P1.
   and public distribution remain blocked on an approved LGPL corresponding-
   source/relink/notice kit, exact Windows compiler payload/runtime inventory,
   and a separate HEVC patent decision.
-- [ ] After production integration is authorized and implemented, run one final
-  executable-tree matrix and one final physical-iPhone production acceptance.
+- [ ] After later direct-HEIC production integration is authorized and
+  implemented, run one final executable-tree matrix and one final physical-
+  iPhone production acceptance.
 
 ### Approved public-codec isolation follow-up
 

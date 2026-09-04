@@ -30,6 +30,7 @@ import {
   type NativeRepresentationV1,
 } from './schema';
 import { digestNativeBytes, digestNativeStream, hashingNativeStream, type NativeStreamDigest } from './sha256';
+import { inspectNativeImageSource, type NativeImageAdmission } from './imageMediaAdmission';
 import {
   nativeUnsupportedStateSha256V1,
   validateNativeCollaborationBaselineV1,
@@ -204,6 +205,19 @@ async function writeAndVerifyBinary(
   };
 }
 
+function assertNativeImageBytesMatch(
+  admission: NativeImageAdmission,
+  blob: Pick<NativeBlobRefV1, 'byteLength' | 'digest' | 'mediaType'>,
+  label: string,
+): void {
+  if (
+    blob.byteLength !== admission.byteLength || blob.digest !== admission.sha256 ||
+    blob.mediaType !== admission.mediaType
+  ) {
+    throw new Error(`native ${label}: image bytes changed after content inspection`);
+  }
+}
+
 function representationWithBlob(
   representation: NativeRepresentationDraftV1,
   blob: NativeBlobRefV1,
@@ -309,6 +323,18 @@ export async function createNativeProjectV1(
   if (mediaSources.size !== mediaDrafts.length) {
     throw new Error('native project: every media resource requires exactly one local source');
   }
+  const sortedMediaDrafts = [...mediaDrafts].sort((a, b) => a.id.localeCompare(b.id));
+  const mediaAdmissions = new Map<string, NativeImageAdmission>();
+  // Validate every media envelope before the first project write. A bad image
+  // must not leave Representation staging bytes in a never-published Project.
+  for (const media of sortedMediaDrafts) {
+    const source = mediaSources.get(media.id);
+    if (source === undefined) throw new Error(`native project: missing media source for ${media.id}`);
+    if (source.size < 1 || !isNativeImageMediaType(source.mediaType) || source.mediaType !== media.mediaType) {
+      throw new Error(`native project: unsupported or empty image media source for ${media.id}`);
+    }
+    mediaAdmissions.set(media.id, await inspectNativeImageSource(source, { requireCanonicalDeclaration: true }));
+  }
   const representations = [];
   for (const representation of [...draft.representations].sort((a, b) => a.id.localeCompare(b.id))) {
     const source = sources.get(representation.id);
@@ -328,14 +354,17 @@ export async function createNativeProjectV1(
     representations.push((({ mediaType: _mediaType, ...record }) => ({ ...record, blob }))(representation));
   }
   const mediaResources: NativeMediaResourceV1[] = [];
-  for (const media of [...mediaDrafts].sort((a, b) => a.id.localeCompare(b.id))) {
-    const source = mediaSources.get(media.id);
-    if (source === undefined) throw new Error(`native project: missing media source for ${media.id}`);
-    if (source.size < 1 || !isNativeImageMediaType(source.mediaType) || source.mediaType !== media.mediaType) {
-      throw new Error(`native project: unsupported or empty image media source for ${media.id}`);
-    }
+  for (const media of sortedMediaDrafts) {
+    const source = mediaSources.get(media.id)!;
+    const path = nativeMediaPath(draft.project.id, media.id);
     onStatus?.(`Streaming Caption image ${media.label} to project-local storage…`);
-    const blob = await writeAndVerifyBinary(fs, nativeMediaPath(draft.project.id, media.id), source);
+    const blob = await writeAndVerifyBinary(fs, path, source);
+    try {
+      assertNativeImageBytesMatch(mediaAdmissions.get(media.id)!, blob, 'project creation');
+    } catch (error) {
+      await fs.remove(path).catch(() => {});
+      throw error;
+    }
     mediaResources.push((({ mediaType: _mediaType, ...record }) => ({ ...record, blob }))(media));
     onStatus?.(`Verified Caption image ${media.label} size and SHA-256 by streamed read-back.`);
   }
@@ -624,11 +653,14 @@ export async function restoreNativeProjectV1(
       if (source.size !== media.blob.byteLength || source.mediaType !== media.blob.mediaType) {
         throw new Error(`native restore: package media metadata mismatch for ${media.id}`);
       }
+      const admission = await inspectNativeImageSource(source, { requireCanonicalDeclaration: true, signal });
+      assertNativeImageBytesMatch(admission, media.blob, 'restore');
       const path = nativeMediaPath(snapshot.project.id, media.id);
       if (await fs.exists(path)) throw new Error(`native restore: destination staging path already exists: ${path}`);
       stagedPaths.push(path);
       onStatus?.(`Streaming Caption image ${media.label} from portable backup…`);
       const blob = await writeAndVerifyBinary(fs, path, source, signal);
+      assertNativeImageBytesMatch(admission, blob, 'restore');
       if (
         blob.byteLength !== media.blob.byteLength || blob.digest !== media.blob.digest ||
         blob.mediaType !== media.blob.mediaType
@@ -756,11 +788,14 @@ async function publishNativeCaptionMediaChangeV1(
       ) {
         throw new Error(`native ${labels.action}: media metadata mismatch for ${mediaId}`);
       }
+      const admission = await inspectNativeImageSource(source, { requireCanonicalDeclaration: true, signal });
+      assertNativeImageBytesMatch(admission, media.blob, labels.action);
       const path = nativeMediaPath(current.project.id, mediaId);
       if (await fs.exists(path)) throw new Error(`native ${labels.action}: new media path already exists for ${mediaId}`);
       stagedPaths.push(path);
       onStatus?.(`${labels.staging} ${media.label}…`);
       const stored = await writeAndVerifyBinary(fs, path, source, signal);
+      assertNativeImageBytesMatch(admission, stored, labels.action);
       if (
         stored.byteLength !== media.blob.byteLength || stored.digest !== media.blob.digest ||
         stored.mediaType !== media.blob.mediaType
@@ -846,13 +881,14 @@ export async function addNativeCaptionImageV1(
 ): Promise<NativeProjectSnapshotV1> {
   const caption = current.captions.find((entry) => entry.id === captionId);
   if (caption === undefined) throw new Error('native Caption image: selected Caption is unavailable');
-  if (source.size < 1 || !isNativeImageMediaType(source.mediaType)) {
-    throw new Error('native Caption image: select a PNG, JPEG, WebP or GIF image');
-  }
   throwIfAborted(signal);
   onStatus?.('Verifying selected Caption image…');
-  const digest = await digestNativeStream(source.stream(), signal);
-  if (digest.byteLength !== source.size) throw new Error('native Caption image: selected image size changed while reading');
+  const inspection = await inspectNativeImageSource(source, { filenameHint: label, signal });
+  const admittedSource: NativeBinarySource = {
+    size: source.size,
+    mediaType: inspection.mediaType,
+    stream: () => source.stream(),
+  };
   const mediaId = newNativeId('med');
   const candidate = parseNativeSnapshotV1(serializeNativeSnapshotV1({
     ...current,
@@ -868,14 +904,14 @@ export async function addNativeCaptionImageV1(
         kind: 'image',
         blob: {
           algorithm: 'sha256',
-          digest: digest.sha256,
-          byteLength: digest.byteLength,
-          mediaType: source.mediaType,
+          digest: inspection.sha256,
+          byteLength: inspection.byteLength,
+          mediaType: inspection.mediaType,
         },
       },
     ],
   }));
-  return publishNativeCaptionMediaChangeV1(fs, current, candidate, new Map([[mediaId, source]]), {
+  return publishNativeCaptionMediaChangeV1(fs, current, candidate, new Map([[mediaId, admittedSource]]), {
     action: 'Caption image',
     staging: 'Staging and verifying Caption image',
     writing: 'Writing and verifying Caption image snapshot…',

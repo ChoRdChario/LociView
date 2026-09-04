@@ -2143,6 +2143,42 @@ distribution or HEVC patent coverage, and the local libde265 decoder remains
 blocked from public distribution in every outcome until those independent
 decisions close.
 
+### 29.3 First-candidate device-side HEIC compatibility (Product Owner approved 2026-09-04)
+
+This section supersedes sections 29.1 and 29.2 only for what the first public
+candidate ships. Their original-byte, decoder and schema-2 work remains a later
+direct-HEIC requirement and their PoC results remain isolated evidence.
+
+The first candidate admits PNG, JPEG, WebP and GIF Caption images. It does not
+admit, display or package HEIC/HEIF, does not bundle a HEVC decoder, and does not
+require Microsoft HEIF/HEVC extensions. A user with an existing HEIC/HEIF still
+exports a separate JPEG locally on the source device and selects that JPEG.
+Changing the device's global camera format is optional and is never an
+application prerequisite. The original file is not uploaded or modified by
+LociView.
+
+Direct Caption-image admission derives the supported format from bytes rather
+than trusting the filename or declared MIME. HEIC/HEIF bytes, including bytes
+presented with a supported-image MIME or extension, fail before any media or
+snapshot write and return an actionable Japanese explanation to export a JPEG
+copy on the device. Other declared/content conflicts fail closed without
+publishing a broken image.
+
+The LociMyu adapter continues to inventory HEIC/HEIF from content. An exact
+file-ID relation to HEIC/HEIF creates a warning and a reported media mapping;
+the Caption remains active without that attachment. Unrelated HEIC/HEIF entries
+are also reported as requiring device-side conversion. The source ZIP remains
+unchanged and separately retained. A later JPEG may be manually attached to the
+converted Caption, but the adapter does not infer that a separately converted
+file has the original file ID or silently substitute it during conversion.
+
+This bounded policy introduces no snapshot-schema or package-version change,
+no decoder/provider registry, no runtime network dependency and no Service
+Worker asset. Existing backup and Package Exchange behavior for the four
+admitted image types remains unchanged. The isolated libheif/libde265 PoC and
+its public-build exclusion verifier remain in place for a future separately
+approved direct-HEIC implementation.
+
 ## 30. Bounded native package exchange (Product Owner approved 2026-09-02)
 
 The first public candidate MUST distinguish four user purposes without

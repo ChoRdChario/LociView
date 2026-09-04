@@ -314,12 +314,13 @@ function modelMediaType(format: ModelFormat): string {
 
 interface ImageMediaInspection {
   readonly mediaType: NativeMediaResourceDraftV1['mediaType'] | null;
-  readonly reason: 'unsupported-bytes' | 'filename-bytes-conflict' | null;
+  readonly reason: 'unsupported-bytes' | 'filename-bytes-conflict' | 'heic-device-conversion-required' | null;
 }
 
 function imageMediaType(file: ForeignFile): ImageMediaInspection {
+  const sniffedExt = sniffImageExt(file.data);
   const sniffed = (() => {
-    switch (sniffImageExt(file.data)) {
+    switch (sniffedExt) {
       case 'jpg': return 'image/jpeg' as const;
       case 'png': return 'image/png' as const;
       case 'gif': return 'image/gif' as const;
@@ -337,7 +338,10 @@ function imageMediaType(file: ForeignFile): ImageMediaInspection {
         : lowerName.endsWith('.webp')
           ? 'image/webp' as const
           : null;
-  const hasKnownImageExtension = /\.(?:jpe?g|png|gif|webp|bmp|avif|heic|heif|heix|hevc)$/iu.test(lowerName);
+  const namedHeic = /\.(?:heic|heif|heix)$/iu.test(lowerName);
+  if (sniffedExt === 'heic') return { mediaType: null, reason: 'heic-device-conversion-required' };
+  if (namedHeic && sniffed === null) return { mediaType: null, reason: 'heic-device-conversion-required' };
+  const hasKnownImageExtension = /\.(?:jpe?g|png|gif|webp|bmp|avif|heic|heif|heix)$/iu.test(lowerName);
   if (named !== null && sniffed !== named) {
     return { mediaType: null, reason: 'filename-bytes-conflict' };
   }
@@ -1023,6 +1027,9 @@ export async function planLociMyuZipToNative(
     for (const [captionIndex, caption] of set.captions.entries()) {
       const sourceRow = sourceRows[captionIndex];
       const locator = { sheet: set.name, row: sourceRow?.rowNumber ?? null, id: caption.legacyId };
+      const rawTitle = caption.title;
+      const title = cleanSingleLine(rawTitle, 'Caption');
+      const visibleSetName = cleanSingleLine(set.name, 'Display set');
       const attachments: string[] = [];
       if (caption.legacyImageFileId !== null) {
         const resolution = resolveMedia(caption.legacyImageFileId);
@@ -1033,13 +1040,32 @@ export async function planLociMyuZipToNative(
         } else {
           const mediaInspection = imageMediaType(resolution.file);
           if (mediaInspection.mediaType === null) {
+            const heicNeedsConversion = mediaInspection.reason === 'heic-device-conversion-required';
             issue(issues, 'warning', mediaInspection.reason === 'filename-bytes-conflict'
               ? 'media-filename-bytes-conflict'
-              : 'media-profile-unsupported', { ...locator, field: 'imageFileId' },
+              : heicNeedsConversion
+                ? 'media-heic-device-conversion-required'
+                : 'media-profile-unsupported', { ...locator, field: 'imageFileId' },
               mediaInspection.reason === 'filename-bytes-conflict'
                 ? 'The exact map filename extension conflicts with the media bytes.'
-                : 'The exactly related image is not one of the native image profiles.',
-              'The Caption remains active with no attachment.', [resolution.file.path]);
+                : heicNeedsConversion
+                  ? 'The exactly related image is HEIC/HEIF, which this candidate does not add directly.'
+                  : 'The exactly related image is not one of the native image profiles.',
+              heicNeedsConversion
+                ? `The Caption remains active with no attachment. The report identifies DisplaySet "${visibleSetName}" and Caption "${title}". Keep the unchanged source ZIP, export a separate JPEG on the source device, then attach that JPEG to this Caption in the new Project.`
+                : 'The Caption remains active with no attachment.', [resolution.file.path]);
+            if (heicNeedsConversion) {
+              linkedImagePaths.add(resolution.file.path);
+              mappings.push({
+                sourceKind: 'image',
+                sourceId: resolution.file.path,
+                disposition: 'reported',
+                targetKind: 'Caption',
+                targetId: caption.captionId,
+                relationBasis: 'source-exact',
+                note: `DisplaySet "${visibleSetName}"; Caption "${title}"; exact file-ID relation retained in report; HEIC/HEIF requires device-side JPEG conversion and manual attachment`,
+              });
+            }
           } else {
             let mediaId = mediaIdByPath.get(resolution.file.path);
             if (mediaId === undefined) {
@@ -1080,8 +1106,6 @@ export async function planLociMyuZipToNative(
           'This is an additional occurrence of the same legacy ID in one sheet.',
           'It is preserved as a distinct Caption using locimyu-caption-id-2.');
       }
-      const rawTitle = caption.title;
-      const title = cleanSingleLine(rawTitle, 'Caption');
       if (title !== rawTitle) {
         issue(issues, 'warning', 'caption-title-normalized', { ...locator, field: 'title' },
           'The native single-line title cannot retain controls or an empty label.',
@@ -1120,7 +1144,15 @@ export async function planLociMyuZipToNative(
   }
   for (const image of input.images) {
     if (linkedImagePaths.has(image.path)) continue;
-    mappings.push({ sourceKind: 'image', sourceId: image.path, disposition: 'reported', note: 'not connected by one exact source-authoritative relation' });
+    const heicNeedsConversion = imageMediaType(image).reason === 'heic-device-conversion-required';
+    mappings.push({
+      sourceKind: 'image',
+      sourceId: image.path,
+      disposition: 'reported',
+      note: heicNeedsConversion
+        ? 'HEIC/HEIF inventory candidate; requires device-side JPEG conversion and manual attachment'
+        : 'not connected by one exact source-authoritative relation',
+    });
   }
   for (const video of input.videos) {
     mappings.push({ sourceKind: 'video', sourceId: video.path, disposition: 'reported', note: 'Caption video media is outside the first native adapter' });

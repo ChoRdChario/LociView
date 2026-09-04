@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { describe, expect, it } from 'vitest';
 import {
   BlobReader,
@@ -101,6 +102,11 @@ interface RawZipEntry {
   readonly bytes: Uint8Array;
 }
 
+const VALID_PNG_BYTES = new Uint8Array(Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+));
+
 async function storedZipEntries(blob: Blob): Promise<RawZipEntry[]> {
   const reader = new ZipReader(new BlobReader(blob), { strictness: 'strict' });
   try {
@@ -160,7 +166,7 @@ async function makeSourceProject(withMedia = false): Promise<{
   const base = makeNativeDraft(2);
   const gs = makeGsPlySource(2, 512);
   const mediaId = testNativeId('med', 94);
-  const mediaBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
+  const mediaBytes = VALID_PNG_BYTES;
   const mediaBlob = new Blob([mediaBytes], { type: 'image/png' });
   const detailedDraft: NativeProjectDraftV1 = {
     ...base.draft,
@@ -211,7 +217,8 @@ async function makeSourceProject(withMedia = false): Promise<{
       background: { kind: 'solid', colorSrgb: [0.05, 0.1, 0.2] },
     }],
     ...(withMedia ? {
-      mediaResources: [{ id: mediaId, label: 'Caption photo', kind: 'image', mediaType: 'image/png' }],
+      // Schema-1 label is display text, not a filename or format authority.
+      mediaResources: [{ id: mediaId, label: 'Historical display label.heic', kind: 'image', mediaType: 'image/png' }],
     } : {}),
   };
   const sources = new Map(base.sources);
@@ -297,6 +304,7 @@ describe('native portable .lociview streamed backup/restore', () => {
     const inspection = await inspectNativePortablePackageV1(blob);
     expect(inspection.manifest.packageVersion).toBe(2);
     expect(inspection.snapshot.captions[0]?.attachmentMediaIds).toEqual([mediaId]);
+    expect(inspection.snapshot.mediaResources?.[0]?.label).toBe('Historical display label.heic');
 
     const target = new ChunkedMemoryFS();
     const restoreSession = await acquireNew(target);

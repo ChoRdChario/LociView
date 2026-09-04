@@ -3,6 +3,7 @@
 
 import {
   IMPORT_DIAGNOSTIC_DISPLAY_LIMIT,
+  sniffImageExt,
   type ImportPlan,
 } from '../assets/importWizard';
 import {
@@ -43,6 +44,14 @@ export interface ImportWizardVisibleDiagnostics {
   omittedCurrentSource: number;
   background: string[];
   omittedBackground: number;
+}
+
+export function lociMyuHeicDeviceConversionNotice(plan: Pick<ImportPlan, 'images'>): string | null {
+  const count = plan.images.filter((image) => (
+    sniffImageExt(image.data) === 'heic' || /\.(?:heic|heif|heix)$/iu.test(image.name)
+  )).length;
+  if (count === 0) return null;
+  return `HEIC／HEIF画像が${count}件あります。この版では添付せず説明ファイルへ記録します。元ZIPを保管したまま変換を完了し、端末で別のJPEGとして書き出してください。説明ファイルに表示セット名とキャプション名が示された画像だけ、その場所へ追加してください。対応先を確認できない画像は自動で関連付けません。`;
 }
 
 /** Keep current-source facts visible even when the archive has many rejected candidates. */
@@ -140,6 +149,8 @@ export function importWizardDialog(
             el('div', { class: 'lv-mr-detail warn' },
               '元のLociMyu ZIPは別途保管してください。正確に確定できない画像・見え方・視点は自動推測せず、説明ファイルへ記録します。'),
           );
+          const heicNotice = lociMyuHeicDeviceConversionNotice(plan);
+          if (heicNotice !== null) summary.append(el('div', { class: 'lv-mr-detail warn' }, heicNotice));
         } else {
           const retentionNotice = importWizardRetentionNotice(plan);
           if (retentionNotice !== null) {

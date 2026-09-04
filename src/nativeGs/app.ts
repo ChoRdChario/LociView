@@ -1257,7 +1257,10 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
     const materialStatus = el('p', { class: 'ng-note' });
     const materialSection = el('section', { class: 'ng-card' });
     const captionMedia = el('div', { class: 'ng-list' });
-    const captionImageInput = el('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp,image/gif' });
+    const captionImageInput = el('input', {
+      type: 'file',
+      accept: 'image/png,image/jpeg,image/webp,image/gif,image/heic,image/heif,.heic,.heif',
+    });
     const addCaptionImage = el('button', {}, '画像を添付して保存');
     const captionImageStatus = el('p', { class: 'ng-note' });
     const collaborationInput = el('input', { type: 'file' });
@@ -1638,6 +1641,8 @@ export async function bootNativeGsApp(root: HTMLElement): Promise<void> {
       el('label', { class: 'ng-field' }, el('span', {}, 'ピンの色'), captionColor),
       captionMedia,
       el('label', { class: 'ng-field' }, el('span', {}, '画像を追加（PNG／JPEG／WebP／GIF）'), captionImageInput),
+      el('p', { class: 'ng-note' },
+        'HEIC／HEIFは、端末上で別のJPEGとして書き出してから選んでください。iPhoneでは「プレビュー」の「書き出す」または「ショートカット」の画像変換を利用できます。元の写真は変更されません。'),
       addCaptionImage,
       captionImageStatus,
       captionReview,

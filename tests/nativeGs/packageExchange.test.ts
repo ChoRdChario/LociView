@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { describe, expect, it } from 'vitest';
 import {
   BlobReader,
@@ -51,6 +52,10 @@ interface RawZipEntry {
 const CAPTION_A = testNativeId('cap', 31);
 const CAPTION_B = testNativeId('cap', 32);
 const CAPTION_NEW = testNativeId('cap', 33);
+const VALID_PNG_BYTES = new Uint8Array(Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+));
 
 function caption(id: string, title: string, body: string): NativeCaptionV1 {
   return {
@@ -159,7 +164,7 @@ async function branchPair(): Promise<{ readonly local: TestProject; readonly inc
 }
 
 async function addIncomingCaptionWithImage(project: TestProject): Promise<string> {
-  const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
+  const bytes = VALID_PNG_BYTES;
   project.snapshot = await saveNativeProjectV1(project.session.workspace, {
     ...project.snapshot,
     captions: [
