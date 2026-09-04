@@ -1,13 +1,14 @@
-# Fresh-session handoff — release-candidate preparation
+# Fresh-session handoff — public-candidate preparation
 
-> Status: `CURRENT HANDOFF`; updated after the Product Owner selected and
-> authorized the bounded Native-only write-authority implementation (option A)
-> on 2026-09-03. The bounded implementation, indexed-tree automated matrix and
-> Product Owner Desktop acceptance are complete; clean-checkout CI remains
-> pending. The later first-candidate device-side HEIC compatibility tree has
-> completed automated, Edge, independent-review and Product Owner physical-
-> iPhone acceptance. The bounded implementation is fixed at
-> `6b2a28a0e5983676c9dc5d97534d916e3288f40d`.
+> Status: `CURRENT HANDOFF`; the bounded Native-only write-authority path,
+> device-side HEIC-to-JPEG compatibility path, automated checks and Product
+> Owner Desktop/physical-iPhone acceptance are complete. The latest production
+> implementation is `6b2a28a0e5983676c9dc5d97534d916e3288f40d`; the accepted
+> result checkpoint at the start of this handoff preparation is
+> `87a249d4ab85308c0486366c5516bc82dd7ff139`. Its clean GitHub Actions run
+> passed and no P0/P1 is unresolved. The next authorized workstream is a
+> task-based public-candidate UI/UX audit and design pass; see
+> `tasks/uiux-handoff.md`. This does not authorize production or release work.
 >
 > This file is navigation and handoff context, not a product specification.
 > Code/tests define observed behavior; accepted specifications define product
@@ -17,6 +18,8 @@
 
 - Repository: `ChoRdChario/LociView`
 - Branch: `g0-baseline`
+- UI/UX handoff preparation start checkpoint:
+  `87a249d4ab85308c0486366c5516bc82dd7ff139`
 - Accepted documentation checkpoint: `5f2a19df9fcfd50215d1313c1265e6cdf82872b4`
 - Native Package Exchange implementation:
   `0b5dd461d761fc0669b1c0c80b3d6549cd01b1e6`
@@ -31,7 +34,7 @@
   `6b2a28a0e5983676c9dc5d97534d916e3288f40d`.
 - Accepted Native Package Exchange tree verification: typecheck, 60 test files /
   1,478 passing tests with 21 existing todo, and production build all PASS.
-- Current executable candidate: the option-A indexed tree passed typecheck,
+- Option-A pre-HEIC executable checkpoint: the indexed tree passed typecheck,
   61 test files / 1,501 tests with 21 existing todo and both production builds.
   The corrective tree adds two focused passing tests; its one unrelated
   five-second verifier timeout passed on immediate single-test and full-file
@@ -41,9 +44,10 @@
   Caption pin/overlay display; physical-iPhone PASS includes Native restore/
   save/completely-offline-reopen and the later device-side HEIC-to-JPEG
   compatibility flow; no unresolved P0/P1.
-- The device-side HEIC implementation and evidence commits remain local pending
-  push. The worktree was clean before this result-only update, and its temporary
-  preview server and HTTPS tunnel were stopped after acceptance.
+- At the handoff preparation start checkpoint, local `g0-baseline` matched
+  `origin/g0-baseline`, the worktree was clean, no commit was unpushed, GitHub
+  Actions run `33885272816` passed on the same SHA, and no temporary preview,
+  tunnel or HEIC PoC process was running.
 - The first candidate does not require Windows HEIF/HEVC extensions and does
   not ship a decoder. Users make a separate JPEG on their device and attach
   that JPEG; direct original-byte HEIC/HEIF remains required post-candidate
@@ -63,16 +67,19 @@ of `5f2a19d` and matches `origin/g0-baseline`.
 
 ## 2. Read order
 
-Read only these before the first Product Owner decision:
+Read these before the public-candidate UI/UX audit:
 
 1. `AGENTS.md`
 2. `PROJECT_MAP.md`
 3. `docs/README.md`
 4. this file
-5. the top current boundary in `tasks/todo.md`
-6. `tasks/critical-path.md` sections 7, 8 and 12
-7. `tasks/lessons.md` section “長期プロジェクトと長期Codexセッションを分離する”
-8. `docs/specs/02-storage-package-migration.md` §31 and
+5. `tasks/uiux-handoff.md`
+6. the top current boundary and next decision in `tasks/todo.md`
+7. `tasks/critical-path.md` sections 7, 8 and 12
+8. `tasks/lessons.md` section “長期プロジェクトと長期Codexセッションを分離する”
+9. `docs/specs/00-product-contract.md` `PROD-13`–`PROD-16`, sections 4–8
+   and 10, then
+   `docs/specs/02-storage-package-migration.md` §31 and
    `docs/specs/03-gates-and-delivery.md` §3.8 for the selected Native-only
    candidate boundary; read `docs/specs/02-storage-package-migration.md` §29.3
    for current first-candidate HEIC compatibility; read §30 only if package
@@ -103,8 +110,10 @@ Treat these as complete unless a newly reproduced P0/P1 directly blocks release:
   - existing complete backup retained as a separate purpose.
 
 Do not reopen package permutations, extra camera inference, material-system
-expansion, Caption-overlay polish, memory instrumentation, Proxy edge cases or
-additional physical-iPhone matrices without a release-blocking P0/P1.
+expansion, memory instrumentation, Proxy edge cases or additional physical-
+iPhone evidence matrices without a release-blocking P0/P1. The authorized UX
+session may identify workflow and presentation changes, but it may not make
+production changes before Product Owner approval.
 
 ## 4. Product invariants that must not drift
 
@@ -147,8 +156,10 @@ Legacy package/CSV export and device-local legacy-source deletion are absent.
 Without durable OPFS,
 legacy registration/conversion is unavailable rather than presented as
 transiently saved. General journal, quarantine/resolution, writable-v1 S2/S3
-work, package permutations, UI polish and Compare remain excluded. A bounded
-private staging receipt closes only exact import-marker publication; it is not
+work, package permutations and Compare remain excluded. UI production changes
+now require the separate audit/design and Product Owner approval described in
+`tasks/uiux-handoff.md`. A bounded private staging receipt closes only exact
+import-marker publication; it is not
 a package entry, source authority or general journal. One short ordinary-home
 LociMyu discovery label/help route is release hygiene, not a new
 importer or general UI-polish workstream.
@@ -168,7 +179,8 @@ Also surface these genuine release decisions/blockers:
 - third-party and built-output notices;
 - application/package version and exact release SHA;
 - current README and ordinary-home LociMyu discovery;
-- clean-tree CI;
+- clean-tree CI on the eventual final executable SHA (`87a249d` passed, but a
+  later production change requires a new exact-tree result);
 - `g0-baseline` to `main` integration method;
 - named rollback point and previous-build rollback procedure;
 - GitHub Pages/base-path/Service Worker update verification;
@@ -183,53 +195,17 @@ Option A does not authorize license adoption, version/SHA selection, `main`
 integration, Release creation or Pages deployment. Those remain separate Product
 Owner decisions after RC-A implementation and exact-tree verification.
 
-## 6. First message for the fresh session
+## 6. Next fresh session
 
-Copy the following as the first user message. Replace `<CURRENT_HEAD>` only
-after checking Git; it must be a clean `g0-baseline` descendant of `5f2a19d`.
+The next session must follow `tasks/uiux-handoff.md`: verify Git and the stop
+boundary read-only, teach back the product model in plain Japanese, then run the
+actual current UI from the ordinary home and audit the fixed task inventory.
+It must compare task flow—not implementation internals—with the permitted
+LociMyu references, measure both operation load and decision load, and produce
+the public-candidate UX closure proposal. It stops for Product Owner approval
+before production implementation, license/version decisions, `main`
+integration or deployment.
 
-```text
-LociViewのrelease-candidate準備を引き継いでください。
-
-開始checkpoint：
-
-- repository: ChoRdChario/LociView
-- branch: g0-baseline
-- HEAD: <CURRENT_HEAD>
-- accepted product checkpoint: 5f2a19df9fcfd50215d1313c1265e6cdf82872b4
-- Native Package Exchange implementation: 0b5dd461d761fc0669b1c0c80b3d6549cd01b1e6
-- Desktop／physical iPhone Product Owner acceptance: PASS（端末側HEIC→JPEG互換
-  フローを含む）
-- unresolved P0／P1: なし
-
-最初にread-onlyでbranch、HEAD、worktree、originとの差、private sourceの
-Git／build非混入、一時server／tunnel停止を確認してください。その後、
-`AGENTS.md`、`PROJECT_MAP.md`、`docs/README.md`、`tasks/handoff.md`、
-`tasks/todo.md`の先頭、`tasks/critical-path.md`の該当節、関連する
-`tasks/lessons.md`を読んでください。
-
-Direct LociMyu Product Acceptance、DisplaySet／material／Caption／Saved View、
-Caption overlay、iPhone texture correction、Native backup／restore、Native
-Package Exchangeは完了済みです。新しいrelease-blocking P0／P1がない限り、
-追加hardening、package permutation、UI polishへ戻らないでください。
-CompareはMVP／release gate／critical pathから除外済みです。
-
-Product Ownerは初回public candidateについてAを選択済みです。Nativeだけを
-ユーザー書込み可能とし、legacy v1はsafe import／View／非破壊Native変換専用に
-します。Native Package ExchangeのCaption／new-image mergeは残します。
-
-production実装前に、`docs/specs/02-storage-package-migration.md` §31の
-`RC-A-01`〜`RC-A-07`と`tasks/todo.md`のbounded planを確認してください。
-一般S2／S3 hardening、package permutation、UI polish、Compareへ戻らないで
-ください。
-
-併せてlicense／notices、version／exact release SHA、README、clean CI、
-main統合、rollback、Pages／Service Worker、LociMyu変換の発見性、
-private-source由来metadataの公開可否だけを整理してください。
-
-計画確認まではproduction実装を行わず、確認後もlicense採用、version／exact
-release SHA確定、main merge、Release作成、Pages deploymentは別承認まで
-行わないでください。
-
-`RELEASE CANDIDATE OPTION A: PRODUCT OWNER ACCEPTANCE PASS`
-```
+The paste-ready start message is generated in the preparation session's final
+report so it can name that docs-only commit exactly. Never use this document's
+own embedded SHA as an unchecked checkout target.
