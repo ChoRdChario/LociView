@@ -6,7 +6,8 @@
 > Product Owner Desktop acceptance are complete; clean-checkout CI remains
 > pending. The later first-candidate device-side HEIC compatibility tree has
 > completed automated, Edge and independent-review acceptance; its physical
-> iPhone JPEG-export flow and exact implementation commit are still pending.
+> iPhone JPEG-export flow is still pending. The bounded implementation is fixed
+> at `6b2a28a0e5983676c9dc5d97534d916e3288f40d`.
 >
 > This file is navigation and handoff context, not a product specification.
 > Code/tests define observed behavior; accepted specifications define product
@@ -26,8 +27,8 @@
 - Accepted corrective executable commit:
   `f6c88967155b0c83d4bcdd4fec6b4a78d9caf772`
 - First-candidate device-side HEIC compatibility start HEAD:
-  `14257e0a13526f7233e474c0f61b259cd443933d`; the implementation is currently
-  staged but not yet committed.
+  `14257e0a13526f7233e474c0f61b259cd443933d`; exact implementation commit:
+  `6b2a28a0e5983676c9dc5d97534d916e3288f40d`.
 - Accepted Native Package Exchange tree verification: typecheck, 60 test files /
   1,478 passing tests with 21 existing todo, and production build all PASS.
 - Current executable candidate: the option-A indexed tree passed typecheck,

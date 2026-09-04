@@ -163,7 +163,7 @@ change, unguarded conversion fallback or a newly reproduced P0/P1.
 
 ## Active implementation — first-candidate device-side HEIC compatibility
 
-> Status: `BOUNDED IMPLEMENTATION COMPLETE / AUTOMATED + EDGE ACCEPTANCE PASS / PHYSICAL IPHONE FLOW PENDING / COMMIT PENDING`.
+> Status: `BOUNDED IMPLEMENTATION COMPLETE / AUTOMATED + EDGE ACCEPTANCE PASS / PHYSICAL IPHONE FLOW PENDING`.
 
 - [x] Supersede direct HEIC/HEIF candidate admission with a documented local
   device-side JPEG-export compatibility flow. Keep direct original-byte HEIC as
@@ -187,7 +187,7 @@ change, unguarded conversion fallback or a newly reproduced P0/P1.
   builds and the existing public-codec isolation verifier.
 - [x] Obtain independent read-only security and UI final diff/risk reviews;
   both report no remaining P0/P1.
-- [ ] Commit this verified tree and record its exact implementation SHA. Stop
+- [x] Commit this verified tree and record its exact implementation SHA. Stop
   before application-version selection, license adoption, `main` integration
   or Pages deployment.
 
@@ -212,7 +212,7 @@ change, unguarded conversion fallback or a newly reproduced P0/P1.
 - Independent security and UI reviews report no remaining P0/P1. The physical
   iPhone flow—local JPEG export, Caption addition, save/close and completely
   offline reopen—has not yet been executed on this tree. Exact implementation
-  commit is also pending.
+  commit: `6b2a28a0e5983676c9dc5d97534d916e3288f40d`.
 
 `FIRST-CANDIDATE HEIC COMPATIBILITY: IMPLEMENTATION PASS / PHYSICAL IPHONE ACCEPTANCE PENDING`
 
