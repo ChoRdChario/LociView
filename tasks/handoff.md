@@ -5,9 +5,9 @@
 > on 2026-09-03. The bounded implementation, indexed-tree automated matrix and
 > Product Owner Desktop acceptance are complete; clean-checkout CI remains
 > pending. The later first-candidate device-side HEIC compatibility tree has
-> completed automated, Edge and independent-review acceptance; its physical
-> iPhone JPEG-export flow is still pending. The bounded implementation is fixed
-> at `6b2a28a0e5983676c9dc5d97534d916e3288f40d`.
+> completed automated, Edge, independent-review and Product Owner physical-
+> iPhone acceptance. The bounded implementation is fixed at
+> `6b2a28a0e5983676c9dc5d97534d916e3288f40d`.
 >
 > This file is navigation and handoff context, not a product specification.
 > Code/tests define observed behavior; accepted specifications define product
@@ -38,20 +38,24 @@
   reruns (1/1 and 82/82). Independent read-only reviews found no remaining
   code P0/P1.
 - Product Owner acceptance: option-A Desktop PASS, including immediate unsaved
-  Caption pin/overlay display; accepted physical-iPhone Native restore/save/
-  completely-offline-reopen evidence remains applicable; no unresolved P0/P1.
-- At handoff preparation, `origin/g0-baseline` matched the local branch, the
-  worktree was clean, and temporary preview/Cloudflare Tunnel were stopped.
+  Caption pin/overlay display; physical-iPhone PASS includes Native restore/
+  save/completely-offline-reopen and the later device-side HEIC-to-JPEG
+  compatibility flow; no unresolved P0/P1.
+- The device-side HEIC implementation and evidence commits remain local pending
+  push. The worktree was clean before this result-only update, and its temporary
+  preview server and HTTPS tunnel were stopped after acceptance.
 - The first candidate does not require Windows HEIF/HEVC extensions and does
   not ship a decoder. Users make a separate JPEG on their device and attach
   that JPEG; direct original-byte HEIC/HEIF remains required post-candidate
   work. The existing libheif+libde265 decoder stays an isolated local PoC, and
   generated output remains outside the application/Pages/Service Worker graph.
-  On the staged tree, typecheck, 65 files / 1,542 tests with 21 existing todo,
+  On the implementation tree, typecheck, 65 files / 1,542 tests with 21 existing todo,
   ordinary and Pages-path builds, public-codec isolation and Edge 152 actual
   JPEG/PNG/GIF/WebP decode all pass. Two independent reviews found no P0/P1.
-  The new physical-iPhone local-JPEG-add/save/offline-reopen flow is not yet
-  accepted and must not inherit credit from the earlier Native restore smoke.
+  The Product Owner then accepted the physical-iPhone flow: direct HEIC was
+  rejected with guidance, the separately exported JPEG was added and displayed,
+  and the saved Project reopened with the attachment after Safari restart while
+  completely offline.
 
 Do not hard-code this document's own commit as the checkout target. At the
 start of a fresh session, verify that current `g0-baseline` is a clean descendant
@@ -194,7 +198,8 @@ LociViewのrelease-candidate準備を引き継いでください。
 - HEAD: <CURRENT_HEAD>
 - accepted product checkpoint: 5f2a19df9fcfd50215d1313c1265e6cdf82872b4
 - Native Package Exchange implementation: 0b5dd461d761fc0669b1c0c80b3d6549cd01b1e6
-- Desktop／physical iPhone Product Owner acceptance: PASS
+- Desktop／physical iPhone Product Owner acceptance: PASS（端末側HEIC→JPEG互換
+  フローを含む）
 - unresolved P0／P1: なし
 
 最初にread-onlyでbranch、HEAD、worktree、originとの差、private sourceの
@@ -226,5 +231,5 @@ private-source由来metadataの公開可否だけを整理してください。
 release SHA確定、main merge、Release作成、Pages deploymentは別承認まで
 行わないでください。
 
-`RELEASE CANDIDATE OPTION A: BOUNDED IMPLEMENTATION COMPLETE / EVIDENCE PENDING`
+`RELEASE CANDIDATE OPTION A: PRODUCT OWNER ACCEPTANCE PASS`
 ```

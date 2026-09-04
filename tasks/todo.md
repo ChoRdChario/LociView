@@ -161,9 +161,9 @@ change, unguarded conversion fallback or a newly reproduced P0/P1.
 
 `RELEASE CANDIDATE OPTION A: PRODUCT OWNER ACCEPTANCE PASS`
 
-## Active implementation — first-candidate device-side HEIC compatibility
+## Completed implementation — first-candidate device-side HEIC compatibility
 
-> Status: `BOUNDED IMPLEMENTATION COMPLETE / AUTOMATED + EDGE ACCEPTANCE PASS / PHYSICAL IPHONE FLOW PENDING`.
+> Status: `PRODUCT OWNER ACCEPTANCE PASS`.
 
 - [x] Supersede direct HEIC/HEIF candidate admission with a documented local
   device-side JPEG-export compatibility flow. Keep direct original-byte HEIC as
@@ -209,12 +209,15 @@ change, unguarded conversion fallback or a newly reproduced P0/P1.
   existing todo; ordinary and Pages-path builds; public-codec isolation check.
   Edge `152.0.4191.62` decoded the representative 1x1 JPEG/PNG/GIF/WebP through
   both `HTMLImageElement.decode()` and `createImageBitmap()`.
-- Independent security and UI reviews report no remaining P0/P1. The physical
-  iPhone flow—local JPEG export, Caption addition, save/close and completely
-  offline reopen—has not yet been executed on this tree. Exact implementation
-  commit: `6b2a28a0e5983676c9dc5d97534d916e3288f40d`.
+- Independent security and UI reviews report no remaining P0/P1. The Product
+  Owner completed the physical-iPhone flow on this tree: direct HEIC selection
+  failed closed with guidance, the separately exported JPEG was added and
+  displayed, and the saved Project reopened with that attachment after Safari
+  restart while completely offline. The temporary server and HTTPS tunnel were
+  stopped afterward. Exact implementation commit:
+  `6b2a28a0e5983676c9dc5d97534d916e3288f40d`.
 
-`FIRST-CANDIDATE HEIC COMPATIBILITY: IMPLEMENTATION PASS / PHYSICAL IPHONE ACCEPTANCE PENDING`
+`FIRST-CANDIDATE HEIC COMPATIBILITY: PASS`
 
 ## Active investigation — first-candidate single-still HEIC/HEIF
 
