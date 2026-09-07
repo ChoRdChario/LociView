@@ -232,6 +232,14 @@ instead retains a completely verified causal batch atomically, blocks only the
 affected authoritative projection and requires an explicit later resolution;
 it never presents a library-selected value as the winner.
 
+For a duplicate Scene membership conflict, show the named candidates with
+keep-one and `両方残す` choices. Keep-both creates independently editable
+Caption/model items, not two linked aliases. Confirm which continues the original
+and which becomes a copy, disclose other-Scene effects and leave existing Caption
+model ownership unchanged. Preview the actual result; do not automatically merge
+equal-looking choices or choose an original candidate for the user. Other typed
+conflicts expose only their implemented resolution actions.
+
 ## 7. Writing and labels
 
 > Classification: **Accepted requirement**.

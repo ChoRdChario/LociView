@@ -68,7 +68,10 @@ identity inference, a single-model assumption or a hidden external version syste
    semantic conflict. Only the affected authoritative projection is blocked.
    Resolution is a new causal command that explicitly chooses a candidate or
    records a manual combined value; arrival time and materialized library values
-   never choose a winner. Losing candidates remain historical evidence.
+   never choose a winner. For duplicate Scene memberships the user may keep one
+   or explicitly keep both as independently editable Caption/model resources,
+   with the original/copy assignment disclosed and confirmed. Equal endpoints
+   are not automatically coalesced. Losing candidates remain historical evidence.
 10. Invalid package structure, missing causal dependencies, missing required
     blobs, wrong lineage, failed integrity, quota exhaustion or interrupted
     staging publishes no new head. Semantic conflict and invalid input are not

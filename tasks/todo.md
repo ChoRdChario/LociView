@@ -1,11 +1,34 @@
 # LociView active work
 
-## Current boundary — contract checkpoint handoff; S1 not started (2026-09-07)
+## Current boundary — focused contract corrections and S1 entry (2026-09-08)
 
-Present and preserve the exact ratified contract checkpoint. Do not begin S1 in
-this same boundary. On a subsequent requested continuation, begin with the short
-meta-audit and S1 slice statement required by `AGENTS.md`; do not infer authority
-for S2, S3, dependency adoption or release work from completion of this document.
+The Product Owner requested explicit conflict choices (keep either candidate or
+keep both), delegated the gate/sequence/acceptance corrections and asked that
+verification remain proportional. Start from pushed contract checkpoint
+`25b9a776de84a2bb0fb4eb4d78aa542aeb64fb48`.
+
+- [x] Record explicit user-selected keep-either/keep-both semantics without
+  automatic membership coalescing or an automatic conflict winner.
+- [x] Map G1-C to the five-purpose Scene/team contract and separate adapter proof
+  from S2 wire/converter proof.
+- [x] Name the immediate S1 entry deliverable and separate storage/device evidence
+  from S3 integrated product acceptance.
+- [x] Add one continuing-team end-to-end acceptance flow using existing checks.
+- [x] Check the changed contracts once and record remaining blockers. Do not add
+  a test matrix, repeat unchanged application tests or reopen unrelated gates.
+
+Next executable step: the S1 entry described in specification 05 section 13.
+Its first deliverable reuses existing evidence to name one missing adapter/I/O
+proof and its bounded harness. No further planning layers are required before
+executing that harness once its existing dependency/adoption conditions are met.
+
+Review result: keep-both was explicitly clarified as independently editable items.
+The focused independent review found no blocking contract issue. Diff whitespace
+and 72 inline Markdown file references pass. All changes are documentation;
+unchanged application tests/build were not repeated and no new technology or
+device acceptance is claimed. The next evidence gap is the pinned candidate
+adapter, not another document review. Dependency selection/approval and actual
+G1-A/C execution remain required before production storage adoption.
 
 ## Completed boundary — ProjectScene and continuing-team contract ratification (2026-09-07)
 
@@ -74,7 +97,7 @@ Approved implementation sequence after this contract boundary:
    authoring, conflicts/`needsReview`, Desktop rendering and physical-iPhone
    acceptance. No Pages, Service Worker, main integration or deployment.
 
-### Current stop condition
+### Contract checkpoint stop condition (completed historical boundary)
 
 Stop after the contract diff and independent review are ready for Product Owner
 inspection. Do not add Automerge/CAS or another dependency, implement ProjectDocV2,

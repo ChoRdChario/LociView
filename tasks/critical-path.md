@@ -2,7 +2,8 @@
 
 > Status: `PROJECTSCENE/TEAM CONTRACT RATIFIED; S1 NOT STARTED`
 >
-> Updated: 2026-09-07 after Product Owner acceptance of the Project-as-workspace,
+> Updated: 2026-09-08 with explicit keep-both conflict choices and a concrete S1
+> adapter-harness entry in specification 05 section 13, following acceptance of the Project-as-workspace,
 > persistent ProjectScene and continuing causal team contract. The preserved
 > executable checkpoint is `2178677` on `g0-baseline`; ADR-0002 and specification
 > 05 are accepted but not implemented. The older Native candidate execution plan
@@ -335,12 +336,15 @@ language, disposable PoCs and one writer.
 
 **2026-09-07 amendment:** the Product Owner subsequently accepted the
 Project-as-typed-workspace, persistent ProjectScene and continuing causal team
-direction. The active boundary is the contract ratification in `tasks/todo.md`,
+direction. The 2026-09-08 correction adds user-selected independent keep-both,
+the updated G1-C evidence map and the integrated `TEAM-FLOW-01` acceptance. The
+active boundary and next adapter-harness entry are in `tasks/todo.md`,
 ADR-0002 and `docs/specs/05-project-scene-team-workflow.md`. It changes no
 current Native bytes or behavior. After the contract checkpoint, S1 may address
 only the gated Scene-capable v2 core; ProjectScene migration/package S2 remains
-blocked on its new recipe and wire companions, and production UI/iPhone evidence
-belongs to S3. The Native acceptance record below remains historical evidence,
+blocked on its new recipe and wire companions. S1/S2 require their applicable iOS
+storage/recovery evidence; S3 supplies integrated product UI/device acceptance.
+The Native acceptance record below remains historical evidence,
 not the current next-work instruction.
 
 The completed native checkpoints remain closed unless a new P0/P1 directly

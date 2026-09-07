@@ -198,7 +198,9 @@ second persistent hidden-Asset list. Temporary isolate/hide is local UI state.
 
 At most one active edge may own semantic key `(sceneId, assetId)` and at most one
 may own `(sceneId, captionId)`. Multiple active IDs for one key are retained as
-a duplicate-key conflict and apply none. Edge collections order by `orderKey`
+a duplicate-key conflict and apply none until the user selects which to keep or
+explicitly keeps both as independent resources under section 8. Matching
+endpoints never authorize automatic coalescing. Edge collections order by `orderKey`
 then stable ID. Reordering one edge changes that edge's atomic order key; it does
 not rewrite an array.
 
@@ -620,19 +622,54 @@ At minimum the adapter/resolver distinguishes:
 | lifecycle delete versus edit/restore | exclude affected entity and preserve dependent orphan review items |
 | same immutable ID, different payload | invalid/tampered input; quarantine or reject before activation |
 
-Resolution is one explicit causal command after all candidate changes. It either
-selects one complete candidate or writes a manually combined valid value. The UI
+Resolution is one explicit causal command after all candidate changes. It
+selects one complete candidate, writes a manually combined valid value, or uses
+the explicit membership keep-both operation below. The UI
 does not automatically make a duplicate alternative. Every losing candidate and
 its provenance remain in history. Only labelled read-only preview may show a
 candidate before resolution.
 
-A duplicate membership-key conflict is resolved differently from a scalar
-candidate: after observing every current conflicting edge, one command either
-keeps one exact edge ID and tombstones all other active IDs for that semantic key,
-or retargets explicitly named edges to distinct validated endpoint pairs. Its
-causal dependencies include every observed edge and it is idempotent on replay.
-An unseen concurrent edge remains detectable and reopens the conflict; neither
-merge order nor an ID sort silently keeps a winner.
+A duplicate membership-key conflict is resolved by the user's explicit choice:
+keep a named candidate or keep both. Do not coalesce even equal endpoint pairs
+automatically. Before confirmation show the affected Scene, resources and all
+candidates; neither arrival order nor an ID sort chooses for the user.
+
+- Keep one: retain the selected exact edge ID and tombstone the other observed
+  active IDs for that semantic key. Losing candidates remain in history.
+- Keep both: retain the candidate explicitly confirmed as continuing the original
+  resource and create a separately editable resource for each other selected
+  candidate. The preflight identifies original versus copy and the original's
+  other-Scene references; this assignment must not be hidden in a default winner.
+  The new resource belongs only to the conflict's Scene. Other Scene references
+  and other resources are not silently redirected or copied.
+- For a Caption copy, use fresh Caption, attachment and tag-membership IDs;
+  preserve the confirmed content/anchor and reference the same immutable media
+  and Project tag definitions. Later text, anchor and attachment edits are
+  independent. This never infers or changes the anchor's model ownership.
+- For a model copy, allocate a new Asset and AssetFrame and rebuild the confirmed
+  active editable revision/binding/Representation closure with new nominal IDs
+  and metadata digests. Preserve numeric frame/placement and internal source/
+  proxy/compatibility relationships through an explicit complete remap. Reuse
+  verified immutable payload bytes through BlobStore; do not duplicate large
+  blobs or introduce a second active revision of the original Asset. Re-key the
+  confirmed effective material intent for the copy in this Scene. Existing
+  Captions remain attached to the original model and are not copied/re-anchored.
+
+Keep-both retains the confirmed original edge, tombstones every other observed
+conflicting edge and creates one new edge/resource per other selected candidate
+as one causal command, leaving one active edge per `(Scene, resource)` key. The
+command carries all chosen candidate IDs and the complete fresh-ID/reference map;
+retry/replay uses that same command rather than minting additional copies. All
+dependencies and required bytes must validate before publication. An unresolved
+required resource field, invalid remap, quota or failure leaves the previous
+published state/candidates available; it never publishes a partial copy.
+
+This bounded independent-copy operation is the Scene membership conflict action,
+not a general Scene duplicate tool. Other conflict types keep their typed
+choose/manual-combine resolution; a scalar/default pointer cannot store two
+values by exposing an unimplemented keep-both action. The command depends on
+every observed candidate. An unseen concurrent edge remains detectable and
+reopens the conflict; no automatic winner or automatic duplicate is introduced.
 
 ## 9. Migration
 
@@ -824,8 +861,11 @@ or advances it merely because export completed.
 - `TEAM-HIST-05`: 10,000-Caption/50,000-change, two-tab and restart fixtures meet
   the ratified metadata budgets before adapter adoption.
 - `TEAM-HIST-06`: duplicate Scene membership keys apply none. Resolution observes
-  all known edge IDs and tombstones or explicitly retargets them; both merge
-  orders, replay and one later unseen edge preserve the same conflict semantics.
+  all known edge IDs and supports user-selected keep-one or keep-both. Keep-both
+  creates independent Caption/model identities with an exact remap and no silent
+  other-Scene or Caption retargeting; editing one copy leaves the other unchanged.
+  Both merge orders, replay, interrupted copy and one later unseen edge preserve
+  candidate history, uniqueness and the same conflict semantics.
 
 ### 12.3 Packages and recovery
 
@@ -899,7 +939,52 @@ or advances it merely because export completed.
   failure recovery, save and completely offline reopen. Dev server, DOM tests and
   Desktop emulation do not count as device/PWA PASS.
 
+### 12.6 Continuing-team acceptance through the whole product
+
+`TEAM-FLOW-01` is the required completion scenario for this workstream. Use one
+synthetic two-Scene Project and two independent participant workspaces:
+
+1. The coordinator distributes a Team Workspace; the participant opens it and
+   edits Caption text/media without separately importing a model.
+2. While those changes remain local, the coordinator replaces one model and
+   distributes the updated Team Workspace. The participant integrates it without
+   losing local Caption edits; every Scene referencing that Asset uses the new
+   revision. Positions are preserved; only unproven compatibility is `needsReview`.
+3. One participant explicitly corrects an affected pin and sends a Contribution.
+   The coordinator receives both pending Caption work and that correction with
+   original causal dependencies, then makes and exchanges a second edit round.
+4. A duplicate Scene membership conflict requires keep-one/keep-both selection;
+   exercise keep-both and verify independent subsequent edits and no duplicated
+   copies on replay. Genuine field conflicts retain explicit resolution.
+5. Save, restart and reopen offline in both workspaces. Verify both rounds, Scene
+   membership, model update, independent copies and pin correction; replaying an
+   accepted Contribution is a no-op. Inject one representative interrupted import
+   and retry using the existing journal-boundary checks for the remaining faults.
+
+Run the service-level chain in S2 and the ordinary UI chain on Desktop and physical
+iPhone in S3. Reuse `SCN-DOM-03/04`, `TEAM-HIST-01/03/06`, `TEAM-PKG-01/04/05/08`
+and `SCN-UI-05` fixtures/assertions; do not multiply them into another exhaustive
+matrix. S3 completion requires this integrated outcome, not merely individual
+test counts. Existing Native test passes provide regression evidence only.
+
 ## 13. Bounded implementation sequence
+
+S1–S3 name delivery stages, not three indivisible commits. The immediate S1 entry
+is one disposable candidate-adapter harness for the existing `TEAM-PKG-08` causal
+sequence and section 8 conflict choices. Its input is one synthetic Project with
+two Scenes, one Asset and shared Captions; O/A/B/W branches exercise exact change
+subtraction, no base advancement, candidate retention and explicit resolution.
+Use a fake blob port for this first metadata proof and make no I/O/device claim.
+
+Before running that harness, inventory the already executed evidence once:
+Native storage/portable-package/merge tests provide regression and reusable
+fixtures, not proof of Automerge or CAS. The current application has no adopted
+metadata adapter. Record the exact candidate version and isolated dependency
+scope for the existing dependency approval, then run the harness. Its exit is
+the bounded assertions passing on the pinned adapter or one concrete failed
+capability and alternative. Do not add another planning document or broad
+fixture campaign before executing it. A pass is partial G1-C evidence; complete
+only the still-missing G1-A/C criteria before production storage adoption.
 
 1. **S1 — Scene-capable v2 core:** after metadata/CAS gates, implement ProjectDocV2,
    ProjectSession/MetadataRepository, journal, Scene records/commands/resolver under
@@ -914,8 +999,21 @@ or advances it merely because export completed.
    Desktop and physical-iPhone evidence. No Pages, Service Worker, `main`, release
    or deployment action.
 
-Each slice requires a short meta-audit, exact-tree tests/build, one independent
-read-only review and a reversible commit. A gate failure, specification conflict,
+S1/S2 include the physical-iOS storage/durability/recovery checks required by the
+specific changed path. S3 owns the integrated UI/device acceptance; it is neither
+the first possible storage test nor a substitute for adapter/I/O evidence.
+The first harness, production adapter/journal, domain/resolver and production
+exchange changes each close a named requirement using focused evidence.
+
+Each production slice requires a short meta-audit, exact-tree tests/build, one
+independent read-only review and a reversible commit. Run focused checks during
+editing, then the required full matrix once on the final executable tree. Reuse
+passing evidence while its code, dependencies and contract remain applicable.
+Documentation-only corrections receive diff/reference/contract checks, not an
+unchanged application test rerun. Review findings outside the active acceptance
+go to backlog unless they directly threaten correctness or completion. Do not
+repeat broad review after the focused correction is confirmed.
+A gate failure, specification conflict,
 unproven migration relation, new P0/P1, required scope expansion or release/
 destructive boundary stops the slice and returns to Product Owner review.
 

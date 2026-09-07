@@ -432,7 +432,10 @@ the implemented Native contract unchanged:
 - valid semantic-conflict imports atomically retain every candidate/history/blob
   and block only affected authoritative projection. Resolution explicitly chooses
   one candidate or records a manual combined value, with no automatic winner or
-  duplicate alternative;
+  duplicate alternative. For duplicate Scene membership, the 2026-09-08 decision
+  also permits user-selected keep-both as independently editable Caption/model
+  resources. The original/copy assignment and other-Scene effects are confirmed;
+  equal endpoints never authorize automatic coalescing;
 - free camera and active Scene are local; only explicit Named Views and the
   Project default Scene are shared;
 - exact backup, whole-Project Team Workspace, thin Contribution, one-Scene

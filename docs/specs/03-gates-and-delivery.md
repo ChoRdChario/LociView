@@ -7,8 +7,9 @@
 > sequence below where it would write the closed DisplaySet migration target or
 > old three-purpose package wire. The ProjectScene writer requires its separately
 > ratified migration companion, portable Native-bridge support record and
-> five-purpose package-wire companion before S2. Existing G0/G0-S/G1 technology,
-> renderer, durability and physical-device gates remain unchanged.
+> five-purpose package-wire companion before S2. The 2026-09-08 correction maps
+> G1-C inputs to this new contract below. Existing durability, privacy and device
+> thresholds remain in force; no aggregate G0/G0-S or renderer work is restarted.
 
 ## 1. Gate discipline
 
@@ -471,6 +472,25 @@ If both pass comparably, adopt the lower migration/maintenance cost. A hard fail
 
 ## 6. G1-C — metadata/Automerge PoC
 
+For the ProjectScene writer, this gate proves candidate adapter/domain behavior
+using disposable fixtures. It does not implement or approve the S2 package wire
+or converters. The five semantic purposes are `teamWorkspace`, `contribution`,
+`review`, `backup` and `clean`; the superseded three-purpose manifest is not a
+substitute. Preserve the existing durability/privacy requirements below, using
+this acceptance ownership:
+
+| Evidence | Adapter PoC / S1 | S2 production exchange / migration |
+|---|---|---|
+| Causal history and explicit conflicts | `TEAM-HIST-01`–`06`, including user-selected resolution; original changes, sibling branches and replay | Same semantics through real package import, with no rewritten dependencies |
+| Contribution base and delta | `TEAM-PKG-08`: exact current-minus-base changes and durable local base records via a test port | Manifest/base validation, reopen/backup, blob delta and real package replay |
+| Five purposes and privacy | Derive each semantic closure from the same synthetic Project; verify history/identity and exchange-record inclusion/omission | Section 7.5 companion: exact discriminated wire, golden vectors, streamed transport and read-back |
+| Migration continuity | Synthetic registered ancestor plus later changes proves causal preservation; no old recipe output is reinterpreted | `SCN-MIG-01`–`06`, new recipe and portable bridge with real accepted source paths |
+| Mobile durability and performance | Applicable iOS adapter/storage evidence before adoption or production storage acceptance | Changed package/storage recovery paths on device; S3 later adds the integrated product workflow |
+
+These rows map evidence to existing requirements rather than create a second
+test matrix. One result may satisfy multiple IDs when its inputs and assertions
+actually cover them. G1-C adapter proof does not receive S2 wire/converter credit.
+
 Scenarios:
 
 - two live tabs and a third-tab restart;
@@ -485,9 +505,13 @@ Scenarios:
 - concurrent active bindings and delete/edit;
 - parent deletion versus concurrent child/tag/attachment addition;
 - missing-model v1 asset with scale-100/Z-up placement and later verified assignment preserving caption/camera projection;
-- device-A conversion/package followed by device-B later-copy migration with stable IDs and v2-only attachment edits;
+- a synthetic registered migration ancestor followed by device-B changes with
+  stable IDs and preserved v2-only attachment edits; real conversion is S2;
 - invalid/unknown domain values;
-- collaboration, review/share and clean-copy export.
+- all five semantic output closures, including a base-dependent Contribution
+  and a self-contained Team Workspace/backup, before real S2 encoding exists;
+- the `TEAM-PKG-08` sibling/base sequence and explicit keep-either/keep-both
+  membership conflict choices in specification 05 section 8.
 
 Hard merge/durability pass:
 
@@ -506,16 +530,25 @@ Hard merge/durability pass:
 
 Hard privacy pass:
 
-- collaboration output is labelled history-bearing;
+- Team Workspace, Contribution and backup are labelled history-bearing;
 - review/share is built from a validated snapshot without Automerge bytes;
 - clean copy blocks until every included semantic conflict is explicitly resolved, then creates a new project and history epoch;
 - clean copy topologically re-keys every included record/reference and contains no source lineage/parent/provenance sentinel;
 - review/clean re-keying includes anchor-compatibility and composite-group equality classes, while proxy-derived anchors retain internal method/confidence without retaining out-of-closure source provenance or requiring a persistent approximation badge;
 - deleted secret, old actor/profile values and unreferenced blobs are absent by semantic parse and raw sentinel scan;
-- an unknown-minor-only blob remains protected through old-writer edit, GC attempt and collaboration re-export; unrecognized minor fields block history-free export until a pinned explicit field policy exists;
+- an unknown-minor-only blob remains protected through old-writer edit, GC attempt
+  and same-lineage output closure; a Contribution may omit bytes only when its
+  verified base guarantees them. Unknown fields still block history-free output
+  until a pinned explicit field policy exists;
 - non-resolving caption revision provenance does not pull omitted historical blobs into a history-free package;
-- collaboration, clean and review manifests accept only their discriminator-specific lineage fields; review is nonmergeable and has no source identity, while clean copy cannot merge into the source lineage.
-- migrated collaboration retains the portable migration case and active/conflicting baseline closure across devices; review/clean omit every registry/baseline sentinel and disclose that later-v1-copy continuity is lost.
+- all five semantic closures obey their purpose-specific identity/history rules.
+  Review has no source identity and clean creates a new lineage; exact manifest
+  rejection/golden vectors belong to S2;
+- same-lineage closures protect registered migration ancestors and required
+  baseline blobs; review/clean omit registry/baseline sentinels and disclose
+  continuity loss. Exact portable Native-bridge support and converters are S2;
+- durable workspace-local exchange-base records survive reopen and are included
+  only in backup, with disclosure; importing a Contribution never advances them.
 
 If the candidate fails, record a replacement ADR. Do not automatically extend the custom v1 HLC/LWW log.
 

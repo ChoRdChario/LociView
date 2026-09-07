@@ -1,6 +1,16 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **Current update (2026-09-07 ProjectScene/team contract):** The Product Owner
+> **Current update (2026-09-08 focused correction):** Contract checkpoint
+> `25b9a776de84a2bb0fb4eb4d78aa542aeb64fb48` is pushed. The Product Owner then
+> selected explicit keep-one/keep-both conflict choices, with keep-both creating
+> independently editable Caption/model items. Specification 05 sections 8, 12.6
+> and 13 define the correction, one continuing-team acceptance flow and the
+> immediate S1 entry; specification 03 section 6 maps the updated G1-C evidence.
+> Use the current top of `tasks/todo.md`. S1/S2 own their required iOS storage
+> checks; S3 owns integrated product/UI acceptance. Reuse applicable evidence and
+> do not repeat broad review or unchanged tests after the focused correction.
+
+> **Historical update (2026-09-07 ProjectScene/team contract):** The Product Owner
 > accepted the Project-as-typed-workspace, persistent ProjectScene and continuing
 > causal team-work direction, including separate Team Workspace/Contribution/
 > review/backup/clean purposes and full-Project editing. The preserved current
@@ -240,14 +250,16 @@ Owner decisions after RC-A implementation and exact-tree verification.
 
 ## 6. Next fresh session
 
-The next session starts from the 2026-09-07 update at the top of this file and
+The next session starts from the 2026-09-08 update at the top of this file and
 the first current boundary in `tasks/todo.md`. Read ADR-0002, specification 05,
 `tasks/team-operations-review.md` and `docs/ui-product-guidelines.md`; verify the
-Git/worktree boundary read-only. If the contract checkpoint has been committed
-and reviewed with no P0/P1, prepare S1 only: Scene-capable v2 metadata, commands
-and resolver behind a nondefault boundary after its metadata/CAS gates. S2 stays
+Git/worktree boundary read-only. Next execute the bounded S1 adapter-harness entry
+in specification 05 section 13 after its existing dependency conditions; use its
+result to close the remaining G1-A/C prerequisites before production storage.
+No additional general audit/planning workstream is required. S2 stays
 blocked until the separately specified ProjectScene migration and five-purpose
-package-wire companions pass; S3 owns production UI and physical-iPhone evidence.
+package-wire companions pass. S1/S2 collect their required physical-iOS storage/
+recovery evidence; S3 owns the integrated product UI and `TEAM-FLOW-01` device run.
 Stop before dependency adoption, license/version decisions, `main`, Pages,
 Service Worker or deployment.
 
