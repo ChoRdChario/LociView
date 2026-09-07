@@ -32,14 +32,24 @@ Slice review: isolated typecheck/build PASS; browser WebCrypto recipe executed
 under Node versus independent Node AES/SHA-256 at 5 MiB + 19 bytes and full
 500 MiB with the pinned digest (1/1 focused test PASS). Independent review found
 a misleading blanket READY on partial readback and an overbroad recovery hint;
-both are corrected and confirmed. The OPFS page itself is not browser-executed.
+both are corrected and confirmed. Browser execution was pending at preparation.
 Its output remains private synthetic OPFS, not an adopted browser download sink.
 No new server/tunnel, production import, dependency or root build change. The
 preceding root matrix remains applicable; browser-control retry and immediate
 human requests were deliberately not repeated.
 
-Next dependency: execute the prepared OPFS page in the deferred Desktop batch,
-then obtain applicable physical-iOS/storage evidence before adoption. Remaining
+PO follow-up: after the verified HTTP link for `e51fea8`, the supplied page text
+reports READY for saved-payload readback and PASS for reopening the 500 MiB
+payload with the original hash. Record this narrow user-operated result, not
+agent automation or a full initial-round-trip/platform gate. The PO answered
+that the first completion was not remembered and no log was available. Its
+result is unknown, not failed; do not ask again or repeat the stress run solely
+to reconstruct this log. The browser's family/version and
+page-reload ordering are not inferred from the text alone.
+
+Next dependency: retain the bounded readback and the explicit first-run evidence
+gap, then obtain applicable physical-iOS/storage evidence before adoption. Missing
+old logs do not create a new PO approval hold for approved implementation work. Remaining
 G1-A/C work includes the real cross-store journal/inventory, safe reachability/
 GC, semantic privacy closures, scale/domain limits and platform durability;
 neither this preparation nor the earlier Node proof closes those requirements.

@@ -66,7 +66,7 @@ unchanged from the 17-test run. Root typecheck, 80 files / 1,658 PASS / 21 exist
 todo and build PASS; existing import/chunk warnings remain. The application does
 not import this proof. No gate adoption or new browser/device acceptance follows.
 
-## OPFS browser preparation (not yet browser-verified)
+## OPFS browser probe (bounded user-operated readback PASS; other evidence partial)
 
 Reuse the exact candidate and deterministic byte recipe in a separate loopback
 page with no production imports other than the unchanged hash implementation.
@@ -74,9 +74,10 @@ Uses a dedicated synthetic-only OPFS directory and real `navigator.locks`, bound
 file slices and awaited writes. Preserve interrupted synthetic data for explicit
 recovery/readback; never clear an origin or user workspace. One button will run
 the prepared cases; reload/readback is a separate action so persistence is not
-inferred from an in-memory handle. Human execution is deferred as a batch.
+inferred from an in-memory handle. Human execution was deferred as a batch;
+the subsequently supplied result is recorded below.
 This preparation adds no OPFS/iOS PASS, download sink, GC, journal, offline/PWA
-or technology-adoption credit. No temporary server or HTTPS tunnel is started.
+or technology-adoption credit. No server/tunnel was started during preparation.
 
 Isolated typecheck/build PASS. The browser WebCrypto AES-CTR recipe was executed
 under Node against independent Node AES/SHA-256 at 5 MiB + 19 bytes and the full
@@ -89,7 +90,28 @@ Focused independent read-only review found an overbroad READY/readback claim and
 a recovery hint that included the pre-large-data stage. Both are corrected and
 confirmed: readback acknowledges only the saved large payload, and a run stopped
 before that payload exists needs a new run after retaining its URL/log. Latest
-isolated typecheck/build pass. No agent or human has executed this OPFS page yet.
+isolated typecheck/build pass. That preparation did not include browser execution.
+
+### User-operated browser readback (2026-09-08)
+
+After the loopback link was provided for implementation checkpoint `e51fea8`,
+the PO supplied the page text `READY / 保存済み本体の確認が完了` and
+`PASS 再オープン：500 MiB の保存済み本体と元のハッシュが一致`.
+This is bounded evidence that a fresh OPFS readback recovered the expected
+reference and streamed/hash-verified the saved 500 MiB payload. It is not agent
+browser automation; browser family/version and the reload sequence are not
+independently observed from that text alone.
+
+The PO subsequently answered that the first completion was not remembered and
+no log was available. The first-run `READY / この限定検証が完了` and its
+output/fault-case result therefore remain unknown, not failed. Do not infer
+successful OPFS file-output verification,
+all injected-failure assertions, chunk/timing measurements, cross-tab behavior,
+iOS, process-kill, offline/PWA or G1-A/C adoption from the readback alone.
+This evidence inquiry is closed; do not ask again for the unavailable log or
+request a duplicate 500 MiB run. Keep the missing evidence distinct from the
+passing readback and continue approved implementation/prerequisite work without
+treating the missing old log as a new PO approval hold or waiving adoption gates.
 
 ### 開発側の準備
 
@@ -103,7 +125,14 @@ node ../../node_modules/vite/bin/vite.js preview --config vite.config.mjs
 一括確認を依頼する直前に開発側でHTTP応答を確認し、実行buildを記録してから
 `http://127.0.0.1:5185/` を案内します。以前の保存検証（5184）の再実施は不要です。
 このlocalhost経路はDesktopだけの案内です。iPhone用の経路ではありません。
-現時点でサーバー起動・人間への実行依頼は行っていません。
+検証用HTMLファイルを直接開かないでください。file://では画面だけ表示され、
+処理用moduleの読込が拒否される場合があります。Chromeの安全設定は変更せず、
+必ず稼働確認済みのHTTPリンクを使います。
+
+2026-09-08追記: POのfile://起動画面でmoduleのCORS拒否を確認したため、
+実装checkpoint `e51fea8` をbuildし、loopback previewを起動しました。
+homeとbuilt JavaScriptのHTTP 200を確認してリンクを案内します。
+これは配信確認であり、OPFS検証PASSやサーバーの将来の稼働保証ではありません。
 
 ### 後日の一括確認手順
 
