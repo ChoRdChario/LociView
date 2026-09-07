@@ -2,6 +2,14 @@
 
 > Status: `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED`
 
+> **ProjectScene amendment (2026-09-07):**
+> `05-project-scene-team-workflow.md` supersedes sections 2.2, 4.2--4.5,
+> 5--6 and affected section 12 rows only where they encode DisplaySet-based
+> presentation. The frame, Asset revision, Representation, renderer-neutral
+> material and interaction contracts otherwise remain authoritative.
+> Historical DisplaySet text remains below as the superseded proposal and as
+> context for deterministic migration; it is not the v2 write target.
+
 ## 1. Scope and invariants
 
 This document defines the persistent spatial model, the renderer-neutral scene boundary, and the supported rendering and interaction behavior. It does not select a renderer.

@@ -4,7 +4,15 @@
 
 ## 1. Product outcome
 
-LociView v2 is a local-first, offline-capable browser viewer for portable project packages. It MUST let a non-specialist open a project, place multiple visual Assets and formats as independent layers in one shared Project coordinate space, show or hide each Asset, place and edit captions, exchange project packages, and recover from unsupported or damaged inputs without silently losing work. Mesh, ordinary points and Gaussian Splatting (GS) are supported Representation kinds rather than the user's primary visibility grouping.
+LociView v2 is a local-first, offline-capable browser tool whose Project is the
+durable working source of truth for logical 3D models, Captions, media, views and
+presentation. A non-specialist MUST be able to open a Project, compose those
+typed resources through named Scenes, align and revise multiple visual Assets in
+one shared Project coordinate space, place and edit Captions, exchange complete
+workspaces or causal contributions, and recover from unsupported or damaged
+inputs without silently losing work. Mesh, ordinary points and Gaussian
+Splatting (GS) are Representation kinds rather than the user's primary visibility
+grouping.
 
 The current application remains the migration base. v2 replaces storage and rendering internals behind explicit ports while preserving the useful LociMyu/LociView viewing and recording workflow and the ability to open source v1 packages. Ordinary file, caption, merge, export and recovery flows target a person comfortable with normal Microsoft Office file workflows; they MUST NOT require developer, 3D-engine, storage-engine or synchronization-protocol knowledge.
 
@@ -23,29 +31,35 @@ destructive merge and silent guessed linkage are never defaults.
 
 | ID | Outcome |
 |---|---|
-| `PROD-01` | A project remains portable as a bounded, inspectable package and does not require a LociView server or account. |
-| `PROD-02` | Multiple visual Assets, including Mesh, ordinary-point and GS data, can coexist in one ProjectFrame and be aligned without rewriting source assets. Each loaded visual Asset is an independent layer that can be selected and shown or hidden regardless of its Representation kind. The standard GS interaction configuration may keep its GS and invisible interaction proxy in one logical Asset and active AssetRevision; Mesh-only, point-only and GS-only Assets remain valid. |
-| `PROD-03` | A material or cross-Representation composition that cannot be rendered safely is diagnosed and degrades only the affected contribution; it does not require a separate Compare product mode or make unrelated visible Assets unusable. |
+| `PROD-01` | A Project remains portable without a LociView server or account. Complete backup and Team Workspace are bounded, inspectable, self-contained packages; a Contribution is explicitly base-dependent and never presented as a standalone restore. |
+| `PROD-02` | Multiple visual Assets, including Mesh, ordinary-point and GS data, can coexist in one ProjectFrame and be aligned without rewriting source assets. A ProjectScene explicitly selects each logical Asset to display regardless of Representation kind; temporary local isolation does not rewrite Scene membership. The standard GS interaction configuration may keep its GS and invisible interaction proxy in one logical Asset and active AssetRevision; Mesh-only, point-only and GS-only Assets remain valid. |
+| `PROD-03` | A material or cross-Representation composition that cannot be rendered safely is diagnosed and degrades only the affected rendered model/material contribution; it does not require a separate Compare product mode or make unrelated visible Assets unusable. |
 | `PROD-04` | The initial supported GS interaction path raycasts only the invisible same-asset proxy explicitly related to the selected visible GS family. It converts that approximate hit to a transient candidate in the GS Asset's AssetFrame; the user then adjusts or confirms the ordinary Caption gizmo before a source-less manual anchor is saved. Hiding that GS Asset also removes its proxy from interaction. A selected visible Mesh Asset raycasts itself; an unrelated visual Mesh is never substituted for a GS proxy. The proxy is never the saved-position authority, and a proxy-less GS Asset is view-only for new placement. Missing, invalid, ambiguous, cross-asset or unregistered interaction data is reported and never guessed; direct splat picking and automatic proxy generation are not initial MVP requirements. |
-| `PROD-05` | A topology-changing asset replacement never moves captions or material overrides to a new surface silently. |
+| `PROD-05` | A topology-changing Asset replacement preserves the logical Asset, AssetFrame and every Scene membership but never moves Captions or material overrides to a new surface silently. Unproven anchor/material compatibility becomes explicit review work. |
 | `PROD-06` | Data shown as durably saved survives a reload or process interruption covered by the durability gate. |
-| `PROD-07` | Collaboration import exposes unresolved concurrent edits instead of silently choosing a destructive winner. |
-| `PROD-08` | Review/share export excludes edit history by construction; clean editable copy starts a new lineage. |
+| `PROD-07` | A structurally valid same-lineage Contribution atomically retains all causal changes and required candidates/blobs even when it introduces a semantic conflict. Only the affected authoritative projection is blocked; an explicit causal resolution is required and arrival order never chooses a winner. Invalid lineage, dependency, integrity or blob input publishes no new head. |
+| `PROD-08` | Review/share exports one explicitly selected Scene and excludes edit history by construction. A clean editable copy contains the whole current Project under a new lineage. Exact backup, Team Workspace, Contribution, review/share and clean copy remain distinct purposes. |
 | `PROD-09` | Large GS and package paths degrade quality or refuse safely before browser memory pressure kills the page. |
 | `PROD-10` | Unsupported schema, renderer capability, material policy or missing blob produces an actionable diagnosis, not a blank viewer. |
 | `PROD-11` | The same validated static source produces the same pose, logical bounds, material class and canonical pick anchor/method across supported backends; candidate-local weak provenance may differ or be absent, and a decoder upgrade cannot reinterpret an existing Representation silently. |
-| `PROD-12` | A non-specialist can complete ordinary open/import, caption, merge, export and recovery flows using familiar file/task language, without a Google/LociView account or exposure to actor, HLC, hash, CAS, OPFS, renderer-profile or similar implementation terminology. |
+| `PROD-12` | A non-specialist can complete ordinary open/import, Scene selection/composition, Caption, team integration, purpose-specific export and recovery flows using familiar file/task language, without a Google/LociView account or exposure to actor, HLC, hash, CAS, OPFS, renderer-profile or similar implementation terminology. |
 | `PROD-13` | A LociMyu save dataset consisting of an XLSX save, associated model and images, and an optional file-ID map remains convertible into a new LociView project without a Google account or Google API. Conversion never overwrites the selected source artifacts. Every otherwise-valid non-empty LociMyu caption data-row occurrence with a non-empty stable legacy ID is preserved independently. A row whose trimmed legacy-ID cell is empty is treated as an empty Caption row: it creates no Caption, affects no occurrence ordinal and is explicitly reported while the unchanged source remains available. Duplicate non-empty legacy caption identifiers do not identify one target entity: every occurrence becomes a distinct Caption, and no occurrence is dropped, merged or selected as a winner. Only a uniquely source-authoritative relationship may be activated automatically. An inferred or ambiguous sheet relationship and an unresolved or ambiguous media relationship remain inactive or unlinked; an exportable conversion report records the source sheet, row, ID, affected field, reason and impact. The original outer ZIP remains outside the Project under user control, and that ZIP plus the report are the audit record. The new native Project is the working source of truth. Invalid non-empty identity or collision blocks publication rather than inventing an ID. The ordinary-user flow reports aggregate results and does not require item-by-item decisions. |
 | `PROD-14` | When an import or conversion can preserve every otherwise-valid record and isolate uncertain semantics, it MUST continue with the safe preserved result and the bounded accounting approved for that adapter instead of asking an ordinary user for fine-grained decisions. It MUST NOT silently drop, merge, choose a winner, invent a relationship or activate a guessed relationship. The first LociMyu adapter uses an exportable report and separately retained source ZIP; it adds no project-local sidecar, quarantine or review database. An ordinary-user choice is permitted only for a coarse source/target-authority decision, a destructive or irreversible action, or a condition that the accepted contract identifies as preventing any safe preserved result. |
 | `PROD-15` | In the first public candidate, a Native Project is the only user-writable Project authority. Legacy v1 remains a compatibility source that can be safely inspected, imported without rewriting its operation text, opened explicitly in View, or converted non-destructively into a separate Native Project. The candidate exposes no legacy project creation, Edit mode, operation dispatch, CSV application, model/media mutation, legacy package/CSV export or ZIP merge. This restriction does not remove Native editing, Native backup/restore or Native Package Exchange, including its bounded Caption/new-image collaboration merge. |
 | `PROD-16` | Caption video/audio and direct HEIC/HEIF handling remain required LociView product capabilities after the first public candidate, even when absent from the current representative sample. The first candidate writes PNG/JPEG/WebP/GIF Caption images. For an existing HEIC/HEIF still it provides an explicit local compatibility flow: export a separate JPEG on the source device and then select that JPEG. It does not require a global camera-format change, a Windows codec extension, an external upload or a bundled HEVC decoder. Direct HEIC/HEIF selection is rejected before Project publication with an actionable device-side conversion explanation. A HEIC/HEIF entry in a LociMyu ZIP is detected and reported; an exact file-ID relation remains visible in the report while the Caption is converted without that attachment and the unchanged source ZIP remains under user control. The candidate does not claim direct HEIC/HEIF import, display or original-byte carriage. The isolated libheif/libde265 PoC remains non-production evidence, and Native snapshot schema 2 is not introduced by this candidate policy. A later direct HEIC/HEIF implementation must preserve the selected original bytes as authority, remain local/offline, and pass its own decoder, package, license/patent and device gates. The ordinary-user concept remains `添付メディア`; unavailable video/audio controls are not exposed. Live Photo video, animated HEIF/HEIF image sequences, burst/depth/auxiliary selection, RAW/ProRAW, strict HDR/10-bit fidelity and image editing remain outside the candidate. Video/audio formats/codecs, streaming, viewer, privacy and physical-iOS support require their own later bounded contract and gate evidence. |
+| `PROD-17` | A Project retains typed resources; internal `Asset` remains the logical 3D model/AssetFrame owner. A ProjectScene explicitly selects logical Assets and Captions, supplies Scene-scoped material presentation and may name one entry Saved View. A Caption may be referenced by multiple Scenes without duplicating its content or media. |
+| `PROD-18` | Continuing team work uses one verifiable Project lineage and causal heads. A self-contained Team Workspace lets a new participant begin without independently loading a model; a base-dependent Contribution automatically includes the dependency-closed set difference `reachable(current heads) - reachable(base heads)`, including valid siblings, and only newly required blobs. It never fabricates a rebase. Every participant may use the complete normal Edit surface on Desktop and iPhone. |
+| `PROD-19` | A Scene references a logical Asset rather than an exact model revision. Active Asset revision/alignment remains Project-wide supporting infrastructure. Older-revision Caption text/media changes remain integrable, while only unproven anchors/material mappings become `needsReview`; no user must replace the model independently merely to participate. |
+| `PROD-20` | `Project.defaultSceneId` and explicitly saved Named Views are shared. The momentary active Scene, free camera, selection, filters, temporary isolation, gizmo values and floating-window layout are local UI state and never silently enter Project history or package scope. |
+| `PROD-21` | Desktop and physical-iPhone layouts expose the same Project administration, Scene composition, model revision review, conflict resolution and package purposes. Responsive reflow may change layout and resource admission may fail safely before a write, but mobile is not a restricted contributor role. |
 
 ## 3. Asset visibility and composition support
 
-The primary user-visible display model is an ordered collection of loaded visual
-Assets in one ProjectFrame. Each Asset is independently selectable and visible or
-hidden. Mesh, ordinary points and GS identify Representation/rendering kinds;
-they do not divide the project into mandatory product modes.
+The primary user-visible display model is one named ProjectScene resolving an
+ordered collection of logical visual Assets and Captions in one ProjectFrame.
+Each active Scene/Asset membership makes that Asset persistently visible in the
+Scene. Mesh, ordinary points and GS identify Representation/rendering kinds; they
+do not divide the Project or Scene into mandatory product modes.
 
 The first proxy-backed native slice retains `mixed`, `gs-only` and `mesh-only`
 as project-wide convenience filters for its bounded one-Mesh/one-GS snapshot v1.
@@ -68,7 +82,13 @@ Support labels MUST appear in UI and diagnostics:
 
 Smooth alpha blend, transmission/refraction and arbitrary multi-layer intersection between closed mesh and GS are not **Supported** in the MVP. After G1-D, a backend MAY offer an explicitly experimental smooth-alpha approximation while preserving the requested semantic material policy. Transmission/refraction remains **Unsupported** and redirected until a separate later material/research gate; G1-D does not authorize it.
 
-Display sets preserve the LociMyu sheet-switching outcome: one appearance set combines Caption membership, set-scoped material appearance and an optional default saved view. Per-Asset visibility remains a separate required capability and may be recalled by that saved view; this amendment does not introduce a second layer/domain model or decide a new persistence framework. V2 MUST preserve Caption tags, portable set ordering and an explicit per-set default view.
+ProjectScenes preserve and generalize the useful LociMyu sheet-switching outcome:
+one Scene combines explicit Asset visibility, Caption membership, Scene-scoped
+material appearance and an optional entry Saved View. A Saved View stores camera
+and 3D background, not another visibility authority. V2 MUST preserve Caption
+tags, portable Scene/membership ordering and explicit Scene defaults. The exact
+contract is `05-project-scene-team-workflow.md`; current Native DisplaySets remain
+unchanged compatibility inputs.
 
 ## 4. Primary flows
 
@@ -86,7 +106,8 @@ Display sets preserve the LociMyu sheet-switching outcome: one appearance set co
 2. Create immutable representations, an asset revision and a binding candidate.
 3. Validate coordinate and compatibility metadata.
 4. Atomically activate one binding only after its required blobs are durable.
-5. Mark incompatible captions and material mappings for review.
+5. Preserve every ProjectScene membership and mark only incompatible Captions
+   and material mappings for review.
 
 ### 4.3 Align representations
 
@@ -147,11 +168,15 @@ Incomplete data degrades exactly as follows:
 
 ### 4.6 Exchange work
 
-Users choose one of three explicit outputs:
+Users choose one of five explicit outputs:
 
-- a mergeable collaboration package with history;
-- a non-mergeable review/share package containing current visible state only;
-- a clean editable copy with a new project and history lineage.
+- a complete backup for exact recovery of the same Project;
+- a self-contained Team Workspace with same-lineage history and required bytes;
+- a base-dependent Contribution containing the dependency-closed set difference
+  `reachable(current heads) - reachable(base heads)`, including valid siblings,
+  plus newly required bytes;
+- a non-mergeable review/share package for one explicit Scene;
+- a whole-Project clean editable copy with a new Project/history lineage.
 
 The UI MUST explain that these outputs serve different purposes; changing a filename does not change their merge or privacy semantics.
 
@@ -161,10 +186,13 @@ Included:
 
 - bounded-memory package import/export;
 - v2 metadata/blob storage and explicit v1 conversion;
-- multiple-format, multiple-Asset shared-coordinate display with per-Asset visibility and manual alignment;
+- multiple-format, multiple-Asset shared-coordinate display with explicit
+  ProjectScene Asset/Caption membership and Project-wide manual alignment;
 - a GS AssetRevision with one explicit invisible same-asset proxy, coexisting
   with independent Mesh, point or other GS Assets;
-- caption edit, package merge conflict review and clean share export;
+- Caption edit and all five package purposes: complete backup, Team Workspace,
+  continuing causal Contribution with conflict review, one-Scene review/share
+  and whole-Project clean copy;
 - opaque/mask/dither shared-view composition;
 - mobile LOD, resident budgets and deterministic degradation;
 - missing/corrupt resource diagnosis and recovery paths;
@@ -205,6 +233,13 @@ iOS is a required release-candidate target, not yet a released support guarantee
 
 It MUST NOT evict the only source copy, an attachment, or an irreplaceable display resource automatically. Safari does not expose a reliable universal GPU-memory limit, so physical-device stability, context loss, background/restore and frame-time evidence are release criteria.
 
+Responsive iPhone UI MUST expose the same Project/Scene administration,
+full-Project editing, team package preflight, conflict resolution and recovery
+semantics as Desktop. A device may reject a resource before writing when its
+measured budget is insufficient, but it does not hide an entire capability under
+a permanent contributor-only mode or require Desktop merely to resolve ordinary
+Project state.
+
 ## 8. Compatibility and rollback
 
 - LociMyu dataset conversion and LociView v1-package-to-v2 migration are distinct compatibility paths. The user outcome in `PROD-13` is required; whether it is delivered by the integrated importer or a separately packaged tool is an implementation decision, but implementations MUST share one accepted conversion contract rather than silently diverging.
@@ -212,6 +247,10 @@ It MUST NOT evict the only source copy, an attachment, or an irreplaceable displ
   not a user-writable Project format.
 - LociView v1-package-to-v2 conversion writes a new v2 project and never overwrites the selected v1 source.
 - After explicit v1-package-to-v2 conversion the new project is v2-only-write; no reverse synchronization to v1 is implied.
+- Native snapshot schema 1, its portable/package-exchange versions and the
+  implemented fixed-baseline merge remain readable compatibility inputs. The
+  future ProjectScene/team contract never adds fields to those frozen bytes;
+  conversion publishes a separate ProjectDocV2.
 - Unknown future major versions are read-only or rejected clearly.
 - Every new storage or renderer path remains behind a feature flag until its rollback test passes.
 - A failed v2 open MUST leave source packages and the last durable local project unchanged.
@@ -371,12 +410,51 @@ Recorded on 2026-09-04:
 - this candidate policy requires no Native snapshot or package version change,
   and does not cancel the later original-byte direct-HEIC product requirement.
 
+Recorded on 2026-09-07, superseding the future-v2 DisplaySet presentation and
+single collaboration-package portions of the 2026-08-29 decision while leaving
+the implemented Native contract unchanged:
+
+- a LociView Project is the durable typed workspace; internal `Asset` remains a
+  logical 3D model rather than a generic union of Captions/media/views;
+- a persistent ProjectScene explicitly selects logical Assets and Captions,
+  supplies Scene-scoped material intent and may name one entry Saved View;
+  Captions may be referenced by multiple Scenes;
+- active Asset revision/binding/alignment is Project-wide. A model revision is
+  supporting infrastructure for continuing updates and review, not a Scene mode
+  or a model choice every participant repeats;
+- one same-lineage causal history supports repeated rounds and all participants
+  may edit the complete Project. Team Workspace is self-contained; Contribution
+  is base-dependent and automatically includes the dependency-closed set
+  difference `reachable(current heads) - reachable(base heads)`, including valid
+  siblings, plus newly required blobs; it never fabricates a rebase;
+- package/base/head identity and an automatic change summary are mandatory;
+  a human memo is optional and neither name nor time is merge authority;
+- valid semantic-conflict imports atomically retain every candidate/history/blob
+  and block only affected authoritative projection. Resolution explicitly chooses
+  one candidate or records a manual combined value, with no automatic winner or
+  duplicate alternative;
+- free camera and active Scene are local; only explicit Named Views and the
+  Project default Scene are shared;
+- exact backup, whole-Project Team Workspace, thin Contribution, one-Scene
+  history-free review and whole-Project new-lineage clean copy are distinct;
+- review/share accurately discloses included original metadata/labels but does
+  not claim sanitization; sanitization is separate later work;
+- migration keeps Native snapshot 1, frozen v1 and LociMyu readable and unchanged,
+  then writes only v2. No filename/hash/proximity/order relation is inferred;
+- physical iPhone receives full Project administration parity through responsive
+  layout rather than a reduced contributor mode.
+
+The normative detail and acceptance are in
+`05-project-scene-team-workflow.md` and ADR-0002.
+
 Still required later:
 
 - a scripted Product Owner usability walkthrough before public release, using the intended non-specialist persona to complete open/import, caption, merge, export and recovery without implementation terminology; `PROD-12` remains unaccepted until this succeeds;
 - tablet-PC hardware/OS/browser details and any additional repeatedly testable release classes;
 - G0 performance, memory, package-size, support-class and degradation guarantees after baseline measurement;
 - adoption, wording and default behavior for experimental smooth transparency only if G1-D passes, and a separate future decision before any transmission/refraction claim;
-- final merge-conflict interaction design and privacy labels; the fail-closed behavior itself is accepted;
+- final rendered layout and copy acceptance for merge-conflict interaction and
+  privacy disclosure; affected-unit retention/resolution semantics and accurate
+  unsanitized-metadata disclosure are accepted in the 2026-09-07 contract;
 - approval of the exact Native-only candidate and public release; stabilized-v1
   approval remains required before any future candidate re-enables legacy writes.

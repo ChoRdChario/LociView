@@ -1,11 +1,18 @@
 # LociMyu conversion identity, source authority and report contract
 
-> Status: `PRODUCT-OWNER APPROVED / BOUNDED DIRECT ADAPTER IMPLEMENTED / ORTHOGRAPHIC SAVED-VIEW COMPATIBILITY APPROXIMATION IMPLEMENTED; DESKTOP VISUAL ACCEPTANCE PENDING`
+> Status: `PRODUCT-OWNER APPROVED / BOUNDED DIRECT ADAPTER IMPLEMENTED / ORTHOGRAPHIC SAVED-VIEW COMPATIBILITY APPROXIMATION IMPLEMENTED / PRODUCT ACCEPTANCE PASS`
 > Approved: 2026-08-26
 > Direct-adapter boundary approved: 2026-08-31
 > Corroborated DisplaySet relation confirmation approved: 2026-09-01
 > Orthographic Saved-View compatibility approximation approved: 2026-09-02
 > Identity recipe: `locimyu-caption-id-2`
+
+> **Future-v2 mapping amendment (2026-09-07):**
+> This document remains authoritative for LociMyu source identity, relation
+> evidence, unchanged source bytes, conversion accounting and the implemented
+> Native receiver. When a converter writes the future v2 schema, section 9.2 of
+> `05-project-scene-team-workflow.md` maps each admitted sheet to a ProjectScene.
+> That mapping does not rewrite or reinterpret current Native DisplaySet bytes.
 
 ## 1. Scope and authority
 

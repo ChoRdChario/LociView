@@ -1,17 +1,20 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **Current update (2026-09-07 team-operation review):** The Product Owner
-> paused further UI editing and requested a whole-lifecycle review of whether
-> one knowledgeable operator can lower participation cost for a continuing
-> team. The read-only product-fit review is in
-> `tasks/team-operations-review.md`; the approved UI/UX philosophy and visual
-> direction are consolidated in `docs/ui-product-guidelines.md`. Current Native
-> collaboration safely supports a self-contained initial handoff and a bounded
-> frozen-base Caption campaign, but does not yet support continuing causal
-> rounds or model/presentation revision propagation. This is a documentation
-> boundary only. Stop before production UI, schema/package, dependency,
-> release, Pages or Service Worker changes until the Product Owner decides the
-> listed team-workflow questions.
+> **Current update (2026-09-07 ProjectScene/team contract):** The Product Owner
+> accepted the Project-as-typed-workspace, persistent ProjectScene and continuing
+> causal team-work direction, including separate Team Workspace/Contribution/
+> review/backup/clean purposes and full-Project editing. The preserved current
+> implementation checkpoint is `21786771bdb39800a29f835fa4f25535cd01d5bc` and
+> is pushed on `g0-baseline`. ADR-0002 and
+> `docs/specs/05-project-scene-team-workflow.md` are the new accepted, not-yet-
+> implemented authority; `tasks/team-operations-review.md` retains the audit
+> rationale and `docs/ui-product-guidelines.md` the UI/UX and visual direction.
+> Current Native DisplaySet/fixed-baseline behavior and all frozen input bytes
+> remain unchanged. The contract and cross-document/privacy reviews found no
+> remaining P0/P1. The current boundary ends after preserving and presenting this
+> docs-only checkpoint; S1 has not started. A later requested continuation begins
+> with the S1 meta-audit and slice statement. Stop before S2/S3, dependency
+> adoption, release, Pages or Service Worker work.
 
 > **Historical completed update (2026-09-06 implementation):** The Product Owner approved
 > D1–D4 and all three bounded legacy-convenience UI slices. Production code,
@@ -238,14 +241,17 @@ Owner decisions after RC-A implementation and exact-tree verification.
 ## 6. Next fresh session
 
 The next session starts from the 2026-09-07 update at the top of this file and
-the first current boundary in `tasks/todo.md`. Read
-`tasks/team-operations-review.md` and `docs/ui-product-guidelines.md`, verify the
-current Git/worktree boundary read-only, and present or resolve the Product Owner
-decisions listed in the team review. Stop before UI implementation,
-storage/schema/package changes, dependency work, license/version decisions,
-`main`, Pages, Service Worker or deployment.
+the first current boundary in `tasks/todo.md`. Read ADR-0002, specification 05,
+`tasks/team-operations-review.md` and `docs/ui-product-guidelines.md`; verify the
+Git/worktree boundary read-only. If the contract checkpoint has been committed
+and reviewed with no P0/P1, prepare S1 only: Scene-capable v2 metadata, commands
+and resolver behind a nondefault boundary after its metadata/CAS gates. S2 stays
+blocked until the separately specified ProjectScene migration and five-purpose
+package-wire companions pass; S3 owns production UI and physical-iPhone evidence.
+Stop before dependency adoption, license/version decisions, `main`, Pages,
+Service Worker or deployment.
 
 The older instruction to begin the 41-task UI walkthrough was completed or
 superseded and is not the next workstream. Rendered Desktop and physical-iPhone
-UI acceptance remain open but inactive until the team-operation boundary is
-resolved. Never use this document's embedded SHA as an unchecked checkout target.
+UI acceptance remain open but inactive until S3. Never use this document's
+embedded SHA as an unchecked checkout target.

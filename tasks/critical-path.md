@@ -1,10 +1,12 @@
 # LociView critical-path execution plan
 
-> Status: `CURRENT CHECKPOINT / OPTION A INDEXED-TREE AUTOMATION PASS; PRODUCT UI EVIDENCE PENDING`
+> Status: `PROJECTSCENE/TEAM CONTRACT RATIFIED; S1 NOT STARTED`
 >
-> Updated: 2026-09-03 after Product Owner Desktop and physical-iPhone Native
-> Package Exchange acceptance. Exact executable implementation: `0b5dd46`;
-> accepted result synchronization: `5f2a19d` on `g0-baseline`.
+> Updated: 2026-09-07 after Product Owner acceptance of the Project-as-workspace,
+> persistent ProjectScene and continuing causal team contract. The preserved
+> executable checkpoint is `2178677` on `g0-baseline`; ADR-0002 and specification
+> 05 are accepted but not implemented. The older Native candidate execution plan
+> below remains historical evidence except where section 8 names the new boundary.
 >
 > This is an execution plan plus the Product Owner's scheduling and display-model
 > decisions. For the first Native-only public candidate,
@@ -331,6 +333,16 @@ language, disposable PoCs and one writer.
 
 ## 8. Current authorization boundary
 
+**2026-09-07 amendment:** the Product Owner subsequently accepted the
+Project-as-typed-workspace, persistent ProjectScene and continuing causal team
+direction. The active boundary is the contract ratification in `tasks/todo.md`,
+ADR-0002 and `docs/specs/05-project-scene-team-workflow.md`. It changes no
+current Native bytes or behavior. After the contract checkpoint, S1 may address
+only the gated Scene-capable v2 core; ProjectScene migration/package S2 remains
+blocked on its new recipe and wire companions, and production UI/iPhone evidence
+belongs to S3. The Native acceptance record below remains historical evidence,
+not the current next-work instruction.
+
 The completed native checkpoints remain closed unless a new P0/P1 directly
 blocks downstream production work. At exact production checkpoint `a2708cf`,
 the consolidated flow passed Product Owner Desktop and physical-iPhone checks:
@@ -467,7 +479,7 @@ decisions.
   DisplaySet-switch evidence was reused rather than repeated for the one-set
   merge fixture.
 - **Review/P0/P1:** independent read-only review complete; none open.
-- **Next boundary:** the Product Owner selected Native-only writes and
+- **Historical next boundary:** the Product Owner selected Native-only writes and
   authorized the bounded `RC-A-01`–`RC-A-07` implementation. The bounded
   implementation, indexed-tree matrix, independent review and Product Owner
   Desktop acceptance are complete. Accepted physical-iPhone Native restore,
@@ -475,6 +487,9 @@ decisions.
   license/notices, candidate version/SHA,
   main/deploy gating, rollback and public metadata, plus clean-tree CI and
   Pages/base-path/service-worker/private-source verification.
+
+The current next boundary is the 2026-09-07 amendment in section 8 and
+`tasks/todo.md`, not the historical release-preparation list above.
 
 `NATIVE PACKAGE EXCHANGE: PASS`
 

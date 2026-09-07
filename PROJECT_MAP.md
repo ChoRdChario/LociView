@@ -4,6 +4,7 @@
 > That baseline is a historical normalization anchor, not a checkout target. Use Git `HEAD` and `tasks/todo.md` for the active checkpoint.
 > A bounded, nondefault native production path now supports repeated ordinary Mesh, exact ASCII XYZ+RGB Point, or Graphdeco SH2/SH3 GS Asset imports, optional explicit per-GS Proxies, streamed portable backup, independent visibility and per-Asset manual position/rotation/uniform-scale alignment. It also supports DisplaySet-linked Caption/material/Saved-View state and purpose-separated collaboration/review/clean-copy package exchange. It does not pass G0/G0-S/G1 or adopt Spark permanently. Additional point profiles, full Alignment workflows, Automerge, content-addressed storage, and renderer backends remain `PROPOSED`.
 > Product visibility is per loaded Asset/layer, not per Mesh/GS kind. The current native `mixed` / `gs-only` / `mesh-only` values are bounded convenience filters; formal Compare is neither implemented nor selected as the next workstream.
+> The accepted future-v2 contract makes the Project a typed workspace and replaces DisplaySet presentation with persistent ProjectScenes. It also separates Team Workspace, Contribution, one-Scene review, complete backup and clean copy under continuing causal history. This is specified in ADR-0002 and `docs/specs/05-project-scene-team-workflow.md` but is not implemented; current Native DisplaySet/fixed-baseline behavior above remains the observed production path.
 > The bounded direct LociMyu ZIP -> native adapter is implemented with exact Caption identity/source authority, a separately retained report and marker-last publication. On the private representative, six rows with an empty trimmed Caption ID are explicitly treated as empty input under the approved rule: 103 of 109 source rows became Captions, the source remained unchanged, and automated native publication plus portable restore passed. Product Owner Desktop and physical-iPhone acceptance, including Native Package Exchange restore and completely offline reopen, passed through checkpoint `5f2a19d`; no P0/P1 remains in these bounded Native lanes.
 > For the first public candidate, Caption image writes are PNG/JPEG/WebP/GIF. Existing HEIC/HEIF is handled by exporting a separate JPEG on the source device; direct HEIC bytes fail before publication. LociMyu HEIC/HEIF remains inventoried and reported, including an exact file-ID relation, but is not attached. The source ZIP remains unchanged, no decoder or Windows extension is required, and direct original-byte HEIC remains required post-candidate work.
 
@@ -144,16 +145,27 @@ npm test
 npm run build
 ```
 
-## Proposed v2 boundary
+## Accepted, not-yet-implemented v2 boundary
 
-The approved direction is summarized in `docs/v2/00-approved-direction.md`; the proposed implementation contracts are indexed by `docs/specs/README.md`. The eventual flow is:
+The approved direction is summarized in `docs/v2/00-approved-direction.md`; the
+implementation contracts are indexed by `docs/specs/README.md`. Technology
+adoption and production code remain gated. The eventual flow is:
 
 ```text
 ProjectDocV2 + BlobStore + ResourceManager
-  -> SceneDocument resolver
+  -> selected persistent ProjectScene
+  -> derived SceneDocument resolver
   -> ViewerController
   -> RenderCoordinator + InteractionIndex
   -> RenderBackend
 ```
 
-No proposed dependency or type may leak into current UI/storage code before its gate passes.
+Every user edits the full same-lineage Project. Team Workspace supplies a
+self-contained whole-Project start/update; Contribution carries the dependency-
+closed current-minus-base causal set, including valid siblings, plus newly
+required blobs. A valid conflict
+batch is retained atomically and blocks only the affected projection; invalid
+or incomplete input activates nothing.
+
+No candidate dependency or v2 type may leak into current UI/storage code before
+its gate passes.

@@ -2,6 +2,14 @@
 
 > Status: `PRODUCT-OWNER APPROVED CONTRACT / IMPLEMENTATION AND GATE STATUS ARE SECTION-SPECIFIC`
 
+> **ProjectScene/team-history amendment (2026-09-07):**
+> `05-project-scene-team-workflow.md` supersedes sections 3--3.3, 5, 8--12
+> and affected acceptance rows only where they encode DisplaySet presentation,
+> its conflict/migration/export closure or the former single collaboration
+> purpose. Current Native snapshot schema 1, Native portable package 1/2,
+> Native Package Exchange 1, fixed-baseline merge, frozen-v1 input and their
+> byte-exact historical sections remain unchanged compatibility contracts.
+
 ## 1. Scope and candidate status
 
 This document defines durable metadata, binary storage, package exchange, merge semantics and v1 conversion. It does not adopt Automerge or a hashing/ZIP dependency. The leading candidate is Automerge metadata with Automerge Repo browser storage plus an OPFS SHA-256 content-addressed blob store (CAS); adoption requires every G1 storage gate in this document and `03-gates-and-delivery.md` to pass.

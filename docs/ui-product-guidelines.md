@@ -68,18 +68,23 @@ or contextual details unless the user must decide something about it.
 
 | User-visible concept | Meaning | Must not be confused with |
 |---|---|---|
-| プロジェクト | A durable working unit saved on this device and opened in View or Edit according to its state | An exported file, a temporary view or a browser tab |
-| モデル | A logical 3D subject that can be shown, placed or replaced | A rendering mode or filename |
-| キャプション | A record tied to a place in one model | A generic image caption or a model-wide setting |
+| プロジェクト | The durable workspace containing models, Captions, media, Scenes and saved views | An exported file, a temporary view or a browser tab |
+| モデル | A logical 3D subject with one Project-wide active revision and alignment | A rendering mode, Scene or filename |
+| キャプション | One Project record normally tied to an explicitly chosen model location and reusable in multiple Scenes | A copied per-Scene note, generic image caption or inferred model relation |
 | メディア | Images and other content attached to a Caption | A separate model, surface material or an automatically inferred source relation |
-| 表示セット | A named presentation grouping of records and appearance | Per-model visibility, material or camera alone |
-| モデルの表示 | Whether an Asset is shown in the current Project presentation | Selecting a DisplaySet |
+| シーン | A named Project presentation selecting models and Captions, Scene appearance and an optional entry view | A model revision, renderer scene object or temporary filter |
+| モデルの表示 | Whether a model belongs to the current Scene | Replacing the model or selecting a model revision |
 | マテリアル | How a supported model surface is drawn | Model visibility or Caption color |
-| 保存した視点 | A reusable camera and 3D-background state | Project save or model placement |
+| 保存した視点 | A reusable camera and 3D-background state owned by one Scene | Project save, Scene membership or model placement |
 | 完全バックアップ | A complete restore of the same Project | A merge contribution or independent copy |
-| 共同編集用ファイル | A file for returning supported Caption changes from copies distributed from the same fixed Project state | Arbitrary co-editing, cross-model matching or a review link |
-| 閲覧共有用ファイル | An allowlisted copy that cannot merge back into its source and opens in View first; later local editing is independent | Access control, permanent read-only enforcement, automatic privacy scrubbing or a backup |
+| Team Workspace | A self-contained whole-Project starting point or same-lineage update | A thin change file, account access control or a backup promise |
+| Contribution | The dependency-closed difference between current and verified-base history, including valid sibling changes, plus only newly required bytes | A hand-selected subset, standalone restore, filename-based merge or rewritten rebase |
+| 閲覧共有用ファイル | One explicitly selected Scene closure that cannot merge back and opens in View first | Access control, permanent read-only enforcement, automatic privacy scrubbing or a backup |
 | 編集用コピー | An independent editable Project with new identity | A branch that can later merge into the source |
+
+`Team Workspace` and `Contribution` are contract names in this document; their
+final short Japanese control labels require rendered copy review and are not
+ratified by translating them mechanically.
 
 ### 3.1 Asset and Representation language
 
@@ -93,6 +98,11 @@ chosen from proximity, filename or load order.
 
 Ordinary UI says `モデル` or, at file selection, `3Dモデル`. It exposes a
 Representation kind only when it changes a real capability or recovery step.
+
+Model revision is supporting context, not a navigation mode. Every Scene that
+contains a model uses the same Project-wide active revision and alignment.
+Revision evidence appears when replacement, `要確認`, conflict or recovery
+changes a user decision; the Scene selector never asks which revision to use.
 
 ### 3.2 Current media boundary
 
@@ -129,7 +139,7 @@ There is one normal home at `/`.
 The normal Desktop workspace has three stable regions:
 
 1. a shared header for Project identity, View/Edit state, save state,
-   DisplaySet and file/help actions;
+   current Scene and file/help actions;
 2. the 3D stage, with frequent view recovery close to it;
 3. a right-side task area with four purpose-based tabs.
 
@@ -138,18 +148,22 @@ model-management responsibility required by LociView:
 
 | Tab | User questions it answers | Contents |
 |---|---|---|
-| キャプション | What is recorded here? What should I add or correct? | Search, owner filter, pin-color filters, list, add/place/move, title/body/color and attached media |
-| モデル | What models are present, visible and aligned? | Model list, visibility, placement, pin scale, format-specific applicable controls, add, replace and delete |
-| マテリアル | How should this supported surface be drawn? | Explicit target model/surface, opacity, sidedness, unlit and applicable chroma controls |
-| 視点 | From where and against what background should I inspect it? | Six directions, projection, Saved View call/manage and 3D background |
+| キャプション | What is recorded in this Scene? What should I add or correct? | Current-Scene search, model filter, pin-color filters, list, existing-Project Caption inclusion, add/place/move, title/body/color and attached media |
+| モデル | What Project models exist, and which belong to this Scene? | Project model list, Scene membership, Project-wide placement/alignment and replacement, pin scale, format-specific applicable controls, add and delete |
+| マテリアル | How should this surface look in this Scene? | Explicit target model/surface, Scene or Project scope, opacity, sidedness, unlit and applicable chroma controls |
+| 視点 | From where and against what background should I inspect this Scene? | Six directions, projection, Scene-owned Saved View recall/manage, entry view and 3D background |
 
-DisplaySet switching, Project save state and file exchange stay outside the
-tabs because they affect or frame more than one task. Frequent `全体表示` and
+Scene switching, Project save state and file exchange stay outside the tabs
+because they affect or frame more than one task. Frequent `全体表示` and
 Saved View recall may also have a shortcut beside the 3D stage; the shortcut
 must use the same state and must not create a second view system.
 
 Tab changes move the UI only. They do not implicitly save, select a different
-model, apply a view, change DisplaySet, end a mode or discard unfinished input.
+model, apply a view, change Scene, end a mode or discard unfinished input.
+Scene selection itself is local session state: it changes the resolved
+presentation and applies that Scene's valid entry view once, but it never changes
+the Project-wide active model revision/alignment or silently changes the Project
+default Scene.
 
 ## 5. Caption-first interaction
 
@@ -164,6 +178,17 @@ Caption work is the ordinary center of the product.
    the user leave the list context.
 5. Preserve list position, selection and unfinished fields during nearby view
    and tab operations.
+
+The ordinary list shows Captions included in the current Scene. A separate
+progressively disclosed picker can add an existing Project Caption to this Scene
+without copying it. Editing one Caption changes that shared Project record; when
+it belongs to multiple Scenes, show the affected Scene count at the edit point.
+`このシーンから外す` removes only membership. Project-wide deletion is a
+separate destructive action that names the affected Scenes and attachments.
+Existing/imported Project-space Captions remain visible in one explicit
+model-independent list/filter bucket and can be re-anchored deliberately. New
+Project-space Caption authoring is outside the current accepted slice. No surface
+hit, empty Scene or missing model ever creates one or fabricates an owner model.
 
 The Caption list stays in the right task area on Desktop. It must not live below
 the page or behind a collapsed section that forces page travel to identify the
@@ -201,8 +226,11 @@ Reducing decisions never authorizes semantic guessing. The product must not:
 
 If file content or purpose remains genuinely ambiguous after strict inspection,
 stop and explain the needed evidence; do not turn ambiguity into a guessed role
-choice. The current collaboration path detects conflicts and leaves the Project
-unchanged; a future resolution UI still requires an explicit product contract.
+choice. The current Native fixed-baseline path rejects an unsupported or
+conflicting merge without writes. The accepted ProjectScene/team-history target
+instead retains a completely verified causal batch atomically, blocks only the
+affected authoritative projection and requires an explicit later resolution;
+it never presents a library-selected value as the winner.
 
 ## 7. Writing and labels
 
@@ -239,6 +267,17 @@ affected action when relevant:
 - the exact scope and prerequisites of collaboration;
 - what original bytes, labels or metadata leave the device;
 - what failed, what stayed unchanged and what the user can safely do next.
+
+A team-file preflight first names the purpose and result. When the user needs
+the evidence, it then reveals whether the file is whole-Project or base-dependent,
+the verified base/head relation, every unsent change class, newly included byte
+size, the generated change summary and any optional human memo. The ordinary
+surface does not expose raw IDs or hashes, but it also cannot hide an unsent
+model, Scene, material or view change behind a Caption-only description.
+For a Contribution, the visible base means the exact Team Workspace expected at
+the recipient. Importing a sibling Contribution or finishing an export does not
+silently advance it. When no verified base record remains, the recovery is a new
+Team Workspace rather than a guessed recent file.
 
 ## 8. Visual language
 
@@ -318,14 +357,19 @@ sufficient.
   stage.
 - Save state is workspace-wide and remains visible across tab switches: `未保存`,
   saving, saved and failed must not disappear because the user switched tabs.
+- Project identity and current Scene remain understandable across every tab.
+  Local Scene selection, camera and filters are not shown as shared edits;
+  membership, default Scene, Scene entry view and named Saved Views are.
 - Long-running import/export/merge uses a perceivable status region. A cancel
   action appears only where cancellation is actually supported.
 - A failed mutation keeps the last durable Project intact, preserves recoverable
   input where the accepted implementation supports it, and states the safe
   retry or rollback path.
-- Collaboration, backup and share preflights describe the actual contract. UI
-  wording must never turn a bounded Caption merge into a promise of general
-  co-editing.
+- Collaboration, backup and share preflights describe the actual implemented
+  contract. The current Native fixed-baseline path must not promise continuing
+  co-editing. The future team path distinguishes self-contained Team Workspace,
+  base-dependent Contribution, one-Scene review, same-Project backup and
+  independent clean copy.
 
 ## 10. Responsive behavior
 
@@ -343,8 +387,15 @@ onscreen keyboard, and never hide the only way to end a placement or gizmo mode.
 
 Multiple floating windows may be arranged on a constrained stage, but that is
 UI-only state. Responsive behavior must not silently close retained windows,
-change selection, mutate DisplaySet membership or lose the user's explicit
+change selection, mutate Scene membership or lose the user's explicit
 comparison intent. A separate one-window mode remains proposed, not approved.
+
+Narrow layouts provide the same Project administration and decisions as
+Desktop: Scene selection/authoring, Project-wide model replacement/alignment,
+Caption reuse, material/view editing, team-file preflight, revision review and
+conflict resolution. Device resource limits may reject an operation safely
+before writes with a clear next step; they do not define a reduced contributor
+role or silently hide a capability category.
 
 ## 11. Accessibility and evidence
 
@@ -363,6 +414,13 @@ Acceptance checks include:
 - 200% zoom and approximately 320 CSS px width;
 - long Japanese labels, IME input, many Captions and empty/error states;
 - reduced motion and non-color status cues;
+- Scene A/B switching without cross-Scene leakage or an implicit Project edit;
+- adding one existing Caption to another Scene without copying its content;
+- Project-wide model replacement showing all affected Scenes and `要確認` state;
+- temporary camera versus shared Saved View and separate entry-view assignment;
+- all five file purposes with exact whole/base-dependent/one-Scene consequences;
+- affected-only semantic conflict blocking and an explicit resolution/recovery path;
+- feature-parity reachability on physical iPhone, not a contributor-only layout;
 - Desktop rendered walkthrough and physical-iPhone checks where the change is
   mobile-sensitive.
 
@@ -373,13 +431,15 @@ device acceptance. A development server is not offline/PWA evidence.
 
 > Classification: **Current implementation snapshot / no rendered acceptance**.
 
-As inspected on 2026-09-07, branch `g0-baseline` at HEAD
-`d2302ec7e31e563448393ae3b42798e27d219b14` plus the uncommitted UI worktree
-contains the one-home composition, four-tab workspace, Caption list/detail,
-pin-color controls, multiple Caption-window comparison and the warm-greige
-visual system. The relevant implementation is under `src/ui` and
-`src/nativeGs`; task-specific evidence remains in `tasks/uiux-implementation.md`
-and `tasks/uiux-parity-plan.md`.
+As inspected on 2026-09-07, branch `g0-baseline` at checkpoint
+`21786771bdb39800a29f835fa4f25535cd01d5bc` contains the one-home composition,
+four-tab workspace, Caption list/detail, pin-color controls, multiple
+Caption-window comparison and the warm-greige visual system. The current Native
+implementation still persists DisplaySets and uses fixed-baseline package
+exchange. ProjectScene, continuing causal Contribution and the five-purpose v2
+package contract are accepted but not implemented. The relevant current code is
+under `src/ui` and `src/nativeGs`; task-specific evidence remains in
+`tasks/uiux-implementation.md` and `tasks/uiux-parity-plan.md`.
 
 Automated checks can establish structure and state contracts; rendered Desktop
 and any newly required physical-iPhone acceptance remain separately recorded

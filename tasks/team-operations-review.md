@@ -1,9 +1,11 @@
 # LociView team-operation suitability review
 
-> Status: `READ-ONLY PRODUCT-FIT REVIEW / PROPOSED TARGET DIRECTION / NO
+> Status: `READ-ONLY CURRENT-BEHAVIOR REVIEW / ACCEPTED TARGET CONTRACT / NO
 > IMPLEMENTATION AUTHORITY`
 >
-> Review date: 2026-09-07. Further UI editing is paused. This document does not
+> Review date: 2026-09-07. The target direction is now ratified by ADR-0002 and
+> `docs/specs/05-project-scene-team-workflow.md`; it remains unimplemented.
+> Further UI editing is paused. This document does not
 > authorize production code, schema, package-version, dependency, renderer,
 > migration, release, Pages or Service Worker changes.
 
@@ -290,8 +292,9 @@ Every Caption contribution carries every Representation again, plus the baseline
 and Caption-referenced media closure retained in that package.
 For a small Project this is inconvenient; for large GS and repeated contribution
 rounds it can defeat practical team exchange. Bounded-memory streaming is still
-required, but transfer scope should distinguish initial/full recovery from a
-change contribution that requires an already verified base.
+required, but transfer scope should distinguish a self-contained team start/
+update and exact backup recovery from a change contribution that requires an
+already verified base.
 
 ### TEAM-GAP 4 — collaboration state and export side effects are unclear
 
@@ -412,7 +415,7 @@ This procedure is safe but too restrictive and labor-intensive to be the final
 team experience. It should be presented as a current limitation, not marketed as
 general collaborative editing.
 
-## 10. Proposed target workflow
+## 10. Accepted target workflow
 
 The target remains local-first and file-exchange capable. It does not require a
 cloud service or accounts.
@@ -420,8 +423,8 @@ cloud service or accounts.
 ### 10.1 Separate full workspace from contribution
 
 1. **Team workspace package:** a self-contained exact base for a new participant,
-   new device or full recovery. It includes the verified required model/media
-   closure.
+   new device or same-lineage update. It includes the verified required
+   model/media closure; exact workflow recovery belongs to complete backup.
 2. **Contribution package:** requires an existing verified Project lineage/head
    and carries causally identified metadata changes plus only genuinely new
    blobs. It never silently falls back to a guessed base.
@@ -430,17 +433,14 @@ cloud service or accounts.
 4. **Complete backup:** remains an exact same-Project restore.
 5. **Clean editable copy:** remains an independent lineage.
 
-Whether `team workspace` and `contribution` become two explicit purposes or two
-strict modes under collaboration is a Product Owner/package-contract decision.
+On 2026-09-07 the Product Owner accepted Team Workspace and Contribution as two
+distinct purposes. ADR-0002 and `docs/specs/05-project-scene-team-workflow.md`
+supersede the former general-v2 single-collaboration-package rule. Exact package
+wire remains gated before S2; this decision does not change the implemented
+Native fixed-baseline package.
 
-This thin contribution proposal does **not** fit the currently accepted general
-v2 package rule in `docs/specs/02-storage-package-migration.md` §9.1, which
-requires every collaboration package to carry the complete required blob
-closure. D2 therefore asks whether to explicitly amend/supersede that clause
-with a new base-dependent package contract. Until such approval and specification
-exist, §9.1 remains authoritative and no thin collaboration package is implied.
-
-Terminology remains separated while D2 is open:
+Terminology remains separated; final Japanese labels are still a rendered-copy
+decision, not a schema decision:
 
 | Status | User-visible label | Meaning |
 |---|---|---|
@@ -448,8 +448,8 @@ Terminology remains separated while D2 is open:
 | Current canonical term | `共同編集用ファイル` | Current bounded fixed-baseline Caption/image exchange |
 | Current canonical term | `閲覧共有用ファイル` | Allowlisted copy that cannot merge back into its source and opens in View first |
 | Current canonical term | `編集用コピー` | Independent editable lineage |
-| Proposed working label only | `チーム作業用一式（仮）` | Future self-contained team workspace |
-| Proposed working label only | `変更ファイル（仮）` | Future verified-base-dependent contribution |
+| Accepted contract term / Japanese label pending | `Team Workspace` | Future self-contained team workspace |
+| Accepted contract term / Japanese label pending | `Contribution` | Future verified-base-dependent contribution |
 
 The proposed labels are discussion aids, not approved UI copy. Manifest/internal
 purpose values remain implementation terms and are not user-facing alternatives.
@@ -459,18 +459,21 @@ purpose values remain implementation terms and are not user-facing alternatives.
 1. The coordinator prepares a Project and publishes a named team baseline/head.
 2. A contributor imports the full workspace once or opens an already verified
    local copy.
-3. The workspace visibly shows role/responsibility, base/head, mergeable scope,
-   pending local changes and new blob size.
-4. A contributor exports a base-dependent contribution. If D2 is approved,
-   omitting unchanged Representation bytes may make it smaller, but no package-
-   size or transfer-count guarantee is implied.
+3. The workspace visibly shows Project/Scene context, the selected exchange base,
+   mergeable scope, pending local changes and new blob size. Optional human
+   responsibility labels are hints, never permissions or identity.
+4. A contributor exports a base-dependent Contribution. Unchanged
+   Representation bytes are omitted only when the verified base guarantees
+   them; no package-size or transfer-count guarantee is implied.
 5. The integrator previews exact changes and external provenance before writes.
 6. A valid future-history import atomically publishes its complete history batch.
    Nonconflicting fields project normally; semantic conflicts enter an explicit
    review queue, retain every candidate and block only their affected
    authoritative projection under the accepted conflict contract.
-7. The integrator publishes the resulting head or a refreshed full workspace. A stale
-   contributor can update/rebase through a defined, fail-closed path.
+7. The integrator publishes a refreshed Team Workspace whose declared heads form
+   a new exchange base. A stale contributor integrates it without rewriting
+   local sibling changes; the next Contribution uses the exact causal set
+   difference and never fabricates a rebase.
 
 ### 10.3 Model-revision lifecycle
 
@@ -488,8 +491,9 @@ purpose values remain implementation terms and are not user-facing alternatives.
    coordinator/integrator explicitly resolves them; file order is never a
    winner rule. Authentication or permission authority, if required, needs a
    separate contract.
-7. Late branches are detected by causal base/head. The contract defines whether
-   their Caption-only changes can rebase or require manual review.
+7. Late branches are detected by causal base/head. A dependency-complete batch
+   integrates idempotently; any semantic overlap enters the explicit affected-
+   unit conflict flow rather than an implicit rebase/winner rule.
 
 ## 11. Proposed state and recovery model
 
@@ -524,7 +528,21 @@ New causal head          Candidate history retained
 | External share contains original metadata/labels | Disclose and preview included material | Call an allowlist a privacy scrub |
 | Same-Project backup restore | Open existing or require an explicit backed-up replacement decision | Silent overwrite |
 
-## 12. Product decisions required before implementation planning
+## 12. Product decisions and 2026-09-07 resolution
+
+All D1--D7 product questions below are resolved by the Product Owner-approved
+ADR-0002 and `docs/specs/05-project-scene-team-workflow.md`. The original
+questions/recommendations remain as audit rationale; the accepted result is:
+
+- continuing multi-round, full-Project work in one causal lineage;
+- distinct Team Workspace and Contribution purposes;
+- no contributor-only capability restriction;
+- candidate-preserving, affected-only conflicts with explicit resolution;
+- machine-verifiable package/base/head identity and automatic summary, with
+  optional human provenance hints but no authentication claim;
+- accurate disclosure of original metadata/labels, with no sanitization claim;
+- unchanged legacy inputs, dual-read/v2-only-write and a separately gated
+  ProjectScene migration/package companion.
 
 ### D1 — What collaboration promise is the product making?
 
@@ -589,12 +607,13 @@ current Native behavior with the original LociMyu Google Drive/Sheets flow:
 - competing anchor edits or model revisions retain candidates until an explicit
   resolution change; arrival order never selects a winner.
 
-This is an accepted product/architecture direction, not an implementation or a
-complete storage contract. D2, D3, D5-D7 and the exact history/rebase/conflict
-schema remain open. The current fixed-baseline collaboration path still rejects a
-model-state difference and must not be described as already supporting this flow.
+This is an accepted product/architecture direction, not an implementation.
+ADR-0002 and specification 05 now close its product/domain semantics and state
+the exact pre-S2 wire/recipe gates. The current fixed-baseline collaboration path
+still rejects a model-state difference and must not be described as already
+supporting this flow.
 
-## 13. Acceptance scenarios for a future contract
+## 13. Acceptance scenarios for the accepted contract
 
 The implementation plan should not be approved until the chosen design can state
 expected results for all of these scenarios:
@@ -614,10 +633,11 @@ expected results for all of these scenarios:
 5. One reviewer re-places a `needsReview` Caption and that explicit correction
    propagates without remapping unrelated Captions.
 6. Two model revisions compete; both remain available and no arrival order wins.
-7. A late contribution based on an older head is identified and either safely
-   rebased under the accepted contract or sent to explicit review.
-8. If D2 explicitly replaces the current required-blob-closure rule, a large-GS
-   Caption-only contribution omits unchanged model bytes while a fresh
+7. A late Contribution based on an older head is integrated as its original
+   dependency-complete sibling changes; semantic overlap enters explicit review
+   and no rebase or arrival-order winner is fabricated.
+8. A large-GS Caption-only Contribution omits unchanged model bytes relative to
+   its verified base while a fresh
    participant can still receive a self-contained full workspace.
 9. An unknown or separately imported identical model never auto-matches a team
    Project.
@@ -625,8 +645,9 @@ expected results for all of these scenarios:
     original metadata/labels.
 11. Restoring a backup when the same Project exists offers only recoverable,
     explicit choices and never overwrites silently.
-12. Desktop and physical iPhone can inspect role, base/head, pending change,
-    conflict and recovery states without hidden mode exits or page travel.
+12. Desktop and physical iPhone can inspect Project/Scene context, exchange base,
+    pending change, conflict and recovery states without hidden mode exits or
+    page travel.
 13. Cancelling or failing output after a team head/base is prepared publishes no
     partial head and never activates or reports a partial package as complete.
     Any residual staging/destination artifact is identified with a recovery or
@@ -650,21 +671,21 @@ expected results for all of these scenarios:
 
 Do not resume UI implementation yet.
 
-1. Product Owner decides D1–D7, especially continuing history, contribution
-   packaging and model-revision ownership.
-2. Record the chosen team lifecycle, identity/history rules, package purposes,
-   conflict commands, migration and acceptance cases in the applicable product
-   and storage specifications.
-3. Only then create bounded implementation slices. Storage/history/package
-   changes receive their own tests, migration review and independent security/
-   architecture review; contributor and conflict UI follows the accepted
-   behavior rather than inventing it.
+1. Complete independent product/domain and storage/security review of ADR-0002
+   and specification 05; resolve every P0/P1 and preserve the result as the
+   contract checkpoint.
+2. Begin only S1 after the metadata/CAS/adapter gates it depends on are explicit:
+   ProjectScene-capable v2 metadata, commands and resolver behind a nondefault
+   boundary, without converter, package or production UI work.
+3. Before S2, separately ratify and gate the ProjectScene migration companion,
+   portable Native bridge support record and five-purpose package wire. UI and
+   physical-iPhone acceptance remain S3.
 
 Explicit non-goals for this review are a cloud backend, accounts, real-time
 presence, cross-Project guessing, automatic Caption remapping, automatic conflict
 winners, direct HEIC/video/audio work, dependency adoption and release work.
 
-## 15. Independent review and evidence record
+## 15. Initial audit review and evidence record
 
 Three independent read-only review lanes checked current collaboration/storage
 semantics, the full team lifecycle, UI/UX authority and cross-document navigation.
@@ -684,7 +705,7 @@ Corrections made before final PASS include:
 - completing current return/receipt/backup/retry and future interruption/quota/
   idempotence/divergent-integrator recovery scenarios.
 
-Final documentation checks:
+Documentation checks at that initial audit checkpoint:
 
 - branch `g0-baseline`, HEAD
   `d2302ec7e31e563448393ae3b42798e27d219b14`, origin comparison `0 ahead / 0 behind`;
@@ -695,6 +716,7 @@ Final documentation checks:
 - no application test/build or rendered/device acceptance was claimed or needed
   for this documentation-only review.
 
-The pre-existing uncommitted UI implementation worktree remains intact and
-paused. No production code, product specification or release state was changed
-by this review.
+The then-uncommitted UI implementation worktree remained intact and paused. No
+production code, product specification or release state was changed by that
+initial read-only review. The later accepted contract is recorded in the
+normative documents named at the top rather than being inferred from this audit.

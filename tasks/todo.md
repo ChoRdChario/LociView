@@ -1,51 +1,97 @@
 # LociView active work
 
-## Current boundary — team-operation suitability review; UI editing paused (2026-09-07)
+## Current boundary — contract checkpoint handoff; S1 not started (2026-09-07)
 
-The Product Owner paused further UI editing and requested a whole-lifecycle review
-of whether LociView lets one knowledgeable operator lower the participation cost
-for the rest of a team. This is a documentation-only review. The existing UI
-worktree remains intact but is not extended while this boundary is active.
+Present and preserve the exact ratified contract checkpoint. Do not begin S1 in
+this same boundary. On a subsequent requested continuation, begin with the short
+meta-audit and S1 slice statement required by `AGENTS.md`; do not infer authority
+for S2, S3, dependency adoption or release work from completion of this document.
 
-- [x] Trace the current team lifecycle from initial Project preparation through
-  distribution, parallel Caption/media work, merge, model revision, conflict,
-  review/share, clean handoff, backup and recovery.
-- [x] Separate byte identity, logical Asset identity, Project lineage and Caption
-  surface compatibility; identify where current fixed-baseline behavior helps or
-  prevents ordinary team work.
-- [x] Classify findings by user impact and distinguish candidate safety limitations
-  from a viable long-term collaboration design. Do not turn a missing collaboration
-  capability into a UI-copy workaround.
-- [x] Record the agreed UI/UX philosophy, information hierarchy, writing rules and
-  low-chroma warm-greige research-instrument visual direction in a durable `docs`
-  document, clearly separating principles from current/proposed implementation.
-- [x] Obtain independent read-only reviews of the team-flow analysis and UI/UX
-  document, correct omissions, update the documentation index and run document
-  hygiene checks.
+## Completed boundary — ProjectScene and continuing-team contract ratification (2026-09-07)
 
-Review result: `tasks/team-operations-review.md` records the current one-campaign
-fit, two continuing-team blockers, eleven material gaps, the safe bounded current
-procedure, proposed target flow and D1–D7 Product Owner decisions. Three read-only
-review lanes passed after current-v1, accepted-v2 and proposed-package semantics
-were separated. `docs/ui-product-guidelines.md` is indexed and preserves the
-approved UI/UX direction with section-specific status labels. Documentation
-hygiene passed; no production UI or product contract was changed.
+The Product Owner approved the Project-as-workspace / Scene-as-presentation model
+and the three-slice implementation plan. The prior UI and team-review work is
+preserved at pushed checkpoint `21786771bdb39800a29f835fa4f25535cd01d5bc`.
+This boundary updates normative specifications and acceptance before any v2
+production code, dependency, schema/package version or UI implementation.
 
-The Product Owner subsequently accepted the core continuing-history/model-revision
-direction: one Project lineage with causal base/head, model revisions as immutable
-Project changes, Caption ownership by logical Asset/AssetFrame, preservation of
-older-revision Caption edits, `needsReview` for unproven anchor compatibility and
-explicit resolution without an automatic winner. This records direction only;
-current fixed-baseline behavior and accepted package-closure requirements remain
-unchanged until a complete storage/history contract is approved.
+- [x] Preserve the exact pre-Scene UI/team-review tree as a clean, pushed Git
+  checkpoint after typecheck, 79-file/1,646-test verification, production build,
+  cached diff check and independent code/privacy review with no P0/P1.
+- [x] Amend the product contract so a LociView Project retains typed resources and
+  a ProjectScene explicitly selects logical models and Captions while owning
+  Scene-scoped material presentation and one optional entry Saved View.
+- [x] Amend the domain contract with ID-keyed Scene/Asset and Scene/Caption
+  memberships, Project-wide active Asset revision/binding, session-local active
+  Scene and complete fail-closed Scene resolution/conflict semantics.
+- [x] Amend the storage/package contract for causal continuing history, a
+  self-contained Team Workspace, a base-dependent thin Contribution, selected-
+  Scene review, exact backup, new-lineage clean copy and atomic failure recovery.
+- [x] Freeze dual-read/v2-only-write migration from Native snapshot 1, frozen v1
+  and LociMyu without changing source bytes or inferring model/source relations.
+  Define the bounded fixed-baseline Native bridge for recoverable late changes.
+- [x] Update the UI/UX contract to use `シーン` as a cross-tab context while
+  reserving internal `Asset` for a logical 3D model and revealing revision details
+  only when model replacement, review, conflict or recovery requires a decision.
+- [x] Add executable acceptance identifiers for Scene switching, multi-Scene
+  Caption membership, model revision propagation, package closure, conflicts,
+  idempotence, interruption/quota recovery, Desktop and physical-iPhone behavior.
+- [x] Obtain independent read-only product/domain and storage/security reviews,
+  resolve every P0/P1, run documentation/privacy/diff checks and record the result.
 
-### Next decision
+### Contract review result
 
-Resolve the remaining D2, D3 and D5-D7 decisions and turn the accepted continuity
-direction into a complete storage/history/package contract with migration and
-failure/recovery acceptance. Stop before changing production UI,
-storage/schema/package versions, merge behavior or release state. Any implementation
-plan follows a separate Product Owner decision.
+- ADR-0002 and specification 05 now carry the accepted ProjectScene, continuing
+  causal history, five-purpose package, migration, recovery and device contract;
+  the authority indexes and superseded-clause banners point to them explicitly.
+- Independent product/domain, storage/security and final cross-document/privacy
+  reviews report no remaining P0/P1. Markdown links and whitespace checks pass;
+  no private representative path, filename, source digest, source bytes or
+  internal source name was added.
+- This boundary changes documentation and task records only. It adds no runtime
+  dependency, production code, schema/package version, migration output, UI,
+  renderer, Pages, Service Worker or release state.
+- With every normative contract file staged, `npm run typecheck` and the
+  production build pass; the build emits only the existing mixed-import and
+  chunk-size warnings. The two fixture-registry suites pass 53/53, then the full
+  matrix passes 79 files / 1,646 tests with 21 existing todo. This closes the
+  earlier expected registry stop while specification 02 differed from the Git
+  index and the one aggregate-load receipt-verifier timeout, which had already
+  passed 7/7 in isolation. No rendered Desktop, offline/PWA or physical-iPhone
+  acceptance is claimed by this docs-only verification.
+
+Approved implementation sequence after this contract boundary:
+
+1. **S1 — Scene-capable v2 core:** gated metadata/CAS adapter, ProjectSession,
+   journal, ProjectScene records, typed commands and resolver behind a nondefault
+   boundary. No converter, package or production UI.
+2. **S2 — migration and team exchange:** Native/frozen-v1/LociMyu conversion,
+   fixed-baseline bridge, Team Workspace/Contribution/review/backup/clean-copy
+   closure and recovery, only after the new ProjectScene migration/portable-
+   bridge companion and five-purpose package-wire companion pass their gates.
+   No UI polish or release work.
+3. **S3 — product UI and acceptance:** shared Scene selector, four-tab composition
+   authoring, conflicts/`needsReview`, Desktop rendering and physical-iPhone
+   acceptance. No Pages, Service Worker, main integration or deployment.
+
+### Current stop condition
+
+Stop after the contract diff and independent review are ready for Product Owner
+inspection. Do not add Automerge/CAS or another dependency, implement ProjectDocV2,
+change Native snapshot/package wire formats, resume production UI work, or claim a
+gate/candidate/release PASS in this boundary.
+
+## Completed prior boundary — team-operation suitability review; UI editing paused (2026-09-07)
+
+`tasks/team-operations-review.md` records the current one-campaign fit, the
+continuing-team blockers, the safe bounded current procedure and the accepted
+direction. `docs/ui-product-guidelines.md` preserves the approved UI/UX direction.
+The Product Owner then approved continuing causal history, Project-wide model
+revisions, Scene-based presentation, all-Project editing, full Workspace versus
+thin Contribution, explicit conflicts, accurate share disclosure and
+dual-read/v2-only-write migration. The current boundary above supersedes the old
+decision wait; current Native fixed-baseline behavior remains unchanged until the
+new implementation passes its gates.
 
 ## Paused prior boundary — legacy-convenience UI implemented, rendered acceptance pending (2026-09-06)
 

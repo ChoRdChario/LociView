@@ -2,6 +2,14 @@
 
 > Status: `PRODUCT-OWNER APPROVED CONTRACT / IMPLEMENTATION AND GATE STATUS ARE SECTION-SPECIFIC`
 
+> **ProjectScene/team-history sequence amendment (2026-09-07):**
+> ADR-0002 and `05-project-scene-team-workflow.md` supersede the production
+> sequence below where it would write the closed DisplaySet migration target or
+> old three-purpose package wire. The ProjectScene writer requires its separately
+> ratified migration companion, portable Native-bridge support record and
+> five-purpose package-wire companion before S2. Existing G0/G0-S/G1 technology,
+> renderer, durability and physical-device gates remain unchanged.
+
 ## 1. Gate discipline
 
 Every high-risk gate follows the same sequence:
@@ -591,8 +599,14 @@ below.
 4. G1-B renderer decision.
 5. G1-C metadata decision.
 6. renderer/storage-neutral domain and ports with unchanged v1 characterization.
-7. production blob journal, metadata repository and package classes.
-8. ratify the immutable `v1-migration-recipe-1` companion/golden manifest and its one-to-one descriptor, then implement canonical v1 conversion; no durable conversion exists before this sub-gate passes.
+7. production blob journal and metadata repository; keep package production
+   behind its versioned wire gate.
+8. preserve the immutable `v1-migration-recipe-1` companion/golden manifest as
+   closed evidence. For the ProjectScene writer, ratify
+   `v1-project-scene-migration-recipe-1`, its portable Native-bridge support type
+   and the five-purpose manifest/review companion before implementing conversion
+   or package S2; no durable ProjectScene conversion or package wire exists before
+   those sub-gates pass.
 9. Proxy-backed vertical slice with one independent Mesh Asset and one GS Asset
    whose active AssetRevision contains its explicitly related invisible proxy:
    import -> stream -> switch simple mixed/GS-only/Mesh-only visibility -> select

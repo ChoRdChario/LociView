@@ -1,8 +1,16 @@
 # ADR-0001: v2 foundation and staged evolution
 
-- Status: Accepted architecture direction; product-display amendment recorded 2026-08-29; technology selections remain conditional on PoC gates
+- Status: Accepted architecture direction; amended by ADR-0002 on 2026-09-07;
+  technology selections remain conditional on PoC gates
 - Date: 2026-08-18
 - Baseline: LociView v1 at `4f6e48196041d7ae39a11aba04f647db99deb450`
+
+> ADR-0002 supersedes this ADR only where its direct-Asset presentation model
+> and three package-purpose model conflict with persistent ProjectScenes and
+> the five continuing-team package purposes. `SceneDocument` remains the
+> disposable renderer-neutral read model derived from a ProjectScene. The
+> coordinate, Asset revision, renderer-port and gated-technology decisions
+> below remain unchanged.
 
 ## Context
 

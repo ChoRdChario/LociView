@@ -2,9 +2,12 @@
 
 > Status: `PRODUCT-OWNER APPROVED IMPLEMENTATION CONTRACT / NOT IMPLEMENTED`
 > Baseline implementation: normalized v1 commit `fc7054f`; this specification revision is identified by its own Git commit
-> Approved: 2026-08-19; Product Owner amendments recorded through 2026-08-29
+> Approved: 2026-08-19; Product Owner amendments recorded through 2026-09-07
 
-These documents turn ADR-0001 and the approved v2 direction into testable implementation contracts. They intentionally separate fixed product and domain rules from technologies that may still fail a proof-of-concept gate.
+These documents turn accepted ADRs 0001 and 0002 and the approved v2 direction
+into testable implementation contracts. They intentionally separate fixed
+product and domain rules from technologies that may still fail a proof-of-concept
+gate.
 
 ## Authority
 
@@ -31,10 +34,12 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metri
 | [`02-storage-package-migration.md`](02-storage-package-migration.md) | Metadata, CAS, transaction recovery, package classes, merge semantics, v1 conversion |
 | [`03-gates-and-delivery.md`](03-gates-and-delivery.md) | G0, blocking G0-S, PoC gates, evidence, feature flags, rollback and development sequence |
 | [`04-locimyu-conversion.md`](04-locimyu-conversion.md) | Canonical LociMyu Caption identity, source-authority rules and the direct-adapter conversion-report boundary |
+| [`05-project-scene-team-workflow.md`](05-project-scene-team-workflow.md) | ProjectScene composition, continuing causal team history, Workspace/Contribution purposes, migration bridge and acceptance; supersedes the identified general-v2 DisplaySet/fixed-campaign clauses without changing Native bytes |
 
 ## Fixed versus conditional decisions
 
-Fixed unless a new ADR supersedes ADR-0001:
+Fixed unless a later accepted ADR supersedes the applicable part of ADR-0001 or
+ADR-0002:
 
 - evolve the current app through adapters; no big-bang rewrite;
 - `RepresentationFrame -> AssetFrame -> ProjectFrame`;
@@ -49,8 +54,13 @@ Fixed unless a new ADR supersedes ADR-0001:
   the user retains the original ZIP and an exportable report accounts for
   inactive/unlinked information; no project-local sidecar or portable review
   continuity is required.
-- caption tags and ordered display sets with explicit default views remain portable;
-- review snapshots carry no editable lineage identity, while clean editable copies re-key into a new lineage.
+- caption tags and ordered ProjectScenes with explicit Asset/Caption membership
+  and optional entry views remain portable; model revision/alignment remains
+  Project-wide;
+- exact backup, self-contained Team Workspace, base-dependent Contribution,
+  one-Scene history-free review and whole-Project clean copy remain distinct;
+- valid semantic conflicts retain exact causal candidates and block only their
+  affected authoritative projection; resolution is always explicit.
 
 Conditional on a named gate:
 

@@ -1,10 +1,14 @@
 # LociView v2 approved direction
 
 > Status: `ACCEPTED DIRECTION SUMMARY / NON-NORMATIVE / NOT IMPLEMENTED`
-> Updated: 2026-09-03
+> Updated: 2026-09-07
 > Technology choices marked as candidates remain subject to the listed PoC gates.
 
-This is a navigation summary, not an independent requirements source. Rationale, decisions, rejected defaults and reconsideration triggers are normative in `docs/adr/0001-v2-foundation.md`. Review-ready implementation contracts are indexed in `docs/specs/README.md`; after product-owner approval they provide the detailed normative contract. Until then they remain proposed and do not authorize implementation.
+This is a navigation summary, not an independent requirements source. Rationale,
+decisions, rejected defaults and reconsideration triggers are normative in
+`docs/adr/0001-v2-foundation.md` and its ProjectScene/team-history amendment
+`docs/adr/0002-project-scenes-and-continuing-team-history.md`. Approved
+implementation contracts are indexed in `docs/specs/README.md`.
 
 ## Objective
 
@@ -14,6 +18,10 @@ Evolve the current offline LociView without a full rewrite so it can:
 - display Gaussian Splatting data;
 - support multiple formats and multiple visual Assets as independently
   placeable, selectable and visible layers in one ProjectFrame;
+- make the LociView Project the typed durable workspace, with persistent Scenes
+  selecting which models and Captions are presented without copying them;
+- let a prepared whole Project start another participant and integrate later
+  full-Project changes through verified continuing causal history;
 - include Caption image, video and audio in LociView product scope. The first
   public candidate writes PNG/JPEG/WebP/GIF and treats device-side export of a
   separate JPEG as the explicit compatibility path for existing HEIC/HEIF.
@@ -35,6 +43,12 @@ not as legacy Edit or merge.
 
 ## Fixed domain direction
 
+- A Project owns typed models, Captions, media, Saved Views and persistent
+  ProjectScenes in one continuing causal history. It is not an untyped bag of
+  Unity-style assets.
+- A ProjectScene has explicit Asset and Caption membership, Scene-scoped
+  material intent and an optional same-Scene entry Saved View. One Caption may
+  be referenced by multiple Scenes without being copied.
 - Coordinate hierarchy: `RepresentationFrame -> AssetFrame -> ProjectFrame`.
 - User alignment is non-destructive Sim(3): translation, quaternion rotation, and positive uniform scale.
 - A ready logical `Asset` points to one immutable `AssetBindingRevision`; a migrated missing-source placeholder is explicitly unresolved, has no fabricated binding/blob, and may retain portable pending alignment for later verified assignment.
@@ -44,14 +58,21 @@ not as legacy Edit or merge.
 - Material overrides target asset/variant-family/material-layout/logical-slot identities and store renderer-neutral appearance plus independent coverage/optics intent, not Three.js flags. Source material semantics are profile-derived immutable metadata; revision-to-revision remapping is explicit.
 - Every immutable Representation names a versioned semantic FormatProfile and carries a profile-derived family bounds envelope/material summary; a backend either reproduces that profile or reports Unsupported. SceneResolver derives fit bounds from those envelopes without loading the blobs.
 - The MVP is a deterministic static-scene viewer. Animation clips never autoplay; unsupported skin/morph state is explicitly baked to a derived static representation or rejected.
-- `SceneDocument` is a derived renderer-neutral read model. It is never the persisted source of truth.
+- Model active revision and alignment are Project-wide; a Scene references the
+  logical Asset and never chooses a competing revision.
+- Active Scene, temporary camera, filters, selection and floating-window layout
+  are local UI state. Named Saved Views, Scene membership/defaults and content
+  edits are shared Project state.
+- `SceneDocument` is a disposable renderer-neutral read model derived from one
+  ProjectScene. It is never the persisted source of truth.
 
 ## Rendering scope
 
-Each loaded visual Asset is the primary visibility unit. Users may show, hide,
-select and align Assets independently while their Representations are decoded by
-the applicable Mesh, ordinary-point or GS path. The visible Assets share one
-ProjectFrame and camera.
+Within the selected ProjectScene, each member Asset is an independently
+selectable visual unit while its Representations are decoded by the applicable
+Mesh, ordinary-point or GS path. Scene membership is the durable visibility
+authority; temporary isolate/hide is local. All Scenes use the same ProjectFrame
+and each Asset's Project-wide active revision and alignment.
 
 The first proxy-backed native slice retains simple Mesh+GS mixed, GS-only and
 Mesh-only as project-wide convenience filters for its bounded snapshot v1. They
@@ -128,9 +149,19 @@ This candidate is not adopted until the Automerge and streaming gates pass. Pers
 
 Package purposes remain distinct:
 
-- collaboration package: mergeable history;
-- review/share package: separately keyed nonmergeable current snapshot with no source lineage identity;
-- clean editable copy: topologically re-keyed new project/history epoch after conflicts and orphans are resolved.
+- Team Workspace: self-contained whole-Project history and blobs for starting or
+  updating same-lineage work;
+- Contribution: dependency-closed `reachable(current heads) - reachable(base
+  heads)`, including valid siblings, plus newly required blobs; never a hand-
+  selected subset or rewritten rebase;
+- review/share: one explicitly selected Scene closure, re-keyed and nonmergeable;
+- complete backup: exact recovery of the same Project;
+- clean editable copy: whole current Project under a new independent lineage.
+
+A valid incoming causal batch is retained atomically even if it creates a
+semantic conflict. Only the affected authoritative projection is blocked;
+arrival order, filename, time and a metadata library's materialized value never
+choose a winner. Invalid or incomplete input activates nothing.
 
 ## Migration
 
@@ -146,10 +177,14 @@ Package purposes remain distinct:
   writable-v1 G0S-S2/S3 work is deferred and becomes a required gate again
   before any future candidate re-enables legacy writes.
 - Convert known copies to one canonical genesis/history epoch.
-- Keep deterministic v1 ID/decision/mapping continuity in collaboration packages so a reviewed later v1 copy can migrate on another device; review/share and clean copies intentionally omit that lineage.
+- Keep deterministic v1 ID/decision/mapping continuity in Team Workspaces and
+  complete backups so a reviewed later v1 copy can migrate on another device;
+  review/share and clean copies intentionally omit that lineage.
 - Represent imported v1 assets as synthetic legacy revisions.
-- Preserve caption tags, display-set ordering, set-scoped material appearance and
-  explicit per-set default views as the LociMyu-derived appearance-set workflow.
+- Preserve caption tags and map each admitted LociMyu sheet/Native DisplaySet to
+  one ProjectScene with exact membership, Scene-scoped material appearance and
+  same-Scene entry Saved View. A new ratified recipe performs this mapping; the
+  closed `v1-migration-recipe-1` and current Native bytes are never reinterpreted.
 - Preserve ambiguous anchors/material mappings for review instead of guessing.
 - Unknown future major schemas open read-only or fail clearly; they are not auto-migrated.
 
@@ -161,6 +196,9 @@ Package purposes remain distinct:
 - Runtime uses paging and explicit draw/resident budgets.
 - Raw large-GS optimization and collision generation occur on desktop/local tooling, not on iOS.
 - DPR, MSAA, render-target count, context loss, background restore, and peak memory are acceptance measurements, not implementation details to defer.
+- iPhone provides the same Project/Scene/team administration categories as
+  Desktop through responsive reflow. Resource limits may reject safely before
+  writes but do not define a contributor-only feature subset.
 
 ## Development governance
 
@@ -187,6 +225,8 @@ Package purposes remain distinct:
 8. Renderer/storage-neutral ports inserted with unchanged v1 behavior.
 9. v2 binary storage and metadata productionization.
 10. Ratified byte-exact v1 migration recipe, then canonical v1 migration.
+    ProjectScene migration and the five-purpose package wire each require a new
+    separately ratified companion; neither widens the closed v1 recipe/package.
 11. Proxy-backed vertical slice with one independent Mesh Asset and one GS Asset
     whose active AssetRevision contains its explicitly related invisible proxy:
     import -> switch simple mixed/GS-only/Mesh-only visibility -> select visible
@@ -211,11 +251,13 @@ Included:
 - account-independent conversion of LociMyu save datasets under one accepted compatibility contract;
 - bounded-memory package I/O;
 - v2 metadata/blob storage and v1 conversion;
-- multiple-format, multiple-Asset shared-coordinate display with per-Asset visibility and alignment;
+- multiple-format, multiple-Asset shared-coordinate display with explicit
+  ProjectScene membership and Project-wide per-Asset alignment;
 - GS interaction through one explicit invisible same-Asset proxy while
   independent Mesh, point and GS Assets may coexist;
 - ordinary-point display and caption picking for v1-compatible point data;
-- captions, collaboration merge, and clean share export;
+- reusable multi-Scene Captions, continuing causal integration, Team Workspace,
+  Contribution, one-Scene review, complete backup and clean-copy export;
 - opaque/mask/dither shared-view composition;
 - mobile LOD and resident-budget degradation.
 

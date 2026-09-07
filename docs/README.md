@@ -1,6 +1,8 @@
 # Documentation authority index
 
-This index prevents current v1 behavior, historical plans, and the proposed v2 architecture from being treated as one specification.
+This index prevents current v1/Native behavior, historical plans and the
+accepted-but-not-yet-implemented v2 architecture from being treated as one
+observed implementation.
 
 ## Purpose-specific authority
 
@@ -42,6 +44,7 @@ If observed code conflicts with the applicable compatibility or accepted future 
 | `g0/fixture-acquisition-contract.md` | `PRODUCT-OWNER RATIFIED / MODE B IMPLEMENTED OFFLINE / MODE A NOT IMPLEMENTED` | Exact Mode-B CLI/core/schemas exist and are offline-verified; real network, Release, publication and adoption actions remain unexecuted and retain separate stops |
 | `v2/00-approved-direction.md` | `ACCEPTED DIRECTION SUMMARY / NON-NORMATIVE / NOT IMPLEMENTED` | Navigation summary; ADR and approved specifications are authoritative |
 | `adr/0001-v2-foundation.md` | `ACCEPTED DIRECTION / CONDITIONAL TECHNOLOGY` | Rationale, rejected alternatives, and reconsideration triggers |
+| `adr/0002-project-scenes-and-continuing-team-history.md` | `ACCEPTED DIRECTION / CONDITIONAL TECHNOLOGY` | Project-as-workspace, Scene composition, Project-wide model revisions and continuing causal file collaboration |
 | `history/legacy-locimyu-alpha.md` | `PROVENANCE` | Location and hashes of archived legacy evidence |
 | `history/task-ledger-through-d32a6a0.md` | `HISTORICAL TASK LEDGER` | Completed development records through the pre-consolidation native checkpoint; not an active plan or product specification |
 | `specs/README.md` | `PRODUCT-OWNER APPROVED CONTRACT / NOT IMPLEMENTED` | Index and authority for the gated v2 implementation contract |
@@ -50,6 +53,7 @@ If observed code conflicts with the applicable compatibility or accepted future 
 | `specs/02-storage-package-migration.md` | `PRODUCT-OWNER APPROVED / BOUNDED NATIVE SECTIONS 13–31 IMPLEMENTED WHERE MARKED / §29.1 DIRECT HEIC DEFERRED / GENERAL V2 NOT IMPLEMENTED` | General metadata/CAS candidate boundaries plus implemented Native snapshot/package, multi-Asset, DisplaySet/media receiver, package exchange, Native-only write authority and §29.3 device-side HEIC compatibility boundary |
 | `specs/03-gates-and-delivery.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | G0/G0-S/G1 evidence, thresholds, feature flags, rollback and schedule |
 | `specs/04-locimyu-conversion.md` | `PRODUCT-OWNER APPROVED / BOUNDED DIRECT ADAPTER IMPLEMENTED / PRODUCT ACCEPTANCE PASS` | Exact LociMyu identity/source authority and report boundary; six representative rows with an empty trimmed ID are reported as empty input, while 103 Captions publish and survive portable restore without changing the source; Desktop and physical-iPhone acceptance passed |
+| `specs/05-project-scene-team-workflow.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | Superseding future-v2 ProjectScene, causal team history, package-purpose, migration and recovery contract; current Native DisplaySet/fixed-baseline bytes remain unchanged |
 
 ## Known implementation drift
 
