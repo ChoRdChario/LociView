@@ -2,6 +2,37 @@
 
 ## Current boundary — implementation through UI verification (2026-09-08)
 
+### Active slice — isolated bounded CAS I/O proof (2026-09-08)
+
+The PO requested autonomous continuation with human checks batched. The existing
+S1 plan authorizes remaining metadata/CAS proofs, not silent technology adoption.
+Starting HEAD `3c0bb76` is clean; usage remaining is 45 percent. Reuse the now
+completed manual save/recovery proof and disconnected Scene core.
+
+- [x] Define one missing bounded streaming/publication proof in the existing PoC
+  lane, with backend limits and exclusions before coding (`poc/cas-io/README.md`).
+- [x] Implement isolated stream/hash/copy/receipt publication and exact staged
+  recovery; no atomic rename assumption, production imports or new dependencies.
+- [x] Execute one 500 MiB stream round-trip and focused cancellation/quota/
+  interruption/dedup/corruption checks through a real Node filesystem backend.
+- [x] Typecheck the isolated files, obtain focused read-only review, fix findings
+  and record observed results without OPFS/iOS/full-journal or adoption credit.
+
+This closes only the genuinely missing non-browser I/O algorithm proof. Node
+locking/durability does not stand in for browser platform behavior. Existing
+storage/UI integration remains gated; implementation within the approved proof
+scope does not need another PO micro-approval.
+
+Slice review: isolated typecheck and 17/17 tests PASS; the 500 MiB case took
+45.947 seconds with 1 MiB observed maximum chunks, an independent matching digest,
+one verified payload and zero payload reads on completed replay. The 3 MiB +
+16 KiB buffer figure is static code accounting, not measured process memory.
+Review clarified torn-receipt refusal and private scratch-sink limits and found
+one invalid-export cleanup P2; it is fixed, the focused actual-file regression
+and typecheck pass, and the reviewer confirmed closure. Root typecheck, all
+80 files / 1,658 PASS / 21 existing todo and build PASS. No production source or
+dependency changed. Temporary synthetic payloads were removed by scoped cleanup.
+
 ### Active slice — disconnected pure Scene core (PO approved 2026-09-08)
 
 The PO approved advancing Scene creation, membership management, integrity checks

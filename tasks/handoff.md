@@ -1,5 +1,14 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **Current I/O prerequisite update (2026-09-08):** Under the PO's autonomous
+> continuation request, `poc/cas-io` now supplies a disposable Node filesystem
+> streaming/publication proof. The 500 MiB exact-digest round trip and focused
+> cancellation/quota/interruption/dedup/corruption checks pass; review's cleanup
+> P2 is fixed and confirmed. See its README and current todo for exact evidence.
+> This is not OPFS/iOS, full cross-store journal or technology adoption. Root
+> application source/dependencies remain unchanged. Human checks stay batched;
+> do not repeat the completed history probe or infer browser PASS from Node.
+
 > **Current pure-core update (2026-09-08):** The PO approved advancing the
 > disconnected Scene core while browser storage evidence is blocked. Specification
 > 05 §13.1 is the narrow scheduling exception. `src/scene` now provides pure Scene
