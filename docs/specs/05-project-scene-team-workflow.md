@@ -1,6 +1,6 @@
 # ProjectScene and continuing-team workflow contract
 
-> Status: `PRODUCT-OWNER APPROVED CONTRACT / NOT IMPLEMENTED`
+> Status: `PRODUCT-OWNER APPROVED CONTRACT / PURE SCENE CORE ONLY; INTEGRATED V2 NOT IMPLEMENTED`
 >
 > Approved: 2026-09-07
 >
@@ -968,6 +968,43 @@ matrix. S3 completion requires this integrated outcome, not merely individual
 test counts. Existing Native test passes provide regression evidence only.
 
 ## 13. Bounded implementation sequence
+
+### 13.1 Approved scheduling exception — pure Scene core (2026-09-08)
+
+The Product Owner approved advancing the storage/renderer-neutral Scene core
+while browser adapter evidence is blocked. This exception permits production-
+quality pure modules and tests, not their activation in the current application.
+It supersedes only the gate-before-domain ordering in this section, ADR-0002
+and specification 03 section 10. Metadata/CAS adoption, durable commands,
+migration/package changes and UI wiring retain every existing prerequisite.
+
+Implement Scene creation (including initial default), rename/default/view
+selection, exact membership inclusion/exclusion, guarded deletion and deterministic
+composition planning. Use an explicit conflict-aware, validated resource read
+projection: no Automerge types, storage I/O, blob reads, renderer, network,
+dependency addition or changes to existing v1/Native paths. The read projection
+is not a new serialized ProjectDocV2 schema or an untrusted-file validator.
+Its provider must eventually validate full resource/representation/material/view
+closures and supply all conflicts; missing or unresolved inputs fail closed.
+
+Pure command planning returns an immutable logical Scene change with the source
+snapshot token. It acknowledges no save and changes no active UI/session state.
+The future write authority must check that token, revalidate, encode one causal
+change and durably publish before use; a stale plan is never applied directly.
+Resource content edits, revision activation, keep-both deep remapping, journal,
+media, full render-plan construction and frame-by-frame/device acceptance remain
+in their existing slices, not silently implemented by this exception.
+
+Acceptance reuses the pure portions of SCN-DOM-01–09: A/B/A composition with no
+state leakage; shared Caption membership without copying; current Project-wide
+model binding selection and preserved needsReview anchors; duplicate/conflicted
+edge exclusion; hidden-owner list entries versus ProjectAnchor markers; explicit
+default/view validation; source-Scene model-only creation; and non-cascading
+membership/Scene deletion. Tests must also show input immutability, stale-token
+rejection and absent imports from application entry points. These are domain
+results only, not completion of those integrated acceptance IDs.
+
+### 13.2 Gated storage and integrated delivery
 
 S1–S3 name delivery stages, not three indivisible commits. The immediate S1 entry
 is one disposable candidate-adapter harness for the existing `TEAM-PKG-08` causal

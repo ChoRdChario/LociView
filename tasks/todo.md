@@ -2,6 +2,43 @@
 
 ## Current boundary — implementation through UI verification (2026-09-08)
 
+### Active slice — disconnected pure Scene core (PO approved 2026-09-08)
+
+The PO approved advancing Scene creation, membership management, integrity checks
+and composition planning without connecting storage or existing screens.
+Specification 05 §13.1 records the exact sequencing exception. This supersedes
+the documentation-only stop below, not any durability/adoption requirement.
+
+- [x] Record scope, conflict-aware read-port boundary and reused acceptance.
+- [x] Implement pure Scene records/command planning and deterministic composition.
+- [x] Cover the pure SCN-DOM-01–09 portions plus input immutability, stale token
+  refusal and isolation from application imports; do not claim full ID acceptance.
+- [x] Run focused tests, typecheck, full tests/build once on the final tree;
+  obtain one independent read-only review, fix bounded findings and report.
+
+Completion: tested reusable core with explicit unresolved diagnostics and no
+storage/UI adoption. Excluded: dependencies, journal, deep conflict-copy remap,
+resource edits, package/migration, renderer, UI wiring, device/PWA/release work.
+Stop on specification conflict, implicit winner/source inference or scope expansion.
+
+Slice review: `src/scene` implements typed conflict-aware read projections, pure
+logical command plans and composition selection, without application imports.
+Focused tests 12/12 PASS; typecheck PASS; full suite 80 files / 1,658 PASS with
+21 existing todo; build PASS (existing mixed-import/chunk-size warnings only).
+This full invocation also passes the previous environment-limited acquisition
+test, without changing it. Prior failed invocation remains historical evidence.
+Independent read-only review found one P2: fresh IDs reversed tied source model
+order during Scene creation. Distinct ordered keys on new edges and a two-model
+regression fix it; focused reviewer confirmation reports no remaining blocker.
+Source resources, memberships and authored anchor coordinates remain unchanged.
+Usage remains 46 percent. No browser/device/PWA PASS or storage adoption follows.
+
+Next boundary: the approved pure Scene core is implemented but disconnected.
+The validated full-resource read provider and causal write integration still wait
+for applicable storage gates. Human Chrome interruption/recovery checks remain
+batched in the existing runbook. No further UI/storage integration is authorized
+by this scheduling exception, and no extra unchanged tests are required now.
+
 The Product Owner authorized implementation toward UI verification, with a stop
 for their decision whenever the available Codex usage falls below 10 percent.
 Starting checkout: clean pushed `b5e621f` on `g0-baseline`; available main usage
@@ -43,11 +80,18 @@ production-adoption evidence (see the probe README). Historical conflict inspect
 reconstructs recorded heads from original changes; scalar resolution uses an
 explicit replacement even when selecting the currently materialized value.
 No complete model remap, real blob I/O, durability/device or adoption is claimed.
-Usage recheck: 47 percent remaining. Browser execution is pending: the browser
+Usage recheck: 46 percent remaining. Browser automation is blocked: the browser
 control runtime failed to load, and Windows automation twice stopped because it
 could not establish Chrome's URL, including after the Product Owner opened the
 exact loopback page. Do not repeat the same blocked automation or bypass its
-safety check. No control in the storage probe has been browser-executed.
+safety check. The Product Owner subsequently supplied screenshot/log evidence
+for `保存・失敗・再試行を検証`: initial durability, gated acknowledgement,
+quota/retry and independent Repo original-byte readback PASS, with READY and
+unchanged exchange base. Subsequent manual logs confirm page reload/readback,
+one-of-three remote changes durable with only the old view visible, and a
+second tab's READ-ONLY plus synthetic-request denial. Owner-tab interruption,
+refusal after lock release and recovery/replay remain unmeasured; see the probe
+README for exact evidence.
 
 Current verification: root typecheck and build PASS; root test run had 1,645
 passes, 21 todos and one ENOSPC failure in the existing 6-GiB temporary-file
@@ -60,12 +104,40 @@ found no blocking code issue; its evidence wording correction is applied:
 No application code/root dependency, production storage, release or SW source
 changed. The root build's normal generated PWA files remain ignored outputs.
 
-Next external evidence: manual Chrome execution of the bounded sequence in
-`poc/scene-history/README.md`, preserving visible PASS/FAIL outputs, or repair of
-the supported browser-control connection. The loopback preview is on port 5184;
-recheck its process/HTTP state before reuse. No public/tunnel/device route exists.
-This stops the immediate adapter/storage gate, not completion of S1/S2/S3;
-production adoption remains forbidden until their actual remaining criteria pass.
+### Current bounded continuation — deferred browser evidence
+
+The Product Owner selected provisional in-app-browser testing and a consolidated
+human Chrome check later, then authorized this continuation. Chrome repair is
+paused. The in-app connection retry also failed before page access with
+`Importing module "node:process" is not allowed in node_repl`; this is separate
+from the Chrome sidebar's missing `nodePath` launch-metadata error. No provisional
+in-app run occurred. Do not retry unchanged connections or bypass tool safety.
+
+- [x] Reconcile existing manual results with the probe source; retain their
+  exact limited scope and identify the three missing interruption/recovery checks.
+- [x] Consolidate the existing README procedure into action/expected-result rows
+  with separate prior manual, provisional in-app and final Chrome evidence lanes.
+- [x] Verify the instructions against current controls/logs and run the bounded
+  Node regression once; reuse unchanged root checks instead of repeating them.
+- [x] Self-review the documentation diff and report the gate boundary without
+  claiming browser, production, offline or device acceptance.
+
+Review result: focused Node regression 6/6 PASS on unchanged probe source;
+six visible control labels and three literal log messages match the runbook.
+Self-review and one focused independent read-only review found no blocking
+runbook discrepancy; diff whitespace checks pass. Existing root test/build
+results above were not rerun or upgraded. Only four documentation files changed,
+including the pre-existing manual evidence updates; no new browser PASS exists.
+
+Next external evidence is the three missing checks in the existing
+`poc/scene-history/README.md` sequence, consolidated for the later human Chrome
+session. Do not ask for button-by-button responses now. The loopback preview
+uses port 5184; recheck its process/HTTP state before reuse. No public/tunnel/device
+route exists. Deferring Chrome confirmation changes scheduling, not metadata/CAS
+adoption criteria: production storage still waits for actual prerequisite proof.
+S3's final product Chrome test also remains separate from this synthetic probe.
+No new implementation, dependency, architecture, release or deployment change is
+part of this documentation/evidence continuation.
 
 ## Completed boundary — focused contract corrections and S1 entry (2026-09-08)
 

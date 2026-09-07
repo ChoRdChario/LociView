@@ -7,6 +7,10 @@
 
 ## Context
 
+2026-09-08 scheduling amendment: the PO approved the pure Scene-core exception
+in specification 05 §13.1. Disconnected domain modules/tests may precede storage
+gate completion; dependency adoption, persistence and application activation may not.
+
 LociView is intended to let one knowledgeable operator prepare a useful Project
 once and lower the participation cost for the rest of a team. The current Native
 Project can be distributed self-contained and can safely merge a bounded set of

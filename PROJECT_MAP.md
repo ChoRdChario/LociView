@@ -35,6 +35,7 @@ For a normal task, read only the target file, its matching tests, and direct imp
 | Path | Current responsibility |
 |---|---|
 | `src/core` | IDs, HLC, operation validation, JSONL, reduction, merge, manifest, and `ProjectStore` |
+| `src/scene` | Disconnected pure Scene command/composition core (specification 05 §13.1); validated conflict-aware read port, no storage/UI integration or adoption |
 | `src/platform` | `WorkspaceFS`, OPFS, memory filesystem, PWA and browser integration |
 | `src/assets` | ZIP/package handling, model asset registration/replacement, GLB optimization, import wizard |
 | `src/io` | CSV, minimal XLSX reader, and legacy LociMyu conversion |

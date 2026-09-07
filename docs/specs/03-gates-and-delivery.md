@@ -616,6 +616,10 @@ Rollback means preserving the source v1 package/workspace, opening conversion in
 
 ## 10. Production sequence after gates
 
+2026-09-08 approved exception: specification 05 §13.1 permits disconnected pure
+Scene-domain modules/tests before metadata/CAS adoption. It does not authorize
+storage dependencies, persistence, existing-app/UI integration or any gate PASS.
+
 This remains the release/adoption sequence. The Product Owner has approved one
 narrow scheduling exception: after the bounded `G0S-TAB` production root fix is
 committed, the proxy-backed Mesh/GS technical vertical slice in item 9 may

@@ -1,16 +1,35 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **Current pure-core update (2026-09-08):** The PO approved advancing the
+> disconnected Scene core while browser storage evidence is blocked. Specification
+> 05 §13.1 is the narrow scheduling exception. `src/scene` now provides pure Scene
+> command planning, snapshot-token checks and conflict-aware composition through
+> a validated resource read projection. No existing application entry imports it;
+> there is no storage, renderer, package, migration or UI activation. See the top
+> of `tasks/todo.md` for exact verification and remaining prerequisites. The
+> browser failure below does not make the new domain tests browser evidence.
+> Focused core tests 12/12, typecheck, all 80 test files (1,658 PASS / 21 existing
+> todo) and build pass. Independent review's one ordering P2 is corrected and
+> confirmed closed. Next work cannot silently connect storage/UI before its gates.
+
 > **Current update (2026-09-08 isolated implementation):** The approved
 > implementation-to-UI-verification goal is active in scope, with a user decision
-> required if usage remaining falls below 10 percent (latest: 47 percent).
+> required if usage remaining falls below 10 percent (latest: 46 percent).
 > `poc/scene-history` contains the disposable S1-entry history proof (6/6 PASS)
-> and a built but browser-unexecuted Repo/IndexedDB storage probe. Root code and
+> and a Repo/IndexedDB storage probe. Product Owner screenshot/log evidence now
+> confirms save/failure/retry, page reload/readback and the second-tab barrier
+> while the owner holds the lock; owner-tab interruption and interrupted-batch
+> recovery remain pending. Root code and
 > dependencies are unchanged. See the current top of `tasks/todo.md` for exact
 > tests, the isolated dependency advisory, scope exclusions and the recurring
-> browser URL-enforcement blocker. Do not call partial PoC evidence production
-> adoption or UI/device acceptance. The next action is the existing bounded
-> manual browser sequence or restoring supported browser control, not another
-> synthetic matrix, architecture rewrite or repeated blocked browser attempt.
+> browser-control blockers. Do not call partial PoC evidence production
+> adoption or UI/device acceptance. The PO now defers human Chrome checks into
+> one later session and permits provisional in-app testing; the latter also
+> failed before page access, so neither repair nor identical retries continue.
+> The probe README consolidates actions/expected results and separates the
+> three evidence lanes. Only documentation/non-browser verification can proceed
+> at this boundary; deferred checks do not waive production-adoption gates.
+> Do not create another synthetic matrix or architecture rewrite.
 
 > **Historical update (2026-09-08 focused correction):** Contract checkpoint
 > `25b9a776de84a2bb0fb4eb4d78aa542aeb64fb48` is pushed. The Product Owner then
