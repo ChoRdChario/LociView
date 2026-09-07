@@ -2,6 +2,52 @@
 
 ## Current boundary — implementation through UI verification (2026-09-08)
 
+### Completed bounded proof — five semantic purposes and privacy (2026-09-08)
+
+Starting checkpoint `4ca0eec` is clean, eight ahead of last fetched origin, zero
+behind; usage remaining is 42 percent. Browser ports are prepared, not executed.
+The genuinely missing G1-C row is deriving five semantic closures from the same
+causal Project (specification 03 §6; specification 05 §7, TEAM-PKG-06/09).
+
+- [x] Record the isolated semantic projection contract in the existing PoC README.
+- [x] Implement whole-Project versus explicit one-Scene closure, exact original
+  history/delta, conservative opaque/baseline roots and history-free re-keying.
+- [x] Execute one focused synthetic fixture sequence, including conflict/missing
+  refusal, base-relative payload selection and parsed/raw privacy checks.
+- [x] Obtain independent read-only review, correct bounded findings and checkpoint.
+
+Production scope is zero. The small synthetic adapter is not a full domain or
+untrusted-file validator. No new wire/schema policy, browser page, dependency,
+GC deletion, repeated large-payload/manual test, platform PASS or UI adoption.
+Reuse unchanged root regression and existing durability evidence. Completion is
+an executed semantic privacy/closure result, not S2 transport or aggregate G1-C.
+Stop on a specification conflict or a policy needing PO ratification; never use
+the viewing resolver's partial `ready` result as export authorization.
+
+Slice review: isolated typecheck and 17/17 purpose tests PASS. The same causal
+synthetic Project produces five distinct semantic outputs; original change hashes
+and bytes survive same-lineage outputs, backup alone includes base records, and
+Contribution subtracts the exact declared base without advancing it. One-Scene
+review excludes hidden-owner payloads and weak/derivation history; whole-Project
+clean re-keys typed references/equality classes into a fresh bootstrap. Current
+model/media embedded metadata remains unchanged and is explicitly disclosed.
+Parsed and decoded-change/raw-string scans find no source identity, deleted or
+profile/migration sentinels in the history-free projections. Unknown fields,
+including nonmaterialized root candidates, fail closed; resolved tombstones do
+not block unrelated current closure. Independent review's unknown-field finding
+and its root-conflict continuation are corrected and confirmed closed. No
+blocking finding remains within this small graph port.
+
+Short meta-audit: this advances G1-C's five-purpose/privacy row, not full domain
+admission, migration continuity, GC, package transport or an aggregate gate PASS.
+Root source/dependencies and earlier journal/browser source are unchanged; reuse
+their exact bounded evidence and root matrix (including the recorded default-
+parallel timeouts), with no large-payload/manual rerun. Usage remains 42 percent.
+Next boundary remains the specific missing adoption criteria: complete validated
+domain/retention behavior, actual prepared OPFS/IDB isolation/recovery, and ratified
+scale/device evidence. Do not repeat this semantic suite as a new workstream or
+add a new probe page. S2 wire/migration companions and S3 UI remain gated.
+
 ### Completed preparation — browser cross-store journal port (2026-09-08)
 
 The previous goal turn made progress: reviewed exact Node journal proof committed

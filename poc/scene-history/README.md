@@ -28,6 +28,67 @@ with a shared-handle `view`; large-history reconstruction cost remains unmeasure
 API references: https://automerge.org/automerge/api-docs/js/
 and https://automerge.org/docs/reference/documents/conflicts/ .
 
+## Five-purpose semantic closure — bounded contract
+
+Specification 03 §6 and specification 05 §7/TEAM-PKG-06/09 require five outputs
+derived from one causal synthetic Project. This probe uses an explicitly small
+decoded resource graph over the pinned adapter, not the ProjectDocV2 wire,
+complete domain validator or production exporter. Each graph field is an atomic
+JSON scalar; the probe inspects all adapter candidates, never a materialized
+winner. Structural validation of real coordinates, immutable digests, source
+profiles, full surface evidence and migration recipes remains outside this port.
+
+The graph includes two Scenes, shared and unassigned resources, Scene-external
+Caption owners, model revisions, attachments, tags, Saved Views and materials.
+The semantic builder follows typed strong edges rather than ID-looking strings.
+History-bearing outputs retain original causal bytes and verified source root;
+Contribution uses one explicit retained base and omits only payloads guaranteed
+by its verified closure. Backup alone includes disclosed exchange-base records.
+Opaque inventory and registered active migration-baseline bytes are conservative
+same-lineage roots. A GC-attempt decision here can only refuse; it deletes nothing.
+
+Review uses one explicitly selected Scene, independently of UI filters/camera,
+and provides counts, metadata disclosure and minimal nonvisual owner projections.
+It blocks required conflicts/missing data; the sole optional-view exception needs
+the exact `開始視点なし` confirmation. Clean follows all active Project resources
+and starts a fresh genesis. Both use an explicit known-field projection, re-key
+nominal references and compatibility/composite equality classes, omit old weak
+parents/history/migration/contributor values, and reject any unrecognized field.
+The nonvisual owner is an in-memory test projection, not a ratified review schema.
+Nonmanual source evidence can be retained in clean only through an explicit
+validated evidence port; there is no guessed relation or new sanitization policy.
+Original model/media bytes are unchanged and their embedded metadata is disclosed.
+
+Acceptance checks semantic contents plus raw/decompressed-change sentinels,
+complete closure and unchanged source/base. Small synthetic bytes suffice; reuse
+the unchanged 500 MiB and durable-base evidence rather than repeat those runs.
+No manifest, container, package ID/summary wire, import/restore UI, platform I/O,
+cross-project GC or adoption is implemented by this probe. Its input/output
+objects are nonpersisted test ports, not a new compatibility contract.
+
+Executed 2026-09-08: isolated typecheck and 17/17 semantic tests PASS. The five
+outputs come from the same actual causal fixture, not five prebuilt expected
+packages. Original heads/change bytes, current-minus-base blob plans, minimal
+hidden owners, required material/view conflicts, optional-view confirmation,
+compatibility/composite equality remapping and clean fresh genesis are asserted.
+Raw JSON/decompressed-change scans complement parsed reference/closure checks.
+Unknown nested/root-map candidates fail closed; no CRDT winner silently authorizes
+a snapshot. Independent review's unknown-field finding is fixed and confirmed,
+including hidden root candidates. No blocking finding remains in this subset.
+
+Run from the repository root:
+
+```powershell
+npx tsc --noEmit --project poc/scene-history/journal.tsconfig.json
+npx vitest run --config poc/scene-history/journal.vitest.config.ts poc/scene-history/purposes.test.ts
+```
+
+The receipt inventory/evidence callback are explicit validated test ports; this
+does not implement full frame/surface validation, actual GC or S2 wire. Blob lists
+show which bytes would be carried; no new streaming, 500 MiB, OPFS or device claim
+follows from this in-memory builder. Prior source/dependencies remain unchanged,
+so root regression and actual I/O proofs retain their previous bounded attribution.
+
 ## Exact cross-store journal protocol — bounded Node proof PASS
 
 Specification 02 §8 and specification 05 §10/13.2 authorize the next disposable

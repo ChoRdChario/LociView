@@ -1,5 +1,16 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **Current semantic-purpose update (2026-09-08):** Isolated `purposes.ts` derives
+> all five semantic closures from one causal synthetic Project. Typecheck and
+> 17/17 focused tests pass; independent review's unknown-field/root-candidate
+> finding is fixed and confirmed. Exact same-lineage changes, base-relative blob
+> plans, backup-only exchange records, one-Scene review/minimal hidden owners and
+> fresh whole-Project clean re-keying are proven only in this small decoded graph.
+> The existing probe README owns its boundaries. No production source/dependency,
+> wire, browser page/server, GC deletion or UI connection changed. Full domain,
+> platform/scale/device adoption remains open; use current todo and do not repeat
+> the completed manual tests or this semantic proof as another workstream.
+
 > **Current browser journal preparation (2026-09-08):** The same exact journal
 > now has an isolated OPFS files/inventory + pinned Repo/IndexedDB metadata port
 > and one resumable page, `poc/scene-history/journal.html`. Its result log survives
