@@ -65,3 +65,71 @@ regression PASS, followed by reviewer confirmation. Other executable paths are
 unchanged from the 17-test run. Root typecheck, 80 files / 1,658 PASS / 21 existing
 todo and build PASS; existing import/chunk warnings remain. The application does
 not import this proof. No gate adoption or new browser/device acceptance follows.
+
+## OPFS browser preparation (not yet browser-verified)
+
+Reuse the exact candidate and deterministic byte recipe in a separate loopback
+page with no production imports other than the unchanged hash implementation.
+Uses a dedicated synthetic-only OPFS directory and real `navigator.locks`, bounded
+file slices and awaited writes. Preserve interrupted synthetic data for explicit
+recovery/readback; never clear an origin or user workspace. One button will run
+the prepared cases; reload/readback is a separate action so persistence is not
+inferred from an in-memory handle. Human execution is deferred as a batch.
+This preparation adds no OPFS/iOS PASS, download sink, GC, journal, offline/PWA
+or technology-adoption credit. No temporary server or HTTPS tunnel is started.
+
+Isolated typecheck/build PASS. The browser WebCrypto AES-CTR recipe was executed
+under Node against independent Node AES/SHA-256 at 5 MiB + 19 bytes and the full
+500 MiB, including counter carries and the pinned expected digest (one focused
+test PASS). This validates recipe parity, not execution of OPFS or browser APIs
+on a target device. Browser buffers/copy behavior remain unmeasured; the earlier
+Node-only 3 MiB + 16 KiB figure is not transferred to this backend.
+
+Focused independent read-only review found an overbroad READY/readback claim and
+a recovery hint that included the pre-large-data stage. Both are corrected and
+confirmed: readback acknowledges only the saved large payload, and a run stopped
+before that payload exists needs a new run after retaining its URL/log. Latest
+isolated typecheck/build pass. No agent or human has executed this OPFS page yet.
+
+### 開発側の準備
+
+`poc/cas-io` で次を実行します。新しい依存ライブラリは不要です。
+
+```powershell
+node ../../node_modules/vite/bin/vite.js build --config vite.config.mjs
+node ../../node_modules/vite/bin/vite.js preview --config vite.config.mjs
+```
+
+一括確認を依頼する直前に開発側でHTTP応答を確認し、実行buildを記録してから
+`http://127.0.0.1:5185/` を案内します。以前の保存検証（5184）の再実施は不要です。
+このlocalhost経路はDesktopだけの案内です。iPhone用の経路ではありません。
+現時点でサーバー起動・人間への実行依頼は行っていません。
+
+### 後日の一括確認手順
+
+1. 案内されたページに「隔離・大容量保存検証」が表示されることを確認します。
+   空き容量は約1.5 GiBが目安です。実際の容量不足はエラーとして表示されます。
+2. 「検証を実行」を選択し、このタブを開いたまま待ちます。数分かかる場合があります。
+   容量不足・中止・途中停止・復旧は小さい合成データで自動検証し、その後に
+   500 MiBの保存・出力を実行します。注入した容量不足は実際の端末容量測定ではありません。
+3. `READY / この限定検証が完了` と、500 MiBのサイズ・ハッシュ一致を含むPASSが
+   表示されたら、ログ全体と画面を保存します。ページを再読み込みするとログは消えます。
+4. 同じページを再読み込みし、「保存結果を確認」を選択します。
+   `READY / 保存済み本体の確認が完了` と再オープンのPASSを保存します。
+   これは保存済み本体の再確認です。手順2で失敗した出力などの合格を意味しません。
+5. 結果をまとめて開発側へ渡します。ボタンごとの返信は不要です。
+
+失敗・中止の場合はログとその時点のURLを残してください。同じURLの
+「保存結果を確認」は大容量データ本体の復旧だけを試みます。未検証・破損状態は
+拒否し、事前の小規模検証中など、大容量データの保存開始前には復旧対象がありません。
+その場合は記録を残してから、新しい検証を実行してください。「検証を実行」を
+再び選ぶと別の合成検証になります。前回のデータは削除せず、ページ下の
+「前の検証結果」リンクから確認できますが、そのリンク表示も再読み込みで消えます。
+必要なURLは別途保存してください。利用者のプロジェクトを消す操作はありません。
+大量の反復実行は不要です。
+
+「同じ検証を別タブで開く」は同じ合成runを参照します。先のタブが保存ロックを
+保持している間、2つ目のタブの保存結果確認は「別のタブで検証中」と拒否されます。
+この跨タブ挙動は実測待ちで、自動通知・2writer収束の証拠ではありません。
+500 MiBのOPFS出力はブラウザ内部の合成ファイルです。一般のダウンロード先や
+iPhoneの共有先への有界出力、実quota、プロセスkill、完全offlineは別の未確認事項です。

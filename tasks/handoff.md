@@ -1,5 +1,15 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **Current browser-preparation update (2026-09-08):** `poc/cas-io` now also has
+> a dedicated synthetic OPFS backend and one-action local probe with separate
+> reload/readback. Isolated typecheck/build and the full 500 MiB cross-runtime
+> recipe check pass; focused review findings are corrected and confirmed.
+> Browser execution remains unperformed, not blocked code mislabeled PASS. The
+> README owns the batched steps and recovery limits. No new server/tunnel was
+> started and no human micro-check was requested. Actual OPFS/iOS, full journal,
+> inventory/GC, privacy/scale and adoption requirements still remain. The current
+> application and previously completed history-probe evidence are unchanged.
+
 > **Current I/O prerequisite update (2026-09-08):** Under the PO's autonomous
 > continuation request, `poc/cas-io` now supplies a disposable Node filesystem
 > streaming/publication proof. The 500 MiB exact-digest round trip and focused

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>隔離・大容量保存検証</title>
+    <style>
+      body { max-width: 54rem; margin: 2rem auto; padding: 0 1rem; font: 16px/1.6 system-ui, sans-serif; }
+      button, a { margin: .25rem; } button { min-height: 44px; padding: .4rem .8rem; }
+      pre { white-space: pre-wrap; overflow-wrap: anywhere; } #status { font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <h1>隔離・大容量保存検証</h1>
+    <p>500 MiBの合成データだけを使います。本番プロジェクトには触れません。作業中の検証データを含め、約1.5 GiBの空き容量が必要です。</p>
+    <p>ブラウザを開いたまま実行してください。数分かかる場合があります。オフライン・PWA・本番UIの合格判定ではありません。</p>
+    <button id="run">検証を実行</button>
+    <button id="cancel" disabled>中止</button>
+    <button id="readback">保存結果を確認</button>
+    <a id="second" target="_blank" rel="noopener" href="./">同じ検証を別タブで開く</a>
+    <p id="status" role="status">未実行</p>
+    <pre id="log"></pre>
+    <div id="previous"></div>
+    <script type="module" src="./browser.ts"></script>
+  </body>
+</html>

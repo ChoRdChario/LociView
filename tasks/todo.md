@@ -2,7 +2,51 @@
 
 ## Current boundary — implementation through UI verification (2026-09-08)
 
-### Active slice — isolated bounded CAS I/O proof (2026-09-08)
+### Completed preparation — the same I/O proof for OPFS (2026-09-08)
+
+Short meta-audit: `779859a` is the reviewed Node proof, not a production storage
+change. Its missing direct prerequisite is execution against browser OPFS and a
+real browser writer lock. Prepare that backend and one self-running local page;
+batch human execution later rather than asking for every step. Existing browser
+control initialization failure is unchanged and will not be retried here.
+
+- [x] Add an isolated OPFS backend with bounded reads/writes, explicit abort and
+  the same origin-scoped exclusive lock for import/recovery/export.
+- [x] Reuse the synthetic recipe and candidate for a one-action browser probe:
+  streamed round trip, duplicate import, injected failure/cancellation and exact
+  staged recovery. Provide a separate readback after reload without resetting.
+- [x] Check the cross-runtime synthetic recipe against the Node oracle, typecheck
+  and build only the isolated page, and obtain one focused read-only review.
+- [x] Record preparation separately from unexecuted browser/device evidence and
+  add concise batched instructions to the same README; no immediate PO check.
+
+Production scope is zero. No new dependency, main application/UI import,
+cross-store metadata journal, GC, package wire, adoption, browser download/PWA
+claim or tunnel. The page writes only its explicitly named synthetic OPFS area;
+existing user projects and prior history-probe data are not read or removed.
+Stop on a specification conflict or an actual required scope expansion. Completion
+means executable browser preparation, not a passing OPFS/iPhone gate. Reuse the
+unchanged production matrix from the preceding slice.
+
+Slice review: isolated typecheck/build PASS; browser WebCrypto recipe executed
+under Node versus independent Node AES/SHA-256 at 5 MiB + 19 bytes and full
+500 MiB with the pinned digest (1/1 focused test PASS). Independent review found
+a misleading blanket READY on partial readback and an overbroad recovery hint;
+both are corrected and confirmed. The OPFS page itself is not browser-executed.
+Its output remains private synthetic OPFS, not an adopted browser download sink.
+No new server/tunnel, production import, dependency or root build change. The
+preceding root matrix remains applicable; browser-control retry and immediate
+human requests were deliberately not repeated.
+
+Next dependency: execute the prepared OPFS page in the deferred Desktop batch,
+then obtain applicable physical-iOS/storage evidence before adoption. Remaining
+G1-A/C work includes the real cross-store journal/inventory, safe reachability/
+GC, semantic privacy closures, scale/domain limits and platform durability;
+neither this preparation nor the earlier Node proof closes those requirements.
+Keep production storage/UI wiring gated. No approval is requested for ordinary
+implementation details, and no completed manual sequence should be repeated.
+
+### Completed slice — isolated bounded CAS I/O proof (2026-09-08)
 
 The PO requested autonomous continuation with human checks batched. The existing
 S1 plan authorizes remaining metadata/CAS proofs, not silent technology adoption.
