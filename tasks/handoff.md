@@ -1,5 +1,21 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **Current journal prerequisite update (2026-09-08):** `poc/scene-history`
+> now contains an isolated exact source/ordinal-change journal protocol using
+> separate real Node metadata/journal stores and the existing isolated CAS.
+> Isolated typecheck, 29 journal tests and six existing history tests pass. Its
+> independent review findings are fixed and confirmed: missing inventory refuses
+> facade requests, and loss after `metadataDurable` requires repair rather than
+> silent replay. Original-byte local/remote recovery and old-head publication
+> barriers are proven only within the stated synthetic Node boundary. No remaining
+> P0/P1 was found there. See current todo and the probe README for exact limits.
+> Root typecheck/build and all 80 test files pass with `--maxWorkers=2`; the initial
+> default-parallel script-suite timeouts are retained separately in that record.
+> This is not actual OPFS/IndexedDB coordination, GC, complete domain validation,
+> platform/scale adoption or UI integration. Next work must close those real
+> prerequisites, not repeat the same Node fault matrix or completed human sequence.
+> Application source/dependencies remain unchanged; usage remaining is 43 percent.
+
 > **Current OPFS evidence update (2026-09-08):** `poc/cas-io` now also has
 > a dedicated synthetic OPFS backend and one-action local probe with separate
 > reload/readback. Isolated typecheck/build and the full 500 MiB cross-runtime

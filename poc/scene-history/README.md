@@ -28,6 +28,77 @@ with a shared-handle `view`; large-history reconstruction cost remains unmeasure
 API references: https://automerge.org/automerge/api-docs/js/
 and https://automerge.org/docs/reference/documents/conflicts/ .
 
+## Exact cross-store journal protocol — bounded Node proof PASS
+
+Specification 02 §8 and specification 05 §10/13.2 authorize the next disposable
+proof. Use the already pinned Automerge 3.4.1 and the isolated CAS implementation;
+no new dependency or production import. Unlike the earlier inline catalog,
+source metadata and original changes are separate source/ordinal files; the
+journal contains the specified target, descriptors and domain-separated JCS
+change-set digest. A proper synthetic bootstrap adds schema, identity/lineageSeed,
+empty collections and a separately held root proof. The earlier tiny fixture is
+not silently promoted to a complete ProjectDocV2 schema.
+
+The test uses separate temporary Node filesystem areas for metadata changes,
+journal/control and real CAS bytes. Complete writes are fsynced; interruption
+injection and a shared Node single-writer gate are not browser locks, IndexedDB
+durability, process-kill/power-loss or device evidence. Metadata publication
+retains old published heads while pending and refuses mutation/export/GC facade
+requests. Local recovery permits valid concurrent history; remote recovery
+requires exactly the base-plus-source change set and final heads. Never rebuild
+an old mutation or replace imported dependencies. Source completeness must work
+when receiver-local siblings are absent from the source document.
+
+A synthetic conflict-aware domain test port supplies final strong/opaque closure;
+hidden intermediate and weak historical references are not final requirements.
+Conservative inventory protection precedes metadata activation and checks already
+verified blob receipts/presence without reading their payload. Invalid/missing
+final closure cannot publish. This port is not the full domain/frame validator,
+unknown-field policy, cross-project reachability analysis or garbage collector.
+
+Initial proof ceilings: 64 changes, 1 MiB per change, 8 MiB aggregate metadata,
+256 KiB journal JSON and 10,000 decoded journal nodes/depth 32. These are test-only
+limits, not ratified G0/G1, target-device or hostile compressed-metadata guarantees.
+Retain the journal and original source/part artifacts after completion for this
+experiment; cleanup/grace GC remains unproved. A torn journal/control record
+refuses repair rather than guessing state. Existing browser/history/stress proofs
+are reused and no duplicate manual run is requested. No adoption or S2 wire credit.
+
+Executed 2026-09-08: isolated typecheck and 29/29 journal tests PASS; the existing
+six causal-history tests also PASS. The tests cover exact local concurrent replay,
+remote diamond interruption/publication, source subtraction with receiver-local
+siblings, final conflict/opaque closure, tamper/quota refusal and zero existing-CAS
+payload reads during metadata operations. A fresh port instance reads the same
+separate real files; this is not process-kill or browser-restart evidence.
+
+Independent read-only review's two active findings are corrected and confirmed:
+missing inventory now rejects edit/export/GC as well as presenting read-only repair;
+`metadataDurable` requires every acknowledged hash/original byte (and exact remote
+heads) already present. Missing acknowledged metadata is repair-required, not
+silently recreated from parts. Only `blobsVerified` permits missing-part recovery.
+Identity-map conflicts are rejected even when the projected fields happen to match.
+No P0/P1 remains in this bounded review. Retained-source validation on a completed
+replay never republishes old heads over legitimate later edits.
+
+Root regression: typecheck/build PASS and `npm test -- --maxWorkers=2` passes all
+80 files / 1,658 tests (21 existing todo). The default-parallel run first timed out
+in 19 tests across five unchanged script suites, with follow-on temporary-cleanup
+errors. The bounded-worker run changed neither assertions nor the 5-second test
+limit; retain the initial failure rather than describing the default run as PASS.
+
+Run from the repository root:
+
+```powershell
+npx tsc --noEmit --project poc/scene-history/journal.tsconfig.json
+npx vitest run --config poc/scene-history/journal.vitest.config.ts
+npm test --prefix poc/scene-history
+```
+
+Remaining adoption prerequisites are actual OPFS/IndexedDB coordination and its
+platform interruption evidence, the complete domain/privacy/reachability contract,
+GC, scale and ratified budgets. This result does not satisfy those gates and does
+not connect the adapter, Scene core or new team flow to the application UI.
+
 ## Browser storage probe (bounded manual sequence PASS; G1-C partial evidence)
 
 Product Owner supplied visible log text and a screenshot on 2026-09-08 after

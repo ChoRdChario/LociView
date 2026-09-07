@@ -106,6 +106,12 @@ export class CasCandidate {
     return true;
   }
 
+  /** Isolated journal test port: verified receipt + size/presence, not a rehash. */
+  async hasVerified(ref: BlobRef): Promise<boolean> {
+    validateRef(ref); const expected = { ...ref };
+    return this.io.exclusive(() => this.isPublished(expected));
+  }
+
   async import(tx: string, ref: BlobRef, source: AsyncIterable<Uint8Array>, signal?: AbortSignal): Promise<BlobRef> {
     validateTx(tx); validateRef(ref);
     // Snapshot caller-owned identity before waiting for the lock.

@@ -2,6 +2,62 @@
 
 ## Current boundary — implementation through UI verification (2026-09-08)
 
+### Completed bounded proof — isolated exact journal/publication protocol (2026-09-08)
+
+Previous goal turn made progress by recording actual OPFS payload readback and
+closing the unavailable-log inquiry. Starting checkout `4ff9adf` was clean, six
+commits ahead of the last fetched origin; latest usage remaining is 43 percent. Do not
+reopen that human check or infer full I/O/device acceptance. The next missing
+S1 prerequisite is coordination between durable original metadata changes and
+verified binary inventory, not more standalone streaming fixtures.
+
+- [x] Implement exact descriptor/source/ordinal-part preparation and validation
+  under specification 02 §8 in `poc/scene-history`, reusing pinned Automerge and
+  the isolated CAS. Write the bounded contract in its existing README first.
+- [x] Exercise local original-change recovery with valid concurrent edits and
+  remote linear/diamond prefix recovery using separate real temporary Node
+  metadata/journal stores, a publication barrier and conservative inventory.
+- [x] Prove final strong/conflict/opaque closure checks, unchanged old publication
+  on failures, root/source/descriptor tamper refusal and zero existing-blob
+  payload reads for metadata-only/replay paths; use focused existing semantics.
+- [x] Run isolated tests/typecheck, obtain one independent read-only review and
+  correct current-boundary findings.
+- [x] Complete final root regression and preserve a reversible checkpoint.
+
+Production scope is zero; application/dependency/schema/wire/UI adoption remains
+gated. No new dependency, browser-control retry, device request, GC deletion,
+converter or product budget. The synthetic domain validator and Node stores are
+test ports, not the full ProjectDocV2 validator or OPFS/IndexedDB implementation.
+Journal/source files remain retained for inspection after publication; this proof
+does not claim cleanup/GC, browser restart or complete cross-store adoption.
+Completion is an executed exact-byte/closure/publication protocol result, not a
+new feature flag or UI integration. Stop on a specification conflict or a failed
+required adapter capability; do not substitute stale command regeneration.
+
+Slice review: final isolated typecheck and 29/29 tests PASS; existing causal-history
+suite 6/6 PASS. One read-only review identified missing-inventory facade refusal
+and improper replay after acknowledged metadata loss. Both are fixed, regression
+tested and confirmed closed; root identity-map conflict refusal is also checked.
+Only prepared `blobsVerified` batches restore missing original changes;
+`metadataDurable` loss requires repair and cannot acknowledge/publish. No active
+P0/P1 remains in this bounded scope. Root typecheck and production build PASS.
+Default-parallel `npm test` hit the unchanged 5-second limit in 19 tests across
+five existing script suites, with some follow-on temporary-cleanup errors. On the
+same tree, `npm test -- --maxWorkers=2` passes all 80 files / 1,658 tests with 21
+existing todo; no assertions/timeouts, production code or test configuration were
+changed. This supports a concurrency-sensitive runner issue, not a proven product
+regression. Retain both outcomes; use the bounded worker count on this host rather
+than rerunning the same high-parallel invocation. Existing build warnings remain.
+
+Short meta-audit: this closes exact journal/source/part coordination, not another
+streaming recipe. The remaining platform boundary is actual OPFS journal plus
+IndexedDB metadata coordination, not another Node fault matrix. Reuse these exact
+protocol tests and the completed history/readback evidence. Production integration
+still needs the remaining metadata/CAS adoption criteria, including domain/privacy/
+reachability, GC, scale/ratified limits and applicable physical-iOS durability.
+Do not turn the unavailable first-run log into a blocker or reopen completed manual
+tests. S2 wire/migration companions and S3 UI remain downstream, not implemented.
+
 ### Completed preparation — the same I/O proof for OPFS (2026-09-08)
 
 Short meta-audit: `779859a` is the reviewed Node proof, not a production storage
