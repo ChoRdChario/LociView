@@ -1,5 +1,16 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **Current browser journal preparation (2026-09-08):** The same exact journal
+> now has an isolated OPFS files/inventory + pinned Repo/IndexedDB metadata port
+> and one resumable page, `poc/scene-history/journal.html`. Its result log survives
+> reload. Typecheck/build, 29 reused journal tests and four new library-lifecycle
+> cases pass; independent review findings are corrected and confirmed. No real
+> browser/OPFS-IDB/cross-tab result is claimed. The page is not running yet; its
+> README owns the developer launch and later one-batch human instructions. No new
+> server/tunnel, browser bootstrap retry, Chrome switch or production wiring was
+> performed. Actual platform, domain/privacy/GC/scale adoption gates remain open.
+> Use current todo; do not grow another probe page or repeat completed manual tests.
+
 > **Current journal prerequisite update (2026-09-08):** `poc/scene-history`
 > now contains an isolated exact source/ordinal-change journal protocol using
 > separate real Node metadata/journal stores and the existing isolated CAS.

@@ -99,6 +99,79 @@ platform interruption evidence, the complete domain/privacy/reachability contrac
 GC, scale and ratified budgets. This result does not satisfy those gates and does
 not connect the adapter, Scene core or new team flow to the application UI.
 
+## Browser cross-store journal port — implemented preparation, not platform PASS
+
+Next bounded prerequisite under specification 02 §8: run the same journal engine
+against OPFS source/part/control/inventory files, the pinned Repo/IndexedDB adapter
+for original metadata, the existing OPFS CAS and a browser-owned per-run lock.
+No inline journal changes or in-memory metadata substitute. The synthetic run has
+a separate stored identity/root proof and Repo document locator, and never opens
+the application database or a prior probe's run. All public reads reconstruct only
+published heads through a fresh repository; no live handle is a UI authority.
+
+One batched page prepares an initial local edit and a remote diamond, deliberately
+stops after one durable remote change, verifies old-head/read-only behavior and
+then offers exact recovery/readback. The page retains bounded result logs in OPFS
+before showing them, so reload does not erase the evidence. A completed recovery
+must prove exact original hashes/bytes and a repeated no-op without payload reads.
+Other-tab/reload checks remain separately attributable, not inferred from fresh
+Repo instances. This is neither process-kill nor physical-iOS/offline/PWA evidence.
+
+The pinned Repo 2.5.6 `removeFromCache`/DocHandle unload path was found to schedule
+a save during cleanup. This port therefore creates no DocHandles: a fresh Repo's
+version-pinned `storageSubsystem.loadDoc/saveDoc` explicitly reads/awaits the same
+IDB storage implementation, then a fresh Repo verifies exact bytes. These hidden
+APIs remain an isolated candidate seam, not an adopted production API. Storage
+identity is initialized only under the writer lease. Cleanup first rejects new
+writes and drains started transactions; there is no autosave queue or live handle
+to flush while reading or releasing a lease.
+
+The backend must preserve failed/pending state on OPFS/IndexedDB errors and must
+not auto-reset or regenerate a failed run. Missing/corrupt session/control/files
+fail closed. Run initialization is synthetic preparation, not production Project
+creation/migration. No GC/cleanup, full domain/privacy/scale adoption, S2 encoding,
+new dependency, human stress rerun, tunnel or production UI is included.
+
+Executed 2026-09-08: isolated TypeScript check and browser build PASS; the unchanged
+exact journal suite passes 29/29, and four additional pinned-Repo lifecycle tests
+pass (read/cleanup write-free, missing-identity refusal, no cleanup retry after
+failed save, started-write drain with late-write refusal). Their memory test port
+proves only library lifecycle; it is not IndexedDB/OPFS or browser evidence.
+Independent read-only review confirmed both findings closed: metadata payload-read
+counters now exclude newly staged blob verification, and DocHandle cleanup no
+longer schedules unowned saves. No blocking finding remains in this preparation.
+Root code/dependencies/build inputs are unchanged, so the `a401a77` root matrix
+remains applicable; it is not repeated for the isolated page.
+
+No browser execution or new server is recorded for this slice. The separate
+Windows screen-control connection was available, but its skill forbids operating
+the ChatGPT app UI, so it was not used to bypass the unavailable in-app browser
+control. Chrome was not silently substituted for the selected in-app browser.
+No unchanged browser bootstrap retry or immediate human request was made.
+
+Developer launch, from this directory (not a currently running link):
+
+```powershell
+node ../../node_modules/vite/bin/vite.js build --config journal.vite.config.mjs
+node ../../node_modules/vite/bin/vite.js preview --config journal.vite.config.mjs
+```
+
+The prepared route is `http://127.0.0.1:5186/journal.html`. Before handing it to a
+human, verify that exact page and its referenced JS/WASM return HTTP 200 and bind
+the build to its source checkpoint. The prior 5184/5185 builds are not replaced.
+
+Later batched execution follows the four steps displayed on the page. The initial
+tab stops with `初期タイトル` / `手元の追記` / `revision-1`, read-only. Reload must
+retain that view and the saved log. Open the page's same-run link in a second tab;
+recover there to `共有されたタイトル` / `統合後の本文` / `revision-2`, with exact-byte
+and one-publication PASS. A second recovery must report no-op/zero publications.
+Confirm the first tab's automatic update separately, then reload/read back in
+both tabs. Log rows include a tab token and observation origin so an actual
+notification is not confused with a manual check. Report failures once, in one
+batch; do not reset the run, remove browser data or repeat the 500 MiB probe.
+The full G1-A/C device, process-kill, domain/privacy, GC and scale requirements
+remain open, as do production integration and the eventual S3 product UI flow.
+
 ## Browser storage probe (bounded manual sequence PASS; G1-C partial evidence)
 
 Product Owner supplied visible log text and a screenshot on 2026-09-08 after

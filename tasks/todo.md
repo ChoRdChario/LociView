@@ -2,6 +2,53 @@
 
 ## Current boundary — implementation through UI verification (2026-09-08)
 
+### Completed preparation — browser cross-store journal port (2026-09-08)
+
+The previous goal turn made progress: reviewed exact Node journal proof committed
+as `a401a77`; worktree clean, seven ahead of last fetched origin and zero behind.
+Usage remaining is 43 percent. The next actual gap is browser OPFS/IndexedDB
+coordination. Do not repeat the Node fault matrix or the completed manual probes.
+
+- [x] Implement isolated OPFS journal/control/inventory files and pinned Repo/IDB
+  metadata ports for the same exact protocol, with a shared browser writer lock.
+- [x] Prepare one batched browser flow: initial local edit, remote interruption,
+  old-head read-only view from a fresh repository, exact recovery and repeated
+  readback/no-op. Preserve the run identity and result log across page reload.
+- [x] Typecheck/build the isolated page, execute reusable protocol checks, obtain
+  one bounded independent read-only review and preserve a reversible checkpoint.
+
+Production scope remains zero: no adoption, root dependency/schema, UI hookup,
+GC deletion, new source data, 500 MiB stress repeat, release/PWA/tunnel or immediate
+human-test request. Use new synthetic storage per run and never reset prior runs.
+The page is preparation, not platform PASS until executed. Reuse `a401a77` root
+matrix while its source/dependencies remain unchanged. Stop on a specification
+conflict or failure of a required adapter capability; do not substitute inline
+source changes or a memory-only metadata port for the actual cross-store path.
+
+Slice review: isolated typecheck/build PASS, unchanged journal suite 29/29 PASS,
+and four added pinned-Repo lifecycle cases PASS. The new cases use a memory
+storage test port, not a browser claim. Review corrected cumulative CAS-read
+accounting and unload-triggered autosave. The browser port now creates no
+DocHandles; explicit version-pinned storageSubsystem saves are awaited and read
+back by a fresh Repo. The hidden API remains an isolated candidate, not adopted.
+Cleanup closes new write admission and drains started transactions before lease
+release. Independent review confirms the findings closed with no new blocker.
+Production source/dependencies remain unchanged; reuse the preceding root matrix.
+
+The existing browser-control bootstrap failure was not retried. Windows screen
+control connected but cannot operate the ChatGPT app UI under its skill; no
+browser action, Chrome switch or new server/tunnel was performed. The new page's
+real OPFS/IDB, other-tab and reload results remain pending. Its persistent logs
+and later batched instructions are in the existing probe README; no immediate
+human request or repeated large-payload run is needed.
+
+Next boundary: obtain the prepared platform evidence in the batched device lane
+before adoption, while addressing genuinely remaining G1-C domain/privacy/closure
+requirements from specification 05. Do not grow another browser page or repeat
+these protocol/lifecycle tests without a changed requirement or implementation.
+Storage/Scene/UI hookup is still gated; S2's wire/migration companions and S3's
+integrated Desktop/iPhone flow are not implemented and must not be marked done.
+
 ### Completed bounded proof — isolated exact journal/publication protocol (2026-09-08)
 
 Previous goal turn made progress by recording actual OPFS payload readback and
