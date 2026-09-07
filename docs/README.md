@@ -54,6 +54,7 @@ If observed code conflicts with the applicable compatibility or accepted future 
 | `specs/03-gates-and-delivery.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | G0/G0-S/G1 evidence, thresholds, feature flags, rollback and schedule |
 | `specs/04-locimyu-conversion.md` | `PRODUCT-OWNER APPROVED / BOUNDED DIRECT ADAPTER IMPLEMENTED / PRODUCT ACCEPTANCE PASS` | Exact LociMyu identity/source authority and report boundary; six representative rows with an empty trimmed ID are reported as empty input, while 103 Captions publish and survive portable restore without changing the source; Desktop and physical-iPhone acceptance passed |
 | `specs/05-project-scene-team-workflow.md` | `PRODUCT-OWNER APPROVED / DISCONNECTED PURE SCENE CORE ONLY` | Scene command/composition core under §13.1; no storage/UI integration. Causal team exchange/migration remains unimplemented; current Native bytes remain unchanged |
+| `specs/06-project-package-wire.md` | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED` | Five-purpose wire companion draft; explicit delta/journal, base-receipt, budget and snapshot-builder ratification inputs. No adopted format/version, production bytes or gate credit |
 
 ## Known implementation drift
 

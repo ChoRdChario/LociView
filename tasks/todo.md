@@ -2,6 +2,52 @@
 
 ## Current boundary — implementation through UI verification (2026-09-08)
 
+### Completed draft — proposed five-purpose package-wire companion (2026-09-08)
+
+Checkpoint `459d7bd` is clean, ten ahead and zero behind the last fetched origin;
+usage remaining is 41 percent. The unavailable initial OPFS log is already
+recorded as unknown, with saved-payload readback separately PASS. Do not reopen
+that inquiry or repeat the manual stress run.
+
+The proposed scheduling exception for full storage-neutral validators and
+reusable UI components has not received PO approval. Automatic continuation and
+the OPFS evidence reply do not approve it. Existing specification 05 §13.1 still
+permits only the disconnected pure Scene core; no wider production work begins.
+
+Specification 05 §7.5 already authorizes a bounded package-wire design. This
+slice supplies the missing S2 companion draft, not a ratified format or writer.
+
+- [x] Draft the five-purpose manifest, exact causal delta/base records, one-Scene
+  snapshot, privacy/stream/recovery boundaries and remaining ratification inputs.
+- [x] Obtain one independent read-only contract review and correct draft findings.
+- [x] Check links/diff and record the proposal status without application retests.
+
+Production scope is zero. Reuse accepted domain/stream/journal rules and the
+bounded semantic proof; do not promote the synthetic graph to a wire schema.
+Do not choose unapproved device budgets, add package code/fixtures/dependencies,
+change current Native/v1 bytes, start a server, or claim S2/gate/UI completion.
+Where delta transport needs a journal-contract amendment, mark that amendment
+explicitly unresolved; do not silently redefine the approved source-byte rule.
+Completion is a reviewable proposal and exact remaining decisions, not more
+PoC coverage. Stop before ratification, production adoption or release.
+
+Slice review: `docs/specs/06-project-package-wire.md` and both authority indexes
+explicitly say PROPOSED / UNRATIFIED / NOT IMPLEMENTED. Independent read-only
+review found no blocker to presenting the proposal. Self-review clarified unknown
+minor preservation and clean nonmanual provenance. Local Markdown links resolve
+and whitespace checks pass. No executable source/dependencies changed, so the
+existing root matrix is reused without an unchanged test/build or large-file run.
+
+Short meta-audit / next decision: the draft identifies the delta-to-journal
+source-byte mismatch as a proposed amendment, not an approved implementation.
+Exact profiles/budgets/summary and backup evidence, journal/base publication,
+and complete history-free conversion remain grouped ratification inputs in §10.
+This closes a companion-draft task, not S2's wire gate, storage adoption or UI.
+Do not start a new auxiliary proof just because the production path is gated.
+The pending PO scheduling exception above remains the next implementation
+decision; physical storage evidence and final real UI/device acceptance remain
+separate, required lanes. No new human test request or server was created.
+
 ### Completed bounded proof — cross-project retention and orphan GC (2026-09-08)
 
 Previous turn made progress with `9fbf05e`; checkout is clean, nine ahead of last

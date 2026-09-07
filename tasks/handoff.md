@@ -1,5 +1,16 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **Current package design update (2026-09-08):**
+> `docs/specs/06-project-package-wire.md` is a reviewed **PROPOSED / UNRATIFIED**
+> companion under 05 §7.5, not a format/version or S2 adoption. It separates five
+> purposes, exact delta/base state, one-Scene privacy and required journal changes;
+> §10 owns the remaining ratification inputs. No executable code, dependency,
+> server or additional manual test changed. The scheduling proposal to advance
+> full storage-neutral validators/reusable UI components still has no PO approval;
+> automatic continuation and the unavailable-log reply do not approve it. Use the
+> current todo's next decision, preserve required platform/device gates, and do
+> not repeat completed proofs or create another auxiliary page while waiting.
+
 > **Current retention update (2026-09-08):** Isolated `poc/cas-io/retention.ts`
 > now proves shared-Project retention and grace-period orphan collection with
 > actual synthetic files. Typecheck and 14/14 tests pass; independent review's

@@ -36,6 +36,12 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metri
 | [`04-locimyu-conversion.md`](04-locimyu-conversion.md) | Canonical LociMyu Caption identity, source-authority rules and the direct-adapter conversion-report boundary |
 | [`05-project-scene-team-workflow.md`](05-project-scene-team-workflow.md) | ProjectScene composition, continuing causal team history, Workspace/Contribution purposes, migration bridge and acceptance; supersedes the identified general-v2 DisplaySet/fixed-campaign clauses without changing Native bytes |
 
+### Proposed companions — not covered by the approval above
+
+| Document | Status / purpose |
+|---|---|
+| [`06-project-package-wire.md`](06-project-package-wire.md) | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED`; five-purpose wire design under 05 §7.5, with explicit unresolved journal/base, budget and history-free-builder inputs; no format/version or production authorization |
+
 ## Fixed versus conditional decisions
 
 Fixed unless a later accepted ADR supersedes the applicable part of ADR-0001 or
