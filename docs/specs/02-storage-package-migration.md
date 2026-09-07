@@ -2453,3 +2453,176 @@ Stop and return to the Product Owner if this boundary requires legacy mutation,
 a v1 wire change, journal/quarantine/resolution infrastructure, a Native schema
 or Package Exchange change, or a fallback that converts without proven source
 exclusivity.
+
+## 32. Bounded Native legacy-convenience UI closure (Product Owner approved 2026-09-06)
+
+This section adds the user-facing conveniences and exact exchange projections
+approved after the public-candidate UI audit. It extends sections 27, 29 and 30
+without changing Native snapshot schema `1`, portable package versions or Native
+Package Exchange version `1`. It does not change legacy source authority or make
+legacy/LociMyu inputs writable.
+
+### 32.1 Caption repetition and comparison
+
+- New Caption placement has a per-open-session, per-DisplaySet authoring color.
+  The explicit color is reused for consecutive new Captions. Existing Caption
+  selection/editing and 3D pin color filtering do not change it. Only the color
+  written into a created Caption is durable.
+- The Caption list shows whether each record has attached media and its count.
+  The count is derived from exact ordered `attachmentMediaIds`; it does not infer
+  attachment identity from labels or bytes.
+- One selected Caption remains the only editor, placement and gizmo authority.
+  The UI may retain additional Caption windows for comparison without creating
+  additional selections or durable window state. Each retained window resolves
+  one exact Caption ID, has its own temporary position/size and connector, and
+  closes independently. A Caption is never represented by duplicate windows.
+- Hidden DisplaySets suspend their retained windows without discarding session
+  intent. Missing/deleted/unplaced/unavailable or off-screen pins never receive
+  an invented projection. Content may remain available with an explicit reason,
+  while the connector is hidden. Color-filter recovery never overrides Asset
+  visibility. The full-image viewer remains one-at-a-time and stale media loads
+  cannot repopulate a closed or reassigned window.
+- Dragging the temporary card remains available, but a click/tap-operable
+  alternative must be provided for arranging comparison windows. No window
+  count is silently evicted; a supported device limit, if needed, requires
+  measured evidence and a separate Product Owner decision.
+
+### 32.2 Existing-media reuse and attachment removal
+
+- Clean Edit may attach either a newly admitted image or an existing verified
+  project media record to an explicitly selected Caption. Existing-media reuse
+  uses its exact stable media ID and never infers equivalence from filename,
+  label, digest similarity or image content. An already attached ID is a no-op,
+  not a duplicate ordered reference.
+- Clean Edit may remove one exact media ID from one Caption. Removal changes only
+  that Caption's ordered attachment references. The project media record, bytes,
+  other Caption references and collaboration baseline remain unchanged. The UI
+  must state that this is not secure deletion or project-media garbage collection.
+- Reuse and removal use the existing project writer and immediate-save boundary
+  used by new Caption-image attachment: no dirty working change may be pending,
+  publication is snapshot-last/marker-last, failure leaves the previous durable
+  snapshot active and retry is explicit.
+- Collaboration export projects away a media record only when it is absent from
+  the fixed baseline and unreferenced by every current Caption. This projection
+  affects only the exported collaboration snapshot and byte closure. It does not
+  modify the active Project, source bytes, fixed baseline, complete backup or clean
+  copy. Baseline media is retained even when currently unreferenced. The receiver's
+  unreferenced incoming-media rejection and all conflict/zero-write rules remain.
+  Re-importing the same semantic package remains a no-op.
+
+### 32.3 DisplaySet and view authoring
+
+- A user may create a DisplaySet with one explicit name. It receives a new stable
+  ID/order key, no Captions, no material appearances and no default Saved View.
+  Asset visibility, transforms and Representations remain Project-wide and are
+  neither copied nor changed. Materializing an older implicit default set preserves
+  its existing membership and view relation.
+- Renaming changes the name of one exact DisplaySet while preserving its ID and
+  every reference. Blank/invalid input is rejected without discarding the field.
+  Equal display names do not merge sets or change identity.
+- One existing Saved View belonging to the same DisplaySet may be explicitly made
+  that set's default without applying its camera. Selecting or applying a view alone
+  never changes the default. Updating a Saved View explicitly recaptures its name,
+  camera and background under the same ID.
+- These mutations use ordinary dirty/save/reload behavior. They remain unsupported
+  collaboration state under section 30.1: local editing is allowed, but a fixed
+  collaboration baseline is never automatically rebased and a later incompatible
+  collaboration export/merge fails with an actionable explanation.
+- Background controls expose the same six-digit sRGB value through a color picker
+  and validated HEX field. `Standard color` sets the current 3D background to
+  `#101725`; it does not reset camera, material, interface palette or Saved View.
+  Background persists only when captured/updated in a Saved View as already defined.
+  DisplaySet delete/copy/reorder and bulk Caption reassignment are outside this slice.
+
+### 32.4 Exact review target and workspace-to-export handoff
+
+- Review/share export accepts one explicit DisplaySet ID that exists in the durable
+  source snapshot. The review allowlist is built from that set rather than implicitly
+  reading `presentation.activeDisplaySetId`. This does not change the active Project,
+  its presentation value, collaboration baseline or the other three export purposes.
+- Before an export, the UI identifies the exact Project, purpose and—only for
+  review/share—the chosen DisplaySet, plus the resulting visible Asset, Caption and
+  attached-media counts. Search text, pin-color filters, temporary windows and other
+  UI-only state never affect package contents. An unsaved or missing set is rejected;
+  the exporter never substitutes another set.
+- An opened workspace may hand the exact Project ID, explicit purpose and optional
+  review set to the ordinary home exporter. The current Edit session must close and
+  release its lock first. The existing exporter then reopens the durable snapshot,
+  reacquires the required writer and preserves the direct user gesture for the OS
+  save picker. Project/purpose are not guessed and the user does not reselect them.
+- If durable reload after preflight changes snapshot identity, generation or any
+  shown package count, the old confirmation is invalid. The updated scope is shown
+  and requires a new user export action, or export stops. Cancellation, streaming,
+  read-back verification, result retention and staged-file cleanup keep section 30.
+
+### 32.5 Post-selection file intent and GS offline preparation
+
+- The ordinary home has one neutral file-selection entry. Its primary copy does
+  not require the user to choose or understand a package format first. After
+  selection, validated bytes and container metadata—not the filename—determine
+  the detected format/purpose. Before the first registration, restore, conversion,
+  Project creation or navigation, the UI states the detected content, the next
+  action, the resulting opening mode and whether the selected source changes.
+  This is the only idle file picker. A safely detected model replaces the idle
+  intake and Project list with the contextual new-Project form; cancelling or
+  removing its last model returns to the idle intake without writing.
+- A valid old LociView Project is identified as a saved read-only copy that can be
+  converted later without modifying its source. A LociMyu ZIP keeps the existing
+  no-guess import review. A model enters the new-Project flow; ambiguous or unsupported
+  model content stops without assigning a role. Native complete backup, collaboration,
+  review/share and clean-copy purposes remain distinct and are never inferred from
+  a filename. Review/share is described as opening in View first, not as durable
+  access control.
+- `Ambiguous model content` means that more than one supported interpretation remains
+  possible after structural admission; a filename extension alone is not a deciding
+  signal. When exact
+  validation identifies one supported role, the UI names and applies that safe
+  default. When no role or more than one interpretation validates, it stops instead
+  of presenting a choice that would later fail or silently treating the input as
+  another role.
+- Native model intake validates the selected bytes again before publication. A
+  GLB/glTF/OBJ/STL or Mesh PLY is admitted to the Mesh role only when its parser
+  produces a non-empty triangle Mesh without Point or Line primitives. The exact
+  ordinary-Point and GS PLY profiles keep their separate roles. Point-only, mixed
+  Point/Mesh, Line-bearing, malformed and multiply valid inputs stop before Project
+  creation; neither an extension nor a filename breaks a tie or converts them to
+  Mesh.
+- New-Project creation exposes one model-selection entry rather than separate
+  Mesh/Point and GS inputs. The existing bounded combination—at most one Mesh or
+  exact ordinary Point plus at most one GS—may be selected together or added through
+  that same entry. Validated content assigns each role. Two files for the same role
+  block the whole pending selection without choosing a winner. The GS Caption-placement
+  proxy and GS offline action appear only while the selected set contains GS.
+- A write-capable action requires an explicit post-inspection confirmation.
+  Cancelling clears the pending choice and performs no registration, restore,
+  conversion, creation, merge or navigation. Confirmation is not write authority:
+  the existing validators, quota check, Project collision check, lock acquisition
+  and marker-last publication run again immediately before their normal write.
+- A collaboration file whose exact Project already exists is not restored as a
+  second copy from home. The confirmation directs the user to open that Project in
+  Edit and use its explicit collaboration-merge action. No conflict winner or
+  target Project is guessed.
+- The explicit offline preparation control is specifically for GS display code in
+  the current browser/origin. It does not save Project/model bytes and does not
+  create a backup. The generic `offline/device` home category is not user-facing;
+  the action is named `GSをオフラインでも見る` and is presented only after a GS
+  need is established. Mesh/ordinary Point-only flows do not show it. A ready claim
+  still requires the existing Service Worker, cache read-back and runtime-init
+  checks; a development server never supplies offline/PWA acceptance.
+
+### 32.6 Acceptance and exclusions
+
+Acceptance covers consecutive authoring color, retained comparison windows,
+list attachment counts, one-at-a-time image viewing, exact media reuse/removal,
+shared-media retention, baseline/nonbaseline orphan cases, collaboration projection
+and idempotence, DisplaySet create/rename/default-view authoring, background HEX and
+standard color, exact review-set export, stale preflight, dirty/lock/failure recovery,
+portable round trips, Desktop rendering and physical-iPhone interaction. The original
+41-task inventory remains and adds the eight scenarios recorded in
+`tasks/uiux-parity-plan.md`.
+
+This closure adds no direct HEIC/HEIF, video/audio, media processing, attachment
+reorder, media deletion/GC, generic Undo/history, durable window layout, DisplaySet
+delete/copy/reorder, bulk Caption movement, cloud/Google dependency, new package or
+snapshot version, schema field, runtime dependency, Service Worker, release or
+deployment change.

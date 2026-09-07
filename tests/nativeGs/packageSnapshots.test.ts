@@ -2,9 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { createNativeCollaborationBaselineV1 } from '../../src/nativeGs/captionThreeWayMerge';
 import {
   buildNativeCleanCopySnapshotPlanV1,
+  buildNativeCollaborationSnapshotPlanV1,
   buildNativeReviewSnapshotPlanV1,
 } from '../../src/nativeGs/packageSnapshots';
-import { parseNativeSnapshotV1, serializeNativeSnapshotV1 } from '../../src/nativeGs/schema';
+import {
+  NATIVE_DEFAULT_DISPLAY_SET_ID,
+  nativeDisplaySetsV1,
+  parseNativeSnapshotV1,
+  serializeNativeSnapshotV1,
+} from '../../src/nativeGs/schema';
 import { makeNativeDraft, NATIVE_TEST_IDS, snapshotFromDraft, testNativeId } from './nativeTestProject';
 
 function sourceSnapshot() {
@@ -46,6 +52,11 @@ function sourceSnapshot() {
 }
 
 describe('native exchange snapshot builders', () => {
+  it('does not project collaboration media without a fixed baseline', () => {
+    const source = snapshotFromDraft(makeNativeDraft().draft);
+    expect(() => buildNativeCollaborationSnapshotPlanV1(source)).toThrow(/baseline is missing/);
+  });
+
   it('builds a fully re-keyed visible review closure without lineage metadata', () => {
     const source = sourceSnapshot();
     const hiddenMediaId = testNativeId('med', 2);
@@ -72,7 +83,7 @@ describe('native exchange snapshot builders', () => {
         },
       ],
     }));
-    const plan = buildNativeReviewSnapshotPlanV1(sourceWithHiddenCaption);
+    const plan = buildNativeReviewSnapshotPlanV1(sourceWithHiddenCaption, NATIVE_DEFAULT_DISPLAY_SET_ID);
     expect(plan.snapshot.project.id).not.toBe(source.project.id);
     expect(plan.snapshot.collaborationBaseline).toBeUndefined();
     expect(plan.snapshot.assets).toHaveLength(1);
@@ -102,7 +113,7 @@ describe('native exchange snapshot builders', () => {
       ...source,
       presentation: { ...source.presentation, hiddenAssetIds: [] },
     }));
-    const plan = buildNativeReviewSnapshotPlanV1(allVisible);
+    const plan = buildNativeReviewSnapshotPlanV1(allVisible, NATIVE_DEFAULT_DISPLAY_SET_ID);
     expect(plan.snapshot.assets).toHaveLength(2);
     expect(plan.snapshot.representations.map((entry) => entry.role).sort()).toEqual([
       'gsPrimary', 'interactionProxy', 'meshPrimary',
@@ -150,7 +161,7 @@ describe('native exchange snapshot builders', () => {
     const plan = buildNativeReviewSnapshotPlanV1({
       ...source,
       captions: [{ ...source.captions[0]!, anchor: null }],
-    });
+    }, NATIVE_DEFAULT_DISPLAY_SET_ID);
     expect(plan.snapshot.captions).toHaveLength(1);
     expect(plan.snapshot.captions[0]).toEqual(expect.objectContaining({
       anchor: null,
@@ -164,6 +175,57 @@ describe('native exchange snapshot builders', () => {
     expect(() => buildNativeReviewSnapshotPlanV1({
       ...source,
       captions: [{ ...withoutOwner, anchor: null }],
-    })).toThrow(/no durable owning Asset/);
+    }, NATIVE_DEFAULT_DISPLAY_SET_ID)).toThrow(/no durable owning Asset/);
+  });
+
+  it('projects only nonbaseline unreferenced media from collaboration output', () => {
+    const source = sourceSnapshot();
+    const orphanId = testNativeId('med', 9);
+    const withOrphan = parseNativeSnapshotV1(serializeNativeSnapshotV1({
+      ...source,
+      mediaResources: [
+        ...(source.mediaResources ?? []),
+        {
+          id: orphanId,
+          label: 'detached.png',
+          kind: 'image',
+          blob: { algorithm: 'sha256', digest: '9'.repeat(64), byteLength: 9, mediaType: 'image/png' },
+        },
+      ],
+    }));
+    const plan = buildNativeCollaborationSnapshotPlanV1(withOrphan);
+    expect(withOrphan.mediaResources?.map((media) => media.id)).toContain(orphanId);
+    expect(plan.snapshot.mediaResources?.map((media) => media.id)).not.toContain(orphanId);
+    expect(plan.snapshot.mediaResources?.map((media) => media.id)).toEqual(
+      source.collaborationBaseline?.mediaResources.map((media) => media.id),
+    );
+    expect(plan.mediaSourceIds.has(orphanId)).toBe(false);
+    expect(plan.snapshot.collaborationBaseline).toEqual(source.collaborationBaseline);
+  });
+
+  it('builds review output from the exact requested saved DisplaySet', () => {
+    const source = sourceSnapshot();
+    const setId = testNativeId('set', 2);
+    const captionId = testNativeId('cap', 3);
+    const selected = parseNativeSnapshotV1(serializeNativeSnapshotV1({
+      ...source,
+      displaySets: [
+        ...nativeDisplaySetsV1(source).map((set) => ({ ...set, id: NATIVE_DEFAULT_DISPLAY_SET_ID })),
+        { id: setId, name: 'Field review', orderKey: '000001', defaultSavedViewId: null },
+      ],
+      captions: [
+        ...source.captions,
+        {
+          ...source.captions[0]!, id: captionId, title: 'Selected set Caption',
+          displaySetId: setId, attachmentMediaIds: [],
+        },
+      ],
+    }));
+    const plan = buildNativeReviewSnapshotPlanV1(selected, setId);
+    expect(plan.snapshot.displaySets?.[0]?.name).toBe('Field review');
+    expect(plan.snapshot.captions.map((caption) => caption.title)).toEqual(['Selected set Caption']);
+    expect(selected.presentation.activeDisplaySetId).not.toBe(setId);
+    expect(() => buildNativeReviewSnapshotPlanV1(selected, testNativeId('set', 99)))
+      .toThrow(/selected DisplaySet is unavailable/);
   });
 });

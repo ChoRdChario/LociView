@@ -22,6 +22,7 @@ import { el, clear, downloadBlob, fmtBytes } from './dom';
 import { infoDialog, promptDialog } from './dialogs';
 import { fNum, fStr } from './fields';
 import { mountHome, type NativeProjectListItem } from './home';
+import type { NativeHomeUi } from '../nativeGs/homeUi';
 import type { ZipInspection } from '../assets/package';
 import { serializeConventionalSourceReport } from './conventionalSourceReport';
 import { mountViewerScreen } from './viewerScreen';
@@ -81,6 +82,8 @@ export async function bootApp(root: HTMLElement): Promise<void> {
   let packageExportStatus: PackageExportStatus = Object.freeze({ phase: 'idle' });
   let v1ConversionInProgress = false;
   let lociMyuConversionInProgress = false;
+  let activeHomeUi: NativeHomeUi | null = null;
+  let homeEpoch = 0;
 
   // ---- 保存状態（書き出し済みop数をプロジェクトごとに記録） -----------------------------
   const exportedKey = (dir: string): string => `lv-package-covered:${dir}`;
@@ -607,9 +610,12 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     }
   }
 
-  function renderHome(): void {
+  async function renderHome(): Promise<void> {
+    const epoch = ++homeEpoch;
+    activeHomeUi = null;
     clear(root);
-    mountHome(root, {
+    root.className = '';
+    const deps = {
       fs,
       identity,
       openProject,
@@ -620,10 +626,35 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       openNativeProjects,
       restoreNativePackage,
       convertLociMyuZipToNative,
-    });
+    };
+    if (!persistentWorkspace) {
+      mountHome(root, deps);
+      return;
+    }
+    try {
+      const { bootNativeGsApp } = await import('../nativeGs/app');
+      if (epoch !== homeEpoch) return;
+      await bootNativeGsApp(root, {
+        isCurrent: () => epoch === homeEpoch,
+        mount: (container, nativeHome) => {
+          if (epoch !== homeEpoch) return;
+          activeHomeUi = nativeHome;
+          mountHome(container, { ...deps, nativeHome });
+        },
+        openProject: openNativeProjects,
+      });
+    } catch (error) {
+      if (epoch !== homeEpoch) return;
+      clear(root);
+      mountHome(root, { ...deps, storageWarning: `プロジェクトの準備に失敗しました：${error instanceof Error ? error.message : String(error)}` });
+    }
   }
 
   async function closeProjectAndShowHome(): Promise<boolean> {
+    if (activeHomeUi?.busy) {
+      await infoDialog('ファイル処理中', '先に処理と、書き出したファイルの保存確認を完了してください。受け取るファイルは、その後にもう一度開いてください。');
+      return false;
+    }
     projectNavigationEpoch += 1;
     const activeCtx = ctx;
     const access = projectAccess;
@@ -652,7 +683,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     }
     projectAccess = null;
     disposeViewer();
-    renderHome();
+    await renderHome();
     return true;
   }
 
@@ -717,6 +748,9 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       throw new Error('project: opening was superseded by another navigation');
     }
     clear(root);
+    root.className = '';
+    homeEpoch += 1;
+    activeHomeUi = null;
     const viewer = new ViewerCore();
     ctx = new AppContext(access.workspace, dir, store, viewer, identity);
     // メモリ不足でGLが落ちたら、白画面のままにせず状況を伝える
@@ -794,6 +828,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
   });
 
   // ---- OSから開かれたファイル（関連付け・共有シート） -------------------------------
+  await renderHome();
   onExternalFileOpen(async (file) => {
     // ビューアを開いている場合はホームへ戻してから投入する（ホームが受け口の一貫ルール）
     if (!(await closeProjectAndShowHome())) return;
@@ -805,7 +840,6 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     dropTarget.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
   });
 
-  renderHome();
 }
 
 /** 画面下部の一時通知（更新案内など） */

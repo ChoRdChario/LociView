@@ -15,8 +15,10 @@ import { importWizardDialog } from './importDialog';
 import { isStandalone, onInstallAvailability, promptInstall } from '../platform/pwa';
 import type { LociMyuDisplaySetRelationConfirmation } from '../io/locimyu';
 import { serializeConventionalSourceReport } from './conventionalSourceReport';
+import type { NativeHomeUi } from '../nativeGs/homeUi';
 
 export interface HomeDeps {
+  nativeHome?: NativeHomeUi;
   fs: WorkspaceFS;
   identity: Identity;
   openProject: (dir: string) => Promise<void>;
@@ -85,11 +87,20 @@ async function listProjects(fs: WorkspaceFS): Promise<ProjectListItem[]> {
 
 export function mountHome(root: HTMLElement, deps: HomeDeps): void {
   const listEl = el('div', { class: 'lv-home-list' });
+  const conventionalSection = el('details', { class: 'ng-card', hidden: 'true' },
+    el('summary', {}, 'この端末に残っている旧プロジェクト'),
+    el('p', { class: 'ng-note' }, '以前に読み込んだ旧LociViewプロジェクトです。閲覧専用で開き、元データを変更せず新しいプロジェクトへ変換できます。'),
+    listEl,
+  );
   const nativeListEl = el('div', { class: 'lv-home-list' });
-  const fileStatus = el('div', { class: 'lv-dim lv-pad', role: 'status' });
+  const nativeProjectsSection = el('section', { class: 'ng-card' },
+    el('h2', {}, 'この端末のプロジェクト'),
+    deps.nativeHome?.projects ?? nativeListEl,
+  );
+  const fileStatus = el('div', { class: 'lv-dim lv-pad lv-file-status', role: 'status' });
   const fileInput = el('input', {
     type: 'file',
-    accept: '.zip,.lociview',
+    // No accept filter: custom .lociview UTI may otherwise be hidden on iPhone.
     style: 'display:none',
   }) as HTMLInputElement;
   fileInput.addEventListener('change', () => {
@@ -98,8 +109,11 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
     fileInput.value = '';
   });
 
-  const dropZone = el('div', {
+  const dropZone = el('button', {
+    type: 'button',
     class: 'lv-drop',
+    'aria-label': 'ファイルを開く',
+    'aria-describedby': 'lv-file-open-hint',
     onclick: () => fileInput.click(),
     ondragover: (event) => {
       event.preventDefault();
@@ -112,10 +126,24 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
       const file = (event as DragEvent).dataTransfer?.files?.[0];
       if (file !== undefined) void handleFile(file);
     },
-  },
-    el('div', { class: 'lv-drop-title' }, 'バックアップ／従来形式／LociMyu ZIPを開く'),
-    el('div', { class: 'lv-dim' }, '従来形式は閲覧専用で開き、新しい形式へ変換して編集できます。'),
+    },
+    el('span', { class: 'lv-drop-title' }, 'ファイルを開く'),
+    el('span', { id: 'lv-file-open-hint', class: 'lv-dim' }, '選択またはここにドロップ'),
   );
+
+  let creationPending = false;
+  let hasConventionalProjects = false;
+  const syncHomeStep = (): void => {
+    dropZone.hidden = creationPending;
+    nativeProjectsSection.hidden = creationPending;
+    conventionalSection.hidden = creationPending || !hasConventionalProjects;
+  };
+  deps.nativeHome?.onCreationPendingChange((pending) => {
+    const returningToIdle = creationPending && !pending;
+    creationPending = pending;
+    syncHomeStep();
+    if (returningToIdle) dropZone.focus();
+  });
 
   const installBar = el('div', { class: 'lv-install' });
   if (!isStandalone()) {
@@ -123,45 +151,67 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
       clear(installBar);
       if (!available) return;
       installBar.append(
-        el('span', {}, '📲 ホーム画面に追加すると、ネットのない場所でも起動でき、データが消えにくくなります'),
+        el('span', {}, 'ホーム画面に追加できます。オフライン利用の準備と、外部ファイルへのバックアップも確認してください。'),
         el('button', { class: 'primary mini', onclick: () => void promptInstall() }, '追加'),
       );
     });
   }
 
   root.append(
-    el('div', { class: 'lv-home' },
+    el('main', { class: 'lv-home ng-home' },
       el('header', { class: 'lv-home-head' },
-        el('b', {}, 'LociView'),
+        el('span', { class: 'ng-brand' }, 'LociView'),
         el('span', { class: 'lv-flex1' }),
         el('button', { onclick: deps.openProfile }, 'プロファイル'),
       ),
       installBar,
       deps.storageWarning === null ? null : el('div', { class: 'lv-warn lv-pad' }, `⚠ ${deps.storageWarning}`),
-      el('div', { class: 'lv-row lv-space', style: 'margin-top:14px' },
-        el('div', { class: 'lv-hint' }, '編集できるプロジェクト'),
-        el('button', { class: 'primary', onclick: () => deps.openNativeProjects() }, '開く／新しく作る'),
+      el('h1', {}, 'LociViewは、3Dデータにキャプションとメディアを添付するツールです'),
+      el('p', { class: 'ng-note' },
+        '作業内容はこの端末に保存されます。同じプロジェクトを使う相手とは、共同編集用ファイルでキャプション変更をやり取りできます。',
       ),
-      nativeListEl,
       dropZone,
       fileStatus,
-      el('div', { class: 'lv-hint', style: 'margin-top:14px' }, '従来形式・閲覧専用'),
-      listEl,
+      deps.nativeHome?.transfer ?? null,
+      deps.nativeHome?.creation ?? null,
+      nativeProjectsSection,
+      conventionalSection,
       fileInput,
     ),
   );
 
   async function handleFile(file: File): Promise<void> {
-    const archiveLike = /\.(zip|lociview)$/iu.test(file.name);
-    if (!archiveLike) {
-      await infoDialog('開けないファイル', 'ここではZIP形式のバックアップ、従来形式、LociMyuデータを選んでください。');
+    const release = deps.nativeHome?.beginIntake();
+    if (release === null) {
+      fileStatus.textContent = '処理中、または書き出したファイルの保存確認待ちです。処理結果を確認してから開いてください。';
       return;
     }
     try {
-      fileStatus.className = 'lv-dim lv-pad';
-      fileStatus.textContent = 'ファイルの種類を確認しています…';
-      const identity = await inspectZipContainerIdentity(file);
+      fileStatus.className = 'lv-file-status lv-dim lv-pad';
+      fileStatus.textContent = 'ファイルを確認しています…';
+      const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+      const hasZipSignature = head.length === 4 && head[0] === 0x50 && head[1] === 0x4b && (
+        head[2] === 0x03 && head[3] === 0x04 ||
+        head[2] === 0x05 && head[3] === 0x06 ||
+        head[2] === 0x07 && head[3] === 0x08
+      );
+      let identity: Awaited<ReturnType<typeof inspectZipContainerIdentity>>;
+      try {
+        identity = await inspectZipContainerIdentity(file);
+      } catch (error) {
+        if (hasZipSignature || deps.nativeHome === undefined) throw error;
+        release?.();
+        await deps.nativeHome.acceptModelFile(file);
+        fileStatus.textContent = '';
+        return;
+      }
       if (decideHomeIntakeRoute({ container: identity }) === 'native-package') {
+        if (deps.nativeHome !== undefined) {
+          release?.();
+          fileStatus.textContent = '';
+          deps.nativeHome.acceptPackageFile(file);
+          return;
+        }
         const restored = await deps.restoreNativePackage(file, (message) => { fileStatus.textContent = message; });
         fileStatus.textContent = '復元が完了しました。プロジェクトを開きます…';
         deps.openNativeProjects(restored.projectId, restored.openMode);
@@ -174,28 +224,42 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
         if (inspection.manifest === null) throw new Error('従来形式の情報を確認できませんでした。');
         const issues = inspection.opsIssues ?? [];
         if (issues.length > 0) {
-          downloadBlob(
-            serializeConventionalSourceReport(issues),
-            `${inspection.manifest.projectId}-source-report.json`,
-            'application/json',
+          fileStatus.className = 'lv-file-status lv-warn lv-pad';
+          fileStatus.textContent = '安全に開けない記録があります。この端末には保存していません。';
+          const saveReport = await confirmDialog(
+            'ファイルを安全に開けません',
+            `${issues.length}件の記録を閲覧へ反映できません。元のファイルは変更せず、ファイル・行番号・理由を説明ファイルに書き出せます。`,
+            '説明ファイルを保存',
           );
-          fileStatus.className = 'lv-warn lv-pad';
-          fileStatus.textContent = '安全に読み込めない記録があるため、従来形式は保存していません。';
-          await infoDialog(
-            '従来形式の確認結果',
-            `${issues.length}件の記録を閲覧へ反映できません。ファイル、行番号、理由を説明ファイルへ保存しました。元のファイルは変更されていません。`,
-          );
+          if (saveReport) {
+            downloadBlob(
+              serializeConventionalSourceReport(issues),
+              `${inspection.manifest.projectId}-source-report.json`,
+              'application/json',
+            );
+            fileStatus.textContent = '説明ファイルのダウンロードを開始しました。ブラウザの保存先で完了を確認してください。従来形式は保存していません。';
+          } else {
+            fileStatus.textContent = 'ファイルを開くのを中止しました。説明ファイルも、この端末のプロジェクトも作成していません。';
+          }
           return;
         }
         const existing = (await listProjects(deps.fs)).find(
           ({ projectId }) => projectId === inspection.manifest!.projectId,
         );
+        const proceed = await confirmDialog(
+          'ファイルを確認しました',
+          existing === undefined
+            ? '検出した内容：以前のLociView形式。開き方：この端末へ旧形式のコピーを保存し、閲覧専用で開きます。編集する場合は、開いた後に元データを変更しない新しいプロジェクトへ変換します。選択したファイルは変更しません。'
+            : '検出した内容：以前のLociView形式。同じプロジェクトの旧形式コピーがこの端末にあります。選択したファイルは統合・上書き・変更せず、保存済みのコピーを閲覧専用で開きます。',
+          existing === undefined ? '保存して閲覧専用で開く' : '保存済みを閲覧専用で開く',
+        );
+        if (!proceed) {
+          fileStatus.className = 'lv-file-status lv-dim lv-pad';
+          fileStatus.textContent = 'ファイルを開くのを中止しました。この端末には保存していません。';
+          return;
+        }
         if (existing !== undefined) {
-          const openSaved = await confirmDialog(
-            '保存済みの従来形式があります',
-            '選択したファイルは統合・上書きしません。端末に保存済みのコピーを閲覧専用で開きますか？',
-          );
-          if (openSaved) await openSavedConventional(existing.dir);
+          await openSavedConventional(existing.dir, true);
           return;
         }
         const dir = await deps.registerConventionalPackage(inspection);
@@ -206,25 +270,30 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
 
       await runLociMyuConversion(file, bytes);
     } catch (error) {
-      fileStatus.className = 'lv-warn lv-pad';
+      fileStatus.className = 'lv-file-status lv-warn lv-pad';
       fileStatus.textContent = 'ファイルを開けませんでした。元のファイルは変更されていません。';
       const detail = error instanceof Error ? error.message : String(error);
       await infoDialog(
-        '取込失敗',
+        'ファイルを開けません',
         /operation log|legacy|\bv1\b|writer/iu.test(detail)
           ? '安全に読み込めない記録があるため、この従来形式は開きませんでした。元のファイルは変更されていません。'
           : detail,
       );
-    }
+    } finally { release?.(); }
   }
 
-  async function openSavedConventional(dir: string): Promise<void> {
+  async function openSavedConventional(dir: string, intakeHeld = false): Promise<void> {
+    const release = intakeHeld ? undefined : deps.nativeHome?.beginIntake();
+    if (release === null) {
+      fileStatus.textContent = '先にファイル処理と保存先の確認を完了してください。';
+      return;
+    }
     try {
-      fileStatus.className = 'lv-dim lv-pad';
+      fileStatus.className = 'lv-file-status lv-dim lv-pad';
       fileStatus.textContent = '従来形式を安全に確認しています…';
       await deps.openProject(dir);
     } catch (error) {
-      fileStatus.className = 'lv-warn lv-pad';
+      fileStatus.className = 'lv-file-status lv-warn lv-pad';
       fileStatus.textContent = '従来形式を開けませんでした。保存済みの元データは変更されていません。';
       const detail = error instanceof Error ? error.message : String(error);
       await infoDialog(
@@ -233,7 +302,7 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
           ? '安全に読み込めない記録があるため、この従来形式は開きませんでした。保存済みの元データは変更されていません。'
           : detail,
       );
-    }
+    } finally { release?.(); }
   }
 
   async function runLociMyuConversion(file: File, bytes: Uint8Array): Promise<void> {
@@ -242,7 +311,7 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
     if (decideHomeIntakeRoute({ container: 'foreign', hasLociMyuSource: directNative }) === 'unsupported') {
       await infoDialog(
         '対応していないZIP',
-        'この画面で変換できるLociMyuデータが見つかりませんでした。モデルから始める場合は「開く／新しく作る」を選んでください。',
+        'このZIPには、開けるLociViewまたはLociMyuデータが見つかりませんでした。別のファイルを選んでください。',
       );
       return;
     }
@@ -255,12 +324,12 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
       answer.projectName,
       answer.confirmedDisplaySetRelation,
       (message) => {
-        fileStatus.className = 'lv-dim lv-pad';
+        fileStatus.className = 'lv-file-status lv-dim lv-pad';
         fileStatus.textContent = message;
       },
     );
     if (projectId === null) {
-      fileStatus.className = 'lv-warn lv-pad';
+      fileStatus.className = 'lv-file-status lv-warn lv-pad';
       fileStatus.textContent = '変換は開始されませんでした。変換結果の説明を確認してください。';
       return;
     }
@@ -271,8 +340,9 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
   async function renderList(): Promise<void> {
     clear(listEl);
     const items = await listProjects(deps.fs);
+    hasConventionalProjects = items.length > 0;
+    syncHomeStep();
     if (items.length === 0) {
-      listEl.append(el('div', { class: 'lv-dim lv-pad' }, '保存済みの従来形式はありません'));
       return;
     }
     for (const item of items) {
@@ -307,6 +377,6 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
     }
   }
 
-  void renderNativeList();
+  if (deps.nativeHome === undefined) void renderNativeList();
   void renderList();
 }

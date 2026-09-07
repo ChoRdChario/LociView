@@ -34,6 +34,7 @@ describe('native Caption placement', () => {
       existing: null,
       captionId: NATIVE_TEST_IDS.caption,
       activeDisplaySetId: ACTIVE_SET_ID,
+      newCaptionColor: '#123456',
       anchor: anchor(),
     });
     const working = {
@@ -47,6 +48,7 @@ describe('native Caption placement', () => {
     };
 
     expect(caption.displaySetId).toBe(ACTIVE_SET_ID);
+    expect(caption.color).toBe('#123456');
     expect(resolveNativeCaptionOverlayV1(working, caption.id, ACTIVE_SET_ID)).not.toBeNull();
     expect(resolveNativeCaptionOverlayV1(working, caption.id, NATIVE_DEFAULT_DISPLAY_SET_ID)).toBeNull();
   });
@@ -63,12 +65,14 @@ describe('native Caption placement', () => {
       existing,
       captionId: testNativeId('cap', 99),
       activeDisplaySetId: testNativeId('set', 3),
+      newCaptionColor: '#abcdef',
       anchor: anchor([1, 2, 3]),
     });
 
     expect(repositioned).toMatchObject({
       id: existing.id,
       title: existing.title,
+      color: '#eab308',
       displaySetId: ACTIVE_SET_ID,
       ownerAssetId: NATIVE_TEST_IDS.gsAsset,
       anchor: { positionAsset: [1, 2, 3] },

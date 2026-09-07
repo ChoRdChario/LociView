@@ -1,5 +1,648 @@
 # LociView active work
 
+## Current boundary — team-operation suitability review; UI editing paused (2026-09-07)
+
+The Product Owner paused further UI editing and requested a whole-lifecycle review
+of whether LociView lets one knowledgeable operator lower the participation cost
+for the rest of a team. This is a documentation-only review. The existing UI
+worktree remains intact but is not extended while this boundary is active.
+
+- [x] Trace the current team lifecycle from initial Project preparation through
+  distribution, parallel Caption/media work, merge, model revision, conflict,
+  review/share, clean handoff, backup and recovery.
+- [x] Separate byte identity, logical Asset identity, Project lineage and Caption
+  surface compatibility; identify where current fixed-baseline behavior helps or
+  prevents ordinary team work.
+- [x] Classify findings by user impact and distinguish candidate safety limitations
+  from a viable long-term collaboration design. Do not turn a missing collaboration
+  capability into a UI-copy workaround.
+- [x] Record the agreed UI/UX philosophy, information hierarchy, writing rules and
+  low-chroma warm-greige research-instrument visual direction in a durable `docs`
+  document, clearly separating principles from current/proposed implementation.
+- [x] Obtain independent read-only reviews of the team-flow analysis and UI/UX
+  document, correct omissions, update the documentation index and run document
+  hygiene checks.
+
+Review result: `tasks/team-operations-review.md` records the current one-campaign
+fit, two continuing-team blockers, eleven material gaps, the safe bounded current
+procedure, proposed target flow and D1–D7 Product Owner decisions. Three read-only
+review lanes passed after current-v1, accepted-v2 and proposed-package semantics
+were separated. `docs/ui-product-guidelines.md` is indexed and preserves the
+approved UI/UX direction with section-specific status labels. Documentation
+hygiene passed; no production UI or product contract was changed.
+
+The Product Owner subsequently accepted the core continuing-history/model-revision
+direction: one Project lineage with causal base/head, model revisions as immutable
+Project changes, Caption ownership by logical Asset/AssetFrame, preservation of
+older-revision Caption edits, `needsReview` for unproven anchor compatibility and
+explicit resolution without an automatic winner. This records direction only;
+current fixed-baseline behavior and accepted package-closure requirements remain
+unchanged until a complete storage/history contract is approved.
+
+### Next decision
+
+Resolve the remaining D2, D3 and D5-D7 decisions and turn the accepted continuity
+direction into a complete storage/history/package contract with migration and
+failure/recovery acceptance. Stop before changing production UI,
+storage/schema/package versions, merge behavior or release state. Any implementation
+plan follows a separate Product Owner decision.
+
+## Paused prior boundary — legacy-convenience UI implemented, rendered acceptance pending (2026-09-06)
+
+The Product Owner approved D1–D4 and the three bounded slices in
+`tasks/uiux-parity-plan.md`, and authorized implementation. The accepted bounded
+behavior is recorded in `docs/specs/02-storage-package-migration.md` §32 before code.
+
+- [x] Ratify the exact no-schema/no-version contract for Caption comparison,
+  media reference editing/projection, DisplaySet authoring and review-set export.
+- [x] S1: implement and verify Caption repetition, comparison and media reuse/removal.
+- [x] S2: implement and verify DisplaySet/view/background authoring.
+- [x] S3: implement and verify exact export handoff/preflight and contextual help.
+- [x] Run typecheck, focused tests, build, diff/privacy checks and independent review;
+  independent S1/S2/S3 reviewers report no remaining P0/P1.
+- [ ] Obtain an aggregate full-suite PASS or an explicit disposition for the two
+  fixture-registry suites that stop before collection because retained local
+  representative source bytes differ from the indexed blob. Do not modify or expose
+  those bytes to make an unrelated UI run green. The other 1,588 checks passed in
+  the latest aggregate run, including all 82 evidence-verifier cases.
+- [ ] Record rendered Desktop evidence. Physical-iPhone acceptance remains PO-run;
+  propose one exact HTTPS route first only if fresh offline/PWA evidence is required.
+  On 2026-09-07 the Product Owner explicitly approved switching the automated
+  walkthrough from the in-app browser to Chrome. Chrome control failed at the same
+  shared connection initialization boundary before browser discovery or page
+  interaction, so neither attempt supplies rendered evidence.
+
+### Prior next decision (superseded while team review is active)
+
+Rendered Desktop/iPhone acceptance remains open but inactive while the team review
+boundary is current. Later, run the ordinary `/` Desktop walkthrough when Codex
+browser control is available,
+or collect an explicitly human-run Chrome walkthrough against the exact worktree;
+then Product Owner performs or explicitly schedules the physical-iPhone acceptance.
+Do not call the current worktree a candidate PASS from automated evidence alone.
+The remaining nonblocking polish candidates are thumbnail queue coalescing and
+avoiding thumbnail reload while editing Caption text; they do not authorize a new
+feature, release, commit/push, Pages or Service Worker workstream.
+
+### Desktop correction RC8 — one idle file entry
+
+The Product Owner's current correction and the already approved one-home design
+replace the two idle start actions with one intent-based `ファイルを開く` entry.
+Official UI-writing guidance supplies the durable wording rules below.
+
+- [x] Verify that the neutral intake already routes inspected non-ZIP model bytes to
+  the new-Project flow while package, LociMyu and old-project inputs keep their
+  existing review/confirmation paths.
+- [x] Record durable UI-copy rules in `AGENTS.md`: result-based labels, stable terms,
+  input-neutral wording, one-purpose helper text, progressive disclosure and no
+  hiding of failure/unsaved/recovery state.
+- [x] Make `ファイルを開く` the only idle file picker and use the input-neutral
+  helper `選択またはここにドロップ`; do not narrate automatic type detection.
+- [x] After a model is safely detected, reveal the existing creation controls as a
+  contextual `新しいプロジェクト` form rather than a second intake card.
+- [x] Preserve project name, detected type/source, per-file removal, contextual
+  second-model addition, the Mesh/Point-plus-GS boundary, conditional GS proxy and
+  offline preparation, explicit create/cancel, atomic duplicate-role rejection and
+  all zero-write/revalidation guarantees.
+- [x] Update stale help/error text that still pointed to `モデルから新しく作る`,
+  and cover idle absence, model reveal, last-removal/cancel, accessible labelling,
+  existing package routing and failure/retry in focused tests.
+- [ ] Record refreshed Desktop rendered evidence; physical-iPhone acceptance remains
+  separate and is not inferred from the development server.
+
+Acceptance: an idle user chooses a file once without knowing its format. A model
+selection reveals only the decisions needed to create a Project; package and
+conversion routes retain their own confirmed outcomes. Unsupported or ambiguous
+content remains visible and creates nothing. No storage/schema/package, dependency,
+renderer, media-format, PWA, release, main or Pages behavior changes.
+
+RC8 executable evidence: 51 focused home/import checks, typecheck, production build
+and `git diff --check` pass. The build reports only the existing chunk-size and
+mixed static/dynamic import warnings. The full run passed 1,593 tests with 21
+existing todo; the same two fixture-registry suites stopped before collection
+because the retained private representative source differs from its indexed blob.
+No private bytes were changed to mask that boundary. Independent read-only review
+found and closed focus loss on first reveal, cancel, last removal and two-to-one
+model removal; its final rerun passed 37/37 with no remaining P0/P1. Rendered
+Desktop evidence remains open.
+
+### Desktop rendered correction RC1 — home idle state
+
+- [x] Replace the remaining home-level `画像` umbrella wording with the approved
+  `メディア` wording and state the local-save/file-export boundary plainly.
+- [x] Remove empty install/file-status layout slots and hide transfer detail/control
+  affordances while no transfer is active and no result or recovery exists.
+- [x] Keep cancel visible only while an operation is both running and cancellable.
+- [x] Run focused home tests, typecheck, production build and diff check.
+- [ ] Obtain a refreshed Chrome screenshot before continuing the task walkthrough.
+
+Acceptance: an idle first visit shows no cancel action, empty detail disclosure or
+blank status gap; an actual package operation still exposes status, cancellation
+when permitted, details, result and retry. This correction does not change intake
+routing, package semantics, storage, dependencies, schema, Pages or Service Worker.
+
+### Desktop rendered correction RC2 — saved legacy projects
+
+- [x] Make the top `ファイルを開く…` the only visible intake entry for a new
+  conventional file.
+- [x] Hide the saved-conventional section when this device has no such project.
+- [x] When records exist, label them as previously saved old LociView projects and
+  explain that they open read-only and may then be converted without changing them.
+- [ ] Verify the empty state in a refreshed Chrome screenshot and retain the existing
+  strict file inspection, registration and read-only conversion behavior.
+
+Acceptance: no empty legacy accordion competes with normal start actions, and a user
+cannot mistake the saved-project list for a second file picker. No legacy storage,
+package, migration or conversion semantics change in this correction.
+
+### Desktop rendered correction RC3 — post-selection intent
+
+- [x] Make the primary file entry format-neutral and promise a detected-result
+  explanation rather than listing implementation formats as required knowledge.
+- [x] Before Native restore or old-LociView registration, show detected purpose,
+  next action, opening mode and unchanged-source status with explicit continue/cancel.
+- [x] Keep the existing LociMyu review and model-role boundary, but give their
+  committing action an outcome label rather than an ambiguous `内容を確認` label.
+- [x] Revalidate package purpose, Project identity/collision, quota and lock after
+  confirmation and before the first write; cancellation must remain zero-write.
+- [ ] Add pure route/copy tests plus focused home/package tests, typecheck, build and
+  an updated Chrome walkthrough.
+
+Acceptance: filename never selects purpose; backup/collaboration/review/clean-copy,
+old LociView, LociMyu and model lead to visibly different outcomes before mutation.
+Existing package/schema versions, validators and no-guess relation rules remain.
+
+### Desktop rendered correction RC4 — exact GS offline action
+
+- [x] Remove the generic `オフライン・端末` category and name the exact outcome
+  `GSをオフラインでも見る` only after a GS need has been established.
+- [x] State that this stores GS display capability in the current browser and does
+  not save Project/model data or make a backup; keep ready/failure claims unchanged.
+- [x] Preserve the explicit user action and production offline checks. Do not claim
+  offline/PWA acceptance from the current development server.
+
+Acceptance: Mesh/Point-only flows see no GS preparation control; GS flows retain a
+discoverable explicit preparation and truthful current-browser scope. Service Worker,
+cache policy and runtime dependencies do not change.
+
+### Desktop rendered correction RC5 — one model-selection entry
+
+- [x] Replace the separate Mesh/ordinary-Point and GS inputs in new-Project creation
+  with one model picker whose validated bytes determine Mesh, exact Point PLY or GS.
+- [x] Preserve the existing ability to start with one Mesh/Point Asset and one GS
+  Asset by accepting both in the same selection; reject duplicate roles rather than
+  guessing which file wins.
+- [x] Show the detected files and roles beside the picker. Reveal the explicit GS
+  Caption-placement proxy and GS offline action only while a GS source is selected.
+- [x] Reuse the same strict inspector immediately before Project publication and add
+  focused order/role/conditional-disclosure/zero-write failure coverage.
+- [x] Run focused tests, typecheck, production build, diff/privacy checks and an
+  independent P0/P1 review.
+- [ ] Obtain a refreshed Chrome screenshot.
+
+Acceptance: users select model files by intent, not by understanding Representation
+roles. One safe result is applied automatically; duplicate/unsupported/ambiguous
+content stops before publication. Existing multi-Asset creation remains available.
+No schema, package, dependency, renderer, media, PWA or release boundary changes.
+
+### Desktop rendered correction RC6 — concise start copy
+
+- [x] Name the creation picker `3Dモデルを選ぶ` consistently before and after a
+  selection.
+- [x] Rewrite the neutral file-entry description as a clear user action; RC7 further
+  removes routine post-selection narration from the idle state.
+- [x] Remove the redundant explanation of simultaneous versus sequential model
+  selection while retaining supported-content and automatic-detection clarity.
+- [x] Add focused copy assertions and rerun home tests, typecheck, production build
+  and diff/privacy checks; independent review reports no remaining P0/P1.
+
+Rendered Chrome evidence remains separate. The RC6 focused home checks passed 35/35.
+
+Acceptance: the two start actions are understandable from their visible text alone,
+without procedural filler or an unnamed actor. Intake classification, supported
+combinations and every publication boundary remain unchanged.
+
+### Desktop rendered correction RC7 — home copy density
+
+- [x] Remove automatic-detection narration from the new-Project form and selected-file
+  summary.
+- [x] Reduce the idle product and file-entry descriptions to the minimum action and
+  local-save information needed on the screen.
+- [x] Keep supported ordinary Point and Gaussian Splatting discoverable without
+  explaining internal classification behavior.
+- [x] Add focused copy assertions and rerun home tests, typecheck, production build,
+  diff/privacy checks and independent copy review.
+
+Acceptance: each idle helper line has one user-facing job. Required consequences,
+errors, recovery and unsaved-state messages are not shortened or hidden. No intake,
+storage, schema, package or release behavior changes.
+
+RC7 evidence: home copy/behavior checks passed 35/35; the wider home/import matrix
+passed 81/81. Typecheck, production build and diff/privacy checks passed. Independent
+review reports no remaining P0/P1.
+
+Automated correction evidence: 81 focused checks passed across home composition,
+Native import disclosure/revalidation, active Representation resolution, LociMyu
+source switching, old-format release mode and content-based ZIP identity. Typecheck,
+production build and diff/privacy checks passed. The latest full run passed 1,588
+tests, including all 82 evidence-verifier cases. Two known fixture-registry suites
+still stop at collection because the private representative source differs from its Git index;
+this UI slice does not alter that source. The file-result panel now occupies the slot
+immediately below the single picker. Two independent read-only reviews found no
+remaining P0/P1 after corrections. Refreshed Chrome rendering remains the open
+RC1/RC2/RC3 evidence item; the development build is not offline/PWA acceptance.
+
+### Desktop rendered correction RC9 — team collaboration scope
+
+- [x] Extend the local-save note with the concrete file-based Caption collaboration
+  outcome so the home screen communicates a plausible team workflow.
+- [x] Limit that claim to people using the same Project; do not imply arbitrary
+  cross-Project or cross-model Caption matching.
+- [x] Run the focused home-copy check, typecheck and diff check.
+
+Acceptance: the introduction communicates both device-local work and file-based
+Caption exchange without overstating the fixed-baseline/same-lineage merge path.
+Different-model behavior, merge semantics, schema and package versions do not
+change in this wording correction.
+
+RC9 evidence: the focused home intake checks passed 6/6; typecheck, production
+build and `git diff --check` passed. The aggregate run passed 1,593 tests with
+21 existing todo; the two known fixture-registry suites stopped before collection
+because the retained private representative source differs from its indexed blob.
+This wording correction did not alter that source. Rendered Desktop evidence
+remains separate.
+
+### Current implementation stop boundary
+
+Do not commit/push, release, change dependencies/schema/package versions, add media
+formats, or touch main/Pages/Service Worker. Stop and re-plan if the approved behavior
+cannot be implemented without crossing those boundaries.
+
+## Previous boundary — legacy convenience re-audit and planning (2026-09-06)
+
+The Product Owner requested a renewed legacy-convenience audit and a UI/UX plan,
+with remaining work inventoried BEFORE planning implementation. This turn changes
+documents only. The existing uncommitted UI implementation is preserved; its
+Desktop/iPhone acceptance and independent final review remain incomplete.
+
+- [x] Recheck current checkpoint and distinguish existing Native coverage,
+  missing legacy conveniences, intentional replacements and unverified behavior.
+- [x] Audit connected legacy behavior against current code and applicable contracts;
+  do not treat headings/placeholders or previous feature counts as proof of parity.
+- [x] Inventory remaining work, user impact, UI location, state/recovery rules and
+  explicit non-inheritance; retain unconfirmed evidence as an open question.
+- [x] Derive at most three bounded implementation slices from that inventory,
+  with dependencies, required policy decisions, acceptance and exclusions.
+- [x] Self-review the plan and obtain independent read-only gap/contract feedback;
+  submit to the Product Owner before any further production changes.
+
+### Historical next decision — resolved by Product Owner approval
+
+The Product Owner approved the inventory, behavior choices and implementation plan.
+See `tasks/uiux-parity-plan.md`: 14 remaining-work rows, three slices, D1–D4 policy
+choices and eight additional task scenarios linked to the unchanged 41-task audit.
+That approval did not authorize unrelated feature/schema/package policy, release,
+commit/push, Pages or Service Worker work.
+
+### Audit review result
+
+Legacy connected-source and Native contract audits identified additional gaps in
+new-pin color reuse, attachment indicators/reuse, and contextual help. The plan
+also addresses existing repeated image previews and deletion-to-collaboration
+orphan-media refusal. Review caught that displaying the saved review set alone
+does not let users share a newly created set; explicit review-set selection is
+now a proposed contract choice, not an implemented feature. Read-only plan reviews
+and self-review corrections are complete; product approval and live acceptance
+remain open. This run changed documents only and did not rerun production tests.
+
+## Previous boundary — approved UI implementation, not release
+
+The Product Owner approved the refined design and requested a code-backed
+existing-function/UI crosswalk before implementation. The implementation contract
+and crosswalk are in `tasks/uiux-implementation.md`. This supersedes the historical
+no-implementation boundary below; it does not approve schema/dependency changes,
+new media formats, release, deployment, Pages or Service Worker changes.
+
+- [x] Recheck branch/HEAD/worktree and local origin tracking divergence (0/0).
+- [x] Independently cross-check all 42 existing function groups against source;
+  record immediate-save, picker, mode and image-viewing caveats.
+- [x] Separate approved UI-only color filtering (P01) from existing functionality.
+- [x] Slice 1 code: one start screen with retained intake, creation and project management.
+- [x] Slice 2 code: common status/header and four tabs, independent Caption list/details.
+- [x] Slice 3 code: direct color filters and explicit mode/recovery presentation.
+- [x] Run typecheck, full tests and build; add focused UI regression checks.
+- [ ] Complete the independent final diff review. Interim findings were corrected;
+  the workspace reviewer stopped before a final conclusion. No final approval claimed.
+- [ ] Verify rendered Desktop UI and mobile-sensitive behavior. Browser connection
+  retried on 2026-09-05 and failed during runtime initialization; no live credit.
+
+### Next action
+
+The three bounded UI slices are implemented in the uncommitted worktree, preserving
+accepted save rollback. Next: rendered Desktop walkthrough, physical iPhone checks
+and completed independent review. Browser initialization remains blocked. Do not
+claim candidate PASS, commit/push or release from automated checks alone.
+
+### Implementation review result
+
+Final automated checks: typecheck PASS; 69 test files / 1572 passed / 21 existing
+todo; build PASS with chunk/import warnings; diff whitespace check PASS. Thirty
+new tests cover the actual UI composition/marker methods using controlled substitutes,
+not rendered pixels. Existing 42 function groups are mapped and P01 is separate.
+No release, schema/dependency/package-policy change, commit or push was performed.
+
+## Historical boundary — public-candidate UI/UX audit and design
+
+> Audit input: `d2302ec7e31e563448393ae3b42798e27d219b14` on
+> `g0-baseline`; production implementation remains `6b2a28a`.
+> Status: `DESIGN DIRECTIONS APPROVED / DETAILED SPECIFICATION PENDING / LIVE INTERACTION BLOCKED / NO IMPLEMENTATION APPROVAL`.
+> The Product Owner confirmed ordinary home `/` displays in the Codex browser
+> and authorized autonomous work within the existing audit/design boundary.
+
+- [x] Read the prescribed current documents and teach back the product model.
+- [x] Check branch, HEAD, clean worktree, existing origin divergence and unpushed
+  commits; record the exact privacy/process-check limits in the audit report.
+- [x] Start the prescribed local Vite command and request ordinary home `/` in
+  the Codex browser; obtain Product Owner confirmation that home is displayed.
+- [ ] Complete the 41-task live walkthrough and record actual operation counts,
+  decision counts, recovery behavior and elapsed time. Browser control currently
+  fails during initialization; no interaction measurement is credited.
+- [x] Record the code-backed task map, findings, LociMyu pattern comparison,
+  information architecture, state/recovery flows and low-fidelity wireframes.
+- [x] Check proposed changes against the accepted contract and limit the proposal
+  to at most three bounded slices with acceptance and explicit exclusions.
+- [x] Present the design draft with evidence gaps to the Product Owner and stop before
+  production implementation. Stop the temporary server at the end of this run.
+- [x] Create schematic code-derived review images. Fidelity corrections are
+  recorded in `tasks/uiux-audit-design.md` §13; these are not exact screen captures.
+- [x] Verify the image set at desktop and narrow widths, exclude private source
+  identifiers, and hand it off for Astra review without changing production UI.
+- [x] Review image fidelity and current code; record user-task priorities and
+  corrections from the Product Owner's image review.
+- [x] Replace the two-home proposal with one start screen, specify file-intake
+  wording and Caption-first Desktop/iPhone layouts, and revise the three slices.
+- [x] Check the revised design against storage/selection/format boundaries and
+  present the recommendation with concrete acceptance tasks.
+- [x] Research current primary UI guidelines and distinguish platform guidance,
+  usability heuristics, and web accessibility requirements.
+- [x] Reassess current UI and the previous design against those sources; record
+  concrete corrections, counterarguments, evidence limits and acceptance checks.
+- [x] Independently review the guideline-based proposal, verify documentation,
+  and present it without production implementation or release actions.
+- [x] Record Product Owner agreement on the three design directions and clarify
+  the coverage and remaining work for palette, icons and visual design review.
+- [x] Clarify the requested clean/traditional/research visual direction before
+  starting the renewed holistic audit; use Endfield/NieR as mood references,
+  not as copied assets or mandatory game UI patterns.
+- [x] Define one consistent UX/visual rubric and reassess the weakly covered
+  palette, icons, typography, spacing, component states and cross-screen coherence.
+- [x] Present source-backed corrections and a coherent visual direction, preserving
+  the existing no-implementation boundary and unmeasured live-audit status.
+
+### Next decision
+
+- [x] Apply the PO's placement decision: color circles directly above the Caption
+  list, below search/owner fields, not in the 3D toolbar. Recheck DOM placement,
+  direct toggles and preserved state. Preview/design only; browser rendering unverified.
+
+Current refinement: restore direct color-circle toggles and remove redundant copy
+throughout the preview, while retaining target, save, failure and destructive-action
+information. Design/preview only; no production implementation.
+
+- [x] Define a compact-label rule and review repeated labels across all four tabs.
+- [x] Replace modal color filtering with visible circles; simplify the floating window.
+- [x] Shorten or relocate explanatory copy without removing functions or safety context.
+- [x] Self-review direct access, accessible names, selection and recovery; submit the preview.
+
+Refinement result (§23): one always-visible circle row replaces the color dialog;
+the floating window uses its title and × without the selection prefix. Shared and
+tab labels are shorter; contextual help and confirmations retain the necessary
+save/target/failure boundaries. Existing 42 groups and P01 remain represented.
+Sixteen direct-toggle states, seven dialogs, selection/recovery, accessible names
+and existing color checks pass in the simplified DOM checker. Independent review
+and self-review corrected a stale recovery instruction and preserved the selected
+title needed during scrolling. Actual browser/device rendering remains unverified.
+
+
+Current correction: distinguish the floating Caption window from the fixed editor,
+and compare the missing pin-color filter with original LociMyu behavior. Design only.
+
+- [x] Verify Native window/connector and legacy color-filter behavior against source.
+- [x] Correct the preview and design: floating-window intent, visible color-filter
+  proposal, explicit list/3D scope and hidden-selection recovery.
+- [x] Self-review and check preserved interactions; report current vs proposed behavior.
+
+Correction result (§22): the fixed bottom card was a mock simplification, not a
+product decision. The preview now connects a movable Caption window to its pin.
+P01 adds a concrete multi-color pin-visibility proposal, independent from list
+search and content color edits, with hidden-selection explanation and recovery.
+Sixteen color combinations and eight dialog routes pass simplified DOM checks;
+window/line movement and a narrow-stage overlap warning pass bounded geometry
+checks. These do not establish browser rendering or physical-iPhone acceptance.
+Native production remains unchanged; P01 implementation still requires approval.
+
+Current review: the accepted tone is retained. Functional grouping and discoverability
+have been checked against current LociView controls, the 41 tasks and LociMyu browsing
+aids. The revised design and preview are ready for Product Owner review; production
+implementation and legacy-only feature additions remain unapproved.
+
+- [x] Inventory current Native/home/package controls and LociMyu user-facing aids.
+- [x] Map every function to a discoverable surface; distinguish existing, legacy-only
+  and intentionally excluded capabilities without silently expanding support.
+- [x] Complete the preview and design correspondence for common, tab and contextual flows.
+- [x] Self-review omissions, duplication, target/state safety and compact access;
+  correct findings and present the bounded result with unmeasured evidence explicit.
+
+Review result (§21): retain four task-oriented tabs, with shared Project/DisplaySet,
+camera shortcuts, purpose-specific file exchange and help outside them. All 42
+inventoried current feature groups have design/preview locations; all 41 tasks map
+to those groups. Self-review and two limited independent placement reviews corrected
+compact creation access, persistent placement/move exits, normal attachment flow,
+model target confirmation, camera/default-view wording and missing browsing controls.
+The preview's simplified DOM checks pass for seven dialog routes, combined filters,
+conditional model tools, media navigation, state preservation and 144 declared color
+pairs. This is not live-browser, native file-dialog, 3D, save or iPhone evidence.
+Legacy-only gaps and their proposed locations are explicit in §21.4, not silently
+added to the three production slices. Branch/HEAD and existing origin comparison
+remain unchanged (0/0); only audit documents and the external preview were edited.
+
+Current PO decision: adopt the low-chroma tan/greige direction in §20.4. A logo
+will be supplied by the Product Owner later; use a quieter temporary wordmark now.
+This accepts a visual direction, not production implementation or device UX closure.
+
+- [x] Replace the prominent serif wordmark with small, regular system sans in the preview.
+- [x] Verify the limited change and record the palette decision and logo placeholder boundary.
+
+Review result: the temporary wordmark is 14px regular system sans with the existing
+muted-text token. Its two CSS rules pass static independent review; the existing
+144 color-pair and interaction checks pass again. No new font, logo asset or
+production UI change. Actual font rendering and wrapping remain unverified.
+
+Previous refinement: reduce the tan palette's saturation toward a warm greige,
+using the NieR creator's beige color direction without copying texture or decoration.
+
+- [x] Update only the tan light/dark palette and make it the preview's initial choice.
+- [x] Recheck contrast and preserved interactions; show the revised design, not production UI.
+
+Refinement result: §20.4 uses low-chroma warm greige, with the same detail-button
+boundary. The 144 scoped color checks include eight added tan muted-text pairs;
+state checks pass again. Actual rendering remains unverified; PO palette agreement
+is now recorded above.
+
+Previous PO decision: continue with the §19 tone and component direction, with
+the exact palette still open. The low-priority detail button must remain visibly
+button-like. Compare green, light tan, light blue and neutral gray in the same UI.
+
+- [x] Give detail/return buttons a visible surface and border without primary emphasis.
+- [x] Add four coherent palette families while keeping layout, content and 3D fixed.
+- [x] Verify palette/state combinations and preserved selection, obtain a read-only
+  critique, and present the comparison without production implementation.
+
+Review result: §20 records the detail-button correction and four palette families
+with light/dark variants. Eight palette/theme transitions preserve work state in
+the DOM substitute; 136 declared color pairs pass the scoped static checks. The
+read-only CSS critique found no additional issue in the changed scope. These are
+not rendered/browser/device evidence. Palette preference is resolved above; no UI implementation.
+
+Previous PO follow-up: retain LociMyu's functional-tab philosophy while organizing
+the other tool groups, and refine restrained color, corners, typography, border
+hierarchy and pressed feedback using the three supplied visual references.
+This is design refinement, not authority to implement UI or change functionality.
+
+- [x] Inspect the supplied references to the extent accessible; separate creator
+  intent and guidance from the two galleries whose images remain unviewed.
+- [x] Propose tab membership, shared context and state-preserving transitions;
+  define one coherent component/typography/color/state specification.
+- [x] Update the design comparison, independently review it and verify its limited
+  interactions; present the result without production or release changes.
+- [ ] Visually inspect the two supplied gallery references when their images are
+  available. A non-blocking request for representative screenshots was sent.
+
+The functional/shape proposal is §19 of `tasks/uiux-audit-design.md`: four
+whole-workspace tabs, Caption list/details preserved within Caption work, common
+selection recall elsewhere, restrained shape/typography/border and press states.
+Independent design review found no scope blocker; static CSS review found and
+corrected a compact selected-button color/background mismatch. Tests cover 20
+selections, four groups and three state samples; §20 expands palette checks, not
+actual browser rendering, focus, device behavior or CSS conformance.
+
+Previous PO request: reconsider the below-viewport Caption list placement using
+primary evidence from analogous applications/games. Evaluate a right-hand list
+and selected-record workspace by repeated selection tasks and constrained heights,
+not by a three-row screenshot. Preserve the no-production-implementation boundary.
+
+- [x] Research analogous list/viewport/inspector patterns and distinguish facts from inference.
+- [x] Compare below-viewport, right-docked and three-column layouts; define scroll,
+  selection/camera/focus, dirty-state and narrow-screen behavior.
+- [x] Revise the recommendation and preview, independently critique it, and record
+  acceptance gaps without claiming live browser or physical-iPhone measurements.
+
+Caption-layout proposal: `tasks/uiux-audit-design.md` §18 supersedes the below-viewport
+list with a right-hand list above selected details, independently scrolling with
+a persistent selection identity. Low-height/mobile uses list/detail navigation,
+not a long page. The 20-record comparison has static interaction checks only;
+actual geometry, browser focus, adaptive height and device evidence remain open.
+Await PO review; retain the three boundaries in §16.8 and no implementation approval.
+
+PO correction: the action label is "メディアを追加…", with the currently
+accepted image formats stated separately. A Caption list is a primary browsing
+surface, not merely a collapsed entry. Revise the design/example accordingly.
+The existing LociMyu comparison used documentation, not a live original-UI audit;
+verify the original UI evidence before claiming its interaction patterns are
+confirmed. Current LociView test UI constrains facts about implementation, not
+the completeness or arrangement of the intended product UI.
+
+- [x] Correct media wording and make the Caption list visible in the proposal.
+- [x] Record exactly what original LociMyu UI evidence is available and reviewed.
+- [x] Verify the corrected design/example without changing production code.
+- [ ] Obtain actual original-LociMyu screen/interaction evidence; archived alpha
+  source inspection is not live UI verification or proof of the currently used version.
+
+The current request is a renewed holistic UX and aesthetic review, emphasizing
+the weakly covered visual design. The Product Owner clarified that light and
+dark should be compared before choosing; the mood is quiet research documents
+with a small amount of instrumentation. Use identical layout/content for both
+palettes and one rubric across all screens. Game references are inspiration,
+not permission to copy assets or sacrifice readability.
+
+The Product Owner agreed to the recommended common home file entry, explicit
+pin-placement mode with non-drag/keyboard alternatives, and preserving unsaved
+editing in memory after a failed save. The decision and its limits are in
+`tasks/uiux-audit-design.md` §15; this is not implementation authorization.
+Define the bounded input/recovery contracts and acceptance, then revise the
+at-most-three-slice proposal before implementation. The preceding UI-only slices
+do not yet include those input/recovery changes. Visual design is in audit scope,
+and the code-backed holistic reassessment is recorded in §16 with ten findings,
+light/dark comparison, state rules and an updated at-most-three-boundary proposal.
+Next, the Product Owner can compare palettes and correction priorities; exact
+replacement specifications and rendered/device verification remain incomplete.
+No color/icon approval, two-theme feature decision or live UX PASS is implied.
+The earlier proposal to preserve two visible home screens is superseded.
+Live walkthrough evidence remains separate and incomplete. No new iPhone run,
+HTTPS tunnel, dependency, schema, media capability, release, license, version,
+main, Pages or Service Worker action is authorized here. Accepted Native and
+physical-iPhone product results remain closed; fresh UI evidence cannot be
+inferred from them or from the dev server.
+
+### Audit review
+
+The functional-tab and surface-refinement follow-up is recorded in §19. Source
+inspection, two read-only research/review lanes, independent draft review, static
+prototype interaction checks and color calculations are complete within stated
+limits. Both image galleries and rendered/device acceptance remain incomplete;
+Codex browser initialization failed again. Only design/task documentation and the
+thread-scoped comparison changed. No runtime dependency, font download, private
+source data, production test/build, server, tunnel or release action was added.
+
+The Caption-placement follow-up used official Unreal, Acrobat, Unity, Apple HIG
+and NieR creator documentation, distinguishing observed documentation from design
+inference. Two research lanes and an independent static prototype critique informed
+§18. Selection, search, owner separation, local-scroll calculations and compact
+navigation calls passed the isolated mockup checker; no rendered or product PASS.
+Only this plan, lessons and the audit draft changed in the repository.
+
+The renewed holistic review used the clarified research-document/instrumentation
+direction and primary HIG color/type/icon guidance, alongside the preceding
+accessibility and usability sources. Independent code/design reviews led to
+corrections in state styling, disabled explanations, mobile ordering and repeated
+record access. The thread-scoped comparison has static markup/script/state and
+literal-color checks only; no new pixel/browser/device acceptance is claimed.
+Browser initialization still fails. No production code, contract, dependencies,
+private source data, server or release artifact was changed by this reassessment.
+
+`tasks/uiux-audit-design.md` contains all 41 code-mapped tasks, unmeasured live
+metrics, the three-way decision classification, findings, wireframes and three
+unapproved slices. A bounded independent read-only check confirmed the existing
+save/selection/package constraints; no feature change is inferred from UI polish.
+F13 records a still-unmeasured review-export versus transient DisplaySet-selection
+question requiring live confirmation and, if needed, Product Owner interpretation.
+Document checks passed: all task IDs 1–41 once in the task table, all metrics
+unmeasured, exactly three proposed slices, whitespace/diff checks, no production
+changes. No application test/build matrix was rerun for this docs-only work.
+The temporary Vite server was stopped and port 5173 verified non-listening.
+The original live audit remains incomplete; this plan does not amend product
+specifications or grant implementation/release approval.
+Eight thread-scoped code-derived review images and one combined overview were
+rendered and visually checked. They cover ordinary home, LociMyu confirmation,
+Native project intake, conventional-view conversion, Desktop editor, Caption and
+image review, package/error recovery, and the current narrow-width editor. They
+contain generic sample content only, are explicitly labeled as reconstructions,
+and do not count as live walkthrough or browser acceptance evidence.
+The subsequent image/code review found omissions and invented presentation
+details, including a Native mobile sheet handle and confirmation wording.
+The design document §13 records those corrections; image dimensions and control
+positions are not measured application evidence. Sections 7, 9 and 10 now follow
+the Product Owner's one-home, purpose-led intake and Caption-first direction,
+with Desktop/iPhone wireframes, ten concrete user scenarios and three bounded
+implementation proposals. Only design/task documents changed.
+The guideline-based reassessment is in the same document §14. Apple HIG,
+WCAG 2.2/WAI-ARIA, NN/g and GOV.UK primary guidance produced nine findings,
+revised §§7/9/10, and explicit criteria instead of unmeasured usability scores.
+Two read-only reviewers checked interaction design and accessibility separately.
+The proposed three slices do not resolve input recovery after save rollback or
+all 3D keyboard/non-drag alternatives; these remain explicit scope decisions,
+not hidden post-candidate polish or a WCAG-conformance claim.
+
 > Accepted result/document checkpoint:
 > `5f2a19df9fcfd50215d1313c1265e6cdf82872b4`; exact executable checkpoint:
 > `0b5dd461d761fc0669b1c0c80b3d6549cd01b1e6` on `g0-baseline` (2026-09-03).
@@ -809,8 +1452,8 @@ consolidated direct-LociMyu acceptance rather than repeated per sub-slice.
   native receiver, verified binary/media writes and marker-last publication;
   it adds no durable intermediate v1 workspace, sidecar or generalized
   migration system.
-- The private representative retained 94,063,937 bytes and SHA-256
-  `3736aa3bb5cffcf9b9aaffb70cc210878069d4876b63ced8441f79da8a9da01c`.
+- The private representative retained its exact source bytes. Its private path,
+  filename, digest and source bytes are not recorded in tracked artifacts.
   Under the approved correction, 109 source Caption rows produce 103 Captions;
   rows 43–48 are explicit reported empty input. Native publication and portable
   package-v2 restore pass with no missing Representation or media.

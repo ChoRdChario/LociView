@@ -5,6 +5,7 @@ import {
   validateNativeCollaborationBaselineV1,
 } from '../../src/nativeGs/captionThreeWayMerge';
 import {
+  appendEmptyNativeDisplaySetV1,
   parseNativeSnapshotV1,
   removeNativeAssetV1,
   serializeNativeSnapshotV1,
@@ -170,6 +171,26 @@ describe('native Caption collaboration three-way merge', () => {
     }));
   });
 
+  it('rejects a fixed-baseline media record that is missing or changed in current media', () => {
+    const base = snapshotFromDraft(makeNativeDraft().draft);
+    const baselineMedia = media(8);
+    const withMedia = parseNativeSnapshotV1(serializeNativeSnapshotV1({
+      ...base,
+      mediaResources: [baselineMedia],
+    }));
+    const fixed = parseNativeSnapshotV1(serializeNativeSnapshotV1({
+      ...withMedia,
+      collaborationBaseline: createNativeCollaborationBaselineV1(withMedia),
+    }));
+    const missing = parseNativeSnapshotV1(serializeNativeSnapshotV1({ ...fixed, mediaResources: [] }));
+    expect(() => validateNativeCollaborationBaselineV1(missing)).toThrow(/baseline media is missing or changed/);
+    const changed = parseNativeSnapshotV1(serializeNativeSnapshotV1({
+      ...fixed,
+      mediaResources: [{ ...baselineMedia, label: 'changed.png' }],
+    }));
+    expect(() => validateNativeCollaborationBaselineV1(changed)).toThrow(/baseline media is missing or changed/);
+  });
+
   it('rejects incoming media that no merged Caption references', () => {
     const baseline = fixedBaseline();
     const orphan = media(9);
@@ -191,6 +212,15 @@ describe('native Caption collaboration three-way merge', () => {
     const removed = removeNativeAssetV1(withoutCaption, NATIVE_TEST_IDS.meshAsset);
     expect(() => parseNativeSnapshotV1(serializeNativeSnapshotV1(removed))).not.toThrow();
     expect(() => validateNativeCollaborationBaselineV1(removed)).toThrow(/unsupported Project state/);
+  });
+
+  it('allows a local DisplaySet edit without rebasing the fixed collaboration state', () => {
+    const baseline = fixedBaseline();
+    const baselineRecord = baseline.collaborationBaseline;
+    const changed = appendEmptyNativeDisplaySetV1(baseline, testNativeId('set', 3), 'Field review');
+    expect(changed.collaborationBaseline).toEqual(baselineRecord);
+    expect(() => parseNativeSnapshotV1(serializeNativeSnapshotV1(changed))).not.toThrow();
+    expect(() => validateNativeCollaborationBaselineV1(changed)).toThrow(/unsupported Project state/);
   });
 
   it('round-trips and validates the optional self-contained baseline', () => {

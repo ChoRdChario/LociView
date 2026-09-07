@@ -22,7 +22,7 @@ export function closeModal(node: HTMLElement): void {
   node.remove();
 }
 
-export function confirmDialog(title: string, message: string): Promise<boolean> {
+export function confirmDialog(title: string, message: string, confirmLabel = 'OK'): Promise<boolean> {
   return new Promise((resolve) => {
     const body = el('div', { class: 'lv-modal-body' }, message);
     const cancel = el('button', {
@@ -37,7 +37,7 @@ export function confirmDialog(title: string, message: string): Promise<boolean> 
         closeModal(root);
         resolve(true);
       },
-    }, 'OK');
+    }, confirmLabel);
     const root = openModal(title, body, [cancel, ok]);
   });
 }

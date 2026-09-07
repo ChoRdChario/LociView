@@ -1,5 +1,4 @@
 import {
-  NATIVE_DEFAULT_DISPLAY_SET_ID,
   NATIVE_SCHEMA_VERSION,
   NATIVE_SNAPSHOT_FORMAT,
   nativeCaptionDisplaySetIdV1,
@@ -27,10 +26,21 @@ function parsed(snapshot: NativeProjectSnapshotV1): NativeProjectSnapshotV1 {
 export function buildNativeCollaborationSnapshotPlanV1(
   source: NativeProjectSnapshotV1,
 ): NativeExchangeSnapshotPlanV1 {
+  if (source.collaborationBaseline === undefined) {
+    throw new Error('native collaboration export: fixed baseline is missing');
+  }
+  const referencedMediaIds = new Set(source.captions.flatMap((caption) => caption.attachmentMediaIds ?? []));
+  const baselineMediaIds = new Set(source.collaborationBaseline.mediaResources.map((media) => media.id));
+  const includedMedia = (source.mediaResources ?? []).filter((media) => (
+    baselineMediaIds.has(media.id) || referencedMediaIds.has(media.id)
+  ));
+  const snapshot = includedMedia.length === (source.mediaResources ?? []).length
+    ? source
+    : parsed({ ...source, mediaResources: includedMedia });
   return {
-    snapshot: source,
+    snapshot,
     representationSourceIds: new Map(source.representations.map((entry) => [entry.id, entry.id])),
-    mediaSourceIds: new Map((source.mediaResources ?? []).map((entry) => [entry.id, entry.id])),
+    mediaSourceIds: new Map(includedMedia.map((entry) => [entry.id, entry.id])),
   };
 }
 
@@ -56,6 +66,7 @@ export function buildNativeCleanCopySnapshotPlanV1(
 
 export function buildNativeReviewSnapshotPlanV1(
   source: NativeProjectSnapshotV1,
+  requestedDisplaySetId: string,
 ): NativeExchangeSnapshotPlanV1 {
   const hidden = new Set(source.presentation.hiddenAssetIds ?? []);
   const sourceAssets = source.assets.filter((asset) => !hidden.has(asset.id));
@@ -64,9 +75,9 @@ export function buildNativeReviewSnapshotPlanV1(
   const sourceRevisions = new Map(source.assetRevisions.map((revision) => [revision.id, revision]));
   const sourceRepresentations = new Map(source.representations.map((representation) => [representation.id, representation]));
   const sourceMedia = new Map((source.mediaResources ?? []).map((media) => [media.id, media]));
-  const activeDisplaySetId = source.presentation.activeDisplaySetId ?? NATIVE_DEFAULT_DISPLAY_SET_ID;
+  const activeDisplaySetId = requestedDisplaySetId;
   const sourceDisplaySet = nativeDisplaySetsV1(source).find((displaySet) => displaySet.id === activeDisplaySetId);
-  if (sourceDisplaySet === undefined) throw new Error('native review export: active DisplaySet is unavailable');
+  if (sourceDisplaySet === undefined) throw new Error('native review export: selected DisplaySet is unavailable');
 
   const idMap = new Map<string, string>();
   const mapped = (id: string, prefix: Parameters<typeof newNativeId>[0]): string => {

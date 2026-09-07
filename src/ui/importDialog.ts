@@ -30,6 +30,16 @@ export interface ImportWizardOptions {
   readonly directNative?: boolean;
 }
 
+export function importWizardPrimaryActionLabel(
+  plan: Pick<ImportPlan, 'migration' | 'blockedLociMyuSource'>,
+  options: ImportWizardOptions = {},
+): string {
+  if (!options.directNative) return '取り込む';
+  return plan.migration !== null || plan.blockedLociMyuSource?.code === 'missing-legacy-id'
+    ? '新しいプロジェクトへ変換して編集'
+    : '説明ファイルを保存';
+}
+
 export function importWizardRetentionNotice(plan: Pick<ImportPlan, 'migration'>): string | null {
   return plan.migration === null ? null : `⚠ ${LOCIMYU_SOURCE_RETENTION_NOTICE}`;
 }
@@ -86,6 +96,9 @@ export function importWizardDialog(
     let confirmedDisplaySetRelation: LociMyuDisplaySetRelationConfirmation | null = null;
     const sourceSelection = new ImportSourceSelectionController();
     let okButton: HTMLButtonElement | null = null;
+    const refreshPrimaryAction = (): void => {
+      if (okButton !== null) okButton.textContent = importWizardPrimaryActionLabel(plan, options);
+    };
 
     // ---- スプレッドシートの選択（複数ある場合） ----
     const sourceSection = el('div', { class: 'lv-grp' });
@@ -103,6 +116,7 @@ export function importWizardDialog(
           renderSummary();
           if (shouldRebuildImportLinks(outcome)) renderLinkSection();
           renderDisplaySetRelationSection();
+          refreshPrimaryAction();
         },
       }) as HTMLSelectElement;
       plan.sources.forEach((s, i) => {
@@ -181,7 +195,7 @@ export function importWizardDialog(
           el('div', { class: 'lv-mr-detail warn' },
             skipsMissingIdRows
               ? '元のLociMyu ZIPは別途保管してください。その行からキャプションは作らず説明ファイルへ記録します。元ZIPは変更せず、残りの有効なデータを新しいプロジェクトへ変換します。'
-              : '元のLociMyu ZIPは別途保管してください。「取り込み内容を確認」を押すと説明ファイルを保存し、不完全なプロジェクトは作りません。'),
+              : '元のLociMyu ZIPは別途保管してください。「説明ファイルを保存」を押すと確認結果を書き出し、不完全なプロジェクトは作りません。'),
         );
       } else if (plan.tables.length > 0) {
         summary.append(
@@ -326,7 +340,7 @@ export function importWizardDialog(
           confirmedDisplaySetRelation,
         });
       },
-    }, options.directNative ? '取り込み内容を確認' : '取り込む') as HTMLButtonElement;
+    }, importWizardPrimaryActionLabel(plan, options)) as HTMLButtonElement;
     okButton = ok;
 
     const card = el('div', { class: 'lv-modal-card', role: 'dialog', 'aria-label': 'インポート' },

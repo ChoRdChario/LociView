@@ -24,7 +24,12 @@ import {
   inspectNativePortablePackageV1,
   restoreNativePortablePackageV1,
 } from '../../src/nativeGs/portablePackage';
-import type { NativeCaptionV1, NativeProjectDraftV1, NativeProjectSnapshotV1 } from '../../src/nativeGs/schema';
+import {
+  NATIVE_DEFAULT_DISPLAY_SET_ID,
+  type NativeCaptionV1,
+  type NativeProjectDraftV1,
+  type NativeProjectSnapshotV1,
+} from '../../src/nativeGs/schema';
 import {
   addNativeCaptionImageV1,
   createNativeProjectV1,
@@ -33,6 +38,7 @@ import {
   nativeMediaPath,
   nativeProjectRoot,
   openNativeProjectV1,
+  removeNativeCaptionMediaV1,
   saveNativeProjectV1,
   type NativeBinarySource,
 } from '../../src/nativeGs/storage';
@@ -108,13 +114,16 @@ async function makeProject(projectId = NATIVE_TEST_IDS.project): Promise<TestPro
 
 async function exportBlob(project: TestProject, purpose: 'collaboration' | 'review' | 'cleanCopy'): Promise<Blob> {
   const chunks: Uint8Array[] = [];
-  const result = await exportNativeExchangePackageV1(
+  await exportNativeExchangePackageV1(
     project.session.workspace,
     project.snapshot.project.id,
     purpose,
     new WritableStream<Uint8Array>({ write(chunk) { chunks.push(new Uint8Array(chunk)); } }),
+    purpose === 'review' ? { reviewDisplaySetId: NATIVE_DEFAULT_DISPLAY_SET_ID } : {},
   );
-  if (purpose === 'collaboration') project.snapshot = result.snapshot;
+  if (purpose === 'collaboration') {
+    project.snapshot = (await openNativeProjectV1(project.fs, project.snapshot.project.id)).snapshot;
+  }
   return new Blob(chunks.map((chunk) => new Uint8Array(chunk)), { type: 'application/zip' });
 }
 
@@ -221,6 +230,49 @@ async function writeStoredZip(entries: readonly RawZipEntry[]): Promise<Blob> {
 }
 
 describe('native package exchange v1', () => {
+  it('requires one exact DisplaySet only for review and writes no package bytes on invalid intent', async () => {
+    const source = await makeProject();
+    const attempt = async (
+      purpose: 'collaboration' | 'review' | 'cleanCopy',
+      options: { readonly reviewDisplaySetId?: string } = {},
+    ): Promise<number> => {
+      let writtenBytes = 0;
+      const destination = new WritableStream<Uint8Array>({
+        write(chunk) { writtenBytes += chunk.byteLength; },
+      });
+      await expect(exportNativeExchangePackageV1(
+        source.session.workspace,
+        source.snapshot.project.id,
+        purpose,
+        destination,
+        options,
+      )).rejects.toThrow();
+      return writtenBytes;
+    };
+    await expect(attempt('review')).resolves.toBe(0);
+    await expect(attempt('collaboration', { reviewDisplaySetId: NATIVE_DEFAULT_DISPLAY_SET_ID })).resolves.toBe(0);
+    await expect(attempt('review', { reviewDisplaySetId: testNativeId('set', 99) })).resolves.toBe(0);
+    source.session.release();
+  });
+
+  it('does not publish the first collaboration baseline when already cancelled', async () => {
+    const source = await makeProject();
+    const controller = new AbortController();
+    controller.abort(new DOMException('cancelled', 'AbortError'));
+    let writtenBytes = 0;
+    await expect(exportNativeExchangePackageV1(
+      source.session.workspace,
+      source.snapshot.project.id,
+      'collaboration',
+      new WritableStream<Uint8Array>({ write(chunk) { writtenBytes += chunk.byteLength; } }),
+      { signal: controller.signal },
+    )).rejects.toMatchObject({ name: 'AbortError' });
+    expect(writtenBytes).toBe(0);
+    expect((await openNativeProjectV1(source.fs, source.snapshot.project.id)).snapshot.collaborationBaseline)
+      .toBeUndefined();
+    source.session.release();
+  });
+
   it('routes backup and all exchange purposes by manifest content', async () => {
     const source = await makeProject();
     const backup = await exportBackupBlob(source);
@@ -232,6 +284,92 @@ describe('native package exchange v1', () => {
     expect(nativeExchangeDefaultOpenModeV1('collaboration')).toBe('edit');
     expect(nativeExchangeDefaultOpenModeV1('cleanCopy')).toBe('edit');
     source.session.release();
+  });
+
+  it('omits only a detached nonbaseline image from collaboration while other package purposes and the sender retain it', async () => {
+    const local = await makeProject();
+    local.snapshot = await addNativeCaptionImageV1(
+      local.session.workspace,
+      local.snapshot,
+      CAPTION_A,
+      'Baseline reference image.png',
+      binarySource(VALID_PNG_BYTES, 'image/png'),
+    );
+    const baselineMediaId = local.snapshot.captions.find((entry) => entry.id === CAPTION_A)?.attachmentMediaIds?.[0];
+    if (baselineMediaId === undefined) throw new Error('expected baseline image ID');
+    const baselinePackage = await exportBlob(local, 'collaboration');
+    const incoming = await restoreBlob(baselinePackage);
+
+    local.snapshot = await removeNativeCaptionMediaV1(
+      local.session.workspace, local.snapshot, CAPTION_A, baselineMediaId,
+    );
+    local.snapshot = await addNativeCaptionImageV1(
+      local.session.workspace,
+      local.snapshot,
+      CAPTION_A,
+      'Detached nonbaseline image.png',
+      binarySource(VALID_PNG_BYTES, 'image/png'),
+    );
+    const nonbaselineMediaId = local.snapshot.captions.find((entry) => entry.id === CAPTION_A)?.attachmentMediaIds?.[0];
+    if (nonbaselineMediaId === undefined) throw new Error('expected nonbaseline image ID');
+    local.snapshot = await removeNativeCaptionMediaV1(
+      local.session.workspace, local.snapshot, CAPTION_A, nonbaselineMediaId,
+    );
+    const senderBefore = local.snapshot;
+    const senderPathsBefore = await local.fs.list(`${nativeProjectRoot(local.snapshot.project.id)}/`);
+    const baselineBytesBefore = await local.fs.readBytes(nativeMediaPath(local.snapshot.project.id, baselineMediaId));
+    const nonbaselineBytesBefore = await local.fs.readBytes(nativeMediaPath(local.snapshot.project.id, nonbaselineMediaId));
+    expect(baselineBytesBefore).toEqual(VALID_PNG_BYTES);
+    expect(nonbaselineBytesBefore).toEqual(VALID_PNG_BYTES);
+    expect(senderBefore.collaborationBaseline?.mediaResources.map((media) => media.id)).toEqual([baselineMediaId]);
+
+    const collaborationPackage = await exportBlob(local, 'collaboration');
+    const collaborationInspection = await inspectNativeExchangePackageV1(collaborationPackage);
+    expect(collaborationInspection.snapshot.mediaResources?.map((media) => media.id)).toEqual([baselineMediaId]);
+    expect(collaborationInspection.manifest.media.map((media) => media.id)).toEqual([baselineMediaId]);
+    expect(collaborationInspection.snapshot.captions.find((caption) => caption.id === CAPTION_A)?.attachmentMediaIds).toEqual([]);
+    const collaborationEntries = await storedZipEntries(collaborationPackage);
+    expect(collaborationEntries.some((entry) => entry.path === `native/media/${baselineMediaId}.bin`)).toBe(true);
+    expect(collaborationEntries.some((entry) => entry.path === `native/media/${nonbaselineMediaId}.bin`)).toBe(false);
+    expect(local.snapshot).toEqual(senderBefore);
+    expect(await local.fs.list(`${nativeProjectRoot(local.snapshot.project.id)}/`)).toEqual(senderPathsBefore);
+    expect(await local.fs.readBytes(nativeMediaPath(local.snapshot.project.id, baselineMediaId))).toEqual(baselineBytesBefore);
+    expect(await local.fs.readBytes(nativeMediaPath(local.snapshot.project.id, nonbaselineMediaId))).toEqual(nonbaselineBytesBefore);
+
+    const backup = await exportBackupBlob(local);
+    const restoredBackup = await restoreBackupBlob(backup);
+    expect(restoredBackup.snapshot.mediaResources?.map((media) => media.id)).toEqual([baselineMediaId, nonbaselineMediaId]);
+    expect(restoredBackup.snapshot.collaborationBaseline).toEqual(senderBefore.collaborationBaseline);
+    expect(await restoredBackup.fs.readBytes(nativeMediaPath(restoredBackup.snapshot.project.id, baselineMediaId))).toEqual(baselineBytesBefore);
+    expect(await restoredBackup.fs.readBytes(nativeMediaPath(restoredBackup.snapshot.project.id, nonbaselineMediaId))).toEqual(nonbaselineBytesBefore);
+
+    const cleanCopy = await exportBlob(local, 'cleanCopy');
+    const restoredClean = await restoreBlob(cleanCopy);
+    expect(restoredClean.snapshot.mediaResources?.map((media) => media.id)).toEqual([baselineMediaId, nonbaselineMediaId]);
+    expect(restoredClean.snapshot.collaborationBaseline).toBeUndefined();
+    expect(await restoredClean.fs.readBytes(nativeMediaPath(restoredClean.snapshot.project.id, baselineMediaId))).toEqual(baselineBytesBefore);
+    expect(await restoredClean.fs.readBytes(nativeMediaPath(restoredClean.snapshot.project.id, nonbaselineMediaId))).toEqual(nonbaselineBytesBefore);
+
+    const firstImport = await mergeNativeCollaborationPackageV1(
+      incoming.session.workspace, incoming.snapshot.project.id, collaborationPackage,
+    );
+    expect(firstImport).toMatchObject({ kind: 'merged' });
+    if (firstImport.kind !== 'merged') throw new Error('expected detached baseline media merge');
+    incoming.snapshot = firstImport.snapshot;
+    expect(incoming.snapshot.captions.find((caption) => caption.id === CAPTION_A)?.attachmentMediaIds).toEqual([]);
+    expect(incoming.snapshot.mediaResources?.map((media) => media.id)).toEqual([baselineMediaId]);
+    expect(await incoming.fs.readBytes(nativeMediaPath(incoming.snapshot.project.id, baselineMediaId))).toEqual(baselineBytesBefore);
+    expect(await incoming.fs.readBytes(nativeMediaPath(incoming.snapshot.project.id, nonbaselineMediaId))).toBeNull();
+    const receiverBeforeDuplicate = incoming.snapshot;
+    const secondImport = await mergeNativeCollaborationPackageV1(
+      incoming.session.workspace, incoming.snapshot.project.id, collaborationPackage,
+    );
+    expect(secondImport).toMatchObject({ kind: 'noop' });
+    expect((await openNativeProjectV1(incoming.fs, incoming.snapshot.project.id)).snapshot).toEqual(receiverBeforeDuplicate);
+    local.session.release();
+    incoming.session.release();
+    restoredBackup.session.release();
+    restoredClean.session.release();
   });
 
   it('merges independent Caption edits and new image bytes, then treats duplicate import as a no-op', async () => {

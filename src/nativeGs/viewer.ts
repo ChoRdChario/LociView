@@ -45,6 +45,7 @@ import { NativeSparkRuntime } from './sparkRuntime';
 import type { WorkspaceReadableFile } from '../platform/fs';
 import { nativeMaterialSlotKey } from './materialSlots';
 import { createNativePlacedCaptionV1 } from './captionPlacement';
+import { nativePinColorKey } from './pinColorFilter';
 
 const NATIVE_CAPTION_PICK_DIAMETER_CSS_PX = 20;
 
@@ -55,7 +56,7 @@ export interface NativeCaptionScreenPointV1 {
 }
 
 export interface NativeGsViewerCallbacks {
-  onCaptionCreationStarted(): boolean;
+  onCaptionCreationStarted(): { readonly color: string } | null;
   onCaptionChanged(caption: NativeCaptionV1): boolean;
   onCaptionSelected(captionId: string): void;
   onCaptionDeselected(): void;
@@ -272,6 +273,7 @@ export class NativeGsViewer {
   private sparkRuntime: NativeSparkRuntime | null = null;
   private readonly captionMarkers = new Map<string, THREE.Mesh>();
   private currentCaption: NativeCaptionV1 | null = null;
+  private visibleCaptionColors: ReadonlySet<string> | null = null;
   private repositionCaptionId: string | null = null;
   private gizmoTarget: NativeGizmoTarget = null;
   private assetGizmoMode: NativeAssetGizmoMode = 'translate';
@@ -650,9 +652,22 @@ export class NativeGsViewer {
     return true;
   }
 
-  projectCaption(captionId: string): NativeCaptionScreenPointV1 | null {
+  setCaptionColorFilter(colors: ReadonlySet<string> | null): void {
+    this.visibleCaptionColors = colors === null ? null : new Set([...colors].map(nativePinColorKey));
+    this.syncCaptionMarkers();
+    this.refreshGizmoAttachment();
+  }
+
+  isCaptionColorVisible(captionId: string): boolean {
+    const caption = this.snapshot.captions.find((entry) => entry.id === captionId);
+    return caption !== undefined && (this.visibleCaptionColors?.has(nativePinColorKey(caption.color)) ?? true);
+  }
+
+  projectCaption(captionId: string, includeColorHidden = false): NativeCaptionScreenPointV1 | null {
     const marker = this.captionMarkers.get(captionId);
-    if (marker === undefined || !marker.visible) return null;
+    const caption = this.snapshot.captions.find((entry) => entry.id === captionId);
+    if (marker === undefined || caption?.anchor == null || !this.assetIsVisible(caption.anchor.assetId)) return null;
+    if (!includeColorHidden && !marker.visible) return null;
     this.scene.updateMatrixWorld(true);
     this.camera.updateMatrixWorld(true);
     const projected = marker.getWorldPosition(new THREE.Vector3()).project(this.camera);
@@ -711,6 +726,21 @@ export class NativeGsViewer {
     this.gizmoTarget = null;
     this.refreshGizmoAttachment();
     return true;
+  }
+
+  isCaptionRepositioning(): boolean { return this.repositionCaptionId !== null; }
+  getPositionEditingTarget(): NativeGizmoTarget { return this.gizmoTarget; }
+
+  cancelCaptionReposition(): void {
+    this.repositionCaptionId = null;
+    this.clearLongPress();
+  }
+
+  stopPositionEditing(): void {
+    this.repositionCaptionId = null;
+    this.gizmoTarget = null;
+    this.clearLongPress();
+    this.refreshGizmoAttachment();
   }
 
   armCaptionReposition(captionId: string, explicitTargetAssetId?: string): boolean {
@@ -1156,8 +1186,9 @@ export class NativeGsViewer {
       this.callbacks.onIssuesChanged([...this.resolution.issues, 'Re-placement must use the Caption owning Asset.']);
       return;
     }
+    const creation = repositioned === null ? this.callbacks.onCaptionCreationStarted() : null;
     if (repositioned === null) {
-      if (!this.callbacks.onCaptionCreationStarted()) return;
+      if (creation === null) return;
       this.currentCaption = null;
       this.syncCaptionMarkers();
     }
@@ -1177,6 +1208,7 @@ export class NativeGsViewer {
       captionId: repositioned?.id ?? newNativeId('cap'),
       activeDisplaySetId: this.activeDisplaySetOverride ??
         this.snapshot.presentation.activeDisplaySetId ?? NATIVE_DEFAULT_DISPLAY_SET_ID,
+      ...(creation === null ? {} : { newCaptionColor: creation.color }),
       anchor: {
         kind: 'asset',
         assetId: asset.id,
@@ -1305,7 +1337,8 @@ export class NativeGsViewer {
       group.add(marker);
       marker.position.fromArray(caption.anchor.positionAsset);
       marker.quaternion.identity();
-      marker.visible = this.assetIsVisible(caption.anchor.assetId);
+      marker.visible = this.assetIsVisible(caption.anchor.assetId) &&
+        (this.visibleCaptionColors?.has(nativePinColorKey(caption.color)) ?? true);
       const material = marker.material as THREE.MeshStandardMaterial;
       const selected = caption.id === this.currentCaption?.id;
       const needsReview = nativeCaptionNeedsReviewV1(this.snapshot, caption);

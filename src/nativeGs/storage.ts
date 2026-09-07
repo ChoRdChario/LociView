@@ -920,6 +920,63 @@ export async function addNativeCaptionImageV1(
   }, onStatus, signal);
 }
 
+/** Attaches one exact existing project media record without copying or inferring bytes. */
+export async function attachExistingNativeCaptionMediaV1(
+  fs: ProjectWorkspaceFS,
+  current: NativeProjectSnapshotV1,
+  captionId: string,
+  mediaId: string,
+  onStatus?: (message: string) => void,
+): Promise<NativeProjectSnapshotV1> {
+  const caption = current.captions.find((entry) => entry.id === captionId);
+  if (caption === undefined) throw new Error('native Caption media: selected Caption is unavailable');
+  if (!(current.mediaResources ?? []).some((media) => media.id === mediaId)) {
+    throw new Error('native Caption media: selected project image is unavailable');
+  }
+  if ((caption.attachmentMediaIds ?? []).includes(mediaId)) return current;
+  const candidate = parseNativeSnapshotV1(serializeNativeSnapshotV1({
+    ...current,
+    captions: current.captions.map((entry) => entry.id === captionId ? {
+      ...entry,
+      attachmentMediaIds: [...(entry.attachmentMediaIds ?? []), mediaId],
+    } : entry),
+  }));
+  return publishNativeCaptionMediaChangeV1(fs, current, candidate, new Map(), {
+    action: 'Caption media reuse',
+    staging: 'Checking existing Caption image',
+    writing: 'Writing and verifying Caption attachment snapshot…',
+    publishing: 'Publishing Caption attachment receipt…',
+    success: 'Existing Caption image attached and active.',
+  }, onStatus);
+}
+
+/** Removes only one Caption-to-media reference; the project media record/bytes remain. */
+export async function removeNativeCaptionMediaV1(
+  fs: ProjectWorkspaceFS,
+  current: NativeProjectSnapshotV1,
+  captionId: string,
+  mediaId: string,
+  onStatus?: (message: string) => void,
+): Promise<NativeProjectSnapshotV1> {
+  const caption = current.captions.find((entry) => entry.id === captionId);
+  if (caption === undefined) throw new Error('native Caption media: selected Caption is unavailable');
+  if (!(caption.attachmentMediaIds ?? []).includes(mediaId)) return current;
+  const candidate = parseNativeSnapshotV1(serializeNativeSnapshotV1({
+    ...current,
+    captions: current.captions.map((entry) => entry.id === captionId ? {
+      ...entry,
+      attachmentMediaIds: (entry.attachmentMediaIds ?? []).filter((id) => id !== mediaId),
+    } : entry),
+  }));
+  return publishNativeCaptionMediaChangeV1(fs, current, candidate, new Map(), {
+    action: 'Caption media removal',
+    staging: 'Checking Caption attachment',
+    writing: 'Writing and verifying Caption attachment removal…',
+    publishing: 'Publishing Caption attachment removal…',
+    success: 'Caption attachment removed; project image bytes retained.',
+  }, onStatus);
+}
+
 export async function openNativeProjectV1(fs: WorkspaceFS, projectId: string): Promise<NativeOpenProject> {
   const markerText = await fs.readText(nativeActiveMarkerPath(projectId));
   if (markerText === null) throw new Error('native project: no active marker');

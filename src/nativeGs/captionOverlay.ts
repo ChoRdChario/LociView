@@ -161,6 +161,8 @@ export interface NativeCaptionOverlayOptionsV1 {
   readonly getSelectedCaptionId: () => string | null;
   readonly getActiveDisplaySetId: () => string;
   readonly projectCaption: (captionId: string) => NativeCaptionScreenPointV1 | null;
+  readonly isPinColorVisible?: (captionId: string) => boolean;
+  readonly onShowPinColor?: (captionId: string) => void;
   readonly readMedia: (mediaId: string) => Promise<WorkspaceReadableFile | null>;
   readonly onDismiss: () => void;
   readonly onError: (message: string) => void;
@@ -180,6 +182,12 @@ export function mountNativeCaptionOverlayV1(
   line.setAttribute('stroke-width', '2');
   svg.append(line);
   const card = el('article', { class: 'ng-caption-overlay', role: 'note' });
+  const showPinColor = el('button', {}, '表示');
+  const pinColorNotice = el('div', { class: 'ng-row ng-color-hidden', hidden: true },
+    el('span', {}, '色で非表示'), showPinColor);
+  showPinColor.addEventListener('click', () => {
+    if (currentModel !== null) options.onShowPinColor?.(currentModel.captionId);
+  });
   options.stage.append(svg, card);
 
   const mediaSelection = new NativeCaptionMediaSelectionV1();
@@ -370,7 +378,7 @@ export function mountNativeCaptionOverlayV1(
     };
     header.addEventListener('pointerup', finishDrag);
     header.addEventListener('pointercancel', finishDrag);
-    const content = el('div', { class: 'ng-caption-overlay-content' }, header);
+    const content = el('div', { class: 'ng-caption-overlay-content' }, header, pinColorNotice);
     if (model.body !== '') content.append(el('div', { class: 'ng-caption-overlay-body' }, model.body));
     if (model.media.length > 0) {
       const thumbnails = el('div', { class: 'ng-caption-overlay-thumbnails' });
@@ -478,6 +486,7 @@ export function mountNativeCaptionOverlayV1(
     if (nextMediaKey !== mediaSelectionKey) resetMediaSelection(nextMediaKey);
     const nextSignature = JSON.stringify([next.captionId, next.title, next.body, next.color, next.media]);
     currentModel = next;
+    pinColorNotice.hidden = options.isPinColorVisible?.(next.captionId) !== false;
     if (nextSignature !== contentSignature) {
       contentSignature = nextSignature;
       renderContent(next);
@@ -513,7 +522,7 @@ export function mountNativeCaptionOverlayV1(
         manualSize = { widthCss: placement.widthCss, heightCss: placement.heightCss };
       }
       card.style.display = '';
-      svg.style.display = '';
+      svg.style.display = options.isPinColorVisible?.(model!.captionId) === false ? 'none' : '';
       card.style.width = `${placement.widthCss}px`;
       // Even the automatic size gets an explicit, stage-clamped height for the
       // painted frame. The next frame clears it before measuring again, so

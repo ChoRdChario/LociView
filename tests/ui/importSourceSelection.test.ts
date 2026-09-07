@@ -6,6 +6,7 @@ import {
 import { LOCIMYU_SOURCE_RETENTION_NOTICE } from '../../src/io/locimyu';
 import {
   importWizardRetentionNotice,
+  importWizardPrimaryActionLabel,
   importWizardVisibleDiagnostics,
   lociMyuHeicDeviceConversionNotice,
   shouldRebuildImportLinks,
@@ -114,6 +115,29 @@ describe('ImportSourceSelectionController', () => {
     expect(plan.selectedSourceIndex).toBe(selectedIndex);
     expect(shouldRebuildImportLinks(outcome)).toBe(false);
     await expect(controller.select(plan, backupIndex)).resolves.toEqual(outcome);
+  });
+
+  it('direct Nativeの主操作名はsource切替後の実際の結果に追従する', async () => {
+    const valid = captionCsv('c_valid', '変換できる記録');
+    const collision = encoder.encode([
+      CAP_HEADER.join(','),
+      ['c_one', '衝突A', '', '', '', '', '', '', '', ''].join(','),
+      ['c_two', '衝突B', '', '', '', '', '', '', '', ''].join(','),
+    ].join('\n'));
+    vi.spyOn(crypto.subtle, 'digest').mockResolvedValue(new Uint8Array(32).buffer as ArrayBuffer);
+    const plan = await buildImportPlan([
+      { path: 'current.csv', data: valid },
+      { path: 'backup.csv', data: collision },
+    ], { preserveBlockedLociMyuSource: true });
+    const controller = new ImportSourceSelectionController();
+    const validIndex = plan.sources.findIndex((source) => source.fileName === 'current.csv');
+    const blockedIndex = plan.sources.findIndex((source) => source.fileName === 'backup.csv');
+
+    expect(importWizardPrimaryActionLabel(plan, { directNative: true })).toBe('説明ファイルを保存');
+    await expect(controller.select(plan, validIndex)).resolves.toEqual({ kind: 'selected' });
+    expect(importWizardPrimaryActionLabel(plan, { directNative: true })).toBe('新しいプロジェクトへ変換して編集');
+    await expect(controller.select(plan, blockedIndex)).resolves.toEqual({ kind: 'selected' });
+    expect(importWizardPrimaryActionLabel(plan, { directNative: true })).toBe('説明ファイルを保存');
   });
 });
 

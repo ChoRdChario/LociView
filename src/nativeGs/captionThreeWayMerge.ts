@@ -131,6 +131,13 @@ export function validateNativeCollaborationBaselineV1(snapshot: NativeProjectSna
   if (nativeCollaborationBaselineIdV1(baseline) !== baseline.baselineId) {
     throw new Error('native collaboration: baseline ID does not match its canonical content');
   }
+  const currentMedia = new Map((snapshot.mediaResources ?? []).map((media) => [media.id, media]));
+  for (const baselineMedia of baseline.mediaResources) {
+    const current = currentMedia.get(baselineMedia.id);
+    if (current === undefined || !same(current, baselineMedia)) {
+      throw new Error('native collaboration: baseline media is missing or changed in the current Project');
+    }
+  }
   if (nativeUnsupportedStateSha256V1(snapshot) !== baseline.unsupportedStateSha256) {
     throw new Error('native collaboration: unsupported Project state changed after the fixed baseline');
   }

@@ -10,6 +10,7 @@ import {
 } from '../../src/nativeGs/resolver';
 import {
   activateNativeManualAssetTransformV1,
+  appendEmptyNativeDisplaySetV1,
   appendNativeSavedViewAsDisplaySetDefaultV1,
   NATIVE_ACTIVE_FORMAT,
   NATIVE_CAPTION_PIN_SCALE_DEFAULT,
@@ -20,8 +21,10 @@ import {
   parseNativeSnapshotV1,
   removeNativeAssetV1,
   removeSelectedNativeCaptionV1,
+  renameNativeDisplaySetV1,
   setNativeAssetVisibilityV1,
   setNativeAssetPinScaleV1,
+  setNativeDisplaySetDefaultSavedViewV1,
   serializeNativeActiveMarkerV1,
   serializeNativeSnapshotV1,
   updateSelectedNativeCaptionV1,
@@ -369,6 +372,67 @@ describe('native snapshot v1 and fixed degradation outcomes', () => {
       id: testNativeId('view', 14),
       displaySetId: testNativeId('set', 99),
     })).toThrow(/target DisplaySet is missing/);
+  });
+
+  it('creates and renames an empty DisplaySet and points it at one exact existing view', () => {
+    const base = snapshotFromDraft(makeNativeDraft().draft);
+    const setId = testNativeId('set', 2);
+    const created = appendEmptyNativeDisplaySetV1(base, setId, ' Field notes ');
+    expect(created.displaySets).toEqual([
+      { id: NATIVE_DEFAULT_DISPLAY_SET_ID, name: 'Default', orderKey: '000000', defaultSavedViewId: null },
+      { id: setId, name: 'Field notes', orderKey: setId, defaultSavedViewId: null },
+    ]);
+    expect(created.captions).toEqual(base.captions);
+    expect(created.assets).toBe(base.assets);
+    expect(created.presentation).toBe(base.presentation);
+
+    const renamed = renameNativeDisplaySetV1(created, setId, 'Review');
+    expect(renamed.displaySets?.[1]).toEqual({
+      id: setId, name: 'Review', orderKey: setId, defaultSavedViewId: null,
+    });
+    expect(renameNativeDisplaySetV1(renamed, setId, 'Review')).toBe(renamed);
+    expect(() => renameNativeDisplaySetV1(renamed, setId, '   ')).toThrow(/non-empty/);
+    expect(() => appendEmptyNativeDisplaySetV1(renamed, setId, 'Duplicate')).toThrow(/already exists/);
+
+    const viewId = testNativeId('view', 22);
+    const foreignViewId = testNativeId('view', 23);
+    const withViews: NativeProjectSnapshotV1 = {
+      ...renamed,
+      savedViews: [{
+        id: viewId,
+        name: 'Review view',
+        orderKey: '000001',
+        projectFrameId: base.project.frame.id,
+        displaySetId: setId,
+        camera: {
+          position: [2, 2, 2], target: [0, 0, 0], up: [0, 1, 0],
+          projection: { kind: 'perspective', verticalFovRadians: Math.PI / 4 },
+        },
+        background: { kind: 'solid', colorSrgb: [0.1, 0.2, 0.3] },
+      }, {
+        id: foreignViewId,
+        name: 'Default view',
+        orderKey: '000002',
+        projectFrameId: base.project.frame.id,
+        displaySetId: NATIVE_DEFAULT_DISPLAY_SET_ID,
+        camera: {
+          position: [3, 3, 3], target: [0, 0, 0], up: [0, 1, 0],
+          projection: { kind: 'perspective', verticalFovRadians: Math.PI / 4 },
+        },
+        background: { kind: 'solid', colorSrgb: [0.2, 0.3, 0.4] },
+      }],
+    };
+    const pointed = setNativeDisplaySetDefaultSavedViewV1(withViews, setId, viewId);
+    expect(pointed.displaySets?.[1]?.defaultSavedViewId).toBe(viewId);
+    expect(pointed.savedViews).toBe(withViews.savedViews);
+    expect(setNativeDisplaySetDefaultSavedViewV1(pointed, setId, viewId)).toBe(pointed);
+    expect(() => setNativeDisplaySetDefaultSavedViewV1(pointed, setId, foreignViewId))
+      .toThrow(/different DisplaySet/);
+    expect(() => setNativeDisplaySetDefaultSavedViewV1(pointed, setId, testNativeId('view', 99)))
+      .toThrow(/default SavedView is missing/);
+    const reparsed = parseNativeSnapshotV1(serializeNativeSnapshotV1(pointed));
+    expect(reparsed.displaySets).toEqual(pointed.displaySets);
+    expect(reparsed.savedViews).toEqual(pointed.savedViews);
   });
 
   it('updates only the selected Caption and fails closed if its stable ID disappears', () => {

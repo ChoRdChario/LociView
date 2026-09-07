@@ -57,6 +57,39 @@
 - When v2 migration is implemented, preserve v1 input and use dual-read/v2-only-write unless a later accepted specification says otherwise. This does not prohibit maintenance of the current v1 writer before that migration exists.
 - Do not describe Gaussian Splatting, Automerge, CAS, multiple simultaneous models, or renderer ports as adopted, generally supported or gate-passed until the applicable gate has passed and the code exists. `Implemented` may describe only an exact bounded production path whose code and executed evidence exist; it must state the tested scope and must not imply aggregate gate, adoption, broader support or release credit.
 
+## UI copy rules
+
+- Introduce the product with a complete statement whose subject is `LociView` and
+  whose predicate names its core user-facing capability. Do not substitute an
+  imperative fragment or an unexplained slogan for the product description.
+- Label an action by the result the user wants, using familiar terms and a short
+  verb phrase such as `ファイルを開く` or `メディアを追加`. Do not use internal
+  formats, implementation steps or a control type as the action name.
+- Use one stable term for one concept. A visible control label and its accessible
+  name must use the same wording; supplemental help belongs in an accessible
+  description, not in an inflated control name.
+- Helper text may add only information that changes the current action or decision:
+  a required condition, important consequence or non-obvious alternative. Remove
+  paraphrases of the label and routine narration of automatic behavior.
+- Prefer input-neutral wording such as `選択`. Mention `ここにドロップ` only as
+  an additional discoverable path. Do not use `クリック` or `タップ` unless the
+  task genuinely depends on that input method, and never make dragging the only
+  way to complete an action.
+- If content inspection can choose one safe path, expose one intent-based entry and
+  reveal the detected result and conditional controls afterward. Do not ask the
+  user to choose a file type or internal role that the product can determine.
+- Use progressive disclosure for rare or state-specific controls. Keep one primary
+  action per decision point and avoid competing cards that lead to the same result.
+- Brevity must not hide failure, ambiguity, unsaved state, destructive effects,
+  source preservation or recovery. State these beside the affected control when
+  they become relevant, in plain language without blame.
+- Describe collaboration with its user-visible scope. Do not use generic wording
+  such as `other data can be merged` when the implemented path requires the same
+  Project lineage and a collaboration file; never imply cross-model matching.
+- Review every string in its rendered context: if removing it changes no user
+  decision, prevents no error and removes no recovery instruction, remove it or
+  move it to contextual help.
+
 ## Verification
 
 Run at minimum:

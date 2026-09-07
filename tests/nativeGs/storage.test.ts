@@ -20,6 +20,7 @@ import {
 import {
   addNativeAssetV1,
   addNativeCaptionImageV1,
+  attachExistingNativeCaptionMediaV1,
   assertNativeProjectDoesNotMixV1,
   createNativeProjectV1,
   deleteNativeProjectV1,
@@ -30,10 +31,12 @@ import {
   nativeRepresentationPath,
   openNativeProjectV1,
   replaceNativeAssetV1,
+  removeNativeCaptionMediaV1,
   restoreNativeProjectV1,
   saveNativeProjectV1,
 } from '../../src/nativeGs/storage';
 import { digestNativeBytes } from '../../src/nativeGs/sha256';
+import { createNativeCollaborationBaselineV1 } from '../../src/nativeGs/captionThreeWayMerge';
 import {
   makeNativeDraft,
   makeNativeGsReplacement,
@@ -572,6 +575,63 @@ describe('native project blob-first/marker-last publication', () => {
       expect(await invalidTarget.list(`${nativeProjectRoot(next.project.id)}/`)).toEqual([]);
       invalidRestoreSession.release();
     }
+    session.release();
+  });
+
+  it('reuses and removes every exact Caption media reference while retaining baseline records and bytes', async () => {
+    const fs = new RecordingMemoryFS();
+    const session = await editable(fs);
+    const base = makeNativeDraft(2);
+    const captionA = NATIVE_TEST_IDS.caption;
+    const captionB = testNativeId('cap', 2);
+    const first = await createNativeProjectV1(session.workspace, {
+      ...base.draft,
+      captions: [
+        { id: captionA, title: 'A', body: '', ownerAssetId: NATIVE_TEST_IDS.meshAsset, anchor: null },
+        { id: captionB, title: 'B', body: '', ownerAssetId: NATIVE_TEST_IDS.meshAsset, anchor: null },
+      ],
+    }, base.sources);
+    const image = new Blob([VALID_PNG_BYTES], { type: 'image/png' });
+    const attachedA = await addNativeCaptionImageV1(
+      session.workspace, first, captionA, 'shared.png',
+      { size: image.size, mediaType: image.type, stream: () => image.stream() },
+    );
+    const mediaId = attachedA.mediaResources![0]!.id;
+    const attachedBoth = await attachExistingNativeCaptionMediaV1(
+      session.workspace, attachedA, captionB, mediaId,
+    );
+    expect(attachedBoth.captions.map((caption) => caption.attachmentMediaIds ?? [])).toEqual([
+      [mediaId], [mediaId],
+    ]);
+    await expect(attachExistingNativeCaptionMediaV1(
+      session.workspace, attachedBoth, captionB, mediaId,
+    )).resolves.toBe(attachedBoth);
+
+    const detachedA = await removeNativeCaptionMediaV1(
+      session.workspace, attachedBoth, captionA, mediaId,
+    );
+    expect(detachedA.captions.map((caption) => caption.attachmentMediaIds ?? [])).toEqual([
+      [], [mediaId],
+    ]);
+    expect(detachedA.mediaResources).toEqual(attachedBoth.mediaResources);
+    expect(await fs.readBytes(nativeMediaPath(first.project.id, mediaId))).toEqual(VALID_PNG_BYTES);
+    expect((await openNativeProjectV1(fs, first.project.id)).snapshot).toEqual(detachedA);
+
+    const withBaseline = await saveNativeProjectV1(session.workspace, {
+      ...detachedA,
+      collaborationBaseline: createNativeCollaborationBaselineV1(detachedA),
+    });
+    const detachedLastReference = await removeNativeCaptionMediaV1(
+      session.workspace, withBaseline, captionB, mediaId,
+    );
+    expect(detachedLastReference.captions.every((caption) => (
+      (caption.attachmentMediaIds ?? []).length === 0
+    ))).toBe(true);
+    expect(detachedLastReference.mediaResources).toEqual(withBaseline.mediaResources);
+    expect(detachedLastReference.collaborationBaseline).toEqual(withBaseline.collaborationBaseline);
+    expect(detachedLastReference.collaborationBaseline?.mediaResources.map((media) => media.id)).toContain(mediaId);
+    expect(await fs.readBytes(nativeMediaPath(first.project.id, mediaId))).toEqual(VALID_PNG_BYTES);
+    expect((await openNativeProjectV1(fs, first.project.id)).snapshot).toEqual(detachedLastReference);
     session.release();
   });
 

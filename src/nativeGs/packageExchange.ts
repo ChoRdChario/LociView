@@ -563,28 +563,47 @@ async function prepareExportPlan(
   fs: ProjectWorkspaceFS,
   projectId: string,
   purpose: NativeExchangePurposeV1,
+  reviewDisplaySetId?: string,
   onStatus?: (message: string) => void,
+  signal?: AbortSignal,
 ): Promise<{ readonly sourceProjectId: string; readonly plan: NativeExchangeSnapshotPlanV1 }> {
   if (fs.projectRoot !== null && fs.projectRoot !== nativeProjectRoot(projectId)) {
     throw new Error('native exchange export: writer is scoped to another Project');
   }
   fs.mutationAuthority.assertEditable();
+  if (purpose === 'review' && reviewDisplaySetId === undefined) {
+    throw new Error('native review export: an explicit DisplaySet is required');
+  }
+  if (purpose !== 'review' && reviewDisplaySetId !== undefined) {
+    throw new Error('native exchange export: a DisplaySet is only valid for review output');
+  }
+  signal?.throwIfAborted();
+  const explicitReviewDisplaySetId = reviewDisplaySetId;
   let snapshot = (await openNativeProjectV1(fs, projectId)).snapshot;
+  signal?.throwIfAborted();
   if (purpose === 'collaboration') {
     if (snapshot.collaborationBaseline === undefined) {
       onStatus?.('Freezing the first Caption collaboration baseline…');
+      signal?.throwIfAborted();
       snapshot = await saveNativeProjectV1(fs, {
         ...snapshot,
         collaborationBaseline: createNativeCollaborationBaselineV1(snapshot),
       });
+      signal?.throwIfAborted();
     }
     validateNativeCollaborationBaselineV1(snapshot);
   }
-  const plan = purpose === 'collaboration'
-    ? buildNativeCollaborationSnapshotPlanV1(snapshot)
-    : purpose === 'review'
-      ? buildNativeReviewSnapshotPlanV1(snapshot)
-      : buildNativeCleanCopySnapshotPlanV1(snapshot);
+  let plan: NativeExchangeSnapshotPlanV1;
+  if (purpose === 'collaboration') {
+    plan = buildNativeCollaborationSnapshotPlanV1(snapshot);
+  } else if (purpose === 'review') {
+    if (explicitReviewDisplaySetId === undefined) {
+      throw new Error('native review export: an explicit DisplaySet is required');
+    }
+    plan = buildNativeReviewSnapshotPlanV1(snapshot, explicitReviewDisplaySetId);
+  } else {
+    plan = buildNativeCleanCopySnapshotPlanV1(snapshot);
+  }
   return { sourceProjectId: projectId, plan };
 }
 
@@ -593,14 +612,20 @@ export async function exportNativeExchangePackageV1(
   projectId: string,
   purpose: NativeExchangePurposeV1,
   destination: WritableStream<Uint8Array>,
-  options: { readonly signal?: AbortSignal; readonly onStatus?: (message: string) => void } = {},
+  options: {
+    readonly signal?: AbortSignal;
+    readonly onStatus?: (message: string) => void;
+    readonly reviewDisplaySetId?: string;
+  } = {},
 ): Promise<NativeExchangeExportResultV1> {
   let prepared: { readonly sourceProjectId: string; readonly plan: NativeExchangeSnapshotPlanV1 };
   let manifest: NativeExchangeManifestV1;
   let snapshotText: string;
   let manifestText: string;
   try {
-    prepared = await prepareExportPlan(fs, projectId, purpose, options.onStatus);
+    prepared = await prepareExportPlan(
+      fs, projectId, purpose, options.reviewDisplaySetId, options.onStatus, options.signal,
+    );
     snapshotText = serializeNativeSnapshotV1(prepared.plan.snapshot);
     manifest = buildManifest(prepared.plan.snapshot, purpose, snapshotText);
     manifestText = assertExportBoundary(manifest, snapshotText);

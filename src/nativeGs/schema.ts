@@ -304,6 +304,79 @@ export function appendNativeSavedViewAsDisplaySetDefaultV1(
   };
 }
 
+function nativeDisplaySetNameV1(name: string): string {
+  return singleLineString(name.trim(), 'DisplaySet name');
+}
+
+/** Materializes the implicit default and appends one empty, independently named set. */
+export function appendEmptyNativeDisplaySetV1(
+  snapshot: NativeProjectSnapshotV1,
+  displaySetId: string,
+  name: string,
+): NativeProjectSnapshotV1 {
+  id(displaySetId, 'set', 'DisplaySet id');
+  const displaySets = nativeDisplaySetsV1(snapshot);
+  if (displaySets.some((displaySet) => displaySet.id === displaySetId)) {
+    throw new Error('native snapshot: new DisplaySet ID already exists');
+  }
+  return {
+    ...snapshot,
+    displaySets: [
+      ...displaySets,
+      {
+        id: displaySetId,
+        name: nativeDisplaySetNameV1(name),
+        orderKey: displaySetId,
+        defaultSavedViewId: null,
+      },
+    ],
+  };
+}
+
+/** Renames one exact set without changing identity or any membership/reference. */
+export function renameNativeDisplaySetV1(
+  snapshot: NativeProjectSnapshotV1,
+  displaySetId: string,
+  name: string,
+): NativeProjectSnapshotV1 {
+  const nextName = nativeDisplaySetNameV1(name);
+  let found = false;
+  let changed = false;
+  const displaySets = nativeDisplaySetsV1(snapshot).map((displaySet) => {
+    if (displaySet.id !== displaySetId) return displaySet;
+    found = true;
+    if (displaySet.name === nextName) return displaySet;
+    changed = true;
+    return { ...displaySet, name: nextName };
+  });
+  if (!found) throw new Error('native snapshot: DisplaySet to rename is missing');
+  return changed ? { ...snapshot, displaySets } : snapshot;
+}
+
+/** Changes only the default-view pointer; it never applies or recaptures camera state. */
+export function setNativeDisplaySetDefaultSavedViewV1(
+  snapshot: NativeProjectSnapshotV1,
+  displaySetId: string,
+  savedViewId: string,
+): NativeProjectSnapshotV1 {
+  const savedView = (snapshot.savedViews ?? []).find((candidate) => candidate.id === savedViewId);
+  if (savedView === undefined) throw new Error('native snapshot: default SavedView is missing');
+  if (nativeSavedViewDisplaySetIdV1(savedView) !== displaySetId) {
+    throw new Error('native snapshot: default SavedView belongs to a different DisplaySet');
+  }
+  let found = false;
+  let changed = false;
+  const displaySets = nativeDisplaySetsV1(snapshot).map((displaySet) => {
+    if (displaySet.id !== displaySetId) return displaySet;
+    found = true;
+    if (displaySet.defaultSavedViewId === savedViewId) return displaySet;
+    changed = true;
+    return { ...displaySet, defaultSavedViewId: savedViewId };
+  });
+  if (!found) throw new Error('native snapshot: default SavedView target DisplaySet is missing');
+  return changed || snapshot.displaySets === undefined ? { ...snapshot, displaySets } : snapshot;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

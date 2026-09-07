@@ -15,6 +15,7 @@ This index prevents current v1 behavior, historical plans, and the proposed v2 a
 | Fresh-session checkpoint and stop boundary | `tasks/handoff.md`; navigation only, never a product specification |
 | Active work sequencing | `tasks/todo.md`; never a product specification |
 | Recurrent failure patterns | Task-relevant entries in `tasks/lessons.md`; advisory until promoted to a rule/ADR |
+| Accepted UI/UX presentation principles | Blocks marked `Accepted requirement` in `ui-product-guidelines.md`; behavior and safety still come from the applicable product specification |
 
 If observed code conflicts with the applicable compatibility or accepted future contract, stop and resolve the discrepancy explicitly. Neither side silently overwrites the other.
 
@@ -32,6 +33,7 @@ If observed code conflicts with the applicable compatibility or accepted future 
 | `07-roadmap.md` | `SUPERSEDED 2026-07 ROADMAP` | Historical only; never use as the active plan |
 | `08-ios-test-guide.md` | `V1 QA RUNBOOK` | Current manual v1 check, not a v2 GS performance specification |
 | `09-locimyu-migration.md` | `V1 LEGACY RUNBOOK` | Existing legacy import guidance; ambiguous filename cases remain possible |
+| `ui-product-guidelines.md` | `PRODUCT-OWNER APPROVED UI/UX PRINCIPLES / IMPLEMENTATION AND ACCEPTANCE STATUS ARE SECTION-SPECIFIC` | Accepted-labelled interaction, information architecture, writing and visual principles; `Current implementation`, `Evidence pending` and `Proposed` blocks are informative and gain no authority from this index |
 | `licensing-and-ownership.md` | `PRODUCT-OWNER APPROVED DIRECTION / PROPOSED ADOPTION / NO LICENSE GRANT` | Ownership/relicensing record, freedom-first MPL-2.0 candidate, material scopes and formal adoption gate |
 | `sponsorship-policy.md` | `PRODUCT-OWNER APPROVED DIRECTION / PROPOSED OPERATIONAL POLICY` | Sponsor acknowledgement, individual consultation, privacy, influence and release boundaries; no sponsor is accepted by the document |
 | `g0/device-performance-runbook.md` | `G0 EVIDENCE CONTRACT / NO MEASUREMENTS RECORDED` | Repeatable device/performance procedure and provisional, unapproved observations |

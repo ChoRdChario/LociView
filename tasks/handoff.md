@@ -1,12 +1,45 @@
 # Fresh-session handoff — public-candidate preparation
 
-> Status: `CURRENT HANDOFF`; the bounded Native-only write-authority path,
+> **Current update (2026-09-07 team-operation review):** The Product Owner
+> paused further UI editing and requested a whole-lifecycle review of whether
+> one knowledgeable operator can lower participation cost for a continuing
+> team. The read-only product-fit review is in
+> `tasks/team-operations-review.md`; the approved UI/UX philosophy and visual
+> direction are consolidated in `docs/ui-product-guidelines.md`. Current Native
+> collaboration safely supports a self-contained initial handoff and a bounded
+> frozen-base Caption campaign, but does not yet support continuing causal
+> rounds or model/presentation revision propagation. This is a documentation
+> boundary only. Stop before production UI, schema/package, dependency,
+> release, Pages or Service Worker changes until the Product Owner decides the
+> listed team-workflow questions.
+
+> **Historical completed update (2026-09-06 implementation):** The Product Owner approved
+> D1–D4 and all three bounded legacy-convenience UI slices. Production code,
+> focused acceptance and independent read-only code review are complete with no
+> remaining P0/P1. Rendered Desktop/41-task measurement and physical-iPhone
+> acceptance remain open; see `tasks/uiux-parity-plan.md` §9 and `tasks/todo.md`.
+> This does not authorize release, commit/push, Pages or Service Worker changes.
+
+> **Historical superseded planning update (2026-09-06):** PO requested a renewed legacy-convenience audit
+> and a remaining-work-first UI/UX plan. See `tasks/uiux-parity-plan.md` and the
+> current top of `tasks/todo.md`. This is document-only planning; D1–D4 and further
+> implementation require PO review. Existing UI code stays uncommitted and its
+> live Desktop/iPhone acceptance and independent final diff review remain open.
+
+> **Historical superseded update (2026-09-05):** The PO subsequently approved the refined UI
+> design and requested an existing-function/UI crosswalk followed by implementation.
+> See `tasks/uiux-implementation.md` and the top of `tasks/todo.md` for the current
+> worktree and verification boundary. The no-production-authorization statements
+> below describe the earlier handoff, not the current UI authorization. This UI
+> change has no new rendered/physical-iPhone acceptance and no release approval.
+
+> **Historical checkpoint status (superseded by the 2026-09-07 update):** the bounded Native-only write-authority path,
 > device-side HEIC-to-JPEG compatibility path, automated checks and Product
 > Owner Desktop/physical-iPhone acceptance are complete. The latest production
 > implementation is `6b2a28a0e5983676c9dc5d97534d916e3288f40d`; the accepted
 > result checkpoint at the start of this handoff preparation is
 > `87a249d4ab85308c0486366c5516bc82dd7ff139`. Its clean GitHub Actions run
-> passed and no P0/P1 is unresolved. The next authorized workstream is a
+> passed and no P0/P1 was unresolved. At that checkpoint, the next authorized workstream was a
 > task-based public-candidate UI/UX audit and design pass; see
 > `tasks/uiux-handoff.md`. This does not authorize production or release work.
 >
@@ -88,7 +121,13 @@ Read these before the public-candidate UI/UX audit:
 Do not reconstruct current scope from chat history, the superseded roadmap or
 old unchecked gate prose.
 
-## 3. Closed production boundaries
+## 3. Public-candidate safety boundaries closed at the accepted scope
+
+The items below remain closed for the accepted public-candidate safety contract;
+the team-operation review does not reclassify its fail-closed implementation as
+defective. A separately Product Owner-approved continuing-team contract may
+supersede history/package semantics through updated specifications and new
+acceptance before implementation.
 
 Treat these as complete unless a newly reproduced P0/P1 directly blocks release:
 
@@ -105,11 +144,12 @@ Treat these as complete unless a newly reproduced P0/P1 directly blocks release:
   - Caption/new-image three-way merge;
   - conflict report with zero Project writes;
   - idempotent re-import and lineage rejection;
-  - non-mergeable review/share package, View mode by default;
+  - source-nonmergeable review/share package, View mode by default; a restored
+    v1 copy may later begin only a new independent lineage;
   - clean editable copy with a new Project ID/lineage;
   - existing complete backup retained as a separate purpose.
 
-Do not reopen package permutations, extra camera inference, material-system
+Within current candidate maintenance, do not reopen package permutations, extra camera inference, material-system
 expansion, memory instrumentation, Proxy edge cases or additional physical-
 iPhone evidence matrices without a release-blocking P0/P1. The authorized UX
 session may identify workflow and presentation changes, but it may not make
@@ -197,15 +237,15 @@ Owner decisions after RC-A implementation and exact-tree verification.
 
 ## 6. Next fresh session
 
-The next session must follow `tasks/uiux-handoff.md`: verify Git and the stop
-boundary read-only, teach back the product model in plain Japanese, then run the
-actual current UI from the ordinary home and audit the fixed task inventory.
-It must compare task flow—not implementation internals—with the permitted
-LociMyu references, measure both operation load and decision load, and produce
-the public-candidate UX closure proposal. It stops for Product Owner approval
-before production implementation, license/version decisions, `main`
-integration or deployment.
+The next session starts from the 2026-09-07 update at the top of this file and
+the first current boundary in `tasks/todo.md`. Read
+`tasks/team-operations-review.md` and `docs/ui-product-guidelines.md`, verify the
+current Git/worktree boundary read-only, and present or resolve the Product Owner
+decisions listed in the team review. Stop before UI implementation,
+storage/schema/package changes, dependency work, license/version decisions,
+`main`, Pages, Service Worker or deployment.
 
-The paste-ready start message is generated in the preparation session's final
-report so it can name that docs-only commit exactly. Never use this document's
-own embedded SHA as an unchecked checkout target.
+The older instruction to begin the 41-task UI walkthrough was completed or
+superseded and is not the next workstream. Rendered Desktop and physical-iPhone
+UI acceptance remain open but inactive until the team-operation boundary is
+resolved. Never use this document's embedded SHA as an unchecked checkout target.

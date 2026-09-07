@@ -1,6 +1,20 @@
 # Public candidate UI/UX監査 handoff
 
-> Status: `AUTHORIZED AUDIT/DESIGN INPUT / NO PRODUCTION AUTHORIZATION`。
+> **2026-09-06の実装結果**: POはD1–D4と3つのbounded sliceを批准し、production
+> 実装を指示した。実装とfocused acceptance、独立read-only code reviewは完了し、
+> P0/P1なし。現行境界と未完の実描画/physical-iPhone証拠は`tasks/uiux-parity-plan.md`
+> §9と`tasks/todo.md`先頭を参照する。release/commit/push/Pages/SWは未承認。
+
+> **2026-09-06の現行境界**: PO依頼で継承不足を原本codeから再監査し、残作業→配置/状態→
+> 3slice計画を`tasks/uiux-parity-plan.md`へ記録した時点の履歴。既存41taskはそのまま、
+> 追加シナリオを関連付けた。
+
+> **2026-09-05の後続承認**: POは設計を概ね承認し、既存機能との対応表による
+> 抜け確認後のUI実装を指示した。現行境界は`tasks/uiux-implementation.md`。
+> 以下の未承認表記は開始時の履歴。41タスクの実操作計測・新UIのiPhone受入れは
+> 未完了のまま維持する。新機能一般・schema・release・deployの承認ではない。
+
+> Historical status at audit start: `AUTHORIZED AUDIT/DESIGN INPUT / NO PRODUCTION AUTHORIZATION`。
 > 製品挙動の受入れ済みcheckpointは、このhandoff準備開始時点で
 > `87a249d4ab85308c0486366c5516bc82dd7ff139`。最新production実装は
 > `6b2a28a0e5983676c9dc5d97534d916e3288f40d`。利用前に必ず現在の
@@ -235,7 +249,7 @@ Workerを変更しない。新機能追加、既存機能削除、大規模renam
 framework導入も行わない。新しいPoC、fixture matrix、evidence system、広い
 reviewer loopを作らない。
 
-次にProduct Ownerが、candidate必須項目、candidate後polish、最大3 sliceの開始可否を
-承認する。正式license／notice、exact version／release SHA、`main`統合／rollback、
+Product Ownerはcandidate必須項目と最大3 sliceを承認済み。正式license／notice、
+exact version／release SHA、`main`統合／rollback、
 Pages deployment、advertised POST share-target削除、既にpublicなprivate-source由来
 metadataの扱いは、UX closure後も別のrelease判断として残る。
