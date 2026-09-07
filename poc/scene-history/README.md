@@ -28,7 +28,7 @@ with a shared-handle `view`; large-history reconstruction cost remains unmeasure
 API references: https://automerge.org/automerge/api-docs/js/
 and https://automerge.org/docs/reference/documents/conflicts/ .
 
-## Browser storage probe (partial manual evidence)
+## Browser storage probe (bounded manual sequence PASS; G1-C partial evidence)
 
 Product Owner supplied visible log text and a screenshot on 2026-09-08 after
 running `保存・失敗・再試行を検証` on the loopback probe associated with checkpoint
@@ -44,8 +44,30 @@ bytes PASS), then `PAUSED: 1/3 original changes durable; zero prefix publication
 and a second tab displaying the unchanged old view as READ-ONLY plus
 `PASS DENIED synthetic facade request`. The exchange base remained unchanged.
 This confirms tab reload readback and the pending guard while the owner tab
-holds its writer lock. Owner-tab interruption, refusal after lock release,
-interrupted-batch recovery and no-op replay remain pending.
+holds its writer lock.
+
+Follow-up: the PO reported "以前の中断状態から再開" and supplied two screenshots.
+The recovery-tab log contains `PASS DENIED synthetic facade request`, then
+`PASS recovered 2 missing original changes; one final publication; base unchanged`.
+Both visible pages end at READY with `Coordinator title`, `Final remote body`
+and `revision-2`, and report fresh Repo heads/hash/original-byte readback PASS
+with `base unchanged=true`. The preceding failed start reached the pending-run
+guard inside the exclusive lock, establishing that the old writer lock was no
+longer held at that point. This supports the resumed pending-state barrier and
+exact missing-change recovery; it is not a separately measured process-kill or
+power-loss test. Automatic versus manually requested other-tab refresh and final
+page-reload ordering are not established by these screenshots. The explicit
+`PASS no pending batch; replay is a no-op` line is not present: that confirmation
+remains pending. Browser family/version/OS are not inferred from cropped pages.
+After the requested final page-reload/readback step, the PO supplied text showing
+READY `Coordinator title` / `Final remote body` / `revision-2`, repeated independent
+Repo heads/hash/original-byte PASS and `base unchanged=true`. Record this as the
+user-operated final readback result, not agent browser automation. The PO then
+explicitly confirmed that `PASS no pending batch; replay is a no-op` appeared
+before reloading. That last result is user attestation, not a retained screenshot.
+The bounded save/failure/retry, pending-state refusal, exact recovery and no-op/
+reopen sequence is complete; do not request this same sequence again unchanged.
+Other-tab automatic refresh remains unconfirmed separately from data recovery.
 This evidence does not expand the exclusions below or complete G1-C.
 
 Repo and IndexedDB adapter are pinned to 2.5.6 (MIT), retaining Automerge 3.4.1.
@@ -84,32 +106,48 @@ full two-writer convergence, CAS, CSP/offline or application UI acceptance.
 Chrome修復の反復は中止する。以前の手動証拠、内蔵ブラウザの暫定証拠、Chromeの
 最終証拠を混同しない。この手順は合成データの保存プローブであり、本番UIの試験ではない。
 
-準備: 実施時のGit HEAD、probeソース差分、Chromeのバージョン・OS・日時を記録する。
-上記の専用build/previewを使い、同じChromeプロファイルの通常タブAでloopback URLを
-開く。別タブBもページ内リンクから開き、同じoriginを使う。サーバー未起動は保存失敗と
-区別する。ログにはFAILを含め、各リロード前に画面の状態とログを保存する。
-ブラウザのデータ削除、実プロジェクト読込、複数の試験操作の同時実行は行わない。
+#### 何を確かめるテストか
+
+データの統合が途中で止まっても、途中の内容を表示せず、保存済みの元データから
+復旧できるかを確かめます。実際のプロジェクトやファイルは使いません。
+
+#### 準備とタブの呼び方
+
+1. Chromeで http://127.0.0.1:5184/ を開き、「隔離・保存検証」と表示されることを確認します。
+   接続エラーの場合は操作を進めず、サーバーの起動を担当者に依頼してください。
+2. このページを開いたタブを、以下では **最初のタブ** と呼びます。
+   同じ検証画面がほかのタブにも開いている場合は、それらだけを閉じ、最初のタブを再読み込みします。
+3. **2つ目のタブ** は、下の手順4でページ内リンクから追加するタブです。
+   別のChromeウィンドウやシークレットウィンドウを用意する必要はありません。
+
+画面上部に `未作成` または `READY` と表示されていれば、手順1から始めます。
+`READ-ONLY / 未完了の統合あり` と表示されていれば、以前の中断状態が残っています。
+その画面を保存し、表示内容が下記の「旧表示」と一致することを確認して手順4へ進んでください。
+この場合、手順1〜3は「以前の中断状態から再開のため未実施」と報告します。
+別の内容や `FAILED` が表示される場合は、そこで止めて画面を共有してください。
+
+再読み込みにはChromeの再読み込みボタンを使います。**再読み込みで画面のログは消えるため、
+その直前にスクリーンショットまたはログのコピーを保存してください。**
+ブラウザの保存データは削除せず、各操作の結果を待ってから次へ進みます。
 
 | 手順 | 操作 | 期待結果 | 既存の手動証拠 |
 |---|---|---|---|
-| 1 | Aで `保存・失敗・再試行を検証`。完了まで待つ | 初期保存、保存待ち中の未公開、注入した容量不足と再試行がPASS。最後は下記の旧表示 | あり |
-| 2 | Aを再読込して `保存状態を確認` | 旧表示と `PASS independent Repo reopen: heads, hashes and original bytes`。`base unchanged=true` | あり |
-| 3 | Aで `統合の途中で停止` | `PAUSED: 1/3 original changes durable; zero prefix publication`。`READ-ONLY / 未完了の統合あり` で旧表示のまま | あり |
-| 4 | `同じ検証を別タブで開く` からBを開き、Bで `未完了時の操作拒否を検証` | `PASS DENIED synthetic facade request`。旧表示のまま | あり（Aがロック保持中） |
-| 5 | Aを再読込。読込完了後、Bで再び `未完了時の操作拒否を検証` | ロック解放後も `PASS DENIED synthetic facade request`。両タブとも未完了・旧表示 | **未確認** |
-| 6 | Bで `元の変更データから復旧` | `PASS recovered 2 missing original changes; one final publication; base unchanged`。両タブがREADY・下記の新表示になる | **未確認** |
-| 7 | Bでもう一度 `元の変更データから復旧` | `PASS no pending batch; replay is a no-op`。新表示のまま、再コピーや変更なし | **未確認** |
-| 8 | 両タブで `保存状態を確認`、Bを再読込して再度確認 | 新表示、独立Repoによる元の変更バイト検証PASS、`base unchanged=true` | 復旧後は未確認（6・7の終端確認） |
+| 1 | **最初のタブ**で `保存・失敗・再試行を検証` を押し、READYになるまで待つ | 初期保存、保存待ち中の未公開、注入した容量不足と再試行がPASS。最後は下記の旧表示 | あり |
+| 2 | **最初のタブ**の画面を保存して再読み込みし、`保存状態を確認` を押す | 旧表示と `PASS independent Repo reopen: heads, hashes and original bytes`。`base unchanged=true` | あり |
+| 3 | **最初のタブ**で `統合の途中で停止` を押す | `PAUSED: 1/3 original changes durable; zero prefix publication`。`READ-ONLY / 未完了の統合あり` で旧表示のまま | あり |
+| 4 | **最初のタブ**の `同じ検証を別タブで開く` を押す。開いた **2つ目のタブ**に切り替え、`未完了時の操作拒否を検証` を押す | `PASS DENIED synthetic facade request`。旧表示のまま | あり（以前の実測では最初のタブが操作権を保持中） |
+| 5 | **最初のタブ**に戻り、画面を保存して再読み込みする。読込後、**2つ目のタブ**へ戻り、再び `未完了時の操作拒否を検証` を押す | 最初のタブの操作権が解放された後も `PASS DENIED synthetic facade request`。両タブとも未完了・旧表示 | 再開した未完了状態での拒否は確認済み。再読み込みの操作順自体は画像から判定しない |
+| 6 | **2つ目のタブ**で `元の変更データから復旧` を押す。最初のタブにも切り替えて表示を確認する（まだ再読み込みしない） | `PASS recovered 2 missing original changes; one final publication; base unchanged`。両タブがREADY・下記の新表示になる | 復旧と両タブの新表示は確認済み。自動更新か手動確認かは未確認 |
+| 7 | **2つ目のタブ**でもう一度 `元の変更データから復旧` を押す | `PASS no pending batch; replay is a no-op`。新表示のまま、再コピーや変更なし | POが再読み込み前に表示されたと明示確認。画像ではなく本人の報告による証拠 |
+| 8 | **最初のタブ**と **2つ目のタブ**でそれぞれ `保存状態を確認` を押す。その後、2つ目のタブの画面を保存して再読み込みし、もう一度 `保存状態を確認` を押す | 新表示、独立Repoによる元の変更バイト検証PASS、`base unchanged=true` | 両タブの独立Repo再読込PASSに加え、追加依頼後の最終再読込ログも確認済み |
 
 旧表示: `READY`（中断後はREAD-ONLY）と
 `{"title":"Retry survived","body":"Durable participant edit","modelRevision":"revision-1"}`。
 新表示: `READY` と
 `{"title":"Coordinator title","body":"Final remote body","modelRevision":"revision-2"}`。
 
-既存のA/Bが手順4までの状態を保持していると確認できれば、5から再開してよい。
-別ブラウザ・別プロファイルへの切替では状態引継ぎを仮定せず、1から一続きで実施する。
-開始時に未完了表示があれば1を押さず、その状態を記録して中断した回の復旧を先に扱う。
-手順6ではBを操作する。Aの復旧ボタン自身がロックを解放する経路で、手順5を代替しない。
+手順6では必ず2つ目のタブを操作します。最初のタブの復旧ボタンには自分の操作権を
+解放する処理もあるため、それを押すだけでは手順5の再読み込みによる中断確認を代替できません。
 
 FAIL、途中結果の表示、意図しない保存内容の変化が出たら、その手順で止めてログを残す。
 注入した `EXPECTED background save failure: injected quota` は手順1の想定内だが、
@@ -117,9 +155,23 @@ FAIL、途中結果の表示、意図しない保存内容の変化が出たら�
 手順6で他タブが自動更新されない場合も記録し、手動の `保存状態を確認` による読込成功と
 自動通知成功を分ける。タブ再読込はプロセス強制終了・電源断・オフライン試験の代わりではない。
 
-結果欄（実施後に記入）: 日時 / HEAD・ソース差分 / browser・version・OS /
-各手順のPASS・FAIL・未実施 / リロード前後の状態・ログ / 自動更新か手動確認か。
-現状は既存手動証拠が1〜4、内蔵ブラウザ暫定実測は未実施、Chrome一括確認は未実施。
+#### 最後に共有するもの
+
+各操作のたびに担当者へ返答する必要はありません。最後にまとめて、次を共有してください。
+
+- 手順1から実施したか、以前の中断状態から手順4へ進んだか。
+- 各手順が期待どおりだったか。違った場合は手順番号と実際の表示。
+- 保存した画面またはログ（失敗表示も含める）。
+- 手順6で最初のタブも自動で新表示になったか。
+
+実施担当者はChromeのバージョン・OS・日時も記録します。開発担当者はサーバーの
+応答確認、対象Git HEAD・ソース差分・buildの記録を担当します。これらを実施者へ
+説明せず調査させたり、単にログが無いことから合格と判断したりしないでください。
+現状は既存手動証拠1〜4に加え、中断状態からの拒否・復旧・両タブの新表示と独立Repo
+再読込PASSを確認済み。追加依頼後のログで最終ページ再読込後の新内容も確認済み。
+7のno-opもPOの明示報告で確認済み。この限定的な保存・復旧手順は完了とする。
+他タブの自動通知自体は未確認で、データ復旧成功から推定しない。内蔵ブラウザのAI操作に
+よる暫定実測は未実施で、Chromeのバージョン等も未記録。
 このプローブがすべて通っても残るG1-A/C要件、本番journal/CAS、実機iOSを完了扱いにしない。
 
 ### 本番UIの最後のChrome確認との区別

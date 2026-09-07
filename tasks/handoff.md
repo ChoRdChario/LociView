@@ -18,8 +18,13 @@
 > `poc/scene-history` contains the disposable S1-entry history proof (6/6 PASS)
 > and a Repo/IndexedDB storage probe. Product Owner screenshot/log evidence now
 > confirms save/failure/retry, page reload/readback and the second-tab barrier
-> while the owner holds the lock; owner-tab interruption and interrupted-batch
-> recovery remain pending. Root code and
+> while the owner holds the lock. Follow-up screenshots from a resumed pending
+> run now confirm refusal, recovery of two original changes and both-tab READY
+> revision-2 with independent Repo readback and unchanged base; the subsequent
+> final page-reload/readback logs also pass. The PO explicitly confirmed the no-op
+> replay line, closing this bounded manual sequence. Automatic other-tab refresh
+> is not independently established; this is not process-kill/device or G1-C
+> acceptance. Do not ask to repeat the unchanged sequence. Root application wiring and
 > dependencies are unchanged. See the current top of `tasks/todo.md` for exact
 > tests, the isolated dependency advisory, scope exclusions and the recurring
 > browser-control blockers. Do not call partial PoC evidence production

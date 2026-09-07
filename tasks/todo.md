@@ -35,8 +35,11 @@ Usage remains 46 percent. No browser/device/PWA PASS or storage adoption follows
 
 Next boundary: the approved pure Scene core is implemented but disconnected.
 The validated full-resource read provider and causal write integration still wait
-for applicable storage gates. Human Chrome interruption/recovery checks remain
-batched in the existing runbook. No further UI/storage integration is authorized
+for applicable storage gates. The PO supplied resumed-run rejection/recovery and
+both-tab readback evidence, followed by final page-reload/readback logs and an
+explicit attestation that no-op replay passed. The bounded manual probe is now
+complete; automatic other-tab notification remains a separate unmeasured property.
+No further UI/storage integration is authorized
 by this scheduling exception, and no extra unchanged tests are required now.
 
 The Product Owner authorized implementation toward UI verification, with a stop
@@ -50,7 +53,7 @@ boundaries; do not consume a reset or silently continue below the threshold.
   deltas, original dependency replay, scalar conflict inspection, explicit
   keep-one/independent-keep-both and save/load using synthetic data/fake blobs.
   Review lockfile and audit the isolated dependency before execution.
-- [ ] Next bounded proof: pinned Automerge Repo/browser IndexedDB durability
+- [x] Bounded proof: pinned Automerge Repo/browser IndexedDB durability
   acknowledgement and exact-byte reopen, with a project-wide single-writer
   barrier and a second tab denied intermediate publication. Keep this in the
   disposable harness; no application dependency/storage/UI changes. Reuse the
@@ -58,6 +61,8 @@ boundaries; do not consume a reset or silently continue below the threshold.
   missing gate evidence. Stop on an unsupported required capability.
   Candidate dependencies: Repo and IndexedDB adapter exactly 2.5.6 (MIT), with
   Automerge 3.4.1 in the existing isolated manifest. Review/audit before running.
+  Completed through PO screenshots/logs and explicit no-op confirmation, not
+  agent browser automation or full G1-C adoption. See the README evidence limits.
 - [ ] Close the remaining applicable metadata/CAS adoption proofs, then implement
   the production adapter, journal, Scene commands and resolver under S1.
 - [ ] S2: ratify the bounded wire/migration companions, implement five-purpose
@@ -89,9 +94,14 @@ for `保存・失敗・再試行を検証`: initial durability, gated acknowledg
 quota/retry and independent Repo original-byte readback PASS, with READY and
 unchanged exchange base. Subsequent manual logs confirm page reload/readback,
 one-of-three remote changes durable with only the old view visible, and a
-second tab's READ-ONLY plus synthetic-request denial. Owner-tab interruption,
-refusal after lock release and recovery/replay remain unmeasured; see the probe
-README for exact evidence.
+second tab's READ-ONLY plus synthetic-request denial. New screenshots from a
+resumed pending run confirm denial, recovery of exactly two missing original
+changes, one final publication and READY revision-2 in both tabs with fresh Repo
+byte readback and unchanged base. The earlier start refusal reached the pending
+guard after acquiring the writer lock; the prior owner was no longer holding it.
+The no-op replay line, final page-reload ordering and automatic versus manual
+other-tab refresh are not shown. See the probe README; no browser-family, device
+restart or general journal guarantee is inferred.
 
 Current verification: root typecheck and build PASS; root test run had 1,645
 passes, 21 todos and one ENOSPC failure in the existing 6-GiB temporary-file
@@ -129,9 +139,12 @@ runbook discrepancy; diff whitespace checks pass. Existing root test/build
 results above were not rerun or upgraded. Only four documentation files changed,
 including the pre-existing manual evidence updates; no new browser PASS exists.
 
-Next external evidence is the three missing checks in the existing
-`poc/scene-history/README.md` sequence, consolidated for the later human Chrome
-session. Do not ask for button-by-button responses now. The loopback preview
+The PO confirmed the no-op line appeared before reload. This closes the bounded
+manual sequence; preserve its evidence and do not repeat it unchanged. Next
+work is the remaining applicable metadata/CAS adoption proof, not another request
+for the same button sequence. Automatic other-tab notification remains separately
+unconfirmed and must not be credited from manual readback.
+The loopback preview
 uses port 5184; recheck its process/HTTP state before reuse. No public/tunnel/device
 route exists. Deferring Chrome confirmation changes scheduling, not metadata/CAS
 adoption criteria: production storage still waits for actual prerequisite proof.
