@@ -43,6 +43,72 @@ metadata journal/inventory atomicity, grace-period cross-project GC and real
 package import/export closure. These Node checks cannot replace those results.
 Reuse passing history/browser/core proofs; do not repeat their manual sequence.
 
+## Isolated cross-project retention / collection contract
+
+Specification 02 §7/8 and STO-CAS-07/09 require cross-project roots and grace-period
+collection. The additional `retention` port uses the same existing CAS writer and
+fresh synthetic files, not user workspaces. A separate registered-project catalog
+requires every inventory; absent/corrupt/unreadable/future-major inventories and
+unfinished metadata updates refuse global collection. Opaque inventories cannot
+shrink; this conservative candidate refuses collection while any is opaque.
+Recognized current/derived, conflict, migration-baseline, retention-pin, unfinished
+journal and active-package roots are supplied by a validated synthetic port, not
+inferred from visibility, file naming or mutable reference counts. The full
+ProjectDoc resolver and origin-wide browser integration remain separate gates.
+Normal inventory updates and their recovery cannot clear an unfinished metadata
+journal flag. That requires the separately verified exact journal owner; this
+probe does not invent a completion proof. Initial test-only ceilings are 16
+registered Projects, 128 references per list/mark table and 256 KiB per inventory
+file (4 KiB per existing CAS receipt); these are not product/device budgets.
+
+Inventory publication holds the CAS writer across its pending marker, verified
+blob publication and final ready inventory. A failed transfer remains pending;
+finishing verifies the recorded target references, not a regenerated domain edit.
+The candidate never publishes metadata or claims to replace the exact metadata
+journal. A lock-held CAS adapter avoids recursively acquiring the same mutex and
+cannot be used after its lease ends. No fire-and-forget I/O is permitted.
+
+Collection records the first observed unreferenced time, waits an injected test
+grace and rescans all roots under the same writer before deletion. It records
+deletion intent before removing the verified receipt, then the exact payload.
+An interruption is retried only after a new root check; a returning root clears
+the old grace mark. Torn catalog/mark/intent data refuses, never means no roots.
+An unreadable or missing strongly required blob is repair-required, not eviction.
+Only published verified orphan payloads are collected here; transaction receipts
+and unverified staging cleanup remain with their existing recovery protocol.
+
+Acceptance uses actual tiny synthetic CAS files: two Projects sharing a blob,
+last-root removal plus grace, each root class, orphan deletion interruption and
+resume, opaque/invalid/missing envelopes, lock serialization and return of a root.
+The temporary Node backend shares one enforced writer across the test instances;
+it is not an OPFS/browser/process-kill proof. No runtime cache-release operation
+changes durable roots. Actual product grace duration, user-data cleanup, full
+metadata validation, browser integration, GC adoption and performance are not
+decided by this disposable experiment. Existing large-I/O proofs are reused.
+
+Executed 2026-09-08: isolated typecheck and 14/14 focused actual-file tests PASS
+(31.38 seconds for the final run; observation only). The tests demonstrate shared
+retention, all supplied root classes, real last-root/grace deletion, root-return
+reset, queued collector/publication serialization and fresh-port deletion retry.
+Receipt/stat validation reads no retained model payload. Opaque and invalid
+inventory variants, missing bytes and torn marks refuse destructive work.
+Independent review's unfinished-journal bypass finding is fixed and confirmed:
+neither normal update nor pending-inventory completion can assert journal repair.
+The referenced-root producer is still a validated synthetic port; this is not a
+full domain/journal integration or a browser lock. No gate adoption follows.
+
+Run only the changed scope from the repository root:
+
+```powershell
+npx tsc --noEmit --project poc/cas-io/tsconfig.json
+npx vitest run --config poc/cas-io/vitest.config.ts poc/cas-io/retention.test.ts
+```
+
+All files deleted in these runs were generated synthetic inputs or fresh scratch
+files under checked `retention-probe-` test directories. The recipe can recreate
+them; no user data or prior browser runs were removed. Existing CAS, journal,
+semantic and root regression results remain unchanged and are reused.
+
 ## Executed Node result (2026-09-08)
 
 Isolated typecheck and 17 tests PASS. The 500 MiB case completed in 45.947 s,

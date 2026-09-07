@@ -2,6 +2,50 @@
 
 ## Current boundary — implementation through UI verification (2026-09-08)
 
+### Completed bounded proof — cross-project retention and orphan GC (2026-09-08)
+
+Previous turn made progress with `9fbf05e`; checkout is clean, nine ahead of last
+fetched origin. Remaining usage is 42 percent. G1-A/§7 and STO-CAS-07/09 still
+lack actual cross-project collection under a shared writer; a permanently
+refused semantic GC stub does not establish this capability.
+
+- [x] Specify and implement a disposable registered-project inventory/GC port
+  sharing the existing CAS writer, with durable mark/grace/deletion intent.
+- [x] Demonstrate real synthetic-file retention/deletion, root return, missing/
+  opaque/future/unreadable inventory refusal and interruption-safe retry.
+- [x] Run focused typecheck/tests, obtain read-only review and checkpoint.
+
+This uses a fresh private test directory, explicit synthetic roots and an injected
+test clock/grace only. No user-data deletion, production retention duration,
+browser page, device claim, 500 MiB rerun, full domain validator or schema/wire
+adoption. Reuse existing CAS and journal evidence; do not duplicate their matrices.
+Unfinished metadata roots stop GC. All publication/inventory mutations share the
+same enforced writer; a missing registered inventory is not an empty Project.
+Completion requires actual safe collection, not just another refusal fixture.
+Stop on a conflicting contract, unsafe deletion target or new product policy.
+
+Slice review: isolated typecheck and 14/14 actual-file tests PASS. Two registered
+Projects share one verified payload; removal of one reference retains it, and
+last-root removal plus the injected grace permits exact receipt-then-payload
+deletion. Current/derivative, conflict, migration, retention, journal and package
+roots remain protected. A returning root resets grace, and interruption at each
+deletion stage resumes after root checks. Missing/opaque/future/unreadable/pending
+inventories and torn marks refuse collection; publication and root transfer use
+one injected Node writer without recursive lock acquisition. Independent review
+found an ordinary-update bypass of the unfinished-journal flag; update and pending
+completion now refuse it, with a direct regression and confirmed closure.
+No blocking finding remains in this bounded synthetic protocol.
+
+Short meta-audit: this is actual safe file collection, not the earlier permanent
+GC-refusal stub. It closes this bounded retention mechanism, not full ProjectDoc
+root derivation, browser origin locking, exact metadata-journal integration,
+process kill, iOS or aggregate G1 adoption. Temporary synthetic data was removed
+only within verified fresh test directories and is reproducible from the tests.
+Existing CAS/journal/semantic sources and production dependencies are unchanged;
+reuse their recorded evidence/root regression, with no unchanged matrix or large
+payload rerun. Next work must address a genuinely missing domain/platform/scale
+criterion rather than repeat these collection cases or add another probe page.
+
 ### Completed bounded proof — five semantic purposes and privacy (2026-09-08)
 
 Starting checkpoint `4ca0eec` is clean, eight ahead of last fetched origin, zero

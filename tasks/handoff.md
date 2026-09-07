@@ -1,5 +1,16 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **Current retention update (2026-09-08):** Isolated `poc/cas-io/retention.ts`
+> now proves shared-Project retention and grace-period orphan collection with
+> actual synthetic files. Typecheck and 14/14 tests pass; independent review's
+> unfinished-journal bypass is fixed and confirmed. All mutations share the same
+> injected Node writer; pending/opaque/invalid inventories fail closed, deletion
+> removes the receipt before payload, and interruption rechecks roots on retry.
+> Full domain root derivation, actual metadata journal/browser integration,
+> platform/scale/iOS adoption and UI are still open. Existing source/dependencies
+> and earlier evidence are unchanged; no new page/server or user-data deletion.
+> Reuse this bounded result rather than repeat it as another workstream.
+
 > **Current semantic-purpose update (2026-09-08):** Isolated `purposes.ts` derives
 > all five semantic closures from one causal synthetic Project. Typecheck and
 > 17/17 focused tests pass; independent review's unknown-field/root-candidate
