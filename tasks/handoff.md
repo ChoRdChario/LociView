@@ -1,6 +1,18 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **Current update (2026-09-08 focused correction):** Contract checkpoint
+> **Current update (2026-09-08 isolated implementation):** The approved
+> implementation-to-UI-verification goal is active in scope, with a user decision
+> required if usage remaining falls below 10 percent (latest: 47 percent).
+> `poc/scene-history` contains the disposable S1-entry history proof (6/6 PASS)
+> and a built but browser-unexecuted Repo/IndexedDB storage probe. Root code and
+> dependencies are unchanged. See the current top of `tasks/todo.md` for exact
+> tests, the isolated dependency advisory, scope exclusions and the recurring
+> browser URL-enforcement blocker. Do not call partial PoC evidence production
+> adoption or UI/device acceptance. The next action is the existing bounded
+> manual browser sequence or restoring supported browser control, not another
+> synthetic matrix, architecture rewrite or repeated blocked browser attempt.
+
+> **Historical update (2026-09-08 focused correction):** Contract checkpoint
 > `25b9a776de84a2bb0fb4eb4d78aa542aeb64fb48` is pushed. The Product Owner then
 > selected explicit keep-one/keep-both conflict choices, with keep-both creating
 > independently editable Caption/model items. Specification 05 sections 8, 12.6

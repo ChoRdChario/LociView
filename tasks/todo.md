@@ -1,6 +1,73 @@
 # LociView active work
 
-## Current boundary — focused contract corrections and S1 entry (2026-09-08)
+## Current boundary — implementation through UI verification (2026-09-08)
+
+The Product Owner authorized implementation toward UI verification, with a stop
+for their decision whenever the available Codex usage falls below 10 percent.
+Starting checkout: clean pushed `b5e621f` on `g0-baseline`; available main usage
+was 49 percent at entry. Recheck at meaningful implementation/verification
+boundaries; do not consume a reset or silently continue below the threshold.
+
+- [x] S1 entry: isolated `poc/scene-history`, pinned `@automerge/automerge@3.4.1`
+  (MIT), its own package/lockfile and no application imports. Prove exact sibling
+  deltas, original dependency replay, scalar conflict inspection, explicit
+  keep-one/independent-keep-both and save/load using synthetic data/fake blobs.
+  Review lockfile and audit the isolated dependency before execution.
+- [ ] Next bounded proof: pinned Automerge Repo/browser IndexedDB durability
+  acknowledgement and exact-byte reopen, with a project-wide single-writer
+  barrier and a second tab denied intermediate publication. Keep this in the
+  disposable harness; no application dependency/storage/UI changes. Reuse the
+  causal probe; full journal/CAS, performance and physical iOS remain separate
+  missing gate evidence. Stop on an unsupported required capability.
+  Candidate dependencies: Repo and IndexedDB adapter exactly 2.5.6 (MIT), with
+  Automerge 3.4.1 in the existing isolated manifest. Review/audit before running.
+- [ ] Close the remaining applicable metadata/CAS adoption proofs, then implement
+  the production adapter, journal, Scene commands and resolver under S1.
+- [ ] S2: ratify the bounded wire/migration companions, implement five-purpose
+  exchange and source-preserving conversion, pass the service TEAM-FLOW-01.
+- [ ] S3: connect the approved UI and record ordinary-home Desktop walkthrough;
+  obtain required physical-iPhone storage/UI evidence on an approved exact route.
+
+First completion boundary: a passing executable candidate result or one concrete
+unsupported capability, with focused independent review. This is partial G1-C
+evidence only; no production adoption, CAS or device PASS follows from it. No
+extra synthetic matrix is required before moving to the missing production gate.
+
+S1-entry review: isolated Node harness 6/6 PASS; independent read-only review
+found no blocking P0/P1. At the first metadata-only checkpoint, the isolated
+lockfile contained only Automerge and scoped npm audit reported zero
+vulnerabilities. The subsequent browser-probe dependencies have three moderate
+audit entries propagated from uuid 9.0.1; independent call-site review found no
+reachable affected input in the synthetic-only probe. This is not audit-clean or
+production-adoption evidence (see the probe README). Historical conflict inspection
+reconstructs recorded heads from original changes; scalar resolution uses an
+explicit replacement even when selecting the currently materialized value.
+No complete model remap, real blob I/O, durability/device or adoption is claimed.
+Usage recheck: 47 percent remaining. Browser execution is pending: the browser
+control runtime failed to load, and Windows automation twice stopped because it
+could not establish Chrome's URL, including after the Product Owner opened the
+exact loopback page. Do not repeat the same blocked automation or bypass its
+safety check. No control in the storage probe has been browser-executed.
+
+Current verification: root typecheck and build PASS; root test run had 1,645
+passes, 21 todos and one ENOSPC failure in the existing 6-GiB temporary-file
+acquisition test (system temporary volume had about 5 GiB free). The unchanged
+affected file then passed 32/32 with process-local TEMP/TMP on the workspace
+volume. Do not describe the first full-suite invocation as green. Isolated Node
+probe 6/6 and isolated browser build PASS. Independent browser-source review
+found no blocking code issue; its evidence wording correction is applied:
+`attempt()` proves one synthetic facade guard, not real edit/export/GC services.
+No application code/root dependency, production storage, release or SW source
+changed. The root build's normal generated PWA files remain ignored outputs.
+
+Next external evidence: manual Chrome execution of the bounded sequence in
+`poc/scene-history/README.md`, preserving visible PASS/FAIL outputs, or repair of
+the supported browser-control connection. The loopback preview is on port 5184;
+recheck its process/HTTP state before reuse. No public/tunnel/device route exists.
+This stops the immediate adapter/storage gate, not completion of S1/S2/S3;
+production adoption remains forbidden until their actual remaining criteria pass.
+
+## Completed boundary — focused contract corrections and S1 entry (2026-09-08)
 
 The Product Owner requested explicit conflict choices (keep either candidate or
 keep both), delegated the gate/sequence/acceptance corrections and asked that
