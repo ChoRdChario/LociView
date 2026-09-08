@@ -35,7 +35,7 @@ For a normal task, read only the target file, its matching tests, and direct imp
 | Path | Current responsibility |
 |---|---|
 | `src/core` | IDs, HLC, operation validation, JSONL, reduction, merge, manifest, and `ProjectStore` |
-| `src/domain` | Disconnected canonical decoded-value/individual Scene-record admission, atomic material intent and local Caption text guards (05 §13.3); not full Project/resource/history validation or imported-text rewriting |
+| `src/domain` | Disconnected canonical decoded-value/individual Scene and MaterialOverride record admission, atomic material intent and local Caption text guards (05 §13.3); not full Project/resource/history validation or imported-text rewriting |
 | `src/scene` | Disconnected pure Scene command/composition core (specification 05 §13.1); validated conflict-aware read port, no storage/UI integration or adoption |
 | `src/platform` | `WorkspaceFS`, OPFS, memory filesystem, PWA and browser integration |
 | `src/assets` | ZIP/package handling, model asset registration/replacement, GLB optimization, import wizard |

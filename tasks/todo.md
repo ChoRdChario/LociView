@@ -2,6 +2,49 @@
 
 ## Current boundary — implementation through UI verification (2026-09-09)
 
+### Completed — individual MaterialOverride record admission (2026-09-09)
+
+Starting `a313c49`: clean, 20 ahead of local origin tracking ref; no fetch/push.
+Continue the accepted next component immediately under 05 §13.3; no human
+decision is needed for the fixed 01 §4.2 / 02 §3.1 / 05 §3.3 record rules.
+
+- [x] Reuse the existing nominal-ID/lifecycle rules through a small shared pure
+  record-field helper; preserve Scene-record behavior and existing test evidence.
+- [x] Admit one canonical decoded MaterialOverride: exact `ovr` identity/map key,
+  atomic Project/Scene routing and complete nominal target tuple, lifecycle and
+  existing whole appearance/compositing validation. Reject irrelevant known scope
+  fields rather than silently moving the setting to another scope.
+- [x] Retain and report unknown fields at every record/atomic level, without
+  inferring history-free export permission; add only missing malformed/extension
+  cases and verify existing Scene/source-isolation contracts.
+- [x] Obtain one independent read-only review and run typecheck, full two-worker
+  tests and build before checkpointing the bounded result.
+
+Completion is individual record admission only. Reference existence/active catalog
+ownership, same-key duplicates across records, source/backend applicability, causal
+conflicts, blob closure, writes, schema/dependency and current-app integration stay
+excluded. No new page/server, human probe or aggregate technology/device PASS.
+
+Review / evidence: typecheck, 41 focused tests, final 93 files / 1,770 PASS with
+21 existing todo (two workers), build and whitespace checks pass. Independent
+read-only review found no blocking issue and confirmed the five new cases against
+the bounded acceptance. Shared Scene lifecycle reasons, required fields and issue
+paths remain unchanged. Existing mixed-import/large-chunk build warnings persist.
+
+Short meta-audit / next accepted work: this closes only individual material record
+shape, not the complete validated provider required by the Scene/UI ports. Current
+entry/runtime/storage/package/dependencies and servers are unchanged; only normal
+ignored build output was regenerated. Continue the missing pure resource admission
+with Caption/anchor record shapes under 01 §4.1, 02 §3.1 and 05 §3.3: exact nominal
+IDs, title/body/color/lifecycle and complete AssetAnchor/ProjectAnchor fields,
+preserved raw CR/LF and unknown data, with no inferred owner or source relation.
+Reuse the canonical/lifecycle/text guard and existing pin/Scene tests; distinguish
+individual shape from later active-frame/reference/history checks. Do not reopen
+browser bootstrap, completed manual probes or the package-wire adoption decision.
+Current app, real payloads/storage/renderer, new schema/dependencies and release
+remain excluded. No PO check is needed for the accepted pure component; a real
+contract conflict or gate-crossing still requires the explicit stop.
+
 ### Completed — material target, scope and retained appearance editor (2026-09-09)
 
 Starting `dd6f053`: clean, 19 ahead of local origin tracking ref; no fetch/push.

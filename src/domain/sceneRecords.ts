@@ -1,12 +1,9 @@
 import { cloneCanonicalValue, DomainValidationError, reject, scalarLength, singleLineControls,
-  type JsonObject, type JsonValue, type ValidationIssue, type ValueLimits } from './values';
+  type JsonObject, type ValidationIssue, type ValueLimits } from './values';
+import { recordObject as object, requiredField as required, logicalId as id, lifecycleValue, lifecycleFields, type LifecycleRecord } from './recordFields';
+export type { LifecycleRecord } from './recordFields';
 
 export type SceneRecordKind = 'scene' | 'assetMembership' | 'captionMembership';
-export type LifecycleRecord = JsonObject & (
-  | { readonly state: 'active'; readonly eventId: string;
-      readonly reason?: 'initial' | 'restore' | 'migrationResolution' | 'conflictResolution' }
-  | { readonly state: 'deleted'; readonly eventId: string;
-      readonly reason: 'userDelete' | 'replacement' | 'migrationResolution' | 'conflictResolution' });
 export type SceneRecord = JsonObject & { readonly id: string; readonly name: string;
   readonly orderKey: string; readonly defaultViewId?: string; readonly lifecycle: LifecycleRecord };
 export type AssetMembershipRecord = JsonObject & { readonly id: string; readonly sceneId: string;
@@ -26,15 +23,6 @@ const known = {
   assetMembership: new Set(['id', 'sceneId', 'assetId', 'orderKey', 'lifecycle']),
   captionMembership: new Set(['id', 'sceneId', 'captionId', 'orderKey', 'lifecycle']),
 };
-const lifeFields = new Set(['state', 'eventId', 'reason']);
-const activeReasons = new Set(['initial', 'restore', 'migrationResolution', 'conflictResolution']);
-const deletedReasons = new Set(['userDelete', 'replacement', 'migrationResolution', 'conflictResolution']);
-const object = (item: JsonValue, path: readonly string[]): JsonObject =>
-  item !== null && typeof item === 'object' && !Array.isArray(item) ? item as JsonObject : reject('type', path);
-const required = (record: JsonObject, field: string, parent: readonly string[] = []): JsonValue =>
-  Object.hasOwn(record, field) ? record[field]! : reject('missing', [...parent, field]);
-const id = (item: JsonValue, prefix: string, path: readonly string[]): string =>
-  typeof item === 'string' && new RegExp(`^${prefix}_[0-9a-f]{32}$`).test(item) ? item : reject('id', path);
 
 /**
  * Individual persisted record shape only. Never confers Project/graph/history/
@@ -50,15 +38,7 @@ export function admitSceneRecord<K extends SceneRecordKind>(kind: K, input: unkn
     if (expectedMapKey !== undefined && key !== expectedMapKey) reject('identity', ['id']);
     const order = required(record, 'orderKey');
     if (typeof order !== 'string' || !/^[0-9A-Za-z]{1,64}$/.test(order)) reject('value', ['orderKey']);
-    const lifecycle = object(required(record, 'lifecycle'), ['lifecycle']);
-    const state = required(lifecycle, 'state', ['lifecycle']);
-    id(required(lifecycle, 'eventId', ['lifecycle']), 'evt', ['lifecycle', 'eventId']);
-    if (state !== 'active' && state !== 'deleted') reject('value', ['lifecycle', 'state']);
-    if (state === 'deleted' || Object.hasOwn(lifecycle, 'reason')) {
-      const reason = required(lifecycle, 'reason', ['lifecycle']);
-      if (typeof reason !== 'string' || !(state === 'active' ? activeReasons : deletedReasons).has(reason))
-        reject('value', ['lifecycle', 'reason']);
-    }
+    const lifecycle = lifecycleValue(required(record, 'lifecycle'));
     if (kind === 'scene') {
       const name = required(record, 'name');
       if (typeof name !== 'string') reject('type', ['name']);
@@ -71,7 +51,7 @@ export function admitSceneRecord<K extends SceneRecordKind>(kind: K, input: unkn
       id(required(record, field), kind === 'assetMembership' ? 'ast' : 'cap', [field]);
     }
     const hasUnknownFields = Object.keys(record).some(field => !known[kind].has(field)) ||
-      Object.keys(lifecycle).some(field => !lifeFields.has(field));
+      Object.keys(lifecycle).some(field => !lifecycleFields.includes(field));
     return Object.freeze({ kind: 'valid-record', record: record as SceneRecordByKind[K], hasUnknownFields });
   } catch (error) {
     if (error instanceof DomainValidationError) return Object.freeze({ kind: 'rejected', issue: error.issue });

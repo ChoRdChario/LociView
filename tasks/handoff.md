@@ -104,6 +104,15 @@
 > without another check; current todo proceeds to individual MaterialOverride
 > record admission, not a new probe or integrated release.
 >
+> **Current material-record update (2026-09-09):** Continued without a PO pause
+> to individual MaterialOverride admission: exact nominal ID/routing/target,
+> shared unchanged lifecycle and atomic-value checks, with unknown fields retained
+> and flagged. Independent review found no blocking issue. Typecheck, 41 focused
+> tests, final 93 files / 1,770 PASS (21 existing todo) and build pass. This does
+> not validate graph/catalog ownership, source/backend support, causal state or
+> payloads and does not connect the app. Current todo owns the next pure Caption/
+> anchor admission component. No new manual check, page/server or adoption claim.
+>
 > **Current package design update (2026-09-08):**
 > `docs/specs/06-project-package-wire.md` is a reviewed **PROPOSED / UNRATIFIED**
 > companion under 05 §7.5, not a format/version or S2 adoption. It separates five

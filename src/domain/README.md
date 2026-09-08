@@ -16,6 +16,18 @@ not an adopted metadata adapter or a complete ProjectDocV2 validator.
   Explicit local appearance edits retain unknown data and untouched exact RGB;
   removing a chroma subtree with unknown fields refuses. This is not material
   target/lifecycle, source optics, coverage rendering or backend admission.
+- `materialRecords.ts` composes that atomic-value guard with one decoded
+  MaterialOverride's `ovr`/map identity, Project-or-Scene atomic routing,
+  `ast`/`fam`/`lay`/`slot` nominal tuple and the shared lifecycle guard. It keeps
+  unknown root/routing/scope/target/lifecycle/appearance/chroma/compositing/coverage
+  members and flags them with `hasUnknownFields`; a Project scope carrying the
+  known Scene-only `sceneId` is rejected rather than repaired. Referenced objects
+  may still be absent, inactive, foreign, duplicated or conflicted: individual
+  record admission does not resolve those whole-graph conditions or authorize
+  history-free export. Tombstone admission does not physically remove anything.
+- `recordFields.ts` shares the existing internal nominal-ID/lifecycle checks
+  between Scene and material record guards. It consumes already canonically
+  cloned values, is not a separate raw-input entry and changes no lifecycle policy.
 - `normalizeSceneName` is a local-command boundary: normalize user input to NFC,
   then apply the accepted single-line/256-scalar rules. Persisted admission never
   repairs noncanonical source text.
