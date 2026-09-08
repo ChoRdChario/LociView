@@ -24,6 +24,19 @@
 > layout and full application integration remain pending; no new page/server or
 > human verification is requested by this slice.
 
+> **Current Caption-list update (2026-09-08):** `src/ui/projectScene` now also
+> has a retained current-Scene list, search/exact-owner filters and direct color
+> controls immediately above the list. Colors filter only pins, not list rows;
+> all/explicit/none and per-Scene state stay distinct. Unknown owner/color/text
+> stays explicit, hidden-owner and review actions are host intentions, and no
+> selection ends a pending edit. Scoped style and DOM-contract tests are not
+> rendered evidence. Independent review's combined color-hidden/review feedback
+> finding is corrected and confirmed. Current todo owns exact checks/next scope.
+> Root typecheck, 50 focused tests, full two-worker test suite and build pass;
+> the next component is selected detail/retained comparison-window state.
+> No current app, storage, renderer, package, new page/server or manual probe
+> changed. Full content-editor/window integration and platform gates remain open.
+
 > **Current package design update (2026-09-08):**
 > `docs/specs/06-project-package-wire.md` is a reviewed **PROPOSED / UNRATIFIED**
 > companion under 05 §7.5, not a format/version or S2 adoption. It separates five

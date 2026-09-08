@@ -2,11 +2,15 @@ import type { SceneState } from '../../scene/types';
 
 export const taskLabels = Object.freeze({ captions: 'キャプション', models: 'モデル', materials: 'マテリアル', views: '視点' });
 export type TaskId = keyof typeof taskLabels;
+export type CaptionOwnerFilter = Readonly<{ kind: 'all' | 'project' | 'unresolved' }> |
+  Readonly<{ kind: 'asset'; assetId: string }>;
 export interface SceneUiMemory {
   readonly selectedCaptionId: string | null;
   readonly listScrollTop: number;
   readonly search: string;
-  readonly pinColors: readonly string[];
+  /** null includes future colors; [] deliberately shows no known-color pins. */
+  readonly pinColors: readonly string[] | null;
+  readonly ownerFilter: CaptionOwnerFilter;
 }
 export interface NavigationSession {
   readonly sceneId: string | null;

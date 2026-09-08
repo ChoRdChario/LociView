@@ -2,6 +2,51 @@
 
 ## Current boundary — implementation through UI verification (2026-09-08)
 
+### Completed — disconnected Caption list and pin-color controls (2026-09-08)
+
+Starting `4ba71cb`: clean, approved 05 §13.3 scheduling exception remains active.
+The PO asked to continue the documented next component; no additional approval
+is needed. Reuse 05 §§3.2/11, UI guidelines §§4–5/8–11 and existing Native
+Caption-list/pin-color tests; do not redefine the current list/pin distinction.
+
+- [x] Implement a reusable current-Scene Caption list with search, exact owner
+  filtering, explicit model-independent/unknown-owner buckets and selection.
+- [x] Place direct pin-color controls immediately above the list. Preserve
+  all/null versus explicit/empty color selection, without filtering list rows.
+- [x] Retain selection, search/IME and list-scroll memory; emit local plans only.
+  Keep unavailable/uncertain rows and recovery intents reachable without guessing.
+- [x] Verify pure transitions/DOM contracts and isolation, run root checks and
+  obtain one read-only review. Keep real browser/IME/layout/iPhone evidence open.
+
+Scope is reusable production-source UI under synthetic read ports, not another
+probe page. Source/membership/owner identity, conflict resolution, content edits,
+model visibility, renderer pin filtering and saves remain host responsibilities;
+the component cannot acknowledge or perform them. No current-entry hookup,
+storage/package/dependency change, new media support or automatic relation/winner.
+Completion is one retained list/control boundary with exact tests. Stop for a
+contract conflict or required new product policy; do not repeat previous device
+or storage probes or ask the PO to test a disconnected component.
+
+Slice review: root typecheck PASS; 50 focused tests PASS, including 11 new
+Caption-list cases and reused navigation/Scene/Native filter contracts. Final
+`npm test -- --maxWorkers=2` and subsequent build PASS; existing mixed-import
+and large-chunk warnings remain. Independent read-only review's combined-state
+P2 is fixed and confirmed: pin-position review and color-hidden feedback appear
+independently. Synthetic DOM evidence covers 100 ordered rows, keyed focus,
+composition guards, explicit recovery and desired-scroll retention after a
+simulated clamp, not real layout, native IME or platform acceptance.
+
+Short meta-audit / next implementation: navigation plus a retained Caption list
+now close two reusable UI boundaries, with no existing entry/dependency/storage
+changes. Next is selected-Caption detail and retained comparison-window state,
+using the same explicit synthetic ports. Preserve existing multiple-window intent,
+field drafts, conflict/unsaved distinctions and media-neutral terminology; do not
+add media I/O or connect renderer/storage. Reuse accepted UI guidelines and Native
+session/window evidence; only genuinely missing component state/DOM contracts
+need new tests. Full Project/resource/reference admission, storage/platform gates,
+package-wire ratification and integrated Desktop/iPhone acceptance remain open.
+No new Product Owner action is needed to continue this authorized component work.
+
 ### Completed — disconnected Scene/task navigation component (2026-09-08)
 
 Starting `5b95c52` is clean; individual record admission is implemented/reviewed,

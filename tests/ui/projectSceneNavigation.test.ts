@@ -11,8 +11,8 @@ function fixture(): { state: SceneState; session: NavigationSession } {
   return { state: { token: 'snapshot-1', defaultSceneId: { kind: 'unresolved', reason: 'conflict' },
     scenes: { [b]: scene(b, '比較', 'B'), [a]: scene(a, '全体', 'A') }, assetMemberships: {}, captionMemberships: {} },
   session: { sceneId: a, task: 'captions', sceneMemory: {
-    [a]: { selectedCaptionId: 'cap_' + '1'.repeat(32), listScrollTop: 240, search: '場所', pinColors: ['#ff0000'] },
-    [b]: { selectedCaptionId: null, listScrollTop: 10, search: '', pinColors: [] },
+    [a]: { selectedCaptionId: 'cap_' + '1'.repeat(32), listScrollTop: 240, search: '場所', pinColors: ['#ff0000'], ownerFilter: { kind: 'all' } },
+    [b]: { selectedCaptionId: null, listScrollTop: 10, search: '', pinColors: [], ownerFilter: { kind: 'all' } },
   } } };
 }
 
