@@ -94,6 +94,16 @@
 > integration or browser/device acceptance. Current todo owns the next exact-target
 > Material component; no new human test, page/server or release change is requested.
 >
+> **Current material update (2026-09-09):** Exact model/surface and Scene/Project
+> scope, whole-record precedence, retained appearance editing and confirmed override
+> removal now exist as disconnected controls. A pure atomic-intent guard preserves
+> unknown data and untouched exact color. Independent refusal/selector findings
+> are fixed and confirmed. Typecheck, 29 focused tests, final 92 files / 1,765 PASS
+> (21 existing todo) and build pass. No current-app, real material rendering,
+> browser/IME/storage/device acceptance. The PO permits continuing accepted tasks
+> without another check; current todo proceeds to individual MaterialOverride
+> record admission, not a new probe or integrated release.
+>
 > **Current package design update (2026-09-08):**
 > `docs/specs/06-project-package-wire.md` is a reviewed **PROPOSED / UNRATIFIED**
 > companion under 05 §7.5, not a format/version or S2 adoption. It separates five

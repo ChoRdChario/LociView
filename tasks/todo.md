@@ -1,6 +1,55 @@
 # LociView active work
 
-## Current boundary — implementation through UI verification (2026-09-08)
+## Current boundary — implementation through UI verification (2026-09-09)
+
+### Completed — material target, scope and retained appearance editor (2026-09-09)
+
+Starting `dd6f053`: clean, 19 ahead of local origin tracking ref; no fetch/push.
+Continue approved 05 §13.3, 05 §§3.3/3.4/11, 01 §4.2, 02 §3 conflict/unknown
+preservation and UI guidelines §§4.2/8–10. The PO permits moving directly to the
+next accepted task when no human decision/evidence is required.
+
+- [x] Add storage-neutral guards for complete material appearance/compositing
+  values and explicit edits, preserving unknown siblings and untouched exact RGB.
+  Reuse canonical decoded-value guards; no raw payload or full Project admission.
+- [x] Add exact model/surface and Scene/Project scope selection, observed precedence
+  and applicable opacity/lighting/sidedness/chroma controls. No default target,
+  name/key inference, nested cross-scope merge or write caused by selection.
+- [x] Retain raw draft/IME through failure/access loss, bind apply/retry to original
+  target and snapshot, confirm cancellation/override removal, and show the effect
+  of falling back to Project/source or remaining under a Scene override.
+- [x] Reuse Scene precedence/source-isolation evidence, add only missing intent/
+  atomic-edit/retention tests, obtain independent read-only review, and run
+  typecheck, full two-worker tests and build before the checkpoint.
+
+Completion is reusable pure admission + synthetic-port controls, not renderer
+material support, durable save or application integration. Advanced compositing
+authoring, guessed catalog compatibility, current Native changes, storage/package,
+payloads, schema/dependency/release and new page/server are excluded. The host
+must supply validated exact targets/complete conflicts and candidate applicability;
+missing support remains explicit, never a fallback saved as intent. Stop for a
+contract conflict/new authority only; retain batched browser/device/platform gates.
+
+Review / evidence: typecheck, 29 focused tests, final 92 files / 1,765 PASS with
+21 existing todo (two workers), build and whitespace checks pass. Independent
+review's empty/error applicability denial and selector/target desynchronization
+findings are corrected with regression coverage and confirmed. Retained failed-
+target review is explicitly admitted; an earlier claim that this was already
+blocked in the final code was withdrawn. Native browser/IME/material rendering,
+storage and device acceptance remain open. No current app/runtime is connected.
+
+Short meta-audit / continue without PO pause: the four task areas now have bounded
+reusable components, not a finished team product or complete UI. Rather than add
+another probe, close the adjacent missing individual MaterialOverride admission:
+exact ID/map key, atomic Scene/Project routing, nominal target tuple, lifecycle,
+existing appearance/compositing checks and unknown-field retention/reporting under
+01 §4.2, 02 §3.1 and 05 §3.3. Reuse the existing lifecycle rules and canonical
+cloner, avoiding a competing validator policy. Completion is one decoded record
+guard, not graph/catalog/source/backend/history validation or adoption. Existing
+Scene-record tests plus focused malformed-record/unknown cases suffice before
+normal verification/review. No payload, storage, app entry, dependency, schema,
+new server or release authority is added. Continue within 05 §13.3; stop only for
+a contract conflict or required external authority/evidence.
 
 ### Completed — Project model inventory and Scene membership controls (2026-09-08)
 

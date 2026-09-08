@@ -11,6 +11,11 @@ not an adopted metadata adapter or a complete ProjectDocV2 validator.
   Caption-membership shapes and lifecycle unions, nominal field prefixes and
   optional map-key equality. Unknown members, including nested lifecycle members,
   remain intact and set `hasUnknownFields`; no history-free permission follows.
+- `materialIntent.ts` admits bounded decoded appearance/compositing atomic values,
+  normalized colors/numbers, policy-specific cutoffs and opaque/alpha combinations.
+  Explicit local appearance edits retain unknown data and untouched exact RGB;
+  removing a chroma subtree with unknown fields refuses. This is not material
+  target/lifecycle, source optics, coverage rendering or backend admission.
 - `normalizeSceneName` is a local-command boundary: normalize user input to NFC,
   then apply the accepted single-line/256-scalar rules. Persisted admission never
   repairs noncanonical source text.

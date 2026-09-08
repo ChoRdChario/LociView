@@ -392,3 +392,70 @@ and source-isolation tests. Recorded checkbox properties are not native-input,
 layout, real IME, durable storage, app or device evidence. Real import/model bytes,
 placement/gizmo/replacement, Project deletion, renderer/local isolate, full graph
 validation and current-app integration remain outside this component.
+
+## Exact material target, scope and retained appearance editor
+
+`materialState.ts` / `materialControls.ts` / `materialControls.css` provide explicit
+model/surface selection and `このシーンだけ` / `プロジェクト共通` scope. Neither
+selector writes, creates a default target nor redirects an override by display
+name/Native slot key. Current effective origin and editing scope are distinct.
+The valid Scene record replaces the complete Project record; a conflict contributes
+no winner at that scope and stays visible even when a lower scope can display.
+The lower-scope/source intent supplies the complete baseline when explicitly
+starting a new override, not a field-by-field cross-scope merge.
+
+`src/domain/materialIntent.ts` validates bounded canonical decoded atomic
+appearance/compositing values, including normalized numbers/colors, policy cutoffs
+and opaque/alpha incompatibility. It preserves unknown data at every level. This
+is not routing/reference/lifecycle, source-optics, causal conflict, blob or backend
+admission. Limits are explicit caller inputs, not device guarantees. The local
+edit helper only consumes already validated immutable appearances. Raw field edits
+are sparse; applying creates a whole atomic appearance while preserving exact
+untouched RGB, base-color data, unknown siblings and the complete compositing.
+HEX is display only until explicitly changed; removing chroma with unknown nested
+data refuses rather than erasing it. Unsupported fields retain their values.
+
+Host contract before integration:
+
+- Supply complete validated exact model/family/layout/slot catalogs, including
+  known models without an eligible surface; GS/proxy must not gain guessed Mesh
+  slots. Per-scope `null` means proven absence. Duplicate keys, routing/lifecycle
+  conflicts and unsafe fields must be unresolved, not a chosen record or absence.
+  This port is not the resolver's renderable-only output or a full record validator.
+- Source token covers Project/Scene, catalogs, complete conflict-aware records,
+  capability inputs and validation limits. A candidate's `admit` is a pure,
+  snapshot-bound check for source optics/coverage and applicable backend capability,
+  not an effect or permission to save fallback settings. Only `null` permits apply;
+  nonnull even with empty reason blocks. Advanced compositing authoring/support is
+  not introduced. Current Scene membership remains independent of material routing.
+- Keep immutable selection/draft/feedback in per-Project/Scene UI state. Accept
+  local plans synchronously against exact base identities. Starting edit captures
+  a baseline once; external changes never rebase it. Include this editor in task,
+  Scene and target transition guards. Rejected render means defer the whole host
+  transition, not unmount the pending form. Capability/access loss preserves raw
+  input, composing text, original operation and exact target. Unrelated Caption
+  input/windows stay mounted and are neither saved nor discarded here.
+- Revalidate `materialPlanIsCurrent` before dispatch and after async preparation;
+  only the exact own in-flight plan can ignore its applying feedback. Existing
+  override apply updates its whole appearance through future write authority,
+  without rewriting routing/lifecycle or unchanged compositing/unknown root data.
+  New override creation must allocate a fresh ID/event and atomically publish its
+  exact routing plus complete baseline appearance/compositing after all authority
+  checks. The emitted intent is not an operation or a standalone save service.
+- Removal requires inline confirmation bound to the exact record/target/scope/token.
+  It means lifecycle tombstone, not physical deletion, record matching by name or
+  writing default values. Confirmation states lower-scope/source fallback, including
+  unknown source state; Project reset may leave a Scene-specific appearance active.
+  Cancel requires the exact unsubmitted draft and never dismisses an in-flight write.
+- Retain the original prepared command/ID for retry and uncertain-outcome recovery.
+  Failure remains target-bound after selection changes; retry refuses stale context
+  and never relocates a failed action. `acceptMaterialApply` clears only exact input
+  with an exact-plan host receipt and target/record identity. The receipt's intent
+  handle must be the submitted immutable object, issued only after the host verifies
+  all its canonical contents against applied state. It does not inspect raw saved
+  bytes, prove fresh allocation or acknowledge durable save/render success.
+
+Pure/recorded-DOM tests verify these bounded intentions, policy refusal, inherited
+values, input/IME retention and confirmation. Real browser focus/IME/layout, actual
+material images, camera/picking, storage/platform and physical-iPhone acceptance
+remain pending. No current application, renderer or storage imports are added.

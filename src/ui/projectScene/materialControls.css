@@ -1,0 +1,14 @@
+/* Reusable component only; not imported into the current application. */
+.lv-material-editor { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; overflow: auto; color: #312f2d; background: #f2f0ee; font: 400 14px/1.5 system-ui, sans-serif; }
+.lv-material-editor[hidden], .lv-material-editor [hidden] { display: none !important; }
+.lv-material-editor :is(button, input, select) { box-sizing: border-box; min-width: 44px; min-height: 44px; max-width: 100%; padding: 6px 10px; border: 1px solid #817c78; border-radius: 2px; color: inherit; background: #faf9f8; font: inherit; }
+.lv-material-editor :is(button, input, select):focus-visible { outline: 2px solid #312f2d; outline-offset: 2px; }
+.lv-material-editor button:active:not(:disabled) { background: #d2cfcb; box-shadow: inset 0 1px 2px #817c78; }
+.lv-material-editor :disabled { border-style: dashed; color: #504d4a; }
+.lv-material-editor :read-only { color: #504d4a; }
+.lv-material-editor label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.lv-material-editor p { margin: 0; overflow-wrap: anywhere; }
+.lv-material-target, .lv-material-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: 8px; }
+.lv-material-fields p { font-size: 13px; }
+.lv-material-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.lv-material-editor .lv-material-primary { background: #413d39; color: #faf9f8; font-weight: 500; }

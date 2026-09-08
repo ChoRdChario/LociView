@@ -241,7 +241,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
         // 05 §13.3 permits the existing side-effect-free presentation helper,
         // not the Native controller/schema runtime or a general Native dependency.
-        const shared = ['../../scene/types', '../../domain/captionText', '../../domain/values', '../../nativeGs/backgroundColor'];
+        const shared = ['../../scene/types', '../../domain/captionText', '../../domain/values', '../../domain/materialIntent', '../../nativeGs/backgroundColor'];
         expect(imports.every(p => p?.startsWith('./') || shared.includes(p!)), path).toBe(true);
       } else expect(source).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/(scene|domain|projectScene)\//);
     }
