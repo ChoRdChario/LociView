@@ -2,6 +2,58 @@
 
 ## Current boundary — implementation through UI verification (2026-09-08)
 
+### Completed — viewing aids and Scene entry-view controls (2026-09-08)
+
+Starting `620d596`: clean; 16 commits ahead of the local origin tracking ref,
+no fetch/push. Continue approved 05 §13.3 with 05 §§3.3/4.1/11, UI guidelines
+§§4.2/9–10 and the bounded Native camera semantics in 02 §18. Native's first-view
+selection fallback is NOT inherited; the future Scene contract forbids guessing.
+
+- [x] Add fit, six explicit Project-axis directions and perspective/orthographic
+  controls; consume observed runtime state, never optimistically show success.
+- [x] Add exact current-Scene Saved View selection/recall and a separate entry-
+  view choice/apply/cancel surface. Recall applies camera+background only;
+  setting/clearing entry changes only that Scene's pointer, never the current camera.
+- [x] Preserve entry drafts, external Caption/mode input and independent failure
+  lanes; expose unavailable/foreign/conflicted view/default states without selecting
+  a winner, first item or another Scene. Bind effects to current runtime/source/draft.
+- [x] Reuse Scene/core view contracts, add only missing pure/DOM tests, obtain one
+  read-only review and run root typecheck/full test/build.
+
+Completion is reusable controls and host intentions. No camera math, real runtime
+or Project connection, view capture/update/delete/reorder, background authoring,
+storage/package/renderer/dependency change, new page/server or release. Named-view
+authoring and background controls remain a subsequent bounded UI component, not
+silently removed. Missing browser/device evidence stays open; do not retry the
+broken browser bootstrap or repeat prior human probes. Stop for a specification
+conflict/new authority, not another approval of this already accepted component.
+
+Slice review: typecheck and 49 focused tests PASS, including 11 new viewing-aid
+cases. Final executable tree: root typecheck, full two-worker suite (88 files /
+1,724 PASS, 21 existing todo) and build PASS. Existing mixed-import/large-chunk
+build warnings remain. Independent read-only review's two P2s are fixed and
+confirmed: stale Scene/frame runtime never leaves selected axis/projection, and
+refused actions expose their reason in the relevant lane/near-stage shortcut.
+Final pending-Scene-transition message fix was also independently confirmed.
+Null entry baselines never rebase; failed input remains and only exact matching
+working-state acknowledgement clears a draft. None of this is a durable-save,
+real camera, browser, offline or device result.
+
+Short meta-audit / next implementation: this closes reusable view recovery,
+recall and entry-pointer controls, not the whole View tab or integrated UI.
+Production entry, storage/package/renderer/dependencies and servers are unchanged;
+only normal ignored build output was regenerated. Continue 05 §13.3 with the
+remaining named-view authoring and 3D-background UI: explicit current-Scene target,
+validated observed capture, retained name/background drafts, sparse update,
+dependency-aware explicit delete and stable-order intentions. Reuse existing
+Native view/background tests and Scene/core guards; add only missing pure/DOM
+contracts. Complete the reusable authoring surface without guessing conflicts,
+changing current view on selection, erasing other editors or claiming actual
+capture/write/undo. Keep real payload/runtime/storage connection, new pages,
+schema/dependencies and release excluded; resolve a spec conflict with the PO,
+not by inventing a policy. Integrated Desktop/iPhone and platform gates stay open;
+no new human verification or repeated earlier probe is required now.
+
 ### Completed — Caption inclusion and pin-mode controls (2026-09-08)
 
 Starting `7da124e`: clean; 15 commits ahead of the local origin tracking ref,

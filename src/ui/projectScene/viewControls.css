@@ -1,0 +1,13 @@
+/* Disconnected host style; current app does not import this file. */
+:is(.lv-view-controls, .lv-view-stage-tools) { min-width: 0; color: #312f2d; background: #f2f0ee; font: 400 14px/1.5 system-ui, sans-serif; }
+:is(.lv-view-controls, .lv-view-stage-tools)[hidden], :is(.lv-view-controls, .lv-view-stage-tools) [hidden] { display: none !important; }
+.lv-view-controls > section { padding: 12px 0; border-bottom: 1px solid #c5c0bb; }
+.lv-view-controls label { display: flex; flex-direction: column; gap: 4px; margin-block: 8px; }
+:is(.lv-view-controls, .lv-view-stage-tools) :is(button, select) { box-sizing: border-box; min-height: 44px; min-width: 44px; max-width: 100%; padding: 6px 10px; border: 1px solid #817c78; border-radius: 2px; background: #faf9f8; color: inherit; font: inherit; }
+:is(.lv-view-controls, .lv-view-stage-tools) p { margin: 4px 0; overflow-wrap: anywhere; }
+:is(.lv-view-controls, .lv-view-stage-tools) :is(button, select):focus-visible { outline: 2px solid #312f2d; outline-offset: 2px; }
+:is(.lv-view-controls, .lv-view-stage-tools) :disabled { color: #504d4a; border-style: dashed; }
+:is(.lv-view-controls, .lv-view-stage-tools) button:active:not(:disabled) { background: #d2cfcb; box-shadow: inset 0 1px 2px #817c78; }
+.lv-view-controls button[aria-pressed="true"] { background: #d2cfcb; box-shadow: inset 0 0 0 1px #413d39; }
+.lv-view-axes { display: grid; grid-template-columns: repeat(2, minmax(44px, 1fr)); gap: 8px; margin-block: 8px; }
+.lv-view-stage-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

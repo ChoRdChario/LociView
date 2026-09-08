@@ -215,3 +215,51 @@ Pin host contract before integration:
 These additions require no new browser page, server, model bytes or human probe.
 Tests verify authored DOM/intents and retained synthetic identities, not actual
 browser input, gizmos, position accuracy, rendering, storage or device acceptance.
+
+## Viewing aids and Scene entry-view controls
+
+`viewState.ts` / `viewControls.ts` separate free camera, exact Scene-owned Saved
+View recall and the Scene's entry-view draft. Fit, six explicit Project-axis
+directions (`+X` through `-Z`) and observed projection are camera intentions.
+They never infer a model's front/up, alter Caption input or clear a pin mode.
+The separate `stageTools` fit shortcut uses the same host and intention path.
+Read-only metadata does not prohibit safe camera use; actual unsafe camera
+publication (for example an active pointer drag) is a separate `cameraBlock`.
+
+Selecting a Saved View does not recall it. Recall requests its exact resolved
+camera AND background, but changes no membership, material or entry-view pointer.
+Setting/clearing `シーンを開いたときの視点` emits only that Scene's pointer;
+it never recalls the view now. No first/default/foreign view is automatically
+selected. Missing/deleted/duplicate/conflicted view state stays explicit; an
+independent name/order conflict does not block a resolved camera/background.
+
+Host contract before integration:
+
+- Source is a validated, immutable, conflict-aware projection; camera/background
+  values are already fully validated upstream, not raw imported metadata. Runtime
+  tokens cover camera/background, visible logical-Asset union bounds, viewport,
+  Scene and ProjectFrame identity. Wrong-identity runtime state displays neutrally.
+- Implement fit/axis with the bounded Native logical-bounds semantics (02 §18),
+  not hidden support geometry. Projection preserves pose and apparent span. These
+  modules contain no camera math and do not prove actual framing/projection.
+- Keep immutable memory per Scene in UI state. Accept local `change` plans
+  synchronously against the exact memory. Recheck `viewPlanIsCurrent` before an
+  effect and after asynchronous preparation; stale effects must not publish.
+  The host owns one in-flight effect per lane and provides applying/failure state.
+- Entry draft captures the original pointer, including `null`; external updates
+  never rebase it. Apply maps only to Scene `setView` through future write authority.
+  `acceptEntryView` clears only the exact submitted draft after host-confirmed
+  working-state success with matching Scene/frame/pointer, never a durable save.
+  Failure retains the draft. Cancel remains available on source/access loss,
+  except during an in-flight apply. Camera and entry failure lanes are separate.
+- A different Scene/frame render returns false while an entry draft or either
+  effect is pending. Defer the whole host transition and keep this component
+  mounted. Do not erase Caption/pin state to run a camera action or dispose a
+  pending draft. Scene entry applies its valid entry view once under navigation's
+  later host contract, not from these controls or ordinary re-render.
+
+`viewControls.css` is disconnected, like the other task styles. Current evidence
+is pure/DOM contract tests only; no rendered/current-app/device acceptance.
+Named-view capture/update/delete/reorder and background authoring remain separate
+unimplemented UI work. No new page/server, storage/package/renderer or real Project
+connection is introduced.

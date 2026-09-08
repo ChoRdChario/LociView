@@ -60,6 +60,17 @@
 > acceptance remain unimplemented/unverified. Current todo owns the next viewing-
 > aid component; no new human check, probe page/server or current-app hookup.
 
+> **Current viewing-aid update (2026-09-08):** The disconnected UI now has fit,
+> six explicit Project-axis directions, observed projection, exact Scene-owned
+> Saved View recall and independent entry-view choice/apply/cancel. A near-stage
+> fit shortcut shares the same intention path. Stale Scene/frame/view/draft
+> refuses effects without default selection or losing input; camera/entry failures
+> stay separate. Independent findings are fixed and confirmed. Typecheck, 49
+> focused tests, final 88 files / 1,724 PASS (21 existing todo) and build pass.
+> These are reusable control contracts, not actual camera/storage/browser/device
+> results. Named-view authoring/background controls remain next in current todo;
+> no current-app hookup, new page/server or human check is requested.
+>
 > **Current package design update (2026-09-08):**
 > `docs/specs/06-project-package-wire.md` is a reviewed **PROPOSED / UNRATIFIED**
 > companion under 05 §7.5, not a format/version or S2 adoption. It separates five

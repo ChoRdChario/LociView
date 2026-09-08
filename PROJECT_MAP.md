@@ -43,7 +43,7 @@ For a normal task, read only the target file, its matching tests, and direct imp
 | `src/viewer` | Three.js loaders, material shader patch, single-model `ViewerCore` |
 | `src/nativeGs` | Version-1 native snapshot, streamed project-local binaries/packages, exact ASCII Point and SH2/SH3 GS admission, lazy Spark runtime, repeated Asset import, per-Asset visibility/alignment, DisplaySet/material/Caption/media state, legacy conversion and bounded package exchange |
 | `src/ui` | App shell, home, viewer screen, dialogs, tabs, and UI-only state |
-| `src/ui/projectScene` | Disconnected Scene/task navigation, save-state presentation, Caption list/pin filters/detail drafts, inclusion/pin-mode controls and comparison-window state (05 §13.3); synthetic ports only, no current-app hookup, floating renderer or rendered acceptance |
+| `src/ui/projectScene` | Disconnected Scene/task navigation, save-state presentation, Caption list/pin filters/detail drafts, inclusion/pin modes, comparison-window state and viewing aids/entry-view controls (05 §13.3); synthetic ports only, no current-app hookup, floating renderer or rendered acceptance |
 | `tests` | Executable contracts for core, assets, I/O, and UI logic |
 | `public/samples` | Small deterministic files used by the manual viewer and iOS runbook |
 | `fixtures` | G0 fixture registry, provenance, hashes and small committed fixture metadata |
