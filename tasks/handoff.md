@@ -71,6 +71,18 @@
 > results. Named-view authoring/background controls remain next in current todo;
 > no current-app hookup, new page/server or human check is requested.
 >
+> **Current view-authoring update (2026-09-08):** Reusable create/name/edit,
+> exact camera+background recapture, dependency-aware confirmed deletion and
+> earlier/later intentions now accompany the view controls. Solid-background
+> HEX/picker/standard-color has independent draft/apply/cancel, no hidden rounding
+> of captures and no durable-save claim. Creation never changes entry; deletion
+> never auto-clears it. Independent review's cross-lane applying-state P2 and the
+> source-isolation allowlist adjustment are fixed/confirmed. Root typecheck, 58
+> focused tests, final 89 files / 1,736 PASS (21 existing todo) and build pass.
+> Still no current app, renderer/storage, real capture/undo or browser/device
+> acceptance. Current todo owns the next model-list/Scene-membership component;
+> no new page/server or repeated human test is requested.
+>
 > **Current package design update (2026-09-08):**
 > `docs/specs/06-project-package-wire.md` is a reviewed **PROPOSED / UNRATIFIED**
 > companion under 05 §7.5, not a format/version or S2 adoption. It separates five

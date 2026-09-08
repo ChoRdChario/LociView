@@ -239,8 +239,14 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         expect(imports.every(p => p?.startsWith('./') || p === '../domain/values')).toBe(true);
       } else if (/[\\/]ui[\\/]projectScene[\\/]/.test(path)) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
-        expect(imports.every(p => p?.startsWith('./') || p === '../../scene/types' || p === '../../domain/captionText')).toBe(true);
+        // 05 §13.3 permits the existing side-effect-free presentation helper,
+        // not the Native controller/schema runtime or a general Native dependency.
+        const shared = ['../../scene/types', '../../domain/captionText', '../../domain/values', '../../nativeGs/backgroundColor'];
+        expect(imports.every(p => p?.startsWith('./') || shared.includes(p!)), path).toBe(true);
       } else expect(source).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/(scene|domain|projectScene)\//);
     }
+    const backgroundHelper = readFileSync('src/nativeGs/backgroundColor.ts', 'utf8');
+    expect(backgroundHelper).not.toMatch(/^\s*import(?!\s+type\b)/m);
+    expect(backgroundHelper).not.toMatch(/\bimport\s*\(|\bexport\s+[^;]*\bfrom\s+['"]/);
   });
 });

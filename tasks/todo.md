@@ -2,6 +2,72 @@
 
 ## Current boundary — implementation through UI verification (2026-09-08)
 
+### Completed — named-view authoring and 3D background controls (2026-09-08)
+
+Starting `81fb17d`: clean, 17 ahead of the local origin tracking ref; no fetch/push.
+Continue the approved next component under 05 §13.3, 05 §§3.3–3.4/11 and UI
+guidelines §§4.2/8–10. Reuse Native 02 §§18/32.3 presentation semantics and pure
+HEX helpers, but not its create-default/delete-clear policy or storage controller.
+
+- [x] Add explicit new-view capture/name/apply and selected-view sparse rename /
+  camera+background recapture. Retain the exact captured host snapshot and name/IME
+  draft; no current/default-view change, auto-selection or HEX round-trip of captures.
+- [x] Add dependency-aware confirmed deletion and keyboard-friendly earlier/later
+  intentions. Bind to exact Scene/frame/selection/source; never auto-clear entry,
+  resolve conflicts, renumber an entire collection or erase another editor's input.
+- [x] Add current 3D solid-background HEX/picker/standard-color/apply/cancel controls
+  with independent failure state and stale-draft refusal. Background is session
+  state, persists only through explicit Saved View capture/update, and never edits
+  the interface palette. Unavailable/unsupported observed background stays explicit.
+- [x] Test only missing pure/DOM intent and input-retention contracts, reuse existing
+  view/background tests, obtain one independent read-only review and typecheck /
+  full two-worker test suite / build on the final executable tree.
+
+Completion is reusable source components and an explicit host contract, not a new
+probe or full v2 validator. Real capture/render/write/undo, deletion/reference
+admission, storage/package hookup, current app activation, transparent-background
+authoring, schema/dependency and release changes are excluded. Host capture and
+dependency tokens represent fully validated immutable synthetic read ports, never
+approval of raw bytes. Browser/IME/device gates stay open; do not repeat broken
+bootstrap or prior human probes. Stop for a contract conflict or new authority,
+not another approval of already accepted implementation details.
+
+Verification adjustment: the first full run exposed one stale source-isolation
+allowlist assertion in `sceneCore.test.ts`; UI behavior tests passed. Its explicit
+allowed imports predated the 05 §13.3-authorized pure helper reuse in this slice.
+Added only `domain/values` and `nativeGs/backgroundColor`, with a separate assertion
+that the background helper has no runtime imports/re-exports. Do not allow the
+Native namespace generally, connect an entry or relocate current production code.
+This exact adjustment was independently confirmed and passed with the focused
+suite and final full verification.
+
+Slice review: root typecheck, 58 focused tests (including 12 new authoring/
+background cases), final 89 files / 1,736 PASS with 21 existing todo (two workers),
+and build PASS. Existing mixed-import/large-chunk warnings remain. Independent
+review found one P2: background plan revalidation cleared another camera action's
+applying state. It now ignores only its own feedback; an in-progress recall blocks
+publication, with regression coverage. That fix and the new-draft null review
+target were independently confirmed. Name-only changes omit camera/background;
+capture preserves exact host identity/atomic baselines, current/default view stays
+unchanged, entry-referenced deletion refuses, and HEX never reconstructs an
+untouched captured background. IME/visual/device/storage effects remain unverified.
+
+Short meta-audit / next implementation: this closes the reusable View authoring
+and solid-background surface, not application integration or TEAM-FLOW-01.
+Current entry/runtime/storage/package/dependencies and servers are unchanged;
+normal ignored build artifacts alone were regenerated. Next is the `モデル` tab's
+Project inventory and current-Scene membership surface under 05 §§3.2/4.3/11:
+all Project models remain discoverable, selection is local, and `このシーンに表示`
+uses exact include/exclude membership intentions rather than Project deletion or
+hidden per-kind visibility. Preserve selection/pending input and expose unknown
+membership, unavailable binding and Project-wide placement/replacement scope.
+Reuse existing Scene include/exclude and pin-target contracts; add only missing
+list/intent/refusal DOM tests. Real model import/bytes, placement/gizmo, revision
+activation, renderer/storage, schema/dependency and release remain excluded.
+Do not infer relations, unblock an unknown source or expand beyond 05 §13.3.
+No new PO micro-approval/human probe is needed; the integrated Desktop/iPhone,
+full resource/reference validation and platform/package gates remain open.
+
 ### Completed — viewing aids and Scene entry-view controls (2026-09-08)
 
 Starting `620d596`: clean; 16 commits ahead of the local origin tracking ref,

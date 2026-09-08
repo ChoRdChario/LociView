@@ -263,3 +263,75 @@ is pure/DOM contract tests only; no rendered/current-app/device acceptance.
 Named-view capture/update/delete/reorder and background authoring remain separate
 unimplemented UI work. No new page/server, storage/package/renderer or real Project
 connection is introduced.
+
+## Named-view authoring and current solid background
+
+`viewAuthoringState.ts` / `viewAuthoringControls.ts` extend the existing selected
+view with explicit create/edit, sparse name change, camera+background recapture,
+confirmed delete and earlier/later intentions. They do not supply another chooser.
+New view creation never changes the Scene entry pointer. Delete refuses an entry
+reference and requires the host's complete dependency admission for the exact
+source/target. It emits a lifecycle-delete intention, never physical removal or
+automatic reference clearing. Reorder names one item and exact neighbor; the host
+must allocate its new atomic order key without rewriting the collection. Unknown
+order/lifecycle or duplicate identity cannot be sorted into a successful request.
+
+- Capture handles name exact immutable, fully validated camera AND background
+  snapshots retained by the host until the draft/operation ends. They are not
+  payload validators or a rendering implementation. Creation/recapture requires
+  matching current runtime/Scene/frame. Subsequent camera movement does not replace
+  that retained snapshot: the UI says it was taken earlier and offers explicit
+  recapture. A retry uses the same snapshot, not the then-current viewport.
+- The immutable `versions` port is bound to source token and selected View ID;
+  its camera/background tokens distinguish exact atomic states including causal
+  changes/conflicts, not timestamps or user labels. Re-capturing after an incoming
+  update never rebases the original target-field versions. Unresolved camera or
+  background blocks their update, not an independent valid rename; unresolved
+  name blocks its editing, not camera/background update. Only explicit changed
+  fields enter a plan. The host must retain unknown siblings and validate complete
+  field/reference/lifecycle/causal policy before a real command.
+- Local create/edit/recapture plans pass `viewAuthorPlanIsCurrent` and are consumed
+  synchronously. Name `input` events require exact `baseDraft` identity and preserve
+  raw composing text; never unmount an active editor or change its selected view.
+  The host includes these drafts in Scene/selection guards. Render returns false
+  for an attempted cross-target transition while a draft/operation remains.
+- The host owns one in-flight authoring effect, rechecks the plan before dispatch
+  and after async preparation, allocates fresh IDs/order/lifecycle events and
+  supplies failed/applying feedback. Cancellation confirms the exact draft; delete
+  confirmation is invalidated by source/selection change. Neither hides failures.
+  Retrying an unchanged draft must reuse its original prepared command/identity
+  and journal recovery, not allocate a second View after a lost reply. Unknown
+  publication outcome stays in host recovery; this UI cannot infer success or
+  find the created item by its name. No idempotent storage result is proved here.
+- `acceptViewAuthor` clears only the exact submitted draft with an exact-plan
+  receipt and matching observed Scene/frame/View/name. A capture receipt additionally
+  names the retained capture token: the host must verify its full exact camera and
+  background against the applied record before issuing that receipt. The helper
+  cannot inspect opaque snapshot contents or prove fresh-ID allocation. It is a
+  working-state acknowledgement, not evidence of durable save. No receipt means
+  no successful apply; keep the original input for retry/recovery.
+
+`viewBackgroundState.ts` and the separate background control use the existing pure
+Native HEX/standard-color helpers, without importing its controller or writer.
+HEX is the rounded display of a validated solid background, never a round-trip
+replacement for an untouched exact value. An unchanged HEX emits no effect;
+explicit changed HEX/standard-color becomes a draft, then one background-only
+apply intention. The standard value remains `#101725`. No camera, Saved View,
+material or interface-palette field is changed. Persistence requires an explicit
+Saved View create/update; View/read-only metadata does not prohibit this local
+display adjustment. Transparent/unsupported/unknown observed backgrounds are
+labelled unavailable for this bounded solid-color editor, never converted silently.
+
+Background source tokens cover exact unrounded background state, not unrelated
+camera movements. Stale background refuses apply without losing HEX/IME. Host
+serializes it with other camera/background publications, revalidates
+`viewBackgroundPlanIsCurrent`, and clears only exact submitted input through
+`acceptViewBackground` with a matching exact-color receipt. Failed or newer input
+survives. Background's own applying state belongs only to its `feedback`; the
+separate camera feedback describes OTHER camera/recall work and blocks background
+publication even when that other operation has not changed the observed token yet.
+Capture UI must receive a host capture of the actually applied display,
+never the unsubmitted HEX draft. Both editors retain nodes and confirmed cancel
+after source loss. Reuse `viewControls.css`; recorded DOM and scoped CSS remain
+non-rendered evidence. Real camera/capture/undo/write, browser/IME/mobile and
+physical-iPhone acceptance, full graph validation and integration remain open.
