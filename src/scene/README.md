@@ -1,7 +1,8 @@
 # Disconnected pure Scene core
 
-Implements the scheduling exception in specification 05 §13.1. Only tests import
-these modules; current Native/v1 behavior and storage are unchanged.
+Implements the scheduling exception in specification 05 §13.1. Tests and the
+explicit synthetic development host (§13.4) import these modules; current
+Native/v1 behavior and storage are unchanged.
 
 - `types.ts`: conflict-aware Scene/resource read projection, not ProjectDocV2 wire.
 - `commands.ts`: plans one logical Scene edit without acknowledging or saving it.
@@ -21,7 +22,9 @@ and existing IDs. Do not persist the read projection, replace whole CRDT maps, o
 treat `previewScenePlan` as a durable commit. `needsReview` retains the authored
 anchor coordinate; a hidden-owner entry is still listable with no marker.
 
-Remaining: storage/causal adapter and journal, full resource validators/resolver,
+Remaining: production storage/causal adapter and journal, full resource validators/resolver,
 resource content commands, deep keep-both remapping, conversion/exchange, actual
-SceneDocument/render plan, UI wiring, once-per-entry view application and device
-acceptance. No dependency, storage or renderer adoption follows from core tests.
+SceneDocument/render plan, ordinary UI integration and device acceptance.
+Synthetic UI/view/media connections already exist; see current todo. Full
+provider stages A/B/C must not be replaced with fixture assumptions.
+No dependency, storage or renderer adoption follows from core tests.

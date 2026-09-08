@@ -1,7 +1,25 @@
-# Disconnected reusable domain validation
+# Reusable domain validation / complete-provider foundations
 
 Authorized by specification 05 §13.3. These are production-quality pure modules,
-not an adopted metadata adapter or a complete ProjectDocV2 validator.
+not an adopted metadata adapter or a complete ProjectDocV2 validator. The finite
+provider plan in 05 §13.4 has stages A (records), B (closure/conflict/evidence) and
+C (same-host authority). Do not conflate their completion or introduce per-record
+workstreams. Stage A's two modules below are not connected authority yet.
+
+- `projectRecords.ts` is one whole-root **decoded record** entry for the amended
+  Project and all 14 entity maps. It enforces required maps, schema/nominal map
+  identities, known record unions, counts and global canonical-value budgets.
+  It reuses the Scene/material guards and preserves the whole independent frozen
+  tree, including unknown minor fields. A `valid-records` result has no token,
+  SceneResources, save/merge receipt or permission to activate a Project.
+- `projectRecordFields.ts` supplies internal checks on that already cloned tree:
+  status, portable frame/transform, full anchor/camera/background, BlobRef,
+  profile/tool/provenance declarations, roles/catalogs and collection order.
+  Required digest strings and profile IDs are syntax only, not verified hashes
+  or decoder capabilities. Preserving declared video/audio/document metadata is
+  not implementation or activation of those media features. Migration support
+  is retained as a protected opaque root subtree, not structurally validated
+  by this entry. Stage B must handle it before claiming complete authority.
 
 - `values.ts` checks/clones already decoded plain JSON without invoking getters;
   rejects invalid Unicode/NFC, nonfinite numbers, unsafe keys/non-JSON values,
@@ -41,9 +59,11 @@ here. No raw parser, serializer, digest, package writer or byte I/O is provided.
 Host objects, proxies and CRDT library objects are outside the input contract;
 the future adapter must supply plain data without losing conflict candidates.
 
-Not yet covered: whole-Project maps and schema version, resource/frame/immutable
-payload validity, reference existence/lifecycle/ownership, semantic-key conflicts,
+Not yet covered: immutable payload digests, reference existence/lifecycle/ownership,
+frame ownership and whole family/partition/DAG relationships, semantic-key conflicts,
 causal delete/edit and immutable mutation checks, full candidate provenance,
 blobs/inventory, migration and history-free policy. A `valid-record` result must
 not be cast into a fully validated SceneResources provider or publish metadata.
-No current application entry imports these modules or the disconnected Scene core.
+Selected pre-existing guards are consumed by the explicit synthetic development
+host under §13.4; current Native/v1 entries remain unchanged. The new whole-root
+record entry is not an importer or a substitute for stages B/C.

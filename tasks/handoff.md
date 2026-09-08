@@ -37,6 +37,10 @@
 > renderer adoption, integrated v2 or rendered acceptance. Next:
 > the finite complete-provider/gated durable boundary. Real file inputs and
 > image pan/pinch/filters remain pending, not removed conveniences.
+> Provider stage A now checks the decoded amended root/all record kinds and
+> preserves unknown subtrees. This is structural success only; B must validate
+> the complete graph/candidates/exact content evidence before C can replace the
+> same host's known-only authority. One finite boundary, not new per-record tasks.
 > Windows Computer Use initialized but stopped automatically on unsafe-to-resolve
 > Chrome URL; no browser input/PASS or bypass. Keep the existing batched UI lane.
 > No repeated journal check or scheduling approval is needed. Real-data/current

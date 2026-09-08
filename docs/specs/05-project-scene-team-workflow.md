@@ -1147,6 +1147,39 @@ nonblocking visual polish. A required gate/ratification blocks its actual
 activation, not unrelated authorized development. Before such a boundary,
 report the exact missing prerequisite instead of inventing substitute work.
 
+**Current implementation plan — complete provider (from `5225110`):** this is
+one finite implementation boundary derived from §§13.3/13.4 and specifications
+01/02, not adoption of the candidate, a new wire format, decoder or numeric policy.
+The exit is a complete conflict-aware validated provider connected to this same
+host, retaining source data and all diagnostics. Individual stages below do not
+authorize casting partial results into trusted `SceneResources`.
+
+| Stage | Contract and reused work | Acceptance / remaining evidence |
+|---|---|---|
+| A: decoded record structure | One whole amended Project root; all map keys/IDs, known fields/unions, canonical frames/transforms/cameras/anchors, models/media/tags/views and existing Scene/material guards. Reuse safe decoded-value cloning, nominal/lifecycle checks and material intent. Preserve unknown minor subtrees and flag them; never repair persisted text. | One explicit `valid-records` result, not a valid Project. Reject every malformed candidate when stage B supplies it. Bound whole-tree depth/nodes, total entities and specified per-record collections. Structural digest/type declarations do not certify bytes/profile/graph/causality. |
+| B: closure and conflict authority | Consume complete atomic candidates/provenance from a neutral read port, immutable prior identity and externally verified blob/profile summaries. Validate every record/candidate, immutable digests/append-only identity, owner/frame/parent/DAG/family/catalog/partition/proxy/exclusion relations; preserve strong/weak roots and unknown data. | No materialized winner. Missing required evidence blocks the affected authority; absent weak provenance does not invalidate a canonical pin. Causal delete/edit, orphans, order/scalar/lifecycle and duplicate semantic keys remain actionable. Evidence is bound to exact bytes/profile/metadata, never inferred from labels or synthesized as success. |
+| C: same-host provider connection | Emit SceneState/resources with one snapshot token plus retained full records/candidates/diagnostics, using the existing Scene resolver. Replace known-only validation assumptions at the existing synthetic history boundary; do not add a parallel UI/probe. | Actual candidate two-round/copy/recovery and adversarial closure checks on the same provider. Exact fixture evidence remains development-only; no real-file/default-entry activation. Partial record success never reaches this output. One final independent review and required whole-tree checks; browser/iPhone remain the existing batched lane. |
+
+Stages may be committed separately but this boundary stays open until C passes.
+No per-record review campaign or default expansion into UI polish. Stage A is
+authorized pure decoded-data validation only: no raw JSON parser, portable writer,
+blob reading or current Project activation. Stage B must retain unknown metadata
+and all conflict roots; history-free export remains blocked without its separate
+versioned policy. Do not change field atomicity/identity/retention to fit a library.
+Real FormatProfile/goldens, metadata/CAS adoption, wire/migration recipe and physical
+iOS storage evidence retain their explicit gates before durable product activation.
+A contract disagreement stops that affected implementation for PO resolution.
+
+**Stage A observed implementation:** `src/domain/projectRecords.ts` validates
+one already decoded amended root and all 14 record maps, reusing the existing
+Scene/material guards and safe clone. `projectRecordFields.ts` checks known
+nested values; unknown root/record/nested values remain in the frozen result.
+Migration support remains protected opaque data, not validated migration state.
+Camera nonparallel checks use exact transient binary64 integer arithmetic, so
+overflow/underflow do not create an unapproved coordinate-range restriction.
+Result `valid-records` provides no token/SceneResources, resolved conflict, verified
+digest/blob/profile or write receipt. All B/C requirements above remain open.
+
 **Observed bounded media connection (from `7b57fd2`):** the same host now has two
 preloaded public synthetic PNGs. Each immutable MediaResource has a verified
 exact blob descriptor and domain-separated metadata digest; history accepts only

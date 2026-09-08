@@ -13,10 +13,16 @@ IME and device acceptance remain pending, not implied by its DOM tests.
 The fixed-PNG media connection below is complete in development memory. Next is
 the finite complete-provider boundary under 05 §§13.3/13.4, then the gated durable
 loop. Do not return to detached UI parts or polish as the default workstream.
-- [ ] Map the accepted Project/resource/frame/reference/conflict/blob rules to
+- [x] Map the accepted Project/resource/frame/reference/conflict/blob rules to
   existing production-quality guards and the still-missing provider subparts.
   Record one bounded contract/acceptance matrix before implementation, with one
   final complete-provider exit; do not create a new per-record review campaign.
+- [x] Stage A: whole-root decoded record structure for all approved
+  entity kinds, preserved unknown fields and global budgets. `valid-records`
+  never means valid Project, verified blobs or conflict-free authority.
+- [ ] Stage B (current): full closure/candidates/causal and exact external-evidence checks.
+- [ ] Stage C: connect that authority to the existing synthetic workflow; final
+  integration evidence and independent review close the single provider boundary.
 - [ ] Implement and connect that provider to the same synthetic host where
   authorized, replacing known-only assumptions with verified closure. Reuse
   existing adversarial/reference tests; partial guards are never trusted as full
@@ -28,9 +34,28 @@ loop. Do not return to detached UI parts or polish as the default workstream.
 
 Existing image pan/pinch/filters, real file input, actual renderer/native IME/
 device checks and full tags remain explicit gaps, not deleted conveniences.
-The completed branch checkpoint is Git HEAD; last check before commit was
-`g0-baseline`, 0 behind / 34 ahead of local tracking (no fetch), only this slice's
-changes. Official remaining quota 78%; continue automatically, pause below 10%.
+The completed branch checkpoint is Git HEAD; stage A starts from clean
+`g0-baseline` / `5225110`, 35 ahead of local tracking (no fetch). The previous
+goal turn made connected media progress. Official remaining quota at entry was
+77%; continue automatically, pause below 10%.
+
+Stage A review: one amended whole-root entry covers all 14 entity maps and known
+nested fields, retaining unknown subtrees and exact body newlines. It exposes
+`valid-records` only, no SceneResources or save/merge/profile/blob receipt. Global
+budgets include unknown fields; delegated Scene/material guards remain reused.
+Migration support remains protected opaque data, not validated migration state.
+Independent read-only review found and closed finite-camera overflow rejection:
+exact transient binary64 arithmetic now also preserves subnormal perpendicular
+components without a new coordinate cap/epsilon. Root typecheck, 36 focused
+checks and final 100-file suite PASS (1803 tests, 21 existing TODO). The camera
+fix's grouped test and final whole suite ran after the initial 36-check pass.
+Ordinary and harness builds PASS with existing size warnings. Parsed source maps
+contain no candidate modules and no new stage-A entry in either build: no early
+authority or current UI activation. The unchanged candidate/media checks are
+reused from the previous checkpoint, not rerun or rebranded as provider evidence.
+No current UI/renderer change, private bytes, file/storage activation, dependency,
+wire/migration decision or new server/probe. Stage B/C still gate the complete
+provider; do not mark that boundary complete or resume per-record UI polishing.
 
 ### Completed media connection
 
