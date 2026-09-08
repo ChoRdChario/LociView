@@ -2,6 +2,52 @@
 
 ## Current boundary — implementation through UI verification (2026-09-08)
 
+### Completed — Caption inclusion and pin-mode controls (2026-09-08)
+
+Starting `7da124e`: clean; 15 commits ahead of the local origin tracking ref,
+no fetch/push. Continue the PO-approved next component under 05 §13.3. Reuse
+05 §§3.2/4.3/11, 01 §4.1, UI guidelines §§5/9–10 and existing Scene/Native tests.
+
+- [x] Add a progressively disclosed existing-Project Caption picker, exact
+  membership-only intent, search/selection retention and unavailable/conflict
+  recovery. Never copy a Caption or automatically show its hidden owner model.
+- [x] Keep add/move controls adjacent, require explicit new-placement model,
+  preserve the existing move target, and expose a separate near-stage mode strip
+  with confirm/cancel. Target eligibility and position proposals are synthetic
+  validated host inputs; this component performs no picking/anchor construction.
+- [x] Bind effects to exact source/session/proposal state; retain failed input,
+  block stale confirmation and keep confirmed cancellation available on source
+  loss. Disclose shared-Scene impact before moving a shared Caption.
+- [x] Verify missing pure/DOM contracts and reuse Scene tests; obtain one
+  independent read-only review and run typecheck/full test/build.
+
+Completion is reusable intent/control modules, not active application features.
+No model inference, conflict resolution, ProjectAnchor creation, re-anchoring,
+media/renderer/storage/package hookup, new page/server/dependency or release.
+Browser/IME/real gizmo/iPhone evidence remains pending under the existing batch
+lane; do not repeat broken bootstrap or completed manual probes. Stop for a
+specification conflict or new authority, not another micro-approval.
+
+Slice review: typecheck and 60 focused tests PASS, including six inclusion and
+eight pin-mode cases. Full two-worker suite: 87 files / 1,713 PASS, 21 existing
+todo; build PASS with existing mixed-import/large-chunk warnings. Independent
+read-only review's P2 is fixed and confirmed: `追加先モデル` applies only to new
+placement, while move names the selected Caption/exact owner before entry.
+Cancellation binds both mode and proposal; a changed proposal invalidates an
+open confirmation. `otherPending` excludes this mode so its own navigation guard
+cannot deadlock completion. DOM/CSS contracts are not rendered/device evidence.
+
+Short meta-audit / next implementation: this closes reusable inclusion and
+pin-mode controls, not actual placement, full Caption editing or team operation.
+No current entry, storage, package, renderer, dependency or server changed.
+Next is the `視点` task's reusable viewing aids under 05 §11 and UI guidelines
+§4.2: fit, six directions, projection and Scene-owned Saved View recall versus
+entry-view selection. Emit explicit host intentions; reuse existing view/core
+contracts, keep camera math/renderer/storage outside this disconnected slice,
+and retain unfinished Caption/mode state. Full resource/reference admission,
+wire/platform adoption and integrated Desktop/iPhone acceptance remain open;
+do not repeat prior manual probes or claim whole-UI completion.
+
 ### Completed — disconnected Caption detail and comparison state (2026-09-08)
 
 Starting `8d6fe24`: clean. The PO asked to continue the documented next component

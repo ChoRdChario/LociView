@@ -49,6 +49,17 @@
 > acceptance is claimed. Current todo owns the next Caption inclusion/mode-control
 > component; no new Product Owner action, server or repeated probe is needed.
 
+> **Current Caption-action update (2026-09-08):** The same disconnected UI now
+> includes an existing-Project Caption picker and add/move controls with a separate
+> near-stage confirm/cancel strip. Inclusion emits exact membership-only intent;
+> add requires explicit model, move shows its existing owner, and shared impact
+> remains visible. Failed/stale proposals stay retained, and cancel confirms exact
+> mode plus proposal. Independent review's target-label P2 is fixed and confirmed.
+> Typecheck, 60 focused tests, full 87 files / 1,713 PASS (21 existing todo) and
+> build pass. Actual picking/anchor writes, renderer/storage and browser/device
+> acceptance remain unimplemented/unverified. Current todo owns the next viewing-
+> aid component; no new human check, probe page/server or current-app hookup.
+
 > **Current package design update (2026-09-08):**
 > `docs/specs/06-project-package-wire.md` is a reviewed **PROPOSED / UNRATIFIED**
 > companion under 05 §7.5, not a format/version or S2 adoption. It separates five

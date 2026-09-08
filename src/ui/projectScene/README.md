@@ -149,3 +149,69 @@ Current evidence covers pure plans and DOM-contract tests only. Actual browser
 keyboard/focus, layout, contrast, mobile reflow, IME, stage composition and iPhone
 acceptance remain pending. DOM test doubles and current production build do not
 constitute rendered evidence for these disconnected components.
+
+## Existing Caption inclusion and pin modes
+
+`captionIncludeState.ts` / `captionIncludeControls.ts` provide a native disclosure,
+search and exact-ID picker over the host's complete current-Project inventory.
+The inventory distinguishes lifecycle from this Scene's membership; duplicate
+row IDs, unavailable inventory and unresolved membership never become a default
+choice. Unknown title/body/owner fields do not prohibit independent membership
+inclusion. A selected item remains identifiable outside search or during source
+loss; search/IME and failure stay local. No picker selection changes the current
+editor, and no inclusion request copies content, re-anchors or shows its owner.
+
+The later host must bind `include` to the existing Scene `include` command for
+that exact Caption/Scene, supply fresh membership/event IDs and order, recheck
+`captionIncludePlanIsCurrent`, validate the complete current causal/resource
+closure, and apply through the write authority. The reusable core preview test
+proves membership-only composition, NOT full validation or a durable write.
+Accept local `change` plans synchronously against their exact memory; in-flight
+feedback blocks repeated submission. A failure preserves selection for retry.
+On confirmed inclusion, refresh membership to `included` rather than pretending
+the exported intent saved anything. `review` is an explicit host recovery request.
+
+`pinModeState.ts` / `pinModeControls.ts` expose adjacent add/move actions and a
+separate `modeStrip`. Mount the strip near the stage outside tab/unmount/scroll
+lifetimes. The `追加先モデル` selector starts empty even for one model; move shows
+the selected Caption and its exact existing owner BEFORE entry, independent of
+that selector. A shared Caption discloses affected Scene count; unknown impact
+blocks movement. `captionActions.css` supplies disconnected scoped controls,
+44px targets and an explicit root-hidden rule; actual layout remains unverified.
+
+Pin host contract before integration:
+
+- Read ports are immutable, complete, conflict-aware projections, not raw JSON.
+  Model target tokens cover binding/frame, chosen family/current compatibility
+  class, effective visibility/membership and separate add/move eligibility.
+  Move-target tokens also cover Caption anchor/owner, availability and affected
+  Scene count. No token is a timestamp, filename, best-match relation or save flag.
+- The host resolves ambiguous visual families and needsReview in their explicit
+  recovery workflow before exposing eligibility. Add requires a valid explicit
+  interaction target; a missing GS proxy blocks only new placement. A compatible
+  existing pin may remain movable without that proxy. This UI never picks a
+  surface, fabricates a ProjectAnchor, changes owner or resolves an anchor conflict.
+- `otherPending` contains OTHER editors' unfinished input, not this pin mode.
+  Feed this mode to navigation/list guards as `pinPlacement` or `pinMove`; tab
+  changes alone never end it. An attempted cross-Scene render while active returns
+  false and the host must defer the entire transition, not just this control.
+- A `PinProposal` is an opaque identity for a fully validated TRANSIENT candidate
+  retained by the host; its exact `mode` reference and unique candidate token
+  change when input changes. No coordinates, surface hit or complete anchor are
+  constructed here. Finish rechecks target/Caption eligibility and exact proposal.
+  Host rechecks `pinModePlanIsCurrent` immediately before the real command and
+  after asynchronous preparation. Stale input stays visible until explicit cancel
+  and restart; it is not rebased onto a different binding or Caption.
+- Actual finish must atomically create Caption + Scene membership, or replace the
+  existing complete manual anchor under 01 §4.1. That command, source-byte policy,
+  undo and durable acknowledgement are NOT implemented by these UI modules.
+  Retain mode/proposal while applying or failed; clear only the exact submitted
+  input after host-confirmed working-state success. Workspace save state is separate.
+- Cancel first confirms the exact mode AND proposal. Changing the proposal invalidates
+  the confirmation. Source/access loss does not hide local cancellation, but an
+  in-flight command cannot be interrupted through this UI-only path. Never dispose
+  the component or clear a proposal as an implicit cancel.
+
+These additions require no new browser page, server, model bytes or human probe.
+Tests verify authored DOM/intents and retained synthetic identities, not actual
+browser input, gizmos, position accuracy, rendering, storage or device acceptance.
