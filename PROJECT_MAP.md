@@ -35,6 +35,7 @@ For a normal task, read only the target file, its matching tests, and direct imp
 | Path | Current responsibility |
 |---|---|
 | `src/core` | IDs, HLC, operation validation, JSONL, reduction, merge, manifest, and `ProjectStore` |
+| `src/domain` | Disconnected canonical decoded-value and individual Scene-record admission (05 §13.3); preserves unknown minor fields, not full Project/resource/history validation |
 | `src/scene` | Disconnected pure Scene command/composition core (specification 05 §13.1); validated conflict-aware read port, no storage/UI integration or adoption |
 | `src/platform` | `WorkspaceFS`, OPFS, memory filesystem, PWA and browser integration |
 | `src/assets` | ZIP/package handling, model asset registration/replacement, GLB optimization, import wizard |
@@ -169,4 +170,5 @@ batch is retained atomically and blocks only the affected projection; invalid
 or incomplete input activates nothing.
 
 No candidate dependency or v2 type may leak into current UI/storage code before
-its gate passes.
+its gate passes. Specification 05 §§13.1/13.3 permit disconnected pure logic,
+validators and synthetic-port UI components only; they do not activate that path.

@@ -1,5 +1,18 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **Current approval update (2026-09-08):** The PO explicitly approved advancing
+> storage-neutral validators/reusable UI components without real-data/storage
+> connection. Specification 05 §13.3 supersedes the approval hold below, not
+> technology/package/device gates. Use current todo; do not ask again for that
+> scheduling choice, wire current application entry paths or infer full UI PASS.
+
+> The first reusable boundary is implemented in `src/domain`: safe decoded JSON
+> and individual Scene/membership record shapes, not full Project validation.
+> Existing pure Scene commands share its local-name guard. Typecheck, focused
+> 19 tests, full 81 files/1,665 tests (two workers; 21 existing todo) and build
+> pass. Independent review findings are fixed and confirmed. No current app,
+> storage or renderer hookup; current todo owns the next reusable UI component.
+
 > **Current package design update (2026-09-08):**
 > `docs/specs/06-project-package-wire.md` is a reviewed **PROPOSED / UNRATIFIED**
 > companion under 05 §7.5, not a format/version or S2 adoption. It separates five

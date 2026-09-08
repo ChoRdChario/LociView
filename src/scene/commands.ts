@@ -1,6 +1,7 @@
 import type { Entity, Field, Lifecycle, Membership, Scene, SceneResources, SceneState, Table } from './types';
 import { value } from './types';
 import { active, memberships, sameSnapshot } from './resolve';
+import { DomainValidationError, normalizeSceneName } from '../domain/values';
 
 type EdgeKind = 'asset' | 'caption';
 export type SceneCommand =
@@ -26,8 +27,8 @@ const id = (text: string, prefix: string) => {
 };
 const order = (text: string) => { if (!/^[0-9A-Za-z]{1,64}$/.test(text)) fail('invalid', 'orderKey'); };
 const name = (text: string) => {
-  if (!text.trim() || [...text].length > 256 || /[\u0000-\u001f\u007f]/u.test(text) ||
-    [...text].some(c => c.length === 1 && /[\ud800-\udfff]/u.test(c))) fail('invalid', 'name');
+  try { return normalizeSceneName(text); }
+  catch (error) { if (error instanceof DomainValidationError) return fail('invalid', 'name'); throw error; }
 };
 function exact<T>(field: Field<T>, target: string): T {
   return field.kind === 'value' ? field.value : fail(field.reason, target);
@@ -86,8 +87,8 @@ export function planSceneCommand(state: SceneState, resources: SceneResources,
     table[membershipId] = { id: membershipId, sceneId, resourceId, orderKey: value(orderKey), lifecycle: life('active') };
   };
   const create = (sceneId: string, sceneName: string, orderKey: string) => {
-    fresh(sceneId, 'scn'); name(sceneName); order(orderKey);
-    next.scenes[sceneId] = { id: sceneId, name: value(sceneName), orderKey: value(orderKey),
+    fresh(sceneId, 'scn'); const normalizedName = name(sceneName); order(orderKey);
+    next.scenes[sceneId] = { id: sceneId, name: value(normalizedName), orderKey: value(orderKey),
       defaultViewId: value(null), lifecycle: life('active') };
   };
   switch (command.kind) {
@@ -115,8 +116,8 @@ export function planSceneCommand(state: SceneState, resources: SceneResources,
       break;
     }
     case 'rename': {
-      const current = scene(command.sceneId); exact(current.name, 'name'); name(command.name);
-      next.scenes[current.id] = { ...current, name: value(command.name) }; break;
+      const current = scene(command.sceneId); exact(current.name, 'name');
+      next.scenes[current.id] = { ...current, name: value(name(command.name)) }; break;
     }
     case 'setDefault':
       scene(command.sceneId); exact(state.defaultSceneId, 'defaultSceneId');

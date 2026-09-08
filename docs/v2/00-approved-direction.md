@@ -213,6 +213,11 @@ choose a winner. Invalid or incomplete input activates nothing.
 
 ## Gate order
 
+PO-approved scheduling exceptions in specification 05 §§13.1/13.3 allow pure
+Scene logic, storage-neutral domain validators and reusable UI components before
+adoption, disconnected from real-data/storage and current application entry paths.
+Synthetic evidence does not replace the storage, package or device gates below.
+
 1. `G-1` repository normalization and source-of-truth cleanup.
 2. `G0` golden projects, reference scenes, target devices, and baseline measurements.
 3. `G0-S` current-v1 safety stabilization for multi-tab collisions, durable-write failure, untrusted keys, and operation/blob consistency.

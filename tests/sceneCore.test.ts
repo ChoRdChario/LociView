@@ -210,6 +210,9 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
     expect(() => run(state, resources, { kind: 'rename', sceneId: sca, name: ' ' })).toThrow('name');
     expect(() => run(state, resources, { kind: 'rename', sceneId: sca, name: 'あ'.repeat(257) })).toThrow('name');
     expect(() => run(state, resources, { kind: 'rename', sceneId: sca, name: '\ud800' })).toThrow('name');
+    for (const name of ['x\u0085y', 'x\u2028y', 'x\u2029y'])
+      expect(() => run(state, resources, { kind: 'rename', sceneId: sca, name })).toThrow('name');
+    expect(run(state, resources, { kind: 'rename', sceneId: sca, name: 'e\u0301' }).scenes[sca]?.name).toEqual(value('é'));
     expect(() => run(state, resources, { kind: 'rename', sceneId: '__proto__', name: 'x' })).toThrow('id');
     expect(() => run(state, resources, { kind: 'setView', sceneId: sca, viewId: viewB })).toThrow('invalid');
     const cleared = run(state, resources, { kind: 'setView', sceneId: sca, viewId: null });
@@ -231,10 +234,10 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
     });
     for (const path of walk('src').filter(p => /\.(ts|tsx|js)$/.test(p))) {
       const source = readFileSync(path, 'utf8');
-      if (/[\\/]scene[\\/]/.test(path)) {
+      if (/[\\/](scene|domain)[\\/]/.test(path)) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
-        expect(imports.every(p => p?.startsWith('./'))).toBe(true);
-      } else expect(source).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/scene\//);
+        expect(imports.every(p => p?.startsWith('./') || p === '../domain/values')).toBe(true);
+      } else expect(source).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/(scene|domain)\//);
     }
   });
 });

@@ -620,6 +620,10 @@ Rollback means preserving the source v1 package/workspace, opening conversion in
 Scene-domain modules/tests before metadata/CAS adoption. It does not authorize
 storage dependencies, persistence, existing-app/UI integration or any gate PASS.
 
+The further PO-approved exception in specification 05 §13.3 allows reusable
+storage-neutral validators and disconnected UI components on synthetic ports.
+It changes scheduling only, not real-data/storage integration or gate acceptance.
+
 This remains the release/adoption sequence. The Product Owner has approved one
 narrow scheduling exception: after the bounded `G0S-TAB` production root fix is
 committed, the proxy-backed Mesh/GS technical vertical slice in item 9 may

@@ -1,6 +1,6 @@
 # ProjectScene and continuing-team workflow contract
 
-> Status: `PRODUCT-OWNER APPROVED CONTRACT / PURE SCENE CORE ONLY; INTEGRATED V2 NOT IMPLEMENTED`
+> Status: `PRODUCT-OWNER APPROVED CONTRACT / DISCONNECTED SCENE CORE AND RECORD GUARDS; INTEGRATED V2 NOT IMPLEMENTED`
 >
 > Approved: 2026-09-07
 >
@@ -1053,6 +1053,39 @@ repeat broad review after the focused correction is confirmed.
 A gate failure, specification conflict,
 unproven migration relation, new P0/P1, required scope expansion or release/
 destructive boundary stops the slice and returns to Product Owner review.
+
+### 13.3 Approved scheduling exception — validators and UI components (2026-09-08)
+
+The PO explicitly approved advancing storage-neutral data validation and reusable
+UI components while the required storage/platform evidence continues separately.
+This extends only implementation scheduling beyond §13.1; it does not approve
+the proposed package companion, adapter adoption or existing-app activation.
+
+Production-quality pure domain validators may implement the accepted Project,
+Scene, resource, frame, anchor and conflict rules in specifications 01/02/05.
+Reusable UI components may consume explicit synthetic/conflict-aware read ports
+and emit intentions to a test host. Neither connects to real Projects, storage,
+package readers/writers, model/media payloads or the current application entry.
+No synthetic action acknowledges a durable save or claims actual team exchange.
+Existing Native presentation primitives may be reused without importing their
+storage/controller side effects. No candidate dependency or renderer is adopted.
+
+Work in bounded reusable modules, not another disposable probe application.
+Admission of a record is not admission of a whole Project: report which structural,
+reference, causal/conflict and blob checks have actually executed. Never brand a
+partial record validator as a complete validated SceneResources provider.
+Unknown minor subtrees remain preserved; invalid data, unavailable required
+checks, semantic conflicts and unsaved state stay distinct. UI validation and
+temporary selection never choose a conflict winner or infer source relations.
+
+Acceptance is proportionate to each component: exact domain rules and malformed
+input/refusal, retained unknown data, side-effect-free operation and absence of
+imports from current entry paths; UI intentions, selection/mode/unsaved-state
+preservation, accessible concise labels and rendered evidence where available.
+Synthetic component/DOM tests are not browser, storage, integrated UI or iPhone
+PASS. Missing browser/device evidence stays pending without forcing repeated
+unchanged manual probes before continuing another authorized pure component.
+After this exception, actual storage/UI integration still follows §13.2's gates.
 
 ## 14. Explicit non-goals
 

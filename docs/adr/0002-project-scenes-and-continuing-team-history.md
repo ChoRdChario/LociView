@@ -11,6 +11,11 @@
 in specification 05 §13.1. Disconnected domain modules/tests may precede storage
 gate completion; dependency adoption, persistence and application activation may not.
 
+Further PO-approved scheduling amendment (2026-09-08): specification 05 §13.3
+also permits reusable storage-neutral validators and disconnected UI components
+with synthetic ports. Real-data/storage connection, current-app activation and
+all technology/package/device gates remain unchanged.
+
 LociView is intended to let one knowledgeable operator prepare a useful Project
 once and lower the participation cost for the rest of a team. The current Native
 Project can be distributed self-contained and can safely merge a bounded set of

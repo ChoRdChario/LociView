@@ -2,6 +2,51 @@
 
 ## Current boundary — implementation through UI verification (2026-09-08)
 
+### In progress — approved disconnected validators/UI implementation (2026-09-08)
+
+The PO answered `良いです` to advancing data validators and reusable UI components
+without real-data/storage connection. Specification 05 §13.3 records the scope;
+the preceding scheduling approval hold is resolved, not a package/gate approval.
+Starting `7c37552`: clean, eleven ahead of last fetched origin, usage 40 percent
+remaining. Do not ask again for this implementation-order choice.
+
+First reusable boundary: domain-record admission in `src/domain`, applying 02
+§3.1–3.2 and 05 §3 to safe canonical decoded values, IDs, lifecycle, Scene and
+membership shapes. This closes real record-shape validation, not whole-Project
+reference/causal/conflict/blob validation or a package parser. Future UI and
+metadata adapters reuse these modules rather than duplicating PoC guards.
+
+- [x] Record approved scheduling exception and synchronize normative navigation.
+- [x] Implement pure bounded decoded-value/record validation with typed issues,
+  immutable output and retained unknown minor data; document exact coverage.
+- [x] Run focused malformed/valid/preservation tests and unchanged-path boundary
+  checks, then root typecheck/tests/build on the final tree.
+- [x] Obtain one independent read-only review, correct relevant findings and
+  checkpoint; continue to reusable UI state/components within §13.3.
+
+Inputs are bounded decoded JSON/controlled synthetic records, not raw package or
+Automerge bytes. Practical input limits are explicit caller parameters capped by
+accepted semantic ceilings, not invented device guarantees. No data I/O,
+dependency, wire/schema change, application activation, UI polish or device claim.
+Stop for a contract conflict or required new policy, not every implementation
+detail. Full domain admission and actual rendered UI remain separate incomplete
+requirements; component success cannot waive them.
+
+First-boundary review: `src/domain` admits the three exact individual record
+shapes, not whole Project state; it preserves unknown data without invoking
+getters and bounds cloning. Scene commands reuse its local-name normalization,
+including C1/line-separator rejection, while persisted input rejects non-NFC
+without alteration. Review removed an unsupported persisted-label nonblank
+restriction and duplicate approval paragraphs; focused corrections confirmed.
+Typecheck PASS; focused 19/19 PASS; full `npm test -- --maxWorkers=2` PASS with
+81 files, 1,665 tests and 21 existing todo; build PASS with existing import/chunk
+warnings. The two-worker setting reuses the proven runner configuration after
+earlier default-parallel timeouts; no assertion, timeout or dependency changed.
+No rendering/storage input or current entry path changed. This is reusable
+production-source work under the scheduling exception, not adapter/full domain
+adoption. Next: shared Scene/task-navigation UI intentions preserving modal,
+selection and unsaved state; actual visual/platform acceptance remains pending.
+
 ### Completed draft — proposed five-purpose package-wire companion (2026-09-08)
 
 Checkpoint `459d7bd` is clean, ten ahead and zero behind the last fetched origin;
@@ -9,10 +54,9 @@ usage remaining is 41 percent. The unavailable initial OPFS log is already
 recorded as unknown, with saved-payload readback separately PASS. Do not reopen
 that inquiry or repeat the manual stress run.
 
-The proposed scheduling exception for full storage-neutral validators and
-reusable UI components has not received PO approval. Automatic continuation and
-the OPFS evidence reply do not approve it. Existing specification 05 §13.1 still
-permits only the disconnected pure Scene core; no wider production work begins.
+At this draft checkpoint the scheduling exception had not received PO approval.
+The later explicit approval is recorded above and in specification 05 §13.3;
+automatic continuation and the earlier OPFS evidence reply did not approve it.
 
 Specification 05 §7.5 already authorizes a bounded package-wire design. This
 slice supplies the missing S2 companion draft, not a ratified format or writer.
@@ -44,8 +88,8 @@ Exact profiles/budgets/summary and backup evidence, journal/base publication,
 and complete history-free conversion remain grouped ratification inputs in §10.
 This closes a companion-draft task, not S2's wire gate, storage adoption or UI.
 Do not start a new auxiliary proof just because the production path is gated.
-The pending PO scheduling exception above remains the next implementation
-decision; physical storage evidence and final real UI/device acceptance remain
+The then-pending scheduling decision was subsequently resolved by §13.3;
+physical storage evidence and final real UI/device acceptance remain
 separate, required lanes. No new human test request or server was created.
 
 ### Completed bounded proof — cross-project retention and orphan GC (2026-09-08)
