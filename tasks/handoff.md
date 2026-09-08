@@ -43,7 +43,11 @@
 > same host's known-only authority. B now includes whole-record graph inspection,
 > actual canonical immutable metadata hashes and prior identity, keeping weak
 > absence separate from invalid references. Complete candidate/causal/external
-> content evidence and C remain open. No SceneResources/GC/save permission follows.
+> content evidence and C remain open. Neutral original-change inspection now
+> retains absent/concurrent candidates and inspects historical immutable/lifecycle
+> mutations. The served candidate exposes original flat-string evidence alongside
+> its existing fixture projection. Project candidate-value/graph/external-content
+> composition remains next. No SceneResources/GC/save permission follows.
 > One finite boundary, not new per-record tasks; no additional manual test hold.
 > Windows Computer Use initialized but stopped automatically on unsafe-to-resolve
 > Chrome URL; no browser input/PASS or bypass. Keep the existing batched UI lane.

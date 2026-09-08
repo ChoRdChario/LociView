@@ -26,6 +26,11 @@ loop. Do not return to detached UI parts or polish as the default workstream.
     known strong/weak edges. Reuse stage A; never output SceneResources or GC roots.
   - [ ] Complete all-candidate/causal and externally verified profile/blob evidence
     before B can supply authority to C. Graph inspection alone cannot close B.
+    - [x] Add a neutral original-change read inspection (including absent values),
+      exact maximal candidate identities and lifecycle/immutable-history review;
+      prove extraction against the isolated pinned candidate, not a winner map.
+    - [ ] Compose full candidate-value/graph checks and exact external content
+      evidence into the provider; neither independent inspection closes B.
 - [ ] Stage C: connect that authority to the existing synthetic workflow; final
   integration evidence and independent review close the single provider boundary.
 - [ ] Implement and connect that provider to the same synthetic host where
@@ -44,7 +49,7 @@ The completed branch checkpoint is Git HEAD; stage A starts from clean
 goal turn made connected media progress. Official remaining quota at entry was
 77%; continue automatically, pause below 10%.
 
-Current continuation: clean `e5c1d2a`, official remaining quota 76%. No manual
+Previous graph continuation: clean `e5c1d2a`, official remaining quota 76%. No manual
 hold. The next production-quality pure part of B checks all known record graph
 relations, not one additional UI control/probe. Digest verification uses actual
 canonical metadata bytes; it does not manufacture a blob/profile receipt. Tests
@@ -68,6 +73,38 @@ Next continue those B/C parts in the same provider; do not add detached UI/probe
 or request another manual journal test. No new server/tunnel, private source,
 dependency, schema/wire/adoption, real file/storage, Native/main/Pages/SW
 configuration, version/license or release change. Official remaining quota 76%.
+
+Current continuation starts clean `3c9facb` (37 ahead of local tracking; no fetch),
+76% official quota. The preceding goal turn made verified graph-inspection progress.
+Next close the neutral candidate/causal read component of B: source change DAG,
+original final-write identities, absence distinct from null, exact candidate sets,
+known field classes and historical lifecycle/immutable review. This is a read
+inspection, not a new CRDT writer/schema or a candidate-adoption decision. Prove
+the original-operation extraction in the existing isolated candidate; do not add
+a probe or change current UI authority. Value/graph/evidence composition and C
+remain required before claiming the complete provider. Stop on contract conflict.
+
+Neutral-read review: original DAG/head/final-write inspection retains absent,
+equal and concurrent candidates and checks historical immutable/lifecycle changes.
+The same served candidate exposes exact flat-string evidence beside, not instead
+of, its existing known-fixture authority. No general Project admission follows.
+Root typecheck, scoped candidate TypeScript and 46 isolated candidate checks PASS.
+Final root suite: 102 files / 1822 tests PASS, 21 existing TODO. An initial root
+run caught the new type-only sidecar import missing from the isolation whitelist;
+the exact file/import is now checked as type-only, without admitting runtime
+provider imports. Focused 19 checks and the final full suite pass afterward.
+Ordinary and harness builds PASS with existing warnings. Parsed source maps have
+zero candidate and new neutral-history modules in both builds. Independent
+read-only review closed the overly strict equal immutable-payload registration
+check and confirmed the final type-only isolation correction; no limited-diff
+blocker remains. Candidate read enumeration is stable across actors without
+rewriting original bytes/operation IDs; shared causal work budgets are enforced.
+B remains incomplete until candidate-value/graph/content evidence composition;
+C's same-token provider connection is still next within that finite boundary.
+No new probe/server/tunnel, private bytes, actual-file/storage activation,
+dependency, schema/wire/adoption, Native/main/Pages/SW configuration or release.
+No fresh browser/IME/iPhone/offline evidence is claimed; no manual test requested.
+Official remaining quota 75%; no usage reset redeemed.
 
 Stage A review: one amended whole-root entry covers all 14 entity maps and known
 nested fields, retaining unknown subtrees and exact body newlines. It exposes

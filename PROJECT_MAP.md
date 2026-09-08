@@ -43,7 +43,10 @@ maps, preserving unknown fields. This is `valid-records` only, not authoritative
 SceneResources. Stage B now has whole-record graph inspection and actual immutable
 metadata digest/prior-identity checks. It reports scoped invalid/orphan/review and
 unverified evidence; it is not a conflict-aware provider or blob verification.
-B's complete candidate/causal/content evidence and C's same-host authority remain
+The neutral original-change inspector now retains absent/concurrent candidates
+and reviews immutable/lifecycle history; the served candidate exposes its exact
+flat-string evidence as a non-authoritative sidecar. Full candidate-value/graph
+and content-evidence composition, then C's same-host authority, remain
 the single provider boundary's required completion, recorded in spec 05 §13.4.
 File/package exchange, durable storage and rendered/device acceptance remain
 pending as recorded in todo.
@@ -75,7 +78,7 @@ For a normal task, read only the target file, its matching tests, and direct imp
 | Path | Current responsibility |
 |---|---|
 | `src/core` | IDs, HLC, operation validation, JSONL, reduction, merge, manifest, and `ProjectStore` |
-| `src/domain` | Whole-root decoded record structure and Stage-B record graph/digest inspection, existing Scene/Material admission and local edit guards; retains unknown values. No full candidate/history/blob authority, storage, imported-text rewriting or current-entry activation |
+| `src/domain` | Whole-root record, graph/digest and neutral original-change/candidate inspection; retains unknown values. No composed Project/SceneResources/blob authority, storage, imported-text rewriting or current-entry activation |
 | `src/scene` | Pure Scene command/composition core (05 §13.1), now also used by the synthetic development host (§13.4); no production storage or adoption |
 | `src/platform` | `WorkspaceFS`, OPFS, memory filesystem, PWA and browser integration |
 | `src/assets` | ZIP/package handling, model asset registration/replacement, GLB optimization, import wizard |

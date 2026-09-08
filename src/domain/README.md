@@ -42,6 +42,20 @@ workstreams. These modules do not provide connected authority yet.
   Active Assets/attachments outside Scenes still have roots; parent lineage,
   authored source and input-digest provenance do not protect blobs by themselves.
 
+- `atomicHistory.ts` validates a neutral original-change DAG, exact heads and
+  unique final-write identities under shared caller node/work budgets. It derives
+  maximal concurrent whole-field writes, retaining absent versus JSON-null values,
+  equal-value operation identities, unknown values and overwritten history. This
+  is read evidence, not a CRDT implementation, schema or authenticated provenance.
+- `projectHistoryReview.ts` classifies the approved semantic field paths and
+  inspects historical immutable mutations and lifecycle delete/edit causality.
+  Equal complete payloads in the four immutable maps retain all registrations;
+  frame/endpoint conflicts remain invalid. Unknown policy stays unverified.
+  The isolated candidate checks original flat operations and supplies this evidence
+  in the existing development host; its strings are not validated Project records.
+  `project-history-inspection` does not validate all candidate values/references,
+  certify source extraction for a general schema, compose a Project or activate UI.
+
 - `values.ts` checks/clones already decoded plain JSON without invoking getters;
   rejects invalid Unicode/NFC, nonfinite numbers, unsafe keys/non-JSON values,
   cycles and caller-specified traversal limits; returns an independent frozen
@@ -81,7 +95,8 @@ only the exact immutable metadata digest computation above is implemented.
 Host objects, proxies and CRDT library objects are outside the input contract;
 the future adapter must supply plain data without losing conflict candidates.
 
-Not yet covered: complete conflict candidate/provenance authority, causal delete/edit,
+Not yet covered: composed complete Project candidate/value/reference authority,
+parent-child conflict propagation and general adapter provenance,
 external verified profiles/content/material enumeration/bounds/equivalence/source
 indices, invalid-closure propagation into a same-token provider, blobs/inventory,
 migration and history-free policy. A structural or record-graph result must

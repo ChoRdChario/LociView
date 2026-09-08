@@ -96,7 +96,10 @@ amended 14 maps and canonical known values while preserving unknown data. A
 inspects whole-record references and actual immutable metadata digests/prior
 identity, with scoped diagnoses and known strong/weak edges. This still returns
 no authoritative projection: complete candidate/causal/exact blob-profile evidence
-(B) and same-host authority (C) remain required; see 05 §13.4.
+(B) and same-host authority (C) remain required; see 05 §13.4. Neutral original
+change inspection now retains absent and concurrent candidates and reviews
+immutable/lifecycle history. The existing served candidate supplies exact raw
+flat-string evidence; no Project-value/graph/content authority follows yet.
 
 - Legacy-v1 ZIP/package code is not bounded-memory streaming despite older architecture text. The bounded Native portable and exchange packages use their separate streamed path.
 - Current XLSX reading is the local minimal reader in `src/io/xlsx.ts`, not SheetJS.

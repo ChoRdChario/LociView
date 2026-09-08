@@ -259,6 +259,13 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           '../../ui/projectScene/viewAuthoringState', '../../ui/projectScene/viewAuthoringControls');
         if (path.replaceAll('\\', '/').endsWith('/viewHistory.ts')) permitted.push('../../domain/values');
         if (path.replaceAll('\\', '/').endsWith('/mediaHistory.ts')) permitted.push('../../domain/values');
+        if (path.replaceAll('\\', '/').endsWith('/historyPort.ts')) {
+          // Evidence sidecar type only; this does not admit a runtime provider.
+          const typeOnly = "import type { AtomicHistory } from '../../domain/atomicHistory';";
+          expect(source).toContain(typeOnly);
+          expect(source.replace(typeOnly, '')).not.toContain('../../domain/atomicHistory');
+          permitted.push('../../domain/atomicHistory');
+        }
         if (/[\\/](materialHistory|materialSession|viewportModel)\.ts$/.test(path)) permitted.push('../../domain/materialIntent');
         if (path.replaceAll('\\', '/').endsWith('/materialHistory.ts')) permitted.push('../../domain/materialRecords');
         if (/[\\/](materialSession|session)\.ts$/.test(path)) permitted.push('../../ui/projectScene/materialState');

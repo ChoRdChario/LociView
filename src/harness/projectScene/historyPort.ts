@@ -1,3 +1,4 @@
+import type { AtomicHistory } from '../../domain/atomicHistory';
 /** Nonpersistent synthetic test port, not a ProjectDoc schema or package format. */
 export type HistoryCell = { readonly kind: 'value'; readonly value: string } |
   { readonly kind: 'conflict'; readonly candidates: readonly { readonly id: string; readonly value: string }[] };
@@ -9,6 +10,9 @@ export interface HistorySnapshot {
   readonly cellVersions?: Readonly<Record<string, string>>;
   /** Original command dependencies/final writes, not wall-clock times or persisted extension fields. */
   readonly causalChanges?: readonly HistoryChange[];
+  /** Complete original flat-cell final-write evidence, including absent candidates.
+   * Paths/values are still development strings, not validated Project fields. */
+  readonly originalAtomicHistory?: AtomicHistory;
 }
 /** Local/plan preview only; the candidate derives its own evidence from original encoded changes. */
 export function previewHistory(snapshot: HistorySnapshot, token: string, changes: Readonly<Record<string, string>>): HistorySnapshot {

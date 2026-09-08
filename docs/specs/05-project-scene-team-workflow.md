@@ -1205,6 +1205,33 @@ include resources outside Scenes; parent/input/anchor provenance edges are weak.
 The result explicitly lists missing candidate/causal, verified-content and
 same-token authority. It is not a complete provider and does not activate the UI.
 
+**Stage B neutral history-read detail:** a nonpersistent read inspection accepts
+the source snapshot token/heads and complete original change DAG, with each
+change's final whole-field write identity/value. An absent value is explicit and
+distinct from JSON null. Derive maximal concurrent writes without selecting a
+materialized winner. The adapter must prove exact extraction, including deleted
+cells and rejection of nested writes inside known atomic fields; the neutral
+inspector checks internal DAG/head/identity/budget consistency and retains every
+historical write. Known immutable mutations and lifecycle delete/edit causality
+are inspected across history, not only live candidates. Unknown fields/candidates
+remain protected and uninterpreted. Limits are explicit caller execution budgets,
+not a newly ratified product count/performance guarantee. This intermediate read
+result is not a Project validator, write/GC receipt or SceneResources. Complete
+candidate value/graph checks and externally verified content plus C still gate
+the provider. The isolated flat-string adapter is a pinned development proof only,
+not an adopted metadata schema/adapter or a portable format.
+
+**Observed neutral read component:** `atomicHistory.ts` and
+`projectHistoryReview.ts` now implement DAG/head/write-identity inspection,
+absent/equal/concurrent candidate retention and immutable/lifecycle history review.
+Same complete canonical payloads under one ID in the four immutable maps retain
+all registrations; this idempotence does not relax frame/endpoint conflicts.
+The isolated `atomic-read.ts` checks every original flat operation and retains
+deleted keys; `development.ts` exposes raw-string evidence beside its existing
+fixture projection. Stable read enumeration changes no original encoded byte.
+All Project candidate-value/graph/content composition and C authority remain
+pending; the intermediate result lists these missing authorities explicitly.
+
 **Observed bounded media connection (from `7b57fd2`):** the same host now has two
 preloaded public synthetic PNGs. Each immutable MediaResource has a verified
 exact blob descriptor and domain-separated metadata digest; history accepts only

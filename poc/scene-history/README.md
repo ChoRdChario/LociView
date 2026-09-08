@@ -46,6 +46,22 @@ deletes/replaces the scalar to resolve even the materialized winner. In 3.4.1,
 `getConflicts` exposes immutable-string candidates as JS strings while the map
 property is `ImmutableString`; the adapter handles both without choosing one.
 
+The served snapshot additionally exposes `originalAtomicHistory`, a neutral
+read-only sidecar from `atomic-read.ts`: complete original change dependencies
+and final whole-string write identities, including deleted cells omitted by
+the materialized map. Its paths/values remain raw development strings, not
+validated Project records. Original operations are checked against the fixed
+flat-map shape and live setter/candidate identities; nested/root extras refuse.
+Read-view change/dependency order is canonical across actors without rewriting
+encoded changes or operation IDs. Existing detached-publish limits still apply;
+the extra node/work limits are development execution budgets, not product guarantees.
+Tests exercise absent versus JSON-null concurrency, save/reload, repeated equal
+writes, nested/root rejection, noninjective mappings and second exchange. The
+43 existing same-host tests additionally check unchanged operations/retained
+drafts/copy/recovery behavior with the sidecar. This is not a general Automerge
+schema adapter or a source-content/profile/adoption receipt. Neutral domain
+history review remains separate from complete candidate-value/graph authority.
+
 Current executable cases cover second-round field/membership preservation,
 original bytes/base, both scalar choices, incomplete/foreign/stale rejection,
 draft retention, actor-bound/disposed choice refusal and mounted two-actor

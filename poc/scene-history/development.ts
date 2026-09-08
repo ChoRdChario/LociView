@@ -1,5 +1,6 @@
 import type * as Automerge from '@automerge/automerge/slim';
 import type { DevelopmentHistory, HistorySnapshot, HistoryChange, MemoryUpdate } from '../../src/harness/projectScene/historyPort';
+import { readFlatAtomicHistory } from './atomic-read';
 
 type Api = typeof Automerge;
 type Data = { cells: Record<string, Automerge.ImmutableString> };
@@ -40,6 +41,9 @@ export function createDevelopmentPair(A: Api, seed: Readonly<Record<string, stri
   const rootHashes = (changes: Map<string, Change>) => [...changes].filter(([, c]) => !c.deps.length).map(([hash]) => hash).sort();
   const roots = rootHashes(index(A.getAllChanges(bootstrap)));
   function snapshot(doc: Doc): HistorySnapshot {
+    const atomic = readFlatAtomicHistory(A, doc, { path: key => [key], value: (_key, text) => text },
+      { maxNodes: 500_000, maxDepth: 16, maxStringScalars: totalLimit, maxWork: 5_000_000 });
+    if (atomic.kind === 'rejected') fail();
     const cellVersions: Record<string, string> = {};
     const causalChanges: HistoryChange[] = [];
     // Fixed 3.4.1 flat ImmutableString map only. getConflicts omits single setters.
@@ -77,7 +81,7 @@ export function createDevelopmentPair(A: Api, seed: Readonly<Record<string, stri
           Object.freeze({ kind: 'value' as const, value: v.toString() })];
       })));
     causalChanges.sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-    return Object.freeze({ token: `memory-history:${heads(doc).join(',')}`, cells, cellVersions: Object.freeze(cellVersions), causalChanges: Object.freeze(causalChanges) });
+    return Object.freeze({ token: `memory-history:${heads(doc).join(',')}`, cells, cellVersions: Object.freeze(cellVersions), causalChanges: Object.freeze(causalChanges), originalAtomicHistory: atomic.history });
   }
   function participant(): DevelopmentHistory {
     // clone without actor option allocates an independent actor; edits never mutate the bootstrap.
