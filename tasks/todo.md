@@ -2,6 +2,50 @@
 
 ## Current boundary — implementation through UI verification (2026-09-08)
 
+### Completed — disconnected Scene/task navigation component (2026-09-08)
+
+Starting `5b95c52` is clean; individual record admission is implemented/reviewed,
+not full Project validation. Continue within approved 05 §13.3, reusing 05 §11
+and UI guidelines §§4–5/9. No new product decision is needed for this component.
+
+- [x] Implement reusable Scene selector, four-task controls and truthful save/
+  pending-state presentation, with pure local navigation intentions.
+- [x] Test explicit Scene selection, no winner/default guesses, guarded Scene
+  changes, preserved tab/draft/selection memory, and no synthetic save authority.
+- [x] Run focused checks, final regression/build and independent read-only
+  review; retain actual browser/visual/iPhone acceptance as pending.
+
+The host supplies a synthetic conflict-aware Scene read projection and owns
+local UI state. The component emits a token-bound intent, not a metadata command,
+save acknowledgement, camera mutation or file action. Scene/header and task-tab
+elements are separate layout slots so the Scene context stays outside the tabs.
+Tab changes do not end modes or erase drafts; modal/gizmo input blocks only Scene
+changes that would discard it. No new page/server, current-entry hookup, renderer,
+storage, dependency or unsupported media control. No browser-control retry without
+changed evidence. Completion is reusable component logic, not rendered acceptance.
+
+Slice review: typecheck and 25 focused tests PASS; final root
+`npm test -- --maxWorkers=2` PASS (82 files, 1,671 tests, 21 existing todo),
+followed by build PASS with existing mixed-import/chunk warnings. Independent
+review's P2 is fixed and confirmed: a missing/deleted current Scene now has an
+explicit placeholder and recovery reason even when another Scene is available;
+unresolved availability remains visible. No alternative is selected or committed
+automatically. Async hosts must recheck token, session identity and pending input
+before applying a plan. Save failures cannot be acknowledged by this component.
+
+Short meta-audit / next implementation: this closes reusable navigation logic,
+not full domain/storage or real UI acceptance. Continue within 05 §13.3 with the
+retained Caption list, selection and directly visible color-filter controls,
+reusing the accepted UI guidelines and current Native behavior/tests as evidence.
+Use synthetic read ports; preserve draft/list/filter state and expose unresolved
+values instead of choosing winners. The missing acceptance is the reusable
+component's logic/DOM contract, followed later by real host/renderer/browser
+integration. No new test page, platform probe, dependency or policy is needed.
+Full record/resource/reference admission, storage/platform gates, proposed
+package-wire ratification and integrated Desktop/iPhone acceptance remain open.
+No new PO action or repeat of completed manual checks is required for this next
+disconnected component; stop only for a contract conflict or expanded scope.
+
 ### In progress — approved disconnected validators/UI implementation (2026-09-08)
 
 The PO answered `良いです` to advancing data validators and reusable UI components
@@ -44,8 +88,8 @@ warnings. The two-worker setting reuses the proven runner configuration after
 earlier default-parallel timeouts; no assertion, timeout or dependency changed.
 No rendering/storage input or current entry path changed. This is reusable
 production-source work under the scheduling exception, not adapter/full domain
-adoption. Next: shared Scene/task-navigation UI intentions preserving modal,
-selection and unsaved state; actual visual/platform acceptance remains pending.
+adoption. The navigation boundary is now completed above; actual visual/platform
+acceptance remains pending.
 
 ### Completed draft — proposed five-purpose package-wire companion (2026-09-08)
 

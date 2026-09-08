@@ -11,7 +11,18 @@
 > Existing pure Scene commands share its local-name guard. Typecheck, focused
 > 19 tests, full 81 files/1,665 tests (two workers; 21 existing todo) and build
 > pass. Independent review findings are fixed and confirmed. No current app,
-> storage or renderer hookup; current todo owns the next reusable UI component.
+> storage or renderer hookup; current todo owns the active reusable UI boundary.
+
+> Reusable Scene/four-task navigation is now also implemented in
+> `src/ui/projectScene`. It retains local selection/search/list memories, blocks
+> Scene changes during uncommitted input, exposes unavailable-current Scene and
+> save/recovery states, and emits plans instead of mutating Project/camera/storage.
+> Independent review's missing-current-selection finding is fixed and confirmed.
+> Typecheck, 25 focused tests, all 82 test files (1,671 PASS / 21 existing todo,
+> two workers) and build pass. Current todo owns the next Caption-list component.
+> Native browser keyboard/IME, visual/mobile
+> layout and full application integration remain pending; no new page/server or
+> human verification is requested by this slice.
 
 > **Current package design update (2026-09-08):**
 > `docs/specs/06-project-package-wire.md` is a reviewed **PROPOSED / UNRATIFIED**
@@ -19,9 +30,9 @@
 > purposes, exact delta/base state, one-Scene privacy and required journal changes;
 > §10 owns the remaining ratification inputs. No executable code, dependency,
 > server or additional manual test changed. The scheduling proposal to advance
-> full storage-neutral validators/reusable UI components still has no PO approval;
-> automatic continuation and the unavailable-log reply do not approve it. Use the
-> current todo's next decision, preserve required platform/device gates, and do
+> full storage-neutral validators/reusable UI components was pending at that
+> draft checkpoint; the later approval at the top supersedes that hold, not this
+> wire proposal's ratification. Preserve required platform/device gates and do
 > not repeat completed proofs or create another auxiliary page while waiting.
 
 > **Current retention update (2026-09-08):** Isolated `poc/cas-io/retention.ts`
