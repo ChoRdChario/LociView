@@ -49,6 +49,8 @@ export class SyntheticSession {
   private placement: ModelPlacementDraft | null = null;
   private pinFeedback: PinModeContext['feedback'] = { kind: 'idle' };
   private searchComposing = false;
+  private viewportDragging = false;
+  private viewportState = { ready: false, assetIds: [] as readonly string[], issue: null as string | null };
   private detailFeedback: DetailContext['feedback'] = { kind: 'idle' };
   private modelFeedback: ModelListContext['feedback'] = { kind: 'idle' };
   message = '';
@@ -69,7 +71,7 @@ export class SyntheticSession {
   get memory() { return this.navigation.sceneMemory[this.sceneId]!; }
   get pending(): PendingInteraction | null {
     const text = this.textPending;
-    return text === 'composition' ? text : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : text;
+    return text === 'composition' ? text : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : text;
   }
   private get textPending(): PendingInteraction | null {
     if (this.placement?.composing || this.pinInputComposing || this.searchComposing || [...this.includes.values()].some(m => m.composing) || [...this.models.values()].some(m => m.composing) ||
@@ -77,6 +79,12 @@ export class SyntheticSession {
     return [...this.drafts.values()].some(hasCaptionDraft) ? 'text' : null;
   }
   setSearchComposing(active: boolean) { this.searchComposing = active; }
+  setViewportDragging(active: boolean): boolean { const changed = this.viewportDragging !== active; this.viewportDragging = active; return changed; }
+  setViewportState(ready: boolean, assetIds: readonly string[], issue: string | null): boolean {
+    const next = { ready, assetIds, issue }, changed = JSON.stringify(next) !== JSON.stringify(this.viewportState);
+    this.viewportState = next; return changed;
+  }
+  get displayReady() { return this.viewportState.ready; }
   refreshHistory() {
     if (this.authority) this.publish(this.authority.read());
     // Keep the same draft objects and UI memory. Edited fields detect a changed source at apply.
@@ -179,9 +187,11 @@ export class SyntheticSession {
           : value({ kind: 'absent' });
         return { id: asset.id, name: modelNames[asset.id] === undefined ? unknown<string>() : value(modelNames[asset.id]!),
           lifecycle: asset.lifecycle.kind === 'value' ? value(asset.lifecycle.value.state) : unknown<'active' | 'deleted'>(),
-          membership, display: value(edge ? 'unavailable' as const : 'outsideScene' as const),
-          displayReason: edge ? 'シーンに含まれています。3D描画は未接続です。' : null };
-      }) }, memory: this.models.get(this.sceneId)!, pending: this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : null, mutationBlock: null, feedback: this.modelFeedback };
+          membership, display: value(!edge ? 'outsideScene' as const : this.viewportState.ready && this.viewportState.assetIds.includes(asset.id) ? 'visible' as const : 'unavailable' as const),
+          displayReason: !edge || (this.viewportState.ready && this.viewportState.assetIds.includes(asset.id)) ? null :
+            asset.projection.kind !== 'value' || edges.length > 1 ? 'モデルの更新・所属の候補を確認してください。' :
+              this.viewportState.issue ?? 'シーンに含まれています。3D表示を確認してください。' };
+      }) }, memory: this.models.get(this.sceneId)!, pending: this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : null, mutationBlock: null, feedback: this.modelFeedback };
   }
   get modelVersions() { return this.project.modelVersions ?? syntheticVersions; }
   modelUpdateContext() {
@@ -193,7 +203,7 @@ export class SyntheticSession {
       name: asset ? this.project.modelNames[asset.id] ?? 'モデル' : '',
       current: projection ? modelVersion(asset!.id, projection.bindingId, this.modelVersions) : undefined,
       choices: this.modelVersions.filter(v => v.assetId === asset?.id && v.projection.bindingId !== projection?.bindingId), sceneCount,
-      issue: this.placement ? 'モデルの配置を確定するか、取り消してください。' : this.pinInput ? 'ピンの操作を確定するか、取り消してください。' : this.textPending === 'composition'
+      issue: this.viewportDragging ? 'カメラ操作を終えてください。' : this.placement ? 'モデルの配置を確定するか、取り消してください。' : this.pinInput ? 'ピンの操作を確定するか、取り消してください。' : this.textPending === 'composition'
         ? '文字の入力を確定してください。' : !asset ? '一覧からモデルを選択してください。' :
           asset.lifecycle.kind !== 'value' || asset.lifecycle.value.state !== 'active' || !projection ? 'モデルの更新状態を確認してください。' : null };
   }
@@ -246,7 +256,7 @@ export class SyntheticSession {
       const prepared = draft.prepared ?? moveFixtureModel(draft.source, fresh('bnd'), position);
       this.placement = freezeSynthetic({ ...draft, prepared });
       this.publishModelVersion(draft.token, versionFromClosure(prepared)); this.placement = null;
-      this.message = 'モデルの配置を適用しました。保存と3D描画は未接続です。'; return true;
+      this.message = 'モデルの配置を適用しました。保存は未接続です。'; return true;
     } catch (error) { return this.refuse(this.errorText(error)); }
   }
   get pinCoordinates() { return this.pinInput; }
@@ -273,7 +283,7 @@ export class SyntheticSession {
       block: !anchor ? 'ピン位置の競合を確認してください。' : anchor.kind !== 'asset' ? 'この接続版ではモデルに付いたピンだけ移動できます。' : null } : null;
     const correction = this.pinInput ? this.preparePinAnchor() : null;
     return { source: { kind: 'ready', token: state.token, sceneId: this.sceneId, models, selected },
-      memory: this.pins.get(this.sceneId)!, otherPending: this.placement ? 'modelTransform' : this.textPending, mutationBlock: null,
+      memory: this.pins.get(this.sceneId)!, otherPending: this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.textPending, mutationBlock: null,
       proposal: this.pinProposal, proposalIssue: correction?.issue ?? null, feedback: this.pinFeedback };
   }
   pinCoordinateContext() {
@@ -333,7 +343,7 @@ export class SyntheticSession {
           ...this.project, state: { ...this.project.state, token }, resources: { ...this.project.resources, token,
             captions: { ...this.project.resources.captions, [captionId]: { ...caption, anchor: value(correction.anchor) } } } });
         this.pins.set(this.sceneId, { ...this.pins.get(this.sceneId)!, mode: null }); this.pinInput = null; this.pinProposal = null;
-        this.message = 'ピン座標を適用しました。3D描画と保存は未接続です。';
+        this.message = 'ピン座標を適用しました。保存は未接続です。';
       }
       this.pinFeedback = { kind: 'idle' }; return true;
     } catch (error) { this.pinFeedback = { kind: 'failed', message: this.errorText(error) }; return this.refuse(this.errorText(error)); }
@@ -398,7 +408,7 @@ export class SyntheticSession {
     if (plan.kind === 'blocked') return this.refuse(plan.reason);
     if (!modelListPlanIsCurrent(plan, this.modelContext())) return this.refuse('所属状態が変わっています。選び直してください。');
     if (plan.kind === 'change') this.models.set(this.sceneId, plan.memory);
-    else if (plan.kind === 'review') return this.refuse('3D描画・モデルの修復は未接続です。シーンへの追加・除外は操作できます。');
+    else if (plan.kind === 'review') return this.refuse('モデルの修復は未接続です。シーンへの追加・除外は操作できます。');
     else if (plan.kind === 'membership') {
       try {
         const command = plan.action === 'include'

@@ -61,8 +61,8 @@ export function createFixtureModel(ids: FixtureModelIds, shape: 'original' | 'up
   const representation = sealed('representation', { id: ids.representation, assetId: ids.asset, representationFrameId: ids.representationFrame,
     contentKind: 'mesh' as const, purposes: ['source', 'display'], role: 'meshPrimary' as const, variantFamilyId: ids.family,
     formatProfile: profile, blob: { algorithm: 'sha256' as const, digest, byteLength: bytes.byteLength, mediaType: 'application/json' },
-    representationToAsset: { translation: [0.25, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1, reflection: 'none' as const },
-    logicalBoundsAsset: { min: [0.25, 0, 0], max: [1.25, 1, shape === 'updated' ? 0.5 : 0] }, derivedFrom: [] as string[],
+    representationToAsset: { translation: [0.25, 0, 0] as const, rotationXYZW: [0, 0, 0, 1] as const, uniformScale: 1, reflection: 'none' as const },
+    logicalBoundsAsset: { min: [0.25, 0, 0] as const, max: [1.25, 1, shape === 'updated' ? 0.5 : 0] as const }, derivedFrom: [] as string[],
     materialCatalog: { layoutId: ids.layout, slots: [{ logicalMaterialSlotId: ids.slot,
       sourceLocator: { kind: 'representationMaterial' as const, slotIndex: 0 },
       sourceSemantics: { coverage: { kind: 'opaque' as const }, optics: 'surface' as const, lighting: 'lit' as const, doubleSided: false } }] } });

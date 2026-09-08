@@ -1147,6 +1147,28 @@ nonblocking visual polish. A required gate/ratification blocks its actual
 activation, not unrelated authorized development. Before such a boundary,
 report the exact missing prerequisite instead of inventing substitute work.
 
+**Observed bounded display connection (from `775e14e`):** in the same
+synthetic host, a thin Three.js/OrbitControls adapter consumes only the known
+resolved fixture closure. Meshes apply RepresentationFrame -> AssetFrame ->
+ProjectFrame; pins apply only their anchor's AssetFrame -> ProjectFrame. Camera
+fit uses the eight-corner transformed logical family envelope, never engine
+geometry or pin bounds. Existing view controls connect fit, six axes and
+perspective/orthographic projection; temporary pose/span is retained per actor
+and Scene, without history writes or automatic fit on ordinary refresh. Only
+resolved visible/compatible pins pass the color filter and select through the
+existing Caption intention. Single-sided source semantics stay unchanged even
+when an axis makes the triangle invisible. Native/v1 controllers, real loaders,
+geometry picks/gizmos, Saved View writes, material/media effects and adoption are
+excluded. Initialization/context loss/refused projection remain visible and do
+not affect metadata edits; runtime resources are released on hide/dispose.
+Object/DOM tests prove only these connections, not rendered/native-input/iPhone
+acceptance. Projection switching retains pose and target-plane span; Orbit
+changes update clipping from semantic bounds. Ready/failure transitions update
+the model list without starting a second animation loop. Context restoration
+requires explicit retry before drawing resumes. Independent read-only review
+confirmed the bounded fixes; current todo and the existing browser batch own
+exact executable evidence and the remaining raster/native-input/device lane.
+
 **Observed bounded implementation (2026-09-09, not further adoption):** the
 development host now connects two independent memory histories through a neutral
 port. The adapter remains in `poc/scene-history` with pinned Automerge 3.4.1 and

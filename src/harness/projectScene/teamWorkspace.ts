@@ -7,9 +7,10 @@ import { sceneSwitchReason } from '../../ui/projectScene/navigationState';
 import { applyMembershipResolution, duplicateMemberships, planMembershipResolution, type MembershipResolutionPlan } from './membershipResolution';
 import type { Membership } from '../../scene/types';
 import { allocateModelCopyIds, fixtureModelIds } from './modelClosure';
+import type { ViewportFactory } from './viewportHost';
 
 /** Two independently edited histories in one disposable page, not a file-sharing UI. */
-export function createTeamWorkspace(document: Document, factory: DevelopmentHistoryFactory) {
+export function createTeamWorkspace(document: Document, factory: DevelopmentHistoryFactory, viewportFactory?: ViewportFactory) {
   const histories = factory(historySeed(), projectHistory);
   const sessions = histories.map(h => new SyntheticSession(historyAuthority(h)));
   const initial = histories.map(h => h.read().token);
@@ -33,7 +34,7 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
   const instructions = make('p', 'それぞれの編集を適用してから、相手の更新を受け取ります。');
   toolbar.append(label, receive, retry, instructions, status);
   conflictPanel.className = 'lv-development-conflicts'; conflictPanel.setAttribute('aria-label', '更新の競合');
-  const workspaces = sessions.map(session => createDevelopmentWorkspace(document, session, { team: true, onAction: renderTeam }));
+  const workspaces = sessions.map(session => createDevelopmentWorkspace(document, session, { team: true, onAction: renderTeam, viewportFactory }));
   root.append(toolbar, conflictPanel, ...workspaces.map(w => w.root));
   function attempt(action: () => void) {
     if (disposed) return;

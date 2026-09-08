@@ -22,8 +22,10 @@ or losing local work. Explicit membership keep-one and independent Caption copie
 also connect in the known attachment/tag-empty fixture. Independent model copies
 now connect for an exact synthetic triangle closure, with fresh closed IDs,
 verified fixture bytes/immutable digests, selected-model translation and a second
-exchange. This is not full model admission or a ratified format profile. 3D,
-file/package exchange, durable storage and rendered/device acceptance remain
+exchange. The same host now connects exact synthetic triangle/pin display, fit,
+six-axis/projection controls and retained temporary cameras through existing
+Three.js. This is not full model admission or a ratified renderer/format profile.
+File/package exchange, durable storage and rendered/device acceptance remain
 pending as recorded in todo.
 Real Project, storage, package and current-app activation retain their gates.
 
@@ -61,7 +63,7 @@ For a normal task, read only the target file, its matching tests, and direct imp
 | `src/viewer` | Three.js loaders, material shader patch, single-model `ViewerCore` |
 | `src/nativeGs` | Version-1 native snapshot, streamed project-local binaries/packages, exact ASCII Point and SH2/SH3 GS admission, lazy Spark runtime, repeated Asset import, per-Asset visibility/alignment, DisplaySet/material/Caption/media state, legacy conversion and bounded package exchange |
 | `src/ui` | App shell, home, viewer screen, dialogs, tabs, and UI-only state |
-| `src/harness/projectScene` | Nondefault synthetic workspace; Scene/navigation/Caption/model controls plus neutral history port and two-actor UI. Candidate injection is serve-only from `poc/scene-history`, absent from both builds; no real Project, file, storage, renderer or adoption path |
+| `src/harness/projectScene` | Nondefault synthetic workspace; Scene/Caption/model controls, two-actor history port and exact triangle/pin viewport using existing Three.js. Candidate injection is serve-only from `poc/scene-history`, absent from both builds; no real Project, file, storage, general renderer adoption or rendered acceptance |
 | `src/ui/projectScene` | Reusable Scene/task navigation, save-state presentation, Caption list/pin filters/detail drafts, inclusion/pin modes, comparison-window state, viewing aids/entry-view, named-view/background controls, Project model inventory/Scene membership and exact-target material editor (05 §13.3); navigation/Caption/model controls now connected in synthetic development only (§13.4); no ordinary-app hookup, floating renderer or rendered acceptance |
 | `tests` | Executable contracts for core, assets, I/O, and UI logic |
 | `public/samples` | Small deterministic files used by the manual viewer and iOS runbook |

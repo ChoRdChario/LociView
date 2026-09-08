@@ -8,10 +8,11 @@ import { createPinModeControls } from '../../ui/projectScene/pinModeControls';
 import { createModelUpdateControls, createPinCoordinateControls, createModelPlacementControls } from './developmentControls';
 import { modelVersion } from './modelFixture';
 import { createCaptionIncludeControls } from '../../ui/projectScene/captionIncludeControls';
+import { createViewportHost, type ViewportFactory } from './viewportHost';
 
 /** One mounted integration host. Components own their DOM; synthetic session owns all working/UI state. */
 export function createDevelopmentWorkspace(document: Document, session = new SyntheticSession(),
-  options: { team?: boolean; onAction?: () => void } = {}) {
+  options: { team?: boolean; onAction?: () => void; viewportFactory?: ViewportFactory } = {}) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => {
     const node = document.createElement(tag); node.textContent = text; return node;
   };
@@ -59,13 +60,16 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   const pin = createPinModeControls(document, plan => { session.acceptPin(plan); afterAction(); });
   const coordinates = createPinCoordinateControls(document, session, afterAction);
   const include = createCaptionIncludeControls(document, plan => { session.acceptInclude(plan); afterAction(); });
+  const viewport = createViewportHost(document, session, afterAction, options.viewportFactory);
   header.append(brand, name, navigation.sceneControl, navigation.saveStatus);
   editor.append(editorHeading, detail.root, pin.actions, coordinates.root, pin.modeStrip, mediaNote);
-  stage.append(composition, placement.modeStrip, editor);
+  stage.append(viewport.stageTools, viewport.root, composition, placement.modeStrip, editor);
+  viewPanel.replaceChildren(viewport.view);
   sidebar.append(navigation.taskControl, list.root, include.root, modelList.root, placement.actions, modelUpdate.root, materialPanel, viewPanel);
   content.append(stage, sidebar); root.append(header, notice, message, content, footer);
   function render() {
     if (disposed) return;
+    viewport.render(!root.hidden);
     // Session admission aggregates all component pending-input rules before a Scene change.
     // Refresh every mounted recipient even while hidden; never unmount an editor to change tabs.
     const captionContext = session.captionContext();
@@ -89,6 +93,8 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     if (task === 'captions') list.render(captionContext);
     if (task === 'models') modelList.render(session.modelContext());
     const current = session.composition;
+    disconnected.textContent = viewport.connected ? '合成モデルの表示です。3D上の位置指定・ギズモは未接続です。' :
+      '3D描画・ピン配置は未接続です。ここではシーンの構成を確認できます。';
     sceneName.textContent = current.name.kind === 'value' ? current.name.value : 'シーン名を確認';
     const names = current.assets.map(asset => {
       const version = modelVersion(asset.assetId, asset.projection.bindingId, session.modelVersions);
@@ -100,12 +106,12 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     const captions = captionContext.source.kind === 'ready' ? captionContext.source.captions : [];
     const intended = captions.filter(c => c.pin === 'visible' && (session.memory.pinColors === null ||
       session.memory.pinColors.includes(captionColorKey(c.color) ?? ''))).length;
-    pinCount.textContent = `キャプション ${captions.length}件 ・ ピン表示対象 ${intended}件（描画未接続）`;
+    pinCount.textContent = `キャプション ${captions.length}件 ・ ピン表示対象 ${intended}件${viewport.connected ? '' : '（描画未接続）'}`;
     message.textContent = session.message; message.hidden = !session.message;
   }
   render();
   return { root, session, render, dispose() {
     disposed = true; navigation.dispose(); list.dispose(); detail.dispose(); modelList.dispose();
-    pin.dispose(); coordinates.dispose(); modelUpdate.dispose(); placement.dispose(); include.dispose(); root.remove();
+    pin.dispose(); coordinates.dispose(); modelUpdate.dispose(); placement.dispose(); include.dispose(); viewport.dispose(); root.remove();
   } };
 }

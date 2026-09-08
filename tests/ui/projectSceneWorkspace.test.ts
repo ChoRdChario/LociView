@@ -138,6 +138,6 @@ describe('connected synthetic development host (not rendered, storage or TEAM-FL
     expect(text).toContain('再読み込みで失われます'); expect(text).toContain('3D描画・ピン配置は未接続');
     expect(text).toContain('未保存'); expect(text).not.toContain('保存済み');
     button(root, 'マテリアル').fire('click'); expect(label(root, 'タイトル')).toBeDefined();
-    button(root, '視点').fire('click'); expect(text).toContain('方向プリセット');
+    button(root, '視点').fire('click'); expect(button(root, '+X').disabled).toBe(true);
   });
 });

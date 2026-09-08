@@ -53,7 +53,7 @@ If observed code conflicts with the applicable compatibility or accepted future 
 | `specs/02-storage-package-migration.md` | `PRODUCT-OWNER APPROVED / BOUNDED NATIVE SECTIONS 13–31 IMPLEMENTED WHERE MARKED / §29.1 DIRECT HEIC DEFERRED / GENERAL V2 NOT IMPLEMENTED` | General metadata/CAS candidate boundaries plus implemented Native snapshot/package, multi-Asset, DisplaySet/media receiver, package exchange, Native-only write authority and §29.3 device-side HEIC compatibility boundary |
 | `specs/03-gates-and-delivery.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | G0/G0-S/G1 evidence, thresholds, feature flags, rollback and schedule |
 | `specs/04-locimyu-conversion.md` | `PRODUCT-OWNER APPROVED / BOUNDED DIRECT ADAPTER IMPLEMENTED / PRODUCT ACCEPTANCE PASS` | Exact LociMyu identity/source authority and report boundary; six representative rows with an empty trimmed ID are reported as empty input, while 103 Captions publish and survive portable restore without changing the source; Desktop and physical-iPhone acceptance passed |
-| `specs/05-project-scene-team-workflow.md` | `PRODUCT-OWNER APPROVED / CORE, RECORD GUARDS, UI AND SYNTHETIC WORKSPACE/HISTORY LOOPS` | §§13.1/13.3 reusable core/UI; §13.4 connects navigation/Caption/model membership and two independent memory histories with scalar choices/replay in serve-only development. No ordinary-app/storage/renderer integration, rendered acceptance or full Project validator. Product file exchange/migration remains unimplemented; current Native bytes unchanged |
+| `specs/05-project-scene-team-workflow.md` | `PRODUCT-OWNER APPROVED / CORE, RECORD GUARDS, UI AND SYNTHETIC WORKSPACE/HISTORY LOOPS` | §§13.1/13.3 reusable core/UI; §13.4 connects navigation/Caption/models, two independent memory histories and exact synthetic triangle/pin viewing controls. No ordinary-app/storage integration, renderer adoption, rendered acceptance or full Project validator. Product file exchange/migration remains unimplemented; current Native bytes unchanged |
 | `specs/06-project-package-wire.md` | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED` | Five-purpose wire companion draft; explicit delta/journal, base-receipt, budget and snapshot-builder ratification inputs. No adopted format/version, production bytes or gate credit |
 
 ## Known implementation drift
@@ -74,7 +74,9 @@ connect in the known empty attachment/tag fixture. Exact synthetic model copies
 also connect, with fresh closed IDs, fixture-byte/immutable-digest checks and
 independent placement edits through a second exchange. General model-copy
 admission, migration and the full provider remain unimplemented; current todo
-owns exact scope/checks and the still-pending rendered UI lane.
+owns exact scope/checks and the still-pending rendered UI lane. Exact fixture
+triangle/pin display now connects fit, six axes and projection with retained
+temporary cameras. Object/DOM tests do not prove raster or native input behavior.
 
 - Legacy-v1 ZIP/package code is not bounded-memory streaming despite older architecture text. The bounded Native portable and exchange packages use their separate streamed path.
 - Current XLSX reading is the local minimal reader in `src/io/xlsx.ts`, not SheetJS.

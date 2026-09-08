@@ -18,7 +18,7 @@ export interface NavigationSession {
   /** Session-only memories; a tab/Scene switch never modifies them. */
   readonly sceneMemory: Readonly<Record<string, SceneUiMemory>>;
 }
-export type PendingInteraction = 'text' | 'composition' | 'pinPlacement' | 'pinMove' | 'modelTransform';
+export type PendingInteraction = 'text' | 'composition' | 'pinPlacement' | 'pinMove' | 'modelTransform' | 'camera';
 export type NavigationIntent = Readonly<{ kind: 'scene'; sceneId: string }> | Readonly<{ kind: 'task'; task: TaskId }>;
 export type NavigationPlan =
   | Readonly<{ kind: 'unchanged'; session: NavigationSession }>
@@ -27,6 +27,7 @@ export type NavigationPlan =
       enterScene?: string }>;
 export interface SceneChoice { readonly id: string; readonly label: string; readonly available: boolean }
 const pendingReasons: Readonly<Record<PendingInteraction, string>> = Object.freeze({
+  camera: 'カメラ操作を終えてください。',
   text: '入力を確定するか、取り消してください。',
   composition: '文字の入力を確定してください。',
   pinPlacement: 'ピンの追加を完了するか、取り消してください。',

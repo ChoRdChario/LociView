@@ -101,13 +101,24 @@ The same browser batch can exercise model copies: both actors select Scene
 change X and `配置を確定`. Only that model's position should change. Receive as
 the other actor and exchange again; the original Captions remain on the original.
 The active placement editor stays visible across task tabs; cancel ends the draft
-without publishing. This is numeric fixture placement, not a renderer/gizmo test.
+without publishing. The same host now projects the known triangle and its pins;
+this remains numeric fixture placement, not geometry picking or a gizmo test.
+
+Extend that same later batch with visible-model/pin checks, not a new probe:
+use `全体表示`, six directions and perspective/orthographic controls in `視点`;
+orbit/zoom, switch Scene or actor and return to check retained pose. Select a 3D
+pin and verify right-list selection; direct color filters hide only matching
+pins without losing the selected Caption or changing camera fit. Model movement
+must follow its binding; its original Captions stay on the original after a
+copy. A single-sided triangle legitimately disappears edge-on/from behind.
+If a real drawing failure occurs, metadata must remain and recovery must be
+explicit. Do not force context loss or treat object/DOM tests as raster evidence.
 
 Windows Computer Use fallback initialized on 2026-09-09 but stopped automatically
 because the current Chrome URL could not be safely determined. No browser-input
 or rendered PASS follows, and no workaround/repeated repair was attempted.
 
-General model-copy admission, media, renderer,
+General model-copy admission, media, general renderer adoption,
 real files, persistence and full `TEAM-FLOW-01` remain pending. The fixed small
 cell representation, transfer object and safety limits are disposable test ports,
 not a ratified ProjectDoc, import validator or numeric product guarantee.

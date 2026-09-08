@@ -243,7 +243,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         // not the Native controller/schema runtime or a general Native dependency.
         const shared = ['../../scene/types', '../../domain/captionText', '../../domain/values', '../../domain/materialIntent', '../../nativeGs/backgroundColor'];
         expect(imports.every(p => p?.startsWith('./') || shared.includes(p!)), path).toBe(true);
-      } else if (/[\\/]harness[\\/]projectScene[\\/](fixture|session|workspace|entry|historyPort|historyProjection|teamWorkspace|modelFixture|modelClosure|modelHistory|developmentControls|membershipResolution)\.ts$/.test(path)) {
+      } else if (/[\\/]harness[\\/]projectScene[\\/](fixture|session|workspace|entry|historyPort|historyProjection|teamWorkspace|modelFixture|modelClosure|modelHistory|developmentControls|membershipResolution|viewport|viewportHost|viewportModel)\.ts$/.test(path)) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
         const permitted = ['../../scene/types', '../../scene/commands', '../../scene/resolve',
           '../../ui/projectScene/navigationState', '../../ui/projectScene/navigationControls',
@@ -252,6 +252,9 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           '../../ui/projectScene/captionIncludeState', '../../ui/projectScene/captionIncludeControls',
           '../../ui/projectScene/pinModeState', '../../ui/projectScene/pinModeControls',
           '../../ui/projectScene/modelListState', '../../ui/projectScene/modelListControls'];
+        if (/[\\/]viewport(?:Model)?\.ts$/.test(path)) permitted.push('three');
+        if (path.replaceAll('\\', '/').endsWith('/viewport.ts')) permitted.push('three/addons/controls/OrbitControls.js');
+        if (path.replaceAll('\\', '/').endsWith('/viewportHost.ts')) permitted.push('../../ui/projectScene/viewControls', '../../ui/projectScene/viewState');
         if (path.replaceAll('\\', '/').endsWith('/modelClosure.ts')) {
           // Exact fixture canonicalization/hash helpers only; no Native controller or storage.
           permitted.push('../../domain/values', '../../nativeGs/sha256');

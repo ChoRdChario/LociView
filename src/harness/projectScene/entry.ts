@@ -1,9 +1,11 @@
 import { createDevelopmentWorkspace } from './workspace';
 import { createTeamWorkspace } from './teamWorkspace';
+import { createSyntheticViewport } from './viewport';
 import '../../ui/projectScene/captionList.css';
 import '../../ui/projectScene/captionDetail.css';
 import '../../ui/projectScene/modelList.css';
 import '../../ui/projectScene/captionActions.css';
+import '../../ui/projectScene/viewControls.css';
 import './workspace.css';
 
 document.title = 'LociView — シーン編集・開発用';
@@ -21,8 +23,8 @@ if (import.meta.env.DEV) {
   }
 }
 // Do not replace an editable workspace after asynchronous initialization.
-const workspace = factory ? createTeamWorkspace(document, factory) : (() => {
-  const single = createDevelopmentWorkspace(document), initial = single.session.snapshot;
+const workspace = factory ? createTeamWorkspace(document, factory, createSyntheticViewport) : (() => {
+  const single = createDevelopmentWorkspace(document, undefined, { viewportFactory: createSyntheticViewport }), initial = single.session.snapshot;
   if (bootFailure) { single.session.message = `${bootFailure} 1人分の編集のみ利用できます。`; single.render(); }
   return { ...single, hasChanges: () => single.session.snapshot !== initial || single.session.pending !== null };
 })();

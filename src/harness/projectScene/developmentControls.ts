@@ -8,7 +8,7 @@ export function createModelUpdateControls(document: Document, session: Synthetic
   const label = document.createElement('label'); label.textContent = '更新する合成モデル';
   const select = document.createElement('select'); select.setAttribute('aria-label', '更新する合成モデル'); label.append(select);
   const apply = document.createElement('button'); apply.type = 'button'; apply.textContent = 'このモデルに更新';
-  const note = document.createElement('p'); note.textContent = '合成データの更新です。ファイル読込・3D描画は未接続です。';
+  const note = document.createElement('p'); note.textContent = '合成データの更新です。ファイル読込は未接続です。';
   root.append(title, state, label, impact, apply, issue, note);
   let context = session.modelUpdateContext(), scope = '', chosen = '', disposed = false;
   const change = () => { chosen = select.value; render(); };
@@ -97,7 +97,7 @@ export function createModelPlacementControls(document: Document, session: Synthe
   const begin = document.createElement('button'); begin.type = 'button'; begin.textContent = 'モデルの位置を編集';
   const state = document.createElement('p'); actions.append(state, begin);
   const heading = document.createElement('h2'), note = document.createElement('p');
-  note.textContent = '位置はプロジェクト全体で共通です。3D描画は未接続です。'; modeStrip.append(heading, note);
+  note.textContent = '位置はプロジェクト全体で共通です。'; modeStrip.append(heading, note);
   const inputs = ['X', 'Y', 'Z'].map(axis => {
     const label = document.createElement('label'); label.textContent = axis;
     const input = document.createElement('input'); input.type = 'text'; input.inputMode = 'decimal'; input.setAttribute('aria-label', axis);

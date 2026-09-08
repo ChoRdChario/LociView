@@ -10,8 +10,48 @@ IME and device acceptance remain pending, not implied by its DOM tests.
 
 ### Current checkpoint / next implementation
 
-Next: continue the same host toward the remaining visible workflow (3D, viewing
-and material effects, retained comparison windows/media), reusing the existing
+Completed from `775e14e`: connect synthetic Scene display in this same host.
+- [x] Build exact triangle/Caption display input from the existing resolved
+  composition. Apply Representation-to-Asset then Asset-to-Project to meshes,
+  only Asset-to-Project to pins; transform all eight logical-bound corners for
+  fit. Exclude unresolved/hidden/review pins and respect direct color filters.
+- [x] Add a thin development-only Three.js/OrbitControls adapter using existing
+  dependencies, not either coupled v1/Native controller. Connect existing fit,
+  six-axis and projection controls; retain temporary cameras through refresh,
+  Scene and actor changes. Select visible pins through the existing session.
+  No geometry picking, gizmo, Saved View writes or material/media effects yet.
+- [x] Verify transform/fit/selection/failure/retained-state behavior with the
+  existing Node/DOM lanes, one independent review and final required checks.
+  Record browser evidence only if a safe supported lane becomes available;
+  do not repeat the unchanged browser-URL safety failure or bypass it. Keep
+  actual raster/native-input/device evidence explicitly pending otherwise.
+
+Preflight: independent read-only review confirmed this exact adapter is within
+05 §13.4, not renderer adoption. Existing ViewerCore auto-fits engine bounds and
+uses one model-local pin root; NativeGsViewer is tied to Native schema/loaders.
+Neither is imported or changed. Reuse their existing Three.js dependency and
+the accepted camera/transform rules instead. Root was clean; prior turn made
+connected implementation progress. Latest weekly quota is 82% remaining. Stop on an
+actual specification/gate conflict or any available quota below 10%. No current
+Project, storage, wire, dependency, main, deploy or physical-device claim.
+
+Review: five new connection tests cover coordinate frames, eight-corner/portrait
+fit, pin visibility/selection, projection span and Scene camera retention, orbit
+clipping, lazy initialization, context recovery and resource release. Mocked GPU
+tests are not raster evidence. Independent review's projection-pose, clipping,
+ready-copy and reentrant-animation findings are fixed and confirmed. Context
+restoration alone does not restart drawing; explicit retry is required.
+
+Final evidence: root typecheck, 95 files / 1,782 tests PASS (21 existing todo),
+25 isolated connected-history tests and scoped TypeScript check PASS. Ordinary
+and harness builds PASS with existing chunk warnings. Parsed source maps contain
+zero candidate modules in either build and zero synthetic viewport modules in
+the ordinary build (three in the harness). The existing dev URL responds HTTP
+200; that is not a rendering check. Actual raster/native input/iPhone/offline
+acceptance remains pending; no new manual hold or browser-repair retry.
+
+Next: continue the same host toward the remaining visible workflow (Saved View,
+material effects, retained comparison windows/media), reusing the existing
 ports/components. Specify the next exact synthetic effect before connecting it;
 do not make more detached probe pages or bypass durable-provider/wire gates.
 Actual browser verification stays pending: the Windows Computer Use fallback
