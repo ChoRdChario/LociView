@@ -233,6 +233,48 @@ batch; do not reset the run, remove browser data or repeat the 500 MiB probe.
 The full G1-A/C device, process-kill, domain/privacy, GC and scale requirements
 remain open, as do production integration and the eventual S3 product UI flow.
 
+### 2026-09-09 existing journal build readiness — execution still pending
+
+The completion-path audit selected this already prepared platform run; no new
+probe was created. Built from executable source
+`d8f52d1f9dbb7fdac00af1989eef012fc2252aaa`, with only task/documentation changes
+in the worktree. Isolated lockfile SHA-256:
+`9b9530bdfbb526e03c59df582df9f3908e0e587de507f45a794461f77dcd5ff5`.
+Existing build passed. At `2026-09-08T15:34:55Z` (2026-09-09 JST), the loopback
+preview served these exact local build bytes with HTTP 200:
+
+| Build entry | Bytes | SHA-256 |
+|---|---:|---|
+| `journal.html` | 1,956 | `01249fa4ef1589dfb6c86789f7e3a4a897e3a720886410d9f30a094eea671c78` |
+| `assets/journal-CMgrBqoP.js` | 243,461 | `afc35fcc03c8f1c03233adc9e952d6ab438331db03bfe43b70e695b76f94f962` |
+| `assets/automerge-CntZrugP.wasm` | 3,571,259 | `304ea6e230898ed66af3c29ac554a36c15bbe03f5c8816b5310fddb88f7f5d78` |
+
+The in-app automation connection failed before navigation; no page action, real
+OPFS/IndexedDB result or runtime PASS was observed by the agent. Do not repeat
+bootstrap attempts or silently switch the automation to Chrome. This is the one
+pending human Chrome batch, distinct from the completed earlier history probe
+and the 500 MiB readback. HTTP readiness is not platform or device evidence.
+The server is temporary; recheck HTTP before offering this link in a later turn.
+
+#### 人間による一括確認（今回の未実施分だけ）
+
+このPCのChromeで [隔離・統合保存検証](http://127.0.0.1:5186/journal.html) を開きます。
+本番プロジェクトや以前の検証データには触れません。最初の表示は `未作成` です。
+途中で返答する必要はありません。最後に2つのタブの結果をまとめて共有してください。
+
+| 順番 | 操作する画面と操作 | 確認する表示 |
+|---|---|---|
+| 1 | 最初のタブで `保存・中断を検証` を選ぶ | `READ-ONLY / 未完了の統合あり`。内容は `初期タイトル` / `手元の追記` / `revision-1`。これは意図した中断で、完了ではありません |
+| 2 | 最初のタブを再読み込みする。URL末尾は変更しない | 同じ旧内容と未完了表示、保存された結果ログが残る |
+| 3 | ページ内の `同じ検証を別タブで開く` から2つ目のタブを開き、`復旧して再確認` を選ぶ | `READY / 復旧後の保存内容を確認済み`。内容は `共有されたタイトル` / `統合後の本文` / `revision-2`。ログに `PASS 復旧: 元の変更バイト・headsが一致。公開1回、既存モデルの読込0バイト` |
+| 4 | 最初のタブへ戻る。再読み込みや `保存状態を確認` はまだ押さない | 新内容へ自動更新され、ログに `他タブ通知後` がある。ない場合は自動通知未確認として報告する |
+| 5 | 2つ目のタブで再度 `復旧して再確認` を選び、その後両方のタブを再読み込みする | ログに `PASS no-op: 元の変更を再追加せず、再公開も0回`。両方のタブに新内容とREADY表示が残る |
+
+赤いエラーや `FAILED` が出た場合はそこで停止し、表示内容と保存された結果を
+まとめて送ってください。データ削除・新しいrunでのやり直し・旧5184/5185試験の
+再実行は不要です。この限定試験の成功だけで、プロセス強制終了、実機iPhone、
+オフライン/PWA、大容量の出力、本番UIや保存方式の正式採用が済んだとは扱いません。
+
 ## Browser storage probe (bounded manual sequence PASS; G1-C partial evidence)
 
 Product Owner supplied visible log text and a screenshot on 2026-09-08 after

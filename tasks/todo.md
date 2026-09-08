@@ -2,6 +2,64 @@
 
 ## Current boundary — implementation through UI verification (2026-09-09)
 
+### Active — completion-path correction and existing platform journal (2026-09-09)
+
+PO requested a macro progress check before continuing. Audit checkpoint:
+`d8f52d1f9dbb7fdac00af1989eef012fc2252aaa`, clean `g0-baseline`, 0 behind / 21
+ahead of the local origin tracking ref; no fetch or fresh remote claim. The ten
+latest executable commits build disconnected Scene/domain/UI parts. They are
+useful reusable work, but none closes a new integrated `TEAM-FLOW-01` step.
+The full provider, durable host and team exchange remain unimplemented. The
+previous automatic next choice of another individual record guard is superseded.
+
+- [x] Compare actual entry/import boundaries and recent changes with 05 §12.6 /
+  §§13.2–13.3; independently review domain/UI and storage evidence read-only.
+- [x] Reprioritize the already prepared OPFS + IndexedDB journal execution over
+  further disconnected UI/individual-validator expansion. Keep completed 5184
+  history checks and 5185 readback closed; no new page or 500 MiB rerun.
+- [x] Build the existing `poc/scene-history/journal.html` from this exact source;
+  verify the served HTML and referenced JS/WASM against local build bytes, and
+  put the one existing batched procedure in a ready-to-run state.
+- [ ] Record real-browser interruption, same-run reload, second-tab recovery,
+  first-tab notification and repeated no-op results, or one concrete failure.
+  HTTP/build readiness is not execution evidence. Agent control currently fails
+  before navigation; do not infer PASS or repeat bootstrap/repair attempts.
+
+**Purpose / acceptance:** close the missing real-backend publication-boundary
+evidence for 02 §8 and 05 `TEAM-PKG-05`, using the existing tiny synthetic run.
+Completion is the exact observed old/new-head and original-byte outcomes, not
+G1-A/C adoption, process-kill, device, PWA or actual application PASS. Human
+Chrome execution, if needed, is one batch with all expected labels and recovery
+instructions, not a return to button-by-button development pauses.
+
+**Next decision:** after that result, select a named remaining G1-A/C row using
+the completion map in `critical-path.md` §8. Finish full resource/reference/
+conflict admission as a provider deliverable, not an unbounded series of record
+or UI components. Browser unavailability does not waive its gate or block all
+approved coding, but a substitute coding slice must close a named missing
+requirement rather than merely be available. Wire/migration ratification and
+storage adoption remain explicit PO boundaries; do not restore unrelated old G0
+or writable-v1 gates. No dependency, current-app activation, real data, new
+format, renderer, release or deployment changes in this audit/preparation.
+
+**Review:** two bounded independent read-only checks agreed that sequencing had
+drifted toward horizontal prebuilding. Existing final executable evidence remains
+93 files / 1,770 PASS / 21 existing todo, typecheck and build at `d8f52d1`;
+it is regression/component evidence only. Documentation changes do not trigger a
+repeat full suite. Browser skill check found no retained connection; one selected
+in-app bootstrap failed with a denied `node:process` import before page access.
+No browser execution or product failure is inferred; no security setting changed.
+
+Preparation result: existing isolated build PASS; one loopback preview is running
+on 5186. HTML and its JS/WASM all return HTTP 200 with bytes/digests equal to the
+local build. Exact executable/lock/build identity and the one human batch are in
+`poc/scene-history/README.md` under the 2026-09-09 readiness record. No application
+source, dependency or earlier probe changed. Real platform results remain pending;
+the server is temporary and is not an offline/PWA, adoption or release candidate.
+Targeted independent confirmation found no blocking documentation/procedure issue;
+the batch matches the existing page implementation. Diff/whitespace checks pass.
+Only these task records and the existing probe README changed; no root test rerun.
+
 ### Completed — individual MaterialOverride record admission (2026-09-09)
 
 Starting `a313c49`: clean, 20 ahead of local origin tracking ref; no fetch/push.

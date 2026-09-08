@@ -1,5 +1,16 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **Current sequencing correction (2026-09-09):** PO requested a completion-path
+> audit at `d8f52d1` (clean, 21 ahead of local tracking; no fetch). Ten recent
+> executable commits are useful disconnected components, not a new completed
+> `TEAM-FLOW-01` step. Two bounded read-only reviews agree: prioritize the already
+> prepared OPFS/IndexedDB journal real-browser batch, not another individual
+> Caption validator by default. `tasks/todo.md` and `critical-path.md` §8 own the
+> finite completion map and current readiness/result. The previous “next component”
+> statements below are historical, not scheduling authority. No repeated 5184/5185
+> test, new page or adoption waiver. Full provider, gated storage, wire/recipe
+> ratification, integrated services/UI and physical-device evidence remain open.
+
 > **Current approval update (2026-09-08):** The PO explicitly approved advancing
 > storage-neutral validators/reusable UI components without real-data/storage
 > connection. Specification 05 §13.3 supersedes the approval hold below, not

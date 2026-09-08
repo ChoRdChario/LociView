@@ -1,13 +1,13 @@
 # LociView critical-path execution plan
 
-> Status: `PROJECTSCENE/TEAM CONTRACT RATIFIED; S1 NOT STARTED`
+> Status: `PROJECTSCENE/TEAM CONTRACT RATIFIED; DISCONNECTED COMPONENTS AND PARTIAL ADAPTER EVIDENCE; INTEGRATED S1–S3 OPEN`
 >
-> Updated: 2026-09-08 with explicit keep-both conflict choices and a concrete S1
-> adapter-harness entry in specification 05 section 13, following acceptance of the Project-as-workspace,
-> persistent ProjectScene and continuing causal team contract. The preserved
-> executable checkpoint is `2178677` on `g0-baseline`; ADR-0002 and specification
-> 05 are accepted but not implemented. The older Native candidate execution plan
-> below remains historical evidence except where section 8 names the new boundary.
+> Updated: 2026-09-09 after the PO-requested completion-path audit at `d8f52d1`.
+> Specification 05 §§13.1/13.3 permits the implemented disconnected Scene/domain/UI
+> components; candidate history/CAS/journal proofs are partial, not storage
+> adoption or integrated S1 completion. Section 8 owns the current completion map.
+> The older Native candidate execution plan below remains historical evidence,
+> not a reason to reopen completed Native work or its deferred broader gates.
 >
 > This is an execution plan plus the Product Owner's scheduling and display-model
 > decisions. For the first Native-only public candidate,
@@ -333,6 +333,36 @@ language, disposable PoCs and one writer.
 | `WS5` accepted native product + non-destructive compatibility conversion | Preserve the accepted Native Project product and conversion lanes; Compare remains excluded | Product functions and RC-A evidence are accepted; release preparation remains | Codex / PO / external reviewer | Accepted native checkpoints | `FIRST FROZEN-V1 LANE: PASS`; `DIRECT LOCIMYU PRODUCT ACCEPTANCE: PASS`; `NATIVE PACKAGE EXCHANGE: PASS`; `RC-A PRODUCT OWNER ACCEPTANCE: PASS` |
 
 ## 8. Current authorization boundary
+
+### 2026-09-09 completion-path audit — current sequencing
+
+The ten latest executable commits through `d8f52d1` implement reusable Scene,
+record-admission and four-tab UI parts, with source-isolation tests deliberately
+preventing current-app use. This is real component progress but no newly completed
+step of the five-step continuing-team scenario in 05 §12.6. Component/test/commit
+counts are not an integrated-completion percentage. Pause horizontal component
+expansion as the default scheduling choice; §§13.1/13.3 authorization remains.
+
+| Completion boundary | Present evidence / gap | Next exit and responsible lane |
+|---|---|---|
+| Metadata/CAS candidate viability | Original causal bytes/conflicts, small five-purpose closures, Node journal and CAS/retention proofs; old limited browser history/readback results | Existing OPFS + IndexedDB journal real-browser batch first. Then only still-missing domain, scale, cross-tab/process interruption, sink/CSP/security and physical-iOS evidence under 03 §§4/6. Codex implementation; operator for inaccessible browser/physical device; PO for measured limits/adoption |
+| Complete domain provider and S1 durable host | Pure Scene core, individual Scene/Material records and local edit guards exist; full resource/reference/frame/conflict admission and Project session are absent | One complete validated-provider boundary with named subparts, then gated durable repository/journal integration under 05 §13.2; individual shape guards alone cannot supply trusted SceneResources |
+| S2 migration and exchange | Five semantic purposes proven only on small synthetic graph; 06 wire is PROPOSED, new migration/Native-bridge recipe not ratified | Reviewed exact wire/recipe and required PO ratification, production five-purpose services and service-level `TEAM-FLOW-01`; preserve source bytes and local work |
+| S3 actual user workflow | Reusable four-tab controls/intents exist, but no actual host, renderer/save/package connection or new rendered acceptance | Connect the proven services; run the whole two-round team workflow on Desktop and physical iPhone, including conflict keep-both, recovery and offline reopen |
+| Release | Not part of this implementation approval | Exact candidate/license/version/main/deploy decisions stay separate; no implicit release credit |
+
+The **one immediate execution** is the prepared `poc/scene-history/journal.html`
+using its existing four-step procedure and persisted logs. Its genuine new
+evidence is actual OPFS/IndexedDB old/new publication, same-run reload, second-tab
+recovery and first-tab notification; it is not another 5184 inline-metadata probe
+or 5185 500 MiB rerun. Build/HTTP success does not close it. A repeated browser
+bootstrap failure moves this one batch to the human Chrome lane without another
+page or automatic adoption. After its outcome, choose the next named unmet row;
+do not automatically substitute another isolated UI/record component. The
+remaining requirements above are not all blocked on that manual run, nor does a
+pass on that run satisfy them. This map does not change a contract or gate.
+
+### Preserved approval and Native acceptance context
 
 **2026-09-07 amendment:** the Product Owner subsequently accepted the
 Project-as-typed-workspace, persistent ProjectScene and continuing causal team
