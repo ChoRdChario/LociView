@@ -1147,6 +1147,23 @@ nonblocking visual polish. A required gate/ratification blocks its actual
 activation, not unrelated authorized development. Before such a boundary,
 report the exact missing prerequisite instead of inventing substitute work.
 
+**Observed comparison-window connection (from `d12f271`):** reuses existing
+Scene-local follower/retained/dismissed/order/placement memory in the same host,
+separately for each actor. Floating windows show confirmed Caption text; drafts
+remain in the sole detail editor. Fronting/arranging does not select a Caption or
+write history. Explicit close and reopen remain distinct. Hidden/review/filtered
+pins suppress their connector, not retained content; unavailable memberships
+suppress the window without deleting comparison intent. Resize may clamp only
+the display rectangle, never erase retained IDs or overwrite stored placement.
+Keyboard movement and explicit arrange/front access accompany pointer dragging.
+Stale placement is refused, cancelled
+placement restores the prior position. No media, new selection authority, schema,
+storage or ordinary-app activation; rendered/device evidence remains pending.
+Explicit same-row/other-row reselection reopens the follower; refresh does not.
+Default positions are stable independently of z-order. Failure/retry controls
+stay outside floating overlap. Existing state and mounted connection tests plus
+independent read-only review verify this bounded path, not native input/raster.
+
 **Observed bounded display connection (from `775e14e`):** in the same
 synthetic host, a thin Three.js/OrbitControls adapter consumes only the known
 resolved fixture closure. Meshes apply RepresentationFrame -> AssetFrame ->

@@ -31,7 +31,8 @@ export type CaptionListIntent =
   | Readonly<{ kind: 'scroll'; top: number }>
   | Readonly<{ kind: 'select' | 'showModel' | 'review'; captionId: string }>;
 interface PlanBase { readonly token: string; readonly sceneId: string; readonly baseMemory: SceneUiMemory }
-export type CaptionListPlan = Readonly<{ kind: 'blocked'; reason: string }> | Readonly<{ kind: 'unchanged' }> |
+export type CaptionListPlan = Readonly<{ kind: 'blocked'; reason: string }> |
+  Readonly<{ kind: 'unchanged'; explicitSelection?: PlanBase & { readonly captionId: string } }> |
   (PlanBase & Readonly<{ kind: 'change'; memory: SceneUiMemory; intent: CaptionListIntent['kind'] }>) |
   (PlanBase & Readonly<{ kind: 'effect'; action: 'showModel' | 'review'; captionId: string; assetId?: string }>);
 
@@ -130,7 +131,8 @@ export function planCaptionList(context: CaptionListContext, intent: CaptionList
     default: {
       const item = source.kind === 'ready' ? source.captions.find(item => item.id === intent.captionId) : undefined;
       if (!item) return { kind: 'blocked', reason: 'キャプションの状態を確認してください。' };
-      if (intent.kind === 'select' && item.id === memory.selectedCaptionId) return { kind: 'unchanged' };
+      // Preserve explicit reselection for host viewing aids without changing editor selection.
+      if (intent.kind === 'select' && item.id === memory.selectedCaptionId) return { kind: 'unchanged', explicitSelection: { ...base, captionId: item.id } };
       if (context.pending) return { kind: 'blocked', reason: sceneSwitchReason(context.pending) };
       if (intent.kind === 'select') return change({ selectedCaptionId: item.id });
       if (intent.kind === 'review') return { ...base, kind: 'effect', action: 'review', captionId: item.id };
@@ -142,7 +144,12 @@ export function planCaptionList(context: CaptionListContext, intent: CaptionList
   }
 }
 export function captionListPlanIsCurrent(plan: CaptionListPlan, context: CaptionListContext): boolean {
-  if (plan.kind === 'blocked' || plan.kind === 'unchanged') return true;
+  if (plan.kind === 'blocked') return true;
+  if (plan.kind === 'unchanged') {
+    const selected = plan.explicitSelection;
+    return !selected || (!captionSourceIssue(context.source) && selected.token === context.source.token &&
+      selected.sceneId === context.source.sceneId && selected.baseMemory === context.memory && selected.captionId === context.memory.selectedCaptionId);
+  }
   return !captionSourceIssue(context.source) && plan.token === context.source.token &&
     plan.sceneId === context.source.sceneId && plan.baseMemory === context.memory &&
     (!(plan.kind === 'effect' || plan.intent === 'select') || context.pending === null) &&

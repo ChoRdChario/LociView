@@ -8,6 +8,8 @@ import { captionListPlanIsCurrent, planCaptionList, type CaptionListContext, typ
 import { acceptCaptionApply, beginCaptionDraft, captionApplyIsCurrent, hasCaptionDraft,
   type CaptionDraft, type DetailContext, type DetailSource } from '../../ui/projectScene/captionDetailState';
 import type { CaptionDetailEvent } from '../../ui/projectScene/captionDetailControls';
+import { captionWindowPlanIsCurrent, newCaptionWindowMemory, planCaptionWindow,
+  type CaptionWindowMemory, type CaptionWindowPlan } from '../../ui/projectScene/captionWindowState';
 import { modelListPlanIsCurrent, newModelListMemory, planModelList, type ModelListContext,
   type ModelListMemory, type ModelListPlan, type ModelMembership } from '../../ui/projectScene/modelListState';
 import { createSyntheticProject, fixtureIds, freezeSynthetic, type SyntheticProject } from './fixture';
@@ -40,6 +42,8 @@ export class SyntheticSession {
   private navigation: NavigationSession;
   private drafts = new Map<string, CaptionDraft>();
   private models = new Map<string, ModelListMemory>();
+  private windows = new Map<string, CaptionWindowMemory>();
+  private windowDragging = false;
   private includes = new Map<string, CaptionIncludeMemory>();
   private includeFeedback: CaptionIncludeContext['feedback'] = { kind: 'idle' };
   private pins = new Map<string, PinModeMemory>();
@@ -61,6 +65,7 @@ export class SyntheticSession {
     this.navigation = Object.freeze({ sceneId, task: 'captions', sceneMemory: Object.freeze(
       Object.fromEntries(Object.keys(this.project.state.scenes).map(key => [key, emptyMemory()]))) });
     for (const key of Object.keys(this.project.state.scenes)) {
+      this.windows.set(key, newCaptionWindowMemory(key));
       this.includes.set(key, newCaptionIncludeMemory(key));
       this.models.set(key, newModelListMemory(fixtureIds.project, key)); this.pins.set(key, newPinModeMemory(key));
     }
@@ -71,7 +76,7 @@ export class SyntheticSession {
   get memory() { return this.navigation.sceneMemory[this.sceneId]!; }
   get pending(): PendingInteraction | null {
     const text = this.textPending;
-    return text === 'composition' ? text : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : text;
+    return text === 'composition' ? text : this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : text;
   }
   private get textPending(): PendingInteraction | null {
     if (this.placement?.composing || this.pinInputComposing || this.searchComposing || [...this.includes.values()].some(m => m.composing) || [...this.models.values()].some(m => m.composing) ||
@@ -85,6 +90,14 @@ export class SyntheticSession {
     this.viewportState = next; return changed;
   }
   get displayReady() { return this.viewportState.ready; }
+  get windowMemory() { return this.windows.get(this.sceneId)!; }
+  setWindowDragging(active: boolean) { this.windowDragging = active; }
+  acceptWindow(plan: CaptionWindowPlan): boolean {
+    if (plan.kind === 'blocked') return this.refuse(plan.reason);
+    if (!captionWindowPlanIsCurrent(plan, this.captionContext().source, this.windowMemory, this.memory.selectedCaptionId))
+      return this.refuse('ウィンドウの状態が変わっています。操作を選び直してください。');
+    this.windows.set(this.sceneId, plan.memory); this.message = ''; return true;
+  }
   refreshHistory() {
     if (this.authority) this.publish(this.authority.read());
     // Keep the same draft objects and UI memory. Edited fields detect a changed source at apply.
@@ -172,7 +185,7 @@ export class SyntheticSession {
     if (source.kind === 'ready' && !this.drafts.has(source.caption.id))
       this.drafts.set(source.caption.id, beginCaptionDraft(source)!);
     const draft = source.kind === 'ready' ? this.drafts.get(source.caption.id)! : null;
-    return { source, draft, mutationBlock: this.placement ? 'モデルの配置を確定するか、取り消してください。' :
+    return { source, draft, mutationBlock: this.windowDragging ? 'ウィンドウの移動を終えてください。' : this.placement ? 'モデルの配置を確定するか、取り消してください。' :
       this.pinInput ? 'ピンの操作を確定するか、取り消してください。' : null, feedback: this.detailFeedback };
   }
   modelContext(): ModelListContext {
@@ -191,7 +204,7 @@ export class SyntheticSession {
           displayReason: !edge || (this.viewportState.ready && this.viewportState.assetIds.includes(asset.id)) ? null :
             asset.projection.kind !== 'value' || edges.length > 1 ? 'モデルの更新・所属の候補を確認してください。' :
               this.viewportState.issue ?? 'シーンに含まれています。3D表示を確認してください。' };
-      }) }, memory: this.models.get(this.sceneId)!, pending: this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : null, mutationBlock: null, feedback: this.modelFeedback };
+      }) }, memory: this.models.get(this.sceneId)!, pending: this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : null, mutationBlock: null, feedback: this.modelFeedback };
   }
   get modelVersions() { return this.project.modelVersions ?? syntheticVersions; }
   modelUpdateContext() {
@@ -203,7 +216,7 @@ export class SyntheticSession {
       name: asset ? this.project.modelNames[asset.id] ?? 'モデル' : '',
       current: projection ? modelVersion(asset!.id, projection.bindingId, this.modelVersions) : undefined,
       choices: this.modelVersions.filter(v => v.assetId === asset?.id && v.projection.bindingId !== projection?.bindingId), sceneCount,
-      issue: this.viewportDragging ? 'カメラ操作を終えてください。' : this.placement ? 'モデルの配置を確定するか、取り消してください。' : this.pinInput ? 'ピンの操作を確定するか、取り消してください。' : this.textPending === 'composition'
+      issue: this.windowDragging ? 'ウィンドウの移動を終えてください。' : this.viewportDragging ? 'カメラ操作を終えてください。' : this.placement ? 'モデルの配置を確定するか、取り消してください。' : this.pinInput ? 'ピンの操作を確定するか、取り消してください。' : this.textPending === 'composition'
         ? '文字の入力を確定してください。' : !asset ? '一覧からモデルを選択してください。' :
           asset.lifecycle.kind !== 'value' || asset.lifecycle.value.state !== 'active' || !projection ? 'モデルの更新状態を確認してください。' : null };
   }
@@ -283,7 +296,7 @@ export class SyntheticSession {
       block: !anchor ? 'ピン位置の競合を確認してください。' : anchor.kind !== 'asset' ? 'この接続版ではモデルに付いたピンだけ移動できます。' : null } : null;
     const correction = this.pinInput ? this.preparePinAnchor() : null;
     return { source: { kind: 'ready', token: state.token, sceneId: this.sceneId, models, selected },
-      memory: this.pins.get(this.sceneId)!, otherPending: this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.textPending, mutationBlock: null,
+      memory: this.pins.get(this.sceneId)!, otherPending: this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.textPending, mutationBlock: null,
       proposal: this.pinProposal, proposalIssue: correction?.issue ?? null, feedback: this.pinFeedback };
   }
   pinCoordinateContext() {
@@ -361,7 +374,14 @@ export class SyntheticSession {
     if (!captionListPlanIsCurrent(plan, this.captionContext())) return this.refuse('一覧が更新されています。選び直してください。');
     if (plan.kind === 'change') {
       this.navigation = Object.freeze({ ...this.navigation, sceneMemory: Object.freeze({ ...this.navigation.sceneMemory, [this.sceneId]: plan.memory }) });
-      if (plan.intent === 'select') this.detailFeedback = { kind: 'idle' };
+      if (plan.intent === 'select') {
+        this.detailFeedback = { kind: 'idle' };
+        this.acceptWindow(planCaptionWindow(this.captionContext().source, this.windowMemory, this.memory.selectedCaptionId,
+          { kind: 'open', captionId: this.memory.selectedCaptionId! }));
+      }
+    } else if (plan.kind === 'unchanged' && plan.explicitSelection) {
+      return this.acceptWindow(planCaptionWindow(this.captionContext().source, this.windowMemory, this.memory.selectedCaptionId,
+        { kind: 'open', captionId: plan.explicitSelection.captionId }));
     } else if (plan.kind === 'effect') {
       if (plan.action === 'review') {
         if (plan.captionId !== this.memory.selectedCaptionId && !this.acceptList(planCaptionList(this.captionContext(),
@@ -375,6 +395,12 @@ export class SyntheticSession {
   }
   acceptDetail(event: CaptionDetailEvent): boolean {
     const context = this.detailContext();
+    if (event.kind === 'window') {
+      if (context.source.kind !== 'ready' || event.token !== context.source.token || event.sceneId !== this.sceneId ||
+        event.captionId !== this.memory.selectedCaptionId) return this.refuse('キャプションを選び直してください。');
+      return this.acceptWindow(planCaptionWindow(this.captionContext().source, this.windowMemory, this.memory.selectedCaptionId,
+        { kind: event.action, captionId: event.captionId }));
+    }
     if (event.kind === 'draft') {
       if (context.draft !== event.baseDraft) return this.refuse('入力の状態が変わっています。');
       this.drafts.set(event.draft.captionId, event.draft); this.message = ''; return true;
@@ -385,7 +411,7 @@ export class SyntheticSession {
       if (clean) this.drafts.set(clean.captionId, clean);
       this.detailFeedback = { kind: 'idle' }; this.message = ''; return true;
     }
-    if (event.kind !== 'apply') return this.refuse('この開発版ではウィンドウ表示・状態修復は未接続です。');
+    if (event.kind !== 'apply') return this.refuse('この開発版では状態修復は未接続です。');
     try {
       if (!captionApplyIsCurrent(event, context)) throw new Error('状態が変わっています。入力は保持しています。');
       const token = fresh('snapshot'), old = this.project.resources.captions[event.captionId]!;

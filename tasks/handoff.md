@@ -20,6 +20,8 @@
 > a second exchange without changing the original. Unsupported closure variants
 > refuse, not silently omit. Exact fixture triangle/pin display now connects fit,
 > six axes/projection and retained temporary cameras, with explicit recovery.
+> Multiple retained Caption windows also connect confirmed text and eligible pin
+> lines; close/reopen, front order and drag/keyboard/arrange are local UI state.
 > File/storage effects remain unconnected; do not claim full model-copy admission,
 > renderer adoption, integrated v2 or rendered acceptance. Next:
 > remaining visible effects in the same host, with current todo's exact boundary.

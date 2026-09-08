@@ -114,6 +114,15 @@ copy. A single-sided triangle legitimately disappears edge-on/from behind.
 If a real drawing failure occurs, metadata must remain and recovery must be
 explicit. Do not force context loss or treat object/DOM tests as raster evidence.
 
+In that same batch, use `比較に残す` on one Caption, select another and retain it.
+Both confirmed texts should remain; bringing a window forward must not change
+the right-list selection or its position. `×` closes only that window; refresh
+must not reopen it, while explicit selection or `ウィンドウを表示` does. Move a
+title by drag or arrow keys, use `ウィンドウを並べる`, and switch Scene/actor and
+back. Resize must retain comparison intent. Pin filters/review hide the line,
+not retained text. Unapplied text stays solely in the detail editor. This extends
+the existing pending batch; no immediate human reply or repeat journal run.
+
 Windows Computer Use fallback initialized on 2026-09-09 but stopped automatically
 because the current Chrome URL could not be safely determined. No browser-input
 or rendered PASS follows, and no workaround/repeated repair was attempted.

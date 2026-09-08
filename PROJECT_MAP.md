@@ -25,6 +25,8 @@ verified fixture bytes/immutable digests, selected-model translation and a secon
 exchange. The same host now connects exact synthetic triangle/pin display, fit,
 six-axis/projection controls and retained temporary cameras through existing
 Three.js. This is not full model admission or a ratified renderer/format profile.
+Retained comparison windows now connect to confirmed Caption text and visible
+pins, with explicit close/reopen, independent front order and local positioning.
 File/package exchange, durable storage and rendered/device acceptance remain
 pending as recorded in todo.
 Real Project, storage, package and current-app activation retain their gates.

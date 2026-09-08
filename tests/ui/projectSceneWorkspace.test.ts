@@ -132,7 +132,7 @@ describe('connected synthetic development host (not rendered, storage or TEAM-FL
   it('discloses unsaved and unconnected capabilities rather than reporting a fake product success', () => {
     const document = new RecordedDocument(), workspace = createDevelopmentWorkspace(document.asDocument()), root = record(workspace.root);
     find(workspace.session, { kind: 'select', captionId: f.shared }); workspace.render();
-    expect(button(root, 'ウィンドウを表示').disabled).toBe(true); expect(button(root, '比較に残す').disabled).toBe(true);
+    expect(button(root, 'ウィンドウを表示').disabled).toBe(false); expect(button(root, '比較に残す').disabled).toBe(false);
     button(root, 'ウィンドウを表示').fire('click'); expect(workspace.session.message).toBe('');
     const text = descendants(root).map(n => n.textContent).join('\n');
     expect(text).toContain('再読み込みで失われます'); expect(text).toContain('3D描画・ピン配置は未接続');

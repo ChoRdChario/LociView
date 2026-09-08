@@ -10,6 +10,46 @@ IME and device acceptance remain pending, not implied by its DOM tests.
 
 ### Current checkpoint / next implementation
 
+Completed from `d12f271`: retained comparison windows in the same development host.
+- [x] Connect existing Caption-window state to the session, independently for
+  each actor/Scene. Reuse detail open/retain/release intents; explicit close stays
+  closed on refresh, front order never changes editing selection or history.
+- [x] Mount read-only floating title/body windows and meaningful projected-pin
+  connectors. Keep unavailable/hidden/filter/review content and comparison intent;
+  suppress invalid connectors. Reuse stable nodes, offer keyboard movement and
+  explicit arrange/front access without requiring dragging. Retain placements
+  through resize without writing clamped display positions back to memory.
+- [x] Verify mounted controls, pending/stale/cancel behavior, Scene/actor memory
+  and coordinate/connector effects. Reuse closed history/storage tests; one
+  independent read-only review and final required checks. Browser/raster/mobile
+  evidence remains the existing later batch, not a new manual hold.
+
+Boundary: viewing confirmed Caption text only; drafts stay in the single detail
+editor and remain visibly unapplied. No media payloads, new selection authority,
+resource mutations, persistence, one-window fallback, general renderer adoption
+or current-app entry. This is authorized 05 §13.4 / UI guidelines §§5/10 reuse.
+Stop on policy/spec conflict, unexpected data writes or quota below 10%.
+
+Review/evidence: four mounted regressions plus the existing five window-state
+cases cover explicit open/retain/release/close, same-row and other-row reopen,
+front order independent from placement/selection, stable body/scroll, resize,
+draft separation, text-only conflict presentation, filter/review/missing-member
+suppression, drag/keyboard/Esc, stale plans and Scene/actor memories. The read-only
+review's explicit-reselection and z-order/default-position findings are fixed and
+confirmed. Failure/retry is outside the floating stack. Full root: 96 files /
+1,786 PASS, 21 existing todo; typecheck, 25 isolated history tests and scoped
+TypeScript, ordinary/harness builds PASS. Candidate modules stay absent from both
+parsed build graphs; window controls stay absent from ordinary production output.
+These are executable connection checks, not raster/native input/device evidence.
+
+Next: connect the remaining Saved View/material/media workflow in this same host
+under a specified bounded plan, then the gated complete-provider/durable-file
+boundary. No detached probes, repeated journal tests or per-control manual hold.
+The latest available weekly quota is 81% remaining; no secondary window is
+available and no reset was used. Actual browser evidence remains the batched lane.
+
+### Completed synthetic display connection
+
 Completed from `775e14e`: connect synthetic Scene display in this same host.
 - [x] Build exact triangle/Caption display input from the existing resolved
   composition. Apply Representation-to-Asset then Asset-to-Project to meshes,
@@ -50,8 +90,8 @@ the ordinary build (three in the harness). The existing dev URL responds HTTP
 200; that is not a rendering check. Actual raster/native input/iPhone/offline
 acceptance remains pending; no new manual hold or browser-repair retry.
 
-Next: continue the same host toward the remaining visible workflow (Saved View,
-material effects, retained comparison windows/media), reusing the existing
+Next at that checkpoint: continue the same host toward the remaining visible
+workflow, reusing the existing
 ports/components. Specify the next exact synthetic effect before connecting it;
 do not make more detached probe pages or bypass durable-provider/wire gates.
 Actual browser verification stays pending: the Windows Computer Use fallback

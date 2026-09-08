@@ -1,6 +1,8 @@
 import { createViewControls } from '../../ui/projectScene/viewControls';
 import { newViewMemory, viewPlanIsCurrent, type ViewContext, type ViewCameraIntent, type ViewAxis } from '../../ui/projectScene/viewState';
 import { planCaptionList } from '../../ui/projectScene/captionListState';
+import { createCaptionWindowControls } from '../../ui/projectScene/captionWindowControls';
+import { sceneSwitchReason } from '../../ui/projectScene/navigationState';
 import { value } from '../../scene/types';
 import { syntheticDisplay, type SyntheticDisplay } from './viewportModel';
 import type { SyntheticSession } from './session';
@@ -23,7 +25,7 @@ export function createViewportHost(document: Document, session: SyntheticSession
   const overlay = document.createElement('div'); overlay.className = 'lv-development-pin-layer';
   const status = document.createElement('p'); status.setAttribute('role', 'status');
   const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = '3D表示を再試行';
-  root.append(canvas, overlay, status, retry);
+  root.append(canvas, overlay);
   let disposed = false, display: SyntheticDisplay | null = null, error: string | null = null;
   let rendering = false, hasRendered = false;
   let runtime: SyntheticViewport | undefined, context: ViewContext, pinKey = '';
@@ -34,6 +36,13 @@ export function createViewportHost(document: Document, session: SyntheticSession
     try { runtime.camera(plan.action); error = null; } catch (e) { error = text(e); }
     paint();
   });
+  const windows = createCaptionWindowControls(document, plan => {
+    const accepted = session.acceptWindow(plan); changed(); return accepted;
+  }, active => { session.setWindowDragging(active); changed(); });
+  const renderStatus = document.createElement('div'); renderStatus.className = 'lv-development-render-status';
+  renderStatus.append(status, retry);
+  // Keep failure/retry outside the floating-window stack so comparison cannot cover recovery.
+  root.append(windows.root); view.stageTools.append(windows.tools, renderStatus);
   function text(e: unknown) { return e instanceof Error ? e.message : '3D表示を確認してください。'; }
   function currentContext(): ViewContext {
     const observation = runtime?.read(), scope = { sceneId: session.sceneId, projectFrameId: session.snapshot.resources.projectFrameId };
@@ -42,13 +51,15 @@ export function createViewportHost(document: Document, session: SyntheticSession
         ...(observation?.ready && !error ? { kind: 'ready' as const, projection: observation.projection, axis: observation.axis,
           bounds: value(display?.bounds ? 'available' as const : 'empty' as const) } :
           { kind: 'unavailable' as const, reason: error ?? observation?.issue ?? '3D表示は未接続です。' }) },
-      cameraBlock: observation?.dragging ? 'カメラ操作を終えてください。' : null,
+      cameraBlock: observation?.dragging ? 'カメラ操作を終えてください。' : session.pending === 'window' ? sceneSwitchReason('window') : null,
       mutationBlock: '保存した視点の編集は未接続です。', cameraFeedback: { kind: 'idle' }, entryFeedback: { kind: 'idle' } };
   }
   function paint() {
     if (disposed) return;
     context = currentContext(); view.render(context);
     const observed = runtime?.read();
+    const rect = canvas.getBoundingClientRect?.();
+    windows.project({ ready: Boolean(observed?.ready && !error), width: rect?.width ?? 0, height: rect?.height ?? 0, pins: observed?.pins ?? [] });
     const dragChanged = session.setViewportDragging(observed?.dragging ?? false);
     const stateChanged = session.setViewportState(Boolean(observed?.ready && !error), display?.models.map(m => m.binding.assetId) ?? [], error ?? observed?.issue ?? null);
     status.textContent = error ?? observed?.issue ?? (observed?.ready ? '' : '3D表示は未接続です。'); status.hidden = !status.textContent;
@@ -74,6 +85,8 @@ export function createViewportHost(document: Document, session: SyntheticSession
     if (disposed) return;
     rendering = true;
     try {
+      windows.render({ source: session.captionContext().source, memory: session.windowMemory,
+        selectedId: session.memory.selectedCaptionId, moveBlock: session.pending ? sceneSwitchReason(session.pending) : null });
       display = syntheticDisplay(session.snapshot, session.sceneId, session.memory.pinColors, session.memory.selectedCaptionId);
       const key = JSON.stringify([display.token, display.sceneId, display.pins, display.selectedId]);
       if (key !== pinKey) {
@@ -97,5 +110,5 @@ export function createViewportHost(document: Document, session: SyntheticSession
   }
   return { root, view: view.root, stageTools: view.stageTools, render,
     get connected() { return Boolean(runtime?.read().ready && !error); },
-    dispose() { disposed = true; runtime?.dispose(); view.dispose(); retry.removeEventListener('click', tryAgain); root.remove(); } };
+    dispose() { disposed = true; windows.dispose(); runtime?.dispose(); view.dispose(); retry.removeEventListener('click', tryAgain); root.remove(); } };
 }

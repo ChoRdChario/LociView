@@ -10,9 +10,10 @@ Development connection (2026-09-09, specification 05 §13.4):
 model controls through `src/harness/projectScene`. One fixed synthetic Project
 supplies two Scenes and shared Caption content. Exact-token actions update only
 page memory; no imported/raw Project is validated by this fixture. A/B/A retains
-selection/search/colors, shared text and unrelated draft input. The stage reports
-composition, not 3D rendering. `windowBlock` explicitly disables unavailable
-window actions with a reason, retaining the same labels. Other effects remain
+selection/search/colors, shared text and unrelated draft input. The same host now
+connects exact fixture triangle/pin rendering through existing Three.js and
+retained read-only comparison windows. `windowBlock` still lets other hosts
+disable unavailable window actions honestly. Other effects remain
 pending, not replaced with fake success. Host/DOM tests are not browser/IME or
 device evidence. Full Project admission, renderer, durable storage and ordinary
 app activation retain their prerequisites. Do not create a competing mock UI.
@@ -143,8 +144,10 @@ Detail host contract:
   and visual/mobile acceptance remain required later, not proven by DOM records.
 
 `captionWindowState.ts` manages only Scene-scoped retention, dismissal, z-order
-and preferred position/size; no floating DOM layer, connector or geometry allocator
-is added. The host owns the sole editing selection and supplies it to every plan.
+and preferred position/size. `captionWindowControls.ts` now supplies a thin
+read-only floating DOM/connector layer to the synthetic development host; it is
+not imported by the ordinary app. The host owns the sole editing selection and
+supplies it to every plan.
 Retained windows plus the selected follower are deduplicated. `close` records an
 explicit dismissal without clearing selection/draft, so refresh cannot reopen the
 selected follower. An explicit selection/reopen event calls `open` for that selected
@@ -154,9 +157,17 @@ Window plans bind source, memory and selection. Missing/unavailable memberships
 suppress projection without deleting retained intent; hidden/review pins do not
 close their content windows. Exact complete valid arrangements preserve all open
 windows, and invalid/incomplete arrangements change nothing. Geometry fitting,
-connector eligibility and responsive clamps belong to the later renderer/host;
+connector eligibility and responsive clamps belong to the renderer/host;
 they must not rewrite preferred positions or introduce a single-window fallback.
 Closing one Scene's copy does not erase another Scene's retention or placement.
+
+The connected layer uses confirmed Field text only, not draft text. Unknown
+fields remain explicit. It updates lines/rectangles without rebuilding cards on
+camera ticks. Stable initial positions are independent from front order; resize
+clamps the display only. Pointer movement has keyboard/arrange alternatives and
+Esc/cancel; active dragging blocks incompatible host transitions. Missing members
+retain intent, hidden/review/filtered/offscreen pins lose only their connector.
+Failure/retry stays outside floating overlap. Native drag/focus/layout is unverified.
 
 Current evidence covers pure plans and DOM-contract tests only. Actual browser
 keyboard/focus, layout, contrast, mobile reflow, IME, stage composition and iPhone

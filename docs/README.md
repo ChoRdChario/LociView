@@ -76,7 +76,9 @@ independent placement edits through a second exchange. General model-copy
 admission, migration and the full provider remain unimplemented; current todo
 owns exact scope/checks and the still-pending rendered UI lane. Exact fixture
 triangle/pin display now connects fit, six axes and projection with retained
-temporary cameras. Object/DOM tests do not prove raster or native input behavior.
+temporary cameras. Multiple retained Caption windows now connect confirmed text,
+pin lines, close/reopen, front order and UI-only positioning. Object/DOM tests
+do not prove raster or native input behavior.
 
 - Legacy-v1 ZIP/package code is not bounded-memory streaming despite older architecture text. The bounded Native portable and exchange packages use their separate streamed path.
 - Current XLSX reading is the local minimal reader in `src/io/xlsx.ts`, not SheetJS.

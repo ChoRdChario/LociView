@@ -73,8 +73,8 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     // Session admission aggregates all component pending-input rules before a Scene change.
     // Refresh every mounted recipient even while hidden; never unmount an editor to change tabs.
     const captionContext = session.captionContext();
-    const detailOkay = detail.render({ ...session.detailContext(), retained: false,
-      windowBlock: '複数ウィンドウ・ピンへの接続は未接続です。' });
+    const detailOkay = detail.render({ ...session.detailContext(),
+      retained: session.windowMemory.retained.includes(session.memory.selectedCaptionId ?? ''), windowBlock: null });
     const listOkay = list.render(captionContext);
     const modelsOkay = modelList.render(session.modelContext());
     const pinsOkay = pin.render(session.pinContext()), includeOkay = include.render(session.includeContext()); coordinates.render(); modelUpdate.render(); placement.render();

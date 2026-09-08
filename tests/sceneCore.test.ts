@@ -249,6 +249,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           '../../ui/projectScene/navigationState', '../../ui/projectScene/navigationControls',
           '../../ui/projectScene/captionListState', '../../ui/projectScene/captionListControls',
           '../../ui/projectScene/captionDetailState', '../../ui/projectScene/captionDetailControls',
+          '../../ui/projectScene/captionWindowState', '../../ui/projectScene/captionWindowControls',
           '../../ui/projectScene/captionIncludeState', '../../ui/projectScene/captionIncludeControls',
           '../../ui/projectScene/pinModeState', '../../ui/projectScene/pinModeControls',
           '../../ui/projectScene/modelListState', '../../ui/projectScene/modelListControls'];
