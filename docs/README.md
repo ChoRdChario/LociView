@@ -92,8 +92,11 @@ the same host. Tags remain empty-fixture-only; real media files/storage and
 gated durable-file services remain pending. Next is the complete-provider boundary.
 Its stage A now has one decoded whole-root record admission entry, covering the
 amended 14 maps and canonical known values while preserving unknown data. A
-`valid-records` result is not a valid Project/provider. Full graph/conflict/exact
-blob-profile evidence (B) and same-host authority (C) remain required; see 05 §13.4.
+`valid-records` result is not a valid Project/provider. Stage B now additionally
+inspects whole-record references and actual immutable metadata digests/prior
+identity, with scoped diagnoses and known strong/weak edges. This still returns
+no authoritative projection: complete candidate/causal/exact blob-profile evidence
+(B) and same-host authority (C) remain required; see 05 §13.4.
 
 - Legacy-v1 ZIP/package code is not bounded-memory streaming despite older architecture text. The bounded Native portable and exchange packages use their separate streamed path.
 - Current XLSX reading is the local minimal reader in `src/io/xlsx.ts`, not SheetJS.

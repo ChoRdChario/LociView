@@ -21,6 +21,11 @@ loop. Do not return to detached UI parts or polish as the default workstream.
   entity kinds, preserved unknown fields and global budgets. `valid-records`
   never means valid Project, verified blobs or conflict-free authority.
 - [ ] Stage B (current): full closure/candidates/causal and exact external-evidence checks.
+  - [x] Implement whole-record graph inspection and exact immutable payload checks,
+    with same-lineage prior identity, scoped reference diagnostics and explicit
+    known strong/weak edges. Reuse stage A; never output SceneResources or GC roots.
+  - [ ] Complete all-candidate/causal and externally verified profile/blob evidence
+    before B can supply authority to C. Graph inspection alone cannot close B.
 - [ ] Stage C: connect that authority to the existing synthetic workflow; final
   integration evidence and independent review close the single provider boundary.
 - [ ] Implement and connect that provider to the same synthetic host where
@@ -38,6 +43,31 @@ The completed branch checkpoint is Git HEAD; stage A starts from clean
 `g0-baseline` / `5225110`, 35 ahead of local tracking (no fetch). The previous
 goal turn made connected media progress. Official remaining quota at entry was
 77%; continue automatically, pause below 10%.
+
+Current continuation: clean `e5c1d2a`, official remaining quota 76%. No manual
+hold. The next production-quality pure part of B checks all known record graph
+relations, not one additional UI control/probe. Digest verification uses actual
+canonical metadata bytes; it does not manufacture a blob/profile receipt. Tests
+reuse the existing whole-root public fixture and add adversarial graph changes.
+Missing weak provenance must preserve canonical pins; wrong owners and immutable
+rewrites must remain distinct from orphan/needs-review conditions. Stop on a
+contract disagreement; B/C remain open until their full provider exit passes.
+
+Stage B graph-inspection review: root typecheck, focused 19 checks and final
+101-file suite PASS (1815 tests, 21 existing TODO). Ordinary and harness builds
+PASS with existing warnings. Source-map inspection finds no candidate or new
+graph modules in either build; no early current-entry/SceneResources activation.
+Independent read-only review closed three P2 defects: optional anchor evidence,
+the exact three roles' required material catalog, and mutually ambiguous material
+map entries. Regression checks cover all three; final whole-suite/typecheck and
+builds follow these corrections. No remaining blocker in this limited diff.
+Known metadata references and canonical SHA-256 are checked, not source blob
+bytes or profile semantics. All-candidate/causal authority and invalid-closure
+propagation remain pending, as do the exact external-evidence port and C hookup.
+Next continue those B/C parts in the same provider; do not add detached UI/probes
+or request another manual journal test. No new server/tunnel, private source,
+dependency, schema/wire/adoption, real file/storage, Native/main/Pages/SW
+configuration, version/license or release change. Official remaining quota 76%.
 
 Stage A review: one amended whole-root entry covers all 14 entity maps and known
 nested fields, retaining unknown subtrees and exact body newlines. It exposes

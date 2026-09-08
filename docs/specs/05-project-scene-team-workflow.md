@@ -1180,6 +1180,31 @@ overflow/underflow do not create an unapproved coordinate-range restriction.
 Result `valid-records` provides no token/SceneResources, resolved conflict, verified
 digest/blob/profile or write receipt. All B/C requirements above remain open.
 
+**Stage B implementation detail (not a new persisted contract):** whole-record
+graph inspection first reuses A and retains its frozen records. It recomputes
+all four immutable payload digests from the exact canonical metadata preimage
+specified in 02 §3.2, and compares any supplied same-lineage prior records for
+append-only/immutable identity. It reports affected record/field diagnostics,
+known strong versus weak edges, and unmet semantic evidence, without returning
+SceneResources, a conflict winner, retention/GC permission or a storage receipt.
+Known graph checks include every model closure/frame/family/class/role relation,
+material mappings and active resource references. Weak absent provenance is
+not invalid position data; wrong existing provenance is diagnosed. Unknown data
+stays protected, including migration support. Complete candidate/causal context,
+actual verified profile/blob semantics and the C connection remain mandatory;
+passing this inspection is not completion of B or permission to activate data.
+
+**Stage B observed partial implementation:** `src/domain/projectGraph.ts` now
+implements that inspection through the model/resource graph modules. Exact
+metadata preimages use platform SHA-256; prior same-lineage records enforce
+immutable payload/frame/Scene-owner/endpoint identity and retain tombstones.
+Missing weak source evidence is not invalid position data. Known role-required
+catalogs, invalid partitions and conflicting material-map sets are diagnosed
+without guessing a source or applying a map as an alias. Known active roots
+include resources outside Scenes; parent/input/anchor provenance edges are weak.
+The result explicitly lists missing candidate/causal, verified-content and
+same-token authority. It is not a complete provider and does not activate the UI.
+
 **Observed bounded media connection (from `7b57fd2`):** the same host now has two
 preloaded public synthetic PNGs. Each immutable MediaResource has a verified
 exact blob descriptor and domain-separated metadata digest; history accepts only

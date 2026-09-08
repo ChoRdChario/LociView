@@ -4,7 +4,7 @@ Authorized by specification 05 §13.3. These are production-quality pure modules
 not an adopted metadata adapter or a complete ProjectDocV2 validator. The finite
 provider plan in 05 §13.4 has stages A (records), B (closure/conflict/evidence) and
 C (same-host authority). Do not conflate their completion or introduce per-record
-workstreams. Stage A's two modules below are not connected authority yet.
+workstreams. These modules do not provide connected authority yet.
 
 - `projectRecords.ts` is one whole-root **decoded record** entry for the amended
   Project and all 14 entity maps. It enforces required maps, schema/nominal map
@@ -20,6 +20,27 @@ workstreams. Stage A's two modules below are not connected authority yet.
   not implementation or activation of those media features. Migration support
   is retained as a protected opaque root subtree, not structurally validated
   by this entry. Stage B must handle it before claiming complete authority.
+
+- `projectGraph.ts` composes A with actual immutable metadata SHA-256 and
+  same-lineage prior identity/append-only checks, then whole-record graph
+  inspection. Its internal `projectModelGraph.ts` covers owner/frame, direct
+  parent, iterative depth-bounded derivation DAG, family/catalog/class and
+  proxy/exclusion/group relations. `projectResourceGraph.ts` covers anchors,
+  Scene/view/attachment/tag/material references and current semantic duplicates.
+  Missing weak anchor provenance preserves the canonical pin; invalid partition
+  and old-class review remain distinct. Material maps are validated without
+  becoming runtime aliases; conflicting slot mappings remain review items.
+- `projectGraphSupport.ts` is internal admitted-value/index/canonical metadata
+  support. Immutable preimages include unknown fields and use spec 02 §3.2's
+  exact domain-separated UTF-8 bytes and platform SHA-256. This is not a portable
+  writer, raw parser, decoder, streamed blob check or adoption of a format profile.
+  Hashing failure propagates, never becomes a fabricated success receipt.
+- `record-graph-inspection` retains records, scoped issues, known active roots
+  and known strong/weak edges. It explicitly lacks all-candidate/causal and
+  verified blob/profile semantics and same-token authority. These partial roots
+  MUST NOT drive GC, export, save acknowledgement or a SceneResources cast.
+  Active Assets/attachments outside Scenes still have roots; parent lineage,
+  authored source and input-digest provenance do not protect blobs by themselves.
 
 - `values.ts` checks/clones already decoded plain JSON without invoking getters;
   rejects invalid Unicode/NFC, nonfinite numbers, unsafe keys/non-JSON values,
@@ -55,14 +76,15 @@ zero; each value consumes one node, including unknown values. Object keys have
 the same caller-supplied scalar ceiling and structural single-line restrictions.
 Decoding itself must be separately bounded before calling these modules. Raw
 duplicate JSON keys are already lost in decoded objects and cannot be diagnosed
-here. No raw parser, serializer, digest, package writer or byte I/O is provided.
+here. No raw parser, portable serializer, package writer or binary I/O is provided;
+only the exact immutable metadata digest computation above is implemented.
 Host objects, proxies and CRDT library objects are outside the input contract;
 the future adapter must supply plain data without losing conflict candidates.
 
-Not yet covered: immutable payload digests, reference existence/lifecycle/ownership,
-frame ownership and whole family/partition/DAG relationships, semantic-key conflicts,
-causal delete/edit and immutable mutation checks, full candidate provenance,
-blobs/inventory, migration and history-free policy. A `valid-record` result must
+Not yet covered: complete conflict candidate/provenance authority, causal delete/edit,
+external verified profiles/content/material enumeration/bounds/equivalence/source
+indices, invalid-closure propagation into a same-token provider, blobs/inventory,
+migration and history-free policy. A structural or record-graph result must
 not be cast into a fully validated SceneResources provider or publish metadata.
 Selected pre-existing guards are consumed by the explicit synthetic development
 host under §13.4; current Native/v1 entries remain unchanged. The new whole-root

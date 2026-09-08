@@ -40,7 +40,11 @@
 > Provider stage A now checks the decoded amended root/all record kinds and
 > preserves unknown subtrees. This is structural success only; B must validate
 > the complete graph/candidates/exact content evidence before C can replace the
-> same host's known-only authority. One finite boundary, not new per-record tasks.
+> same host's known-only authority. B now includes whole-record graph inspection,
+> actual canonical immutable metadata hashes and prior identity, keeping weak
+> absence separate from invalid references. Complete candidate/causal/external
+> content evidence and C remain open. No SceneResources/GC/save permission follows.
+> One finite boundary, not new per-record tasks; no additional manual test hold.
 > Windows Computer Use initialized but stopped automatically on unsafe-to-resolve
 > Chrome URL; no browser input/PASS or bypass. Keep the existing batched UI lane.
 > No repeated journal check or scheduling approval is needed. Real-data/current
