@@ -14,8 +14,11 @@ Current delivery order (PO approved 2026-09-09): specification 05 §13.4 permits
 one connected synthetic development host through a nondefault `dev.html` mode,
 reusing the existing Scene/domain/UI parts before subsystem polish. The first
 synthetic workspace loop is implemented: shared Caption editing, model membership
-and Scene/task switching. It is in-memory only; 3D, files, storage/team exchange
-and rendered/device acceptance remain unconnected or pending as recorded in todo.
+and Scene/task switching. A serve-only isolated candidate now also connects two
+independent memory histories, sparse edits, explicit scalar conflict choices and
+second-round updates in that same host. This is not file/package exchange: 3D,
+model replacement/pin correction, durable storage and rendered/device acceptance
+remain unconnected or pending as recorded in todo.
 Real Project, storage, package and current-app activation retain their gates.
 
 For a fresh Codex session, read `tasks/handoff.md` after this map and the
@@ -52,7 +55,7 @@ For a normal task, read only the target file, its matching tests, and direct imp
 | `src/viewer` | Three.js loaders, material shader patch, single-model `ViewerCore` |
 | `src/nativeGs` | Version-1 native snapshot, streamed project-local binaries/packages, exact ASCII Point and SH2/SH3 GS admission, lazy Spark runtime, repeated Asset import, per-Asset visibility/alignment, DisplaySet/material/Caption/media state, legacy conversion and bounded package exchange |
 | `src/ui` | App shell, home, viewer screen, dialogs, tabs, and UI-only state |
-| `src/harness/projectScene` | Nondefault synthetic development workspace; connects Scene resolution, navigation, shared Caption editing/list and model membership in page memory; no real Project, storage, file, renderer or adoption path |
+| `src/harness/projectScene` | Nondefault synthetic workspace; Scene/navigation/Caption/model controls plus neutral history port and two-actor UI. Candidate injection is serve-only from `poc/scene-history`, absent from both builds; no real Project, file, storage, renderer or adoption path |
 | `src/ui/projectScene` | Reusable Scene/task navigation, save-state presentation, Caption list/pin filters/detail drafts, inclusion/pin modes, comparison-window state, viewing aids/entry-view, named-view/background controls, Project model inventory/Scene membership and exact-target material editor (05 §13.3); navigation/Caption/model controls now connected in synthetic development only (§13.4); no ordinary-app hookup, floating renderer or rendered acceptance |
 | `tests` | Executable contracts for core, assets, I/O, and UI logic |
 | `public/samples` | Small deterministic files used by the manual viewer and iOS runbook |

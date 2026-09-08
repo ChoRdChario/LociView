@@ -5,10 +5,74 @@
 PO approved building the whole workflow thinly before subsystem polish. Authority:
 specification 05 §13.4; final completion remains `TEAM-FLOW-01` in §12.6.
 The completed journal Chrome recheck below stays closed; no new manual test is
-requested. The first connected synthetic development host now exists; browser,
+requested. The synthetic workspace and two-person Caption/history loops now exist; browser,
 IME and device acceptance remain pending, not implied by its DOM tests.
 
 ### Current plan / next implementation
+
+- [x] **Completed connection from `50e4e58`:** connect two independent in-memory actors
+  to this same development host through a neutral history port. The adapter stays
+  in `poc/scene-history` with existing pinned Automerge 3.4.1; serve-only injection
+  must exclude it from ordinary and Spark/PWA build graphs. No dependency change.
+  Sparse local Caption/model-membership commands produce real original changes;
+  exact-base delta/replay preserves all local history, and scalar conflicts need
+  exact explicit candidate selection. Receiving must retain unapplied input.
+- [x] Verify different-field merge, same-field choice, second round/idempotent
+  replay, stale/refused commands and unchanged base/raw bytes using the actual
+  pinned adapter plus mounted host tests. Reuse previous causal regression; no
+  new journal/device batch. Synthetic cells/transfer objects are memory-only test
+  ports, not a Project schema, package wire or full validated provider.
+- [x] Final exact-tree root checks, isolated adapter tests/typecheck, both build
+  graph isolation checks and one read-only review. No browser-control repair.
+
+Active exit is the connected two-person Caption/history loop, not all of
+`TEAM-FLOW-01`. Model replacement/pin correction, membership keep-both, media,
+file exchange, durable storage and physical-device acceptance remain pending
+unless separately connected and verified. Do not add fake success controls.
+
+**Next connected slice:** model update → retained local Caption work → explicit
+pin correction in this same host, followed by membership conflict keep-one /
+independent-copy keep-both. Reuse the accepted commands/read ports and the current
+isolated history connection; specify exact missing behavior before implementation.
+Do not substitute another journal/browser-repair task or claim actual 3D/file
+exchange. No fresh PO/manual check is required to continue within §13.4.
+
+### Two-person Caption/history result — 2026-09-09
+
+The served host now switches between `準備担当` and `参加者`, retaining each
+mounted workspace, drafts, selection and Scene memory. `相手の更新を受け取る`
+integrates original causal change bytes, never the peer's replacement snapshot.
+Sparse Caption fields and exact model membership changes survive different-field
+merge and a second round. Same-field conflicts project unresolved; no candidate
+is preselected. A chosen candidate resolves causally even if it was the engine's
+materialized value. Replaying a received update is a no-op; receive/retry never
+advances the explicitly retained initial base. Unapplied text remains available;
+stale apply refuses visibly, and IME admission blocks actor switch/receive.
+
+Nine new actual-pinned-adapter tests include mounted control interactions,
+original bytes/base retention, stale/foreign/incomplete rejection, both scalar
+choices, stale actor/disposed confirmation refusal and unrelated model membership
+edits beside a conflicting edge. They
+are Node/authored-DOM evidence, **not a rendered browser or native IME PASS**.
+Final root typecheck and all 94 files / 1,777 PASS / 21 existing todo pass
+(two workers, 127.65 seconds; repeated after the final actor guard);
+isolated existing 55 cases plus the final 9 connected cases and scoped typecheck
+pass. The unchanged 55 ran in the same turn before the final actor-guard fix;
+only the affected 9 were rerun afterward. Both production and
+Spark/PWA harness builds pass with existing warnings. Parsed source-map module
+lists contain zero candidate/Automerge modules in either build. HTTP 200 confirms
+the development page, entry and candidate modules are served, not that rendered
+interaction, offline or PWA acceptance passed.
+
+Review fixes: write only the exact commanded membership (Scene preview clones
+other edges too); keep scalar candidate copy separate from membership independent
+copy promises; account for 3.4.1 string-valued conflict candidates; bind a displayed
+choice to its actor even when both actors have identical heads. Current docs
+are synchronized. The independent read-only reviewer confirmed all fixes and
+reported no additional blocker in this bounded diff; broader adoption and
+rendered/device acceptance were explicitly not approved by that review.
+No dependencies/lockfiles, ordinary app/storage, public assets, actual source
+bytes, wire/schema/version, Pages/SW or deployment configuration changed.
 
 - First connected-workspace slice starts from `0a4f014`: one synthetic
   session/fixture, existing mounted navigation/list/detail/model controls, exact
@@ -83,7 +147,8 @@ application only, with an explicit unsaved/reload-loss warning.
 | Right Caption list, direct color filters, selection/search | Connected; colors do not remove list rows; stage shows planned pin count | Actual 3D pins and floating comparison windows/lines |
 | Model display | Resolver composition and listed members only | Actual renderer/payload connection; no 3D success claim |
 | Media, pin placement, windows, material/view effects | Explicitly unconnected; window actions disabled with reason | Existing components/ports connected in this same host, no requirement removed |
-| Two-round team exchange, save/recovery and five package purposes | Not connected | Remaining contract/adoption prerequisites and `TEAM-FLOW-01` |
+| Two-round updates and explicit scalar choice | Synthetic page-memory histories connected; actual candidate/mounted tests | Model update/pin correction, membership independent-copy choices, real package exchange and `TEAM-FLOW-01` |
+| Save/recovery and five package purposes | Not connected to this host | Remaining contract/adoption prerequisites and `TEAM-FLOW-01` |
 
 Checks: 31 focused PASS (7 new host scenarios + existing detail/core contracts),
 root typecheck, full 94 files / 1,777 PASS / 21 existing todo (two workers), and

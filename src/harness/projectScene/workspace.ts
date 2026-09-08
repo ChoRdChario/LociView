@@ -6,7 +6,8 @@ import { captionColorKey } from '../../ui/projectScene/captionListState';
 import { SyntheticSession } from './session';
 
 /** One mounted integration host. Components own their DOM; synthetic session owns all working/UI state. */
-export function createDevelopmentWorkspace(document: Document, session = new SyntheticSession()) {
+export function createDevelopmentWorkspace(document: Document, session = new SyntheticSession(),
+  options: { team?: boolean; onAction?: () => void } = {}) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => {
     const node = document.createElement(tag); node.textContent = text; return node;
   };
@@ -33,17 +34,20 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   materialPanel.className = viewPanel.className = 'lv-development-pending-panel';
   materialPanel.append(make('h2', 'マテリアル'), make('p', '表面の選択・色の調整は未接続です。'));
   viewPanel.append(make('h2', '視点'), make('p', '全体表示・方向プリセット・保存した視点は未接続です。'));
-  const footer = make('footer', 'ファイルの読込・保存・共同編集は未接続です。既存プロジェクトには触れません。');
+  const footer = make('footer', options.team ?
+    '更新の受信はこのページ内の2人分の編集だけが対象です。ファイルの読込・保存は未接続です。' :
+    'ファイルの読込・保存・共同編集は未接続です。既存プロジェクトには触れません。');
   footer.className = 'lv-development-footer';
   let disposed = false;
-  const navigation = createNavigationControls(document, plan => { session.acceptNavigation(plan); render(); });
+  const afterAction = () => { render(); options.onAction?.(); };
+  const navigation = createNavigationControls(document, plan => { session.acceptNavigation(plan); afterAction(); });
   const list = createCaptionListControls(document, plan => {
-    const accepted = session.acceptList(plan); render();
+    const accepted = session.acceptList(plan); afterAction();
     if (accepted && plan.kind === 'change' && plan.intent === 'select') list.revealSelected();
-  }, active => { session.setSearchComposing(active); render(); });
-  const detail = createCaptionDetailControls(document, event => { session.acceptDetail(event); render(); });
+  }, active => { session.setSearchComposing(active); afterAction(); });
+  const detail = createCaptionDetailControls(document, event => { session.acceptDetail(event); afterAction(); });
   const modelList = createModelListControls(document, plan => {
-    const accepted = session.acceptModel(plan); render();
+    const accepted = session.acceptModel(plan); afterAction();
     if (accepted && plan.kind === 'change' && plan.action === 'select') modelList.revealSelected();
   });
   header.append(brand, name, navigation.sceneControl, navigation.saveStatus);

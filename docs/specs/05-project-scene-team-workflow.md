@@ -1147,6 +1147,19 @@ nonblocking visual polish. A required gate/ratification blocks its actual
 activation, not unrelated authorized development. Before such a boundary,
 report the exact missing prerequisite instead of inventing substitute work.
 
+**Observed bounded implementation (2026-09-09, not further adoption):** the
+development host now connects two independent memory histories through a neutral
+port. The adapter remains in `poc/scene-history` with pinned Automerge 3.4.1 and
+local WASM, loaded only while serving the explicit development mode, not either
+build. Known fixture Caption fields and exact model-membership commands produce
+original causal changes. Different-field edits merge, same-field candidates stay
+unresolved until explicitly chosen, and a second round/replay preserves original
+bytes and the initial shared base. Refresh retains unapplied drafts and UI memory.
+Synthetic cells and in-memory transfers are not a Project schema or package wire.
+No Repo/storage, model replacement, pin correction, membership keep-both, complete
+provider, production save/exchange, rendered/device acceptance or S1–S3 credit is
+implied. Current todo owns exact executable evidence and remaining connections.
+
 ## 14. Explicit non-goals
 
 - cloud backend, accounts, roles, authentication, signatures or real-time presence;

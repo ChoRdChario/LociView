@@ -1,7 +1,8 @@
 # Isolated Scene history candidate
 
 Disposable S1-entry experiment, not production code or an adopted dependency.
-The root application does not import this directory. The synthetic domain is a
+The ordinary application and both build graphs do not import this directory.
+The explicit served development mode has the bounded exception below. The synthetic domain is a
 small adapter probe, not the complete ProjectDocV2 schema, storage validator,
 package wire or migration implementation. Source: specification 05 sections 8,
 12 and 13; specification 03 section 6.
@@ -27,6 +28,50 @@ with a shared-handle `view`; large-history reconstruction cost remains unmeasure
 
 API references: https://automerge.org/automerge/api-docs/js/
 and https://automerge.org/docs/reference/documents/conflicts/ .
+
+## Connected memory-history workspace — 2026-09-09
+
+05 §13.4 permits `development.ts`/`development-browser.ts` to supply a neutral
+test port to the existing `dev.html?mode=project-scene` host. This stays inside
+the candidate scope: Automerge 3.4.1 slim plus locally served WASM, no new root
+dependency, Repo/IndexedDB, files, network service or package wire. An explicit
+`import.meta.env.DEV` branch excludes it from ordinary and Spark/PWA builds.
+
+Two independent actors start from the same synthetic bootstrap. Exact sparse
+Caption and membership commands create original changes; receive verifies the
+complete initial-base delta, stages it detached and publishes after projection
+validation. It never overwrites with a peer snapshot or advances the base on
+receive/retry. Scalar candidates retain their operation IDs and explicit choice
+deletes/replaces the scalar to resolve even the materialized winner. In 3.4.1,
+`getConflicts` exposes immutable-string candidates as JS strings while the map
+property is `ImmutableString`; the adapter handles both without choosing one.
+
+Nine new executable cases cover second-round field/membership preservation,
+original bytes/base, both scalar choices, incomplete/foreign/stale rejection,
+draft retention, actor-bound/disposed choice refusal and mounted two-actor
+edit/receive/choose/replay controls. These
+are Node plus authored-DOM records, **not rendered/browser/IME/device evidence**.
+Run from repository root:
+
+```powershell
+npx vitest run --config poc/scene-history/journal.vitest.config.ts poc/scene-history/development.test.ts
+npx tsc --project poc/scene-history/journal.tsconfig.json --noEmit
+```
+
+Later batched browser walk: open the existing served development link, select a
+Caption from the right list, edit/apply as `準備担当`, switch `操作する人` to
+`参加者`, edit/apply the same Caption, then `相手の更新を受け取る`. Different
+fields must coexist; for the same field select a displayed candidate and use
+`選んだ内容を使用`. Switch back and receive. `同じ更新を再受信` must leave the
+content unchanged; edit again and exchange both ways for a second round. Keep
+unapplied text through a receive and verify it is not lost; native IME/layout
+checks remain batched pending. Reload intentionally loses all demonstration work.
+This is not a new manual hold or a request to repeat the journal tests.
+
+Model revision/pin correction, membership independent copies, media, renderer,
+real files, persistence and full `TEAM-FLOW-01` remain pending. The fixed small
+cell representation, transfer object and safety limits are disposable test ports,
+not a ratified ProjectDoc, import validator or numeric product guarantee.
 
 ## Five-purpose semantic closure — bounded contract
 

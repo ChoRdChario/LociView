@@ -42,3 +42,16 @@
   .lv-development-editor .lv-caption-detail { max-height: 55dvh; }
   .lv-development-sidebar { min-height: 380px; height: 55dvh; border-left: 0; border-top: 1px solid #b7b1aa; }
 }
+.lv-development-team-toolbar, .lv-development-conflicts {
+  margin: 16px auto; padding: 14px; max-width: 1360px;
+  background: #eeece8; border: 1px solid #a7a49c; color: #383731;
+}
+.lv-development-team-toolbar button, .lv-development-team-toolbar select {
+  margin: 4px 8px 4px 0; padding: 10px; font: inherit;
+}
+.lv-development-team-toolbar p { margin: 8px 0 0; }
+.lv-development-conflicts fieldset { margin: 12px 0; border: 1px solid #898579; }
+.lv-development-conflicts label { display: flex; gap: 10px; padding: 10px 0; }
+.lv-development-conflicts label span { white-space: pre-wrap; overflow-wrap: anywhere; }
+.lv-development-conflicts button { padding: 10px; font: inherit; }
+.lv-development-team [hidden] { display: none !important; }

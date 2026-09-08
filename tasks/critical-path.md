@@ -346,6 +346,15 @@ real Project storage or production dependency changes. The host changes page
 memory only and labels unconnected 3D/file/save effects. Current todo records
 checks and the remaining connections; rendered/IME/device evidence is pending.
 
+The next bounded connection now exists in that same served host: two independent
+memory actors using the isolated pinned candidate, sparse Caption/membership
+commands, explicit scalar conflict selection, unchanged exchange base, original
+change-byte integration and a second round/replay. Candidate modules remain out
+of ordinary and Spark/PWA builds. This closes the Caption/history connection,
+not all of the continuing-team milestone. Model replacement, explicit pin
+correction and membership keep-one/independent-copy keep-both are the next
+connected-flow gaps; no new detached mock page or manual journal rerun.
+
 Progress through workspace interaction, the continuing-team loop, then durable
 product delivery in the same host. Track connected user operations against
 `TEAM-FLOW-01`, not component/test counts. Existing conveniences and the accepted
@@ -366,11 +375,11 @@ to the connected delivery now approved in §13.4.
 
 | Completion boundary | Present evidence / gap | Next exit and responsible lane |
 |---|---|---|
-| Connected development workspace | First shared two-Scene editing/membership loop under 05 §13.4 exists in page memory; host tests, not rendered acceptance | Extend the same host toward the continuing-team loop and connect required effects/provider; no parallel mock UI or fake successful merge/save |
+| Connected development workspace | Shared two-Scene editing/membership plus two-person Caption/history loop under 05 §13.4 in memory; actual candidate and mounted tests, not rendered acceptance | Connect model update/pin correction and explicit membership conflict choices in the same host, then remaining effects/provider; no parallel mock UI or fake merge/save |
 | Metadata/CAS candidate viability | Original causal bytes/conflicts, small five-purpose closures, CAS/retention proofs and bounded human Chrome journal/recheck PASS | Still-missing domain, scale, cross-tab/process interruption, sink/CSP/security and physical-iOS evidence under 03 §§4/6 before relevant adoption. No repeat of the closed journal batch. Operator for inaccessible browser/physical device; PO for measured limits/adoption |
 | Complete domain provider and S1 durable host | Pure Scene core, individual Scene/Material records and local edit guards exist; full resource/reference/frame/conflict admission and Project session are absent | One complete validated-provider boundary with named subparts, then gated durable repository/journal integration under 05 §13.2; individual shape guards alone cannot supply trusted SceneResources |
 | S2 migration and exchange | Five semantic purposes proven only on small synthetic graph; 06 wire is PROPOSED, new migration/Native-bridge recipe not ratified | Reviewed exact wire/recipe and required PO ratification, production five-purpose services and service-level `TEAM-FLOW-01`; preserve source bytes and local work |
-| S3 actual user workflow | Reusable four-tab controls/intents exist, but no actual host, renderer/save/package connection or new rendered acceptance | Connect the proven services; run the whole two-round team workflow on Desktop and physical iPhone, including conflict keep-both, recovery and offline reopen |
+| S3 actual user workflow | Reusable four-tab controls and a synthetic host exist; ordinary product host, renderer/save/package connection and new rendered acceptance remain absent | Connect the proven services; run the whole two-round team workflow on Desktop and physical iPhone, including conflict keep-both, recovery and offline reopen |
 | Release | Not part of this implementation approval | Exact candidate/license/version/main/deploy decisions stay separate; no implicit release credit |
 
 **Result update (2026-09-09):** The existing browser batch found and closed the

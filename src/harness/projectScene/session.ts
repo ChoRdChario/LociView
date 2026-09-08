@@ -11,13 +11,14 @@ import type { CaptionDetailEvent } from '../../ui/projectScene/captionDetailCont
 import { modelListPlanIsCurrent, newModelListMemory, planModelList, type ModelListContext,
   type ModelListMemory, type ModelListPlan, type ModelMembership } from '../../ui/projectScene/modelListState';
 import { createSyntheticProject, fixtureIds, freezeSynthetic, type SyntheticProject } from './fixture';
+import { captionKey, membershipKey, type SyntheticAuthority } from './historyProjection';
 
 const fresh = (prefix: string) => `${prefix}_${crypto.randomUUID().replaceAll('-', '')}`;
 const unknown = <T>(): Field<T> => ({ kind: 'unresolved', reason: 'invalid' });
 const emptyMemory = (): SceneUiMemory => Object.freeze({ selectedCaptionId: null, listScrollTop: 0,
   search: '', pinColors: null, ownerFilter: { kind: 'all' as const } });
 
-/** Development-only working state. No ProjectStore, file, history or durable-save authority. */
+/** Development-only state. Optional isolated memory-history authority; never durable save. */
 export class SyntheticSession {
   private project = createSyntheticProject();
   private navigation: NavigationSession;
@@ -27,7 +28,8 @@ export class SyntheticSession {
   private detailFeedback: DetailContext['feedback'] = { kind: 'idle' };
   private modelFeedback: ModelListContext['feedback'] = { kind: 'idle' };
   message = '';
-  constructor() {
+  constructor(private readonly authority?: SyntheticAuthority) {
+    if (authority) this.project = authority.read();
     const sceneId = chooseStartupScene(this.project.state).sceneId;
     if (!sceneId) throw new Error('合成シーンを開けません。');
     this.navigation = Object.freeze({ sceneId, task: 'captions', sceneMemory: Object.freeze(
@@ -44,6 +46,10 @@ export class SyntheticSession {
     return [...this.drafts.values()].some(hasCaptionDraft) ? 'text' : null;
   }
   setSearchComposing(active: boolean) { this.searchComposing = active; }
+  refreshHistory() {
+    if (this.authority) this.publish(this.authority.read());
+    // Keep the same draft objects and UI memory. Edited fields detect a changed source at apply.
+  }
   private compositionOf(project: SyntheticProject, sceneId: string): Composition {
     const result = resolveScene(project.state, project.resources, sceneId);
     if (result.kind !== 'ready') throw new Error('シーンの状態を確認してください。');
@@ -68,7 +74,7 @@ export class SyntheticSession {
               name: modelNames[anchor.value.assetId] === undefined ? unknown() : value(modelNames[anchor.value.assetId]!) });
           const hidden = result.issues.some(i => i.entityId === caption.captionId && i.code === 'hidden-owner');
           return { id: caption.captionId, title: caption.title, body: caption.body, owner,
-            color: colors[caption.captionId] === undefined ? unknown() : value(colors[caption.captionId]!), mediaCount: value(0),
+            color: colors[caption.captionId] ?? unknown(), mediaCount: value(0),
             pin: hidden ? 'ownerHidden' : caption.marker === 'needsReview' ? 'needsReview' :
               caption.marker === 'visible' ? 'visible' : 'unavailable' };
         }) };
@@ -150,9 +156,12 @@ export class SyntheticSession {
       const token = fresh('snapshot'), old = this.project.resources.captions[event.captionId]!;
       const nextCaption = { ...old, ...(event.changes.title !== undefined ? { title: value(event.changes.title) } : {}),
         ...(event.changes.body !== undefined ? { body: value(event.changes.body) } : {}) };
-      this.publish({ ...this.project, state: { ...this.project.state, token },
+      const local = { ...this.project, state: { ...this.project.state, token },
         resources: { ...this.project.resources, token, captions: { ...this.project.resources.captions, [old.id]: nextCaption } },
-        colors: event.changes.color === undefined ? this.project.colors : { ...this.project.colors, [old.id]: event.changes.color } });
+        colors: event.changes.color === undefined ? this.project.colors : { ...this.project.colors, [old.id]: value(event.changes.color) } };
+      this.publish(this.authority ? this.authority.write(this.project.state.token,
+        Object.fromEntries(Object.entries(event.changes).map(([field, text]) =>
+          [captionKey(old.id, field as 'title' | 'body' | 'color'), text!]))) : local);
       this.drafts.set(old.id, acceptCaptionApply(event, context.draft!, this.detailSource()));
       this.detailFeedback = { kind: 'idle' }; this.message = '変更を適用しました。このページ内だけの変更です。'; return true;
     } catch (error) {
@@ -173,7 +182,10 @@ export class SyntheticSession {
           : { kind: 'exclude' as const, resourceKind: 'asset' as const, membershipId: plan.membershipId };
         const prepared = planSceneCommand(this.project.state, this.project.resources, command, fresh('evt'));
         const state = previewScenePlan(this.project.state, prepared, fresh('snapshot'));
-        this.publish({ ...this.project, state, resources: { ...this.project.resources, token: state.token } });
+        const changed = state.assetMemberships[command.membershipId]!;
+        this.publish(this.authority ? this.authority.write(this.project.state.token,
+          { [membershipKey(changed.id)]: JSON.stringify(changed) }) :
+          { ...this.project, state, resources: { ...this.project.resources, token: state.token } });
         this.modelFeedback = { kind: 'idle' };
       } catch (error) {
         this.modelFeedback = { kind: 'failed', plan, message: this.errorText(error) };

@@ -7,8 +7,12 @@
 > host toward the two-round team flow and gated durable product services.
 > `tasks/todo.md` top and `critical-path.md` §8 own the current plan. The first
 > host loop now exists at `dev.html?mode=project-scene`: shared Caption edits,
-> model membership and Scene/task switching in page memory. 3D, file/storage/team
-> effects remain unconnected; do not claim integrated v2 or rendered acceptance.
+> model membership and Scene/task switching in page memory. That same served host
+> now connects two independent candidate histories: different-field merge, explicit
+> scalar choice, retained drafts/model memberships, second round and replay. This
+> is synthetic memory exchange, not team files or durable writes. Model replacement,
+> pin correction, membership independent-copy choices and 3D/file/storage effects
+> remain unconnected; do not claim integrated v2 or rendered acceptance.
 > No repeated journal check or scheduling approval is needed. Real-data/current
 > app activation, technology adoption, wire/migration and release gates remain.
 > Accepted UI/UX and visual principles remain in `docs/ui-product-guidelines.md`.
