@@ -351,13 +351,19 @@ expansion as the default scheduling choice; §§13.1/13.3 authorization remains.
 | S3 actual user workflow | Reusable four-tab controls/intents exist, but no actual host, renderer/save/package connection or new rendered acceptance | Connect the proven services; run the whole two-round team workflow on Desktop and physical iPhone, including conflict keep-both, recovery and offline reopen |
 | Release | Not part of this implementation approval | Exact candidate/license/version/main/deploy decisions stay separate; no implicit release credit |
 
-The **one immediate execution** is the prepared `poc/scene-history/journal.html`
+**Result update (2026-09-09):** The existing browser batch found and closed the
+simultaneous-read false-repair defect at `96c218b`. PO-reported corrected same-run
+no-op/local-read/other-tab-notification and both reloads pass, reusing earlier
+initialization/interruption/recovery evidence. The bounded manual hold is closed;
+no repeat run is needed. This is not full G1-A/C, device or app acceptance.
+
+The **completed immediate execution** is the prepared `poc/scene-history/journal.html`
 using its existing four-step procedure and persisted logs. Its genuine new
 evidence is actual OPFS/IndexedDB old/new publication, same-run reload, second-tab
 recovery and first-tab notification; it is not another 5184 inline-metadata probe
 or 5185 500 MiB rerun. Build/HTTP success does not close it. A repeated browser
 bootstrap failure moves this one batch to the human Chrome lane without another
-page or automatic adoption. After its outcome, choose the next named unmet row;
+page or automatic adoption. With its bounded result recorded, choose the next named unmet row;
 do not automatically substitute another isolated UI/record component. The
 remaining requirements above are not all blocked on that manual run, nor does a
 pass on that run satisfy them. This map does not change a contract or gate.

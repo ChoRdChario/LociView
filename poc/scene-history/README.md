@@ -160,9 +160,25 @@ platform interruption evidence, the complete domain/privacy/reachability contrac
 GC, scale and ratified budgets. This result does not satisfy those gates and does
 not connect the adapter, Scene core or new team flow to the application UI.
 
-## Browser cross-store journal port — implemented preparation, not platform PASS
+## Browser cross-store journal port — bounded resumed Chrome check PASS
 
-**2026-09-09 implemented correction; Chrome recheck pending:** The PO's actual Chrome batch reached the
+**2026-09-09 PO-reported correction result: PASS within the resumed-run scope.**
+The supplied page shows `検証版：同時読み取り修正 1`, READY and the expected
+updated title/body/revision. After reload, the log from `16:43:11.803Z` through
+`16:44:05.468Z` records three no-op/zero-publication operations, each followed by
+successful local observation and other-tab notification, then two fresh page-load
+observations. No new FAIL appears in that supplied corrected-build interval.
+The served build identity below belongs to executable correction `96c218b`.
+
+This closes the reported simultaneous-read false-repair defect and its human
+Chrome recheck. Earlier initialization, interrupted old-state reload and exact
+recovery/one-publication evidence are reused from the same preserved run; their
+two pre-fix observation failures remain historical failures. It is not a new
+from-empty full run on the corrected build or agent-operated browser evidence.
+No further repetition/reset is requested. Process-kill, physical iOS, offline/PWA,
+scale, full application integration and G1-A/C adoption remain outside this PASS.
+
+**Preserved pre-fix failure:** The PO's actual Chrome batch reached the
 intended pending state, retained it across reload, and logged exact recovery with
 one publication. Immediate post-recovery observation failed; a manual observation
 and the other tab's notification later read the new state. A repeated recovery
@@ -185,14 +201,14 @@ retain the correct published heads without repair flags, payload reads, metadata
 writes or publications; a contending mutation still refuses. Missing/corrupt or
 denied receipt reads still yield read-only failure with the original cause.
 Reuse the existing exact recovery/no-op/interruption matrix. Do not reset the
-existing browser run; corrected real-browser confirmation remains required.
+existing browser run; its corrected real-browser result is recorded above.
 
 Executed correction evidence: both simultaneous-view regressions failed before
 the fix and all five new cases passed after it. The existing journal/Repo/purpose
 suite passes 55/55; CAS/retention passes 30/30 selected cases (the unchanged 500 MiB
 case was deliberately not rerun). Both isolated typechecks and the journal build
-pass. Independent targeted review found no blocking regression. These are Node
-and build results, not a corrected Chrome/OPFS PASS.
+pass. Independent targeted review found no blocking regression. These Node/build
+results are separate from the subsequently supplied human Chrome result above.
 
 The same loopback preview now serves `検証版：同時読み取り修正 1`. At
 `2026-09-08T16:23:11Z`, HTTP 200 bytes matched the local corrected build:
@@ -212,7 +228,7 @@ first tab without a manual observation. Reload both once more. No NEW FAIL shoul
 be appended; previous FAIL rows intentionally remain in the stored log. Supply
 these steps in chat when asking for recheck; no new run or start-button action.
 
-Next bounded prerequisite under specification 02 §8: run the same journal engine
+Bounded prerequisite under specification 02 §8: run the same journal engine
 against OPFS source/part/control/inventory files, the pinned Repo/IndexedDB adapter
 for original metadata, the existing OPFS CAS and a browser-owned per-run lock.
 No inline journal changes or in-memory metadata substitute. The synthetic run has

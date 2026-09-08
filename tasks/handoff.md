@@ -7,9 +7,13 @@
 > fail-fast lock. Only verified-presence reads now queue on that same lock;
 > mutations retain fail-fast admission and real failures preserve their cause.
 > Current todo/isolated README own exact checks and served build identity. The
-> preview shows `検証版：同時読み取り修正 1`. Corrected Chrome verification is still
-> pending: reuse both existing tabs/run/logs, never reset or repeat initialization
-> or the old 500 MiB test. No current app, dependency, schema or adoption changed.
+> preview shows `検証版：同時読み取り修正 1`. The PO subsequently supplied the same-run
+> Chrome recheck: three no-op/local-read/other-tab-notification sequences and two
+> final reloads, READY with new content and no new FAIL. Bounded correction PASS;
+> earlier initialization/recovery evidence is reused, not a fresh full corrected
+> run. Manual hold closed; do not repeat or reset. Exact result is in current todo
+> and the existing probe README. No app, dependency, schema, iOS/PWA or adoption
+> changed. The suggested early integrated app still needs its own scope approval.
 
 > **Current sequencing correction (2026-09-09):** PO requested a completion-path
 > audit at `d8f52d1` (clean, 21 ahead of local tracking; no fetch). Ten recent

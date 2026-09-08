@@ -2,7 +2,17 @@
 
 ## Current boundary — implementation through UI verification (2026-09-09)
 
-### Active correction — simultaneous journal readback after recovery (2026-09-09)
+### Completed correction — simultaneous journal readback after recovery (2026-09-09)
+
+PO supplied corrected-page output and the saved log after the same-run recheck.
+At executable `96c218b`, three no-op/zero-publication operations have successful
+local readback and other-tab notification, followed by two page reload readbacks;
+READY retains the expected updated title/body/revision. No new FAIL occurs in the
+supplied corrected interval (`16:43:11.803Z`–`16:44:05.468Z`, 2026-09-08 UTC).
+The bounded human Chrome recheck is PASS. Original initialization/recovery evidence
+is reused and the two old FAIL rows remain; no fresh-from-empty rerun, agent
+browser execution, full storage/adoption, iOS or offline/PWA PASS is implied.
+The manual hold is closed; no additional operation or reset is requested.
 
 PO's Chrome batch at the unchanged journal build passed initialization, deliberate
 prefix stop and old-state reload. Recovery reported exact original bytes/heads and
@@ -25,7 +35,7 @@ as `repairRequired`. No new architecture, schema or product-policy decision.
 - [x] Run focused regression, isolated typecheck/build and required root checks;
   obtain one targeted independent read-only correction review.
 - [x] Refresh the same preview and provide a short same-run recovery/reload
-  sequence in chat. Corrected Chrome outcome remains pending until observed.
+  sequence in chat; record the PO's successful corrected Chrome result above.
 
 Exit: concurrent readers succeed without duplicate publication or payload reads;
 mutation contention still refuses and missing/corrupt bytes still fail closed.
@@ -37,15 +47,17 @@ all five new cases pass afterward. Isolated journal/Repo/purposes 55/55 and
 CAS/retention 30 selected cases PASS; existing 500 MiB case intentionally omitted.
 Both isolated typechecks/build and targeted independent review pass. Corrected
 HTML/JS/WASM return HTTP 200 and match local build hashes, recorded in the existing
-probe README. Actual corrected Chrome confirmation is pending, not inferred.
+probe README. Actual corrected Chrome confirmation was subsequently supplied
+by the PO as recorded above; it was not inferred from those checks.
 Root typecheck, full 93 files / 1,770 PASS / 21 existing todo (two workers) and
 build pass; existing mixed-import/large-chunk warnings remain. Source changes
 are limited to the existing isolated probes; current application code and
 dependencies are unchanged. Whitespace checks pass, with no blocking review
-finding. Stop this correction at same-run Chrome confirmation rather than
-adding a new probe or treating Node results as platform/adoption PASS.
+finding. The same-run Chrome confirmation closes this correction without another
+probe or test rerun. Existing approved implementation may continue; front-loading
+an integrated app beyond 05 §13.3 remains a proposal, not authority from test PASS.
 
-### Active — completion-path correction and existing platform journal (2026-09-09)
+### Completed checkpoint — completion-path correction and existing platform journal (2026-09-09)
 
 PO requested a macro progress check before continuing. Audit checkpoint:
 `d8f52d1f9dbb7fdac00af1989eef012fc2252aaa`, clean `g0-baseline`, 0 behind / 21
