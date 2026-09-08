@@ -3,6 +3,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { fixtureModelBytes } from './modelClosure';
 import { defaultPose, fittedPose, placementMatrix, switchProjection, type CameraPose, type SyntheticDisplay } from './viewportModel';
 import type { ViewportFactory, ViewportObservation } from './viewportHost';
+import { readProjectCamera, readSolidBackground, type SolidBackground } from './viewHistory';
+import type { DisplayCapture } from './viewSession';
 
 /** Existing Three.js dependency, exact synthetic fixture only. No model loaders or Native controller. */
 export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
@@ -12,17 +14,38 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
   scene.add(new THREE.HemisphereLight(0xffffff, 0x77736e, 2));
   const light = new THREE.DirectionalLight(0xffffff, 2); light.position.set(3, 5, 4); scene.add(light);
   const poses = new Map<string, CameraPose>();
+  const backgrounds = new Map<string, SolidBackground>();
+  let background: SolidBackground = { kind: 'solid', colorSrgb: [232 / 255, 230 / 255, 226 / 255] };
+  let entryPending = false, notice: string | null = null;
   let pose = defaultPose(), display: SyntheticDisplay | null = null, modelKey = '', active = false, disposed = false, applying = false;
   let issue: string | null = null, contextLost = false, dragging = false, axis: ViewportObservation['axis'] = null, serial = 0, raf = 0, lastObservation = '';
   let width = 1, height = 1;
   const errorText = (e: unknown) => e instanceof Error ? e.message : '3D表示を開始できません。';
   function observePose() {
     if (!camera || !controls) return;
-    pose = { position: camera.position.toArray() as [number, number, number], target: controls.target.toArray() as [number, number, number],
-      up: camera.up.toArray() as [number, number, number], projection: camera instanceof THREE.PerspectiveCamera
+    const tuple = (v: THREE.Vector3) => v.toArray().map(n => n || 0) as [number, number, number];
+    pose = { position: tuple(camera.position), target: tuple(controls.target),
+      up: tuple(camera.up), projection: camera instanceof THREE.PerspectiveCamera
         ? { kind: 'perspective', verticalFov: THREE.MathUtils.degToRad(camera.fov) }
         : { kind: 'orthographic', verticalSpan: (camera.top - camera.bottom) / camera.zoom } };
-    if (display) poses.set(display.sceneId, pose);
+    if (display) { poses.set(display.sceneId, pose); backgrounds.set(display.sceneId, background); }
+  }
+  function useCapture(input: DisplayCapture) {
+    const c = readProjectCamera(input.camera), b = readSolidBackground(input.background);
+    pose = { position: c.position, target: c.target, up: c.up, projection: c.projection.kind === 'perspective'
+      ? { kind: 'perspective', verticalFov: c.projection.verticalFovRadians } : c.projection };
+    background = b; axis = null;
+  }
+  function enterScene() {
+    if (!display || !entryPending) return;
+    const entry = display.entry;
+    notice = entry?.kind === 'blocked' ? entry.reason : null;
+    if (entry?.kind === 'ready') useCapture(entry.payload);
+    else if (entry?.kind !== 'blocked') {
+      pose = poses.get(display.sceneId) ?? (display.bounds ? fittedPose(display.bounds, defaultPose(), width / height) : defaultPose());
+      background = backgrounds.get(display.sceneId) ?? { kind: 'solid', colorSrgb: [232 / 255, 230 / 255, 226 / 255] };
+    }
+    poses.set(display.sceneId, pose); backgrounds.set(display.sceneId, background); entryPending = false; axis = null;
   }
   function clearModels() {
     for (const child of [...models.children]) {
@@ -55,9 +78,9 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
   }
   function installPose() {
     if (!renderer) return;
+    const previousCamera = camera, previousControls = controls, previousBackground = scene.background, previousTouchAction = canvas.style.touchAction;
     applying = true;
     try {
-      controls?.dispose();
       const target = new THREE.Vector3(...pose.target), position = new THREE.Vector3(...pose.position);
       const extent = display?.bounds ? new THREE.Vector3(...display.bounds.max).sub(new THREE.Vector3(...display.bounds.min)).length() : 1;
       const center = display?.bounds ? new THREE.Vector3(...display.bounds.min).add(new THREE.Vector3(...display.bounds.max)).multiplyScalar(0.5) : target;
@@ -66,6 +89,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
       if (pose.projection.kind === 'perspective') camera = new THREE.PerspectiveCamera(THREE.MathUtils.radToDeg(pose.projection.verticalFov), width / height, Math.max(1e-6, far / 1e7), far);
       else { const half = pose.projection.verticalSpan / 2; camera = new THREE.OrthographicCamera(-half * width / height, half * width / height, half, -half, -far, far); }
       camera.position.copy(position); camera.up.set(...pose.up); camera.lookAt(target); camera.updateMatrixWorld(true);
+      if (![...camera.projectionMatrix.elements, ...camera.matrixWorld.elements].every(Number.isFinite)) throw new Error('表示範囲を確認してください。');
       controls = new OrbitControls(camera, canvas); controls.enableDamping = false; controls.target.copy(target);
       controls.addEventListener('start', () => { dragging = true; serial++; changed(); });
       controls.addEventListener('end', () => { dragging = false; observePose(); serial++; changed(); });
@@ -73,6 +97,15 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
         if (!applying) { try { axis = null; observePose(); updateClipping(); serial++; } catch (e) { fail(e); } }
       });
       controls.update();
+      scene.background = new THREE.Color().setRGB(...background.colorSrgb, THREE.SRGBColorSpace);
+      previousControls?.dispose();
+      // The old OrbitControls.disconnect resets this shared element to auto.
+      canvas.style.touchAction = 'none';
+    } catch (e) {
+      if (controls !== previousControls) controls?.dispose();
+      camera = previousCamera; controls = previousControls; scene.background = previousBackground;
+      canvas.style.touchAction = previousTouchAction;
+      throw e;
     } finally { applying = false; }
   }
   function updateClipping() {
@@ -90,7 +123,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
       // Reserve before notification: ready -> host render -> ensure may reenter synchronously.
       raf = requestAnimationFrame(draw);
       renderer.render(scene, camera);
-      const fingerprint = JSON.stringify([serial, width, height, display?.token, display?.pins, pose]);
+      const fingerprint = JSON.stringify([serial, width, height, display?.token, display?.pins, pose, background]);
       if (fingerprint !== lastObservation) { lastObservation = fingerprint; changed(); }
     } catch (e) { fail(e); }
   }
@@ -102,7 +135,8 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
       if (!renderer) {
         renderer = new THREE.WebGLRenderer({ canvas, antialias: true }); renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, 2));
-        pose = poses.get(display.sceneId) ?? (display.bounds ? fittedPose(display.bounds, defaultPose(), width / height) : defaultPose());
+        if (entryPending) enterScene();
+        else { pose = poses.get(display.sceneId) ?? pose; background = backgrounds.get(display.sceneId) ?? background; }
         installPose(); buildModels();
       }
       if (resized || !raf) {
@@ -124,7 +158,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
       const sceneChanged = display?.sceneId !== next.sceneId;
       const boundsChanged = JSON.stringify(display?.bounds) !== JSON.stringify(next.bounds);
       if (sceneChanged) observePose(); display = next;
-      if (sceneChanged) { pose = poses.get(next.sceneId) ?? (next.bounds ? fittedPose(next.bounds, defaultPose(), width / height) : defaultPose()); axis = null; installPose(); }
+      if (sceneChanged) { entryPending = true; if (renderer) { enterScene(); installPose(); } }
       else if (boundsChanged) { observePose(); installPose(); }
       buildModels(); serial++;
     },
@@ -135,8 +169,8 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
         return { id: pin.id, x: (p.x + 1) * width / 2, y: (1 - p.y) * height / 2,
           visible: Boolean(camera && p.z >= -1 && p.z <= 1 && Math.abs(p.x) <= 1 && Math.abs(p.y) <= 1) };
       }) ?? [];
-      return { token: JSON.stringify([serial, display?.sceneId, display?.projectFrameId, display?.bounds, width, height, pose]),
-        ready: Boolean(active && renderer && camera && !issue), issue, dragging, projection: pose.projection.kind, axis, pins };
+      return { token: JSON.stringify([serial, display?.sceneId, display?.projectFrameId, display?.bounds, width, height, pose, background]),
+        ready: Boolean(active && renderer && camera && !issue), issue, notice, dragging, projection: pose.projection.kind, axis, pins };
     },
     camera(intent) {
       if (!active || !renderer || issue || !display || dragging) throw new Error('3D表示を確認してください。');
@@ -145,6 +179,18 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
       if (intent.kind === 'projection') pose = switchProjection(pose, intent.projection);
       else { if (!display.bounds) throw new Error('表示するモデルがありません。'); pose = fittedPose(display.bounds, pose, width / height, intent.kind === 'axis' ? intent.axis : undefined); }
       axis = intent.kind === 'axis' ? intent.axis : null; installPose(); observePose(); serial++; changed();
+    },
+    capture() {
+      if (!active || !renderer || issue || !display || dragging) throw new Error('3D表示を確認してください。');
+      return { camera: readProjectCamera({ position: pose.position, target: pose.target, up: pose.up,
+        projection: pose.projection.kind === 'perspective' ? { kind: 'perspective', verticalFovRadians: pose.projection.verticalFov } : pose.projection }), background: readSolidBackground(background) };
+    },
+    recall(payload) {
+      if (!active || !renderer || issue || !display || dragging) throw new Error('3D表示を確認してください。');
+      const previousPose = pose, previousBackground = background, previousAxis = axis;
+      try { useCapture(payload); installPose(); }
+      catch (e) { pose = previousPose; background = previousBackground; axis = previousAxis; throw e; }
+      poses.set(display.sceneId, pose); backgrounds.set(display.sceneId, background); notice = null; serial++; changed();
     },
     retry() { if (contextLost) throw new Error('描画環境の復旧を待って再試行してください。'); release(); issue = null; ensure(); },
     dispose() { disposed = true; release(); resize.disconnect(); canvas.removeEventListener('webglcontextlost', lost); canvas.removeEventListener('webglcontextrestored', restored); },

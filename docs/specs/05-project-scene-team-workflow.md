@@ -1147,6 +1147,29 @@ nonblocking visual polish. A required gate/ratification blocks its actual
 activation, not unrelated authorized development. Before such a boundary,
 report the exact missing prerequisite instead of inventing substitute work.
 
+**Observed Saved View connection (from `e8451a7`):** the same synthetic
+host connects existing authoring/recall/entry controls through exact known
+Scene-owned records and the neutral causal history port. Camera, background,
+name, order, lifecycle and each Scene entry pointer remain independent atomic
+fields; capture publishes camera plus background in one logical change. Exact
+per-field causal versions prevent silent recapture rebase. Captures retain
+ProjectCamera pose/radian FOV or orthographic span and exact solid sRGB, not HEX
+or engine-linear values. Unsupported transparent backgrounds refuse explicitly.
+Creation never sets entry; selecting/setting entry never recalls immediately.
+Confirmed deletion requires no current entry reference and tombstones lifecycle.
+Reorder allocates a key between the exact validated neighbors or refuses without
+changing anything. Source identities, drafts, capture and allocated IDs survive
+failure/retry. Scene entry applies its valid view once after composition, before
+retained temporary pose; invalid default leaves the camera unchanged and reports
+why. Refresh/receive/actor reactivation never reapply entry. No real file/storage,
+general provider/renderer adoption or ordinary-app activation. Tests verify only
+this connected synthetic path; native/raster/device evidence remains required.
+The fixed candidate adapter derives flat ImmutableString cell versions from
+original setter/predecessor operation IDs, including explicit same-value edits;
+this is not a generally adopted field-version API. Recall failure preserves the
+previous camera/background/control state. Tests also cover unrelated membership
+copying after View creation and independent camera/entry failure messages.
+
 **Observed comparison-window connection (from `d12f271`):** reuses existing
 Scene-local follower/retained/dismissed/order/placement memory in the same host,
 separately for each actor. Floating windows show confirmed Caption text; drafts

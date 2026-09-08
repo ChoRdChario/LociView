@@ -46,7 +46,7 @@ deletes/replaces the scalar to resolve even the materialized winner. In 3.4.1,
 `getConflicts` exposes immutable-string candidates as JS strings while the map
 property is `ImmutableString`; the adapter handles both without choosing one.
 
-Twenty-five current executable cases cover second-round field/membership preservation,
+Thirty current executable cases cover second-round field/membership preservation,
 original bytes/base, both scalar choices, incomplete/foreign/stale rejection,
 draft retention, actor-bound/disposed choice refusal and mounted two-actor
 edit/receive/choose/replay controls, model update with retained local work, explicit
@@ -61,6 +61,12 @@ are restricted to the known attachment/tag-empty fixture; model copies to a
 fully specified triangle fixture without unhandled parent/derivation/material
 dependencies. Descriptor checks are not full incoming-history admission. These
 are Node plus authored-DOM records, **not rendered/browser/IME/device evidence**.
+Five cases added with Saved Views cover original setter/predecessor-based atomic
+field versions (the pinned flat ImmutableString map only), independent rename/
+capture, equal-value causal edits and conflicts, exact create retry, invalid
+reference/identity refusal, existing membership-copy compatibility, independent
+error lanes and the same mounted two-actor conflict flow. The decoded-operation
+API is confined to this fixed candidate; no general provider API is adopted.
 Run from repository root:
 
 ```powershell
@@ -77,6 +83,18 @@ content unchanged; edit again and exchange both ways for a second round. Keep
 unapplied text through a receive and verify it is not lost; native IME/layout
 checks remain batched pending. Reload intentionally loses all demonstration work.
 This is not a new manual hold or a request to repeat the journal tests.
+
+Extend the same later batch in `視点`: orbit/zoom, select `視点を作る`, enter a
+name and `視点を追加`. Moving the camera after beginning creation must not replace
+that held capture. Selecting a saved view does not move the camera; `表示` recalls
+camera and background. `編集` supports name-only changes or `現在の表示を使用`;
+`変更を適用` publishes only the chosen edits. Set `シーンを開いたときの視点`
+and `設定を適用`: the camera stays put until leaving and re-entering the Scene.
+Ordinary refresh or actor return must retain the temporary camera. Entry views
+cannot be deleted until cleared/reassigned; other deletions require confirmation.
+Exchange as the other actor, edit and exchange again; simultaneous camera edits
+require an explicit candidate choice. Test IME/caret, touch/orbit and actual
+framing in that one batch; these remain unverified by the automated connection tests.
 
 For the later browser batch, select a model in `モデル`, choose a synthetic model
 update and receive it as the other actor. The same shared Caption keeps its text

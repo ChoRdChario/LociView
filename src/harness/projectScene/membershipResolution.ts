@@ -88,7 +88,7 @@ export function planMembershipResolution(snapshot: HistorySnapshot, group: Dupli
       lifecycle: value({ state: 'active', eventId, reason: 'conflictResolution' }) });
   }
   // Reuse the exact known fixture projector before the single causal publication.
-  projectHistory({ token: snapshot.token, cells: { ...snapshot.cells, ...Object.fromEntries(Object.entries(changes).map(([key, text]) =>
+  projectHistory({ token: snapshot.token, cellVersions: snapshot.cellVersions, cells: { ...snapshot.cells, ...Object.fromEntries(Object.entries(changes).map(([key, text]) =>
     [key, { kind: 'value' as const, value: text }])) } }, snapshot);
   return freezeSynthetic({ token: snapshot.token, group: current, originalEdgeId, action, eventId, copies: [...copies], modelCopies: [...modelCopies], changes });
 }

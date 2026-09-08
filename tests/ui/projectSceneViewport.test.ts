@@ -26,8 +26,8 @@ vi.mock('three/addons/controls/OrbitControls.js', async () => {
   const three = await import('three');
   return { OrbitControls: class extends three.EventDispatcher<any> {
     target = new three.Vector3(); disposed = false;
-    constructor(readonly object: any) { super(); tracker.controls.push(this); }
-    update() { this.object.lookAt(this.target); } dispose() { this.disposed = true; }
+    constructor(readonly object: any, readonly canvas: HTMLCanvasElement) { super(); canvas.style.touchAction = 'none'; tracker.controls.push(this); }
+    update() { this.object.lookAt(this.target); } dispose() { this.disposed = true; this.canvas.style.touchAction = 'auto'; }
   } };
 });
 const descendants = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(descendants)];
@@ -102,11 +102,11 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     viewport.camera({ kind: 'axis', axis: '+x' }); viewport.camera({ kind: 'projection', projection: 'orthographic' });
     const camera = tracker.controls.at(-1).object as THREE.OrthographicCamera; camera.zoom = 2;
     tracker.controls.at(-1).dispatchEvent({ type: 'change' }); expect(viewport.read().axis).toBeNull();
-    const pose = JSON.parse(viewport.read().token).at(-1);
+    const pose = viewport.capture!().camera;
     viewport.update(syntheticDisplay({ ...p, state: { ...p.state, token: 'new' }, resources: { ...p.resources, token: 'new' } }, f.overview, [], null));
-    expect(JSON.parse(viewport.read().token).at(-1)).toEqual(pose);
+    expect(viewport.capture!().camera).toEqual(pose);
     viewport.update(syntheticDisplay(p, f.detail, null, null)); viewport.update(syntheticDisplay(p, f.overview, null, null));
-    expect(JSON.parse(viewport.read().token).at(-1)).toEqual(pose);
+    expect(viewport.capture!().camera).toEqual(pose);
     viewport.camera({ kind: 'projection', projection: 'perspective' });
     const orbit = tracker.controls.at(-1), cam = orbit.object as THREE.PerspectiveCamera;
     cam.position.set(0, 0, 10000); orbit.update(); orbit.dispatchEvent({ type: 'change' });
@@ -126,6 +126,33 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     expect(tracker.raf.size).toBe(0); expect(() => viewport.retry()).toThrow('復旧を待って');
     canvas.canvas.fire('webglcontextrestored'); expect(viewport.read().ready).toBe(false);
     viewport.retry(); expect(viewport.read().ready).toBe(true); viewport.dispose();
+  });
+
+  it('captures exact FOV, actual ortho zoom and sRGB, with entry only on Scene entry, not refresh/reactivation', () => {
+    const canvas = fakeCanvas(), v = createSyntheticViewport(canvas.canvas as unknown as HTMLCanvasElement, () => {});
+    const p = createSyntheticProject(), a = syntheticDisplay(p, f.overview, null, null), b = syntheticDisplay(p, f.detail, null, null);
+    const payload = { camera: { position: [2, 3, 10] as const, target: [0, 0, 0] as const, up: [0, 1, 0] as const,
+      projection: { kind: 'perspective' as const, verticalFovRadians: 0.63 } }, background: { kind: 'solid' as const, colorSrgb: [0.1234567, 0.4, 0.83] as const } };
+    v.update({ ...a, entry: { kind: 'ready', payload } }); v.setActive(true); canvas.show(390, 700);
+    expect(v.capture!()).toEqual(payload); expect(tracker.controls.at(-1).object.fov).toBeCloseTo(THREE.MathUtils.radToDeg(0.63));
+    const rgb = tracker.renderers.at(-1).scene.background;
+    expect(rgb.r).toBeCloseTo(((payload.background.colorSrgb[0] + 0.055) / 1.055) ** 2.4, 10);
+    v.camera({ kind: 'projection', projection: 'orthographic' }); const orbit = tracker.controls.at(-1);
+    expect(canvas.canvas.style.touchAction).toBe('none');
+    orbit.object.zoom = 3; orbit.dispatchEvent({ type: 'change' });
+    const moved = v.capture!(); expect(moved.camera.projection).toEqual({ kind: 'orthographic', verticalSpan: (orbit.object.top - orbit.object.bottom) / 3 });
+    v.update({ ...a, token: 'received', entry: { kind: 'ready', payload } }); expect(v.capture!()).toEqual(moved);
+    v.setActive(false); v.setActive(true); expect(v.capture!()).toEqual(moved);
+    v.update(b); v.update({ ...a, entry: { kind: 'ready', payload } }); expect(v.capture!()).toEqual(payload);
+    v.update({ ...b, entry: { kind: 'blocked', reason: '開始時の視点を確認' } }); expect(v.capture!()).toEqual(payload);
+    expect(v.read()).toMatchObject({ ready: true, notice: '開始時の視点を確認' });
+    expect(() => v.recall!({ ...payload, camera: { ...payload.camera, up: [0, 0, 0] } })).toThrow();
+    const oldControls = tracker.controls.at(-1), oldCamera = oldControls.object, oldBackground = tracker.renderers.at(-1).scene.background.clone();
+    expect(() => v.recall!({ ...payload, camera: { ...payload.camera, position: [1e160, 0, 0] }, background: { kind: 'solid', colorSrgb: [1, 0, 0] } })).toThrow();
+    expect(oldControls.disposed).toBe(false); expect(tracker.controls.at(-1).object).toBe(oldCamera);
+    expect(canvas.canvas.style.touchAction).toBe('none');
+    expect(tracker.renderers.at(-1).scene.background).toEqual(oldBackground); expect(v.read().ready).toBe(true);
+    expect(v.capture!()).toEqual(payload); v.dispose();
   });
 
   it('connects pin selection and view controls, while camera dragging blocks Scene changes without cancelling drafts', () => {

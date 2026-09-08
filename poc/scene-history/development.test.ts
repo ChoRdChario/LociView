@@ -19,6 +19,10 @@ import { applyMembershipResolution, duplicateMemberships, planMembershipResoluti
 import { planNavigation } from '../../src/ui/projectScene/navigationState';
 import { resolveScene } from '../../src/scene/resolve';
 import { RecordedDocument, RecordedNode, record } from '../../tests/ui/domRecorder';
+import { planView, type ViewRuntime } from '../../src/ui/projectScene/viewState';
+import { editViewName, planViewAuthor, type ViewAuthorContext } from '../../src/ui/projectScene/viewAuthoringState';
+import { viewKey, entryKey } from '../../src/harness/projectScene/viewHistory';
+import type { DisplayCapture } from '../../src/harness/projectScene/viewSession';
 
 const factory = (seed: Readonly<Record<string, string>>, validate: Parameters<typeof createDevelopmentPair>[2]) => createDevelopmentPair(A, seed, validate);
 const pair = () => factory(historySeed(), projectHistory);
@@ -60,7 +64,8 @@ function enterDetail(session: SyntheticSession) {
 }
 function includeCaption(session: SyntheticSession, id = f.second) {
   expect(session.acceptInclude(planCaptionInclude(session.includeContext(), { kind: 'select', captionId: id }))).toBe(true);
-  expect(session.acceptInclude(planCaptionInclude(session.includeContext(), { kind: 'include' }))).toBe(true);
+  const accepted = session.acceptInclude(planCaptionInclude(session.includeContext(), { kind: 'include' }));
+  expect(accepted, session.message).toBe(true);
 }
 function resolution(history: DevelopmentHistory, group: DuplicateMembership, originalEdgeId: string, action: 'one' | 'both') {
   return planMembershipResolution(history.read(), group, originalEdgeId, action, freshId('evt'), action === 'one' ? [] :
@@ -79,6 +84,110 @@ function modelConflict() {
 }
 
 describe('actual pinned candidate connected to synthetic workspace; not browser, wire or durable acceptance', () => {
+  const viewPayload = (): DisplayCapture => ({ camera: { position: [1, 2, 10], target: [0, 0, 0], up: [0, 1, 0], projection: { kind: 'perspective', verticalFovRadians: 0.7 } },
+    background: { kind: 'solid', colorSrgb: [0.1234567, 0.42, 0.83] } });
+  const viewRuntime = (s: SyntheticSession): ViewRuntime => ({ kind: 'ready', token: 'runtime-1', sceneId: s.sceneId, projectFrameId: s.snapshot.resources.projectFrameId,
+    projection: 'perspective', axis: null, bounds: { kind: 'value', value: 'available' } });
+  const viewContext = (s: SyntheticSession) => s.views.context(viewRuntime(s), null);
+  const authorContext = (s: SyntheticSession): ViewAuthorContext => s.views.authorContext(viewContext(s), viewPayload);
+  const author = (s: SyntheticSession, kind: 'new' | 'edit' | 'capture' | 'apply') => s.views.acceptAuthor(planViewAuthor(authorContext(s), { kind }), authorContext(s));
+  const viewName = (s: SyntheticSession, name: string) => { const c = authorContext(s); return s.views.acceptAuthor({ kind: 'input', baseDraft: c.draft!, draft: editViewName(c.draft!, name) }, c); };
+  const chooseView = (s: SyntheticSession, viewId: string) => s.views.accept(planView(viewContext(s), { kind: 'select', viewId }), viewContext(s), () => {});
+
+  it('keeps exact per-field causal versions through no-conflict, unrelated writes, same-value writes, equal concurrent candidates and choice', () => {
+    const [a, b] = pair(), key = captionKey(f.shared, 'title'), initial = a.read();
+    a.write(initial.token, { [captionKey(f.shared, 'body')]: 'Independent' });
+    expect(a.read().cellVersions![key]).toBe(initial.cellVersions![key]);
+    const text = (initial.cells[key] as { value: string }).value;
+    a.write(a.read().token, { [key]: text }); expect(a.read().cellVersions![key]).not.toBe(initial.cellVersions![key]);
+    b.write(b.read().token, { [key]: text }); a.receive(b.exportUpdate());
+    const conflict = a.read().cells[key]!; expect(conflict.kind).toBe('conflict'); if (conflict.kind !== 'conflict') throw new Error('conflict');
+    expect(conflict.candidates).toHaveLength(2); expect(new Set(conflict.candidates.map(c => c.value)).size).toBe(1);
+    const before = a.read().cellVersions![key]; a.choose(a.read().token, key, conflict.candidates[0]!.id);
+    expect(a.read().cells[key]).toEqual({ kind: 'value', value: text }); expect(a.read().cellVersions![key]).not.toBe(before);
+  });
+
+  it('creates and exchanges a whole View; sparse rename/capture merge, stale capture retains draft, typed camera choice and second round preserve bytes', () => {
+    const [a, b] = pair(), sa = new SyntheticSession(historyAuthority(a)), sb = new SyntheticSession(historyAuthority(b));
+    expect(author(sa, 'new')).toBe(true); expect(viewName(sa, '入口')).toBe(true); expect(author(sa, 'apply')).toBe(true);
+    const id = viewContext(sa).memory.selectedViewId!; b.receive(a.exportUpdate()); sb.refreshHistory(); chooseView(sb, id);
+    const key = viewKey(id, 'camera'), bg = viewKey(id, 'background'), nameKey = viewKey(id, 'name'), initial = a.read();
+    expect(author(sa, 'edit')).toBe(true); expect(viewName(sa, '正面')).toBe(true); expect(author(sa, 'apply')).toBe(true);
+    expect(a.read().cellVersions![key]).toBe(initial.cellVersions![key]); expect(a.read().cellVersions![bg]).toBe(initial.cellVersions![bg]);
+    expect(author(sb, 'edit')).toBe(true); expect(author(sb, 'capture')).toBe(true);
+    b.receive(a.exportUpdate()); sb.refreshHistory(); expect(author(sb, 'apply')).toBe(true); // unrelated rename does not stale capture
+    a.receive(b.exportUpdate()); sa.refreshHistory();
+    expect(a.read().cells[nameKey]).toEqual({ kind: 'value', value: '正面' }); expect(a.read().cells[key]).toEqual({ kind: 'value', value: canonicalFixture(viewPayload().camera) });
+    expect(author(sa, 'edit')).toBe(true); expect(author(sa, 'capture')).toBe(true); const draft = authorContext(sa).draft;
+    b.write(b.read().token, { [key]: canonicalFixture(viewPayload().camera) }); a.receive(b.exportUpdate()); sa.refreshHistory();
+    expect(author(sa, 'apply')).toBe(false); expect(authorContext(sa).draft).toBe(draft); expect(authorContext(sa).feedback).toMatchObject({ kind: 'failed' });
+    expect(sa.views.acceptAuthor({ kind: 'cancel', draft: draft! }, authorContext(sa))).toBe(true);
+    const alternate = { ...viewPayload().camera, position: [4, 5, 6] };
+    a.write(a.read().token, { [key]: canonicalFixture(alternate) });
+    b.write(b.read().token, { [key]: canonicalFixture({ ...alternate, position: [6, 5, 4] }) }); a.receive(b.exportUpdate()); sa.refreshHistory();
+    expect(viewContext(sa).source).toMatchObject({ kind: 'ready' });
+    expect(planView(viewContext(sa), { kind: 'recall' }).kind).toBe('blocked');
+    const cell = a.read().cells[key]!; if (cell.kind !== 'conflict') throw new Error('conflict');
+    a.choose(a.read().token, key, cell.candidates[0]!.id); b.receive(a.exportUpdate());
+    expect(a.read().cells).toEqual(b.read().cells); const sent = bytes(a.exportUpdate());
+    expect(a.receive(b.exportUpdate()).added).toBe(0); expect(bytes(a.exportUpdate())).toEqual(sent);
+  });
+
+  it('retains the exact fresh View command/capture after failure; rejects partial, wrong-Scene, malformed and identity rewrites before publication', () => {
+    const [a] = pair(), commands: Readonly<Record<string, string>>[] = []; let reject = true;
+    const authority = historyAuthority(a), s = new SyntheticSession({ read: authority.read, write: (token, changes) => {
+      commands.push(changes); if (reject) throw new Error('injected failure'); return authority.write(token, changes);
+    } });
+    author(s, 'new'); viewName(s, '入口'); const held = authorContext(s).draft;
+    expect(author(s, 'apply')).toBe(false); expect(authorContext(s).draft).toBe(held); expect(s.pending).toBe('text');
+    reject = false; expect(author(s, 'apply')).toBe(true); expect(commands[1]).toBe(commands[0]);
+    const id = viewContext(s).memory.selectedViewId!, initial = a.read();
+    for (const changes of [
+      { [viewKey(freshId('view'), 'name')]: 'partial' },
+      { [entryKey(f.detail)]: canonicalFixture(id) },
+      { [viewKey(id, 'camera')]: canonicalFixture({ ...viewPayload().camera, up: [0, 0, 0] }) },
+      { [viewKey(id, 'identity')]: canonicalFixture({ id, sceneId: f.detail, projectFrameId: s.snapshot.resources.projectFrameId }) },
+    ]) { expect(() => a.write(a.read().token, changes)).toThrow(); expect(a.read()).toEqual(initial); }
+  });
+
+  it('preserves existing membership-copy workflows after adding a View and does not clear entry failure with camera success', () => {
+    const [a, b] = pair(), sa = new SyntheticSession(historyAuthority(a)), sb = new SyntheticSession(historyAuthority(b));
+    author(sa, 'new'); viewName(sa, '入口'); expect(author(sa, 'apply')).toBe(true); const id = viewContext(sa).memory.selectedViewId!;
+    b.receive(a.exportUpdate()); sb.refreshHistory();
+    const wanted = planView(viewContext(sa), { kind: 'chooseEntry', viewId: id }); expect(sa.views.accept(wanted, viewContext(sa), () => {})).toBe(true);
+    b.write(b.read().token, { [entryKey(f.overview)]: 'null' }); a.receive(b.exportUpdate()); sa.refreshHistory();
+    expect(sa.views.accept(planView(viewContext(sa), { kind: 'applyEntry' }), viewContext(sa), () => {})).toBe(false);
+    const failure = viewContext(sa).entryFeedback;
+    expect(sa.views.accept(planView(viewContext(sa), { kind: 'fit' }), viewContext(sa), () => {})).toBe(true);
+    expect(viewContext(sa).entryFeedback).toEqual(failure); expect(failure.kind).toBe('failed');
+    sa.views.accept(planView(viewContext(sa), { kind: 'cancelEntry' }), viewContext(sa), () => {});
+    sb.refreshHistory(); enterDetail(sa); enterDetail(sb); includeCaption(sa); includeCaption(sb); a.receive(b.exportUpdate()); sa.refreshHistory();
+    const group = duplicateMemberships(a.read()).find(g => g.kind === 'caption')!;
+    const kept = resolution(a, group, group.edges[0]!.id, 'both'); applyMembershipResolution(a, kept);
+    expect(a.read().cells[viewKey(id, 'camera')]).toEqual({ kind: 'value', value: canonicalFixture(viewPayload().camera) });
+    expect(duplicateMemberships(a.read())).toHaveLength(0);
+  });
+
+  it('mounts Saved View creation and two-actor conflict choice in the same UI without a default camera winner', () => {
+    const doc = new RecordedDocument(), team = createTeamWorkspace(doc.asDocument(), factory, () => ({ update() {}, setActive() {},
+      read: () => ({ token: 'camera-1', ready: true, issue: null, dragging: false, projection: 'perspective', axis: null, pins: [] }),
+      capture: viewPayload, recall() {}, camera() {}, retry() {}, dispose() {} }));
+    const root = record(team.root), actor = label(root, '操作する人'); let workspace = visibleWorkspace(root);
+    button(workspace, '視点').fire('click'); button(workspace, '視点を作る').fire('click');
+    const input = label(workspace, '視点の名称'); input.value = '入口'; input.fire('input'); button(workspace, '視点を追加').fire('click');
+    const id = viewContext(team.sessions[0]!).memory.selectedViewId!; expect(id).toMatch(/^view_/);
+    actor.value = '1'; actor.fire('change'); button(root, '相手の更新を受け取る').fire('click');
+    const [a, b] = team.histories, key = viewKey(id, 'camera');
+    a!.write(a!.read().token, { [key]: canonicalFixture({ ...viewPayload().camera, position: [3, 4, 5] }) });
+    b!.write(b!.read().token, { [key]: canonicalFixture({ ...viewPayload().camera, position: [5, 4, 3] }) });
+    button(root, '相手の更新を受け取る').fire('click'); const panel = label(root, '更新の競合');
+    expect(descendants(panel).some(n => n.tag === 'legend' && n.textContent === '入口 — カメラ')).toBe(true);
+    const radios = descendants(panel).filter(n => n.tag === 'input' && n.type === 'radio'); expect(radios).toHaveLength(2);
+    expect(radios.every(n => !n.checked)).toBe(true); expect(button(panel, '選んだ内容を使用').disabled).toBe(true);
+    radios[0]!.fire('change'); button(panel, '選んだ内容を使用').fire('click');
+    expect(b!.read().cells[key]!.kind).toBe('value'); actor.value = '0'; actor.fire('change'); button(root, '相手の更新を受け取る').fire('click');
+    expect(a!.read().cells[key]).toEqual(b!.read().cells[key]); team.dispose();
+  });
   it('copies the exact model closure once, moves only the copy and converges through a second exchange', () => {
     const { a, b, sa, sb, group } = modelConflict(), before = projectHistory(a.read()), base = a.exportUpdate().base;
     const source = sa.modelVersions.find(v => v.assetId === f.structure)!.closure, plan = modelResolution(a, group), copy = plan.modelCopies[0]!;

@@ -27,6 +27,9 @@ six-axis/projection controls and retained temporary cameras through existing
 Three.js. This is not full model admission or a ratified renderer/format profile.
 Retained comparison windows now connect to confirmed Caption text and visible
 pins, with explicit close/reopen, independent front order and local positioning.
+Scene-owned Saved View creation/recapture/recall, naming/order, explicit deletion
+and entry setting now connect to exact camera/solid-background captures and
+the same two-actor history. Entry applies only on actual Scene entry.
 File/package exchange, durable storage and rendered/device acceptance remain
 pending as recorded in todo.
 Real Project, storage, package and current-app activation retain their gates.

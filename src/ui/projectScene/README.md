@@ -257,6 +257,14 @@ it never recalls the view now. No first/default/foreign view is automatically
 selected. Missing/deleted/duplicate/conflicted view state stays explicit; an
 independent name/order conflict does not block a resolved camera/background.
 
+Current synthetic connection (05 §13.4): `harness/projectScene/viewSession.ts`
+retains per-actor/Scene draft/capture/memory, dispatches sparse neutral-history
+commands and verifies working-state receipts before changing editing targets.
+The same host connects these controls to the fixture viewport, exact solid sRGB,
+radian FOV/orthographic span and once-only entry. No real-file/durable provider or
+rendered acceptance is implied. The host contract below still applies to later
+ordinary-product integration.
+
 Host contract before integration:
 
 - Source is a validated, immutable, conflict-aware projection; camera/background

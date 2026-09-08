@@ -40,7 +40,23 @@ export function createDevelopmentPair(A: Api, seed: Readonly<Record<string, stri
   const rootHashes = (changes: Map<string, Change>) => [...changes].filter(([, c]) => !c.deps.length).map(([hash]) => hash).sort();
   const roots = rootHashes(index(A.getAllChanges(bootstrap)));
   function snapshot(doc: Doc): HistorySnapshot {
-    return Object.freeze({ token: `memory-history:${heads(doc).join(',')}`, cells: Object.freeze(
+    const cellVersions: Record<string, string> = {};
+    // Fixed 3.4.1 flat ImmutableString map only. getConflicts omits single setters.
+    // Decode original changes (already bounded above), never derive versions from values/heads.
+    const objectId = A.getObjectId(doc.cells), setters = new Map<string, Set<string>>(), removed = new Map<string, Set<string>>();
+    if (!objectId) fail();
+    for (const bytes of A.getAllChanges(doc)) {
+      const change = A.decodeChange(bytes);
+      change.ops.forEach((op, i) => {
+        if (op.obj !== objectId) return;
+        if (typeof op.key !== 'string' || !['set', 'del'].includes(op.action) || ('insert' in op && op.insert) ||
+          (op.action === 'set' && (typeof op.value !== 'string' || op.datatype !== undefined))) fail();
+        const live = setters.get(op.key) ?? new Set<string>(), dead = removed.get(op.key) ?? new Set<string>();
+        if (op.action === 'set') live.add(`${change.startOp + i}@${change.actor}`);
+        op.pred.forEach(id => dead.add(id)); setters.set(op.key, live); removed.set(op.key, dead);
+      });
+    }
+    const cells = Object.freeze(
       Object.fromEntries(Object.keys(doc.cells).map(key => {
         const conflicts = A.getConflicts(doc.cells, key);
         const candidates = Object.entries(conflicts ?? {}).map(([id, v]) => {
@@ -49,10 +65,14 @@ export function createDevelopmentPair(A: Api, seed: Readonly<Record<string, stri
           if (typeof v !== 'string' && !(v instanceof A.ImmutableString)) fail();
           return Object.freeze({ id, value: v.toString() });
         }).sort((a, b) => a.id.localeCompare(b.id));
+        const ids = [...(setters.get(key) ?? [])].filter(id => !removed.get(key)?.has(id)).sort();
+        if (!ids.length || (candidates.length > 1 && !equal(ids, candidates.map(c => c.id)))) fail();
+        cellVersions[key] = JSON.stringify([objectId, key, ids]);
         const v = doc.cells[key]; if (!(v instanceof A.ImmutableString)) fail();
         return [key, candidates.length > 1 ? Object.freeze({ kind: 'conflict' as const, candidates: Object.freeze(candidates) }) :
           Object.freeze({ kind: 'value' as const, value: v.toString() })];
-      }))) });
+      })));
+    return Object.freeze({ token: `memory-history:${heads(doc).join(',')}`, cells, cellVersions: Object.freeze(cellVersions) });
   }
   function participant(): DevelopmentHistory {
     // clone without actor option allocates an independent actor; edits never mutate the bootstrap.
@@ -74,7 +94,11 @@ export function createDevelopmentPair(A: Api, seed: Readonly<Record<string, stri
           if (typeof v !== 'string' || snapshot(doc).cells[key]?.kind === 'conflict') fail();
         }
         return publish(A.change(detached(), { time: 0, message: 'synthetic local command' }, draft => {
-          for (const [key, v] of Object.entries(changes)) draft.cells[key] = new A.ImmutableString(v);
+          for (const [key, v] of Object.entries(changes)) {
+            // Explicit same-value writes still record their exact causal field edit.
+            if (draft.cells[key]?.toString() === v) delete draft.cells[key];
+            draft.cells[key] = new A.ImmutableString(v);
+          }
         }));
       },
       choose(token, key, candidateId) {

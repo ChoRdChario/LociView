@@ -139,9 +139,14 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
       const [, id, field] = key.split('/');
       const ordinal = Object.keys(session.snapshot.resources.captions).indexOf(id!) + 1;
       const membership = key.startsWith('membership/') ? JSON.parse(cell.candidates[0]!.value) as Membership : null;
+      const saved = key.startsWith('view/') ? session.snapshot.viewData?.records[id!] : undefined;
+      const viewLabel = saved?.name.kind === 'value' ? saved.name.value : '視点';
+      const viewFields: Record<string, string> = { name: '名称', camera: 'カメラ', background: '背景', order: '順序', lifecycle: '削除状態' };
       const subject = membership ? `${session.snapshot.state.scenes[membership.sceneId]!.name.kind === 'value' ?
         (session.snapshot.state.scenes[membership.sceneId]!.name as { value: string }).value : 'シーン'} — 所属する項目` :
         key.startsWith('asset/') ? `${session.snapshot.modelNames[id!] ?? 'モデル'} — 使用するモデル` :
+        key.startsWith('view/') ? `${viewLabel} — ${viewFields[field!] ?? '視点の状態'}` :
+        key.startsWith('scene/') ? 'シーンを開いたときの視点' :
         `キャプション ${ordinal} — ${field === 'title' ? 'タイトル' : field === 'body' ? '本文' : field === 'anchor' ? 'ピン位置' : 'ピン色'}`;
       const group = make('fieldset'), legend = make('legend', subject);
       const confirm = make('button', '選んだ内容を使用'); confirm.type = 'button'; confirm.disabled = true;
@@ -149,6 +154,15 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
       group.append(legend);
       for (const [i, candidate] of cell.candidates.entries()) {
         let description = candidate.value || '（空欄）';
+        if (key.startsWith('scene/')) {
+          const target = JSON.parse(candidate.value) as string | null, row = target ? session.snapshot.viewData?.records[target] : null;
+          description = target === null ? '指定なし' : row?.name.kind === 'value' ? row.name.value : '名称を確認';
+        }
+        if (key.startsWith('view/') && ['camera', 'background', 'lifecycle'].includes(field!)) {
+          const v = JSON.parse(candidate.value);
+          description = field === 'camera' ? `${v.projection.kind === 'perspective' ? '透視投影' : '平行投影'} — 位置 ${v.position.join(' / ')}、注視点 ${v.target.join(' / ')}、上方向 ${v.up.join(' / ')}、${v.projection.kind === 'perspective' ? `画角 ${v.projection.verticalFovRadians} rad` : `縦幅 ${v.projection.verticalSpan}`}` :
+            field === 'background' ? `背景色（sRGB） ${v.colorSrgb.join(' / ')}` : v.state === 'deleted' ? '削除する' : '残す';
+        }
         if (membership) {
           const edge = JSON.parse(candidate.value) as Membership, caption = session.snapshot.resources.captions[edge.resourceId];
           const name = session.snapshot.modelNames[edge.resourceId] ?? (caption?.title.kind === 'value' ? caption.title.value : 'キャプション');

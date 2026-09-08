@@ -79,6 +79,10 @@ triangle/pin display now connects fit, six axes and projection with retained
 temporary cameras. Multiple retained Caption windows now connect confirmed text,
 pin lines, close/reopen, front order and UI-only positioning. Object/DOM tests
 do not prove raster or native input behavior.
+The same host also connects Scene-owned Saved View authoring/recall and entry
+settings: exact camera/solid-background captures, field-version-aware conflict
+handling and two-round memory exchange. Real storage and rendered/device
+acceptance remain pending.
 
 - Legacy-v1 ZIP/package code is not bounded-memory streaming despite older architecture text. The bounded Native portable and exchange packages use their separate streamed path.
 - Current XLSX reading is the local minimal reader in `src/io/xlsx.ts`, not SheetJS.

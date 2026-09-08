@@ -1,20 +1,24 @@
 import { createViewControls } from '../../ui/projectScene/viewControls';
-import { newViewMemory, viewPlanIsCurrent, type ViewContext, type ViewCameraIntent, type ViewAxis } from '../../ui/projectScene/viewState';
+import { createViewAuthorControls } from '../../ui/projectScene/viewAuthoringControls';
+import { type ViewContext, type ViewCameraIntent, type ViewAxis } from '../../ui/projectScene/viewState';
 import { planCaptionList } from '../../ui/projectScene/captionListState';
 import { createCaptionWindowControls } from '../../ui/projectScene/captionWindowControls';
 import { sceneSwitchReason } from '../../ui/projectScene/navigationState';
 import { value } from '../../scene/types';
 import { syntheticDisplay, type SyntheticDisplay } from './viewportModel';
 import type { SyntheticSession } from './session';
+import type { DisplayCapture } from './viewSession';
 
 export interface ViewportObservation {
   readonly token: string; readonly ready: boolean; readonly issue: string | null; readonly dragging: boolean;
+  readonly notice?: string | null;
   readonly projection: 'perspective' | 'orthographic'; readonly axis: ViewAxis | null;
   readonly pins: readonly { id: string; x: number; y: number; visible: boolean }[];
 }
 export interface SyntheticViewport {
   update(display: SyntheticDisplay): void; setActive(active: boolean): void;
   read(): ViewportObservation; camera(intent: ViewCameraIntent): void; retry(): void; dispose(): void;
+  capture?(): DisplayCapture; recall?(payload: DisplayCapture): void;
 }
 export type ViewportFactory = (canvas: HTMLCanvasElement, changed: () => void) => SyntheticViewport;
 
@@ -31,11 +35,27 @@ export function createViewportHost(document: Document, session: SyntheticSession
   let runtime: SyntheticViewport | undefined, context: ViewContext, pinKey = '';
   const pins = new Map<string, HTMLButtonElement>();
   const view = createViewControls(document, plan => {
-    if (disposed || !viewPlanIsCurrent(plan, currentContext())) return;
-    if (plan.kind !== 'camera' || !runtime) return;
-    try { runtime.camera(plan.action); error = null; } catch (e) { error = text(e); }
-    paint();
+    if (disposed) return;
+    session.views.accept(plan, currentContext(), payload => {
+      if (!runtime || plan.kind !== 'camera') throw new Error('3D表示を確認してください。');
+      if (payload) { if (!runtime.recall) throw new Error('視点の呼び出しは未接続です。'); runtime.recall(payload); }
+      else runtime.camera(plan.action);
+    }); changed();
   });
+  const author = createViewAuthorControls(document, event => {
+    if (disposed) return;
+    const take = runtime?.capture ? () => runtime!.capture!() : undefined;
+    const before = session.views.authorContext(currentContext(), take);
+    const accepted = session.views.acceptAuthor(event, before);
+    if (accepted && event.kind === 'apply') {
+      // Clear the exact receipt-confirmed draft on its original UI target before
+      // showing the newly created selection; never bypass the pending-target guard.
+      const after = session.views.authorContext(currentContext(), take);
+      author.render({ ...after, view: { ...after.view, memory: before.view.memory } });
+    }
+    changed();
+  });
+  view.root.append(author.root);
   const windows = createCaptionWindowControls(document, plan => {
     const accepted = session.acceptWindow(plan); changed(); return accepted;
   }, active => { session.setWindowDragging(active); changed(); });
@@ -46,23 +66,23 @@ export function createViewportHost(document: Document, session: SyntheticSession
   function text(e: unknown) { return e instanceof Error ? e.message : '3D表示を確認してください。'; }
   function currentContext(): ViewContext {
     const observation = runtime?.read(), scope = { sceneId: session.sceneId, projectFrameId: session.snapshot.resources.projectFrameId };
-    return { source: { ...scope, token: session.snapshot.state.token, kind: 'unavailable', reason: '保存した視点は未接続です。' },
-      memory: newViewMemory(session.sceneId), runtime: { ...scope, token: observation?.token ?? 'unconnected',
+    return session.views.context({ ...scope, token: observation?.token ?? 'unconnected',
         ...(observation?.ready && !error ? { kind: 'ready' as const, projection: observation.projection, axis: observation.axis,
           bounds: value(display?.bounds ? 'available' as const : 'empty' as const) } :
           { kind: 'unavailable' as const, reason: error ?? observation?.issue ?? '3D表示は未接続です。' }) },
-      cameraBlock: observation?.dragging ? 'カメラ操作を終えてください。' : session.pending === 'window' ? sceneSwitchReason('window') : null,
-      mutationBlock: '保存した視点の編集は未接続です。', cameraFeedback: { kind: 'idle' }, entryFeedback: { kind: 'idle' } };
+      observation?.dragging ? 'カメラ操作を終えてください。' : session.pending && !['text', 'composition'].includes(session.pending) ? sceneSwitchReason(session.pending) :
+        session.pending === 'composition' && session.views.pending !== 'composition' ? sceneSwitchReason('composition') : null);
   }
   function paint() {
     if (disposed) return;
     context = currentContext(); view.render(context);
+    author.render(session.views.authorContext(context, runtime?.capture ? () => runtime!.capture!() : undefined));
     const observed = runtime?.read();
     const rect = canvas.getBoundingClientRect?.();
     windows.project({ ready: Boolean(observed?.ready && !error), width: rect?.width ?? 0, height: rect?.height ?? 0, pins: observed?.pins ?? [] });
     const dragChanged = session.setViewportDragging(observed?.dragging ?? false);
     const stateChanged = session.setViewportState(Boolean(observed?.ready && !error), display?.models.map(m => m.binding.assetId) ?? [], error ?? observed?.issue ?? null);
-    status.textContent = error ?? observed?.issue ?? (observed?.ready ? '' : '3D表示は未接続です。'); status.hidden = !status.textContent;
+    status.textContent = error ?? observed?.issue ?? observed?.notice ?? (observed?.ready ? '' : '3D表示は未接続です。'); status.hidden = !status.textContent;
     retry.hidden = !factory || (!error && !observed?.issue);
     // Preserve measurable layout while initialization waits for attachment/resize.
     canvas.style.visibility = error || !observed?.ready ? 'hidden' : 'visible';
@@ -110,5 +130,5 @@ export function createViewportHost(document: Document, session: SyntheticSession
   }
   return { root, view: view.root, stageTools: view.stageTools, render,
     get connected() { return Boolean(runtime?.read().ready && !error); },
-    dispose() { disposed = true; windows.dispose(); runtime?.dispose(); view.dispose(); retry.removeEventListener('click', tryAgain); root.remove(); } };
+    dispose() { disposed = true; windows.dispose(); runtime?.dispose(); author.dispose(); view.dispose(); retry.removeEventListener('click', tryAgain); root.remove(); } };
 }

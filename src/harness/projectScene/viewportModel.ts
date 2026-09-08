@@ -4,6 +4,8 @@ import { captionColorKey } from '../../ui/projectScene/captionListState';
 import { freezeSynthetic, type SyntheticProject } from './fixture';
 import { modelVersion, syntheticVersions } from './modelFixture';
 import { readFixtureModel, canonicalFixture, type FixtureModelClosure, type FixturePlacement } from './modelClosure';
+import { readProjectCamera, readSolidBackground } from './viewHistory';
+import type { DisplayCapture } from './viewSession';
 
 export type V3 = readonly [number, number, number];
 export interface Bounds { readonly min: V3; readonly max: V3 }
@@ -12,6 +14,7 @@ export interface SyntheticDisplay {
   readonly token: string; readonly sceneId: string; readonly projectFrameId: string;
   readonly models: readonly FixtureModelClosure[]; readonly pins: readonly DisplayPin[];
   readonly bounds: Bounds | null; readonly selectedId: string | null;
+  readonly entry?: { readonly kind: 'none' } | { readonly kind: 'blocked'; readonly reason: string } | { readonly kind: 'ready'; readonly payload: DisplayCapture };
 }
 export interface CameraPose {
   readonly position: V3; readonly target: V3; readonly up: V3;
@@ -58,7 +61,18 @@ export function syntheticDisplay(project: SyntheticProject, sceneId: string, pin
     if (position) pins.push({ id: caption.captionId, color, position,
       title: caption.title.kind === 'value' && caption.title.value.trim() ? caption.title.value : 'キャプション' });
   }
-  return freezeSynthetic({ token: project.state.token, sceneId, projectFrameId: project.resources.projectFrameId, models, pins, selectedId,
+  const pointer = project.state.scenes[sceneId]!.defaultViewId;
+  let entry: SyntheticDisplay['entry'] = { kind: 'none' };
+  if (pointer.kind !== 'value' || pointer.value !== null) {
+    const v = pointer.kind === 'value' && pointer.value ? project.resources.views[pointer.value] : undefined;
+    entry = { kind: 'blocked', reason: '開始時の視点を確認してください。カメラは変更していません。' };
+    if (v && v.sceneId === sceneId && v.projectFrameId === project.resources.projectFrameId && v.lifecycle.kind === 'value' &&
+      v.lifecycle.value.state === 'active' && v.camera.kind === 'value' && v.background.kind === 'value') {
+      try { entry = { kind: 'ready', payload: { camera: readProjectCamera(v.camera.value), background: readSolidBackground(v.background.value) } }; }
+      catch { /* Keep the explicit entry diagnostic; never fit or choose another View. */ }
+    }
+  }
+  return freezeSynthetic({ token: project.state.token, sceneId, projectFrameId: project.resources.projectFrameId, models, pins, selectedId, entry,
     bounds: box.isEmpty() ? null : { min: tuple(box.min), max: tuple(box.max) } });
 }
 export const defaultPose = (): CameraPose => ({ position: [0, 1, 3], target: [0, 0, 0], up: [0, 1, 0],

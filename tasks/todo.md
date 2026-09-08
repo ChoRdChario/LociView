@@ -10,6 +10,46 @@ IME and device acceptance remain pending, not implied by its DOM tests.
 
 ### Current checkpoint / next implementation
 
+Completed from `e8451a7`: Saved View authoring/recall in the same host.
+- [x] Add an exact synthetic Saved View projection: immutable Scene/frame identity,
+  independently atomic name/order/camera/background/lifecycle and Scene entry
+  pointer. Verify all candidates, reference closure and per-field causal versions;
+  never pick a conflict winner or put camera components into separate cells.
+- [x] Reuse existing view/author controls for create, rename/recapture, recall,
+  entry setting, confirmed delete and reorder. Freeze exact camera/background
+  captures; retain draft, capture and fresh IDs across failure/retry. Commands
+  share the existing neutral causal port; local UI memories remain actor/Scene
+  scoped. No fake saved acknowledgement or Project-wide snapshot replacement.
+- [x] Connect runtime capture/recall and once-only valid Scene entry, explicitly
+  converting runtime FOV to ProjectCamera radians and preserving orthographic
+  span/exact sRGB. Scene entry outranks a retained temporary pose; refresh,
+  receive and actor reactivation do not reapply it. Invalid defaults keep camera
+  unchanged with diagnosis. Verify two-round history, controls and runtime,
+  then one independent review plus required checks; raster/device lane stays pending.
+
+Scope: exact solid-background synthetic records and the existing triangle renderer,
+not real input admission or a format/provider adoption. Unsupported transparent
+background is refused, never substituted. No media/material expansion, real
+files/storage, Native/current entry, dependency, migration/wire or release changes.
+Order allocation must create an actual move or refuse explicitly; no silent
+same-key swap/rebalance. Current root clean, previous turn made connected progress.
+Official remaining quota 81%; stop and ask below 10% or on a specification conflict.
+
+Review: root typecheck and 97-file suite PASS (1789 tests, 21 existing TODO);
+30 isolated candidate cases and scoped TypeScript PASS. Eight connected
+view/runtime cases pass, including the final review fixes. Ordinary and harness
+builds PASS with existing size warnings. Independent review closed exact-version
+preview propagation, separate error lanes, atomic recall rollback and the
+OrbitControls touch-action handover regression. No browser/iPhone/offline PASS.
+
+Next: connect the remaining material/media effects in this same synthetic host,
+then the gated complete-provider/durable-file boundary. Do not add detached
+probes or request per-control manual confirmation. The existing later browser
+batch in `poc/scene-history/README.md` includes the new View flow. Real data,
+adoption, migration/wire and release still retain their explicit gates.
+
+### Completed comparison-window connection
+
 Completed from `d12f271`: retained comparison windows in the same development host.
 - [x] Connect existing Caption-window state to the session, independently for
   each actor/Scene. Reuse detail open/retain/release intents; explicit close stays

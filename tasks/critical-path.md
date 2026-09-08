@@ -362,8 +362,10 @@ exchange prove the copy does not redirect the original or its Captions. Unknown
 closure variants refuse. Exact fixture triangle/pin display now connects fit,
 six axes/projection and retained temporary cameras. Raster/native-input evidence
 remains pending. Retained comparison windows now connect confirmed text, eligible
-pin lines and local close/reopen/front/placement. Next: same-host Saved View/material/media
-connections, not another detached component. General real-model copy admission
+pin lines and local close/reopen/front/placement. Scene-owned Saved View authoring,
+recall and entry settings now also connect to exact camera/solid-background
+captures and two-round history. Next: same-host material/media connections,
+not another detached component. General real-model copy admission
 remains open.
 No new detached mock page or manual journal rerun.
 
@@ -387,7 +389,7 @@ to the connected delivery now approved in §13.4.
 
 | Completion boundary | Present evidence / gap | Next exit and responsible lane |
 |---|---|---|
-| Connected development workspace | Two-Scene/two-person history, model update/manual pin correction, independent copies, synthetic triangle/pin viewing and retained comparison windows under 05 §13.4; actual candidate and object/DOM tests, not rendered acceptance | Connect Saved View/material/media effects and gated provider; no projection cloning, parallel mock UI or fake merge/save. Browser automation stopped on URL safety; keep the batched evidence lane |
+| Connected development workspace | Two-Scene/two-person history, model update/manual pin correction, independent copies, synthetic triangle/pin viewing, comparison windows and Scene-owned Saved Views under 05 §13.4; actual candidate and object/DOM tests, not rendered acceptance | Connect material/media effects and gated provider; no projection cloning, parallel mock UI or fake merge/save. Browser automation stopped on URL safety; keep the batched evidence lane |
 | Metadata/CAS candidate viability | Original causal bytes/conflicts, small five-purpose closures, CAS/retention proofs and bounded human Chrome journal/recheck PASS | Still-missing domain, scale, cross-tab/process interruption, sink/CSP/security and physical-iOS evidence under 03 §§4/6 before relevant adoption. No repeat of the closed journal batch. Operator for inaccessible browser/physical device; PO for measured limits/adoption |
 | Complete domain provider and S1 durable host | Pure Scene core, individual Scene/Material records and local edit guards exist; full resource/reference/frame/conflict admission and Project session are absent | One complete validated-provider boundary with named subparts, then gated durable repository/journal integration under 05 §13.2; individual shape guards alone cannot supply trusted SceneResources |
 | S2 migration and exchange | Five semantic purposes proven only on small synthetic graph; 06 wire is PROPOSED, new migration/Native-bridge recipe not ratified | Reviewed exact wire/recipe and required PO ratification, production five-purpose services and service-level `TEAM-FLOW-01`; preserve source bytes and local work |

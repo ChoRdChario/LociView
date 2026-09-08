@@ -22,9 +22,12 @@
 > six axes/projection and retained temporary cameras, with explicit recovery.
 > Multiple retained Caption windows also connect confirmed text and eligible pin
 > lines; close/reopen, front order and drag/keyboard/arrange are local UI state.
+> Scene-owned Saved Views now connect creation/recapture/recall, naming/order,
+> confirmed deletion and entry setting. Exact camera/solid-background captures
+> use the same causal history; entry applies once, not on refresh or actor return.
 > File/storage effects remain unconnected; do not claim full model-copy admission,
 > renderer adoption, integrated v2 or rendered acceptance. Next:
-> remaining visible effects in the same host, with current todo's exact boundary.
+> remaining material/media effects in the same host, with current todo's boundary.
 > Windows Computer Use initialized but stopped automatically on unsafe-to-resolve
 > Chrome URL; no browser input/PASS or bypass. Keep the existing batched UI lane.
 > No repeated journal check or scheduling approval is needed. Real-data/current

@@ -4,6 +4,8 @@ export type HistoryCell = { readonly kind: 'value'; readonly value: string } |
 export interface HistorySnapshot {
   readonly token: string;
   readonly cells: Readonly<Record<string, HistoryCell>>;
+  /** Exact atomic field operation identities, separate from materialized values. */
+  readonly cellVersions?: Readonly<Record<string, string>>;
 }
 export interface MemoryUpdate {
   readonly base: readonly string[];
