@@ -2,6 +2,61 @@
 
 ## Current boundary — implementation through UI verification (2026-09-08)
 
+### Completed — Project model inventory and Scene membership controls (2026-09-08)
+
+Starting `f1d02e1`: clean, 18 ahead of local origin tracking ref; no fetch/push.
+Continue approved 05 §13.3 with 05 §§3.2/4.3/5/11, UI guidelines §§4.2/8–10
+and existing Scene include/exclude, Caption-list and pin-target contracts.
+
+- [x] Add a complete Project-model inventory with local search, Scene filter,
+  exact selection and retained list position/IME. Unknown name/lifecycle remains
+  reviewable; duplicate IDs or unavailable inventory never imply an empty Project.
+- [x] Add direct `このシーンに表示` controls with observed membership, not
+  optimistic rendering state. Include/exclude emits only exact Scene/Asset/edge
+  intent; binding failure or temporary hiding never implies absent membership.
+- [x] Preserve Caption/model input and selection, show exclusion consequences
+  and Project-wide placement/replacement scope, and retain target-bound failures/
+  retry. Membership conflict/foreign edge fails without a guessed winner; an
+  independent binding/order issue does not prohibit valid exact-edge exclusion.
+- [x] Reuse the Scene/core membership and hidden-owner proofs, add only missing
+  pure/DOM/source-isolation tests, obtain one independent read-only review and
+  run typecheck, full two-worker tests and build on the final executable tree.
+
+Completion is reusable synthetic-port UI plus host intentions, not model loading,
+full resource validation or a second renderer visibility authority. Actual model
+import/bytes, placement/gizmo, revision activation, Project deletion, local isolate
+implementation, renderer/storage/package/current app hookup, schema/dependency,
+new page/server and release are excluded. Keep the existing browser/device gates
+open without another bootstrap or human probe. Stop for a specification conflict
+or new authority, not another micro-approval of this accepted component.
+
+Review / executed evidence: typecheck, 49 focused tests, final 90 files / 1,748
+PASS with 21 existing todo (two workers), build and diff whitespace check PASS.
+Existing mixed-import/large-chunk build warnings remain. Independent read-only
+review found no blocking issue; self-review's explicit `outsideScene` display
+state (normal omission is not a loading failure) was also independently confirmed.
+Checkboxes restore observed state before emitting intent, failures/retry retain
+the original target/plan, and list filtering never writes membership. Complete
+inventory and renderer availability stay distinct; exact edge removal preserves
+other Scene and Caption state through the reused domain proofs. Native checkbox,
+IME, visual layout, actual storage/renderer and physical-iPhone remain unverified.
+
+Short meta-audit / next implementation: this closes the reusable Project inventory
+and Scene-membership surface, not all model-management features or TEAM-FLOW-01.
+Only disconnected UI, its focused tests and documentation changed; current entry,
+storage/package/renderer/dependencies and servers are untouched. Normal ignored
+build output was regenerated. Continue 05 §13.3 with the `マテリアル` tab's exact
+model/surface target and explicit Scene/Project scope under 05 §§3.3/11 and UI
+guidelines §4.2. It must expose observed precedence, applicable controls, retained
+draft/apply/cancel and target-bound failure, without guessing a surface, merging
+whole-record overrides or writing during selection. Reuse current pure material
+presentation/validation semantics where safe; add only missing intent/refusal and
+input-retention checks. Completion is a reusable synthetic-port control, not actual
+material rendering or storage. Payloads, current-app hookup, renderer/storage,
+schema/dependency/release and new probe/server remain excluded. Full validation,
+platform/package adoption and batched Desktop/iPhone gates stay open; no repeat
+human probe or new micro-approval is needed for this accepted component.
+
 ### Completed — named-view authoring and 3D background controls (2026-09-08)
 
 Starting `81fb17d`: clean, 17 ahead of the local origin tracking ref; no fetch/push.

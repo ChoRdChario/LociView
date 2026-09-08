@@ -335,3 +335,60 @@ never the unsubmitted HEX draft. Both editors retain nodes and confirmed cancel
 after source loss. Reuse `viewControls.css`; recorded DOM and scoped CSS remain
 non-rendered evidence. Real camera/capture/undo/write, browser/IME/mobile and
 physical-iPhone acceptance, full graph validation and integration remain open.
+
+## Project model inventory and Scene membership
+
+`modelListState.ts` / `modelListControls.ts` / `modelList.css` supply a complete
+Project-model list with local name search, all/current-Scene filter, exact selection
+and direct `このシーンに表示` checkboxes. Selection opens the model's settings scope,
+not a second visibility authority. Filter/reveal affects only the list. Excluding
+a model changes only its Scene edge; the UI explains that models and Captions remain,
+while owner-attached 3D pins are suppressed. Placement/replacement is Project-wide
+for all Scenes using that model, not an accidental Scene-local copy.
+
+- The host supplies the complete validated, immutable Project inventory, not
+  `resolveScene().composition.assets` (renderable Assets only). The token covers
+  Project/Scene, inventory and exact conflict-aware membership state. `included`
+  means one explicit active Scene/Asset edge with known lifecycle; proven absence
+  means no active OR unresolved duplicate edge. Duplicate/lifecycle conflicts are
+  unresolved, not absence. Unknown names/membership remain reviewable under filters.
+  Invalid/duplicate inventory is unavailable, never an empty successful Project.
+- Membership and display/binding availability are separate ports. An included
+  model stays checked when unavailable or temporarily hidden. Unknown membership
+  is indeterminate and blocked. Normal omission from this Scene is `outsideScene`,
+  not a loading failure; it adds no redundant warning or recovery button.
+  An independent order/binding/Asset issue does not
+  block removal of an exact valid edge; include requires a known active Asset.
+  The host must still validate complete Scene/resource/command policy at authority.
+- Keep immutable memory per Project/Scene in UI state and accept local changes
+  synchronously against their exact `baseMemory`. Search/scroll/filter remain
+  available on source/write failure. Search IME stays mounted and raw input is
+  retained. Incompatible model/pin/text editors block membership/selection; unrelated
+  Caption drafts and floating windows stay mounted and are neither cleared nor
+  implicitly submitted. Search composition alone need not block membership because
+  it does not change the search field. Transition render refusal means defer the
+  whole host transition, not discard the pending editor or applying operation.
+- Revalidate `modelListPlanIsCurrent` immediately before command dispatch and after
+  async preparation. Include names the exact Scene/Asset; the host allocates a fresh
+  `sam_` ID and order key. Exclude names the exact existing edge, Scene and Asset:
+  verify all three before the lower Scene command, whose exclusion argument alone
+  does not prove current-Scene ownership. Never reuse a tombstoned ID or copy the
+  model/Caption to implement membership. Caption-list `モデルを表示` likewise needs
+  an explicit absent-membership check; resolver `hidden-owner` is not that proof.
+- Checkboxes restore observed membership before delivering intent. Only the host's
+  authoritative successful publication can supply changed observed membership;
+  this component never acknowledges a save. The host owns one applying operation,
+  retained feedback per Project/Scene and the original prepared command/identity.
+  Failure/retry stays bound to that model even after list/selection changes. Retry
+  returns the exact original plan, not a new target or fresh command. Stale token,
+  changed edge/access or another applying operation refuses retry. An uncertain
+  publication outcome belongs in host recovery, never guessed from a checkmark.
+- Mount within a height-constrained task panel. The list owns its scroll, selected
+  row reveal never scrolls the page, stable nodes/focus remain and filtered focused
+  rows fall back to search. Do not dispose an active editor to switch task/Scene.
+
+Evidence is 12 pure/recorded-DOM tests plus reused Scene include/exclude/hidden-owner
+and source-isolation tests. Recorded checkbox properties are not native-input,
+layout, real IME, durable storage, app or device evidence. Real import/model bytes,
+placement/gizmo/replacement, Project deletion, renderer/local isolate, full graph
+validation and current-app integration remain outside this component.

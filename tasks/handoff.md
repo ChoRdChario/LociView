@@ -83,6 +83,17 @@
 > acceptance. Current todo owns the next model-list/Scene-membership component;
 > no new page/server or repeated human test is requested.
 >
+> **Current model-inventory update (2026-09-08):** Reusable all-Project model
+> list/search/Scene filter and observed `このシーンに表示` controls now exist.
+> Exact include/exclude intentions preserve selection, retained input and original
+> failed-operation target; absent, unresolved, temporarily hidden and unavailable
+> states remain distinct. Exclusion consequences and Project-wide placement scope
+> are visible. Independent review found no blocking issue and confirmed the
+> normal-omission correction. Typecheck, 49 focused tests, final 90 files / 1,748
+> PASS (21 existing todo) and build pass. No current-app/model-byte/renderer/storage
+> integration or browser/device acceptance. Current todo owns the next exact-target
+> Material component; no new human test, page/server or release change is requested.
+>
 > **Current package design update (2026-09-08):**
 > `docs/specs/06-project-package-wire.md` is a reviewed **PROPOSED / UNRATIFIED**
 > companion under 05 §7.5, not a format/version or S2 adoption. It separates five

@@ -1,0 +1,18 @@
+/* Disconnected host stylesheet, not imported by the current app. */
+.lv-model-browser { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; color: #312f2d; background: #f2f0ee; font: 400 14px/1.5 system-ui, sans-serif; }
+.lv-model-browser[hidden], .lv-model-browser [hidden] { display: none !important; }
+.lv-model-browser :is(button, input, select) { box-sizing: border-box; min-width: 44px; min-height: 44px; max-width: 100%; padding: 6px 10px; border: 1px solid #817c78; border-radius: 2px; color: inherit; background: #faf9f8; font: inherit; }
+.lv-model-browser :is(button, input, select):focus-visible { outline: 2px solid #312f2d; outline-offset: 2px; }
+.lv-model-browser button:active:not(:disabled) { background: #d2cfcb; box-shadow: inset 0 1px 2px #817c78; }
+.lv-model-browser :disabled { color: #504d4a; border-style: dashed; }
+.lv-model-browser :is(p, h3) { margin: 0; overflow-wrap: anywhere; }
+.lv-model-browser h3 { font-size: 14px; font-weight: 500; }
+.lv-model-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.lv-model-filters label { display: flex; flex-direction: column; flex: 1 1 120px; min-width: 0; }
+.lv-model-list { position: relative; flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; margin: 0; padding: 2px; list-style: none; }
+.lv-model-row { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0; border-bottom: 1px solid #d2cfcb; }
+.lv-model-browser .lv-model-select { flex: 1 1 100%; text-align: left; overflow-wrap: anywhere; border-left-width: 3px; font-weight: 500; }
+.lv-model-select[aria-current="true"] { border-left-color: #312f2d; background: #e6e4e2; box-shadow: inset 1px 0 #312f2d; }
+.lv-model-membership { display: flex; align-items: center; gap: 8px; min-height: 44px; padding-inline: 8px; cursor: pointer; }
+.lv-model-membership input { min-width: 20px; min-height: 20px; width: 20px; height: 20px; margin: 0; padding: 0; accent-color: #413d39; }
+.lv-model-note { flex-basis: 100%; font-size: 13px; color: #504d4a; }

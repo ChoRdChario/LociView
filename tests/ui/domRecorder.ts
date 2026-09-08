@@ -4,6 +4,7 @@ export class RecordedNode {
   attributes = new Map<string, string>(); dataset: Record<string, string> = {};
   style: Record<string, string> = {}; textContent = ''; className = ''; id = '';
   value = ''; disabled = false; readOnly = false; hidden = false; type = ''; title = ''; placeholder = '';
+  checked = false; indeterminate = false;
   selectionStart: number | null = 0; selectionEnd: number | null = 0;
   scrollTop = 0; clientHeight = 0; offsetTop = 0; offsetHeight = 0;
   focusCalls: unknown[] = []; listeners = new Map<string, Set<(event: Event) => void>>();
