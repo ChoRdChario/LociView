@@ -5,15 +5,25 @@
 PO approved building the whole workflow thinly before subsystem polish. Authority:
 specification 05 §13.4; final completion remains `TEAM-FLOW-01` in §12.6.
 The completed journal Chrome recheck below stays closed; no new manual test is
-requested. The first connected development host is **not yet implemented**.
+requested. The first connected synthetic development host now exists; browser,
+IME and device acceptance remain pending, not implied by its DOM tests.
 
 ### Current plan / next implementation
 
+- First connected-workspace slice starts from `0a4f014`: one synthetic
+  session/fixture, existing mounted navigation/list/detail/model controls, exact
+  development-entry isolation and host interaction tests. The stage reports
+  composition without claiming 3D rendering; unconnected window/view/material,
+  media and durable operations are explicitly unavailable. Existing parts and
+  tests are reused. Browser/IME/device evidence will not be inferred from DOM tests.
+
 - [x] Record the approved sequencing in the contract, execution plan and handoff;
   distinguish current instructions from historical “next component” notes.
-- [ ] **Connected workspace:** use one explicit nondefault `dev.html` mode for
+- [x] **Connected workspace (code + synthetic host tests):** one explicit nondefault `dev.html` mode for
   two synthetic Scenes, shared Captions and two model resources; connect existing
   Scene resolution, navigation, Caption editing and model membership controls.
+- [ ] Rendered/IME/mobile verification of that workspace; collect with the next
+  meaningful connected UI batch, not another button-by-button hold.
 - [ ] **Continuing-team flow:** extend that same host through two participants,
   model update, local work preservation, pin correction, explicit conflict
   keep-one/independent-keep-both and a second round. Connect genuine services;
@@ -45,7 +55,7 @@ winner, format/version, main, Pages/SW or release action. Stop the affected path
 on a specification conflict, unsafe data handling or a required new approval;
 continue unaffected authorized work. Nonblocking polish follows the whole loop.
 
-**Review:** starting checkpoint `0d789ac`, clean `g0-baseline`, 0 behind / 24
+**Documentation checkpoint review:** starting `0d789ac`, clean `g0-baseline`, 0 behind / 24
 ahead of local origin tracking; no fetch/fresh-remote claim. The latest executable
 change remains `96c218b`. The current work is a sequencing/documentation change,
 not another integrated feature or test PASS. Existing disconnected parts remain
@@ -55,6 +65,50 @@ Documentation result: specification/ADR, current execution and handoff pointers
 are synchronized. One independent read-only review found no blocking
 contradiction; diff/whitespace checks pass. Application code, dependencies and
 test evidence are unchanged; no full-suite rerun or new browser task.
+
+### Connected workspace result — 2026-09-09
+
+`src/harness/projectScene` now connects the existing pure core and mounted
+navigation/Caption list/detail/model controls, only at `dev.html?mode=project-scene`.
+Two synthetic Scenes share one Caption. A/B/A retains applied content and each
+Scene's selection/search/colors; model inclusion/exclusion changes only the exact
+membership, preserving the resource and current Caption draft. Snapshot tokens
+advance together, stale intentions refuse, pending text/IME blocks Scene changes
+but not task changes. The same editor stays mounted. Apply means page-memory
+application only, with an explicit unsaved/reload-loss warning.
+
+| User operation | Connection now | Remaining acceptance/work |
+|---|---|---|
+| Scene switch, shared Caption title/body/color, model membership | Working synthetic state + mounted controls; host tests | Browser focus/IME/layout, real validated provider and durable authority |
+| Right Caption list, direct color filters, selection/search | Connected; colors do not remove list rows; stage shows planned pin count | Actual 3D pins and floating comparison windows/lines |
+| Model display | Resolver composition and listed members only | Actual renderer/payload connection; no 3D success claim |
+| Media, pin placement, windows, material/view effects | Explicitly unconnected; window actions disabled with reason | Existing components/ports connected in this same host, no requirement removed |
+| Two-round team exchange, save/recovery and five package purposes | Not connected | Remaining contract/adoption prerequisites and `TEAM-FLOW-01` |
+
+Checks: 31 focused PASS (7 new host scenarios + existing detail/core contracts),
+root typecheck, full 94 files / 1,777 PASS / 21 existing todo (two workers), and
+production build PASS. Existing mixed-import/large-chunk build warnings remain.
+Exact entry-isolation tests and a scan of built JS/CSS/HTML/maps confirm the
+development host is absent from the ordinary production build; diff checks pass.
+One independent read-only review found no blocking issue. Current ordinary
+home/Native paths, storage, dependencies and PWA configuration are unchanged.
+The browser skill's existing-binding check found no runtime/connection; the prior
+bootstrap failure is unchanged and was not retried. No actual browser operation,
+IME, physical iOS or offline/PWA PASS. Development HTTP/module checks are only
+delivery readiness, not rendered evidence. No new human action is required now.
+
+Current local entry: `http://127.0.0.1:5173/dev.html?mode=project-scene` (one Vite
+server started with `npm run dev -- --host 127.0.0.1`; recheck availability before
+giving this link in a later session). When the connected UI batch is requested,
+provide its short procedure in chat; keep the completed journal test closed.
+
+Short meta-audit: this closes the first connected in-memory workspace loop, not
+S1–S3 or a whole `TEAM-FLOW-01` step. It is no longer detached component work.
+Next is the continuing-team loop in this same host, assembling its validated
+provider/service boundary and reusing existing causal/retention evidence. No
+fabricated successful exchange, direct PoC-to-production promotion or technology
+adoption. Stop only the affected activation when a named gate/ratification is
+required; do not restart the closed journal batch or make another demo page.
 
 ## Completed history — not current scheduling instructions
 

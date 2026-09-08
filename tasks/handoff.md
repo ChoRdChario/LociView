@@ -5,8 +5,10 @@
 > through an explicit nondefault mode of the existing `dev.html`. First connect
 > two Scenes, shared Caption editing and model membership; then extend that same
 > host toward the two-round team flow and gated durable product services.
-> `tasks/todo.md` top and `critical-path.md` §8 own the current plan. The host is
-> not yet implemented; do not claim integrated v2 or rendered acceptance.
+> `tasks/todo.md` top and `critical-path.md` §8 own the current plan. The first
+> host loop now exists at `dev.html?mode=project-scene`: shared Caption edits,
+> model membership and Scene/task switching in page memory. 3D, file/storage/team
+> effects remain unconnected; do not claim integrated v2 or rendered acceptance.
 > No repeated journal check or scheduling approval is needed. Real-data/current
 > app activation, technology adoption, wire/migration and release gates remain.
 > Accepted UI/UX and visual principles remain in `docs/ui-product-guidelines.md`.

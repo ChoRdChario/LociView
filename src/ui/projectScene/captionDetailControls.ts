@@ -8,7 +8,11 @@ export type CaptionDetailEvent = CaptionApplyPlan |
   Readonly<{ kind: 'cancel'; draft: CaptionDraft }> |
   Readonly<{ kind: 'review'; captionId: string; field: CaptionEditField; token: string }> |
   Readonly<{ kind: 'window'; captionId: string; sceneId: string; token: string; action: 'open' | 'retain' | 'release' }>;
-export interface CaptionDetailProps extends DetailContext { readonly retained: boolean }
+export interface CaptionDetailProps extends DetailContext {
+  readonly retained: boolean;
+  /** Host capability boundary, not a failed command or a change to the Caption. */
+  readonly windowBlock?: string | null;
+}
 let nextDetail = 0;
 
 /** Static form slots; no save, media I/O, metadata dispatch or conflict resolution. */
@@ -73,9 +77,12 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
   const actions = make('div'); actions.className = 'lv-caption-detail-actions';
   const apply = button('変更を適用'), cancel = button('取り消す'), showWindow = button('ウィンドウを表示'), retain = button('比較に残す');
   actions.append(apply, cancel, showWindow, retain); root.append(actions);
+  const windowNote = make('p'); windowNote.id = `lv-caption-windows-${++nextDetail}`;
+  showWindow.setAttribute('aria-describedby', windowNote.id); retain.setAttribute('aria-describedby', windowNote.id);
   const confirmation = make('div'); confirmation.hidden = true;
   const confirm = button('変更を取り消す'), keep = button('編集を続ける');
   confirmation.append(make('p', '入力中の変更を取り消しますか？'), confirm, keep); root.append(confirmation);
+  root.append(windowNote);
   listen(apply, 'click', () => {
     if (!props || apply.disabled) return;
     const plan = planCaptionApply(props);
@@ -91,7 +98,7 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
     const draft = props.draft; cancelFor = null; confirmation.hidden = true; onEvent({ kind: 'cancel', draft });
   });
   const windowEvent = (action: 'open' | 'retain' | 'release') => {
-    if (props?.source.kind === 'ready') onEvent({ kind: 'window', captionId: props.source.caption.id,
+    if (props?.source.kind === 'ready' && props.windowBlock == null) onEvent({ kind: 'window', captionId: props.source.caption.id,
       sceneId: props.source.sceneId, token: props.source.token, action });
   };
   listen(showWindow, 'click', () => windowEvent('open'));
@@ -140,7 +147,9 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
       hasCaptionDraft(owned) && applyIssue && !inFlight && applyIssue].filter(Boolean).join(' ');
     apply.disabled = applyIssue !== null;
     cancel.disabled = !hasCaptionDraft(owned) || Boolean(owned?.composing) || inFlight;
-    showWindow.disabled = source.kind !== 'ready'; retain.disabled = source.kind !== 'ready'; retain.setAttribute('aria-pressed', String(next.retained));
+    windowNote.textContent = next.windowBlock ?? ''; windowNote.hidden = next.windowBlock == null;
+    showWindow.disabled = source.kind !== 'ready' || next.windowBlock != null;
+    retain.disabled = source.kind !== 'ready' || next.windowBlock != null; retain.setAttribute('aria-pressed', String(next.retained));
     return true;
   }
   function dispose(): void { disposed = true; for (const cleanup of cleanups) cleanup(); root.remove(); }

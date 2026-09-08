@@ -13,8 +13,9 @@ implementation contracts are indexed in `docs/specs/README.md`.
 Current delivery sequencing is specification 05 §13.4: assemble one thin
 connected synthetic development workflow using the existing Scene/UI parts,
 then extend that same host toward continuing teamwork and durable product
-delivery. This PO-approved host is not yet implemented. It does not waive
-technology adoption, wire/migration, real-data activation or device gates.
+delivery. Current bounded implementation/evidence is recorded in `PROJECT_MAP.md`
+and `tasks/todo.md`; synthetic development does not waive technology adoption,
+wire/migration, real-data activation or device gates.
 
 ## Objective
 

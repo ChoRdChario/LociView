@@ -8,6 +8,8 @@ if (mode === 'v1') {
   await import('./devharness');
 } else if (mode === 'spark') {
   await import('./harness/sparkHarness');
+} else if (mode === 'project-scene') {
+  await import('./harness/projectScene/entry');
 } else {
   document.body.innerHTML = `<main style="padding:24px;font:16px system-ui;color:#fecaca;background:#111827;min-height:100vh">
     Unknown development harness mode: <code>${mode.replace(/[<>&"']/g, '')}</code>

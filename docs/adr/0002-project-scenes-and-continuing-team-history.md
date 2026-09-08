@@ -20,7 +20,8 @@ PO-approved sequencing amendment (2026-09-09): specification 05 §13.4 permits
 one early connected synthetic development host through a nondefault `dev.html`
 mode. Reuse the domain/UI parts to build the whole workflow thinly before polish.
 This is not current-app activation, real-data/storage or dependency adoption;
-production integration retains the applicable gates. The host is not yet built.
+production integration retains the applicable gates. Current bounded code and
+evidence are recorded in `PROJECT_MAP.md` and `tasks/todo.md`, not implied here.
 
 LociView is intended to let one knowledgeable operator prepare a useful Project
 once and lower the participation cost for the rest of a team. The current Native

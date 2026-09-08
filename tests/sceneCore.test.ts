@@ -228,7 +228,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
     expect(() => run(state, { ...resources, token: 'another' }, { kind: 'setDefault', sceneId: scb })).toThrow('token mismatch');
   });
 
-  it('remains disconnected: only tests import Scene core, which imports no storage/renderer/dependency', () => {
+  it('isolates Scene core/UI from ordinary entries; only the exact synthetic development host may connect them', () => {
     const walk = (path: string): string[] => readdirSync(path, { withFileTypes: true }).flatMap(entry => {
       const name = join(path, entry.name); return entry.isDirectory() ? walk(name) : [name];
     });
@@ -243,6 +243,19 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         // not the Native controller/schema runtime or a general Native dependency.
         const shared = ['../../scene/types', '../../domain/captionText', '../../domain/values', '../../domain/materialIntent', '../../nativeGs/backgroundColor'];
         expect(imports.every(p => p?.startsWith('./') || shared.includes(p!)), path).toBe(true);
+      } else if (/[\\/]harness[\\/]projectScene[\\/](fixture|session|workspace|entry)\.ts$/.test(path)) {
+        const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
+        const permitted = ['../../scene/types', '../../scene/commands', '../../scene/resolve',
+          '../../ui/projectScene/navigationState', '../../ui/projectScene/navigationControls',
+          '../../ui/projectScene/captionListState', '../../ui/projectScene/captionListControls',
+          '../../ui/projectScene/captionDetailState', '../../ui/projectScene/captionDetailControls',
+          '../../ui/projectScene/modelListState', '../../ui/projectScene/modelListControls'];
+        expect(imports.every(p => p?.startsWith('./') || permitted.includes(p!)), path).toBe(true);
+        expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
+      } else if (path.replaceAll('\\', '/') === 'src/dev-entry.ts') {
+        expect(source.replaceAll('\r\n', '\n')).toContain("} else if (mode === 'project-scene') {\n  await import('./harness/projectScene/entry');");
+        expect([...source.matchAll(/(?:from\s+|import\s*\()['"]([^'"]*\/(?:scene|domain|projectScene)\/[^'"]+)['"]/g)].map(m => m[1]))
+          .toEqual(['./harness/projectScene/entry']);
       } else expect(source).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/(scene|domain|projectScene)\//);
     }
     const backgroundHelper = readFileSync('src/nativeGs/backgroundColor.ts', 'utf8');

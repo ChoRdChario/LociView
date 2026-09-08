@@ -53,16 +53,19 @@ If observed code conflicts with the applicable compatibility or accepted future 
 | `specs/02-storage-package-migration.md` | `PRODUCT-OWNER APPROVED / BOUNDED NATIVE SECTIONS 13–31 IMPLEMENTED WHERE MARKED / §29.1 DIRECT HEIC DEFERRED / GENERAL V2 NOT IMPLEMENTED` | General metadata/CAS candidate boundaries plus implemented Native snapshot/package, multi-Asset, DisplaySet/media receiver, package exchange, Native-only write authority and §29.3 device-side HEIC compatibility boundary |
 | `specs/03-gates-and-delivery.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | G0/G0-S/G1 evidence, thresholds, feature flags, rollback and schedule |
 | `specs/04-locimyu-conversion.md` | `PRODUCT-OWNER APPROVED / BOUNDED DIRECT ADAPTER IMPLEMENTED / PRODUCT ACCEPTANCE PASS` | Exact LociMyu identity/source authority and report boundary; six representative rows with an empty trimmed ID are reported as empty input, while 103 Captions publish and survive portable restore without changing the source; Desktop and physical-iPhone acceptance passed |
-| `specs/05-project-scene-team-workflow.md` | `PRODUCT-OWNER APPROVED / DISCONNECTED CORE, RECORD GUARDS AND UI COMPONENTS` | Scene command/composition, individual Scene/MaterialOverride records and atomic-material guards, navigation, Caption list/detail/actions, comparison-window state, viewing aids/entry-view/authoring/background, Project model inventory/Scene membership and exact-target material editing under §§13.1/13.3; no current-app/storage/renderer integration, rendered acceptance or full Project validator. Team exchange/migration remains unimplemented; current Native bytes unchanged |
+| `specs/05-project-scene-team-workflow.md` | `PRODUCT-OWNER APPROVED / CORE, RECORD GUARDS, UI COMPONENTS AND SYNTHETIC WORKSPACE LOOP` | Scene command/composition, individual Scene/MaterialOverride records, atomic-material guards and reusable UI under §§13.1/13.3; §13.4 connects navigation, shared Caption editing/list and model membership in development page memory only. No ordinary-app/storage/renderer integration, rendered acceptance or full Project validator. Team exchange/migration remains unimplemented; current Native bytes unchanged |
 | `specs/06-project-package-wire.md` | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED` | Five-purpose wire companion draft; explicit delta/journal, base-receipt, budget and snapshot-builder ratification inputs. No adopted format/version, production bytes or gate credit |
 
 ## Known implementation drift
 
 Current scheduling amendment (2026-09-09): specification 05 §13.4 is PO approved
 for a thin connected synthetic development host using the existing core/UI parts.
-The host is not yet implemented. `tasks/todo.md` top owns the next bounded slice;
-this approval does not change the observed implementation classifications above
-or adopt production storage, wire/migration or ordinary-app integration.
+The first in-memory workspace loop is implemented in `src/harness/projectScene`:
+Scene/task navigation, shared Caption editing/list and model membership. It is not
+integrated production v2. `tasks/todo.md` top owns exact checks and remaining
+connections; rendered/device acceptance, production storage, wire/migration and
+ordinary-app activation remain pending. The components above are no longer all
+test-only, but team exchange/migration and the full provider remain unimplemented.
 
 - Legacy-v1 ZIP/package code is not bounded-memory streaming despite older architecture text. The bounded Native portable and exchange packages use their separate streamed path.
 - Current XLSX reading is the local minimal reader in `src/io/xlsx.ts`, not SheetJS.

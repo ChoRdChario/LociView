@@ -4,7 +4,8 @@
 >
 > Updated: 2026-09-09 after PO approval of thin whole-workflow delivery.
 > Specification 05 §§13.1/13.3 covers the implemented disconnected components;
-> §13.4 now permits their connected synthetic development host, not yet implemented.
+> §13.4's first connected synthetic development loop now exists; real product
+> services and rendered/device acceptance remain pending.
 > Candidate history/CAS/journal proofs remain partial, not storage adoption or
 > integrated S1 completion. Section 8 owns the current completion map.
 > The older Native candidate execution plan below remains historical evidence,
@@ -338,10 +339,12 @@ language, disposable PoCs and one writer.
 ### 2026-09-09 approved sequencing — thin whole workflow
 
 The PO has now explicitly approved the early connected synthetic development
-scope in specification 05 §13.4. **Next implementation:** one nondefault mode of
+scope in specification 05 §13.4. **First loop implemented:** one nondefault mode of
 the existing `dev.html`, connecting two Scenes, shared Caption edits and two
 model resources through the existing core/UI parts. No current v1/Native entry,
-real Project storage or production dependency changes. It is not implemented yet.
+real Project storage or production dependency changes. The host changes page
+memory only and labels unconnected 3D/file/save effects. Current todo records
+checks and the remaining connections; rendered/IME/device evidence is pending.
 
 Progress through workspace interaction, the continuing-team loop, then durable
 product delivery in the same host. Track connected user operations against
@@ -363,7 +366,7 @@ to the connected delivery now approved in §13.4.
 
 | Completion boundary | Present evidence / gap | Next exit and responsible lane |
 |---|---|---|
-| Connected development workspace — immediate | Existing Scene/domain/four-tab parts are disconnected; no development host yet | One shared two-Scene editing/membership loop under 05 §13.4. Codex connects existing parts; explicit unsaved state and no fake connected effects |
+| Connected development workspace | First shared two-Scene editing/membership loop under 05 §13.4 exists in page memory; host tests, not rendered acceptance | Extend the same host toward the continuing-team loop and connect required effects/provider; no parallel mock UI or fake successful merge/save |
 | Metadata/CAS candidate viability | Original causal bytes/conflicts, small five-purpose closures, CAS/retention proofs and bounded human Chrome journal/recheck PASS | Still-missing domain, scale, cross-tab/process interruption, sink/CSP/security and physical-iOS evidence under 03 §§4/6 before relevant adoption. No repeat of the closed journal batch. Operator for inaccessible browser/physical device; PO for measured limits/adoption |
 | Complete domain provider and S1 durable host | Pure Scene core, individual Scene/Material records and local edit guards exist; full resource/reference/frame/conflict admission and Project session are absent | One complete validated-provider boundary with named subparts, then gated durable repository/journal integration under 05 §13.2; individual shape guards alone cannot supply trusted SceneResources |
 | S2 migration and exchange | Five semantic purposes proven only on small synthetic graph; 06 wire is PROPOSED, new migration/Native-bridge recipe not ratified | Reviewed exact wire/recipe and required PO ratification, production five-purpose services and service-level `TEAM-FLOW-01`; preserve source bytes and local work |

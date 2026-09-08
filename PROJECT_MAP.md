@@ -12,8 +12,10 @@
 
 Current delivery order (PO approved 2026-09-09): specification 05 §13.4 permits
 one connected synthetic development host through a nondefault `dev.html` mode,
-reusing the existing Scene/domain/UI parts before subsystem polish. This host is
-**not yet implemented**; the entry diagram below records existing code only.
+reusing the existing Scene/domain/UI parts before subsystem polish. The first
+synthetic workspace loop is implemented: shared Caption editing, model membership
+and Scene/task switching. It is in-memory only; 3D, files, storage/team exchange
+and rendered/device acceptance remain unconnected or pending as recorded in todo.
 Real Project, storage, package and current-app activation retain their gates.
 
 For a fresh Codex session, read `tasks/handoff.md` after this map and the
@@ -32,6 +34,7 @@ dev.html
   -> src/dev-entry.ts
     -> src/devharness.ts                 # default manual v1 harness
     -> src/harness/sparkHarness.ts       # ?mode=spark; isolated candidate only
+    -> src/harness/projectScene/entry.ts # ?mode=project-scene; synthetic in-memory host
 ```
 
 For a normal task, read only the target file, its matching tests, and direct imports first.
@@ -42,14 +45,15 @@ For a normal task, read only the target file, its matching tests, and direct imp
 |---|---|
 | `src/core` | IDs, HLC, operation validation, JSONL, reduction, merge, manifest, and `ProjectStore` |
 | `src/domain` | Disconnected canonical decoded-value/individual Scene and MaterialOverride record admission, atomic material intent and local Caption text guards (05 §13.3); not full Project/resource/history validation or imported-text rewriting |
-| `src/scene` | Disconnected pure Scene command/composition core (specification 05 §13.1); validated conflict-aware read port, no storage/UI integration or adoption |
+| `src/scene` | Pure Scene command/composition core (05 §13.1), now also used by the synthetic development host (§13.4); no production storage or adoption |
 | `src/platform` | `WorkspaceFS`, OPFS, memory filesystem, PWA and browser integration |
 | `src/assets` | ZIP/package handling, model asset registration/replacement, GLB optimization, import wizard |
 | `src/io` | CSV, minimal XLSX reader, and legacy LociMyu conversion |
 | `src/viewer` | Three.js loaders, material shader patch, single-model `ViewerCore` |
 | `src/nativeGs` | Version-1 native snapshot, streamed project-local binaries/packages, exact ASCII Point and SH2/SH3 GS admission, lazy Spark runtime, repeated Asset import, per-Asset visibility/alignment, DisplaySet/material/Caption/media state, legacy conversion and bounded package exchange |
 | `src/ui` | App shell, home, viewer screen, dialogs, tabs, and UI-only state |
-| `src/ui/projectScene` | Disconnected Scene/task navigation, save-state presentation, Caption list/pin filters/detail drafts, inclusion/pin modes, comparison-window state, viewing aids/entry-view, named-view/background controls, Project model inventory/Scene membership and exact-target material editor (05 §13.3); synthetic ports only, no current-app hookup, floating renderer or rendered acceptance |
+| `src/harness/projectScene` | Nondefault synthetic development workspace; connects Scene resolution, navigation, shared Caption editing/list and model membership in page memory; no real Project, storage, file, renderer or adoption path |
+| `src/ui/projectScene` | Reusable Scene/task navigation, save-state presentation, Caption list/pin filters/detail drafts, inclusion/pin modes, comparison-window state, viewing aids/entry-view, named-view/background controls, Project model inventory/Scene membership and exact-target material editor (05 §13.3); navigation/Caption/model controls now connected in synthetic development only (§13.4); no ordinary-app hookup, floating renderer or rendered acceptance |
 | `tests` | Executable contracts for core, assets, I/O, and UI logic |
 | `public/samples` | Small deterministic files used by the manual viewer and iOS runbook |
 | `fixtures` | G0 fixture registry, provenance, hashes and small committed fixture metadata |

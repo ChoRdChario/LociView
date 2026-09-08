@@ -1,15 +1,21 @@
-# Disconnected ProjectScene UI components
+# ProjectScene UI components and development connection
 
-Reusable components under specification 05 §13.3. Only synthetic tests currently
-import them. They do not open files, read/write storage, acknowledge saves, apply
-camera views or import the current Native application.
+Reusable components under specification 05 §13.3. Synthetic tests and the first
+nondefault development host (§13.4) now import them. The components do not open
+files, read/write storage, acknowledge saves, apply camera views or import the
+current Native application.
 
-Approved next connection (2026-09-09, specification 05 §13.4): reuse these
-components in one synthetic development host through a nondefault `dev.html`
-mode. The host is not yet implemented; “only tests import” above describes
-current code, not a prohibition on this approved connection. Do not create a
-competing mock UI or disposable probe page. Full Project admission, renderer,
-durable storage and current-app activation retain their existing prerequisites.
+Development connection (2026-09-09, specification 05 §13.4):
+`dev.html?mode=project-scene` mounts existing navigation, Caption list/detail and
+model controls through `src/harness/projectScene`. One fixed synthetic Project
+supplies two Scenes and shared Caption content. Exact-token actions update only
+page memory; no imported/raw Project is validated by this fixture. A/B/A retains
+selection/search/colors, shared text and unrelated draft input. The stage reports
+composition, not 3D rendering. `windowBlock` explicitly disables unavailable
+window actions with a reason, retaining the same labels. Other effects remain
+pending, not replaced with fake success. Host/DOM tests are not browser/IME or
+device evidence. Full Project admission, renderer, durable storage and ordinary
+app activation retain their prerequisites. Do not create a competing mock UI.
 
 `navigationState.ts` builds conflict-aware Scene choices and token-bound local
 navigation plans. Scene selection is explicit; it never guesses a default or

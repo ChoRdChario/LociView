@@ -11,8 +11,9 @@ gate.
 
 Specification 05 §13.4 records the PO-approved thin whole-workflow sequencing:
 one connected synthetic development host may precede subsystem polish and gated
-production integration. It is not yet implemented. Existing data, adoption,
-wire/migration and device requirements are unchanged.
+production integration. The first synthetic in-memory loop exists; general v2
+and its full acceptance do not. Existing data, adoption, wire/migration and
+device requirements are unchanged. Current bounded evidence is in `tasks/todo.md`.
 
 ## Authority
 

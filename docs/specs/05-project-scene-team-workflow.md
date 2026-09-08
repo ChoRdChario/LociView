@@ -1,10 +1,11 @@
 # ProjectScene and continuing-team workflow contract
 
-> Status: `PRODUCT-OWNER APPROVED CONTRACT / DISCONNECTED CORE, RECORD GUARDS AND UI COMPONENTS; INTEGRATED V2 NOT IMPLEMENTED`
+> Status: `PRODUCT-OWNER APPROVED CONTRACT / CORE, RECORD GUARDS, UI COMPONENTS AND SYNTHETIC WORKSPACE LOOP; INTEGRATED V2 NOT IMPLEMENTED`
 >
 > Approved: 2026-09-07
 > Scheduling amendment: 2026-09-09, §13.4. Connected synthetic development
-> delivery is approved; the host is not yet implemented.
+> delivery is approved; the first in-memory loop exists, not rendered/storage or
+> whole-product acceptance. Current evidence/remaining connections: `tasks/todo.md`.
 >
 > Architecture authority: `docs/adr/0002-project-scenes-and-continuing-team-history.md`
 

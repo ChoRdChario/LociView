@@ -1,0 +1,44 @@
+/* Development-host shell only. The regular home, Native UI and 3D background are untouched. */
+.lv-development-page { color-scheme: light; }
+.lv-development-page body { display: block; height: auto; background: #e6e4e1; color: #312f2d; }
+.lv-development { display: flex; flex-direction: column; height: 100vh; height: 100dvh; min-height: 560px; font: 400 14px/1.5 system-ui, sans-serif; }
+.lv-development [hidden] { display: none !important; }
+.lv-development :is(h1, h2, p) { margin: 0; }
+.lv-development h1 { font-size: 16px; font-weight: 500; }
+.lv-development h2 { font-size: 15px; font-weight: 500; }
+.lv-development :is(button, input, select, textarea) { font: inherit; border-radius: 2px; }
+.lv-development :is(button, input, select) { min-height: 44px; color: #312f2d; background: #faf9f8; border: 1px solid #817c78; }
+.lv-development button:disabled { cursor: default; border-style: dashed; }
+.lv-development button:active:not(:disabled) { background: #d2cfcb; box-shadow: inset 0 1px 2px #817c78; }
+.lv-development :is(button, input, select, textarea):focus-visible { outline: 2px solid #312f2d; outline-offset: 2px; }
+.lv-development-header { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 24px; padding: 12px 20px; border-bottom: 1px solid #b7b1aa; }
+.lv-development-brand { color: #635e58; font-size: 13px; font-weight: 400; margin-right: auto; }
+.lv-development .lv-scene-control label { display: flex; align-items: center; gap: 8px; }
+.lv-development .lv-scene-control p:empty { display: none; }
+.lv-development .lv-save-status { padding: 4px 10px; border: 1px dashed #817c78; }
+.lv-development-notice, .lv-development-message { padding: 8px 20px; border-bottom: 1px solid #b7b1aa; background: #f2f0ee; }
+.lv-development-message { border-left: 3px solid #6e5639; }
+.lv-development-content { display: grid; grid-template-columns: minmax(0, 1fr) 360px; flex: 1; min-height: 0; }
+.lv-development-stage { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 20px; gap: 20px; }
+.lv-development-composition { flex: 0 0 auto; padding: 16px; border: 1px solid #b7b1aa; background: #edeae6; }
+.lv-development-composition ul { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 12px 0; list-style: none; }
+.lv-development-composition li { padding: 6px 12px; background: #faf9f8; border: 1px solid #b7b1aa; }
+.lv-development-editor { display: flex; flex-direction: column; gap: 8px; min-height: 0; max-width: 740px; width: 100%; margin-inline: auto; }
+.lv-development-editor .lv-caption-detail { padding: 12px; border: 1px solid #b7b1aa; }
+.lv-development-sidebar { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; border-left: 1px solid #b7b1aa; background: #f2f0ee; padding: 12px; }
+.lv-development-sidebar > :is(.lv-caption-browser, .lv-model-browser) { flex: 1; }
+.lv-development .lv-task-control { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; }
+.lv-development .lv-task-control button { padding: 6px 2px; font-size: 13px; border-color: transparent; background: transparent; border-bottom: 2px solid #b7b1aa; }
+.lv-development .lv-task-control button[aria-pressed="true"] { background: #e1ddd7; border-bottom-color: #413d39; font-weight: 500; }
+.lv-development-pending-panel { padding: 12px 0; }
+.lv-development .lv-development-pending, .lv-development-pending-panel p { color: #635e58; font-size: 13px; margin-top: 8px; }
+.lv-development-footer { padding: 8px 20px; color: #635e58; font-size: 12px; border-top: 1px solid #b7b1aa; }
+@media (max-width: 760px) {
+  .lv-development { height: auto; min-height: 100dvh; }
+  .lv-development-header { gap: 8px 12px; padding: 12px; }
+  .lv-development-content { display: flex; flex-direction: column; }
+  .lv-development-stage { padding: 12px; }
+  .lv-development-editor { max-width: none; }
+  .lv-development-editor .lv-caption-detail { max-height: 55dvh; }
+  .lv-development-sidebar { min-height: 380px; height: 55dvh; border-left: 0; border-top: 1px solid #b7b1aa; }
+}
