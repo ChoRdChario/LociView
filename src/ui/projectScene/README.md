@@ -78,6 +78,73 @@ Host contract before later integration:
 - A blocked/unavailable source needs the host's actual recovery surface. A list
   button cannot manufacture missing model bytes, owner relations or permissions.
 
+## Selected detail and comparison-window state
+
+`captionDetailState.ts` and `captionDetailControls.ts` cover current-Scene
+title/body/color drafts, shared-Scene impact and explicit apply/cancel requests.
+Only edited fields enter an apply plan. Unresolved fields show neutral placeholders
+and review actions; an independent field can still be edited. Unknown Scene count
+blocks apply until the host can disclose actual impact. Whole-resource unavailable
+state blocks normal edits but keeps locally authored text distinguishable.
+
+`src/domain/captionText.ts` implements only the accepted local title/body scalar,
+NFC and control rules (02 §§3.1–3.2): it preserves body TAB/LF/CR and never rewrites
+imported source. Color in this UI port is a hex authoring value, NOT a persisted
+`colorSrgb` field or complete Caption DTO. The eventual command adapter must map
+only explicit edits, preserve unknown siblings and validate full lifecycle,
+reference, atomic-field and causal requirements. No media file/thumbnail I/O,
+attachments editing, pin placement or conflict-resolution command is added here.
+
+Detail host contract:
+
+- Start one draft per Caption identity with `beginCaptionDraft`; same shared
+  Caption never acquires independent content drafts merely by appearing in two
+  Scenes. Keep draft objects immutable. Accept local `draft` events synchronously
+  only against their exact `baseDraft`; they are UI state, not shared edits.
+- A first edit captures the actually observed field. Incoming changes to an
+  already edited field block apply without rebasing or losing that input. Changes
+  to unrelated fields do not cause an accidental whole-record replacement.
+- Feed `draft.composing`/`hasCaptionDraft` into the host's selection/Scene guards.
+  Do not unmount drafts during tab operations. Different-Caption/Scene render
+  returns false while input remains; the host must defer the entire transition.
+  Same-Caption refresh/source failure retains active composition until it ends.
+- `textareaBody.ts` maps LF-only textarea values back onto unchanged source
+  CR/CRLF tokens. Validated `beforeinput` ranges identify replaced newline tokens;
+  without an exact range, ambiguous newline edits retain input and block apply.
+  The user can copy that input and explicitly cancel/re-edit; later typing or a
+  title-only apply cannot silently clear the issue. This is a tested mapping
+  contract, not evidence of real browser/IME event ordering.
+- Recheck `captionApplyIsCurrent` before dispatch. A returned plan grants no
+  write authority and proves no persistence. Host feedback keeps applying/failure
+  visible; workspace save state remains the navigation host's independent state.
+  `acceptCaptionApply` clears only the exact submitted draft after the host
+  confirms working-state application and supplies matching observed values; it
+  returns the original draft on mismatch/newer input. It never acknowledges a
+  durable save. Never use a missing/failed reply as success.
+- Cancel first opens a confirmation for the exact draft. Handle the `cancel`
+  event explicitly; confirmation becomes invalid if the draft changes. In-flight
+  apply cannot be cancelled through this UI-only route.
+- The form and optional native color picker are static nodes. Unknown/invalid
+  color hides the picker so its implicit black default is never projected as data.
+  Scoped `captionDetail.css` is disconnected. Native IME/caret/newline behavior
+  and visual/mobile acceptance remain required later, not proven by DOM records.
+
+`captionWindowState.ts` manages only Scene-scoped retention, dismissal, z-order
+and preferred position/size; no floating DOM layer, connector or geometry allocator
+is added. The host owns the sole editing selection and supplies it to every plan.
+Retained windows plus the selected follower are deduplicated. `close` records an
+explicit dismissal without clearing selection/draft, so refresh cannot reopen the
+selected follower. An explicit selection/reopen event calls `open` for that selected
+Caption; opening another comparison uses `retain`. Front/place/arrange never select.
+
+Window plans bind source, memory and selection. Missing/unavailable memberships
+suppress projection without deleting retained intent; hidden/review pins do not
+close their content windows. Exact complete valid arrangements preserve all open
+windows, and invalid/incomplete arrangements change nothing. Geometry fitting,
+connector eligibility and responsive clamps belong to the later renderer/host;
+they must not rewrite preferred positions or introduce a single-window fallback.
+Closing one Scene's copy does not erase another Scene's retention or placement.
+
 Current evidence covers pure plans and DOM-contract tests only. Actual browser
 keyboard/focus, layout, contrast, mobile reflow, IME, stage composition and iPhone
 acceptance remain pending. DOM test doubles and current production build do not

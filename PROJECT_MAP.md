@@ -35,7 +35,7 @@ For a normal task, read only the target file, its matching tests, and direct imp
 | Path | Current responsibility |
 |---|---|
 | `src/core` | IDs, HLC, operation validation, JSONL, reduction, merge, manifest, and `ProjectStore` |
-| `src/domain` | Disconnected canonical decoded-value and individual Scene-record admission (05 §13.3); preserves unknown minor fields, not full Project/resource/history validation |
+| `src/domain` | Disconnected canonical decoded-value/individual Scene-record admission and local Caption text guards (05 §13.3); not full Project/resource/history validation or imported-text rewriting |
 | `src/scene` | Disconnected pure Scene command/composition core (specification 05 §13.1); validated conflict-aware read port, no storage/UI integration or adoption |
 | `src/platform` | `WorkspaceFS`, OPFS, memory filesystem, PWA and browser integration |
 | `src/assets` | ZIP/package handling, model asset registration/replacement, GLB optimization, import wizard |
@@ -43,7 +43,7 @@ For a normal task, read only the target file, its matching tests, and direct imp
 | `src/viewer` | Three.js loaders, material shader patch, single-model `ViewerCore` |
 | `src/nativeGs` | Version-1 native snapshot, streamed project-local binaries/packages, exact ASCII Point and SH2/SH3 GS admission, lazy Spark runtime, repeated Asset import, per-Asset visibility/alignment, DisplaySet/material/Caption/media state, legacy conversion and bounded package exchange |
 | `src/ui` | App shell, home, viewer screen, dialogs, tabs, and UI-only state |
-| `src/ui/projectScene` | Disconnected Scene/task navigation, save-state presentation and retained Caption list/direct pin-color controls (05 §13.3); synthetic ports only, no current-app hookup or rendered acceptance |
+| `src/ui/projectScene` | Disconnected Scene/task navigation, save-state presentation, Caption list/pin filters, detail drafts and comparison-window state (05 §13.3); synthetic ports only, no current-app hookup, floating renderer or rendered acceptance |
 | `tests` | Executable contracts for core, assets, I/O, and UI logic |
 | `public/samples` | Small deterministic files used by the manual viewer and iOS runbook |
 | `fixtures` | G0 fixture registry, provenance, hashes and small committed fixture metadata |

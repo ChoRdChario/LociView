@@ -2,6 +2,52 @@
 
 ## Current boundary — implementation through UI verification (2026-09-08)
 
+### Completed — disconnected Caption detail and comparison state (2026-09-08)
+
+Starting `8d6fe24`: clean. The PO asked to continue the documented next component
+under approved 05 §13.3. Reuse 02 §§3.1–3.2/7 conflict-field policy, 05 §§3.3/4.3/11,
+UI guidelines §§5/9–10 and Native session/window evidence. No storage adoption.
+
+- [x] Add selected-Caption title/body/color draft and detail controls with sparse
+  apply intents, field-specific conflict blocking and affected-Scene disclosure.
+- [x] Keep raw draft/IME on refresh, stale apply and failure; require exact host
+  acceptance or explicitly confirmed cancel before clearing it. No save claim.
+- [x] Add Scene-scoped retained/follower window state, explicit close/reopen,
+  front/placement/size/arrangement intentions independent of editing selection.
+- [x] Verify focused pure/DOM contracts and source isolation, obtain one read-only
+  review, then run root typecheck/test/build on final executable changes.
+
+Production scope is disconnected reusable modules and local text guards only.
+Known edits never rebuild a whole Caption DTO; host commands preserve unknown
+fields and validate causal/lifecycle/reference policy. No conflict winner,
+automatic rebase/owner mapping, media payload/file I/O, renderer/window layer,
+package/storage hookup, new page, dependency or single-window fallback. Existing
+window STATE ideas may be reused; their Native storage/render controller must
+not be imported. Temporary unavailable/filter states suppress projection without
+deleting retained intent. Real editor/viewport/IME/iPhone acceptance stays open.
+Stop for a contract conflict or scope expansion, not repeated human micro-checks.
+
+Slice review: root typecheck PASS; 46 focused tests PASS, including 12 detail
+and five window-state tests. Full two-worker suite: 85 files / 1,699 PASS,
+21 existing todo; build PASS with the existing mixed-import/large-chunk warnings.
+Independent read-only review's P2 is fixed and confirmed: textarea LF projection
+preserves unchanged source CR/CRLF tokens. Ambiguous newline edits retain input
+and block apply until explicit recovery. Simulated LF-only values also verify
+no redundant assignment after input; actual caret/IME event ordering is pending.
+Failures/stale replies cannot clear a newer draft or acknowledge a durable save.
+Multiple retained windows, explicit dismissal, order and placement are STATE only,
+not implemented floating DOM, connectors or renderer integration.
+
+Short meta-audit / next implementation: these modules close the selected-detail
+draft and comparison-memory boundary without current app/storage/package changes.
+Continue the Caption task with reusable existing-Project Caption inclusion and
+explicit add/move mode controls under 05 §§4.3/11/13.3 and UI guidelines §5.
+Emit synthetic host intentions only; preserve exact target, pending input and
+finish/cancel recovery. Reuse Scene command tests; add only missing UI contracts.
+No model picking, re-anchoring, media I/O, floating renderer, storage integration,
+new probe or repeated human checks. Full resource/reference admission, gated
+storage/wire adoption and integrated Desktop/iPhone acceptance remain open.
+
 ### Completed — disconnected Caption list and pin-color controls (2026-09-08)
 
 Starting `4ba71cb`: clean, approved 05 §13.3 scheduling exception remains active.

@@ -1,0 +1,18 @@
+/* Disconnected style: the host imports it only during separately gated integration. */
+.lv-caption-detail { min-width: 0; min-height: 0; overflow: auto; color: #312f2d; background: #f2f0ee; font: 400 14px/1.5 system-ui, sans-serif; }
+.lv-caption-detail [hidden] { display: none !important; }
+.lv-caption-detail label { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.lv-caption-detail input, .lv-caption-detail textarea, .lv-caption-detail button {
+  box-sizing: border-box; min-height: 44px; min-width: 44px; max-width: 100%;
+  border: 1px solid #817c78; border-radius: 2px; background: #faf9f8; color: inherit; font: inherit; padding: 6px 10px;
+}
+.lv-caption-detail textarea { min-height: 144px; resize: vertical; }
+.lv-caption-detail p { margin: 4px 0; overflow-wrap: anywhere; }
+.lv-caption-detail input[readonly], .lv-caption-detail textarea[readonly] { border-style: dashed; }
+.lv-caption-detail button:disabled { color: #504d4a; border-style: dashed; }
+.lv-caption-detail button:active:not(:disabled) { background: #d2cfcb; box-shadow: inset 0 1px 2px #817c78; }
+.lv-caption-detail :is(input, textarea, button):focus-visible { outline: 2px solid #312f2d; outline-offset: 2px; }
+.lv-caption-detail-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.lv-caption-detail-actions > button:first-child:not(:disabled) { background: #413d39; color: #faf9f8; font-weight: 500; }
+.lv-caption-detail-actions > button[aria-pressed="true"] { box-shadow: inset 0 0 0 1px #413d39; }
+.lv-caption-impact { color: #504d4a; }

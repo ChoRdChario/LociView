@@ -239,7 +239,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         expect(imports.every(p => p?.startsWith('./') || p === '../domain/values')).toBe(true);
       } else if (/[\\/]ui[\\/]projectScene[\\/]/.test(path)) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
-        expect(imports.every(p => p?.startsWith('./') || p === '../../scene/types')).toBe(true);
+        expect(imports.every(p => p?.startsWith('./') || p === '../../scene/types' || p === '../../domain/captionText')).toBe(true);
       } else expect(source).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/(scene|domain|projectScene)\//);
     }
   });

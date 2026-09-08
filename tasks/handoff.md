@@ -37,6 +37,18 @@
 > No current app, storage, renderer, package, new page/server or manual probe
 > changed. Full content-editor/window integration and platform gates remain open.
 
+> **Current Caption-detail update (2026-09-08):** Reusable title/body/color
+> draft controls and Scene-scoped multiple-window STATE now exist under the same
+> disconnected boundary. Sparse apply plans preserve independent conflicted fields;
+> stale/failure paths retain input, cancel is confirmed, shared-Scene impact stays
+> visible. Closing/front/arranging windows never changes editing selection.
+> Independent review's CR/CRLF-preservation finding is fixed and confirmed, with
+> ambiguous newline edits retained and blocked before apply. Root typecheck,
+> 46 focused tests, full 85 files / 1,699 PASS (21 existing todo; two workers)
+> and build pass. No actual floating layer, connector, durable-save or browser/IME
+> acceptance is claimed. Current todo owns the next Caption inclusion/mode-control
+> component; no new Product Owner action, server or repeated probe is needed.
+
 > **Current package design update (2026-09-08):**
 > `docs/specs/06-project-package-wire.md` is a reviewed **PROPOSED / UNRATIFIED**
 > companion under 05 §7.5, not a format/version or S2 adoption. It separates five
