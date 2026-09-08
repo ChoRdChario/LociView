@@ -1156,9 +1156,14 @@ original causal changes. Different-field edits merge, same-field candidates stay
 unresolved until explicitly chosen, and a second round/replay preserves original
 bytes and the initial shared base. Refresh retains unapplied drafts and UI memory.
 Synthetic cells and in-memory transfers are not a Project schema or package wire.
-No Repo/storage, model replacement, pin correction, membership keep-both, complete
-provider, production save/exchange, rendered/device acceptance or S1–S3 credit is
-implied. Current todo owns exact executable evidence and remaining connections.
+The same port now includes known synthetic Project-wide model-binding updates
+and complete manual anchors. Review correction needs explicit current-family
+selection; local text, Scene references and coordinates survive model updates.
+Typed binding/anchor conflicts remain unresolved until explicitly chosen. These
+are known metadata projections, not full immutable payload/anchor wire admission
+or renderer picking/gizmo. No Repo/storage, membership keep-both, complete provider,
+production save/exchange, rendered/device acceptance or S1–S3 credit is implied.
+Current todo owns exact executable evidence and remaining connections.
 
 ## 14. Explicit non-goals
 

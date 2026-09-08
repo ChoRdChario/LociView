@@ -2,18 +2,24 @@ import { value, type Field, type Membership } from '../../scene/types';
 import { resolveScene } from '../../scene/resolve';
 import { createSyntheticProject, freezeSynthetic, type SyntheticProject } from './fixture';
 import type { DevelopmentHistory, HistoryCell, HistorySnapshot } from './historyPort';
+import { decodeSyntheticAnchor, modelVersion } from './modelFixture';
 
-export const captionKey = (id: string, field: 'title' | 'body' | 'color') => `caption/${id}/${field}`;
+export const captionKey = (id: string, field: 'title' | 'body' | 'color' | 'anchor') => `caption/${id}/${field}`;
+export const bindingKey = (id: string) => `asset/${id}/binding`;
 export const membershipKey = (id: string) => `membership/${id}`;
 const initial = createSyntheticProject();
-const fields = ['title', 'body', 'color'] as const;
+const fields = ['title', 'body', 'color', 'anchor'] as const;
 export function historySeed(): Readonly<Record<string, string>> {
   return Object.fromEntries([
     ...Object.values(initial.resources.captions).flatMap(c => fields.map(field => {
       const cell = field === 'color' ? initial.colors[c.id]! : c[field];
       if (cell.kind !== 'value') throw new Error('合成データの初期値がありません。');
-      return [captionKey(c.id, field), cell.value];
+      return [captionKey(c.id, field), field === 'anchor' ? JSON.stringify(cell.value) : cell.value as string];
     })),
+    ...Object.values(initial.resources.assets).map(asset => {
+      if (asset.projection.kind !== 'value') throw new Error('合成モデルの初期値がありません。');
+      return [bindingKey(asset.id), asset.projection.value.bindingId];
+    }),
     ...Object.values(initial.state.assetMemberships).map(edge => [membershipKey(edge.id), JSON.stringify(edge)]),
   ]);
 }
@@ -22,16 +28,25 @@ const projectField = (cell: HistoryCell): Field<string> => cell.kind === 'value'
 
 /** Exact known fixture projection. This is not an importer for arbitrary Project data. */
 export function projectHistory(snapshot: HistorySnapshot): SyntheticProject {
-  const captions = { ...initial.resources.captions }, colors = { ...initial.colors };
+  const captions = { ...initial.resources.captions }, colors = { ...initial.colors }, assets = { ...initial.resources.assets };
   const memberships: Record<string, Membership> = {};
-  const expected = new Set(Object.keys(historySeed()).filter(key => key.startsWith('caption/')));
+  const expected = new Set(Object.keys(historySeed()).filter(key => !key.startsWith('membership/')));
   for (const [key, cell] of Object.entries(snapshot.cells)) {
     const candidates = cell.kind === 'value' ? [cell.value] : cell.candidates.map(c => c.value);
     if (!candidates.length) throw new Error('更新候補がありません。');
     if (expected.delete(key)) {
       const [, id, field] = key.split('/');
       if (!id || !field || candidates.some(c => c.length > 65_536)) throw new Error('更新内容を確認してください。');
-      if (field === 'color') {
+      if (key.startsWith('asset/')) {
+        const versions = candidates.map(candidate => modelVersion(id, candidate));
+        if (versions.some(v => !v)) throw new Error('この開発版で扱わないモデル更新です。');
+        assets[id] = { ...assets[id]!, projection: cell.kind === 'value' ? value(versions[0]!.projection) :
+          { kind: 'unresolved', reason: 'conflict' } };
+      } else if (field === 'anchor') {
+        const anchors = candidates.map(candidate => decodeSyntheticAnchor(candidate, id));
+        captions[id] = { ...captions[id]!, anchor: cell.kind === 'value' ? value(anchors[0]!) :
+          { kind: 'unresolved', reason: 'conflict' } };
+      } else if (field === 'color') {
         if (candidates.some(c => !/^#[0-9a-f]{6}$/i.test(c))) throw new Error('ピン色を確認してください。');
         colors[id] = projectField(cell);
       } else if (field === 'title' || field === 'body') {
@@ -57,7 +72,7 @@ export function projectHistory(snapshot: HistorySnapshot): SyntheticProject {
     throw new Error('必要な更新内容がありません。');
   const result: SyntheticProject = { ...initial,
     state: { ...initial.state, token: snapshot.token, assetMemberships: memberships },
-    resources: { ...initial.resources, token: snapshot.token, captions }, colors };
+    resources: { ...initial.resources, token: snapshot.token, captions, assets }, colors };
   for (const id of Object.keys(result.state.scenes)) {
     if (resolveScene(result.state, result.resources, id).kind !== 'ready') throw new Error('シーンを確認してください。');
   }

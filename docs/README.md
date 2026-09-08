@@ -67,7 +67,10 @@ connections; rendered/device acceptance, production storage, wire/migration and
 ordinary-app activation remain pending. The components above are no longer all
 test-only. The served development host also connects the isolated candidate to
 two independent memory histories and explicit scalar choices/replay. This is not
-product file exchange; migration and the full provider remain unimplemented.
+product file exchange. Known synthetic model-binding updates and manual pin
+correction now participate in the same two-round loop, preserving local work and
+Scene references. Membership independent copies, migration and the full provider
+remain unimplemented; current todo owns exact scope and checks.
 
 - Legacy-v1 ZIP/package code is not bounded-memory streaming despite older architecture text. The bounded Native portable and exchange packages use their separate streamed path.
 - Current XLSX reading is the local minimal reader in `src/io/xlsx.ts`, not SheetJS.

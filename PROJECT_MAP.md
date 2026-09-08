@@ -16,9 +16,10 @@ reusing the existing Scene/domain/UI parts before subsystem polish. The first
 synthetic workspace loop is implemented: shared Caption editing, model membership
 and Scene/task switching. A serve-only isolated candidate now also connects two
 independent memory histories, sparse edits, explicit scalar conflict choices and
-second-round updates in that same host. This is not file/package exchange: 3D,
-model replacement/pin correction, durable storage and rendered/device acceptance
-remain unconnected or pending as recorded in todo.
+second-round updates in that same host. Known model-binding updates and explicit
+manual pin correction are also connected there, without changing Scene references
+or losing local work. Membership independent copies, 3D, file/package exchange,
+durable storage and rendered/device acceptance remain pending as recorded in todo.
 Real Project, storage, package and current-app activation retain their gates.
 
 For a fresh Codex session, read `tasks/handoff.md` after this map and the

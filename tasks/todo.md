@@ -10,6 +10,37 @@ IME and device acceptance remain pending, not implied by its DOM tests.
 
 ### Current plan / next implementation
 
+- [x] **Completed connection from `6134be3`:** same development host, known synthetic
+  model-binding choices and exact atomic anchor corrections. Model update changes
+  only the Project-wide active binding; all Scene memberships, Caption text and
+  coordinates remain. Incoming changes retain local work and drafts. Missing
+  compatibility becomes review, never reraycast or source matching.
+- [x] Reuse mounted pin-mode controls for move/confirm/cancel, adding an explicitly
+  synthetic AssetFrame coordinate proposal (not renderer picking/gizmo evidence).
+  A reviewed anchor needs an explicitly selected current synthetic visual family;
+  coordinate edits alone cannot clear review. Bind proposals to owner/frame/
+  binding/anchor/Scene; stale/conflicted targets refuse while input remains.
+- [x] Exercise model update -> retained edits -> pin correction -> original-byte
+  return -> second round with actual candidate and mounted host tests. Cover
+  compatible updates, hidden owner, whole-anchor/binding conflicts and cancellation
+  using the existing resolver/field-choice boundary; no new probe page.
+- [x] One read-only final review and final root checks; preserve candidate build
+  isolation. Update current pointers, then continue to the next authorized
+  connected gap without a routine PO hold.
+
+This slice is a synthetic metadata interaction only, not full Asset/anchor wire
+admission, payload publication, model decoding or actual 3D pin placement. No
+current v1/Native, dependency/schema/wire, storage/renderer adoption, release,
+PWA/device claim or arbitrary resource copying. Membership independent keep-both
+stays the following bounded gap. Stop on an accepted-contract conflict or a gate
+needed for real activation, not on ordinary implementation choices.
+
+Meta-audit: clean `g0-baseline` / `6134be3`; 0 behind / 27 ahead of local origin
+tracking (no fetch). Last two executable slices connect the same working UI,
+not new isolated pages. Prior automated checks passed; rendered/native IME/
+device evidence remains pending. This next connection closes §12.6 steps 2–3
+only in the development lane; broader product completion remains open.
+
 - [x] **Completed connection from `50e4e58`:** connect two independent in-memory actors
   to this same development host through a neutral history port. The adapter stays
   in `poc/scene-history` with existing pinned Automerge 3.4.1; serve-only injection
@@ -25,17 +56,38 @@ IME and device acceptance remain pending, not implied by its DOM tests.
 - [x] Final exact-tree root checks, isolated adapter tests/typecheck, both build
   graph isolation checks and one read-only review. No browser-control repair.
 
-Active exit is the connected two-person Caption/history loop, not all of
-`TEAM-FLOW-01`. Model replacement/pin correction, membership keep-both, media,
+The connected two-person Caption/history and synthetic model/pin loops are closed,
+not all of `TEAM-FLOW-01`. Membership keep-both, media,
 file exchange, durable storage and physical-device acceptance remain pending
 unless separately connected and verified. Do not add fake success controls.
 
-**Next connected slice:** model update → retained local Caption work → explicit
-pin correction in this same host, followed by membership conflict keep-one /
-independent-copy keep-both. Reuse the accepted commands/read ports and the current
-isolated history connection; specify exact missing behavior before implementation.
+**Next connected slice:** explicit membership keep-one plus independent Caption
+keep-both, limited to the known attachment/tag-empty synthetic records. Model
+keep-both first needs an exact synthetic immutable closure/preflight, not copied
+projection IDs; this is missing implementation, not a new PO policy or a reason
+to reopen completed storage probes. Reuse the same isolated history host.
 Do not substitute another journal/browser-repair task or claim actual 3D/file
 exchange. No fresh PO/manual check is required to continue within §13.4.
+
+### Model update / pin correction result — 2026-09-09
+
+The same host now updates a known synthetic model's Project-wide binding without
+changing either Scene's membership, Caption text, drafts or coordinates. An
+incompatible surface becomes review; a compatible display revision does not.
+Existing pin-mode controls now accept a finite AssetFrame coordinate proposal.
+Review correction requires explicit current-surface selection and publishes one
+complete manual anchor; editing coordinates alone cannot silently clear review.
+Whole-anchor and binding conflicts have distinct labels and explicit candidates.
+Pending proposals block actor/receive/Scene/model mutation; stale confirmation
+refuses while input remains, and cancellation does not change history.
+
+Final checks: 15 actual-candidate/authored-DOM cases and scoped typecheck PASS;
+root typecheck, 94 files / 1,777 PASS / 21 existing todo (119.46 seconds), default
+and Spark harness builds PASS. Both parsed source-map module graphs exclude the
+candidate/Automerge modules. Existing build warnings remain. One independent
+read-only review found no blocker. No rendered/native IME/iOS/PWA credit, model
+payload or 3D picking/gizmo implementation is implied. No dependencies, wire,
+current app/storage, real source bytes or release configuration changed.
 
 ### Two-person Caption/history result — 2026-09-09
 

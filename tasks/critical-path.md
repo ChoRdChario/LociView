@@ -351,9 +351,11 @@ memory actors using the isolated pinned candidate, sparse Caption/membership
 commands, explicit scalar conflict selection, unchanged exchange base, original
 change-byte integration and a second round/replay. Candidate modules remain out
 of ordinary and Spark/PWA builds. This closes the Caption/history connection,
-not all of the continuing-team milestone. Model replacement, explicit pin
-correction and membership keep-one/independent-copy keep-both are the next
-connected-flow gaps; no new detached mock page or manual journal rerun.
+not all of the continuing-team milestone. Known synthetic model-binding updates
+and explicit surface/coordinate manual pin corrections now join this same loop,
+retaining local work and all Scene references. Next: membership keep-one and
+Caption independent keep-both; model copies need an exact synthetic immutable
+closure first. No new detached mock page or manual journal rerun.
 
 Progress through workspace interaction, the continuing-team loop, then durable
 product delivery in the same host. Track connected user operations against
@@ -375,7 +377,7 @@ to the connected delivery now approved in §13.4.
 
 | Completion boundary | Present evidence / gap | Next exit and responsible lane |
 |---|---|---|
-| Connected development workspace | Shared two-Scene editing/membership plus two-person Caption/history loop under 05 §13.4 in memory; actual candidate and mounted tests, not rendered acceptance | Connect model update/pin correction and explicit membership conflict choices in the same host, then remaining effects/provider; no parallel mock UI or fake merge/save |
+| Connected development workspace | Two-Scene editing, two-person history and synthetic model update/manual pin correction under 05 §13.4; actual candidate and mounted tests, not rendered acceptance | Connect explicit membership keep-one/Caption independent-copy choices, then exact model-copy closure and remaining effects/provider; no parallel mock UI or fake merge/save |
 | Metadata/CAS candidate viability | Original causal bytes/conflicts, small five-purpose closures, CAS/retention proofs and bounded human Chrome journal/recheck PASS | Still-missing domain, scale, cross-tab/process interruption, sink/CSP/security and physical-iOS evidence under 03 §§4/6 before relevant adoption. No repeat of the closed journal batch. Operator for inaccessible browser/physical device; PO for measured limits/adoption |
 | Complete domain provider and S1 durable host | Pure Scene core, individual Scene/Material records and local edit guards exist; full resource/reference/frame/conflict admission and Project session are absent | One complete validated-provider boundary with named subparts, then gated durable repository/journal integration under 05 §13.2; individual shape guards alone cannot supply trusted SceneResources |
 | S2 migration and exchange | Five semantic purposes proven only on small synthetic graph; 06 wire is PROPOSED, new migration/Native-bridge recipe not ratified | Reviewed exact wire/recipe and required PO ratification, production five-purpose services and service-level `TEAM-FLOW-01`; preserve source bytes and local work |

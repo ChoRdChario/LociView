@@ -10,9 +10,12 @@
 > model membership and Scene/task switching in page memory. That same served host
 > now connects two independent candidate histories: different-field merge, explicit
 > scalar choice, retained drafts/model memberships, second round and replay. This
-> is synthetic memory exchange, not team files or durable writes. Model replacement,
-> pin correction, membership independent-copy choices and 3D/file/storage effects
-> remain unconnected; do not claim integrated v2 or rendered acceptance.
+> is synthetic memory exchange, not team files or durable writes. Known model
+> binding updates and explicit manual pin corrections now connect to the same
+> two-round loop, retaining drafts and Scene references. Membership independent
+> copies and 3D/file/storage effects remain unconnected; do not claim integrated
+> v2 or rendered acceptance. Next: membership keep-one and Caption keep-both;
+> model keep-both requires a full synthetic copy closure, not projection cloning.
 > No repeated journal check or scheduling approval is needed. Real-data/current
 > app activation, technology adoption, wire/migration and release gates remain.
 > Accepted UI/UX and visual principles remain in `docs/ui-product-guidelines.md`.

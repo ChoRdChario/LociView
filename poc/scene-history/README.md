@@ -46,10 +46,12 @@ deletes/replaces the scalar to resolve even the materialized winner. In 3.4.1,
 `getConflicts` exposes immutable-string candidates as JS strings while the map
 property is `ImmutableString`; the adapter handles both without choosing one.
 
-Nine new executable cases cover second-round field/membership preservation,
+Fifteen current executable cases cover second-round field/membership preservation,
 original bytes/base, both scalar choices, incomplete/foreign/stale rejection,
 draft retention, actor-bound/disposed choice refusal and mounted two-actor
-edit/receive/choose/replay controls. These
+edit/receive/choose/replay controls, model update with retained local work, explicit
+surface/manual anchor correction, typed binding/anchor conflicts, stale pin
+proposals and invalid metadata rejection. These
 are Node plus authored-DOM records, **not rendered/browser/IME/device evidence**.
 Run from repository root:
 
@@ -68,7 +70,14 @@ unapplied text through a receive and verify it is not lost; native IME/layout
 checks remain batched pending. Reload intentionally loses all demonstration work.
 This is not a new manual hold or a request to repeat the journal tests.
 
-Model revision/pin correction, membership independent copies, media, renderer,
+For the later browser batch, select a model in `モデル`, choose a synthetic model
+update and receive it as the other actor. The same shared Caption keeps its text
+and position but requests pin review when its surface changed. Select that Caption,
+use `ピン位置を編集`, enter development coordinates, explicitly choose the current
+surface and confirm. Exchange both ways again. This is coordinate input for the
+synthetic fixture, not 3D picking/gizmo or real model-file replacement.
+
+Membership independent copies, media, renderer,
 real files, persistence and full `TEAM-FLOW-01` remain pending. The fixed small
 cell representation, transfer object and safety limits are disposable test ports,
 not a ratified ProjectDoc, import validator or numeric product guarantee.

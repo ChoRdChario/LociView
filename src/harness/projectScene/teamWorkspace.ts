@@ -2,6 +2,8 @@ import { createDevelopmentWorkspace } from './workspace';
 import { SyntheticSession } from './session';
 import { historyAuthority, historySeed, projectHistory } from './historyProjection';
 import type { DevelopmentHistoryFactory, MemoryUpdate } from './historyPort';
+import { decodeSyntheticAnchor, modelVersion, syntheticVersions } from './modelFixture';
+import { sceneSwitchReason } from '../../ui/projectScene/navigationState';
 
 /** Two independently edited histories in one disposable page, not a file-sharing UI. */
 export function createTeamWorkspace(document: Document, factory: DevelopmentHistoryFactory) {
@@ -30,19 +32,21 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
   const workspaces = sessions.map(session => createDevelopmentWorkspace(document, session, { team: true, onAction: renderTeam }));
   root.append(toolbar, conflictPanel, ...workspaces.map(w => w.root));
   function attempt(action: () => void) {
+    if (disposed) return;
     try { action(); }
     catch (error) { status.textContent = error instanceof Error ? error.message : '受信できません。編集は保持しています。'; }
     render();
   }
   actor.addEventListener('change', () => attempt(() => {
-    if (sessions[active]!.pending === 'composition') throw new Error('文字の変換を確定してから切り替えてください。');
+    const pending = sessions[active]!.pending;
+    if (pending && pending !== 'text') throw new Error(sceneSwitchReason(pending));
     const next = Number(actor.value); if (next !== 0 && next !== 1) return;
     active = next; status.textContent = `${names[active]}の編集です。もう1人の入力も保持しています。`;
   }));
   function receiveUpdate(replay: boolean) {
     attempt(() => {
       const session = sessions[active]!;
-      if (session.pending === 'composition') throw new Error('文字の変換を確定してから受信してください。入力は保持しています。');
+      if (session.pending && session.pending !== 'text') throw new Error(sceneSwitchReason(session.pending));
       const update = replay ? lastReceived[active] : histories[1 - active]!.exportUpdate();
       if (!update) throw new Error('再受信する更新がありません。');
       const result = histories[active]!.receive(update);
@@ -58,8 +62,8 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
     actor.value = String(active); retry.disabled = !lastReceived[active];
     const shownActor = active, history = histories[shownActor]!;
     const session = sessions[shownActor]!, snapshot = history.read();
-    actor.disabled = receive.disabled = session.pending === 'composition';
-    if (session.pending === 'composition') retry.disabled = true;
+    actor.disabled = receive.disabled = session.pending !== null && session.pending !== 'text';
+    if (actor.disabled) retry.disabled = true;
     const conflicts = Object.entries(snapshot.cells).filter(([, cell]) => cell.kind === 'conflict');
     conflictPanel.hidden = !conflicts.length;
     const elements: HTMLElement[] = [];
@@ -67,20 +71,30 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
       '同じ項目に異なる編集があります。使用する内容を選択してください。'));
     for (const [key, cell] of conflicts) {
       if (cell.kind !== 'conflict') continue;
-      if (!key.startsWith('caption/')) {
+      if (key.startsWith('membership/')) {
         elements.push(make('p', 'モデルの所属に競合があります。残す項目の選択・独立した別項目として両方残す操作は未接続です。')); continue;
       }
       const [, id, field] = key.split('/');
       const ordinal = Object.keys(session.snapshot.resources.captions).indexOf(id!) + 1;
-      const group = make('fieldset'), legend = make('legend', `キャプション ${ordinal} — ${
-        field === 'title' ? 'タイトル' : field === 'body' ? '本文' : 'ピン色'}`);
+      const subject = key.startsWith('asset/') ? `${session.snapshot.modelNames[id!] ?? 'モデル'} — 使用するモデル` :
+        `キャプション ${ordinal} — ${field === 'title' ? 'タイトル' : field === 'body' ? '本文' : field === 'anchor' ? 'ピン位置' : 'ピン色'}`;
+      const group = make('fieldset'), legend = make('legend', subject);
       const confirm = make('button', '選んだ内容を使用'); confirm.type = 'button'; confirm.disabled = true;
       let selected: string | null = null;
       group.append(legend);
       for (const [i, candidate] of cell.candidates.entries()) {
-        const choice = make('label'), radio = make('input'), text = make('span', candidate.value || '（空欄）');
+        let description = candidate.value || '（空欄）';
+        if (key.startsWith('asset/')) description = modelVersion(id!, candidate.value)?.label ?? 'モデル候補を確認';
+        if (field === 'anchor') {
+          const anchor = decodeSyntheticAnchor(candidate.value, id!);
+          if (anchor.kind === 'asset') {
+            const version = syntheticVersions.find(v => v.assetId === anchor.assetId && v.projection.revisionId === anchor.authoredAssetRevisionId);
+            description = `${session.snapshot.modelNames[anchor.assetId]} — X ${anchor.positionAsset[0]} / Y ${anchor.positionAsset[1]} / Z ${anchor.positionAsset[2]} — ${version?.label ?? '以前のモデル'}`;
+          }
+        }
+        const choice = make('label'), radio = make('input'), text = make('span', description);
         radio.type = 'radio'; radio.name = `choice-${active}-${key}`; radio.value = candidate.id;
-        radio.setAttribute('aria-label', `キャプション ${ordinal} ${field === 'title' ? 'タイトル' : field === 'body' ? '本文' : 'ピン色'} 候補 ${i + 1}`);
+        radio.setAttribute('aria-label', `${subject} 候補 ${i + 1}`);
         radio.disabled = session.pending !== null;
         radio.addEventListener('change', () => { selected = candidate.id; confirm.disabled = false; });
         choice.append(radio, text); group.append(choice);

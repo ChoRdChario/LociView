@@ -4,6 +4,9 @@ import { createCaptionDetailControls } from '../../ui/projectScene/captionDetail
 import { createModelListControls } from '../../ui/projectScene/modelListControls';
 import { captionColorKey } from '../../ui/projectScene/captionListState';
 import { SyntheticSession } from './session';
+import { createPinModeControls } from '../../ui/projectScene/pinModeControls';
+import { createModelUpdateControls, createPinCoordinateControls } from './developmentControls';
+import { modelVersion } from './modelFixture';
 
 /** One mounted integration host. Components own their DOM; synthetic session owns all working/UI state. */
 export function createDevelopmentWorkspace(document: Document, session = new SyntheticSession(),
@@ -50,10 +53,13 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     const accepted = session.acceptModel(plan); afterAction();
     if (accepted && plan.kind === 'change' && plan.action === 'select') modelList.revealSelected();
   });
+  const modelUpdate = createModelUpdateControls(document, session, afterAction);
+  const pin = createPinModeControls(document, plan => { session.acceptPin(plan); afterAction(); });
+  const coordinates = createPinCoordinateControls(document, session, afterAction);
   header.append(brand, name, navigation.sceneControl, navigation.saveStatus);
-  editor.append(editorHeading, detail.root, mediaNote);
+  editor.append(editorHeading, detail.root, pin.actions, coordinates.root, pin.modeStrip, mediaNote);
   stage.append(composition, editor);
-  sidebar.append(navigation.taskControl, list.root, modelList.root, materialPanel, viewPanel);
+  sidebar.append(navigation.taskControl, list.root, modelList.root, modelUpdate.root, materialPanel, viewPanel);
   content.append(stage, sidebar); root.append(header, notice, message, content, footer);
   function render() {
     if (disposed) return;
@@ -64,20 +70,23 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
       windowBlock: '複数ウィンドウ・ピンへの接続は未接続です。' });
     const listOkay = list.render(captionContext);
     const modelsOkay = modelList.render(session.modelContext());
-    if (!detailOkay || !listOkay || !modelsOkay) {
+    const pinsOkay = pin.render(session.pinContext()); coordinates.render(); modelUpdate.render();
+    if (!detailOkay || !listOkay || !modelsOkay || !pinsOkay) {
       message.textContent = '入力中の状態を保持しています。操作を完了してから切り替えてください。';
       message.hidden = false; return;
     }
     navigation.render({ scenes: session.snapshot.state, session: session.session, pending: session.pending, save: { kind: 'unsaved' } });
     const task = session.session.task;
     list.root.hidden = task !== 'captions'; modelList.root.hidden = task !== 'models';
+    modelUpdate.root.hidden = task !== 'models';
     materialPanel.hidden = task !== 'materials'; viewPanel.hidden = task !== 'views';
     // A second visible-list pass restores the desired inner scroll after a tab was hidden.
     if (task === 'captions') list.render(captionContext);
     if (task === 'models') modelList.render(session.modelContext());
     const current = session.composition;
     sceneName.textContent = current.name.kind === 'value' ? current.name.value : 'シーン名を確認';
-    const names = current.assets.map(asset => make('li', session.snapshot.modelNames[asset.assetId] ?? 'モデル名を確認'));
+    const names = current.assets.map(asset => make('li', `${session.snapshot.modelNames[asset.assetId] ?? 'モデル名を確認'} — ${
+      modelVersion(asset.assetId, asset.projection.bindingId)?.label ?? '状態を確認'}`));
     models.replaceChildren(...(names.length ? names : [make('li', 'このシーンにモデルはありません。')]));
     models.setAttribute('aria-label', 'シーンに含まれるモデル');
     const captions = captionContext.source.kind === 'ready' ? captionContext.source.captions : [];
@@ -88,6 +97,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   }
   render();
   return { root, session, render, dispose() {
-    disposed = true; navigation.dispose(); list.dispose(); detail.dispose(); modelList.dispose(); root.remove();
+    disposed = true; navigation.dispose(); list.dispose(); detail.dispose(); modelList.dispose();
+    pin.dispose(); coordinates.dispose(); modelUpdate.dispose(); root.remove();
   } };
 }

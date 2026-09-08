@@ -55,3 +55,12 @@
 .lv-development-conflicts label span { white-space: pre-wrap; overflow-wrap: anywhere; }
 .lv-development-conflicts button { padding: 10px; font: inherit; }
 .lv-development-team [hidden] { display: none !important; }
+.lv-development-model-update, .lv-development-coordinates { padding: 10px; border: 1px solid #b7b1aa; background: #f2f0ee; }
+.lv-development-model-update { flex: 0 0 auto; }
+.lv-development-model-update label { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.lv-development-model-update button { margin: 8px 0; padding: 6px 10px; }
+.lv-development-coordinates { display: flex; flex-wrap: wrap; gap: 8px; }
+.lv-development-coordinates > p { flex-basis: 100%; }
+.lv-development-coordinates label { display: flex; flex-direction: column; flex: 1; min-width: 80px; }
+.lv-development-coordinates input, .lv-development-coordinates select { width: 100%; box-sizing: border-box; }
+.lv-development-editor { overflow: auto; }

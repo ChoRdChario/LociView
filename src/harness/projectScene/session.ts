@@ -1,9 +1,9 @@
 import { planSceneCommand, previewScenePlan } from '../../scene/commands';
 import { chooseStartupScene, resolveScene } from '../../scene/resolve';
-import { value, type Composition, type Field } from '../../scene/types';
+import { value, type Anchor, type Composition, type Field } from '../../scene/types';
 import { navigationPlanIsCurrent, type NavigationPlan, type NavigationSession, type PendingInteraction,
   type SceneUiMemory } from '../../ui/projectScene/navigationState';
-import { captionListPlanIsCurrent, type CaptionListContext, type CaptionListItem,
+import { captionListPlanIsCurrent, planCaptionList, type CaptionListContext, type CaptionListItem,
   type CaptionListPlan } from '../../ui/projectScene/captionListState';
 import { acceptCaptionApply, beginCaptionDraft, captionApplyIsCurrent, hasCaptionDraft,
   type CaptionDraft, type DetailContext, type DetailSource } from '../../ui/projectScene/captionDetailState';
@@ -11,7 +11,15 @@ import type { CaptionDetailEvent } from '../../ui/projectScene/captionDetailCont
 import { modelListPlanIsCurrent, newModelListMemory, planModelList, type ModelListContext,
   type ModelListMemory, type ModelListPlan, type ModelMembership } from '../../ui/projectScene/modelListState';
 import { createSyntheticProject, fixtureIds, freezeSynthetic, type SyntheticProject } from './fixture';
-import { captionKey, membershipKey, type SyntheticAuthority } from './historyProjection';
+import { bindingKey, captionKey, membershipKey, type SyntheticAuthority } from './historyProjection';
+import { decodeSyntheticAnchor, modelVersion, syntheticVersions } from './modelFixture';
+import { newPinModeMemory, pinModePlanIsCurrent, planPinMode, type PinModeContext,
+  type PinModeMemory, type PinModePlan, type PinProposal } from '../../ui/projectScene/pinModeState';
+
+export interface SyntheticPinInput {
+  readonly coordinates: readonly [string, string, string]; readonly familyId: string | null;
+}
+export interface ModelUpdatePlan { readonly token: string; readonly sceneId: string; readonly assetId: string; readonly bindingId: string }
 
 const fresh = (prefix: string) => `${prefix}_${crypto.randomUUID().replaceAll('-', '')}`;
 const unknown = <T>(): Field<T> => ({ kind: 'unresolved', reason: 'invalid' });
@@ -24,6 +32,11 @@ export class SyntheticSession {
   private navigation: NavigationSession;
   private drafts = new Map<string, CaptionDraft>();
   private models = new Map<string, ModelListMemory>();
+  private pins = new Map<string, PinModeMemory>();
+  private pinInput: SyntheticPinInput | null = null;
+  private pinProposal: PinProposal | null = null;
+  private pinInputComposing = false;
+  private pinFeedback: PinModeContext['feedback'] = { kind: 'idle' };
   private searchComposing = false;
   private detailFeedback: DetailContext['feedback'] = { kind: 'idle' };
   private modelFeedback: ModelListContext['feedback'] = { kind: 'idle' };
@@ -34,14 +47,20 @@ export class SyntheticSession {
     if (!sceneId) throw new Error('合成シーンを開けません。');
     this.navigation = Object.freeze({ sceneId, task: 'captions', sceneMemory: Object.freeze(
       Object.fromEntries(Object.keys(this.project.state.scenes).map(key => [key, emptyMemory()]))) });
-    for (const key of Object.keys(this.project.state.scenes)) this.models.set(key, newModelListMemory(fixtureIds.project, key));
+    for (const key of Object.keys(this.project.state.scenes)) {
+      this.models.set(key, newModelListMemory(fixtureIds.project, key)); this.pins.set(key, newPinModeMemory(key));
+    }
   }
   get snapshot() { return this.project; }
   get session() { return this.navigation; }
   get sceneId() { return this.navigation.sceneId!; }
   get memory() { return this.navigation.sceneMemory[this.sceneId]!; }
   get pending(): PendingInteraction | null {
-    if (this.searchComposing || [...this.models.values()].some(m => m.composing) ||
+    const text = this.textPending;
+    return text === 'composition' ? text : this.pinInput ? 'pinMove' : text;
+  }
+  private get textPending(): PendingInteraction | null {
+    if (this.pinInputComposing || this.searchComposing || [...this.models.values()].some(m => m.composing) ||
       [...this.drafts.values()].some(d => d.composing !== null)) return 'composition';
     return [...this.drafts.values()].some(hasCaptionDraft) ? 'text' : null;
   }
@@ -99,7 +118,7 @@ export class SyntheticSession {
     if (source.kind === 'ready' && !this.drafts.has(source.caption.id))
       this.drafts.set(source.caption.id, beginCaptionDraft(source)!);
     const draft = source.kind === 'ready' ? this.drafts.get(source.caption.id)! : null;
-    return { source, draft, mutationBlock: null, feedback: this.detailFeedback };
+    return { source, draft, mutationBlock: this.pinInput ? 'ピンの操作を確定するか、取り消してください。' : null, feedback: this.detailFeedback };
   }
   modelContext(): ModelListContext {
     const { state, resources, modelNames } = this.project;
@@ -115,7 +134,121 @@ export class SyntheticSession {
           lifecycle: asset.lifecycle.kind === 'value' ? value(asset.lifecycle.value.state) : unknown<'active' | 'deleted'>(),
           membership, display: value(edge ? 'unavailable' as const : 'outsideScene' as const),
           displayReason: edge ? 'シーンに含まれています。3D描画は未接続です。' : null };
-      }) }, memory: this.models.get(this.sceneId)!, pending: null, mutationBlock: null, feedback: this.modelFeedback };
+      }) }, memory: this.models.get(this.sceneId)!, pending: this.pinInput ? 'pinMove' : null, mutationBlock: null, feedback: this.modelFeedback };
+  }
+  modelUpdateContext() {
+    const model = this.models.get(this.sceneId)!, asset = model.assetId ? this.project.resources.assets[model.assetId] : undefined;
+    const projection = asset?.projection.kind === 'value' ? asset.projection.value : null;
+    const sceneCount = asset ? new Set(Object.values(this.project.state.assetMemberships).filter(e => e.resourceId === asset.id &&
+      (e.lifecycle.kind !== 'value' || e.lifecycle.value.state !== 'deleted')).map(e => e.sceneId)).size : 0;
+    return { token: this.project.state.token, sceneId: this.sceneId, assetId: asset?.id ?? null,
+      name: asset ? this.project.modelNames[asset.id] ?? 'モデル' : '',
+      current: projection ? modelVersion(asset!.id, projection.bindingId) : undefined,
+      choices: syntheticVersions.filter(v => v.assetId === asset?.id && v.projection.bindingId !== projection?.bindingId), sceneCount,
+      issue: this.pinInput ? 'ピンの操作を確定するか、取り消してください。' : this.textPending === 'composition'
+        ? '文字の入力を確定してください。' : !asset ? '一覧からモデルを選択してください。' :
+          asset.lifecycle.kind !== 'value' || asset.lifecycle.value.state !== 'active' || !projection ? 'モデルの更新状態を確認してください。' : null };
+  }
+  acceptModelUpdate(plan: ModelUpdatePlan): boolean {
+    try {
+      const context = this.modelUpdateContext(), version = modelVersion(plan.assetId, plan.bindingId);
+      if (context.issue || plan.token !== context.token || plan.sceneId !== context.sceneId || plan.assetId !== context.assetId ||
+        !version || !context.choices.includes(version)) throw new Error(context.issue ?? '対象が更新されています。モデルを選び直してください。');
+      const token = fresh('snapshot'), asset = this.project.resources.assets[plan.assetId]!;
+      this.publish(this.authority ? this.authority.write(plan.token, { [bindingKey(plan.assetId)]: plan.bindingId }) : {
+        ...this.project, state: { ...this.project.state, token }, resources: { ...this.project.resources, token,
+          assets: { ...this.project.resources.assets, [asset.id]: { ...asset, projection: value(version.projection) } } } });
+      this.message = '合成モデルを更新しました。記録と座標は保持しています。'; return true;
+    } catch (error) { return this.refuse(this.errorText(error)); }
+  }
+  get pinCoordinates() { return this.pinInput; }
+  setPinComposing(active: boolean) { this.pinInputComposing = active; }
+  pinContext(): PinModeContext {
+    const { state, resources, modelNames } = this.project;
+    const modelSource = this.modelContext().source;
+    const items = modelSource.kind === 'ready' ? modelSource.items : [];
+    const source = this.detailSource(), selectedId = this.memory.selectedCaptionId;
+    const caption = selectedId ? resources.captions[selectedId] : undefined;
+    const anchor = caption?.anchor.kind === 'value' ? caption.anchor.value : null;
+    const models = items.map(item => {
+      const asset = resources.assets[item.id]!, present = item.membership.kind === 'value' && item.membership.value.kind === 'included';
+      return { assetId: asset.id, name: value(modelNames[asset.id] ?? 'モデル'),
+        token: JSON.stringify([asset.projection, asset.lifecycle, item.membership]),
+        addBlock: 'この接続版ではピンの追加は未接続です。',
+        moveBlock: !present ? '所有モデルをこのシーンに表示してください。' : asset.projection.kind !== 'value'
+          ? 'モデルの更新候補を確認してください。' : null };
+    });
+    const selected = caption ? { captionId: caption.id, title: caption.title,
+      assetId: anchor?.kind === 'asset' ? value(anchor.assetId) : unknown<string>(),
+      token: JSON.stringify([caption.anchor, caption.lifecycle]),
+      sceneCount: source.kind === 'ready' ? source.sceneCount : unknown<number>(),
+      block: !anchor ? 'ピン位置の競合を確認してください。' : anchor.kind !== 'asset' ? 'この接続版ではモデルに付いたピンだけ移動できます。' : null } : null;
+    const correction = this.pinInput ? this.preparePinAnchor() : null;
+    return { source: { kind: 'ready', token: state.token, sceneId: this.sceneId, models, selected },
+      memory: this.pins.get(this.sceneId)!, otherPending: this.textPending, mutationBlock: null,
+      proposal: this.pinProposal, proposalIssue: correction?.issue ?? null, feedback: this.pinFeedback };
+  }
+  pinCoordinateContext() {
+    const mode = this.pins.get(this.sceneId)!.mode;
+    const asset = mode ? this.project.resources.assets[mode.target.assetId] : undefined;
+    const version = asset?.projection.kind === 'value' ? modelVersion(asset.id, asset.projection.value.bindingId) : undefined;
+    const caption = mode?.caption ? this.project.resources.captions[mode.caption.captionId] : undefined;
+    const anchor = caption?.anchor.kind === 'value' && caption.anchor.value.kind === 'asset' ? caption.anchor.value : null;
+    const needsFamily = !anchor || !version?.projection.anchorCompatibilityIds.includes(anchor.authoredAnchorCompatibilityId);
+    return { mode, input: this.pinInput, families: version?.families ?? [], needsFamily };
+  }
+  private preparePinAnchor(): { anchor?: Anchor; issue: string | null } {
+    try {
+      const { mode, input, families, needsFamily } = this.pinCoordinateContext();
+      if (!mode?.caption || !input) throw new Error('ピンの操作を開始してください。');
+      const old = this.project.resources.captions[mode.caption.captionId]!.anchor;
+      const asset = this.project.resources.assets[mode.target.assetId]!, projection = asset.projection;
+      if (old.kind !== 'value' || old.value.kind !== 'asset' || projection.kind !== 'value' ||
+        old.value.assetId !== asset.id || old.value.assetFrameId !== projection.value.assetFrameId) throw new Error('ピンのモデルを確認してください。');
+      const family = input.familyId ? families.find(f => f.id === input.familyId) : undefined;
+      if (needsFamily && !family) throw new Error('補正先の表面を選択してください。');
+      if (input.coordinates.some(raw => !/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(raw.trim()) || !Number.isFinite(Number(raw))))
+        throw new Error('X・Y・Zを有限の数値で指定してください。');
+      const positionAsset = input.coordinates.map(raw => Number(raw) || 0);
+      const anchor = decodeSyntheticAnchor(JSON.stringify({ kind: 'asset', assetId: asset.id, assetFrameId: projection.value.assetFrameId,
+        positionAsset, authoredAssetRevisionId: projection.value.revisionId,
+        authoredAnchorCompatibilityId: needsFamily ? family!.compatibilityId : old.value.authoredAnchorCompatibilityId,
+        hitEvidence: { method: 'manual' } }), mode.caption.captionId);
+      return { anchor, issue: null };
+    } catch (error) { return { issue: this.errorText(error) }; }
+  }
+  changePinCoordinates(input: SyntheticPinInput): boolean {
+    const mode = this.pins.get(this.sceneId)!.mode;
+    if (!mode || !this.pinInput) return false;
+    this.pinInput = freezeSynthetic({ coordinates: [...input.coordinates] as [string, string, string], familyId: input.familyId });
+    this.pinProposal = this.preparePinAnchor().issue ? null : Object.freeze({ token: fresh('proposal'), mode });
+    this.pinFeedback = { kind: 'idle' }; return true;
+  }
+  acceptPin(plan: PinModePlan): boolean {
+    try {
+      if (plan.kind === 'blocked') throw new Error(plan.reason);
+      if (!pinModePlanIsCurrent(plan, this.pinContext())) throw new Error('対象が更新されています。指定中の位置は保持しています。');
+      if (plan.kind === 'change') {
+        this.pins.set(this.sceneId, plan.memory);
+        if (plan.intent === 'cancel') { this.pinInput = null; this.pinProposal = null; this.pinInputComposing = false; }
+        else if (plan.intent === 'move') {
+          const caption = this.project.resources.captions[plan.memory.mode!.caption!.captionId]!;
+          if (caption.anchor.kind !== 'value' || caption.anchor.value.kind !== 'asset') throw new Error('ピンを確認してください。');
+          this.pinInput = { coordinates: caption.anchor.value.positionAsset.map(String) as [string, string, string], familyId: null };
+          this.changePinCoordinates(this.pinInput);
+        }
+      } else {
+        const correction = this.preparePinAnchor(), captionId = plan.mode.caption!.captionId;
+        if (correction.issue || !correction.anchor) throw new Error(correction.issue ?? '位置を確認してください。');
+        const token = fresh('snapshot'), caption = this.project.resources.captions[captionId]!;
+        this.publish(this.authority ? this.authority.write(plan.token, { [captionKey(captionId, 'anchor')]: JSON.stringify(correction.anchor) }) : {
+          ...this.project, state: { ...this.project.state, token }, resources: { ...this.project.resources, token,
+            captions: { ...this.project.resources.captions, [captionId]: { ...caption, anchor: value(correction.anchor) } } } });
+        this.pins.set(this.sceneId, { ...this.pins.get(this.sceneId)!, mode: null }); this.pinInput = null; this.pinProposal = null;
+        this.message = 'ピン座標を適用しました。3D描画と保存は未接続です。';
+      }
+      this.pinFeedback = { kind: 'idle' }; return true;
+    } catch (error) { this.pinFeedback = { kind: 'failed', message: this.errorText(error) }; return this.refuse(this.errorText(error)); }
   }
   acceptNavigation(plan: NavigationPlan): boolean {
     if (plan.kind === 'blocked') { this.message = plan.reason; return false; }
@@ -132,7 +265,11 @@ export class SyntheticSession {
       this.navigation = Object.freeze({ ...this.navigation, sceneMemory: Object.freeze({ ...this.navigation.sceneMemory, [this.sceneId]: plan.memory }) });
       if (plan.intent === 'select') this.detailFeedback = { kind: 'idle' };
     } else if (plan.kind === 'effect') {
-      if (plan.action === 'review') return this.refuse('この開発版では状態修復は未接続です。');
+      if (plan.action === 'review') {
+        if (plan.captionId !== this.memory.selectedCaptionId && !this.acceptList(planCaptionList(this.captionContext(),
+          { kind: 'select', captionId: plan.captionId }))) return false;
+        return this.acceptPin(planPinMode(this.pinContext(), { kind: 'move' }));
+      }
       if (!plan.assetId) return this.refuse('対象のモデルを確認してください。');
       return this.acceptModel(planModelList(this.modelContext(), { kind: 'membership', assetId: plan.assetId, included: true }));
     }

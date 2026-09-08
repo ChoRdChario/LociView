@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import * as A from '@automerge/automerge';
 import { createDevelopmentPair } from './development';
-import { historyAuthority, historySeed, projectHistory, captionKey, membershipKey } from '../../src/harness/projectScene/historyProjection';
+import { historyAuthority, historySeed, projectHistory, captionKey, membershipKey, bindingKey } from '../../src/harness/projectScene/historyProjection';
+import { syntheticVersions } from '../../src/harness/projectScene/modelFixture';
 import { SyntheticSession } from '../../src/harness/projectScene/session';
 import { fixtureIds as f } from '../../src/harness/projectScene/fixture';
 import { createTeamWorkspace } from '../../src/harness/projectScene/teamWorkspace';
@@ -9,6 +10,9 @@ import type { DevelopmentHistory, MemoryUpdate } from '../../src/harness/project
 import { planCaptionList } from '../../src/ui/projectScene/captionListState';
 import { editCaptionDraft, planCaptionApply, type CaptionEditField } from '../../src/ui/projectScene/captionDetailState';
 import { planModelList } from '../../src/ui/projectScene/modelListState';
+import { planPinMode } from '../../src/ui/projectScene/pinModeState';
+import { planNavigation } from '../../src/ui/projectScene/navigationState';
+import { resolveScene } from '../../src/scene/resolve';
 import { RecordedDocument, RecordedNode, record } from '../../tests/ui/domRecorder';
 
 const factory = (seed: Readonly<Record<string, string>>, validate: Parameters<typeof createDevelopmentPair>[2]) => createDevelopmentPair(A, seed, validate);
@@ -34,8 +38,145 @@ const button = (root: RecordedNode, text: string) => by(root, n => n.tag === 'bu
 const visibleWorkspace = (root: RecordedNode) => by(root, n => n.className === 'lv-development' && !n.hidden);
 const toggle = (session: SyntheticSession, assetId: string, included: boolean) => session.acceptModel(
   planModelList(session.modelContext(), { kind: 'membership', assetId, included }));
+const versions = syntheticVersions.filter(v => v.assetId === f.equipment);
+function updateModel(session: SyntheticSession, version = versions[1]!) {
+  session.acceptModel(planModelList(session.modelContext(), { kind: 'select', assetId: f.equipment }));
+  const ctx = session.modelUpdateContext();
+  return session.acceptModelUpdate({ token: ctx.token, sceneId: ctx.sceneId, assetId: f.equipment, bindingId: version.projection.bindingId });
+}
+function movePin(session: SyntheticSession, coordinates: readonly [string, string, string], familyId: string | null = null) {
+  expect(session.acceptPin(planPinMode(session.pinContext(), { kind: 'move' }))).toBe(true);
+  session.changePinCoordinates({ coordinates, familyId });
+  expect(session.acceptPin(planPinMode(session.pinContext(), { kind: 'finish' }))).toBe(true);
+}
 
 describe('actual pinned candidate connected to synthetic workspace; not browser, wire or durable acceptance', () => {
+  it('carries a model update through both Scenes, retains participant work, explicitly repairs a pin and exchanges a second round', () => {
+    const [a, b] = pair(), sa = new SyntheticSession(historyAuthority(a)), sb = new SyntheticSession(historyAuthority(b));
+    select(sa); select(sb); const original = sb.snapshot, base = a.exportUpdate().base;
+    draft(sb, 'body', '手元で編集した本文'); apply(sb); const local = b.exportUpdate();
+    draft(sb, 'title', '未適用の題'); const pending = sb.detailContext().draft;
+    expect(updateModel(sa)).toBe(true); const update = a.exportUpdate();
+    b.receive(update); sb.refreshHistory();
+    expect(sb.detailContext().draft).toBe(pending); expect(sb.snapshot.state.assetMemberships).toEqual(original.state.assetMemberships);
+    expect(sb.snapshot.resources.captions[f.shared]!.anchor).toEqual(original.resources.captions[f.shared]!.anchor);
+    for (const sceneId of [f.overview, f.detail]) {
+      const resolved = resolveScene(sb.snapshot.state, sb.snapshot.resources, sceneId);
+      if (resolved.kind !== 'ready') throw new Error('scene blocked');
+      expect(resolved.composition.assets.find(v => v.assetId === f.equipment)?.projection).toEqual(versions[1]!.projection);
+      expect(resolved.composition.captions.find(c => c.captionId === f.shared)?.marker).toBe('needsReview');
+    }
+    expect(sb.composition.captions.find(c => c.captionId === f.second)?.marker).toBe('visible');
+    apply(sb); expect(field(b, 'body')).toEqual({ kind: 'value', value: '手元で編集した本文' });
+    expect(sb.acceptPin(planPinMode(sb.pinContext(), { kind: 'move' }))).toBe(true);
+    sb.changePinCoordinates({ coordinates: ['1', '2', '3'], familyId: null });
+    expect(planPinMode(sb.pinContext(), { kind: 'finish' }).kind).toBe('blocked');
+    sb.changePinCoordinates({ coordinates: ['1', '2', '3'], familyId: versions[1]!.families[0]!.id });
+    const beforeConfirm = bytes(b.exportUpdate()); expect(sb.snapshot.resources.captions[f.shared]!.anchor).toEqual(original.resources.captions[f.shared]!.anchor);
+    expect(sb.acceptPin(planPinMode(sb.pinContext(), { kind: 'finish' }))).toBe(true);
+    expect(b.exportUpdate().changes.length).toBe(beforeConfirm.length + 1);
+    expect(sb.composition.captions.find(c => c.captionId === f.shared)?.marker).toBe('visible');
+    const cell = b.read().cells[captionKey(f.shared, 'anchor')]; if (cell?.kind !== 'value') throw new Error('anchor missing');
+    expect(JSON.parse(cell.value)).toEqual({ kind: 'asset', assetId: f.equipment, assetFrameId: versions[1]!.projection.assetFrameId,
+      positionAsset: [1, 2, 3], authoredAssetRevisionId: versions[1]!.projection.revisionId,
+      authoredAnchorCompatibilityId: versions[1]!.families[0]!.compatibilityId, hitEvidence: { method: 'manual' } });
+    const contribution = b.exportUpdate(); a.receive(contribution); sa.refreshHistory();
+    for (const bytesOriginal of [...bytes(local), ...bytes(update)]) expect(bytes(a.exportUpdate())).toContain(bytesOriginal);
+    expect(sa.snapshot.resources.captions[f.shared]!.anchor).toEqual(sb.snapshot.resources.captions[f.shared]!.anchor);
+    draft(sa, 'body', '次の往復の本文'); apply(sa); draft(sb, 'title', '次の往復の題'); apply(sb);
+    const nextA = a.exportUpdate(), nextB = b.exportUpdate(); a.receive(nextB); b.receive(nextA);
+    expect(a.read()).toEqual(b.read()); expect(a.exportUpdate().base).toEqual(base);
+    const prior = a.read(); expect(a.receive(contribution).added).toBe(0); expect(a.read()).toEqual(prior);
+  });
+
+  it('keeps compatible anchors and refuses hidden, invalid or stale pin corrections without losing the proposal', () => {
+    const [a] = pair(), session = new SyntheticSession(historyAuthority(a)); select(session);
+    const old = session.snapshot.resources.captions[f.shared]!.anchor;
+    expect(updateModel(session, versions[2]!)).toBe(true);
+    expect(session.snapshot.resources.captions[f.shared]!.anchor).toEqual(old);
+    expect(session.composition.captions.find(c => c.captionId === f.shared)?.marker).toBe('visible');
+    expect(toggle(session, f.equipment, false)).toBe(true);
+    expect(planPinMode(session.pinContext(), { kind: 'move' }).kind).toBe('blocked');
+    expect(toggle(session, f.equipment, true)).toBe(true);
+    expect(session.acceptPin(planPinMode(session.pinContext(), { kind: 'move' }))).toBe(true);
+    const beforeInput = a.read(); session.changePinCoordinates({ coordinates: ['Infinity', '2', '3'], familyId: null });
+    expect(planPinMode(session.pinContext(), { kind: 'finish' }).kind).toBe('blocked'); expect(a.read()).toEqual(beforeInput);
+    session.changePinCoordinates({ coordinates: ['4', '5', '-0'], familyId: null });
+    const finish = planPinMode(session.pinContext(), { kind: 'finish' }); expect(finish.kind).toBe('finish');
+    expect(updateModel(session)).toBe(false); expect(toggle(session, f.equipment, false)).toBe(false);
+    expect(session.acceptNavigation(planNavigation(session.snapshot.state, session.session, session.pending,
+      { kind: 'scene', sceneId: f.detail }))).toBe(false);
+    // Simulate a changed authoritative target below the UI's receive guard.
+    const input = session.pinCoordinates; a.write(a.read().token, { [bindingKey(f.equipment)]: versions[1]!.projection.bindingId }); session.refreshHistory();
+    const changed = a.read(); expect(session.acceptPin(finish)).toBe(false); expect(a.read()).toEqual(changed); expect(session.pinCoordinates).toBe(input);
+    const ctx = session.pinContext(); expect(session.acceptPin(planPinMode(ctx, { kind: 'cancel', confirmedMode: ctx.memory.mode!, confirmedProposal: ctx.proposal }))).toBe(true);
+    expect(a.read()).toEqual(changed); expect(session.pinCoordinates).toBeNull();
+  });
+
+  it.each(['binding', 'anchor'] as const)('retains whole %s conflicts with correctly labelled explicit UI choices', kind => {
+    const document = new RecordedDocument(), team = createTeamWorkspace(document.asDocument(), factory), root = record(team.root);
+    const [a, b] = team.histories, [sa, sb] = team.sessions; select(sa!); select(sb!);
+    if (kind === 'binding') { expect(updateModel(sa!, versions[1]!)).toBe(true); expect(updateModel(sb!, versions[2]!)).toBe(true); }
+    else { movePin(sa!, ['1', '2', '3']); movePin(sb!, ['4', '5', '6']); }
+    a.receive(b.exportUpdate()); sa!.refreshHistory(); team.render();
+    const key = kind === 'binding' ? bindingKey(f.equipment) : captionKey(f.shared, 'anchor');
+    const conflict = a.read().cells[key]; expect(conflict?.kind).toBe('conflict');
+    if (conflict?.kind !== 'conflict') throw new Error('conflict missing');
+    if (kind === 'binding') expect(sa!.composition.assets.some(v => v.assetId === f.equipment)).toBe(false);
+    else expect(sa!.snapshot.resources.captions[f.shared]!.anchor.kind).toBe('unresolved');
+    expect(sa!.captionContext().source.kind).toBe('ready');
+    const panel = label(root, '更新の競合');
+    expect(descendants(panel).some(n => n.tag === 'legend' && n.textContent.includes(kind === 'binding' ? '使用するモデル' : 'ピン位置'))).toBe(true);
+    expect(descendants(panel).some(n => n.tag === 'legend' && n.textContent.includes('ピン色'))).toBe(false);
+    const first = by(panel, n => n.type === 'radio'), expected = conflict.candidates.find(c => c.id === first.value)!.value;
+    first.checked = true; first.fire('change'); button(panel, '選んだ内容を使用').fire('click');
+    expect(a.read().cells[key]).toEqual({ kind: 'value', value: expected });
+    b.receive(a.exportUpdate()); expect(b.read()).toEqual(a.read()); team.dispose();
+  });
+
+  it('rejects unknown bindings and invalid whole anchors before changing the published history', () => {
+    const [a] = pair(), session = new SyntheticSession(historyAuthority(a)); select(session); movePin(session, ['1', '2', '3']);
+    const key = captionKey(f.shared, 'anchor'), cell = a.read().cells[key];
+    if (cell?.kind !== 'value') throw new Error('anchor missing');
+    const original = JSON.parse(cell.value), before = a.read(), originalBytes = bytes(a.exportUpdate());
+    const foreign = syntheticVersions.find(v => v.assetId === f.structure)!;
+    expect(() => a.write(before.token, { [bindingKey(f.equipment)]: foreign.projection.bindingId })).toThrow();
+    for (const patch of [{ assetFrameId: foreign.projection.assetFrameId }, { assetId: f.structure },
+      { authoredAnchorCompatibilityId: foreign.projection.anchorCompatibilityIds[0] }, { positionAsset: [1, null, 3] },
+      { hitEvidence: { method: 'proxy', source: { representationId: 'guessed' } } }, { normalAsset: [0, 1, 0] }]) {
+      expect(() => a.write(before.token, { [key]: JSON.stringify({ ...original, ...patch }) })).toThrow();
+      expect(a.read()).toEqual(before); expect(bytes(a.exportUpdate())).toEqual(originalBytes);
+    }
+  });
+
+  it('walks model update and coordinate/family correction in mounted controls, with no actor/receive escape during a proposal', () => {
+    const document = new RecordedDocument(), team = createTeamWorkspace(document.asDocument(), factory), root = record(team.root);
+    const actor = label(root, '操作する人'), first = visibleWorkspace(root);
+    button(first, 'モデル').fire('click');
+    const inventory = label(first, 'プロジェクトのモデル一覧');
+    by(inventory, n => n.tag === 'button' && n.textContent === '設備').fire('click');
+    const version = label(first, '更新する合成モデル'); version.value = versions[1]!.projection.bindingId; version.fire('change');
+    button(first, 'このモデルに更新').fire('click');
+    expect(team.sessions[0]!.snapshot.resources.assets[f.equipment]!.projection).toEqual({ kind: 'value', value: versions[1]!.projection });
+    actor.value = '1'; actor.fire('change'); const second = visibleWorkspace(root);
+    by(label(second, 'キャプション一覧'), n => n.className === 'lv-caption-select').fire('click');
+    button(root, '相手の更新を受け取る').fire('click');
+    button(second, 'ピンを移動').fire('click'); const position = label(second, 'ピン座標・開発用');
+    const x = label(position, 'X'); x.value = '7'; x.fire('input');
+    expect(actor.disabled).toBe(true); expect(button(root, '相手の更新を受け取る').disabled).toBe(true);
+    const before = team.histories[1].read(); actor.value = '0'; actor.fire('change'); button(root, '相手の更新を受け取る').fire('click');
+    expect(actor.value).toBe('1'); expect(team.histories[1].read()).toEqual(before);
+    expect(button(second, '位置を確定').disabled).toBe(true);
+    const surface = label(position, '補正先の表面'); expect(surface.value).toBe('');
+    surface.value = versions[1]!.families[0]!.id; surface.fire('change');
+    expect(button(second, '位置を確定').disabled).toBe(false);
+    button(second, '位置を確定').fire('click'); expect(position.hidden).toBe(true); expect(actor.disabled).toBe(false);
+    const anchor = team.sessions[1]!.snapshot.resources.captions[f.shared]!.anchor;
+    expect(anchor.kind === 'value' && anchor.value.kind === 'asset' && anchor.value.positionAsset).toEqual([7, 0, 0]);
+    actor.value = '0'; actor.fire('change'); button(root, '相手の更新を受け取る').fire('click');
+    expect(team.sessions[0]!.snapshot.resources.captions[f.shared]!.anchor).toEqual(anchor); team.dispose();
+  });
+
   it('merges independent fields and exact model memberships, retaining original bytes and the explicit base across a second round', () => {
     const [a, b] = pair(), sa = new SyntheticSession(historyAuthority(a)), sb = new SyntheticSession(historyAuthority(b));
     select(sa); select(sb);

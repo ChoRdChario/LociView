@@ -3,6 +3,7 @@ import { createTeamWorkspace } from './teamWorkspace';
 import '../../ui/projectScene/captionList.css';
 import '../../ui/projectScene/captionDetail.css';
 import '../../ui/projectScene/modelList.css';
+import '../../ui/projectScene/captionActions.css';
 import './workspace.css';
 
 document.title = 'LociView — シーン編集・開発用';
