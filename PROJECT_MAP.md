@@ -30,6 +30,10 @@ pins, with explicit close/reopen, independent front order and local positioning.
 Scene-owned Saved View creation/recapture/recall, naming/order, explicit deletion
 and entry setting now connect to exact camera/solid-background captures and
 the same two-actor history. Entry applies only on actual Scene entry.
+Exact-target Scene/Project material editing now connects to the fixed triangle's
+lighting, sidedness and hard-chroma effect, explicit conflict/reset and independent
+model-copy material re-keying. Unsupported blend/dither stays diagnosed, not
+silently replaced. Media is the next same-host connection.
 File/package exchange, durable storage and rendered/device acceptance remain
 pending as recorded in todo.
 Real Project, storage, package and current-app activation retain their gates.

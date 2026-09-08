@@ -83,6 +83,10 @@ The same host also connects Scene-owned Saved View authoring/recall and entry
 settings: exact camera/solid-background captures, field-version-aware conflict
 handling and two-round memory exchange. Real storage and rendered/device
 acceptance remain pending.
+Exact fixture material catalogs now connect scoped editing, explicit conflict
+choices/reset and independent model-copy material re-keying to lit/unlit,
+sidedness and hard chroma. This is fixed opaque triangle evidence only, not
+blend/dither adoption; media and gated durable-file services remain next.
 
 - Legacy-v1 ZIP/package code is not bounded-memory streaming despite older architecture text. The bounded Native portable and exchange packages use their separate streamed path.
 - Current XLSX reading is the local minimal reader in `src/io/xlsx.ts`, not SheetJS.

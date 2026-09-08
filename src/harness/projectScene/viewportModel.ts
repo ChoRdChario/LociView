@@ -6,6 +6,8 @@ import { modelVersion, syntheticVersions } from './modelFixture';
 import { readFixtureModel, canonicalFixture, type FixtureModelClosure, type FixturePlacement } from './modelClosure';
 import { readProjectCamera, readSolidBackground } from './viewHistory';
 import type { DisplayCapture } from './viewSession';
+import { materialTarget, targetKey, resolveFixtureMaterial } from './materialHistory';
+import type { MaterialIntent } from '../../domain/materialIntent';
 
 export type V3 = readonly [number, number, number];
 export interface Bounds { readonly min: V3; readonly max: V3 }
@@ -14,6 +16,8 @@ export interface SyntheticDisplay {
   readonly token: string; readonly sceneId: string; readonly projectFrameId: string;
   readonly models: readonly FixtureModelClosure[]; readonly pins: readonly DisplayPin[];
   readonly bounds: Bounds | null; readonly selectedId: string | null;
+  readonly materials?: Readonly<Record<string, ReturnType<typeof resolveFixtureMaterial> | { readonly issue: string }>>;
+  readonly materialNotices?: readonly string[];
   readonly entry?: { readonly kind: 'none' } | { readonly kind: 'blocked'; readonly reason: string } | { readonly kind: 'ready'; readonly payload: DisplayCapture };
 }
 export interface CameraPose {
@@ -45,6 +49,22 @@ export function syntheticDisplay(project: SyntheticProject, sceneId: string, pin
     if (!version) throw new Error('表示する合成モデルを確認してください。');
     return readFixtureModel(canonicalFixture(version.closure));
   });
+  const materials = Object.fromEntries(models.map(c => {
+    const target = materialTarget(c), intent = resolved.composition.materials.find(m => targetKey(m.target) === targetKey(target))?.intent as MaterialIntent | undefined;
+    try { return [c.binding.assetId, resolveFixtureMaterial(intent)]; }
+    catch (e) { return [c.binding.assetId, { issue: e instanceof Error ? e.message : '見え方を確認してください。' }]; }
+  }));
+  const activeTargets = new Set(models.map(m => targetKey(materialTarget(m))));
+  const materialNotices = Object.values(project.materialData?.records ?? {}).flatMap(r => {
+    if (r.lifecycle.kind === 'value' && r.lifecycle.value.state === 'deleted') return [];
+    if (r.routing.kind !== 'value') return ['見え方の適用先に競合があります。'];
+    const route = r.routing.value;
+    if (route.scope.kind === 'scene' && route.scope.sceneId !== sceneId) return [];
+    if (!models.some(m => m.binding.assetId === route.target.assetId)) return [];
+    return !activeTargets.has(targetKey(route.target)) ? ['以前のモデルの設定は適用していません。モデルと面の対応を確認してください。'] :
+      r.lifecycle.kind !== 'value' || r.intent.kind !== 'value' || resolved.issues.some(i => i.entityId === r.id)
+        ? ['見え方の設定に競合があります。この範囲の設定は適用していません。'] : [];
+  });
   const box = new THREE.Box3();
   for (const model of models) {
     const b = projectBounds(model.representation.logicalBoundsAsset, model.binding.assetToProject);
@@ -72,7 +92,7 @@ export function syntheticDisplay(project: SyntheticProject, sceneId: string, pin
       catch { /* Keep the explicit entry diagnostic; never fit or choose another View. */ }
     }
   }
-  return freezeSynthetic({ token: project.state.token, sceneId, projectFrameId: project.resources.projectFrameId, models, pins, selectedId, entry,
+  return freezeSynthetic({ token: project.state.token, sceneId, projectFrameId: project.resources.projectFrameId, models, pins, selectedId, entry, materials, materialNotices: [...new Set(materialNotices)],
     bounds: box.isEmpty() ? null : { min: tuple(box.min), max: tuple(box.max) } });
 }
 export const defaultPose = (): CameraPose => ({ position: [0, 1, 3], target: [0, 0, 0], up: [0, 1, 0],

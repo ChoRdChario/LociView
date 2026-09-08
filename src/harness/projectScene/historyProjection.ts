@@ -5,6 +5,7 @@ import type { DevelopmentHistory, HistoryCell, HistorySnapshot } from './history
 import { decodeSyntheticAnchor } from './modelFixture';
 import { modelHistorySeed, projectModelHistory } from './modelHistory';
 import { projectViewHistory, viewHistorySeed } from './viewHistory';
+import { projectMaterialHistory } from './materialHistory';
 
 export const captionKey = (id: string, field: 'title' | 'body' | 'color' | 'anchor' | 'template') => `caption/${id}/${field}`;
 export const bindingKey = (id: string) => `asset/${id}/binding`;
@@ -31,6 +32,7 @@ const projectField = (cell: HistoryCell): Field<string> => cell.kind === 'value'
 export function projectHistory(snapshot: HistorySnapshot, previous?: HistorySnapshot): SyntheticProject {
   const models = projectModelHistory(snapshot, previous);
   const views = projectViewHistory(snapshot, previous);
+  const materials = projectMaterialHistory(snapshot, models.versions.map(v => v.closure), previous);
   const captions = { ...initial.resources.captions }, colors = { ...initial.colors }, assets = models.assets;
   const memberships: Record<string, Membership> = {}, captionMemberships: Record<string, Membership> = {};
   const captionTemplates = { ...initial.captionTemplates };
@@ -65,7 +67,7 @@ export function projectHistory(snapshot: HistorySnapshot, previous?: HistorySnap
       throw new Error('コピーの識別情報は変更できません。');
   }
   for (const [key, cell] of Object.entries(snapshot.cells)) {
-    if (key.startsWith('model/') || key.startsWith('asset/') || key.startsWith('view/') || key.startsWith('scene/')) continue; // Known model/view graphs checked together above.
+    if (['model/', 'asset/', 'view/', 'scene/', 'material/'].some(prefix => key.startsWith(prefix))) continue; // Known graphs checked together above.
     const candidates = cell.kind === 'value' ? [cell.value] : cell.candidates.map(c => c.value);
     if (!candidates.length) throw new Error('更新候補がありません。');
     if (expected.delete(key)) {
@@ -113,7 +115,7 @@ export function projectHistory(snapshot: HistorySnapshot, previous?: HistorySnap
     throw new Error('必要な更新内容がありません。');
   const result: SyntheticProject = { ...initial,
     state: { ...initial.state, scenes: views.scenes, token: snapshot.token, assetMemberships: memberships, captionMemberships },
-    resources: { ...initial.resources, token: snapshot.token, captions, assets, views: views.data.records }, colors, captionTemplates, viewData: views.data,
+    resources: { ...initial.resources, token: snapshot.token, captions, assets, views: views.data.records, materials: materials.records }, colors, captionTemplates, viewData: views.data, materialData: materials,
     modelNames: models.names, modelVersions: models.versions };
   for (const id of Object.keys(result.state.scenes)) {
     if (resolveScene(result.state, result.resources, id).kind !== 'ready') throw new Error('シーンを確認してください。');

@@ -8,6 +8,7 @@ import { createDevelopmentWorkspace } from '../../src/harness/projectScene/works
 import { SyntheticSession } from '../../src/harness/projectScene/session';
 import { planModelList } from '../../src/ui/projectScene/modelListState';
 import { value } from '../../src/scene/types';
+import { resolveFixtureMaterial, sourceColorSrgb, sourceMaterialIntent } from '../../src/harness/projectScene/materialHistory';
 import { RecordedDocument, record, type RecordedNode } from './domRecorder';
 
 const tracker = vi.hoisted(() => ({ renderers: [] as any[], controls: [] as any[], resize: [] as (() => void)[],
@@ -114,6 +115,27 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     viewport.setActive(false); expect(renderer.disposed).toBe(true); expect(viewport.read().ready).toBe(false); expect(tracker.raf.size).toBe(0);
     viewport.setActive(true); expect(viewport.read().ready).toBe(true); viewport.dispose();
     expect(tracker.renderers.every(r => r.disposed)).toBe(true); expect(tracker.controls.every(c => c.disposed)).toBe(true);
+  });
+
+  it('updates exact fixture material without fitting the camera; binary coverage never becomes fractional depth blending', () => {
+    const canvas = fakeCanvas(), v = createSyntheticViewport(canvas.canvas as unknown as HTMLCanvasElement, () => {});
+    const display = syntheticDisplay(createSyntheticProject(), f.overview, null, null), assetId = display.models[0]!.binding.assetId;
+    v.update(display); v.setActive(true); canvas.show(); v.camera({ kind: 'axis', axis: '+x' }); const pose = v.capture!();
+    const models = () => tracker.renderers[0].scene.children[0] as THREE.Group;
+    const mesh = () => models().children[0]!.children[0] as THREE.Mesh;
+    expect(mesh().material).toBeInstanceOf(THREE.MeshStandardMaterial);
+    const appearance = resolveFixtureMaterial({ ...sourceMaterialIntent, appearance: { lighting: 'unlit', doubleSided: true, baseColorSrgb: [0.1234567, 0.5, 1] } });
+    v.update({ ...display, materials: { ...display.materials, [assetId]: appearance } });
+    expect(v.capture!()).toEqual(pose); expect(mesh().material).toBeInstanceOf(THREE.MeshBasicMaterial);
+    expect(mesh().material).toMatchObject({ side: THREE.DoubleSide, visible: true, transparent: false, opacity: 1, depthWrite: true });
+    expect((mesh().material as THREE.MeshBasicMaterial).color.toArray()).toEqual(appearance.colorLinear);
+    v.update({ ...display, materials: { ...display.materials, [assetId]: resolveFixtureMaterial({ ...sourceMaterialIntent,
+      appearance: { chroma: { keyColorSrgb: sourceColorSrgb, tolerance: 0, softness: 0 } } }) } });
+    expect(mesh().material).toMatchObject({ visible: false, transparent: false, opacity: 1, depthWrite: true });
+    expect(v.capture!()).toEqual(pose); const before = models().children.length;
+    v.update({ ...display, materials: { ...display.materials, [assetId]: { issue: '半透明の表示は未接続です。' } } });
+    expect(models().children).toHaveLength(before - 1); expect(v.read().notice).toContain('半透明');
+    expect(v.read().ready).toBe(true); expect(v.capture!()).toEqual(pose); v.dispose();
   });
 
   it('shows context/init failure with recoverable metadata and no automatic retry', () => {

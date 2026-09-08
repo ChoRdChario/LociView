@@ -23,6 +23,9 @@ import { captionIncludePlanIsCurrent, newCaptionIncludeMemory, type CaptionInclu
   type CaptionIncludeMemory, type CaptionIncludePlan } from '../../ui/projectScene/captionIncludeState';
 import { SyntheticViewSession } from './viewSession';
 import { projectViewHistory, viewHistorySeed } from './viewHistory';
+import { SyntheticMaterialSession } from './materialSession';
+import { projectMaterialHistory } from './materialHistory';
+import type { MaterialPlan } from '../../ui/projectScene/materialState';
 
 export interface SyntheticPinInput {
   readonly coordinates: readonly [string, string, string]; readonly familyId: string | null;
@@ -41,6 +44,7 @@ const emptyMemory = (): SceneUiMemory => Object.freeze({ selectedCaptionId: null
 /** Development-only state. Optional isolated memory-history authority; never durable save. */
 export class SyntheticSession {
   readonly views = new SyntheticViewSession(() => this.project, () => this.sceneId, (token, changes) => this.writeViews(token, changes));
+  readonly materials = new SyntheticMaterialSession(() => this.project, () => this.sceneId, (token, changes) => this.writeMaterials(token, changes));
   private project = createSyntheticProject();
   private navigation: NavigationSession;
   private drafts = new Map<string, CaptionDraft>();
@@ -82,10 +86,10 @@ export class SyntheticSession {
     return text === 'composition' ? text : this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : text;
   }
   private get textPending(): PendingInteraction | null {
-    if (this.views.pending === 'composition') return 'composition';
+    if (this.views.pending === 'composition' || this.materials.pending === 'composition') return 'composition';
     if (this.placement?.composing || this.pinInputComposing || this.searchComposing || [...this.includes.values()].some(m => m.composing) || [...this.models.values()].some(m => m.composing) ||
       [...this.drafts.values()].some(d => d.composing !== null)) return 'composition';
-    return this.views.pending ?? ([...this.drafts.values()].some(hasCaptionDraft) ? 'text' : null);
+    return this.views.pending ?? this.materials.pending ?? ([...this.drafts.values()].some(hasCaptionDraft) ? 'text' : null);
   }
   setSearchComposing(active: boolean) { this.searchComposing = active; }
   setViewportDragging(active: boolean): boolean { const changed = this.viewportDragging !== active; this.viewportDragging = active; return changed; }
@@ -129,6 +133,21 @@ export class SyntheticSession {
     const result = projectViewHistory(next, previous);
     this.publish({ ...this.project, state: { ...this.project.state, token, scenes: result.scenes },
       resources: { ...this.project.resources, token, views: result.data.records }, viewData: result.data });
+  }
+  materialContext() {
+    const other: PendingInteraction | null = this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' :
+      this.searchComposing || [...this.includes.values()].some(m => m.composing) || [...this.models.values()].some(m => m.composing) ||
+      [...this.drafts.values()].some(d => d.composing) ? 'composition' : this.views.pending;
+    return this.materials.context(other);
+  }
+  acceptMaterial(plan: MaterialPlan) { const accepted = this.materials.accept(plan, this.materialContext()); this.message = this.materials.message; return accepted; }
+  private writeMaterials(base: string, changes: Readonly<Record<string, string>>) {
+    if (base !== this.project.state.token) throw new Error('設定が更新されています。入力を保持しています。');
+    if (this.authority) { this.publish(this.authority.write(base, changes)); return; }
+    const token = fresh('snapshot'), previous = { token: base, cells: this.project.materialData?.cells ?? {} };
+    const cells = { ...previous.cells, ...Object.fromEntries(Object.entries(changes).map(([key, text]) => [key, { kind: 'value' as const, value: text }])) };
+    const data = projectMaterialHistory({ token, cells }, this.modelVersions.map(v => v.closure), previous);
+    this.publish({ ...this.project, state: { ...this.project.state, token }, resources: { ...this.project.resources, token, materials: data.records }, materialData: data });
   }
   captionContext(): CaptionListContext {
     const { resources, colors, modelNames, state } = this.project;

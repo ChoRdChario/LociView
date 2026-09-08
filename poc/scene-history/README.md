@@ -46,7 +46,7 @@ deletes/replaces the scalar to resolve even the materialized winner. In 3.4.1,
 `getConflicts` exposes immutable-string candidates as JS strings while the map
 property is `ImmutableString`; the adapter handles both without choosing one.
 
-Thirty current executable cases cover second-round field/membership preservation,
+Current executable cases cover second-round field/membership preservation,
 original bytes/base, both scalar choices, incomplete/foreign/stale rejection,
 draft retention, actor-bound/disposed choice refusal and mounted two-actor
 edit/receive/choose/replay controls, model update with retained local work, explicit
@@ -58,7 +58,7 @@ hashes and a second exchange, malformed/partial/rewritten closure refusal,
 placement retry/stale input and content-update placement retention, and mounted
 explicit original/model-copy/translation with pending/IME guards. Caption copies
 are restricted to the known attachment/tag-empty fixture; model copies to a
-fully specified triangle fixture without unhandled parent/derivation/material
+fully specified triangle fixture without unhandled parent/derivation or unresolved material
 dependencies. Descriptor checks are not full incoming-history admission. These
 are Node plus authored-DOM records, **not rendered/browser/IME/device evidence**.
 Five cases added with Saved Views cover original setter/predecessor-based atomic
@@ -67,6 +67,12 @@ capture, equal-value causal edits and conflicts, exact create retry, invalid
 reference/identity refusal, existing membership-copy compatibility, independent
 error lanes and the same mounted two-actor conflict flow. The decoded-operation
 API is confined to this fixed candidate; no general provider API is adopted.
+Material connection cases cover atomic appearance candidates, unchanged
+compositing, exact scope/reset, retained original retry command/IDs, stale draft
+refusal, same-key duplicates with explicit choice and fresh Scene-only effective
+material copies. Multiple conflict targets are distinguishable; unresolved routing
+is never guessed. The current total is 35 cases. Fixed-color renderer/object tests
+cover binary hard chroma and mask cutoff zero without claiming raster acceptance.
 Run from repository root:
 
 ```powershell
@@ -95,6 +101,19 @@ cannot be deleted until cleared/reassigned; other deletions require confirmation
 Exchange as the other actor, edit and exchange again; simultaneous camera edits
 require an explicit candidate choice. Test IME/caret, touch/orbit and actual
 framing in that one batch; these remain unverified by the automated connection tests.
+
+Extend the same later batch in `マテリアル`: choose `モデル`, `面` and
+`適用範囲`, then `設定を編集`. Change `照明` or `表示する面` and use
+`変更を適用`; confirm the 3D effect without camera movement. A Project setting
+applies in both Scenes; a Scene setting replaces it only there. Use
+`この範囲の設定を解除`, inspect the fallback and confirm `設定を解除する`.
+Hard color removal uses `指定した色を透過` and `透過する色`; inherited fractional
+opacity/softness remain explicitly unconnected. Edit/receive as both actors;
+simultaneous edits require choosing the identified model/scope/surface candidate.
+Concurrent new settings on the same surface require `選んだ設定を残す`, with no
+preselected winner. Independent model keep-both carries the confirmed effective
+appearance into the copy, without changing original/other-Scene settings. Verify
+IME, focus and actual effect in this batch only; no new manual hold is created.
 
 For the later browser batch, select a model in `モデル`, choose a synthetic model
 update and receive it as the other actor. The same shared Caption keeps its text

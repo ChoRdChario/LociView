@@ -23,6 +23,10 @@ import { planView, type ViewRuntime } from '../../src/ui/projectScene/viewState'
 import { editViewName, planViewAuthor, type ViewAuthorContext } from '../../src/ui/projectScene/viewAuthoringState';
 import { viewKey, entryKey } from '../../src/harness/projectScene/viewHistory';
 import type { DisplayCapture } from '../../src/harness/projectScene/viewSession';
+import { editMaterialDraft, materialTargetKey, planMaterial, type MaterialIntentRequest } from '../../src/ui/projectScene/materialState';
+import type { MaterialEditField } from '../../src/domain/materialIntent';
+import { materialBucket, materialCopyIntent, materialKey, materialTarget } from '../../src/harness/projectScene/materialHistory';
+import { syntheticDisplay } from '../../src/harness/projectScene/viewportModel';
 
 const factory = (seed: Readonly<Record<string, string>>, validate: Parameters<typeof createDevelopmentPair>[2]) => createDevelopmentPair(A, seed, validate);
 const pair = () => factory(historySeed(), projectHistory);
@@ -83,7 +87,131 @@ function modelConflict() {
   return { a, b, sa, sb, group: duplicateMemberships(a.read())[0]! };
 }
 
+const mat = (s: SyntheticSession, request: MaterialIntentRequest) => s.acceptMaterial(planMaterial(s.materialContext(), request));
+function materialSelection(s: SyntheticSession, assetId: string, scope: 'scene' | 'project' = 'scene') {
+  expect(mat(s, { kind: 'model', assetId }), s.message).toBe(true);
+  const source = s.materialContext().source;
+  if (source.kind !== 'ready') throw new Error('ready');
+  const surfaces = source.models.find(m => m.assetId === assetId)!.surfaces;
+  if (surfaces.kind !== 'value') throw new Error('surfaces');
+  expect(mat(s, { kind: 'surface', key: materialTargetKey(surfaces.value[0]!.target) }), s.message).toBe(true);
+  expect(mat(s, { kind: 'scope', scope }), s.message).toBe(true);
+}
+function materialEdit(s: SyntheticSession, field: MaterialEditField, text: string) {
+  const draft = s.materialContext().draft!;
+  expect(s.acceptMaterial({ kind: 'draft', baseDraft: draft, draft: editMaterialDraft(draft, field, text) }), s.message).toBe(true);
+}
+function materialApply(s: SyntheticSession, field: MaterialEditField, text: string) {
+  expect(mat(s, { kind: 'begin' }), s.message).toBe(true); materialEdit(s, field, text);
+  expect(mat(s, { kind: 'apply' }), s.message).toBe(true);
+}
+
 describe('actual pinned candidate connected to synthetic workspace; not browser, wire or durable acceptance', () => {
+  it('exchanges exact material scope/atomic appearance, explicit candidate choice and reset without changing compositing or another Scene', () => {
+    const [a, b] = pair(), sa = new SyntheticSession(historyAuthority(a)), sb = new SyntheticSession(historyAuthority(b));
+    materialSelection(sa, f.equipment, 'project'); materialApply(sa, 'lighting', 'unlit');
+    const id = Object.keys(sa.snapshot.resources.materials)[0]!, appearance = materialKey(id, 'appearance'), compositing = materialKey(id, 'compositing');
+    b.receive(a.exportUpdate()); sb.refreshHistory(); materialSelection(sb, f.equipment, 'project');
+    const original = a.read(); materialApply(sa, 'doubleSided', 'double'); materialApply(sb, 'lighting', 'lit');
+    a.receive(b.exportUpdate()); sa.refreshHistory();
+    expect(a.read().cellVersions![compositing]).toBe(original.cellVersions![compositing]);
+    const conflict = a.read().cells[appearance]!; if (conflict.kind !== 'conflict') throw new Error('whole appearance conflict');
+    expect(conflict.candidates.map(c => JSON.parse(c.value))).toEqual(expect.arrayContaining([{ doubleSided: true, lighting: 'unlit' }, { lighting: 'lit' }]));
+    expect(sa.snapshot.materialData!.records[id]!.intent.kind).toBe('unresolved');
+    expect(syntheticDisplay(sa.snapshot, f.overview, null, null).materialNotices!.join()).toContain('競合');
+    a.choose(a.read().token, appearance, conflict.candidates.find(c => JSON.parse(c.value).lighting === 'unlit')!.id); sa.refreshHistory();
+    materialSelection(sa, f.equipment, 'scene'); materialApply(sa, 'doubleSided', 'front');
+    const before = syntheticDisplay(sa.snapshot, f.detail, null, null);
+    expect(syntheticDisplay(sa.snapshot, f.overview, null, null).materials![f.equipment]).toMatchObject({ doubleSided: false, unlit: true });
+    expect(before.materials![f.equipment]).toMatchObject({ doubleSided: true, unlit: true });
+    expect(mat(sa, { kind: 'remove' }), sa.message).toBe(true);
+    b.receive(a.exportUpdate()); sb.refreshHistory(); expect(a.read().cells).toEqual(b.read().cells);
+    expect(syntheticDisplay(sa.snapshot, f.detail, null, null).materials).toEqual(before.materials);
+    const sent = bytes(a.exportUpdate()); expect(a.receive(b.exportUpdate()).added).toBe(0); expect(bytes(a.exportUpdate())).toEqual(sent);
+  });
+
+  it('keeps original material command/IDs and draft on failure, retries exactly, and refuses a stale draft after receive', () => {
+    const [a, b] = pair(), authority = historyAuthority(a), commands: Readonly<Record<string, string>>[] = []; let reject = true;
+    const s = new SyntheticSession({ read: authority.read, write: (token, changes) => {
+      commands.push(changes); if (reject) throw new Error('injected'); return authority.write(token, changes);
+    } });
+    materialSelection(s, f.equipment); mat(s, { kind: 'begin' }); materialEdit(s, 'lighting', 'unlit');
+    const draft = s.materialContext().draft; expect(mat(s, { kind: 'apply' })).toBe(false); expect(s.materialContext().draft).toBe(draft);
+    expect(s.materialContext().feedback.kind).toBe('failed'); reject = false;
+    expect(mat(s, { kind: 'retry' }), s.message).toBe(true); expect(commands[1]).toBe(commands[0]); expect(s.pending).toBeNull();
+    const id = Object.keys(s.snapshot.resources.materials)[0]!; b.receive(a.exportUpdate());
+    mat(s, { kind: 'begin' }); materialEdit(s, 'doubleSided', 'double'); const held = s.materialContext().draft;
+    b.write(b.read().token, { [materialKey(id, 'appearance')]: canonicalFixture({ lighting: 'lit', baseColorSrgb: [0.1234567, 0.456789, 0.9876543] }) });
+    a.receive(b.exportUpdate()); s.refreshHistory(); expect(mat(s, { kind: 'apply' })).toBe(false); expect(s.materialContext().draft).toBe(held);
+    expect(s.acceptMaterial({ kind: 'cancel', draft: held! })).toBe(true); materialApply(s, 'doubleSided', 'double');
+    expect(JSON.parse((a.read().cells[materialKey(id, 'appearance')] as { value: string }).value).baseColorSrgb).toEqual([0.1234567, 0.456789, 0.9876543]);
+  });
+
+  it('mounts duplicate material choice without a winner, keeps the explicit choice and converges after second receive', () => {
+    const doc = new RecordedDocument(), team = createTeamWorkspace(doc.asDocument(), factory), [sa, sb] = team.sessions, [a, b] = team.histories;
+    materialSelection(sa!, f.equipment); materialApply(sa!, 'lighting', 'unlit'); materialSelection(sb!, f.equipment); materialApply(sb!, 'doubleSided', 'double');
+    a!.receive(b!.exportUpdate()); sa!.refreshHistory(); team.render(); const root = record(team.root), panel = label(root, 'マテリアルの重複');
+    const radios = descendants(panel).filter(n => n.tag === 'input' && n.type === 'radio');
+    expect(radios).toHaveLength(2); expect(radios.every(r => !r.checked)).toBe(true); expect(button(panel, '選んだ設定を残す').disabled).toBe(true);
+    const target = sa!.materialContext().selection.target!; expect(materialBucket(sa!.snapshot.materialData, { scope: { kind: 'scene', sceneId: f.overview }, target }).kind).toBe('unresolved');
+    const wanted = Object.values(sa!.snapshot.materialData!.records).find(r => r.intent.kind === 'value' && r.intent.value.appearance.lighting === 'unlit')!.id;
+    radios.find(r => r.value === wanted)!.fire('change'); button(panel, '選んだ設定を残す').fire('click');
+    expect(Object.values(sa!.snapshot.materialData!.records).filter(r => r.lifecycle.kind === 'value' && r.lifecycle.value.state === 'active')).toHaveLength(1);
+    expect(syntheticDisplay(sa!.snapshot, f.overview, null, null).materials![f.equipment]).toMatchObject({ unlit: true, doubleSided: false });
+    b!.receive(a!.exportUpdate()); expect(a!.read().cells).toEqual(b!.read().cells); team.dispose();
+  });
+
+  it('copies confirmed effective material onto a fresh independent model in this Scene only, retaining original resources and retry bytes', () => {
+    const { a, b, sa, group } = modelConflict(); materialSelection(sa, f.structure, 'project'); materialApply(sa, 'lighting', 'unlit');
+    materialSelection(sa, f.structure, 'scene'); materialApply(sa, 'doubleSided', 'double');
+    const before = projectHistory(a.read()), source = before.modelVersions!.find(v => v.assetId === f.structure)!.closure;
+    const copy = { edgeId: group.edges[1]!.id, membershipId: freshId('sam'), ids: allocateModelCopyIds(fixtureModelIds(source), freshId), materialOverrideId: freshId('ovr') };
+    const p = planMembershipResolution(a.read(), group, group.edges[0]!.id, 'both', freshId('evt'), [], [copy]);
+    const retryHistory: DevelopmentHistory = { ...a, write: () => { throw new Error('injected'); } };
+    expect(() => applyMembershipResolution(retryHistory, p)).toThrow('injected');
+    expect(a.read().token).toBe(p.token); const originalCommand = canonicalFixture(p.changes); applyMembershipResolution(a, p);
+    expect(canonicalFixture(p.changes)).toBe(originalCommand); const after = projectHistory(a.read());
+    const originalMaterialIds = Object.keys(before.resources.materials);
+    originalMaterialIds.forEach(id => expect(after.resources.materials[id]).toEqual(before.resources.materials[id]));
+    expect(after.resources.captions).toEqual(before.resources.captions);
+    const copied = after.materialData!.records[copy.materialOverrideId]!;
+    expect(copied.routing).toMatchObject({ value: { scope: { kind: 'scene', sceneId: f.detail }, target: { assetId: copy.ids.asset, variantFamilyId: copy.ids.family,
+      materialLayoutId: copy.ids.layout, logicalMaterialSlotId: copy.ids.slot } } });
+    expect(copied.intent).toEqual({ kind: 'value', value: materialCopyIntent(before.materialData, f.detail, source) });
+    expect(syntheticDisplay(after, f.detail, null, null).materials![copy.ids.asset]).toMatchObject({ unlit: true, doubleSided: true });
+    expect(syntheticDisplay(after, f.overview, null, null).materials![f.structure]).toMatchObject({ unlit: true, doubleSided: false });
+    sa.refreshHistory(); materialSelection(sa, copy.ids.asset); materialApply(sa, 'lighting', 'lit');
+    expect(syntheticDisplay(sa.snapshot, f.detail, null, null).materials![f.structure]).toMatchObject({ unlit: true, doubleSided: true });
+    b.receive(a.exportUpdate()); expect(a.read().cells).toEqual(b.read().cells);
+    const sent = bytes(a.exportUpdate()); expect(a.receive(b.exportUpdate()).added).toBe(0); expect(bytes(a.exportUpdate())).toEqual(sent);
+    const unresolved = { ...before.materialData!, records: Object.fromEntries(Object.entries(before.materialData!.records).map(([id, r]) => [id, { ...r, intent: { kind: 'unresolved' as const, reason: 'conflict' as const } }])) };
+    expect(() => materialCopyIntent(unresolved, f.detail, source)).toThrow('競合');
+  });
+
+  it('names simultaneous material conflicts by exact model, scope and surface; unresolved routing never acquires a guessed target', () => {
+    const doc = new RecordedDocument(), team = createTeamWorkspace(doc.asDocument(), factory), [sa, sb] = team.sessions, [a, b] = team.histories;
+    materialSelection(sa!, f.equipment); materialApply(sa!, 'lighting', 'unlit');
+    materialSelection(sa!, f.structure, 'project'); materialApply(sa!, 'lighting', 'unlit');
+    const ids = Object.keys(sa!.snapshot.materialData!.records); b!.receive(a!.exportUpdate());
+    for (const id of ids) {
+      a!.write(a!.read().token, { [materialKey(id, 'appearance')]: canonicalFixture({ lighting: 'lit' }) });
+      b!.write(b!.read().token, { [materialKey(id, 'appearance')]: canonicalFixture({ lighting: 'unlit', doubleSided: true }) });
+    }
+    a!.receive(b!.exportUpdate()); sa!.refreshHistory(); team.render();
+    const panel = label(record(team.root), '更新の競合');
+    const subjects = descendants(panel).filter(n => n.tag === 'legend').map(n => n.textContent);
+    expect(subjects).toHaveLength(2); expect(new Set(subjects).size).toBe(2);
+    expect(subjects.some(s => s.includes(sa!.snapshot.modelNames[f.equipment]!) && s.includes('全体') && s.includes('面の識別'))).toBe(true);
+    expect(subjects.some(s => s.includes(sa!.snapshot.modelNames[f.structure]!) && s.includes('プロジェクト共通'))).toBe(true);
+    const choices = descendants(panel).filter(n => n.type === 'radio'); expect(new Set(choices.map(n => n.attributes.get('aria-label'))).size).toBe(4);
+    const id = ids[0]!, route = sa!.snapshot.materialData!.records[id]!.routing; if (route.kind !== 'value') throw new Error('routing');
+    b!.receive(a!.exportUpdate());
+    a!.write(a!.read().token, { [materialKey(id, 'routing')]: canonicalFixture({ ...route.value, scope: { kind: 'project' } }) });
+    b!.write(b!.read().token, { [materialKey(id, 'routing')]: canonicalFixture({ ...route.value, scope: { kind: 'scene', sceneId: f.detail } }) });
+    a!.receive(b!.exportUpdate()); sa!.refreshHistory(); team.render();
+    expect(descendants(panel).filter(n => n.tag === 'legend').some(n => n.textContent.includes(`適用先を確認 — 設定 ${id}`))).toBe(true);
+    expect(descendants(panel).filter(n => n.type === 'radio').every(n => !n.checked)).toBe(true); team.dispose();
+  });
   const viewPayload = (): DisplayCapture => ({ camera: { position: [1, 2, 10], target: [0, 0, 0], up: [0, 1, 0], projection: { kind: 'perspective', verticalFovRadians: 0.7 } },
     background: { kind: 'solid', colorSrgb: [0.1234567, 0.42, 0.83] } });
   const viewRuntime = (s: SyntheticSession): ViewRuntime => ({ kind: 'ready', token: 'runtime-1', sceneId: s.sceneId, projectFrameId: s.snapshot.resources.projectFrameId,

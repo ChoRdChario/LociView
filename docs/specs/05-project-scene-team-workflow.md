@@ -1147,6 +1147,28 @@ nonblocking visual polish. A required gate/ratification blocks its actual
 activation, not unrelated authorized development. Before such a boundary,
 report the exact missing prerequisite instead of inventing substitute work.
 
+**Observed material connection (from `895169e`):** the same synthetic host
+connects exact existing fixture model/family/layout/slot catalogs and the
+existing scoped appearance controls. Routing, appearance, compositing and
+lifecycle remain separate atomic fields. Duplicate semantic keys contribute no
+winner; explicit keep-one tombstones the other records. A Scene override replaces
+the whole Project intent; absence falls back to Project/source, never field merge.
+Retain exact draft/command/fresh IDs on failure; removal is confirmed tombstone.
+Independent model copy captures confirmed effective material in this Scene into
+fresh Scene-only overrides on the fresh target; unrelated materials remain intact.
+The triangle fixture has one constant source color, alpha one and surface optics.
+Its displayed effect supports lit/unlit, sidedness and binary hard chroma using
+the specified linear-color distance. Inherited fractional alpha/soft chroma,
+transmission and unratified dither are unavailable, never silently converted to
+blending or persisted fallback. No new format-profile/adoption/real-renderer
+guarantee follows; no files/storage/ordinary app or device acceptance changes.
+Connected tests cover exact retry/IDs, concurrent atomic appearance choices,
+duplicate-key explicit selection, Scene-only material re-keying during model
+copy, second-round exchange, mask cutoff including zero and fixed-color renderer
+objects. Conflict controls identify model, scope and exact surface; unresolved
+routing is explicitly identified, never assigned a guessed target. These are
+candidate/DOM/object checks, not rendered or native-input acceptance.
+
 **Observed Saved View connection (from `e8451a7`):** the same synthetic
 host connects existing authoring/recall/entry controls through exact known
 Scene-owned records and the neutral causal history port. Camera, background,

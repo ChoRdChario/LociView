@@ -9,6 +9,7 @@ import { createModelUpdateControls, createPinCoordinateControls, createModelPlac
 import { modelVersion } from './modelFixture';
 import { createCaptionIncludeControls } from '../../ui/projectScene/captionIncludeControls';
 import { createViewportHost, type ViewportFactory } from './viewportHost';
+import { createMaterialControls } from '../../ui/projectScene/materialControls';
 
 /** One mounted integration host. Components own their DOM; synthetic session owns all working/UI state. */
 export function createDevelopmentWorkspace(document: Document, session = new SyntheticSession(),
@@ -61,10 +62,12 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   const coordinates = createPinCoordinateControls(document, session, afterAction);
   const include = createCaptionIncludeControls(document, plan => { session.acceptInclude(plan); afterAction(); });
   const viewport = createViewportHost(document, session, afterAction, options.viewportFactory);
+  const material = createMaterialControls(document, plan => { session.acceptMaterial(plan); afterAction(); });
   header.append(brand, name, navigation.sceneControl, navigation.saveStatus);
   editor.append(editorHeading, detail.root, pin.actions, coordinates.root, pin.modeStrip, mediaNote);
   stage.append(viewport.stageTools, viewport.root, composition, placement.modeStrip, editor);
   viewPanel.replaceChildren(viewport.view);
+  materialPanel.replaceChildren(material.root);
   sidebar.append(navigation.taskControl, list.root, include.root, modelList.root, placement.actions, modelUpdate.root, materialPanel, viewPanel);
   content.append(stage, sidebar); root.append(header, notice, message, content, footer);
   function render() {
@@ -77,8 +80,9 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
       retained: session.windowMemory.retained.includes(session.memory.selectedCaptionId ?? ''), windowBlock: null });
     const listOkay = list.render(captionContext);
     const modelsOkay = modelList.render(session.modelContext());
+    const materialOkay = material.render(session.materialContext());
     const pinsOkay = pin.render(session.pinContext()), includeOkay = include.render(session.includeContext()); coordinates.render(); modelUpdate.render(); placement.render();
-    if (!detailOkay || !listOkay || !modelsOkay || !pinsOkay || !includeOkay) {
+    if (!detailOkay || !listOkay || !modelsOkay || !pinsOkay || !includeOkay || !materialOkay) {
       message.textContent = '入力中の状態を保持しています。操作を完了してから切り替えてください。';
       message.hidden = false; return;
     }
@@ -112,6 +116,6 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   render();
   return { root, session, render, dispose() {
     disposed = true; navigation.dispose(); list.dispose(); detail.dispose(); modelList.dispose();
-    pin.dispose(); coordinates.dispose(); modelUpdate.dispose(); placement.dispose(); include.dispose(); viewport.dispose(); root.remove();
+    pin.dispose(); coordinates.dispose(); modelUpdate.dispose(); placement.dispose(); include.dispose(); viewport.dispose(); material.dispose(); root.remove();
   } };
 }

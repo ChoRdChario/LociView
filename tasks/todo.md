@@ -10,6 +10,52 @@ IME and device acceptance remain pending, not implied by its DOM tests.
 
 ### Current checkpoint / next implementation
 
+Next: connect Caption media to this same synthetic workflow, reusing confirmed
+attachment identity, comparison windows and the two-round history. Keep it to
+known public synthetic image bytes; do not open real file/storage or new media
+formats. Record its exact closure/acceptance before implementation. Then address
+the finite complete-provider and gated durable-file boundary; do not restart
+detached probes or request another per-control manual check.
+
+### Completed material connection
+
+Completed from `895169e`: exact-target material editing/effects in this host.
+- [x] Project complete synthetic catalogs and atomic routing/appearance/compositing/
+  lifecycle through the existing history port. Validate all candidates and exact
+  known target closure; same-key duplicate records never choose a winner.
+- [x] Connect existing controls for explicit model/surface/scope, retained drafts,
+  apply/retry and confirmed tombstone removal. Resolve duplicate records with an
+  explicit keep-one choice. Copy confirmed effective material into fresh Scene-
+  scoped overrides when independently copying a model; preserve unrelated records.
+- [x] Apply constant-color fixture lit/unlit, sidedness and hard chroma with exact
+  linear/sRGB semantics and binary coverage; keep bounds/camera/pins independent.
+  Verify Scene/project precedence, conflict fallback, copies and second-round
+  exchange with existing lanes; independent review and final checks, then media.
+
+Entry meta-audit: previous goal turn made connected progress (`895169e`); root clean,
+33 ahead of local tracking (no fetch). This closes the next
+missing visible effect in the same whole workflow, not a detached probe. Reuse
+material UI/domain guards, Scene resolver, fixed catalogs and viewport tests.
+G0 dither/G1-D smooth blending remain gated: unsupported fractional opacity/soft
+chroma is explicit and unchanged, not silently replaced. No new model profile,
+source optics, real data, storage/wire, dependencies, Native/default app or release.
+Stop for a specification/gate conflict or official quota below 10%; no manual hold.
+
+Review: root typecheck, 98-file suite (1793 PASS, 21 existing TODO), 35 isolated
+development cases and scoped TypeScript PASS. Ordinary/harness builds PASS with
+existing size warnings. Parsed build source maps contain no candidate modules;
+ordinary has no material connection modules, harness has the two local connection
+modules. Existing development HTTP returns 200; not rendered/browser evidence.
+Independent read-only review closed missing target context on material conflict
+cards; model/scope/surface and unresolved record identity now distinguish choices.
+Mask cutoff zero, linear hard-chroma boundary, no camera refit, no unsupported
+blend fallback, fresh Scene-only copy, second exchange and exact retry are tested.
+Browser/IME/iPhone/offline remain pending in the existing batch. No private data,
+new server/tunnel, dependency, storage/wire, Native/default-entry or release change.
+Latest official remaining quota 79%; continue without a manual hold.
+
+### Completed Saved View connection
+
 Completed from `e8451a7`: Saved View authoring/recall in the same host.
 - [x] Add an exact synthetic Saved View projection: immutable Scene/frame identity,
   independently atomic name/order/camera/background/lifecycle and Scene entry

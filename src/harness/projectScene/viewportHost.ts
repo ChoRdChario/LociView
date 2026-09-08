@@ -81,7 +81,7 @@ export function createViewportHost(document: Document, session: SyntheticSession
     const rect = canvas.getBoundingClientRect?.();
     windows.project({ ready: Boolean(observed?.ready && !error), width: rect?.width ?? 0, height: rect?.height ?? 0, pins: observed?.pins ?? [] });
     const dragChanged = session.setViewportDragging(observed?.dragging ?? false);
-    const stateChanged = session.setViewportState(Boolean(observed?.ready && !error), display?.models.map(m => m.binding.assetId) ?? [], error ?? observed?.issue ?? null);
+    const stateChanged = session.setViewportState(Boolean(observed?.ready && !error), display?.models.filter(m => !('issue' in (display?.materials?.[m.binding.assetId] ?? {}))).map(m => m.binding.assetId) ?? [], error ?? observed?.issue ?? observed?.notice ?? null);
     status.textContent = error ?? observed?.issue ?? observed?.notice ?? (observed?.ready ? '' : '3D表示は未接続です。'); status.hidden = !status.textContent;
     retry.hidden = !factory || (!error && !observed?.issue);
     // Preserve measurable layout while initialization waits for attachment/resize.

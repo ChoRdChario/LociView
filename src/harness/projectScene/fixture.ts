@@ -1,6 +1,7 @@
 import { value, type Field, type Lifecycle, type Membership, type Scene, type SceneResources, type SceneState } from '../../scene/types';
 import type { SyntheticModelVersion } from './modelFixture';
 import type { ViewData } from './viewHistory';
+import type { MaterialData } from './materialHistory';
 
 // Fixed synthetic identities, NOT a source-file importer or a persistent Project schema.
 const id = (prefix: string, n: number) => `${prefix}_${n.toString(16).padStart(32, '0')}`;
@@ -16,6 +17,7 @@ export interface SyntheticProject {
   readonly captionTemplates: Readonly<Record<string, string>>;
   readonly modelVersions?: readonly SyntheticModelVersion[];
   readonly viewData?: ViewData;
+  readonly materialData?: MaterialData;
 }
 export function freezeSynthetic<T>(item: T): T {
   if (item && typeof item === 'object' && !Object.isFrozen(item)) {

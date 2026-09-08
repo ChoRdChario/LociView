@@ -60,14 +60,18 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
   function fail(e: unknown) { issue = `3D表示を停止しました。${errorText(e)} 編集内容は保持しています。`; release(); serial++; changed(); }
   function buildModels() {
     if (!display || !renderer) return;
-    const key = JSON.stringify(display.models.map(m => m.binding.id)); if (key === modelKey) return;
+    const key = JSON.stringify([display.models.map(m => m.binding.id), display.materials]); if (key === modelKey) return;
     clearModels();
     try {
       for (const model of display.models) {
+        const appearance = display.materials?.[model.binding.assetId];
+        if (appearance && 'issue' in appearance) continue; // Diagnosed unsupported effect; no source-looking replacement.
         const raw = JSON.parse(new TextDecoder().decode(fixtureModelBytes(model.shape))) as { positions: number[]; indices: number[] };
         const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(raw.positions, 3));
         geometry.setIndex(raw.indices); geometry.computeVertexNormals();
-        const material = new THREE.MeshStandardMaterial({ color: '#a8a29a', side: THREE.FrontSide, transparent: false, roughness: 0.8 });
+        const params = { color: appearance ? new THREE.Color().setRGB(...appearance.colorLinear, THREE.LinearSRGBColorSpace) : new THREE.Color('#a8a29a'),
+          side: appearance?.doubleSided ? THREE.DoubleSide : THREE.FrontSide, transparent: false, depthWrite: true, opacity: 1, visible: appearance?.visible ?? true };
+        const material = appearance?.unlit ? new THREE.MeshBasicMaterial(params) : new THREE.MeshStandardMaterial({ ...params, roughness: 0.8 });
         const mesh = new THREE.Mesh(geometry, material), asset = new THREE.Group();
         mesh.matrix.copy(placementMatrix(model.representation.representationToAsset)); mesh.matrixAutoUpdate = false;
         asset.matrix.copy(placementMatrix(model.binding.assetToProject)); asset.matrixAutoUpdate = false;
@@ -170,7 +174,9 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
           visible: Boolean(camera && p.z >= -1 && p.z <= 1 && Math.abs(p.x) <= 1 && Math.abs(p.y) <= 1) };
       }) ?? [];
       return { token: JSON.stringify([serial, display?.sceneId, display?.projectFrameId, display?.bounds, width, height, pose, background]),
-        ready: Boolean(active && renderer && camera && !issue), issue, notice, dragging, projection: pose.projection.kind, axis, pins };
+        ready: Boolean(active && renderer && camera && !issue), issue,
+        notice: [notice, ...(display?.materialNotices ?? []), ...Object.values(display?.materials ?? {}).flatMap(m => 'issue' in m ? [m.issue] : [])].filter(Boolean).join(' ') || null,
+        dragging, projection: pose.projection.kind, axis, pins };
     },
     camera(intent) {
       if (!active || !renderer || issue || !display || dragging) throw new Error('3D表示を確認してください。');

@@ -8,6 +8,8 @@ import { applyMembershipResolution, duplicateMemberships, planMembershipResoluti
 import type { Membership } from '../../scene/types';
 import { allocateModelCopyIds, fixtureModelIds } from './modelClosure';
 import type { ViewportFactory } from './viewportHost';
+import { materialCopyIntent } from './materialHistory';
+import { createMaterialConflictControls, describeMaterialCandidate, describeMaterialTarget } from './materialReview';
 
 /** Two independently edited histories in one disposable page, not a file-sharing UI. */
 export function createTeamWorkspace(document: Document, factory: DevelopmentHistoryFactory, viewportFactory?: ViewportFactory) {
@@ -34,8 +36,10 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
   const instructions = make('p', 'それぞれの編集を適用してから、相手の更新を受け取ります。');
   toolbar.append(label, receive, retry, instructions, status);
   conflictPanel.className = 'lv-development-conflicts'; conflictPanel.setAttribute('aria-label', '更新の競合');
+  let materialConflicts: ReturnType<typeof createMaterialConflictControls> | undefined;
   const workspaces = sessions.map(session => createDevelopmentWorkspace(document, session, { team: true, onAction: renderTeam, viewportFactory }));
-  root.append(toolbar, conflictPanel, ...workspaces.map(w => w.root));
+  materialConflicts = createMaterialConflictControls(document, () => ({ history: histories[active]!, session: sessions[active]!, actor: active }), () => attempt(() => {}));
+  root.append(toolbar, conflictPanel, materialConflicts.root, ...workspaces.map(w => w.root));
   function attempt(action: () => void) {
     if (disposed) return;
     try { action(); }
@@ -64,6 +68,7 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
   retry.addEventListener('click', () => receiveUpdate(true));
   function renderTeam() {
     if (disposed) return;
+    materialConflicts?.render();
     actor.value = String(active); retry.disabled = !lastReceived[active];
     const shownActor = active, history = histories[shownActor]!;
     const session = sessions[shownActor]!, snapshot = history.read();
@@ -118,7 +123,8 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
             duplicate.edges.filter(edge => edge.id !== choice.selected).map(edge => ({ edgeId: edge.id,
               captionId: fresh('cap'), membershipId: fresh('scm') })), action === 'one' || duplicate.kind !== 'asset' ? [] :
             duplicate.edges.filter(edge => edge.id !== choice.selected).map(edge => ({ edgeId: edge.id,
-              membershipId: fresh('sam'), ids: allocateModelCopyIds(fixtureModelIds(source!), fresh) })));
+              membershipId: fresh('sam'), ids: allocateModelCopyIds(fixtureModelIds(source!), fresh),
+              ...(materialCopyIntent(session.snapshot.materialData, duplicate.sceneId, source!) ? { materialOverrideId: fresh('ovr') } : {}) })));
         }
         applyMembershipResolution(history, choice.plan);
         session.refreshHistory(); status.textContent = action === 'one' ? '選んだ項目を残しました。' :
@@ -147,6 +153,7 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
         key.startsWith('asset/') ? `${session.snapshot.modelNames[id!] ?? 'モデル'} — 使用するモデル` :
         key.startsWith('view/') ? `${viewLabel} — ${viewFields[field!] ?? '視点の状態'}` :
         key.startsWith('scene/') ? 'シーンを開いたときの視点' :
+        key.startsWith('material/') ? `${describeMaterialTarget(id!, session.snapshot)} — ${{ routing: '適用先', appearance: '見え方', compositing: '合成方式', lifecycle: '設定の状態' }[field!] ?? '状態'}` :
         `キャプション ${ordinal} — ${field === 'title' ? 'タイトル' : field === 'body' ? '本文' : field === 'anchor' ? 'ピン位置' : 'ピン色'}`;
       const group = make('fieldset'), legend = make('legend', subject);
       const confirm = make('button', '選んだ内容を使用'); confirm.type = 'button'; confirm.disabled = true;
@@ -154,6 +161,7 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
       group.append(legend);
       for (const [i, candidate] of cell.candidates.entries()) {
         let description = candidate.value || '（空欄）';
+        if (key.startsWith('material/')) description = describeMaterialCandidate(field!, candidate.value, session.snapshot);
         if (key.startsWith('scene/')) {
           const target = JSON.parse(candidate.value) as string | null, row = target ? session.snapshot.viewData?.records[target] : null;
           description = target === null ? '指定なし' : row?.name.kind === 'value' ? row.name.value : '名称を確認';
@@ -205,5 +213,5 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
   render();
   return { root, sessions, histories, render,
     hasChanges: () => sessions.some(s => s.pending !== null) || histories.some((h, i) => h.read().token !== initial[i]),
-    dispose() { disposed = true; workspaces.forEach(w => w.dispose()); root.remove(); } };
+    dispose() { disposed = true; materialConflicts?.dispose(); workspaces.forEach(w => w.dispose()); root.remove(); } };
 }

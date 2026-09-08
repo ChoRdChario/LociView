@@ -4,6 +4,7 @@ import { captionKey, membershipKey, projectHistory } from './historyProjection';
 import type { DevelopmentHistory, HistorySnapshot } from './historyPort';
 import { canonicalFixture, remapFixtureModel, type FixtureModelIds } from './modelClosure';
 import { modelBindingKey, modelClosureKey, modelIdentityKey, projectModelHistory } from './modelHistory';
+import { materialCopyIntent, materialKey, materialTarget } from './materialHistory';
 
 export type MemberKind = 'asset' | 'caption';
 export interface DuplicateMembership {
@@ -11,7 +12,7 @@ export interface DuplicateMembership {
   readonly edges: readonly Membership[];
 }
 export interface CopyIds { readonly edgeId: string; readonly captionId: string; readonly membershipId: string }
-export interface ModelCopyIds { readonly edgeId: string; readonly membershipId: string; readonly ids: FixtureModelIds }
+export interface ModelCopyIds { readonly edgeId: string; readonly membershipId: string; readonly ids: FixtureModelIds; readonly materialOverrideId?: string }
 export interface MembershipResolutionPlan {
   readonly token: string; readonly group: DuplicateMembership; readonly originalEdgeId: string;
   readonly action: 'one' | 'both'; readonly eventId: string; readonly copies: readonly CopyIds[];
@@ -45,7 +46,7 @@ export function planMembershipResolution(snapshot: HistorySnapshot, group: Dupli
   const others = current.edges.filter(e => e.id !== originalEdgeId), project = projectHistory(snapshot);
   const allIds = new Set([...Object.keys(project.resources.captions), ...Object.keys(project.resources.assets),
     ...Object.keys(project.state.captionMemberships), ...Object.keys(project.state.assetMemberships), project.resources.projectFrameId,
-    ...projectModelHistory(snapshot).usedIds]);
+    ...Object.keys(project.resources.materials), ...Object.keys(project.resources.views), ...projectModelHistory(snapshot).usedIds]);
   const fresh = (id: string, prefix: string) => {
     if (!new RegExp(`^${prefix}_[0-9a-f]{32}$`).test(id) || allIds.has(id)) fail('コピーの識別情報が重複しています。');
     allIds.add(id);
@@ -72,10 +73,12 @@ export function planMembershipResolution(snapshot: HistorySnapshot, group: Dupli
   }
   for (const copy of modelCopies) {
     const asset = project.resources.assets[group.resourceId];
-    if (!asset || exact(asset.lifecycle).state !== 'active' || Object.keys(project.resources.materials).length)
+    if (!asset || exact(asset.lifecycle).state !== 'active')
       fail('モデルとマテリアルの状態を確認してください。');
     const projection = exact(asset.projection), source = project.modelVersions?.find(v => v.projection.bindingId === projection.bindingId)?.closure;
     if (!source) fail('コピー元のモデルを確認してください。');
+    const material = materialCopyIntent(project.materialData, group.sceneId, source);
+    if (Boolean(material) !== Boolean(copy.materialOverrideId)) fail('コピーする見え方の識別情報を確認してください。');
     const closure = remapFixtureModel(source, copy.ids);
     for (const id of Object.values(copy.ids)) fresh(id, id.split('_')[0]!);
     fresh(copy.membershipId, 'sam');
@@ -83,6 +86,13 @@ export function planMembershipResolution(snapshot: HistorySnapshot, group: Dupli
       assetFrameId: copy.ids.assetFrame, eventId });
     changes[modelBindingKey(copy.ids.asset)] = copy.ids.binding;
     changes[modelClosureKey(copy.ids.binding)] = canonicalFixture(closure);
+    if (material && copy.materialOverrideId) {
+      fresh(copy.materialOverrideId, 'ovr');
+      changes[materialKey(copy.materialOverrideId, 'routing')] = canonicalFixture({ scope: { kind: 'scene', sceneId: group.sceneId }, target: materialTarget(closure) });
+      changes[materialKey(copy.materialOverrideId, 'appearance')] = canonicalFixture(material.appearance);
+      changes[materialKey(copy.materialOverrideId, 'compositing')] = canonicalFixture(material.compositing);
+      changes[materialKey(copy.materialOverrideId, 'lifecycle')] = canonicalFixture({ state: 'active', eventId, reason: 'conflictResolution' });
+    }
     const edge = others.find(e => e.id === copy.edgeId)!;
     changes[membershipKey(copy.membershipId)] = JSON.stringify({ ...edge, id: copy.membershipId, resourceId: copy.ids.asset,
       lifecycle: value({ state: 'active', eventId, reason: 'conflictResolution' }) });
