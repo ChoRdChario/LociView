@@ -10,6 +10,12 @@
 
 ## Start here
 
+Current delivery order (PO approved 2026-09-09): specification 05 §13.4 permits
+one connected synthetic development host through a nondefault `dev.html` mode,
+reusing the existing Scene/domain/UI parts before subsystem polish. This host is
+**not yet implemented**; the entry diagram below records existing code only.
+Real Project, storage, package and current-app activation retain their gates.
+
 For a fresh Codex session, read `tasks/handoff.md` after this map and the
 documentation authority index. It records the accepted checkpoint, closed
 scope and next Product Owner decision without relying on chat history.

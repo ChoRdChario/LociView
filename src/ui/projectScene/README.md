@@ -2,7 +2,14 @@
 
 Reusable components under specification 05 §13.3. Only synthetic tests currently
 import them. They do not open files, read/write storage, acknowledge saves, apply
-camera views or import the current Native application. No new demo/probe page.
+camera views or import the current Native application.
+
+Approved next connection (2026-09-09, specification 05 §13.4): reuse these
+components in one synthetic development host through a nondefault `dev.html`
+mode. The host is not yet implemented; “only tests import” above describes
+current code, not a prohibition on this approved connection. Do not create a
+competing mock UI or disposable probe page. Full Project admission, renderer,
+durable storage and current-app activation retain their existing prerequisites.
 
 `navigationState.ts` builds conflict-aware Scene choices and token-bound local
 navigation plans. Scene selection is explicit; it never guesses a default or

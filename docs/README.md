@@ -58,6 +58,12 @@ If observed code conflicts with the applicable compatibility or accepted future 
 
 ## Known implementation drift
 
+Current scheduling amendment (2026-09-09): specification 05 §13.4 is PO approved
+for a thin connected synthetic development host using the existing core/UI parts.
+The host is not yet implemented. `tasks/todo.md` top owns the next bounded slice;
+this approval does not change the observed implementation classifications above
+or adopt production storage, wire/migration or ordinary-app integration.
+
 - Legacy-v1 ZIP/package code is not bounded-memory streaming despite older architecture text. The bounded Native portable and exchange packages use their separate streamed path.
 - Current XLSX reading is the local minimal reader in `src/io/xlsx.ts`, not SheetJS.
 - Strict CSP and single-file distribution are goals, not current implemented controls.

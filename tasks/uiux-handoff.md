@@ -1,5 +1,12 @@
 # Public candidate UI/UX監査 handoff
 
+> **2026-09-09の現行入口**: 現在はProject/Sceneと継続的なチーム運用の実装工程。
+> POは全体を薄くつなぐ順序を承認した。`docs/specs/05-project-scene-team-workflow.md`
+> §13.4と`tasks/todo.md`先頭が現在の実装範囲で、合成Projectの統合hostは未実装。
+> UI/UX思想・文言・低彩度の薄茶系トンマナは`docs/ui-product-guidelines.md`を維持する。
+> 以下は監査・実装時点の履歴。41タスクと継承機能の対応は再利用するが、古い次作業・
+> 承認待ち・Git一致条件を現在の指示として扱わない。最新引継ぎは`tasks/handoff.md`。
+
 > **2026-09-06の実装結果**: POはD1–D4と3つのbounded sliceを批准し、production
 > 実装を指示した。実装とfocused acceptance、独立read-only code reviewは完了し、
 > P0/P1なし。現行境界と未完の実描画/physical-iPhone証拠は`tasks/uiux-parity-plan.md`

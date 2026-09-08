@@ -624,6 +624,12 @@ The further PO-approved exception in specification 05 §13.3 allows reusable
 storage-neutral validators and disconnected UI components on synthetic ports.
 It changes scheduling only, not real-data/storage integration or gate acceptance.
 
+The 2026-09-09 PO-approved sequencing amendment in specification 05 §13.4 permits
+one early connected synthetic development host through a nondefault `dev.html`
+mode. Whole-workflow connection now precedes subsystem polish; current v1/Native
+entry, real-data/storage activation, wire/migration and adoption gates do not
+change. This scheduling approval is not implemented-host or acceptance evidence.
+
 This remains the release/adoption sequence. The Product Owner has approved one
 narrow scheduling exception: after the bounded `G0S-TAB` production root fix is
 committed, the proxy-backed Mesh/GS technical vertical slice in item 9 may

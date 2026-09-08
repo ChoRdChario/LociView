@@ -1,7 +1,7 @@
 # LociView v2 approved direction
 
 > Status: `ACCEPTED DIRECTION SUMMARY / NON-NORMATIVE / NOT IMPLEMENTED`
-> Updated: 2026-09-07
+> Updated: 2026-09-09
 > Technology choices marked as candidates remain subject to the listed PoC gates.
 
 This is a navigation summary, not an independent requirements source. Rationale,
@@ -9,6 +9,12 @@ decisions, rejected defaults and reconsideration triggers are normative in
 `docs/adr/0001-v2-foundation.md` and its ProjectScene/team-history amendment
 `docs/adr/0002-project-scenes-and-continuing-team-history.md`. Approved
 implementation contracts are indexed in `docs/specs/README.md`.
+
+Current delivery sequencing is specification 05 §13.4: assemble one thin
+connected synthetic development workflow using the existing Scene/UI parts,
+then extend that same host toward continuing teamwork and durable product
+delivery. This PO-approved host is not yet implemented. It does not waive
+technology adoption, wire/migration, real-data activation or device gates.
 
 ## Objective
 

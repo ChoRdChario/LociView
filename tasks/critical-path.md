@@ -2,10 +2,11 @@
 
 > Status: `PROJECTSCENE/TEAM CONTRACT RATIFIED; DISCONNECTED COMPONENTS AND PARTIAL ADAPTER EVIDENCE; INTEGRATED S1–S3 OPEN`
 >
-> Updated: 2026-09-09 after the PO-requested completion-path audit at `d8f52d1`.
-> Specification 05 §§13.1/13.3 permits the implemented disconnected Scene/domain/UI
-> components; candidate history/CAS/journal proofs are partial, not storage
-> adoption or integrated S1 completion. Section 8 owns the current completion map.
+> Updated: 2026-09-09 after PO approval of thin whole-workflow delivery.
+> Specification 05 §§13.1/13.3 covers the implemented disconnected components;
+> §13.4 now permits their connected synthetic development host, not yet implemented.
+> Candidate history/CAS/journal proofs remain partial, not storage adoption or
+> integrated S1 completion. Section 8 owns the current completion map.
 > The older Native candidate execution plan below remains historical evidence,
 > not a reason to reopen completed Native work or its deferred broader gates.
 >
@@ -334,18 +335,36 @@ language, disposable PoCs and one writer.
 
 ## 8. Current authorization boundary
 
-### 2026-09-09 completion-path audit — current sequencing
+### 2026-09-09 approved sequencing — thin whole workflow
+
+The PO has now explicitly approved the early connected synthetic development
+scope in specification 05 §13.4. **Next implementation:** one nondefault mode of
+the existing `dev.html`, connecting two Scenes, shared Caption edits and two
+model resources through the existing core/UI parts. No current v1/Native entry,
+real Project storage or production dependency changes. It is not implemented yet.
+
+Progress through workspace interaction, the continuing-team loop, then durable
+product delivery in the same host. Track connected user operations against
+`TEAM-FLOW-01`, not component/test counts. Existing conveniences and the accepted
+UI/UX direction stay in scope. Defer nonblocking polish; loss of work, unsafe
+conflicts, invalid references and hidden failures remain immediate fixes.
+`tasks/todo.md` top defines the first exit and exact exclusions. The journal
+manual hold is closed; another individual validator is not the default next task.
+
+### Completion map and retained audit evidence
 
 The ten latest executable commits through `d8f52d1` implement reusable Scene,
 record-admission and four-tab UI parts, with source-isolation tests deliberately
 preventing current-app use. This is real component progress but no newly completed
 step of the five-step continuing-team scenario in 05 §12.6. Component/test/commit
 counts are not an integrated-completion percentage. Pause horizontal component
-expansion as the default scheduling choice; §§13.1/13.3 authorization remains.
+expansion as the default scheduling choice; §§13.1/13.3 remain reusable inputs
+to the connected delivery now approved in §13.4.
 
 | Completion boundary | Present evidence / gap | Next exit and responsible lane |
 |---|---|---|
-| Metadata/CAS candidate viability | Original causal bytes/conflicts, small five-purpose closures, Node journal and CAS/retention proofs; old limited browser history/readback results | Existing OPFS + IndexedDB journal real-browser batch first. Then only still-missing domain, scale, cross-tab/process interruption, sink/CSP/security and physical-iOS evidence under 03 §§4/6. Codex implementation; operator for inaccessible browser/physical device; PO for measured limits/adoption |
+| Connected development workspace — immediate | Existing Scene/domain/four-tab parts are disconnected; no development host yet | One shared two-Scene editing/membership loop under 05 §13.4. Codex connects existing parts; explicit unsaved state and no fake connected effects |
+| Metadata/CAS candidate viability | Original causal bytes/conflicts, small five-purpose closures, CAS/retention proofs and bounded human Chrome journal/recheck PASS | Still-missing domain, scale, cross-tab/process interruption, sink/CSP/security and physical-iOS evidence under 03 §§4/6 before relevant adoption. No repeat of the closed journal batch. Operator for inaccessible browser/physical device; PO for measured limits/adoption |
 | Complete domain provider and S1 durable host | Pure Scene core, individual Scene/Material records and local edit guards exist; full resource/reference/frame/conflict admission and Project session are absent | One complete validated-provider boundary with named subparts, then gated durable repository/journal integration under 05 §13.2; individual shape guards alone cannot supply trusted SceneResources |
 | S2 migration and exchange | Five semantic purposes proven only on small synthetic graph; 06 wire is PROPOSED, new migration/Native-bridge recipe not ratified | Reviewed exact wire/recipe and required PO ratification, production five-purpose services and service-level `TEAM-FLOW-01`; preserve source bytes and local work |
 | S3 actual user workflow | Reusable four-tab controls/intents exist, but no actual host, renderer/save/package connection or new rendered acceptance | Connect the proven services; run the whole two-round team workflow on Desktop and physical iPhone, including conflict keep-both, recovery and offline reopen |
@@ -363,8 +382,9 @@ evidence is actual OPFS/IndexedDB old/new publication, same-run reload, second-t
 recovery and first-tab notification; it is not another 5184 inline-metadata probe
 or 5185 500 MiB rerun. Build/HTTP success does not close it. A repeated browser
 bootstrap failure moves this one batch to the human Chrome lane without another
-page or automatic adoption. With its bounded result recorded, choose the next named unmet row;
-do not automatically substitute another isolated UI/record component. The
+page or automatic adoption. With its bounded result recorded, the PO selected
+the connected development row under §13.4; do not substitute another isolated
+UI/record component. The
 remaining requirements above are not all blocked on that manual run, nor does a
 pass on that run satisfy them. This map does not change a contract or gate.
 

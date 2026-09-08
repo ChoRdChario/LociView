@@ -3,6 +3,8 @@
 > Status: `PRODUCT-OWNER APPROVED CONTRACT / DISCONNECTED CORE, RECORD GUARDS AND UI COMPONENTS; INTEGRATED V2 NOT IMPLEMENTED`
 >
 > Approved: 2026-09-07
+> Scheduling amendment: 2026-09-09, §13.4. Connected synthetic development
+> delivery is approved; the host is not yet implemented.
 >
 > Architecture authority: `docs/adr/0002-project-scenes-and-continuing-team-history.md`
 
@@ -1085,7 +1087,64 @@ preservation, accessible concise labels and rendered evidence where available.
 Synthetic component/DOM tests are not browser, storage, integrated UI or iPhone
 PASS. Missing browser/device evidence stays pending without forcing repeated
 unchanged manual probes before continuing another authorized pure component.
-After this exception, actual storage/UI integration still follows §13.2's gates.
+After this exception, production storage/UI integration still follows §13.2's
+gates. The later §13.4 permits earlier connected synthetic development delivery.
+
+### 13.4 Approved sequencing — thin whole workflow first (2026-09-09)
+
+The PO chose to assemble a thin, usable whole before refining each subsystem.
+This supersedes disconnected component expansion as the default next work and
+the former hold on an early synthetic development host. It changes delivery
+order, not the product contract, migration/wire ratification or technology gates.
+
+Use one reusable development integration host, reached by an explicit nondefault
+mode of the existing `dev.html` entry. Reuse the Scene core and UI components;
+do not create a parallel UI implementation or a succession of disposable pages.
+Start with a fixed synthetic Project containing two Scenes, shared Captions and
+two model resources. The host must not open existing v1/Native Projects, touch
+their storage, or become the ordinary home entry. Its synthetic read projection
+is not a serialized schema or proof of full untrusted-Project admission.
+
+Deliver three connected milestones in that same host:
+
+1. **Workspace loop:** select a Scene, inspect/edit a shared Caption, include or
+   exclude a model, and return to the first Scene. Connect the shared header and
+   four task tabs, preserving per-Scene selection, drafts and temporary filters.
+   Revalidate snapshot-bound intentions before applying to in-memory synthetic
+   state. Pending input must be finished or explicitly cancelled before a Scene
+   switch when the existing navigation contract requires it. Model exclusion is
+   membership-only, not resource deletion. Expose unconnected renderer, media,
+   view or material effects honestly; a button or static placeholder is not a
+   completed operation. Page-memory changes are explicitly unsaved and lost on
+   reload, never acknowledged as durable Project writes.
+2. **Continuing-team loop:** extend the same host toward §12.6's two-participant,
+   model-update, retained local work, explicit pin correction, conflict choice
+   and second-round flow. Connect genuine operations through the appropriate
+   service ports; do not simulate successful merges by replacing snapshots or
+   choosing winners. Candidate-adapter experiments remain isolated, using the
+   existing pinned scope; do not copy PoC code into production or adopt a
+   dependency implicitly. Unconnected operations remain marked pending.
+3. **Durable product loop:** after the applicable §13.2 prerequisites, connect
+   the production provider, storage, import/export and recovery services to the
+   same workflow. Complete both service-level and ordinary-UI `TEAM-FLOW-01`,
+   including restart/offline reopen and physical-iPhone evidence. Synthetic
+   development execution does not waive those requirements or pass S1–S3.
+
+Track coverage by user operation as implemented, connected and verified, with
+the remaining gap explicit. The whole scope includes the existing accepted
+conveniences: direct pin-color filters, retained comparison windows, media,
+viewing presets/Saved Views, model and material controls and the five package
+purposes. Delaying connection or polish does not remove those requirements.
+Each milestone may take bounded commits, but each commit must advance this
+shared workflow rather than merely add another detached component.
+
+Use focused tests while connecting; run the required full checks on each final
+executable checkpoint and reuse unchanged evidence. Batch human browser/device
+checks at meaningful connected outcomes. Correct loss of work, invalid references,
+hidden unsaved/failure state and unsafe conflict handling immediately; defer
+nonblocking visual polish. A required gate/ratification blocks its actual
+activation, not unrelated authorized development. Before such a boundary,
+report the exact missing prerequisite instead of inventing substitute work.
 
 ## 14. Explicit non-goals
 

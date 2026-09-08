@@ -2,12 +2,17 @@
 
 > Status: `PRODUCT-OWNER APPROVED IMPLEMENTATION CONTRACT / NOT IMPLEMENTED`
 > Baseline implementation: normalized v1 commit `fc7054f`; this specification revision is identified by its own Git commit
-> Approved: 2026-08-19; Product Owner amendments recorded through 2026-09-07
+> Approved: 2026-08-19; Product Owner amendments recorded through 2026-09-09
 
 These documents turn accepted ADRs 0001 and 0002 and the approved v2 direction
 into testable implementation contracts. They intentionally separate fixed
 product and domain rules from technologies that may still fail a proof-of-concept
 gate.
+
+Specification 05 §13.4 records the PO-approved thin whole-workflow sequencing:
+one connected synthetic development host may precede subsystem polish and gated
+production integration. It is not yet implemented. Existing data, adoption,
+wire/migration and device requirements are unchanged.
 
 ## Authority
 

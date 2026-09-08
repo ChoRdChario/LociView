@@ -1,6 +1,65 @@
 # LociView active work
 
-## Current boundary — implementation through UI verification (2026-09-09)
+## Current boundary — thin connected workflow first (2026-09-09)
+
+PO approved building the whole workflow thinly before subsystem polish. Authority:
+specification 05 §13.4; final completion remains `TEAM-FLOW-01` in §12.6.
+The completed journal Chrome recheck below stays closed; no new manual test is
+requested. The first connected development host is **not yet implemented**.
+
+### Current plan / next implementation
+
+- [x] Record the approved sequencing in the contract, execution plan and handoff;
+  distinguish current instructions from historical “next component” notes.
+- [ ] **Connected workspace:** use one explicit nondefault `dev.html` mode for
+  two synthetic Scenes, shared Captions and two model resources; connect existing
+  Scene resolution, navigation, Caption editing and model membership controls.
+- [ ] **Continuing-team flow:** extend that same host through two participants,
+  model update, local work preservation, pin correction, explicit conflict
+  keep-one/independent-keep-both and a second round. Connect genuine services;
+  do not represent a canned state change as successful file exchange.
+- [ ] **Durable product flow:** complete the provider and applicable adoption /
+  wire / migration prerequisites, connect actual save/import/export/recovery,
+  then execute service/UI `TEAM-FLOW-01` and batch Desktop/iPhone checks.
+
+**First slice target and exit:** the same mounted workspace can edit a shared
+Caption, change model membership and switch Scene A/B/A while retaining applied
+content, per-Scene selection and drafts under the existing pending-input rules.
+Reuse `src/scene` and `src/ui/projectScene`; do not build a competing mock UI.
+Synthetic in-memory application is not `ProjectStore.dispatch()` or durable
+save: explicitly show unsaved/reload loss. Current v1/Native home, files and
+storage remain untouched; no model/media payload import or renderer adoption.
+
+**Reuse / missing evidence:** reuse component/domain tests and accepted UI/UX
+principles. Add only host integration, stale/refusal and exact entry-isolation
+checks that are missing; rendered/browser/IME evidence remains separate. Required
+full checks run once on the final executable tree, not on this documentation edit.
+One read-only final review; human checks are batched, not button-by-button holds.
+
+**Coverage and exclusions:** use `TEAM-FLOW-01` and the existing UI parity plan
+to track implemented / connected / verified separately. Keep direct pin colors,
+multiple Caption windows, media, viewing presets/Saved Views, model/material
+controls and all five package purposes in scope; they need not all be connected
+in the first commit. No new dependency, real-data migration, automatic conflict
+winner, format/version, main, Pages/SW or release action. Stop the affected path
+on a specification conflict, unsafe data handling or a required new approval;
+continue unaffected authorized work. Nonblocking polish follows the whole loop.
+
+**Review:** starting checkpoint `0d789ac`, clean `g0-baseline`, 0 behind / 24
+ahead of local origin tracking; no fetch/fresh-remote claim. The latest executable
+change remains `96c218b`. The current work is a sequencing/documentation change,
+not another integrated feature or test PASS. Existing disconnected parts remain
+useful, but completion is judged by connected user outcomes.
+
+Documentation result: specification/ADR, current execution and handoff pointers
+are synchronized. One independent read-only review found no blocking
+contradiction; diff/whitespace checks pass. Application code, dependencies and
+test evidence are unchanged; no full-suite rerun or new browser task.
+
+## Completed history — not current scheduling instructions
+
+Entries below preserve the scope and evidence at their respective checkpoints.
+Their “next”/“pending” statements are historical; use the current plan above.
 
 ### Completed correction — simultaneous journal readback after recovery (2026-09-09)
 
@@ -54,8 +113,8 @@ build pass; existing mixed-import/large-chunk warnings remain. Source changes
 are limited to the existing isolated probes; current application code and
 dependencies are unchanged. Whitespace checks pass, with no blocking review
 finding. The same-run Chrome confirmation closes this correction without another
-probe or test rerun. Existing approved implementation may continue; front-loading
-an integrated app beyond 05 §13.3 remains a proposal, not authority from test PASS.
+probe or test rerun. Test PASS did not itself authorize an early integrated app;
+the subsequent explicit PO scheduling approval is now recorded in 05 §13.4.
 
 ### Completed checkpoint — completion-path correction and existing platform journal (2026-09-09)
 
@@ -87,7 +146,7 @@ G1-A/C adoption, process-kill, device, PWA or actual application PASS. Human
 Chrome execution, if needed, is one batch with all expected labels and recovery
 instructions, not a return to button-by-button development pauses.
 
-**Next decision:** after that result, select a named remaining G1-A/C row using
+**Historical next decision (superseded by §13.4 above):** after that result, select a named remaining G1-A/C row using
 the completion map in `critical-path.md` §8. Finish full resource/reference/
 conflict admission as a provider deliverable, not an unbounded series of record
 or UI components. Browser unavailability does not waive its gate or block all

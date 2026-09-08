@@ -1,6 +1,20 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **Current platform correction (2026-09-09):** The PO ran the prepared journal
+> **Current direction (2026-09-09):** PO approved thin whole-workflow delivery.
+> Specification 05 §13.4 now permits one connected synthetic development host
+> through an explicit nondefault mode of the existing `dev.html`. First connect
+> two Scenes, shared Caption editing and model membership; then extend that same
+> host toward the two-round team flow and gated durable product services.
+> `tasks/todo.md` top and `critical-path.md` §8 own the current plan. The host is
+> not yet implemented; do not claim integrated v2 or rendered acceptance.
+> No repeated journal check or scheduling approval is needed. Real-data/current
+> app activation, technology adoption, wire/migration and release gates remain.
+> Accepted UI/UX and visual principles remain in `docs/ui-product-guidelines.md`.
+>
+> All checkpoint updates below are history. Old “next component” or “needs
+> approval” statements do not override the current plan or its explicit gates.
+
+> **Completed platform correction (2026-09-09):** The PO ran the prepared journal
 > in Chrome and reported a concrete failure: recovery/no-op logged success but
 > immediate view reported missing data; manual and other-tab views later succeeded.
 > Deterministic regression reproduces two read-only CAS checks competing for a
@@ -13,7 +27,7 @@
 > earlier initialization/recovery evidence is reused, not a fresh full corrected
 > run. Manual hold closed; do not repeat or reset. Exact result is in current todo
 > and the existing probe README. No app, dependency, schema, iOS/PWA or adoption
-> changed. The suggested early integrated app still needs its own scope approval.
+> changed. The subsequent early-development scope approval is 05 §13.4 above.
 
 > **Current sequencing correction (2026-09-09):** PO requested a completion-path
 > audit at `d8f52d1` (clean, 21 ahead of local tracking; no fetch). Ten recent
