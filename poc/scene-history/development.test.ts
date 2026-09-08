@@ -27,6 +27,7 @@ import { editMaterialDraft, materialTargetKey, planMaterial, type MaterialIntent
 import type { MaterialEditField } from '../../src/domain/materialIntent';
 import { materialBucket, materialCopyIntent, materialKey, materialTarget } from '../../src/harness/projectScene/materialHistory';
 import { syntheticDisplay } from '../../src/harness/projectScene/viewportModel';
+import { attachmentKey, captionAttachments, copyableAttachments, fixtureMedia } from '../../src/harness/projectScene/mediaHistory';
 
 const factory = (seed: Readonly<Record<string, string>>, validate: Parameters<typeof createDevelopmentPair>[2]) => createDevelopmentPair(A, seed, validate);
 const pair = () => factory(historySeed(), projectHistory);
@@ -107,6 +108,143 @@ function materialApply(s: SyntheticSession, field: MaterialEditField, text: stri
 }
 
 describe('actual pinned candidate connected to synthetic workspace; not browser, wire or durable acceptance', () => {
+  it('merges independent attachment additions, alt/order edits and the second exchange without deduplicating equal images', () => {
+    const [a, b] = pair(), sa = new SyntheticSession(historyAuthority(a)), sb = new SyntheticSession(historyAuthority(b)); select(sa); select(sb);
+    expect(sa.media.add(sa.mediaContext(), fixtureMedia[0]!.record.id)).toBe(true);
+    expect(sb.media.add(sb.mediaContext(), fixtureMedia[0]!.record.id)).toBe(true);
+    a.receive(b.exportUpdate()); b.receive(a.exportUpdate()); sa.refreshHistory(); sb.refreshHistory();
+    let rows = captionAttachments(sa.snapshot.mediaData, f.shared).ready; expect(rows).toHaveLength(2); expect(new Set(rows.map(r => r.id)).size).toBe(2);
+    const id = rows[0]!.id; expect(sa.media.begin(sa.mediaContext(), id)).toBe(true); sa.media.input('説明を追加', false); expect(sa.media.apply()).toBe(true);
+    expect(sb.media.reorder(sb.mediaContext(), id, 1), sb.media.message).toBe(true);
+    a.receive(b.exportUpdate()); b.receive(a.exportUpdate()); sa.refreshHistory(); rows = captionAttachments(sa.snapshot.mediaData, f.shared).ready;
+    expect(rows.at(-1)!.id).toBe(id); expect(rows.at(-1)!.altText).toEqual({ kind: 'value', value: '説明を追加' });
+    expect(a.read()).toEqual(b.read()); expect(captionAttachments(sa.snapshot.mediaData, f.shared).review).toHaveLength(0);
+    const sent = bytes(a.exportUpdate()); expect(a.receive(b.exportUpdate()).added).toBe(0); expect(bytes(a.exportUpdate())).toEqual(sent);
+  });
+
+  for (const state of ['active', 'deleted']) it(`holds delete/edit causally for explicit ${state} choice and rejects edits after observed deletion`, () => {
+    const document = new RecordedDocument(), team = createTeamWorkspace(document.asDocument(), factory), [sa, sb] = team.sessions, [a, b] = team.histories;
+    select(sa!); select(sb!); sa!.media.add(sa!.mediaContext(), fixtureMedia[0]!.record.id); b!.receive(a!.exportUpdate()); sb!.refreshHistory();
+    const id = captionAttachments(sa!.snapshot.mediaData, f.shared).ready[0]!.id;
+    expect(sa!.media.remove(sa!.mediaContext(), id)).toBe(true);
+    expect(sb!.media.begin(sb!.mediaContext(), id)).toBe(true); sb!.media.input('削除を知らずに追記', false); expect(sb!.media.apply()).toBe(true);
+    a!.receive(b!.exportUpdate()); sa!.refreshHistory(); team.render();
+    expect(sa!.snapshot.mediaData!.records[id]!.deleteEdit).toBe(true); expect(captionAttachments(sa!.snapshot.mediaData, f.shared).ready).toHaveLength(0);
+    expect(() => copyableAttachments(sa!.snapshot.mediaData, f.shared)).toThrow('競合');
+    const root = record(team.root), selectBox = descendants(root).find(n => n.tag === 'select' && n.attributes.get('aria-label')?.endsWith('削除と編集の確認'))!;
+    expect(selectBox.value).toBe(''); expect(button(root, '選択を適用').disabled).toBe(true);
+    expect(descendants(selectBox.parent!).some(n => n.textContent === '説明：削除を知らずに追記')).toBe(true);
+    expect(descendants(selectBox.parent!).some(n => n.textContent.startsWith('順序：'))).toBe(true);
+    selectBox.value = state; selectBox.fire('change'); button(root, '選択を適用').fire('click');
+    expect(sa!.snapshot.mediaData!.records[id]!.deleteEdit).toBe(false);
+    expect(sa!.snapshot.mediaData!.records[id]!.lifecycle).toMatchObject({ value: { state, reason: 'conflictResolution' } });
+    expect(sa!.snapshot.mediaData!.records[id]!.altText).toEqual({ kind: 'value', value: '削除を知らずに追記' });
+    b!.receive(a!.exportUpdate()); expect(a!.read()).toEqual(b!.read());
+    if (state === 'deleted') {
+      const before = a!.read(); expect(() => a!.write(before.token, { [attachmentKey(id, 'altText')]: '削除を観測後の不正な追記' })).toThrow('削除後'); expect(a!.read()).toEqual(before);
+      expect(sa!.media.begin(sa!.mediaContext(), id)).toBe(false);
+      a!.write(a!.read().token, { [attachmentKey(id, 'lifecycle')]: canonicalFixture({ state: 'active', eventId: freshId('evt'), reason: 'restore' }) });
+      expect(() => a!.write(a!.read().token, { [attachmentKey(id, 'altText')]: '復元後の追記' })).not.toThrow();
+    }
+    team.dispose();
+  });
+
+  it.each([false, true])('resolves simultaneous attachment lifecycle conflicts with a fresh retained command; delete/edit overlap=%s', overlap => {
+    let reject = false; const commands: string[] = [];
+    const document = new RecordedDocument(), team = createTeamWorkspace(document.asDocument(), (seed, validate) => {
+      const [a, b] = factory(seed, validate);
+      return [{ ...a, resolveAttachmentLifecycle(token, key, ids, value) {
+        commands.push(value); if (reject) throw new Error('synthetic resolution failure');
+        return a.resolveAttachmentLifecycle!(token, key, ids, value);
+      } }, b];
+    }), [sa, sb] = team.sessions, [a, b] = team.histories, root = record(team.root);
+    select(sa!); select(sb!); sa!.media.add(sa!.mediaContext(), fixtureMedia[0]!.record.id); b!.receive(a!.exportUpdate()); sb!.refreshHistory();
+    const id = captionAttachments(sa!.snapshot.mediaData, f.shared).ready[0]!.id, key = attachmentKey(id, 'lifecycle');
+    expect(sa!.media.remove(sa!.mediaContext(), id)).toBe(true);
+    if (overlap) { sb!.media.begin(sb!.mediaContext(), id); sb!.media.input('削除前の説明更新', false); expect(sb!.media.apply()).toBe(true); }
+    expect(sb!.media.remove(sb!.mediaContext(), id)).toBe(true);
+    a!.receive(b!.exportUpdate()); sa!.refreshHistory(); team.render();
+    const before = a!.read(), conflict = before.cells[key]!; if (conflict.kind !== 'conflict') throw new Error('lifecycle conflict missing');
+    const ids = conflict.candidates.map(c => c.id), value = canonicalFixture({ state: 'active', eventId: freshId('evt'), reason: 'conflictResolution' });
+    expect(() => a!.write(before.token, { [key]: value })).toThrow();
+    expect(() => a!.resolveAttachmentLifecycle!('stale', key, ids, value)).toThrow();
+    expect(() => a!.resolveAttachmentLifecycle!(before.token, key, ids.slice(1), value)).toThrow();
+    expect(() => a!.resolveAttachmentLifecycle!(before.token, captionKey(f.shared, 'title'), ids, value)).toThrow();
+    const old = JSON.parse(conflict.candidates[0]!.value);
+    expect(() => a!.resolveAttachmentLifecycle!(before.token, key, ids, canonicalFixture({ ...old, reason: 'conflictResolution' }))).toThrow('再使用');
+    expect(a!.read()).toEqual(before); commands.length = 0; reject = true;
+    const panel = label(root, '更新の競合');
+    if (overlap) {
+      const choose = descendants(panel).find(n => n.tag === 'select')!;
+      expect(descendants(choose.parent!).some(n => n.textContent === '説明：削除前の説明更新')).toBe(true);
+      choose.value = 'active'; choose.fire('change'); button(panel, '選択を適用').fire('click');
+      expect(descendants(panel).find(n => n.tag === 'select')!.value).toBe('active');
+    } else {
+      const radio = by(panel, n => n.type === 'radio'); radio.checked = true; radio.fire('change');
+      button(panel, '選んだ内容を使用').fire('click'); expect(by(panel, n => n.type === 'radio').checked).toBe(true);
+    }
+    expect(a!.read()).toEqual(before); reject = false;
+    button(panel, overlap ? '選択を適用' : '選んだ内容を使用').fire('click');
+    expect(commands).toHaveLength(2); expect(commands[1]).toBe(commands[0]);
+    expect(sa!.snapshot.mediaData!.records[id]!.lifecycle).toMatchObject({ kind: 'value', value: { state: overlap ? 'active' : 'deleted', reason: 'conflictResolution' } });
+    expect(sa!.snapshot.mediaData!.records[id]!.deleteEdit).toBe(false); expect(panel.hidden).toBe(true);
+    b!.receive(a!.exportUpdate()); expect(a!.read()).toEqual(b!.read());
+    const sent = bytes(a!.exportUpdate()); expect(a!.receive(b!.exportUpdate()).added).toBe(0); expect(bytes(a!.exportUpdate())).toEqual(sent);
+    team.dispose();
+  });
+
+  it('lets the user cancel a retained media draft when receiving excludes its Caption from the Scene', () => {
+    const document = new RecordedDocument(), team = createTeamWorkspace(document.asDocument(), factory), [sa, sb] = team.sessions, [a, b] = team.histories;
+    select(sa!); select(sb!); sa!.media.add(sa!.mediaContext(), fixtureMedia[0]!.record.id); b!.receive(a!.exportUpdate()); sb!.refreshHistory();
+    const id = captionAttachments(sa!.snapshot.mediaData, f.shared).ready[0]!.id;
+    sa!.media.begin(sa!.mediaContext(), id); sa!.media.input('失わない下書き', false); const draft = sa!.media.draft;
+    const edge = Object.values(sb!.snapshot.state.captionMemberships).find(e => e.resourceId === f.shared && e.sceneId === sb!.sceneId)!;
+    b!.write(b!.read().token, { [membershipKey(edge.id)]: JSON.stringify({ ...edge, lifecycle: { kind: 'value', value: { state: 'deleted', eventId: freshId('evt'), reason: 'userDelete' } } }) });
+    a!.receive(b!.exportUpdate()); sa!.refreshHistory(); team.render();
+    const root = record(team.root), panel = label(visibleWorkspace(root), 'メディア');
+    expect(sa!.media.draft).toBe(draft); expect(sa!.mediaContext().block).toBeTruthy(); expect(sa!.pending).toBe('text');
+    expect(button(panel, '説明を適用').disabled).toBe(true); expect(button(panel, '取り消す').disabled).toBe(false);
+    button(panel, '取り消す').fire('click'); expect(sa!.media.draft).toBeNull(); expect(sa!.pending).toBeNull();
+    enterDetail(sa!); expect(sa!.sceneId).toBe(f.detail); team.dispose();
+  });
+
+  it('independently copies all confirmed attachments in source order with shared immutable media and unchanged originals', () => {
+    const [a, b] = pair(), sa = new SyntheticSession(historyAuthority(a)), sb = new SyntheticSession(historyAuthority(b));
+    sa.acceptList(planCaptionList(sa.captionContext(), { kind: 'select', captionId: f.second }));
+    sa.media.add(sa.mediaContext(), fixtureMedia[0]!.record.id); sa.media.add(sa.mediaContext(), fixtureMedia[1]!.record.id);
+    const sourceRows = captionAttachments(sa.snapshot.mediaData, f.second).ready;
+    a.write(a.read().token, { [attachmentKey(sourceRows[0]!.id, 'orderKey')]: 'A', [attachmentKey(sourceRows[1]!.id, 'orderKey')]: 'A' });
+    b.receive(a.exportUpdate()); sa.refreshHistory(); sb.refreshHistory(); enterDetail(sa); enterDetail(sb); includeCaption(sa); includeCaption(sb); a.receive(b.exportUpdate()); sa.refreshHistory();
+    const group = duplicateMemberships(a.read()).find(g => g.resourceId === f.second)!, rows = copyableAttachments(sa.snapshot.mediaData, f.second), before = sa.snapshot;
+    const copiedId = freshId('cap'), maps = [{ edgeId: group.edges[1]!.id, captionId: copiedId, membershipId: freshId('scm'), attachments: rows.map((r, i) => ({ sourceId: r.id,
+      attachmentId: `att_${(100 - i).toString(16).padStart(32, '0')}` })) }]; // reverse IDs must not reverse tied source order
+    const p = planMembershipResolution(a.read(), group, group.edges[0]!.id, 'both', freshId('evt'), maps);
+    expect(() => applyMembershipResolution({ ...a, write: () => { throw new Error('injected'); } }, p)).toThrow('injected');
+    expect(a.read().token).toBe(p.token); applyMembershipResolution(a, p); sa.refreshHistory();
+    const copyRows = copyableAttachments(sa.snapshot.mediaData, copiedId); expect(copyRows.map(r => r.mediaResourceId)).toEqual(rows.map(r => r.mediaResourceId));
+    expect(copyRows.map(r => r.id)).toEqual(maps[0]!.attachments.map(m => m.attachmentId)); rows.forEach(r => expect(sa.snapshot.mediaData!.records[r.id]).toEqual(before.mediaData!.records[r.id]));
+    sa.acceptList(planCaptionList(sa.captionContext(), { kind: 'select', captionId: copiedId }));
+    expect(sa.media.remove(sa.mediaContext(), copyRows[0]!.id)).toBe(true); expect(copyableAttachments(sa.snapshot.mediaData, f.second)).toHaveLength(2);
+    b.receive(a.exportUpdate()); expect(a.read()).toEqual(b.read()); const bytesBefore = bytes(a.exportUpdate()); expect(a.receive(b.exportUpdate()).added).toBe(0); expect(bytes(a.exportUpdate())).toEqual(bytesBefore);
+  });
+
+  it('retains media retry IDs and stale explanation input; exposes order/alt conflicts without a materialized winner', () => {
+    const [a, b] = pair(), authority = historyAuthority(a), commands: Readonly<Record<string, string>>[] = []; let reject = true;
+    const s = new SyntheticSession({ read: authority.read, write: (t, c) => { commands.push(c); if (reject) throw new Error('injected'); return authority.write(t, c); } }); select(s);
+    expect(s.media.add(s.mediaContext(), fixtureMedia[0]!.record.id)).toBe(false); reject = false; expect(s.media.retry()).toBe(true); expect(commands[1]).toBe(commands[0]);
+    const id = captionAttachments(s.snapshot.mediaData, f.shared).ready[0]!.id; b.receive(a.exportUpdate());
+    s.media.begin(s.mediaContext(), id); s.media.input('未適用の説明', false); const draft = s.media.draft;
+    b.write(b.read().token, { [attachmentKey(id, 'altText')]: '相手の説明' }); a.receive(b.exportUpdate()); s.refreshHistory();
+    expect(s.media.apply()).toBe(false); expect(s.media.draft).toBe(draft); expect(s.media.cancel()).toBe(true);
+    a.write(a.read().token, { [attachmentKey(id, 'altText')]: '別の説明', [attachmentKey(id, 'orderKey')]: 'A' });
+    b.write(b.read().token, { [attachmentKey(id, 'altText')]: '更に説明', [attachmentKey(id, 'orderKey')]: 'B' }); a.receive(b.exportUpdate()); s.refreshHistory();
+    const order = a.read().cells[attachmentKey(id, 'orderKey')]!; if (order.kind !== 'conflict') throw new Error('order conflict');
+    expect(captionAttachments(s.snapshot.mediaData, f.shared).review).toHaveLength(1);
+    a.choose(a.read().token, attachmentKey(id, 'orderKey'), order.candidates[0]!.id); s.refreshHistory();
+    expect(captionAttachments(s.snapshot.mediaData, f.shared).ready[0]!.altText.kind).toBe('unresolved');
+    expect(() => copyableAttachments(s.snapshot.mediaData, f.shared)).toThrow('競合');
+    const previous = a.read(); expect(() => a.write(previous.token, { [attachmentKey(freshId('att'), 'altText')]: 'partial' })).toThrow(); expect(a.read()).toEqual(previous);
+  });
   it('exchanges exact material scope/atomic appearance, explicit candidate choice and reset without changing compositing or another Scene', () => {
     const [a, b] = pair(), sa = new SyntheticSession(historyAuthority(a)), sb = new SyntheticSession(historyAuthority(b));
     materialSelection(sa, f.equipment, 'project'); materialApply(sa, 'lighting', 'unlit');

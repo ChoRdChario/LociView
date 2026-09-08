@@ -57,7 +57,7 @@ re-conflict. Four additional cases cover exact synthetic model-copy closed IDs/
 hashes and a second exchange, malformed/partial/rewritten closure refusal,
 placement retry/stale input and content-update placement retention, and mounted
 explicit original/model-copy/translation with pending/IME guards. Caption copies
-are restricted to the known attachment/tag-empty fixture; model copies to a
+are restricted to the known fixture (fixed PNG attachments below; tags still empty); model copies to a
 fully specified triangle fixture without unhandled parent/derivation or unresolved material
 dependencies. Descriptor checks are not full incoming-history admission. These
 are Node plus authored-DOM records, **not rendered/browser/IME/device evidence**.
@@ -71,8 +71,15 @@ Material connection cases cover atomic appearance candidates, unchanged
 compositing, exact scope/reset, retained original retry command/IDs, stale draft
 refusal, same-key duplicates with explicit choice and fresh Scene-only effective
 material copies. Multiple conflict targets are distinguishable; unresolved routing
-is never guessed. The current total is 35 cases. Fixed-color renderer/object tests
+is never guessed. The current total is 43 cases. Fixed-color renderer/object tests
 cover binary hard chroma and mask cutoff zero without claiming raster acceptance.
+Eight media cases cover distinct same-image attachments, independent alt/order
+edits, causal delete/edit review, simultaneous lifecycle conflicts, exact fresh
+resolution/retry, stale/unavailable draft cancellation and independent Caption
+copies. Copies keep source order even with equal keys and freshly reversed IDs.
+Normal writes never clear a conflict; explicit lifecycle resolution verifies
+the exact token/candidate set and creates one fresh whole event. Original change
+dependencies/final field writes are read-only development evidence, not wire fields.
 Run from repository root:
 
 ```powershell
@@ -114,6 +121,22 @@ Concurrent new settings on the same surface require `選んだ設定を残す`, 
 preselected winner. Independent model keep-both carries the confirmed effective
 appearance into the copy, without changing original/other-Scene settings. Verify
 IME, focus and actual effect in this batch only; no new manual hold is created.
+
+Extend the same later batch in `キャプション`: select a Caption, use
+`メディアを選択` to choose `三角形` or `四角形`, then `メディアを追加`.
+These are preloaded synthetic images, not an operating-system file dialog.
+Confirm the image in the Caption window. `拡大`/`縮小` must not change the right
+list selection or discard another window's scroll. `説明を編集` retains input
+until `説明を適用`; `取り消す` remains available after receiving removes the
+Caption from this Scene, except during IME composition. Use `前へ`/`後へ` and
+check image order. `添付を削除` requires a second explicit confirmation; other
+Captions and image bodies remain. Exchange changes as both actors and edit again.
+To inspect delete/edit recovery, let one actor delete an already-shared attachment
+while the other edits its explanation before receiving. The review must show
+the retained explanation/order and offer `削除を維持`/`添付を復元` without a
+default selection. `選択を適用` resolves the state, not the original change bytes.
+Full image pan/pinch/filters, real file input, raster/native IME and device
+acceptance remain later work. This is not durable storage or offline evidence.
 
 For the later browser batch, select a model in `モデル`, choose a synthetic model
 update and receive it as the other actor. The same shared Caption keeps its text

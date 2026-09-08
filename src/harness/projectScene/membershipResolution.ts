@@ -2,16 +2,19 @@ import { value, type Field, type Membership } from '../../scene/types';
 import { freezeSynthetic } from './fixture';
 import { captionKey, membershipKey, projectHistory } from './historyProjection';
 import type { DevelopmentHistory, HistorySnapshot } from './historyPort';
+import { previewHistory } from './historyPort';
 import { canonicalFixture, remapFixtureModel, type FixtureModelIds } from './modelClosure';
 import { modelBindingKey, modelClosureKey, modelIdentityKey, projectModelHistory } from './modelHistory';
 import { materialCopyIntent, materialKey, materialTarget } from './materialHistory';
+import { attachmentKey, copyableAttachments } from './mediaHistory';
 
 export type MemberKind = 'asset' | 'caption';
 export interface DuplicateMembership {
   readonly kind: MemberKind; readonly sceneId: string; readonly resourceId: string;
   readonly edges: readonly Membership[];
 }
-export interface CopyIds { readonly edgeId: string; readonly captionId: string; readonly membershipId: string }
+export interface CopyIds { readonly edgeId: string; readonly captionId: string; readonly membershipId: string;
+  readonly attachments?: readonly { readonly sourceId: string; readonly attachmentId: string }[] }
 export interface ModelCopyIds { readonly edgeId: string; readonly membershipId: string; readonly ids: FixtureModelIds; readonly materialOverrideId?: string }
 export interface MembershipResolutionPlan {
   readonly token: string; readonly group: DuplicateMembership; readonly originalEdgeId: string;
@@ -46,7 +49,7 @@ export function planMembershipResolution(snapshot: HistorySnapshot, group: Dupli
   const others = current.edges.filter(e => e.id !== originalEdgeId), project = projectHistory(snapshot);
   const allIds = new Set([...Object.keys(project.resources.captions), ...Object.keys(project.resources.assets),
     ...Object.keys(project.state.captionMemberships), ...Object.keys(project.state.assetMemberships), project.resources.projectFrameId,
-    ...Object.keys(project.resources.materials), ...Object.keys(project.resources.views), ...projectModelHistory(snapshot).usedIds]);
+    ...Object.keys(project.resources.materials), ...Object.keys(project.resources.views), ...Object.keys(project.mediaData?.records ?? {}), ...projectModelHistory(snapshot).usedIds]);
   const fresh = (id: string, prefix: string) => {
     if (!new RegExp(`^${prefix}_[0-9a-f]{32}$`).test(id) || allIds.has(id)) fail('コピーの識別情報が重複しています。');
     allIds.add(id);
@@ -67,6 +70,17 @@ export function planMembershipResolution(snapshot: HistorySnapshot, group: Dupli
       anchor: JSON.stringify(exact(source.anchor)) };
     changes[captionKey(copy.captionId, 'template')] = JSON.stringify({ templateId: project.captionTemplates[source.id], sourceId: source.id, eventId });
     for (const [key, text] of Object.entries(fields)) changes[captionKey(copy.captionId, key as keyof typeof fields)] = text;
+    const attachments = copyableAttachments(project.mediaData, source.id), mappings = copy.attachments ?? [];
+    if (mappings.length !== attachments.length || new Set(mappings.map(m => m.sourceId)).size !== attachments.length ||
+      mappings.some(m => !attachments.some(a => a.id === m.sourceId))) fail('添付コピーの対応を確認してください。');
+    const keys = attachments.map(a => exact(a.orderKey)), tied = new Set(keys).size !== keys.length;
+    attachments.forEach((a, i) => {
+      const id = mappings.find(m => m.sourceId === a.id)!.attachmentId; fresh(id, 'att');
+      const values = { captionId: copy.captionId, mediaResourceId: exact(a.mediaResourceId), altText: exact(a.altText),
+        orderKey: tied ? i.toString(36).toUpperCase().padStart(13, '0') : exact(a.orderKey),
+        lifecycle: canonicalFixture({ state: 'active', eventId, reason: 'conflictResolution' }) };
+      for (const [field, text] of Object.entries(values)) changes[attachmentKey(id, field as 'captionId')] = text;
+    });
     const edge = others.find(e => e.id === copy.edgeId)!;
     changes[membershipKey(copy.membershipId)] = JSON.stringify({ ...edge, id: copy.membershipId, resourceId: copy.captionId,
       lifecycle: value({ state: 'active', eventId, reason: 'conflictResolution' }) });
@@ -98,8 +112,7 @@ export function planMembershipResolution(snapshot: HistorySnapshot, group: Dupli
       lifecycle: value({ state: 'active', eventId, reason: 'conflictResolution' }) });
   }
   // Reuse the exact known fixture projector before the single causal publication.
-  projectHistory({ token: snapshot.token, cellVersions: snapshot.cellVersions, cells: { ...snapshot.cells, ...Object.fromEntries(Object.entries(changes).map(([key, text]) =>
-    [key, { kind: 'value' as const, value: text }])) } }, snapshot);
+  projectHistory(previewHistory(snapshot, `preview:${snapshot.token}`, changes), snapshot);
   return freezeSynthetic({ token: snapshot.token, group: current, originalEdgeId, action, eventId, copies: [...copies], modelCopies: [...modelCopies], changes });
 }
 

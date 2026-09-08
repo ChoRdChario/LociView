@@ -8,6 +8,7 @@ import { value } from '../../scene/types';
 import { syntheticDisplay, type SyntheticDisplay } from './viewportModel';
 import type { SyntheticSession } from './session';
 import type { DisplayCapture } from './viewSession';
+import { createMediaGallery } from './mediaControls';
 
 export interface ViewportObservation {
   readonly token: string; readonly ready: boolean; readonly issue: string | null; readonly dragging: boolean;
@@ -58,7 +59,7 @@ export function createViewportHost(document: Document, session: SyntheticSession
   view.root.append(author.root);
   const windows = createCaptionWindowControls(document, plan => {
     const accepted = session.acceptWindow(plan); changed(); return accepted;
-  }, active => { session.setWindowDragging(active); changed(); });
+  }, active => { session.setWindowDragging(active); changed(); }, captionId => createMediaGallery(document, () => session.snapshot, captionId));
   const renderStatus = document.createElement('div'); renderStatus.className = 'lv-development-render-status';
   renderStatus.append(status, retry);
   // Keep failure/retry outside the floating-window stack so comparison cannot cover recovery.

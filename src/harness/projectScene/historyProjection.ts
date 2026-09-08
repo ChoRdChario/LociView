@@ -6,6 +6,7 @@ import { decodeSyntheticAnchor } from './modelFixture';
 import { modelHistorySeed, projectModelHistory } from './modelHistory';
 import { projectViewHistory, viewHistorySeed } from './viewHistory';
 import { projectMaterialHistory } from './materialHistory';
+import { mediaSeed, projectMediaHistory } from './mediaHistory';
 
 export const captionKey = (id: string, field: 'title' | 'body' | 'color' | 'anchor' | 'template') => `caption/${id}/${field}`;
 export const bindingKey = (id: string) => `asset/${id}/binding`;
@@ -21,6 +22,7 @@ export function historySeed(): Readonly<Record<string, string>> {
     })),
     ...Object.entries(modelHistorySeed()),
     ...Object.entries(viewHistorySeed()),
+    ...Object.entries(mediaSeed()),
     ...Object.values(initial.state.assetMemberships).map(edge => [membershipKey(edge.id), JSON.stringify(edge)]),
     ...Object.values(initial.state.captionMemberships).map(edge => [membershipKey(edge.id), JSON.stringify(edge)]),
   ]);
@@ -38,7 +40,7 @@ export function projectHistory(snapshot: HistorySnapshot, previous?: HistorySnap
   const captionTemplates = { ...initial.captionTemplates };
   const expected = new Set(Object.keys(historySeed()).filter(key => key.startsWith('caption/')));
   const copies: Record<string, { templateId: string; sourceId: string; eventId: string }> = {};
-  // Only these fixture-derived, attachment/tag-empty copies are admitted, not arbitrary resources.
+  // Only fixture-derived Caption identities; known attachments are validated as a complete closure below.
   for (const [key, cell] of Object.entries(snapshot.cells)) {
     if (!/^caption\/cap_[0-9a-f]{32}\/template$/.test(key)) continue;
     const id = key.split('/')[1]!;
@@ -67,7 +69,7 @@ export function projectHistory(snapshot: HistorySnapshot, previous?: HistorySnap
       throw new Error('コピーの識別情報は変更できません。');
   }
   for (const [key, cell] of Object.entries(snapshot.cells)) {
-    if (['model/', 'asset/', 'view/', 'scene/', 'material/'].some(prefix => key.startsWith(prefix))) continue; // Known graphs checked together above.
+    if (['model/', 'asset/', 'view/', 'scene/', 'material/', 'media/', 'attachment/'].some(prefix => key.startsWith(prefix))) continue; // Known graphs checked together.
     const candidates = cell.kind === 'value' ? [cell.value] : cell.candidates.map(c => c.value);
     if (!candidates.length) throw new Error('更新候補がありません。');
     if (expected.delete(key)) {
@@ -113,7 +115,8 @@ export function projectHistory(snapshot: HistorySnapshot, previous?: HistorySnap
     Object.keys(initial.state.captionMemberships).some(id => !captionMemberships[id]) ||
     Object.keys(copies).some(id => !Object.values(captionMemberships).some(edge => edge.resourceId === id)))
     throw new Error('必要な更新内容がありません。');
-  const result: SyntheticProject = { ...initial,
+  const media = projectMediaHistory(snapshot, Object.keys(captions), previous);
+  const result: SyntheticProject = { ...initial, mediaData: media,
     state: { ...initial.state, scenes: views.scenes, token: snapshot.token, assetMemberships: memberships, captionMemberships },
     resources: { ...initial.resources, token: snapshot.token, captions, assets, views: views.data.records, materials: materials.records }, colors, captionTemplates, viewData: views.data, materialData: materials,
     modelNames: models.names, modelVersions: models.versions };

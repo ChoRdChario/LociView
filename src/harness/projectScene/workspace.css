@@ -86,3 +86,12 @@
 .lv-caption-window-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .lv-caption-window-tools select { max-width: 220px; }
 .lv-caption-window-tools > p:empty { display: none; }
+.lv-development-media { border-top: 1px solid #b7b1aa; padding-top: 8px; }
+.lv-development-media > div > section { border-top: 1px solid #d3cec7; padding: 8px 0; }
+.lv-development-media button, .lv-development-media select { margin: 3px; }
+.lv-development-media-gallery { white-space: normal; }
+.lv-development-media-gallery figure { margin: 8px 0; }
+.lv-development-media-gallery img { display: block; width: 96px; height: auto; max-width: 100%; }
+.lv-development-media-gallery .is-expanded img { width: 100%; }
+.lv-development-media-gallery figcaption { font-size: 12px; overflow-wrap: anywhere; }
+.lv-development-media-gallery p:empty { display: none; }

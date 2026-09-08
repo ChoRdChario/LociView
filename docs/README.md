@@ -70,7 +70,7 @@ two independent memory histories and explicit scalar choices/replay. This is not
 product file exchange. Known synthetic model-binding updates and manual pin
 correction now participate in the same two-round loop, preserving local work and
 Scene references. Explicit membership keep-one and independent Caption copies now
-connect in the known empty attachment/tag fixture. Exact synthetic model copies
+connect in the known synthetic fixture. Exact synthetic model copies
 also connect, with fresh closed IDs, fixture-byte/immutable-digest checks and
 independent placement edits through a second exchange. General model-copy
 admission, migration and the full provider remain unimplemented; current todo
@@ -86,7 +86,10 @@ acceptance remain pending.
 Exact fixture material catalogs now connect scoped editing, explicit conflict
 choices/reset and independent model-copy material re-keying to lit/unlit,
 sidedness and hard chroma. This is fixed opaque triangle evidence only, not
-blend/dither adoption; media and gated durable-file services remain next.
+blend/dither adoption. Fixed PNG media now connects add/description/order/removal,
+window images, causal delete/edit choices and independent attachment copies in
+the same host. Tags remain empty-fixture-only; real media files/storage and
+gated durable-file services remain pending. Next is the complete-provider boundary.
 
 - Legacy-v1 ZIP/package code is not bounded-memory streaming despite older architecture text. The bounded Native portable and exchange packages use their separate streamed path.
 - Current XLSX reading is the local minimal reader in `src/io/xlsx.ts`, not SheetJS.

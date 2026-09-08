@@ -23,7 +23,7 @@ export function canonicalFixture(input: unknown): string {
 }
 export function fixtureSha256(bytes: Uint8Array): string { const hash = new NativeSha256(); hash.update(bytes); return hash.digestHex(); }
 const utf8 = (text: string) => new TextEncoder().encode(text);
-export function fixtureRecordDigest(kind: 'representation' | 'asset-revision' | 'asset-binding-revision', record: object): string {
+export function fixtureRecordDigest(kind: 'representation' | 'asset-revision' | 'asset-binding-revision' | 'media-resource', record: object): string {
   const { payloadDigest: _digest, ...payload } = record as Record<string, unknown>;
   return fixtureSha256(utf8(`lociview:v2:immutable:${kind}:jcs-v1\n${canonicalFixture(payload)}`));
 }

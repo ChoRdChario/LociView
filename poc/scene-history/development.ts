@@ -1,5 +1,5 @@
 import type * as Automerge from '@automerge/automerge/slim';
-import type { DevelopmentHistory, HistorySnapshot, MemoryUpdate } from '../../src/harness/projectScene/historyPort';
+import type { DevelopmentHistory, HistorySnapshot, HistoryChange, MemoryUpdate } from '../../src/harness/projectScene/historyPort';
 
 type Api = typeof Automerge;
 type Data = { cells: Record<string, Automerge.ImmutableString> };
@@ -41,20 +41,24 @@ export function createDevelopmentPair(A: Api, seed: Readonly<Record<string, stri
   const roots = rootHashes(index(A.getAllChanges(bootstrap)));
   function snapshot(doc: Doc): HistorySnapshot {
     const cellVersions: Record<string, string> = {};
+    const causalChanges: HistoryChange[] = [];
     // Fixed 3.4.1 flat ImmutableString map only. getConflicts omits single setters.
     // Decode original changes (already bounded above), never derive versions from values/heads.
     const objectId = A.getObjectId(doc.cells), setters = new Map<string, Set<string>>(), removed = new Map<string, Set<string>>();
     if (!objectId) fail();
     for (const bytes of A.getAllChanges(doc)) {
       const change = A.decodeChange(bytes);
+      const writes: Record<string, string | null> = {};
       change.ops.forEach((op, i) => {
         if (op.obj !== objectId) return;
         if (typeof op.key !== 'string' || !['set', 'del'].includes(op.action) || ('insert' in op && op.insert) ||
           (op.action === 'set' && (typeof op.value !== 'string' || op.datatype !== undefined))) fail();
         const live = setters.get(op.key) ?? new Set<string>(), dead = removed.get(op.key) ?? new Set<string>();
         if (op.action === 'set') live.add(`${change.startOp + i}@${change.actor}`);
+        writes[op.key] = op.action === 'set' ? op.value as string : null;
         op.pred.forEach(id => dead.add(id)); setters.set(op.key, live); removed.set(op.key, dead);
       });
+      causalChanges.push(Object.freeze({ id: change.hash, deps: Object.freeze([...change.deps].sort()), writes: Object.freeze(writes) }));
     }
     const cells = Object.freeze(
       Object.fromEntries(Object.keys(doc.cells).map(key => {
@@ -72,7 +76,8 @@ export function createDevelopmentPair(A: Api, seed: Readonly<Record<string, stri
         return [key, candidates.length > 1 ? Object.freeze({ kind: 'conflict' as const, candidates: Object.freeze(candidates) }) :
           Object.freeze({ kind: 'value' as const, value: v.toString() })];
       })));
-    return Object.freeze({ token: `memory-history:${heads(doc).join(',')}`, cells, cellVersions: Object.freeze(cellVersions) });
+    causalChanges.sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    return Object.freeze({ token: `memory-history:${heads(doc).join(',')}`, cells, cellVersions: Object.freeze(cellVersions), causalChanges: Object.freeze(causalChanges) });
   }
   function participant(): DevelopmentHistory {
     // clone without actor option allocates an independent actor; edits never mutate the bootstrap.
@@ -109,6 +114,18 @@ export function createDevelopmentPair(A: Api, seed: Readonly<Record<string, stri
         return publish(A.change(detached(), { time: 0, message: 'explicit synthetic candidate choice' }, draft => {
           // A same-value assignment alone can be a no-op; choice must causally resolve all candidates.
           delete draft.cells[key]; draft.cells[key] = new A.ImmutableString(chosen.value);
+        }));
+      },
+      resolveAttachmentLifecycle(token, key, candidateIds, value) {
+        checkToken(token);
+        const cell = snapshot(doc).cells[key];
+        if (!/^attachment\/att_[0-9a-f]{32}\/lifecycle$/.test(key) || cell?.kind !== 'conflict' ||
+          !equal(candidateIds, cell.candidates.map(c => c.id))) fail();
+        const event = JSON.parse(value);
+        if (!event || !['active', 'deleted'].includes(event.state) || event.reason !== 'conflictResolution') fail();
+        // Admission checks the complete event and fresh ID before publication. Normal writes still refuse conflict keys.
+        return publish(A.change(detached(), { time: 0, message: 'explicit synthetic attachment lifecycle resolution' }, draft => {
+          delete draft.cells[key]; draft.cells[key] = new A.ImmutableString(value);
         }));
       },
       exportUpdate() {

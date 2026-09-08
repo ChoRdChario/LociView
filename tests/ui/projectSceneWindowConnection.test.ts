@@ -86,7 +86,7 @@ describe('same-host comparison windows; authored DOM only, not raster or native 
       pin: 'needsReview', title: { kind: 'unresolved', reason: 'conflict' }, body: value('<img src=x onerror=bad()>\r\n記録') } : c) }, memory, selectedId: f.shared, moveBlock: null };
     h.layer.render(context); expect(card.attributes.get('aria-label')).toBe('タイトルを確認');
     h.project(); expect(line.hidden).toBe(true); // A stale visible-pin observation cannot bypass current review state.
-    expect(card.children.find(n => n.className === 'lv-caption-window-body')!.textContent).toBe('<img src=x onerror=bad()>\r\n記録');
+    expect(descendants(card).find(n => n.className === 'lv-caption-window-text')!.textContent).toBe('<img src=x onerror=bad()>\r\n記録');
     expect(descendants(card).some(n => n.tag === 'img')).toBe(false);
     h.layer.render({ ...context, source: { ...source, captions: [] } }); expect(h.root.children.filter(n => n.className === 'lv-caption-window')).toHaveLength(0);
     expect(h.session.windowMemory).toBe(memory); h.render(); expect(named(h.root, '設備の確認箇所')).toBeDefined();

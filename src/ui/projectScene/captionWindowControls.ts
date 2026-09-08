@@ -17,7 +17,8 @@ export function displayedWindowRect(preferred: WindowRect, width: number, height
 
 /** Read-only comparison layer. Selection/drafts/history remain owned by the host. */
 export function createCaptionWindowControls(document: Document, onPlan: (plan: CaptionWindowPlan) => boolean,
-  onMoving: (active: boolean) => void) {
+  onMoving: (active: boolean) => void,
+  content?: (captionId: string) => { root: HTMLElement; render(): void; dispose(): void }) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const n = document.createElement(tag); n.textContent = text; return n; };
   const button = (text: string) => { const n = make('button', text); n.type = 'button'; return n; };
   const root = make('div'); root.className = 'lv-caption-windows'; root.setAttribute('aria-label', 'キャプションのウィンドウ');
@@ -26,6 +27,7 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
   label.append(front); const arrange = button('ウィンドウを並べる'), status = make('p'); status.setAttribute('role', 'status');
   tools.append(label, arrange, status);
   type Card = { root: HTMLElement; title: HTMLButtonElement; body: HTMLElement; note: HTMLElement;
+    content?: ReturnType<NonNullable<typeof content>>;
     retain: HTMLButtonElement; close: HTMLButtonElement; line: HTMLElement; rect: WindowRect; initial: WindowRect; cleanups: (() => void)[] };
   const cards = new Map<string, Card>();
   const initialPositions = new Map<string, Map<string, WindowRect>>();
@@ -45,7 +47,7 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
     if (commit) { const proposed = plan({ kind: 'place', captionId: old.id, rect: old.rect }, old.context); if (proposed) onPlan(proposed); }
     paint();
   }
-  function removeCard(card: Card) { for (const cleanup of card.cleanups) cleanup(); card.root.remove(); card.line.remove(); }
+  function removeCard(card: Card) { for (const cleanup of card.cleanups) cleanup(); card.content?.dispose(); card.root.remove(); card.line.remove(); }
   function createCard(id: string): Card {
     let positions = initialPositions.get(scope); if (!positions) { positions = new Map(); initialPositions.set(scope, positions); }
     const initial = positions.get(id) ?? { left: 16 + positions.size * 32, top: 16 + positions.size * 28, width: 280, height: 200 };
@@ -53,12 +55,13 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
     const node = make('section'), header = make('header'), title = button(''), close = button('×'), retain = button('比較に残す');
     node.className = 'lv-caption-window'; close.setAttribute('aria-label', '閉じる');
     title.className = 'lv-caption-window-title'; title.title = 'ドラッグまたは矢印キーで移動。Escで取り消し';
-    const body = make('div'), note = make('p'), line = make('div');
-    body.className = 'lv-caption-window-body'; note.className = 'lv-caption-window-note';
+    const body = make('div'), scroll = make('div'), note = make('p'), line = make('div'), extension = content?.(id);
+    body.className = 'lv-caption-window-text'; scroll.className = 'lv-caption-window-body'; note.className = 'lv-caption-window-note';
+    scroll.append(body); if (extension) scroll.append(extension.root);
     line.className = 'lv-caption-window-line'; line.setAttribute('aria-hidden', 'true');
-    header.append(title, close); node.append(header, body, note, retain); root.append(line, node);
+    header.append(title, close); node.append(header, scroll, note, retain); root.append(line, node);
     const card: Card = { root: node, title, body, note, close, retain, line,
-      rect: initial, initial, cleanups: [] };
+      rect: initial, initial, cleanups: [], content: extension };
     const listen = (element: HTMLElement, type: string, fn: (event: Event) => void) => {
       element.addEventListener(type, fn); card.cleanups.push(() => element.removeEventListener(type, fn));
     };
@@ -128,6 +131,7 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
       card.root.setAttribute('aria-label', title);
       const body = item.body.kind === 'value' ? item.body.value : '本文の更新候補を確認してください。';
       if (card.body.textContent !== body) card.body.textContent = body;
+      card.content?.render();
       card.note.textContent = item.pin === 'needsReview' ? 'ピン位置の確認が必要です。' : item.pin === 'ownerHidden' ? 'モデルは非表示です。' :
         item.pin === 'unavailable' ? 'ピンの状態を確認してください。' : '';
       card.note.hidden = !card.note.textContent; card.retain.setAttribute('aria-pressed', String(next.memory.retained.includes(id)));

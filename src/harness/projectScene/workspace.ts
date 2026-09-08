@@ -10,6 +10,7 @@ import { modelVersion } from './modelFixture';
 import { createCaptionIncludeControls } from '../../ui/projectScene/captionIncludeControls';
 import { createViewportHost, type ViewportFactory } from './viewportHost';
 import { createMaterialControls } from '../../ui/projectScene/materialControls';
+import { createMediaControls } from './mediaControls';
 
 /** One mounted integration host. Components own their DOM; synthetic session owns all working/UI state. */
 export function createDevelopmentWorkspace(document: Document, session = new SyntheticSession(),
@@ -34,7 +35,6 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   composition.append(sceneName, models, pinCount, disconnected);
   const editor = make('section'); editor.className = 'lv-development-editor';
   const editorHeading = make('h2', 'キャプションの編集');
-  const mediaNote = make('p', 'メディアの追加は未接続です。'); mediaNote.className = 'lv-development-pending';
   const sidebar = make('aside'); sidebar.className = 'lv-development-sidebar'; sidebar.setAttribute('aria-label', '作業パネル');
   const materialPanel = make('section'), viewPanel = make('section');
   materialPanel.className = viewPanel.className = 'lv-development-pending-panel';
@@ -63,8 +63,9 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   const include = createCaptionIncludeControls(document, plan => { session.acceptInclude(plan); afterAction(); });
   const viewport = createViewportHost(document, session, afterAction, options.viewportFactory);
   const material = createMaterialControls(document, plan => { session.acceptMaterial(plan); afterAction(); });
+  const media = createMediaControls(document, session.media, afterAction);
   header.append(brand, name, navigation.sceneControl, navigation.saveStatus);
-  editor.append(editorHeading, detail.root, pin.actions, coordinates.root, pin.modeStrip, mediaNote);
+  editor.append(editorHeading, detail.root, pin.actions, coordinates.root, pin.modeStrip, media.root);
   stage.append(viewport.stageTools, viewport.root, composition, placement.modeStrip, editor);
   viewPanel.replaceChildren(viewport.view);
   materialPanel.replaceChildren(material.root);
@@ -81,6 +82,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     const listOkay = list.render(captionContext);
     const modelsOkay = modelList.render(session.modelContext());
     const materialOkay = material.render(session.materialContext());
+    media.render();
     const pinsOkay = pin.render(session.pinContext()), includeOkay = include.render(session.includeContext()); coordinates.render(); modelUpdate.render(); placement.render();
     if (!detailOkay || !listOkay || !modelsOkay || !pinsOkay || !includeOkay || !materialOkay) {
       message.textContent = '入力中の状態を保持しています。操作を完了してから切り替えてください。';
@@ -116,6 +118,6 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   render();
   return { root, session, render, dispose() {
     disposed = true; navigation.dispose(); list.dispose(); detail.dispose(); modelList.dispose();
-    pin.dispose(); coordinates.dispose(); modelUpdate.dispose(); placement.dispose(); include.dispose(); viewport.dispose(); material.dispose(); root.remove();
+    pin.dispose(); coordinates.dispose(); modelUpdate.dispose(); placement.dispose(); include.dispose(); viewport.dispose(); material.dispose(); media.dispose(); root.remove();
   } };
 }

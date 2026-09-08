@@ -13,8 +13,8 @@
 > is synthetic memory exchange, not team files or durable writes. Known model
 > binding updates and explicit manual pin corrections now connect to the same
 > two-round loop, retaining drafts and Scene references. Explicit membership
-> keep-one and independent Caption keep-both are also connected (known empty
-> attachment/tag fixture only). Exact synthetic model keep-both now also connects:
+> keep-one and independent Caption keep-both are also connected (known synthetic
+> fixture only; media scope below). Exact synthetic model keep-both now also connects:
 > fresh model/frame/representation/material IDs, verified tiny fixture bytes and
 > immutable digests; selected-model translation creates a new binding and passes
 > a second exchange without changing the original. Unsupported closure variants
@@ -28,10 +28,15 @@
 > Exact-target Scene/Project material edits now connect lighting/sidedness/hard
 > chroma on the known triangle, explicit conflicts/reset and Scene-only material
 > re-keying for independent model copies. Unknown effects stay diagnosed; no
-> blend/dither adoption. Current todo records tests and independent review.
+> blend/dither adoption. Fixed PNG media now connects add/description/order,
+> confirmed deletion, comparison-window images and causal delete/edit recovery.
+> Independent Caption copies retain image bodies with fresh attachment IDs;
+> tag support remains empty-fixture-only. Failure retains exact commands/drafts.
+> Current todo records tests and independent review.
 > File/storage effects remain unconnected; do not claim full model-copy admission,
 > renderer adoption, integrated v2 or rendered acceptance. Next:
-> media in the same host, then the finite complete-provider/gated durable boundary.
+> the finite complete-provider/gated durable boundary. Real file inputs and
+> image pan/pinch/filters remain pending, not removed conveniences.
 > Windows Computer Use initialized but stopped automatically on unsafe-to-resolve
 > Chrome URL; no browser input/PASS or bypass. Keep the existing batched UI lane.
 > No repeated journal check or scheduling approval is needed. Real-data/current

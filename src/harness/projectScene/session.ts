@@ -26,6 +26,9 @@ import { projectViewHistory, viewHistorySeed } from './viewHistory';
 import { SyntheticMaterialSession } from './materialSession';
 import { projectMaterialHistory } from './materialHistory';
 import type { MaterialPlan } from '../../ui/projectScene/materialState';
+import { SyntheticMediaSession, type MediaContext } from './mediaSession';
+import { mediaSeed, projectMediaHistory } from './mediaHistory';
+import { previewHistory } from './historyPort';
 
 export interface SyntheticPinInput {
   readonly coordinates: readonly [string, string, string]; readonly familyId: string | null;
@@ -45,6 +48,7 @@ const emptyMemory = (): SceneUiMemory => Object.freeze({ selectedCaptionId: null
 export class SyntheticSession {
   readonly views = new SyntheticViewSession(() => this.project, () => this.sceneId, (token, changes) => this.writeViews(token, changes));
   readonly materials = new SyntheticMaterialSession(() => this.project, () => this.sceneId, (token, changes) => this.writeMaterials(token, changes));
+  readonly media = new SyntheticMediaSession(() => this.mediaContext(), (token, changes) => this.writeMedia(token, changes));
   private project = createSyntheticProject();
   private navigation: NavigationSession;
   private drafts = new Map<string, CaptionDraft>();
@@ -86,10 +90,10 @@ export class SyntheticSession {
     return text === 'composition' ? text : this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : text;
   }
   private get textPending(): PendingInteraction | null {
-    if (this.views.pending === 'composition' || this.materials.pending === 'composition') return 'composition';
+    if (this.views.pending === 'composition' || this.materials.pending === 'composition' || this.media.pending === 'composition') return 'composition';
     if (this.placement?.composing || this.pinInputComposing || this.searchComposing || [...this.includes.values()].some(m => m.composing) || [...this.models.values()].some(m => m.composing) ||
       [...this.drafts.values()].some(d => d.composing !== null)) return 'composition';
-    return this.views.pending ?? this.materials.pending ?? ([...this.drafts.values()].some(hasCaptionDraft) ? 'text' : null);
+    return this.views.pending ?? this.materials.pending ?? this.media.pending ?? ([...this.drafts.values()].some(hasCaptionDraft) ? 'text' : null);
   }
   setSearchComposing(active: boolean) { this.searchComposing = active; }
   setViewportDragging(active: boolean): boolean { const changed = this.viewportDragging !== active; this.viewportDragging = active; return changed; }
@@ -137,10 +141,27 @@ export class SyntheticSession {
   materialContext() {
     const other: PendingInteraction | null = this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' :
       this.searchComposing || [...this.includes.values()].some(m => m.composing) || [...this.models.values()].some(m => m.composing) ||
-      [...this.drafts.values()].some(d => d.composing) ? 'composition' : this.views.pending;
+      [...this.drafts.values()].some(d => d.composing) ? 'composition' : this.views.pending ?? this.media.pending;
     return this.materials.context(other);
   }
   acceptMaterial(plan: MaterialPlan) { const accepted = this.materials.accept(plan, this.materialContext()); this.message = this.materials.message; return accepted; }
+  mediaContext(): MediaContext {
+    const source = this.captionContext().source, captionId = this.memory.selectedCaptionId;
+    const other = this.windowDragging || this.viewportDragging || this.placement || this.pinInput;
+    const composing = this.searchComposing || [...this.includes.values()].some(m => m.composing) || [...this.models.values()].some(m => m.composing) ||
+      [...this.drafts.values()].some(d => d.composing);
+    return { project: this.project, sceneId: this.sceneId, captionId,
+      block: other ? '移動中の操作を終えてください。' : composing ? '文字の入力を確定してください。' : this.views.pending || this.materials.pending ?
+        '他の編集中の設定を適用するか取り消してください。' : source.kind !== 'ready' || !source.captions.some(c => c.id === captionId) ? 'キャプションを選択してください。' : null };
+  }
+  private writeMedia(base: string, changes: Readonly<Record<string, string>>) {
+    if (base !== this.project.state.token) throw new Error('添付が更新されています。入力を保持しています。');
+    if (this.authority) { this.publish(this.authority.write(base, changes)); return; }
+    const token = fresh('snapshot'), data = this.project.mediaData;
+    const previous = { token: base, cells: data?.cells ?? Object.fromEntries(Object.entries(mediaSeed()).map(([k, text]) => [k, { kind: 'value' as const, value: text }])), causalChanges: data?.causalChanges };
+    const mediaData = projectMediaHistory(previewHistory(previous, token, changes), Object.keys(this.project.resources.captions), previous);
+    this.publish({ ...this.project, state: { ...this.project.state, token }, resources: { ...this.project.resources, token }, mediaData });
+  }
   private writeMaterials(base: string, changes: Readonly<Record<string, string>>) {
     if (base !== this.project.state.token) throw new Error('設定が更新されています。入力を保持しています。');
     if (this.authority) { this.publish(this.authority.write(base, changes)); return; }

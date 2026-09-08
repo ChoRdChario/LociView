@@ -1147,6 +1147,41 @@ nonblocking visual polish. A required gate/ratification blocks its actual
 activation, not unrelated authorized development. Before such a boundary,
 report the exact missing prerequisite instead of inventing substitute work.
 
+**Observed bounded media connection (from `7b57fd2`):** the same host now has two
+preloaded public synthetic PNGs. Each immutable MediaResource has a verified
+exact blob descriptor and domain-separated metadata digest; history accepts only
+those known records/bytes, not arbitrary media admission or a transport format.
+CaptionAttachment fields (caption target, media target, alt text, order and
+lifecycle) are independent atomic cells under a fresh stable attachment ID.
+Validate every candidate and known Caption/media reference before publication.
+Unresolved parent/resource/lifecycle never supplies an inline image; unresolved
+alt text uses a neutral message, and unresolved order remains visibly unresolved.
+No byte/name-based attachment deduplication. Add/reorder/alt edit/removal use the
+same causal port; removal confirms and tombstones the attachment, not the media
+resource. Draft/command/ID retention, exact token guards and explicit conflict
+selection remain mandatory. Independent Caption copy maps every confirmed active
+attachment to a fresh ID, retaining the same immutable media and exact metadata,
+in its existing one-command keep-both flow; unresolved required fields refuse.
+Existing comparison windows show confirmed images, not editor drafts, with
+explicit image-load error/retry and bounded enlargement. These effects are page
+memory and known public bytes only. No general image decoder/profile adoption,
+real files/storage, new media formats or current-app activation; full image
+viewing aids and raster/native/device evidence remain required later.
+The fixed flat-map candidate additionally exposes original change dependencies
+and final per-command field writes through a neutral development-only read port.
+This is not a stored metadata/wire extension or an adopted history API. Derive
+attachment delete/edit review from causal order, not timestamps: observed edits
+need no review, concurrent edits are held, and edits after delete without an
+intervening explicit restore are invalid. Keep-deleted/restore resolution writes
+a fresh lifecycle event after all candidates. Copying equal-order attachments
+allocates keys in the copy's confirmed source order without changing originals.
+Lifecycle conflicts use an explicit assignment port guarded by the exact token
+and candidate IDs; normal conflict-key writes remain refused. Retain the chosen
+state and fresh event across a failed attempt. Delete/edit review displays the
+retained explanation/order, including unresolved candidates, before the choice.
+If receiving removes the draft's Caption from the current Scene, keep the draft
+and block apply but permit explicit cancellation once composition has ended.
+
 **Observed material connection (from `895169e`):** the same synthetic host
 connects exact existing fixture model/family/layout/slot catalogs and the
 existing scoped appearance controls. Routing, appearance, compositing and

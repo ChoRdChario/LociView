@@ -10,6 +10,8 @@ import { allocateModelCopyIds, fixtureModelIds } from './modelClosure';
 import type { ViewportFactory } from './viewportHost';
 import { materialCopyIntent } from './materialHistory';
 import { createMaterialConflictControls, describeMaterialCandidate, describeMaterialTarget } from './materialReview';
+import { attachmentImage, attachmentKey, copyableAttachments, fixtureMedia } from './mediaHistory';
+import { canonicalFixture } from './modelClosure';
 
 /** Two independently edited histories in one disposable page, not a file-sharing UI. */
 export function createTeamWorkspace(document: Document, factory: DevelopmentHistoryFactory, viewportFactory?: ViewportFactory) {
@@ -20,6 +22,8 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
   const lastReceived: (MemoryUpdate | undefined)[] = [];
   let active = 0, disposed = false;
   const memberChoices = new Map<string, { selected: string | null; plan?: MembershipResolutionPlan }>();
+  const deleteChoices = new Map<string, { selected: string; changes?: Readonly<Record<string, string>> }>();
+  const lifecycleChoices = new Map<string, { selected: string | null; value?: string }>();
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => {
     const node = document.createElement(tag); node.textContent = text; return node;
   };
@@ -76,7 +80,8 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
     if (actor.disabled) retry.disabled = true;
     const conflicts = Object.entries(snapshot.cells).filter(([, cell]) => cell.kind === 'conflict');
     const duplicates = duplicateMemberships(snapshot), shownScene = session.sceneId;
-    conflictPanel.hidden = !conflicts.length && !duplicates.length;
+    const deleteReviews = Object.values(session.snapshot.mediaData?.records ?? {}).filter(r => r.deleteEdit);
+    conflictPanel.hidden = !conflicts.length && !duplicates.length && !deleteReviews.length;
     const elements: HTMLElement[] = [];
     const retainedKeys = new Set<string>();
     if (duplicates.length) elements.push(make('h2', '重複した項目を整理'));
@@ -121,7 +126,8 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
           if (action === 'both' && duplicate.kind === 'asset' && !source) throw new Error('モデルの更新候補を先に確認してください。');
           choice.plan = planMembershipResolution(snapshot, duplicate, choice.selected, action, fresh('evt'), action === 'one' || duplicate.kind !== 'caption' ? [] :
             duplicate.edges.filter(edge => edge.id !== choice.selected).map(edge => ({ edgeId: edge.id,
-              captionId: fresh('cap'), membershipId: fresh('scm') })), action === 'one' || duplicate.kind !== 'asset' ? [] :
+              captionId: fresh('cap'), membershipId: fresh('scm'), attachments: copyableAttachments(session.snapshot.mediaData, duplicate.resourceId)
+                .map(a => ({ sourceId: a.id, attachmentId: fresh('att') })) })), action === 'one' || duplicate.kind !== 'asset' ? [] :
             duplicate.edges.filter(edge => edge.id !== choice.selected).map(edge => ({ edgeId: edge.id,
               membershipId: fresh('sam'), ids: allocateModelCopyIds(fixtureModelIds(source!), fresh),
               ...(materialCopyIntent(session.snapshot.materialData, duplicate.sceneId, source!) ? { materialOverrideId: fresh('ovr') } : {}) })));
@@ -138,6 +144,42 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
       syncChoice(); elements.push(fieldset);
     }
     for (const key of memberChoices.keys()) if (!retainedKeys.has(key)) memberChoices.delete(key);
+    const attachmentSubject = (id: string) => {
+      const row = session.snapshot.mediaData?.records[id], caption = row?.captionId.kind === 'value' ? session.snapshot.resources.captions[row.captionId.value] : null;
+      return `${caption?.title.kind === 'value' ? caption.title.value : 'キャプションを確認'} — ${row && attachmentImage(row)?.record.label || 'メディアを確認'} — 添付 ${id}`;
+    };
+    const resolveAttachmentLife = (key: string, value: string) => {
+      const cell = snapshot.cells[key];
+      if (cell?.kind === 'conflict') {
+        if (!history.resolveAttachmentLifecycle) throw new Error('この接続では削除状態を解決できません。候補と選択を保持しています。');
+        history.resolveAttachmentLifecycle(snapshot.token, key, cell.candidates.map(c => c.id), value);
+      } else history.write(snapshot.token, { [key]: value });
+    };
+    for (const choices of [deleteChoices, lifecycleChoices]) for (const key of choices.keys())
+      if (key.startsWith(`${active}/`) && !key.startsWith(`${active}/${snapshot.token}/`)) choices.delete(key);
+    for (const row of deleteReviews) {
+      const key = `${active}/${snapshot.token}/${row.id}`, choice = deleteChoices.get(key) ?? { selected: '' }; deleteChoices.set(key, choice);
+      const box = make('fieldset'), legend = make('legend', attachmentSubject(row.id)), choose = make('select');
+      choose.setAttribute('aria-label', `${attachmentSubject(row.id)} 削除と編集の確認`);
+      for (const [key, label] of [['', '選択してください'], ['deleted', '削除を維持'], ['active', '添付を復元']]) { const o = make('option', label); o.value = key!; choose.append(o); }
+      choose.value = choice.selected;
+      const apply = make('button', '選択を適用'); apply.type = 'button'; apply.disabled = !choice.selected || session.pending !== null; choose.disabled = session.pending !== null;
+      choose.addEventListener('change', () => { choice.selected = choose.value; delete choice.changes; apply.disabled = !choose.value || session.pending !== null; });
+      apply.addEventListener('click', () => attempt(() => {
+        if (disposed || active !== shownActor || session.pending || !['deleted', 'active'].includes(choose.value)) throw new Error('対象と入力を確認してください。');
+        if (!choice.changes) choice.changes = { [attachmentKey(row.id, 'lifecycle')]:
+          canonicalFixture({ state: choose.value, eventId: `evt_${crypto.randomUUID().replaceAll('-', '')}`, reason: 'conflictResolution' }) };
+        const field = attachmentKey(row.id, 'lifecycle'); resolveAttachmentLife(field, choice.changes[field]!);
+        session.refreshHistory(); deleteChoices.delete(key);
+      }));
+      box.append(legend, make('p', '添付の削除と編集が同時に行われました。両方の変更を保持しています。'));
+      for (const [field, label] of [['altText', '説明'], ['orderKey', '順序']] as const) {
+        const cell = snapshot.cells[attachmentKey(row.id, field)]!;
+        if (cell.kind === 'value') box.append(make('p', `${label}：${cell.value || '（空欄）'}`));
+        else { box.append(make('p', `${label}は未解決です。`)); cell.candidates.forEach((c, i) => box.append(make('p', `候補 ${i + 1}：${c.value || '（空欄）'}`))); }
+      }
+      box.append(choose, apply); elements.push(box);
+    }
     if (conflicts.length) elements.push(make('h2', '残す内容を選択'), make('p',
       '同じ項目に異なる編集があります。使用する内容を選択してください。'));
     for (const [key, cell] of conflicts) {
@@ -153,15 +195,27 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
         key.startsWith('asset/') ? `${session.snapshot.modelNames[id!] ?? 'モデル'} — 使用するモデル` :
         key.startsWith('view/') ? `${viewLabel} — ${viewFields[field!] ?? '視点の状態'}` :
         key.startsWith('scene/') ? 'シーンを開いたときの視点' :
+        key.startsWith('attachment/') ? `${attachmentSubject(id!)} — ${{ captionId: 'キャプション', mediaResourceId: '画像', altText: '説明', orderKey: '順序', lifecycle: '削除状態' }[field!]}` :
         key.startsWith('material/') ? `${describeMaterialTarget(id!, session.snapshot)} — ${{ routing: '適用先', appearance: '見え方', compositing: '合成方式', lifecycle: '設定の状態' }[field!] ?? '状態'}` :
         `キャプション ${ordinal} — ${field === 'title' ? 'タイトル' : field === 'body' ? '本文' : field === 'anchor' ? 'ピン位置' : 'ピン色'}`;
       const group = make('fieldset'), legend = make('legend', subject);
       const confirm = make('button', '選んだ内容を使用'); confirm.type = 'button'; confirm.disabled = true;
-      let selected: string | null = null;
+      const retainedKey = `${active}/${snapshot.token}/${key}`;
+      const lifecycleChoice = key.startsWith('attachment/') && field === 'lifecycle'
+        ? lifecycleChoices.get(retainedKey) ?? { selected: null } : null;
+      if (lifecycleChoice) lifecycleChoices.set(retainedKey, lifecycleChoice);
+      let selected: string | null = lifecycleChoice?.selected ?? null;
+      confirm.disabled = !selected || session.pending !== null;
       group.append(legend);
       for (const [i, candidate] of cell.candidates.entries()) {
         let description = candidate.value || '（空欄）';
         if (key.startsWith('material/')) description = describeMaterialCandidate(field!, candidate.value, session.snapshot);
+        if (key.startsWith('attachment/')) {
+          const target = session.snapshot.resources.captions[candidate.value];
+          if (field === 'captionId') description = target?.title.kind === 'value' ? `${target.title.value} — ${target.id}` : `キャプション ${candidate.value}`;
+          if (field === 'mediaResourceId') description = fixtureMedia.find(m => m.record.id === candidate.value)!.record.label;
+          if (field === 'lifecycle') description = JSON.parse(candidate.value).state === 'deleted' ? '削除する' : '残す';
+        }
         if (key.startsWith('scene/')) {
           const target = JSON.parse(candidate.value) as string | null, row = target ? session.snapshot.viewData?.records[target] : null;
           description = target === null ? '指定なし' : row?.name.kind === 'value' ? row.name.value : '名称を確認';
@@ -190,14 +244,20 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
         const choice = make('label'), radio = make('input'), text = make('span', description);
         radio.type = 'radio'; radio.name = `choice-${active}-${key}`; radio.value = candidate.id;
         radio.setAttribute('aria-label', `${subject} 候補 ${i + 1}`);
-        radio.disabled = session.pending !== null;
-        radio.addEventListener('change', () => { selected = candidate.id; confirm.disabled = false; });
+        radio.disabled = session.pending !== null; radio.checked = selected === candidate.id;
+        radio.addEventListener('change', () => { selected = candidate.id;
+          if (lifecycleChoice) { lifecycleChoice.selected = selected; delete lifecycleChoice.value; }
+          confirm.disabled = session.pending !== null; });
         choice.append(radio, text); group.append(choice);
       }
       confirm.addEventListener('click', () => attempt(() => {
         if (disposed || active !== shownActor) throw new Error('操作する人が変わっています。候補を選び直してください。');
         if (session.pending !== null || !selected) throw new Error('入力を適用するか、取り消してから選択してください。');
-        history.choose(snapshot.token, key, selected);
+        if (lifecycleChoice) {
+          lifecycleChoice.value ??= canonicalFixture({ state: JSON.parse(cell.candidates.find(c => c.id === selected)!.value).state,
+            eventId: `evt_${crypto.randomUUID().replaceAll('-', '')}`, reason: 'conflictResolution' });
+          resolveAttachmentLife(key, lifecycleChoice.value); lifecycleChoices.delete(retainedKey);
+        } else history.choose(snapshot.token, key, selected);
         session.refreshHistory(); status.textContent = '選んだ内容を適用しました。相手側でも更新を受け取ってください。';
       }));
       group.append(confirm);

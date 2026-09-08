@@ -10,12 +10,69 @@ IME and device acceptance remain pending, not implied by its DOM tests.
 
 ### Current checkpoint / next implementation
 
-Next: connect Caption media to this same synthetic workflow, reusing confirmed
-attachment identity, comparison windows and the two-round history. Keep it to
-known public synthetic image bytes; do not open real file/storage or new media
-formats. Record its exact closure/acceptance before implementation. Then address
-the finite complete-provider and gated durable-file boundary; do not restart
-detached probes or request another per-control manual check.
+The fixed-PNG media connection below is complete in development memory. Next is
+the finite complete-provider boundary under 05 §§13.3/13.4, then the gated durable
+loop. Do not return to detached UI parts or polish as the default workstream.
+- [ ] Map the accepted Project/resource/frame/reference/conflict/blob rules to
+  existing production-quality guards and the still-missing provider subparts.
+  Record one bounded contract/acceptance matrix before implementation, with one
+  final complete-provider exit; do not create a new per-record review campaign.
+- [ ] Implement and connect that provider to the same synthetic host where
+  authorized, replacing known-only assumptions with verified closure. Reuse
+  existing adversarial/reference tests; partial guards are never trusted as full
+  SceneResources. Stop on a specification conflict or required adoption decision.
+- [ ] Name the exact remaining metadata/CAS, wire/recipe and iOS prerequisites
+  before real-file/storage activation; reuse closed Chrome evidence. Actual
+  durable/file services and UI acceptance remain future work, not inferred from
+  the synthetic provider. No new manual hold unless that activation needs it.
+
+Existing image pan/pinch/filters, real file input, actual renderer/native IME/
+device checks and full tags remain explicit gaps, not deleted conveniences.
+The completed branch checkpoint is Git HEAD; last check before commit was
+`g0-baseline`, 0 behind / 34 ahead of local tracking (no fetch), only this slice's
+changes. Official remaining quota 78%; continue automatically, pause below 10%.
+
+### Completed media connection
+
+Completed from `7b57fd2`: Caption media in this same synthetic workflow.
+- [x] Add two exact public synthetic PNG resources with byte/record digests and
+  complete ID-keyed attachment fields. Validate all candidates and references;
+  no materialized conflict winner, inferred relation or immutable byte rewrite.
+- [x] Connect add, retained alt-text drafts/apply/retry, ordered list/reorder and
+  confirmed attachment tombstones; display confirmed images in the existing
+  comparison windows, with image-load failure/retry and simple enlargement.
+- [x] Carry sparse attachments through two-actor exchange and independent Caption
+  copies with fresh attachment IDs and shared immutable media; preserve original
+  text/media/Scene references and exact retry command. Verify relevant mounted
+  controls, candidates/copy/round-trip, independent review and required checks.
+
+Entry meta-audit: previous turn was connected progress (`7b57fd2`), worktree clean,
+official quota 79%. Fixed preloaded PNGs only, not real file input/transport,
+BlobStore, general media admission, HEIC/video/audio, new dependencies or Native
+activation. Reuse existing Caption windows/history/copy and order allocation;
+do not reuse the v1 image-window controller's ProjectStore/file assumptions.
+Full image pan/pinch/filters and actual raster/native-input acceptance stay in
+the later connected UI batch, not deleted requirements. Stop on a specification
+conflict or quota below 10%. After this, advance the finite complete-provider
+and gated durable-file boundary, not new detached probes/manual holds.
+
+Review: root typecheck and 99-file suite PASS (1796 tests, 21 existing TODO),
+43 isolated development cases and scoped TypeScript PASS. Ordinary/harness builds
+PASS with existing size warnings. Parsed source-map graphs have zero candidate
+modules in both builds; the three media modules are absent from ordinary and
+present only in harness. Existing served development entry responds HTTP 200,
+not browser/raster evidence. Exact PNG CRC/decompression and independent SHA
+checks pass; images are generated public shapes, not private representative data.
+Independent review closed simultaneous-lifecycle resolution and unavailable-
+owner draft cancellation defects. Normal writes still refuse conflicts; explicit
+resolution binds exact token/candidates, retains fresh event/choice on failure,
+and shows retained description/order before delete/restore. Caption copies have
+fresh attachment IDs, preserve equal-key source order and share immutable images.
+Two-round/replay preserves original changes/base. Review reported no unresolved
+blocker in this bounded diff; no general provider/adoption/device approval follows.
+No new server/tunnel, real files, dependency, storage/wire, Native/default entry,
+version, Pages/Service Worker configuration or release mutation. Browser control
+and physical-device evidence stay pending in the already documented batched lane.
 
 ### Completed material connection
 
@@ -302,7 +359,7 @@ only in the development lane; broader product completion remains open.
 
 The connected two-person Caption/history, synthetic model/pin and independent
 Caption/exact synthetic-model-copy loops are closed, not all of `TEAM-FLOW-01`.
-General model-copy admission, media, file exchange, durable storage and physical-device acceptance remain pending
+General model-copy admission, real media/file exchange, durable storage and physical-device acceptance remain pending
 unless separately connected and verified. Do not add fake success controls.
 
 **Current next connection:** use the top-of-file plan for remaining visible
