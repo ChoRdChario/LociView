@@ -355,7 +355,12 @@ not all of the continuing-team milestone. Known synthetic model-binding updates
 and explicit surface/coordinate manual pin corrections now join this same loop,
 retaining local work and all Scene references. Membership keep-one and Caption
 independent keep-both now also connect (known empty attachment/tag fixture only).
-Next: model copies need an exact synthetic immutable closure/preflight first.
+Independent model keep-both now also connects for an exact synthetic triangle
+closure: fresh closed IDs, fixture-byte/immutable-digest verification, explicit
+original choice and one causal command. Selected-model translation and a second
+exchange prove the copy does not redirect the original or its Captions. Unknown
+closure variants refuse. Next: remaining same-host visible effects, not another
+detached component. General real-model copy admission remains open.
 No new detached mock page or manual journal rerun.
 
 Progress through workspace interaction, the continuing-team loop, then durable
@@ -378,7 +383,7 @@ to the connected delivery now approved in §13.4.
 
 | Completion boundary | Present evidence / gap | Next exit and responsible lane |
 |---|---|---|
-| Connected development workspace | Two-Scene/two-person history, synthetic model update/manual pin correction and explicit membership keep-one/Caption independent copies under 05 §13.4; actual candidate and mounted tests, not rendered acceptance | Connect exact model-copy closure/preflight and remaining effects/provider; no projection cloning, parallel mock UI or fake merge/save |
+| Connected development workspace | Two-Scene/two-person history, model update/manual pin correction, explicit membership keep-one and independent Caption/exact synthetic-model copies with placement edits under 05 §13.4; actual candidate and mounted tests, not rendered acceptance | Connect remaining visible effects and gated provider; no projection cloning, parallel mock UI or fake merge/save. Browser automation stopped on URL safety; keep the batched evidence lane |
 | Metadata/CAS candidate viability | Original causal bytes/conflicts, small five-purpose closures, CAS/retention proofs and bounded human Chrome journal/recheck PASS | Still-missing domain, scale, cross-tab/process interruption, sink/CSP/security and physical-iOS evidence under 03 §§4/6 before relevant adoption. No repeat of the closed journal batch. Operator for inaccessible browser/physical device; PO for measured limits/adoption |
 | Complete domain provider and S1 durable host | Pure Scene core, individual Scene/Material records and local edit guards exist; full resource/reference/frame/conflict admission and Project session are absent | One complete validated-provider boundary with named subparts, then gated durable repository/journal integration under 05 §13.2; individual shape guards alone cannot supply trusted SceneResources |
 | S2 migration and exchange | Five semantic purposes proven only on small synthetic graph; 06 wire is PROPOSED, new migration/Native-bridge recipe not ratified | Reviewed exact wire/recipe and required PO ratification, production five-purpose services and service-level `TEAM-FLOW-01`; preserve source bytes and local work |

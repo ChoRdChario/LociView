@@ -46,15 +46,20 @@ deletes/replaces the scalar to resolve even the materialized winner. In 3.4.1,
 `getConflicts` exposes immutable-string candidates as JS strings while the map
 property is `ImmutableString`; the adapter handles both without choosing one.
 
-Twenty-one current executable cases cover second-round field/membership preservation,
+Twenty-five current executable cases cover second-round field/membership preservation,
 original bytes/base, both scalar choices, incomplete/foreign/stale rejection,
 draft retention, actor-bound/disposed choice refusal and mounted two-actor
 edit/receive/choose/replay controls, model update with retained local work, explicit
 surface/manual anchor correction, typed binding/anchor conflicts, stale pin
 proposals, invalid metadata rejection, explicit membership keep-one/independent
 Caption keep-both, retry with identical planned IDs, stale refusal and unseen-edge
-re-conflict. Caption copies are restricted to the known attachment/tag-empty
-fixture; descriptor immutability checks are not full incoming-history admission. These
+re-conflict. Four additional cases cover exact synthetic model-copy closed IDs/
+hashes and a second exchange, malformed/partial/rewritten closure refusal,
+placement retry/stale input and content-update placement retention, and mounted
+explicit original/model-copy/translation with pending/IME guards. Caption copies
+are restricted to the known attachment/tag-empty fixture; model copies to a
+fully specified triangle fixture without unhandled parent/derivation/material
+dependencies. Descriptor checks are not full incoming-history admission. These
 are Node plus authored-DOM records, **not rendered/browser/IME/device evidence**.
 Run from repository root:
 
@@ -89,7 +94,20 @@ original's other-Scene reference and model owner remain. Exchange updates again
 and edit the two records independently. This is not a general duplicate button
 or a new manual hold. Reload loses all memory-only work.
 
-Independent model copies, media, renderer,
+The same browser batch can exercise model copies: both actors select Scene
+`設備の確認`, open `モデル` and include `建物` in the Scene, then receive. In
+`更新の競合`, select which observed entry remains the original and use
+`別々のモデルとして残す`. Select `建物（コピー）`, use `モデルの位置を編集`,
+change X and `配置を確定`. Only that model's position should change. Receive as
+the other actor and exchange again; the original Captions remain on the original.
+The active placement editor stays visible across task tabs; cancel ends the draft
+without publishing. This is numeric fixture placement, not a renderer/gizmo test.
+
+Windows Computer Use fallback initialized on 2026-09-09 but stopped automatically
+because the current Chrome URL could not be safely determined. No browser-input
+or rendered PASS follows, and no workaround/repeated repair was attempted.
+
+General model-copy admission, media, renderer,
 real files, persistence and full `TEAM-FLOW-01` remain pending. The fixed small
 cell representation, transfer object and safety limits are disposable test ports,
 not a ratified ProjectDoc, import validator or numeric product guarantee.

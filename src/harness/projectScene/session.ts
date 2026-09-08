@@ -12,7 +12,9 @@ import { modelListPlanIsCurrent, newModelListMemory, planModelList, type ModelLi
   type ModelListMemory, type ModelListPlan, type ModelMembership } from '../../ui/projectScene/modelListState';
 import { createSyntheticProject, fixtureIds, freezeSynthetic, type SyntheticProject } from './fixture';
 import { bindingKey, captionKey, membershipKey, type SyntheticAuthority } from './historyProjection';
-import { decodeSyntheticAnchor, modelVersion, syntheticVersions } from './modelFixture';
+import { decodeSyntheticAnchor, modelVersion, syntheticVersions, versionFromClosure, type SyntheticModelVersion } from './modelFixture';
+import { canonicalFixture, createFixtureModel, fixtureModelIds, moveFixtureModel, type FixtureModelClosure } from './modelClosure';
+import { modelClosureKey } from './modelHistory';
 import { newPinModeMemory, pinModePlanIsCurrent, planPinMode, type PinModeContext,
   type PinModeMemory, type PinModePlan, type PinProposal } from '../../ui/projectScene/pinModeState';
 import { captionIncludePlanIsCurrent, newCaptionIncludeMemory, type CaptionIncludeContext,
@@ -22,6 +24,10 @@ export interface SyntheticPinInput {
   readonly coordinates: readonly [string, string, string]; readonly familyId: string | null;
 }
 export interface ModelUpdatePlan { readonly token: string; readonly sceneId: string; readonly assetId: string; readonly bindingId: string }
+export interface ModelPlacementDraft {
+  readonly token: string; readonly sceneId: string; readonly assetId: string; readonly source: FixtureModelClosure;
+  readonly coordinates: readonly [string, string, string]; readonly composing: boolean; readonly prepared?: FixtureModelClosure;
+}
 
 const fresh = (prefix: string) => `${prefix}_${crypto.randomUUID().replaceAll('-', '')}`;
 const unknown = <T>(): Field<T> => ({ kind: 'unresolved', reason: 'invalid' });
@@ -40,6 +46,7 @@ export class SyntheticSession {
   private pinInput: SyntheticPinInput | null = null;
   private pinProposal: PinProposal | null = null;
   private pinInputComposing = false;
+  private placement: ModelPlacementDraft | null = null;
   private pinFeedback: PinModeContext['feedback'] = { kind: 'idle' };
   private searchComposing = false;
   private detailFeedback: DetailContext['feedback'] = { kind: 'idle' };
@@ -62,10 +69,10 @@ export class SyntheticSession {
   get memory() { return this.navigation.sceneMemory[this.sceneId]!; }
   get pending(): PendingInteraction | null {
     const text = this.textPending;
-    return text === 'composition' ? text : this.pinInput ? 'pinMove' : text;
+    return text === 'composition' ? text : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : text;
   }
   private get textPending(): PendingInteraction | null {
-    if (this.pinInputComposing || this.searchComposing || [...this.includes.values()].some(m => m.composing) || [...this.models.values()].some(m => m.composing) ||
+    if (this.placement?.composing || this.pinInputComposing || this.searchComposing || [...this.includes.values()].some(m => m.composing) || [...this.models.values()].some(m => m.composing) ||
       [...this.drafts.values()].some(d => d.composing !== null)) return 'composition';
     return [...this.drafts.values()].some(hasCaptionDraft) ? 'text' : null;
   }
@@ -157,7 +164,8 @@ export class SyntheticSession {
     if (source.kind === 'ready' && !this.drafts.has(source.caption.id))
       this.drafts.set(source.caption.id, beginCaptionDraft(source)!);
     const draft = source.kind === 'ready' ? this.drafts.get(source.caption.id)! : null;
-    return { source, draft, mutationBlock: this.pinInput ? 'ピンの操作を確定するか、取り消してください。' : null, feedback: this.detailFeedback };
+    return { source, draft, mutationBlock: this.placement ? 'モデルの配置を確定するか、取り消してください。' :
+      this.pinInput ? 'ピンの操作を確定するか、取り消してください。' : null, feedback: this.detailFeedback };
   }
   modelContext(): ModelListContext {
     const { state, resources, modelNames } = this.project;
@@ -173,8 +181,9 @@ export class SyntheticSession {
           lifecycle: asset.lifecycle.kind === 'value' ? value(asset.lifecycle.value.state) : unknown<'active' | 'deleted'>(),
           membership, display: value(edge ? 'unavailable' as const : 'outsideScene' as const),
           displayReason: edge ? 'シーンに含まれています。3D描画は未接続です。' : null };
-      }) }, memory: this.models.get(this.sceneId)!, pending: this.pinInput ? 'pinMove' : null, mutationBlock: null, feedback: this.modelFeedback };
+      }) }, memory: this.models.get(this.sceneId)!, pending: this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : null, mutationBlock: null, feedback: this.modelFeedback };
   }
+  get modelVersions() { return this.project.modelVersions ?? syntheticVersions; }
   modelUpdateContext() {
     const model = this.models.get(this.sceneId)!, asset = model.assetId ? this.project.resources.assets[model.assetId] : undefined;
     const projection = asset?.projection.kind === 'value' ? asset.projection.value : null;
@@ -182,22 +191,62 @@ export class SyntheticSession {
       (e.lifecycle.kind !== 'value' || e.lifecycle.value.state !== 'deleted')).map(e => e.sceneId)).size : 0;
     return { token: this.project.state.token, sceneId: this.sceneId, assetId: asset?.id ?? null,
       name: asset ? this.project.modelNames[asset.id] ?? 'モデル' : '',
-      current: projection ? modelVersion(asset!.id, projection.bindingId) : undefined,
-      choices: syntheticVersions.filter(v => v.assetId === asset?.id && v.projection.bindingId !== projection?.bindingId), sceneCount,
-      issue: this.pinInput ? 'ピンの操作を確定するか、取り消してください。' : this.textPending === 'composition'
+      current: projection ? modelVersion(asset!.id, projection.bindingId, this.modelVersions) : undefined,
+      choices: this.modelVersions.filter(v => v.assetId === asset?.id && v.projection.bindingId !== projection?.bindingId), sceneCount,
+      issue: this.placement ? 'モデルの配置を確定するか、取り消してください。' : this.pinInput ? 'ピンの操作を確定するか、取り消してください。' : this.textPending === 'composition'
         ? '文字の入力を確定してください。' : !asset ? '一覧からモデルを選択してください。' :
           asset.lifecycle.kind !== 'value' || asset.lifecycle.value.state !== 'active' || !projection ? 'モデルの更新状態を確認してください。' : null };
   }
   acceptModelUpdate(plan: ModelUpdatePlan): boolean {
     try {
-      const context = this.modelUpdateContext(), version = modelVersion(plan.assetId, plan.bindingId);
+      const context = this.modelUpdateContext(); let version = modelVersion(plan.assetId, plan.bindingId, this.modelVersions);
       if (context.issue || plan.token !== context.token || plan.sceneId !== context.sceneId || plan.assetId !== context.assetId ||
         !version || !context.choices.includes(version)) throw new Error(context.issue ?? '対象が更新されています。モデルを選び直してください。');
-      const token = fresh('snapshot'), asset = this.project.resources.assets[plan.assetId]!;
-      this.publish(this.authority ? this.authority.write(plan.token, { [bindingKey(plan.assetId)]: plan.bindingId }) : {
-        ...this.project, state: { ...this.project.state, token }, resources: { ...this.project.resources, token,
-          assets: { ...this.project.resources.assets, [asset.id]: { ...asset, projection: value(version.projection) } } } });
+      if (context.current && canonicalFixture(context.current.closure.binding.assetToProject) !== canonicalFixture(version.closure.binding.assetToProject)) {
+        version = versionFromClosure(createFixtureModel({ ...fixtureModelIds(version.closure), binding: fresh('bnd') }, version.closure.shape,
+          context.current.closure.binding.assetToProject, context.current.projection.bindingId));
+      }
+      this.publishModelVersion(plan.token, version);
       this.message = '合成モデルを更新しました。記録と座標は保持しています。'; return true;
+    } catch (error) { return this.refuse(this.errorText(error)); }
+  }
+  private publishModelVersion(baseToken: string, version: SyntheticModelVersion) {
+    const token = fresh('snapshot'), asset = this.project.resources.assets[version.assetId]!;
+    const versions = this.modelVersions.some(v => v.projection.bindingId === version.projection.bindingId) ? this.modelVersions : [...this.modelVersions, version];
+    const changes = { [bindingKey(asset.id)]: version.projection.bindingId,
+      ...(versions === this.modelVersions ? {} : { [modelClosureKey(version.projection.bindingId)]: canonicalFixture(version.closure) }) };
+    this.publish(this.authority ? this.authority.write(baseToken, changes) : { ...this.project, modelVersions: versions,
+      state: { ...this.project.state, token }, resources: { ...this.project.resources, token,
+        assets: { ...this.project.resources.assets, [asset.id]: { ...asset, projection: value(version.projection) } } } });
+  }
+  get modelPlacement() { return this.placement; }
+  beginModelPlacement(): boolean {
+    const ctx = this.modelUpdateContext();
+    if (this.pending || ctx.issue || !ctx.current || !ctx.assetId) return this.refuse(ctx.issue ?? '入力を確定し、モデルを選択してください。');
+    this.placement = freezeSynthetic({ token: ctx.token, sceneId: this.sceneId, assetId: ctx.assetId, source: ctx.current.closure,
+      coordinates: ctx.current.closure.binding.assetToProject.translation.map(String) as [string, string, string], composing: false });
+    this.message = ''; return true;
+  }
+  changeModelPlacement(coordinates: readonly [string, string, string], composing = false): boolean {
+    if (!this.placement) return false;
+    const { prepared: _prepared, ...old } = this.placement;
+    this.placement = freezeSynthetic({ ...old, coordinates: [...coordinates] as [string, string, string], composing }); return true;
+  }
+  finishModelPlacement(cancel = false): boolean {
+    try {
+      const draft = this.placement; if (!draft || draft.composing) throw new Error('入力を確定してください。');
+      if (cancel) { this.placement = null; this.message = ''; return true; }
+      const active = this.project.resources.assets[draft.assetId]?.projection;
+      if (draft.token !== this.project.state.token || draft.sceneId !== this.sceneId || active?.kind !== 'value' || active.value.bindingId !== draft.source.binding.id)
+        throw new Error('モデルが更新されています。指定した位置は保持しています。');
+      if (draft.coordinates.some(raw => !/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(raw.trim()) || !Number.isFinite(Number(raw))))
+        throw new Error('X・Y・Zを有限の数値で指定してください。');
+      const position = draft.coordinates.map(raw => Number(raw) || 0) as [number, number, number];
+      if (position.every((n, i) => n === draft.source.binding.assetToProject.translation[i])) { this.placement = null; this.message = '位置は変更されていません。'; return true; }
+      const prepared = draft.prepared ?? moveFixtureModel(draft.source, fresh('bnd'), position);
+      this.placement = freezeSynthetic({ ...draft, prepared });
+      this.publishModelVersion(draft.token, versionFromClosure(prepared)); this.placement = null;
+      this.message = 'モデルの配置を適用しました。保存と3D描画は未接続です。'; return true;
     } catch (error) { return this.refuse(this.errorText(error)); }
   }
   get pinCoordinates() { return this.pinInput; }
@@ -224,13 +273,13 @@ export class SyntheticSession {
       block: !anchor ? 'ピン位置の競合を確認してください。' : anchor.kind !== 'asset' ? 'この接続版ではモデルに付いたピンだけ移動できます。' : null } : null;
     const correction = this.pinInput ? this.preparePinAnchor() : null;
     return { source: { kind: 'ready', token: state.token, sceneId: this.sceneId, models, selected },
-      memory: this.pins.get(this.sceneId)!, otherPending: this.textPending, mutationBlock: null,
+      memory: this.pins.get(this.sceneId)!, otherPending: this.placement ? 'modelTransform' : this.textPending, mutationBlock: null,
       proposal: this.pinProposal, proposalIssue: correction?.issue ?? null, feedback: this.pinFeedback };
   }
   pinCoordinateContext() {
     const mode = this.pins.get(this.sceneId)!.mode;
     const asset = mode ? this.project.resources.assets[mode.target.assetId] : undefined;
-    const version = asset?.projection.kind === 'value' ? modelVersion(asset.id, asset.projection.value.bindingId) : undefined;
+    const version = asset?.projection.kind === 'value' ? modelVersion(asset.id, asset.projection.value.bindingId, this.modelVersions) : undefined;
     const caption = mode?.caption ? this.project.resources.captions[mode.caption.captionId] : undefined;
     const anchor = caption?.anchor.kind === 'value' && caption.anchor.value.kind === 'asset' ? caption.anchor.value : null;
     const needsFamily = !anchor || !version?.projection.anchorCompatibilityIds.includes(anchor.authoredAnchorCompatibilityId);

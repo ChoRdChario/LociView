@@ -88,3 +88,49 @@ export function createPinCoordinateControls(document: Document, session: Synthet
   }
   return { root, render, dispose() { disposed = true; cleanups.forEach(cleanup => cleanup()); root.remove(); } };
 }
+
+/** Keep the active editor outside the task tabs so confirm/cancel never disappears. */
+export function createModelPlacementControls(document: Document, session: SyntheticSession, changed: () => void) {
+  const actions = document.createElement('section'), modeStrip = document.createElement('section');
+  actions.className = modeStrip.className = 'lv-development-coordinates';
+  modeStrip.setAttribute('aria-label', 'モデル配置・開発用');
+  const begin = document.createElement('button'); begin.type = 'button'; begin.textContent = 'モデルの位置を編集';
+  const state = document.createElement('p'); actions.append(state, begin);
+  const heading = document.createElement('h2'), note = document.createElement('p');
+  note.textContent = '位置はプロジェクト全体で共通です。3D描画は未接続です。'; modeStrip.append(heading, note);
+  const inputs = ['X', 'Y', 'Z'].map(axis => {
+    const label = document.createElement('label'); label.textContent = axis;
+    const input = document.createElement('input'); input.type = 'text'; input.inputMode = 'decimal'; input.setAttribute('aria-label', axis);
+    label.append(input); modeStrip.append(label); return input;
+  });
+  const apply = document.createElement('button'), cancel = document.createElement('button');
+  apply.type = cancel.type = 'button'; apply.textContent = '配置を確定'; cancel.textContent = '配置を取り消す'; modeStrip.append(apply, cancel);
+  let disposed = false, composing: HTMLInputElement | null = null;
+  const cleanups: (() => void)[] = [];
+  const listen = (node: HTMLElement, type: string, action: () => void) => {
+    node.addEventListener(type, action); cleanups.push(() => node.removeEventListener(type, action));
+  };
+  const update = () => {
+    if (disposed || !session.modelPlacement) return;
+    session.changeModelPlacement([inputs[0]!.value, inputs[1]!.value, inputs[2]!.value], composing !== null); changed();
+  };
+  for (const input of inputs) {
+    listen(input, 'input', update);
+    listen(input, 'compositionstart', () => { composing = input; update(); });
+    listen(input, 'compositionend', () => { composing = null; update(); });
+  }
+  listen(begin, 'click', () => { if (!disposed && !begin.disabled) { session.beginModelPlacement(); changed(); } });
+  listen(apply, 'click', () => { if (!disposed && !apply.disabled) { session.finishModelPlacement(); changed(); } });
+  listen(cancel, 'click', () => { if (!disposed && !cancel.disabled) { session.finishModelPlacement(true); changed(); } });
+  function render() {
+    if (disposed) return;
+    const context = session.modelUpdateContext(), draft = session.modelPlacement;
+    state.textContent = context.current ? `位置 ${context.current.closure.binding.assetToProject.translation.join(' / ')}` : '';
+    begin.disabled = Boolean(session.pending || context.issue || !context.current); modeStrip.hidden = !draft;
+    if (!draft) return;
+    heading.textContent = `${session.snapshot.modelNames[draft.assetId] ?? 'モデル'}の位置`;
+    inputs.forEach((input, i) => { if (input !== composing && input.value !== draft.coordinates[i]) input.value = draft.coordinates[i]!; });
+    apply.disabled = cancel.disabled = draft.composing;
+  }
+  return { actions, modeStrip, render, dispose() { disposed = true; cleanups.forEach(cleanup => cleanup()); actions.remove(); modeStrip.remove(); } };
+}

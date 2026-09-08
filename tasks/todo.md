@@ -5,10 +5,65 @@
 PO approved building the whole workflow thinly before subsystem polish. Authority:
 specification 05 §13.4; final completion remains `TEAM-FLOW-01` in §12.6.
 The completed journal Chrome recheck below stays closed; no new manual test is
-requested. Synthetic two-person model/pin/history and independent Caption-copy loops now exist; browser,
+requested. Synthetic two-person model/pin/history and independent Caption/model-copy loops now exist; browser,
 IME and device acceptance remain pending, not implied by its DOM tests.
 
-### Current plan / next implementation
+### Current checkpoint / next implementation
+
+Next: continue the same host toward the remaining visible workflow (3D, viewing
+and material effects, retained comparison windows/media), reusing the existing
+ports/components. Specify the next exact synthetic effect before connecting it;
+do not make more detached probe pages or bypass durable-provider/wire gates.
+Actual browser verification stays pending: the Windows Computer Use fallback
+initialized, then automatically stopped because it could not safely determine
+the current Chrome URL. No browser input/test PASS, no bypass or repeated repair.
+The existing batched browser lane remains, without a new per-slice manual hold.
+
+### Completed model-independent-copy slice
+
+- [x] **Completed from `8c414fa`:** supply each known synthetic triangle model with
+  an exact active closure: Asset/Representation frame evidence, mesh source/display
+  record, singleton family/class, one explicit source material slot, revision and
+  binding with numeric transforms. Hash the known bytes and canonical immutable
+  metadata using the accepted record-kind prefixes. This is a fixture format,
+  not a ratified FormatProfile, full provider or real BlobStore admission.
+- [x] Connect model membership keep-both in the same host. Require explicit
+  original-edge choice and one fresh map for Asset, frames, binding, revision,
+  Representation, family, compatibility, material layout/slot and membership.
+  Copy only the supported active closure; refuse unhandled parent/derivation/
+  compatibility-map or effective-material dependencies instead of discarding them. Preserve
+  numeric transforms/bounds, source semantics and verified fixture payload refs.
+  Proxy/patch/exclusion and effective material overrides are absent, not discarded.
+  Reject unsupported/nonempty closure variants. Keep existing Captions and other
+  Scene references on the original; publish one sparse causal command, never
+  shared mutable IDs, partial copy or an automatic winner.
+- [x] Connect selected-model-only numeric translation to a newly hashed binding,
+  preserving rotation/scale and revision, to prove copy edits are independent.
+  This is not a prohibition on moving an original fixture model. The selected
+  Asset's placement remains shared by every Scene that references that Asset.
+  Test original bytes/base, second exchange, invalid/fresh-map/immutable/partial
+  refusal, snapshot-bound pending input and retry/replay. Then verify the UI lane
+  that is actually available; no repeated browser-repair or old journal batch.
+- [x] One read-only review, final root/isolated checks, build graph isolation and
+  synchronized current docs. Recheck account usage at the checkpoint; pause and
+  ask if any available quota window has less than 10% remaining.
+
+Review/evidence: 25 actual-candidate connected tests PASS; root typecheck and
+isolated scoped TypeScript check PASS; full root 94 files / 1,777 PASS with 21
+existing todo; ordinary and harness builds PASS with existing chunk warnings.
+Both parsed source-map graphs have zero candidate modules. One independent
+read-only review found no blocker in the exact closure, commands or mounted UI.
+The four added cases cover complete-copy hashes/IDs and a second exchange,
+invalid/partial/rewritten closure refusal, placement retry/stale input and
+content-update placement preservation, plus mounted explicit-choice/IME guards.
+Authored DOM is not native IME or browser evidence. No manual tests requested.
+
+Meta-audit: preceding connected progress (`6c61182`, `8c414fa`) followed by the
+same-host independent-model loop; no detached-subsystem expansion. Tree was
+clean at entry. Latest available weekly quota is 85% remaining; no second window
+was available. No reset used. This closes exact synthetic model-copy interaction,
+not full domain/storage/wire/renderer adoption or UI/device acceptance. Ordinary
+app entries, dependencies, packages, main and deployment are unchanged.
 
 - [x] **Completed from `6c61182`:** connect the existing Caption inclusion picker to
   the same two-actor host. Concurrent additions create real duplicate membership
@@ -79,22 +134,17 @@ only in the development lane; broader product completion remains open.
 - [x] Final exact-tree root checks, isolated adapter tests/typecheck, both build
   graph isolation checks and one read-only review. No browser-control repair.
 
-The connected two-person Caption/history, synthetic model/pin and Caption-copy loops are closed,
-not all of `TEAM-FLOW-01`. Independent model copies, media,
-file exchange, durable storage and physical-device acceptance remain pending
+The connected two-person Caption/history, synthetic model/pin and independent
+Caption/exact synthetic-model-copy loops are closed, not all of `TEAM-FLOW-01`.
+General model-copy admission, media, file exchange, durable storage and physical-device acceptance remain pending
 unless separately connected and verified. Do not add fake success controls.
 
-**Next connected slice:** model keep-both with an exact synthetic immutable
-closure/preflight, not copied projection IDs. Before implementation specify a
-minimal known model closure (numeric Frame/placement, binding/revision/
-Representation/family/compatibility and metadata digests; explicitly empty absent
-proxy/material relations). Confirm the original, remap fresh nominal IDs, preserve
-payload references and existing Captions, and publish the complete copy in one
-causal command in this same host. This missing implementation does not require a
-new PO policy or reopening storage probes. Real blob verification/provider and
-gated storage/exchange activation remain separate; no shortcut through UI cloning.
-Do not substitute another journal/browser-repair task or claim actual 3D/file
-exchange. No fresh PO/manual check is required to continue within §13.4.
+**Current next connection:** use the top-of-file plan for remaining visible
+effects in the same host. Exact synthetic model keep-both/placement above is now
+implemented, including one explicit source material slot rather than an omitted
+material catalog. Real blob/provider and gated storage/exchange activation remain
+separate. Do not substitute another journal/browser-repair task or claim actual
+3D/file exchange. No fresh PO/manual check is required to continue within §13.4.
 
 ### Membership / independent Caption-copy result — 2026-09-09
 

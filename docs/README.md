@@ -70,8 +70,11 @@ two independent memory histories and explicit scalar choices/replay. This is not
 product file exchange. Known synthetic model-binding updates and manual pin
 correction now participate in the same two-round loop, preserving local work and
 Scene references. Explicit membership keep-one and independent Caption copies now
-connect in the known empty attachment/tag fixture. Model copies, migration and
-the full provider remain unimplemented; current todo owns exact scope and checks.
+connect in the known empty attachment/tag fixture. Exact synthetic model copies
+also connect, with fresh closed IDs, fixture-byte/immutable-digest checks and
+independent placement edits through a second exchange. General model-copy
+admission, migration and the full provider remain unimplemented; current todo
+owns exact scope/checks and the still-pending rendered UI lane.
 
 - Legacy-v1 ZIP/package code is not bounded-memory streaming despite older architecture text. The bounded Native portable and exchange packages use their separate streamed path.
 - Current XLSX reading is the local minimal reader in `src/io/xlsx.ts`, not SheetJS.

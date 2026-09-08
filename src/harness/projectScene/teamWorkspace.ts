@@ -6,6 +6,7 @@ import { decodeSyntheticAnchor, modelVersion, syntheticVersions } from './modelF
 import { sceneSwitchReason } from '../../ui/projectScene/navigationState';
 import { applyMembershipResolution, duplicateMemberships, planMembershipResolution, type MembershipResolutionPlan } from './membershipResolution';
 import type { Membership } from '../../scene/types';
+import { allocateModelCopyIds, fixtureModelIds } from './modelClosure';
 
 /** Two independently edited histories in one disposable page, not a file-sharing UI. */
 export function createTeamWorkspace(document: Document, factory: DevelopmentHistoryFactory) {
@@ -86,14 +87,14 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
       const otherScenes = [...new Set(Object.values(table).filter(edge => edge.resourceId === duplicate.resourceId &&
         edge.sceneId !== duplicate.sceneId && (edge.lifecycle.kind !== 'value' || edge.lifecycle.value.state !== 'deleted')).map(edge => edge.sceneId))];
       const explanation = make('p', `元として残す項目を選択してください。他のシーン ${otherScenes.length}件の参照は変更しません。`);
-      const preview = make('p'), one = make('button', '選んだ項目だけ残す'), both = make('button', '別々のキャプションとして残す');
+      const preview = make('p'), one = make('button', '選んだ項目だけ残す'), both = make('button', duplicate.kind === 'caption'
+        ? '別々のキャプションとして残す' : '別々のモデルとして残す');
       one.type = both.type = 'button';
       const syncChoice = () => {
         one.disabled = both.disabled = !choice.selected || session.pending !== null || duplicate.edges.some(edge => edge.lifecycle.kind !== 'value');
         const ordinal = duplicate.edges.findIndex(edge => edge.id === choice.selected) + 1;
-        preview.textContent = !ordinal ? '' : duplicate.kind === 'caption'
-          ? `項目 ${ordinal}を元として残します。「別々に残す」場合、ほかの${duplicate.edges.length - 1}件はこのシーンだけの独立コピーになります。`
-          : `項目 ${ordinal}を残し、ほかの${duplicate.edges.length - 1}件をこのシーンから除外します。`;
+        preview.textContent = !ordinal ? '' : `項目 ${ordinal}を元として残します。「別々に残す」場合、ほかの${duplicate.edges.length - 1}件はこのシーンだけの独立コピーになります。` +
+          (duplicate.kind === 'asset' ? '元モデルのキャプションはコピーしません。' : '');
       };
       fieldset.append(legend, explanation);
       duplicate.edges.forEach((edge, i) => {
@@ -109,18 +110,22 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
           throw new Error('入力と操作対象を確認してください。選択は保持しています。');
         if (!choice.plan || choice.plan.action !== action) {
           const fresh = (prefix: string) => `${prefix}_${crypto.randomUUID().replaceAll('-', '')}`;
-          choice.plan = planMembershipResolution(snapshot, duplicate, choice.selected, action, fresh('evt'), action === 'one' ? [] :
+          const currentAsset = session.snapshot.resources.assets[duplicate.resourceId], projection = currentAsset?.projection;
+          const source = projection?.kind === 'value' ? session.snapshot.modelVersions?.find(v => v.projection.bindingId === projection.value.bindingId)?.closure : undefined;
+          if (action === 'both' && duplicate.kind === 'asset' && !source) throw new Error('モデルの更新候補を先に確認してください。');
+          choice.plan = planMembershipResolution(snapshot, duplicate, choice.selected, action, fresh('evt'), action === 'one' || duplicate.kind !== 'caption' ? [] :
             duplicate.edges.filter(edge => edge.id !== choice.selected).map(edge => ({ edgeId: edge.id,
-              captionId: fresh('cap'), membershipId: fresh('scm') })));
+              captionId: fresh('cap'), membershipId: fresh('scm') })), action === 'one' || duplicate.kind !== 'asset' ? [] :
+            duplicate.edges.filter(edge => edge.id !== choice.selected).map(edge => ({ edgeId: edge.id,
+              membershipId: fresh('sam'), ids: allocateModelCopyIds(fixtureModelIds(source!), fresh) })));
         }
         applyMembershipResolution(history, choice.plan);
         session.refreshHistory(); status.textContent = action === 'one' ? '選んだ項目を残しました。' :
-          '別々に編集できるキャプションとして残しました。相手側でも更新を受け取ってください。';
+          '別々に編集できる項目として残しました。相手側でも更新を受け取ってください。';
       });
       one.addEventListener('click', () => resolve('one')); both.addEventListener('click', () => resolve('both'));
       fieldset.append(preview, one);
-      if (duplicate.kind === 'caption') fieldset.append(both);
-      else fieldset.append(make('p', 'モデルの独立コピーは未接続です。候補は保持しています。'));
+      fieldset.append(both);
       if (session.pending !== null) fieldset.append(make('p', '未適用の入力を保持しています。適用するか取り消してから選択してください。'));
       if (duplicate.edges.some(edge => edge.lifecycle.kind !== 'value')) fieldset.append(make('p', '所属の競合を先に確認してください。'));
       syncChoice(); elements.push(fieldset);
@@ -148,7 +153,10 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
           const name = session.snapshot.modelNames[edge.resourceId] ?? (caption?.title.kind === 'value' ? caption.title.value : 'キャプション');
           description = `${name} — ${edge.lifecycle.kind === 'value' && edge.lifecycle.value.state === 'active' ? 'このシーンに含める' : 'このシーンから除外'}`;
         }
-        if (key.startsWith('asset/')) description = modelVersion(id!, candidate.value)?.label ?? 'モデル候補を確認';
+        if (key.startsWith('asset/')) {
+          const version = modelVersion(id!, candidate.value, session.snapshot.modelVersions);
+          description = version ? `${version.label} — 位置 ${version.closure.binding.assetToProject.translation.join(' / ')}` : 'モデル候補を確認';
+        }
         if (field === 'anchor') {
           const anchor = decodeSyntheticAnchor(candidate.value, session.snapshot.captionTemplates[id!]!);
           if (anchor.kind === 'asset') {

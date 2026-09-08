@@ -14,9 +14,15 @@
 > binding updates and explicit manual pin corrections now connect to the same
 > two-round loop, retaining drafts and Scene references. Explicit membership
 > keep-one and independent Caption keep-both are also connected (known empty
-> attachment/tag fixture only). Next: exact synthetic model-copy closure and
-> preflight, not projection cloning. Model copies and 3D/file/storage effects
-> remain unconnected; do not claim integrated v2 or rendered acceptance.
+> attachment/tag fixture only). Exact synthetic model keep-both now also connects:
+> fresh model/frame/representation/material IDs, verified tiny fixture bytes and
+> immutable digests; selected-model translation creates a new binding and passes
+> a second exchange without changing the original. Unsupported closure variants
+> refuse, not silently omit. 3D/file/storage effects remain unconnected; do not
+> claim full model-copy admission, integrated v2 or rendered acceptance. Next:
+> remaining visible effects in the same host, with current todo's exact boundary.
+> Windows Computer Use initialized but stopped automatically on unsafe-to-resolve
+> Chrome URL; no browser input/PASS or bypass. Keep the existing batched UI lane.
 > No repeated journal check or scheduling approval is needed. Real-data/current
 > app activation, technology adoption, wire/migration and release gates remain.
 > Accepted UI/UX and visual principles remain in `docs/ui-product-guidelines.md`.

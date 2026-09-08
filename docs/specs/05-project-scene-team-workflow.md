@@ -1166,7 +1166,19 @@ Caption keep-both now connect as one causal command, with retained fresh-ID maps
 and no redirection of original/other-Scene references. This fixture has no
 attachment/tag records; copying them is not verified. Already-known synthetic
 copy descriptors/endpoints cannot be replaced, but this is not general immutable
-history admission. Model keep-both still needs an exact synthetic copy closure.
+history admission. Model keep-both now connects for an exact triangle fixture:
+explicit original-edge choice, complete fresh Asset/frame/binding/revision/
+Representation/family/compatibility/material-layout/slot IDs and a fresh membership
+and event, with the same ProjectFrame. Known bytes and canonical immutable digests
+are verified, numeric transforms/bounds/source material semantics are preserved.
+Only the exact active fixture closure is supported; nonempty parent/derivation/
+compatibility-map or effective-material dependencies refuse instead of being
+dropped. The fixed fixture profile is not ratified real-format support. A selected
+Asset's numeric translation creates a new immutable binding, preserving its
+rotation/scale and revision. Copies can be moved independently and exchanged
+again without reowning original Captions or changing other-Scene references.
+Original fixtures may also be moved; each Asset's placement is still Project-wide.
+Retry retains the prepared binding; stale apply retains input and offers cancel.
 No Repo/storage, complete provider, production save/exchange, rendered/device
 acceptance or S1–S3 credit is implied.
 Current todo owns exact executable evidence and remaining connections.

@@ -1,4 +1,5 @@
 import { value, type Field, type Lifecycle, type Membership, type Scene, type SceneResources, type SceneState } from '../../scene/types';
+import type { SyntheticModelVersion } from './modelFixture';
 
 // Fixed synthetic identities, NOT a source-file importer or a persistent Project schema.
 const id = (prefix: string, n: number) => `${prefix}_${n.toString(16).padStart(32, '0')}`;
@@ -12,6 +13,7 @@ export interface SyntheticProject {
   readonly colors: Readonly<Record<string, Field<string>>>;
   /** Known fixture owner/frame template; copied resources still have independent editable cells. */
   readonly captionTemplates: Readonly<Record<string, string>>;
+  readonly modelVersions?: readonly SyntheticModelVersion[];
 }
 export function freezeSynthetic<T>(item: T): T {
   if (item && typeof item === 'object' && !Object.isFrozen(item)) {
@@ -37,11 +39,11 @@ export function createSyntheticProject(): SyntheticProject {
       [id('scm', 3)]: edge(id('scm', 3), f.overview, f.second, 'B') } };
   const asset = (key: string, n: number) => ({ id: key, lifecycle: life,
     projection: value({ assetFrameId: id('frm', n), bindingId: id('bnd', n), revisionId: id('rev', n),
-      representationIds: [id('rep', n)], anchorCompatibilityIds: [`synthetic-surface-${n}`] }) });
+      representationIds: [id('rep', n)], anchorCompatibilityIds: [id('cmp', n)] }) });
   const caption = (key: string, owner: string, n: number, title: string, body: string) => ({ id: key,
     lifecycle: life, title: value(title), body: value(body), anchor: value({ kind: 'asset' as const,
       assetId: owner, assetFrameId: id('frm', n), positionAsset: [0, 0, 0] as const,
-      authoredAnchorCompatibilityId: `synthetic-surface-${n}`, authoredAssetRevisionId: id('rev', n) }) });
+      authoredAnchorCompatibilityId: id('cmp', n), authoredAssetRevisionId: id('rev', n) }) });
   return freezeSynthetic({ state, resources: { token: state.token, projectFrameId: id('frm', 3),
     assets: { [f.structure]: asset(f.structure, 1), [f.equipment]: asset(f.equipment, 2) },
     captions: { [f.shared]: caption(f.shared, f.equipment, 2, '設備の確認箇所', 'この記録は2つのシーンで共有しています。'),

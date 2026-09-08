@@ -5,7 +5,7 @@ import { createModelListControls } from '../../ui/projectScene/modelListControls
 import { captionColorKey } from '../../ui/projectScene/captionListState';
 import { SyntheticSession } from './session';
 import { createPinModeControls } from '../../ui/projectScene/pinModeControls';
-import { createModelUpdateControls, createPinCoordinateControls } from './developmentControls';
+import { createModelUpdateControls, createPinCoordinateControls, createModelPlacementControls } from './developmentControls';
 import { modelVersion } from './modelFixture';
 import { createCaptionIncludeControls } from '../../ui/projectScene/captionIncludeControls';
 
@@ -55,13 +55,14 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     if (accepted && plan.kind === 'change' && plan.action === 'select') modelList.revealSelected();
   });
   const modelUpdate = createModelUpdateControls(document, session, afterAction);
+  const placement = createModelPlacementControls(document, session, afterAction);
   const pin = createPinModeControls(document, plan => { session.acceptPin(plan); afterAction(); });
   const coordinates = createPinCoordinateControls(document, session, afterAction);
   const include = createCaptionIncludeControls(document, plan => { session.acceptInclude(plan); afterAction(); });
   header.append(brand, name, navigation.sceneControl, navigation.saveStatus);
   editor.append(editorHeading, detail.root, pin.actions, coordinates.root, pin.modeStrip, mediaNote);
-  stage.append(composition, editor);
-  sidebar.append(navigation.taskControl, list.root, include.root, modelList.root, modelUpdate.root, materialPanel, viewPanel);
+  stage.append(composition, placement.modeStrip, editor);
+  sidebar.append(navigation.taskControl, list.root, include.root, modelList.root, placement.actions, modelUpdate.root, materialPanel, viewPanel);
   content.append(stage, sidebar); root.append(header, notice, message, content, footer);
   function render() {
     if (disposed) return;
@@ -72,7 +73,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
       windowBlock: '複数ウィンドウ・ピンへの接続は未接続です。' });
     const listOkay = list.render(captionContext);
     const modelsOkay = modelList.render(session.modelContext());
-    const pinsOkay = pin.render(session.pinContext()), includeOkay = include.render(session.includeContext()); coordinates.render(); modelUpdate.render();
+    const pinsOkay = pin.render(session.pinContext()), includeOkay = include.render(session.includeContext()); coordinates.render(); modelUpdate.render(); placement.render();
     if (!detailOkay || !listOkay || !modelsOkay || !pinsOkay || !includeOkay) {
       message.textContent = '入力中の状態を保持しています。操作を完了してから切り替えてください。';
       message.hidden = false; return;
@@ -82,14 +83,18 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     list.root.hidden = task !== 'captions'; modelList.root.hidden = task !== 'models';
     include.root.hidden = task !== 'captions';
     modelUpdate.root.hidden = task !== 'models';
+    placement.actions.hidden = task !== 'models';
     materialPanel.hidden = task !== 'materials'; viewPanel.hidden = task !== 'views';
     // A second visible-list pass restores the desired inner scroll after a tab was hidden.
     if (task === 'captions') list.render(captionContext);
     if (task === 'models') modelList.render(session.modelContext());
     const current = session.composition;
     sceneName.textContent = current.name.kind === 'value' ? current.name.value : 'シーン名を確認';
-    const names = current.assets.map(asset => make('li', `${session.snapshot.modelNames[asset.assetId] ?? 'モデル名を確認'} — ${
-      modelVersion(asset.assetId, asset.projection.bindingId)?.label ?? '状態を確認'}`));
+    const names = current.assets.map(asset => {
+      const version = modelVersion(asset.assetId, asset.projection.bindingId, session.modelVersions);
+      return make('li', `${session.snapshot.modelNames[asset.assetId] ?? 'モデル名を確認'} — ${version?.label ?? '状態を確認'}${
+        version ? ` ・ 位置 ${version.closure.binding.assetToProject.translation.join(' / ')}` : ''}`);
+    });
     models.replaceChildren(...(names.length ? names : [make('li', 'このシーンにモデルはありません。')]));
     models.setAttribute('aria-label', 'シーンに含まれるモデル');
     const captions = captionContext.source.kind === 'ready' ? captionContext.source.captions : [];
@@ -101,6 +106,6 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   render();
   return { root, session, render, dispose() {
     disposed = true; navigation.dispose(); list.dispose(); detail.dispose(); modelList.dispose();
-    pin.dispose(); coordinates.dispose(); modelUpdate.dispose(); include.dispose(); root.remove();
+    pin.dispose(); coordinates.dispose(); modelUpdate.dispose(); placement.dispose(); include.dispose(); root.remove();
   } };
 }

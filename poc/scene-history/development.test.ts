@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
 import * as A from '@automerge/automerge';
 import { createDevelopmentPair } from './development';
 import { historyAuthority, historySeed, projectHistory, captionKey, membershipKey, bindingKey } from '../../src/harness/projectScene/historyProjection';
 import { syntheticVersions } from '../../src/harness/projectScene/modelFixture';
+import { allocateModelCopyIds, canonicalFixture, fixtureModelIds, fixtureModelBytes, readFixtureModel, remapFixtureModel } from '../../src/harness/projectScene/modelClosure';
+import { modelClosureKey, projectModelHistory } from '../../src/harness/projectScene/modelHistory';
 import { SyntheticSession } from '../../src/harness/projectScene/session';
 import { fixtureIds as f } from '../../src/harness/projectScene/fixture';
 import { createTeamWorkspace } from '../../src/harness/projectScene/teamWorkspace';
@@ -63,8 +66,128 @@ function resolution(history: DevelopmentHistory, group: DuplicateMembership, ori
   return planMembershipResolution(history.read(), group, originalEdgeId, action, freshId('evt'), action === 'one' ? [] :
     group.edges.filter(edge => edge.id !== originalEdgeId).map(edge => ({ edgeId: edge.id, captionId: freshId('cap'), membershipId: freshId('scm') })));
 }
+function modelResolution(history: DevelopmentHistory, group: DuplicateMembership) {
+  const source = projectModelHistory(history.read()).versions.find(v => v.assetId === group.resourceId)!;
+  return planMembershipResolution(history.read(), group, group.edges[0]!.id, 'both', freshId('evt'), [],
+    group.edges.slice(1).map(edge => ({ edgeId: edge.id, membershipId: freshId('sam'), ids: allocateModelCopyIds(fixtureModelIds(source.closure), freshId) })));
+}
+function modelConflict() {
+  const [a, b] = pair(), sa = new SyntheticSession(historyAuthority(a)), sb = new SyntheticSession(historyAuthority(b));
+  enterDetail(sa); enterDetail(sb); expect(toggle(sa, f.structure, true)).toBe(true); expect(toggle(sb, f.structure, true)).toBe(true);
+  a.receive(b.exportUpdate()); sa.refreshHistory();
+  return { a, b, sa, sb, group: duplicateMemberships(a.read())[0]! };
+}
 
 describe('actual pinned candidate connected to synthetic workspace; not browser, wire or durable acceptance', () => {
+  it('copies the exact model closure once, moves only the copy and converges through a second exchange', () => {
+    const { a, b, sa, sb, group } = modelConflict(), before = projectHistory(a.read()), base = a.exportUpdate().base;
+    const source = sa.modelVersions.find(v => v.assetId === f.structure)!.closure, plan = modelResolution(a, group), copy = plan.modelCopies[0]!;
+    const oldBytes = bytes(a.exportUpdate());
+    expect(() => applyMembershipResolution({ ...a, write: () => { throw new Error('injected refusal'); } }, plan)).toThrow('injected');
+    expect(bytes(a.exportUpdate())).toEqual(oldBytes); applyMembershipResolution(a, plan);
+    expect(a.exportUpdate().changes).toHaveLength(oldBytes.length + 1);
+    const result = projectHistory(a.read()), closure = result.modelVersions!.find(v => v.assetId === copy.ids.asset)!.closure;
+    expect(result.resources.assets[copy.ids.asset]!.lifecycle).toEqual({ kind: 'value', value: { state: 'active', eventId: plan.eventId, reason: 'conflictResolution' } });
+    expect(Object.values(copy.ids).some(id => Object.values(fixtureModelIds(source)).includes(id))).toBe(false);
+    expect(closure.binding.assetToProject).toEqual(source.binding.assetToProject);
+    expect(closure.representation.representationToAsset).toEqual(source.representation.representationToAsset);
+    expect(closure.representation.logicalBoundsAsset).toEqual(source.representation.logicalBoundsAsset);
+    expect(closure.representation.materialCatalog.slots[0]!.sourceSemantics).toEqual(source.representation.materialCatalog.slots[0]!.sourceSemantics);
+    expect(closure.representation.blob).toEqual(source.representation.blob);
+    expect(closure.representation.blob.digest).toBe(createHash('sha256').update(fixtureModelBytes(closure.shape)).digest('hex'));
+    for (const [kind, record] of [['representation', closure.representation], ['asset-revision', closure.revision], ['asset-binding-revision', closure.binding]] as const) {
+      const { payloadDigest, ...payload } = record;
+      expect(payloadDigest).toBe(createHash('sha256').update(`lociview:v2:immutable:${kind}:jcs-v1\n${canonicalFixture(payload)}`).digest('hex'));
+    }
+    expect(result.resources.captions).toEqual(before.resources.captions);
+    expect(result.state.captionMemberships).toEqual(before.state.captionMemberships);
+    expect(Object.values(result.state.assetMemberships).filter(e => e.resourceId === copy.ids.asset).map(e => e.sceneId)).toEqual([f.detail]);
+    for (const edge of Object.values(before.state.assetMemberships).filter(e => e.sceneId !== f.detail)) expect(result.state.assetMemberships[edge.id]).toEqual(edge);
+    b.receive(a.exportUpdate()); sa.refreshHistory(); sb.refreshHistory();
+    expect(sb.acceptModel(planModelList(sb.modelContext(), { kind: 'select', assetId: copy.ids.asset }))).toBe(true);
+    expect(sb.beginModelPlacement()).toBe(true); sb.changeModelPlacement(['9', '8', '7']); expect(sb.finishModelPlacement()).toBe(true);
+    const moved = sb.modelUpdateContext().current!.closure;
+    expect(moved.binding.parentBindingId).toBe(closure.binding.id); expect(moved.binding.assetToProject.translation).toEqual([9, 8, 7]);
+    expect(moved.binding.assetToProject.rotationXYZW).toEqual(closure.binding.assetToProject.rotationXYZW);
+    expect(moved.binding.assetToProject.uniformScale).toBe(closure.binding.assetToProject.uniformScale);
+    expect(moved.revision).toEqual(closure.revision); expect(moved.representation).toEqual(closure.representation);
+    expect(sb.snapshot.resources.assets[f.structure]).toEqual(before.resources.assets[f.structure]);
+    select(sa); draft(sa, 'body', '別の参加者の追記'); apply(sa);
+    const ua = a.exportUpdate(), ub = b.exportUpdate(); a.receive(ub); b.receive(ua);
+    expect(a.read()).toEqual(b.read()); expect(a.exportUpdate().base).toEqual(base);
+    const n = a.exportUpdate().changes.length; expect(a.receive(ub).added).toBe(0); expect(a.exportUpdate().changes).toHaveLength(n);
+    for (const original of [...oldBytes, ...bytes(ub)]) expect(bytes(a.exportUpdate())).toContain(original);
+    expect(() => applyMembershipResolution(a, plan)).toThrow('更新');
+    expect(Object.keys(projectHistory(a.read()).resources.assets)).toHaveLength(3);
+  });
+
+  it('refuses incomplete, colliding, rewritten and unsupported model closures before publication', () => {
+    const { a, group } = modelConflict(), plan = modelResolution(a, group), copy = plan.modelCopies[0]!, before = a.read();
+    const planCopy = (ids: typeof copy.ids) => planMembershipResolution(before, group, plan.originalEdgeId, 'both', plan.eventId, [], [{ ...copy, ids }]);
+    expect(() => planCopy({ ...copy.ids, assetFrame: fixtureModelIds(syntheticVersions[0]!.closure).assetFrame })).toThrow();
+    expect(() => planCopy({ ...copy.ids, representationFrame: copy.ids.assetFrame })).toThrow();
+    const partial = { ...plan.changes }; delete partial[modelClosureKey(copy.ids.binding)];
+    expect(() => a.write(before.token, partial)).toThrow(); expect(a.read()).toEqual(before);
+    const closureText = plan.changes[modelClosureKey(copy.ids.binding)]!, clean = readFixtureModel(closureText);
+    for (const mutate of [
+      (c: any) => { c.representation.blob.digest = '0'.repeat(64); },
+      (c: any) => { c.binding.payloadDigest = '0'.repeat(64); },
+      (c: any) => { c.representation.assetId = f.equipment; },
+      (c: any) => { c.representation.derivedFrom = [syntheticVersions[0]!.projection.revisionId]; },
+      (c: any) => { c.revision.materialCompatibilityMaps = []; },
+      (c: any) => { c.binding.assetToProject.uniformScale = 0; },
+    ]) {
+      const broken = JSON.parse(closureText); mutate(broken);
+      expect(() => a.write(before.token, { ...plan.changes, [modelClosureKey(copy.ids.binding)]: canonicalFixture(broken) })).toThrow();
+      expect(a.read()).toEqual(before);
+    }
+    applyMembershipResolution(a, plan);
+    expect(() => a.write(a.read().token, { [modelClosureKey(copy.ids.binding)]: canonicalFixture({ ...clean, shape: 'updated' }) })).toThrow();
+    const s = new SyntheticSession(historyAuthority(a)); s.acceptModel(planModelList(s.modelContext(), { kind: 'select', assetId: copy.ids.asset }));
+    expect(s.beginModelPlacement()).toBe(true); s.changeModelPlacement(['1', '2', '3']); expect(s.finishModelPlacement()).toBe(true);
+    expect(() => remapFixtureModel(s.modelUpdateContext().current!.closure, allocateModelCopyIds(copy.ids, freshId))).toThrow('未接続');
+  });
+
+  it('retains a placement draft and exact binding on retry, refuses stale apply, and preserves placement during content update', () => {
+    const [a] = pair(), writes: Readonly<Record<string, string>>[] = []; let fail = true;
+    const wrapped: DevelopmentHistory = { ...a, write(token, changes) {
+      writes.push(changes); if (fail) { fail = false; throw new Error('injected'); } return a.write(token, changes);
+    } };
+    const s = new SyntheticSession(historyAuthority(wrapped)); s.acceptModel(planModelList(s.modelContext(), { kind: 'select', assetId: f.equipment }));
+    expect(s.beginModelPlacement()).toBe(true); s.changeModelPlacement(['6', '5', '4']);
+    expect(s.finishModelPlacement()).toBe(false); const prepared = s.modelPlacement!.prepared; expect(prepared).toBeDefined();
+    expect(s.finishModelPlacement()).toBe(true); expect(writes[1]).toEqual(writes[0]);
+    expect(updateModel(s)).toBe(true); expect(s.modelUpdateContext().current!.closure.binding.assetToProject.translation).toEqual([6, 5, 4]);
+    expect(s.modelUpdateContext().current!.closure.revision.id).toBe(versions[1]!.closure.revision.id);
+    expect(s.beginModelPlacement()).toBe(true); s.changeModelPlacement(['1', '2', '3']);
+    a.write(a.read().token, { [captionKey(f.shared, 'body')]: '更新' }); s.refreshHistory();
+    const current = a.read(); expect(s.finishModelPlacement()).toBe(false); expect(a.read()).toEqual(current);
+    expect(s.modelPlacement!.coordinates).toEqual(['1', '2', '3']); expect(s.finishModelPlacement(true)).toBe(true);
+  });
+
+  it('mounts model keep-both and copy translation with visible cancellation across tabs and pending/IME guards', () => {
+    const document = new RecordedDocument(), team = createTeamWorkspace(document.asDocument(), factory), root = record(team.root), actor = label(root, '操作する人');
+    for (const who of ['0', '1']) {
+      actor.value = who; actor.fire('change'); const workspace = visibleWorkspace(root), scenes = label(workspace, 'シーン');
+      scenes.value = f.detail; scenes.fire('change'); button(workspace, 'モデル').fire('click');
+      const s = team.sessions[Number(who)]!; expect(toggle(s, f.structure, true)).toBe(true); team.render();
+    }
+    button(root, '相手の更新を受け取る').fire('click'); const panel = label(root, '更新の競合');
+    expect(button(panel, '別々のモデルとして残す').disabled).toBe(true);
+    descendants(panel).filter(node => node.type === 'radio')[1]!.fire('change'); button(panel, '別々のモデルとして残す').fire('click');
+    const workspace = visibleWorkspace(root), s = team.sessions[1]!, copyId = Object.keys(s.snapshot.resources.assets).find(id => id !== f.equipment && id !== f.structure)!;
+    button(label(workspace, 'プロジェクトのモデル一覧'), s.snapshot.modelNames[copyId]!).fire('click'); button(workspace, 'モデルの位置を編集').fire('click');
+    const strip = label(workspace, 'モデル配置・開発用'), x = label(strip, 'X'); expect(strip.hidden).toBe(false);
+    x.value = '9'; x.fire('input'); x.fire('compositionstart');
+    expect(button(strip, '配置を確定').disabled).toBe(true); expect(button(strip, '配置を取り消す').disabled).toBe(true);
+    expect(actor.disabled).toBe(true); expect(button(root, '相手の更新を受け取る').disabled).toBe(true);
+    x.fire('compositionend'); button(workspace, 'キャプション').fire('click'); expect(strip.hidden).toBe(false); expect(x.value).toBe('9');
+    button(strip, '配置を確定').fire('click'); expect(strip.hidden).toBe(true); expect(actor.disabled).toBe(false);
+    expect(s.modelUpdateContext().current!.closure.binding.assetToProject.translation[0]).toBe(9);
+    actor.value = '0'; actor.fire('change'); button(root, '相手の更新を受け取る').fire('click');
+    expect(team.histories[0].read()).toEqual(team.histories[1].read()); team.dispose();
+  });
+
   it('resolves concurrent Caption inclusion into independently editable copies in one causal change, then exchanges again', () => {
     const [a, b] = pair(), sa = new SyntheticSession(historyAuthority(a)), sb = new SyntheticSession(historyAuthority(b));
     const before = sa.snapshot, base = a.exportUpdate().base;
@@ -103,7 +226,7 @@ describe('actual pinned candidate connected to synthetic workspace; not browser,
     const [a, b] = pair(), sa = new SyntheticSession(historyAuthority(a)), sb = new SyntheticSession(historyAuthority(b));
     enterDetail(sa); enterDetail(sb); expect(toggle(sa, f.structure, true)).toBe(true); expect(toggle(sb, f.structure, true)).toBe(true);
     a.receive(b.exportUpdate()); const before = projectHistory(a.read()), group = duplicateMemberships(a.read())[0]!;
-    expect(() => resolution(a, group, group.edges[0]!.id, 'both')).toThrow('モデルの独立コピー');
+    expect(() => resolution(a, group, group.edges[0]!.id, 'both')).toThrow('コピーする項目');
     const plan = resolution(a, group, group.edges[1]!.id, 'one'); applyMembershipResolution(a, plan);
     const after = projectHistory(a.read()); expect(after.resources.assets).toEqual(before.resources.assets);
     expect(after.state.assetMemberships[plan.originalEdgeId]).toEqual(before.state.assetMemberships[plan.originalEdgeId]);
