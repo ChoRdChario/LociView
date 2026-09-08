@@ -1,9 +1,10 @@
-import { beforeEach, afterEach, expect, it } from 'vitest';
+import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { mkdtemp, mkdir, rm, unlink } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import { CasCandidate } from '../cas-io/candidate';
 import { NodeIo } from '../cas-io/node-io';
+import { OpfsIo } from '../cas-io/opfs-io';
 import { A, FORMAT, LIMIT, type Doc, type Ref, type Target, type Prepared, require, refs,
   canonical, jsonBytes, parse, heads, sha, index, seal, decodeJournal } from './journal-format';
 import { JournalCandidate } from './journal';
@@ -58,6 +59,7 @@ beforeEach(async () => {
   await ports.initialize(base, [oldRef]);
 });
 afterEach(async () => {
+  vi.unstubAllGlobals();
   const path = resolve(root); require(path.startsWith(parent + sep + 'journal-probe-') && path !== parent, 'unsafe scratch cleanup');
   await rm(path, { recursive: true, force: true });
 });
@@ -77,6 +79,85 @@ async function stopPrepared(source: Doc, staged: Ref[] = []) {
   await expect(engine.remote(tx(1), A.save(source), id('pkg'), staged)).rejects.toThrow('injected stop');
   ports.checkpoint = async () => {};
 }
+
+// Exercise the actual OPFS adapter's lock method with Node's Web Locks. File
+// reads reuse the real synthetic Node CAS; this is not browser/OPFS evidence.
+async function browserLockReader() {
+  const locks = navigator.locks;
+  expect(locks).toBeDefined();
+  const directory = { async getDirectoryHandle() { return directory; } };
+  vi.stubGlobal('navigator', { locks, storage: { async getDirectory() { return directory; } } });
+  const io = await OpfsIo.open(tx(200));
+  io.read = casIo.read.bind(casIo);
+  const reader = new CasCandidate(io);
+  ports.hasVerified = ref => reader.hasVerified({ sha256: ref.digest, byteLength: ref.byteLength });
+  return io;
+}
+
+it.each(['pending', 'recovered'])('simultaneous notification and local %s views do not mistake CAS contention for loss', async state => {
+  await stageNew(); const source = diamond(); await stopPrepared(source, [newRef]);
+  if (state === 'recovered') await engine.recover(tx(1));
+  const published = (await ports.control()).publishedHeads;
+  const writes = [...casIo.writes], metadataWrites = ports.metadataWrites, publications = ports.publications;
+  const reads = casIo.readPayloadBytes;
+  const io = await browserLockReader();
+  let release!: () => void, entered!: () => void, secondAttempt!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  const firstEntered = new Promise<void>(resolve => { entered = resolve; });
+  const secondRequested = new Promise<void>(resolve => { secondAttempt = resolve; });
+  const read = io.read.bind(io); let firstReceipt = true;
+  io.read = async key => {
+    if (firstReceipt && key.startsWith('verified/')) {
+      firstReceipt = false; entered(); await held;
+    }
+    return read(key);
+  };
+  const exclusive = io.exclusive.bind(io); let requests = 0;
+  io.exclusive = (...args) => {
+    const result = exclusive(...args);
+    if (++requests === 2) secondAttempt();
+    return result;
+  };
+  const first = engine.view(); let second: ReturnType<typeof engine.view> | undefined;
+  try {
+    await firstEntered; second = engine.view(); await secondRequested;
+    await new Promise<void>(resolve => setImmediate(resolve));
+    let mutationRan = false;
+    await expect(io.exclusive(async () => { mutationRan = true; })).rejects.toMatchObject({ name: 'InvalidStateError' });
+    expect(mutationRan).toBe(false);
+  } finally { release(); }
+  const results = await Promise.all([first, second!]);
+  for (const view of results) {
+    expect(view.repairRequired).not.toBe(true);
+    expect(view.readOnly).toBe(state === 'pending'); expect(heads(view.doc)).toEqual(published);
+  }
+  expect(casIo.readPayloadBytes).toBe(reads); expect(casIo.writes).toEqual(writes);
+  expect(ports.metadataWrites).toBe(metadataWrites); expect(ports.publications).toBe(publications);
+  if (state === 'recovered') {
+    expect(await engine.recover(tx(1))).toBe('noop'); expect(ports.publications).toBe(publications);
+  }
+});
+
+it.each(['missing', 'corrupt', 'denied'])('queued receipt observation still refuses %s data and retains its cause', async kind => {
+  const io = await browserLockReader(), read = io.read.bind(io);
+  const denial = new DOMException('Synthetic receipt access denied', 'NotAllowedError');
+  io.read = async key => {
+    if (key.startsWith('verified/')) {
+      if (kind === 'missing') return null;
+      if (kind === 'denied') throw denial;
+      return { size: 1, async *chunks() { yield new Uint8Array([0]); } };
+    }
+    return read(key);
+  };
+  const publications = ports.publications, writes = ports.metadataWrites, reads = casIo.readPayloadBytes;
+  const observed = await engine.view();
+  expect(observed).toMatchObject({ readOnly: true, repairRequired: true });
+  expect(observed.repairCause).toBeInstanceOf(Error);
+  if (kind === 'denied') expect(observed.repairCause).toBe(denial);
+  expect(heads(observed.doc)).toEqual(heads(base));
+  expect(ports.publications).toBe(publications); expect(ports.metadataWrites).toBe(writes);
+  expect(casIo.readPayloadBytes).toBe(reads);
+});
 
 it.each(['prepared', 'metadataDurable:0', 'metadataDurable:1', 'metadataDurable:2', 'journalDurable', 'published'])
 ('remote diamond resumes exact bytes after %s with one publication and no prefix exposure', async boundary => {

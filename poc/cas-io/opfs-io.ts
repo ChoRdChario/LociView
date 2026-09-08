@@ -18,8 +18,8 @@ export class OpfsIo implements Io {
     const area = await origin.getDirectoryHandle(AREA, { create: true });
     return new OpfsIo(await area.getDirectoryHandle(run, { create: true }));
   }
-  async exclusive<T>(task: () => Promise<T>): Promise<T> {
-    return await navigator.locks.request(PROBE_LOCK, { mode: 'exclusive', ifAvailable: true }, lock => {
+  async exclusive<T>(task: () => Promise<T>, options?: { wait: boolean }): Promise<T> {
+    return await navigator.locks.request(PROBE_LOCK, { mode: 'exclusive', ifAvailable: !options?.wait }, lock => {
       if (!lock) throw new DOMException('別のタブで検証中です。完了後に保存結果を確認してください。', 'InvalidStateError');
       return task();
     });

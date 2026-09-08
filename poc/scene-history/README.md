@@ -162,6 +162,56 @@ not connect the adapter, Scene core or new team flow to the application UI.
 
 ## Browser cross-store journal port — implemented preparation, not platform PASS
 
+**2026-09-09 implemented correction; Chrome recheck pending:** The PO's actual Chrome batch reached the
+intended pending state, retained it across reload, and logged exact recovery with
+one publication. Immediate post-recovery observation failed; a manual observation
+and the other tab's notification later read the new state. A repeated recovery
+logged no-op/zero publication and then the same observation failure. This is a
+failed overall platform run, not missing-payload proof or an aggregate PASS.
+
+The deterministic regression reproduces the cause through the actual `OpfsIo`
+locking method with Node Web Locks and synthetic Node files: notification and
+local readers compete for a fail-fast exclusive CAS lock, and `view()` converted
+the rejected read into generic missing-data repair. Verified-presence observation
+now waits on that same exclusive lock; mutation admission remains fail-fast.
+Receipt/size/presence checks remain intact, and failed observation retains its
+actual cause. Node's existing queue and retention's already-owned lease do not
+acquire an extra lock. No notification suppression, automatic retry/write, schema,
+dependency or published-head change is introduced. This fixes an existing probe
+implementation defect; the accepted journal contract and candidate gates remain.
+
+Correction acceptance: two deliberately overlapping pending/recovered views
+retain the correct published heads without repair flags, payload reads, metadata
+writes or publications; a contending mutation still refuses. Missing/corrupt or
+denied receipt reads still yield read-only failure with the original cause.
+Reuse the existing exact recovery/no-op/interruption matrix. Do not reset the
+existing browser run; corrected real-browser confirmation remains required.
+
+Executed correction evidence: both simultaneous-view regressions failed before
+the fix and all five new cases passed after it. The existing journal/Repo/purpose
+suite passes 55/55; CAS/retention passes 30/30 selected cases (the unchanged 500 MiB
+case was deliberately not rerun). Both isolated typechecks and the journal build
+pass. Independent targeted review found no blocking regression. These are Node
+and build results, not a corrected Chrome/OPFS PASS.
+
+The same loopback preview now serves `検証版：同時読み取り修正 1`. At
+`2026-09-08T16:23:11Z`, HTTP 200 bytes matched the local corrected build:
+
+| Build entry | Bytes | SHA-256 |
+|---|---:|---|
+| `journal.html` | 2,004 | `f40df16d20aad930e8524addf7ab7c1e53577c7d4f82b4ec54d712214289f516` |
+| `assets/journal-D0JQ1cDN.js` | 243,589 | `3ba869b2ff40b7125e6cd2743b6749b1c48003aa8a99b7acbac987974b3741ff` |
+| `assets/automerge-CntZrugP.wasm` | 3,571,259 | `304ea6e230898ed66af3c29ac554a36c15bbe03f5c8816b5310fddb88f7f5d78` |
+
+The isolated dependency lock is unchanged from the identity below. Preserve the
+earlier failed run rather than replacing its evidence. For the PO's already
+recovered run: reload BOTH existing tabs without changing their URLs, wait for
+the correction label and new-state READY, then use `復旧して再確認` in the second
+tab. Expect no-op/zero publication followed by READY, and `他タブ通知後` in the
+first tab without a manual observation. Reload both once more. No NEW FAIL should
+be appended; previous FAIL rows intentionally remain in the stored log. Supply
+these steps in chat when asking for recheck; no new run or start-button action.
+
 Next bounded prerequisite under specification 02 §8: run the same journal engine
 against OPFS source/part/control/inventory files, the pinned Repo/IndexedDB adapter
 for original metadata, the existing OPFS CAS and a browser-owned per-run lock.

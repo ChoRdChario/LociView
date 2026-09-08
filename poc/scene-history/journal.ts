@@ -48,11 +48,11 @@ export class JournalCandidate {
     for (const ref of staged) require(await this.ports.hasVerified(ref), 'unverified staged blob');
     await this.ports.protect(staged); await this.ports.checkpoint('inventoryProtected');
   }
-  async view(): Promise<{ readOnly: boolean; doc: Doc; repairRequired?: boolean }> {
+  async view(): Promise<{ readOnly: boolean; doc: Doc; repairRequired?: boolean; repairCause?: unknown }> {
     const control = await this.ports.control(); const doc = await this.ports.readAt(control.publishedHeads);
     validateRoot(doc, this.target);
     try { await this.checkClosure(doc); }
-    catch { return { readOnly: true, doc, repairRequired: true }; }
+    catch (repairCause) { return { readOnly: true, doc, repairRequired: true, repairCause }; }
     return { readOnly: control.pending !== null, doc };
   }
   async request(action: 'edit' | 'export' | 'gc'): Promise<void> {

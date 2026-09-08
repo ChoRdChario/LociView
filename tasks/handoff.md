@@ -1,5 +1,16 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **Current platform correction (2026-09-09):** The PO ran the prepared journal
+> in Chrome and reported a concrete failure: recovery/no-op logged success but
+> immediate view reported missing data; manual and other-tab views later succeeded.
+> Deterministic regression reproduces two read-only CAS checks competing for a
+> fail-fast lock. Only verified-presence reads now queue on that same lock;
+> mutations retain fail-fast admission and real failures preserve their cause.
+> Current todo/isolated README own exact checks and served build identity. The
+> preview shows `検証版：同時読み取り修正 1`. Corrected Chrome verification is still
+> pending: reuse both existing tabs/run/logs, never reset or repeat initialization
+> or the old 500 MiB test. No current app, dependency, schema or adoption changed.
+
 > **Current sequencing correction (2026-09-09):** PO requested a completion-path
 > audit at `d8f52d1` (clean, 21 ahead of local tracking; no fetch). Ten recent
 > executable commits are useful disconnected components, not a new completed

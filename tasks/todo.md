@@ -2,6 +2,49 @@
 
 ## Current boundary — implementation through UI verification (2026-09-09)
 
+### Active correction — simultaneous journal readback after recovery (2026-09-09)
+
+PO's Chrome batch at the unchanged journal build passed initialization, deliberate
+prefix stop and old-state reload. Recovery reported exact original bytes/heads and
+one publication; immediate observation failed. Manual observation and the other
+tab's notification later saw the new state. Repeated recovery reported no-op/zero
+publication but immediate observation failed again. This is a concrete failed
+platform run, not a full PASS or evidence of confirmed payload loss. Preserve
+the existing run, its logs and original source/changes; do not reset browser data.
+
+Target: the existing disposable CAS/journal readback path only (02 §§7–8).
+Hypothesis confirmed independently in code: broadcast and local observation
+compete for the same fail-fast exclusive CAS lock; the rejected read is caught
+as `repairRequired`. No new architecture, schema or product-policy decision.
+
+- [x] Reproduce simultaneous verified-receipt reads deterministically with the
+  actual CAS/OPFS locking method; label Node lock/files evidence as non-browser.
+- [x] Queue read-only verified-presence checks under the same CAS lock, keeping
+  mutation fail-fast behavior and actual missing/corrupt-data refusal. Preserve
+  original observation failure details instead of declaring every error missing.
+- [x] Run focused regression, isolated typecheck/build and required root checks;
+  obtain one targeted independent read-only correction review.
+- [x] Refresh the same preview and provide a short same-run recovery/reload
+  sequence in chat. Corrected Chrome outcome remains pending until observed.
+
+Exit: concurrent readers succeed without duplicate publication or payload reads;
+mutation contention still refuses and missing/corrupt bytes still fail closed.
+No bootstrap retry, new page, 500 MiB rerun, dependency, production hookup,
+application-data write, cleanup, device/PWA or adoption claim.
+
+Evidence: two concurrent-read cases reproduced the false repair before the fix;
+all five new cases pass afterward. Isolated journal/Repo/purposes 55/55 and
+CAS/retention 30 selected cases PASS; existing 500 MiB case intentionally omitted.
+Both isolated typechecks/build and targeted independent review pass. Corrected
+HTML/JS/WASM return HTTP 200 and match local build hashes, recorded in the existing
+probe README. Actual corrected Chrome confirmation is pending, not inferred.
+Root typecheck, full 93 files / 1,770 PASS / 21 existing todo (two workers) and
+build pass; existing mixed-import/large-chunk warnings remain. Source changes
+are limited to the existing isolated probes; current application code and
+dependencies are unchanged. Whitespace checks pass, with no blocking review
+finding. Stop this correction at same-run Chrome confirmation rather than
+adding a new probe or treating Node results as platform/adoption PASS.
+
 ### Active — completion-path correction and existing platform journal (2026-09-09)
 
 PO requested a macro progress check before continuing. Audit checkpoint:
@@ -20,7 +63,7 @@ previous automatic next choice of another individual record guard is superseded.
 - [x] Build the existing `poc/scene-history/journal.html` from this exact source;
   verify the served HTML and referenced JS/WASM against local build bytes, and
   put the one existing batched procedure in a ready-to-run state.
-- [ ] Record real-browser interruption, same-run reload, second-tab recovery,
+- [x] Record real-browser interruption, same-run reload, second-tab recovery,
   first-tab notification and repeated no-op results, or one concrete failure.
   HTTP/build readiness is not execution evidence. Agent control currently fails
   before navigation; do not infer PASS or repeat bootstrap/repair attempts.

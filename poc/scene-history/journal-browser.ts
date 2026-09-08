@@ -69,7 +69,11 @@ async function observe(origin: string) {
     renderLog(await logEntries()); state.textContent = '未作成'; value.textContent = ''; return;
   }
   const fresh = await ports.fresh(); const engine = new JournalCandidate(fresh, fresh.session.target);
-  const view = await engine.view(); require(!view.repairRequired, '必要な保存データがありません。修復が必要です');
+  const view = await engine.view();
+  if (view.repairRequired) {
+    const detail = view.repairCause instanceof Error ? view.repairCause.message : String(view.repairCause ?? '原因不明');
+    throw new Error(`保存内容を確認できません。${detail}`);
+  }
   // This synthetic flow expects unambiguous fields; never expose a library winner.
   for (const key of ['title', 'body']) require(Object.keys(A.getConflicts(view.doc.captions, key) ?? {}).length <= 1, 'Captionの競合が未解決です');
   require(Object.keys(A.getConflicts(view.doc.resources, 'revision') ?? {}).length <= 1, 'モデルの競合が未解決です');

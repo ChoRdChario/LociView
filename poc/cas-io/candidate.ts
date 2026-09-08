@@ -6,7 +6,9 @@ const RECEIPT_BYTES = 4096;
 export interface BlobRef { sha256: string; byteLength: number }
 export interface Source { size: number; chunks(): AsyncIterable<Uint8Array> }
 export interface Io {
-  exclusive<T>(task: () => Promise<T>): Promise<T>;
+  // Observation may wait for the same writer lock; mutations retain the
+  // backend's default contention policy. Never inspect receipts without a lease.
+  exclusive<T>(task: () => Promise<T>, options?: { wait: boolean }): Promise<T>;
   read(key: string): Promise<Source | null>;
   write(key: string, bytes: AsyncIterable<Uint8Array>): Promise<void>;
   remove(key: string): Promise<void>;
@@ -109,7 +111,7 @@ export class CasCandidate {
   /** Isolated journal test port: verified receipt + size/presence, not a rehash. */
   async hasVerified(ref: BlobRef): Promise<boolean> {
     validateRef(ref); const expected = { ...ref };
-    return this.io.exclusive(() => this.isPublished(expected));
+    return this.io.exclusive(() => this.isPublished(expected), { wait: true });
   }
 
   async import(tx: string, ref: BlobRef, source: AsyncIterable<Uint8Array>, signal?: AbortSignal): Promise<BlobRef> {
