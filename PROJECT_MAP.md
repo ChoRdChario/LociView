@@ -18,8 +18,10 @@ and Scene/task switching. A serve-only isolated candidate now also connects two
 independent memory histories, sparse edits, explicit scalar conflict choices and
 second-round updates in that same host. Known model-binding updates and explicit
 manual pin correction are also connected there, without changing Scene references
-or losing local work. Membership independent copies, 3D, file/package exchange,
-durable storage and rendered/device acceptance remain pending as recorded in todo.
+or losing local work. Explicit membership keep-one and independent Caption copies
+also connect in the known attachment/tag-empty fixture. Model copies, 3D,
+file/package exchange, durable storage and rendered/device acceptance remain
+pending as recorded in todo.
 Real Project, storage, package and current-app activation retain their gates.
 
 For a fresh Codex session, read `tasks/handoff.md` after this map and the

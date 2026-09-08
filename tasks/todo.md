@@ -5,10 +5,33 @@
 PO approved building the whole workflow thinly before subsystem polish. Authority:
 specification 05 §13.4; final completion remains `TEAM-FLOW-01` in §12.6.
 The completed journal Chrome recheck below stays closed; no new manual test is
-requested. The synthetic workspace and two-person Caption/history loops now exist; browser,
+requested. Synthetic two-person model/pin/history and independent Caption-copy loops now exist; browser,
 IME and device acceptance remain pending, not implied by its DOM tests.
 
 ### Current plan / next implementation
+
+- [x] **Completed from `6c61182`:** connect the existing Caption inclusion picker to
+  the same two-actor host. Concurrent additions create real duplicate membership
+  edges, not a manufactured conflict or replacement snapshot.
+- [x] Show all observed active edges, affected Scene/resource and other-Scene
+  references. Require explicit original-edge selection. Keep-one tombstones the
+  others; Caption keep-both creates independent Caption/membership IDs, retaining
+  text/color/complete anchor and the unchanged owner. Scope: known synthetic
+  Captions with no attachment/tag records; model-copy closure remains missing.
+- [x] Preflight captures exact token/candidate IDs/content and fresh-ID map once.
+  Publish all sparse cells in one original causal change; reject conflicted
+  required fields, stale selection and invalid/partial maps before publication.
+  Retry preserves the prepared IDs; replay cannot multiply copies. A previously
+  unseen edge reopens the conflict. Test independent edits and second exchange.
+- [x] Focused actual-candidate/mounted tests, one independent read-only review,
+  final root checks/build isolation and current-document update; no manual hold.
+
+Meta-audit for this slice: `6c61182` closed synthetic model/pin flow with executed
+evidence. The remaining membership gap is on §12.6's continuing-team path. This
+is still disposable memory metadata, not full Caption/Asset admission, immutable
+blob verification, real files, durable storage, new wire/dependency or adoption.
+Stop on specification conflict; do not substitute model projection cloning for
+the missing full model-copy closure, nor reopen closed Chrome journal evidence.
 
 - [x] **Completed connection from `6134be3`:** same development host, known synthetic
   model-binding choices and exact atomic anchor corrections. Model update changes
@@ -56,18 +79,48 @@ only in the development lane; broader product completion remains open.
 - [x] Final exact-tree root checks, isolated adapter tests/typecheck, both build
   graph isolation checks and one read-only review. No browser-control repair.
 
-The connected two-person Caption/history and synthetic model/pin loops are closed,
-not all of `TEAM-FLOW-01`. Membership keep-both, media,
+The connected two-person Caption/history, synthetic model/pin and Caption-copy loops are closed,
+not all of `TEAM-FLOW-01`. Independent model copies, media,
 file exchange, durable storage and physical-device acceptance remain pending
 unless separately connected and verified. Do not add fake success controls.
 
-**Next connected slice:** explicit membership keep-one plus independent Caption
-keep-both, limited to the known attachment/tag-empty synthetic records. Model
-keep-both first needs an exact synthetic immutable closure/preflight, not copied
-projection IDs; this is missing implementation, not a new PO policy or a reason
-to reopen completed storage probes. Reuse the same isolated history host.
+**Next connected slice:** model keep-both with an exact synthetic immutable
+closure/preflight, not copied projection IDs. Before implementation specify a
+minimal known model closure (numeric Frame/placement, binding/revision/
+Representation/family/compatibility and metadata digests; explicitly empty absent
+proxy/material relations). Confirm the original, remap fresh nominal IDs, preserve
+payload references and existing Captions, and publish the complete copy in one
+causal command in this same host. This missing implementation does not require a
+new PO policy or reopening storage probes. Real blob verification/provider and
+gated storage/exchange activation remain separate; no shortcut through UI cloning.
 Do not substitute another journal/browser-repair task or claim actual 3D/file
 exchange. No fresh PO/manual check is required to continue within §13.4.
+
+### Membership / independent Caption-copy result — 2026-09-09
+
+The existing Caption inclusion picker now participates in both independent
+histories. Concurrent inclusion produces genuine duplicate semantic memberships.
+All observed edges and the affected Scene/resource are shown; no original is
+preselected. Keep-one retains that exact edge and tombstones the other observed
+edges. Caption keep-both preflights resolved text/color/complete anchor and a
+fresh Caption/membership map, then creates separately editable resources in one
+original causal change. Other Scene references and anchor ownership stay unchanged.
+The fixture has no attachments/tags: this is not general attachment/media copying.
+Single-edge lifecycle conflicts retain their separate typed candidate choice.
+
+The 21 actual-candidate/authored-DOM cases and scoped typecheck pass. New cases
+cover copy-only text/pin edits and a second exchange, exact model keep-one,
+conflicted/partial/invalid copy refusal, immutable identity replacement refusal,
+unseen edge re-conflict, no default original and actor-bound mounted controls.
+Injected mounted publication refusal retries the identical prepared cells/IDs;
+stale plans add no resource, and original-change replay is a no-op. Independent
+read-only review, including the final retry/stale cases, found no blocker.
+Final root typecheck, 94 files / 1,777 PASS / 21 existing todo (97.89 seconds),
+default and Spark harness builds PASS with existing warnings. Candidate build
+isolation is retained. The previous-snapshot guard protects already-known
+synthetic descriptors/edge endpoints; it is not arbitrary incoming immutable-
+history validation or a full provider. No full model-copy, blob/storage/wire or
+rendered/device acceptance. No new dependencies or current-app changes.
 
 ### Model update / pin correction result — 2026-09-09
 

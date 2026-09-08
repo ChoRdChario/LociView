@@ -1161,8 +1161,14 @@ and complete manual anchors. Review correction needs explicit current-family
 selection; local text, Scene references and coordinates survive model updates.
 Typed binding/anchor conflicts remain unresolved until explicitly chosen. These
 are known metadata projections, not full immutable payload/anchor wire admission
-or renderer picking/gizmo. No Repo/storage, membership keep-both, complete provider,
-production save/exchange, rendered/device acceptance or S1–S3 credit is implied.
+or renderer picking/gizmo. Explicit duplicate-membership keep-one and independent
+Caption keep-both now connect as one causal command, with retained fresh-ID maps
+and no redirection of original/other-Scene references. This fixture has no
+attachment/tag records; copying them is not verified. Already-known synthetic
+copy descriptors/endpoints cannot be replaced, but this is not general immutable
+history admission. Model keep-both still needs an exact synthetic copy closure.
+No Repo/storage, complete provider, production save/exchange, rendered/device
+acceptance or S1–S3 credit is implied.
 Current todo owns exact executable evidence and remaining connections.
 
 ## 14. Explicit non-goals

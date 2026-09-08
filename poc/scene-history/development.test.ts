@@ -11,6 +11,8 @@ import { planCaptionList } from '../../src/ui/projectScene/captionListState';
 import { editCaptionDraft, planCaptionApply, type CaptionEditField } from '../../src/ui/projectScene/captionDetailState';
 import { planModelList } from '../../src/ui/projectScene/modelListState';
 import { planPinMode } from '../../src/ui/projectScene/pinModeState';
+import { planCaptionInclude } from '../../src/ui/projectScene/captionIncludeState';
+import { applyMembershipResolution, duplicateMemberships, planMembershipResolution, type DuplicateMembership } from '../../src/harness/projectScene/membershipResolution';
 import { planNavigation } from '../../src/ui/projectScene/navigationState';
 import { resolveScene } from '../../src/scene/resolve';
 import { RecordedDocument, RecordedNode, record } from '../../tests/ui/domRecorder';
@@ -49,8 +51,148 @@ function movePin(session: SyntheticSession, coordinates: readonly [string, strin
   session.changePinCoordinates({ coordinates, familyId });
   expect(session.acceptPin(planPinMode(session.pinContext(), { kind: 'finish' }))).toBe(true);
 }
+const freshId = (prefix: string) => `${prefix}_${crypto.randomUUID().replaceAll('-', '')}`;
+function enterDetail(session: SyntheticSession) {
+  expect(session.acceptNavigation(planNavigation(session.snapshot.state, session.session, session.pending, { kind: 'scene', sceneId: f.detail }))).toBe(true);
+}
+function includeCaption(session: SyntheticSession, id = f.second) {
+  expect(session.acceptInclude(planCaptionInclude(session.includeContext(), { kind: 'select', captionId: id }))).toBe(true);
+  expect(session.acceptInclude(planCaptionInclude(session.includeContext(), { kind: 'include' }))).toBe(true);
+}
+function resolution(history: DevelopmentHistory, group: DuplicateMembership, originalEdgeId: string, action: 'one' | 'both') {
+  return planMembershipResolution(history.read(), group, originalEdgeId, action, freshId('evt'), action === 'one' ? [] :
+    group.edges.filter(edge => edge.id !== originalEdgeId).map(edge => ({ edgeId: edge.id, captionId: freshId('cap'), membershipId: freshId('scm') })));
+}
 
 describe('actual pinned candidate connected to synthetic workspace; not browser, wire or durable acceptance', () => {
+  it('resolves concurrent Caption inclusion into independently editable copies in one causal change, then exchanges again', () => {
+    const [a, b] = pair(), sa = new SyntheticSession(historyAuthority(a)), sb = new SyntheticSession(historyAuthority(b));
+    const before = sa.snapshot, base = a.exportUpdate().base;
+    enterDetail(sa); enterDetail(sb); includeCaption(sa); includeCaption(sb);
+    const originalA = a.exportUpdate(), originalB = b.exportUpdate(); a.receive(originalB); b.receive(originalA); sa.refreshHistory(); sb.refreshHistory();
+    expect(sa.composition.captions.some(c => c.captionId === f.second)).toBe(false);
+    const group = duplicateMemberships(a.read())[0]!;
+    const plan = resolution(a, group, group.edges[1]!.id, 'both'), copy = plan.copies[0]!;
+    const oldBytes = bytes(a.exportUpdate());
+    // A failed publication retains the exact planned IDs/content, not a partial resource.
+    expect(() => applyMembershipResolution({ ...a, write: () => { throw new Error('injected refusal'); } }, plan)).toThrow('injected');
+    expect(bytes(a.exportUpdate())).toEqual(oldBytes);
+    applyMembershipResolution(a, plan); expect(a.exportUpdate().changes).toHaveLength(oldBytes.length + 1);
+    const next = projectHistory(a.read()); expect(duplicateMemberships(a.read())).toHaveLength(0);
+    expect(next.resources.captions[copy.captionId]).toMatchObject({ title: before.resources.captions[f.second]!.title,
+      body: before.resources.captions[f.second]!.body, anchor: before.resources.captions[f.second]!.anchor });
+    expect(next.colors[copy.captionId]).toEqual(before.colors[f.second]);
+    expect(Object.values(next.state.captionMemberships).filter(e => e.resourceId === copy.captionId).map(e => e.sceneId)).toEqual([f.detail]);
+    for (const edge of Object.values(before.state.captionMemberships)) expect(next.state.captionMemberships[edge.id]).toEqual(edge);
+    expect(() => applyMembershipResolution(a, plan)).toThrow('更新'); expect(a.exportUpdate().changes).toHaveLength(oldBytes.length + 1);
+    b.receive(a.exportUpdate()); sa.refreshHistory(); sb.refreshHistory();
+    sa.acceptList(planCaptionList(sa.captionContext(), { kind: 'select', captionId: f.second })); draft(sa, 'body', '元だけの本文'); apply(sa);
+    sb.acceptList(planCaptionList(sb.captionContext(), { kind: 'select', captionId: copy.captionId })); draft(sb, 'body', 'コピーだけの本文'); apply(sb);
+    expect(toggle(sb, f.structure, true)).toBe(true); movePin(sb, ['4', '5', '6']);
+    const updateA = a.exportUpdate(), updateB = b.exportUpdate(); a.receive(updateB); b.receive(updateA);
+    expect(a.read()).toEqual(b.read()); const result = projectHistory(a.read());
+    expect(result.resources.captions[f.second]!.body).toEqual({ kind: 'value', value: '元だけの本文' });
+    expect(result.resources.captions[copy.captionId]!.body).toEqual({ kind: 'value', value: 'コピーだけの本文' });
+    expect(result.resources.captions[f.second]!.anchor).toEqual(before.resources.captions[f.second]!.anchor);
+    expect(result.resources.captions[copy.captionId]!.anchor).not.toEqual(result.resources.captions[f.second]!.anchor);
+    const old = a.read(); expect(a.receive(updateB).added).toBe(0); expect(a.read()).toEqual(old); expect(a.exportUpdate().base).toEqual(base);
+    for (const source of [...bytes(originalA), ...bytes(originalB)]) expect(bytes(a.exportUpdate())).toContain(source);
+  });
+
+  it('keeps the exact selected model edge without creating model copies or affecting other Scenes', () => {
+    const [a, b] = pair(), sa = new SyntheticSession(historyAuthority(a)), sb = new SyntheticSession(historyAuthority(b));
+    enterDetail(sa); enterDetail(sb); expect(toggle(sa, f.structure, true)).toBe(true); expect(toggle(sb, f.structure, true)).toBe(true);
+    a.receive(b.exportUpdate()); const before = projectHistory(a.read()), group = duplicateMemberships(a.read())[0]!;
+    expect(() => resolution(a, group, group.edges[0]!.id, 'both')).toThrow('モデルの独立コピー');
+    const plan = resolution(a, group, group.edges[1]!.id, 'one'); applyMembershipResolution(a, plan);
+    const after = projectHistory(a.read()); expect(after.resources.assets).toEqual(before.resources.assets);
+    expect(after.state.assetMemberships[plan.originalEdgeId]).toEqual(before.state.assetMemberships[plan.originalEdgeId]);
+    expect(duplicateMemberships(a.read())).toHaveLength(0);
+    expect(Object.values(after.state.assetMemberships).filter(edge => edge.sceneId === f.overview)).toEqual(
+      Object.values(before.state.assetMemberships).filter(edge => edge.sceneId === f.overview));
+  });
+
+  it('rejects unresolved copy content, invalid maps, partial copy publication and altered immutable copy identity', () => {
+    const [a, b] = pair(), sa = new SyntheticSession(historyAuthority(a)), sb = new SyntheticSession(historyAuthority(b));
+    enterDetail(sa); enterDetail(sb); includeCaption(sa); includeCaption(sb);
+    a.write(a.read().token, { [captionKey(f.second, 'title')]: '片方' }); b.write(b.read().token, { [captionKey(f.second, 'title')]: 'もう片方' });
+    a.receive(b.exportUpdate()); const group = duplicateMemberships(a.read())[0]!, before = a.read();
+    expect(() => resolution(a, group, group.edges[0]!.id, 'both')).toThrow('内容の競合'); expect(a.read()).toEqual(before);
+    const conflict = a.read().cells[captionKey(f.second, 'title')]; if (conflict?.kind !== 'conflict') throw new Error('missing conflict');
+    a.choose(a.read().token, captionKey(f.second, 'title'), conflict.candidates[0]!.id);
+    const current = duplicateMemberships(a.read())[0]!, plan = resolution(a, current, current.edges[0]!.id, 'both'), copy = plan.copies[0]!;
+    expect(() => planMembershipResolution(a.read(), current, plan.originalEdgeId, 'both', plan.eventId,
+      [{ ...copy, captionId: f.second }])).toThrow();
+    const incomplete = { ...plan.changes }; delete incomplete[captionKey(copy.captionId, 'anchor')]; const untouched = a.read();
+    expect(() => a.write(a.read().token, incomplete)).toThrow(); expect(a.read()).toEqual(untouched);
+    expect(() => applyMembershipResolution(a, { ...plan, changes: incomplete })).toThrow(); expect(a.read()).toEqual(untouched);
+    applyMembershipResolution(a, plan); const applied = a.read();
+    expect(() => a.write(a.read().token, { [captionKey(copy.captionId, 'template')]: JSON.stringify({ templateId: f.second,
+      sourceId: f.second, eventId: freshId('evt') }) })).toThrow('識別情報'); expect(a.read()).toEqual(applied);
+  });
+
+  it('reopens a conflict for an unseen later membership instead of coalescing equal endpoints', () => {
+    const [a, b] = pair(), sa = new SyntheticSession(historyAuthority(a)), sb = new SyntheticSession(historyAuthority(b));
+    enterDetail(sa); enterDetail(sb); includeCaption(sa); includeCaption(sb); a.receive(b.exportUpdate());
+    const group = duplicateMemberships(a.read())[0]!, bEdge = Object.values(sb.snapshot.state.captionMemberships).find(edge => edge.sceneId === f.detail && edge.resourceId === f.second)!;
+    const plan = resolution(a, group, group.edges.find(edge => edge.id !== bEdge.id)!.id, 'one'); applyMembershipResolution(a, plan);
+    // B has not observed A's resolution: remove its own edge and include the resource again.
+    b.write(b.read().token, { [membershipKey(bEdge.id)]: JSON.stringify({ ...bEdge,
+      lifecycle: { kind: 'value', value: { state: 'deleted', eventId: freshId('evt'), reason: 'userDelete' } } }) });
+    sb.refreshHistory(); includeCaption(sb); a.receive(b.exportUpdate());
+    expect(duplicateMemberships(a.read()).some(g => g.resourceId === f.second)).toBe(true);
+    const resolved = projectHistory(a.read()); const scene = resolveScene(resolved.state, resolved.resources, f.detail);
+    expect(scene.kind === 'ready' && scene.composition.captions.some(c => c.captionId === f.second)).toBe(false);
+  });
+
+  it('mounts the existing inclusion picker and requires an explicit original before independent keep-both', () => {
+    const copyWrites: Readonly<Record<string, string>>[] = []; let refuseCopy = true;
+    const document = new RecordedDocument(), team = createTeamWorkspace(document.asDocument(), (seed, validate) => {
+      const [a, b] = factory(seed, validate);
+      const wrap = (history: DevelopmentHistory): DevelopmentHistory => ({ ...history, write(token, changes) {
+        if (Object.keys(changes).some(key => key.endsWith('/template'))) {
+          copyWrites.push(changes); if (refuseCopy) { refuseCopy = false; throw new Error('injected copy refusal'); }
+        }
+        return history.write(token, changes);
+      } });
+      return [wrap(a), wrap(b)];
+    }), root = record(team.root);
+    const actor = label(root, '操作する人');
+    for (const who of ['0', '1']) {
+      actor.value = who; actor.fire('change'); const workspace = visibleWorkspace(root), scenes = label(workspace, 'シーン');
+      scenes.value = f.detail; scenes.fire('change');
+      const picker = by(workspace, node => node.className === 'lv-caption-include'), select = label(picker, 'キャプション');
+      select.value = f.second; select.fire('change'); button(picker, 'このシーンに追加').fire('click');
+    }
+    button(root, '相手の更新を受け取る').fire('click');
+    const panel = label(root, '更新の競合'), both = button(panel, '別々のキャプションとして残す');
+    expect(both.disabled).toBe(true);
+    expect(descendants(panel).filter(node => node.type === 'radio').every(node => !node.checked)).toBe(true);
+    const radios = descendants(panel).filter(node => node.type === 'radio'); expect(radios).toHaveLength(2);
+    radios[1]!.fire('change'); expect(both.disabled).toBe(false);
+    const before = team.histories[1].read(); actor.value = '0'; actor.fire('change'); both.fire('click');
+    expect(team.histories[1].read()).toEqual(before); // detached, actor-bound handler cannot act on the old party.
+    actor.value = '1'; actor.fire('change');
+    const current = label(root, '更新の競合'); descendants(current).filter(node => node.type === 'radio')[1]!.fire('change');
+    button(current, '別々のキャプションとして残す').fire('click');
+    expect(team.histories[1].read()).toEqual(before); expect(copyWrites).toHaveLength(1);
+    button(label(root, '更新の競合'), '別々のキャプションとして残す').fire('click');
+    expect(copyWrites).toHaveLength(2); expect(copyWrites[1]).toBe(copyWrites[0]);
+    expect(Object.keys(team.sessions[1]!.snapshot.resources.captions)).toHaveLength(3);
+    expect(team.sessions[1]!.composition.captions).toHaveLength(3); expect(duplicateMemberships(team.histories[1].read())).toHaveLength(0);
+    actor.value = '0'; actor.fire('change'); button(root, '相手の更新を受け取る').fire('click');
+    expect(team.histories[0].read()).toEqual(team.histories[1].read()); team.dispose();
+  });
+
+  it('refuses a prepared membership resolution after an unrelated update without reusing fresh IDs', () => {
+    const [a, b] = pair(), sa = new SyntheticSession(historyAuthority(a)), sb = new SyntheticSession(historyAuthority(b));
+    enterDetail(sa); enterDetail(sb); includeCaption(sa); includeCaption(sb); a.receive(b.exportUpdate());
+    const group = duplicateMemberships(a.read())[0]!, plan = resolution(a, group, group.edges[0]!.id, 'both');
+    a.write(a.read().token, { [captionKey(f.shared, 'body')]: '選択後の更新' }); const changed = a.read();
+    expect(() => applyMembershipResolution(a, plan)).toThrow('更新'); expect(a.read()).toEqual(changed);
+    expect(projectHistory(a.read()).resources.captions[plan.copies[0]!.captionId]).toBeUndefined();
+  });
+
   it('carries a model update through both Scenes, retains participant work, explicitly repairs a pin and exchanges a second round', () => {
     const [a, b] = pair(), sa = new SyntheticSession(historyAuthority(a)), sb = new SyntheticSession(historyAuthority(b));
     select(sa); select(sb); const original = sb.snapshot, base = a.exportUpdate().base;

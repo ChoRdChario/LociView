@@ -15,6 +15,8 @@ import { bindingKey, captionKey, membershipKey, type SyntheticAuthority } from '
 import { decodeSyntheticAnchor, modelVersion, syntheticVersions } from './modelFixture';
 import { newPinModeMemory, pinModePlanIsCurrent, planPinMode, type PinModeContext,
   type PinModeMemory, type PinModePlan, type PinProposal } from '../../ui/projectScene/pinModeState';
+import { captionIncludePlanIsCurrent, newCaptionIncludeMemory, type CaptionIncludeContext,
+  type CaptionIncludeMemory, type CaptionIncludePlan } from '../../ui/projectScene/captionIncludeState';
 
 export interface SyntheticPinInput {
   readonly coordinates: readonly [string, string, string]; readonly familyId: string | null;
@@ -32,6 +34,8 @@ export class SyntheticSession {
   private navigation: NavigationSession;
   private drafts = new Map<string, CaptionDraft>();
   private models = new Map<string, ModelListMemory>();
+  private includes = new Map<string, CaptionIncludeMemory>();
+  private includeFeedback: CaptionIncludeContext['feedback'] = { kind: 'idle' };
   private pins = new Map<string, PinModeMemory>();
   private pinInput: SyntheticPinInput | null = null;
   private pinProposal: PinProposal | null = null;
@@ -48,6 +52,7 @@ export class SyntheticSession {
     this.navigation = Object.freeze({ sceneId, task: 'captions', sceneMemory: Object.freeze(
       Object.fromEntries(Object.keys(this.project.state.scenes).map(key => [key, emptyMemory()]))) });
     for (const key of Object.keys(this.project.state.scenes)) {
+      this.includes.set(key, newCaptionIncludeMemory(key));
       this.models.set(key, newModelListMemory(fixtureIds.project, key)); this.pins.set(key, newPinModeMemory(key));
     }
   }
@@ -60,7 +65,7 @@ export class SyntheticSession {
     return text === 'composition' ? text : this.pinInput ? 'pinMove' : text;
   }
   private get textPending(): PendingInteraction | null {
-    if (this.pinInputComposing || this.searchComposing || [...this.models.values()].some(m => m.composing) ||
+    if (this.pinInputComposing || this.searchComposing || [...this.includes.values()].some(m => m.composing) || [...this.models.values()].some(m => m.composing) ||
       [...this.drafts.values()].some(d => d.composing !== null)) return 'composition';
     return [...this.drafts.values()].some(hasCaptionDraft) ? 'text' : null;
   }
@@ -112,6 +117,40 @@ export class SyntheticSession {
     const count = edges.some(e => e.lifecycle.kind !== 'value') || sceneIds.size !== edges.length
       ? unknown<number>() : value(sceneIds.size);
     return { ...base, kind: 'ready', caption, sceneCount: count };
+  }
+  includeContext(): CaptionIncludeContext {
+    const { state, resources, colors, modelNames } = this.project;
+    return { source: { kind: 'ready', token: state.token, sceneId: this.sceneId,
+      items: Object.values(resources.captions).map(caption => {
+        const anchor = caption.anchor.kind === 'value' ? caption.anchor.value : null;
+        const edges = Object.values(state.captionMemberships).filter(e => e.sceneId === this.sceneId && e.resourceId === caption.id &&
+          (e.lifecycle.kind !== 'value' || e.lifecycle.value.state !== 'deleted'));
+        return { caption: { id: caption.id, title: caption.title, body: caption.body, color: colors[caption.id] ?? unknown<string>(),
+          mediaCount: value(0), pin: anchor?.kind === 'asset' && !this.composition.assets.some(asset => asset.assetId === anchor.assetId)
+            ? 'ownerHidden' as const : 'unavailable' as const, owner: anchor?.kind === 'asset' ? value({ kind: 'asset' as const,
+            assetId: anchor.assetId, name: value(modelNames[anchor.assetId] ?? 'モデル') }) : unknown<CaptionListItem['owner'] extends Field<infer T> ? T : never>() },
+          lifecycle: caption.lifecycle.kind === 'value' ? value(caption.lifecycle.value.state) : unknown<'active' | 'deleted'>(),
+          membership: edges.length > 1 || edges.some(e => e.lifecycle.kind !== 'value') ? unknown<'absent' | 'included'>() :
+            value(edges.length ? 'included' as const : 'absent' as const) };
+      }) }, memory: this.includes.get(this.sceneId)!, pending: this.pending, mutationBlock: null, feedback: this.includeFeedback };
+  }
+  acceptInclude(plan: CaptionIncludePlan): boolean {
+    try {
+      if (plan.kind === 'blocked') throw new Error(plan.reason);
+      if (!captionIncludePlanIsCurrent(plan, this.includeContext())) throw new Error('所属状態が変わっています。選び直してください。');
+      if (plan.kind === 'change') this.includes.set(this.sceneId, plan.memory);
+      else if (plan.kind === 'review') return this.refuse('画面上部で重複した項目・更新の競合を確認してください。');
+      else {
+        const membershipId = fresh('scm'), prepared = planSceneCommand(this.project.state, this.project.resources,
+          { kind: 'include', sceneId: this.sceneId, resourceKind: 'caption', resourceId: plan.captionId, membershipId, orderKey: 'Z' }, fresh('evt'));
+        const state = previewScenePlan(this.project.state, prepared, fresh('snapshot'));
+        this.publish(this.authority ? this.authority.write(this.project.state.token,
+          { [membershipKey(membershipId)]: JSON.stringify(state.captionMemberships[membershipId]) }) :
+          { ...this.project, state, resources: { ...this.project.resources, token: state.token } });
+        this.message = 'このシーンに追加しました。キャプションの内容と所有モデルは変わりません。';
+      }
+      this.includeFeedback = { kind: 'idle' }; return true;
+    } catch (error) { this.includeFeedback = { kind: 'failed', message: this.errorText(error) }; return this.refuse(this.errorText(error)); }
   }
   detailContext(): DetailContext {
     const source = this.detailSource();
@@ -213,7 +252,7 @@ export class SyntheticSession {
       const anchor = decodeSyntheticAnchor(JSON.stringify({ kind: 'asset', assetId: asset.id, assetFrameId: projection.value.assetFrameId,
         positionAsset, authoredAssetRevisionId: projection.value.revisionId,
         authoredAnchorCompatibilityId: needsFamily ? family!.compatibilityId : old.value.authoredAnchorCompatibilityId,
-        hitEvidence: { method: 'manual' } }), mode.caption.captionId);
+        hitEvidence: { method: 'manual' } }), this.project.captionTemplates[mode.caption.captionId]!);
       return { anchor, issue: null };
     } catch (error) { return { issue: this.errorText(error) }; }
   }

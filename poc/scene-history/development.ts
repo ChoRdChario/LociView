@@ -12,7 +12,7 @@ function fail(): never { throw new Error('更新を適用できません。元�
 
 /** Candidate remains isolated here. No Repo, persistence, network, or package writer. */
 export function createDevelopmentPair(A: Api, seed: Readonly<Record<string, string>>,
-  validate: (snapshot: HistorySnapshot) => void): readonly [DevelopmentHistory, DevelopmentHistory] {
+  validate: (snapshot: HistorySnapshot, previous?: HistorySnapshot) => void): readonly [DevelopmentHistory, DevelopmentHistory] {
   const bootstrap = A.from<Data>({ cells: Object.fromEntries(Object.entries(seed).map(([k, v]) => [k, new A.ImmutableString(v)])) });
   const base = A.getHeads(bootstrap).sort();
   const heads = (doc: Doc) => A.getHeads(doc).sort();
@@ -59,7 +59,7 @@ export function createDevelopmentPair(A: Api, seed: Readonly<Record<string, stri
     let doc = A.clone(bootstrap);
     function publish(staged: Doc): HistorySnapshot {
       index(A.getAllChanges(staged));
-      const next = snapshot(staged); validate(next); doc = staged; return next;
+      const next = snapshot(staged); validate(next, snapshot(doc)); doc = staged; return next;
     }
     function checkToken(token: string) {
       if (token !== snapshot(doc).token) throw new Error('更新されています。操作を選び直してください。');

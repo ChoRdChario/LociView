@@ -243,12 +243,13 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         // not the Native controller/schema runtime or a general Native dependency.
         const shared = ['../../scene/types', '../../domain/captionText', '../../domain/values', '../../domain/materialIntent', '../../nativeGs/backgroundColor'];
         expect(imports.every(p => p?.startsWith('./') || shared.includes(p!)), path).toBe(true);
-      } else if (/[\\/]harness[\\/]projectScene[\\/](fixture|session|workspace|entry|historyPort|historyProjection|teamWorkspace|modelFixture|developmentControls)\.ts$/.test(path)) {
+      } else if (/[\\/]harness[\\/]projectScene[\\/](fixture|session|workspace|entry|historyPort|historyProjection|teamWorkspace|modelFixture|developmentControls|membershipResolution)\.ts$/.test(path)) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
         const permitted = ['../../scene/types', '../../scene/commands', '../../scene/resolve',
           '../../ui/projectScene/navigationState', '../../ui/projectScene/navigationControls',
           '../../ui/projectScene/captionListState', '../../ui/projectScene/captionListControls',
           '../../ui/projectScene/captionDetailState', '../../ui/projectScene/captionDetailControls',
+          '../../ui/projectScene/captionIncludeState', '../../ui/projectScene/captionIncludeControls',
           '../../ui/projectScene/pinModeState', '../../ui/projectScene/pinModeControls',
           '../../ui/projectScene/modelListState', '../../ui/projectScene/modelListControls'];
         if (path.replaceAll('\\', '/').endsWith('/entry.ts')) {

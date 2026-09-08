@@ -46,12 +46,15 @@ deletes/replaces the scalar to resolve even the materialized winner. In 3.4.1,
 `getConflicts` exposes immutable-string candidates as JS strings while the map
 property is `ImmutableString`; the adapter handles both without choosing one.
 
-Fifteen current executable cases cover second-round field/membership preservation,
+Twenty-one current executable cases cover second-round field/membership preservation,
 original bytes/base, both scalar choices, incomplete/foreign/stale rejection,
 draft retention, actor-bound/disposed choice refusal and mounted two-actor
 edit/receive/choose/replay controls, model update with retained local work, explicit
 surface/manual anchor correction, typed binding/anchor conflicts, stale pin
-proposals and invalid metadata rejection. These
+proposals, invalid metadata rejection, explicit membership keep-one/independent
+Caption keep-both, retry with identical planned IDs, stale refusal and unseen-edge
+re-conflict. Caption copies are restricted to the known attachment/tag-empty
+fixture; descriptor immutability checks are not full incoming-history admission. These
 are Node plus authored-DOM records, **not rendered/browser/IME/device evidence**.
 Run from repository root:
 
@@ -73,11 +76,20 @@ This is not a new manual hold or a request to repeat the journal tests.
 For the later browser batch, select a model in `モデル`, choose a synthetic model
 update and receive it as the other actor. The same shared Caption keeps its text
 and position but requests pin review when its surface changed. Select that Caption,
-use `ピン位置を編集`, enter development coordinates, explicitly choose the current
+use `ピンを移動`, enter development coordinates, explicitly choose the current
 surface and confirm. Exchange both ways again. This is coordinate input for the
 synthetic fixture, not 3D picking/gizmo or real model-file replacement.
 
-Membership independent copies, media, renderer,
+For the same later batch, each actor can select Scene `設備の確認`, open
+`既存のキャプションを追加`, select `入口の記録` and use `このシーンに追加`.
+Receive the other actor's update: both membership candidates remain. Explicitly
+choose the original, then `選んだ項目だけ残す` or `別々のキャプションとして残す`.
+The latter creates independently editable Captions only in that Scene; the
+original's other-Scene reference and model owner remain. Exchange updates again
+and edit the two records independently. This is not a general duplicate button
+or a new manual hold. Reload loses all memory-only work.
+
+Independent model copies, media, renderer,
 real files, persistence and full `TEAM-FLOW-01` remain pending. The fixed small
 cell representation, transfer object and safety limits are disposable test ports,
 not a ratified ProjectDoc, import validator or numeric product guarantee.

@@ -10,6 +10,8 @@ export interface SyntheticProject {
   readonly resources: SceneResources;
   readonly modelNames: Readonly<Record<string, string>>;
   readonly colors: Readonly<Record<string, Field<string>>>;
+  /** Known fixture owner/frame template; copied resources still have independent editable cells. */
+  readonly captionTemplates: Readonly<Record<string, string>>;
 }
 export function freezeSynthetic<T>(item: T): T {
   if (item && typeof item === 'object' && !Object.isFrozen(item)) {
@@ -45,5 +47,6 @@ export function createSyntheticProject(): SyntheticProject {
     captions: { [f.shared]: caption(f.shared, f.equipment, 2, '設備の確認箇所', 'この記録は2つのシーンで共有しています。'),
       [f.second]: caption(f.second, f.structure, 1, '入口の記録', '全体シーンだけに含まれる記録です。') },
     views: {}, materials: {} }, modelNames: { [f.structure]: '建物', [f.equipment]: '設備' },
-    colors: { [f.shared]: value('#a08045'), [f.second]: value('#57758b') } });
+    colors: { [f.shared]: value('#a08045'), [f.second]: value('#57758b') },
+    captionTemplates: { [f.shared]: f.shared, [f.second]: f.second } });
 }

@@ -7,6 +7,7 @@ import { SyntheticSession } from './session';
 import { createPinModeControls } from '../../ui/projectScene/pinModeControls';
 import { createModelUpdateControls, createPinCoordinateControls } from './developmentControls';
 import { modelVersion } from './modelFixture';
+import { createCaptionIncludeControls } from '../../ui/projectScene/captionIncludeControls';
 
 /** One mounted integration host. Components own their DOM; synthetic session owns all working/UI state. */
 export function createDevelopmentWorkspace(document: Document, session = new SyntheticSession(),
@@ -56,10 +57,11 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   const modelUpdate = createModelUpdateControls(document, session, afterAction);
   const pin = createPinModeControls(document, plan => { session.acceptPin(plan); afterAction(); });
   const coordinates = createPinCoordinateControls(document, session, afterAction);
+  const include = createCaptionIncludeControls(document, plan => { session.acceptInclude(plan); afterAction(); });
   header.append(brand, name, navigation.sceneControl, navigation.saveStatus);
   editor.append(editorHeading, detail.root, pin.actions, coordinates.root, pin.modeStrip, mediaNote);
   stage.append(composition, editor);
-  sidebar.append(navigation.taskControl, list.root, modelList.root, modelUpdate.root, materialPanel, viewPanel);
+  sidebar.append(navigation.taskControl, list.root, include.root, modelList.root, modelUpdate.root, materialPanel, viewPanel);
   content.append(stage, sidebar); root.append(header, notice, message, content, footer);
   function render() {
     if (disposed) return;
@@ -70,14 +72,15 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
       windowBlock: '複数ウィンドウ・ピンへの接続は未接続です。' });
     const listOkay = list.render(captionContext);
     const modelsOkay = modelList.render(session.modelContext());
-    const pinsOkay = pin.render(session.pinContext()); coordinates.render(); modelUpdate.render();
-    if (!detailOkay || !listOkay || !modelsOkay || !pinsOkay) {
+    const pinsOkay = pin.render(session.pinContext()), includeOkay = include.render(session.includeContext()); coordinates.render(); modelUpdate.render();
+    if (!detailOkay || !listOkay || !modelsOkay || !pinsOkay || !includeOkay) {
       message.textContent = '入力中の状態を保持しています。操作を完了してから切り替えてください。';
       message.hidden = false; return;
     }
     navigation.render({ scenes: session.snapshot.state, session: session.session, pending: session.pending, save: { kind: 'unsaved' } });
     const task = session.session.task;
     list.root.hidden = task !== 'captions'; modelList.root.hidden = task !== 'models';
+    include.root.hidden = task !== 'captions';
     modelUpdate.root.hidden = task !== 'models';
     materialPanel.hidden = task !== 'materials'; viewPanel.hidden = task !== 'views';
     // A second visible-list pass restores the desired inner scroll after a tab was hidden.
@@ -98,6 +101,6 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   render();
   return { root, session, render, dispose() {
     disposed = true; navigation.dispose(); list.dispose(); detail.dispose(); modelList.dispose();
-    pin.dispose(); coordinates.dispose(); modelUpdate.dispose(); root.remove();
+    pin.dispose(); coordinates.dispose(); modelUpdate.dispose(); include.dispose(); root.remove();
   } };
 }

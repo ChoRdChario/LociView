@@ -4,6 +4,8 @@ import { historyAuthority, historySeed, projectHistory } from './historyProjecti
 import type { DevelopmentHistoryFactory, MemoryUpdate } from './historyPort';
 import { decodeSyntheticAnchor, modelVersion, syntheticVersions } from './modelFixture';
 import { sceneSwitchReason } from '../../ui/projectScene/navigationState';
+import { applyMembershipResolution, duplicateMemberships, planMembershipResolution, type MembershipResolutionPlan } from './membershipResolution';
+import type { Membership } from '../../scene/types';
 
 /** Two independently edited histories in one disposable page, not a file-sharing UI. */
 export function createTeamWorkspace(document: Document, factory: DevelopmentHistoryFactory) {
@@ -13,6 +15,7 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
   const names = ['準備担当', '参加者'];
   const lastReceived: (MemoryUpdate | undefined)[] = [];
   let active = 0, disposed = false;
+  const memberChoices = new Map<string, { selected: string | null; plan?: MembershipResolutionPlan }>();
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => {
     const node = document.createElement(tag); node.textContent = text; return node;
   };
@@ -65,18 +68,74 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
     actor.disabled = receive.disabled = session.pending !== null && session.pending !== 'text';
     if (actor.disabled) retry.disabled = true;
     const conflicts = Object.entries(snapshot.cells).filter(([, cell]) => cell.kind === 'conflict');
-    conflictPanel.hidden = !conflicts.length;
+    const duplicates = duplicateMemberships(snapshot), shownScene = session.sceneId;
+    conflictPanel.hidden = !conflicts.length && !duplicates.length;
     const elements: HTMLElement[] = [];
+    const retainedKeys = new Set<string>();
+    if (duplicates.length) elements.push(make('h2', '重複した項目を整理'));
+    for (const duplicate of duplicates) {
+      const key = `${shownActor}/${snapshot.token}/${shownScene}/${duplicate.kind}/${duplicate.sceneId}/${duplicate.resourceId}`;
+      retainedKeys.add(key);
+      const choice = memberChoices.get(key) ?? { selected: null }; memberChoices.set(key, choice);
+      const scene = session.snapshot.state.scenes[duplicate.sceneId]!, caption = session.snapshot.resources.captions[duplicate.resourceId];
+      const title = duplicate.kind === 'asset' ? session.snapshot.modelNames[duplicate.resourceId] ?? 'モデル' :
+        caption?.title.kind === 'value' ? caption.title.value || '無題' : 'タイトルの競合を確認';
+      const sceneName = scene.name.kind === 'value' ? scene.name.value : 'シーン名を確認';
+      const fieldset = make('fieldset'), legend = make('legend', `${sceneName} — ${title}`);
+      const table = duplicate.kind === 'asset' ? session.snapshot.state.assetMemberships : session.snapshot.state.captionMemberships;
+      const otherScenes = [...new Set(Object.values(table).filter(edge => edge.resourceId === duplicate.resourceId &&
+        edge.sceneId !== duplicate.sceneId && (edge.lifecycle.kind !== 'value' || edge.lifecycle.value.state !== 'deleted')).map(edge => edge.sceneId))];
+      const explanation = make('p', `元として残す項目を選択してください。他のシーン ${otherScenes.length}件の参照は変更しません。`);
+      const preview = make('p'), one = make('button', '選んだ項目だけ残す'), both = make('button', '別々のキャプションとして残す');
+      one.type = both.type = 'button';
+      const syncChoice = () => {
+        one.disabled = both.disabled = !choice.selected || session.pending !== null || duplicate.edges.some(edge => edge.lifecycle.kind !== 'value');
+        const ordinal = duplicate.edges.findIndex(edge => edge.id === choice.selected) + 1;
+        preview.textContent = !ordinal ? '' : duplicate.kind === 'caption'
+          ? `項目 ${ordinal}を元として残します。「別々に残す」場合、ほかの${duplicate.edges.length - 1}件はこのシーンだけの独立コピーになります。`
+          : `項目 ${ordinal}を残し、ほかの${duplicate.edges.length - 1}件をこのシーンから除外します。`;
+      };
+      fieldset.append(legend, explanation);
+      duplicate.edges.forEach((edge, i) => {
+        const label = make('label'), radio = make('input'); radio.type = 'radio'; radio.name = `membership-${key}`;
+        radio.value = edge.id; radio.checked = choice.selected === edge.id; radio.disabled = session.pending !== null;
+        const text = `項目 ${i + 1}（表示順 ${edge.orderKey.kind === 'value' ? edge.orderKey.value : '要確認'}）`;
+        radio.setAttribute('aria-label', `${sceneName} — ${title} 項目 ${i + 1}`);
+        radio.addEventListener('change', () => { choice.selected = edge.id; delete choice.plan; syncChoice(); });
+        label.append(radio, make('span', text)); fieldset.append(label);
+      });
+      const resolve = (action: 'one' | 'both') => attempt(() => {
+        if (active !== shownActor || session.sceneId !== shownScene || session.pending !== null || !choice.selected)
+          throw new Error('入力と操作対象を確認してください。選択は保持しています。');
+        if (!choice.plan || choice.plan.action !== action) {
+          const fresh = (prefix: string) => `${prefix}_${crypto.randomUUID().replaceAll('-', '')}`;
+          choice.plan = planMembershipResolution(snapshot, duplicate, choice.selected, action, fresh('evt'), action === 'one' ? [] :
+            duplicate.edges.filter(edge => edge.id !== choice.selected).map(edge => ({ edgeId: edge.id,
+              captionId: fresh('cap'), membershipId: fresh('scm') })));
+        }
+        applyMembershipResolution(history, choice.plan);
+        session.refreshHistory(); status.textContent = action === 'one' ? '選んだ項目を残しました。' :
+          '別々に編集できるキャプションとして残しました。相手側でも更新を受け取ってください。';
+      });
+      one.addEventListener('click', () => resolve('one')); both.addEventListener('click', () => resolve('both'));
+      fieldset.append(preview, one);
+      if (duplicate.kind === 'caption') fieldset.append(both);
+      else fieldset.append(make('p', 'モデルの独立コピーは未接続です。候補は保持しています。'));
+      if (session.pending !== null) fieldset.append(make('p', '未適用の入力を保持しています。適用するか取り消してから選択してください。'));
+      if (duplicate.edges.some(edge => edge.lifecycle.kind !== 'value')) fieldset.append(make('p', '所属の競合を先に確認してください。'));
+      syncChoice(); elements.push(fieldset);
+    }
+    for (const key of memberChoices.keys()) if (!retainedKeys.has(key)) memberChoices.delete(key);
     if (conflicts.length) elements.push(make('h2', '残す内容を選択'), make('p',
       '同じ項目に異なる編集があります。使用する内容を選択してください。'));
     for (const [key, cell] of conflicts) {
       if (cell.kind !== 'conflict') continue;
-      if (key.startsWith('membership/')) {
-        elements.push(make('p', 'モデルの所属に競合があります。残す項目の選択・独立した別項目として両方残す操作は未接続です。')); continue;
-      }
       const [, id, field] = key.split('/');
       const ordinal = Object.keys(session.snapshot.resources.captions).indexOf(id!) + 1;
-      const subject = key.startsWith('asset/') ? `${session.snapshot.modelNames[id!] ?? 'モデル'} — 使用するモデル` :
+      const membership = key.startsWith('membership/') ? JSON.parse(cell.candidates[0]!.value) as Membership : null;
+      const subject = membership ? `${session.snapshot.state.scenes[membership.sceneId]!.name.kind === 'value' ?
+        (session.snapshot.state.scenes[membership.sceneId]!.name as { value: string }).value : 'シーン'} — 所属する項目` :
+        key.startsWith('asset/') ? `${session.snapshot.modelNames[id!] ?? 'モデル'} — 使用するモデル` :
         `キャプション ${ordinal} — ${field === 'title' ? 'タイトル' : field === 'body' ? '本文' : field === 'anchor' ? 'ピン位置' : 'ピン色'}`;
       const group = make('fieldset'), legend = make('legend', subject);
       const confirm = make('button', '選んだ内容を使用'); confirm.type = 'button'; confirm.disabled = true;
@@ -84,9 +143,14 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
       group.append(legend);
       for (const [i, candidate] of cell.candidates.entries()) {
         let description = candidate.value || '（空欄）';
+        if (membership) {
+          const edge = JSON.parse(candidate.value) as Membership, caption = session.snapshot.resources.captions[edge.resourceId];
+          const name = session.snapshot.modelNames[edge.resourceId] ?? (caption?.title.kind === 'value' ? caption.title.value : 'キャプション');
+          description = `${name} — ${edge.lifecycle.kind === 'value' && edge.lifecycle.value.state === 'active' ? 'このシーンに含める' : 'このシーンから除外'}`;
+        }
         if (key.startsWith('asset/')) description = modelVersion(id!, candidate.value)?.label ?? 'モデル候補を確認';
         if (field === 'anchor') {
-          const anchor = decodeSyntheticAnchor(candidate.value, id!);
+          const anchor = decodeSyntheticAnchor(candidate.value, session.snapshot.captionTemplates[id!]!);
           if (anchor.kind === 'asset') {
             const version = syntheticVersions.find(v => v.assetId === anchor.assetId && v.projection.revisionId === anchor.authoredAssetRevisionId);
             description = `${session.snapshot.modelNames[anchor.assetId]} — X ${anchor.positionAsset[0]} / Y ${anchor.positionAsset[1]} / Z ${anchor.positionAsset[2]} — ${version?.label ?? '以前のモデル'}`;

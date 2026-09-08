@@ -19,4 +19,4 @@ export interface DevelopmentHistory {
   receive(update: MemoryUpdate): { readonly snapshot: HistorySnapshot; readonly added: number };
 }
 export type DevelopmentHistoryFactory = (seed: Readonly<Record<string, string>>,
-  validate: (snapshot: HistorySnapshot) => void) => readonly [DevelopmentHistory, DevelopmentHistory];
+  validate: (snapshot: HistorySnapshot, previous?: HistorySnapshot) => void) => readonly [DevelopmentHistory, DevelopmentHistory];
