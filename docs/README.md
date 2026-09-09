@@ -58,6 +58,13 @@ If observed code conflicts with the applicable compatibility or accepted future 
 
 ## Known implementation drift
 
+Current readiness review (2026-09-10): `tasks/todo.md` top separates approved
+outcomes, exact wire/migration design gaps and remaining storage/device evidence.
+05 §9.4 records an open unplaced-Caption migration gap and proposed preservation,
+not a schema amendment. The Native nullable anchor must not become fabricated
+v2 coordinates or a silently dropped Caption. No adoption/wire/recipe approval
+or new runtime change follows from this documentation task.
+
 2026-09-10: PO reports the five prescribed camera/pin/window groups PASS at
 `7540478`; their earlier pending status below is historical. Broader rendered,
 IME/iPhone/storage acceptance remains open. PO-approved Scene-first UX and the

@@ -393,6 +393,13 @@ and implementation-only probe identifiers never enter tracked vectors.
 
 ## 10. Remaining ratification inputs and stop boundary
 
+Readiness review (2026-09-10): the five user purposes and conflict/source-preservation
+policies are already approved; the following are exact technical ratification
+inputs, not invitations to reselect those policies. Current sequencing and reused
+evidence are at the top of `../../tasks/todo.md`. Specification 05 §9.4 records a
+separate unplaced-Caption representability decision affecting migration and all
+five output builders; this draft's anchor fields do not resolve that gap.
+
 The proposal is reviewable, not yet an executable wire contract. Resolve these
 three grouped inputs once; do not grow another isolated browser page or treat a
 new documentation checkpoint as a technology gate pass.

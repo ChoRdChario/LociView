@@ -9,7 +9,105 @@ requested. Synthetic two-person model/pin/history and independent Caption/model-
 The scoped PO result below closes only the listed interaction checks; broader
 rendered, IME, device and durable-file acceptance remain pending.
 
-### Current implementation — Scene-first Caption workflow (2026-09-10)
+### Current boundary review — durable/file readiness (2026-09-10)
+
+PO approved identifying the prerequisites for real-file/save/team integration.
+Start: clean `g0-baseline` at `b1b36bd`, synchronized with origin. This is a bounded
+documentation/read-only task, not approval of a package version, migration recipe,
+storage technology or production activation.
+
+- [x] Verify checkpoint and read current authority, completion map and relevant lessons.
+- [x] Separate already-approved user outcomes from exact wire/migration design gaps.
+- [x] Reconcile existing storage evidence with genuinely missing adoption/device inputs.
+- [x] Record a finite next slice, acceptance, exclusions and only necessary PO decisions.
+- [x] Independent read-only review of the result and document/reference checks.
+
+No UI/runtime/dependency/schema/old-project mutation, new probe or human retest in
+this task. Preserve `TEAM-FLOW-01` as the completion outcome; do not reopen approved
+Project/Scene, conflict choice, source preservation or five-purpose decisions.
+
+#### Decision summary / actual next decision
+
+**One immediate PO decision remains:** specification 05 §9.4 proposes preserving
+old unplaced Captions as active, editable list items with their text/media/tags and
+Scene memberships, no invented coordinates/owner and no marker until explicit
+placement. Native permits this today; the current v2 target only accepts positioned
+Asset/Project anchors. This is an open migration representability gap, not a defect
+in the accepted Native path. Its exact atomic state/schema must be independently
+reviewed after the outcome is accepted; no code or schema change occurs here.
+
+Already-approved outcomes need no renewed choice: one full Project per participant;
+Scene-based composition; Project-wide model updates preserve local Caption work;
+explicit keep-one/independently-editable keep-both; original source preservation;
+five separate purposes; content-based purpose detection; no inferred relation.
+The storage engine's production adoption, measured guarantees, new wire/recipe and
+any required schema amendment still need their own evidence-backed ratification.
+Those are later bounded approval packages, not questions about every implementation detail.
+
+#### Engineering work before real-file activation
+
+| Gap | Concrete next artifact / recommended direction | Gate / owner |
+|---|---|---|
+| Contribution delta versus full-source journal | Close 06 §8's source union: retain original manifest/parts, verified exchange-base evidence and separately hashed derived reconstruction. Keep receiver published heads distinct from sender target/base. Define exact replay/repair states; never label rebuilt bytes as the original source | Design in 06; independent review and PO ratification before changing 02 §8 or S2 import |
+| Durable exchange bases and backup | Close 06 §4.1's record/receipt/inventory shapes and idempotent completion point. Only verified import or completed output records a base; output is not receipt by another person. Back up the evidence needed to verify a restored base, not bare IDs/hashes | Same wire/recovery design, then actual persistence/output checks |
+| Wire profile and summaries | Exact five discriminators/control bytes, allowed ZIP features and output sink, adapter identity, complete inventory, deterministic summary classifier and golden vectors. Keep measured budgets as explicit pending inputs; no invented version/limit or adoption from PoC ceilings | 06 §§3–7/9–10; engineering prepares, PO ratifies reviewed format/guarantees |
+| History-free construction | Finish nested field/ID policy for whole-Project clean and one-Scene review, plus review-to-edit mapping for a nonvisual owner and the proposed unplaced state. No source history/identity leakage, fabricated model, ProjectAnchor rewrite or guessed conflict winner | 05 §§7.3–7.4; 06 §§5–6. Output builders remain unimplemented |
+| Migration recipe and late Native bridge | New companion for exact source keys/preimages/full digests/collision checks and golden outputs. Specify portable bridge support with verified old baseline, mapped ancestor and processed-package records. Do not reinterpret old recipe IDs, closed MigrationSupportV1 or Native files | 05 §9 / proposed §9.4 outcome; separate reviewed recipe/bridge ratification before S2 |
+| Actual model/media content and product services | Replace fixture-only source construction/verifier with admitted real content, durable metadata/CAS/journal and package services. Preserve current supported formats/media; use existing Native readers as bounded reference/reuse inputs, not proof of a v2 adapter | S1/S2 prerequisites below before connection; source/model/profile relationships never inferred |
+
+#### Evidence reuse and genuinely missing observations
+
+| Existing result retained | Still missing for the changed path / when needed |
+|---|---|
+| Root 1868 PASS / 21 TODO, scoped provider and verified two-person development loops, exact retry | No durable Project session or actual file exchange in this host. Synthetic bytes/DOM and page-local exchange do not prove real file admission or save/reopen |
+| Chrome journal old/new publication, separate-tab recovery, notification/no-op and reload after the simultaneous-read fix | Actual domain/repository/inventory/journal integration, required cross-tab/process interruption and restart. Reuse original fault vectors; do not request the closed Chrome batch again |
+| Node 500 MiB bounded stream/hash/output; user-reported OPFS saved-body readback | Chosen browser output sink, managed buffers and semantic round-trip on the candidate. Original OPFS output log remains unknown, not failed and not a new manual hold; do not request its duplicate run |
+| Synthetic-file shared retention, grace collection, root return and interrupted GC | Real domain strong/conflict/opaque/migration roots and origin-wide save/GC coordination before enabling production GC |
+| Small adapter/domain and fixture UI checks | Spec 03 §6's two-tab 1,000-command phases, multiple seeds/third-tab/process interruption and 10,000-Caption/50,000-change usable UI plus measured cold-open/durable-edit/merge limits. These are not a new all-format/device matrix |
+| Pinned isolated dependencies; scoped source review | Adoption configuration's security/license/lockfile, bundled CSP/offline behavior and bounded output. Last recorded Repo audit had three moderate entries, not a current fresh audit or production waiver |
+| Previous Native Desktop/physical-iPhone acceptance | Applicable new adapter/storage/background/quota/restart/output evidence before adoption or changed-path acceptance; S3 then adds integrated Desktop/iPhone team/offline acceptance. Device checks cannot all be postponed past the storage-adoption gate |
+
+No renewed G0 three-device campaign, renderer bakeoff, old journal run, detached
+provider series or fresh browser page is selected. A live dev server is not
+offline/PWA evidence. No immediate human operation is requested; when device work
+is necessary, propose one exact candidate/HTTPS route for approval and batch the
+remaining relevant operations, preserving already-passed evidence.
+
+#### Next bounded work and completion criteria
+
+1. **Contract closure, next:** complete the exact wire/recovery and new migration-
+   companion drafts above. Independent wire/recovery design need not wait for
+   the unplaced decision; affected anchor/conversion/builder rules do. The user
+   result is lossless conversion and continuing return of edits, not a new file
+   management concept. Exit: closed structural mappings, source/base/receipt
+   separation, canonical valid/invalid vector definitions, explicitly owned
+   measured inputs and one independent review before ratification. This is design
+   authorization only; no package bytes, dependency adoption or durable activation.
+2. **Remaining candidate prerequisites:** use the existing isolated adapter/CAS
+   scope and source/domain parts to close only the G1-A/C gaps above; do not copy
+   PoC implementations into production. Exit: exact evidence, limitations and
+   security/device findings for an explicit adoption decision. A real-data/durable
+   switch in the synthetic host is not authorized by the §13.4 exception alone.
+3. **Gated connected product delivery:** after applicable approvals, implement
+   S1 production save/reopen, S2 real conversion/five-purpose exchange, then S3
+   ordinary UI in small reversible connections to the same workflow. Exit remains
+   all five steps of `TEAM-FLOW-01`, not only a successful save. Model update plus
+   local text/media, pin correction, independent copies, second exchange and
+   restart/offline must survive; failure preserves source, local work and recovery.
+
+Exclusions: UI polish/new capabilities, new media formats, arbitrary storage
+fallbacks, automatic relation/winner selection, source overwrite, large refactor,
+release/version/main/Pages/Service Worker changes. Stop at a contract conflict,
+unproved migration identity, adoption/numeric decision or required device action.
+This readiness task does not itself grant any of those approvals.
+
+Readiness result: independent storage-evidence and migration inspection plus a
+read-only final-diff review found no blocker to presenting this plan. The unplaced
+gap is recorded, not silently resolved. Diff/markdown-only scope and referenced
+file checks PASS. No application test/build rerun for unchanged executable bytes;
+no new runtime, browser/device, adoption or performance evidence is claimed.
+
+### Completed implementation — Scene-first Caption workflow (2026-09-10)
 
 - [x] Record PO-reported PASS for the five preceding manual test groups at
   `7540478`: basic Blender mouse navigation; Shift+click placement/gizmo;

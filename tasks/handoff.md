@@ -1,5 +1,13 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **Current next decision (2026-09-10, after pushed `b1b36bd`):** the bounded
+> durable/file readiness review is at the top of todo. Approved Project/Scene,
+> five purposes and conflict choices need no renewed decision. One source/target
+> gap needs PO resolution: preserve old unplaced Captions as editable list items
+> without invented coordinates/owner (05 §9.4 proposal). Exact wire/recovery,
+> migration/bridge and adoption/device inputs remain before real-file activation.
+> No old Chrome journal rerun or immediate human test. Current UI is unchanged.
+
 > **2026-09-10 update:** PO reports the five prescribed camera/pin/window manual
 > groups PASS at `7540478`, not full team/device/storage acceptance. The subsequent
 > Scene-first UX is PO-approved and implemented in the same development host:

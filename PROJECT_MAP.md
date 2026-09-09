@@ -10,6 +10,13 @@
 
 ## Start here
 
+Current task (2026-09-10, after synchronized `b1b36bd`): durable/file readiness
+review is recorded at the top of `tasks/todo.md`. The one immediate product
+decision is unplaced-Caption preservation in 05 §9.4; the existing Native path
+permits it, but the v2 target has no such state. Wire/recipe details and remaining
+adoption/device evidence stay separate. No new schema, real-data activation or
+repeat of the closed Chrome journal is authorized by this planning checkpoint.
+
 2026-09-10: PO reports the five prescribed camera/pin/window manual groups PASS
 at `7540478`; this supersedes their pending status below only for that scope.
 PO approved Scene-first Caption UX under spec 05 §13.4. The same development host

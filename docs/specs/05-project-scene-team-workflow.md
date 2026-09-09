@@ -768,6 +768,37 @@ blob, processed-package registration, retention/privacy roots and package
 closure. No implementation may improvise this data inside `MigrationSupportV1`,
 whose schema is closed, or keep it only in an unexported local index.
 
+### 9.4 Readiness finding — unplaced Caption migration (2026-09-10)
+
+> `OPEN / PROPOSED RESOLUTION / NOT A SCHEMA AMENDMENT`
+
+There is a real source/target representability gap, not a new failure in the
+current Native path. Native `NativeCaptionV1` permits `anchor: null` with a known
+or absent `ownerAssetId`. Specification 02's bounded Native receiver keeps these
+Captions editable, and specification 04 §4.3 preserves a valid Caption with an
+invalid coordinate as active/unplaced. In contrast, the current v2 Caption
+contract and `src/domain/projectMutableFields.ts` require an anchor accepted by
+`ProjectRecordFields.anchor`: only `asset` or `project`, both with coordinates.
+The current target has no authoritative unplaced state. A conversion recipe
+cannot fix this by inventing coordinates, choosing a model or deleting the Caption.
+
+Recommended PO decision: preserve an unplaced Caption as an active list item with
+its text, supported media, tags and exact Scene memberships; show `未配置` and no
+3D marker until an explicit placement command. Retain any source-authoritative
+known owner separately from a position; an absent owner remains absent. Do not
+turn an unknown/conflicted placement into an ordinary unplaced state or infer a
+ProjectAnchor. This is a compatibility-preserving proposal, not approval to change
+the schema, migrate real files or expand media support.
+
+After PO agreement, the technical amendment must define the closed state and its
+atomic field/conflict/owner semantics across record admission, projections,
+migration/late Native bridge, five package purposes and history-free builders.
+It must distinguish unplaced, placed-but-hidden/missing-model, `needsReview`, and
+unresolved conflict. Reuse source conversion cases; require same-source replay,
+independent edit/placement, export/reopen and cancellation to preserve the record
+without a fabricated position or owner. Until then, ProjectScene conversion of
+this source state remains blocked; the existing Native reader/writer is unchanged.
+
 ## 10. Atomicity, interruption and recovery
 
 Local commands and remote batches use the existing v2 cross-store journal
