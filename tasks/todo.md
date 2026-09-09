@@ -8,7 +8,51 @@ The completed journal Chrome recheck below stays closed; no journal rerun is
 requested. Synthetic two-person model/pin/history and independent Caption/model-copy loops now exist; browser,
 IME and device acceptance remain pending, not implied by its DOM tests.
 
-### Current checkpoint / next implementation
+### Current checkpoint / interaction correction
+
+**PO correction — human-operable placement before the browser batch:** the
+provided screen shows buried add/move controls and compressed nested editors.
+The PO stopped the manual test: connect a translation gizmo and restore
+Shift+click addition first. The prior statement that no implementation remained
+before measurement is superseded. Multiple windows already have code support;
+make their existing entry discoverable rather than claiming a new implementation.
+Started clean `56bbeb3`, quota 68%. No renewed journal test or manual approval hold.
+- [x] Connect existing Three.js translate gizmo to the provisional pin position;
+  preview in real time, retain explicit confirmation/cancel and exact retry.
+- [x] Shift+click the explicit selected model to start an add proposal; preserve
+  button/tap alternative, stale/multitouch/drag guards and no automatic owner.
+- [x] Keep pin mode exits beside the stage, move detail into the right task area,
+  collapse numeric supplements and expose existing comparison-window actions.
+- [x] Run focused connected checks, required full checks and independent review.
+No schema/dependency/storage/general renderer adoption. Real browser/native-input
+acceptance is still pending; do not ask the PO to repeat the old unusable flow.
+
+Result / self-review: the same host now connects translation arrows/planes to a
+transient ProjectFrame marker and converts back to AssetFrame once. Confirm is
+still the sole history mutation. Orbit is disabled during the drag; Escape,
+pointer cancellation/lost capture and multiple-pointer interruption restore its
+starting proposal. Final cancel keeps the confirmed pin. A read-only review's
+pointer-owner finding was fixed and rechecked with no remaining concrete blocker.
+Shift+click proposes addition only on the explicit model; normal add plus surface
+click/tap remains available. Creation, move, finish/cancel are before the viewport;
+detail is right-side, numbers collapsed, and existing comparison actions visible.
+
+Verification: root and scoped TypeScript PASS; focused 4 files / 34 PASS; root
+105 files / 1862 PASS / 21 existing TODO; actual-candidate mounted acknowledgment
+8 PASS. Both builds PASS with existing chunk/import warnings; 13/9 parsed source
+maps contain zero candidate/provider modules (shared pure value/material helpers
+remain permitted). Existing dev HTML and changed modules return HTTP 200; this
+proves delivery only. No native handle hit-test/event-order, raster/layout, IME,
+iPhone, offline/PWA, real storage or adoption acceptance. Quota now 67% remaining.
+
+Short meta-audit / next boundary: this repairs a concrete obstacle in the connected
+workflow rather than extending auxiliary components. The old numeric-first test
+and its ready-for-measurement conclusion are withdrawn. Native usability of the
+correction remains open; keep one later connected browser batch, not a new probe,
+and do not bypass the unchanged automation failure or request the old human steps.
+Real file/storage prerequisites below remain unchanged. No push/release performed.
+
+### Previous checkpoint — direct surface proposal, not sufficient human UI
 
 Direct position selection/preview is now connected in the same served verified
 host. A visible surface on the explicitly chosen model proposes AssetFrame XYZ;
@@ -28,7 +72,7 @@ bounded-diff blocker. Dev HTML and changed modules return HTTP 200. That is deli
 not browser execution. No native pointer, raster, IME, iPhone, offline/PWA,
 durable-save or adoption PASS. Official quota 68% remains; no reset redeemed.
 
-Short meta-audit / next decision: this closes the essential missing direct
+Previous meta-audit / superseded next decision: this closes the essential missing direct
 creation/correction interaction, rather than adding a detached component. A
 read-only sequencing check identifies no mandatory additional implementation
 before UI measurement under 05 §13.4. The next finite exit is the same host's
@@ -46,7 +90,8 @@ Real storage/file activation requires the S1/S2 prerequisites in the table below
 Do not silently promote the candidate, add convenience-only work indefinitely,
 or treat an unavailable browser as proof of UI success. Gated production services
 and the full TEAM-FLOW-01 remain open. No new general profile, dependency, renderer
-port, GS/Point/proxy/gizmo, real data, ordinary-entry or release action.
+port, GS/Point/proxy, real data, ordinary-entry or release action. The later bounded
+pin-gizmo correction above supersedes this checkpoint's gizmo exclusion.
 
 ### Completed direct-position slice — from `b04cd43`
 

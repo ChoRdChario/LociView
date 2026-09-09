@@ -33,6 +33,18 @@ const label = (root: RecordedNode, name: string) => by(root, n => n.attributes.g
 const button = (root: RecordedNode, text: string) => by(root, n => n.tag === 'button' && n.textContent === text);
 
 describe('connected synthetic development host (not rendered, storage or TEAM-FLOW acceptance)', () => {
+  it('keeps placement controls outside the editor and details/comparison entry in the right task area', () => {
+    const w = createDevelopmentWorkspace(new RecordedDocument().asDocument()), root = record(w.root);
+    const stage = label(root, 'シーンの構成'), sidebar = label(root, '作業パネル');
+    expect(stage.contains(label(root, 'ピンの追加・移動'))).toBe(true);
+    expect(stage.contains(label(root, 'ピンの操作'))).toBe(true);
+    expect(sidebar.contains(label(root, 'キャプションの詳細'))).toBe(true);
+    expect(sidebar.contains(button(root, '比較に残す'))).toBe(true);
+    const numeric = by(root, n => n.className === 'lv-development-numeric');
+    expect(numeric.tag).toBe('details'); expect(numeric.hidden).toBe(true);
+    expect(stage.contains(label(root, 'キャプションの詳細'))).toBe(false);
+    w.dispose();
+  });
   it('shares one Caption through A/B/A and keeps each Scene selection, search and color memory', () => {
     const session = new SyntheticSession(); const original = session.snapshot;
     expect(find(session, { kind: 'select', captionId: f.shared })).toBe(true);
@@ -122,7 +134,7 @@ describe('connected synthetic development host (not rendered, storage or TEAM-FL
     by(label(root, 'キャプション一覧'), n => n.className === 'lv-caption-select').fire('click');
     expect(title.value).toBe('画面で編集'); scene.value = f.overview; scene.fire('change');
     expect(title.value).toBe('画面で編集'); expect(label(root, 'タイトル')).toBe(title);
-    title.value = '取り消す文章'; title.fire('input'); button(root, '取り消す').fire('click');
+    title.value = '取り消す文章'; title.fire('input'); button(label(root, 'キャプションの詳細'), '取り消す').fire('click');
     expect(hasCaptionDraft(workspace.session.detailContext().draft)).toBe(true);
     button(root, '変更を取り消す').fire('click'); expect(title.value).toBe('画面で編集');
     expect(hasCaptionDraft(workspace.session.detailContext().draft)).toBe(false);

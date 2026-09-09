@@ -6,9 +6,10 @@ import type { ViewportFactory, ViewportObservation } from './viewportHost';
 import { readProjectCamera, readSolidBackground, type SolidBackground } from './viewHistory';
 import type { DisplayCapture } from './viewSession';
 import { pickResidentSurface, type ResidentSurface } from './viewportPicking';
+import { createPinGizmo } from './pinGizmo';
 
 /** Existing Three.js dependency, exact synthetic fixture only. No model loaders or Native controller. */
-export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
+export const createSyntheticViewport: ViewportFactory = (canvas, changed, proposePin) => {
   let renderer: THREE.WebGLRenderer | null = null, controls: OrbitControls | null = null;
   let camera: THREE.PerspectiveCamera | THREE.OrthographicCamera | null = null;
   const scene = new THREE.Scene(), models = new THREE.Group(); scene.add(models); scene.background = new THREE.Color('#e8e6e2');
@@ -23,6 +24,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
   let issue: string | null = null, contextLost = false, dragging = false, axis: ViewportObservation['axis'] = null, serial = 0, raf = 0, lastObservation = '';
   let width = 1, height = 1;
   let pickEpoch = 0;
+  let gizmo: ReturnType<typeof createPinGizmo> | null = null;
   const errorText = (e: unknown) => e instanceof Error ? e.message : '3D表示を開始できません。';
   function observePose() {
     if (!camera || !controls) return;
@@ -59,6 +61,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
   }
   function release() {
     pickEpoch++;
+    gizmo?.dispose(); gizmo = null;
     observePose(); cancelAnimationFrame(raf); raf = 0; controls?.dispose(); controls = null; camera = null;
     clearModels(); renderer?.dispose(); renderer = null; modelKey = ''; dragging = false;
   }
@@ -90,7 +93,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
   function installPose() {
     if (!renderer) return;
     pickEpoch++;
-    const previousCamera = camera, previousControls = controls, previousBackground = scene.background, previousTouchAction = canvas.style.touchAction;
+    const previousCamera = camera, previousControls = controls, previousGizmo = gizmo, previousBackground = scene.background, previousTouchAction = canvas.style.touchAction;
     applying = true;
     try {
       const target = new THREE.Vector3(...pose.target), position = new THREE.Vector3(...pose.position);
@@ -102,6 +105,15 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
       else { const half = pose.projection.verticalSpan / 2; camera = new THREE.OrthographicCamera(-half * width / height, half * width / height, half, -half, -far, far); }
       camera.position.copy(position); camera.up.set(...pose.up); camera.lookAt(target); camera.updateMatrixWorld(true);
       if (![...camera.projectionMatrix.elements, ...camera.matrixWorld.elements].every(Number.isFinite)) throw new Error('表示範囲を確認してください。');
+      // Register TransformControls before OrbitControls: handle-down disables orbit
+      // before its listener sees that same event (including touch).
+      gizmo = proposePin ? createPinGizmo(canvas, scene, camera, (target, world) => {
+        const surface = resident.get(target.assetId);
+        if (!surface || JSON.stringify(target) !== JSON.stringify(display?.pinEdit?.target) || !display?.pinEdit?.enabled) return false;
+        surface.asset.updateMatrixWorld(true);
+        const p = surface.asset.worldToLocal(new THREE.Vector3(...world));
+        return [p.x, p.y, p.z].every(Number.isFinite) && proposePin(target, [p.x || 0, p.y || 0, p.z || 0]);
+      }, busy => { if (controls) controls.enabled = !busy; serial++; if (!applying) changed(); }) : null;
       controls = new OrbitControls(camera, canvas); controls.enableDamping = false; controls.target.copy(target);
       controls.addEventListener('start', () => { dragging = true; serial++; changed(); });
       controls.addEventListener('end', () => { dragging = false; observePose(); serial++; changed(); });
@@ -111,10 +123,12 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
       controls.update();
       scene.background = new THREE.Color().setRGB(...background.colorSrgb, THREE.SRGBColorSpace);
       previousControls?.dispose();
+      previousGizmo?.dispose(); gizmo?.update(display?.pinEdit);
       // The old OrbitControls.disconnect resets this shared element to auto.
       canvas.style.touchAction = 'none';
     } catch (e) {
       if (controls !== previousControls) controls?.dispose();
+      if (gizmo !== previousGizmo) gizmo?.dispose(); gizmo = previousGizmo;
       camera = previousCamera; controls = previousControls; scene.background = previousBackground;
       canvas.style.touchAction = previousTouchAction;
       throw e;
@@ -173,11 +187,11 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
       if (sceneChanged) observePose(); display = next;
       if (sceneChanged) { entryPending = true; if (renderer) { enterScene(); installPose(); } }
       else if (boundsChanged) { observePose(); installPose(); }
-      buildModels(); serial++;
+      buildModels(); gizmo?.update(next.pinEdit); serial++;
     },
     setActive(next) { if (!next && active) release(); active = next; ensure(); },
     pick(target, x, y) {
-      if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || !display) return null;
+      if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || gizmo?.dragging || !display) return null;
       return pickResidentSurface(display, target, resident, camera, new THREE.Vector2(x * 2 / width - 1, 1 - y * 2 / height));
     },
     read() {
@@ -191,10 +205,11 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
         pickToken: String(pickEpoch),
         ready: Boolean(active && renderer && camera && !issue), issue,
         notice: [notice, ...(display?.materialNotices ?? []), ...Object.values(display?.materials ?? {}).flatMap(m => 'issue' in m ? [m.issue] : [])].filter(Boolean).join(' ') || null,
-        dragging, projection: pose.projection.kind, axis, pins, preview: display?.preview ? project(display.preview) : undefined };
+        dragging: dragging || !!gizmo?.dragging, manipulating: !!gizmo?.dragging,
+        projection: pose.projection.kind, axis, pins, preview: display?.preview ? project(display.preview) : undefined };
     },
     camera(intent) {
-      if (!active || !renderer || issue || !display || dragging) throw new Error('3D表示を確認してください。');
+      if (!active || !renderer || issue || !display || dragging || gizmo?.dragging) throw new Error('3D表示を確認してください。');
       observePose();
       if (intent.kind === 'recall') throw new Error('保存した視点は未接続です。');
       if (intent.kind === 'projection') pose = switchProjection(pose, intent.projection);
@@ -202,12 +217,12 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
       axis = intent.kind === 'axis' ? intent.axis : null; installPose(); observePose(); serial++; changed();
     },
     capture() {
-      if (!active || !renderer || issue || !display || dragging) throw new Error('3D表示を確認してください。');
+      if (!active || !renderer || issue || !display || dragging || gizmo?.dragging) throw new Error('3D表示を確認してください。');
       return { camera: readProjectCamera({ position: pose.position, target: pose.target, up: pose.up,
         projection: pose.projection.kind === 'perspective' ? { kind: 'perspective', verticalFovRadians: pose.projection.verticalFov } : pose.projection }), background: readSolidBackground(background) };
     },
     recall(payload) {
-      if (!active || !renderer || issue || !display || dragging) throw new Error('3D表示を確認してください。');
+      if (!active || !renderer || issue || !display || dragging || gizmo?.dragging) throw new Error('3D表示を確認してください。');
       const previousPose = pose, previousBackground = background, previousAxis = axis;
       try { useCapture(payload); installPose(); }
       catch (e) { pose = previousPose; background = previousBackground; axis = previousAxis; throw e; }

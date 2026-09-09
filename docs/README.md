@@ -72,8 +72,12 @@ independent keep-both copies and continuing exchange; anchors on verified model
 copies remain owned by that model. Direct viewport picking/preview now connects
 the exact selected resident surface to confirmation/cancellation and retry.
 CPU/mounted checks cover transforms, clipping, material/occlusion and rejected
-gestures; they do not prove native input or raster output. Next is connected UI
-evidence, not more detached provider components. Current execution counts and remaining gates
+gestures; they do not prove native input or raster output. A PO correction now
+connects transient translate handles and Shift+click addition, moves pin actions
+beside the viewport, and exposes detail/comparison actions in the right task area.
+Numeric input is supplemental. The old UI test request is withdrawn; corrected
+native interaction/layout remains unverified, not a new provider campaign.
+Current execution counts and remaining gates
 are recorded at the top of todo; no new browser/device/storage credit.
 
 Current scheduling amendment (2026-09-09): specification 05 §13.4 is PO approved

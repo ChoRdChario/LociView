@@ -34,8 +34,9 @@ class/manual evidence is checked at its causal parent; later aggregate receives
 may include additional memberships and independent copies. This feeds the existing
 host's add-pin mode with exact retained retry, not a new schema or durable write.
 The same host also accepts provisional positions from its exact resident fixture
-surface. A separate preview and XYZ correction precede confirmation; failed
-admission retains that proposal. CPU intersection and mounted gesture tests are
+surface. A separate preview, translate gizmo and optional XYZ correction precede
+confirmation; Shift+click starts addition only on the explicitly selected model.
+Failed admission retains that proposal. CPU intersection and mounted gesture tests are
 root checks; the actual-candidate mounted retry case also retains this preview.
 `development-browser.ts` now initializes this pair before mounting the existing
 development UI. One session acknowledgment coordinator handles all editors and
@@ -204,16 +205,22 @@ acceptance remain later work. This is not durable storage or offline evidence.
 For the later browser batch, select a model in `モデル`, choose a synthetic model
 update and receive it as the other actor. The same shared Caption keeps its text
 and position but requests pin review when its surface changed. Select that Caption,
-use `ピンを移動`, select a visible point on that model's surface, inspect
-`仮の位置` and use `位置を確定`. Numeric XYZ and the explicit surface control
-remain available as an alternative. Exchange both ways again. This is the exact
-synthetic triangle connection, not a gizmo or real model-file replacement.
+use `ピンを移動` just above the 3D viewport, select a visible point on that model's
+surface, then drag the translation arrows/planes to adjust `仮の位置` before
+`位置を確定`. A reviewed model update still requires the explicit current surface;
+coordinates alone do not resolve it. `数値で調整` is a collapsed supplement, not
+the required position UI. Exchange both ways again. This is an exact synthetic
+triangle/pin connection, not real model-file replacement.
 
-For new Caption creation in that same batch, open `キャプション`, select
-`追加先モデル`, then `ピンを追加`. Select a visible point on that model without
-dragging: `仮の位置` and XYZ should change, but the Caption list must not gain a
-record until `位置を確定`. Correct XYZ once and confirm; the new Caption should
-be selected for editing. Enter/apply its title/body, switch `操作する人` and
+The previous numeric-first manual request is withdrawn after the PO's UI report.
+For the corrected later batch, `追加先モデル` is the selector immediately above
+the 3D viewport (choose `設備`, for example). Shift+click a visible point on that
+model, or use the adjacent `ピンを追加` followed by ordinary click/tap on its
+surface. `仮の位置` and translation handles should appear, with no new list record
+until `位置を確定`. Drag an arrow/plane to adjust it without rotating the camera;
+Escape or pointer cancellation restores the drag-start proposal. Confirm after
+releasing the drag; the new Caption should be selected in the right detail editor.
+Enter/apply its title/body, switch `操作する人` and
 receive the update. Its owner and position must be preserved. Repeat position
 selection with `ピンを移動`, then `取り消す` and `操作を取り消す`: the confirmed
 pin must not move. A camera drag or a miss must not replace the provisional
@@ -253,7 +260,8 @@ copy. A single-sided triangle legitimately disappears edge-on/from behind.
 If a real drawing failure occurs, metadata must remain and recovery must be
 explicit. Do not force context loss or treat object/DOM tests as raster evidence.
 
-In that same batch, use `比較に残す` on one Caption, select another and retain it.
+In that same batch, use `比較に残す` near the top of the right `キャプション`
+area on one Caption, select another and retain it.
 Both confirmed texts should remain; bringing a window forward must not change
 the right-list selection or its position. `×` closes only that window; refresh
 must not reopen it, while explicit selection or `ウィンドウを表示` does. Move a

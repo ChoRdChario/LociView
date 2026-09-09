@@ -1217,7 +1217,42 @@ preview -> numeric correction -> confirmation or cancellation and exact retry.
 GPU/native input and physical-iPhone acceptance remain the batched external lane.
 This adds no general profile, GS/Point/proxy/gizmo support or storage activation.
 
-Observed bounded result: exact resident picking, a separate provisional marker,
+**PO interaction correction (from `56bbeb3`):** the previous bounded exclusion of
+gizmo/Shift input is superseded for this development host. Before resuming human
+tests, connect existing Three.js translation handles to the provisional position.
+Axis/plane/screen translation changes only the proposal, including off-surface
+positions; explicit confirmation still writes one complete manual AssetAnchor.
+Convert ProjectFrame to AssetFrame once. A current compatible move retains its
+class; needsReview still requires an explicit current surface selection, never
+cleared by coordinates alone. Orbit is disabled during handle manipulation;
+cancelled drag restores its initial proposal, final cancel restores the confirmed
+pin, and failures retain exact proposal/change bytes. Stale owner/source, hidden
+host and context loss detach interaction without publishing.
+
+Shift+primary click on the explicitly selected added-to model starts the same
+add proposal; during placement a surface click or Shift+click repositions it.
+Keep release/movement/multi-pointer/stale guards, reject other modifiers and
+exclude gizmo handles from the surface action. No inferred model relation or
+instant durable addition. A normal add button plus surface tap remains available.
+Add/move and finish/cancel stay adjacent to the stage outside the detail scroller;
+numeric editing is collapsed supplemental UI. The right task area contains list
+and detail without shrinking the form into nested one-line scroll areas. Expose
+the existing open/retain comparison-window actions; no new window semantics.
+Acceptance reuses current session/history/window tests and adds handle transform,
+cancel/stale/Orbit lifetime, shortcut and layout-ownership checks. CPU/DOM evidence
+is not native rendering/touch/IME acceptance. No new files/storage/profile gate.
+
+Observed PO correction: provisional translation handles, explicit-model
+Shift+click addition and near-stage action/right-detail ownership are connected.
+CPU/mounted checks cover the single world-to-asset transform, Orbit exclusion,
+drag-start restoration on Escape/cancel/lost capture/multiple-pointer interruption,
+camera replacement/disposal and explicit final confirmation/cancel. Independent
+review's pointer-owner finding is fixed and rechecked. Existing async retry and
+comparison-window tests pass. This is code/object/DOM evidence only, not native
+handle hit-testing, event ordering or rendered usability. Current todo records
+executed full checks; the PO's withdrawn old manual test is not a new hold.
+
+Previous bounded result: exact resident picking, a separate provisional marker,
 numeric correction and the existing confirmed creation/move/cancel/retry path
 are now connected. CPU intersections cover transforms, side/material/occlusion
 and perspective/orthographic clipping, including the viewport's negative near

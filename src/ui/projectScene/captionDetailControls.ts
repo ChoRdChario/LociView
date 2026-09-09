@@ -76,7 +76,9 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
   });
   const actions = make('div'); actions.className = 'lv-caption-detail-actions';
   const apply = button('変更を適用'), cancel = button('取り消す'), showWindow = button('ウィンドウを表示'), retain = button('比較に残す');
-  actions.append(apply, cancel, showWindow, retain); root.append(actions);
+  const windowActions = make('div'); windowActions.className = 'lv-caption-detail-actions';
+  windowActions.setAttribute('aria-label', 'キャプションの表示');
+  actions.append(apply, cancel); windowActions.append(showWindow, retain); root.append(actions, windowActions);
   const windowNote = make('p'); windowNote.id = `lv-caption-windows-${++nextDetail}`;
   showWindow.setAttribute('aria-describedby', windowNote.id); retain.setAttribute('aria-describedby', windowNote.id);
   const confirmation = make('div'); confirmation.hidden = true;
@@ -153,5 +155,5 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
     return true;
   }
   function dispose(): void { disposed = true; for (const cleanup of cleanups) cleanup(); root.remove(); }
-  return { root, render, dispose };
+  return { root, windowActions, render, dispose };
 }

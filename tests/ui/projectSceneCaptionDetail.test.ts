@@ -36,7 +36,7 @@ function host(initial = context(), document = new RecordedDocument()) {
   controls.render(props);
   const root = record(controls.root), titleGroup = root.children[2]!, bodyGroup = root.children[3]!, colorGroup = root.children[4]!;
   const title = titleGroup.children[0]!.children[0]!, body = bodyGroup.children[0]!.children[0]!, color = colorGroup.children[0]!.children[0]!;
-  const actions = root.children[6]!, confirmation = root.children[7]!;
+  const actions = root.children[6]!, confirmation = root.children.find(n => n.children.some(child => child.textContent === '変更を取り消す'))!;
   return { controls, document, root, title, body, color, titleGroup, status: root.children[0]!, impact: root.children[1]!,
     picker: root.children[5]!, apply: actions.children[0]!, cancel: actions.children[1]!, confirmation,
     events, get props() { return props; }, render(next: CaptionDetailProps) { if (controls.render(next)) props = next; } };

@@ -34,7 +34,7 @@ describe('same-host comparison windows; authored DOM only, not raster or native 
   it('opens from selected detail, retains both, closes without selection/draft loss and explicitly reopens', () => {
     const doc = new RecordedDocument(), workspace = createDevelopmentWorkspace(doc.asDocument()), root = record(workspace.root), s = workspace.session;
     const original = s.snapshot; select(s, f.shared); workspace.render();
-    const detail = named(root, 'キャプションの詳細'); button(detail, '比較に残す').fire('click');
+    const detail = named(root, 'キャプションの表示'); button(detail, '比較に残す').fire('click');
     select(s, f.second); workspace.render(); button(detail, '比較に残す').fire('click');
     expect(visible(s)).toEqual([f.shared, f.second]);
     const windows = named(root, 'キャプションのウィンドウ'), shared = named(windows, '設備の確認箇所');

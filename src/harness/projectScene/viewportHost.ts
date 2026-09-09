@@ -15,6 +15,7 @@ export interface ViewportObservation {
   readonly token: string; readonly ready: boolean; readonly issue: string | null; readonly dragging: boolean;
   /** Changes for geometry/camera lifetime, but not an Orbit start/end without movement. */
   readonly pickToken?: string;
+  readonly manipulating?: boolean;
   readonly notice?: string | null;
   readonly projection: 'perspective' | 'orthographic'; readonly axis: ViewAxis | null;
   readonly pins: readonly { id: string; x: number; y: number; visible: boolean }[];
@@ -26,12 +27,13 @@ export interface SyntheticViewport {
   capture?(): DisplayCapture; recall?(payload: DisplayCapture): void;
   pick?(target: PinSurfaceTarget, xCss: number, yCss: number): V3 | null;
 }
-export type ViewportFactory = (canvas: HTMLCanvasElement, changed: () => void) => SyntheticViewport;
+export type ViewportFactory = (canvas: HTMLCanvasElement, changed: () => void,
+  proposePin?: (target: PinSurfaceTarget, positionAsset: V3) => boolean) => SyntheticViewport;
 
 /** DOM/read-port adapter, not a second camera implementation or durable service. */
 export function createViewportHost(document: Document, session: SyntheticSession, changed: () => void, factory?: ViewportFactory) {
   const root = document.createElement('section'); root.className = 'lv-development-viewport'; root.setAttribute('aria-label', '3D表示');
-  const canvas = document.createElement('canvas'); canvas.setAttribute('aria-label', '合成モデルの3D表示');
+  const canvas = document.createElement('canvas'); canvas.tabIndex = 0; canvas.setAttribute('aria-label', '合成モデルの3D表示');
   const overlay = document.createElement('div'); overlay.className = 'lv-development-pin-layer';
   const preview = document.createElement('div'); preview.className = 'lv-development-pin-preview'; preview.textContent = '仮の位置'; preview.hidden = true;
   const status = document.createElement('p'); status.setAttribute('role', 'status');
@@ -41,7 +43,7 @@ export function createViewportHost(document: Document, session: SyntheticSession
   let rendering = false, hasRendered = false;
   let active = false, gestureGeneration = 0;
   const pressed = new Set<number>();
-  let gesture: { id: number; x: number; y: number; target: PinSurfaceTarget; stamp: string } | null = null;
+  let gesture: { id: number; x: number; y: number; target: PinSurfaceTarget; stamp: string; shortcut: boolean; shifted: boolean } | null = null;
   let runtime: SyntheticViewport | undefined, context: ViewContext, pinKey = '';
   let authorConfirmationMemory: ViewContext['memory'] | undefined;
   const pins = new Map<string, HTMLButtonElement>();
@@ -95,7 +97,7 @@ export function createViewportHost(document: Document, session: SyntheticSession
     }
     author.render(authorContext);
     const observed = runtime?.read();
-    if (!observed?.ready || error) { gesture = null; gestureGeneration++; }
+    if (!observed?.ready || observed.manipulating || error) { gesture = null; gestureGeneration++; }
     const rect = canvas.getBoundingClientRect?.();
     windows.project({ ready: Boolean(observed?.ready && !error), width: rect?.width ?? 0, height: rect?.height ?? 0, pins: observed?.pins ?? [] });
     const dragChanged = session.setViewportDragging(observed?.dragging ?? false);
@@ -113,12 +115,15 @@ export function createViewportHost(document: Document, session: SyntheticSession
     if (ghost) { preview.style.left = `${ghost.x}px`; preview.style.top = `${ghost.y}px`; }
     if ((dragChanged || stateChanged) && hasRendered && !rendering) changed();
   }
-  try { runtime = factory?.(canvas, paint); } catch (e) { error = text(e); }
+  const proposePin = (target: PinSurfaceTarget, position: V3) => {
+    const accepted = session.acceptPinSurface(target, position, true); changed(); return accepted;
+  };
+  try { runtime = factory?.(canvas, paint, proposePin); } catch (e) { error = text(e); }
   const tryAgain = () => {
     if (disposed) return;
     gesture = null; pressed.clear(); gestureGeneration++;
     error = null;
-    try { if (!runtime) runtime = factory?.(canvas, paint); else runtime.retry(); }
+    try { if (!runtime) runtime = factory?.(canvas, paint, proposePin); else runtime.retry(); }
     catch (e) { error = text(e); }
     render(true);
   };
@@ -129,17 +134,19 @@ export function createViewportHost(document: Document, session: SyntheticSession
     if (![rect.left, rect.top, rect.width, rect.height].every(Number.isFinite) || rect.width <= 0 || rect.height <= 0) return null;
     try { return JSON.stringify([runtime.read().pickToken, runtime.capture(), rect.left, rect.top, rect.width, rect.height]); } catch { return null; }
   }
-  const modified = (e: PointerEvent) => e.altKey || e.ctrlKey || e.metaKey || e.shiftKey;
+  const modified = (e: PointerEvent) => e.altKey || e.ctrlKey || e.metaKey;
   const down = (e: PointerEvent) => {
     pressed.add(e.pointerId); gesture = null; gestureGeneration++;
-    const target = session.pinSurfaceTarget(), stamp = gestureStamp();
+    const activeTarget = session.pinSurfaceTarget(), shortcut = !activeTarget && e.shiftKey;
+    const target = activeTarget ?? (shortcut ? session.pinShortcutTarget() : null), stamp = gestureStamp();
+    if (shortcut && !target && !session.pinCoordinates) { session.message = '追加先モデルを選び、入力中の操作を終えてください。'; changed(); }
     if (pressed.size !== 1 || !e.isPrimary || e.button !== 0 || modified(e) || !runtime?.pick || !target || !stamp ||
       ![e.clientX, e.clientY].every(Number.isFinite)) return;
-    gesture = { id: e.pointerId, x: e.clientX, y: e.clientY, target, stamp };
+    gesture = { id: e.pointerId, x: e.clientX, y: e.clientY, target, stamp, shortcut, shifted: Boolean(e.shiftKey) };
   };
   const move = (e: PointerEvent) => {
     if (gesture?.id === e.pointerId && (!Number.isFinite(e.clientX) || !Number.isFinite(e.clientY) ||
-      Math.hypot(e.clientX - gesture.x, e.clientY - gesture.y) > 4 || modified(e))) { gesture = null; gestureGeneration++; }
+      Math.hypot(e.clientX - gesture.x, e.clientY - gesture.y) > 4 || modified(e) || Boolean(e.shiftKey) !== gesture.shifted)) { gesture = null; gestureGeneration++; }
   };
   const up = (e: PointerEvent) => {
     const start = gesture, generation = gestureGeneration; move(e); pressed.delete(e.pointerId);
@@ -150,11 +157,11 @@ export function createViewportHost(document: Document, session: SyntheticSession
     // its start/end on a stationary press for a drag, or capture mid-orbit state.
     queueMicrotask(() => {
       if (disposed || !active || generation !== gestureGeneration || pressed.size || start.stamp !== gestureStamp() ||
-        JSON.stringify(start.target) !== JSON.stringify(session.pinSurfaceTarget())) return;
+        JSON.stringify(start.target) !== JSON.stringify(start.shortcut ? session.pinShortcutTarget() : session.pinSurfaceTarget())) return;
       const rect = canvas.getBoundingClientRect();
       try {
         const hit = runtime?.pick?.(start.target, e.clientX - rect.left, e.clientY - rect.top);
-        if (hit) session.acceptPinSurface(start.target, hit);
+        if (hit) { if (start.shortcut) session.acceptPinShortcut(start.target, hit); else session.acceptPinSurface(start.target, hit); }
         else session.message = '選んだモデルの面を指定してください。指定中の位置は変えていません。';
       } catch (e) { session.message = `${text(e)} 指定中の位置は保持しています。`; }
       changed();
@@ -175,7 +182,11 @@ export function createViewportHost(document: Document, session: SyntheticSession
       display = syntheticDisplay(session.snapshot, session.sceneId, session.memory.pinColors, session.memory.selectedCaptionId);
       const proposed = session.pinPreviewAnchor;
       const owner = proposed?.kind === 'asset' ? display.models.find(m => m.binding.assetId === proposed.assetId) : undefined;
-      if (proposed?.kind === 'asset' && owner) display = { ...display, preview: pointInProject(proposed.positionAsset, owner.binding.assetToProject) };
+      if (proposed?.kind === 'asset' && owner) {
+        const position = pointInProject(proposed.positionAsset, owner.binding.assetToProject), target = session.pinSurfaceTarget(true);
+        display = { ...display, preview: position, ...(target ? { pinEdit: { target, position,
+          enabled: !!session.pinSurfaceTarget(false, true) } } : {}) };
+      }
       const key = JSON.stringify([display.token, display.sceneId, display.pins, display.selectedId]);
       if (key !== pinKey) {
         pinKey = key; pins.clear(); overlay.replaceChildren();

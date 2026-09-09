@@ -72,9 +72,14 @@
 > evidence. Direct canvas position selection/preview now connects the selected
 > resident fixture surface to the same confirmation/cancel/retry path. CPU and
 > mounted checks cover transforms, clipping, occlusion and gesture cancellation;
-> no native-input/raster PASS. Next is connected UI evidence, not another guard
-> campaign; real storage activation remains behind its separately named gates.
-> One finite boundary, not new per-record tasks; no additional manual test hold.
+> no native-input/raster PASS. The PO stopped that test because numeric placement
+> and buried controls were not human-operable. The correction connects transient
+> translate handles and Shift+click on the explicit selected model, keeps exits
+> beside the viewport and moves detail/comparison controls right; numbers become
+> a collapsed supplement. Multiple windows already existed, not a future-only
+> feature. Native hit-testing/layout of the correction remains unverified; do not
+> repeat the withdrawn old test or claim usability from DOM checks.
+> One finite correction, not a guard campaign; real storage retains its gates.
 > Windows Computer Use initialized but stopped automatically on unsafe-to-resolve
 > Chrome URL; no browser input/PASS or bypass. Keep the existing batched UI lane.
 > No repeated journal check or scheduling approval is needed. Real-data/current

@@ -73,9 +73,13 @@ It retains cancellation/retry, and new Captions support media, independent copie
 and continuing exchange, including anchors on verified model copies. Direct
 viewport position selection/preview now connects the selected resident fixture
 surface to the same confirmation path. CPU/mounted evidence covers transforms,
-clipping, occlusion, gesture cancellation and retained retry; real pointer/render
-acceptance is still pending. Next is the connected UI evidence boundary, not a
-new provider or detached component campaign.
+clipping, occlusion, gesture cancellation and retained retry. The PO's subsequent
+UI correction connects a provisional translation gizmo and Shift+click on the
+explicit selected model. Pin actions/exits now sit beside the viewport; detail
+and comparison-window actions sit in the right task area, with numeric input
+collapsed. The prior numeric-first UI was not ready for human testing. Native
+input/raster acceptance of this correction is pending; do not repeat the old
+flow or start another provider/component campaign.
 Real Project, storage, package and current-app activation retain their gates.
 
 For a fresh Codex session, read `tasks/handoff.md` after this map and the

@@ -14,7 +14,7 @@ import { planPinMode } from '../../src/ui/projectScene/pinModeState';
 import { pickResidentSurface } from '../../src/harness/projectScene/viewportPicking';
 
 const tracker = vi.hoisted(() => ({ renderers: [] as any[], controls: [] as any[], resize: [] as (() => void)[],
-  raf: new Map<number, () => void>(), nextRaf: 0, fail: false }));
+  raf: new Map<number, () => void>(), nextRaf: 0, fail: false, gizmos: [] as any[] }));
 vi.mock('three', async importOriginal => {
   const actual = await importOriginal<typeof import('three')>();
   return { ...actual, WebGLRenderer: class {
@@ -33,6 +33,19 @@ vi.mock('three/addons/controls/OrbitControls.js', async () => {
     update() { this.object.lookAt(this.target); } dispose() { this.disposed = true; this.canvas.style.touchAction = 'auto'; }
   } };
 });
+vi.mock('three/addons/controls/TransformControls.js', async () => {
+  const three = await import('three');
+  return { TransformControls: class extends three.EventDispatcher<any> {
+    object: any; enabled = true; axis: string | null = null; disposed = false; private busy = false;
+    helper = new three.Group();
+    constructor(readonly camera: any) { super(); tracker.gizmos.push(this); }
+    get dragging() { return this.busy; }
+    set dragging(value: boolean) { if (value === this.busy) return; this.busy = value; this.dispatchEvent({ type: 'dragging-changed', value }); }
+    getHelper() { return this.helper; } setMode() {} setSpace() {} setSize() {}
+    attach(object: any) { this.object = object; } detach() { this.object = undefined; }
+    dispose() { this.disposed = true; }
+  } };
+});
 const descendants = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(descendants)];
 const control = (root: RecordedNode, text: string) => descendants(root).find(n => n.tag === 'button' && n.textContent === text)!;
 const labeled = (root: RecordedNode, label: string) => descendants(root).find(n => n.attributes.get('aria-label') === label)!;
@@ -43,7 +56,7 @@ function fakeCanvas() {
   return { canvas, show(width = 800, height = 600) { size = { width, height, left: 0, top: 0 }; tracker.resize.forEach(f => f()); } };
 }
 beforeEach(() => {
-  tracker.renderers.length = tracker.controls.length = tracker.resize.length = 0; tracker.raf.clear(); tracker.fail = false;
+  tracker.renderers.length = tracker.controls.length = tracker.resize.length = tracker.gizmos.length = 0; tracker.raf.clear(); tracker.fail = false;
   vi.stubGlobal('ResizeObserver', class { constructor(fn: () => void) { tracker.resize.push(fn); } observe() {} disconnect() {} });
   vi.stubGlobal('requestAnimationFrame', (fn: () => void) => { const id = ++tracker.nextRaf; tracker.raf.set(id, fn); return id; });
   vi.stubGlobal('cancelAnimationFrame', (id: number) => tracker.raf.delete(id));
@@ -51,6 +64,56 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance', () => {
+  it('moves a provisional pin with translation handles, blocks orbit, restores cancelled drag and confirms only explicitly', async () => {
+    const doc = new RecordedDocument(), s = new SyntheticSession(); let v: ReturnType<typeof createSyntheticViewport>;
+    const w = createDevelopmentWorkspace(doc.asDocument(), s, { viewportFactory: (canvas, changed, propose) => {
+      Object.assign(canvas, { getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }) });
+      return v = createSyntheticViewport(canvas, changed, propose);
+    } });
+    const root = record(w.root), initial = s.snapshot;
+    s.acceptPin(planPinMode(s.pinContext(), { kind: 'target', assetId: f.equipment }));
+    s.acceptPin(planPinMode(s.pinContext(), { kind: 'add' }));
+    const target = s.pinSurfaceTarget()!; s.acceptPinSurface(target, [0.5, 0.25, 0]); w.render();
+    let g = tracker.gizmos.at(-1); expect(g.object).toBeDefined(); const origin = g.object.position.clone();
+    g.dragging = true; expect(tracker.controls.at(-1).enabled).toBe(false);
+    expect(control(root, '位置を確定').disabled).toBe(true);
+    g.object.position.z += 3; g.dispatchEvent({ type: 'objectChange' });
+    expect(s.snapshot).toBe(initial); expect(Number(s.pinCoordinates!.coordinates[2])).toBeCloseTo(2);
+    labeled(root, '合成モデルの3D表示').fire('keydown', { key: 'Escape', preventDefault() {} });
+    expect(g.object.position.toArray()).toEqual(origin.toArray()); expect(Number(s.pinCoordinates!.coordinates[2])).toBeCloseTo(0);
+    expect(tracker.controls.at(-1).enabled).toBe(true); expect(control(root, '位置を確定').disabled).toBe(false);
+    // Authored pointer-owner guard only; the mock does not emulate native handle hit-testing/event phases.
+    const canvas = labeled(root, '合成モデルの3D表示');
+    const pointer = { pointerId: 1, isPrimary: true, button: 0, clientX: 400, clientY: 300 };
+    for (const interruption of ['multi', 'wrong-move', 'cancel', 'capture'] as const) {
+      canvas.fire('pointerdown', pointer); g.dragging = true;
+      g.object.position.z += 3; g.dispatchEvent({ type: 'objectChange' });
+      expect(() => v!.capture!()).toThrow();
+      if (interruption === 'multi') canvas.fire('pointerdown', { ...pointer, pointerId: 2, isPrimary: false });
+      else if (interruption === 'wrong-move') canvas.fire('pointermove', { ...pointer, pointerId: 2, isPrimary: false });
+      else canvas.fire(interruption === 'cancel' ? 'pointercancel' : 'lostpointercapture', pointer);
+      expect(g.dragging, interruption).toBe(false); expect(g.object.position.toArray(), interruption).toEqual(origin.toArray());
+      expect(Number(s.pinCoordinates!.coordinates[2]), interruption).toBeCloseTo(0); expect(s.snapshot).toBe(initial);
+      if (interruption === 'multi') {
+        expect(g.enabled).toBe(false); canvas.fire('pointerup', { ...pointer, pointerId: 2, isPrimary: false });
+        await Promise.resolve(); expect(g.enabled).toBe(false);
+      }
+      canvas.fire('pointerup', pointer); await Promise.resolve(); expect(g.enabled).toBe(true);
+    }
+    v!.camera({ kind: 'projection', projection: 'orthographic' }); expect(g.disposed).toBe(true);
+    g = tracker.gizmos.at(-1); expect(g.object.position.toArray()).toEqual(origin.toArray());
+    g.dragging = true; g.object.position.z += 3; g.dispatchEvent({ type: 'objectChange' }); g.dragging = false;
+    control(root, '位置を確定').fire('click'); expect(g.object).toBeUndefined();
+    const caption = s.snapshot.resources.captions[s.memory.selectedCaptionId!]!;
+    expect(caption.anchor).toMatchObject({ kind: 'value', value: { assetId: f.equipment, hitEvidence: { method: 'manual' } } });
+    if (caption.anchor.kind !== 'value' || caption.anchor.value.kind !== 'asset') throw Error('anchor');
+    expect(caption.anchor.value.positionAsset[2]).toBeCloseTo(2);
+    const confirmed = s.snapshot; control(root, 'ピンを移動').fire('click');
+    g = tracker.gizmos.at(-1); g.dragging = true; g.object.position.z += 3; g.dispatchEvent({ type: 'objectChange' }); g.dragging = false;
+    control(labeled(root, 'ピンの操作'), '取り消す').fire('click'); control(root, '操作を取り消す').fire('click');
+    expect(s.snapshot).toBe(confirmed); expect(g.object).toBeUndefined();
+    w.dispose(); expect(g.disposed).toBe(true);
+  });
   it('picks the current resident triangle with both transforms, perspective/orthographic clip, side, visibility and occlusion', () => {
     const s = new SyntheticSession(); s.acceptPin(planPinMode(s.pinContext(), { kind: 'target', assetId: f.equipment }));
     s.acceptPin(planPinMode(s.pinContext(), { kind: 'add' })); const target = s.pinSurfaceTarget()!;
@@ -131,7 +194,12 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     }
     control(labeled(root, 'ピンの操作'), '取り消す').fire('click'); control(root, '操作を取り消す').fire('click');
     expect(s.snapshot).toBe(initial); expect(ghost.hidden).toBe(true);
-    rect = { ...rect, width: 800 }; control(root, 'ピンを追加').fire('click'); canvas.fire('pointerdown', event); canvas.fire('pointerup', event); await Promise.resolve();
+    rect = { ...rect, width: 800 };
+    const shifted = { ...event, shiftKey: true };
+    canvas.fire('pointerdown', { ...shifted, ctrlKey: true }); canvas.fire('pointerup', { ...shifted, ctrlKey: true }); await Promise.resolve();
+    expect(s.pinCoordinates).toBeNull();
+    canvas.fire('pointerdown', shifted); canvas.fire('pointerup', shifted); await Promise.resolve();
+    expect(s.snapshot).toBe(initial); expect(s.pinCoordinateContext().mode?.kind).toBe('add');
     control(root, '位置を確定').fire('click'); expect(Object.keys(s.snapshot.resources.captions)).toHaveLength(3); expect(ghost.hidden).toBe(true);
     expect(s.snapshot.resources.captions[s.memory.selectedCaptionId!]!.anchor).toMatchObject({ kind: 'value', value: { positionAsset: [0.5, 0.25, 0] } });
     workspace.dispose();

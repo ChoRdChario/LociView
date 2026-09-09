@@ -23,10 +23,13 @@
 .lv-development-composition { flex: 0 0 auto; padding: 16px; border: 1px solid #b7b1aa; background: #edeae6; }
 .lv-development-composition ul { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 12px 0; list-style: none; }
 .lv-development-composition li { padding: 6px 12px; background: #faf9f8; border: 1px solid #b7b1aa; }
-.lv-development-editor { display: flex; flex-direction: column; gap: 8px; min-height: 0; max-width: 740px; width: 100%; margin-inline: auto; }
+.lv-development-editor { display: flex; flex: 0 0 auto; flex-direction: column; gap: 8px; min-height: 0; width: 100%; }
 .lv-development-editor .lv-caption-detail { padding: 12px; border: 1px solid #b7b1aa; }
-.lv-development-sidebar { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; border-left: 1px solid #b7b1aa; background: #f2f0ee; padding: 12px; }
-.lv-development-sidebar > :is(.lv-caption-browser, .lv-model-browser) { flex: 1; }
+.lv-development-sidebar { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; overflow-y: auto; border-left: 1px solid #b7b1aa; background: #f2f0ee; padding: 12px; }
+.lv-development-sidebar > .lv-caption-browser { flex: 0 0 auto; }
+.lv-development-sidebar .lv-caption-list { flex: 0 0 auto; max-height: 240px; }
+.lv-development-sidebar > .lv-model-browser { flex: 1; }
+.lv-development-sidebar > .lv-task-control { flex: 0 0 auto; position: sticky; top: -12px; background: #f2f0ee; z-index: 1; }
 .lv-development .lv-task-control { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; }
 .lv-development .lv-task-control button { padding: 6px 2px; font-size: 13px; border-color: transparent; background: transparent; border-bottom: 2px solid #b7b1aa; }
 .lv-development .lv-task-control button[aria-pressed="true"] { background: #e1ddd7; border-bottom-color: #413d39; font-weight: 500; }
@@ -39,8 +42,7 @@
   .lv-development-content { display: flex; flex-direction: column; }
   .lv-development-stage { padding: 12px; }
   .lv-development-editor { max-width: none; }
-  .lv-development-editor .lv-caption-detail { max-height: 55dvh; }
-  .lv-development-sidebar { min-height: 380px; height: 55dvh; border-left: 0; border-top: 1px solid #b7b1aa; }
+  .lv-development-sidebar { min-height: 380px; max-height: 75dvh; border-left: 0; border-top: 1px solid #b7b1aa; }
 }
 .lv-development-team-toolbar, .lv-development-conflicts {
   margin: 16px auto; padding: 14px; max-width: 1360px;
@@ -63,7 +65,15 @@
 .lv-development-coordinates > p { flex-basis: 100%; }
 .lv-development-coordinates label { display: flex; flex-direction: column; flex: 1; min-width: 80px; }
 .lv-development-coordinates input, .lv-development-coordinates select { width: 100%; box-sizing: border-box; }
-.lv-development-editor { overflow: auto; }
+.lv-development-editor, .lv-development-editor .lv-caption-detail { overflow: visible; flex-shrink: 0; }
+.lv-development .lv-pin-actions, .lv-development .lv-pin-mode { flex: 0 0 auto; padding: 8px; border: 1px solid #b7b1aa; }
+.lv-development .lv-pin-actions label { flex: 1 1 160px; }
+.lv-development .lv-pin-actions p { font-size: 12px; }
+.lv-development .lv-pin-actions button { align-self: end; }
+.lv-development .lv-pin-mode { border-left: 3px solid #6e5639; }
+.lv-development-pin-help, .lv-development-information { font-size: 12px; color: #635e58; }
+.lv-development-information, .lv-development-numeric { flex: 0 0 auto; }
+.lv-development :is(.lv-development-information, .lv-development-numeric) > summary { cursor: pointer; padding: 8px; }
 .lv-development-viewport { position: relative; flex: 1 0 260px; min-height: 260px; overflow: hidden; border: 1px solid #817c78; background: #e8e6e2; }
 .lv-development-viewport canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; }
 .lv-development-render-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
