@@ -14,7 +14,7 @@ import { planPinMode } from '../../src/ui/projectScene/pinModeState';
 import { pickResidentSurface } from '../../src/harness/projectScene/viewportPicking';
 
 const tracker = vi.hoisted(() => ({ renderers: [] as any[], controls: [] as any[], resize: [] as (() => void)[],
-  raf: new Map<number, () => void>(), nextRaf: 0, fail: false, gizmos: [] as any[] }));
+  raf: new Map<number, () => void>(), nextRaf: 0, fail: false, gizmos: [] as any[], realOrbit: false }));
 vi.mock('three', async importOriginal => {
   const actual = await importOriginal<typeof import('three')>();
   return { ...actual, WebGLRenderer: class {
@@ -27,9 +27,14 @@ vi.mock('three', async importOriginal => {
 });
 vi.mock('three/addons/controls/OrbitControls.js', async () => {
   const three = await import('three');
+  const actual = await vi.importActual<typeof import('three/addons/controls/OrbitControls.js')>('three/addons/controls/OrbitControls.js');
   return { OrbitControls: class extends three.EventDispatcher<any> {
     target = new three.Vector3(); disposed = false;
-    constructor(readonly object: any, readonly canvas: HTMLCanvasElement) { super(); canvas.style.touchAction = 'none'; tracker.controls.push(this); }
+    constructor(readonly object: any, readonly canvas: HTMLCanvasElement) {
+      super();
+      if (tracker.realOrbit) { const real = new actual.OrbitControls(object, canvas); tracker.controls.push(real); return real as any; }
+      canvas.style.touchAction = 'none'; tracker.controls.push(this);
+    }
     update() { this.object.lookAt(this.target); } dispose() { this.disposed = true; this.canvas.style.touchAction = 'auto'; }
   } };
 });
@@ -55,8 +60,32 @@ function fakeCanvas() {
   Object.assign(canvas, { getBoundingClientRect: () => size });
   return { canvas, show(width = 800, height = 600) { size = { width, height, left: 0, top: 0 }; tracker.resize.forEach(f => f()); } };
 }
+/** Actual Orbit handlers on an authored capture/bubble target, not native browser input. */
+function controlEventTarget(canvas: HTMLCanvasElement) {
+  const listeners = new Map<string, { handler: EventListener; capture: boolean }[]>();
+  Object.assign(canvas, {
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }), clientWidth: 800, clientHeight: 600,
+    getRootNode: () => ({ addEventListener() {}, removeEventListener() {} }),
+    setPointerCapture() {}, releasePointerCapture() {},
+    addEventListener(type: string, handler: EventListener, options?: boolean | AddEventListenerOptions) {
+      const capture = typeof options === 'boolean' ? options : Boolean(options?.capture), group = listeners.get(type) ?? [];
+      if (!group.some(l => l.handler === handler && l.capture === capture)) group.push({ handler, capture });
+      listeners.set(type, group);
+    },
+    removeEventListener(type: string, handler: EventListener, options?: boolean | EventListenerOptions) {
+      const capture = typeof options === 'boolean' ? options : Boolean(options?.capture);
+      listeners.set(type, (listeners.get(type) ?? []).filter(l => l.handler !== handler || l.capture !== capture));
+    },
+    fire(type: string, event: Event) {
+      for (const capture of [true, false]) for (const l of [...(listeners.get(type) ?? [])]) {
+        if (l.capture === capture && listeners.get(type)?.includes(l)) l.handler(event);
+      }
+    },
+  });
+}
 beforeEach(() => {
   tracker.renderers.length = tracker.controls.length = tracker.resize.length = tracker.gizmos.length = 0; tracker.raf.clear(); tracker.fail = false;
+  tracker.realOrbit = false;
   vi.stubGlobal('ResizeObserver', class { constructor(fn: () => void) { tracker.resize.push(fn); } observe() {} disconnect() {} });
   vi.stubGlobal('requestAnimationFrame', (fn: () => void) => { const id = ++tracker.nextRaf; tracker.raf.set(id, fn); return id; });
   vi.stubGlobal('cancelAnimationFrame', (id: number) => tracker.raf.delete(id));
@@ -64,6 +93,50 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance', () => {
+  it.each([false, true])('reserves placement before actual Orbit starts (Shift=%s), including tiny movement and cancellation', async shifted => {
+    tracker.realOrbit = true;
+    const doc = new RecordedDocument(), s = new SyntheticSession(); let v: ReturnType<typeof createSyntheticViewport>;
+    const w = createDevelopmentWorkspace(doc.asDocument(), s, { viewportFactory: (canvas, changed, propose) => {
+      controlEventTarget(canvas); return v = createSyntheticViewport(canvas, changed, propose);
+    } });
+    const root = record(w.root), canvas = labeled(root, '合成モデルの3D表示');
+    const model = syntheticDisplay(s.snapshot, s.sceneId, null, null).models.find(m => m.binding.assetId === f.equipment)!;
+    const world = new THREE.Vector3(1 / 3, 1 / 3, 0).applyMatrix4(placementMatrix(model.representation.representationToAsset))
+      .applyMatrix4(placementMatrix(model.binding.assetToProject));
+    v!.recall!({ camera: { position: [world.x, world.y, world.z + 4], target: world.toArray(), up: [0, 1, 0],
+      projection: { kind: 'perspective', verticalFovRadians: 0.7 } }, background: { kind: 'solid', colorSrgb: [0.5, 0.5, 0.5] } });
+    const orbit = tracker.controls.at(-1); let starts = 0; orbit.addEventListener('start', () => starts++);
+    const choose = labeled(root, '追加先モデル'); choose.value = f.equipment; choose.fire('change');
+    if (!shifted) control(root, 'ピンを追加').fire('click');
+    const original = s.snapshot, cameraPosition = orbit.object.position.toArray(), pointer = { pointerId: 1, pointerType: 'mouse', isPrimary: true,
+      button: 0, clientX: 400, clientY: 300, pageX: 400, pageY: 300, shiftKey: shifted, preventDefault() {} };
+    canvas.fire('pointerdown', pointer); expect(orbit.enabled).toBe(false); expect(starts).toBe(0);
+    canvas.fire('pointermove', { ...pointer, clientX: 401 }); expect(orbit.object.position.toArray()).toEqual(cameraPosition);
+    canvas.fire('pointerup', { ...pointer, clientX: 401 }); await Promise.resolve();
+    expect(starts).toBe(0); expect(s.snapshot).toBe(original); expect(s.pinPreviewAnchor).not.toBeNull();
+    expect(orbit.enabled).toBe(true);
+    const retained = s.pinCoordinates;
+    for (const rejection of ['drag', 'multi', 'cancel', 'capture'] as const) {
+      canvas.fire('pointerdown', pointer); expect(orbit.enabled).toBe(false);
+      if (rejection === 'multi') {
+        canvas.fire('pointerdown', { ...pointer, pointerId: 2, isPrimary: false });
+        canvas.fire('pointerup', { ...pointer, pointerId: 2, isPrimary: false }); expect(orbit.enabled).toBe(false);
+      } else if (rejection === 'drag') canvas.fire('pointermove', { ...pointer, clientX: 480 });
+      else canvas.fire(rejection === 'cancel' ? 'pointercancel' : 'lostpointercapture', pointer);
+      canvas.fire('pointerup', pointer); await Promise.resolve();
+      expect(starts, rejection).toBe(0); expect(s.pinCoordinates, rejection).toBe(retained);
+      expect(orbit.object.position.toArray()).toEqual(cameraPosition);
+      expect(orbit.enabled, rejection).toBe(true);
+    }
+    // Finishing a handle drag cannot release a still-reserved placement sequence.
+    const g = tracker.gizmos.at(-1); v!.setPinPointerActive!(true); g.dragging = true; g.dragging = false;
+    expect(orbit.enabled).toBe(false); v!.setPinPointerActive!(false); expect(orbit.enabled).toBe(true);
+    control(labeled(root, 'ピンの操作'), '取り消す').fire('click'); control(root, '操作を取り消す').fire('click');
+    const cameraPointer = { ...pointer, shiftKey: false };
+    canvas.fire('pointerdown', cameraPointer); expect(starts).toBe(1);
+    canvas.fire('pointermove', { ...cameraPointer, clientX: 430 }); canvas.fire('pointerup', cameraPointer);
+    expect(orbit.object.position.toArray()).not.toEqual(cameraPosition); expect(s.snapshot).toBe(original); w.dispose();
+  });
   it('moves a provisional pin with translation handles, blocks orbit, restores cancelled drag and confirms only explicitly', async () => {
     const doc = new RecordedDocument(), s = new SyntheticSession(); let v: ReturnType<typeof createSyntheticViewport>;
     const w = createDevelopmentWorkspace(doc.asDocument(), s, { viewportFactory: (canvas, changed, propose) => {

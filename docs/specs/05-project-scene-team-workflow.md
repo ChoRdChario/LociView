@@ -1234,6 +1234,15 @@ add proposal; during placement a surface click or Shift+click repositions it.
 Keep release/movement/multi-pointer/stale guards, reject other modifiers and
 exclude gizmo handles from the surface action. No inferred model relation or
 instant durable addition. A normal add button plus surface tap remains available.
+This supersedes the earlier wait-for-Orbit release routing. The PO's follow-up
+camera-conflict report requires primary placement sequences
+to be reserved on pointerdown, including Shift addition before a preview exists.
+Orbit must not begin rotation/pan for that sequence, including rejected movement
+or additional pointers. Compose the reservation with gizmo activity; releasing
+one must not override the other. Release/cancel/hidden/dispose restore ordinary
+camera availability. Never weaken source/pending checks or rely on a microtask
+running after native bubble listeners. Regress actual Orbit handlers as well as
+the existing authored-controller tests; native browser acceptance remains separate.
 Add/move and finish/cancel stay adjacent to the stage outside the detail scroller;
 numeric editing is collapsed supplemental UI. The right task area contains list
 and detail without shrinking the form into nested one-line scroll areas. Expose

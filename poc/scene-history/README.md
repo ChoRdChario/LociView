@@ -218,12 +218,14 @@ the 3D viewport (choose `設備`, for example). Shift+click a visible point on t
 model, or use the adjacent `ピンを追加` followed by ordinary click/tap on its
 surface. `仮の位置` and translation handles should appear, with no new list record
 until `位置を確定`. Drag an arrow/plane to adjust it without rotating the camera;
+both normal placement and Shift+click reserve the pointer before camera rotation
+or pan starts. Slight movement must not turn a placement click into camera motion.
 Escape or pointer cancellation restores the drag-start proposal. Confirm after
 releasing the drag; the new Caption should be selected in the right detail editor.
 Enter/apply its title/body, switch `操作する人` and
 receive the update. Its owner and position must be preserved. Repeat position
 selection with `ピンを移動`, then `取り消す` and `操作を取り消す`: the confirmed
-pin must not move. A camera drag or a miss must not replace the provisional
+pin must not move. A drag outside the handles or a miss must not replace the provisional
 position. A hidden, back-facing or occluded target is not an alternative model.
 Use `視点` / `全体表示` or a viewing direction to expose the selected surface
 before starting placement. Do not force a graphics failure or reload to test

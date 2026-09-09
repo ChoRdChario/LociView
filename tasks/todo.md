@@ -8,7 +8,40 @@ The completed journal Chrome recheck below stays closed; no journal rerun is
 requested. Synthetic two-person model/pin/history and independent Caption/model-copy loops now exist; browser,
 IME and device acceptance remain pending, not implied by its DOM tests.
 
-### Current checkpoint / interaction correction
+### Current fix — pin pointer and camera ownership (2026-09-09)
+
+PO reports primary placement clicks becoming camera operations, including
+Shift+click. Start clean `54394b3`; repair this input conflict before the pending
+human batch, not a new feature/subsystem. Actual Orbit starts rotation/pan on down;
+the current release microtask is not a native-event ordering guarantee. Reserve
+placement primary pointer sequences before Orbit starts, composing that lock with
+gizmo activity. Keep token/pending/explicit-confirmation checks unchanged.
+- [x] Reserve ordinary add/move and Shift+click input through release/cancellation;
+  never turn a rejected placement drag into camera motion mid-gesture.
+- [x] Regress both paths with real Orbit handlers, camera immobility, cancellation,
+  ordinary camera recovery and existing gizmo/guard cases.
+- [x] Run required checks and one bounded read-only review; record native evidence
+  as pending, without repeating unavailable browser initialization.
+Scope: current synthetic development host only. No schema/dependency/storage,
+general renderer adoption, ordinary entry, deployment or source-relation changes.
+
+Result / review: both entry paths now reserve primary input before Orbit's actual
+down handler, including before the first preview exists. Rejected movement does
+not become camera movement; the final release/cancel restores availability, and
+gizmo completion cannot release another input reservation. Existing token/pending
+checks and explicit confirmation remain. Read-only review found no concrete
+blocker. Regression uses actual Orbit handlers on an authored event target, not
+native browser hit-testing; GPU/TransformControls remain mocked in these tests.
+Root/scoped types PASS; focused 4 files / 36 PASS; full root 105 files / 1864 PASS /
+21 existing TODO. Ordinary/harness builds PASS with existing warnings; 13/9 parsed
+source maps contain zero candidate/provider modules. Served dev HTML and changed
+modules return HTTP 200 (delivery only). Existing candidate/history evidence is
+reused; no native input/raster/iPhone/offline/PWA/storage acceptance or new probe.
+Official quota 67% remains. No push/release. The next boundary remains the same
+connected UI batch, with this concrete defect repaired in code, not another
+provider campaign or a request to repeat old human test steps.
+
+### Previous checkpoint / interaction correction
 
 **PO correction — human-operable placement before the browser batch:** the
 provided screen shows buried add/move controls and compressed nested editors.

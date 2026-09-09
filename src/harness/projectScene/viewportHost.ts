@@ -23,6 +23,8 @@ export interface ViewportObservation {
 }
 export interface SyntheticViewport {
   update(display: SyntheticDisplay): void; setActive(active: boolean): void;
+  /** Reserve placement input before Orbit receives pointerdown; independent of gizmo activity. */
+  setPinPointerActive?(active: boolean): void;
   read(): ViewportObservation; camera(intent: ViewCameraIntent): void; retry(): void; dispose(): void;
   capture?(): DisplayCapture; recall?(payload: DisplayCapture): void;
   pick?(target: PinSurfaceTarget, xCss: number, yCss: number): V3 | null;
@@ -137,6 +139,13 @@ export function createViewportHost(document: Document, session: SyntheticSession
   const modified = (e: PointerEvent) => e.altKey || e.ctrlKey || e.metaKey;
   const down = (e: PointerEvent) => {
     pressed.add(e.pointerId); gesture = null; gestureGeneration++;
+    // Orbit otherwise starts ROTATE/PAN synchronously, including Shift+click.
+    // Hold the whole sequence even when movement later disqualifies the pick.
+    if (pressed.size === 1 && e.isPrimary && e.button === 0 &&
+      (session.pinCoordinates || e.shiftKey) && !runtime?.read().dragging) {
+      runtime?.setPinPointerActive?.(true);
+      canvas.setPointerCapture?.(e.pointerId);
+    }
     const activeTarget = session.pinSurfaceTarget(), shortcut = !activeTarget && e.shiftKey;
     const target = activeTarget ?? (shortcut ? session.pinShortcutTarget() : null), stamp = gestureStamp();
     if (shortcut && !target && !session.pinCoordinates) { session.message = '追加先モデルを選び、入力中の操作を終えてください。'; changed(); }
@@ -152,9 +161,10 @@ export function createViewportHost(document: Document, session: SyntheticSession
     const start = gesture, generation = gestureGeneration; move(e); pressed.delete(e.pointerId);
     const eligible = start && start === gesture && e.pointerId === start.id && e.button === 0 && !modified(e) && pressed.size === 0;
     gesture = null;
+    if (!pressed.size) runtime?.setPinPointerActive?.(false);
     if (!eligible) return;
-    // OrbitControls handles pointerup/end in the same dispatch. Do not mistake
-    // its start/end on a stationary press for a drag, or capture mid-orbit state.
+    // Revalidate the completed gesture. This is NOT an Orbit-end ordering fence:
+    // placement owns the sequence from down, so Orbit never started for it.
     queueMicrotask(() => {
       if (disposed || !active || generation !== gestureGeneration || pressed.size || start.stamp !== gestureStamp() ||
         JSON.stringify(start.target) !== JSON.stringify(start.shortcut ? session.pinShortcutTarget() : session.pinSurfaceTarget())) return;
@@ -167,13 +177,14 @@ export function createViewportHost(document: Document, session: SyntheticSession
       changed();
     });
   };
-  const cancel = (e: PointerEvent) => { pressed.delete(e.pointerId); gesture = null; gestureGeneration++; };
+  const cancel = (e: PointerEvent) => { pressed.delete(e.pointerId); gesture = null; gestureGeneration++;
+    if (!pressed.size) runtime?.setPinPointerActive?.(false); };
   const lost = (e: PointerEvent) => { if (pressed.has(e.pointerId)) cancel(e); };
   canvas.addEventListener('pointerdown', down, true); canvas.addEventListener('pointermove', move, true);
   canvas.addEventListener('pointerup', up, true); canvas.addEventListener('pointercancel', cancel, true); canvas.addEventListener('lostpointercapture', lost, true);
   function render(nextActive: boolean) {
     if (disposed) return;
-    if (!nextActive) { gesture = null; pressed.clear(); gestureGeneration++; }
+    if (!nextActive) { gesture = null; pressed.clear(); gestureGeneration++; runtime?.setPinPointerActive?.(false); }
     active = nextActive;
     rendering = true;
     try {

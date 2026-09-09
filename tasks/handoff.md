@@ -79,6 +79,10 @@
 > a collapsed supplement. Multiple windows already existed, not a future-only
 > feature. Native hit-testing/layout of the correction remains unverified; do not
 > repeat the withdrawn old test or claim usability from DOM checks.
+> Follow-up PO report exposed camera/placement input competition, also on Shift.
+> The host now reserves primary placement sequences before Orbit starts and
+> combines that reservation with gizmo activity. Actual Orbit handler regressions
+> cover both entry paths; native-input/raster acceptance remains pending.
 > One finite correction, not a guard campaign; real storage retains its gates.
 > Windows Computer Use initialized but stopped automatically on unsafe-to-resolve
 > Chrome URL; no browser input/PASS or bypass. Keep the existing batched UI lane.

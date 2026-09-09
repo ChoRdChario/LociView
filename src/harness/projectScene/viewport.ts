@@ -25,6 +25,10 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
   let width = 1, height = 1;
   let pickEpoch = 0;
   let gizmo: ReturnType<typeof createPinGizmo> | null = null;
+  let pinPointerActive = false;
+  function syncOrbit(manipulating = Boolean(gizmo?.dragging)) {
+    if (controls) controls.enabled = !pinPointerActive && !manipulating;
+  }
   const errorText = (e: unknown) => e instanceof Error ? e.message : '3D表示を開始できません。';
   function observePose() {
     if (!camera || !controls) return;
@@ -61,6 +65,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
   }
   function release() {
     pickEpoch++;
+    pinPointerActive = false;
     gizmo?.dispose(); gizmo = null;
     observePose(); cancelAnimationFrame(raf); raf = 0; controls?.dispose(); controls = null; camera = null;
     clearModels(); renderer?.dispose(); renderer = null; modelKey = ''; dragging = false;
@@ -113,7 +118,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
         surface.asset.updateMatrixWorld(true);
         const p = surface.asset.worldToLocal(new THREE.Vector3(...world));
         return [p.x, p.y, p.z].every(Number.isFinite) && proposePin(target, [p.x || 0, p.y || 0, p.z || 0]);
-      }, busy => { if (controls) controls.enabled = !busy; serial++; if (!applying) changed(); }) : null;
+      }, busy => { syncOrbit(busy); serial++; if (!applying) changed(); }) : null;
       controls = new OrbitControls(camera, canvas); controls.enableDamping = false; controls.target.copy(target);
       controls.addEventListener('start', () => { dragging = true; serial++; changed(); });
       controls.addEventListener('end', () => { dragging = false; observePose(); serial++; changed(); });
@@ -123,7 +128,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
       controls.update();
       scene.background = new THREE.Color().setRGB(...background.colorSrgb, THREE.SRGBColorSpace);
       previousControls?.dispose();
-      previousGizmo?.dispose(); gizmo?.update(display?.pinEdit);
+      previousGizmo?.dispose(); gizmo?.update(display?.pinEdit); syncOrbit();
       // The old OrbitControls.disconnect resets this shared element to auto.
       canvas.style.touchAction = 'none';
     } catch (e) {
@@ -190,6 +195,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
       buildModels(); gizmo?.update(next.pinEdit); serial++;
     },
     setActive(next) { if (!next && active) release(); active = next; ensure(); },
+    setPinPointerActive(next) { pinPointerActive = next; syncOrbit(); },
     pick(target, x, y) {
       if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || gizmo?.dragging || !display) return null;
       return pickResidentSurface(display, target, resident, camera, new THREE.Vector2(x * 2 / width - 1, 1 - y * 2 / height));
