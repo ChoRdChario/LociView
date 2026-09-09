@@ -9,6 +9,44 @@ requested. Synthetic two-person model/pin/history and independent Caption/model-
 The scoped PO result below closes only the listed interaction checks; broader
 rendered, IME, device and durable-file acceptance remain pending.
 
+### Current decision — isolated saved-development host approval (2026-09-10)
+
+Start clean `2abb57a`; prior turn is progress: complete development-source/domain
+and guarded journal connection committed, not the full UI goal. Account remaining
+57%; pause only below 10%. Do not start another independent provider/probe.
+
+- [x] Recheck current Git, usage, approved host and browser/platform interfaces.
+- [ ] Exercise the current host through the permitted browser surface. BLOCKED
+  in this environment; no new rendered/input/storage credit (details below).
+- [x] Resolve the exact distinction between isolated saved development and gated
+  production storage; write one bounded next-implementation/approval decision.
+- [x] Independently check that decision and update current handoff. No product
+  schema/adoption or ordinary data activation without the applicable authority.
+
+Current browser attempt: the prescribed browser-client bootstrap failed before
+selection with an unsupported built-in module import (`node:process`). No Browser
+tab was controlled. The Windows alternative initialized, but its target appeared
+as the ChatGPT desktop surface, which the computer-use skill excludes. No app
+input, configuration change, Chrome switch or simulated browser PASS was made.
+The local 5173 listener was absent; no unused server was started. This is not a
+new LociView runtime defect or a repetition of the earlier accepted Chrome batch.
+
+Independent scope review: 03's persistence experiments are not themselves gated
+on full technology adoption. However, 05 §13.4 currently declares this host to be
+page-memory. The smallest new PO decision is an explicit opt-in, synthetic-only
+saved-development mode in that same host. Its exact proposed boundary and finite
+acceptance are now in 05 §13.4; do not demand blanket G1/profile/wire approval for
+this experiment, and do not implement the changed host promise before consent.
+
+After consent: reuse BrowserPorts with async final closure and initial checks,
+connect the existing host/encoder to the journal-backed pair and dedicated run
+storage, preserve exact source and exchange bases, expose save/recovery failure,
+and verify the existing two-round workflow across reopen. No new probe, arbitrary
+file, real Project, product format/adoption or device/offline claim. UI rendering
+still needs a permitted working browser lane; do not ask for another tiny journal
+manual test. Goal remains active, awaiting this one scope choice; first occurrence
+of this specific approval blocker, not eligible for a blocked goal transition.
+
 ### Completed work — full development source through the durable service (2026-09-10)
 
 Start clean `ca1b723`, five commits ahead of the tracked origin. The preceding

@@ -1,5 +1,15 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **Current decision (2026-09-10, after `2abb57a`):** full synthetic source/service
+> persistence is connected, but the existing UI remains page-memory. 05 §13.4 now
+> contains one PROPOSED opt-in saved-development mode, awaiting PO confirmation:
+> same host, synthetic data and dedicated storage only; no product adoption or
+> real files. On approval connect the journal-backed pair to existing controls,
+> not another probe. Browser bootstrap failed before selection this turn; the
+> Windows alternative cannot control the ChatGPT desktop surface under its skill.
+> No new rendered/input/storage acceptance, browser switch or server startup.
+> Current todo contains the exact decision and finite acceptance; usage 57% left.
+
 > **Current continuation (2026-09-10, after readiness `77a22b0`):** PO approved
 > keeping unplaced Captions editable. Specification 05 §9.4 defines the proposed
 > atomic mapping and late-input rules; 06 §§4.1/5.1/8–9 define base evidence,

@@ -78,6 +78,9 @@ actual temporary-CAS content verification and the journal under an explicit
 candidate-only flat profile. Seven service cases cover local work, scoped review,
 retained original bytes and reopen/replay. No new browser page or durable UI
 activation; exact wire/profile/whole-converter and adoption inputs remain open.
+05 §13.4 now proposes the finite intermediate step: explicit opt-in synthetic-only
+save/reopen in the same development host. PO confirmation is pending; this neither
+adopts a product format nor requires pretending the full technology gate passed.
 No ordinary-runtime change or renewed unplaced-preservation question.
 
 2026-09-10: PO reports the five prescribed camera/pin/window groups PASS at

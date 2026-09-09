@@ -1210,6 +1210,36 @@ gates. The later §13.4 permits earlier connected synthetic development delivery
 
 ### 13.4 Approved sequencing — thin whole workflow first (2026-09-09)
 
+**PROPOSED, awaiting PO confirmation (2026-09-10): isolated saved-development
+mode in the same host.** This is not active authorization and does not replace
+the page-memory contract below. The service connection at `2abb57a` permits a
+finite next step without pretending that product adoption has passed: add an
+explicit opt-in to save/reopen only the same synthetic two-participant workspace
+in dedicated development storage. Keep the current memory mode and ordinary
+home unchanged. No existing v1/Native Project or arbitrary user file is admitted.
+
+On approval, reuse the existing BrowserPorts, full development-source service,
+command encoder and shared UI. Do not create a new probe page or parallel UI.
+One bounded implementation connects initialization → confirmed local edits →
+two-participant receive/explicit conflict choices → reload/reopen → recovery.
+Initial and subsequent publication must await full domain/guard and actual-CAS
+checks. Both participants' exact original histories and their separately recorded
+exchange bases survive restart. Only acknowledged published heads are UI authority;
+unfinished journals expose the old view and a visible recovery state. A failed
+write retains the same draft/change bytes, without an implicit memory fallback,
+silent reset, automatic winner or data clearing. Do not label these saves as
+ordinary production Project durability.
+
+Reuse the latest mounted team/pin/model/media/view/material tests and the 135
+isolated service/journal checks. Add only the missing host/persistence seam and
+one connected saved two-round/reopen/retry check, then batch native browser input
+verification. Browser input and actual storage receipts remain separate evidence.
+The explicit candidate flat-root profile remains distinct from product bootstrap
+and format adoption. Runtime adoption, real data/import/export, portable migration
+artifact/recipe/wire, main/release, PWA/offline and physical-iPhone gates are not
+waived by approval of this development-only mode. The complete product/UI goal
+remains open after this intermediate connection.
+
 **PO-approved Scene-first interaction amendment (2026-09-10, from `4ad055c`):**
 in the same synthetic development host, replace required model preselection for
 new Caption placement with explicit selection of a visible resident surface.

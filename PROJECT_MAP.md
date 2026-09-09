@@ -23,8 +23,9 @@ connects the complete existing development source to same-head managed/birth
 inspection and actual temporary-CAS verification. Original parts survive local
 editing, interruption/reopen and replay under an explicit candidate-only flat
 profile. This does not connect durable UI, real conversion or product wire.
-Next consolidate the finite existing-host activation/approval gap; do not start
-another provider/probe campaign. Measured adoption requirements remain separate. See
+The finite next decision is now proposed in 05 §13.4: PO confirmation for an
+opt-in synthetic-only saved-development mode in the same host. No new provider/
+probe campaign or product adoption is implied. Measured requirements remain separate. See
 `tasks/todo.md` top. No old journal rerun or immediate human test.
 
 2026-09-10: PO reports the five prescribed camera/pin/window manual groups PASS
