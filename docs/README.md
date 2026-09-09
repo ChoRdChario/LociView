@@ -60,9 +60,10 @@ If observed code conflicts with the applicable compatibility or accepted future 
 
 2026-09-10: PO reports the five prescribed camera/pin/window groups PASS at
 `7540478`; their earlier pending status below is historical. Broader rendered,
-IME/iPhone/storage acceptance remains open. The next Scene-first UX review and
-later-adjustment entry are recorded in UI guidelines §4.3, not implemented or
-an accepted change to model-relative anchors.
+IME/iPhone/storage acceptance remains open. PO-approved Scene-first UX and the
+later-adjustment entry now exist in the same synthetic development host under
+spec 05 §13.4 / UI guidelines §4.3. Internal model-relative anchors remain; this
+new arrangement has executable checks, not new rendered acceptance.
 
 Latest C implementation: the isolated candidate has canonical original-field
 source correspondence and an async verified driver. Its two-actor/equivalent

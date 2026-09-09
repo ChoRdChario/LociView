@@ -1093,6 +1093,43 @@ gates. The later §13.4 permits earlier connected synthetic development delivery
 
 ### 13.4 Approved sequencing — thin whole workflow first (2026-09-09)
 
+**PO-approved Scene-first interaction amendment (2026-09-10, from `4ad055c`):**
+in the same synthetic development host, replace required model preselection for
+new Caption placement with explicit selection of a visible resident surface.
+This supersedes the preselected-model input restrictions in §4.3 and the earlier
+§13.4 additions below, not the AssetAnchor/owner contract. `ピンを追加` arms local
+surface selection; Shift+primary click can select a surface directly. Resolve
+only a unique visible front hit from the currently verified resident models.
+Same-depth ambiguity, unsupported/hidden surfaces, miss, stale snapshot/camera,
+cancelled drag and multiple pointers must not invent a target or create a Caption.
+Show the exact chosen target beside the provisional position; existing gizmo and
+explicit confirm/cancel continue. No automatic source/family relation, owner rebind,
+ProjectAnchor fallback, schema or storage change. A non-pointer target/coordinate
+alternative may stay in contextual progressive disclosure, not the normal entry.
+
+`位置を調整` operates on the selected Caption's existing owner/current position;
+it does not ask for add-target selection. Compatible moves start the gizmo at that
+position without a surface re-pick. Incompatible model updates still require
+current-surface review. Pending/failed work and exact retries stay intact.
+
+Use one shared Scene navigation state with a Scene list at the top of the Caption
+tab and current-Scene context in other tabs. This supersedes the shared-header
+placement requirement only; Scene effects, valid entry view and draft guards stay.
+Ordinary Caption browsing uses Scene, search and direct color circles, not model
+classification. Color filtering applies to list rows and pins together, without
+changing selection, open windows, membership or history; unknown colors remain
+discoverable with diagnosis and a filtered selection has an explicit reveal path.
+Everyday owner filters/subtitles are removed; hidden/missing owner recovery stays.
+Place secondary window tools in the right Caption panel, outside the 3D stage.
+
+Acceptance: no preselection for button/Shift add; exact picked owner through confirm,
+cancel/retry and later model movement; overlap/miss/stale/drag/multitouch rejection;
+existing-position move without repick and no automatic rebind; Scene buttons and
+tab context with pending guards; list/pin colors with unknown and reveal recovery;
+window tools in sidebar with existing close/reopen/draft behavior. Reuse the PO's
+five-group `7540478` PASS only for unchanged behavior. New native rendering/input
+and physical-iPhone evidence remain pending; no general model/file/storage claim.
+
 The PO chose to assemble a thin, usable whole before refining each subsystem.
 This supersedes disconnected component expansion as the default next work and
 the former hold on an early synthetic development host. It changes delivery

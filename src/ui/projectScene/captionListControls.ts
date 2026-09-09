@@ -1,4 +1,4 @@
-import { captionColorKey, captionListView, captionOwnerLabel, captionTitle, ownerFilterKey, planCaptionList,
+import { captionColorKey, captionListView, captionOwnerLabel, captionTitle, planCaptionList,
   type CaptionListContext, type CaptionListIntent, type CaptionListPlan, type CaptionListRow } from './captionListState';
 import { sceneSwitchReason } from './navigationState';
 
@@ -14,15 +14,14 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
   const searchLabel = make('label', '検索'), search = make('input');
   search.type = 'search'; search.placeholder = 'タイトル・本文'; search.setAttribute('aria-label', '検索');
   searchLabel.append(search);
-  const ownerLabel = make('label', 'モデル'), owner = make('select'); owner.setAttribute('aria-label', 'モデル');
-  ownerLabel.append(owner); filters.append(searchLabel, ownerLabel);
+  filters.append(searchLabel);
   const status = make('p'); status.className = 'lv-caption-status'; status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
   const reveal = button('選択した項目を表示'); reveal.hidden = true;
   const count = make('p'); count.className = 'lv-caption-count';
   const colorBar = make('div'); colorBar.className = 'lv-caption-colors';
-  colorBar.setAttribute('role', 'group'); colorBar.setAttribute('aria-label', '3Dピンの色');
-  const colorLabel = make('span', '3Dピンの色'), colorChoices = make('div'), all = button('全色'), unknown = make('span');
+  colorBar.setAttribute('role', 'group'); colorBar.setAttribute('aria-label', 'ピンの色');
+  const colorLabel = make('span', 'ピンの色'), colorChoices = make('div'), all = button('全色'), unknown = make('span');
   colorChoices.className = 'lv-caption-color-choices'; unknown.className = 'lv-caption-note';
   colorBar.append(colorLabel, colorChoices, all, unknown);
   const list = make('ul'); list.className = 'lv-caption-list'; list.setAttribute('aria-label', 'キャプション一覧');
@@ -30,7 +29,6 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
   root.append(filters, status, reveal, count, colorBar, list);
   let context: CaptionListContext | undefined, composing = false, disposed = false, rendering = false;
   let observedScrollTop = 0;
-  let ownerFingerprint = '';
   const cleanups: (() => void)[] = [];
   const listen = (node: HTMLElement, event: string, handler: () => void) => {
     node.addEventListener(event, handler); cleanups.push(() => node.removeEventListener(event, handler));
@@ -38,7 +36,6 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
   const request = (intent: CaptionListIntent) => {
     if (!context || disposed) return;
     const plan = planCaptionList(context, intent);
-    owner.value = ownerFilterKey(context.memory.ownerFilter);
     if (plan.kind === 'blocked') { status.textContent = plan.reason; status.hidden = false; }
     onPlan(plan);
   };
@@ -49,13 +46,6 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     onComposition(false);
   });
   listen(search, 'input', () => { if (!composing) request({ kind: 'search', query: search.value }); });
-  listen(owner, 'change', () => {
-    if (!context) return;
-    const choice = owner.value === 'all' ? { kind: 'all' as const }
-      : captionListView(context.source, context.memory).owners.find(item => ownerFilterKey(item.filter) === owner.value)?.filter;
-    if (choice) request({ kind: 'owner', filter: choice });
-    else { owner.value = ownerFilterKey(context.memory.ownerFilter); status.textContent = 'モデルを選び直してください。'; status.hidden = false; }
-  });
   listen(all, 'click', () => request({ kind: 'allColors' }));
   listen(reveal, 'click', () => request({ kind: 'revealSelection' }));
   listen(list, 'scroll', () => {
@@ -92,6 +82,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
       rows.set(item.id, entry);
     }
     entry.title.textContent = captionTitle(item); entry.owner.textContent = captionOwnerLabel(item);
+    entry.owner.hidden = item.pin === 'visible' && item.owner.kind === 'value';
     entry.select.setAttribute('aria-current', String(item.id === context!.memory.selectedCaptionId));
     entry.swatch.style.backgroundColor = row.color ?? ''; entry.swatch.hidden = row.color === null;
     const notes: string[] = [];
@@ -125,22 +116,11 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     const view = captionListView(next.source, next.memory), active = document.activeElement;
     const hadFocus = active !== null && root.contains(active);
     if (!composing) search.value = next.memory.search;
-    search.disabled = Boolean(view.issue) && !composing; owner.disabled = Boolean(view.issue);
-    const ownerKey = ownerFilterKey(next.memory.ownerFilter);
-    const missingOwner = ownerKey !== 'all' && !view.owners.some(item => ownerFilterKey(item.filter) === ownerKey);
-    const fingerprint = JSON.stringify([view.owners, missingOwner ? ownerKey : null]);
-    if (fingerprint !== ownerFingerprint) {
-      const choices = [{ filter: { kind: 'all' as const }, label: 'すべてのモデル' }, ...view.owners];
-      const options = choices.map(choice => { const option = make('option', choice.label); option.value = ownerFilterKey(choice.filter); return option; });
-      if (missingOwner) { const option = make('option', '選択したモデルを確認'); option.value = ownerKey; option.disabled = true; options.push(option); }
-      owner.replaceChildren(...options); ownerFingerprint = fingerprint;
-    }
-    owner.value = ownerKey;
+    search.disabled = Boolean(view.issue) && !composing;
     const selectionMessage = next.memory.selectedCaptionId === null ? '' : !view.selected
       ? '選択したキャプションはこのシーンにありません。別の項目を選択してください。'
       : !view.selectionVisible ? '選択したキャプションは絞り込みで非表示です。' : '';
-    status.textContent = [view.issue, sceneSwitchReason(next.pending), !view.issue && selectionMessage,
-      !view.issue && missingOwner && '選択したモデルが一覧にありません。モデルを選び直してください。'].filter(Boolean).join(' ');
+    status.textContent = [view.issue, sceneSwitchReason(next.pending), !view.issue && selectionMessage].filter(Boolean).join(' ');
     status.hidden = !status.textContent;
     reveal.hidden = !view.selected || view.selectionVisible || Boolean(view.issue);
     count.textContent = view.issue ? '' : `${view.rows.length} / ${view.total}件`;

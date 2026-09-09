@@ -32,8 +32,8 @@ function host() {
     }
   });
   controls.render(current); const actions = record(controls.actions), strip = record(controls.modeStrip);
-  return { controls, events, actions, strip, target: actions.children[0]!.children[0]!, add: actions.children[1]!, move: actions.children[2]!,
-    impact: actions.children[5]!, moveTarget: actions.children[6]!, heading: strip.children[0]!, status: strip.children[1]!,
+  return { controls, events, actions, strip, target: actions.children[6]!.children[1]!.children[0]!, add: actions.children[0]!, move: actions.children[1]!,
+    impact: actions.children[4]!, moveTarget: actions.children[5]!, heading: strip.children[0]!, status: strip.children[1]!,
     finish: strip.children[2]!, cancel: strip.children[3]!, confirmation: strip.children[4]!,
     get context() { return current; }, render(next: PinModeContext) { if (controls.render(next)) current = next; } };
 }
@@ -99,8 +99,8 @@ describe('disconnected pin-mode intentions, not picking or anchor construction',
 
   it('shows distinct add and move target before entry, shared impact and a separate near-stage strip', () => {
     const h = host(); expect(h.target.attributes.get('aria-label')).toBe('追加先モデル');
-    expect(h.add.disabled).toBe(true); expect(h.move.disabled).toBe(false); expect(h.strip.hidden).toBe(true);
-    h.target.value = assetA; h.target.fire('change'); expect(h.moveTarget.textContent).toBe('移動：入口 — 北館');
+    expect(h.add.disabled).toBe(false); expect(h.move.disabled).toBe(false); expect(h.strip.hidden).toBe(true);
+    h.target.value = assetA; h.target.fire('change'); expect(h.moveTarget.textContent).toBe('選択：入口');
     expect(h.impact.textContent).toContain('2シーン'); h.move.fire('click');
     expect(h.heading.textContent).toContain('入口 — 北館'); expect(h.strip.hidden).toBe(false); expect(h.finish.disabled).toBe(true);
     h.render(proposal(h.context)); expect(h.finish.disabled).toBe(false); h.finish.fire('click');

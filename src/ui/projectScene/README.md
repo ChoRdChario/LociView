@@ -197,9 +197,12 @@ the exported intent saved anything. `review` is an explicit host recovery reques
 
 `pinModeState.ts` / `pinModeControls.ts` expose adjacent add/move actions and a
 separate `modeStrip`. Mount the strip near the stage outside tab/unmount/scroll
-lifetimes. The `追加先モデル` selector starts empty even for one model; move shows
-the selected Caption and its exact existing owner BEFORE entry, independent of
-that selector. A shared Caption discloses affected Scene count; unknown impact
+lifetimes. Daily add/move controls live beside the right Caption list. `beginAdd`
+enters a cancellable surface-wait state without choosing a model; the host supplies
+an exact unique surface target before the existing add proposal. Shift+click uses
+the same path. `数値で配置` retains the explicit model selector as an optional
+non-pointer alternative. `位置を調整` starts a compatible selected pin at its
+current position; it never reassigns its owner. A shared Caption discloses affected Scene count; unknown impact
 blocks movement. `captionActions.css` supplies disconnected scoped controls,
 44px targets and an explicit root-hidden rule; actual layout remains unverified.
 

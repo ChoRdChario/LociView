@@ -544,7 +544,7 @@ describe('actual pinned candidate connected to synthetic workspace; not browser,
     const document = new RecordedDocument(), team = createTeamWorkspace(document.asDocument(), factory), root = record(team.root), actor = label(root, '操作する人');
     for (const who of ['0', '1']) {
       actor.value = who; actor.fire('change'); const workspace = visibleWorkspace(root), scenes = label(workspace, 'シーン');
-      scenes.value = f.detail; scenes.fire('change'); button(workspace, 'モデル').fire('click');
+      button(scenes, '設備の確認').fire('click'); button(workspace, 'モデル').fire('click');
       const s = team.sessions[Number(who)]!; expect(toggle(s, f.structure, true)).toBe(true); team.render();
     }
     button(root, '相手の更新を受け取る').fire('click'); const panel = label(root, '更新の競合');
@@ -658,7 +658,7 @@ describe('actual pinned candidate connected to synthetic workspace; not browser,
     const actor = label(root, '操作する人');
     for (const who of ['0', '1']) {
       actor.value = who; actor.fire('change'); const workspace = visibleWorkspace(root), scenes = label(workspace, 'シーン');
-      scenes.value = f.detail; scenes.fire('change');
+      button(scenes, '設備の確認').fire('click');
       const picker = by(workspace, node => node.className === 'lv-caption-include'), select = label(picker, 'キャプション');
       select.value = f.second; select.fire('change'); button(picker, 'このシーンに追加').fire('click');
     }
@@ -801,7 +801,7 @@ describe('actual pinned candidate connected to synthetic workspace; not browser,
     actor.value = '1'; actor.fire('change'); const second = visibleWorkspace(root);
     by(label(second, 'キャプション一覧'), n => n.className === 'lv-caption-select').fire('click');
     button(root, '相手の更新を受け取る').fire('click');
-    button(second, 'ピンを移動').fire('click'); const position = label(second, 'ピン座標・開発用');
+    button(second, '位置を調整').fire('click'); const position = label(second, 'ピン座標・開発用');
     const x = label(position, 'X'); x.value = '7'; x.fire('input');
     expect(actor.disabled).toBe(true); expect(button(root, '相手の更新を受け取る').disabled).toBe(true);
     const before = team.histories[1].read(); actor.value = '0'; actor.fire('change'); button(root, '相手の更新を受け取る').fire('click');

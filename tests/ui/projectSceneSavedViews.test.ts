@@ -24,7 +24,7 @@ describe('Saved Views in the connected synthetic workspace, not browser/device e
     const picker = select(r, '保存した視点'), name = descendants(author).find(n => n.tag === 'input')!;
     const add = (text: string) => { button(author, '視点を作る').fire('click'); name.value = text; name.fire('input'); button(author, '視点を追加').fire('click'); };
     button(author, '視点を作る').fire('click'); name.fire('compositionstart'); name.value = '全体を確認'; name.fire('input');
-    expect(s.pending).toBe('composition'); expect(select(r, 'シーン').disabled).toBe(true);
+    expect(s.pending).toBe('composition'); expect(button(r, '設備の確認').disabled).toBe(true);
     name.fire('compositionend'); expect(s.pending).toBe('text');
     display = { ...payload(), camera: { ...payload().camera, position: [3, 4, 9] } }; cameraToken++; w.render();
     button(author, '視点を追加').fire('click'); expect(s.pending).toBeNull();
@@ -44,8 +44,10 @@ describe('Saved Views in the connected synthetic workspace, not browser/device e
     change(select(entry, 'シーンを開いたときの視点'), ''); button(entry, '設定を適用').fire('click');
     button(author, '削除').fire('click'); expect(s.snapshot.viewData!.records[first]!.lifecycle).toMatchObject({ value: { state: 'active' } });
     button(author, '削除する').fire('click'); expect(s.snapshot.viewData!.records[first]!.lifecycle).toMatchObject({ value: { state: 'deleted' } });
-    change(select(r, 'シーン'), f.detail); expect(select(r, '保存した視点').children.some(n => n.value === second)).toBe(false);
-    change(select(r, 'シーン'), f.overview); expect(select(r, '保存した視点').children.some(n => n.value === second)).toBe(true);
+    button(r, 'キャプション').fire('click'); button(r, '設備の確認').fire('click'); button(r, '視点').fire('click');
+    expect(select(r, '保存した視点').children.some(n => n.value === second)).toBe(false);
+    button(r, 'キャプション').fire('click'); button(r, '全体').fire('click'); button(r, '視点').fire('click');
+    expect(select(r, '保存した視点').children.some(n => n.value === second)).toBe(true);
     expect(s.snapshot.resources.captions).toEqual(new SyntheticSession().snapshot.resources.captions); w.dispose();
   });
   it('validates exact camera/background shapes and allocates strict order intervals without rewriting neighbors', () => {

@@ -136,13 +136,13 @@ There is one normal home at `/`.
 
 ### 4.2 Workspace structure
 
-The PO's 2026-09-10 requested revision is recorded in §4.3. The following layout
-describes the preceding arrangement; proposed input semantics do not amend spec 05 alone.
+The PO-approved 2026-09-10 revision is recorded in §4.3 and spec 05 §13.4.
+It supersedes the earlier header/owner-filter arrangement in the development host.
 
 The normal Desktop workspace has three stable regions:
 
 1. a shared header for Project identity, View/Edit state, save state,
-   current Scene and file/help actions;
+   and file/help actions;
 2. the 3D stage, with frequent view recovery close to it;
 3. a right-side task area with four purpose-based tabs.
 
@@ -151,13 +151,13 @@ model-management responsibility required by LociView:
 
 | Tab | User questions it answers | Contents |
 |---|---|---|
-| キャプション | What is recorded in this Scene? What should I add or correct? | Current-Scene search, model filter, pin-color filters, list, existing-Project Caption inclusion, add/place/move, title/body/color and attached media |
+| キャプション | What is recorded in this Scene? What should I add or correct? | Scene list, current-Scene search, pin-color filters, list, existing-Project Caption inclusion, add/place/move, title/body/color, attached media and secondary window tools |
 | モデル | What Project models exist, and which belong to this Scene? | Project model list, Scene membership, Project-wide placement/alignment and replacement, pin scale, format-specific applicable controls, add and delete |
 | マテリアル | How should this surface look in this Scene? | Explicit target model/surface, Scene or Project scope, opacity, sidedness, unlit and applicable chroma controls |
 | 視点 | From where and against what background should I inspect this Scene? | Six directions, projection, Scene-owned Saved View recall/manage, entry view and 3D background |
 
-Scene switching, Project save state and file exchange stay outside the tabs
-because they affect or frame more than one task. Frequent `全体表示` and
+Scene switching lives atop Caption; other tabs show the current Scene as context.
+Project save state and file exchange stay outside the tabs. Frequent `全体表示` and
 Saved View recall may also have a shortcut beside the 3D stage; the shortcut
 must use the same state and must not create a second view system.
 
@@ -168,9 +168,9 @@ presentation and applies that Scene's valid entry view once, but it never change
 the Project-wide active model revision/alignment or silently changes the Project
 default Scene.
 
-### 4.3 Scene-first revision requested after manual acceptance (2026-09-10)
+### 4.3 Accepted Scene-first revision after manual acceptance (2026-09-10)
 
-**PO-requested direction / not implemented:** ordinary Caption work starts with
+**Accepted requirement (PO confirmed 2026-09-10); implemented in the bounded synthetic development host, new rendered acceptance pending:** ordinary Caption work starts with
 the Scene, then search and direct pin-color circles immediately above the list.
 Move Scene selection from the shared-header dropdown to a visible Scene list at
 the top of the Caption tab. Move window front/arrange tools out of the upper-left
@@ -179,22 +179,22 @@ recovery and contextual placement controls. Do not require everyday model-based
 Caption organization. Make later pin adjustment discoverable from the selected
 Caption, next to add, without requiring the user to select the owner model again.
 
-**Proposed implementation for confirmation:** retain one navigation state; Scene
+**Accepted implementation direction:** retain one navigation state; Scene
 changes still affect models, materials and entry views, not only Captions. Other
 tabs show the current Scene as context. Tab changes never switch Scene or discard
 drafts. Remove the normal owner filter and repeated owner subtitles; retain
 contextual model details for hidden/missing models, review and deliberate model
 management. Model-independent/unresolved records remain discoverable.
 
-Current color controls filter pins only. Propose filtering list rows and pins
+Previous color controls filter pins only. The approved change filters list rows and pins
 together, preserving selected/editing records and open windows, with a visible
 way to reveal filtered selection. Unknown/review colors need a recoverable path,
 not omission or guessed defaults. Filters never delete or change Scene membership.
 
-For new placement, propose `ピンを追加` then selecting a visible surface, or
+For new placement, use `ピンを追加` then selecting a visible surface, or
 Shift+click directly. Use the exact hit Asset/frame as a visible provisional target
 before gizmo adjustment and explicit confirmation. No normal preselection dropdown.
-This needs amendment of spec 05 §§4.3/13.4. Ambiguous/unsupported hits require an
+Spec 05 §13.4 records the approved input amendment. Ambiguous/unsupported hits require an
 explicit choice or refusal; misses create nothing. Retain internal model-relative
 anchors so model movement carries its pins; owner removal, automatic rebind and
 new Project-space authoring are not implied by the request.
@@ -213,7 +213,8 @@ review. Failure retains the proposal; cancel restores the confirmed position.
 Caption work is the ordinary center of the product.
 
 1. Search or select an existing Caption, or use the Caption-add action.
-2. For a new Caption, show the explicit target model before placement.
+2. For a new Caption, use a uniquely selected visible surface to establish the
+   provisional target; show it before confirmation (§4.3), not as mandatory preselection.
 3. Keep adding, moving and re-placing the pin adjacent in the action hierarchy.
 4. Show title, body, color and media for the selected Caption without making
    the user leave the list context.

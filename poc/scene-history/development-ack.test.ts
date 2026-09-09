@@ -68,17 +68,16 @@ describe('verified candidate through the existing mounted host; not browser or d
     });
     const team = createTeamWorkspace(new RecordedDocument().asDocument(), () => pair), root = record(team.root), s = team.sessions[0]!;
     const work = visible(root), initial = s.snapshot;
-    expect(button(work, 'ピンを追加').disabled).toBe(true);
-    const target = label(work, '追加先モデル'); target.value = f.equipment; target.fire('change');
     expect(button(work, 'ピンを追加').disabled, s.message).toBe(false);
     button(work, 'ピンを追加').fire('click'); expect(s.pinCoordinates?.coordinates).toEqual(['', '', '']);
-    const strip = label(work, 'ピンの操作'); expect(button(strip, '位置を確定').disabled).toBe(true);
+    expect(s.pinContext().memory).toMatchObject({ mode: null, addTargetId: null, choosingSurface: true });
+    const strip = label(work, 'ピンの操作'); expect(button(strip, '位置を確定').hidden).toBe(true);
     button(strip, '取り消す').fire('click'); button(strip, '操作を取り消す').fire('click');
     expect(s.snapshot).toBe(initial); expect(pair[0].exportUpdate().changes).toHaveLength(0);
     s.acceptList(planCaptionList(s.captionContext(), { kind: 'search', query: '絞り込みを保持' })); team.render();
     button(work, 'ピンを追加').fire('click'); const coords = label(work, 'ピン座標・開発用');
-    const surfaceTarget = s.pinSurfaceTarget()!;
-    expect(s.acceptPinSurface(surfaceTarget, [0.5, 0.25, 0])).toBe(true); team.render();
+    const surfaceTarget = s.pinCreationTargets().find(t => t.assetId === f.equipment)!;
+    expect(s.acceptPinCreation(surfaceTarget, [0.5, 0.25, 0])).toBe(true); team.render();
     expect(s.pinPreviewAnchor).toMatchObject({ positionAsset: [0.5, 0.25, 0] });
     for (const [axis, raw] of [['X', '1'], ['Y', '2'], ['Z', '3']]) { const input = label(coords, axis!); input.value = raw!; input.fire('input'); }
     const family = label(coords, 'ピンを置く表面'); family.value = s.pinCoordinateContext().families[0]!.id; family.fire('change');

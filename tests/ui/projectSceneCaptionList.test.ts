@@ -31,19 +31,19 @@ function host(initial = fixture()) {
   }, active => compositions.push(active));
   controls.render(context);
   const root = record(controls.root), filters = root.children[0]!, search = filters.children[0]!.children[0]!;
-  const owner = filters.children[1]!.children[0]!, status = root.children[1]!, reveal = root.children[2]!;
+  const status = root.children[1]!, reveal = root.children[2]!;
   const colorBar = root.children[4]!, colorChoices = colorBar.children[1]!, all = colorBar.children[2]!, list = root.children[5]!;
-  return { document, controls, root, search, owner, status, reveal, colorBar, colorChoices, all, list, plans, compositions,
+  return { document, controls, root, search, status, reveal, colorBar, colorChoices, all, list, plans, compositions,
     get context() { return context; }, render(next: CaptionListContext) { if (controls.render(next)) context = next; } };
 }
 
 describe('disconnected Caption list contracts (not browser/render/storage evidence)', () => {
-  it('matches title OR body plus exact owner, preserving order and model-independent identity', () => {
+  it('matches title OR body without legacy owner classification hiding records', () => {
     let context = fixture(); const before = structuredClone(context);
     context = change(context, planCaptionList(context, { kind: 'search', query: '  gear ' }));
     expect(captionListView(context.source, context.memory).rows.map(row => row.item.id)).toEqual([b]);
     context = change(context, planCaptionList(context, { kind: 'owner', filter: { kind: 'asset', assetId: model } }));
-    expect(captionListView(context.source, context.memory).rows).toEqual([]);
+    expect(captionListView(context.source, context.memory).rows.map(row => row.item.id)).toEqual([b]);
     expect(context.memory.selectedCaptionId).toBe(a); expect(context.memory.listScrollTop).toBe(240);
     context = change(context, planCaptionList(context, { kind: 'owner', filter: { kind: 'project' } }));
     expect(captionListView(context.source, context.memory).rows.map(row => row.item.id)).toEqual([b]);
@@ -57,22 +57,23 @@ describe('disconnected Caption list contracts (not browser/render/storage eviden
     const view = captionListView(source, { ...context.memory, search: 'missing', ownerFilter: { kind: 'asset', assetId: model } });
     expect(view.rows.map(row => row.item.id)).toEqual([c]); expect(view.rows[0]?.uncertainMatch).toBe(true);
     expect(view.rows[0]?.color).toBeNull(); expect(view.colors).toEqual([red, blue]);
+    expect(captionListView(source, { ...context.memory, pinColors: [] }).rows.map(row => row.item.id)).toEqual([c]);
     expect(view.owners.some(owner => owner.filter.kind === 'unresolved')).toBe(true);
     expect(captionColorKey(value('url(https://untrusted.example/a)'))).toBeNull();
     expect(captionColorKey(value('#aBc'))).toBe('#aabbcc');
   });
 
-  it('color filtering hides pins only; zero stays zero, explicit all differs from future-inclusive all', () => {
+  it('color filtering also hides rows; zero stays zero, explicit all differs from future-inclusive all', () => {
     let context = fixture(); const source = context.source;
     for (const color of [red, blue]) context = change(context, planCaptionList(context, { kind: 'color', color }));
     expect(context.memory.pinColors).toEqual([]);
     let view = captionListView(source, context.memory);
-    expect(view.rows.map(row => row.item.id)).toEqual([a, b]); expect(view.rows.every(row => row.colorHidden)).toBe(true);
+    expect(view.rows).toEqual([]); expect(view.selectionVisible).toBe(false);
     for (const color of [red, blue]) context = change(context, planCaptionList(context, { kind: 'color', color }));
     expect(context.memory.pinColors).toEqual([red, blue]);
     if (source.kind !== 'ready') return;
     const future = { ...source, captions: [...source.captions, item(c, 'new', '#123456')] };
-    expect(captionListView(future, context.memory).rows.at(-1)?.colorHidden).toBe(true);
+    expect(captionListView(future, context.memory).rows.some(row => row.item.id === c)).toBe(false);
     context = change(context, planCaptionList(context, { kind: 'allColors' }));
     expect(captionListView(future, context.memory).rows.at(-1)?.colorHidden).toBe(false);
     expect(context.source).toBe(source); expect(context.memory.selectedCaptionId).toBe(a);
@@ -114,13 +115,16 @@ describe('disconnected Caption list contracts (not browser/render/storage eviden
   it('renders color circles immediately above the list with native pressed states and retains keyed rows/focus/scroll', () => {
     const h = host(); h.list.clientHeight = 100;
     expect(h.root.children.indexOf(h.list) - h.root.children.indexOf(h.colorBar)).toBe(1);
-    expect(h.search.attributes.get('aria-label')).toBe('検索'); expect(h.owner.attributes.get('aria-label')).toBe('モデル');
+    expect(h.search.attributes.get('aria-label')).toBe('検索'); expect(h.root.children[0]!.children).toHaveLength(1);
     const first = h.list.children[0]!, select = first.children[0]!, redButton = h.colorChoices.children[0]!;
-    select.focus(); redButton.fire('click');
+    select.focus(); h.colorChoices.children[1]!.fire('click');
     expect(h.list.children[0]).toBe(first); expect(select.attributes.get('aria-current')).toBe('true');
     expect(h.document.activeElement).toBe(select); expect(select.focusCalls.at(-1)).toEqual({ preventScroll: true });
-    expect(h.list.scrollTop).toBe(240); expect(redButton.attributes.get('aria-pressed')).toBe('false');
-    expect(first.children[0]!.children[3]!.textContent).toContain('ピン非表示（色）');
+    expect(h.list.scrollTop).toBe(240); expect(redButton.attributes.get('aria-pressed')).toBe('true');
+    expect(h.list.children).toHaveLength(1);
+    redButton.fire('click'); expect(h.context.memory.selectedCaptionId).toBe(a);
+    expect(h.document.activeElement).toBe(h.search); expect(h.reveal.hidden).toBe(false);
+    h.reveal.fire('click'); expect(h.context.memory.pinColors).toBeNull(); expect(h.list.children).toHaveLength(2);
     h.list.scrollTop = 310; h.list.fire('scroll'); expect(h.context.memory.listScrollTop).toBe(310);
     h.list.clientHeight = 0; h.list.scrollTop = 0; h.list.fire('scroll'); expect(h.context.memory.listScrollTop).toBe(310);
     h.controls.dispose();
@@ -152,22 +156,22 @@ describe('disconnected Caption list contracts (not browser/render/storage eviden
     h.controls.dispose();
   });
 
-  it('reports color-hidden and pin-review states independently while keeping the row selectable', () => {
+  it('retains a filtered review selection and explicitly reveals its recovery action', () => {
     const context = fixture(); if (context.source.kind !== 'ready') return;
     const h = host({ ...context, source: { ...context.source, captions: [{ ...item(a, '確認対象', red), pin: 'needsReview' }] },
-      memory: { ...context.memory, selectedCaptionId: null, pinColors: [] } });
+      memory: { ...context.memory, selectedCaptionId: a, pinColors: [] } });
+    expect(h.reveal.hidden).toBe(false); h.reveal.fire('click');
     const row = h.list.children[0]!, select = row.children[0]!, action = row.children[1]!;
     expect(select.children[3]!.textContent).toContain('ピン位置を確認');
-    expect(select.children[3]!.textContent).toContain('ピン非表示（色）');
     expect(action.hidden).toBe(false); expect(action.textContent).toBe('状態を確認');
     select.fire('click'); expect(h.context.memory.selectedCaptionId).toBe(a);
-    expect(h.context.memory.pinColors).toEqual([]); h.controls.dispose();
+    expect(h.context.memory.pinColors).toBeNull(); h.controls.dispose();
   });
 
   it('retains missing owner/color memory, explains missing selection and scrolls only the inner list on explicit reveal', () => {
     const h = host(); const before = h.context;
     h.render({ ...before, memory: { ...before.memory, pinColors: [red], ownerFilter: { kind: 'asset', assetId: 'absent' } } });
-    expect(h.owner.value).toBe('asset:absent'); expect(h.status.textContent).toContain('モデルを選び直して');
+    expect(h.list.children).toHaveLength(1); expect(h.status.textContent).not.toContain('モデルを選び直して');
     expect(h.context.memory.pinColors).toEqual([red]);
     h.render(before); h.list.clientHeight = 100; h.list.scrollTop = 0;
     h.list.children[0]!.offsetTop = 250; h.list.children[0]!.offsetHeight = 44;

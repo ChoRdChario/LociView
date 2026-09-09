@@ -13,7 +13,10 @@
 .lv-development :is(button, input, select, textarea):focus-visible { outline: 2px solid #312f2d; outline-offset: 2px; }
 .lv-development-header { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 24px; padding: 12px 20px; border-bottom: 1px solid #b7b1aa; }
 .lv-development-brand { color: #635e58; font-size: 13px; font-weight: 400; margin-right: auto; }
-.lv-development .lv-scene-control label { display: flex; align-items: center; gap: 8px; }
+.lv-development .lv-scene-choices { display: flex; flex-wrap: wrap; gap: 6px; max-height: 144px; overflow-y: auto; margin-top: 6px; }
+.lv-development .lv-scene-choices button { padding: 6px 12px; text-align: left; }
+.lv-development .lv-scene-choices button[aria-pressed="true"] { border-left: 3px solid #413d39; background: #e1ddd7; font-weight: 500; }
+.lv-development .lv-scene-context { padding: 4px 0; color: #635e58; }
 .lv-development .lv-scene-control p:empty { display: none; }
 .lv-development .lv-save-status { padding: 4px 10px; border: 1px dashed #817c78; }
 .lv-development-notice, .lv-development-message { padding: 8px 20px; border-bottom: 1px solid #b7b1aa; background: #f2f0ee; }
@@ -70,6 +73,11 @@
 .lv-development .lv-pin-actions label { flex: 1 1 160px; }
 .lv-development .lv-pin-actions p { font-size: 12px; }
 .lv-development .lv-pin-actions button { align-self: end; }
+.lv-development .lv-pin-actions > details { flex-basis: 100%; font-size: 12px; }
+.lv-development .lv-pin-actions > details > summary { cursor: pointer; padding: 6px 0; }
+.lv-development .lv-pin-actions > details label { display: flex; flex-direction: column; gap: 4px; }
+.lv-development .lv-pin-actions > details select { max-width: 100%; }
+.lv-development .lv-caption-search { grid-template-columns: minmax(0, 1fr); }
 .lv-development .lv-pin-mode { border-left: 3px solid #6e5639; }
 .lv-development-pin-help, .lv-development-information { font-size: 12px; color: #635e58; }
 .lv-development-information, .lv-development-numeric { flex: 0 0 auto; }
@@ -93,6 +101,8 @@
 .lv-caption-window-note { padding: 4px 8px; font-size: 12px; }
 .lv-caption-window-line { position: absolute; height: 1px; background: #635e58; transform-origin: 0 0; pointer-events: none; }
 .lv-caption-window-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.lv-development-window-actions { border-top: 1px solid #d3cec7; padding-top: 8px; font-size: 12px; }
+.lv-development-window-actions .lv-caption-window-tools { margin-top: 8px; }
 .lv-caption-window-tools select { max-width: 220px; }
 .lv-caption-window-tools > p:empty { display: none; }
 .lv-development-media { border-top: 1px solid #b7b1aa; padding-top: 8px; }

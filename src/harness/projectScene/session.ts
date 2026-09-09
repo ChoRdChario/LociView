@@ -409,6 +409,20 @@ export class SyntheticSession {
     return !context.memory.mode && !pinActionIssue(context, 'add') && context.memory.addTargetId
       ? this.surfaceTarget(context.memory.addTargetId) : null;
   }
+  /** Exact eligible models for a user-selected visible surface; no chosen owner yet. */
+  pinCreationTargets(): readonly PinSurfaceTarget[] {
+    const context = this.pinContext();
+    if (context.source.kind !== 'ready' || context.memory.mode || this.workingBlock || context.otherPending ||
+      this.pinInputComposing) return [];
+    return context.source.models.filter(model => model.token && model.addBlock === null)
+      .flatMap(model => { const target = this.surfaceTarget(model.assetId); return target ? [target] : []; });
+  }
+  acceptPinCreation(target: PinSurfaceTarget, position: readonly [number, number, number]): boolean {
+    if (!position.every(Number.isFinite) || !this.pinCreationTargets().some(t => JSON.stringify(t) === JSON.stringify(target)))
+      return this.refuse('表示が変わっています。面を選び直してください。');
+    return this.acceptPin(planPinMode(this.pinContext(), { kind: 'target', assetId: target.assetId })) &&
+      this.acceptPin(planPinMode(this.pinContext(), { kind: 'add' })) && this.acceptPinSurface(target, position);
+  }
   acceptPinShortcut(target: PinSurfaceTarget, position: readonly [number, number, number]): boolean {
     if (!position.every(Number.isFinite) || JSON.stringify(target) !== JSON.stringify(this.pinShortcutTarget())) return false;
     return this.acceptPin(planPinMode(this.pinContext(), { kind: 'add' })) && this.acceptPinSurface(target, position);
@@ -470,7 +484,7 @@ export class SyntheticSession {
       if (plan.kind === 'change') {
         this.pins.set(this.sceneId, plan.memory);
         if (plan.intent === 'cancel') { this.pinInput = null; this.pinProposal = null; this.pinInputComposing = false; }
-        else if (plan.intent === 'add') {
+        else if (plan.intent === 'add' || plan.intent === 'beginAdd') {
           this.pinInput = { coordinates: ['', '', ''], familyId: null }; this.pinProposal = null;
         }
         else if (plan.intent === 'move') {

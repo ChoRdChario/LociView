@@ -9,24 +9,26 @@ requested. Synthetic two-person model/pin/history and independent Caption/model-
 The scoped PO result below closes only the listed interaction checks; broader
 rendered, IME, device and durable-file acceptance remain pending.
 
-### Current decision — Scene-first Caption workflow (2026-09-10)
+### Current implementation — Scene-first Caption workflow (2026-09-10)
 
 - [x] Record PO-reported PASS for the five preceding manual test groups at
   `7540478`: basic Blender mouse navigation; Shift+click placement/gizmo;
   button-based placement/cancel; existing-pin move/cancel; accumulating windows,
   close/reopen, list/pin selection and arrange. This is a human report, not an AI
   browser run or captured browser version; no full team/iPhone/storage/offline PASS.
-- [x] Inspect code/contracts and receive one bounded read-only review. Record
-  requested layout and proposed input changes in UI guidelines §4.3; no code edits.
-- [ ] Confirm removal of everyday model preselection versus removal of internal
-  model-relative anchors; amend spec 05 before changing the surface-target rule.
-- [ ] Same-host UI: Scene list atop Caption; Scene/color/search browsing;
+- [x] At the preceding documentation checkpoint, inspect code/contracts and receive
+  one bounded read-only review; record requested layout/input changes in UI guidelines §4.3.
+- [x] PO confirms removing everyday model preselection while retaining internal
+  model-relative anchors. Spec 05 §13.4 amended before code; start clean `4ad055c`.
+- [x] Same-host UI: Scene list atop Caption; Scene/color/search browsing;
   conditional model details; secondary window tools in the sidebar; discoverable
   selected-Caption `位置を調整` next to add, using the current-position gizmo.
-- [ ] Reuse the five-group PASS and verify changed paths, not the old journal.
+- [x] Reuse the five-group PASS and verify changed executable paths, not the old journal.
+- [ ] Batched rendered/native-input acceptance for this changed arrangement;
+  do not relabel prior `7540478` evidence as acceptance of this slice.
 
-Current code filters pins by color, not list rows. Combined list/pin filtering is
-proposed. Scene selection remains one workspace-wide state, affecting models,
+Before this slice code filtered pins by color, not list rows. Combined list/pin
+filtering is now approved and implemented. Scene selection remains one workspace-wide state, affecting models,
 materials and views; retain current-Scene context in other tabs. A compatible
 existing pin already initializes move from its current coordinates without a
 new surface hit; the earlier human instructions unnecessarily required one.
@@ -36,6 +38,29 @@ state is not established. Incompatible updated anchors still require surface rev
 Miss/ambiguous hits, unknown/review records, explicit confirmation, pending drafts
 and original-owner moves remain protected. No owner removal, automatic rebind,
 new ProjectAnchor authoring, storage/schema/dependency/ordinary-entry/release change.
+
+Result / review: the right Caption panel now owns Scene selection, add/adjust,
+Scene/search/color browsing and secondary window actions. Surface-wait can cancel
+before any owner/proposal exists. Button/Shift placement uses the exact unique
+visible model, followed by the existing gizmo and explicit confirmation. Compatible
+existing pins start adjustment at their current position. Independent read-only
+implementation review found no concrete blocker; internal ownership is unchanged.
+
+Root/scoped TypeScript PASS; focused 7 files / 55 PASS; full root 105 files /
+1868 PASS / 21 existing TODO. Isolated actual candidate tests: development 43 PASS,
+verified mounted acknowledgment 8 PASS, including surface-first creation, cancel,
+IME, unchanged input on failure and exact retry. Three old dropdown/preselection
+test assumptions were updated to the approved controls; final runs have no failures.
+Ordinary/harness builds PASS with existing chunk/import warnings. Parsed 13/9
+source maps contain zero candidate/provider modules. Dev entry returns HTTP 200
+(delivery only). No new browser/raster/physical-iPhone/offline/PWA acceptance.
+
+Short meta-audit: this closes the PO's concrete same-host interaction/layout gap,
+not a new storage/probe campaign. Branch `g0-baseline`, start `4ad055c`; no dependency,
+release or ordinary-entry change. Current maps, handoffs, guidelines and later
+batched instructions are aligned. Remaining work stays the connected team flow
+and its gated real-file/durable integration; new visual usability checks remain
+batched with that flow, not an immediate repeat of the old five groups or journal.
 
 ### Previous change — Blender mouse navigation and accumulating windows
 

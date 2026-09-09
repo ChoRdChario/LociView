@@ -60,13 +60,6 @@ export function captionSourceIssue(source: CaptionListSource): string | null {
     return '一覧の状態を確認してください。';
   return null;
 }
-function matchOwner(item: CaptionListItem, filter: CaptionOwnerFilter): boolean | null {
-  if (filter.kind === 'all') return true;
-  if (item.owner.kind !== 'value') return filter.kind === 'unresolved' ? true : null;
-  if (filter.kind === 'unresolved') return false;
-  return item.owner.value.kind === 'project' ? filter.kind === 'project'
-    : filter.kind === 'asset' && filter.assetId === item.owner.value.assetId;
-}
 function matchSearch(item: CaptionListItem, query: string): boolean | null {
   if (!query) return true;
   const fields = [item.title, item.body];
@@ -94,10 +87,12 @@ export function captionListView(source: CaptionListSource, memory: SceneUiMemory
     const key = ownerFilterKey(filter), label = captionOwnerLabel(item), previous = owners.get(key);
     // Divergent names in a bad projection never become a first/last-label winner.
     owners.set(key, { filter, label: previous && previous.label !== label ? 'モデル名を確認' : label });
-    const byOwner = matchOwner(item, memory.ownerFilter), bySearch = matchSearch(item, query);
-    if (byOwner === false || bySearch === false) continue;
-    rows.push({ item, uncertainMatch: byOwner === null || bySearch === null, color,
-      colorHidden: color !== null && memory.pinColors !== null && !memory.pinColors.includes(color) });
+    const bySearch = matchSearch(item, query);
+    const colorHidden = color !== null && memory.pinColors !== null && !memory.pinColors.includes(color);
+    // Old UI memory may still contain an owner filter; it no longer hides records.
+    // Unknown colors stay discoverable for recovery, never guessed or silently dropped.
+    if (bySearch === false || colorHidden) continue;
+    rows.push({ item, uncertainMatch: bySearch === null, color, colorHidden });
   }
   return { issue, rows, colors: [...colors], owners: [...owners.values()], total: captions.length,
     selected: captions.find(item => item.id === memory.selectedCaptionId),
@@ -127,7 +122,7 @@ export function planCaptionList(context: CaptionListContext, intent: CaptionList
       ? intent.top === memory.listScrollTop ? { kind: 'unchanged' } : change({ listScrollTop: intent.top })
       : { kind: 'blocked', reason: '一覧の位置を確認してください。' };
     case 'revealSelection': return !view.selected ? { kind: 'blocked', reason: '選択したキャプションの状態を確認してください。' }
-      : change({ search: '', ownerFilter: { kind: 'all' } });
+      : change({ search: '', ownerFilter: { kind: 'all' }, pinColors: null });
     default: {
       const item = source.kind === 'ready' ? source.captions.find(item => item.id === intent.captionId) : undefined;
       if (!item) return { kind: 'blocked', reason: 'キャプションの状態を確認してください。' };

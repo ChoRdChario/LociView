@@ -7,6 +7,7 @@ import { planNavigation, type TaskId } from '../../src/ui/projectScene/navigatio
 import { captionListView, planCaptionList, type CaptionListIntent } from '../../src/ui/projectScene/captionListState';
 import { editCaptionDraft, hasCaptionDraft, planCaptionApply } from '../../src/ui/projectScene/captionDetailState';
 import { planModelList } from '../../src/ui/projectScene/modelListState';
+import { planPinMode } from '../../src/ui/projectScene/pinModeState';
 import { RecordedDocument, RecordedNode, record } from './domRecorder';
 
 const find = (session: SyntheticSession, intent: CaptionListIntent) => session.acceptList(planCaptionList(session.captionContext(), intent));
@@ -33,10 +34,38 @@ const label = (root: RecordedNode, name: string) => by(root, n => n.attributes.g
 const button = (root: RecordedNode, text: string) => by(root, n => n.tag === 'button' && n.textContent === text);
 
 describe('connected synthetic development host (not rendered, storage or TEAM-FLOW acceptance)', () => {
-  it('keeps placement controls outside the editor and details/comparison entry in the right task area', () => {
+  it('arms surface selection without an owner; blocks Scene/editor changes and cancels before any hit', () => {
+    const w = createDevelopmentWorkspace(new RecordedDocument().asDocument()), root = record(w.root), s = w.session, original = s.snapshot;
+    button(root, 'ピンを追加').fire('click');
+    expect(s.pinContext().memory).toMatchObject({ choosingSurface: true, addTargetId: null, mode: null });
+    expect(s.pinPreviewAnchor).toBeNull(); expect(s.pending).toBe('pinMove');
+    expect(button(label(root, 'シーン'), '設備の確認').disabled).toBe(true);
+    expect(navigate(s, f.detail)).toBe(false); expect(find(s, { kind: 'select', captionId: f.second })).toBe(false);
+    expect(s.snapshot).toBe(original);
+    button(root, '視点').fire('click'); expect(label(root, 'ピンの操作').hidden).toBe(false);
+    button(label(root, 'ピンの操作'), '取り消す').fire('click'); button(root, '操作を取り消す').fire('click');
+    expect(s.pending).toBeNull(); expect(s.pinContext().memory.mode).toBeNull(); expect(s.snapshot).toBe(original);
+    expect(navigate(s, f.detail)).toBe(true); w.dispose();
+  });
+  it('accepts only a current explicit surface identity and keeps an existing pin owner during adjustment', () => {
+    const s = new SyntheticSession(), original = s.snapshot, targets = s.pinCreationTargets();
+    const equipment = targets.find(t => t.assetId === f.equipment)!, structure = targets.find(t => t.assetId === f.structure)!;
+    expect(s.acceptPinCreation({ ...equipment, bindingId: 'stale' }, [1, 2, 3])).toBe(false);
+    expect(s.acceptPinCreation(equipment, [1, 2, 3])).toBe(true); expect(s.snapshot).toBe(original);
+    expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'finish' }))).toBe(true);
+    const id = s.memory.selectedCaptionId!, confirmed = s.snapshot;
+    expect(confirmed.resources.captions[id]!.anchor).toMatchObject({ value: { assetId: f.equipment, positionAsset: [1, 2, 3] } });
+    expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'move' }))).toBe(true);
+    expect(s.pinPreviewAnchor).toMatchObject({ assetId: f.equipment, positionAsset: [1, 2, 3] });
+    expect(s.acceptPinSurface(structure, [4, 5, 6])).toBe(false); expect(s.snapshot).toBe(confirmed);
+  });
+  it('keeps Scene/list/add/adjust/window tools in the right area and active placement beside the stage', () => {
     const w = createDevelopmentWorkspace(new RecordedDocument().asDocument()), root = record(w.root);
     const stage = label(root, 'シーンの構成'), sidebar = label(root, '作業パネル');
-    expect(stage.contains(label(root, 'ピンの追加・移動'))).toBe(true);
+    expect(sidebar.contains(label(root, 'ピンの追加・移動'))).toBe(true);
+    expect(sidebar.contains(label(root, 'シーン'))).toBe(true);
+    expect(sidebar.contains(button(root, 'ウィンドウを並べる'))).toBe(true);
+    expect(stage.contains(button(root, 'ウィンドウを並べる'))).toBe(false);
     expect(stage.contains(label(root, 'ピンの操作'))).toBe(true);
     expect(sidebar.contains(label(root, 'キャプションの詳細'))).toBe(true);
     expect(sidebar.contains(button(root, 'ウィンドウを表示'))).toBe(true);
@@ -96,12 +125,11 @@ describe('connected synthetic development host (not rendered, storage or TEAM-FL
     expect(session.acceptDetail(apply(session))).toBe(true); expect(hasCaptionDraft(session.detailContext().draft)).toBe(false);
   });
 
-  it('never uses pin color choices to filter list rows; null/all and empty/none stay distinct', () => {
+  it('uses pin colors for list rows too; null/all and empty/none stay distinct', () => {
     const session = new SyntheticSession();
     find(session, { kind: 'color', color: '#a08045' }); find(session, { kind: 'color', color: '#57758b' });
     expect(session.memory.pinColors).toEqual([]);
-    const ctx = session.captionContext(); expect(captionListView(ctx.source, ctx.memory).rows).toHaveLength(2);
-    expect(captionListView(ctx.source, ctx.memory).rows.every(row => row.colorHidden)).toBe(true);
+    const ctx = session.captionContext(); expect(captionListView(ctx.source, ctx.memory).rows).toHaveLength(0);
     expect(navigate(session, f.detail)).toBe(true); expect(session.memory.pinColors).toBeNull();
     expect(navigate(session, f.overview)).toBe(true); expect(session.memory.pinColors).toEqual([]);
     find(session, { kind: 'allColors' }); expect(session.memory.pinColors).toBeNull();
@@ -122,7 +150,7 @@ describe('connected synthetic development host (not rendered, storage or TEAM-FL
     const list = label(root, 'キャプション一覧'); by(list, n => n.className === 'lv-caption-select').fire('click');
     const title = label(root, 'タイトル'), body = label(root, '本文'), scene = label(root, 'シーン');
     title.value = '画面で編集'; title.focus(); title.fire('input');
-    expect(scene.disabled).toBe(true); button(root, 'モデル').fire('click');
+    expect(button(scene, '設備の確認').disabled).toBe(true); button(root, 'モデル').fire('click');
     expect(label(root, 'タイトル')).toBe(title); expect(label(root, '本文')).toBe(body);
     const draft = workspace.session.detailContext().draft;
     const modelRoot = by(root, n => n.className === 'lv-model-browser');
@@ -130,9 +158,9 @@ describe('connected synthetic development host (not rendered, storage or TEAM-FL
     const check = label(equipment, 'このシーンに表示'); check.checked = false; check.fire('change');
     expect(check.checked).toBe(false); expect(workspace.session.detailContext().draft).toBe(draft);
     button(root, 'キャプション').fire('click'); button(root, '変更を適用').fire('click');
-    expect(scene.disabled).toBe(false); scene.value = f.detail; scene.fire('change');
+    expect(button(scene, '設備の確認').disabled).toBe(false); button(scene, '設備の確認').fire('click');
     by(label(root, 'キャプション一覧'), n => n.className === 'lv-caption-select').fire('click');
-    expect(title.value).toBe('画面で編集'); scene.value = f.overview; scene.fire('change');
+    expect(title.value).toBe('画面で編集'); button(scene, '全体').fire('click');
     expect(title.value).toBe('画面で編集'); expect(label(root, 'タイトル')).toBe(title);
     title.value = '取り消す文章'; title.fire('input'); button(label(root, 'キャプションの詳細'), '取り消す').fire('click');
     expect(hasCaptionDraft(workspace.session.detailContext().draft)).toBe(true);

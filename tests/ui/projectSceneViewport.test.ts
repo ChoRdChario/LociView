@@ -141,7 +141,7 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     v!.recall!({ camera: { position: [world.x, world.y, world.z + 4], target: world.toArray(), up: [0, 1, 0],
       projection: { kind: 'perspective', verticalFovRadians: 0.7 } }, background: { kind: 'solid', colorSrgb: [0.5, 0.5, 0.5] } });
     const orbit = tracker.controls.at(-1); let starts = 0; orbit.addEventListener('start', () => starts++);
-    const choose = labeled(root, '追加先モデル'); choose.value = f.equipment; choose.fire('change');
+    expect(s.pinContext().memory.addTargetId).toBeNull();
     if (!shifted) control(root, 'ピンを追加').fire('click');
     const original = s.snapshot, cameraPosition = orbit.object.position.toArray(), pointer = { pointerId: 1, pointerType: 'mouse', isPrimary: true,
       button: 0, clientX: 400, clientY: 300, pageX: 400, pageY: 300, shiftKey: shifted, preventDefault() {} };
@@ -149,6 +149,7 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     canvas.fire('pointermove', { ...pointer, clientX: 401 }); expect(orbit.object.position.toArray()).toEqual(cameraPosition);
     canvas.fire('pointerup', { ...pointer, clientX: 401 }); await Promise.resolve();
     expect(starts).toBe(0); expect(s.snapshot).toBe(original); expect(s.pinPreviewAnchor).not.toBeNull();
+    expect(s.pinPreviewAnchor).toMatchObject({ assetId: f.equipment });
     expect(orbit.enabled).toBe(true);
     const retained = s.pinCoordinates;
     for (const rejection of ['drag', 'multi', 'cancel', 'capture'] as const) {
@@ -216,7 +217,7 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     expect(caption.anchor).toMatchObject({ kind: 'value', value: { assetId: f.equipment, hitEvidence: { method: 'manual' } } });
     if (caption.anchor.kind !== 'value' || caption.anchor.value.kind !== 'asset') throw Error('anchor');
     expect(caption.anchor.value.positionAsset[2]).toBeCloseTo(2);
-    const confirmed = s.snapshot; control(root, 'ピンを移動').fire('click');
+    const confirmed = s.snapshot; control(root, '位置を調整').fire('click');
     g = tracker.gizmos.at(-1); g.dragging = true; g.object.position.z += 3; g.dispatchEvent({ type: 'objectChange' }); g.dragging = false;
     control(labeled(root, 'ピンの操作'), '取り消す').fire('click'); control(root, '操作を取り消す').fire('click');
     expect(s.snapshot).toBe(confirmed); expect(g.object).toBeUndefined();
@@ -263,6 +264,8 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     occluder.matrixAutoUpdate = false; occluder.add(otherMesh);
     const resident = new Map([[target.assetId, { asset, mesh }], [f.structure, { asset: occluder, mesh: otherMesh }]]);
     expect(pickResidentSurface(display, target, resident, tracker.controls.at(-1).object, new THREE.Vector2(0, 0))).toBe(null);
+    occluder.matrix.copy(asset.matrix); // Coincident surfaces cannot choose a winner by iteration order.
+    expect(pickResidentSurface(display, target, resident, tracker.controls.at(-1).object, new THREE.Vector2(0, 0))).toBe(null);
     occluder.visible = false; expect(pickResidentSurface(display, target, resident, tracker.controls.at(-1).object, new THREE.Vector2(0, 0))).not.toBe(null);
     canvas.canvas.fire('webglcontextlost', { preventDefault() {} }); expect(hit()).toBe(null); v.dispose();
   });
@@ -276,12 +279,18 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
         capture: () => ({ camera: { position: [0, 0, 4], target: [0, 0, 0], up: [0, 1, 0], projection: { kind: 'perspective', verticalFovRadians: 0.7 } },
           background: { kind: 'solid', colorSrgb: [0.5, 0.5, 0.5] } }),
         pick: (_target, x, y) => { calls++; expect([x, y]).toEqual([400, 300]); return [0.5, 0.25, 0]; },
+        pickCreation: (targets, x, y) => { calls++; expect([x, y]).toEqual([400, 300]); return { target: targets.find(t => t.assetId === f.equipment)!, position: [0.5, 0.25, 0] }; },
         read: () => ({ token: 'view', pickToken: String(epoch), ready, dragging, issue: null, projection: 'perspective', axis: null,
           pins: [], preview: display?.preview ? { x: 400, y: 300, visible: true } : undefined }) };
     } });
     const root = record(workspace.root), canvas = labeled(root, '合成モデルの3D表示');
-    const choose = labeled(root, '追加先モデル'); choose.value = f.equipment; choose.fire('change'); control(root, 'ピンを追加').fire('click');
+    control(root, 'ピンを追加').fire('click');
     const initial = s.snapshot, event = { pointerId: 1, isPrimary: true, button: 0, clientX: 410, clientY: 320 };
+    canvas.fire('pointerdown', event);
+    control(labeled(root, 'ピンの操作'), '取り消す').fire('click'); control(root, '操作を取り消す').fire('click');
+    canvas.fire('pointerup', event); await Promise.resolve();
+    expect(calls).toBe(0); expect(s.pinCoordinates).toBeNull(); expect(s.snapshot).toBe(initial);
+    control(root, 'ピンを追加').fire('click');
     canvas.fire('pointerdown', event); dragging = true; notify(); canvas.fire('pointerup', event); dragging = false; notify(); await Promise.resolve();
     expect(calls).toBe(1); expect(s.snapshot).toBe(initial); expect(s.pinCoordinates?.coordinates).toEqual(['0.5', '0.25', '0']);
     const ghost = descendants(root).find(n => n.className === 'lv-development-pin-preview')!; expect(ghost.hidden).toBe(false);
@@ -457,8 +466,8 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     pin('設備の確認箇所').fire('click'); expect(workspace.session.windowMemory.retained).toEqual([f.shared, f.second]);
     control(root, '全体表示').fire('click'); expect(actions).toEqual([{ kind: 'fit' }]);
     control(root, '視点').fire('click'); control(root, '+Y').fire('click'); expect(actions.at(-1)).toEqual({ kind: 'axis', axis: '+y' });
-    dragging = true; notified(); expect(labeled(root, 'シーン').disabled).toBe(true); expect(control(root, '全体表示').disabled).toBe(true);
-    dragging = false; notified(); expect(labeled(root, 'シーン').disabled).toBe(false);
+    dragging = true; notified(); expect(control(labeled(root, 'シーン'), '設備の確認').disabled).toBe(true); expect(control(root, '全体表示').disabled).toBe(true);
+    dragging = false; notified(); expect(control(labeled(root, 'シーン'), '設備の確認').disabled).toBe(false);
     workspace.session.acceptModel(planModelList(workspace.session.modelContext(), { kind: 'membership', assetId: f.equipment, included: false })); workspace.render();
     expect(display.pins.map((p: any) => p.id)).not.toContain(f.shared); expect(workspace.session.memory.selectedCaptionId).toBe(f.shared);
     workspace.dispose();

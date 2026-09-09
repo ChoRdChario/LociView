@@ -12,9 +12,11 @@
 
 2026-09-10: PO reports the five prescribed camera/pin/window manual groups PASS
 at `7540478`; this supersedes their pending status below only for that scope.
-Next: Scene-first Caption UX and discoverable later position adjustment. Current
-todo / UI guidelines §4.3 separate requests from proposed input-rule amendments.
-No full team/device/storage acceptance or new layout implementation is implied.
+PO approved Scene-first Caption UX under spec 05 §13.4. The same development host
+now has a Caption-top Scene list, combined list/pin colors, surface-first add,
+current-position adjustment and right-side window tools. Internal model-relative
+anchors remain. See current todo / UI guidelines §4.3; new rendered acceptance and
+full team/device/storage acceptance remain open.
 
 Current delivery order (PO approved 2026-09-09): specification 05 §13.4 permits
 one connected synthetic development host through a nondefault `dev.html` mode,

@@ -5,7 +5,7 @@ import { defaultPose, fittedPose, placementMatrix, switchProjection, type Camera
 import type { ViewportFactory, ViewportObservation } from './viewportHost';
 import { readProjectCamera, readSolidBackground, type SolidBackground } from './viewHistory';
 import type { DisplayCapture } from './viewSession';
-import { pickResidentSurface, type ResidentSurface } from './viewportPicking';
+import { pickResidentCreation, pickResidentSurface, type ResidentSurface } from './viewportPicking';
 import { createPinGizmo } from './pinGizmo';
 
 /** Existing Three.js dependency, exact synthetic fixture only. No model loaders or Native controller. */
@@ -208,6 +208,10 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
     pick(target, x, y) {
       if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || gizmo?.dragging || !display) return null;
       return pickResidentSurface(display, target, resident, camera, new THREE.Vector2(x * 2 / width - 1, 1 - y * 2 / height));
+    },
+    pickCreation(targets, x, y) {
+      if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || gizmo?.dragging || !display) return null;
+      return pickResidentCreation(display, targets, resident, camera, new THREE.Vector2(x * 2 / width - 1, 1 - y * 2 / height));
     },
     read() {
       const project = (position: readonly [number, number, number]) => {

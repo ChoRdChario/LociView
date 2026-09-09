@@ -205,7 +205,7 @@ acceptance remain later work. This is not durable storage or offline evidence.
 For the later browser batch, select a model in `モデル`, choose a synthetic model
 update and receive it as the other actor. The same shared Caption keeps its text
 and position but requests pin review when its surface changed. Select that Caption,
-use `ピンを移動` just above the 3D viewport, select a visible point on that model's
+use `位置を調整` in the right Caption tab, select a visible point on that model's
 surface, then drag the translation arrows/planes to adjust `仮の位置` before
 `位置を確定`. A reviewed model update still requires the explicit current surface;
 coordinates alone do not resolve it. `数値で調整` is a collapsed supplement, not
@@ -213,10 +213,15 @@ the required position UI. Exchange both ways again. This is an exact synthetic
 triangle/pin connection, not real model-file replacement.
 
 The previous numeric-first manual request is withdrawn after the PO's UI report.
-For the corrected later batch, `追加先モデル` is the selector immediately above
-the 3D viewport (choose `設備`, for example). Shift+click a visible point on that
-model, or use the adjacent `ピンを追加` followed by ordinary click/tap on its
-surface. `仮の位置` and translation handles should appear, with no new list record
+The PO reports the five prescribed camera/pin/window groups PASS at `7540478`.
+The subsequent approved Scene-first layout has executable checks, but no new
+native browser acceptance yet. For a later combined check, start with the Scene
+list at the top of `キャプション`; other tabs show that same Scene as context.
+Shift+click a visible model surface, or use `ピンを追加` in the right Caption tab
+followed by an ordinary surface selection. No model preselection is required.
+Before selecting a surface, `取り消す` → `操作を取り消す` must leave no new Caption.
+An exact unique hit establishes the provisional model; ambiguous/occluded hits
+are refused without changing the proposal. `仮の位置` and translation handles should appear, with no new list record
 until `位置を確定`. Drag an arrow/plane to adjust it without rotating the camera;
 both normal placement and Shift+click reserve the pointer before camera rotation
 or pan starts. Slight movement must not turn a placement click into camera motion.
@@ -224,16 +229,19 @@ Escape or pointer cancellation restores the drag-start proposal. Confirm after
 releasing the drag; the new Caption should be selected in the right detail editor.
 Enter/apply its title/body, switch `操作する人` and
 receive the update. Its owner and position must be preserved. Repeat position
-selection with `ピンを移動`, then `取り消す` and `操作を取り消す`: the confirmed
-pin must not move. A drag outside the handles or a miss must not replace the provisional
+adjustment by selecting an existing Caption → `位置を調整`: its current position
+must immediately show the gizmo without selecting a model/surface again (except
+an incompatible model update under review). Drag it, then use `取り消す` and
+`操作を取り消す`: the confirmed pin must not move. A drag outside the handles or a miss must not replace the provisional
 position. A hidden, back-facing or occluded target is not an alternative model.
 Use `視点` / `全体表示` or a viewing direction to expose the selected surface
 before starting placement. Do not force a graphics failure or reload to test
 durability; this page deliberately has no durable save. Report the failing step
 and visible message together if a check fails; never clear evidence by retrying
-the old storage probes. Native pointer/render/IME and iPhone remain unverified.
+the old storage probes. The preceding scoped PASS does not cover this changed
+layout, the full team flow, native IME, iPhone or durable storage.
 
-For the same later batch, each actor can select Scene `設備の確認`, open
+For the same later batch, each actor can select Scene `設備の確認` in `キャプション`, open
 `既存のキャプションを追加`, select `入口の記録` and use `このシーンに追加`.
 Receive the other actor's update: both membership candidates remain. Explicitly
 choose the original, then `選んだ項目だけ残す` or `別々のキャプションとして残す`.
@@ -250,7 +258,7 @@ change X and `配置を確定`. Only that model's position should change. Receiv
 the other actor and exchange again; the original Captions remain on the original.
 The active placement editor stays visible across task tabs; cancel ends the draft
 without publishing. The same host now projects the known triangle and its pins;
-this remains numeric fixture placement, not geometry picking or a gizmo test.
+model transforms here remain a bounded synthetic fixture path, not general model-file support.
 
 Extend that same later batch with visible-model/pin checks, not a new probe:
 use `全体表示`, six directions and perspective/orthographic controls in `視点`;
@@ -258,8 +266,10 @@ use middle-button drag to orbit, Shift+middle to pan, and wheel/Ctrl+middle to
 zoom (Blender basic mouse bindings). Left/right drags do not move the camera;
 Shift+left remains pin addition. `視点` → `カメラ操作` also shows these bindings.
 Switch Scene or actor and return to check retained pose. Select a 3D
-pin and verify right-list selection; direct color filters hide only matching
-pins without losing the selected Caption or changing camera fit. Model movement
+pin and verify right-list selection; direct color filters narrow
+list rows and 3D pins together without losing selection, open windows or changing
+camera fit. A hidden selected Caption has a reveal action; unknown colors remain
+recoverable. Model movement
 must follow its binding; its original Captions stay on the original after a
 copy. A single-sided triangle legitimately disappears edge-on/from behind.
 If a real drawing failure occurs, metadata must remain and recovery must be
@@ -271,7 +281,8 @@ same Caption brings its existing window forward, not a duplicate.
 Both confirmed texts should remain; bringing a window forward must not change
 the right-list selection or its position. `×` closes only that window; refresh
 must not reopen it, while explicit selection or `ウィンドウを表示` does. Move a
-title by drag or arrow keys, use `ウィンドウを並べる`, and switch Scene/actor and
+title by drag or arrow keys, use `ウィンドウを並べる` in the right Caption area,
+and switch Scene/actor and
 back. Resize must retain comparison intent. Pin filters/review hide the line,
 not retained text. Unapplied text stays solely in the detail editor. This extends
 the existing pending batch; no immediate human reply or repeat journal run.

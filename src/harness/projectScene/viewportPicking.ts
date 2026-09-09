@@ -37,8 +37,21 @@ export function pickResidentSurface(display: SyntheticDisplay, target: PinSurfac
   const chosen = hit(selected); if (!chosen) return null;
   for (const [id, surface] of resident) {
     if (id === target.assetId) continue;
-    const occluder = hit(surface); if (occluder && occluder.distance < chosen.distance) return null;
+    const occluder = hit(surface);
+    // Numerically indistinguishable opaque surfaces have no safe front winner.
+    const tolerance = 1e-9 * Math.max(1, chosen.distance, occluder?.distance ?? 0);
+    if (occluder && occluder.distance <= chosen.distance + tolerance) return null;
   }
   const p = selected.asset.worldToLocal(chosen.point.clone());
   return [p.x, p.y, p.z].every(Number.isFinite) ? [p.x || 0, p.y || 0, p.z || 0] : null;
+}
+
+/** Creation only: the user's visible surface supplies its exact model identity. */
+export function pickResidentCreation(display: SyntheticDisplay, targets: readonly PinSurfaceTarget[],
+  resident: ReadonlyMap<string, ResidentSurface>, camera: THREE.Camera, ndc: THREE.Vector2) {
+  const hits = targets.flatMap(target => {
+    const position = pickResidentSurface(display, target, resident, camera, ndc);
+    return position ? [{ target, position }] : [];
+  });
+  return hits.length === 1 ? hits[0]! : null;
 }

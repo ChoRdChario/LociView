@@ -40,7 +40,7 @@ describe('same-host known PNG media connection; not decoder adoption, raster, IM
     button(gallery, '拡大').fire('click'); expect(session.memory.selectedCaptionId).toBe(f.shared); expect(button(gallery, '縮小').attributes.get('aria-expanded')).toBe('true');
     button(panel, '説明を編集').fire('click'); const input = named(panel, 'メディアの説明');
     input.fire('compositionstart'); input.value = '<script>説明</script>'; input.fire('input'); expect(session.pending).toBe('composition');
-    expect(named(r, 'シーン').disabled).toBe(true); button(r, 'モデル').fire('click'); button(r, 'キャプション').fire('click'); expect(named(panel, 'メディアの説明')).toBe(input);
+    expect(named(r, 'シーン').children.every(n => n.disabled)).toBe(true); button(r, 'モデル').fire('click'); button(r, 'キャプション').fire('click'); expect(named(panel, 'メディアの説明')).toBe(input);
     expect(nodes(gallery).some(n => n.textContent.includes('<script>'))).toBe(false);
     input.fire('compositionend'); button(panel, '説明を適用').fire('click'); expect(session.pending).toBeNull();
     expect(nodes(gallery).find(n => n.tag === 'img')).toBe(firstImage); expect(nodes(gallery).some(n => n.textContent.includes('<script>説明</script>'))).toBe(true);

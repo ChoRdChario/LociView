@@ -17,36 +17,35 @@ const saveLabels = Object.freeze({ saved: '保存済み', unsaved: '未保存', 
 let nextInstance = 0;
 
 /**
- * Disconnected presentation slots. Put sceneControl/saveStatus in the shared
- * header, and taskControl above the right task area (responsive host owns reflow).
+ * Presentation slots: Scene list in Caption, current Scene context in other tabs,
+ * saveStatus in the shared header. All controls use one navigation state.
  * No renderer/storage/app imports, HTML interpolation or mutable Project state.
  */
 export function createNavigationControls(document: Document, onPlan: (plan: NavigationPlan) => void) {
   const sceneControl = document.createElement('div'); sceneControl.className = 'lv-scene-control';
-  const label = document.createElement('label'); label.textContent = 'シーン';
-  const select = document.createElement('select'); select.setAttribute('aria-label', 'シーン');
+  const label = document.createElement('h2'); label.textContent = 'シーン';
+  const choicesRoot = document.createElement('div'); choicesRoot.className = 'lv-scene-choices';
+  choicesRoot.setAttribute('role', 'group'); choicesRoot.setAttribute('aria-label', 'シーン');
+  const sceneContext = document.createElement('p'); sceneContext.className = 'lv-scene-context';
+  sceneContext.setAttribute('aria-label', '表示中のシーン');
   const reason = document.createElement('p'); reason.id = `lv-scene-switch-reason-${++nextInstance}`;
   reason.setAttribute('role', 'status'); reason.setAttribute('aria-live', 'polite');
-  select.setAttribute('aria-describedby', reason.id);
-  label.append(select); sceneControl.append(label, reason);
+  choicesRoot.setAttribute('aria-describedby', reason.id);
+  sceneControl.append(label, choicesRoot, reason);
   const taskControl = document.createElement('nav'); taskControl.className = 'lv-task-control';
   taskControl.setAttribute('aria-label', '作業項目');
   const saveStatus = document.createElement('p'); saveStatus.className = 'lv-save-status';
   saveStatus.setAttribute('role', 'status'); saveStatus.setAttribute('aria-live', 'polite');
   const buttons = new Map<TaskId, HTMLButtonElement>();
   let props: NavigationProps | undefined, disposed = false, choicesFingerprint: string | undefined;
-  let renderedSceneValue = '';
+  const sceneButtons = new Map<string, HTMLButtonElement>();
   const cleanups: (() => void)[] = [];
   const request = (intent: NavigationIntent) => {
     if (disposed || !props) return;
     const plan = planNavigation(props.scenes, props.session, props.pending, intent);
-    // The native select must not visually commit an unaccepted/asynchronous plan.
-    select.value = renderedSceneValue;
     if (plan.kind === 'blocked') reason.textContent = plan.reason;
     onPlan(plan);
   };
-  const change = () => request({ kind: 'scene', sceneId: select.value });
-  select.addEventListener('change', change); cleanups.push(() => select.removeEventListener('change', change));
   for (const [task, text] of Object.entries(taskLabels) as [TaskId, string][]) {
     const button = document.createElement('button'); button.type = 'button'; button.textContent = text;
     // Native buttons support Tab/Enter/Space without pretending to be an ARIA tablist.
@@ -65,17 +64,21 @@ export function createNavigationControls(document: Document, onPlan: (plan: Navi
     const hasAvailable = choices.some(choice => choice.available);
     const fingerprint = JSON.stringify({ choices, missingCurrent });
     if (fingerprint !== choicesFingerprint) {
-      const prompt = document.createElement('option'); prompt.value = '';
-      prompt.textContent = missingCurrent ? '現在のシーンを確認' : 'シーンを選択'; prompt.disabled = true;
+      sceneButtons.clear();
       const options = choices.map(choice => {
-        const option = document.createElement('option'); option.value = choice.id;
-        option.textContent = choice.label; option.disabled = !choice.available; return option;
+        const option = document.createElement('button'); option.type = 'button';
+        option.textContent = choice.label;
+        option.addEventListener('click', () => { if (!option.disabled && sceneButtons.get(choice.id) === option) request({ kind: 'scene', sceneId: choice.id }); });
+        sceneButtons.set(choice.id, option); return option;
       });
-      select.replaceChildren(prompt, ...options); choicesFingerprint = fingerprint;
+      choicesRoot.replaceChildren(...options); choicesFingerprint = fingerprint;
     }
-    renderedSceneValue = missingCurrent ? '' : next.session.sceneId ?? '';
-    select.value = renderedSceneValue;
-    select.disabled = next.pending !== null || !hasAvailable;
+    for (const choice of choices) {
+      const button = sceneButtons.get(choice.id)!;
+      button.disabled = next.pending !== null || !choice.available;
+      button.setAttribute('aria-pressed', String(choice.id === next.session.sceneId));
+    }
+    sceneContext.textContent = current ? `シーン：${current.label}` : '現在のシーンを確認';
     const pendingReason = sceneSwitchReason(next.pending);
     reason.textContent = unavailableCurrent
       ? '現在のシーンを表示できません。' + (pendingReason || (hasAvailable
@@ -88,7 +91,7 @@ export function createNavigationControls(document: Document, onPlan: (plan: Navi
   }
   function dispose(): void {
     disposed = true; props = undefined; for (const cleanup of cleanups) cleanup();
-    sceneControl.remove(); taskControl.remove(); saveStatus.remove();
+    sceneControl.remove(); sceneContext.remove(); taskControl.remove(); saveStatus.remove();
   }
-  return { sceneControl, taskControl, saveStatus, render, dispose };
+  return { sceneControl, sceneContext, taskControl, saveStatus, render, dispose };
 }

@@ -30,7 +30,7 @@ describe('connected fixture material editing, not raster/IME/device evidence', (
     expect(s.snapshot.resources.materials[projectId]!.lifecycle).toMatchObject({ value: { state: 'active' } });
     button(m, '設定を編集').fire('click'); set(named(m, '指定した色を透過'), 'on'); const key = named(m, '透過する色');
     key.fire('compositionstart'); key.value = '#a8a29a'; key.fire('input'); expect(s.pending).toBe('composition');
-    expect(named(r, 'シーン').disabled).toBe(true); button(r, 'キャプション').fire('click'); button(r, 'マテリアル').fire('click'); expect(named(m, '透過する色')).toBe(key);
+    expect(named(r, 'シーン').children.every(n => n.disabled)).toBe(true); button(r, 'キャプション').fire('click'); button(r, 'マテリアル').fire('click'); expect(named(m, '透過する色')).toBe(key);
     key.fire('compositionend'); button(m, '変更を適用').fire('click');
     expect(syntheticDisplay(s.snapshot, f.overview, null, null).materials![f.equipment]).toMatchObject({ visible: false });
     expect(syntheticDisplay(s.snapshot, f.overview, null, null).bounds).toEqual(base.bounds);

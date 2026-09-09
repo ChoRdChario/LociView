@@ -70,16 +70,19 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   const viewport = createViewportHost(document, session, afterAction, options.viewportFactory);
   const material = createMaterialControls(document, plan => { session.acceptMaterial(plan); afterAction(); });
   const media = createMediaControls(document, session.media, afterAction);
-  header.append(brand, name, navigation.sceneControl, navigation.saveStatus);
+  header.append(brand, name, navigation.saveStatus);
   const pinHelp = make('p', 'モデルの面をShift＋クリックで追加。追加・移動中は矢印をドラッグして調整できます。');
   pinHelp.className = 'lv-development-pin-help';
   const information = make('details'), informationLabel = make('summary', 'シーンの構成');
   information.className = 'lv-development-information'; information.append(informationLabel, composition);
   editor.append(editorHeading, detail.root, media.root);
-  stage.append(viewport.stageTools, pin.actions, pinHelp, pin.modeStrip, viewport.root, numeric, placement.modeStrip, information);
+  const windowActions = make('section'); windowActions.className = 'lv-development-window-actions';
+  windowActions.append(detail.windowActions, viewport.windowTools);
+  stage.append(viewport.stageTools, pin.modeStrip, viewport.root, numeric, placement.modeStrip, information);
   viewPanel.replaceChildren(viewport.view);
   materialPanel.replaceChildren(material.root);
-  sidebar.append(navigation.taskControl, detail.windowActions, list.root, editor, include.root, modelList.root, placement.actions, modelUpdate.root, materialPanel, viewPanel);
+  sidebar.append(navigation.taskControl, navigation.sceneControl, navigation.sceneContext, pin.actions, pinHelp,
+    list.root, windowActions, editor, include.root, modelList.root, placement.actions, modelUpdate.root, materialPanel, viewPanel);
   content.append(stage, sidebar); root.append(header, notice, working, message, content, footer);
   function render() {
     if (disposed) return;
@@ -106,9 +109,10 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     }
     navigation.render({ scenes: session.snapshot.state, session: session.session, pending: session.pending, save: { kind: 'unsaved' } });
     const task = session.session.task;
-    editor.hidden = detail.windowActions.hidden = task !== 'captions';
+    editor.hidden = windowActions.hidden = navigation.sceneControl.hidden = pin.actions.hidden = task !== 'captions';
+    navigation.sceneContext.hidden = task === 'captions';
     numeric.hidden = !session.pinCoordinates;
-    pinHelp.hidden = !!session.pinCoordinates;
+    pinHelp.hidden = task !== 'captions' || !!session.pinCoordinates;
     list.root.hidden = task !== 'captions'; modelList.root.hidden = task !== 'models';
     include.root.hidden = task !== 'captions';
     modelUpdate.root.hidden = task !== 'models';

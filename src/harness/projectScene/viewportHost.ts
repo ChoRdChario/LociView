@@ -4,6 +4,7 @@ import { type ViewContext, type ViewCameraIntent, type ViewAxis } from '../../ui
 import { planCaptionList } from '../../ui/projectScene/captionListState';
 import { createCaptionWindowControls } from '../../ui/projectScene/captionWindowControls';
 import { sceneSwitchReason } from '../../ui/projectScene/navigationState';
+import type { PinModeMemory } from '../../ui/projectScene/pinModeState';
 import { value } from '../../scene/types';
 import { pointInProject, syntheticDisplay, type SyntheticDisplay, type V3 } from './viewportModel';
 import type { PinSurfaceTarget } from './viewportPicking';
@@ -28,6 +29,7 @@ export interface SyntheticViewport {
   read(): ViewportObservation; camera(intent: ViewCameraIntent): void; retry(): void; dispose(): void;
   capture?(): DisplayCapture; recall?(payload: DisplayCapture): void;
   pick?(target: PinSurfaceTarget, xCss: number, yCss: number): V3 | null;
+  pickCreation?(targets: readonly PinSurfaceTarget[], xCss: number, yCss: number): { target: PinSurfaceTarget; position: V3 } | null;
 }
 export type ViewportFactory = (canvas: HTMLCanvasElement, changed: () => void,
   proposePin?: (target: PinSurfaceTarget, positionAsset: V3) => boolean) => SyntheticViewport;
@@ -45,7 +47,8 @@ export function createViewportHost(document: Document, session: SyntheticSession
   let rendering = false, hasRendered = false;
   let active = false, gestureGeneration = 0;
   const pressed = new Set<number>();
-  let gesture: { id: number; x: number; y: number; target: PinSurfaceTarget; stamp: string; shortcut: boolean; shifted: boolean } | null = null;
+  let gesture: { id: number; x: number; y: number; targets: readonly PinSurfaceTarget[]; memory: PinModeMemory;
+    stamp: string; creating: boolean; shifted: boolean } | null = null;
   let runtime: SyntheticViewport | undefined, context: ViewContext, pinKey = '';
   let authorConfirmationMemory: ViewContext['memory'] | undefined;
   const pins = new Map<string, HTMLButtonElement>();
@@ -82,7 +85,7 @@ export function createViewportHost(document: Document, session: SyntheticSession
   const renderStatus = document.createElement('div'); renderStatus.className = 'lv-development-render-status';
   renderStatus.append(status, retry);
   // Keep failure/retry outside the floating-window stack so comparison cannot cover recovery.
-  root.append(windows.root); view.stageTools.append(windows.tools, renderStatus);
+  root.append(windows.root); view.stageTools.append(renderStatus);
   function text(e: unknown) { return e instanceof Error ? e.message : '3D表示を確認してください。'; }
   function currentContext(): ViewContext {
     const observation = runtime?.read(), scope = { sceneId: session.sceneId, projectFrameId: session.snapshot.resources.projectFrameId };
@@ -149,12 +152,13 @@ export function createViewportHost(document: Document, session: SyntheticSession
       runtime?.setPinPointerActive?.(true);
       canvas.setPointerCapture?.(e.pointerId);
     }
-    const activeTarget = session.pinSurfaceTarget(), shortcut = !activeTarget && e.shiftKey;
-    const target = activeTarget ?? (shortcut ? session.pinShortcutTarget() : null), stamp = gestureStamp();
-    if (shortcut && !target && !session.pinCoordinates) { session.message = '追加先モデルを選び、入力中の操作を終えてください。'; changed(); }
-    if (pressed.size !== 1 || !e.isPrimary || e.button !== 0 || modified(e) || !runtime?.pick || !target || !stamp ||
+    const activeTarget = session.pinSurfaceTarget(), creating = !activeTarget && (e.shiftKey || !!session.pinContext().memory.choosingSurface);
+    const targets = activeTarget ? [activeTarget] : creating ? session.pinCreationTargets() : [], stamp = gestureStamp();
+    if (creating && !targets.length) { session.message = '追加できるモデルと入力中の操作を確認してください。'; changed(); }
+    if (pressed.size !== 1 || !e.isPrimary || e.button !== 0 || modified(e) ||
+      !(creating ? runtime?.pickCreation : runtime?.pick) || !targets.length || !stamp ||
       ![e.clientX, e.clientY].every(Number.isFinite)) return;
-    gesture = { id: e.pointerId, x: e.clientX, y: e.clientY, target, stamp, shortcut, shifted: Boolean(e.shiftKey) };
+    gesture = { id: e.pointerId, x: e.clientX, y: e.clientY, targets, memory: session.pinContext().memory, stamp, creating, shifted: Boolean(e.shiftKey) };
   };
   const move = (e: PointerEvent) => {
     if (gesture?.id === e.pointerId && (!Number.isFinite(e.clientX) || !Number.isFinite(e.clientY) ||
@@ -170,12 +174,16 @@ export function createViewportHost(document: Document, session: SyntheticSession
     // placement owns the sequence from down, so Orbit never started for it.
     queueMicrotask(() => {
       if (disposed || !active || generation !== gestureGeneration || pressed.size || start.stamp !== gestureStamp() ||
-        JSON.stringify(start.target) !== JSON.stringify(start.shortcut ? session.pinShortcutTarget() : session.pinSurfaceTarget())) return;
+        start.memory !== session.pinContext().memory ||
+        JSON.stringify(start.targets) !== JSON.stringify(start.creating ? session.pinCreationTargets() : [session.pinSurfaceTarget()])) return;
       const rect = canvas.getBoundingClientRect();
       try {
-        const hit = runtime?.pick?.(start.target, e.clientX - rect.left, e.clientY - rect.top);
-        if (hit) { if (start.shortcut) session.acceptPinShortcut(start.target, hit); else session.acceptPinSurface(start.target, hit); }
-        else session.message = '選んだモデルの面を指定してください。指定中の位置は変えていません。';
+        const x = e.clientX - rect.left, y = e.clientY - rect.top;
+        const hit = start.creating ? runtime?.pickCreation?.(start.targets, x, y) : (() => {
+          const position = runtime?.pick?.(start.targets[0]!, x, y); return position ? { target: start.targets[0]!, position } : null;
+        })();
+        if (hit) { if (start.creating) session.acceptPinCreation(hit.target, hit.position); else session.acceptPinSurface(hit.target, hit.position); }
+        else session.message = '配置する面を特定できません。視点を変えて選び直してください。指定中の位置は変えていません。';
       } catch (e) { session.message = `${text(e)} 指定中の位置は保持しています。`; }
       changed();
     });
@@ -221,7 +229,7 @@ export function createViewportHost(document: Document, session: SyntheticSession
     } catch (e) { error = text(e); runtime?.setActive(false); }
     paint(); rendering = false; hasRendered = true;
   }
-  return { root, view: view.root, stageTools: view.stageTools, render,
+  return { root, view: view.root, stageTools: view.stageTools, windowTools: windows.tools, render,
     get connected() { return Boolean(runtime?.read().ready && !error); },
     get pickingConnected() { return Boolean(active && runtime?.read().ready && runtime.pick && !error); },
     dispose() { disposed = true; gesture = null; pressed.clear(); gestureGeneration++; windows.dispose(); runtime?.dispose(); author.dispose(); view.dispose();
