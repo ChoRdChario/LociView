@@ -60,10 +60,12 @@ If observed code conflicts with the applicable compatibility or accepted future 
 
 Current readiness review (2026-09-10): `tasks/todo.md` top separates approved
 outcomes, exact wire/migration design gaps and remaining storage/device evidence.
-05 §9.4 records an open unplaced-Caption migration gap and proposed preservation,
-not a schema amendment. The Native nullable anchor must not become fabricated
-v2 coordinates or a silently dropped Caption. No adoption/wire/recipe approval
-or new runtime change follows from this documentation task.
+05 §9.4 records PO-approved unplaced-Caption preservation and the proposed atomic
+schema/bridge mapping. 06 §§4.1/5.1/8–9 define retained base evidence, nonvisual
+owners and full/delta recovery with structural vectors. Runtime still lacks the
+unplaced branch; no adopted wire/recipe or executed byte goldens are claimed.
+Next is the exact new migration/portable-bridge recipe, not another product choice
+about keeping these Captions. No new browser probe or runtime change in this task.
 
 2026-09-10: PO reports the five prescribed camera/pin/window groups PASS at
 `7540478`; their earlier pending status below is historical. Broader rendered,

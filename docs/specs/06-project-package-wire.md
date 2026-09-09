@@ -57,7 +57,8 @@ type PackageManifestDraft = CommonDraft & (
       changes: ChangeEntry[] }
   | { purpose: 'backup'; identity: Identity;
       metadataEnvelope: MetadataEnvelope; targetHeads: Heads;
-      metadata: Entry; protectedInventory: Entry; exchangeBases: Entry }
+      metadata: Entry; protectedInventory: Entry; exchangeBases: Entry;
+      baseEvidence: EvidenceRef[] }
   | { purpose: 'clean'; identity: Identity;
       metadataEnvelope: MetadataEnvelope; targetHeads: Heads;
       metadata: Entry }
@@ -163,31 +164,84 @@ interface ExchangeBaseDraft {
   workspacePackageId: PackageId;
   workspaceManifestSha256: Sha256Hex;
   declaredHeads: Heads;
-  observation: 'imported' | 'generated';
+  evidence: WorkspaceEvidenceDraft;
+  completions: WorkspaceCompletionDraft[];
   label?: string;
 }
+// Content-addressed evidence, not model/media BlobRef or an arbitrary path.
+type EvidenceRef = { sha256: Sha256Hex; byteLength: number };
+interface WorkspaceEvidenceDraft {
+  manifest: EvidenceRef;
+  metadata: EvidenceRef;
+}
+type WorkspaceCompletionDraft =
+  | { observation: 'imported'; publishedReceiverHeads: Heads }
+  | { observation: 'generated' };
 ```
 
 A table keys these records by Project identity/epoch plus Workspace package ID.
 Different manifest/heads under the same key are an integrity issue, never last-
-writer-wins. `observation` describes the local event, not who received a file.
+writer-wins. `completions` is nonempty, sorted by canonical encoded bytes and duplicate-free;
+union of exact completion entries is idempotent. `observation` describes a local
+event, not who received a file. `publishedReceiverHeads` binds an import's actual
+publication event, not a replacement for the Workspace's `declaredHeads`.
 An imported Workspace records its declared heads after verified publication,
 not the result of merging with local work. A generated Workspace records its
 declared heads only after the export sink finishes successfully. Contribution
 import/export never advances or synthesizes this record. Selecting another
 retained base is explicit; neither most recent filename nor current heads select it.
 
-Proposed base-table update uses one idempotent local completion record bound to
-package ID, manifest digest and heads. A crash may delay the base-table update,
-but must not invent it or hide it as saved: resume the same verified update before
-advertising that base for export. Export completion does not prove delivery.
-Exact platform persistence/publication integration remains an S2 gate input.
-A missing/stale record offers a new Team Workspace, not a reconstructed base.
+The evidence retains exact original canonical Workspace manifest bytes and exact
+original `metadata.am` bytes, each with its own digest/length. The manifest's
+digest equals `workspaceManifestSha256`; its purpose, package ID, identity,
+envelope and target heads equal the record, and its metadata descriptor's digest/length equal
+the retained metadata reference. Validate the root/history/heads from these bytes.
+The verified manifest's blob descriptors are the base's exact guaranteed inventory,
+not all historically mentioned blobs. Recompute the required closure against that
+inventory; unknown minor fields retain the conservative inventory. No guessed
+inventory from hashes, current UI state or the receiver's later union is valid.
 
-Only backup includes the table, under the proposed `exchange-bases.json` entry,
-with records sorted by identity/epoch/package ID. Backup also includes any exact
-Workspace receipt/inventory evidence needed to verify those bases; defining its
-bounded closed shape is required by section 10, not replaced by these hashes.
+An available retained base protects its evidence and guaranteed inventory as local
+retention roots. This may retain models no longer active in current Scenes and is
+included in backup's protected inventory. Inventory verification uses the existing
+durable CAS guarantees; it does not reread large models for Caption-only output.
+Loss/corruption of retained evidence or guaranteed bytes makes that base unavailable,
+with repair/new-Workspace recovery, not silent use of a weaker guarantee. Removing
+a base and its protection would require an explicit disclosed retention operation;
+this draft does not add such a UI or silently expire a record.
+
+The completion and evidence references commit atomically in the local base table,
+after the following events. Publication's local receipt and package roots must
+outlive a crash until base completion is recorded or explicitly reported incomplete.
+
+| Event / interruption | Base-table result |
+|---|---|
+| Workspace import validated but not published | No imported completion |
+| Imported batch published, including a valid zero-change import | Persist a local publication receipt bound to package/manifest/declared heads and actual receiver heads; idempotently finish its base record before advertising it |
+| Output has started, failed or cancelled | No generated completion; explicit incomplete output |
+| Exact output sink reports successful close | Atomically persist generated completion with retained evidence; only then advertise the base |
+| Sink closed but crash precedes durable completion | Completion is unknown, not inferable from a filename or materialized bytes; do not invent a record. Use an independently verifiable retained sink receipt if the adopted sink supports one, otherwise report uncertainty and offer a fresh Workspace |
+| Completion exists, retry/restart | Validate evidence and replay only the same local table update; never generate new metadata or advance another base |
+
+These receipts are local recovery records, not signatures, recipient acknowledgments
+or proof that a person retained the output. A backup restore discloses that they
+are historical observations. Exact backend receipt/atomicity and chosen sink
+capabilities remain adoption inputs; a generic download-start callback is not close.
+A missing/stale record offers a new Team Workspace, not an inferred base.
+
+Only backup includes the table, under `exchange-bases.json`: the closed object is
+`{records: ExchangeBaseDraft[]}`, sorted by identity/epoch/package ID, with all
+records belonging to the backup's exact Project lineage. Evidence entries use
+derived paths `base-evidence/sha256/<digest>` in digest order and are deduplicated
+by raw digest/length. Both their bytes and descriptors are required; extra entries
+reject. Their inventory is declared as `baseEvidence: EvidenceRef[]` on the backup
+manifest branch, sorted/unique by digest; it is forbidden on the other purposes.
+It includes exactly the union of record evidence references. Backup's ordinary
+blob entries/protected inventory include the guaranteed model/media/evidence-blob
+closure of all retained bases, once per digest. Evidence control bytes are not
+mistaken for semantic model/media resources. All these entries count in totals
+and budgets. Missing proof makes a restored base unavailable; a supposedly complete
+backup with missing declared evidence rejects before replacement.
 No local path, handle, transient UI selection or participant profile is allowed.
 Imported/generated local provenance is preserved as a workflow hint and disclosed.
 
@@ -222,7 +276,8 @@ Candidate root members are exactly `schema`, `snapshotId`, `project`, `scene`,
 | `project` | `title`, `frame`, `defaultSceneId`; default equals the sole Scene's re-keyed ID |
 | `scene` | `id`, `name`, `orderKey`, optional `defaultViewId`; no lifecycle |
 | visual Asset | `kind: 'visual'`, `id`, `label`, `assetFrameId`, `assetToProject`, sorted unique `compatibleAnchorClassIds`, sorted unique `representationIds` |
-| nonvisual owner | `kind: 'nonvisualOwner'`, `id`, `assetFrameId`, `assetToProject` only; no label, binding/revision, compatibility list or payload |
+| positioned nonvisual owner | `kind: 'nonvisualOwner'`, `id`, `assetFrameId`, `assetToProject` only; no label, binding/revision, compatibility list or payload |
+| unplaced-only nonvisual owner | `kind: 'unplacedOwner'`, `id`, `assetFrameId` only; exact source identity/frame mapped, no transform, label, binding/revision, compatibility or payload |
 | Representation | `id`, `assetId`, `representationFrameId`, `contentKind`, `purposes`, `role`, `variantFamilyId`, `formatProfile`, `blob`, `representationToAsset`, `logicalBoundsAsset`; optional `materialCatalog`, `compositeGroupId`, `targetGsVariantFamilyIds`, `proxyForGsVariantFamilyId` |
 | Caption | `id`, `title`, `body`, optional `colorSrgb`, `anchor`; no owning Scene, DisplaySet or lifecycle |
 | Asset membership | `id`, `sceneId`, `assetId`, `orderKey`; active source edges only |
@@ -246,6 +301,10 @@ and re-keyed `authoredAnchorCompatibilityId`. Manual anchors contain only
 may retain `normalAsset` and `hitEvidence` with method from the accepted nonmanual
 enum and optional finite `[0,1]` confidence. They never retain authored revision or
 any `hitEvidence.source`. ProjectAnchor retains its existing closed fields.
+The proposed unplaced branch from 05 §9.4 contains only `kind: 'unplaced'` and
+optional re-keyed `ownerAssetId`. It requires no position, compatibility or
+transform. Known owner references cannot be dropped for convenience; absent
+owners create no Asset. Unresolved placement/owner conflicts are not unplaced.
 All references/frame equalities, nominal ID ownership and tuple uniqueness are
 validated after re-keying. A compatibility ID belongs to exactly one Asset;
 absence from its own visual Asset's active list is valid `needsReview`, not a
@@ -256,9 +315,14 @@ Exactly one active source Scene is chosen explicitly. Include all its active
 memberships, included Caption media/tag closure, active views and applicable
 material intent. No search, pin-color filter, temporary hide/isolate, free camera
 or window state changes export scope. A nonvisual owner exists only to preserve
-an included Caption's AssetFrame anchor when that Asset has no Scene membership.
-Its authoritative transform comes from the source binding; unavailable/conflicted
-transform blocks export. It creates neither Scene Asset membership nor a
+an included Caption's known owner when that Asset has no Scene membership. If any
+included Caption has a positioned Asset anchor for that owner, use `nonvisualOwner`;
+its authoritative transform comes from the source binding (or a preserved exact
+pending transform of an unresolved owner). Unavailable/conflicted transform blocks
+that positioned closure. If only unplaced Captions refer to it, use `unplacedOwner`:
+the source Asset ID/frame must be authoritative, but transform/binding/payload
+are neither required nor copied. This rule also allows an unresolved model owner
+to remain list-only. Neither branch creates Scene Asset membership nor a
 Representation entry, and its marker/connector remain suppressed. The review
 discloses that this owner's model is not included; it must not offer an enabled
 `モデルを表示` action that cannot succeed from this package.
@@ -269,10 +333,17 @@ confirmation. Do not omit another conflicted Saved View, material, membership or
 Caption, and do not turn a required conflict into a placeholder in the exported
 bytes. Unrelated Project/Scene conflicts do not block the selected closure.
 
-The exact one-Scene review-to-clean builder is a remaining ratification input:
-it must preserve a nonvisual owner without inventing model bytes, source revision
-identity, active compatibility or a merge relation. Until that mapping is fixed
-and tested, this proposed snapshot cannot be treated as an implemented edit path.
+Proposed review-to-clean mapping for either nonvisual branch is an independently
+re-keyed ordinary Asset with its mapped `assetFrameId`, neutral generated label
+`モデル未収録` and `status: {kind: 'unresolved', reason: 'missingSource'}`.
+Only `nonvisualOwner` also sets `status.pendingAssetToProject` to its exact transform;
+`unplacedOwner` must omit it. No active binding, model/revision, expected digest
+or compatibility assertion is fabricated. Unplaced anchor known-owner links
+and positioned anchor/frame/compatibility identities are re-keyed with the same
+typed map; the unresolved model's marker stays suppressed, while its Caption
+remains editable. No Scene-model edge is added. Visual Assets use the ordinary
+history-free reconstruction path. This is a technical mapping proposal, not an
+implemented builder or ratification of the remaining nested field policy.
 
 ## 6. Mandatory automatic summary and privacy
 
@@ -314,7 +385,7 @@ discloses included Scene/model/Caption/media counts and this metadata boundary.
 
 Proposed layout is a strictly bounded ZIP, with `manifest.json` first,
 `manifest.sha256` second, purpose-specific metadata/snapshot or ordinal changes
-next, backup inventory/base entries next, and blobs last in digest order. Fixed
+next, backup inventory/base entries and base evidence next, and blobs last in digest order. Fixed
 payload names are `metadata.am`, `review.json`, `protected-inventory.json` and
 `exchange-bases.json`; only entries allowed by the selected purpose occur.
 No directories or undeclared payloads are needed. ZIP feature/ZIP64 policy and
@@ -327,8 +398,10 @@ encrypted entries, prohibited nested archives and unsafe compression, per 02 §1
 The preflight is read-only; extraction is bounded staging, not active publication.
 Manifest sizes are checked before allocation and measured while streaming.
 
-One consistent durable head set plus protected package roots lasts until export
-sink completion or cancellation. Concurrent edits belong to the next export.
+One consistent durable head set plus protected package roots lasts through export
+sink completion and the durable completion/base-retention handoff in §4.1, or
+until explicit cancellation safely releases the incomplete job. There is no GC
+gap between the package roots and retained-base roots. Concurrent edits belong to the next export.
 Sink failure stays an explicit incomplete output; it cannot acknowledge a saved
 file or advance a base. A resumable job binds the exact frozen manifest/input;
 otherwise retry is a new export with a fresh package ID, not a spliced prefix.
@@ -341,33 +414,125 @@ publish together with the complete batch; invalid input activates nothing.
 Quota, cancel and corruption retain the original source and a clear retry/repair
 route. No automatic overwrite or winner choice occurs on recovery.
 
-## 8. Explicit unresolved journal adaptation
+## 8. Proposed journal source adaptation
 
 02 §8 currently requires exact `source-metadata.am`, its own hash/length, source
 envelope/root/heads, original ordinal changes and final-head verification. A
 Contribution has no self-contained original `metadata.am`. It is invalid to hash
 the delta as a full document or attach the package's digest to reserialized bytes.
 
-Proposed amendment: retain the original verified package manifest/checksum and
-every exact delta part, plus a separately identified reconstruction receipt bound
-to the verified local base identity/root/frontier and pinned adapter. Construct a
-detached source view at the declared target heads; any saved reconstructed bytes
-have their own hash/length and explicit derived provenance. They are not claimed
-to be the sender's original metadata entry. The journal's receiver `baseHeads`
-remain the receiver's durable published heads, distinct from exchange-base heads.
+### 8.1 Closed candidate source union
 
-Before `blobsVerified`, revalidate the original wire delta against the exchange
-base and prove that the journal's missing-original-change list is exactly what
-the receiver lacks. Recovery must reproduce that proof, source target frontier
-and expected final union while preserving original changes. Tamper, lost required
-base/part or post-acknowledgement data loss requires read-only repair, never a
-new change or a silent replay that hides lost acknowledged storage.
+Keep local-command journals unchanged. A separately versioned remote-package
+journal admits the following closed `source` value, within 02 §8's existing
+transaction target, receiver `baseHeads`, original `changes`, staged blobs and
+`expectedFinalHeads`. No existing v1 journal is reinterpreted as this shape.
+The common package descriptors bind exact original manifest/checksum files.
+
+```ts
+type RemotePackageSourceDraft = {
+  packageId: PackageId;
+  manifest: EvidenceRef;
+  checksum: EvidenceRef;
+  metadataEnvelope: MetadataEnvelope;
+  remoteHeads: Heads;
+} & (
+  | { kind: 'fullMetadata'; metadata: EvidenceRef }
+  | { kind: 'contributionDelta'; base: ExchangeBaseProofDraft;
+      wireChanges: ChangeEntry[]; reconstruction: ReconstructionDraft }
+);
+interface ExchangeBaseProofDraft {
+  identity: Identity;
+  metadataEnvelope: MetadataEnvelope;
+  workspacePackageId: PackageId;
+  workspaceManifestSha256: Sha256Hex;
+  declaredHeads: Heads;
+  evidence: WorkspaceEvidenceDraft;
+}
+interface ReconstructionDraft {
+  kind: 'derivedTargetView';
+  adapterId: string; // exact pinned adapter contract ID: ratification input
+  targetMetadata: EvidenceRef;
+}
+```
+
+The original manifest is stored at fixed `source-manifest.json`, its checksum
+at `source-manifest.sha256`. Full-source original bytes remain at
+`source-metadata.am`, and their descriptor/envelope/heads must match the manifest.
+Contribution has no such original metadata file. It retains every wire delta part
+under `wire-changes/<8-digit ordinal>.amchange`, its base manifest/metadata by
+content-addressed evidence reference, and a separate `derived-target-metadata.am`.
+The latter's independently computed digest/length belongs to `targetMetadata`,
+not the original package metadata or delta. Paths are fixed/derived, never supplied
+by a journal. No hash is used as a substitute for required retained bytes.
+
+The source's package ID, envelope and remote heads agree with the original
+manifest and transaction target. Only Contribution can use `contributionDelta`;
+only a causal full-metadata purpose can use `fullMetadata`. History-free review
+does not use this remote merge union. Backup replacement and new clean-Project
+creation retain their explicit purpose-specific activation authority; the union
+does not grant generic merge permission for either.
+
+The base proof is a frozen projection of a validated available §4.1 record, not
+a lookup by package ID at recovery time. Its original Workspace bytes prove exact
+identity/bootstrap/envelope/frontier/inventory; it matches the Contribution's
+declared base. Do not copy labels, local completion observations or current heads
+into that proof. Base evidence and required original parts stay protected for
+the entire transaction even if another local operation changes the table.
+
+### 8.2 Exact preparation, digest and recovery
+
+Let `B` be base-reachable changes, `T` sender-target-reachable changes, and `R`
+receiver published-reachable changes. Preparation under the origin transaction
+boundary must prove:
+
+1. Every base head exists in the receiver with the same bootstrap identity.
+2. Original wire parts are exactly `D = T - B`, individually byte/hash/dependency
+   verified in canonical dependency order. Build a detached base-plus-delta union,
+   then select the exact declared target view; its heads are not the union heads.
+3. The saved derived target decodes to that identity/frontier with exactly the
+   original reachable change hashes/bytes. A valid equivalent adapter serialization
+   may have different save bytes, hence its separate raw descriptor; never rewrite
+   changes or use a reconstruction to excuse a missing original wire/base file.
+4. Receiver journal parts are exactly `M = T - R`, obtained as original change
+   bytes, not re-authored values. They are stored in the existing receiver
+   `changes/<8-digit ordinal>.amchange` order, separate from wire ordinals. Preserve
+   local-only work and verify detached final union heads and its full required
+   strong/conflict/opaque/migration payload closure before `blobsVerified`.
+
+Full-source preparation proves the same receiver difference/final union directly
+from the retained original metadata, without a derived-source claim.
+
+The proposed remote-journal digest uses a new domain separator
+`lociview:v2:metadata-change-set:jcs-v2\n`, not 02 §8's v1 domain. Its canonical
+preimage is exactly `{transactionId, target, purpose, stagedBlobs, metadataBatch}`,
+with only `metadataBatch.exactChangeSetDigest` excluded. It includes this entire discriminated
+source, original manifest/checksum, wire/base/derived descriptors, receiver heads,
+receiver change descriptors and expected final heads. Thus changing the source
+kind or any evidence binding changes the digest. Exact journal version literal,
+adapter ID and canonical byte goldens are still ratification inputs; the current
+v1 digest and executable journals are unchanged.
+
+| Recovery point | Required behavior |
+|---|---|
+| Staging incomplete, before durable prepared acknowledgment | Resume the same retained input if complete; otherwise report incomplete/quarantine. Publish nothing; do not synthesize source bytes |
+| `blobsVerified`, receiver has a durable prefix | Revalidate all source/base/derived proofs and exact M; replay only missing original M parts, verify expected final heads and publish once |
+| Metadata durable but not published | Recover publication from the exact journal after verification; old published heads remain authoritative until the barrier |
+| Already published | Verify completion and return no-op; do not append changes or publish again |
+| `M` empty, even when `D` is nonempty | No metadata journal/change/publication. A valid Workspace may separately record an imported base; Contribution never advances one. Required blob repair is a distinct bounded transaction, not an empty merge disguised as completion |
+| Prepared/acknowledged source, base, derived bytes or receiver part missing/tampered | Read-only repair preserving old authoritative view/source. Do not regenerate missing acknowledged data, select a winner or hide storage loss behind a successful retry |
+
+Cancellation after durable preparation follows existing journal recovery rules,
+not silent discard of committed prefixes. Collection cannot remove original/base/
+derived evidence while a journal or completion recovery still needs it. After the
+authoritative completion marker and local follow-up receipts are durable, ordinary
+retention policy may release transaction-only evidence; retained bases remain roots.
 
 This is a proposed compatibility amendment, not permission to change 02 §8.
-Its exact closed receipt/source union, retained base evidence, budgets and
-interruption vectors must be ratified together. The existing full-source journal
-and its executed proofs remain unchanged. S2 Contribution import is blocked
-until this interface is settled and proved.
+Its source union, base completion, budgets and byte/recovery vectors must be
+ratified together. Existing full-source proofs remain reusable within their exact
+scope; S2 Contribution import remains blocked until this interface is implemented
+and proved after the applicable approvals.
 
 ## 9. Acceptance vectors required before S2
 
@@ -391,14 +556,44 @@ and digests, canonical valid/invalid outcomes and expected publication state.
 Fixtures are synthetic or public-authorized; private source names/paths/hashes
 and implementation-only probe identifiers never enter tracked vectors.
 
+### 9.1 Defined structural vectors for this amendment
+
+These are exact causal/state expectations, not fabricated canonical byte goldens
+or executed tests. The later pinned adapter fixture must substitute actual original
+change bytes/hashes and retain these outcomes. `root` denotes the verified empty
+bootstrap; `participantEdit` and `coordinatorEdit` independently depend on it.
+`localEdit` depends on `coordinatorEdit`. Names below are synthetic fixture roles,
+not identities or automatic choices shown to users.
+
+| Vector | Input and interruption | Exact expected result |
+|---|---|---|
+| Sibling target, newer selected base | Base heads `[coordinatorEdit]`; sender heads `[participantEdit]`; receiver heads `[localEdit]` | Original wire D and receiver M each contain only `participantEdit`; derived target heads `[participantEdit]`; final receiver heads `[localEdit, participantEdit]` in hash sort order, never rewritten to sender heads |
+| Receiver already has target | Same base/target and wire D; receiver already has both final heads above | D still verified/retained during validation, M empty; no metadata journal/change/publication and no Contribution base update |
+| Tampered evidence | Replace one original wire part, base metadata byte, source-kind tag or derived descriptor after preparation | Digest/proof failure; old published heads remain authoritative, no regeneration of acknowledged data |
+| Interrupted original-parts apply | Sender has three dependent original parts; interrupt after first becomes durable | Old publication remains; resume exact remaining parts, publish complete expected union once; next recovery no-op |
+| Workspace completion | Valid Workspace import adds zero changes to an already-complete receiver | No metadata publication; one idempotent local imported completion bound to exact original Workspace heads/evidence, distinct from receiver heads |
+| Output completion unknown | Crash after successful sink close but before durable completion | No generated base promoted from prepared state; explicit uncertainty, receipt-based verification or fresh Workspace export |
+| Base survives inactive model | Retained Workspace requires a model no longer active at current heads; run GC then backup/restore | Base evidence and guaranteed body stay protected; restored base verifies; Caption-only delta performs zero reads/embedding of unchanged model body |
+| Late old-unplaced input | Baseline/input both unplaced while v2 Caption was explicitly placed; input changes only body | No anchor change; body integrates, current v2 placement survives; identical input replay adds no changes |
+| Concurrent actual placement | Old input placement differs from baseline; v2 also changed placement | Whole-anchor candidates retained; explicit keep-one/independent keep-both, no guessed owner/coordinate combination |
+| History-free unplaced owner | Selected Scene includes unplaced Caption only; its known Asset is unresolved/outside Scene | Review includes Caption plus `unplacedOwner` without transform/model bytes; clean re-keys unresolved owner and membership, no fabricated binding or Scene-model edge |
+
+Unknown-owner input uses the same last vector with `ownerAssetId` absent: no
+owner Asset is created. A positioned Caption sharing that owner instead requires
+the authoritative-transform `nonvisualOwner` branch. Missing/conflicted owner
+identity is a blocked closure, never the unknown-owner variant.
+
 ## 10. Remaining ratification inputs and stop boundary
 
 Readiness review (2026-09-10): the five user purposes and conflict/source-preservation
 policies are already approved; the following are exact technical ratification
 inputs, not invitations to reselect those policies. Current sequencing and reused
 evidence are at the top of `../../tasks/todo.md`. Specification 05 §9.4 records a
-separate unplaced-Caption representability decision affecting migration and all
-five output builders; this draft's anchor fields do not resolve that gap.
+PO-approved unplaced-Caption preservation and its proposed atomic technical
+mapping. Sections 4.1, 5.1 and 8 now specify retained base evidence/completion,
+nonvisual-owner conversion and the full/delta source distinction; §9.1 supplies
+structural vectors. Runtime admission still lacks the unplaced branch. Product
+approval does not ratify this proposed wire/schema or execute those vectors.
 
 The proposal is reviewable, not yet an executable wire contract. Resolve these
 three grouped inputs once; do not grow another isolated browser page or treat a
@@ -406,12 +601,14 @@ new documentation checkpoint as a technology gate pass.
 
 1. **Exact wire/profile:** choose the format/version and adapter identifier,
    ZIP/ZIP64/compression/sink profile, summary classifier, complete backup
-   inventory/base-evidence shapes and golden byte manifest. Fix metadata/change/
+   inventory schema and golden byte manifest, including the proposed base-evidence
+   shapes. Fix metadata/change/
    manifest/archive/entry/ratio/count/depth/head/base-record/output-working-space
    budgets from measured Desktop/iOS evidence. Existing semantic ceilings apply;
    the much smaller PoC limits are not product limits.
 2. **Delta-to-journal and base completion:** ratify section 8's source/receipt
-   amendment and section 4.1's durable base update with exact recovery vectors.
+   amendment and section 4.1's durable base update with canonical byte fixtures
+   and backend completion/receipt behavior for §9.1's recovery vectors.
    Keep original wire bytes, derived validation bytes and receiver publication
    distinct; require sufficient pinned base evidence rather than a bare hash.
 3. **History-free builder:** pin the complete nested copy/omit policy and one-Scene

@@ -10,12 +10,13 @@
 
 ## Start here
 
-Current task (2026-09-10, after synchronized `b1b36bd`): durable/file readiness
-review is recorded at the top of `tasks/todo.md`. The one immediate product
-decision is unplaced-Caption preservation in 05 §9.4; the existing Native path
-permits it, but the v2 target has no such state. Wire/recipe details and remaining
-adoption/device evidence stay separate. No new schema, real-data activation or
-repeat of the closed Chrome journal is authorized by this planning checkpoint.
+Current task (2026-09-10, after readiness checkpoint `77a22b0`): PO approved
+unplaced-Caption preservation. Specification 05 §9.4 proposes its exact atomic
+state/bridge mapping; 06 §§4.1/5.1/8–9 specify retained base proof, history-free
+owners and full/delta recovery vectors. These are reviewed technical drafts, not
+runtime schema or wire adoption. The next contract portion is the new migration/
+portable-bridge recipe and canonical fixtures; remaining measured adoption inputs
+stay separate. See `tasks/todo.md` top. No old journal rerun or immediate human test.
 
 2026-09-10: PO reports the five prescribed camera/pin/window manual groups PASS
 at `7540478`; this supersedes their pending status below only for that scope.

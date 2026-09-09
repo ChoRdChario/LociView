@@ -768,9 +768,9 @@ blob, processed-package registration, retention/privacy roots and package
 closure. No implementation may improvise this data inside `MigrationSupportV1`,
 whose schema is closed, or keep it only in an unexported local index.
 
-### 9.4 Readiness finding — unplaced Caption migration (2026-09-10)
+### 9.4 Unplaced Caption preservation (2026-09-10)
 
-> `OPEN / PROPOSED RESOLUTION / NOT A SCHEMA AMENDMENT`
+> `PO-APPROVED OUTCOME / TECHNICAL AMENDMENT PROPOSED / NOT IMPLEMENTED`
 
 There is a real source/target representability gap, not a new failure in the
 current Native path. Native `NativeCaptionV1` permits `anchor: null` with a known
@@ -782,22 +782,103 @@ contract and `src/domain/projectMutableFields.ts` require an anchor accepted by
 The current target has no authoritative unplaced state. A conversion recipe
 cannot fix this by inventing coordinates, choosing a model or deleting the Caption.
 
-Recommended PO decision: preserve an unplaced Caption as an active list item with
+PO approved: preserve an unplaced Caption as an active list item with
 its text, supported media, tags and exact Scene memberships; show `未配置` and no
 3D marker until an explicit placement command. Retain any source-authoritative
-known owner separately from a position; an absent owner remains absent. Do not
+known owner without requiring a position; an absent owner remains absent. Do not
 turn an unknown/conflicted placement into an ordinary unplaced state or infer a
-ProjectAnchor. This is a compatibility-preserving proposal, not approval to change
-the schema, migrate real files or expand media support.
+ProjectAnchor. This closes the product question, not approval of an exact schema,
+migration recipe, real-file activation or expanded media support.
 
-After PO agreement, the technical amendment must define the closed state and its
-atomic field/conflict/owner semantics across record admission, projections,
-migration/late Native bridge, five package purposes and history-free builders.
-It must distinguish unplaced, placed-but-hidden/missing-model, `needsReview`, and
-unresolved conflict. Reuse source conversion cases; require same-source replay,
-independent edit/placement, export/reopen and cancellation to preserve the record
-without a fabricated position or owner. Until then, ProjectScene conversion of
-this source state remains blocked; the existing Native reader/writer is unchanged.
+#### 9.4.1 Proposed atomic representation and placement
+
+Extend the existing atomic `Caption.anchor` union by exactly:
+
+```ts
+{ kind: 'unplaced'; ownerAssetId?: AssetId }
+```
+
+The object is closed. An absent owner is omitted, not `null`; coordinates, frame,
+revision, compatibility, normal and hit evidence are forbidden in this branch.
+The optional owner comes only from validated source authority or an explicit
+accepted operation, never filename, model count, geometry or current selection.
+It is a strong logical ownership reference, including in conflict candidates:
+retain its Asset and the Asset's ordinary required closure. Rendering an unplaced
+Caption does not load that closure's model bytes or require a binding/transform.
+Missing/deleted/conflicted owners remain reportable; do not erase the reference,
+silently cascade-delete the Caption or describe that case as ordinary ownerless.
+This amendment does not add a general unlink/reassign-owner command.
+
+| State | List and editing | 3D / recovery |
+|---|---|---|
+| Authoritative unplaced | Editable text/media/tags and exact Scene memberships; `未配置` | No marker/connector; explicit first placement |
+| Placed, owner hidden or absent from Scene | Retain placed anchor and record | Existing reveal/missing-model route, not a new placement |
+| Placed, compatibility needs review | Preserve authored position/evidence | Existing `needsReview` route; no automatic rebind |
+| Missing/invalid/conflicting anchor or owner | Preserve source and all valid candidates; report affected state | Repair/explicit conflict resolution, not unplaced fallback |
+
+First placement updates the existing Caption ID, not a newly created Caption.
+A known owner restricts verified surface placement to that Asset. Without a
+known owner, the user's unique verified surface hit supplies the owner; ambiguity,
+stale scene/transform, miss or unavailable model cannot confirm. Position gizmo
+and explicit confirm/cancel follow the existing pin workflow. Confirm replaces
+the whole anchor atomically with a valid Asset anchor. Cancel/failure preserves
+the original anchor, text/media/tags and memberships. No ProjectAnchor fallback.
+Concurrent placement/owner changes retain whole anchor candidates, never combine
+one candidate's owner with another's coordinates. Concurrent unrelated text/media
+edits still integrate normally. `両方残す` allocates independent Caption and owned
+attachment/membership IDs under §8, copies the chosen anchor unchanged and follows
+existing tag/media sharing rules; later placement of either copy is independent.
+
+#### 9.4.2 Proposed conversion and late-bridge mapping
+
+The new recipe companion in §9.1 must record exact source Caption/owner mappings,
+the canonical baseline placement value and immutable source evidence separately
+from the editable target anchor. Do not extend or reinterpret the closed old
+recipe or `MigrationSupportV1`.
+
+| Admitted source | Exact target mapping |
+|---|---|
+| Native `anchor: null`, authoritative owner | Unplaced with the mapped owner ID; no invented frame/position/revision |
+| Native `anchor: null`, owner absent | Unplaced without owner; no synthetic Asset |
+| LociMyu invalid coordinate allowed by 04 §4.3 | Preserve active Caption, issue report and exact sheet/model authority; map to unplaced under the new recipe |
+| Positioned source | Existing exact positioned-anchor mapping; never downgrade because model is hidden |
+| Conflicting/invalid source authority outside the admitted conversion rule | Preserve/report; do not select a winner or convert corruption to normal unplaced |
+
+Native owner and anchor are separate atomic source fields. The bridge compares
+their complete canonical placement tuple against the registered old baseline.
+If unchanged, emit no anchor change: a later v2 placement must survive an old
+unplaced input and text-only edits. If changed, map the authoritative tuple as one
+whole-anchor descendant of the registered common v2 ancestor, not of current
+heads. An unresolved source tuple blocks that affected bridge mapping with its
+source intact; do not synthesize cross-product candidates or serialize a winner.
+Concurrent valid v2 placement then follows ordinary whole-anchor conflict choice.
+Same-input replay reuses registered mappings and original generated change bytes,
+never refreshes its baseline from current v2 state.
+
+Team Workspace and backup preserve unplaced values, candidates and their required
+portable migration/bridge evidence. Contribution sends exact base-relative changes
+and newly required evidence/payloads; placement-only edits do not reread unchanged
+model bodies. Review includes every active Caption of the selected Scene even if
+unplaced; clean includes all active Project resources. Both history-free purposes
+re-key known owners, preserve absent owners, and omit source/history/bridge
+evidence. Neither adds Scene-model memberships. Minimal nonvisual owners and
+review-to-clean mapping are specified in companion 06 §5.1.
+
+#### 9.4.3 Finite acceptance and implementation boundary
+
+Reuse source conversion, conflict, keep-both and export/reopen fixtures; add only
+the cases needed to distinguish known-owner/ownerless unplaced, malformed versus
+normal state, first placement confirm/cancel/failure, unrelated text integration,
+concurrent placement candidates, identical late-source replay after v2 placement,
+independent copy placement and five-purpose closure/privacy. Include an unplaced
+Caption whose owner is unresolved and one with no Scene membership. Expected
+results are exact preserved IDs/content/membership within a lineage and typed
+re-keying for history-free output, not merely a count of visible markers.
+
+This is a proposed technical amendment requiring independent review and inclusion
+in the schema/recipe/wire ratification package. Current record admission still
+accepts only positioned anchors. ProjectScene real-file conversion remains gated;
+current Native reader/writer and the synthetic host are unchanged by this text.
 
 ## 10. Atomicity, interruption and recovery
 

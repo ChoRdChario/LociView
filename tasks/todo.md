@@ -9,7 +9,47 @@ requested. Synthetic two-person model/pin/history and independent Caption/model-
 The scoped PO result below closes only the listed interaction checks; broader
 rendered, IME, device and durable-file acceptance remain pending.
 
-### Current boundary review — durable/file readiness (2026-09-10)
+### Current contract checkpoint — approved unplaced outcome and recovery design (2026-09-10)
+
+PO approved retaining unplaced Captions as editable list items, with their
+text/media/Scene membership and no fabricated position or owner. Start clean
+`77a22b0`; `b1b36bd` is pushed, the readiness record is one local commit ahead.
+This closes the immediate product question, not the wire/recipe/adoption gates.
+
+- [x] Record outcome approval and inspect the relevant anchor/history boundaries.
+- [x] Define one atomic unplaced state, known-owner preservation, explicit first
+  placement and migration/history-free mappings; independent technical review.
+- [x] Draft the next wire-design portion: durable base evidence and exact
+  full-source versus delta-source journal/reconstruction contracts with vectors.
+- [x] Align current documents and obtain independent read-only technical review.
+- [x] Final diff/reference and documentation-only scope checks.
+
+Scope is contract design before implementation. No runtime schema, reader/writer,
+storage activation, dependency, real-file migration, UI change or new browser
+probe. Existing executable evidence is reused; no unchanged full-suite rerun.
+
+Review result: 05 §9.4 now separates PO-approved preservation from the proposed
+closed atomic anchor/placement/bridge amendment. 06 §§4.1/5.1/8 define exact
+retained Workspace evidence, completion uncertainty, nonvisual-owner-to-clean
+mapping and a versioned full/delta source union. Section 9.1 records structural
+recovery vectors, not executed byte goldens. Independent domain/migration review
+found no blocker; storage review requested explicit root handoff duration and
+`transactionId` in the new digest preimage, both corrected. Runtime admission,
+Native bytes and all existing test results remain unchanged.
+Final reviewer confirmed both corrections and the seven-Markdown-file-only scope;
+`git diff --check` and changed-document local inline-reference checks PASS.
+
+**Next bounded artifact:** the new migration/portable-Native-bridge companion:
+exact source-ID preimages/full digests and collisions; immutable baseline and
+mapped ancestor; processed-package/original-change registration; required
+retention/export fields; canonical synthetic known-owner/ownerless/late-placement
+vectors. It must use the approved outcome and this atomic mapping, not reopen
+them as product questions or reuse closed old recipe IDs. Exact wire/profile/
+summary/byte fixtures and measured storage/adoption inputs are still pending;
+collect those into the reviewed ratification package before real-file activation.
+No human test is required for this documentation checkpoint.
+
+### Completed boundary review — durable/file readiness (2026-09-10)
 
 PO approved identifying the prerequisites for real-file/save/team integration.
 Start: clean `g0-baseline` at `b1b36bd`, synchronized with origin. This is a bounded
@@ -28,13 +68,13 @@ Project/Scene, conflict choice, source preservation or five-purpose decisions.
 
 #### Decision summary / actual next decision
 
-**One immediate PO decision remains:** specification 05 §9.4 proposes preserving
+**PO decision accepted on 2026-09-10:** specification 05 §9.4 preserves
 old unplaced Captions as active, editable list items with their text/media/tags and
 Scene memberships, no invented coordinates/owner and no marker until explicit
-placement. Native permits this today; the current v2 target only accepts positioned
-Asset/Project anchors. This is an open migration representability gap, not a defect
-in the accepted Native path. Its exact atomic state/schema must be independently
-reviewed after the outcome is accepted; no code or schema change occurs here.
+placement. Native permits this today; executable v2 admission still only accepts
+positioned Asset/Project anchors. The product question is closed; its exact
+technical amendment and implementation remain distinct from outcome approval.
+This is not a defect in the accepted Native path. No runtime schema changes here.
 
 Already-approved outcomes need no renewed choice: one full Project per participant;
 Scene-based composition; Project-wide model updates preserve local Caption work;
@@ -48,11 +88,11 @@ Those are later bounded approval packages, not questions about every implementat
 
 | Gap | Concrete next artifact / recommended direction | Gate / owner |
 |---|---|---|
-| Contribution delta versus full-source journal | Close 06 §8's source union: retain original manifest/parts, verified exchange-base evidence and separately hashed derived reconstruction. Keep receiver published heads distinct from sender target/base. Define exact replay/repair states; never label rebuilt bytes as the original source | Design in 06; independent review and PO ratification before changing 02 §8 or S2 import |
-| Durable exchange bases and backup | Close 06 §4.1's record/receipt/inventory shapes and idempotent completion point. Only verified import or completed output records a base; output is not receipt by another person. Back up the evidence needed to verify a restored base, not bare IDs/hashes | Same wire/recovery design, then actual persistence/output checks |
+| Contribution delta versus full-source journal | 06 §8 now drafts source union, original/derived proof, receiver difference, digest and replay/repair; §9.1 fixes structural vectors. Next pin canonical bytes and exercise the approved backend, not re-design those outcomes | Reviewed draft; PO ratification before changing 02 §8 or S2 import |
+| Durable exchange bases and backup | 06 §4.1 now drafts record/evidence/completion, inventory retention and backup closure. Next pin backend receipt atomicity, budgets and byte fixtures. Output completion still does not prove receipt by another person | Reviewed wire/recovery design, then ratification and actual persistence/output checks |
 | Wire profile and summaries | Exact five discriminators/control bytes, allowed ZIP features and output sink, adapter identity, complete inventory, deterministic summary classifier and golden vectors. Keep measured budgets as explicit pending inputs; no invented version/limit or adoption from PoC ceilings | 06 §§3–7/9–10; engineering prepares, PO ratifies reviewed format/guarantees |
-| History-free construction | Finish nested field/ID policy for whole-Project clean and one-Scene review, plus review-to-edit mapping for a nonvisual owner and the proposed unplaced state. No source history/identity leakage, fabricated model, ProjectAnchor rewrite or guessed conflict winner | 05 §§7.3–7.4; 06 §§5–6. Output builders remain unimplemented |
-| Migration recipe and late Native bridge | New companion for exact source keys/preimages/full digests/collision checks and golden outputs. Specify portable bridge support with verified old baseline, mapped ancestor and processed-package records. Do not reinterpret old recipe IDs, closed MigrationSupportV1 or Native files | 05 §9 / proposed §9.4 outcome; separate reviewed recipe/bridge ratification before S2 |
+| History-free construction | Nonvisual and unplaced-owner-to-clean mapping drafted in 06 §5.1; finish complete nested field/ID policy and canonical fixtures. No source history/identity leakage, fabricated model, ProjectAnchor rewrite or guessed conflict winner | 05 §§7.3–7.4/9.4; 06 §§5–6. Output builders remain unimplemented |
+| Migration recipe and late Native bridge | Next new companion for exact source keys/preimages/full digests/collision checks and golden outputs. Specify portable bridge support with verified old baseline, mapped ancestor and processed-package records. Do not reinterpret old recipe IDs, closed MigrationSupportV1 or Native files | 05 §9 / §9.4 accepted outcome and proposed technical mapping; separate reviewed recipe/bridge ratification before S2 |
 | Actual model/media content and product services | Replace fixture-only source construction/verifier with admitted real content, durable metadata/CAS/journal and package services. Preserve current supported formats/media; use existing Native readers as bounded reference/reuse inputs, not proof of a v2 adapter | S1/S2 prerequisites below before connection; source/model/profile relationships never inferred |
 
 #### Evidence reuse and genuinely missing observations
@@ -76,8 +116,8 @@ remaining relevant operations, preserving already-passed evidence.
 #### Next bounded work and completion criteria
 
 1. **Contract closure, next:** complete the exact wire/recovery and new migration-
-   companion drafts above. Independent wire/recovery design need not wait for
-   the unplaced decision; affected anchor/conversion/builder rules do. The user
+   companion drafts above. The unplaced product decision is approved and its
+   atomic mapping drafted; do not wait for another preservation decision. The user
    result is lossless conversion and continuing return of edits, not a new file
    management concept. Exit: closed structural mappings, source/base/receipt
    separation, canonical valid/invalid vector definitions, explicitly owned
@@ -101,7 +141,7 @@ release/version/main/Pages/Service Worker changes. Stop at a contract conflict,
 unproved migration identity, adoption/numeric decision or required device action.
 This readiness task does not itself grant any of those approvals.
 
-Readiness result: independent storage-evidence and migration inspection plus a
+Earlier readiness result at `77a22b0`: independent storage-evidence and migration inspection plus a
 read-only final-diff review found no blocker to presenting this plan. The unplaced
 gap is recorded, not silently resolved. Diff/markdown-only scope and referenced
 file checks PASS. No application test/build rerun for unchanged executable bytes;
