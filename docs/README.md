@@ -73,8 +73,11 @@ Four added existing-candidate tests pass (10 harness tests total), limited to
 shared bytes/objects and explicit guards, not admitted domain or durable conversion.
 The isolated journal now has a dedicated preparedMigration seam with exact retained
 source and recovery, exercised by eight added synthetic cases. The complete
-domain/guard-sidecar connection of §10.1 remains open, not replaced by that smaller
-fixture. No new browser page; exact wire/profile and adoption inputs remain open.
+existing development source now also reaches same-head managed/birth inspection,
+actual temporary-CAS content verification and the journal under an explicit
+candidate-only flat profile. Seven service cases cover local work, scoped review,
+retained original bytes and reopen/replay. No new browser page or durable UI
+activation; exact wire/profile/whole-converter and adoption inputs remain open.
 No ordinary-runtime change or renewed unplaced-preservation question.
 
 2026-09-10: PO reports the five prescribed camera/pin/window groups PASS at

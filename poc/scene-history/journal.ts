@@ -29,7 +29,7 @@ export interface Ports {
   protect(refs: Ref[]): Promise<void>;
   hasProtected(ref: Ref): Promise<boolean>;
   hasVerified(ref: Ref): Promise<boolean>;
-  finalClosure(doc: Doc): Ref[];
+  finalClosure(doc: Doc): Ref[] | Promise<Ref[]>;
   checkpoint(name: string): Promise<void>;
 }
 const basePath = (tx: string) => `journal/${tx}`;
@@ -52,7 +52,7 @@ export class JournalCandidate {
     decodeJournal(bytes); await this.ports.files.write(journalPath(journal.transactionId), bytes);
   }
   private async checkClosure(doc: Doc): Promise<void> {
-    validateRoot(doc, this.target); const closure = this.ports.finalClosure(doc); refs(closure);
+    validateRoot(doc, this.target); const closure = await this.ports.finalClosure(doc); refs(closure);
     for (const ref of closure) require(await this.ports.hasProtected(ref) && await this.ports.hasVerified(ref), 'missing final blob/inventory');
   }
   private async protect(staged: Ref[]): Promise<void> {

@@ -19,9 +19,12 @@ portable baseline/registration, atomic relation guards, shared unit/birth artifa
 and a prepared-migration journal source. Four identity examples and four added
 existing-candidate feasibility tests are not whole-conversion proof. The interface
 draft is complete for this slice. The isolated preparedMigration journal seam now
-retains and replays exact synthetic source/parts; the complete domain/guard-sidecar
-connection of 07 §10.1 is still next, alongside exact profile/approval inputs.
-Measured adoption requirements remain separate. See
+connects the complete existing development source to same-head managed/birth
+inspection and actual temporary-CAS verification. Original parts survive local
+editing, interruption/reopen and replay under an explicit candidate-only flat
+profile. This does not connect durable UI, real conversion or product wire.
+Next consolidate the finite existing-host activation/approval gap; do not start
+another provider/probe campaign. Measured adoption requirements remain separate. See
 `tasks/todo.md` top. No old journal rerun or immediate human test.
 
 2026-09-10: PO reports the five prescribed camera/pin/window manual groups PASS

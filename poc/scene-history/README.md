@@ -24,6 +24,18 @@ not constitute the served host switch; the connected C path is described below.
 Project metadata and canonical atomic fields before the candidate records them.
 Original IDs/DAG remain exact; command-sidecar correspondence is checked at every
 causal cut, including redundant original dependencies and explicit absence.
+`development-service.ts` reuses that strict source for the isolated durable
+journal. Its explicit flat profile preserves the populated original genesis;
+it is not 02's product empty-bootstrap format. A private domain/control partition
+retains every original ID/dependency/token, including control-only changes, and
+cannot be used as an export source. Typed managed-Scene and placed-Caption birth
+guards inspect all alternatives and suppress only affected authority. Complete
+nonselected records and known immutable body roots remain retained. Node tests
+inject actual temporary-CAS reads into the existing triangle/PNG verifier; no
+fixture fallback is used while reopening. Async closure is required before initial
+publication and every journal acknowledgment/use. No new browser page, durable
+UI driver, general Native converter, product profile, wire or adoption follows.
+
 `development-verified.ts` connects this source to the full scoped provider before
 asynchronous publication. It retains the confirmed pair while checking, rejects
 permanently malformed source before registering a pending operation, and retries

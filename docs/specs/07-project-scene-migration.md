@@ -748,7 +748,36 @@ original/control bytes, registered receiver foundation, exact missing-part apply
 and shared existing recovery/publication. The eight added Node cases use a small
 synthetic source recipe and existing filesystem/CAS ports. This implements only
 the protocol seam, not these portable artifact schemas, complete domain/birth
-guards, Native parsing, real-data conversion or UI/storage activation. The full
-§10.1 exit is still open: connect complete domain plus guard-sidecar inspection
-at the same original heads without weakening the current development validator.
-Current todo owns executed verification and the precise next adapter boundary.
+guards, Native parsing, real-data conversion or UI/storage activation. The complete
+development-source connection is recorded below; portable recipe and real-file
+activation remain separate. Current todo owns executed verification and the
+precise next boundary.
+
+**Implemented execution descriptor (candidate only):** the existing complete development
+source has a single flat `cells` genesis containing initial records. Its exact
+original DAG may enter the journal only under the explicitly selected
+`automerge-js-3.4.1-flat-isolated-probe` profile. The old isolated empty-bootstrap
+profile is unchanged; neither profile adopts 02 §4's product format. Root identity,
+declaration and the one cell-map object cannot be rewritten, even to equal values.
+The composite reader partitions only an exact `isolatedBridge` control namespace;
+all domain change IDs, dependencies, operation IDs and heads remain original,
+including empty domain changes. Existing development command/field correspondence
+is not weakened. Complete domain writes continue through its current encoder.
+
+The candidate sidecar checks immutable foundation/endpoint registrations and all
+atomic managed-selection/birth alternatives at those same heads. It withholds only
+affected authoritative memberships/resources, retaining ordinary v2-only relations,
+local text and complete nonselected records. Missing or malformed control evidence
+is not an empty selection. Actual temporary-CAS content checks and conservative
+known-record blob retention finish before prepared acknowledgment, publication and
+reopened use. This is a fixed placed-Caption/Scene service exercise, not the full
+portable recipe encoder, unplaced branch, file import or a new UI connection.
+
+Seven Node service cases now execute this connection with real temporary files,
+including a prepared source, participant edit, interrupted original-part flush,
+independent reopen, one publication and exact no-op replay. Scene alternatives
+and different complete births remain explicit; choosing a birth preserves later
+text and its media while unrelated attachment conflicts remain available. The
+capability accepts an exact registered synthetic plan, not a general converter.
+The full portable recipe encoder and artifact/proposal schemas, actual files,
+adopted product profiles and UI/device storage activation are still unimplemented.

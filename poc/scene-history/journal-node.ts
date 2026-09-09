@@ -64,7 +64,7 @@ export class NodePorts implements Ports {
   publications = 0;
   metadataWrites = 0;
   constructor(readonly files: NodeFiles, readonly metadata: NodeFiles, private readonly gate: TestGate,
-    private readonly cas: CasCandidate, private readonly target: Target, readonly finalClosure: (doc: Doc) => Ref[]) {}
+    private readonly cas: CasCandidate, private readonly target: Target, readonly finalClosure: (doc: Doc) => Ref[] | Promise<Ref[]>) {}
   exclusive<T>(fn: () => Promise<T>) { return this.gate.exclusive(fn); }
   async control(): Promise<Control> {
     const bytes = await this.files.read('control.json', LIMIT.journal); require(bytes, 'missing control');
@@ -121,8 +121,11 @@ export class NodePorts implements Ports {
   hasVerified(ref: Ref) { return this.cas.hasVerified({ sha256: ref.digest, byteLength: ref.byteLength }); }
   async initialize(doc: Doc, initial: Ref[]): Promise<void> {
     require(!await this.files.read('control.json', LIMIT.journal), 'probe already initialized'); validateRoot(doc, this.target);
+    refs(initial);
+    const closure = await this.finalClosure(doc); refs(closure);
+    for (const ref of closure) require(initial.some(item => same(item, ref)) && await this.hasVerified(ref), 'initial closure/inventory missing');
     for (const { bytes } of index(doc).values()) await this.appendAndFlush(bytes);
-    refs(initial); await this.files.write('inventory.json', jsonBytes(initial));
+    await this.files.write('inventory.json', jsonBytes(initial));
     await this.setControl({ pending: null, publishedHeads: heads(doc) }); this.publications = 0; this.metadataWrites = 0;
   }
 }

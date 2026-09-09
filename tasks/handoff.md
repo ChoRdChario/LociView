@@ -11,9 +11,12 @@
 > Four added existing-candidate feasibility checks pass; complete Node harness
 > 10/10, not converter/storage/adoption proof. The isolated journal now connects a
 > dedicated preparedMigration source to retained bytes and recovery with eight
-> added synthetic cases. Next remains the complete domain/guard-sidecar portion
-> of 07 §10.1, not another document/probe or promotion of the partial fixture.
-> Wire/profile/adoption inputs remain separate.
+> added synthetic cases. The full existing development source now also connects
+> domain/managed/birth inspection at original heads, actual temporary-CAS checks
+> and journal reopen/replay under an explicit candidate-only flat profile. Seven
+> added service cases retain local work and withhold only affected authority.
+> Next consolidate the finite existing-host activation/approval gap; do not start
+> another provider/probe campaign. Wire/profile/adoption inputs remain separate.
 > Production schema, user files/storage and UI are unchanged. No renewed preservation
 > question, closed Chrome journal rerun or immediate human test is needed.
 

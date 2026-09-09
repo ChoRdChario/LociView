@@ -2,12 +2,17 @@
 import * as A from '@automerge/automerge';
 import { NativeSha256 } from '../../src/nativeGs/sha256';
 import { parseJsonWithoutDuplicateMembers } from '../../src/core/json';
+import { readFlatAtomicHistory } from './atomic-read';
+import { developmentSourceSeed, sourceKey, developmentSourceLimits } from './development-source';
 
 export { A };
 // The full domain validator is an injected test port; this module owns history.
 export type Doc = A.Doc<Record<string, any>>;
 export const LIMIT = { count: 64, part: 1024 * 1024, metadata: 8 * 1024 * 1024, journal: 256 * 1024 } as const;
 export const FORMAT = 'automerge-js-3.4.1-isolated-probe';
+// Explicit candidate profile for the existing populated development genesis.
+// Not the product empty-collections bootstrap and never inferred from shape.
+export const FLAT_FORMAT = 'automerge-js-3.4.1-flat-isolated-probe';
 export interface Ref { algorithm: 'sha256'; digest: string; byteLength: number; mediaType: string }
 export interface Target {
   identity: { projectId: string; historyEpoch: string; lineageSeed: string };
@@ -100,7 +105,7 @@ export function target(value: any): asserts value is Target {
     value.identity.historyEpoch.length === 36 && /^hep_[0-9a-f]{32}$/.test(value.identity.historyEpoch), 'invalid identity');
   hash(value.identity.lineageSeed);
   const envelope = value.metadataEnvelope; keys(envelope, ['adapter', 'adapterFormatVersion', 'lineageProof']);
-  require(envelope.adapter === 'automerge' && envelope.adapterFormatVersion === FORMAT, 'wrong adapter');
+  require(envelope.adapter === 'automerge' && [FORMAT, FLAT_FORMAT].includes(envelope.adapterFormatVersion), 'wrong adapter');
   keys(envelope.lineageProof, ['kind', 'rootChangeHash']);
   require(envelope.lineageProof.kind === 'automerge-root-change-v1', 'wrong root proof'); hash(envelope.lineageProof.rootChangeHash);
 }
@@ -201,6 +206,22 @@ export function validateRoot(doc: Doc, expected: Target): void {
   target(expected); const all = index(doc); const rootHash = expected.metadataEnvelope.lineageProof.rootChangeHash;
   const root = all.get(rootHash); require(root && root.deps.length === 0, 'root not present');
   require([...all].filter(([, p]) => !p.deps.length).length === 1 && A.getMissingDeps(doc, []).length === 0, 'unrelated root/history');
+  if (expected.metadataEnvelope.adapterFormatVersion === FLAT_FORMAT) {
+    const read = readFlatAtomicHistory(A, doc as A.Doc<{ cells: Record<string, A.ImmutableString> }>,
+      { path: key => [key], value: (_key, text) => text }, developmentSourceLimits);
+    require(read.kind !== 'rejected', 'invalid original flat source');
+    const seed = developmentSourceSeed();
+    for (const key of [sourceKey(['identity']), sourceKey(['developmentRoot'])]) {
+      // Inspect decoded operations too: final-write compaction must not hide a
+      // change-and-restore or an equal assignment within an original change.
+      const writes = [...all.values()].flatMap(p => A.decodeChange(p.bytes).ops.filter(op => op.key === key)
+        .map(op => ({ op, root: p === root })));
+      require(writes.length === 1 && writes[0]!.root && writes[0]!.op.action === 'set' &&
+        writes[0]!.op.value === seed[key], 'immutable flat identity/declaration');
+    }
+    require(same(JSON.parse(seed[sourceKey(['identity'])]!), expected.identity), 'wrong flat target identity');
+    return;
+  }
   const bootstrap = A.applyChanges(A.init<Record<string, any>>(), [root!.bytes])[0];
   require(same(JSON.parse(JSON.stringify(bootstrap.identity)), expected.identity) &&
     same(JSON.parse(JSON.stringify(doc.identity)), expected.identity), 'wrong target identity');

@@ -9,6 +9,55 @@ requested. Synthetic two-person model/pin/history and independent Caption/model-
 The scoped PO result below closes only the listed interaction checks; broader
 rendered, IME, device and durable-file acceptance remain pending.
 
+### Completed work — full development source through the durable service (2026-09-10)
+
+Start clean `ca1b723`, five commits ahead of the tracked origin. The preceding
+slice closed the retained journal seam, not the UI goal. This slice connects the
+existing complete flat-cell development source, unchanged command correspondence,
+same-head managed/birth inspection and real temporary CAS reads to that journal.
+
+- [x] Specify and independently check the isolated flat-root profile and composite
+  reader boundary; keep the existing empty-bootstrap profile unchanged.
+- [x] Implement the complete source reader/typed guard sidecar and asynchronous
+  final closure; retain all original changes/operations, including control-only
+  changes, without wrapper genesis or rebasing.
+- [x] Connect original source through Node journal persistence, local edits,
+  interruption/reopen, explicit alternatives and replay. Check actual saved
+  triangle/media bytes, not fixture fallback during reads.
+- [x] Independent diff review, focused and standard regression verification;
+  update current handoff and commit the exact scope.
+
+Reuse existing provider, source encoder, journal and CAS ports. No new probe/UI,
+ordinary entry, Native converter, dependency, adopted schema/wire, PWA or release.
+The new explicit candidate profile does not satisfy the product empty-bootstrap
+contract in 02 §4. Stop real-data activation at that adoption boundary. Human
+testing is unnecessary for this service-only slice; full UI acceptance remains.
+
+Review: source/domain inspection retains the same original heads/operations;
+guard-only changes are empty only in the private validation view. Managed Scene
+alternatives do not become a union. Distinct complete births stay retained with
+only the explicit selected authority exposed, including later text/media. The
+reader uses provider details directly, not the old command projection as display
+authority. It conservatively retains all known immutable body references; this
+does not claim delta I/O, GC, general input profiles or a portable recipe encoder.
+
+Independent review found and closed three concrete gaps: initial publication
+must await full closure/inventory/CAS checks; foundation must be the exact fixed
+genesis rather than a later edited cut; suppressed births must not hide unrelated
+attachment/tag conflicts. Tests cover these within the existing seven service
+cases. Both reviewers confirmed the fixes without a remaining scoped blocker.
+Final isolated typecheck and Vitest 8 files / 135 tests PASS; Node history harness
+10/10 PASS. Root typecheck PASS; `npm test -- --maxWorkers=2` 105 files /
+1,868 PASS and 21 existing TODO; `npm run build` PASS with the existing
+chunk/static-dynamic-import warnings. This is not browser/device/offline evidence.
+Diff whitespace checks PASS. No user-source bytes, production dependency/schema,
+ordinary UI/entry or Service Worker source changed. Usage remains 57%; no pause.
+
+Next: consolidate one finite existing-host activation/approval gap against 05
+§13.4 and the 02/03/06/07 gates, using this executable connection. Do not substitute
+another provider/probe campaign for that decision. Real-file converter, product
+wire/profile and durable UI/device activation remain separate; goal stays active.
+
 ### Completed work — connect prepared migration to retained journal (2026-09-10)
 
 Start clean `b85c68c`. The previous goal turn made progress by correcting the
