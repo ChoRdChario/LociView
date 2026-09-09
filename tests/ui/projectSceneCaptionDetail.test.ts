@@ -24,7 +24,7 @@ function apply(ctx: DetailContext): CaptionApplyPlan {
 }
 function host(initial = context(), document = new RecordedDocument()) {
   const events: CaptionDetailEvent[] = [];
-  let props: CaptionDetailProps = { ...initial, retained: false };
+  let props: CaptionDetailProps = { ...initial };
   const controls = createCaptionDetailControls(document.asDocument(), event => {
     events.push(event);
     if (event.kind === 'draft' && event.baseDraft === props.draft) {

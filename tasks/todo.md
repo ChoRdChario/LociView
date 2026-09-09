@@ -8,7 +8,43 @@ The completed journal Chrome recheck below stays closed; no journal rerun is
 requested. Synthetic two-person model/pin/history and independent Caption/model-copy loops now exist; browser,
 IME and device acceptance remain pending, not implied by its DOM tests.
 
-### Current fix — pin pointer and camera ownership (2026-09-09)
+### Current change — Blender mouse navigation and accumulating windows
+
+PO requests Blender-style camera input and LociMyu-style sequential Caption
+windows: explicit selection opens/keeps each window; users close each with ×.
+Start clean `d0ac27c`. Scope: same development host and shared Scene UI only.
+- [x] Bind MMB orbit, Shift+MMB pan, Ctrl+MMB/wheel zoom; reserve left input for
+  selection/placement and retain the pin/gizmo ownership fix and touch behavior.
+- [x] Make explicit window open accumulate without duplicates; remove redundant
+  retain toggles, keeping close/dismiss/reopen, drafts, order and Scene/actor scope.
+- [x] Verify real Orbit handlers and connected window selection/closure, then
+  required checks/read-only review and current-document alignment.
+The basic mouse bindings follow Blender's official navigation manual. Full Blender
+keymaps, fly/walk, alternate emulation and axis/frame changes are not this slice.
+No dependency/schema/storage/ordinary-entry/release change. Native browser/iPhone
+acceptance remains pending; do not repeat unavailable automation initialization.
+
+Result / review: the development viewport uses the stated mouse bindings in both
+perspective and orthographic views, including after hide/reopen. Left/right drags
+do not navigate; primary pin reservations and gizmo exclusions remain intact.
+Explicit Caption selection accumulates distinct windows. Individual close stays
+dismissed through normal rendering until explicit reopen; front/arrange preserve
+the selected editor and draft. Redundant retain controls are removed. Independent
+read-only review found no concrete blocker; the acceptance is basic navigation,
+not the full Blender keymap or coordinate conventions.
+
+Root/scoped TypeScript PASS; focused 5 files / 43 PASS; full root 105 files /
+1866 PASS / 21 existing TODO. Both builds PASS with existing chunk/import warnings;
+13/9 parsed source maps contain zero candidate/provider modules. Changed served
+modules and dev HTML return HTTP 200 (delivery only). The input tests execute real
+Orbit handlers on an authored event target, with GPU/TransformControls mocked;
+no native browser, raster, iPhone, offline/PWA or storage acceptance is claimed.
+Existing history/candidate evidence is reused. Current documents and the later
+batched UI instructions match this behavior. Last checked quota 66% remains.
+No push/release. Next boundary remains the connected workflow and its outstanding
+native usability evidence, not another journal/probe campaign.
+
+### Previous fix — pin pointer and camera ownership (2026-09-09)
 
 PO reports primary placement clicks becoming camera operations, including
 Shift+click. Start clean `54394b3`; repair this input conflict before the pending

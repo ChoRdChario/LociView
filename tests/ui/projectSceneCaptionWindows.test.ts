@@ -17,8 +17,9 @@ function run(memory: CaptionWindowMemory, selected: string | null, intent: Capti
 describe('disconnected comparison window STATE, not a floating renderer', () => {
   it('retains multiple exact IDs, deduplicates the selected follower and separates front order from selection', () => {
     let memory = newCaptionWindowMemory(sceneA); const selected = a;
-    memory = run(memory, selected, { kind: 'retain', captionId: a });
-    memory = run(memory, selected, { kind: 'retain', captionId: b });
+    memory = run(memory, selected, { kind: 'open', captionId: a });
+    memory = run(memory, b, { kind: 'open', captionId: b });
+    memory = run(memory, b, { kind: 'open', captionId: b });
     expect(captionWindowView(source, memory, selected).visibleIds).toEqual([a, b]);
     memory = run(memory, selected, { kind: 'front', captionId: a });
     expect(captionWindowView(source, memory, selected).visibleIds).toEqual([b, a]);

@@ -39,7 +39,7 @@ describe('connected synthetic development host (not rendered, storage or TEAM-FL
     expect(stage.contains(label(root, 'ピンの追加・移動'))).toBe(true);
     expect(stage.contains(label(root, 'ピンの操作'))).toBe(true);
     expect(sidebar.contains(label(root, 'キャプションの詳細'))).toBe(true);
-    expect(sidebar.contains(button(root, '比較に残す'))).toBe(true);
+    expect(sidebar.contains(button(root, 'ウィンドウを表示'))).toBe(true);
     const numeric = by(root, n => n.className === 'lv-development-numeric');
     expect(numeric.tag).toBe('details'); expect(numeric.hidden).toBe(true);
     expect(stage.contains(label(root, 'キャプションの詳細'))).toBe(false);
@@ -144,7 +144,7 @@ describe('connected synthetic development host (not rendered, storage or TEAM-FL
   it('discloses unsaved and unconnected capabilities rather than reporting a fake product success', () => {
     const document = new RecordedDocument(), workspace = createDevelopmentWorkspace(document.asDocument()), root = record(workspace.root);
     find(workspace.session, { kind: 'select', captionId: f.shared }); workspace.render();
-    expect(button(root, 'ウィンドウを表示').disabled).toBe(false); expect(button(root, '比較に残す').disabled).toBe(false);
+    expect(button(root, 'ウィンドウを表示').disabled).toBe(false);
     button(root, 'ウィンドウを表示').fire('click'); expect(workspace.session.message).toBe('');
     const text = descendants(root).map(n => n.textContent).join('\n');
     expect(text).toContain('再読み込みで失われます'); expect(text).toContain('3D表示は未接続です。シーンの構成と座標入力を確認できます。');

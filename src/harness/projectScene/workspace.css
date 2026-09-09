@@ -84,15 +84,13 @@
 .lv-development-stage { overflow-y: auto; }
 .lv-development-sidebar > .lv-development-pending-panel { overflow-y: auto; min-height: 0; }
 .lv-caption-windows { position: absolute; inset: 0; pointer-events: none; }
-.lv-caption-window { position: absolute; display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; box-sizing: border-box; pointer-events: auto; background: #f2f0ee; border: 1px solid #817c78; box-shadow: 0 2px 6px #312f2d26; }
+.lv-caption-window { position: absolute; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; box-sizing: border-box; pointer-events: auto; background: #f2f0ee; border: 1px solid #817c78; box-shadow: 0 2px 6px #312f2d26; }
 .lv-caption-window > header { display: flex; min-width: 0; border-bottom: 1px solid #b7b1aa; }
 .lv-caption-window > header > button { border: 0; background: transparent; }
 .lv-caption-window > header > button:last-child { flex: 0 0 44px; font-size: 20px; }
 .lv-caption-window .lv-caption-window-title { flex: 1; min-width: 0; padding: 8px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; cursor: move; touch-action: none; }
 .lv-caption-window-body { overflow: auto; padding: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .lv-caption-window-note { padding: 4px 8px; font-size: 12px; }
-.lv-caption-window > button { border-width: 1px 0 0; }
-.lv-caption-window > button[aria-pressed="true"] { background: #dedad4; box-shadow: inset 3px 0 #413d39; }
 .lv-caption-window-line { position: absolute; height: 1px; background: #635e58; transform-origin: 0 0; pointer-events: none; }
 .lv-caption-window-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .lv-caption-window-tools select { max-width: 220px; }

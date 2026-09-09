@@ -93,6 +93,41 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance', () => {
+  it.each(['perspective', 'orthographic'] as const)('uses Blender basic mouse navigation with actual Orbit (%s)', projection => {
+    tracker.realOrbit = true;
+    const canvas = fakeCanvas(); controlEventTarget(canvas.canvas as unknown as HTMLCanvasElement);
+    const v = createSyntheticViewport(canvas.canvas as unknown as HTMLCanvasElement, () => {});
+    v.update(syntheticDisplay(createSyntheticProject(), f.overview, null, null)); v.setActive(true);
+    v.camera({ kind: 'projection', projection });
+    const orbit = tracker.controls.at(-1), camera = orbit.object as THREE.PerspectiveCamera | THREE.OrthographicCamera;
+    let starts = 0; orbit.addEventListener('start', () => starts++);
+    const pointer = { pointerId: 1, pointerType: 'mouse', isPrimary: true, button: 1,
+      clientX: 400, clientY: 300, pageX: 400, pageY: 300, preventDefault() {} };
+    const drag = (modifiers: object) => {
+      canvas.canvas.fire('pointerdown', { ...pointer, ...modifiers });
+      canvas.canvas.fire('pointermove', { ...pointer, clientX: 430, clientY: 320, ...modifiers });
+      canvas.canvas.fire('pointerup', { ...pointer, ...modifiers });
+    };
+    const initial = camera.position.clone(), initialTarget = orbit.target.clone();
+    drag({ button: 0 }); drag({ button: 2 });
+    expect(starts).toBe(0); expect(camera.position).toEqual(initial); expect(orbit.target).toEqual(initialTarget);
+    drag({}); expect(starts).toBe(1); expect(camera.position).not.toEqual(initial);
+    expect(orbit.target).toEqual(initialTarget); expect(camera.position.distanceTo(orbit.target)).toBeCloseTo(initial.distanceTo(initialTarget), 10);
+    const rotated = camera.position.clone();
+    drag({ shiftKey: true }); expect(starts).toBe(2); expect(orbit.target).not.toEqual(initialTarget);
+    const delta = camera.position.clone().sub(rotated), targetDelta = orbit.target.clone().sub(initialTarget);
+    delta.toArray().forEach((n, i) => expect(n).toBeCloseTo(targetDelta.toArray()[i]!, 10));
+    const zoomMeasure = () => projection === 'orthographic' ? camera.zoom : camera.position.distanceTo(orbit.target);
+    const pannedTarget = orbit.target.clone(), beforeZoom = zoomMeasure();
+    drag({ ctrlKey: true }); expect(starts).toBe(3); expect(zoomMeasure()).not.toBe(beforeZoom);
+    expect(orbit.target.distanceTo(pannedTarget)).toBeLessThan(1e-10);
+    const beforeWheel = zoomMeasure();
+    canvas.canvas.fire('wheel', { deltaY: -100, deltaMode: 0, ctrlKey: false, clientX: 400, clientY: 300, preventDefault() {} });
+    expect(starts).toBe(4); expect(zoomMeasure()).not.toBe(beforeWheel); expect(orbit.target.distanceTo(pannedTarget)).toBeLessThan(1e-10);
+    const beforeHide = v.capture!(); v.setActive(false); v.setActive(true);
+    expect(tracker.controls.at(-1).mouseButtons).toEqual({ MIDDLE: THREE.MOUSE.ROTATE });
+    expect(v.capture!()).toEqual(beforeHide); v.dispose();
+  });
   it.each([false, true])('reserves placement before actual Orbit starts (Shift=%s), including tiny movement and cancellation', async shifted => {
     tracker.realOrbit = true;
     const doc = new RecordedDocument(), s = new SyntheticSession(); let v: ReturnType<typeof createSyntheticViewport>;
@@ -132,7 +167,7 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     const g = tracker.gizmos.at(-1); v!.setPinPointerActive!(true); g.dragging = true; g.dragging = false;
     expect(orbit.enabled).toBe(false); v!.setPinPointerActive!(false); expect(orbit.enabled).toBe(true);
     control(labeled(root, 'ピンの操作'), '取り消す').fire('click'); control(root, '操作を取り消す').fire('click');
-    const cameraPointer = { ...pointer, shiftKey: false };
+    const cameraPointer = { ...pointer, button: 1, shiftKey: false };
     canvas.fire('pointerdown', cameraPointer); expect(starts).toBe(1);
     canvas.fire('pointermove', { ...cameraPointer, clientX: 430 }); canvas.fire('pointerup', cameraPointer);
     expect(orbit.object.position.toArray()).not.toEqual(cameraPosition); expect(s.snapshot).toBe(original); w.dispose();
@@ -417,6 +452,9 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     expect(workspace.session.displayReady).toBe(true);
     expect(descendants(root).some(n => n.textContent.startsWith('3D描画・ピン配置は未接続'))).toBe(false);
     control(stage, '設備の確認箇所').fire('click'); expect(workspace.session.memory.selectedCaptionId).toBe(f.shared);
+    const pin = (id: string) => descendants(stage).find(n => n.className === 'lv-development-pin' && n.textContent === id)!;
+    pin('入口の記録').fire('click'); expect(workspace.session.windowMemory.retained).toEqual([f.shared, f.second]);
+    pin('設備の確認箇所').fire('click'); expect(workspace.session.windowMemory.retained).toEqual([f.shared, f.second]);
     control(root, '全体表示').fire('click'); expect(actions).toEqual([{ kind: 'fit' }]);
     control(root, '視点').fire('click'); control(root, '+Y').fire('click'); expect(actions.at(-1)).toEqual({ kind: 'axis', axis: '+y' });
     dragging = true; notified(); expect(labeled(root, 'シーン').disabled).toBe(true); expect(control(root, '全体表示').disabled).toBe(true);

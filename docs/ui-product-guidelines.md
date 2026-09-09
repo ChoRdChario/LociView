@@ -198,10 +198,21 @@ be hidden behind a generic menu.
 
 Floating Caption windows are view aids on the 3D stage, connected to their pins
 when a connector is meaningful. They do not replace the list as the selection
-authority. Multiple retained windows may coexist for comparison; the user can
-bring one forward or arrange them without altering Project data. Use the familiar
+authority. Explicit selection opens and retains each window by default; selecting
+the next Caption does not replace earlier windows. Re-selecting an open Caption
+brings the same window forward without duplicates. No separate retain action is
+required. Users close windows individually; refresh does not reopen a dismissed
+window, but an explicit re-selection/open does. The user can bring one forward or
+arrange them without altering Project data. Use the familiar
 `×` for closing, with an accessible name. Do not repeat `選択中 01` when the list
 highlight and window title already convey the same state.
+
+The PO-specified Desktop camera uses Blender's basic mouse bindings: middle-button
+drag orbits, Shift+middle pans, and wheel/Ctrl+middle zooms. Left-button input is
+reserved for selection/placement, including Shift+left for pin addition. Keep
+existing touch alternatives and explicit view controls; do not imply full Blender
+keymap, frame conventions, fly/walk or input-emulation support. Reference:
+[Blender navigation](https://docs.blender.org/manual/en/5.0/editors/3dview/navigate/navigation.html).
 
 ## 6. Decision-load policy
 

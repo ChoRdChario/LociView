@@ -94,7 +94,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     // Refresh every mounted recipient even while hidden; never unmount an editor to change tabs.
     const captionContext = session.captionContext();
     const detailOkay = detail.render({ ...session.detailContext(),
-      retained: session.windowMemory.retained.includes(session.memory.selectedCaptionId ?? ''), windowBlock: null });
+      windowBlock: null });
     const listOkay = list.render(captionContext);
     const modelsOkay = modelList.render(session.modelContext());
     const materialOkay = material.render(session.materialContext());

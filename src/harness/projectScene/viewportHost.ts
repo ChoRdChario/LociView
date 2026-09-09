@@ -72,7 +72,10 @@ export function createViewportHost(document: Document, session: SyntheticSession
     }
     changed();
   });
-  view.root.append(author.root);
+  const cameraHelp = document.createElement('details'), cameraHelpTitle = document.createElement('summary'), cameraHelpText = document.createElement('p');
+  cameraHelpTitle.textContent = 'カメラ操作';
+  cameraHelpText.textContent = '回転：中央ボタンドラッグ。平行移動：Shift＋中央ボタンドラッグ。ズーム：ホイール／Ctrl＋中央ボタンドラッグ。';
+  cameraHelp.append(cameraHelpTitle, cameraHelpText); view.root.append(cameraHelp, author.root);
   const windows = createCaptionWindowControls(document, plan => {
     const accepted = session.acceptWindow(plan); changed(); return accepted;
   }, active => { session.setWindowDragging(active); changed(); }, captionId => createMediaGallery(document, () => session.snapshot, captionId));

@@ -66,7 +66,7 @@ export function planCaptionWindow(source: CaptionListSource, memory: CaptionWind
       Object.freeze({ captionId: id, rect: Object.freeze({ ...intent.rect }) })]) });
   }
   return change({ order: Object.freeze(atFront(memory.order, id)),
-    retained: intent.kind === 'retain' ? Object.freeze([...new Set([...memory.retained, id])]) : memory.retained,
+    retained: intent.kind === 'retain' || intent.kind === 'open' ? Object.freeze([...new Set([...memory.retained, id])]) : memory.retained,
     dismissed: intent.kind === 'front' ? memory.dismissed : Object.freeze(memory.dismissed.filter(item => item !== id)) });
 }
 export function captionWindowPlanIsCurrent(plan: CaptionWindowPlan, source: CaptionListSource,

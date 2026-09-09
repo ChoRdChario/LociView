@@ -28,7 +28,7 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
   tools.append(label, arrange, status);
   type Card = { root: HTMLElement; title: HTMLButtonElement; body: HTMLElement; note: HTMLElement;
     content?: ReturnType<NonNullable<typeof content>>;
-    retain: HTMLButtonElement; close: HTMLButtonElement; line: HTMLElement; rect: WindowRect; initial: WindowRect; cleanups: (() => void)[] };
+    close: HTMLButtonElement; line: HTMLElement; rect: WindowRect; initial: WindowRect; cleanups: (() => void)[] };
   const cards = new Map<string, Card>();
   const initialPositions = new Map<string, Map<string, WindowRect>>();
   let context: WindowContext | null = null, projection: WindowProjection = { ready: false, width: 0, height: 0, pins: [] };
@@ -52,21 +52,20 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
     let positions = initialPositions.get(scope); if (!positions) { positions = new Map(); initialPositions.set(scope, positions); }
     const initial = positions.get(id) ?? { left: 16 + positions.size * 32, top: 16 + positions.size * 28, width: 280, height: 200 };
     positions.set(id, initial);
-    const node = make('section'), header = make('header'), title = button(''), close = button('×'), retain = button('比較に残す');
+    const node = make('section'), header = make('header'), title = button(''), close = button('×');
     node.className = 'lv-caption-window'; close.setAttribute('aria-label', '閉じる');
     title.className = 'lv-caption-window-title'; title.title = 'ドラッグまたは矢印キーで移動。Escで取り消し';
     const body = make('div'), scroll = make('div'), note = make('p'), line = make('div'), extension = content?.(id);
     body.className = 'lv-caption-window-text'; scroll.className = 'lv-caption-window-body'; note.className = 'lv-caption-window-note';
     scroll.append(body); if (extension) scroll.append(extension.root);
     line.className = 'lv-caption-window-line'; line.setAttribute('aria-hidden', 'true');
-    header.append(title, close); node.append(header, scroll, note, retain); root.append(line, node);
-    const card: Card = { root: node, title, body, note, close, retain, line,
+    header.append(title, close); node.append(header, scroll, note); root.append(line, node);
+    const card: Card = { root: node, title, body, note, close, line,
       rect: initial, initial, cleanups: [], content: extension };
     const listen = (element: HTMLElement, type: string, fn: (event: Event) => void) => {
       element.addEventListener(type, fn); card.cleanups.push(() => element.removeEventListener(type, fn));
     };
     listen(close, 'click', () => apply({ kind: 'close', captionId: id }));
-    listen(retain, 'click', () => apply({ kind: context?.memory.retained.includes(id) ? 'release' : 'retain', captionId: id }));
     listen(title, 'click', () => apply({ kind: 'front', captionId: id }));
     listen(title, 'keydown', event => {
       const e = event as KeyboardEvent;
@@ -134,8 +133,8 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
       card.content?.render();
       card.note.textContent = item.pin === 'needsReview' ? 'ピン位置の確認が必要です。' : item.pin === 'ownerHidden' ? 'モデルは非表示です。' :
         item.pin === 'unavailable' ? 'ピンの状態を確認してください。' : '';
-      card.note.hidden = !card.note.textContent; card.retain.setAttribute('aria-pressed', String(next.memory.retained.includes(id)));
-      card.close.disabled = card.retain.disabled = Boolean(drag);
+      card.note.hidden = !card.note.textContent;
+      card.close.disabled = Boolean(drag);
     }
     const key = JSON.stringify(view.visibleIds.map(id => [id, cards.get(id)?.title.textContent]));
     if (key !== optionKey) {

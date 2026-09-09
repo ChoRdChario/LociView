@@ -31,12 +31,14 @@ function mountedLayer() {
 }
 
 describe('same-host comparison windows; authored DOM only, not raster or native input', () => {
-  it('opens from selected detail, retains both, closes without selection/draft loss and explicitly reopens', () => {
+  it('accumulates consecutive selections without a retain action, closes independently and explicitly reopens', () => {
     const doc = new RecordedDocument(), workspace = createDevelopmentWorkspace(doc.asDocument()), root = record(workspace.root), s = workspace.session;
     const original = s.snapshot; select(s, f.shared); workspace.render();
-    const detail = named(root, 'キャプションの表示'); button(detail, '比較に残す').fire('click');
-    select(s, f.second); workspace.render(); button(detail, '比較に残す').fire('click');
+    const detail = named(root, 'キャプションの表示');
+    select(s, f.second); workspace.render();
     expect(visible(s)).toEqual([f.shared, f.second]);
+    select(s, f.second); workspace.render(); expect(visible(s)).toEqual([f.shared, f.second]);
+    expect(descendants(root).some(n => n.textContent === '比較に残す')).toBe(false);
     const windows = named(root, 'キャプションのウィンドウ'), shared = named(windows, '設備の確認箇所');
     const retry = button(root, '3D表示を再試行'); expect(windows.contains(retry)).toBe(false);
     expect(named(root, '3D表示').contains(retry)).toBe(false); // Recovery is outside every floating overlap.
@@ -47,6 +49,7 @@ describe('same-host comparison windows; authored DOM only, not raster or native 
     button(named(windows, '入口の記録'), '×').fire('click'); workspace.render();
     expect(visible(s)).toEqual([f.shared]); expect(s.memory.selectedCaptionId).toBe(f.second); expect(s.detailContext().draft).toBe(draft);
     expect(s.snapshot).toBe(original);
+    workspace.render(); expect(visible(s)).toEqual([f.shared]);
     select(s, f.second); workspace.render(); // Same-row explicit selection reopens without changing the draft.
     expect(visible(s)).toContain(f.second); expect(s.detailContext().draft).toBe(draft);
     button(named(windows, '入口の記録'), '×').fire('click'); button(detail, 'ウィンドウを表示').fire('click');
@@ -57,7 +60,7 @@ describe('same-host comparison windows; authored DOM only, not raster or native 
   });
 
   it('separates front order from position, retains stable body nodes/scroll and only clamps display on resize', () => {
-    const h = mountedLayer(); h.pick(f.shared); button(named(h.root, '設備の確認箇所'), '比較に残す').fire('click'); h.pick(f.second);
+    const h = mountedLayer(); h.pick(f.shared); h.pick(f.second);
     const a = named(h.root, '設備の確認箇所'), b = named(h.root, '入口の記録');
     const position = (n: RecordedNode) => [n.style.left, n.style.top]; const first = position(a), second = position(b);
     const body = a.children.find(n => n.className === 'lv-caption-window-body')!; body.scrollTop = 90;
@@ -75,7 +78,7 @@ describe('same-host comparison windows; authored DOM only, not raster or native 
   });
 
   it('retains text under filters/review/unavailable membership and never invents connectors or conflict winners', () => {
-    const h = mountedLayer(); h.pick(f.shared); const card = named(h.root, '設備の確認箇所'); button(card, '比較に残す').fire('click');
+    const h = mountedLayer(); h.pick(f.shared); const card = named(h.root, '設備の確認箇所');
     const line = h.root.children.find(n => n.className === 'lv-caption-window-line')!; expect(line.hidden).toBe(false);
     const memory = h.session.windowMemory;
     h.session.acceptList(planCaptionList(h.session.captionContext(), { kind: 'search', query: '見つからない語' }));
@@ -96,7 +99,7 @@ describe('same-host comparison windows; authored DOM only, not raster or native 
 
   it('keeps Scene/actor memories independent and cancels/rejects interrupted or stale moves', () => {
     const h = mountedLayer(), s = h.session; h.pick(f.shared); const card = named(h.root, '設備の確認箇所'), title = button(card, '設備の確認箇所');
-    button(card, '比較に残す').fire('click'); const snapshot = s.snapshot;
+    const snapshot = s.snapshot;
     const event = { button: 0, pointerId: 7, clientX: 50, clientY: 50, preventDefault() {} };
     title.fire('pointerdown', event); expect(s.pending).toBe('window'); expect(go(s, f.detail)).toBe(false);
     expect(s.modelContext().pending).toBe('window'); expect(s.pinContext().otherPending).toBe('window');
@@ -107,11 +110,12 @@ describe('same-host comparison windows; authored DOM only, not raster or native 
     const remembered = s.windowMemory; expect(remembered.placements[0]?.rect.left).toBe(116); expect(s.snapshot).toBe(snapshot);
     const stale = planCaptionWindow(s.captionContext().source, remembered, f.shared, { kind: 'close', captionId: f.shared });
     const reselection = planCaptionList(s.captionContext(), { kind: 'select', captionId: f.shared });
-    expect(go(s, f.detail)).toBe(true); h.render(); h.pick(f.shared); expect(s.windowMemory.retained).toHaveLength(0);
+    expect(go(s, f.detail)).toBe(true); h.render(); h.pick(f.shared); expect(s.windowMemory.retained).toEqual([f.shared]);
     expect(s.acceptWindow(stale)).toBe(false); expect(s.acceptList(reselection)).toBe(false);
     expect(go(s, f.overview)).toBe(true); h.render(); h.project(); expect(s.windowMemory).toBe(remembered);
     expect(named(h.root, '設備の確認箇所').style.left).toBe('116px');
-    const other = new SyntheticSession(); select(other, f.shared); expect(other.windowMemory.retained).toHaveLength(0); expect(other.windowMemory.placements).toHaveLength(0);
+    const other = new SyntheticSession(); expect(other.windowMemory.retained).toHaveLength(0);
+    select(other, f.shared); expect(other.windowMemory.retained).toEqual([f.shared]); expect(other.windowMemory.placements).toHaveLength(0);
     h.layer.dispose(); expect(s.pending).toBeNull();
   });
 });

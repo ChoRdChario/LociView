@@ -1251,6 +1251,22 @@ Acceptance reuses current session/history/window tests and adds handle transform
 cancel/stale/Orbit lifetime, shortcut and layout-ownership checks. CPU/DOM evidence
 is not native rendering/touch/IME acceptance. No new files/storage/profile gate.
 
+**PO navigation/window amendment (from `d0ac27c`):** in this same development
+host, use Blender's basic Desktop bindings: MMB orbit, Shift+MMB pan and wheel /
+Ctrl+MMB zoom. Left/right mouse drags do not move the camera; left/Shift+left
+remain available for explicit selection/placement, with existing reservation and
+gizmo ownership. Preserve touch input and camera/frame/storage semantics. Other
+Blender navigation/keymap modes are not claimed by this bounded change.
+Explicit Caption selection/open now retains that window in the existing local
+Scene/actor memory. Subsequent selections accumulate windows, not duplicates;
+no additional comparison-retain action is needed. × removes only that window
+and records dismissal; refresh never reopens it. Explicit re-selection/open may
+reopen it. Remove redundant retain toggles from this UI, preserving order,
+placement, draft isolation, suppressed membership and stale-plan checks.
+This supersedes the earlier follower/opt-in-retain presentation in §13.4; no
+Project data/history changes. Regress actual Orbit handlers plus connected list/
+pin open, multiple windows, independent close and explicit reopen.
+
 Observed PO correction: provisional translation handles, explicit-model
 Shift+click addition and near-stage action/right-detail ownership are connected.
 CPU/mounted checks cover the single world-to-asset transform, Orbit exclusion,

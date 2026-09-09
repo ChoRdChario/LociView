@@ -29,6 +29,14 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
   function syncOrbit(manipulating = Boolean(gizmo?.dragging)) {
     if (controls) controls.enabled = !pinPointerActive && !manipulating;
   }
+  const mouseNavigation = (event: PointerEvent) => {
+    if (!controls || event.pointerType === 'touch' || event.button !== 1) return;
+    // Configure before Orbit's down handler. Shift+ROTATE is its screen-space pan.
+    controls.mouseButtons.MIDDLE = event.altKey || event.metaKey || (event.ctrlKey && event.shiftKey)
+      ? undefined : event.ctrlKey ? THREE.MOUSE.DOLLY : THREE.MOUSE.ROTATE;
+    event.preventDefault(); // Do not start the browser's middle-button autoscroll.
+  };
+  canvas.addEventListener('pointerdown', mouseNavigation, true);
   const errorText = (e: unknown) => e instanceof Error ? e.message : '3D表示を開始できません。';
   function observePose() {
     if (!camera || !controls) return;
@@ -120,6 +128,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
         return [p.x, p.y, p.z].every(Number.isFinite) && proposePin(target, [p.x || 0, p.y || 0, p.z || 0]);
       }, busy => { syncOrbit(busy); serial++; if (!applying) changed(); }) : null;
       controls = new OrbitControls(camera, canvas); controls.enableDamping = false; controls.target.copy(target);
+      controls.mouseButtons = { MIDDLE: THREE.MOUSE.ROTATE };
       controls.addEventListener('start', () => { dragging = true; serial++; changed(); });
       controls.addEventListener('end', () => { dragging = false; observePose(); serial++; changed(); });
       controls.addEventListener('change', () => {
@@ -235,6 +244,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
       poses.set(display.sceneId, pose); backgrounds.set(display.sceneId, background); notice = null; serial++; changed();
     },
     retry() { if (contextLost) throw new Error('描画環境の復旧を待って再試行してください。'); release(); issue = null; ensure(); },
-    dispose() { disposed = true; release(); resize.disconnect(); canvas.removeEventListener('webglcontextlost', lost); canvas.removeEventListener('webglcontextrestored', restored); },
+    dispose() { disposed = true; release(); resize.disconnect(); canvas.removeEventListener('pointerdown', mouseNavigation, true);
+      canvas.removeEventListener('webglcontextlost', lost); canvas.removeEventListener('webglcontextrestored', restored); },
   };
 };

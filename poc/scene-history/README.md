@@ -254,7 +254,10 @@ this remains numeric fixture placement, not geometry picking or a gizmo test.
 
 Extend that same later batch with visible-model/pin checks, not a new probe:
 use `全体表示`, six directions and perspective/orthographic controls in `視点`;
-orbit/zoom, switch Scene or actor and return to check retained pose. Select a 3D
+use middle-button drag to orbit, Shift+middle to pan, and wheel/Ctrl+middle to
+zoom (Blender basic mouse bindings). Left/right drags do not move the camera;
+Shift+left remains pin addition. `視点` → `カメラ操作` also shows these bindings.
+Switch Scene or actor and return to check retained pose. Select a 3D
 pin and verify right-list selection; direct color filters hide only matching
 pins without losing the selected Caption or changing camera fit. Model movement
 must follow its binding; its original Captions stay on the original after a
@@ -262,8 +265,9 @@ copy. A single-sided triangle legitimately disappears edge-on/from behind.
 If a real drawing failure occurs, metadata must remain and recovery must be
 explicit. Do not force context loss or treat object/DOM tests as raster evidence.
 
-In that same batch, use `比較に残す` near the top of the right `キャプション`
-area on one Caption, select another and retain it.
+In that same batch, select one Caption and then another through the list or 3D
+pins. Both windows remain without an additional retain action. Re-selecting the
+same Caption brings its existing window forward, not a duplicate.
 Both confirmed texts should remain; bringing a window forward must not change
 the right-list selection or its position. `×` closes only that window; refresh
 must not reopen it, while explicit selection or `ウィンドウを表示` does. Move a

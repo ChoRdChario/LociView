@@ -83,6 +83,12 @@
 > The host now reserves primary placement sequences before Orbit starts and
 > combines that reservation with gizmo activity. Actual Orbit handler regressions
 > cover both entry paths; native-input/raster acceptance remains pending.
+> Latest PO behavior change: the development camera now uses Blender basic mouse
+> bindings (MMB orbit, Shift+MMB pan, wheel/Ctrl+MMB zoom); left input stays with
+> selection/pin placement. Explicit Caption selection accumulates open windows
+> by default. Redundant retain toggles are removed; × closes each independently,
+> refresh does not reopen it, and explicit selection/open does. No full Blender
+> keymap/frame equivalence, native-input or device acceptance is implied.
 > One finite correction, not a guard campaign; real storage retains its gates.
 > Windows Computer Use initialized but stopped automatically on unsafe-to-resolve
 > Chrome URL; no browser input/PASS or bypass. Keep the existing batched UI lane.

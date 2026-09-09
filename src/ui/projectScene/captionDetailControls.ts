@@ -9,7 +9,6 @@ export type CaptionDetailEvent = CaptionApplyPlan |
   Readonly<{ kind: 'review'; captionId: string; field: CaptionEditField; token: string }> |
   Readonly<{ kind: 'window'; captionId: string; sceneId: string; token: string; action: 'open' | 'retain' | 'release' }>;
 export interface CaptionDetailProps extends DetailContext {
-  readonly retained: boolean;
   /** Host capability boundary, not a failed command or a change to the Caption. */
   readonly windowBlock?: string | null;
 }
@@ -75,12 +74,12 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
       draft: editCaptionDraft(props.draft, props.source, 'color', picker.value) });
   });
   const actions = make('div'); actions.className = 'lv-caption-detail-actions';
-  const apply = button('変更を適用'), cancel = button('取り消す'), showWindow = button('ウィンドウを表示'), retain = button('比較に残す');
+  const apply = button('変更を適用'), cancel = button('取り消す'), showWindow = button('ウィンドウを表示');
   const windowActions = make('div'); windowActions.className = 'lv-caption-detail-actions';
   windowActions.setAttribute('aria-label', 'キャプションの表示');
-  actions.append(apply, cancel); windowActions.append(showWindow, retain); root.append(actions, windowActions);
+  actions.append(apply, cancel); windowActions.append(showWindow); root.append(actions, windowActions);
   const windowNote = make('p'); windowNote.id = `lv-caption-windows-${++nextDetail}`;
-  showWindow.setAttribute('aria-describedby', windowNote.id); retain.setAttribute('aria-describedby', windowNote.id);
+  showWindow.setAttribute('aria-describedby', windowNote.id);
   const confirmation = make('div'); confirmation.hidden = true;
   const confirm = button('変更を取り消す'), keep = button('編集を続ける');
   confirmation.append(make('p', '入力中の変更を取り消しますか？'), confirm, keep); root.append(confirmation);
@@ -104,7 +103,6 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
       sceneId: props.source.sceneId, token: props.source.token, action });
   };
   listen(showWindow, 'click', () => windowEvent('open'));
-  listen(retain, 'click', () => windowEvent(props?.retained ? 'release' : 'retain'));
 
   function render(next: CaptionDetailProps): boolean {
     if (disposed) return false;
@@ -151,7 +149,6 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
     cancel.disabled = !hasCaptionDraft(owned) || Boolean(owned?.composing) || inFlight;
     windowNote.textContent = next.windowBlock ?? ''; windowNote.hidden = next.windowBlock == null;
     showWindow.disabled = source.kind !== 'ready' || next.windowBlock != null;
-    retain.disabled = source.kind !== 'ready' || next.windowBlock != null; retain.setAttribute('aria-pressed', String(next.retained));
     return true;
   }
   function dispose(): void { disposed = true; for (const cleanup of cleanups) cleanup(); root.remove(); }

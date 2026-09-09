@@ -81,6 +81,10 @@ collapsed. The prior numeric-first UI was not ready for human testing. Native
 input/raster acceptance of this correction is pending; do not repeat the old
 flow or start another provider/component campaign.
 Real Project, storage, package and current-app activation retain their gates.
+Latest PO input defaults: Blender basic mouse navigation (MMB orbit, Shift+MMB
+pan, wheel/Ctrl+MMB zoom) leaves left-button input for selection/placement.
+Explicit Caption selection accumulates open windows; individual × replaces the
+old opt-in retain toggles. No native-input/raster acceptance follows from code.
 
 For a fresh Codex session, read `tasks/handoff.md` after this map and the
 documentation authority index. It records the accepted checkpoint, closed
