@@ -86,7 +86,29 @@ export function developmentCandidateInput(source: HistorySnapshot): ProjectCandi
 /** Author canonical fields BEFORE a candidate change. A null output is an actual field deletion. */
 export function encodeDevelopmentCommands(source: HistorySnapshot | undefined, commands: Readonly<Record<string, string>>): Readonly<Record<string, string | null>> {
   const previous = source ? developmentCommandSnapshot(source) : undefined;
-  if (previous) projectHistory(previewHistory(previous, `preflight:${source!.token}`, commands), previous);
+  if (previous) {
+    const next = projectHistory(previewHistory(previous, `preflight:${source!.token}`, commands), previous);
+    // Check each creation at its original causal parent, never at an aggregate
+    // receive that may already include later Scene memberships or text edits.
+    for (const key of Object.keys(commands)) if (/^caption\/cap_[0-9a-f]{32}\/identity$/.test(key) && !previous.cells[key]) {
+      const id = key.split('/')[1]!, edges = Object.values(next.state.captionMemberships).filter(e => e.resourceId === id);
+      const edge = edges[0], anchor = next.resources.captions[id]?.anchor;
+      const parent = projectHistory(previous), asset = parent.resources.assets[next.captionOwners[id]!.assetId];
+      const projection = asset?.projection;
+      const owners = Object.values(parent.state.assetMemberships).filter(e => e.sceneId === edge?.sceneId && e.resourceId === asset?.id &&
+        (e.lifecycle.kind !== 'value' || e.lifecycle.value.state !== 'deleted'));
+      if (edges.length !== 1 || !edge || previous.cells[`membership/${edge.id}`] || !commands[`membership/${edge.id}`] ||
+        edge.lifecycle.kind !== 'value' || edge.lifecycle.value.state !== 'active' || anchor?.kind !== 'value' || anchor.value.kind !== 'asset' ||
+        projection?.kind !== 'value' || asset?.lifecycle.kind !== 'value' || asset.lifecycle.value.state !== 'active' ||
+        anchor.value.assetFrameId !== projection.value.assetFrameId || anchor.value.authoredAssetRevisionId !== projection.value.revisionId ||
+        !projection.value.anchorCompatibilityIds.includes(anchor.value.authoredAnchorCompatibilityId) ||
+        owners.length !== 1 || owners[0]!.lifecycle.kind !== 'value' || owners[0]!.lifecycle.value.state !== 'active' ||
+        !['title', 'body', 'color', 'anchor'].every(field => commands[`caption/${id}/${field}`] !== undefined) ||
+        encode(object(parse(commands[`caption/${id}/anchor`]!)).hitEvidence ?? null) !== '{"method":"manual"}' ||
+        !Object.values(next.state.assetMemberships).some(e => e.sceneId === edge.sceneId && e.resourceId === next.captionOwners[id]!.assetId &&
+          e.lifecycle.kind === 'value' && e.lifecycle.value.state === 'active')) fail('表示中のモデルと追加先シーンを確認してください。');
+    }
+  }
   const writes: Record<string, string | null> = {};
   const put = (path: string[], v: unknown) => { writes[sourceKey(path)] = encode(v); };
   const once = (path: string[], v: unknown) => {
@@ -111,9 +133,9 @@ export function encodeDevelopmentCommands(source: HistorySnapshot | undefined, c
     } else if (kind === 'asset' && field === 'binding') {
       put(['assetsById', id, 'status'], { kind: 'ready', activeBindingId: text });
     } else if (kind === 'caption') {
-      if (field === 'template') {
+      if (field === 'template' || field === 'identity') {
         const meta = object(parse(text));
-        fields('captionsById', id, { id, lifecycle: { state: 'active', eventId: meta.eventId!, reason: 'conflictResolution' } });
+        fields('captionsById', id, { id, lifecycle: { state: 'active', eventId: meta.eventId!, reason: field === 'identity' ? 'initial' : 'conflictResolution' } });
       } else if (field === 'title' || field === 'body') put(['captionsById', id, field], text);
       else if (field === 'anchor') put(['captionsById', id, 'anchor'], parse(text));
       else if (field === 'color') {

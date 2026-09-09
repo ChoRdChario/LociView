@@ -10,6 +10,32 @@ IME and device acceptance remain pending, not implied by its DOM tests.
 
 ### Current checkpoint / next implementation
 
+New Caption/pin creation is now connected in the same served verified host.
+It uses explicit model / AssetFrame XYZ / surface selection, creates an independent
+Caption and one Scene membership, then opens the editor only after confirmation.
+Cancellation creates nothing; admission failure retains the exact proposal/change
+for retry. New Captions also participate in media, Scene inclusion, independent
+keep-both copies and a second exchange. Captions can be placed on verified model
+copies and moved without rebinding their owner.
+
+Verification: root/scoped TypeScript PASS; root 105 files / 1858 PASS / 21 existing
+TODO; candidate 4 files / 65 PASS, including 8 mounted scenarios. Ordinary/harness
+builds PASS with existing warnings; parsed maps 13/9 have zero candidate/provider
+sources. Independent review found one creation-only missing-evidence path; exact
+manual evidence is now required and its refusal regression passes. Reviewer
+confirmed no remaining bounded-diff blocker. No browser, IME, iPhone, offline/PWA,
+durable storage or adoption PASS. HTTP delivery/transform of the dev entry and
+changed modules succeeds; it is not browser execution. Official quota 69% remains.
+
+Next: connect direct position selection/preview on the existing synthetic 3D
+viewport, reusing this creation/correction/confirmation/retry path. Keep manual
+coordinates as a non-pointer alternative. State exact supported surface/hit and
+gesture boundaries before coding; do not infer a model or rebind a pin. No new
+provider/probe campaign or manual approval hold. Real-file/storage gates remain.
+- [ ] Connect bounded direct viewport position selection and provisional preview.
+
+### Previous checkpoint — async host and new-Caption plan
+
 Completed async host continuation started clean `5b58e4e`, 42 ahead of local tracking (no
 fetch), official remaining quota 71%. Target: switch the existing served pair to
 verified admission and one acknowledgment coordinator for every working edit and
@@ -40,7 +66,7 @@ Existing loopback dev HTML and the changed entry/loader/driver/acknowledgment
 modules return HTTP 200 with the expected HTML/JavaScript types. This is server
 delivery/transform evidence only, not an executed browser or renderer result.
 
-Short meta-audit / next: the dependency on fixture-only display authority is now
+Previous meta-audit / selection: the dependency on fixture-only display authority is now
 removed from the served development loop. The remaining product gap is not more
 provider guards. Use the same host to close the essential, currently disabled
 new-Caption/pin action before interaction polish; carry the verified source and
@@ -49,8 +75,27 @@ fixed checked model/frame evidence, with explicit target/position confirmation;
 do not add a second probe or infer model/source relations. This is the next
 bounded §13.4 implementation, not activation of real files/storage. Record its
 exact command and acceptance before coding; stop on any required contract change.
-- [ ] Connect new Caption/pin creation to the existing host with fresh identity,
+- [x] Connect new Caption/pin creation to the existing host with fresh identity,
   explicit owner/coordinates, one membership and the same verified history/retry.
+
+Completed bounded implementation from clean `f567884` (43 ahead, quota 70%): enable
+the existing add-pin mode using its explicit model selector and AssetFrame XYZ /
+surface controls. This closes new-Caption creation in the same verified pair;
+it does not claim canvas picking or a gizmo. Author a fresh immutable creation
+identity, initial lifecycle, empty title/body, existing neutral pin color and
+anchor plus exactly one current-Scene membership in one command. No fixture
+Caption is a template for a new Caption. Preserve those IDs/bytes through async
+retry; select/open it only after confirmation. Extend known owner/copy validation
+to newly created Captions and exact verified model copies, without relation
+guessing or rewriting original history. See 05 §13.4, new-Caption amendment.
+- [x] Connect creation, explicit cancellation and confirmation to existing controls.
+- [x] Verify creation/edit/exchange, stale/IME/failure/retry and independent copy
+  of the created Caption using existing mounted/service scenarios.
+- [x] Required executable checks, one independent read-only review and aligned
+  current pointers. Reuse provider and closed Chrome evidence; no new probe.
+Next visible gap afterward is direct canvas position selection / preview, not
+another provider audit. Real-file/storage gates and batched native input/render /
+iPhone acceptance remain; stop on contract conflict, new adoption or <10% quota.
 
 Durable/file prerequisites are now named against existing gates (not waived):
 

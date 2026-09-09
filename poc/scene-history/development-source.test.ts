@@ -30,6 +30,32 @@ describe('same-host new synthetic source, exact canonical operations before prov
     expect(input.history.changes.flatMap(c => c.writes.map(w => w.operationId))).toEqual(source.originalAtomicHistory!.changes.flatMap(c => c.writes.map(w => w.operationId)));
     expect(developmentCandidateInput(readDevelopmentSource(A, A.load<typeof doc>(A.save(doc))))).toEqual(input);
   });
+  it('admits creation only as one complete original command with a current explicit owner and one membership', () => {
+    const doc = base(), source = readDevelopmentSource(A, doc), id = `cap_${'9'.repeat(32)}`, edgeId = `scm_${'9'.repeat(32)}`, eventId = `evt_${'9'.repeat(32)}`;
+    const version = syntheticVersions.find(v => v.assetId === fixtureIds.equipment && v.label === '初期モデル')!;
+    const anchor = { kind: 'asset', assetId: version.assetId, assetFrameId: version.projection.assetFrameId,
+      positionAsset: [1, 2, 3], authoredAssetRevisionId: version.projection.revisionId,
+      authoredAnchorCompatibilityId: version.projection.anchorCompatibilityIds[0], hitEvidence: { method: 'manual' } };
+    const edge = { id: edgeId, sceneId: fixtureIds.overview, resourceId: id, orderKey: { kind: 'value', value: 'Z' },
+      lifecycle: { kind: 'value', value: { state: 'active', eventId, reason: 'initial' } } };
+    const changes = { [captionKey(id, 'identity')]: JSON.stringify({ assetId: anchor.assetId, assetFrameId: anchor.assetFrameId, eventId }),
+      [captionKey(id, 'title')]: '', [captionKey(id, 'body')]: '', [captionKey(id, 'color')]: '#a08045',
+      [captionKey(id, 'anchor')]: JSON.stringify(anchor), [membershipKey(edgeId)]: JSON.stringify(edge) };
+    expect(() => encodeDevelopmentCommands(source, changes)).not.toThrow();
+    for (const key of Object.keys(changes)) { const partial = { ...changes }; delete partial[key]; expect(() => encodeDevelopmentCommands(source, partial)).toThrow(); }
+    const secondId = `scm_${'8'.repeat(32)}`;
+    expect(() => encodeDevelopmentCommands(source, { ...changes, [membershipKey(secondId)]: JSON.stringify({ ...edge, id: secondId, sceneId: fixtureIds.detail }) })).toThrow();
+    expect(() => encodeDevelopmentCommands(source, { ...changes, [captionKey(id, 'anchor')]: JSON.stringify({ ...anchor, assetId: fixtureIds.structure }) })).toThrow();
+    const initialCaption = projectHistory(developmentCommandSnapshot(source)).resources.captions[fixtureIds.shared]!;
+    if (initialCaption.anchor.kind !== 'value') throw Error();
+    const initialAnchor = JSON.stringify(initialCaption.anchor.value);
+    expect(() => encodeDevelopmentCommands(source, { ...changes, [captionKey(id, 'anchor')]: initialAnchor })).toThrow();
+    const changedModel = command(A.clone(doc), { [`asset/${version.assetId}/binding`]: syntheticVersions.find(v => v.assetId === version.assetId && v.label === '形状を更新したモデル')!.projection.bindingId });
+    expect(() => encodeDevelopmentCommands(readDevelopmentSource(A, changedModel), changes)).toThrow();
+    const created = command(A.clone(doc), changes), createdSource = readDevelopmentSource(A, created);
+    expect(() => developmentCandidateInput(createdSource)).not.toThrow();
+    expect(() => encodeDevelopmentCommands(createdSource, { [captionKey(id, 'identity')]: changes[captionKey(id, 'identity')]!.replace(eventId, `evt_${'8'.repeat(32)}`) })).toThrow();
+  });
   it('records scalar equal assignments but does not reassign membership identities/order or fixed closure fields', async () => {
     const doc = base(), snapshot = readDevelopmentSource(A, doc), commands = developmentCommandSnapshot(snapshot), project = projectHistory(commands);
     const edge = Object.values(project.state.captionMemberships)[0]!, key = membershipKey(edge.id);

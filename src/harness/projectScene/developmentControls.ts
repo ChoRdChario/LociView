@@ -47,8 +47,8 @@ export function createPinCoordinateControls(document: Document, session: Synthet
     const input = document.createElement('input'); input.type = 'text'; input.inputMode = 'decimal'; input.setAttribute('aria-label', axis);
     label.append(input); root.append(label); return input;
   });
-  const familyLabel = document.createElement('label'); familyLabel.textContent = '補正先の表面';
-  const family = document.createElement('select'); family.setAttribute('aria-label', '補正先の表面'); familyLabel.append(family); root.append(familyLabel);
+  const familyLabel = document.createElement('label'); familyLabel.textContent = 'ピンを置く表面';
+  const family = document.createElement('select'); family.setAttribute('aria-label', 'ピンを置く表面'); familyLabel.append(family); root.append(familyLabel);
   let disposed = false, fingerprint = '', composing: HTMLInputElement | null = null;
   const cleanups: (() => void)[] = [];
   const listen = (node: HTMLElement, type: string, action: () => void) => {

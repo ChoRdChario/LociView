@@ -66,8 +66,11 @@ Caption/model copies through a second exchange. The finite provider connection i
 code/mounted evidence under spec 05 §13.4, not browser/device or adoption credit.
 File/package exchange, durable storage and rendered/device acceptance remain
 pending as recorded in todo.
-The next connected action is new Caption/pin creation, currently disabled in
-this host, with explicit owner/position and the same verified acknowledgment.
+New Caption/pin creation now connects explicit model/AssetFrame coordinates /
+surface confirmation to one fresh Caption/membership and verified acknowledgment.
+It retains cancellation/retry, and new Captions support media, independent copies
+and continuing exchange, including anchors on verified model copies. Direct
+viewport position selection/preview is next; manual coordinates do not prove it.
 Real Project, storage, package and current-app activation retain their gates.
 
 For a fresh Codex session, read `tasks/handoff.md` after this map and the
@@ -97,7 +100,7 @@ For a normal task, read only the target file, its matching tests, and direct imp
 |---|---|
 | `src/core` | IDs, HLC, operation validation, JSONL, reduction, merge, manifest, and `ProjectStore` |
 | `src/domain` | Whole-root record, graph/digest, all-candidate value/reference and exact executable content-evidence inspection; retains unknown values. No complete Project/SceneResources authority, storage, imported-text rewriting or current-entry activation |
-| `src/scene` | Pure Scene command/composition core plus scoped candidate/content provider; core is used by the synthetic host, full provider authority switch still pending (§13.4). No production storage or adoption |
+| `src/scene` | Pure Scene command/composition core plus scoped candidate/content provider, connected to the synthetic host (§13.4). No production storage or adoption |
 | `src/platform` | `WorkspaceFS`, OPFS, memory filesystem, PWA and browser integration |
 | `src/assets` | ZIP/package handling, model asset registration/replacement, GLB optimization, import wizard |
 | `src/io` | CSV, minimal XLSX reader, and legacy LociMyu conversion |

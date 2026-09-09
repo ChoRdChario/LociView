@@ -1147,7 +1147,48 @@ nonblocking visual polish. A required gate/ratification blocks its actual
 activation, not unrelated authorized development. Before such a boundary,
 report the exact missing prerequisite instead of inventing substitute work.
 
-**Current implementation plan — complete provider (from `5225110`):** this is
+**New-Caption connection amendment (from `f567884`):** within this synthetic
+host, the existing add-pin intent uses an explicitly selected, included model
+with a verified projection, AssetFrame XYZ and a chosen current surface class.
+Empty coordinates are not origin defaults. Confirmation authors one fresh
+Caption with explicit immutable creation owner/frame and `initial` lifecycle,
+empty title/body, existing muted gold pin color `#a08045`, an atomic manual
+AssetAnchor and exactly one current-Scene Caption membership. These values are
+authored before original candidate changes, not supplied by a read-time fixture
+template. Existing Captions, model membership and other Scenes do not change.
+The creation sidecar is development command metadata, not a new persisted schema.
+
+Creation and membership are one causal command. Snapshot/target/IME checks and
+the common acknowledgment apply. Cancellation before confirmation creates
+nothing; pending/failure preserves the proposal and exact staged IDs/bytes for
+retry. Only confirmed publication selects/opens the new Caption. Any active
+list filter remains unchanged; report if it hides the new selection. Later edits,
+media, Scene inclusion, explicit conflicts and keep-both copies of that Caption
+must use the same existing paths. Copy lineage may terminate at a declared new
+Caption, never at an invented initial fixture. Known anchor admission uses the
+declared owner/frame and exact known model closure history, including model
+copies, without owner rebinding or coordinate remapping.
+
+Acceptance: create/edit/receive; cancel with no change; stale model, incomplete
+coordinates, IME and failed admission retain work; retry creates one Caption and
+one membership with the same original change; copy the new Caption via explicit
+duplicate-membership review, edit independently and exchange a second time.
+This bounded step is manual coordinate authoring only. Direct viewport picking /
+preview is the next interaction connection. Real files/storage, durable save,
+Native activation, general model admission and browser/device credit are excluded.
+
+Observed bounded result: the source command and mounted host now implement that
+manual-creation path. Original-parent checks require a unique already-included
+model, current frame/revision/class and exact manual evidence; they do not run as
+an aggregate-receive rule that would reject later Scene memberships. Mounted
+actual-candidate tests cover creation/retry/edit/exchange, filters, stale target,
+independent Caption/attachment copy and creation/correction on a model copy.
+Focused refusals cover partial creation, duplicate initial membership, wrong or
+stale owner evidence, missing manual evidence and identity mutation. Read-only
+review cleared the missing-evidence fix. Executed scope is code/mounted only;
+direct viewport picking, browser/IME/device and durable/file gates remain open.
+
+**Historical implementation plan — complete provider (from `5225110`):** this is
 one finite implementation boundary derived from §§13.3/13.4 and specifications
 01/02, not adoption of the candidate, a new wire format, decoder or numeric policy.
 The exit is a complete conflict-aware validated provider connected to this same

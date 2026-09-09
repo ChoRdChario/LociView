@@ -28,6 +28,11 @@ causal cut, including redundant original dependencies and explicit absence.
 asynchronous publication. It retains the confirmed pair while checking, rejects
 permanently malformed source before registering a pending operation, and retries
 transient admission failure with the same staged document/operation bytes.
+The same source now authors new Caption identities/initial lifecycle and one
+initial Scene membership in one original command. Explicit owner/frame/current
+class/manual evidence is checked at its causal parent; later aggregate receives
+may include additional memberships and independent copies. This feeds the existing
+host's add-pin mode with exact retained retry, not a new schema or durable write.
 `development-browser.ts` now initializes this pair before mounting the existing
 development UI. One session acknowledgment coordinator handles all editors and
 team commands, retaining the same draft/plan/IDs until success. Retried admission

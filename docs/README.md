@@ -66,6 +66,12 @@ acknowledgment/retry across editors and team commands. Mounted tests cover two
 rounds, independent Caption/model copies, exact retry and source-based material
 review while rendering stays withheld. This connects C in development scope;
 it does not activate the ordinary UI, real storage, files or adoption.
+New Caption/pin creation now also connects explicit model/coordinates/surface to
+the same verified acknowledgment. Created records support subsequent edits/media,
+independent keep-both copies and continuing exchange; anchors on verified model
+copies remain owned by that model. Direct viewport picking/preview is next, not
+proved by manual coordinate inputs. Current execution counts and remaining gates
+are recorded at the top of todo; no new browser/device/storage credit.
 
 Current scheduling amendment (2026-09-09): specification 05 §13.4 is PO approved
 for a thin connected synthetic development host using the existing core/UI parts.

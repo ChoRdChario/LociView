@@ -64,9 +64,12 @@
 > two rounds, both independent copy types, all editors and duplicate material
 > review without restoring a rendering winner. C now has code/mounted connection
 > evidence; no ordinary UI, GC/save, browser/device or adoption claim. Durable/file
-> prerequisites are named in todo. Next close the same host's disabled new-Caption/
-> pin action using explicit owner/position and verified acknowledgment; do not
-> return to detached guards or activate real storage before its gates.
+> prerequisites are named in todo. New-Caption/pin creation now uses an explicit
+> model, AssetFrame coordinates and surface, creating one membership through the
+> same verified acknowledgment. Cancel/IME/stale/retry, new-Caption independent
+> copies/media/second exchange and pin creation on model copies have code/mounted
+> evidence. Direct canvas picking/preview is next; coordinates are not its proof.
+> No detached guard campaign or real storage activation before its gates.
 > One finite boundary, not new per-record tasks; no additional manual test hold.
 > Windows Computer Use initialized but stopped automatically on unsafe-to-resolve
 > Chrome URL; no browser input/PASS or bypass. Keep the existing batched UI lane.

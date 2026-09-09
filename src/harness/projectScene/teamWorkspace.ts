@@ -239,7 +239,7 @@ export function createTeamWorkspace<F extends WorkingHistoryFactory>(document: D
           description = version ? `${version.label} — 位置 ${version.closure.binding.assetToProject.translation.join(' / ')}` : 'モデル候補を確認';
         }
         if (field === 'anchor') {
-          const anchor = decodeSyntheticAnchor(candidate.value, session.snapshot.captionTemplates[id!]!);
+          const anchor = decodeSyntheticAnchor(candidate.value, session.snapshot.captionOwners[id!]!, session.snapshot.modelVersions);
           if (anchor.kind === 'asset') {
             const version = syntheticVersions.find(v => v.assetId === anchor.assetId && v.projection.revisionId === anchor.authoredAssetRevisionId);
             description = `${session.snapshot.modelNames[anchor.assetId]} — X ${anchor.positionAsset[0]} / Y ${anchor.positionAsset[1]} / Z ${anchor.positionAsset[2]} — ${version?.label ?? '以前のモデル'}`;

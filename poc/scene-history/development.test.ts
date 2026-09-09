@@ -807,7 +807,7 @@ describe('actual pinned candidate connected to synthetic workspace; not browser,
     const before = team.histories[1].read(); actor.value = '0'; actor.fire('change'); button(root, '相手の更新を受け取る').fire('click');
     expect(actor.value).toBe('1'); expect(team.histories[1].read()).toEqual(before);
     expect(button(second, '位置を確定').disabled).toBe(true);
-    const surface = label(position, '補正先の表面'); expect(surface.value).toBe('');
+    const surface = label(position, 'ピンを置く表面'); expect(surface.value).toBe('');
     surface.value = versions[1]!.families[0]!.id; surface.fire('change');
     expect(button(second, '位置を確定').disabled).toBe(false);
     button(second, '位置を確定').fire('click'); expect(position.hidden).toBe(true); expect(actor.disabled).toBe(false);

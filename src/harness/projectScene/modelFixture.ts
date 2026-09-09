@@ -42,18 +42,24 @@ export function versionFromClosure(closure: FixtureModelClosure): SyntheticModel
 }
 
 /** Validate every candidate; an older known class is valid review state, not an automatic rebind. */
-export function decodeSyntheticAnchor(text: string, captionId: string): Anchor {
-  const baseline = initial.resources.captions[captionId]?.anchor;
-  if (baseline?.kind !== 'value' || baseline.value.kind !== 'asset') throw new Error('キャプションの所有モデルを確認してください。');
-  if (text === JSON.stringify(baseline.value)) return baseline.value;
+export function decodeSyntheticAnchor(text: string, owner: string | { readonly assetId: string; readonly assetFrameId: string },
+  versions = syntheticVersions): Anchor {
+  const baseline = typeof owner === 'string' ? initial.resources.captions[owner]?.anchor : undefined;
+  const expected = typeof owner === 'string' ? initial.captionOwners[owner] : owner;
+  if (!expected) throw new Error('キャプションの所有モデルを確認してください。');
+  // Only the two exact original fixture anchors omit authored manual evidence.
+  if (baseline?.kind === 'value' && text === JSON.stringify(baseline.value)) return baseline.value;
+  if (Object.values(initial.resources.captions).some(c => c.anchor.kind === 'value' && c.anchor.value.kind === 'asset' &&
+    c.anchor.value.assetId === expected.assetId && c.anchor.value.assetFrameId === expected.assetFrameId && text === JSON.stringify(c.anchor.value)))
+    return JSON.parse(text) as Anchor;
   const anchor = JSON.parse(text) as Record<string, unknown>;
   const allowed = ['kind', 'assetId', 'assetFrameId', 'positionAsset', 'authoredAssetRevisionId', 'authoredAnchorCompatibilityId', 'hitEvidence'];
   if (!anchor || Object.keys(anchor).length !== allowed.length || Object.keys(anchor).some(key => !allowed.includes(key)) ||
-    anchor.kind !== 'asset' || anchor.assetId !== baseline.value.assetId || anchor.assetFrameId !== baseline.value.assetFrameId ||
+    anchor.kind !== 'asset' || anchor.assetId !== expected.assetId || anchor.assetFrameId !== expected.assetFrameId ||
     !Array.isArray(anchor.positionAsset) || anchor.positionAsset.length !== 3 ||
     anchor.positionAsset.some(n => typeof n !== 'number' || !Number.isFinite(n) || Object.is(n, -0)) ||
     JSON.stringify(anchor.hitEvidence) !== '{"method":"manual"}' ||
-    !syntheticVersions.some(v => v.assetId === anchor.assetId && v.projection.revisionId === anchor.authoredAssetRevisionId &&
+    !versions.some(v => v.assetId === anchor.assetId && v.projection.assetFrameId === anchor.assetFrameId && v.projection.revisionId === anchor.authoredAssetRevisionId &&
       v.families.some(f => f.compatibilityId === anchor.authoredAnchorCompatibilityId)))
     throw new Error('ピンの位置・モデル・表面を確認してください。');
   return freezeSynthetic(anchor) as unknown as Anchor;

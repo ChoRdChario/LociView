@@ -9,7 +9,7 @@ import { projectViewHistory, viewHistorySeed } from './viewHistory';
 import { projectMaterialHistory } from './materialHistory';
 import { mediaSeed, projectMediaHistory } from './mediaHistory';
 
-export const captionKey = (id: string, field: 'title' | 'body' | 'color' | 'anchor' | 'template') => `caption/${id}/${field}`;
+export const captionKey = (id: string, field: 'title' | 'body' | 'color' | 'anchor' | 'template' | 'identity') => `caption/${id}/${field}`;
 export const bindingKey = (id: string) => `asset/${id}/binding`;
 export const membershipKey = (id: string) => `membership/${id}`;
 const initial = createSyntheticProject();
@@ -39,20 +39,39 @@ export function projectHistory(snapshot: HistorySnapshot, previous?: HistorySnap
   const captions = { ...initial.resources.captions }, colors = { ...initial.colors }, assets = models.assets;
   const memberships: Record<string, Membership> = {}, captionMemberships: Record<string, Membership> = {};
   const captionTemplates = { ...initial.captionTemplates };
+  const captionOwners = { ...initial.captionOwners };
   const expected = new Set(Object.keys(historySeed()).filter(key => key.startsWith('caption/')));
+  const created = new Set<string>();
+  // New creation is explicitly declared, never a copy of an arbitrary fixture Caption.
+  for (const [key, cell] of Object.entries(snapshot.cells)) {
+    if (!/^caption\/cap_[0-9a-f]{32}\/identity$/.test(key)) continue;
+    const id = key.split('/')[1]!;
+    if (captions[id] || cell.kind !== 'value') throw new Error('キャプションの識別情報を確認してください。');
+    const meta = JSON.parse(cell.value) as { assetId: string; assetFrameId: string; eventId: string };
+    if (!meta || Object.keys(meta).sort().join(',') !== 'assetFrameId,assetId,eventId' ||
+      !/^evt_[0-9a-f]{32}$/.test(meta.eventId) || !assets[meta.assetId] ||
+      !models.versions.some(v => v.assetId === meta.assetId && v.projection.assetFrameId === meta.assetFrameId))
+      throw new Error('キャプションの所有モデルを確認してください。');
+    created.add(id); captionTemplates[id] = id;
+    captionOwners[id] = { assetId: meta.assetId, assetFrameId: meta.assetFrameId };
+    captions[id] = { id, lifecycle: value({ state: 'active', eventId: meta.eventId, reason: 'initial' }),
+      title: { kind: 'unresolved', reason: 'missing' }, body: { kind: 'unresolved', reason: 'missing' }, anchor: { kind: 'unresolved', reason: 'missing' } };
+    expected.add(key); fields.forEach(field => expected.add(captionKey(id, field)));
+  }
   const copies: Record<string, { templateId: string; sourceId: string; eventId: string }> = {};
-  // Only fixture-derived Caption identities; known attachments are validated as a complete closure below.
+  // Declared creation roots and copy chains; attachment closures are checked below.
   for (const [key, cell] of Object.entries(snapshot.cells)) {
     if (!/^caption\/cap_[0-9a-f]{32}\/template$/.test(key)) continue;
     const id = key.split('/')[1]!;
-    if (initial.resources.captions[id] || cell.kind !== 'value') throw new Error('コピーの識別情報を確認してください。');
+    if (captions[id] || cell.kind !== 'value') throw new Error('コピーの識別情報を確認してください。');
     const meta = JSON.parse(cell.value) as (typeof copies)[string];
     if (!meta || Object.keys(meta).sort().join(',') !== 'eventId,sourceId,templateId' ||
-      !initial.resources.captions[meta.templateId] || !/^cap_[0-9a-f]{32}$/.test(meta.sourceId) ||
+      !(initial.resources.captions[meta.templateId] || created.has(meta.templateId)) || !/^cap_[0-9a-f]{32}$/.test(meta.sourceId) ||
       !/^evt_[0-9a-f]{32}$/.test(meta.eventId) || meta.sourceId === id)
       throw new Error('コピーの参照関係を確認してください。');
     copies[id] = meta; captionTemplates[id] = meta.templateId;
-    captions[id] = { ...initial.resources.captions[meta.templateId]!, id,
+    captionOwners[id] = captionOwners[meta.templateId]!;
+    captions[id] = { ...captions[meta.templateId]!, id,
       lifecycle: value({ state: 'active', eventId: meta.eventId, reason: 'conflictResolution' }) };
     expected.add(key); fields.forEach(field => expected.add(captionKey(id, field)));
   }
@@ -66,7 +85,7 @@ export function projectHistory(snapshot: HistorySnapshot, previous?: HistorySnap
   }
   // Local edits and incoming updates cannot replace an already known immutable copy identity.
   for (const [key, old] of Object.entries(previous?.cells ?? {})) {
-    if (key.endsWith('/template') && JSON.stringify(snapshot.cells[key]) !== JSON.stringify(old))
+    if (key.startsWith('caption/') && (key.endsWith('/template') || key.endsWith('/identity')) && JSON.stringify(snapshot.cells[key]) !== JSON.stringify(old))
       throw new Error('コピーの識別情報は変更できません。');
   }
   for (const [key, cell] of Object.entries(snapshot.cells)) {
@@ -76,9 +95,9 @@ export function projectHistory(snapshot: HistorySnapshot, previous?: HistorySnap
     if (expected.delete(key)) {
       const [, id, field] = key.split('/');
       if (!id || !field || candidates.some(c => c.length > 65_536)) throw new Error('更新内容を確認してください。');
-      if (field === 'template') continue;
+      if (field === 'template' || field === 'identity') continue;
       if (field === 'anchor') {
-        const anchors = candidates.map(candidate => decodeSyntheticAnchor(candidate, captionTemplates[id]!));
+        const anchors = candidates.map(candidate => decodeSyntheticAnchor(candidate, captionOwners[id]!, models.versions));
         captions[id] = { ...captions[id]!, anchor: cell.kind === 'value' ? value(anchors[0]!) :
           { kind: 'unresolved', reason: 'conflict' } };
       } else if (field === 'color') {
@@ -114,12 +133,12 @@ export function projectHistory(snapshot: HistorySnapshot, previous?: HistorySnap
   }
   if (expected.size || Object.keys(initial.state.assetMemberships).some(id => !memberships[id]) ||
     Object.keys(initial.state.captionMemberships).some(id => !captionMemberships[id]) ||
-    Object.keys(copies).some(id => !Object.values(captionMemberships).some(edge => edge.resourceId === id)))
+    [...Object.keys(copies), ...created].some(id => !Object.values(captionMemberships).some(edge => edge.resourceId === id)))
     throw new Error('必要な更新内容がありません。');
   const media = projectMediaHistory(snapshot, Object.keys(captions), previous);
   const result: SyntheticProject = { ...initial, mediaData: media,
     state: { ...initial.state, scenes: views.scenes, token: snapshot.token, assetMemberships: memberships, captionMemberships },
-    resources: { ...initial.resources, token: snapshot.token, captions, assets, views: views.data.records, materials: materials.records }, colors, captionTemplates, viewData: views.data, materialData: materials,
+    resources: { ...initial.resources, token: snapshot.token, captions, assets, views: views.data.records, materials: materials.records }, colors, captionTemplates, captionOwners, viewData: views.data, materialData: materials,
     modelNames: models.names, modelVersions: models.versions };
   for (const id of Object.keys(result.state.scenes)) {
     if (resolveScene(result.state, result.resources, id).kind !== 'ready') throw new Error('シーンを確認してください。');

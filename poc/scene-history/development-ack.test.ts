@@ -49,8 +49,101 @@ async function setMaterial(s: SyntheticSession, lighting: string) {
   const draft = s.materialContext().draft!; s.acceptMaterial({ kind: 'draft', baseDraft: draft, draft: editMaterialDraft(draft, 'lighting', lighting) });
   mat({ kind: 'apply' }); await settled(s); expect(s.materialContext().draft, s.materials.message).toBe(null);
 }
+async function createCaption(s: SyntheticSession, assetId = f.equipment) {
+  expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'target', assetId }))).toBe(true);
+  expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'add' }))).toBe(true);
+  s.changePinCoordinates({ coordinates: ['1', '2', '3'], familyId: s.pinCoordinateContext().families[0]!.id });
+  expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'finish' }))).toBe(false);
+  await settled(s); return s.memory.selectedCaptionId!;
+}
 
 describe('verified candidate through the existing mounted host; not browser or durable acceptance', () => {
+  it('creates one new Caption through existing controls, preserves cancel/IME/filter input and retries the exact staged creation', async () => {
+    let fail = false; const tokens: string[] = [];
+    const pair = await createVerifiedDevelopmentPair(A, commands => {
+      tokens.push(commands.token); if (fail) throw Error('Injected creation admission failure');
+      return developmentContentVerifier(projectHistory(commands).modelVersions!.filter(v => Object.entries(commands.cells).some(([key, c]) =>
+        key === `asset/${v.assetId}/binding` && c.kind === 'value' && c.value === v.projection.bindingId)).map(v => ({ variantFamilyId: v.closure.representation.variantFamilyId,
+        representationId: v.closure.representation.id, payloadDigest: v.closure.representation.payloadDigest })));
+    });
+    const team = createTeamWorkspace(new RecordedDocument().asDocument(), () => pair), root = record(team.root), s = team.sessions[0]!;
+    const work = visible(root), initial = s.snapshot;
+    expect(button(work, 'ピンを追加').disabled).toBe(true);
+    const target = label(work, '追加先モデル'); target.value = f.equipment; target.fire('change');
+    expect(button(work, 'ピンを追加').disabled, s.message).toBe(false);
+    button(work, 'ピンを追加').fire('click'); expect(s.pinCoordinates?.coordinates).toEqual(['', '', '']);
+    const strip = label(work, 'ピンの操作'); expect(button(strip, '位置を確定').disabled).toBe(true);
+    button(strip, '取り消す').fire('click'); button(strip, '操作を取り消す').fire('click');
+    expect(s.snapshot).toBe(initial); expect(pair[0].exportUpdate().changes).toHaveLength(0);
+    s.acceptList(planCaptionList(s.captionContext(), { kind: 'search', query: '絞り込みを保持' })); team.render();
+    button(work, 'ピンを追加').fire('click'); const coords = label(work, 'ピン座標・開発用');
+    for (const [axis, raw] of [['X', '1'], ['Y', '2'], ['Z', '3']]) { const input = label(coords, axis!); input.value = raw!; input.fire('input'); }
+    const family = label(coords, 'ピンを置く表面'); family.value = s.pinCoordinateContext().families[0]!.id; family.fire('change');
+    const x = label(coords, 'X'); x.fire('compositionstart'); expect(button(strip, '位置を確定').disabled).toBe(true);
+    x.fire('compositionend'); expect(button(strip, '位置を確定').disabled).toBe(false);
+    fail = true; button(strip, '位置を確定').fire('click'); expect(s.snapshot).toBe(initial); await settled(s, true);
+    const stagedToken = tokens.at(-1), retained = s.pinCoordinates;
+    expect(retained?.coordinates).toEqual(['1', '2', '3']); expect(s.snapshot).toBe(initial);
+    button(strip, '位置を確定').fire('click'); expect(tokens.at(-1)).toBe(stagedToken);
+    fail = false; button(work, '更新を再試行').fire('click'); await settled(s);
+    expect(tokens.at(-1)).toBe(stagedToken); expect(s.snapshot.state.token).toBe(stagedToken);
+    const id = s.memory.selectedCaptionId!; expect(id).not.toBe(f.shared); expect(id).not.toBe(f.second);
+    expect(s.snapshot.resources.captions[id]).toMatchObject({ lifecycle: { value: { state: 'active', reason: 'initial' } },
+      title: { value: '' }, body: { value: '' }, anchor: { value: { assetId: f.equipment, positionAsset: [1, 2, 3] } } });
+    expect(Object.values(s.snapshot.state.captionMemberships).filter(e => e.resourceId === id).map(e => e.sceneId)).toEqual([f.overview]);
+    expect(s.snapshot.state.assetMemberships).toEqual(initial.state.assetMemberships);
+    expect(s.snapshot.resources.captions[f.shared]).toEqual(initial.resources.captions[f.shared]);
+    expect(s.memory.search).toBe('絞り込みを保持'); expect(s.message).toContain('非表示');
+    expect(s.pinCoordinates).toBe(null); expect(pair[0].exportUpdate().changes).toHaveLength(1);
+    const title = label(work, 'タイトル'); title.value = '新しい記録'; title.fire('input'); button(work, '変更を適用').fire('click'); await settled(s);
+    const actor = label(root, '操作する人'); actor.value = '1'; actor.fire('change'); button(root, '相手の更新を受け取る').fire('click'); await settled(team.sessions[1]!);
+    expect(team.sessions[1]!.snapshot.resources.captions[id]!.title).toEqual({ kind: 'value', value: '新しい記録' }); team.dispose();
+  });
+
+  it('keeps a newly created Caption as a copy root through two Scene memberships, media, explicit keep-both and second exchange', async () => {
+    const pair = await createVerifiedDevelopmentPair(A), team = createTeamWorkspace(new RecordedDocument().asDocument(), () => pair);
+    const [a, b] = team.sessions as [SyntheticSession, SyntheticSession], root = record(team.root), actor = label(root, '操作する人');
+    const id = await createCaption(a); edit(a, 'body', '元の記録'); await settled(a);
+    a.media.add(a.mediaContext(), fixtureMedia[0]!.record.id); await settled(a);
+    actor.value = '1'; actor.fire('change'); button(root, '相手の更新を受け取る').fire('click'); await settled(b);
+    const original = a.snapshot.resources.captions[id], originalMedia = captionAttachments(a.snapshot.mediaData, id).ready[0]!;
+    for (const s of [a, b]) {
+      s.acceptNavigation(planNavigation(s.snapshot.state, s.session, s.pending, { kind: 'scene', sceneId: f.detail }));
+      s.acceptInclude(planCaptionInclude(s.includeContext(), { kind: 'select', captionId: id }));
+      s.acceptInclude(planCaptionInclude(s.includeContext(), { kind: 'include' })); await settled(s);
+    }
+    team.render(); button(root, '相手の更新を受け取る').fire('click'); await settled(b);
+    const panel = label(root, '更新の競合'), radio = by(panel, n => n.type === 'radio'); radio.checked = true; radio.fire('change');
+    button(panel, '別々のキャプションとして残す').fire('click'); await settled(b);
+    const copyId = Object.keys(b.snapshot.resources.captions).find(c => ![f.shared, f.second, id].includes(c))!;
+    expect(copyId).toBeDefined(); selected(b, copyId); edit(b, 'body', 'コピーだけの記録'); await settled(b);
+    actor.value = '0'; actor.fire('change'); button(root, '相手の更新を受け取る').fire('click'); await settled(a);
+    expect(a.snapshot.resources.captions[id]).toEqual(original);
+    expect(a.snapshot.resources.captions[copyId]!.body).toEqual({ kind: 'value', value: 'コピーだけの記録' });
+    expect(a.snapshot.resources.captions[copyId]!.anchor).toEqual(original!.anchor);
+    const copiedMedia = captionAttachments(a.snapshot.mediaData, copyId).ready[0]!;
+    expect(copiedMedia.id).not.toBe(originalMedia.id); expect(copiedMedia.mediaResourceId).toEqual(originalMedia.mediaResourceId);
+    expect(Object.values(a.snapshot.state.captionMemberships).filter(e => e.resourceId === copyId).map(e => e.sceneId)).toEqual([f.detail]);
+    expect(pair[0].read().token).toBe(pair[1].read().token);
+    const before = pair[0].exportUpdate().changes; button(root, '同じ更新を再受信').fire('click'); await settled(a);
+    expect(pair[0].exportUpdate().changes).toEqual(before); team.dispose();
+  });
+
+  it('rejects a stale creation target and invalid coordinates without discarding the proposed input', async () => {
+    const pair = await createVerifiedDevelopmentPair(A), team = createTeamWorkspace(new RecordedDocument().asDocument(), () => pair);
+    const s = team.sessions[0]!, before = s.snapshot;
+    s.acceptPin(planPinMode(s.pinContext(), { kind: 'target', assetId: f.equipment })); s.acceptPin(planPinMode(s.pinContext(), { kind: 'add' }));
+    s.changePinCoordinates({ coordinates: ['Infinity', '', '3'], familyId: s.pinCoordinateContext().families[0]!.id });
+    expect(planPinMode(s.pinContext(), { kind: 'finish' }).kind).toBe('blocked'); expect(s.snapshot).toBe(before);
+    s.changePinCoordinates({ coordinates: ['1', '2', '3'], familyId: s.pinCoordinateContext().families[0]!.id });
+    const plan = planPinMode(s.pinContext(), { kind: 'finish' }), input = s.pinCoordinates;
+    const version = s.snapshot.modelVersions!.find(v => v.assetId === f.equipment && v.label === '形状を更新したモデル')!;
+    await pair[0].write(pair[0].read().token, { [`asset/${f.equipment}/binding`]: version.projection.bindingId }); s.refreshHistory();
+    expect(s.acceptPin(plan)).toBe(false); expect(s.pinCoordinates).toBe(input);
+    expect(Object.keys(s.snapshot.resources.captions)).toHaveLength(2);
+    const c = s.pinContext(); expect(s.acceptPin(planPinMode(c, { kind: 'cancel', confirmedMode: c.memory.mode!, confirmedProposal: c.proposal }))).toBe(true);
+    expect(s.pinCoordinates).toBe(null); team.dispose();
+  });
   it('retains draft DOM and confirmed state while checking, then retries exact bytes without an actor/receive escape', async () => {
     let mode: 'normal' | 'wait' | 'fail' = 'normal', release: (() => void) | undefined;
     const observed: string[] = [];
@@ -179,8 +272,12 @@ describe('verified candidate through the existing mounted host; not browser or d
     expect(a.snapshot.resources.assets[copyId]!.projection.kind).toBe('value');
     const display = syntheticDisplay(a.snapshot, a.sceneId, null, null); expect(display.models.some(m => m.binding.assetId === copyId)).toBe(true);
     a.acceptModel(planModelList(a.modelContext(), { kind: 'select', assetId: copyId })); a.beginModelPlacement(); a.changeModelPlacement(['5', '4', '3']); a.finishModelPlacement(); await settled(a);
+    const captionId = await createCaption(a, copyId);
+    expect(a.acceptPin(planPinMode(a.pinContext(), { kind: 'move' }))).toBe(true);
+    a.changePinCoordinates({ coordinates: ['4', '5', '6'], familyId: null }); a.acceptPin(planPinMode(a.pinContext(), { kind: 'finish' })); await settled(a);
     actor.value = '1'; actor.fire('change'); button(root, '相手の更新を受け取る').fire('click'); await settled(b);
     expect(b.snapshot.resources.assets[copyId]).toEqual(a.snapshot.resources.assets[copyId]);
+    expect(b.snapshot.resources.captions[captionId]!.anchor).toMatchObject({ kind: 'value', value: { assetId: copyId, positionAsset: [4, 5, 6] } });
     expect(pair[0].read().token).toBe(pair[1].read().token); team.dispose();
   });
 });

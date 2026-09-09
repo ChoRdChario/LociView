@@ -3,7 +3,7 @@ import { chooseStartupScene, resolveScene } from '../../scene/resolve';
 import { value, type Anchor, type Composition, type Field } from '../../scene/types';
 import { navigationPlanIsCurrent, type NavigationPlan, type NavigationSession, type PendingInteraction,
   type SceneUiMemory } from '../../ui/projectScene/navigationState';
-import { captionListPlanIsCurrent, planCaptionList, type CaptionListContext, type CaptionListItem,
+import { captionListPlanIsCurrent, captionListView, planCaptionList, type CaptionListContext, type CaptionListItem,
   type CaptionListPlan } from '../../ui/projectScene/captionListState';
 import { acceptCaptionApply, beginCaptionDraft, captionApplyIsCurrent, hasCaptionDraft,
   type CaptionDraft, type DetailContext, type DetailSource } from '../../ui/projectScene/captionDetailState';
@@ -371,7 +371,8 @@ export class SyntheticSession {
       const asset = resources.assets[item.id]!, present = item.membership.kind === 'value' && item.membership.value.kind === 'included';
       return { assetId: asset.id, name: value(modelNames[asset.id] ?? 'モデル'),
         token: JSON.stringify([asset.projection, asset.lifecycle, item.membership]),
-        addBlock: 'この接続版ではピンの追加は未接続です。',
+        addBlock: !present ? '追加先モデルをこのシーンに表示してください。' : asset.projection.kind !== 'value' ||
+          !modelVersion(asset.id, asset.projection.value.bindingId, this.modelVersions) ? 'モデルの状態を確認してください。' : null,
         moveBlock: !present ? '所有モデルをこのシーンに表示してください。' : asset.projection.kind !== 'value'
           ? 'モデルの更新候補を確認してください。' : null };
     });
@@ -397,20 +398,20 @@ export class SyntheticSession {
   private preparePinAnchor(): { anchor?: Anchor; issue: string | null } {
     try {
       const { mode, input, families, needsFamily } = this.pinCoordinateContext();
-      if (!mode?.caption || !input) throw new Error('ピンの操作を開始してください。');
-      const old = this.project.resources.captions[mode.caption.captionId]!.anchor;
+      if (!mode || !input) throw new Error('ピンの操作を開始してください。');
+      const old = mode.caption ? this.project.resources.captions[mode.caption.captionId]?.anchor : undefined;
       const asset = this.project.resources.assets[mode.target.assetId]!, projection = asset.projection;
-      if (old.kind !== 'value' || old.value.kind !== 'asset' || projection.kind !== 'value' ||
-        old.value.assetId !== asset.id || old.value.assetFrameId !== projection.value.assetFrameId) throw new Error('ピンのモデルを確認してください。');
+      if (projection.kind !== 'value' || (mode.kind === 'move' && (old?.kind !== 'value' || old.value.kind !== 'asset' ||
+        old.value.assetId !== asset.id || old.value.assetFrameId !== projection.value.assetFrameId))) throw new Error('ピンのモデルを確認してください。');
       const family = input.familyId ? families.find(f => f.id === input.familyId) : undefined;
-      if (needsFamily && !family) throw new Error('補正先の表面を選択してください。');
+      if (needsFamily && !family) throw new Error('ピンを置く表面を選択してください。');
       if (input.coordinates.some(raw => !/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(raw.trim()) || !Number.isFinite(Number(raw))))
         throw new Error('X・Y・Zを有限の数値で指定してください。');
       const positionAsset = input.coordinates.map(raw => Number(raw) || 0);
       const anchor = decodeSyntheticAnchor(JSON.stringify({ kind: 'asset', assetId: asset.id, assetFrameId: projection.value.assetFrameId,
         positionAsset, authoredAssetRevisionId: projection.value.revisionId,
-        authoredAnchorCompatibilityId: needsFamily ? family!.compatibilityId : old.value.authoredAnchorCompatibilityId,
-        hitEvidence: { method: 'manual' } }), this.project.captionTemplates[mode.caption.captionId]!);
+        authoredAnchorCompatibilityId: needsFamily ? family!.compatibilityId : old?.kind === 'value' && old.value.kind === 'asset' ? old.value.authoredAnchorCompatibilityId : undefined,
+        hitEvidence: { method: 'manual' } }), { assetId: asset.id, assetFrameId: projection.value.assetFrameId }, this.modelVersions);
       return { anchor, issue: null };
     } catch (error) { return { issue: this.errorText(error) }; }
   }
@@ -431,6 +432,9 @@ export class SyntheticSession {
       if (plan.kind === 'change') {
         this.pins.set(this.sceneId, plan.memory);
         if (plan.intent === 'cancel') { this.pinInput = null; this.pinProposal = null; this.pinInputComposing = false; }
+        else if (plan.intent === 'add') {
+          this.pinInput = { coordinates: ['', '', ''], familyId: null }; this.pinProposal = null;
+        }
         else if (plan.intent === 'move') {
           const caption = this.project.resources.captions[plan.memory.mode!.caption!.captionId]!;
           if (caption.anchor.kind !== 'value' || caption.anchor.value.kind !== 'asset') throw new Error('ピンを確認してください。');
@@ -438,16 +442,35 @@ export class SyntheticSession {
           this.changePinCoordinates(this.pinInput);
         }
       } else {
-        const correction = this.preparePinAnchor(), captionId = plan.mode.caption!.captionId;
+        const correction = this.preparePinAnchor();
         if (correction.issue || !correction.anchor) throw new Error(correction.issue ?? '位置を確認してください。');
-        const token = fresh('snapshot'), caption = this.project.resources.captions[captionId]!;
-        const changes = { [captionKey(captionId, 'anchor')]: JSON.stringify(correction.anchor) };
-        const local = {
+        const adding = plan.mode.kind === 'add', captionId = adding ? fresh('cap') : plan.mode.caption!.captionId;
+        const token = fresh('snapshot'), eventId = fresh('evt'), owner = correction.anchor;
+        if (owner.kind !== 'asset') throw new Error('ピンのモデルを確認してください。');
+        const caption = adding ? { id: captionId, lifecycle: value({ state: 'active' as const, eventId, reason: 'initial' as const }),
+          title: value(''), body: value(''), anchor: value(owner) } : this.project.resources.captions[captionId]!;
+        const changes: Record<string, string> = { [captionKey(captionId, 'anchor')]: JSON.stringify(owner) };
+        let local: SyntheticProject = {
           ...this.project, state: { ...this.project.state, token }, resources: { ...this.project.resources, token,
-            captions: { ...this.project.resources.captions, [captionId]: { ...caption, anchor: value(correction.anchor) } } } };
+            captions: { ...this.project.resources.captions, [captionId]: { ...caption, anchor: value(owner) } } } };
+        if (adding) {
+          const membershipId = fresh('scm'), edge = { id: membershipId, sceneId: this.sceneId, resourceId: captionId,
+            lifecycle: caption.lifecycle, orderKey: value('Z') };
+          Object.assign(changes, { [captionKey(captionId, 'identity')]: JSON.stringify({ assetId: owner.assetId, assetFrameId: owner.assetFrameId, eventId }),
+            [captionKey(captionId, 'title')]: '', [captionKey(captionId, 'body')]: '', [captionKey(captionId, 'color')]: '#a08045',
+            [membershipKey(membershipId)]: JSON.stringify(edge) });
+          local = { ...local, state: { ...local.state, captionMemberships: { ...local.state.captionMemberships, [membershipId]: edge } },
+            colors: { ...local.colors, [captionId]: value('#a08045') }, captionTemplates: { ...local.captionTemplates, [captionId]: captionId },
+            captionOwners: { ...local.captionOwners, [captionId]: { assetId: owner.assetId, assetFrameId: owner.assetFrameId } } };
+        }
         return this.applyWorking(() => this.writeProject(plan.token, changes, local), () => {
           this.pins.set(this.sceneId, { ...this.pins.get(this.sceneId)!, mode: null }); this.pinInput = null; this.pinProposal = null;
-          this.message = 'ピン座標を適用しました。保存は未接続です。'; this.pinFeedback = { kind: 'idle' };
+          this.pinFeedback = { kind: 'idle' };
+          if (adding && !this.acceptList(planCaptionList(this.captionContext(), { kind: 'select', captionId })))
+            throw new Error('追加済みです。一覧からキャプションを選択してください。');
+          const list = captionListView(this.captionContext().source, this.memory);
+          const filtered = adding && (!list.selectionVisible || list.rows.find(r => r.item.id === captionId)?.colorHidden);
+          this.message = `${adding ? 'キャプションを追加しました。' : 'ピン座標を適用しました。'}${filtered ? '絞り込みで一覧またはピンが非表示です。' : ''}保存は未接続です。`;
         }, failed);
       }
       this.pinFeedback = { kind: 'idle' }; return true;

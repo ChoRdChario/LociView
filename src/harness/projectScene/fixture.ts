@@ -14,8 +14,10 @@ export interface SyntheticProject {
   readonly resources: SceneResources;
   readonly modelNames: Readonly<Record<string, string>>;
   readonly colors: Readonly<Record<string, Field<string>>>;
-  /** Known fixture owner/frame template; copied resources still have independent editable cells. */
+  /** Declared creation root; copied resources still have independent editable cells. */
   readonly captionTemplates: Readonly<Record<string, string>>;
+  /** Immutable command-side owner/frame evidence, never a replacement for provider anchors. */
+  readonly captionOwners: Readonly<Record<string, { readonly assetId: string; readonly assetFrameId: string }>>;
   readonly modelVersions?: readonly SyntheticModelVersion[];
   readonly viewData?: ViewData;
   readonly materialData?: MaterialData;
@@ -58,5 +60,7 @@ export function createSyntheticProject(): SyntheticProject {
       [f.second]: caption(f.second, f.structure, 1, '入口の記録', '全体シーンだけに含まれる記録です。') },
     views: {}, materials: {} }, modelNames: { [f.structure]: '建物', [f.equipment]: '設備' },
     colors: { [f.shared]: value('#a08045'), [f.second]: value('#57758b') },
-    captionTemplates: { [f.shared]: f.shared, [f.second]: f.second } });
+    captionTemplates: { [f.shared]: f.shared, [f.second]: f.second },
+    captionOwners: { [f.shared]: { assetId: f.equipment, assetFrameId: id('frm', 2) },
+      [f.second]: { assetId: f.structure, assetFrameId: id('frm', 1) } } });
 }
