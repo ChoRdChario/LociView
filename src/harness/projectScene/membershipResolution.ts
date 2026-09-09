@@ -1,7 +1,7 @@
 import { value, type Field, type Membership } from '../../scene/types';
 import { freezeSynthetic } from './fixture';
 import { captionKey, membershipKey, projectHistory } from './historyProjection';
-import type { DevelopmentHistory, HistorySnapshot } from './historyPort';
+import type { WorkingHistory, HistorySnapshot } from './historyPort';
 import { previewHistory } from './historyPort';
 import { canonicalFixture, remapFixtureModel, type FixtureModelIds } from './modelClosure';
 import { modelBindingKey, modelClosureKey, modelIdentityKey, projectModelHistory } from './modelHistory';
@@ -116,10 +116,10 @@ export function planMembershipResolution(snapshot: HistorySnapshot, group: Dupli
   return freezeSynthetic({ token: snapshot.token, group: current, originalEdgeId, action, eventId, copies: [...copies], modelCopies: [...modelCopies], changes });
 }
 
-export function applyMembershipResolution(history: DevelopmentHistory, plan: MembershipResolutionPlan) {
+export function applyMembershipResolution<H extends WorkingHistory>(history: H, plan: MembershipResolutionPlan): ReturnType<H['write']> {
   const snapshot = history.read();
   if (snapshot.token !== plan.token) fail('更新されています。選択を確認してください。コピーは追加していません。');
   const checked = planMembershipResolution(snapshot, plan.group, plan.originalEdgeId, plan.action, plan.eventId, plan.copies, plan.modelCopies);
   if (JSON.stringify(checked) !== JSON.stringify(plan)) fail('コピーの計画を確認してください。');
-  return history.write(plan.token, plan.changes);
+  return history.write(plan.token, plan.changes) as ReturnType<H['write']>;
 }

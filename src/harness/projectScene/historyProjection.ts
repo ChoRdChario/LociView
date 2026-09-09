@@ -1,7 +1,8 @@
 import { value, type Field, type Membership } from '../../scene/types';
 import { resolveScene } from '../../scene/resolve';
 import { createSyntheticProject, freezeSynthetic, type SyntheticProject } from './fixture';
-import type { DevelopmentHistory, HistoryCell, HistorySnapshot } from './historyPort';
+import type { WorkingHistory, HistoryCell, HistorySnapshot } from './historyPort';
+import { afterWorking, type WorkingResult } from './acknowledgment';
 import { decodeSyntheticAnchor } from './modelFixture';
 import { modelHistorySeed, projectModelHistory } from './modelHistory';
 import { projectViewHistory, viewHistorySeed } from './viewHistory';
@@ -127,9 +128,14 @@ export function projectHistory(snapshot: HistorySnapshot, previous?: HistorySnap
 }
 export interface SyntheticAuthority {
   read(): SyntheticProject;
-  write(token: string, changes: Readonly<Record<string, string>>): SyntheticProject;
+  write(token: string, changes: Readonly<Record<string, string>>): WorkingResult<SyntheticProject>;
+  status?(): Readonly<{ kind: 'idle' | 'checking' | 'failed'; error?: string }>;
+  retry?(): WorkingResult<SyntheticProject>;
 }
-export function historyAuthority(history: DevelopmentHistory): SyntheticAuthority {
+export function historyAuthority(history: WorkingHistory): SyntheticAuthority {
+  if ('status' in history) return { read: () => history.read().project,
+    write: (token, changes) => afterWorking(history.write(token, changes), () => history.read().project),
+    status: () => history.status(), retry: () => afterWorking(history.retry(), () => history.read().project) };
   return { read: () => projectHistory(history.read()),
     write: (token, changes) => projectHistory(history.write(token, changes)) };
 }

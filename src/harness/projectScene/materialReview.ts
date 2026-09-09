@@ -1,4 +1,4 @@
-import type { DevelopmentHistory } from './historyPort';
+import type { WorkingHistory } from './historyPort';
 import type { SyntheticSession } from './session';
 import type { SyntheticProject } from './fixture';
 import { canonicalFixture } from './modelClosure';
@@ -18,16 +18,16 @@ export function describeMaterialCandidate(field: string, text: string, project: 
 }
 
 export function describeMaterialTarget(id: string, project: SyntheticProject): string {
-  const record = project.materialData?.records[id];
+  const review = project.materialReviewData ?? project.materialData, record = review?.records[id];
   if (record?.routing.kind !== 'value') return `適用先を確認 — 設定 ${id}`;
   const route = record.routing.value;
-  const peers = Object.values(project.materialData!.records).filter(r =>
+  const peers = Object.values(review!.records).filter(r =>
     r.candidates.some(c => routingKey(c) === routingKey(route)) && (r.lifecycle.kind !== 'value' || r.lifecycle.value.state !== 'deleted'));
   return describeMaterialCandidate('routing', canonicalFixture(route), project) + (peers.length > 1 ? ` — 設定 ${id}` : '');
 }
 
 /** Explicit duplicate-key choice. UI selection is never a materialized history winner. */
-export function createMaterialConflictControls(document: Document, current: () => { history: DevelopmentHistory; session: SyntheticSession; actor: number }, changed: () => void) {
+export function createMaterialConflictControls(document: Document, current: () => { history: WorkingHistory; session: SyntheticSession; actor: number }, changed: () => void) {
   const root = document.createElement('section'); root.setAttribute('aria-label', 'マテリアルの重複'); root.className = 'lv-development-conflicts';
   const choices = new Map<string, { selected: string | null; changes?: Readonly<Record<string, string>> }>();
   let disposed = false, error = '';
@@ -35,7 +35,9 @@ export function createMaterialConflictControls(document: Document, current: () =
   function render() {
     if (disposed) return;
     const { history, session, actor } = current(), snapshot = history.read(), groups = new Map<string, { routing: MaterialRouting; ids: string[] }>();
-    const data = session.snapshot.materialData;
+    // Review exact source candidates even when the provider withholds the shared
+    // routing/intent. This does not restore a renderer winner or editable fallback.
+    const data = session.snapshot.materialReviewData ?? session.snapshot.materialData;
     for (const r of Object.values(data?.records ?? {})) {
       if (r.lifecycle.kind === 'value' && r.lifecycle.value.state === 'deleted') continue;
       if (r.routing.kind !== 'value') continue;
@@ -73,7 +75,9 @@ export function createMaterialConflictControls(document: Document, current: () =
             choice.changes = Object.freeze(Object.fromEntries(group.ids.filter(id => id !== choice.selected).map(id => [materialKey(id, 'lifecycle'),
               canonicalFixture({ state: 'deleted', eventId, reason: 'conflictResolution' })])));
           }
-          history.write(snapshot.token, choice.changes); session.refreshHistory(); error = '';
+          const changes = choice.changes;
+          session.applyWorking(() => history.write(snapshot.token, changes), () => { session.refreshHistory(); error = ''; },
+            e => { error = e instanceof Error ? e.message : '設定を整理できません。選択は保持しています。'; });
         } catch (e) { error = e instanceof Error ? e.message : '設定を整理できません。選択は保持しています。'; }
         changed();
       });

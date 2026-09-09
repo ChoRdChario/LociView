@@ -14,7 +14,7 @@ document.documentElement.classList.add('lv-development-page');
 const loading = document.createElement('p'); loading.textContent = '開発用の編集画面を準備しています。';
 loading.setAttribute('role', 'status'); document.body.replaceChildren(loading);
 // The candidate is serve-only. Even the Spark/PWA harness build must not adopt or precache it.
-let factory: import('./historyPort').DevelopmentHistoryFactory | undefined;
+let factory: import('./historyPort').WorkingHistoryFactory | undefined;
 let bootFailure = '';
 if (import.meta.env.DEV) {
   try {

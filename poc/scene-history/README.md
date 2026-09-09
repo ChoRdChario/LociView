@@ -17,8 +17,8 @@ AssetFrame geometry/material semantics, explicit family authority, every claimed
 family/class member, and fixed PNG container/CRC/bounded decompression. It never
 labels its profile as ratified or reads real files. The full flat-map two-round
 test now composes that evidence and the scoped same-token Scene provider/resolver
-without changing conflict candidates or source bytes. This is not the served
-host's complete-provider switch; C remains pending.
+without changing conflict candidates or source bytes. That evidence alone does
+not constitute the served host switch; the connected C path is described below.
 
 `development-source.ts` now authors a new page-memory bootstrap with complete
 Project metadata and canonical atomic fields before the candidate records them.
@@ -28,10 +28,15 @@ causal cut, including redundant original dependencies and explicit absence.
 asynchronous publication. It retains the confirmed pair while checking, rejects
 permanently malformed source before registering a pending operation, and retries
 transient admission failure with the same staged document/operation bytes.
-The service-level two-actor/equivalent-model/independent-Caption-copy/replay loop
-is tested. It is not yet selected by `development-browser.ts` or the served UI;
-asynchronous session/draft acknowledgment and the rest of C's host acceptance
-are next. No old history conversion, file/storage or adopted metadata format.
+`development-browser.ts` now initializes this pair before mounting the existing
+development UI. One session acknowledgment coordinator handles all editors and
+team commands, retaining the same draft/plan/IDs until success. Retried admission
+uses the original staged document; confirmation-only retry never writes again.
+Exact source material candidates have a separate explicit-review lane, without
+restoring their withheld renderer routing/intent. Mounted actual-candidate tests
+cover pending/failure/retry, two rounds, independent Caption/model copies, every
+editor and new Saved View DOM confirmation. This is not a browser/IME/device
+PASS, old history conversion, file/storage or adopted metadata format.
 Class equivalence reuses only actually decoded exact blob/profile/transform
 geometry; it does not fetch weak historical bytes or clear source-index issues.
 

@@ -1,4 +1,5 @@
 import type { AtomicHistory } from '../../domain/atomicHistory';
+import type { SyntheticProject } from './fixture';
 /** Nonpersistent synthetic test port, not a ProjectDoc schema or package format. */
 export type HistoryCell = { readonly kind: 'value'; readonly value: string } |
   { readonly kind: 'conflict'; readonly candidates: readonly { readonly id: string; readonly value: string }[] };
@@ -38,3 +39,17 @@ export interface DevelopmentHistory {
 }
 export type DevelopmentHistoryFactory = (seed: Readonly<Record<string, string>>,
   validate: (snapshot: HistorySnapshot, previous?: HistorySnapshot) => void) => readonly [DevelopmentHistory, DevelopmentHistory];
+/** Serve-only verified pair. UI imports no candidate or provider implementation. */
+export interface VerifiedHistoryPort {
+  read(): HistorySnapshot & { readonly project: SyntheticProject };
+  status(): Readonly<{ kind: 'idle' | 'checking' | 'failed'; error?: string }>;
+  write(token: string, changes: Readonly<Record<string, string>>): Promise<HistorySnapshot>;
+  choose(token: string, key: string, candidateId: string): Promise<HistorySnapshot>;
+  resolveAttachmentLifecycle(token: string, key: string, candidateIds: readonly string[], value: string): Promise<HistorySnapshot>;
+  exportUpdate(): MemoryUpdate;
+  receive(update: MemoryUpdate): Promise<{ readonly snapshot: HistorySnapshot; readonly added: number }>;
+  retry(): Promise<HistorySnapshot>;
+}
+export type WorkingHistory = DevelopmentHistory | VerifiedHistoryPort;
+export type WorkingHistoryFactory = (seed: Readonly<Record<string, string>>,
+  validate: (snapshot: HistorySnapshot, previous?: HistorySnapshot) => void) => readonly [WorkingHistory, WorkingHistory];

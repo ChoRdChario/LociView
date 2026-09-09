@@ -1181,6 +1181,32 @@ stale admission retains prior confirmed state and the pending command/retry IDs.
 The existing host's full source adapter, authority replacement and connected
 two-round/copy/recovery evidence remain one C exit, not separate feature gates.
 
+For that same-host hookup, use one working-state acknowledgment coordinator per
+participant across Caption, model/pin/membership, View, material, attachment and
+team receive/choice. Existing synchronous synthetic test ports may settle inline;
+the verified driver settles asynchronously. Keep the exact confirmation callback,
+draft/plan and IDs while checking or retryable failure. Only after the driver
+confirms its scoped pair may the session publish it and clear the corresponding
+input. Retry uses the retained staged document, not a repeated event handler or
+new command IDs. A confirmation-only retry must not republish original changes.
+Permanent source rejection releases the operation lock and preserves old state
+and the error; pending or retained failure blocks overlapping mutation/navigation.
+Show checking/failure and retry beside the existing workspace, still explicitly
+unsaved/page-memory-only. Preserve source/candidate diagnostics behind the pair.
+This is the existing connected host, not a parallel UI or production activation.
+
+**Observed C connection (2026-09-09, code/mounted scope):** the served development
+entry initializes the canonical-source verified pair before mounting the existing
+workspace. All working editors and team receive/choice/copy share confirmation
+and exact retained retry. Original field/DAG and content evidence remain on that
+pair; command-specific source material candidates are exposed separately for
+explicit duplicate review, never restored as renderer authority. Async new-View
+confirmation clears its exact old DOM target before selecting the new view.
+Actual pinned candidate/mounted controls cover pending/failure, two rounds,
+explicit choices, independent Caption/model copies and editor confirmation.
+The single A/B/C implementation exit is therefore code/mounted-only; ordinary
+UI, real files/storage, browser/IME/iPhone and adoption remain separately gated.
+
 The connected fixture includes inactive equivalent revisions. Repeated-class
 verification still requires exact complete owner/family/member metadata, but an
 inactive member need not trigger a historical blob read. The application-owned

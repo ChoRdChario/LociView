@@ -10,6 +10,62 @@ IME and device acceptance remain pending, not implied by its DOM tests.
 
 ### Current checkpoint / next implementation
 
+Completed async host continuation started clean `5b58e4e`, 42 ahead of local tracking (no
+fetch), official remaining quota 71%. Target: switch the existing served pair to
+verified admission and one acknowledgment coordinator for every working edit and
+team receive/choice. Reuse existing controls, synchronous test ports and source
+service evidence. Keep confirmed state, draft/plan/IDs and conflict selections
+until success; pending/failed commands block overlapping changes and expose exact
+retry. Add mounted two-actor/draft/failure recovery coverage, not another UI/probe.
+No real data, durable save, schema/dependency/adoption or release activation.
+Check C against its complete connected exit; rendered/IME/iPhone stay batched.
+- [x] Connect source authority, shared acknowledgment and all existing editors.
+- [x] Connect team receive/choice/copy and retained retry in the served entry.
+- [x] Execute connected acceptance, independent diff review and update boundaries.
+
+Current result: C's complete-provider **code/mounted development connection** is
+closed. The served entry selects verified authority before mounting. One working
+acknowledgment path covers all editors and receive/choice/copy, retaining exact
+staged changes and drafts on failure. Saved View confirmation clears the original
+DOM target before selecting the new view. Material duplicate choices use exact
+source-only review data; unresolved renderer routing/intent is not restored.
+Independent review confirmed both fixes, with no remaining limited-diff blocker.
+Root suite 105 files / 1858 PASS, 21 existing TODO; root/scoped TypeScript PASS;
+isolated 61 PASS (including 5 actual-candidate mounted scenarios). No browser,
+IME, physical iPhone, offline/PWA, real storage or technology-adoption PASS.
+Ordinary/harness builds PASS with existing warnings. Parsed source maps (13/9)
+contain zero candidate/provider/content modules; the candidate loader remains
+serve-only and absent from both build graphs. No new runtime dependency.
+Existing loopback dev HTML and the changed entry/loader/driver/acknowledgment
+modules return HTTP 200 with the expected HTML/JavaScript types. This is server
+delivery/transform evidence only, not an executed browser or renderer result.
+
+Short meta-audit / next: the dependency on fixture-only display authority is now
+removed from the served development loop. The remaining product gap is not more
+provider guards. Use the same host to close the essential, currently disabled
+new-Caption/pin action before interaction polish; carry the verified source and
+common pending/retry path through it. Reuse the existing pin-mode intentions and
+fixed checked model/frame evidence, with explicit target/position confirmation;
+do not add a second probe or infer model/source relations. This is the next
+bounded §13.4 implementation, not activation of real files/storage. Record its
+exact command and acceptance before coding; stop on any required contract change.
+- [ ] Connect new Caption/pin creation to the existing host with fresh identity,
+  explicit owner/coordinates, one membership and the same verified history/retry.
+
+Durable/file prerequisites are now named against existing gates (not waived):
+
+| Boundary | Remaining prerequisite | Existing evidence retained |
+|---|---|---|
+| S1 metadata/CAS adoption | Spec 03 §§4/6: complete Project-domain repository/inventory/journal coordination, cross-project retention/GC and scale/UI evidence, applicable physical-iOS/background/quota/restart, bounded output and CSP/offline; explicit adoption before production storage | Exact original replay and closed Chrome journal/no-op checks; 500 MiB saved-body readback only, not full output/device pass |
+| S2 wire and migration | Spec 06 §10 grouped ratification: exact profile/budgets/goldens, delta/source-receipt and durable base protocol, history-free builder; spec 05 §§7.5/9 migration recipe and Native bridge | Continuing causal development exchange and synthetic purpose proofs; not a production package reader/writer |
+| Integrated acceptance | Spec 05 §12.6: real service and ordinary UI team flow, restart/offline plus physical iPhone on a separately approved exact candidate/HTTPS route | Native historical acceptance and development mounted tests, neither transferable to the new path |
+
+No new manual hold, server/tunnel, private source, dependency, adopted schema/
+profile, Native/main/Pages/SW configuration or release action. Official remaining
+quota 70%; no reset redeemed. Do not repeat closed browser probes.
+
+### Historical provider checkpoints — not current next steps
+
 Stage C continuation starts clean `14ca964`, 41 ahead of local tracking (no fetch),
 official quota 72%. Previous goal turn made verified implementation progress.
 Target is the same host's complete source adapter and authority switch, not a new
@@ -40,9 +96,10 @@ detached guard/probe. C's single exit, browser/IME/device and durable/file work
 remain open. No manual hold or new server/tunnel/private source/release boundary.
 Official remaining quota 71%; no reset redeemed.
 
-The fixed-PNG media connection below is complete in development memory. Next is
-the finite complete-provider boundary under 05 §§13.3/13.4, then the gated durable
-loop. Do not return to detached UI parts or polish as the default workstream.
+### Provider acceptance ledger — closed in development scope only
+
+The finite A/B/C connection under 05 §§13.3/13.4 is complete at code/mounted scope.
+This does not pass storage, profile/adoption or rendered/device gates.
 - [x] Map the accepted Project/resource/frame/reference/conflict/blob rules to
   existing production-quality guards and the still-missing provider subparts.
   Record one bounded contract/acceptance matrix before implementation, with one
@@ -50,11 +107,11 @@ loop. Do not return to detached UI parts or polish as the default workstream.
 - [x] Stage A: whole-root decoded record structure for all approved
   entity kinds, preserved unknown fields and global budgets. `valid-records`
   never means valid Project, verified blobs or conflict-free authority.
-- [ ] Stage B (current): full closure/candidates/causal and exact external-evidence checks.
+- [x] Stage B: full closure/candidates/causal and exact external-evidence checks.
   - [x] Implement whole-record graph inspection and exact immutable payload checks,
     with same-lineage prior identity, scoped reference diagnostics and explicit
     known strong/weak edges. Reuse stage A; never output SceneResources or GC roots.
-  - [ ] Complete all-candidate/causal and externally verified profile/blob evidence
+  - [x] Complete all-candidate/causal and externally verified profile/blob evidence
     before B can supply authority to C. Graph inspection alone cannot close B.
     - [x] Add a neutral original-change read inspection (including absent values),
       exact maximal candidate identities and lifecycle/immutable-history review;
@@ -71,22 +128,24 @@ loop. Do not return to detached UI parts or polish as the default workstream.
         one scope-labelled same-token Scene pair plus attachment/tag/media details.
         Preserve full source/diagnostics; global identity/frame failure returns no
         pair, scoped failures never choose a winner or invalidate unrelated work.
-- [ ] Stage C: connect that authority to the existing synthetic workflow; final
+- [x] Stage C: connect that authority to the existing synthetic workflow; final
   integration evidence and independent review close the single provider boundary.
   - [x] Author canonical source before original changes; verify every causal
     command/source correspondence. Connect async provider admission before memory
     publication, with scoped pair/details, permanent rejection and exact retry.
-  - [ ] Replace the served entry/session's synchronous acknowledgment with this
+  - [x] Replace the served entry/session's synchronous acknowledgment with this
     driver. Retain drafts/IDs through pending/failure, then complete mounted
     two-round/copy/recovery acceptance and the one final C review.
-- [ ] Implement and connect that provider to the same synthetic host where
+- [x] Implement and connect that provider to the same synthetic host where
   authorized, replacing known-only assumptions with verified closure. Reuse
   existing adversarial/reference tests; partial guards are never trusted as full
   SceneResources. Stop on a specification conflict or required adoption decision.
-- [ ] Name the exact remaining metadata/CAS, wire/recipe and iOS prerequisites
+- [x] Name the exact remaining metadata/CAS, wire/recipe and iOS prerequisites
   before real-file/storage activation; reuse closed Chrome evidence. Actual
   durable/file services and UI acceptance remain future work, not inferred from
   the synthetic provider. No new manual hold unless that activation needs it.
+
+### Earlier implementation evidence — historical next-step wording
 
 Projection implementation: a pure scoped read entry now runs candidate/content
 inspection and returns same-token SceneState/resources plus full known detail

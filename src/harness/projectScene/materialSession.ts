@@ -7,6 +7,7 @@ import { fixtureIds, type SyntheticProject } from './fixture';
 import { syntheticVersions } from './modelFixture';
 import { canonicalFixture } from './modelClosure';
 import { materialBucket, materialCapability, materialKey, materialLimits, materialTarget, sourceMaterialIntent, type MaterialRouting } from './materialHistory';
+import type { WorkingWrite } from './acknowledgment';
 
 const fresh = (prefix: string) => `${prefix}_${crypto.randomUUID().replaceAll('-', '')}`;
 export class SyntheticMaterialSession {
@@ -16,7 +17,7 @@ export class SyntheticMaterialSession {
   private prepared: { plan: MaterialEffect; id: string; changes: Readonly<Record<string, string>> } | null = null;
   message = '';
   constructor(private readonly read: () => SyntheticProject, private readonly scene: () => string,
-    private readonly write: (token: string, changes: Readonly<Record<string, string>>) => void) {}
+    private readonly write: WorkingWrite, private readonly block: () => string | null = () => null) {}
   get pending(): PendingInteraction | null { return [...this.drafts.values()].some(d => d.composing) ? 'composition' : this.drafts.size ? 'text' : null; }
   context(otherPending: PendingInteraction | null): MaterialContext {
     const p = this.read(), sceneId = this.scene();
@@ -36,10 +37,15 @@ export class SyntheticMaterialSession {
           fieldIssues: Object.fromEntries(materialFields.map(f => [f, f === 'opacity' || f === 'softness' ? '半透明の表示は未接続です。' : null])) as Record<typeof materialFields[number], string | null>,
           admit: materialCapability }]), reason: null };
       }) }, selection: this.selections.get(sceneId)!, draft: this.drafts.get(sceneId) ?? null, pending: otherPending,
-      mutationBlock: null, feedback: this.feedback.get(sceneId) ?? { kind: 'idle' } };
+      mutationBlock: this.block(), feedback: this.feedback.get(sceneId) ?? { kind: 'idle' } };
   }
   accept(plan: MaterialPlan, context: MaterialContext): boolean {
+    const failed = (e: unknown) => {
+      this.message = e instanceof Error ? e.message : 'マテリアルを変更できません。';
+      if (plan.kind === 'apply' || plan.kind === 'remove') this.feedback.set(this.scene(), { kind: 'failed', plan, message: this.message });
+    };
     try {
+      if (this.block()) throw new Error(this.block()!);
       if (plan.kind === 'blocked') throw new Error(plan.reason);
       if (!materialPlanIsCurrent(plan, context)) throw new Error('設定が更新されています。入力と操作対象を保持しています。');
       if (plan.kind === 'select') this.selections.set(this.scene(), plan.selection);
@@ -61,27 +67,26 @@ export class SyntheticMaterialSession {
           }
           prepared = this.prepared = { plan, id, changes: Object.freeze(changes) };
         }
-        this.write(plan.token, prepared.changes);
+        const command = prepared;
+        return this.write(plan.token, command.changes, () => {
         const data = this.read().materialData;
-        if (Object.entries(prepared.changes).some(([key, text]) => data?.cells[key]?.kind !== 'value' || (data.cells[key] as { value: string }).value !== text))
+        if (Object.entries(command.changes).some(([key, text]) => data?.cells[key]?.kind !== 'value' || (data.cells[key] as { value: string }).value !== text))
           throw new Error('適用結果を確認できません。入力と操作を保持しています。');
         if (plan.kind === 'apply') {
-          const intent = data?.records[prepared.id]?.intent;
+          const intent = data?.records[command.id]?.intent;
           if (intent?.kind !== 'value' || canonicalFixture(intent.value) !== canonicalFixture(plan.intent)) throw new Error('適用した見え方を確認できません。');
           const remaining = acceptMaterialApply(plan, this.drafts.get(this.scene()) ?? null, { plan, projectId: plan.projectId, sceneId: plan.sceneId,
-            selection: plan.selection, recordId: prepared.id, intent: plan.intent });
+            selection: plan.selection, recordId: command.id, intent: plan.intent });
           if (remaining) throw new Error('入力を保持しています。適用結果を確認してください。');
           this.drafts.delete(this.scene());
         }
         this.prepared = null;
+        this.feedback.set(this.scene(), { kind: 'idle' }); this.message = '';
+        }, failed);
       }
       // Selection changes must not relabel/erase a previous failed operation.
       if (plan.kind !== 'select') this.feedback.set(this.scene(), { kind: 'idle' });
       this.message = ''; return true;
-    } catch (e) {
-      this.message = e instanceof Error ? e.message : 'マテリアルを変更できません。';
-      if (plan.kind === 'apply' || plan.kind === 'remove') this.feedback.set(this.scene(), { kind: 'failed', plan, message: this.message });
-      return false;
-    }
+    } catch (e) { failed(e); return false; }
   }
 }

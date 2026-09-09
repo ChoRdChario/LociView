@@ -59,10 +59,15 @@ asynchronously verified memory driver: commands are recorded as actual atomic
 fields, with original-ID/source correspondence, checked-before-publish state and
 exact staged retry. Equivalent model selection, independent Caption copies and
 second exchange execute through that driver. The existing served entry/session
-still uses the prior synchronous driver; its async acknowledgment hookup and
-connected acceptance remain the single provider exit in spec 05 §13.4.
+now selects it before mounting and shares one async acknowledgment/retry path
+across all editors and team receive/choice/copy. Mounted tests exercise the verified
+pair, retain pending drafts and explicit review candidates, and confirm independent
+Caption/model copies through a second exchange. The finite provider connection is
+code/mounted evidence under spec 05 §13.4, not browser/device or adoption credit.
 File/package exchange, durable storage and rendered/device acceptance remain
 pending as recorded in todo.
+The next connected action is new Caption/pin creation, currently disabled in
+this host, with explicit owner/position and the same verified acknowledgment.
 Real Project, storage, package and current-app activation retain their gates.
 
 For a fresh Codex session, read `tasks/handoff.md` after this map and the

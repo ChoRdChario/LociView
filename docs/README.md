@@ -61,9 +61,11 @@ If observed code conflicts with the applicable compatibility or accepted future 
 Latest C implementation: the isolated candidate has canonical original-field
 source correspondence and an async verified driver. Its two-actor/equivalent
 model/independent Caption copy/retry service loop reaches the full scoped pair.
-The served entry/session still uses the prior synchronous driver; async draft
-acknowledgment and connected C acceptance are next. Neither this source/driver
-nor the pure provider activates current UI, real storage, files or adoption.
+The served development entry now mounts that verified pair and shares async draft
+acknowledgment/retry across editors and team commands. Mounted tests cover two
+rounds, independent Caption/model copies, exact retry and source-based material
+review while rendering stays withheld. This connects C in development scope;
+it does not activate the ordinary UI, real storage, files or adoption.
 
 Current scheduling amendment (2026-09-09): specification 05 §13.4 is PO approved
 for a thin connected synthetic development host using the existing core/UI parts.
@@ -115,8 +117,9 @@ Known triangle/PNG bytes are checked in development scope; weak-only source byte
 are not fetched. A pure scope-labelled provider now maps affected closures/fields
 into same-token SceneState/resources and detail fields, preserving source and all
 diagnoses. The actual two-round candidate test reaches that pair and resolver.
-C's same-host source-adapter/authority switch remains required; no ordinary-app,
-ratified profile, general source-adapter or rendered/device credit.
+C's same-host source-adapter/authority switch now has code/mounted evidence as
+recorded above; no ordinary-app, ratified profile, general source-adapter or
+rendered/device credit.
 
 - Legacy-v1 ZIP/package code is not bounded-memory streaming despite older architecture text. The bounded Native portable and exchange packages use their separate streamed path.
 - Current XLSX reading is the local minimal reader in `src/io/xlsx.ts`, not SheetJS.

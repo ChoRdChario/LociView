@@ -58,9 +58,15 @@
 > validation and no backward failure from annotations into models. C's same-host
 > source now has canonical original operations and an asynchronously verified
 > driver. Two-actor/equivalent-model/independent-Caption-copy/retry tests reach its
-> pair. The served entry/session still uses the prior synchronous driver: next
-> connect async acknowledgment without clearing pending drafts. No current UI,
-> GC/save or adoption claim; C's single completion boundary stays open.
+> pair. The served development entry/session now selects that verified driver.
+> All editors and team commands share pending/failure/exact retry acknowledgment;
+> drafts and review choices clear only after confirmation. Mounted checks cover
+> two rounds, both independent copy types, all editors and duplicate material
+> review without restoring a rendering winner. C now has code/mounted connection
+> evidence; no ordinary UI, GC/save, browser/device or adoption claim. Durable/file
+> prerequisites are named in todo. Next close the same host's disabled new-Caption/
+> pin action using explicit owner/position and verified acknowledgment; do not
+> return to detached guards or activate real storage before its gates.
 > One finite boundary, not new per-record tasks; no additional manual test hold.
 > Windows Computer Use initialized but stopped automatically on unsafe-to-resolve
 > Chrome URL; no browser input/PASS or bypass. Keep the existing batched UI lane.

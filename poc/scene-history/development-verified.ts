@@ -59,7 +59,8 @@ function projectFromProvider(commands: HistorySnapshot, provider: Provider): Syn
       mediaResourceId: active && availability?.kind === 'unresolved' ? availability : fields.mediaResourceId,
       deleteEdit: row.deleteEdit || provider.issues.some(i => i.path[0] === 'captionAttachmentsById' && i.path[1] === id && i.code === 'concurrent-delete-edit') }];
   })) } as SyntheticProject['mediaData'];
-  return freezeSynthetic({ ...known, state: provider.state, resources: provider.resources, colors, modelNames, viewData, materialData, mediaData });
+  return freezeSynthetic({ ...known, state: provider.state, resources: provider.resources, colors, modelNames, viewData, materialData, mediaData,
+    materialReviewData: known.materialData });
 }
 
 /** Existing explicit fixture selections establish construction authority; never a conflict winner. */

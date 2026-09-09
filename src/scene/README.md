@@ -29,13 +29,14 @@ and existing IDs. Do not persist the read projection, replace whole CRDT maps, o
 treat `previewScenePlan` as a durable commit. `needsReview` retains the authored
 anchor coordinate; a hidden-owner entry is still listable with no marker.
 
-The isolated candidate now has a canonical source and async verified driver;
-its service-level same-token pair is tested, but the served entry/session still
-uses the prior synchronous driver. No source-adapter claim follows from this
-pure module alone.
+The isolated candidate now has a canonical source and async verified driver.
+The served development entry/session selects that pair and confirms all editor
+and team commands through one pending/retry coordinator. Exact source material
+candidates remain reviewable when their rendering authority is withheld.
+Connected mounted checks include both independent copy types and two rounds;
+this pure module alone still makes no source-adapter or browser claim.
 
-Remaining: served-host asynchronous acknowledgment/complete-provider integration, production
-storage/causal adapter and journal,
+Remaining: production storage/causal adapter and journal,
 resource content commands, deep keep-both remapping, conversion/exchange, actual
 SceneDocument/render plan, ordinary UI integration and device acceptance.
 Synthetic UI/view/media connections already exist; see current todo. Full

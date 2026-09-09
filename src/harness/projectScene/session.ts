@@ -29,6 +29,7 @@ import type { MaterialPlan } from '../../ui/projectScene/materialState';
 import { SyntheticMediaSession, type MediaContext } from './mediaSession';
 import { mediaSeed, projectMediaHistory } from './mediaHistory';
 import { previewHistory } from './historyPort';
+import { WorkingAcknowledgment, afterWorking, type WorkingResult } from './acknowledgment';
 
 export interface SyntheticPinInput {
   readonly coordinates: readonly [string, string, string]; readonly familyId: string | null;
@@ -46,9 +47,13 @@ const emptyMemory = (): SceneUiMemory => Object.freeze({ selectedCaptionId: null
 
 /** Development-only state. Optional isolated memory-history authority; never durable save. */
 export class SyntheticSession {
-  readonly views = new SyntheticViewSession(() => this.project, () => this.sceneId, (token, changes) => this.writeViews(token, changes));
-  readonly materials = new SyntheticMaterialSession(() => this.project, () => this.sceneId, (token, changes) => this.writeMaterials(token, changes));
-  readonly media = new SyntheticMediaSession(() => this.mediaContext(), (token, changes) => this.writeMedia(token, changes));
+  readonly acknowledgment = new WorkingAcknowledgment();
+  readonly views = new SyntheticViewSession(() => this.project, () => this.sceneId,
+    (token, changes, done, failed) => this.applyWorking(() => this.writeViews(token, changes), done, failed), () => this.workingBlock);
+  readonly materials = new SyntheticMaterialSession(() => this.project, () => this.sceneId,
+    (token, changes, done, failed) => this.applyWorking(() => this.writeMaterials(token, changes), done, failed), () => this.workingBlock);
+  readonly media = new SyntheticMediaSession(() => this.mediaContext(),
+    (token, changes, done, failed) => this.applyWorking(() => this.writeMedia(token, changes), done, failed), () => this.workingBlock);
   private project = createSyntheticProject();
   private navigation: NavigationSession;
   private drafts = new Map<string, CaptionDraft>();
@@ -82,12 +87,28 @@ export class SyntheticSession {
     }
   }
   get snapshot() { return this.project; }
+  get workingBlock() { return this.acknowledgment.block; }
+  /** One confirmation/retry path for every editor and team command. */
+  applyWorking(action: () => WorkingResult<unknown>, confirmed: () => void,
+    failed: (error: unknown) => void = error => { this.message = this.errorText(error); }): boolean {
+    const before = this.project.state.token;
+    return this.acknowledgment.run(action, confirmed, failed, () => {
+      if (this.authority?.status?.().kind === 'failed' && this.authority.retry)
+        return () => afterWorking(this.authority!.retry!(), next => this.publish(next));
+      if (this.authority && this.authority.read().state.token !== before)
+        return () => this.publish(this.authority!.read()); // Confirmation only, never new changes.
+      return undefined;
+    });
+  }
+  private writeProject(base: string, changes: Readonly<Record<string, string>>, local: SyntheticProject) {
+    return this.authority ? afterWorking(this.authority.write(base, changes), next => this.publish(next)) : this.publish(local);
+  }
   get session() { return this.navigation; }
   get sceneId() { return this.navigation.sceneId!; }
   get memory() { return this.navigation.sceneMemory[this.sceneId]!; }
   get pending(): PendingInteraction | null {
     const text = this.textPending;
-    return text === 'composition' ? text : this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : text;
+    return this.workingBlock ? 'update' : text === 'composition' ? text : this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : text;
   }
   private get textPending(): PendingInteraction | null {
     if (this.views.pending === 'composition' || this.materials.pending === 'composition' || this.media.pending === 'composition') return 'composition';
@@ -127,7 +148,7 @@ export class SyntheticSession {
   }
   private writeViews(base: string, changes: Readonly<Record<string, string>>) {
     if (base !== this.project.state.token) throw new Error('視点が更新されています。入力を保持しています。');
-    if (this.authority) { this.publish(this.authority.write(base, changes)); return; }
+    if (this.authority) return afterWorking(this.authority.write(base, changes), next => this.publish(next));
     const token = fresh('snapshot'), previous = { token: base, cells: this.project.viewData?.cells ??
       Object.fromEntries(Object.entries(viewHistorySeed()).map(([key, text]) => [key, { kind: 'value' as const, value: text }])),
       cellVersions: this.project.viewData?.versions };
@@ -139,7 +160,7 @@ export class SyntheticSession {
       resources: { ...this.project.resources, token, views: result.data.records }, viewData: result.data });
   }
   materialContext() {
-    const other: PendingInteraction | null = this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' :
+    const other: PendingInteraction | null = this.workingBlock ? 'update' : this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' :
       this.searchComposing || [...this.includes.values()].some(m => m.composing) || [...this.models.values()].some(m => m.composing) ||
       [...this.drafts.values()].some(d => d.composing) ? 'composition' : this.views.pending ?? this.media.pending;
     return this.materials.context(other);
@@ -151,12 +172,12 @@ export class SyntheticSession {
     const composing = this.searchComposing || [...this.includes.values()].some(m => m.composing) || [...this.models.values()].some(m => m.composing) ||
       [...this.drafts.values()].some(d => d.composing);
     return { project: this.project, sceneId: this.sceneId, captionId,
-      block: other ? '移動中の操作を終えてください。' : composing ? '文字の入力を確定してください。' : this.views.pending || this.materials.pending ?
-        '他の編集中の設定を適用するか取り消してください。' : source.kind !== 'ready' || !source.captions.some(c => c.id === captionId) ? 'キャプションを選択してください。' : null };
+      block: this.workingBlock ?? (other ? '移動中の操作を終えてください。' : composing ? '文字の入力を確定してください。' : this.views.pending || this.materials.pending ?
+        '他の編集中の設定を適用するか取り消してください。' : source.kind !== 'ready' || !source.captions.some(c => c.id === captionId) ? 'キャプションを選択してください。' : null) };
   }
   private writeMedia(base: string, changes: Readonly<Record<string, string>>) {
     if (base !== this.project.state.token) throw new Error('添付が更新されています。入力を保持しています。');
-    if (this.authority) { this.publish(this.authority.write(base, changes)); return; }
+    if (this.authority) return afterWorking(this.authority.write(base, changes), next => this.publish(next));
     const token = fresh('snapshot'), data = this.project.mediaData;
     const previous = { token: base, cells: data?.cells ?? Object.fromEntries(Object.entries(mediaSeed()).map(([k, text]) => [k, { kind: 'value' as const, value: text }])), causalChanges: data?.causalChanges };
     const mediaData = projectMediaHistory(previewHistory(previous, token, changes), Object.keys(this.project.resources.captions), previous);
@@ -164,7 +185,7 @@ export class SyntheticSession {
   }
   private writeMaterials(base: string, changes: Readonly<Record<string, string>>) {
     if (base !== this.project.state.token) throw new Error('設定が更新されています。入力を保持しています。');
-    if (this.authority) { this.publish(this.authority.write(base, changes)); return; }
+    if (this.authority) return afterWorking(this.authority.write(base, changes), next => this.publish(next));
     const token = fresh('snapshot'), previous = { token: base, cells: this.project.materialData?.cells ?? {} };
     const cells = { ...previous.cells, ...Object.fromEntries(Object.entries(changes).map(([key, text]) => [key, { kind: 'value' as const, value: text }])) };
     const data = projectMaterialHistory({ token, cells }, this.modelVersions.map(v => v.closure), previous);
@@ -220,7 +241,9 @@ export class SyntheticSession {
       }) }, memory: this.includes.get(this.sceneId)!, pending: this.pending, mutationBlock: null, feedback: this.includeFeedback };
   }
   acceptInclude(plan: CaptionIncludePlan): boolean {
+    const failed = (error: unknown) => { this.includeFeedback = { kind: 'failed', message: this.errorText(error) }; this.refuse(this.errorText(error)); };
     try {
+      if (this.workingBlock) throw new Error(this.workingBlock);
       if (plan.kind === 'blocked') throw new Error(plan.reason);
       if (!captionIncludePlanIsCurrent(plan, this.includeContext())) throw new Error('所属状態が変わっています。選び直してください。');
       if (plan.kind === 'change') this.includes.set(this.sceneId, plan.memory);
@@ -229,21 +252,22 @@ export class SyntheticSession {
         const membershipId = fresh('scm'), prepared = planSceneCommand(this.project.state, this.project.resources,
           { kind: 'include', sceneId: this.sceneId, resourceKind: 'caption', resourceId: plan.captionId, membershipId, orderKey: 'Z' }, fresh('evt'));
         const state = previewScenePlan(this.project.state, prepared, fresh('snapshot'));
-        this.publish(this.authority ? this.authority.write(this.project.state.token,
-          { [membershipKey(membershipId)]: JSON.stringify(state.captionMemberships[membershipId]) }) :
-          { ...this.project, state, resources: { ...this.project.resources, token: state.token } });
-        this.message = 'このシーンに追加しました。キャプションの内容と所有モデルは変わりません。';
+        return this.applyWorking(() => this.writeProject(plan.token,
+          { [membershipKey(membershipId)]: JSON.stringify(state.captionMemberships[membershipId]) },
+          { ...this.project, state, resources: { ...this.project.resources, token: state.token } }), () => {
+          this.message = 'このシーンに追加しました。キャプションの内容と所有モデルは変わりません。'; this.includeFeedback = { kind: 'idle' };
+        }, failed);
       }
       this.includeFeedback = { kind: 'idle' }; return true;
-    } catch (error) { this.includeFeedback = { kind: 'failed', message: this.errorText(error) }; return this.refuse(this.errorText(error)); }
+    } catch (error) { failed(error); return false; }
   }
   detailContext(): DetailContext {
     const source = this.detailSource();
     if (source.kind === 'ready' && !this.drafts.has(source.caption.id))
       this.drafts.set(source.caption.id, beginCaptionDraft(source)!);
     const draft = source.kind === 'ready' ? this.drafts.get(source.caption.id)! : null;
-    return { source, draft, mutationBlock: this.windowDragging ? 'ウィンドウの移動を終えてください。' : this.placement ? 'モデルの配置を確定するか、取り消してください。' :
-      this.pinInput ? 'ピンの操作を確定するか、取り消してください。' : null, feedback: this.detailFeedback };
+    return { source, draft, mutationBlock: this.workingBlock ?? (this.windowDragging ? 'ウィンドウの移動を終えてください。' : this.placement ? 'モデルの配置を確定するか、取り消してください。' :
+      this.pinInput ? 'ピンの操作を確定するか、取り消してください。' : null), feedback: this.detailFeedback };
   }
   modelContext(): ModelListContext {
     const { state, resources, modelNames } = this.project;
@@ -261,7 +285,7 @@ export class SyntheticSession {
           displayReason: !edge || (this.viewportState.ready && this.viewportState.assetIds.includes(asset.id)) ? null :
             asset.projection.kind !== 'value' || edges.length > 1 ? 'モデルの更新・所属の候補を確認してください。' :
               this.viewportState.issue ?? 'シーンに含まれています。3D表示を確認してください。' };
-      }) }, memory: this.models.get(this.sceneId)!, pending: this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : null, mutationBlock: null, feedback: this.modelFeedback };
+      }) }, memory: this.models.get(this.sceneId)!, pending: this.workingBlock ? 'update' : this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : null, mutationBlock: this.workingBlock, feedback: this.modelFeedback };
   }
   get modelVersions() { return this.project.modelVersions ?? syntheticVersions; }
   modelUpdateContext() {
@@ -273,9 +297,9 @@ export class SyntheticSession {
       name: asset ? this.project.modelNames[asset.id] ?? 'モデル' : '',
       current: projection ? modelVersion(asset!.id, projection.bindingId, this.modelVersions) : undefined,
       choices: this.modelVersions.filter(v => v.assetId === asset?.id && v.projection.bindingId !== projection?.bindingId), sceneCount,
-      issue: this.windowDragging ? 'ウィンドウの移動を終えてください。' : this.viewportDragging ? 'カメラ操作を終えてください。' : this.placement ? 'モデルの配置を確定するか、取り消してください。' : this.pinInput ? 'ピンの操作を確定するか、取り消してください。' : this.textPending === 'composition'
+      issue: this.workingBlock ?? (this.windowDragging ? 'ウィンドウの移動を終えてください。' : this.viewportDragging ? 'カメラ操作を終えてください。' : this.placement ? 'モデルの配置を確定するか、取り消してください。' : this.pinInput ? 'ピンの操作を確定するか、取り消してください。' : this.textPending === 'composition'
         ? '文字の入力を確定してください。' : !asset ? '一覧からモデルを選択してください。' :
-          asset.lifecycle.kind !== 'value' || asset.lifecycle.value.state !== 'active' || !projection ? 'モデルの更新状態を確認してください。' : null };
+          asset.lifecycle.kind !== 'value' || asset.lifecycle.value.state !== 'active' || !projection ? 'モデルの更新状態を確認してください。' : null) };
   }
   acceptModelUpdate(plan: ModelUpdatePlan): boolean {
     try {
@@ -286,8 +310,10 @@ export class SyntheticSession {
         version = versionFromClosure(createFixtureModel({ ...fixtureModelIds(version.closure), binding: fresh('bnd') }, version.closure.shape,
           context.current.closure.binding.assetToProject, context.current.projection.bindingId));
       }
-      this.publishModelVersion(plan.token, version);
-      this.message = '合成モデルを更新しました。記録と座標は保持しています。'; return true;
+      const selected = version;
+      return this.applyWorking(() => this.publishModelVersion(plan.token, selected), () => {
+        this.message = '合成モデルを更新しました。記録と座標は保持しています。';
+      });
     } catch (error) { return this.refuse(this.errorText(error)); }
   }
   private publishModelVersion(baseToken: string, version: SyntheticModelVersion) {
@@ -295,7 +321,7 @@ export class SyntheticSession {
     const versions = this.modelVersions.some(v => v.projection.bindingId === version.projection.bindingId) ? this.modelVersions : [...this.modelVersions, version];
     const changes = { [bindingKey(asset.id)]: version.projection.bindingId,
       ...(versions === this.modelVersions ? {} : { [modelClosureKey(version.projection.bindingId)]: canonicalFixture(version.closure) }) };
-    this.publish(this.authority ? this.authority.write(baseToken, changes) : { ...this.project, modelVersions: versions,
+    return this.writeProject(baseToken, changes, { ...this.project, modelVersions: versions,
       state: { ...this.project.state, token }, resources: { ...this.project.resources, token,
         assets: { ...this.project.resources.assets, [asset.id]: { ...asset, projection: value(version.projection) } } } });
   }
@@ -308,12 +334,14 @@ export class SyntheticSession {
     this.message = ''; return true;
   }
   changeModelPlacement(coordinates: readonly [string, string, string], composing = false): boolean {
+    if (this.workingBlock) return this.refuse(this.workingBlock);
     if (!this.placement) return false;
     const { prepared: _prepared, ...old } = this.placement;
     this.placement = freezeSynthetic({ ...old, coordinates: [...coordinates] as [string, string, string], composing }); return true;
   }
   finishModelPlacement(cancel = false): boolean {
     try {
+      if (this.workingBlock) throw new Error(this.workingBlock);
       const draft = this.placement; if (!draft || draft.composing) throw new Error('入力を確定してください。');
       if (cancel) { this.placement = null; this.message = ''; return true; }
       const active = this.project.resources.assets[draft.assetId]?.projection;
@@ -325,8 +353,9 @@ export class SyntheticSession {
       if (position.every((n, i) => n === draft.source.binding.assetToProject.translation[i])) { this.placement = null; this.message = '位置は変更されていません。'; return true; }
       const prepared = draft.prepared ?? moveFixtureModel(draft.source, fresh('bnd'), position);
       this.placement = freezeSynthetic({ ...draft, prepared });
-      this.publishModelVersion(draft.token, versionFromClosure(prepared)); this.placement = null;
-      this.message = 'モデルの配置を適用しました。保存は未接続です。'; return true;
+      return this.applyWorking(() => this.publishModelVersion(draft.token, versionFromClosure(prepared)), () => {
+        this.placement = null; this.message = 'モデルの配置を適用しました。保存は未接続です。';
+      });
     } catch (error) { return this.refuse(this.errorText(error)); }
   }
   get pinCoordinates() { return this.pinInput; }
@@ -353,7 +382,7 @@ export class SyntheticSession {
       block: !anchor ? 'ピン位置の競合を確認してください。' : anchor.kind !== 'asset' ? 'この接続版ではモデルに付いたピンだけ移動できます。' : null } : null;
     const correction = this.pinInput ? this.preparePinAnchor() : null;
     return { source: { kind: 'ready', token: state.token, sceneId: this.sceneId, models, selected },
-      memory: this.pins.get(this.sceneId)!, otherPending: this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.textPending, mutationBlock: null,
+      memory: this.pins.get(this.sceneId)!, otherPending: this.workingBlock ? 'update' : this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.textPending, mutationBlock: this.workingBlock,
       proposal: this.pinProposal, proposalIssue: correction?.issue ?? null, feedback: this.pinFeedback };
   }
   pinCoordinateContext() {
@@ -386,6 +415,7 @@ export class SyntheticSession {
     } catch (error) { return { issue: this.errorText(error) }; }
   }
   changePinCoordinates(input: SyntheticPinInput): boolean {
+    if (this.workingBlock) return this.refuse(this.workingBlock);
     const mode = this.pins.get(this.sceneId)!.mode;
     if (!mode || !this.pinInput) return false;
     this.pinInput = freezeSynthetic({ coordinates: [...input.coordinates] as [string, string, string], familyId: input.familyId });
@@ -393,7 +423,9 @@ export class SyntheticSession {
     this.pinFeedback = { kind: 'idle' }; return true;
   }
   acceptPin(plan: PinModePlan): boolean {
+    const failed = (error: unknown) => { this.pinFeedback = { kind: 'failed', message: this.errorText(error) }; this.refuse(this.errorText(error)); };
     try {
+      if (this.workingBlock) throw new Error(this.workingBlock);
       if (plan.kind === 'blocked') throw new Error(plan.reason);
       if (!pinModePlanIsCurrent(plan, this.pinContext())) throw new Error('対象が更新されています。指定中の位置は保持しています。');
       if (plan.kind === 'change') {
@@ -409,16 +441,20 @@ export class SyntheticSession {
         const correction = this.preparePinAnchor(), captionId = plan.mode.caption!.captionId;
         if (correction.issue || !correction.anchor) throw new Error(correction.issue ?? '位置を確認してください。');
         const token = fresh('snapshot'), caption = this.project.resources.captions[captionId]!;
-        this.publish(this.authority ? this.authority.write(plan.token, { [captionKey(captionId, 'anchor')]: JSON.stringify(correction.anchor) }) : {
+        const changes = { [captionKey(captionId, 'anchor')]: JSON.stringify(correction.anchor) };
+        const local = {
           ...this.project, state: { ...this.project.state, token }, resources: { ...this.project.resources, token,
-            captions: { ...this.project.resources.captions, [captionId]: { ...caption, anchor: value(correction.anchor) } } } });
-        this.pins.set(this.sceneId, { ...this.pins.get(this.sceneId)!, mode: null }); this.pinInput = null; this.pinProposal = null;
-        this.message = 'ピン座標を適用しました。保存は未接続です。';
+            captions: { ...this.project.resources.captions, [captionId]: { ...caption, anchor: value(correction.anchor) } } } };
+        return this.applyWorking(() => this.writeProject(plan.token, changes, local), () => {
+          this.pins.set(this.sceneId, { ...this.pins.get(this.sceneId)!, mode: null }); this.pinInput = null; this.pinProposal = null;
+          this.message = 'ピン座標を適用しました。保存は未接続です。'; this.pinFeedback = { kind: 'idle' };
+        }, failed);
       }
       this.pinFeedback = { kind: 'idle' }; return true;
-    } catch (error) { this.pinFeedback = { kind: 'failed', message: this.errorText(error) }; return this.refuse(this.errorText(error)); }
+    } catch (error) { failed(error); return false; }
   }
   acceptNavigation(plan: NavigationPlan): boolean {
+    if (this.workingBlock) return this.refuse(this.workingBlock);
     if (plan.kind === 'blocked') { this.message = plan.reason; return false; }
     if (plan.kind === 'unchanged') return true;
     if (!navigationPlanIsCurrent(plan, this.project.state, this.navigation, this.pending))
@@ -451,6 +487,7 @@ export class SyntheticSession {
     this.message = ''; return true;
   }
   acceptDetail(event: CaptionDetailEvent): boolean {
+    if (this.workingBlock) return this.refuse(this.workingBlock);
     const context = this.detailContext();
     if (event.kind === 'window') {
       if (context.source.kind !== 'ready' || event.token !== context.source.token || event.sceneId !== this.sceneId ||
@@ -469,6 +506,7 @@ export class SyntheticSession {
       this.detailFeedback = { kind: 'idle' }; this.message = ''; return true;
     }
     if (event.kind !== 'apply') return this.refuse('この開発版では状態修復は未接続です。');
+    const failed = (error: unknown) => { this.detailFeedback = { kind: 'failed', plan: event, message: this.errorText(error) }; this.refuse(this.detailFeedback.message); };
     try {
       if (!captionApplyIsCurrent(event, context)) throw new Error('状態が変わっています。入力は保持しています。');
       const token = fresh('snapshot'), old = this.project.resources.captions[event.captionId]!;
@@ -477,22 +515,21 @@ export class SyntheticSession {
       const local = { ...this.project, state: { ...this.project.state, token },
         resources: { ...this.project.resources, token, captions: { ...this.project.resources.captions, [old.id]: nextCaption } },
         colors: event.changes.color === undefined ? this.project.colors : { ...this.project.colors, [old.id]: value(event.changes.color) } };
-      this.publish(this.authority ? this.authority.write(this.project.state.token,
-        Object.fromEntries(Object.entries(event.changes).map(([field, text]) =>
-          [captionKey(old.id, field as 'title' | 'body' | 'color'), text!]))) : local);
-      this.drafts.set(old.id, acceptCaptionApply(event, context.draft!, this.detailSource()));
-      this.detailFeedback = { kind: 'idle' }; this.message = '変更を適用しました。このページ内だけの変更です。'; return true;
-    } catch (error) {
-      this.detailFeedback = { kind: 'failed', plan: event, message: this.errorText(error) };
-      return this.refuse(this.detailFeedback.message);
-    }
+      const changes = Object.fromEntries(Object.entries(event.changes).map(([field, text]) => [captionKey(old.id, field as 'title' | 'body' | 'color'), text!]));
+      return this.applyWorking(() => this.writeProject(event.token, changes, local), () => {
+        this.drafts.set(old.id, acceptCaptionApply(event, context.draft!, this.detailSource()));
+        this.detailFeedback = { kind: 'idle' }; this.message = '変更を適用しました。このページ内だけの変更です。';
+      }, failed);
+    } catch (error) { failed(error); return false; }
   }
   acceptModel(plan: ModelListPlan): boolean {
+    if (this.workingBlock) return this.refuse(this.workingBlock);
     if (plan.kind === 'blocked') return this.refuse(plan.reason);
     if (!modelListPlanIsCurrent(plan, this.modelContext())) return this.refuse('所属状態が変わっています。選び直してください。');
     if (plan.kind === 'change') this.models.set(this.sceneId, plan.memory);
     else if (plan.kind === 'review') return this.refuse('モデルの修復は未接続です。シーンへの追加・除外は操作できます。');
     else if (plan.kind === 'membership') {
+      const failed = (error: unknown) => { this.modelFeedback = { kind: 'failed', plan, message: this.errorText(error) }; this.refuse(this.modelFeedback.message); };
       try {
         const command = plan.action === 'include'
           ? { kind: 'include' as const, sceneId: plan.sceneId, resourceKind: 'asset' as const,
@@ -501,14 +538,11 @@ export class SyntheticSession {
         const prepared = planSceneCommand(this.project.state, this.project.resources, command, fresh('evt'));
         const state = previewScenePlan(this.project.state, prepared, fresh('snapshot'));
         const changed = state.assetMemberships[command.membershipId]!;
-        this.publish(this.authority ? this.authority.write(this.project.state.token,
-          { [membershipKey(changed.id)]: JSON.stringify(changed) }) :
-          { ...this.project, state, resources: { ...this.project.resources, token: state.token } });
-        this.modelFeedback = { kind: 'idle' };
-      } catch (error) {
-        this.modelFeedback = { kind: 'failed', plan, message: this.errorText(error) };
-        return this.refuse(this.modelFeedback.message);
-      }
+        return this.applyWorking(() => this.writeProject(plan.token, { [membershipKey(changed.id)]: JSON.stringify(changed) },
+          { ...this.project, state, resources: { ...this.project.resources, token: state.token } }), () => {
+          this.modelFeedback = { kind: 'idle' }; this.message = '';
+        }, failed);
+      } catch (error) { failed(error); return false; }
     }
     this.message = ''; return true;
   }

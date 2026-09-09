@@ -19,6 +19,8 @@ export interface SyntheticProject {
   readonly modelVersions?: readonly SyntheticModelVersion[];
   readonly viewData?: ViewData;
   readonly materialData?: MaterialData;
+  /** Exact known command candidates for explicit review only, never rendering authority. */
+  readonly materialReviewData?: MaterialData;
   readonly mediaData?: MediaData;
 }
 export function freezeSynthetic<T>(item: T): T {

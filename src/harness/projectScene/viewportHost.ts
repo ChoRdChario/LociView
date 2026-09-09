@@ -34,6 +34,7 @@ export function createViewportHost(document: Document, session: SyntheticSession
   let disposed = false, display: SyntheticDisplay | null = null, error: string | null = null;
   let rendering = false, hasRendered = false;
   let runtime: SyntheticViewport | undefined, context: ViewContext, pinKey = '';
+  let authorConfirmationMemory: ViewContext['memory'] | undefined;
   const pins = new Map<string, HTMLButtonElement>();
   const view = createViewControls(document, plan => {
     if (disposed) return;
@@ -48,11 +49,13 @@ export function createViewportHost(document: Document, session: SyntheticSession
     const take = runtime?.capture ? () => runtime!.capture!() : undefined;
     const before = session.views.authorContext(currentContext(), take);
     const accepted = session.views.acceptAuthor(event, before);
+    if (event.kind === 'apply' && (accepted || session.workingBlock)) authorConfirmationMemory = before.view.memory;
     if (accepted && event.kind === 'apply') {
       // Clear the exact receipt-confirmed draft on its original UI target before
       // showing the newly created selection; never bypass the pending-target guard.
       const after = session.views.authorContext(currentContext(), take);
       author.render({ ...after, view: { ...after.view, memory: before.view.memory } });
+      authorConfirmationMemory = undefined;
     }
     changed();
   });
@@ -77,7 +80,11 @@ export function createViewportHost(document: Document, session: SyntheticSession
   function paint() {
     if (disposed) return;
     context = currentContext(); view.render(context);
-    author.render(session.views.authorContext(context, runtime?.capture ? () => runtime!.capture!() : undefined));
+    const authorContext = session.views.authorContext(context, runtime?.capture ? () => runtime!.capture!() : undefined);
+    if (authorConfirmationMemory && !authorContext.draft) {
+      if (author.render({ ...authorContext, view: { ...context, memory: authorConfirmationMemory } })) authorConfirmationMemory = undefined;
+    }
+    author.render(authorContext);
     const observed = runtime?.read();
     const rect = canvas.getBoundingClientRect?.();
     windows.project({ ready: Boolean(observed?.ready && !error), width: rect?.width ?? 0, height: rect?.height ?? 0, pins: observed?.pins ?? [] });

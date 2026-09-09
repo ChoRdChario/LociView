@@ -25,6 +25,10 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   const notice = make('p', '開発用・合成データのみ。変更は保存されず、再読み込みで失われます。');
   notice.className = 'lv-development-notice';
   const message = make('p'); message.className = 'lv-development-message';
+  const working = make('section'), workingStatus = make('p'), retryWorking = make('button', '更新を再試行');
+  working.setAttribute('aria-label', '更新の確認'); workingStatus.setAttribute('role', 'status');
+  retryWorking.type = 'button'; working.append(workingStatus, retryWorking);
+  retryWorking.addEventListener('click', () => { session.acknowledgment.retry(); afterAction(); });
   message.setAttribute('role', 'status'); message.setAttribute('aria-live', 'polite');
   const content = make('div'); content.className = 'lv-development-content';
   const stage = make('section'); stage.className = 'lv-development-stage'; stage.setAttribute('aria-label', 'シーンの構成');
@@ -70,9 +74,15 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   viewPanel.replaceChildren(viewport.view);
   materialPanel.replaceChildren(material.root);
   sidebar.append(navigation.taskControl, list.root, include.root, modelList.root, placement.actions, modelUpdate.root, materialPanel, viewPanel);
-  content.append(stage, sidebar); root.append(header, notice, message, content, footer);
+  content.append(stage, sidebar); root.append(header, notice, working, message, content, footer);
   function render() {
     if (disposed) return;
+    working.hidden = !session.workingBlock;
+    workingStatus.textContent = session.workingBlock ? `${session.workingBlock}${session.acknowledgment.error ? ` ${session.acknowledgment.error}` : ''}` : '';
+    retryWorking.hidden = session.acknowledgment.state !== 'failed';
+    // Keep editors mounted and draft DOM intact, but prevent overlapping native input.
+    content.inert = header.inert = !!session.workingBlock;
+    content.setAttribute('aria-busy', String(session.acknowledgment.state === 'checking'));
     viewport.render(!root.hidden);
     // Session admission aggregates all component pending-input rules before a Scene change.
     // Refresh every mounted recipient even while hidden; never unmount an editor to change tabs.
@@ -115,9 +125,10 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     pinCount.textContent = `キャプション ${captions.length}件 ・ ピン表示対象 ${intended}件${viewport.connected ? '' : '（描画未接続）'}`;
     message.textContent = session.message; message.hidden = !session.message;
   }
+  const unsubscribe = session.acknowledgment.subscribe(afterAction);
   render();
   return { root, session, render, dispose() {
-    disposed = true; navigation.dispose(); list.dispose(); detail.dispose(); modelList.dispose();
+    disposed = true; unsubscribe(); navigation.dispose(); list.dispose(); detail.dispose(); modelList.dispose();
     pin.dispose(); coordinates.dispose(); modelUpdate.dispose(); placement.dispose(); include.dispose(); viewport.dispose(); material.dispose(); media.dispose(); root.remove();
   } };
 }

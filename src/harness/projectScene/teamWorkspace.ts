@@ -1,7 +1,7 @@
 import { createDevelopmentWorkspace } from './workspace';
 import { SyntheticSession } from './session';
 import { historyAuthority, historySeed, projectHistory } from './historyProjection';
-import type { DevelopmentHistoryFactory, MemoryUpdate } from './historyPort';
+import type { WorkingHistoryFactory, MemoryUpdate } from './historyPort';
 import { decodeSyntheticAnchor, modelVersion, syntheticVersions } from './modelFixture';
 import { sceneSwitchReason } from '../../ui/projectScene/navigationState';
 import { applyMembershipResolution, duplicateMemberships, planMembershipResolution, type MembershipResolutionPlan } from './membershipResolution';
@@ -14,8 +14,8 @@ import { attachmentImage, attachmentKey, copyableAttachments, fixtureMedia } fro
 import { canonicalFixture } from './modelClosure';
 
 /** Two independently edited histories in one disposable page, not a file-sharing UI. */
-export function createTeamWorkspace(document: Document, factory: DevelopmentHistoryFactory, viewportFactory?: ViewportFactory) {
-  const histories = factory(historySeed(), projectHistory);
+export function createTeamWorkspace<F extends WorkingHistoryFactory>(document: Document, factory: F, viewportFactory?: ViewportFactory) {
+  const histories = factory(historySeed(), projectHistory) as ReturnType<F>;
   const sessions = histories.map(h => new SyntheticSession(historyAuthority(h)));
   const initial = histories.map(h => h.read().token);
   const names = ['準備担当', '参加者'];
@@ -62,10 +62,12 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
       if (session.pending && session.pending !== 'text') throw new Error(sceneSwitchReason(session.pending));
       const update = replay ? lastReceived[active] : histories[1 - active]!.exportUpdate();
       if (!update) throw new Error('再受信する更新がありません。');
-      const result = histories[active]!.receive(update);
       lastReceived[active] = update;
-      session.refreshHistory();
-      status.textContent = result.added ? '更新を受け取りました。未適用の入力も保持しています。' : '受信済みです。編集内容は変わりません。';
+      const history = histories[active]!, before = history.read().token;
+      session.applyWorking(() => history.receive(update), () => {
+        session.refreshHistory();
+        status.textContent = history.read().token !== before ? '更新を受け取りました。未適用の入力も保持しています。' : '受信済みです。編集内容は変わりません。';
+      }, error => { status.textContent = error instanceof Error ? error.message : '受信できません。編集を保持しています。'; });
     });
   }
   receive.addEventListener('click', () => receiveUpdate(false));
@@ -132,9 +134,11 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
               membershipId: fresh('sam'), ids: allocateModelCopyIds(fixtureModelIds(source!), fresh),
               ...(materialCopyIntent(session.snapshot.materialData, duplicate.sceneId, source!) ? { materialOverrideId: fresh('ovr') } : {}) })));
         }
-        applyMembershipResolution(history, choice.plan);
-        session.refreshHistory(); status.textContent = action === 'one' ? '選んだ項目を残しました。' :
-          '別々に編集できる項目として残しました。相手側でも更新を受け取ってください。';
+        const plan = choice.plan;
+        session.applyWorking(() => applyMembershipResolution(history, plan), () => {
+          session.refreshHistory(); status.textContent = action === 'one' ? '選んだ項目を残しました。' :
+            '別々に編集できる項目として残しました。相手側でも更新を受け取ってください。';
+        });
       });
       one.addEventListener('click', () => resolve('one')); both.addEventListener('click', () => resolve('both'));
       fieldset.append(preview, one);
@@ -152,8 +156,8 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
       const cell = snapshot.cells[key];
       if (cell?.kind === 'conflict') {
         if (!history.resolveAttachmentLifecycle) throw new Error('この接続では削除状態を解決できません。候補と選択を保持しています。');
-        history.resolveAttachmentLifecycle(snapshot.token, key, cell.candidates.map(c => c.id), value);
-      } else history.write(snapshot.token, { [key]: value });
+        return history.resolveAttachmentLifecycle(snapshot.token, key, cell.candidates.map(c => c.id), value);
+      } else return history.write(snapshot.token, { [key]: value });
     };
     for (const choices of [deleteChoices, lifecycleChoices]) for (const key of choices.keys())
       if (key.startsWith(`${active}/`) && !key.startsWith(`${active}/${snapshot.token}/`)) choices.delete(key);
@@ -169,8 +173,8 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
         if (disposed || active !== shownActor || session.pending || !['deleted', 'active'].includes(choose.value)) throw new Error('対象と入力を確認してください。');
         if (!choice.changes) choice.changes = { [attachmentKey(row.id, 'lifecycle')]:
           canonicalFixture({ state: choose.value, eventId: `evt_${crypto.randomUUID().replaceAll('-', '')}`, reason: 'conflictResolution' }) };
-        const field = attachmentKey(row.id, 'lifecycle'); resolveAttachmentLife(field, choice.changes[field]!);
-        session.refreshHistory(); deleteChoices.delete(key);
+        const field = attachmentKey(row.id, 'lifecycle'), command = choice.changes[field]!;
+        session.applyWorking(() => resolveAttachmentLife(field, command), () => { session.refreshHistory(); deleteChoices.delete(key); });
       }));
       box.append(legend, make('p', '添付の削除と編集が同時に行われました。両方の変更を保持しています。'));
       for (const [field, label] of [['altText', '説明'], ['orderKey', '順序']] as const) {
@@ -256,9 +260,12 @@ export function createTeamWorkspace(document: Document, factory: DevelopmentHist
         if (lifecycleChoice) {
           lifecycleChoice.value ??= canonicalFixture({ state: JSON.parse(cell.candidates.find(c => c.id === selected)!.value).state,
             eventId: `evt_${crypto.randomUUID().replaceAll('-', '')}`, reason: 'conflictResolution' });
-          resolveAttachmentLife(key, lifecycleChoice.value); lifecycleChoices.delete(retainedKey);
-        } else history.choose(snapshot.token, key, selected);
-        session.refreshHistory(); status.textContent = '選んだ内容を適用しました。相手側でも更新を受け取ってください。';
+        }
+        const selectedId = selected, command = lifecycleChoice?.value;
+        session.applyWorking(() => command ? resolveAttachmentLife(key, command) : history.choose(snapshot.token, key, selectedId), () => {
+          if (lifecycleChoice) lifecycleChoices.delete(retainedKey);
+          session.refreshHistory(); status.textContent = '選んだ内容を適用しました。相手側でも更新を受け取ってください。';
+        });
       }));
       group.append(confirm);
       if (session.pending !== null) group.append(make('p', '未適用の入力を保持しています。必要な文章を控え、適用するか取り消してから選択してください。'));
