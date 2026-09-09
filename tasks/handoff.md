@@ -4,8 +4,11 @@
 > keeping unplaced Captions editable. Specification 05 §9.4 defines the proposed
 > atomic mapping and late-input rules; 06 §§4.1/5.1/8–9 define base evidence,
 > nonvisual-owner conversion and full/delta recovery vectors. Independent review
-> covers this draft only. Next: new migration/portable-bridge recipe and canonical
-> fixture definitions, followed by the remaining wire/adoption ratification inputs.
+> covers this draft only. Companion 07 now records source identities/ID keys,
+> baseline/registration, guarded old Scene/attachment replacement and shared
+> original-artifact requirements, with four calculated identity examples. Next:
+> exact managed-unit/introduction and prepared-migration journal interfaces plus
+> the remaining wire/profile/adoption inputs, not another standalone probe.
 > Runtime schema, actual files/storage and UI are unchanged. No renewed preservation
 > question, closed Chrome journal rerun or immediate human test is needed.
 

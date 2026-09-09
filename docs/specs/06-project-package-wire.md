@@ -618,5 +618,10 @@ new documentation checkpoint as a technology gate pass.
 Independent review may correct this draft but cannot approve it for the Product
 Owner. After these inputs and explicit ratification, S2 still depends on the
 metadata/CAS gates and separately ratified migration/Native-bridge companion.
+The proposed [07 companion](07-project-scene-migration.md) also requires a
+prepared-migration journal source distinct from this document's full-metadata/
+Contribution union, plus portable managed-unit/introduction evidence. Those
+interfaces and their exact artifact bytes remain ratification inputs, not an
+implicit permission to feed converted Native metadata into a remote source slot.
 No production reader/writer, current UI connection, dependency adoption, release,
 Pages, Service Worker, media expansion or performance guarantee is authorized.

@@ -14,9 +14,12 @@ Current task (2026-09-10, after readiness checkpoint `77a22b0`): PO approved
 unplaced-Caption preservation. Specification 05 §9.4 proposes its exact atomic
 state/bridge mapping; 06 §§4.1/5.1/8–9 specify retained base proof, history-free
 owners and full/delta recovery vectors. These are reviewed technical drafts, not
-runtime schema or wire adoption. The next contract portion is the new migration/
-portable-bridge recipe and canonical fixtures; remaining measured adoption inputs
-stay separate. See `tasks/todo.md` top. No old journal rerun or immediate human test.
+runtime schema or wire adoption. Companion 07 now drafts source identities/keys,
+portable baseline/registration and atomic relation/parallel-introduction behavior;
+four calculated identity examples are not whole-conversion proof. Next are exact
+managed-unit/introduction and prepared-migration journal interfaces alongside
+wire/profile inputs; measured adoption requirements remain separate. See
+`tasks/todo.md` top. No old journal rerun or immediate human test.
 
 2026-09-10: PO reports the five prescribed camera/pin/window manual groups PASS
 at `7540478`; this supersedes their pending status below only for that scope.

@@ -47,6 +47,7 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metri
 | Document | Status / purpose |
 |---|---|
 | [`06-project-package-wire.md`](06-project-package-wire.md) | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED`; five-purpose wire design under 05 §7.5, with explicit unresolved journal/base, budget and history-free-builder inputs; no format/version or production authorization |
+| [`07-project-scene-migration.md`](07-project-scene-migration.md) | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED`; source-domain/ID recipe, portable Native baseline and atomic relation mapping, original-artifact/replay requirements and calculated identity examples. Inspector, introduction/adapter/journal bytes and whole-output goldens remain gates |
 
 ## Fixed versus conditional decisions
 

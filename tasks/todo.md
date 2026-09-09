@@ -9,7 +9,56 @@ requested. Synthetic two-person model/pin/history and independent Caption/model-
 The scoped PO result below closes only the listed interaction checks; broader
 rendered, IME, device and durable-file acceptance remain pending.
 
-### Current contract checkpoint — approved unplaced outcome and recovery design (2026-09-10)
+### Current work — migration and portable Native bridge recipe (2026-09-10)
+
+PO approved proceeding with the next bounded contract artifact. Start clean
+`g0-baseline` at `fdbea7e`; two local documentation commits follow the pushed
+`b1b36bd` implementation. The user outcome remains the connected team workflow,
+not a new migration subsystem campaign. This draft specifies the mapping and
+remaining exact interfaces before real-file activation; no existing UI or source
+bytes change.
+
+- [x] Confirm checkpoint, approved scope and relevant current source contracts.
+- [x] Define a new companion's source identities, deterministic keys, complete
+  digest/collision registration and lossless Scene/Caption mapping.
+- [x] Draft portable baseline/ancestor and processed-package/original-change
+  records, repeat/parallel import behavior and five-purpose retention/privacy.
+- [x] Define canonical synthetic identity vectors and finite conversion/recovery
+  acceptance; distinguish computed identity bytes from unexecuted migration.
+- [x] Independent read-only review and align current indexes/handoffs.
+- [x] Final documentation-only diff/reference and exact staged-scope checks.
+
+Reuse Native/v1/LociMyu source contracts and previous unplaced/full-delta design.
+No runtime implementation, real-file conversion, dependency/profile/adoption,
+UI/browser probe, media expansion or release action. The exact descriptor and
+whole-output goldens remain unratified until their defined inputs are complete.
+Stop at a product-policy/compatibility conflict; do not invent source relations
+or claim that draft recipe text passes a gate. No human test is needed here.
+
+Result: companion 07 separates frozen-v1, Native fixed/isolated and LociMyu
+identity domains, defines new output-key registrations and portable Native
+baseline/ancestor receipts, and preserves whole-source placement/Scene/attachment
+semantics. It keeps membership endpoints immutable and v2-only relations intact.
+Four synthetic identity hashes agree between Node crypto and .NET SHA-256;
+three ID preimage byte lengths also agree. These are calculated identity examples,
+not whole-converter, artifact, storage or browser evidence. Independent reviews
+found one over-broad repack acceptance row; it is corrected to fixed-baseline
+Native bridge only. No runtime files, dependencies or old source data changed.
+Final scope is nine Markdown files; diff/reference checks PASS. The staged-diff
+read caught duplicate navigation paragraphs in 05/06, removed before commit.
+No unchanged application suite/build was rerun for this documentation-only slice.
+
+Next concrete engineering boundary: pin 07 §10's managed-unit/introduction
+reservation and prepared-migration journal interfaces, plus the existing wire/
+inspector/whole-output inputs. A deterministic whole-package actor alone cannot
+avoid duplicate new-entity birth across different packages. Do not bypass that
+gap with random per-device replays, mutable membership endpoints, silent union,
+current-state snapshot replacement or another isolated UI/probe. Native pin-scale
+mapping and frozen-v1 later-copy support are explicit remaining conversion inputs.
+The recipe draft is reviewable, not ready for real-file activation or ratification
+of an absent artifact/profile; adoption and physical-device gates stay separate.
+
+### Completed contract checkpoint — approved unplaced outcome and recovery design (2026-09-10)
 
 PO approved retaining unplaced Captions as editable list items, with their
 text/media/Scene membership and no fabricated position or owner. Start clean

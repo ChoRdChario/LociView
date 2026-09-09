@@ -55,6 +55,7 @@ If observed code conflicts with the applicable compatibility or accepted future 
 | `specs/04-locimyu-conversion.md` | `PRODUCT-OWNER APPROVED / BOUNDED DIRECT ADAPTER IMPLEMENTED / PRODUCT ACCEPTANCE PASS` | Exact LociMyu identity/source authority and report boundary; six representative rows with an empty trimmed ID are reported as empty input, while 103 Captions publish and survive portable restore without changing the source; Desktop and physical-iPhone acceptance passed |
 | `specs/05-project-scene-team-workflow.md` | `PRODUCT-OWNER APPROVED / CORE, RECORD GUARDS, UI AND SYNTHETIC WORKSPACE/HISTORY LOOPS` | §§13.1/13.3 reusable core/UI; §13.4 connects navigation/Caption/models, two independent memory histories and exact synthetic triangle/pin viewing controls. No ordinary-app/storage integration, renderer adoption, rendered acceptance or full Project validator. Product file exchange/migration remains unimplemented; current Native bytes unchanged |
 | `specs/06-project-package-wire.md` | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED` | Five-purpose wire companion draft; explicit delta/journal, base-receipt, budget and snapshot-builder ratification inputs. No adopted format/version, production bytes or gate credit |
+| `specs/07-project-scene-migration.md` | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED` | New migration identity/portable Native bridge draft, source-atomic relation guards, exact-artifact requirements and calculated identity examples; remaining inspector/adapter/journal/whole-output inputs explicit |
 
 ## Known implementation drift
 
@@ -64,8 +65,12 @@ outcomes, exact wire/migration design gaps and remaining storage/device evidence
 schema/bridge mapping. 06 §§4.1/5.1/8–9 define retained base evidence, nonvisual
 owners and full/delta recovery with structural vectors. Runtime still lacks the
 unplaced branch; no adopted wire/recipe or executed byte goldens are claimed.
-Next is the exact new migration/portable-bridge recipe, not another product choice
-about keeping these Captions. No new browser probe or runtime change in this task.
+The next recipe portion is now drafted in 07: source identity/ID keys, portable
+baseline/registrations, source-managed Scene/attachment guards and shared original
+artifacts. Four identity examples were computed, not a whole converter proven.
+The next exact interface is managed-unit/introduction plus prepared-migration
+journal, alongside the existing wire/profile inputs. No new browser probe or
+runtime change, and no renewed question about keeping unplaced Captions.
 
 2026-09-10: PO reports the five prescribed camera/pin/window groups PASS at
 `7540478`; their earlier pending status below is historical. Broader rendered,

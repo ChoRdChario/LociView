@@ -684,6 +684,11 @@ ratify every canonical source key, domain-separated preimage, full digest,
 collision check, output kind and golden byte/hash vector. Until that companion
 passes its gate, durable ProjectScene conversion remains disabled.
 
+The [07 migration/Native-bridge companion](07-project-scene-migration.md) now
+drafts those source domains/ID mappings and portable evidence, including source-
+atomic relation guards and parallel-introduction requirements. It is unratified;
+its §10 lists remaining exact inspector/adapter/journal/whole-output inputs.
+
 Every admitted Native/frozen-v1/LociMyu model and media payload is retained
 byte-for-byte under a verified digest and byte length, either by safely reusing
 the same immutable local blob or by streaming an exact copy into the v2 store.
