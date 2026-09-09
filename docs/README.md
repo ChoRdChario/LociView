@@ -58,6 +58,12 @@ If observed code conflicts with the applicable compatibility or accepted future 
 
 ## Known implementation drift
 
+2026-09-10: PO reports the five prescribed camera/pin/window groups PASS at
+`7540478`; their earlier pending status below is historical. Broader rendered,
+IME/iPhone/storage acceptance remains open. The next Scene-first UX review and
+later-adjustment entry are recorded in UI guidelines §4.3, not implemented or
+an accepted change to model-relative anchors.
+
 Latest C implementation: the isolated candidate has canonical original-field
 source correspondence and an async verified driver. Its two-actor/equivalent
 model/independent Caption copy/retry service loop reaches the full scoped pair.

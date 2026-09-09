@@ -5,10 +5,39 @@
 PO approved building the whole workflow thinly before subsystem polish. Authority:
 specification 05 §13.4; final completion remains `TEAM-FLOW-01` in §12.6.
 The completed journal Chrome recheck below stays closed; no journal rerun is
-requested. Synthetic two-person model/pin/history and independent Caption/model-copy loops now exist; browser,
-IME and device acceptance remain pending, not implied by its DOM tests.
+requested. Synthetic two-person model/pin/history and independent Caption/model-copy loops now exist.
+The scoped PO result below closes only the listed interaction checks; broader
+rendered, IME, device and durable-file acceptance remain pending.
 
-### Current change — Blender mouse navigation and accumulating windows
+### Current decision — Scene-first Caption workflow (2026-09-10)
+
+- [x] Record PO-reported PASS for the five preceding manual test groups at
+  `7540478`: basic Blender mouse navigation; Shift+click placement/gizmo;
+  button-based placement/cancel; existing-pin move/cancel; accumulating windows,
+  close/reopen, list/pin selection and arrange. This is a human report, not an AI
+  browser run or captured browser version; no full team/iPhone/storage/offline PASS.
+- [x] Inspect code/contracts and receive one bounded read-only review. Record
+  requested layout and proposed input changes in UI guidelines §4.3; no code edits.
+- [ ] Confirm removal of everyday model preselection versus removal of internal
+  model-relative anchors; amend spec 05 before changing the surface-target rule.
+- [ ] Same-host UI: Scene list atop Caption; Scene/color/search browsing;
+  conditional model details; secondary window tools in the sidebar; discoverable
+  selected-Caption `位置を調整` next to add, using the current-position gizmo.
+- [ ] Reuse the five-group PASS and verify changed paths, not the old journal.
+
+Current code filters pins by color, not list rows. Combined list/pin filtering is
+proposed. Scene selection remains one workspace-wide state, affecting models,
+materials and views; retain current-Scene context in other tabs. A compatible
+existing pin already initializes move from its current coordinates without a
+new surface hit; the earlier human instructions unnecessarily required one.
+The added PO report says later adjustment was not usable/discoverable. Keep this
+as a UX gap, not an assertion that the move command does not exist; exact failing
+state is not established. Incompatible updated anchors still require surface review.
+Miss/ambiguous hits, unknown/review records, explicit confirmation, pending drafts
+and original-owner moves remain protected. No owner removal, automatic rebind,
+new ProjectAnchor authoring, storage/schema/dependency/ordinary-entry/release change.
+
+### Previous change — Blender mouse navigation and accumulating windows
 
 PO requests Blender-style camera input and LociMyu-style sequential Caption
 windows: explicit selection opens/keeps each window; users close each with ×.

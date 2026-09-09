@@ -136,6 +136,9 @@ There is one normal home at `/`.
 
 ### 4.2 Workspace structure
 
+The PO's 2026-09-10 requested revision is recorded in §4.3. The following layout
+describes the preceding arrangement; proposed input semantics do not amend spec 05 alone.
+
 The normal Desktop workspace has three stable regions:
 
 1. a shared header for Project identity, View/Edit state, save state,
@@ -164,6 +167,44 @@ Scene selection itself is local session state: it changes the resolved
 presentation and applies that Scene's valid entry view once, but it never changes
 the Project-wide active model revision/alignment or silently changes the Project
 default Scene.
+
+### 4.3 Scene-first revision requested after manual acceptance (2026-09-10)
+
+**PO-requested direction / not implemented:** ordinary Caption work starts with
+the Scene, then search and direct pin-color circles immediately above the list.
+Move Scene selection from the shared-header dropdown to a visible Scene list at
+the top of the Caption tab. Move window front/arrange tools out of the upper-left
+stage into secondary Caption controls. The stage prioritizes content, view
+recovery and contextual placement controls. Do not require everyday model-based
+Caption organization. Make later pin adjustment discoverable from the selected
+Caption, next to add, without requiring the user to select the owner model again.
+
+**Proposed implementation for confirmation:** retain one navigation state; Scene
+changes still affect models, materials and entry views, not only Captions. Other
+tabs show the current Scene as context. Tab changes never switch Scene or discard
+drafts. Remove the normal owner filter and repeated owner subtitles; retain
+contextual model details for hidden/missing models, review and deliberate model
+management. Model-independent/unresolved records remain discoverable.
+
+Current color controls filter pins only. Propose filtering list rows and pins
+together, preserving selected/editing records and open windows, with a visible
+way to reveal filtered selection. Unknown/review colors need a recoverable path,
+not omission or guessed defaults. Filters never delete or change Scene membership.
+
+For new placement, propose `ピンを追加` then selecting a visible surface, or
+Shift+click directly. Use the exact hit Asset/frame as a visible provisional target
+before gizmo adjustment and explicit confirmation. No normal preselection dropdown.
+This needs amendment of spec 05 §§4.3/13.4. Ambiguous/unsupported hits require an
+explicit choice or refusal; misses create nothing. Retain internal model-relative
+anchors so model movement carries its pins; owner removal, automatic rebind and
+new Project-space authoring are not implied by the request.
+
+For later adjustment, select the Caption/pin → `位置を調整` → drag the current
+position's gizmo → confirm/cancel. Current code already seeds compatible moves
+from the existing position; audit the entry/discovery rather than inventing a
+second move system. Preserve current owner/frame, Caption identity and other
+Scene references. Only model-update incompatibility requires renewed surface
+review. Failure retains the proposal; cancel restores the confirmed position.
 
 ## 5. Caption-first interaction
 

@@ -1,5 +1,12 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-10 update:** PO reports the five prescribed camera/pin/window manual
+> groups PASS at `7540478`, not full team/device/storage acceptance. Next: Scene-first
+> Caption UX, relocated window tools and discoverable later pin adjustment.
+> Current todo / UI guidelines §4.3 separate layout requests from proposed
+> surface-target selection; removal of internal ownership is not assumed approved.
+> No UI code change or new-path acceptance is claimed by this documentation update.
+
 > **Current direction (2026-09-09):** PO approved thin whole-workflow delivery.
 > Specification 05 §13.4 now permits one connected synthetic development host
 > through an explicit nondefault mode of the existing `dev.html`. First connect

@@ -10,6 +10,12 @@
 
 ## Start here
 
+2026-09-10: PO reports the five prescribed camera/pin/window manual groups PASS
+at `7540478`; this supersedes their pending status below only for that scope.
+Next: Scene-first Caption UX and discoverable later position adjustment. Current
+todo / UI guidelines §4.3 separate requests from proposed input-rule amendments.
+No full team/device/storage acceptance or new layout implementation is implied.
+
 Current delivery order (PO approved 2026-09-09): specification 05 §13.4 permits
 one connected synthetic development host through a nondefault `dev.html` mode,
 reusing the existing Scene/domain/UI parts before subsystem polish. The first
