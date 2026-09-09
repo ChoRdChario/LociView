@@ -82,7 +82,8 @@ export function projectViewHistory(snapshot: HistorySnapshot, previous?: History
       background: field(cells[viewKey(id, 'background')], text => readSolidBackground(decoded(text))),
       lifecycle: field(cells[viewKey(id, 'lifecycle')], text => {
         const l = exact(decoded(text), ['state', 'eventId', 'reason']);
-        if (!/^evt_[0-9a-f]{32}$/.test(l.eventId) || (l.state === 'active' ? l.reason !== 'initial' : l.state !== 'deleted' || l.reason !== 'userDelete')) fail();
+        if (!/^evt_[0-9a-f]{32}$/.test(l.eventId) || (l.state === 'active' ? !['initial', 'conflictResolution'].includes(l.reason) :
+          l.state !== 'deleted' || !['userDelete', 'conflictResolution'].includes(l.reason))) fail();
         return freezeSynthetic(l as Lifecycle);
       }) };
   }

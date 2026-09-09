@@ -20,6 +20,11 @@ type FamilyAuthority = Readonly<{ variantFamilyId: string; representationId: str
 export function developmentContentVerifier(authorities: readonly FamilyAuthority[],
   readBytes: (record: JsonObject) => Promise<Uint8Array | undefined> = developmentContentBytes): ProjectContentVerifier {
   const fixedAuthorities = authorities.map(a => Object.freeze({ ...a }));
+  const geometryKey = (r: JsonObject) => canonical({ blob: r.blob!, formatProfile: r.formatProfile!,
+    representationToAsset: r.representationToAsset!, contentKind: r.contentKind!, role: r.role! });
+  // Populated only by actual byte/profile/AssetFrame decoding, never an imported
+  // receipt, class label, digest equality alone or an unverified constructor claim.
+  const verifiedGeometry = new Map<string, { positions: number[]; indices: number[] }>();
   const bytesFor = async (r: JsonObject) => {
     const bytes = await readBytes(r); if (!bytes) return fail('missing');
     const blob = object(r.blob); if (blob.algorithm !== 'sha256' || bytes.byteLength !== blob.byteLength || fixtureSha256(bytes) !== blob.digest) fail();
@@ -37,6 +42,7 @@ export function developmentContentVerifier(authorities: readonly FamilyAuthority
     const decoded = JSON.parse(text) as { positions: number[]; indices: number[] };
     const positions = decoded.positions.map((v, i) => v + (i % 3 === 0 ? 0.25 : 0));
     const axes = [0, 1, 2].map(i => positions.filter((_, n) => n % 3 === i));
+    verifiedGeometry.set(geometryKey(r), { positions, indices: decoded.indices });
     return { positions, indices: decoded.indices, bounds: { min: axes.map(a => Math.min(...a)), max: axes.map(a => Math.max(...a)) },
       materials: [{ sourceLocator: known.materialCatalog.slots[0]!.sourceLocator, sourceSemantics: known.materialCatalog.slots[0]!.sourceSemantics }] };
   };
@@ -74,7 +80,10 @@ export function developmentContentVerifier(authorities: readonly FamilyAuthority
             const members = list(revision.representationIds).map(id => reps.get(string(id))).filter((r): r is JsonObject => r?.variantFamilyId === family);
             if (!members.length) fail();
             for (const r of members) {
-              const decoded = await triangle(r), geometry = canonical({ positions: decoded.positions, indices: decoded.indices });
+              // Current verified content can prove a byte/profile/transform-exact
+              // historical encoding without reading any weak historical blob.
+              const decoded = verifiedGeometry.get(geometryKey(r)) ?? fail('missing');
+              const geometry = canonical({ positions: decoded.positions, indices: decoded.indices });
               if (expected !== undefined && geometry !== expected) fail(); expected = geometry;
             }
           }

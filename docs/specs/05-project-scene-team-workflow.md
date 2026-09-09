@@ -1161,6 +1161,36 @@ authorize casting partial results into trusted `SceneResources`.
 | C: same-host provider connection | Emit SceneState/resources with one snapshot token plus retained full records/candidates/diagnostics, using the existing Scene resolver. Replace known-only validation assumptions at the existing synthetic history boundary; do not add a parallel UI/probe. | Actual candidate two-round/copy/recovery and adversarial closure checks on the same provider. Exact fixture evidence remains development-only; no real-file/default-entry activation. Partial record success never reaches this output. One final independent review and required whole-tree checks; browser/iPhone remain the existing batched lane. |
 
 Stages may be committed separately but this boundary stays open until C passes.
+
+**C source/acknowledgment detail:** the earlier disposable host encodes some
+compound commands in one string cell; it cannot be retrospectively expanded into
+several purported original operation IDs. For a newly initialized page-memory
+pair, translate its explicit commands to the already specified atomic Project
+fields *before* the candidate records a change. Author Project identity/frame,
+Scene metadata and initial lifecycles in that exact bootstrap, not as later
+read-time defaults. Repeated closure inclusion registers an identical immutable
+record once; mutable equal edits still record their own operation. Membership
+lifecycle edits do not reassign immutable endpoints or unchanged order fields.
+Retain command-specific UI data separately with its original change provenance;
+it is not a second Project authority. Keep the exact original DAG/operations and
+verify source-to-command correspondence, including explicit absence and copies.
+This changes only the unpersisted demonstration representation, never old history,
+wire bytes, adopted schema or current-app data. Complete asynchronous admission
+must precede publication of the same-token pair and clearing drafts; failed or
+stale admission retains prior confirmed state and the pending command/retry IDs.
+The existing host's full source adapter, authority replacement and connected
+two-round/copy/recovery evidence remain one C exit, not separate feature gates.
+
+The connected fixture includes inactive equivalent revisions. Repeated-class
+verification still requires exact complete owner/family/member metadata, but an
+inactive member need not trigger a historical blob read. The application-owned
+verifier may reuse geometry already obtained by actual byte/profile/AssetFrame
+decoding, keyed by the complete blob descriptor, profile, transform and content
+kind/role. It must rebind the proof to the exact queried records and current token;
+missing evidence stays unverified. This clears only class-equivalence diagnostics,
+not source-index, current-content or unrelated graph errors. Labels or matching
+declared digests without prior actual decoding are insufficient.
+
 No per-record review campaign or default expansion into UI polish. Stage A is
 authorized pure decoded-data validation only: no raw JSON parser, portable writer,
 blob reading or current Project activation. Stage B must retain unknown metadata

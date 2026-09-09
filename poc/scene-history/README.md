@@ -18,7 +18,22 @@ family/class member, and fixed PNG container/CRC/bounded decompression. It never
 labels its profile as ratified or reads real files. The full flat-map two-round
 test now composes that evidence and the scoped same-token Scene provider/resolver
 without changing conflict candidates or source bytes. This is not the served
-host's source-adapter/complete-provider switch; C remains pending.
+host's complete-provider switch; C remains pending.
+
+`development-source.ts` now authors a new page-memory bootstrap with complete
+Project metadata and canonical atomic fields before the candidate records them.
+Original IDs/DAG remain exact; command-sidecar correspondence is checked at every
+causal cut, including redundant original dependencies and explicit absence.
+`development-verified.ts` connects this source to the full scoped provider before
+asynchronous publication. It retains the confirmed pair while checking, rejects
+permanently malformed source before registering a pending operation, and retries
+transient admission failure with the same staged document/operation bytes.
+The service-level two-actor/equivalent-model/independent-Caption-copy/replay loop
+is tested. It is not yet selected by `development-browser.ts` or the served UI;
+asynchronous session/draft acknowledgment and the rest of C's host acceptance
+are next. No old history conversion, file/storage or adopted metadata format.
+Class equivalence reuses only actually decoded exact blob/profile/transform
+geometry; it does not fetch weak historical bytes or clear source-index issues.
 
 The experiment checks TEAM-PKG-08 causal branches and TEAM-HIST-01/03/06 explicit
 conflicts, detached exact replay, fake-blob independence and saved-byte reload.

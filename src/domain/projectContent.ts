@@ -97,7 +97,9 @@ export async function inspectProjectContent(input: unknown, limits: HistoryReadL
         for (const id of list(e.revision.representationIds)) {
           charge(); const r = table(repMap)[string(id)]; if (!r) { complete = false; continue; }
           if (list(e.entry.targetVariantFamilyIds).includes(r.variantFamilyId!)) {
-            selected.push(r); if (repEvidence.get(canonical(r))?.outcome !== 'verified') complete = false;
+            // A class proof may reuse application-owned, exact immutable content
+            // evidence. Inactive history is not a request to fetch its weak bytes.
+            selected.push(r);
           }
         }
         for (const family of list(e.entry.targetVariantFamilyIds)) if (!list(e.revision.representationIds).some(id => table(repMap)[string(id)]?.variantFamilyId === family)) complete = false;

@@ -10,6 +10,36 @@ IME and device acceptance remain pending, not implied by its DOM tests.
 
 ### Current checkpoint / next implementation
 
+Stage C continuation starts clean `14ca964`, 41 ahead of local tracking (no fetch),
+official quota 72%. Previous goal turn made verified implementation progress.
+Target is the same host's complete source adapter and authority switch, not a new
+guard/probe. Existing compound cells cannot be expanded into fabricated original
+operation IDs. Translate new synthetic commands into canonical atomic cells before
+the pinned candidate records them; explicitly author bootstrap Project/Scene/
+lifecycle metadata and retain old command cells only as a UI sidecar. This is a
+new page-memory initialization, not migration/replay rewriting of existing bytes.
+The complete provider must run before asynchronous publication/acknowledgment;
+drafts/retry IDs remain until success. Reuse two-round/copy/recovery tests, add only
+source correspondence and pending/failure checks needed by that connection. B/C
+stay open until the same host uses the pair. No manual hold, new schema/adoption,
+real-file/storage or release activation. Stop on specification conflict or <10%.
+
+C source/service review: canonical fields are authored before original changes;
+each causal command/source correspondence and original ID is checked. The async
+driver admits the scoped provider before swapping its confirmed pair, retains
+the exact staged bytes/token for retry, and rejects malformed incoming source
+before entering pending state. Equivalent model selection, independent Caption
+copy, second exchange and fresh lifecycle resolution execute in this driver.
+Independent read-only review confirmed the permanent-rejection fix; no remaining
+limited-diff blocker. Root/scoped TypeScript PASS; final candidate checks 56 PASS;
+root suite 105 files / 1858 PASS, 21 existing TODO. Ordinary/harness builds PASS
+with existing warnings; parsed source maps (13/9) contain zero candidate, provider,
+content, new source or new driver modules. The served entry/session is still the
+old synchronous connection: next is its async draft acknowledgment, not another
+detached guard/probe. C's single exit, browser/IME/device and durable/file work
+remain open. No manual hold or new server/tunnel/private source/release boundary.
+Official remaining quota 71%; no reset redeemed.
+
 The fixed-PNG media connection below is complete in development memory. Next is
 the finite complete-provider boundary under 05 §§13.3/13.4, then the gated durable
 loop. Do not return to detached UI parts or polish as the default workstream.
@@ -43,6 +73,12 @@ loop. Do not return to detached UI parts or polish as the default workstream.
         pair, scoped failures never choose a winner or invalidate unrelated work.
 - [ ] Stage C: connect that authority to the existing synthetic workflow; final
   integration evidence and independent review close the single provider boundary.
+  - [x] Author canonical source before original changes; verify every causal
+    command/source correspondence. Connect async provider admission before memory
+    publication, with scoped pair/details, permanent rejection and exact retry.
+  - [ ] Replace the served entry/session's synchronous acknowledgment with this
+    driver. Retain drafts/IDs through pending/failure, then complete mounted
+    two-round/copy/recovery acceptance and the one final C review.
 - [ ] Implement and connect that provider to the same synthetic host where
   authorized, replacing known-only assumptions with verified closure. Reuse
   existing adversarial/reference tests; partial guards are never trusted as full

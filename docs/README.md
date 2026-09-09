@@ -58,6 +58,13 @@ If observed code conflicts with the applicable compatibility or accepted future 
 
 ## Known implementation drift
 
+Latest C implementation: the isolated candidate has canonical original-field
+source correspondence and an async verified driver. Its two-actor/equivalent
+model/independent Caption copy/retry service loop reaches the full scoped pair.
+The served entry/session still uses the prior synchronous driver; async draft
+acknowledgment and connected C acceptance are next. Neither this source/driver
+nor the pure provider activates current UI, real storage, files or adoption.
+
 Current scheduling amendment (2026-09-09): specification 05 §13.4 is PO approved
 for a thin connected synthetic development host using the existing core/UI parts.
 The first in-memory workspace loop is implemented in `src/harness/projectScene`:

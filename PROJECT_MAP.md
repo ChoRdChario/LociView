@@ -54,8 +54,13 @@ source indices separately. The isolated triangle/PNG verifier is development-onl
 weak-only historical sources are not fetched. A pure scoped provider now maps
 those checks into same-token SceneState/resources and attachment/tag/media details,
 preserving text while affected models/fields are unavailable. The actual candidate
-two-round test reaches that pair; C's same-host source-adapter/authority switch
-remains the single provider boundary's completion, recorded in spec 05 §13.4.
+two-round test reaches that pair. C now has an isolated canonical-source and
+asynchronously verified memory driver: commands are recorded as actual atomic
+fields, with original-ID/source correspondence, checked-before-publish state and
+exact staged retry. Equivalent model selection, independent Caption copies and
+second exchange execute through that driver. The existing served entry/session
+still uses the prior synchronous driver; its async acknowledgment hookup and
+connected acceptance remain the single provider exit in spec 05 §13.4.
 File/package exchange, durable storage and rendered/device acceptance remain
 pending as recorded in todo.
 Real Project, storage, package and current-app activation retain their gates.

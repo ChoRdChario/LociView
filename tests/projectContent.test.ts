@@ -144,4 +144,25 @@ describe('exact external-content composition; not SceneResources or profile adop
     const result = await inspect(r, verifierFor(r, async record => { read.push(String(record.id)); return developmentContentBytes(record); }));
     expect(read).not.toContain(old.id); expect(codes(result)).toContain('source-index-unverified'); expect(codes(result)).not.toContain('source-index-out-of-range');
   });
+  it('reuses actually decoded exact geometry for an inactive equivalent revision without fetching its weak source', async () => {
+    const r = fixture(), old = structuredClone(r.representationsById[id('rep')]); old.id = id('rep', 2); old.representationFrameId = id('frm', 4);
+    old.payloadDigest = await immutableDigest('representation', old); r.representationsById[old.id] = old;
+    const revision = structuredClone(r.assetRevisionsById[id('rev')]); revision.id = id('rev', 2); revision.representationIds = [old.id];
+    revision.payloadDigest = await immutableDigest('asset-revision', revision); r.assetRevisionsById[revision.id] = revision;
+    r.captionsById[id('cap')].anchor.hitEvidence = { method: 'mesh', source: { representationId: old.id,
+      surfaceRef: { kind: 'meshTriangle', nodeIndex: 9, primitiveIndex: 0, triangleIndex: 0, barycentric: [1, 0, 0] } } };
+    const reads: string[] = [], v = verifierFor(r, async record => { reads.push(String(record.id)); return developmentContentBytes(record); });
+    const result = await inspect(r, v);
+    expect(result.checks.find(c => c.request.fact === 'surface-equivalence')?.outcome).toBe('verified');
+    expect(reads).not.toContain(old.id); expect(codes(result)).not.toContain('verified-surface-equivalence-required');
+    expect(codes(result)).toContain('source-index-unverified'); expect(codes(result)).not.toContain('source-index-out-of-range');
+    // Prior verified bytes do not prove a different profile or AssetFrame transform.
+    old.representationToAsset.translation[0]++;
+    old.payloadDigest = await immutableDigest('representation', old);
+    const changed = await inspect(r, v);
+    expect(changed.checks.find(c => c.request.fact === 'surface-equivalence')?.outcome).toBe('missing');
+    expect(codes(changed)).toContain('verified-surface-equivalence-required'); expect(reads).not.toContain(old.id);
+    const proof = result.checks.find(c => c.request.fact === 'surface-equivalence')!.request;
+    expect((await verifierFor(r).verify(proof) as { outcome: string }).outcome).toBe('missing');
+  });
 });

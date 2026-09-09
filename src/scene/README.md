@@ -29,7 +29,12 @@ and existing IDs. Do not persist the read projection, replace whole CRDT maps, o
 treat `previewScenePlan` as a durable commit. `needsReview` retains the authored
 anchor coordinate; a hidden-owner entry is still listable with no marker.
 
-Remaining: served-host source-adapter/complete-provider integration, production
+The isolated candidate now has a canonical source and async verified driver;
+its service-level same-token pair is tested, but the served entry/session still
+uses the prior synchronous driver. No source-adapter claim follows from this
+pure module alone.
+
+Remaining: served-host asynchronous acknowledgment/complete-provider integration, production
 storage/causal adapter and journal,
 resource content commands, deep keep-both remapping, conversion/exchange, actual
 SceneDocument/render plan, ordinary UI integration and device acceptance.

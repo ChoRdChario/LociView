@@ -56,7 +56,11 @@
 > and attachment/tag/media details; source/candidates and all diagnostics remain.
 > Current fields and strong model closures fail independently, with source-optics
 > validation and no backward failure from annotations into models. C's same-host
-> source-adapter/authority switch is next; no current UI, GC/save or adoption claim.
+> source now has canonical original operations and an asynchronously verified
+> driver. Two-actor/equivalent-model/independent-Caption-copy/retry tests reach its
+> pair. The served entry/session still uses the prior synchronous driver: next
+> connect async acknowledgment without clearing pending drafts. No current UI,
+> GC/save or adoption claim; C's single completion boundary stays open.
 > One finite boundary, not new per-record tasks; no additional manual test hold.
 > Windows Computer Use initialized but stopped automatically on unsafe-to-resolve
 > Chrome URL; no browser input/PASS or bypass. Keep the existing batched UI lane.
