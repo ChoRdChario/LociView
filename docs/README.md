@@ -55,7 +55,7 @@ If observed code conflicts with the applicable compatibility or accepted future 
 | `specs/04-locimyu-conversion.md` | `PRODUCT-OWNER APPROVED / BOUNDED DIRECT ADAPTER IMPLEMENTED / PRODUCT ACCEPTANCE PASS` | Exact LociMyu identity/source authority and report boundary; six representative rows with an empty trimmed ID are reported as empty input, while 103 Captions publish and survive portable restore without changing the source; Desktop and physical-iPhone acceptance passed |
 | `specs/05-project-scene-team-workflow.md` | `PRODUCT-OWNER APPROVED / CORE, RECORD GUARDS, UI AND SYNTHETIC WORKSPACE/HISTORY LOOPS` | §§13.1/13.3 reusable core/UI; §13.4 connects navigation/Caption/models, two independent memory histories and exact synthetic triangle/pin viewing controls. No ordinary-app/storage integration, renderer adoption, rendered acceptance or full Project validator. Product file exchange/migration remains unimplemented; current Native bytes unchanged |
 | `specs/06-project-package-wire.md` | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED` | Five-purpose wire companion draft; explicit delta/journal, base-receipt, budget and snapshot-builder ratification inputs. No adopted format/version, production bytes or gate credit |
-| `specs/07-project-scene-migration.md` | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED` | New migration identity/portable Native bridge draft, source-atomic relation guards, exact-artifact requirements and calculated identity examples; remaining inspector/adapter/journal/whole-output inputs explicit |
+| `specs/07-project-scene-migration.md` | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED` | New migration identity/portable Native bridge draft, source-managed guards, shared unit/birth artifacts and prepared-migration source; calculated identity and scoped candidate feasibility are not converter/adoption proof. §10.1 owns the finite service-level next slice |
 
 ## Known implementation drift
 
@@ -68,9 +68,12 @@ unplaced branch; no adopted wire/recipe or executed byte goldens are claimed.
 The next recipe portion is now drafted in 07: source identity/ID keys, portable
 baseline/registrations, source-managed Scene/attachment guards and shared original
 artifacts. Four identity examples were computed, not a whole converter proven.
-The next exact interface is managed-unit/introduction plus prepared-migration
-journal, alongside the existing wire/profile inputs. No new browser probe or
-runtime change, and no renewed question about keeping unplaced Captions.
+Sections 5–7.2 now draft that managed-unit/introduction/prepared-migration interface.
+Four added existing-candidate tests pass (10 harness tests total), limited to
+shared bytes/objects and explicit guards, not admitted domain or durable conversion.
+Next is §10.1's connected synthetic service-level slice using existing guards/journal,
+not another interface document or browser page. Exact wire/profile and adoption
+inputs remain open; no runtime change or renewed unplaced-preservation question.
 
 2026-09-10: PO reports the five prescribed camera/pin/window groups PASS at
 `7540478`; their earlier pending status below is historical. Broader rendered,

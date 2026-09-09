@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { A, id, scalar, fixture, fork, snapshotAt, change, heads, changeIndex, exchangeBase,
   contribution, integrate, fieldProjection, chooseField, include,
   membershipProjection, resolveMembership, memberships } from './candidate.mjs';
@@ -7,6 +8,103 @@ import { A, id, scalar, fixture, fork, snapshotAt, change, heads, changeIndex, e
 const hashes = (packet) => packet.changes.map((bytes) => A.decodeChange(bytes).hash).sort();
 const rootHashes = (doc) => [...changeIndex(doc).keys()].sort();
 const json = (value) => JSON.parse(JSON.stringify(value));
+
+// Bounded recipe feasibility only. These probe keys are NOT ratified recipe
+// bytes, ProjectDoc admission, a Native parser, durable storage or a UI adapter.
+const bridgeProbeKey = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+function bridgeUnitProbe(base, captionId, field, value) {
+  const key = bridgeProbeKey({ phase: 'unit', base: heads(base), captionId, field, value });
+  const doc = A.change(A.clone(base, { actor: key }), { time: 0, message: `unit:${key}` }, (d) => {
+    d.captionsById[captionId][field] = scalar(value);
+  });
+  return A.getLastLocalChange(doc);
+}
+
+test('migration feasibility: repeated old unit in a different packet does not conflict with later v2 work', () => {
+  const { doc: base, ids } = fixture();
+  const first = bridgeUnitProbe(base, ids.cap, 'body', 'Old participant edit');
+  const repeated = bridgeUnitProbe(base, ids.cap, 'body', 'Old participant edit');
+  assert.deepEqual(repeated, first);
+  let receiver = A.applyChanges(fork(base), [first])[0];
+  receiver = change(receiver, 'later v2 edit', (d) => { d.captionsById[ids.cap].body = scalar('Later v2 edit'); });
+  const unrelated = bridgeUnitProbe(base, ids.cap, 'title', 'New old-format title');
+  const originalCount = A.getAllChanges(receiver).length;
+  const result = A.applyChanges(fork(receiver), [repeated, unrelated])[0];
+  assert.deepEqual(fieldProjection(result.captionsById[ids.cap], 'body'), { state: 'value', value: 'Later v2 edit' });
+  assert.equal(String(result.captionsById[ids.cap].title), 'New old-format title');
+  assert.equal(A.getAllChanges(result).length, originalCount + 1);
+});
+
+test('migration feasibility: same introduction shared by different plans creates one object and retains exact bytes', () => {
+  const { doc: base, ids } = fixture();
+  const newCaptionId = id('cap');
+  const introduce = () => {
+    const key = bridgeProbeKey({ phase: 'introduction', base: heads(base), newCaptionId, body: 'Same birth' });
+    return A.change(A.clone(base, { actor: key }), { time: 0, message: `intro:${key}` }, (d) => {
+      d.captionsById[newCaptionId] = { id: scalar(newCaptionId), body: scalar('Same birth') };
+    });
+  };
+  const introduced = introduce();
+  const original = A.getLastLocalChange(introduced);
+  const repeated = A.getLastLocalChange(introduce());
+  assert.deepEqual(original, repeated);
+  const left = A.applyChanges(fork(base), [original, bridgeUnitProbe(base, ids.cap, 'title', 'Left')])[0];
+  const right = A.applyChanges(fork(base), [repeated, bridgeUnitProbe(base, ids.cap, 'body', 'Right')])[0];
+  const merged = A.merge(left, right);
+  assert.equal(A.getObjectId(merged.captionsById[newCaptionId]), A.getObjectId(introduced.captionsById[newCaptionId]));
+  assert.equal(Object.keys(merged.captionsById).length, 2);
+  assert.notEqual(fieldProjection(merged.captionsById, newCaptionId).state, 'conflict');
+  const reloaded = A.load(A.save(merged));
+  assert.deepEqual(heads(reloaded), heads(merged));
+  assert.equal(A.getAllChanges(reloaded).filter((bytes) => Buffer.from(bytes).equals(Buffer.from(original))).length, 1);
+});
+
+test('migration feasibility: an atomic source relation keeps two replacements separate', () => {
+  const { doc: base, ids } = fixture();
+  // Atomic strings model only the guard, not actual membership/attachment records.
+  const left = bridgeUnitProbe(base, ids.cap, 'anchor', JSON.stringify(['source-owned-left']));
+  const right = bridgeUnitProbe(base, ids.cap, 'anchor', JSON.stringify(['source-owned-right']));
+  const local = change(fork(base), 'unrelated local text', (d) => { d.captionsById[ids.cap].body = scalar('Keep local'); });
+  const result = A.applyChanges(local, [left, right])[0];
+  const projection = fieldProjection(result.captionsById[ids.cap], 'anchor');
+  assert.equal(projection.state, 'conflict');
+  assert.equal(projection.value, undefined);
+  assert.deepEqual(projection.candidates.map((c) => c.value).sort(), [JSON.stringify(['source-owned-left']), JSON.stringify(['source-owned-right'])]);
+  assert.equal(String(result.captionsById[ids.cap].body), 'Keep local');
+});
+
+test('migration feasibility: different births have independent targets and an explicit shared selection conflict', () => {
+  const { doc } = fixture();
+  const foundation = change(doc, 'synthetic technical foundation', (d) => { d.birthGroups = {}; });
+  const groupKey = bridgeProbeKey({ phase: 'group', base: heads(foundation), source: 'new-source-id' });
+  const group = A.change(A.clone(foundation, { actor: groupKey }), { time: 0, message: `group:${groupKey}` }, (d) => {
+    d.birthGroups[groupKey] = { source: scalar('new-source-id'), selection: scalar('unselected') };
+  });
+  const birth = (body) => {
+    const key = bridgeProbeKey({ phase: 'birth', groupKey, body });
+    const targetId = `cap_${key.slice(0, 32)}`;
+    return { targetId, doc: A.change(A.clone(group, { actor: key }), { time: 0, message: `birth:${key}` }, (d) => {
+      d.captionsById[targetId] = { id: scalar(targetId), body: scalar(body) };
+      d.birthGroups[groupKey].selection = scalar(targetId);
+    }) };
+  };
+  const first = birth('First birth'); const second = birth('Different birth');
+  assert.notEqual(first.targetId, second.targetId);
+  const edited = change(first.doc, 'later v2 content', (d) => { d.captionsById[first.targetId].body = scalar('Keep later edit'); });
+  const merged = A.merge(edited, second.doc);
+  const conflict = fieldProjection(merged.birthGroups[groupKey], 'selection');
+  assert.equal(conflict.state, 'conflict');
+  assert.deepEqual(conflict.candidates.map((c) => c.value).sort(), [first.targetId, second.targetId].sort());
+  assert.equal(A.getObjectId(merged.birthGroups[groupKey]), A.getObjectId(group.birthGroups[groupKey]));
+  const resolved = change(merged, 'explicit first candidate', (d) => {
+    delete d.birthGroups[groupKey].selection;
+    d.birthGroups[groupKey].selection = scalar(first.targetId);
+  });
+  assert.equal(String(resolved.captionsById[first.targetId].body), 'Keep later edit');
+  assert.deepEqual(fieldProjection(resolved.birthGroups[groupKey], 'selection'), { state: 'value', value: first.targetId });
+  const late = birth('Previously unseen birth');
+  assert.equal(fieldProjection(A.merge(fork(resolved), late.doc).birthGroups[groupKey], 'selection').state, 'conflict');
+});
 
 test('TEAM-PKG-08: O/A/B/W exact sibling delta, unchanged base and replay', () => {
   const { doc: o, ids } = fixture();

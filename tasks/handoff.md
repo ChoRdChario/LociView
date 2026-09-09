@@ -6,9 +6,12 @@
 > nonvisual-owner conversion and full/delta recovery vectors. Independent review
 > covers this draft only. Companion 07 now records source identities/ID keys,
 > baseline/registration, guarded old Scene/attachment replacement and shared
-> original-artifact requirements, with four calculated identity examples. Next:
-> exact managed-unit/introduction and prepared-migration journal interfaces plus
-> the remaining wire/profile/adoption inputs, not another standalone probe.
+> original-artifact requirements, with four calculated identity examples. Its
+> §§5–7.2 now draft shared unit/birth guards and the prepared-migration source.
+> Four added existing-candidate feasibility checks pass; complete Node harness
+> 10/10, not converter/storage/adoption proof. Next is 07 §10.1's finite connected
+> synthetic service slice using existing guards/journal, not another interface
+> document or standalone probe; wire/profile/adoption inputs remain separate.
 > Runtime schema, actual files/storage and UI are unchanged. No renewed preservation
 > question, closed Chrome journal rerun or immediate human test is needed.
 

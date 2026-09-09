@@ -68,6 +68,21 @@ with a shared-handle `view`; large-history reconstruction cost remains unmeasure
 API references: https://automerge.org/automerge/api-docs/js/
 and https://automerge.org/docs/reference/documents/conflicts/ .
 
+## Bounded migration feasibility — 2026-09-10
+
+The same Node harness now has 10/10 PASS, adding four checks for proposed
+specification 07 §§6–7: shared old-unit bytes across different packets preserve
+later local edits; equal introductions create one object and retain exact bytes
+through save/load; atomic relation guards keep alternatives separate; different
+births have independent targets and a shared explicit-selection conflict that
+preserves later edits and reopens for an unseen birth. No browser page was added.
+
+The probe uses synthetic partial records and local SHA-256 keys, not the proposed
+recipe's canonical encoder or complete ProjectDoc admission. It does not implement
+Native conversion, the managed-edge provider, portable artifacts, preparedMigration
+journal or durable integration. Existing dependency versions and served host are
+unchanged. See 07 §10.1 for the finite service-level next slice and activation gate.
+
 ## Connected memory-history workspace — 2026-09-09
 
 05 §13.4 permits `development.ts`/`development-browser.ts` to supply a neutral

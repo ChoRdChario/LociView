@@ -162,6 +162,14 @@ content inspection bound to the exact bytes/profile; §10 must pin its schema.
 | `lifecycle-event` / `evt` | `{role:'lifecycle', targetKind, targetFullDigest, previousEventId:null|LifecycleEventId, state, reason, transitionEvidenceDigest}` |
 | `migration-issue` / `iss` | `{role:'issue', sourceReceiptDigest, issueKind, sourceKey:SourceRef}` |
 
+For baseline-absent **late Native** Caption/media births only, the corresponding
+kind also permits `{role:'lateNativeBirth', source:SourceRef, birthValueDigest}`.
+Existing-baseline keys never change. Child attachments for those targets use
+`{role:'lateNativeAttachment', captionFullDigest, mediaFullDigest}`; Scene edges
+already use actual endpoint full digests. This prevents distinct birth candidates
+from sharing a child identity. The birth digest is the exact whole admitted
+source-entity value under §7.1, not a guess at creation time or causal succession.
+
 For unchanged frozen-v1 immutable input-key families, 02's closed structured keys
 are an additional explicitly labelled `{role:'frozenKey', value: ...}` branch of
 the corresponding kind, excluding `display-set` and all old lifecycle outputs.
@@ -234,6 +242,7 @@ interface MigrationCaseDraft {
   baseline?: NativeBridgeBaselineDraft;
   bridgePlansByDigest: Record<Sha256Hex, BridgePlanDraft>;
   managedUnitsByKey: Record<Sha256Hex, ManagedUnitDraft>;
+  birthGroupsByKey: Record<Sha256Hex, BirthGroupDraft>;
 }
 interface SourceReceiptDraft {
   digest: Sha256Hex;
@@ -258,9 +267,22 @@ interface BridgePlanDraft {
   artifact: BlobRef;
 }
 type ManagedUnitDraft = {key:Sha256Hex; captionId:CaptionId} & (
-  | {kind:'nativePrimaryScene'; value:SceneId|null}
-  | {kind:'nativeAttachments'; value:CaptionAttachmentId[]}
+  | {kind:'nativePrimaryScene'; membersById:Record<SceneCaptionMembershipId,
+      {id:SceneCaptionMembershipId; sceneId:SceneId; captionId:CaptionId}>;
+      value:{kind:'none'}|{kind:'selected'; membershipId:SceneCaptionMembershipId} }
+  | {kind:'nativeAttachments'; membersById:Record<CaptionAttachmentId,
+      {id:CaptionAttachmentId; captionId:CaptionId; mediaResourceId:MediaResourceId}>;
+      value:CaptionAttachmentId[]}
 );
+interface BirthGroupDraft {
+  key: Sha256Hex;
+  sourceKey: Sha256Hex;
+  entityKind: 'caption'|'media';
+  proposalsByDigest: Record<Sha256Hex, {digest:Sha256Hex;
+    birthValueDigest:Sha256Hex; targetId:CaptionId|MediaResourceId;
+    sourceValue:BlobRef; introduction:BlobRef}>;
+  selection: {kind:'unselected'}|{kind:'selected'; proposalDigest:Sha256Hex};
+}
 ```
 
 `SourceReceipt.digest = H('source-receipt', receipt without digest)`;
@@ -301,6 +323,15 @@ installs the registration. This prevents a self-containing head/hash cycle and
 keeps the initial selected snapshot's local edits distinct from the common base.
 Independently converting another Native copy creates a different v2 bootstrap;
 use the team's converted Workspace instead of comparing resource IDs to merge it.
+
+That later registration is a fixed **foundation** change depending only on the
+mapped baseline. It creates the complete case/registry and baseline managed-unit
+records, but includes no post-baseline coordinator edits and does not contain its
+own hash. Portable artifact envelopes refer to its verified `foundationHeads`
+and metadata afterward; a raw SourceReceipt does not carry foundation identity.
+All group/introduction/unit changes depend on that foundation as well
+as their required introductions, never on whichever first edited Native copy was
+converted. The foundation metadata/parts are retained with the ancestor proof.
 
 The `baseline` branch above is deliberately Native-only. Frozen-v1 later-copy
 continuity still needs its own new-recipe accepted-mapping/plan variant preserving
@@ -367,6 +398,24 @@ its edges atomically. `両方残す` uses 05 §8's independent Caption-copy oper
 not the union of two allegedly exclusive source choices. No source bridge support
 survives clean/review; those builders materialize only resolved actual resources.
 
+The complete technical unit record is introduced once from its fixed case/source
+identity, independently of incoming package contents. Initial values are the
+registered baseline selection or an explicit empty selection for a new Caption.
+`membersById` is append-only and contains complete immutable endpoint records;
+the matching actual domain edge/attachment must have exactly those endpoints.
+Every selected ID must be registered; order lists are unique and preserve order.
+A v2-only relation is one with no such registration, not one absent from the
+current selection. Once registered, a removed relation stays source-managed:
+delete/restore/reorder does not change its ID or relabel it v2-only.
+
+Selection is one atomic value; member registrations and lifecycle/order updates
+publish with it as one logical change. Restoring an existing ID creates only a
+new valid lifecycle event, not a second CRDT object. The provider checks all guard
+candidates and selected/unselected member lifecycles, including unseen concurrent
+edits. Missing registration, changed endpoints or inconsistent state is a scoped
+mapping conflict, never a fallback union. All candidate member records/payloads
+stay protected until resolution. An unrelated Scene/Caption remains usable.
+
 ## 7. Exact artifacts, repeat and parallel import
 
 A local lock alone cannot make two offline importers generate the same causal
@@ -374,40 +423,94 @@ changes. The proposed pinned bridge builder produces deterministic artifacts,
 not new random-actor replays on every import. This is an adapter-gated extension,
 not a claim that the current candidate already implements it.
 
-An artifact is closed `{schema, recipeDescriptorDigest, sourceIdentityDigest,
-semanticInputDigest, ancestorHeads, mappingDigest, introductions, changes,
-targetHeads}`. `introductions` names required artifact BlobRefs in digest order;
-`changes` is 02's exact original ordinal/hash/dependency/length/bytes-digest
-descriptor array, with bytes in a separately retained fixed bundle. Neither the
-artifact nor changes include their own digest or a receipt that hashes them.
-The artifact's CAS ref is added in a subsequent registration change; journal
+Artifact envelopes have two closed variants. The common fields are
+`{schema, recipeDescriptorDigest, sourceIdentityDigest, ancestorHeads,
+foundation, introductions, changes, targetHeads}`. `foundation` is the exact
+`{heads:Heads, metadata:BlobRef}` proof from §7.2, retaining the original foundation
+change closure without containing its own artifact registration. `introductions`
+names required predecessor artifact BlobRefs in digest order; `changes` uses
+§7.2's `ExactRetainedChangeDraft[]`, including actual original part BlobRefs.
+
+- Plan variant adds exactly `{kind:'plan', semanticInputDigest, mappingDigest}`.
+  It bundles the semantic input's shared artifacts; its own outer BlobRef may
+  differ when another unit changes.
+- Shared variant adds exactly `{kind:'group'|'introduction'|'unit', keyDigest}`.
+  It contains no semantic-input/whole-plan digest. Equal shared keys must have
+  equal complete envelopes and original bytes across enclosing plans; otherwise
+  reject the inconsistent import, not register a second introduction.
+
+Neither variant nor its changes include their own digest or a receipt that hashes
+them. The artifact's CAS ref is added in a subsequent registration change; journal
 publication covers the complete introduction/mapping/registration sequence once.
 
-Deterministic bridge actor keys bind the full recipe descriptor, verified v2
-identity/ancestor, semantic input and canonical mutation-plan digest, under a
-distinct domain. Reserved actors are not user identities and never used by normal
-commands. The pinned builder must fix exact actor bytes, sequence, time (fixed,
-not wall clock), message and primitive-operation order. Same input must produce
-identical original changes across workers/devices; until those bytes are pinned
-and verified, autonomous parallel bridge admission is disabled.
+### 7.1 Shared introductions and unit-granular changes
 
-Baseline-absent source entities need shared introduction artifacts, not just a
-whole-plan actor. Equal source identity plus equal canonical birth payload must
-reuse the exact introduction bytes/dependencies even in different input plans.
-Unequal payloads under one new source ID are an explicit birth/identity conflict
-(as in Native), not two concurrent creations of the same v2 object. Retain both
-as immutable source proposals; resolve before activating an introduction. Do not
-infer an earlier birth from snapshot generation/time, or treat a later differing
-snapshot of a baseline-absent ID as proven causal succession. Section 10 pins
-this reservation/introduction subformat before production; this draft does not
-silently admit a duplicate-object workaround.
+The earlier whole-input actor sketch is superseded: a semantic plan bundles
+shared **unit artifacts**. Their exact key is
+`H('mapped-unit', {recipeDescriptorDigest, caseId, sourceKey, unit,
+ancestorHeads, foundationHeads, baselineSourceValueDigest, targetValueDigest, introductionHeads,
+mutationPlanDigest})`. `unit` is §5's closed mapping-unit token; heads are verified
+sorted frontiers. `mutationPlanDigest` hashes the unit's canonical ordered logical
+mutations only. No whole-file semantic digest, package receipt, current receiver
+heads, local transaction ID, time or unrelated unit appears in that key.
+
+Thus an old body value already imported is the SAME original change when another
+Caption is later edited in a different old package. It cannot produce a fresh
+sibling body write against a subsequent v2 edit. If source equals the registered
+baseline, no artifact is emitted. Distinct source values remain siblings unless
+source causality is proven; equality with baseline does not prove an undo.
+
+Every necessary technical group, immutable record and source-managed edge is
+introduced by its own shared artifact keyed by fixed identity and complete
+canonical initial value, with only its required predecessor introductions.
+Unit dependencies are the frontier of the fixed foundation and required
+introduction artifacts, not all artifacts of the enclosing package.
+The source/target graph must prove a finite acyclic introduction order. Map/object
+creation is emitted once; later writes use that same original object. No incomplete
+domain-record shell, temporary fabricated coordinate or placeholder owner is used.
+
+For a new Native source ID, first introduce a complete `BirthGroupDraft` with
+empty proposals and `selection:{kind:'unselected'}`. This technical group artifact
+depends only on case/source identity, not birth content. Its key is
+`H('birth-group', {caseId, sourceKey, entityKind})`. A full valid domain record has
+the birth-specific target ID from §3.2. `birthValueDigest` hashes its admitted
+whole source value with `LegacyJcsV1` under
+`lociview:v2:project-scene:birth-value:legacy-jcs-v1\n`. Proposal digest is
+`H('birth-proposal', {groupKey, birthValueDigest, targetId, sourceValue,
+introduction})`. Different payloads therefore create distinct valid records,
+never separate objects at one target ID. Equal births reuse the same complete
+record and original artifact, even in different semantic plans.
+
+Each birth writes a selected proposal from the shared unselected group ancestor.
+If distinct births meet, selection is a whole-value conflict and suppresses their
+affected authoritative resource/managed-child projection until explicit choice;
+both original records and payloads remain retained. This is a guarded semantic
+conflict, not a guessed common birth or an invalid-record shell. An unobserved
+new birth arriving after resolution reopens conflict. Keep-one chooses a current
+candidate without resetting that resource to its birth values: later v2 edits
+remain. Keep-both follows 05 §8's explicit original/copy choice and fresh independent
+IDs, including dependent relations. Labels, generation and arrival order never
+select a candidate. The guard must be integrated before these records are exposed.
+
+Proposed adapter actor is the full 32-byte `H('bridge-actor', {phase, keyDigest})`
+decoded from lowercase hex; phases are `group`, `introduction`, `unit`,
+`semanticRegistration`, `sourceObservation`. Each artifact uses a fresh reserved
+actor, sequence 1, time 0 and message `lociview:bridge:1:<phase>:<keyDigest>`.
+Each executable shared artifact or registration is one change within the adopted
+per-change budget; a plan envelope is a bundle, not a new actor/change. Never
+split or rebase a logical change silently. Exact operation ordering/encoder bytes still need the
+pinned adapter profile and goldens. These actors identify recipes, not people.
+They never author normal user commands. Existing journal transaction IDs are local
+receipt identity and do not enter generated change actor/message/dependencies.
+The earlier foundation belongs to the separately pinned initial-conversion
+bootstrap recipe; it is verified and reused here, not rebuilt by a late input.
 
 | Situation | Required result |
 |---|---|
 | Same semantic input already registered | Validate/reuse exact artifact and ID registrations; domain no-op. Another raw container may add only a receipt |
 | Different package plans share identical new source entity | One shared verified introduction, no duplicate birth/object, then original descendant updates |
 | Concurrent equal input, two offline importers | Same pinned original artifact; merge by existing change hashes, not arrival order |
-| Same new source ID, different content | Preserve source proposals and request explicit identity/copy resolution; no guessed common birth |
+| Same new source ID, different content | Separate birth-specific valid records and a selection conflict; no duplicate same-ID object or guessed common birth |
 | Old fixed-baseline packages differ | They are siblings unless the source proves otherwise; expose actual conflicts, never order by generation or filename |
 | Failure after preparation | Keep original staged artifact/parts; exact retry with old published view until complete. Missing acknowledged bytes means read-only repair, not deterministic regeneration masking storage loss |
 
@@ -420,6 +523,100 @@ An old value equal to its fixed baseline cannot prove an intended undo of a
 previous import: it is indistinguishable from unchanged source. Leave v2 work
 intact; an explicit v2 edit/resolution can change it. Never infer an undo or
 predecessor from arrival order, snapshot generation or the raw package digest.
+
+### 7.2 Prepared-migration source and publication
+
+The proposed new journal batch/purpose is `preparedMigration`, distinct from
+02's `localCommand`/`remotePackageMerge` and 06's source variants. The following
+closed shape is for the **late Native bridge only**, not an implicit initial-
+conversion writer. Initial conversion still needs a private bootstrap and final
+Project-list marker under its separate service contract.
+
+```ts
+interface PreparedNativeBridgeSourceDraft {
+  kind: 'nativeBridgePrepared';
+  caseId: MigrationCaseId;
+  recipeDescriptorDigest: Sha256Hex;
+  sourceReceipt: BlobRef;
+  originalInput: {sha256:Sha256Hex; byteLength:number};
+  ancestor: {identity:Identity; metadataEnvelope:MetadataEnvelope;
+    heads:Heads; metadata:BlobRef};
+  foundation: {heads:Heads; metadata:BlobRef};
+  domainArtifact: BlobRef;
+  semanticRegistration: ExactRetainedChangeDraft[];
+  sourceObservation: ExactRetainedChangeDraft[];
+  generatedHeads: Heads;
+}
+interface ExactRetainedChangeDraft {
+  ordinal: number;
+  expectedChangeHash: Sha256Hex;
+  dependencies: Heads;
+  byteLength: number;
+  bytesSha256: Sha256Hex;
+  bytes: BlobRef;
+}
+interface PreparedMigrationBatchDraft {
+  kind: 'preparedMigration';
+  baseHeads: Heads;
+  source: PreparedNativeBridgeSourceDraft;
+  changes: ExactMetadataChangePartV1[];
+  expectedFinalHeads: Heads;
+  exactChangeSetDigest: Sha256Hex;
+}
+```
+
+Every retained change `bytes` is its actual original bytes, not a descriptor-only
+promise; digest/length must equal the other fields and decoded hash/dependencies
+must match the pinned adapter. Artifacts' introduction/unit descriptors use this
+same retained-part shape; all references are typed retention roots. Generated
+part blobs use the proposed media type `application/vnd.lociview.metadata-change`.
+Schema/media-type literals for other control blobs remain §10 profile inputs.
+
+Prepare in this non-self-referential order: exact source receipt/evidence and
+baseline → shared group/introduction/unit artifacts → domain artifact → semantic
+plan registration referencing that artifact → separate raw-container observation
+registration. The fixed foundation is verified between baseline and groups.
+Domain artifacts contain neither their own digest nor subsequent
+registration parts. They reference every required artifact and original part.
+Repacked equal input reuses all semantic parts; only source observation may differ.
+Observation key binds the exact source receipt, not semantic artifact identity.
+
+Before prepared acknowledgment retain the exact input at fixed local journal path
+`original-source.bin`, stream-hashed against `originalInput`; no path/handle enters
+the descriptor. This temporary original is not included in Team Workspace or a
+completed backup. Its required staging space is preflighted; inability to retain
+it fails before acknowledgment, not an unbounded buffering fallback. Complete
+Native manifest/snapshot/binary verification still runs even for semantic no-op.
+
+The receiver verifies the whole generated DAG from the registered ancestor,
+including semantic/source registrations. Its apply list is exactly generated
+reachable changes minus receiver `baseHeads` closure, preserving original bytes.
+It does not regenerate artifacts from current receiver state. Validate detached
+final domain, every guard candidate and the complete strong/conflict/opaque/
+migration blob closure; only then acknowledge `blobsVerified`. All tabs keep old
+published heads read-only while this transaction is unfinished, with edit/export/
+GC blocked under the existing origin/project barriers.
+
+The proposed journal integrity domain is
+`lociview:v2:metadata-change-set:jcs-v2\n`, using 06's exact preimage
+`{transactionId,target,purpose,stagedBlobs,metadataBatch}` and omitting only the
+batch's `exactChangeSetDigest`. `purpose` equals `preparedMigration`. All source,
+original-input, retained-artifact and registration references, receiver base/apply
+parts and final heads participate. This is not retroactive acceptance by a v1 reader.
+
+After interruption, verify original input, proof/artifact graph, part bytes and
+final closure; replay only missing recorded changes. Missing acknowledged bytes
+requires read-only repair, even if a deterministic builder could regenerate them.
+Registration-only receive applies only that complete registration. A fresh receive
+whose hashes all belong to the already published receiver-base closure needs zero
+journal/change/publication. This is NOT a shortcut for unfinished recovery: even
+if every part is already durable, verify the journal and finish its outstanding
+completion/publication. Only a verified completed transaction permits recovery
+to return without republishing. Source-observation updates
+are explicit technical metadata, not renewed Caption edits. Durable final heads
+and completion marker precede publication/root handoff; transaction-only input can
+be released only then. Live portable registrations retain all required original
+artifact/part bytes, not just receiver-missing parts or descriptors.
 
 ## 8. Retention, backup and history-free output
 
@@ -512,9 +709,35 @@ Do not enable this recipe until these finite inputs are supplied together:
    and explicit PO ratification of the technical schema/recipe amendments. Actual
    S1/S2 adoption/device gates remain separate and unchanged.
 
-The immediate next artifact is the executable-neutral managed-unit/introduction
-and journal interface, alongside the wire/profile ratification inputs, not another
-standalone browser probe. These are genuine source-to-target mismatches exposed
-by this slice. Preserve thin whole-workflow delivery after the required contracts
-and adoption gates; do not call this draft a production implementation or convert
-real files to obtain evidence before its authority exists.
+The interface portion is now drafted in §§5–7.2. It is no longer the next task.
+The remaining items above are implementation/profile evidence and ratification,
+not a request for another companion or standalone browser probe.
+
+### 10.1 Executed feasibility and finite go/no-go (2026-09-10)
+
+The existing `poc/scene-history/harness.test.mjs` adds four small synthetic checks
+against its already pinned Automerge candidate: repeated unit bytes do not renew
+an old write after later local editing; equal introductions share one object and
+survive save/load with exact original bytes; an atomic relation guard retains
+both alternatives; different births have separate targets plus explicit shared
+selection, preserve later edits on keep-one and reopen on an unseen birth.
+All ten harness tests pass. These use probe keys and partial synthetic records,
+not this recipe's canonical encoder, admitted ProjectDoc records, durable journal
+or real Native input. They establish only feasibility of those four mechanisms.
+
+**GO, existing authorized candidate lane:** implement one connected service-level
+slice in the current isolated harness: fixed synthetic baseline/foundation →
+managed relation/birth guards → retained original parts → the existing journal
+port → independent reopen and one repeat input. Reuse the current domain guards,
+journal/recovery fixtures and above cases. Its exit is preserved local edits,
+explicit conflicting alternatives and old-or-complete publication; do not add
+another UI or ask for another synthetic human check. Exact code scope and the
+candidate execution descriptor must be recorded before that implementation.
+
+**NO-GO, real-file/product activation:** this draft and the four feasibility cases
+do not ratify a schema, wire/profile, converter or technology. Collect §10's exact
+byte/profile/retention results into one reviewed approval package; resolve actual
+policy/limit choices with PO, not by interpreting permission to continue as
+adoption. Then connect durable product services to the same thin whole-workflow
+host. Existing Native data, source files, ordinary app, dependency versions,
+release/Pages/Service Worker and physical-device gates remain untouched.

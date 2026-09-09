@@ -9,7 +9,62 @@ requested. Synthetic two-person model/pin/history and independent Caption/model-
 The scoped PO result below closes only the listed interaction checks; broader
 rendered, IME, device and durable-file acceptance remain pending.
 
-### Current work — migration and portable Native bridge recipe (2026-09-10)
+### Completed work — finite bridge integration contract (2026-09-10)
+
+PO requests autonomous progress where no manual check is needed. Start clean
+`c81856b`, three documentation commits after pushed implementation `b1b36bd`.
+Short meta-audit: the last slices exposed real migration/storage interfaces, but
+another open-ended document chain would not close `TEAM-FLOW-01`. This slice must
+finish one reviewable interface/decision package inside existing 07/06, then name
+the exact executable/adoption entry and remaining authority. Do not create another
+probe page, specification series or claim implementation from prose.
+
+- [x] Recheck current checkpoint, approved scope and proportionate verification.
+- [x] Specify source-managed relation identity/selection, registration lifecycle,
+  equal/different introductions and complete prepared-migration source binding.
+- [x] Independently review concrete invariants and resolve draft contradictions;
+  classify any remaining actual product/architecture choice explicitly.
+- [x] Define a finite executable slice and evidence/approval package; update current
+  navigation and verify exact scope. Continue safe authorized work without manual
+  pauses; do not cross real-data/schema-adoption boundaries by inference.
+
+Production scope: none until the technical amendments and relevant gates permit
+it. Reuse 02/05/06/07 and existing journal/candidate evidence. Completion means an
+explicit interface and go/no-go decision, not another list labelled “next design”.
+Four focused feasibility cases were added to the existing candidate harness, so
+the standard root checks/build also run. Real file conversion, dependency,
+media/profile expansion, release and external-device work remain out.
+
+Implementation/evidence: 07 §§5–7.2 now drafts fixed foundation, endpoint-fixed
+managed selection, shared per-unit original changes, birth-specific complete
+targets with explicit selection guards, portable retained artifacts and a separate
+preparedMigration source. Existing candidate harness 10/10 PASS includes four
+new feasibility cases. This is not an admitted ProjectDoc converter or durable
+product connection. No production code, existing host or dependency changed.
+
+Independent review corrected shared-versus-plan artifact shapes, portable
+foundation retention, and the distinction between already-published receive
+no-op and durable-but-unpublished journal recovery. No new UI/probe or human
+test was requested. Both independent reviewers confirmed their corrections with
+no remaining blocker in this bounded draft/feasibility review; no adoption credit.
+
+Verification: `npm run typecheck` PASS; existing Node harness 10/10 PASS;
+`npm run build` PASS with existing chunk/static-dynamic import warnings. Initial
+default `npm test` had 1 existing CLI timeout (5-second limit), 1,867 PASS/21 TODO.
+Without code or timeout changes, `npm test -- --maxWorkers=2` passed all 105 files,
+1,868 tests/21 existing TODO; the same CLI case completed in about one second.
+Retain the initial timeout as observed evidence, not a fabricated first-run PASS.
+Diff whitespace and changed-document relative-link checks PASS. Scope is eight
+Markdown files and one existing isolated Node harness; no private source bytes,
+new assets, runtime code, build configuration or package dependency changes.
+
+Next bounded execution is 07 §10.1: one synthetic service-level path through
+existing domain guards and the journal port, with preserved local edits, explicit
+conflicts, retained original changes and independent reopen/replay. The interface
+draft is no longer the next deliverable. Production schema/profile/recipe approval
+and storage/device gates remain separate; autonomous progress is not adoption.
+
+### Completed work — migration and portable Native bridge recipe (2026-09-10)
 
 PO approved proceeding with the next bounded contract artifact. Start clean
 `g0-baseline` at `fdbea7e`; two local documentation commits follow the pushed
