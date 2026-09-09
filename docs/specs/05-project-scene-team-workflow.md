@@ -1172,7 +1172,7 @@ A contract disagreement stops that affected implementation for PO resolution.
 
 **Stage A observed implementation:** `src/domain/projectRecords.ts` validates
 one already decoded amended root and all 14 record maps, reusing the existing
-Scene/material guards and safe clone. `projectRecordFields.ts` checks known
+Scene/material value rules and safe clone. `projectRecordFields.ts` checks known
 nested values; unknown root/record/nested values remain in the frozen result.
 Migration support remains protected opaque data, not validated migration state.
 Camera nonparallel checks use exact transient binary64 integer arithmetic, so
@@ -1231,6 +1231,41 @@ deleted keys; `development.ts` exposes raw-string evidence beside its existing
 fixture projection. Stable read enumeration changes no original encoded byte.
 All Project candidate-value/graph/content composition and C authority remain
 pending; the intermediate result lists these missing authorities explicitly.
+
+**Candidate composition implementation detail:** validate known atomic fields
+directly with the same guards used by whole-record admission; do not construct a
+record from arbitrary candidate winners or enumerate Cartesian whole Projects.
+Required absent values are invalid, while optional absence remains a distinct
+valid candidate. A missing field in an unresolved projection is not source absence.
+Keep an index of all original records/fields and current candidate references
+apart from any unambiguous diagnostic projection. Whole immutable records retain
+their exact digest and identity checks. Coupled material appearance/compositing
+rules are checked when both are unambiguous; a conflict in either applies no
+override. Never insert a default to make a candidate pass that check.
+All current candidate parent/target references reserve their semantic keys by
+record ID, including records with unresolved lifecycle or routing; candidates of
+one record do not count as multiple owners. Absent/deleted/unresolved parents
+are distinct from proven owner/frame mismatch. Preserve unknown original data
+and protected roots without converting every historical weak reference into a
+permanent strong root. External semantic evidence must bind the exact metadata,
+profile and blob digest/length it actually checked. Missing evidence stays scoped
+and non-authoritative; this does not approve a FormatProfile or a new wire format.
+
+**Observed candidate composition:** `projectCandidates.ts` now joins the neutral
+history inspection with shared header/mutable-field/immutable-record guards,
+exact immutable digests and known reference inspection. Its input includes the
+adapter's decoded schema and complete map-presence inventory (including empty
+maps); that declaration is not proof of a general adapter's source extraction.
+All original candidates remain, and checked operation IDs stay inspectable even
+when another candidate is malformed. Diagnostic partial records contain only
+unambiguous checked values; omitted fields never mean source deletion. Candidate
+references reserve semantic keys by owner ID, distinguish pending parents from
+deleted/missing ones and preserve valid candidate references behind invalid
+siblings. The actual pinned flat-map proof now feeds a full synthetic Project
+through two rounds and save/reload. This returns `project-candidate-inspection`,
+not a complete provider: exact external-content evidence, affected-closure
+projection and C's same-host authority remain required. No real schema adapter,
+BlobStore, import/export or ordinary-app activation follows from this result.
 
 **Observed bounded media connection (from `7b57fd2`):** the same host now has two
 preloaded public synthetic PNGs. Each immutable MediaResource has a verified

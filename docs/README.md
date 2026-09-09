@@ -99,7 +99,11 @@ no authoritative projection: complete candidate/causal/exact blob-profile eviden
 (B) and same-host authority (C) remain required; see 05 §13.4. Neutral original
 change inspection now retains absent and concurrent candidates and reviews
 immutable/lifecycle history. The existing served candidate supplies exact raw
-flat-string evidence; no Project-value/graph/content authority follows yet.
+flat-string evidence; candidate composition now checks all current values and
+known reference reservations without a winner, retaining diagnostic partial
+records. The actual flat-map candidate tests a full synthetic Project through
+two rounds/save/reload. External content evidence, closure projection and C's
+same-host authority remain required; no general provider or source-adapter credit.
 
 - Legacy-v1 ZIP/package code is not bounded-memory streaming despite older architecture text. The bounded Native portable and exchange packages use their separate streamed path.
 - Current XLSX reading is the local minimal reader in `src/io/xlsx.ts`, not SheetJS.

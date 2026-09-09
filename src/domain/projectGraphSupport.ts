@@ -5,7 +5,7 @@ import type { JsonObject, JsonValue } from './values';
 export const object = (v: JsonValue | undefined) => v as JsonObject;
 export const list = (v: JsonValue | undefined) => v as readonly JsonValue[];
 export const string = (v: JsonValue | undefined) => v as string;
-export const active = (r: JsonObject | undefined) => !!r && object(r.lifecycle).state === 'active';
+export const active = (r: JsonObject | undefined) => !!r?.lifecycle && object(r.lifecycle).state === 'active';
 export const canonical = (v: JsonValue): string => v !== null && typeof v === 'object'
   ? Array.isArray(v) ? `[${v.map(canonical).join(',')}]`
     : `{${Object.keys(v).sort().map(k => `${JSON.stringify(k)}:${canonical(object(v)[k]!)}`).join(',')}}`

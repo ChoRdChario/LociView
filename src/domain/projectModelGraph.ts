@@ -14,12 +14,14 @@ export function familyCatalog(r: JsonObject): JsonValue | undefined {
 /** Known metadata relations only. Verified profile/material/bounds/surface semantics are still required. */
 export function inspectModelGraph(g: GraphInspection): void {
   const assets = g.table('assetsById'), reps = g.table('representationsById');
-  const projectFrame = object(object(g.records.project).frame).id;
+  const projectFrame = object(object(g.records.project).frame ?? {}).id;
   const frameOwners = new Map<string, string[]>(), frames = new Map<string, JsonObject[]>(), families = new Map<string, JsonObject[]>(), groups = new Map<string, JsonObject[]>();
   for (const a of Object.values(assets)) {
-    const id = string(a.id), frame = string(a.assetFrameId), owners = frameOwners.get(frame) ?? []; owners.push(id); frameOwners.set(frame, owners);
-    if (frame === projectFrame) g.issue('assetsById', id, 'assetFrameId', 'project-frame-collision');
+    const id = string(a.id), frame = string(a.assetFrameId);
+    if (frame !== undefined) { const owners = frameOwners.get(frame) ?? []; owners.push(id); frameOwners.set(frame, owners);
+      if (frame === projectFrame) g.issue('assetsById', id, 'assetFrameId', 'project-frame-collision'); }
     if (active(a)) g.roots.add(id);
+    if (a.status === undefined) continue;
     const status = object(a.status);
     if (status.kind === 'ready') {
       const bindingId = string(status.activeBindingId); g.edge(id, bindingId, 'status.activeBindingId');
@@ -37,7 +39,7 @@ export function inspectModelGraph(g: GraphInspection): void {
     if (frame === projectFrame) g.issue('representationsById', id, 'representationFrameId', 'project-frame-collision');
     const foreign = frameOwners.get(frame);
     if (foreign?.some(a => a !== r.assetId)) g.issue('representationsById', id, 'representationFrameId', 'foreign-asset-frame');
-    if ((owner?.assetFrameId === frame || r.role === 'splatExclusion') && (!identity(object(r.representationToAsset)) || owner?.assetFrameId !== frame))
+    if ((owner?.assetFrameId === frame || r.role === 'splatExclusion') && (!identity(object(r.representationToAsset)) || (owner?.assetFrameId !== undefined && owner.assetFrameId !== frame)))
       g.issue('representationsById', id, 'representationToAsset', 'asset-frame-alias-requires-identity');
     for (const [index, key] of [[frames, frame], [families, string(r.variantFamilyId)], ...(r.compositeGroupId ? [[groups, string(r.compositeGroupId)] as const] : [])] as const) {
       const entries = index.get(key) ?? []; entries.push(r); index.set(key, entries);

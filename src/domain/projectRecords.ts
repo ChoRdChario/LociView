@@ -1,7 +1,6 @@
 import { cloneCanonicalValue, DomainValidationError, reject, type JsonObject, type JsonValue, type ValidationIssue, type ValueLimits } from './values';
-import { admitSceneRecord } from './sceneRecords';
-import { admitMaterialRecord } from './materialRecords';
 import { ProjectRecordFields } from './projectRecordFields';
+import { checkMutableRecord, mutableRecordFields, type MutableRecordMap } from './projectMutableFields';
 
 export const projectRecordMaps = Object.freeze({ assetsById: 'ast', assetRevisionsById: 'rev', assetBindingsById: 'bnd',
   representationsById: 'rep', mediaResourcesById: 'med', captionsById: 'cap', captionAttachmentsById: 'att', captionTagsById: 'tag',
@@ -23,22 +22,9 @@ export function admitProjectRecords(input: unknown, requested: ValueLimits): Pro
     for (const [key, n] of Object.entries(requested)) if (!Number.isSafeInteger(n) || n < 0) reject('limit', [key]);
     const limits = { maxDepth: Math.min(32, requested.maxDepth), maxNodes: Math.min(5_000_000, requested.maxNodes), maxStringScalars: requested.maxStringScalars };
     const c = new ProjectRecordFields(), root = c.shape(cloneCanonicalValue(input, limits), ['schema', 'identity', 'project', ...Object.keys(projectRecordMaps)], []);
-    const schema = c.shape(c.required(root, 'schema', []), ['major', 'minor'], ['schema']);
-    c.enum(c.required(schema, 'major', ['schema']), [2], ['schema', 'major']); c.integer(c.required(schema, 'minor', ['schema']), ['schema', 'minor']);
-    const identity = c.shape(c.required(root, 'identity', []), ['projectId', 'historyEpoch', 'lineageSeed'], ['identity']);
-    c.id(c.required(identity, 'projectId', ['identity']), 'prj', ['identity', 'projectId']);
-    c.id(c.required(identity, 'historyEpoch', ['identity']), 'hep', ['identity', 'historyEpoch']); c.digest(c.required(identity, 'lineageSeed', ['identity']), ['identity', 'lineageSeed']);
+    for (const field of ['schema', 'identity']) checkProjectHeader(c, field, c.required(root, field, []));
     const project = c.shape(c.required(root, 'project', []), ['title', 'frame', 'defaultSceneId'], ['project']);
-    c.text(c.required(project, 'title', ['project']), 256, ['project', 'title']); c.id(c.required(project, 'defaultSceneId', ['project']), 'scn', ['project', 'defaultSceneId']);
-    const frame = c.shape(c.required(project, 'frame', ['project']), ['id', 'handedness', 'upAxis', 'unit'], ['project', 'frame']);
-    c.id(c.required(frame, 'id', ['project', 'frame']), 'frm', ['project', 'frame', 'id']);
-    c.enum(c.required(frame, 'handedness', ['project', 'frame']), ['right'], ['project', 'frame', 'handedness']);
-    c.enum(c.required(frame, 'upAxis', ['project', 'frame']), ['+Y'], ['project', 'frame', 'upAxis']);
-    const up = ['project', 'frame', 'unit'], unit = c.shape(c.required(frame, 'unit', ['project', 'frame']), ['kind', 'metersPerProjectUnit'], up);
-    c.enum(c.required(unit, 'kind', up), ['meters', 'custom', 'unknown'], [...up, 'kind']);
-    if (unit.kind === 'unknown') c.absent(unit, ['metersPerProjectUnit'], up);
-    else if (unit.kind === 'meters') c.enum(c.required(unit, 'metersPerProjectUnit', up), [1], [...up, 'metersPerProjectUnit']);
-    else c.positive(c.required(unit, 'metersPerProjectUnit', up), [...up, 'metersPerProjectUnit']);
+    for (const field of ['title', 'frame', 'defaultSceneId']) checkProjectHeader(c, field, c.required(project, field, ['project']));
     let entityCount = 0;
     const attachments = new Map<string, number>(), tagMemberships = new Map<string, number>();
     for (const map of Object.keys(projectRecordMaps) as ProjectRecordMap[]) {
@@ -48,7 +34,7 @@ export function admitProjectRecords(input: unknown, requested: ValueLimits): Pro
         c.id(key, projectRecordMaps[map], [map, key]); const record = c.object(entry, [map, key]);
         try {
           if (c.id(c.required(record, 'id', []), projectRecordMaps[map], ['id']) !== key) reject('identity', ['id']);
-          checkRecord(c, map, record, limits);
+          checkProjectRecord(c, map, record);
           if (map === 'captionAttachmentsById' || map === 'captionTagMembershipsById') {
             const counts = map === 'captionAttachmentsById' ? attachments : tagMemberships, id = record.captionId as string;
             const count = (counts.get(id) ?? 0) + 1; if (count > 4096) reject('limit', ['captionId']); counts.set(id, count);
@@ -66,30 +52,38 @@ export function admitProjectRecords(input: unknown, requested: ValueLimits): Pro
   }
 }
 
-function checkRecord(c: ProjectRecordFields, map: ProjectRecordMap, r: JsonObject, limits: ValueLimits) {
+/** Internal atomic header checks on canonical cloned values. */
+export function checkProjectHeader(c: ProjectRecordFields, field: string, v: JsonValue): void {
+  if (field === 'schema') {
+    const schema = c.shape(v, ['major', 'minor'], ['schema']);
+    c.enum(c.required(schema, 'major', ['schema']), [2], ['schema', 'major']); c.integer(c.required(schema, 'minor', ['schema']), ['schema', 'minor']);
+  } else if (field === 'identity') {
+    const identity = c.shape(v, ['projectId', 'historyEpoch', 'lineageSeed'], ['identity']);
+    c.id(c.required(identity, 'projectId', ['identity']), 'prj', ['identity', 'projectId']);
+    c.id(c.required(identity, 'historyEpoch', ['identity']), 'hep', ['identity', 'historyEpoch']); c.digest(c.required(identity, 'lineageSeed', ['identity']), ['identity', 'lineageSeed']);
+  } else if (field === 'title') c.text(v, 256, ['project', field]);
+  else if (field === 'defaultSceneId') c.id(v, 'scn', ['project', field]);
+  else if (field === 'frame') {
+    const frame = c.shape(v, ['id', 'handedness', 'upAxis', 'unit'], ['project', 'frame']);
+    c.id(c.required(frame, 'id', ['project', 'frame']), 'frm', ['project', 'frame', 'id']);
+    c.enum(c.required(frame, 'handedness', ['project', 'frame']), ['right'], ['project', 'frame', 'handedness']);
+    c.enum(c.required(frame, 'upAxis', ['project', 'frame']), ['+Y'], ['project', 'frame', 'upAxis']);
+    const up = ['project', 'frame', 'unit'], unit = c.shape(c.required(frame, 'unit', ['project', 'frame']), ['kind', 'metersPerProjectUnit'], up);
+    c.enum(c.required(unit, 'kind', up), ['meters', 'custom', 'unknown'], [...up, 'kind']);
+    if (unit.kind === 'unknown') c.absent(unit, ['metersPerProjectUnit'], up);
+    else if (unit.kind === 'meters') c.enum(c.required(unit, 'metersPerProjectUnit', up), [1], [...up, 'metersPerProjectUnit']);
+    else c.positive(c.required(unit, 'metersPerProjectUnit', up), [...up, 'metersPerProjectUnit']);
+  } else c.unknown = true;
+}
+
+/** Internal checks on already cloned records, shared with immutable candidate admission. */
+export function checkProjectRecord(c: ProjectRecordFields, map: ProjectRecordMap, r: JsonObject) {
+  if (Object.hasOwn(mutableRecordFields, map)) { checkMutableRecord(c, map as MutableRecordMap, r); return; }
   const required = (key: string) => c.required(r, key, []), id = (key: string, prefix: string) => c.id(required(key), prefix, [key]);
   const optionalId = (key: string, prefix: string) => c.optional(r, key, [], (v, p) => c.id(v, prefix, p));
-  const text = (key: string, max = 256, body = false) => c.text(required(key), max, [key], body);
   const shape = (fields: readonly string[], mutable = true) => { c.shape(r, ['id', ...fields, mutable ? 'lifecycle' : 'payloadDigest'], []);
     if (mutable) c.lifecycle(required('lifecycle'), ['lifecycle']); else { c.digest(required('payloadDigest'), ['payloadDigest']); c.absent(r, ['lifecycle'], []); } };
-  const order = () => c.order(required('orderKey'), ['orderKey']);
-  const color = () => c.optional(r, 'colorSrgb', [], (v, p) => c.color(v, p));
-  const delegated = map === 'scenesById' ? 'scene' : map === 'sceneAssetMembershipsById' ? 'assetMembership' : map === 'sceneCaptionMembershipsById' ? 'captionMembership' : null;
-  if (delegated || map === 'materialOverridesById') {
-    const result = delegated ? admitSceneRecord(delegated, r, limits, r.id as string) : admitMaterialRecord(r, limits, r.id as string);
-    if (result.kind === 'rejected') throw new DomainValidationError(result.issue.code, result.issue.path);
-    c.unknown ||= result.hasUnknownFields; return;
-  }
-  if (map === 'assetsById') {
-    shape(['label', 'assetFrameId', 'status']); text('label'); id('assetFrameId', 'frm');
-    const s = c.shape(required('status'), ['kind', 'activeBindingId', 'reason', 'expectedLabel', 'expectedDigest', 'pendingAssetToProject'], ['status']);
-    c.enum(c.required(s, 'kind', ['status']), ['ready', 'unresolved'], ['status', 'kind']);
-    if (s.kind === 'ready') { c.id(c.required(s, 'activeBindingId', ['status']), 'bnd', ['status', 'activeBindingId']);
-      c.absent(s, ['reason', 'expectedLabel', 'expectedDigest', 'pendingAssetToProject'], ['status']); }
-    else { c.absent(s, ['activeBindingId'], ['status']); c.enum(c.required(s, 'reason', ['status']), ['missingSource', 'unsupportedFormat', 'migrationError'], ['status', 'reason']);
-      c.optional(s, 'expectedLabel', ['status'], (v, p) => c.text(v, 256, p)); c.optional(s, 'expectedDigest', ['status'], (v, p) => c.digest(v, p));
-      c.optional(s, 'pendingAssetToProject', ['status'], (v, p) => c.transform(v, p)); }
-  } else if (map === 'assetBindingsById') {
+  if (map === 'assetBindingsById') {
     shape(['assetId', 'assetRevisionId', 'assetToProject', 'parentBindingId', 'method', 'residual'], false);
     id('assetId', 'ast'); id('assetRevisionId', 'rev'); optionalId('parentBindingId', 'bnd'); c.transform(required('assetToProject'), ['assetToProject']);
     c.enum(required('method'), ['import', 'manual', 'bounds', 'correspondence', 'migration'], ['method']); c.optional(r, 'residual', [], (v, p) => c.number(v, p));
@@ -115,13 +109,7 @@ function checkRecord(c: ProjectRecordFields, map: ProjectRecordMap, r: JsonObjec
   else if (map === 'mediaResourcesById') {
     shape(['blob', 'mediaKind', 'label'], false); c.blob(required('blob'), ['blob']); c.enum(required('mediaKind'), ['image', 'video', 'audio', 'document'], ['mediaKind']);
     c.optional(r, 'label', [], (v, p) => c.text(v, 256, p));
-  } else if (map === 'captionsById') { shape(['title', 'body', 'colorSrgb', 'anchor']); text('title', 512); text('body', 65_536, true); color(); c.anchor(required('anchor'), ['anchor']); }
-  else if (map === 'captionAttachmentsById') { shape(['captionId', 'mediaResourceId', 'altText', 'orderKey']); id('captionId', 'cap'); id('mediaResourceId', 'med'); order();
-    c.optional(r, 'altText', [], (v, p) => c.text(v, 4096, p)); }
-  else if (map === 'captionTagsById') { shape(['label', 'colorSrgb', 'orderKey']); text('label'); order(); color(); }
-  else if (map === 'captionTagMembershipsById') { shape(['captionId', 'tagId']); id('captionId', 'cap'); id('tagId', 'tag'); }
-  else if (map === 'viewsById') { shape(['sceneId', 'name', 'orderKey', 'projectFrameId', 'camera', 'background']); id('sceneId', 'scn'); text('name'); order(); id('projectFrameId', 'frm');
-    c.camera(required('camera'), ['camera']); c.background(required('background'), ['background']); }
+  }
 }
 
 function provenance(c: ProjectRecordFields, v: JsonValue, p: readonly string[], derived = false) {

@@ -29,6 +29,9 @@ loop. Do not return to detached UI parts or polish as the default workstream.
     - [x] Add a neutral original-change read inspection (including absent values),
       exact maximal candidate identities and lifecycle/immutable-history review;
       prove extraction against the isolated pinned candidate, not a winner map.
+    - [x] Join current candidate values with shared whole-record guards and known
+      reference/key reservations. Retain checked candidates behind malformed
+      siblings; prove the full synthetic record fixture through the real candidate.
     - [ ] Compose full candidate-value/graph checks and exact external content
       evidence into the provider; neither independent inspection closes B.
 - [ ] Stage C: connect that authority to the existing synthetic workflow; final
@@ -74,7 +77,7 @@ or request another manual journal test. No new server/tunnel, private source,
 dependency, schema/wire/adoption, real file/storage, Native/main/Pages/SW
 configuration, version/license or release change. Official remaining quota 76%.
 
-Current continuation starts clean `3c9facb` (37 ahead of local tracking; no fetch),
+Completed neutral-read continuation started clean `3c9facb` (37 ahead of local tracking; no fetch),
 76% official quota. The preceding goal turn made verified graph-inspection progress.
 Next close the neutral candidate/causal read component of B: source change DAG,
 original final-write identities, absence distinct from null, exact candidate sets,
@@ -105,6 +108,40 @@ No new probe/server/tunnel, private bytes, actual-file/storage activation,
 dependency, schema/wire/adoption, Native/main/Pages/SW configuration or release.
 No fresh browser/IME/iPhone/offline evidence is claimed; no manual test requested.
 Official remaining quota 75%; no usage reset redeemed.
+
+Current composition continuation: clean `60cde45`, 38 ahead of local tracking
+(no fetch), official quota 75%. Previous turn is verified implementation progress.
+Target: join all-candidate values/references with existing whole-record guards,
+retaining original fields rather than choosing a validation witness/winner. Reuse
+the whole-root fixture, immutable digests, lifecycle inspection and Scene resolver.
+Required absence, scoped parent exclusion and all-candidate semantic reservations
+must be explicit; no global Cartesian Project enumeration or guessed evidence.
+External exact-content verification and the same-host C authority remain part of
+this finite provider exit. No new manual hold, probe, schema/profile/adoption,
+real-file/storage or release changes. Stop on a contract disagreement or quota
+below 10%. The implementation detail is recorded in 05 §13.4 before code changes.
+
+Composition review: all-current-candidate field/immutable values now share
+whole-record guards; exact digests, known graph/anchor references and semantic-key
+reservations are joined without a winner or Cartesian Project. Original input,
+unknowns and valid operation IDs behind malformed siblings remain retained.
+The partial diagnostic record is not source state, SceneResources or a GC/save
+permit. Independent read-only review found and confirmed fixes for three P2s:
+valid sibling references lost behind malformed candidates, fake duplicate keys
+from unresolved endpoints, and unresolved lifecycle/frame misdiagnosed as proven
+missing/deleted/mismatched parents. Regression covers each; no limited-diff
+blocker remains. Full pinned-candidate synthetic records pass two rounds and
+save/reload, retaining original IDs and scalar conflicts. Root/scoped TypeScript,
+47 isolated candidate tests and 103-file root suite PASS (1832 tests, 21 existing
+TODO). Ordinary and harness builds PASS with existing warnings; parsed source
+maps contain zero candidate/new candidate-composition modules in either build.
+Existing material intent helpers were shared without changing admission behavior.
+B/C remain incomplete: next join exact external content/profile evidence and
+affected-closure projection, then replace the same served host's known-only
+authority. Do not rebrand this inspection as the completed provider or introduce
+another UI/probe. No new browser/IME/iPhone/offline evidence, manual hold, private
+source, dependency, schema/profile/adoption, actual-file/storage, Native/main/
+Pages/SW configuration or release changes. Official remaining quota 74%.
 
 Stage A review: one amended whole-root entry covers all 14 entity maps and known
 nested fields, retaining unknown subtrees and exact body newlines. It exposes

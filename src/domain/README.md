@@ -9,7 +9,7 @@ workstreams. These modules do not provide connected authority yet.
 - `projectRecords.ts` is one whole-root **decoded record** entry for the amended
   Project and all 14 entity maps. It enforces required maps, schema/nominal map
   identities, known record unions, counts and global canonical-value budgets.
-  It reuses the Scene/material guards and preserves the whole independent frozen
+  It reuses shared Scene/material value rules and preserves the whole independent frozen
   tree, including unknown minor fields. A `valid-records` result has no token,
   SceneResources, save/merge receipt or permission to activate a Project.
 - `projectRecordFields.ts` supplies internal checks on that already cloned tree:
@@ -56,6 +56,26 @@ workstreams. These modules do not provide connected authority yet.
   `project-history-inspection` does not validate all candidate values/references,
   certify source extraction for a general schema, compose a Project or activate UI.
 
+- `projectCandidates.ts` now joins original history with the shared whole-root
+  header, mutable-field and immutable-record rules. `projectMutableFields.ts`
+  serves the whole-record and atomic-candidate paths, retaining material coupling
+  checks without inserting defaults. Every candidate is checked, including absent
+  versus null; valid operation IDs remain available behind an invalid sibling.
+  Known anchor/model/resource graphs consume only unambiguous diagnostic fields
+  and all checked anchor candidates. A missing diagnostic field is unresolved,
+  not evidence of a removed source field or deleted parent.
+- `projectCandidateReferences.ts` reserves all known current candidate references
+  and semantic keys by record ID, retaining checked immutable blob/dependency
+  references even behind malformed siblings. It keeps unresolved parents distinct
+  from missing/deleted ones and does not manufacture keys from absent fields.
+  `project-candidate-inspection` retains the complete neutral input, every candidate,
+  scoped issues and partial diagnostic records; it gives no SceneResources, GC,
+  save or export authority. Schema/map presence comes from the adapter's complete
+  decoded-root inspection; declaring those fields alone is not source proof.
+  External verified-content evidence, affected-closure propagation and C's actual
+  same-host provider hookup remain mandatory. The pinned flat-map test exercises
+  two real candidate rounds and save/reload of the full synthetic record fixture.
+
 - `values.ts` checks/clones already decoded plain JSON without invoking getters;
   rejects invalid Unicode/NFC, nonfinite numbers, unsafe keys/non-JSON values,
   cycles and caller-specified traversal limits; returns an independent frozen
@@ -95,8 +115,8 @@ only the exact immutable metadata digest computation above is implemented.
 Host objects, proxies and CRDT library objects are outside the input contract;
 the future adapter must supply plain data without losing conflict candidates.
 
-Not yet covered: composed complete Project candidate/value/reference authority,
-parent-child conflict propagation and general adapter provenance,
+Not yet covered: complete Project/provider authority, affected parent-child/closure
+projection and general adapter provenance,
 external verified profiles/content/material enumeration/bounds/equivalence/source
 indices, invalid-closure propagation into a same-token provider, blobs/inventory,
 migration and history-free policy. A structural or record-graph result must

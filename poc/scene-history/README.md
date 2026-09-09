@@ -61,6 +61,15 @@ writes, nested/root rejection, noninjective mappings and second exchange. The
 drafts/copy/recovery behavior with the sidecar. This is not a general Automerge
 schema adapter or a source-content/profile/adoption receipt. Neutral domain
 history review remains separate from complete candidate-value/graph authority.
+The original-read test now also encodes the full 14-map synthetic Project's
+atomic values into this exact flat-map candidate, performs two actual actor
+rounds, and feeds original operations into `inspectProjectCandidates`. Different
+fields survive together; concurrent title setters remain unresolved after
+save/reload with identical original change IDs. Schema/map-presence declarations
+are fixed fixture inputs, not a proven general root/schema adapter. There are
+now four original-read tests plus the 43 unchanged connected development cases.
+The new inspection is still non-authoritative: exact content/profile evidence,
+affected-closure projection and C's served-host replacement remain pending.
 
 Current executable cases cover second-round field/membership preservation,
 original bytes/base, both scalar choices, incomplete/foreign/stale rejection,

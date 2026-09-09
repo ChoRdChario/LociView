@@ -46,8 +46,11 @@
 > content evidence and C remain open. Neutral original-change inspection now
 > retains absent/concurrent candidates and inspects historical immutable/lifecycle
 > mutations. The served candidate exposes original flat-string evidence alongside
-> its existing fixture projection. Project candidate-value/graph/external-content
-> composition remains next. No SceneResources/GC/save permission follows.
+> its existing fixture projection. Candidate composition now checks all current
+> values/references and reserves keys without choosing a winner. Full synthetic
+> record data passes two actual candidate rounds/save-reload; external-content
+> evidence, affected-closure projection and C hookup remain next. The partial
+> diagnostic result gives no SceneResources/GC/save permission.
 > One finite boundary, not new per-record tasks; no additional manual test hold.
 > Windows Computer Use initialized but stopped automatically on unsafe-to-resolve
 > Chrome URL; no browser input/PASS or bypass. Keep the existing batched UI lane.

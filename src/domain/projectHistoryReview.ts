@@ -7,7 +7,7 @@ import { DomainValidationError, reject, type ValidationIssue } from './values';
 export type FieldPolicy = 'immutable' | 'existence' | 'root-default' | 'parent' | 'optional-default' | 'spatial' | 'order' | 'scalar' | 'unknown';
 export type HistoryIssue = Readonly<{ path: readonly string[]; kind: 'invalid' | 'review' | 'unverified'; code: string }>;
 export type ProjectHistoryReview = Readonly<{ kind: 'rejected'; issue: ValidationIssue }> | Readonly<{ kind: 'project-history-inspection';
-  history: AtomicHistory; fields: readonly (AtomicField & { readonly policy: FieldPolicy })[]; issues: readonly HistoryIssue[];
+  history: AtomicHistory; fields: readonly (AtomicField & { readonly policy: FieldPolicy })[]; issues: readonly HistoryIssue[]; workUsed: number;
   pendingAuthority: readonly ['candidate-values-and-graph', 'verified-blob-profile-semantics', 'same-token-provider'] }>;
 
 /** Known semantic paths are a neutral read representation, not persisted field names in a new adapter. */
@@ -77,6 +77,7 @@ export function reviewProjectHistory(input: unknown, limits: HistoryReadLimits):
     }
     const deduplicated = [...new Map(issues.map(i => [JSON.stringify(i), i])).values()];
     return Object.freeze({ kind: 'project-history-inspection', history: read.history, fields: Object.freeze(fields), issues: Object.freeze(deduplicated),
+      workUsed: read.workUsed + index.workUsed,
       pendingAuthority: Object.freeze(['candidate-values-and-graph', 'verified-blob-profile-semantics', 'same-token-provider'] as const) });
   } catch (error) { if (error instanceof DomainValidationError) return Object.freeze({ kind: 'rejected', issue: error.issue }); throw error; }
 }

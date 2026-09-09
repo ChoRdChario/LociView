@@ -20,7 +20,13 @@ const rgb = (value: JsonValue | undefined, path: string[]) => {
 /** Individual decoded atomic values only; not target/reference, source-optics or backend admission. */
 export function validateMaterialIntent(input: unknown, limits: ValueLimits): MaterialIntent {
   const root = object(cloneCanonicalValue(input, limits), []), a = object(root.appearance, ['appearance']);
-  const c = object(root.compositing, ['compositing']), coverage = object(c.coverage, ['compositing', 'coverage']);
+  const c = object(root.compositing, ['compositing']);
+  checkMaterialAppearance(a); checkMaterialCompositing(c); checkMaterialCoupling(a, c);
+  return root as MaterialIntent;
+}
+/** Internal checks on canonical cloned values; callers retain unknown members. */
+export function checkMaterialAppearance(value: JsonValue): void {
+  const a = object(value, ['appearance']);
   if (a.opacity !== undefined) unit(a.opacity, ['appearance', 'opacity']);
   if (a.baseColorSrgb !== undefined) rgb(a.baseColorSrgb, ['appearance', 'baseColorSrgb']);
   if (a.lighting !== undefined && !['inherit', 'lit', 'unlit'].includes(a.lighting as string)) reject('value', ['appearance', 'lighting']);
@@ -30,12 +36,18 @@ export function validateMaterialIntent(input: unknown, limits: ValueLimits): Mat
     rgb(chroma.keyColorSrgb, ['appearance', 'chroma', 'keyColorSrgb']);
     unit(chroma.tolerance, ['appearance', 'chroma', 'tolerance']); unit(chroma.softness, ['appearance', 'chroma', 'softness']);
   }
+}
+export function checkMaterialCompositing(value: JsonValue): void {
+  const c = object(value, ['compositing']), coverage = object(c.coverage, ['compositing', 'coverage']);
   if (!['inherit', 'opaque', 'mask', 'ditherCoverage', 'smoothBlend'].includes(coverage.policy as string)) reject('value', ['compositing', 'coverage', 'policy']);
   if (!['inherit', 'surface', 'transmission'].includes(c.optics as string)) reject('value', ['compositing', 'optics']);
   if (coverage.policy === 'mask' || (coverage.policy === 'ditherCoverage' && coverage.alphaCutoff !== undefined)) unit(coverage.alphaCutoff, ['compositing', 'coverage', 'alphaCutoff']);
   else if (coverage.alphaCutoff !== undefined) reject('value', ['compositing', 'coverage', 'alphaCutoff']);
+}
+/** Only call with two checked unambiguous values; never supply defaults for conflicts. */
+export function checkMaterialCoupling(a: JsonObject, c: JsonObject): void {
+  const coverage = object(c.coverage, ['compositing', 'coverage']);
   if (coverage.policy === 'opaque' && (a.chroma !== undefined || (a.opacity !== undefined && a.opacity !== 1))) reject('value', ['appearance']);
-  return root as MaterialIntent;
 }
 
 export const materialFields = ['opacity', 'lighting', 'doubleSided', 'chroma', 'keyColor', 'tolerance', 'softness'] as const;
