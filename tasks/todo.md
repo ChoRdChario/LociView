@@ -9,6 +9,68 @@ requested. Synthetic two-person model/pin/history and independent Caption/model-
 The scoped PO result below closes only the listed interaction checks; broader
 rendered, IME, device and durable-file acceptance remain pending.
 
+### Completed work — connect prepared migration to retained journal (2026-09-10)
+
+Start clean `b85c68c`. The previous goal turn made progress by correcting the
+interface and executing four discriminating candidate cases; it did not complete
+the UI/durable objective. Account usage check: 59% remaining; pause below 10%.
+This is the executable entry of 07 §10.1, not another design-only checkpoint.
+
+- [x] Recheck code/ports, exact boundary and remaining usage; parallel read-only
+  storage/domain review, one writer.
+- [x] Add the isolated preparedMigration journal discriminator, closed retained
+  source descriptor and v2 seal, preserving existing local/full-source bytes.
+- [x] Connect preparation and recovery through an explicit source-verification
+  port: retained original input/artifact bytes, exact receiver subtraction, final
+  closure and old-or-complete publication. Missing acknowledged bytes must fail.
+- [x] Execute a synthetic old-input/local-edit/reopen/replay path through the
+  existing Node files/CAS ports, including durable-before-publication interruption.
+- [x] Independent diff review, scoped tests/typecheck and root regression/build;
+  update current handoff with implemented versus still-unconnected boundaries.
+
+Execution descriptor: existing isolated Automerge 3.4.1 and journal limits only;
+no dependency changes or product numeric guarantee. The source-verification port
+must be explicitly configured and verifies semantics plus portable proof closure;
+the journal must never treat generated changes as a remote sender's original file.
+Synthetic original-input/retained-blob reads are bounded by existing metadata
+limits. This is not a general large Native ZIP reader or the portable recipe's
+canonical artifact encoder. Existing domain provider integration is assessed in
+parallel; if its source shape differs, do not weaken it or invent a conversion.
+No new browser page, live data, runtime schema/format activation or device claim.
+The full UI-validation objective stays open beyond this journal connection.
+
+Implemented scope: `journal-format.ts`, `journal.ts`, `journal-node.ts` and eight
+cases in the existing `journal.test.ts`. Migration has a closed descriptor and
+distinct v2 seal; local/remote retain v1. Original input and every required retained
+blob are checked before acknowledgment and again on recovery. A registered
+foundation must already belong to the published receiver base; count/aggregate
+limits apply on recovery too. Independent review corrected those two boundaries
+and required exact synthetic actor/sequence/time/message/op/predecessor checks.
+A same-content change reauthored under another actor now refuses before journaling.
+
+The first test run found duplicate test CAS staging IDs on the second packet, not
+a journal failure; the fixture now uses fresh staging IDs and existing verified
+blobs. The focused migration rerun passed; final verification below owns the
+complete totals after adding the reauthored-source refusal case.
+
+Next concrete connection: preserve the existing full `developmentSourceSeed`
+and original flat-cell DAG through a dedicated isolated service reader, separate
+typed guard sidecar, real temporary-CAS content verifier and journal root-profile
+adapter. `developmentCandidateInput`/UI command correspondence remains strict;
+do not bypass it for new guard writes or rewrite old histories. The current small
+journal fixture is not that full provider, so 07 §10.1 and the UI goal remain open.
+
+Final evidence: isolated TypeScript check PASS; complete isolated Vitest 7 files /
+128 tests PASS (journal 42, including 8 new migration cases); Node history harness
+10/10 PASS; root typecheck PASS; `npm test -- --maxWorkers=2` 105 files / 1,868 PASS
+and 21 existing TODO; `npm run build` PASS with unchanged chunk/static-dynamic
+import warnings. Build is not offline/PWA evidence. Independent staged review
+confirmed 4 isolated implementation/test files plus 7 Markdown files, with no
+remaining blocker in this exact scope. Diff/link checks PASS. No browser/device
+test, root dependency, production schema/reader/writer, user-data conversion,
+ordinary entry, Service Worker source, main or release change. Remaining account
+usage is 58%; no 10% pause is needed. Goal remains active for full connection/UI.
+
 ### Completed work — finite bridge integration contract (2026-09-10)
 
 PO requests autonomous progress where no manual check is needed. Start clean

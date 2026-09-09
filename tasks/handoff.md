@@ -9,10 +9,12 @@
 > original-artifact requirements, with four calculated identity examples. Its
 > §§5–7.2 now draft shared unit/birth guards and the prepared-migration source.
 > Four added existing-candidate feasibility checks pass; complete Node harness
-> 10/10, not converter/storage/adoption proof. Next is 07 §10.1's finite connected
-> synthetic service slice using existing guards/journal, not another interface
-> document or standalone probe; wire/profile/adoption inputs remain separate.
-> Runtime schema, actual files/storage and UI are unchanged. No renewed preservation
+> 10/10, not converter/storage/adoption proof. The isolated journal now connects a
+> dedicated preparedMigration source to retained bytes and recovery with eight
+> added synthetic cases. Next remains the complete domain/guard-sidecar portion
+> of 07 §10.1, not another document/probe or promotion of the partial fixture.
+> Wire/profile/adoption inputs remain separate.
+> Production schema, user files/storage and UI are unchanged. No renewed preservation
 > question, closed Chrome journal rerun or immediate human test is needed.
 
 > **2026-09-10 update:** PO reports the five prescribed camera/pin/window manual

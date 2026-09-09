@@ -6,8 +6,9 @@ import { CasCandidate } from '../cas-io/candidate';
 import { NodeIo } from '../cas-io/node-io';
 import { OpfsIo } from '../cas-io/opfs-io';
 import { A, FORMAT, LIMIT, type Doc, type Ref, type Target, type Prepared, require, refs,
-  canonical, jsonBytes, parse, heads, sha, index, seal, decodeJournal } from './journal-format';
-import { JournalCandidate } from './journal';
+  canonical, jsonBytes, parse, heads, sha, index, seal, decodeJournal, load, same, missing,
+  type MigrationSource, type RetainedPart } from './journal-format';
+import { JournalCandidate, type MigrationVerifier, type RetainedBlob } from './journal';
 import { NodeFiles, NodePorts, TestGate } from './journal-node';
 
 const parent = resolve('.artifacts/fixtures');
@@ -329,4 +330,171 @@ it('missing inventory on reopen is explicitly read-only repair, not an editable 
   await files.write('inventory.json', jsonBytes([]));
   expect(await engine.view()).toMatchObject({ readOnly: true, repairRequired: true });
   for (const action of ['edit', 'export', 'gc'] as const) await expect(engine.request(action)).rejects.toThrow('inventory');
+});
+
+// This exact small source recipe is deliberately test-only: not a Native ZIP
+// parser, portable 07 encoder, full ProjectDoc provider or browser UI evidence.
+async function migrationFixture(registerFoundation = true) {
+  const caseId = 'synthetic_case', recipe = sha(encoder.encode('isolated-source-verifier-1'));
+  const ancestor = A.save(base);
+  const foundation = change(base, d => { d.bridge = { caseId: scalar(caseId), plans: {}, receipts: {} }; });
+  const foundationBytes = A.save(foundation);
+  if (registerFoundation) await engine.remote(tx(800), foundationBytes, id('pkg'));
+  const withType = (bytes: Uint8Array, mediaType: string): Ref => ({ ...rawRef(bytes), mediaType });
+  const metadataType = 'application/vnd.lociview.synthetic-metadata';
+  const partType = 'application/vnd.lociview.metadata-change';
+  const controlType = 'application/vnd.lociview.synthetic-control';
+  const fixedChange = (decoded: ReturnType<typeof A.decodeChange>, actor: string, message: string, parent: Doc) => {
+    const nextOp = Math.max(...A.getAllChanges(parent).map(bytes => {
+      const c = A.decodeChange(bytes); return c.startOp + c.ops.length;
+    }));
+    require(decoded.actor === actor && decoded.seq === 1 && decoded.time === 0 &&
+      decoded.message === message && decoded.startOp === nextOp, 'synthetic change recipe mismatch');
+  };
+  const verifier: MigrationVerifier = {
+    async verifySource(source, original, read) {
+      require(source.caseId === caseId && source.recipeDescriptorDigest === recipe &&
+        same(source.ancestor.metadata, withType(ancestor, metadataType)) &&
+        same(source.foundation.metadata, withType(foundationBytes, metadataType)), 'synthetic registered recipe mismatch');
+      const input = parse(original); require(same(Object.keys(input).sort(), ['body', 'title']) &&
+        typeof input.body === 'string' && typeof input.title === 'string', 'synthetic original input');
+      const receipt = parse(await read(source.sourceReceipt));
+      require(same(receipt, { caseId, recipe, originalInput: source.originalInput }), 'synthetic receipt mismatch');
+      const artifact = parse(await read(source.domainArtifact));
+      require(same(Object.keys(artifact).sort(), ['kind', 'parts']) && artifact.kind === 'synthetic-unit-plan' &&
+        Array.isArray(artifact.parts) && artifact.parts.length === 2, 'synthetic artifact shape');
+      const parts: Uint8Array[] = [];
+      for (const [ordinal, field] of ['body', 'title'].entries()) {
+        const descriptor = artifact.parts[ordinal] as RetainedPart, bytes = await read(descriptor.bytes), decoded = A.decodeChange(bytes);
+        const actor = sha(jsonBytes({ foundation: heads(foundation), field, value: input[field] }));
+        fixedChange(decoded, actor, `synthetic-unit:${actor}`, foundation);
+        require(descriptor.ordinal === ordinal && descriptor.expectedChangeHash === decoded.hash &&
+          descriptor.byteLength === bytes.length && descriptor.bytesSha256 === sha(bytes) &&
+          same(descriptor.dependencies, [...decoded.deps].sort()) && same(descriptor.dependencies, heads(foundation)), 'synthetic unit descriptor');
+        require(decoded.ops.length === 1 && decoded.ops[0]!.obj === A.getObjectId(foundation.captions) &&
+          decoded.ops[0]!.action === 'set' && decoded.ops[0]!.key === field &&
+          'value' in decoded.ops[0]! && decoded.ops[0]!.value === input[field], 'synthetic unit meaning');
+        const predecessors = A.getAllChanges(foundation).flatMap(bytes => {
+          const c = A.decodeChange(bytes); return c.ops.flatMap((op, i) => op.obj === A.getObjectId(foundation.captions) && op.key === field ? [`${c.startOp + i}@${c.actor}`] : []);
+        });
+        require(predecessors.length === 1 && same(decoded.ops[0]!.pred, predecessors), 'synthetic unit predecessors');
+        parts.push(bytes);
+      }
+      let generated = A.applyChanges(A.clone(foundation), parts)[0];
+      for (const [descriptors, field, ref] of [
+        [source.semanticRegistration, 'plans', source.domainArtifact],
+        [source.sourceObservation, 'receipts', source.sourceReceipt],
+      ] as const) {
+        require(descriptors.length === 1, 'synthetic registration count');
+        const bytes = await read(descriptors[0]!.bytes), decoded = A.decodeChange(bytes), op = decoded.ops[0];
+        const actor = sha(jsonBytes({ field, ref }));
+        fixedChange(decoded, actor, `synthetic-registration:${actor}`, generated);
+        require(decoded.ops.length === 1 && op?.obj === A.getObjectId(foundation.bridge[field]) &&
+          op.action === 'set' && op.key === ref.digest && 'value' in op && op.value === canonical(ref) &&
+          op.pred.length === 0 && same([...decoded.deps].sort(), heads(generated)), 'synthetic registration meaning');
+        generated = A.applyChanges(generated, [bytes])[0];
+      }
+      return generated;
+    },
+    async validateFinal(doc) {
+      closure(doc); require(String(doc.bridge.caseId) === caseId, 'synthetic final guard');
+      for (const field of ['body', 'title']) {
+        const alternatives = Object.values(A.getConflicts(doc.captions, field) ?? { value: doc.captions[field] });
+        require(alternatives.length > 0 && alternatives.every(v => typeof v === 'string' || v instanceof A.ImmutableString), 'synthetic final candidate');
+      }
+    },
+  };
+  const reopen = () => { const p = fresh().ports; return { ports: p, engine: new JournalCandidate(p, target, verifier) }; };
+  let stagingSequence = 900;
+  const build = async (body = 'Imported body', title = 'Imported title', reauthorUnit = false) => {
+    const retained: RetainedBlob[] = [];
+    const retain = (bytes: Uint8Array, type: string) => { const ref = withType(bytes, type); retained.push({ ref, bytes }); return ref; };
+    const descriptor = (bytes: Uint8Array, ordinal: number): RetainedPart => ({ ordinal, expectedChangeHash: A.decodeChange(bytes).hash,
+      dependencies: [...A.decodeChange(bytes).deps].sort(), byteLength: bytes.length, bytesSha256: sha(bytes), bytes: retain(bytes, partType) });
+    const original = jsonBytes({ body, title });
+    const originalInput = { sha256: sha(original), byteLength: original.length };
+    const sourceReceipt = retain(jsonBytes({ caseId, recipe, originalInput }), controlType);
+    const ancestorRef = retain(ancestor, metadataType), foundationRef = retain(foundationBytes, metadataType);
+    const parts = Object.entries({ body, title }).map(([field, value]) => {
+      const actor = reauthorUnit && field === 'body' ? 'a'.repeat(64) : sha(jsonBytes({ foundation: heads(foundation), field, value }));
+      const doc = A.change(A.clone(foundation, { actor }), { time: 0, message: `synthetic-unit:${actor}` }, d => { d.captions[field] = scalar(value); });
+      return A.getLastLocalChange(doc)!;
+    });
+    const domainArtifact = retain(jsonBytes({ kind: 'synthetic-unit-plan', parts: parts.map(descriptor) }), controlType);
+    let generated = A.applyChanges(A.clone(foundation), parts)[0];
+    const register = (field: 'plans' | 'receipts', ref: Ref) => {
+      const actor = sha(jsonBytes({ field, ref }));
+      generated = A.change(A.clone(generated, { actor }), { time: 0, message: `synthetic-registration:${actor}` }, d => { d.bridge[field][ref.digest] = scalar(canonical(ref)); });
+      return [descriptor(A.getLastLocalChange(generated)!, 0)];
+    };
+    const semanticRegistration = register('plans', domainArtifact), sourceObservation = register('receipts', sourceReceipt);
+    const source: MigrationSource = { kind: 'nativeBridgePrepared', caseId, recipeDescriptorDigest: recipe, sourceReceipt, originalInput,
+      ancestor: { ...target, heads: heads(base), metadata: ancestorRef }, foundation: { heads: heads(foundation), metadata: foundationRef },
+      domainArtifact, semanticRegistration, sourceObservation, generatedHeads: heads(generated) };
+    for (const item of retained) {
+      const ref = { sha256: item.ref.digest, byteLength: item.ref.byteLength };
+      if (!await cas.hasVerified(ref)) await cas.import(tx(stagingSequence++), ref, one(item.bytes));
+    }
+    return { source, original, retained, generated };
+  };
+  return { build, reopen, verifier, foundation };
+}
+
+it.each(['metadataDurable:0', 'journalDurable'])('prepared migration retains original changes and completes publication after %s', async boundary => {
+  const f = await migrationFixture(), input = await f.build();
+  const local = f.reopen(); await local.engine.local(tx(810), tx(811), d => { d.captions.body = scalar('Local participant edit'); });
+  const before = heads((await local.engine.view()).doc);
+  local.ports.checkpoint = async name => { if (name === boundary) throw Error('injected migration stop'); };
+  await expect(local.engine.preparedMigration(tx(1), input.source, input.original, input.retained)).rejects.toThrow('injected migration stop');
+  const reopened = f.reopen(); expect(heads((await reopened.engine.view()).doc)).toEqual(before);
+  expect((await reopened.engine.view()).readOnly).toBe(true);
+  const reads = casIo.readPayloadBytes;
+  expect(await reopened.engine.recover(tx(1))).toBe('published');
+  expect(casIo.readPayloadBytes).toBe(reads);
+  const final = (await reopened.engine.view()).doc;
+  expect(Object.values(A.getConflicts(final.captions, 'body')!).map(String).sort()).toEqual(['Imported body', 'Local participant edit']);
+  for (const { bytes } of index(input.generated).values()) expect(sha(index(final).get(A.decodeChange(bytes).hash)!.bytes)).toBe(sha(bytes));
+  expect(reopened.ports.publications).toBe(1);
+  expect(await reopened.engine.recover(tx(1))).toBe('noop');
+  expect(await reopened.engine.preparedMigration(tx(2), input.source, input.original, input.retained)).toBe('noop');
+  expect(reopened.ports.publications).toBe(1);
+  expect(await files.read(journalKey(2), LIMIT.journal)).toBeNull();
+  const j = await prepared(); expect(j.purpose).toBe('preparedMigration');
+  expect(j.metadataBatch.changes.map(p => p.expectedChangeHash).sort()).toEqual(missing(f.foundation, input.generated).map(b => A.decodeChange(b).hash).sort());
+});
+
+it('prepared migration reuses an old unit across packets without conflicting with a later local edit', async () => {
+  const f = await migrationFixture(), first = await f.build(), worker = f.reopen();
+  await worker.engine.preparedMigration(tx(1), first.source, first.original, first.retained);
+  await worker.engine.local(tx(810), tx(811), d => { d.captions.body = scalar('Later local edit'); });
+  const next = await f.build('Imported body', 'New title');
+  await worker.engine.preparedMigration(tx(2), next.source, next.original, next.retained);
+  const reopened = f.reopen(), final = (await reopened.engine.view()).doc;
+  expect(String(final.captions.body)).toBe('Later local edit');
+  expect(Object.keys(A.getConflicts(final.captions, 'body') ?? {})).toHaveLength(0);
+  expect(Object.values(A.getConflicts(final.captions, 'title')!).map(String).sort()).toEqual(['Imported title', 'New title']);
+});
+
+it('migration requires an explicit verifier and a previously registered foundation', async () => {
+  const f = await migrationFixture(false), input = await f.build();
+  await expect(engine.preparedMigration(tx(1), input.source, input.original, input.retained)).rejects.toThrow('verifier unavailable');
+  await expect(f.reopen().engine.preparedMigration(tx(1), input.source, input.original, input.retained)).rejects.toThrow('missing base dependency');
+  expect(await files.read(journalKey(), LIMIT.journal)).toBeNull();
+});
+
+it('migration refuses a reauthored old unit despite valid hashes and equivalent displayed content', async () => {
+  const f = await migrationFixture(), input = await f.build('Imported body', 'Imported title', true);
+  await expect(f.reopen().engine.preparedMigration(tx(1), input.source, input.original, input.retained)).rejects.toThrow('recipe mismatch');
+  expect(await files.read(journalKey(), LIMIT.journal)).toBeNull();
+});
+
+it.each(['original', 'artifact', 'registration'])('prepared migration rejects missing/corrupt retained %s without regeneration or publication', async kind => {
+  const f = await migrationFixture(), input = await f.build(), worker = f.reopen();
+  worker.ports.checkpoint = async name => { if (name === 'prepared') throw Error('injected stop'); };
+  await expect(worker.engine.preparedMigration(tx(1), input.source, input.original, input.retained)).rejects.toThrow('injected stop');
+  const key = kind === 'original' ? `journal/${tx(1)}/original-source.bin` :
+    `journal/${tx(1)}/artifacts/${kind === 'artifact' ? input.source.domainArtifact.digest : input.source.semanticRegistration[0]!.bytes.digest}.bin`;
+  await files.write(key, encoder.encode('corrupt'));
+  const reopened = f.reopen(); await expect(reopened.engine.recover(tx(1))).rejects.toThrow(/mismatch/);
+  expect((await reopened.engine.view()).readOnly).toBe(true); expect(reopened.ports.publications).toBe(0);
 });

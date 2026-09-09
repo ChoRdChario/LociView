@@ -18,8 +18,9 @@ runtime schema or wire adoption. Companion 07 now drafts source identities/keys,
 portable baseline/registration, atomic relation guards, shared unit/birth artifacts
 and a prepared-migration journal source. Four identity examples and four added
 existing-candidate feasibility tests are not whole-conversion proof. The interface
-draft is complete for this slice; next is 07 §10.1's finite synthetic service-level
-integration using existing guards/journal, alongside exact profile/approval inputs.
+draft is complete for this slice. The isolated preparedMigration journal seam now
+retains and replays exact synthetic source/parts; the complete domain/guard-sidecar
+connection of 07 §10.1 is still next, alongside exact profile/approval inputs.
 Measured adoption requirements remain separate. See
 `tasks/todo.md` top. No old journal rerun or immediate human test.
 

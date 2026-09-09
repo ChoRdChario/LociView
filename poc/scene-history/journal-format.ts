@@ -15,13 +15,21 @@ export interface Target {
     lineageProof: { kind: 'automerge-root-change-v1'; rootChangeHash: string } };
 }
 export interface Part { ordinal: number; expectedChangeHash: string; dependencies: string[]; byteLength: number; bytesSha256: string }
-export interface Batch {
-  kind: 'localCommand' | 'remotePackageMerge'; baseHeads: string[];
-  exactChangeSetDigest: string; changes: Part[];
-  source?: { packageId: string; metadataSha256: string; metadataByteLength: number;
-    metadataEnvelope: Target['metadataEnvelope']; remoteHeads: string[] };
-  expectedFinalHeads?: string[];
+export interface RetainedPart extends Part { bytes: Ref }
+export interface MigrationSource {
+  kind: 'nativeBridgePrepared'; caseId: string; recipeDescriptorDigest: string;
+  sourceReceipt: Ref; originalInput: { sha256: string; byteLength: number };
+  ancestor: Target & { heads: string[]; metadata: Ref };
+  foundation: { heads: string[]; metadata: Ref };
+  domainArtifact: Ref; semanticRegistration: RetainedPart[];
+  sourceObservation: RetainedPart[]; generatedHeads: string[];
 }
+export interface RemoteSource { packageId: string; metadataSha256: string; metadataByteLength: number;
+  metadataEnvelope: Target['metadataEnvelope']; remoteHeads: string[] }
+export type Batch = { baseHeads: string[]; exactChangeSetDigest: string; changes: Part[] } & (
+  { kind: 'localCommand'; source?: never; expectedFinalHeads?: never } |
+  { kind: 'remotePackageMerge'; source: RemoteSource; expectedFinalHeads: string[] } |
+  { kind: 'preparedMigration'; source: MigrationSource; expectedFinalHeads: string[] });
 export type Journal = { transactionId: string; purpose: Batch['kind']; target: Target } & (
   { state: 'staging'; sourceResume: { kind: 'none' } } |
   { state: 'blobsVerified' | 'metadataDurable'; stagedBlobs: Ref[]; metadataBatch: Batch });
@@ -98,25 +106,26 @@ export function target(value: any): asserts value is Target {
 }
 export function seal(journal: Prepared): string {
   const { exactChangeSetDigest: _ignored, ...metadataBatch } = journal.metadataBatch;
-  return sha(encoder.encode('lociview:v2:metadata-change-set:jcs-v1\n' + canonical({
+  const version = journal.purpose === 'preparedMigration' ? 'jcs-v2' : 'jcs-v1';
+  return sha(encoder.encode(`lociview:v2:metadata-change-set:${version}\n` + canonical({
     transactionId: journal.transactionId, target: journal.target, purpose: journal.purpose,
     stagedBlobs: journal.stagedBlobs, metadataBatch,
   })));
 }
 export function decodeJournal(bytes: Uint8Array): Journal {
   const j = parse(bytes); transaction(j.transactionId); target(j.target);
-  require(['localCommand', 'remotePackageMerge'].includes(j.purpose), 'wrong purpose');
+  require(['localCommand', 'remotePackageMerge', 'preparedMigration'].includes(j.purpose), 'wrong purpose');
   if (j.state === 'staging') {
     keys(j, ['transactionId', 'target', 'purpose', 'state', 'sourceResume']); keys(j.sourceResume, ['kind']);
     require(j.sourceResume.kind === 'none', 'unsupported synthetic lease'); return j;
   }
   keys(j, ['transactionId', 'target', 'purpose', 'state', 'stagedBlobs', 'metadataBatch']);
   require(['blobsVerified', 'metadataDurable'].includes(j.state), 'invalid state'); refs(j.stagedBlobs);
-  const b = j.metadataBatch; const remote = j.purpose === 'remotePackageMerge';
-  keys(b, ['kind', 'baseHeads', 'exactChangeSetDigest', 'changes', ...(remote ? ['source', 'expectedFinalHeads'] : [])]);
+  const b = j.metadataBatch; const remote = j.purpose === 'remotePackageMerge', migration = j.purpose === 'preparedMigration';
+  keys(b, ['kind', 'baseHeads', 'exactChangeSetDigest', 'changes', ...(remote || migration ? ['source', 'expectedFinalHeads'] : [])]);
   require(b.kind === j.purpose, 'batch purpose mismatch'); hashes(b.baseHeads); hash(b.exactChangeSetDigest);
   require(Array.isArray(b.changes) && b.changes.length > 0 && b.changes.length <= LIMIT.count, 'change count');
-  require(remote || b.changes.length === 1, 'local change count');
+  require(remote || migration || b.changes.length === 1, 'local change count');
   const seen = new Set(); let total = 0;
   b.changes.forEach((p: any, ordinal: number) => {
     keys(p, ['ordinal', 'expectedChangeHash', 'dependencies', 'byteLength', 'bytesSha256']);
@@ -131,7 +140,34 @@ export function decodeJournal(bytes: Uint8Array): Journal {
     hash(b.source.metadataSha256); length(b.source.metadataByteLength, LIMIT.metadata); hashes(b.source.remoteHeads); hashes(b.expectedFinalHeads);
     require(same(b.source.metadataEnvelope, j.target.metadataEnvelope), 'source envelope mismatch');
   }
+  if (migration) { migrationSource(b.source, j.target); hashes(b.expectedFinalHeads); }
   require(seal(j) === b.exactChangeSetDigest, 'journal digest mismatch'); return j;
+}
+/** Closed isolated source envelope; semantic proof validation is a required capability. */
+export function migrationSource(value: any, expected: Target): asserts value is MigrationSource {
+  keys(value, ['kind', 'caseId', 'recipeDescriptorDigest', 'sourceReceipt', 'originalInput',
+    'ancestor', 'foundation', 'domainArtifact', 'semanticRegistration', 'sourceObservation', 'generatedHeads']);
+  require(value.kind === 'nativeBridgePrepared' && typeof value.caseId === 'string' &&
+    /^[a-zA-Z0-9_-]{1,96}$/.test(value.caseId), 'invalid migration identity');
+  hash(value.recipeDescriptorDigest); refs([value.sourceReceipt]); refs([value.domainArtifact]);
+  keys(value.originalInput, ['sha256', 'byteLength']); hash(value.originalInput.sha256); length(value.originalInput.byteLength, LIMIT.metadata);
+  keys(value.ancestor, ['identity', 'metadataEnvelope', 'heads', 'metadata']);
+  require(same({ identity: value.ancestor.identity, metadataEnvelope: value.ancestor.metadataEnvelope }, expected), 'migration ancestor target mismatch');
+  keys(value.foundation, ['heads', 'metadata']);
+  for (const proof of [value.ancestor, value.foundation]) {
+    hashes(proof.heads); require(proof.heads.length, 'empty migration proof'); refs([proof.metadata]); length(proof.metadata.byteLength, LIMIT.metadata);
+  }
+  hashes(value.generatedHeads); require(value.generatedHeads.length, 'empty generated heads');
+  for (const parts of [value.semanticRegistration, value.sourceObservation]) {
+    require(Array.isArray(parts) && parts.length <= LIMIT.count, 'registration count');
+    parts.forEach((p: any, ordinal: number) => {
+      keys(p, ['ordinal', 'expectedChangeHash', 'dependencies', 'byteLength', 'bytesSha256', 'bytes']);
+      require(p.ordinal === ordinal, 'registration ordinal'); hash(p.expectedChangeHash); hash(p.bytesSha256); hashes(p.dependencies);
+      length(p.byteLength, LIMIT.part); refs([p.bytes]);
+      require(p.bytes.digest === p.bytesSha256 && p.bytes.byteLength === p.byteLength &&
+        p.bytes.mediaType === 'application/vnd.lociview.metadata-change', 'registration byte reference');
+    });
+  }
 }
 export function index(doc: Doc): Map<string, { bytes: Uint8Array; deps: string[] }> {
   const map = new Map<string, { bytes: Uint8Array; deps: string[] }>(); let total = 0;

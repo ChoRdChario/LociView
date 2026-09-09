@@ -741,3 +741,14 @@ policy/limit choices with PO, not by interpreting permission to continue as
 adoption. Then connect durable product services to the same thin whole-workflow
 host. Existing Native data, source files, ordinary app, dependency versions,
 release/Pages/Service Worker and physical-device gates remain untouched.
+
+**Observed isolated connection (2026-09-10):** `poc/scene-history/journal.ts` now
+has a preparedMigration entry with a mandatory configured source verifier, retained
+original/control bytes, registered receiver foundation, exact missing-part apply
+and shared existing recovery/publication. The eight added Node cases use a small
+synthetic source recipe and existing filesystem/CAS ports. This implements only
+the protocol seam, not these portable artifact schemas, complete domain/birth
+guards, Native parsing, real-data conversion or UI/storage activation. The full
+§10.1 exit is still open: connect complete domain plus guard-sidecar inspection
+at the same original heads without weakening the current development validator.
+Current todo owns executed verification and the precise next adapter boundary.

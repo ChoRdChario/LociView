@@ -443,6 +443,39 @@ platform interruption evidence, the complete domain/privacy/reachability contrac
 GC, scale and ratified budgets. This result does not satisfy those gates and does
 not connect the adapter, Scene core or new team flow to the application UI.
 
+## Prepared-migration journal connection — 2026-09-10
+
+`journal-format.ts`/`journal.ts` now implement an isolated `preparedMigration`
+batch, separate from remote packages and single local commands. An explicit
+recipe-verification capability is mandatory; without it only this entry refuses.
+Existing two source variants retain their v1 seal, while this variant uses v2.
+The prepared source binds the exact original input, registered ancestor/foundation,
+retained artifact/registration references and generated heads. The journal derives
+only the receiver-missing original changes and rechecks stored proof before
+acknowledgment and recovery. Completed replay differs from durable-but-unpublished
+recovery; the latter still finishes publication exactly once.
+
+Node files keep original input and control/part artifacts under fixed validated
+journal paths. The synthetic aggregate is bounded to the existing 8 MiB limit at
+entry and recovery; this is not large Native ZIP streaming. All retained refs are
+protected in existing CAS inventory. No new browser path/backend, dependency or
+ordinary application import is added. Transaction artifacts are retained after
+completion; portable export/GC closure remains unimplemented.
+
+Eight added journal cases cover partial and fully durable interruption, independent
+reopen, local conflicts, old-unit reuse in a second input, missing verifier or
+unregistered foundation, corrupt original/artifact/registration refusal and
+reauthored same-content changes. They
+use an exact small synthetic source verifier, not a permissive success stub, but
+its Caption record fixture is not the complete ProjectDoc/Scene provider. Current
+execution results are in `tasks/todo.md`; do not infer whole 07 or UI acceptance.
+
+Next connect the complete existing development source and its real-content provider
+with a separately validated guard sidecar at the same original heads. Keep the
+strict existing UI-command correspondence validator unchanged. Journal-root and
+flat-cell genesis shapes also need an explicit adapter contract before connection;
+do not project snapshots into new histories or silently accept extra root fields.
+
 ## Browser cross-store journal port — bounded resumed Chrome check PASS
 
 **2026-09-09 PO-reported correction result: PASS within the resumed-run scope.**

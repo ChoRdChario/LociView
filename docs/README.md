@@ -71,9 +71,11 @@ artifacts. Four identity examples were computed, not a whole converter proven.
 Sections 5–7.2 now draft that managed-unit/introduction/prepared-migration interface.
 Four added existing-candidate tests pass (10 harness tests total), limited to
 shared bytes/objects and explicit guards, not admitted domain or durable conversion.
-Next is §10.1's connected synthetic service-level slice using existing guards/journal,
-not another interface document or browser page. Exact wire/profile and adoption
-inputs remain open; no runtime change or renewed unplaced-preservation question.
+The isolated journal now has a dedicated preparedMigration seam with exact retained
+source and recovery, exercised by eight added synthetic cases. The complete
+domain/guard-sidecar connection of §10.1 remains open, not replaced by that smaller
+fixture. No new browser page; exact wire/profile and adoption inputs remain open.
+No ordinary-runtime change or renewed unplaced-preservation question.
 
 2026-09-10: PO reports the five prescribed camera/pin/window groups PASS at
 `7540478`; their earlier pending status below is historical. Broader rendered,
