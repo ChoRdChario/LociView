@@ -52,8 +52,11 @@
 > content verification now binds exact snapshots/records and separately checks
 > bounds/catalogs/family contribution/equivalence/source indices and fixed PNGs.
 > Weak-only sources are not fetched. Evidence stays development-fixture-only.
-> Affected-closure projection and C hookup remain next. This diagnostic result
-> gives no SceneResources/GC/save permission.
+> A pure scoped provider now maps these checks into same-token SceneState/resources
+> and attachment/tag/media details; source/candidates and all diagnostics remain.
+> Current fields and strong model closures fail independently, with source-optics
+> validation and no backward failure from annotations into models. C's same-host
+> source-adapter/authority switch is next; no current UI, GC/save or adoption claim.
 > One finite boundary, not new per-record tasks; no additional manual test hold.
 > Windows Computer Use initialized but stopped automatically on unsafe-to-resolve
 > Chrome URL; no browser input/PASS or bypass. Keep the existing batched UI lane.

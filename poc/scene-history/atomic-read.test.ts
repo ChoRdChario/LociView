@@ -6,6 +6,8 @@ import { createDevelopmentPair } from './development';
 import { inspectProjectCandidates } from '../../src/domain/projectCandidates';
 import { inspectProjectContent } from '../../src/domain/projectContent';
 import { developmentContentVerifier } from './content-verifier';
+import { readProjectScene } from '../../src/scene/projectProvider';
+import { resolveScene } from '../../src/scene/resolve';
 import { candidateFixture } from '../../tests/helpers/projectCandidateFixture';
 import { id as fixtureId } from '../../tests/helpers/projectRecordsFixture';
 
@@ -78,5 +80,13 @@ describe('isolated exact 3.4.1 original atomic read proof, not adopted metadata'
     expect(content.checks.every(c => c.outcome === 'verified')).toBe(true);
     expect(content.candidates.fields).toEqual(conflicted.fields);
     expect(await inspectProjectContent((await inspect(restored) as typeof conflicted).source, { ...limits, maxWork: 1_000_000 }, verifier)).toEqual(content);
+    const provider = await readProjectScene(conflicted.source, { ...limits, maxWork: 1_000_000 }, verifier);
+    if (provider.kind !== 'scene-provider') throw Error(JSON.stringify(provider));
+    expect(provider.token).toBe(conflicted.token); expect(provider.resources.token).toBe(provider.state.token);
+    expect(provider.resources.captions[fixtureId('cap')]!.title.kind).toBe('unresolved');
+    expect(provider.resources.captions[fixtureId('cap')]!.body).toEqual({ kind: 'value', value: '相手の本文' });
+    const renderedInput = resolveScene(provider.state, provider.resources, fixtureId('scn'));
+    expect(renderedInput.kind).toBe('ready'); if (renderedInput.kind === 'ready') expect(renderedInput.composition.assets).toHaveLength(1);
+    expect(await readProjectScene((await inspect(restored) as typeof conflicted).source, { ...limits, maxWork: 1_000_000 }, verifier)).toEqual(provider);
   });
 });

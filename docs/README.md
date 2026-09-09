@@ -105,8 +105,11 @@ records. The actual flat-map candidate tests a full synthetic Project through
 two rounds/save/reload. Executable external-content checks now bind the exact
 snapshot/records and keep individual missing/unsupported/failed/stale results.
 Known triangle/PNG bytes are checked in development scope; weak-only source bytes
-are not fetched. Affected-closure projection and C's same-host authority remain
-required; no general provider, ratified profile or source-adapter credit.
+are not fetched. A pure scope-labelled provider now maps affected closures/fields
+into same-token SceneState/resources and detail fields, preserving source and all
+diagnoses. The actual two-round candidate test reaches that pair and resolver.
+C's same-host source-adapter/authority switch remains required; no ordinary-app,
+ratified profile, general source-adapter or rendered/device credit.
 
 - Legacy-v1 ZIP/package code is not bounded-memory streaming despite older architecture text. The bounded Native portable and exchange packages use their separate streamed path.
 - Current XLSX reading is the local minimal reader in `src/io/xlsx.ts`, not SheetJS.

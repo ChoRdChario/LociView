@@ -1307,6 +1307,47 @@ All other candidate/history/graph issues and source data remain. This returns
 `project-content-inspection`, not SceneResources. Affected-closure projection and
 the served host's complete-authority switch still gate completion of B/C.
 
+**Affected-closure projection implementation detail:** one pure Scene provider
+entry invokes the complete candidate/content inspection rather than accepting a
+caller-cast receipt. It retains that frozen source and all diagnostics beside
+one scope-labelled, same-token SceneState/SceneResources pair and attachment/tag/
+media detail fields. Invalid/unresolved identity or ProjectFrame returns no pair;
+title/startup-default problems do not invent a replacement Scene or global failure.
+Read every known atomic field from the exact current candidates; equal mutable
+values still conflict, optional absence remains explicit, and no value is selected
+to satisfy validation. Unknown minor fields remain retained and ignored under
+02 §3.1, not a history-free permission. Known unsafe/unknown-discriminator fields
+remain unavailable. A model requires its unambiguous active binding/revision and
+validated strong immutable/content closure; weak history does not request old
+bytes or propagate unrelated old content failures. Invalid existing owner/class
+metadata remains an error. Model failure suppresses its projection and pin, not
+Caption text/lifecycle; material or attachment issues never invalidate a model.
+Candidate semantic-key reservations suppress all competing members at that exact
+scope/key, including peers of omitted unresolved endpoint/routing records. An
+invalid Scene material can still fall back to a valid whole Project override.
+The provider also checks source-dependent optics at the exact verified catalog:
+every requested transmission candidate needs source transmission parameters.
+Failure blocks that intent only, not the model or a valid lower-scope override.
+View camera/background and default are independent; no free-camera replacement.
+Attachment endpoint/lifecycle/order or unavailable media suppresses only that
+attachment, while alt-text conflict suppresses only its description. Tag label/
+order conflict blocks its normal filter item, not Caption content. Source fields
+remain separately available for repair; projection never edits them. The pair is
+a read result, not a command, store receipt, source-adapter proof, adopted profile
+or real-file activation. C must still connect and verify this exact boundary on
+the same served synthetic host before the finite complete-provider exit closes.
+
+**Observed scoped projection:** `src/scene/projectProvider.ts` now implements the
+read entry above. It maps exact current fields and strong immutable dependencies
+to same-token SceneState/resources plus attachment/tag/media and full known-field
+detail projections, retaining the complete inspection and original candidates.
+Unknown minor fields remain protected; unavailable or duplicate endpoints cannot
+grant a peer winner. Source-dependent transmission violations carry operation-
+bound diagnostics and suppress intent only. The existing flat-map candidate's
+two-round/reload test now reaches this pair and the Scene resolver with the title
+conflict intact. This is not the served host's authority switch or a general
+source-adapter proof. C and the finite complete-provider exit remain open.
+
 **Observed bounded media connection (from `7b57fd2`):** the same host now has two
 preloaded public synthetic PNGs. Each immutable MediaResource has a verified
 exact blob descriptor and domain-separated metadata digest; history accepts only

@@ -72,8 +72,8 @@ workstreams. These modules do not provide connected authority yet.
   scoped issues and partial diagnostic records; it gives no SceneResources, GC,
   save or export authority. Schema/map presence comes from the adapter's complete
   decoded-root inspection; declaring those fields alone is not source proof.
-  Affected-closure propagation and C's actual same-host provider hookup remain
-  mandatory. The pinned flat-map test exercises
+  C's actual same-host source-adapter/provider hookup remains mandatory. The
+  pinned flat-map test exercises
   two real candidate rounds and save/reload of the full synthetic record fixture.
 - `projectContent.ts` runs candidate admission and an application-owned executable
   verifier; imported receipts are not an input. Exact immutable records/full blob
@@ -84,7 +84,9 @@ workstreams. These modules do not provide connected authority yet.
   weak-only history never forces a source read. Individual unmet evidence is
   replaced only by its matching check, retaining all other issues and candidates.
   Development-fixture scope cannot claim ratified-profile authority. The result
-  still lacks affected-closure projection and same-token SceneResources.
+  itself supplies no SceneResources. `src/scene/projectProvider.ts` now invokes
+  this entry and maps affected fields/strong closures into a scope-labelled
+  same-token pair, retaining all source/diagnostics. C's host switch remains open.
 
 - `values.ts` checks/clones already decoded plain JSON without invoking getters;
   rejects invalid Unicode/NFC, nonfinite numbers, unsafe keys/non-JSON values,
@@ -125,10 +127,10 @@ only the exact immutable metadata digest computation above is implemented.
 Host objects, proxies and CRDT library objects are outside the input contract;
 the future adapter must supply plain data without losing conflict candidates.
 
-Not yet covered: complete Project/provider authority, affected parent-child/closure
-projection and general adapter provenance,
+Not yet covered: connected complete Project/provider authority and general
+adapter provenance,
 ratified general profile/decoder implementations behind the checked evidence port,
-invalid-closure propagation into a same-token provider, blobs/inventory,
+blobs/inventory,
 migration and history-free policy. A structural or record-graph result must
 not be cast into a fully validated SceneResources provider or publish metadata.
 Selected pre-existing guards are consumed by the explicit synthetic development

@@ -35,8 +35,12 @@ loop. Do not return to detached UI parts or polish as the default workstream.
     - [x] Join the exact, application-owned content verifier: snapshot/full-record
       binding, separate decoded content/envelope/equivalence/index/media checks,
       scoped missing/unsupported/failed/stale evidence, fixed-fixture byte proof.
-    - [ ] Compose full candidate-value/graph checks and exact external content
+    - [x] Compose full candidate-value/graph checks and exact external content
       evidence into the provider; neither independent inspection closes B.
+      - [x] Project exact atomic fields and affected model/content closures into
+        one scope-labelled same-token Scene pair plus attachment/tag/media details.
+        Preserve full source/diagnostics; global identity/frame failure returns no
+        pair, scoped failures never choose a winner or invalidate unrelated work.
 - [ ] Stage C: connect that authority to the existing synthetic workflow; final
   integration evidence and independent review close the single provider boundary.
 - [ ] Implement and connect that provider to the same synthetic host where
@@ -48,7 +52,49 @@ loop. Do not return to detached UI parts or polish as the default workstream.
   durable/file services and UI acceptance remain future work, not inferred from
   the synthetic provider. No new manual hold unless that activation needs it.
 
-External-evidence continuation starts clean `3dad735`, 39 ahead of local tracking
+Projection implementation: a pure scoped read entry now runs candidate/content
+inspection and returns same-token SceneState/resources plus full known detail
+fields. It preserves source/candidates/diagnostics, returns no pair for invalid
+identity/frame, and suppresses only affected fields/strong immutable closures.
+Caption text survives model/attachment failures; key reservations prevent an
+unresolved omitted endpoint/routing record from letting a normal peer win.
+Exact source optics constrain every requested transmission candidate. Weak old
+content never propagates into a current model/pin; existing owner/class errors
+remain distinct from ordinary old-class review. B/C's single exit stays open
+until C replaces the same served host's source-adapter/known-only authority and
+passes its connected acceptance. Next is that connection, not another inspection.
+
+Completed projection continuation started clean `8dd2202`, 40 ahead of local tracking
+(no fetch), official quota 73%. Previous goal turn made verified implementation
+progress. Next close affected-closure projection using the existing resolver,
+candidate reservations and exact content checks; then C's same-host authority.
+Reuse full synthetic records, adversarial candidates and two-round tests. Missing
+work is field/closure propagation, not another guard/UI probe. Scope and completion
+are detailed in 05 §13.4 before code. No manual hold, new authority/adoption,
+real-file/storage or release; stop on contract conflict or quota below 10%.
+
+Projection review: the scoped entry executes candidate/content inspection before
+producing its same-token pair and field-level attachment/tag/media details. Full
+original candidates and diagnostics remain retained, including behind malformed
+siblings. Global identity/frame failure produces no pair; affected strong model
+closures, key reservations and independent text/view/material fields are covered.
+Independent read-only review found and confirmed the source-optics correction:
+every transmission candidate requires verified transmission source parameters,
+without disabling the model or a valid whole Project fallback. No remaining
+limited-diff blocker. Focused provider/Scene/content checks: 37 PASS. Root and
+isolated candidate TypeScript PASS; 47 isolated checks PASS, including the full
+original-history fixture through the scoped provider/resolver after two rounds
+and save/reload. Final root suite: 105 files / 1857 PASS, 21 existing TODO.
+Ordinary and harness builds PASS with existing warnings; exact parsed source
+maps (13 ordinary, 9 harness) contain zero candidate/projectProvider/projectContent
+modules. These are code-level scoped checks, not served-host, browser, IME,
+iPhone or offline acceptance. C's complete source adapter and authority switch
+in the existing host are next; the single provider boundary remains open.
+No manual hold, new probe/server/tunnel, private source, dependency,
+schema/profile/adoption, real-file/storage, Native/main/Pages/SW configuration
+or release change. Official remaining quota 72%; no reset redeemed.
+
+Completed external-evidence continuation started clean `3dad735`, 39 ahead of local tracking
 (no fetch); official quota 74%. Approved target: join real verifier execution to
 candidate inspection, retaining scoped diagnoses and all original candidates.
 Reuse exact triangle/PNG fixtures, metadata guards and two-round candidate tests.

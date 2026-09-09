@@ -7,7 +7,7 @@ import { cloneCanonicalValue, DomainValidationError, reject, type JsonObject, ty
 type Candidates = Extract<ProjectCandidatesInspection, { kind: 'project-candidate-inspection' }>;
 export type ProjectContentInspection = Readonly<{ kind: 'rejected'; issue: ValidationIssue }> | Readonly<{
   kind: 'project-content-inspection'; token: string; scope: EvidenceScope; candidates: Candidates;
-  checks: readonly ContentCheck[]; issues: readonly CandidateIssue[];
+  checks: readonly ContentCheck[]; issues: readonly CandidateIssue[]; workUsed: number;
   pendingAuthority: readonly ['affected-closure-projection-and-same-token-provider'];
 }>;
 const repMap = 'representationsById', mediaMap = 'mediaResourcesById', revisionMap = 'assetRevisionsById';
@@ -130,7 +130,7 @@ export async function inspectProjectContent(input: unknown, limits: HistoryReadL
       }
       return true;
     });
-    return Object.freeze({ kind: 'project-content-inspection', token: candidates.token, scope, candidates, checks: Object.freeze(checks),
+    return Object.freeze({ kind: 'project-content-inspection', token: candidates.token, scope, candidates, checks: Object.freeze(checks), workUsed: work,
       issues: Object.freeze([...new Map([...issues, ...added].map(i => [canonical(i as unknown as JsonValue), i])).values()]),
       pendingAuthority: Object.freeze(['affected-closure-projection-and-same-token-provider'] as const) });
   } catch (error) { if (error instanceof DomainValidationError) return Object.freeze({ kind: 'rejected', issue: error.issue }); throw error; }

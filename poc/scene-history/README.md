@@ -16,8 +16,9 @@ domain evidence port. It hashes actual fixture bytes, checks triangle static
 AssetFrame geometry/material semantics, explicit family authority, every claimed
 family/class member, and fixed PNG container/CRC/bounded decompression. It never
 labels its profile as ratified or reads real files. The full flat-map two-round
-test now composes that evidence without changing conflict candidates or source
-bytes. This is not the served host's complete-provider switch; C remains pending.
+test now composes that evidence and the scoped same-token Scene provider/resolver
+without changing conflict candidates or source bytes. This is not the served
+host's source-adapter/complete-provider switch; C remains pending.
 
 The experiment checks TEAM-PKG-08 causal branches and TEAM-HIST-01/03/06 explicit
 conflicts, detached exact replay, fake-blob independence and saved-byte reload.

@@ -236,7 +236,11 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
       const source = readFileSync(path, 'utf8');
       if (/[\\/](scene|domain)[\\/]/.test(path)) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
-        expect(imports.every(p => p?.startsWith('./') || p === '../domain/values')).toBe(true);
+        const providerImports = path.replaceAll('\\', '/').endsWith('/scene/projectProvider.ts') ? [
+          '../domain/projectContent', '../domain/projectGraphSupport', '../domain/projectMutableFields', '../domain/projectCandidates',
+          '../domain/atomicHistory', '../domain/projectContentChecks',
+        ] : [];
+        expect(imports.every(p => p?.startsWith('./') || p === '../domain/values' || providerImports.includes(p!))).toBe(true);
       } else if (/[\\/]ui[\\/]projectScene[\\/]/.test(path)) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
         // 05 §13.3 permits the existing side-effect-free presentation helper,

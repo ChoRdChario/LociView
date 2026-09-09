@@ -1,4 +1,4 @@
-# Disconnected pure Scene core
+# Pure Scene core and scoped read provider
 
 Implements the scheduling exception in specification 05 §13.1. Tests and the
 explicit synthetic development host (§13.4) import these modules; current
@@ -8,6 +8,13 @@ Native/v1 behavior and storage are unchanged.
 - `commands.ts`: plans one logical Scene edit without acknowledging or saving it.
 - `resolve.ts`: derives composition, entry-view intent and bounded diagnostics
   from one snapshot. It accepts no prior Scene and applies no camera/UI changes.
+- `projectProvider.ts`: runs the whole candidate/content inspection, then maps
+  exact atomic fields and affected strong immutable closures to one scope-labelled
+  same-token pair. Full source/diagnostics accompany attachment/tag/media detail
+  fields. Invalid identity/frame returns no pair; scalar/default/anchor/attachment
+  issues never globally invalidate unrelated work. Source optics constrain every
+  requested transmission candidate. This is not a raw parser, source-adapter
+  proof, adopted profile, write receipt or the served host's authority switch.
 
 The future adapter must supply a complete validated resource projection with the
 same token as the Scene data. It owns full schema validation, immutable binding/
@@ -22,7 +29,8 @@ and existing IDs. Do not persist the read projection, replace whole CRDT maps, o
 treat `previewScenePlan` as a durable commit. `needsReview` retains the authored
 anchor coordinate; a hidden-owner entry is still listable with no marker.
 
-Remaining: production storage/causal adapter and journal, full resource validators/resolver,
+Remaining: served-host source-adapter/complete-provider integration, production
+storage/causal adapter and journal,
 resource content commands, deep keep-both remapping, conversion/exchange, actual
 SceneDocument/render plan, ordinary UI integration and device acceptance.
 Synthetic UI/view/media connections already exist; see current todo. Full
