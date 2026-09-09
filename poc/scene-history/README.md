@@ -11,6 +11,14 @@ Candidate: `@automerge/automerge` exactly `3.4.1` (MIT). Its own lockfile pins
 transitive dependencies. Installation disables lifecycle scripts. Run from this
 directory: `npm ci --ignore-scripts`, `npm audit`, `npm test`.
 
+`content-verifier.ts` is the isolated exact triangle/PNG implementation of the
+domain evidence port. It hashes actual fixture bytes, checks triangle static
+AssetFrame geometry/material semantics, explicit family authority, every claimed
+family/class member, and fixed PNG container/CRC/bounded decompression. It never
+labels its profile as ratified or reads real files. The full flat-map two-round
+test now composes that evidence without changing conflict candidates or source
+bytes. This is not the served host's complete-provider switch; C remains pending.
+
 The experiment checks TEAM-PKG-08 causal branches and TEAM-HIST-01/03/06 explicit
 conflicts, detached exact replay, fake-blob independence and saved-byte reload.
 Atomic Caption fields use immutable scalar strings at the adapter boundary;

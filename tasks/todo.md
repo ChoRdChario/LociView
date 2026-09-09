@@ -32,6 +32,9 @@ loop. Do not return to detached UI parts or polish as the default workstream.
     - [x] Join current candidate values with shared whole-record guards and known
       reference/key reservations. Retain checked candidates behind malformed
       siblings; prove the full synthetic record fixture through the real candidate.
+    - [x] Join the exact, application-owned content verifier: snapshot/full-record
+      binding, separate decoded content/envelope/equivalence/index/media checks,
+      scoped missing/unsupported/failed/stale evidence, fixed-fixture byte proof.
     - [ ] Compose full candidate-value/graph checks and exact external content
       evidence into the provider; neither independent inspection closes B.
 - [ ] Stage C: connect that authority to the existing synthetic workflow; final
@@ -44,6 +47,38 @@ loop. Do not return to detached UI parts or polish as the default workstream.
   before real-file/storage activation; reuse closed Chrome evidence. Actual
   durable/file services and UI acceptance remain future work, not inferred from
   the synthetic provider. No new manual hold unless that activation needs it.
+
+External-evidence continuation starts clean `3dad735`, 39 ahead of local tracking
+(no fetch); official quota 74%. Approved target: join real verifier execution to
+candidate inspection, retaining scoped diagnoses and all original candidates.
+Reuse exact triangle/PNG fixtures, metadata guards and two-round candidate tests.
+Acceptance: full request binding, individual evidence clearance, no subset-as-
+envelope/equivalence shortcut, exact source-index ranges only with verified bytes,
+and fixed PNG hash/CRC/pixel-layout verification. B/C remain one finite boundary;
+no manual hold, new probe, profile/adoption, real-file/storage or release changes.
+Stop on a contract conflict or official remaining usage below 10%.
+
+External-content review: the candidate entry now invokes exact bound evidence
+checks. Individual decoded bounds/catalog, authoritative envelope, same-family
+contribution, repeated-class equivalence and media/source-index facts never clear
+unrelated issues. Known active strong closure limits byte requests: weak-only
+historical source is not fetched or range-checked and canonical pins remain intact.
+The isolated triangle/PNG implementation executes actual hash/content checks;
+scope remains development-fixture-only. Independent read-only review found and
+confirmed fixes for catalog capacity (65,536, not 4,096) and same-family contribution
+verification within a single revision. Grouped regressions cover both, stale
+bindings, malformed/absent/corrupt responses and weak-only sources; no remaining
+limited-diff blocker. Root/scoped TypeScript and 47 isolated candidate checks PASS,
+including exact-content composition after two rounds/save/reload. Final root
+suite: 104 files / 1843 tests PASS, 21 existing TODO. Ordinary/harness builds PASS
+with existing warnings. Parsed source maps contain zero candidate/new content
+modules in both builds (13 ordinary and 9 harness maps). No current UI authority
+change or browser/IME/iPhone/
+offline credit. B/C stay open: next affected-closure projection then the same
+host's complete-provider switch, not another detached control or manual probe.
+No new server/tunnel, private source, dependency, schema/profile/adoption,
+real-file/storage, Native/main/Pages/SW configuration or release change.
+Official remaining quota 73%; no usage reset redeemed.
 
 Existing image pan/pinch/filters, real file input, actual renderer/native IME/
 device checks and full tags remain explicit gaps, not deleted conveniences.

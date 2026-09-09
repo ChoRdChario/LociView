@@ -22,7 +22,7 @@ export type ProjectCandidatesInspection = Readonly<{ kind: 'rejected'; issue: Va
   kind: 'project-candidate-inspection'; token: string; source: ProjectCandidateInput; fields: readonly CandidateField[];
   issues: readonly CandidateIssue[]; knownReferences: readonly GraphEdge[]; knownActiveRoots: readonly string[];
   /** Diagnostic partial records ONLY. Missing here may mean conflict, never source deletion. */
-  unambiguousRecords: JsonObject; hasUnknownFields: boolean;
+  unambiguousRecords: JsonObject; hasUnknownFields: boolean; workUsed: number;
   pendingAuthority: readonly ['verified-blob-profile-semantics', 'closure-projection-and-same-token-provider'];
 }>;
 const address = (path: readonly string[]) => JSON.stringify(path);
@@ -133,7 +133,7 @@ export async function inspectProjectCandidates(input: unknown, limits: HistoryRe
     const uniqueEdges = [...new Map(g.edges.map(e => [JSON.stringify(e), e])).values()];
     return Object.freeze({ kind: 'project-candidate-inspection', token: read.history.token, source: raw as unknown as ProjectCandidateInput,
       fields: Object.freeze(fields), issues: Object.freeze(uniqueIssues), knownReferences: Object.freeze(uniqueEdges),
-      knownActiveRoots: Object.freeze([...g.roots].sort()), unambiguousRecords: frozenRecords, hasUnknownFields,
+      knownActiveRoots: Object.freeze([...g.roots].sort()), unambiguousRecords: frozenRecords, hasUnknownFields, workUsed: work,
       pendingAuthority: Object.freeze(['verified-blob-profile-semantics', 'closure-projection-and-same-token-provider'] as const) });
   } catch (error) { if (error instanceof DomainValidationError) return Object.freeze({ kind: 'rejected', issue: error.issue }); throw error; }
 }

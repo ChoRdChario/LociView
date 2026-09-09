@@ -1,5 +1,5 @@
 {
   "extends": "../../tsconfig.json",
-  "include": ["./journal*.ts", "./purposes*.ts", "./development*.ts", "./atomic-read*.ts"],
+  "include": ["./journal*.ts", "./purposes*.ts", "./development*.ts", "./atomic-read*.ts", "./content-verifier*.ts"],
   "exclude": ["node_modules", "dist"]
 }

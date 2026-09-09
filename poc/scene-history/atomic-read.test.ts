@@ -4,6 +4,8 @@ import { readFlatAtomicHistory } from './atomic-read';
 import { reviewProjectHistory } from '../../src/domain/projectHistoryReview';
 import { createDevelopmentPair } from './development';
 import { inspectProjectCandidates } from '../../src/domain/projectCandidates';
+import { inspectProjectContent } from '../../src/domain/projectContent';
+import { developmentContentVerifier } from './content-verifier';
 import { candidateFixture } from '../../tests/helpers/projectCandidateFixture';
 import { id as fixtureId } from '../../tests/helpers/projectRecordsFixture';
 
@@ -69,5 +71,12 @@ describe('isolated exact 3.4.1 original atomic read proof, not adopted metadata'
     const restored = A.load<{ cells: typeof seed }>(A.save(merged));
     expect(await inspect(restored)).toEqual(conflicted);
     expect([...conflicted.source.history.changes].map(c => c.id).sort()).toEqual(A.getAllChanges(merged).map(bytes => A.decodeChange(bytes).hash).sort());
+    const rep = Object.values(initial.unambiguousRecords.representationsById as Record<string, any>)[0]!;
+    const verifier = developmentContentVerifier([{ variantFamilyId: rep.variantFamilyId, representationId: rep.id, payloadDigest: rep.payloadDigest }]);
+    const content = await inspectProjectContent(conflicted.source, { ...limits, maxWork: 1_000_000 }, verifier);
+    expect(content.kind).toBe('project-content-inspection'); if (content.kind === 'rejected') throw Error();
+    expect(content.checks.every(c => c.outcome === 'verified')).toBe(true);
+    expect(content.candidates.fields).toEqual(conflicted.fields);
+    expect(await inspectProjectContent((await inspect(restored) as typeof conflicted).source, { ...limits, maxWork: 1_000_000 }, verifier)).toEqual(content);
   });
 });

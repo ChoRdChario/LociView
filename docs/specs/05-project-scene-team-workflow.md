@@ -1267,6 +1267,46 @@ not a complete provider: exact external-content evidence, affected-closure
 projection and C's same-host authority remain required. No real schema adapter,
 BlobStore, import/export or ordinary-app activation follows from this result.
 
+**External-content composition implementation detail:** the candidate inspector
+invokes an application-owned verifier service; imported JSON receipts are never
+an evidence input. Every request and response binds the snapshot token, complete
+immutable records (including payload digest, full BlobRef and exact profile),
+and the requested fact/context. No cache keyed only by ID or blob hash suffices.
+Individually check decoded static contribution/bounds/catalog, authoritative family
+envelope, same-family logical contribution, repeated-class surface equivalence,
+media bytes and source occurrence
+ranges. A bounds subset is not an authoritative envelope or surface-equivalence
+proof. Family authority must be explicitly evidenced by the verifier, not selected
+by ID, arrival order or filenames. Catalog facts must cover every source locator
+with exact source semantics. Surface ranges are representation-local occurrences,
+not flattened renderer indices. Only already verified source bytes can range-check
+weak pin provenance; absent bytes leave canonical position intact.
+The known-active strong-reference closure controls byte requests. A Representation
+named only by weak history/pin metadata is not fetched to inspect that provenance.
+Its deferred content diagnosis stays retained; the known closure is not a GC permit.
+Missing, unsupported, failed, stale and malformed responses stay distinct scoped
+diagnostics. Clear only the matching unmet-evidence diagnosis, never unrelated
+conflict, immutable or graph errors. Development-fixture evidence is labelled and
+cannot grant ratified-profile/product authority. The existing triangle and two
+PNGs supply the exact development implementation, with actual byte/hash/content
+checks; no new decoder/profile adoption. Preserve source candidates and known
+strong/weak edges. This composition still precedes affected-closure projection
+and C's same-token host connection; it is not a write/GC or SceneResources receipt.
+
+**Observed external-content composition:** `projectContent.ts` now runs candidate
+admission and the executable verifier, checking exact frozen request/response
+bindings and individual fact summaries. `projectContentChecks.ts` checks static
+content bounds, complete catalog locator/semantics bijection, authority/member
+coverage and source-local ranges. Multi-candidate family contribution is checked
+even when its class occurs in only one revision. The isolated development verifier
+executes actual known triangle byte/hash/geometry and fixed PNG container/CRC/
+bounded-decompression checks. Its scope is always `development-fixture`; it is not
+an adopted profile or general decoder. Missing/unsupported/failed/stale/malformed
+results are distinct, and only corresponding unverified diagnoses are replaced.
+All other candidate/history/graph issues and source data remain. This returns
+`project-content-inspection`, not SceneResources. Affected-closure projection and
+the served host's complete-authority switch still gate completion of B/C.
+
 **Observed bounded media connection (from `7b57fd2`):** the same host now has two
 preloaded public synthetic PNGs. Each immutable MediaResource has a verified
 exact blob descriptor and domain-separated metadata digest; history accepts only

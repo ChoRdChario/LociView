@@ -48,8 +48,12 @@ and reviews immutable/lifecycle history; the served candidate exposes its exact
 flat-string evidence as a non-authoritative sidecar. Candidate composition now
 checks all current values and known references/semantic reservations without a
 winner; the full synthetic record fixture passes two actual candidate rounds.
-Exact external-content evidence and affected-closure projection, then C's same-host authority, remain
-the single provider boundary's required completion, recorded in spec 05 §13.4.
+External-content composition now binds executable verification to the exact
+snapshot/immutable records and checks bounds, catalogs, family contribution and
+source indices separately. The isolated triangle/PNG verifier is development-only;
+weak-only historical sources are not fetched. Affected-closure projection and C's
+same-host authority remain the single provider boundary's required completion,
+recorded in spec 05 §13.4.
 File/package exchange, durable storage and rendered/device acceptance remain
 pending as recorded in todo.
 Real Project, storage, package and current-app activation retain their gates.
@@ -80,7 +84,7 @@ For a normal task, read only the target file, its matching tests, and direct imp
 | Path | Current responsibility |
 |---|---|
 | `src/core` | IDs, HLC, operation validation, JSONL, reduction, merge, manifest, and `ProjectStore` |
-| `src/domain` | Whole-root record, graph/digest and all-current-candidate value/reference inspection; retains unknown values. No complete Project/SceneResources/blob authority, storage, imported-text rewriting or current-entry activation |
+| `src/domain` | Whole-root record, graph/digest, all-candidate value/reference and exact executable content-evidence inspection; retains unknown values. No complete Project/SceneResources authority, storage, imported-text rewriting or current-entry activation |
 | `src/scene` | Pure Scene command/composition core (05 §13.1), now also used by the synthetic development host (§13.4); no production storage or adoption |
 | `src/platform` | `WorkspaceFS`, OPFS, memory filesystem, PWA and browser integration |
 | `src/assets` | ZIP/package handling, model asset registration/replacement, GLB optimization, import wizard |

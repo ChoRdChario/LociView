@@ -48,9 +48,12 @@
 > mutations. The served candidate exposes original flat-string evidence alongside
 > its existing fixture projection. Candidate composition now checks all current
 > values/references and reserves keys without choosing a winner. Full synthetic
-> record data passes two actual candidate rounds/save-reload; external-content
-> evidence, affected-closure projection and C hookup remain next. The partial
-> diagnostic result gives no SceneResources/GC/save permission.
+> record data passes two actual candidate rounds/save-reload. Executable external
+> content verification now binds exact snapshots/records and separately checks
+> bounds/catalogs/family contribution/equivalence/source indices and fixed PNGs.
+> Weak-only sources are not fetched. Evidence stays development-fixture-only.
+> Affected-closure projection and C hookup remain next. This diagnostic result
+> gives no SceneResources/GC/save permission.
 > One finite boundary, not new per-record tasks; no additional manual test hold.
 > Windows Computer Use initialized but stopped automatically on unsafe-to-resolve
 > Chrome URL; no browser input/PASS or bypass. Keep the existing batched UI lane.

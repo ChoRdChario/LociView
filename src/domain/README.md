@@ -72,9 +72,19 @@ workstreams. These modules do not provide connected authority yet.
   scoped issues and partial diagnostic records; it gives no SceneResources, GC,
   save or export authority. Schema/map presence comes from the adapter's complete
   decoded-root inspection; declaring those fields alone is not source proof.
-  External verified-content evidence, affected-closure propagation and C's actual
-  same-host provider hookup remain mandatory. The pinned flat-map test exercises
+  Affected-closure propagation and C's actual same-host provider hookup remain
+  mandatory. The pinned flat-map test exercises
   two real candidate rounds and save/reload of the full synthetic record fixture.
+- `projectContent.ts` runs candidate admission and an application-owned executable
+  verifier; imported receipts are not an input. Exact immutable records/full blob
+  and profile declarations plus snapshot/fact/context bind every response.
+  `projectContentChecks.ts` checks decoded static bounds, catalog bijection,
+  authoritative family envelope, logical contribution, repeated-class equivalence
+  and source-local ranges. Known active strong closure controls byte requests;
+  weak-only history never forces a source read. Individual unmet evidence is
+  replaced only by its matching check, retaining all other issues and candidates.
+  Development-fixture scope cannot claim ratified-profile authority. The result
+  still lacks affected-closure projection and same-token SceneResources.
 
 - `values.ts` checks/clones already decoded plain JSON without invoking getters;
   rejects invalid Unicode/NFC, nonfinite numbers, unsafe keys/non-JSON values,
@@ -117,8 +127,8 @@ the future adapter must supply plain data without losing conflict candidates.
 
 Not yet covered: complete Project/provider authority, affected parent-child/closure
 projection and general adapter provenance,
-external verified profiles/content/material enumeration/bounds/equivalence/source
-indices, invalid-closure propagation into a same-token provider, blobs/inventory,
+ratified general profile/decoder implementations behind the checked evidence port,
+invalid-closure propagation into a same-token provider, blobs/inventory,
 migration and history-free policy. A structural or record-graph result must
 not be cast into a fully validated SceneResources provider or publish metadata.
 Selected pre-existing guards are consumed by the explicit synthetic development
