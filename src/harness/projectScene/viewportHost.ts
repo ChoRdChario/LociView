@@ -5,21 +5,26 @@ import { planCaptionList } from '../../ui/projectScene/captionListState';
 import { createCaptionWindowControls } from '../../ui/projectScene/captionWindowControls';
 import { sceneSwitchReason } from '../../ui/projectScene/navigationState';
 import { value } from '../../scene/types';
-import { syntheticDisplay, type SyntheticDisplay } from './viewportModel';
+import { pointInProject, syntheticDisplay, type SyntheticDisplay, type V3 } from './viewportModel';
+import type { PinSurfaceTarget } from './viewportPicking';
 import type { SyntheticSession } from './session';
 import type { DisplayCapture } from './viewSession';
 import { createMediaGallery } from './mediaControls';
 
 export interface ViewportObservation {
   readonly token: string; readonly ready: boolean; readonly issue: string | null; readonly dragging: boolean;
+  /** Changes for geometry/camera lifetime, but not an Orbit start/end without movement. */
+  readonly pickToken?: string;
   readonly notice?: string | null;
   readonly projection: 'perspective' | 'orthographic'; readonly axis: ViewAxis | null;
   readonly pins: readonly { id: string; x: number; y: number; visible: boolean }[];
+  readonly preview?: { readonly x: number; readonly y: number; readonly visible: boolean };
 }
 export interface SyntheticViewport {
   update(display: SyntheticDisplay): void; setActive(active: boolean): void;
   read(): ViewportObservation; camera(intent: ViewCameraIntent): void; retry(): void; dispose(): void;
   capture?(): DisplayCapture; recall?(payload: DisplayCapture): void;
+  pick?(target: PinSurfaceTarget, xCss: number, yCss: number): V3 | null;
 }
 export type ViewportFactory = (canvas: HTMLCanvasElement, changed: () => void) => SyntheticViewport;
 
@@ -28,11 +33,15 @@ export function createViewportHost(document: Document, session: SyntheticSession
   const root = document.createElement('section'); root.className = 'lv-development-viewport'; root.setAttribute('aria-label', '3D表示');
   const canvas = document.createElement('canvas'); canvas.setAttribute('aria-label', '合成モデルの3D表示');
   const overlay = document.createElement('div'); overlay.className = 'lv-development-pin-layer';
+  const preview = document.createElement('div'); preview.className = 'lv-development-pin-preview'; preview.textContent = '仮の位置'; preview.hidden = true;
   const status = document.createElement('p'); status.setAttribute('role', 'status');
   const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = '3D表示を再試行';
-  root.append(canvas, overlay);
+  root.append(canvas, overlay, preview);
   let disposed = false, display: SyntheticDisplay | null = null, error: string | null = null;
   let rendering = false, hasRendered = false;
+  let active = false, gestureGeneration = 0;
+  const pressed = new Set<number>();
+  let gesture: { id: number; x: number; y: number; target: PinSurfaceTarget; stamp: string } | null = null;
   let runtime: SyntheticViewport | undefined, context: ViewContext, pinKey = '';
   let authorConfirmationMemory: ViewContext['memory'] | undefined;
   const pins = new Map<string, HTMLButtonElement>();
@@ -86,6 +95,7 @@ export function createViewportHost(document: Document, session: SyntheticSession
     }
     author.render(authorContext);
     const observed = runtime?.read();
+    if (!observed?.ready || error) { gesture = null; gestureGeneration++; }
     const rect = canvas.getBoundingClientRect?.();
     windows.project({ ready: Boolean(observed?.ready && !error), width: rect?.width ?? 0, height: rect?.height ?? 0, pins: observed?.pins ?? [] });
     const dragChanged = session.setViewportDragging(observed?.dragging ?? false);
@@ -98,24 +108,74 @@ export function createViewportHost(document: Document, session: SyntheticSession
       const p = observed?.pins.find(p => p.id === id); pin.hidden = Boolean(error || !observed?.ready || !p?.visible);
       if (p) { pin.style.left = `${p.x}px`; pin.style.top = `${p.y}px`; }
     }
+    const ghost = observed?.preview;
+    preview.hidden = Boolean(error || !observed?.ready || !ghost?.visible);
+    if (ghost) { preview.style.left = `${ghost.x}px`; preview.style.top = `${ghost.y}px`; }
     if ((dragChanged || stateChanged) && hasRendered && !rendering) changed();
   }
   try { runtime = factory?.(canvas, paint); } catch (e) { error = text(e); }
   const tryAgain = () => {
     if (disposed) return;
+    gesture = null; pressed.clear(); gestureGeneration++;
     error = null;
     try { if (!runtime) runtime = factory?.(canvas, paint); else runtime.retry(); }
     catch (e) { error = text(e); }
     render(true);
   };
   retry.addEventListener('click', tryAgain);
-  function render(active: boolean) {
+  function gestureStamp(): string | null {
+    if (!active || !runtime?.read().ready || error || !runtime.capture) return null;
+    const rect = canvas.getBoundingClientRect();
+    if (![rect.left, rect.top, rect.width, rect.height].every(Number.isFinite) || rect.width <= 0 || rect.height <= 0) return null;
+    try { return JSON.stringify([runtime.read().pickToken, runtime.capture(), rect.left, rect.top, rect.width, rect.height]); } catch { return null; }
+  }
+  const modified = (e: PointerEvent) => e.altKey || e.ctrlKey || e.metaKey || e.shiftKey;
+  const down = (e: PointerEvent) => {
+    pressed.add(e.pointerId); gesture = null; gestureGeneration++;
+    const target = session.pinSurfaceTarget(), stamp = gestureStamp();
+    if (pressed.size !== 1 || !e.isPrimary || e.button !== 0 || modified(e) || !runtime?.pick || !target || !stamp ||
+      ![e.clientX, e.clientY].every(Number.isFinite)) return;
+    gesture = { id: e.pointerId, x: e.clientX, y: e.clientY, target, stamp };
+  };
+  const move = (e: PointerEvent) => {
+    if (gesture?.id === e.pointerId && (!Number.isFinite(e.clientX) || !Number.isFinite(e.clientY) ||
+      Math.hypot(e.clientX - gesture.x, e.clientY - gesture.y) > 4 || modified(e))) { gesture = null; gestureGeneration++; }
+  };
+  const up = (e: PointerEvent) => {
+    const start = gesture, generation = gestureGeneration; move(e); pressed.delete(e.pointerId);
+    const eligible = start && start === gesture && e.pointerId === start.id && e.button === 0 && !modified(e) && pressed.size === 0;
+    gesture = null;
+    if (!eligible) return;
+    // OrbitControls handles pointerup/end in the same dispatch. Do not mistake
+    // its start/end on a stationary press for a drag, or capture mid-orbit state.
+    queueMicrotask(() => {
+      if (disposed || !active || generation !== gestureGeneration || pressed.size || start.stamp !== gestureStamp() ||
+        JSON.stringify(start.target) !== JSON.stringify(session.pinSurfaceTarget())) return;
+      const rect = canvas.getBoundingClientRect();
+      try {
+        const hit = runtime?.pick?.(start.target, e.clientX - rect.left, e.clientY - rect.top);
+        if (hit) session.acceptPinSurface(start.target, hit);
+        else session.message = '選んだモデルの面を指定してください。指定中の位置は変えていません。';
+      } catch (e) { session.message = `${text(e)} 指定中の位置は保持しています。`; }
+      changed();
+    });
+  };
+  const cancel = (e: PointerEvent) => { pressed.delete(e.pointerId); gesture = null; gestureGeneration++; };
+  const lost = (e: PointerEvent) => { if (pressed.has(e.pointerId)) cancel(e); };
+  canvas.addEventListener('pointerdown', down, true); canvas.addEventListener('pointermove', move, true);
+  canvas.addEventListener('pointerup', up, true); canvas.addEventListener('pointercancel', cancel, true); canvas.addEventListener('lostpointercapture', lost, true);
+  function render(nextActive: boolean) {
     if (disposed) return;
+    if (!nextActive) { gesture = null; pressed.clear(); gestureGeneration++; }
+    active = nextActive;
     rendering = true;
     try {
       windows.render({ source: session.captionContext().source, memory: session.windowMemory,
         selectedId: session.memory.selectedCaptionId, moveBlock: session.pending ? sceneSwitchReason(session.pending) : null });
       display = syntheticDisplay(session.snapshot, session.sceneId, session.memory.pinColors, session.memory.selectedCaptionId);
+      const proposed = session.pinPreviewAnchor;
+      const owner = proposed?.kind === 'asset' ? display.models.find(m => m.binding.assetId === proposed.assetId) : undefined;
+      if (proposed?.kind === 'asset' && owner) display = { ...display, preview: pointInProject(proposed.positionAsset, owner.binding.assetToProject) };
       const key = JSON.stringify([display.token, display.sceneId, display.pins, display.selectedId]);
       if (key !== pinKey) {
         pinKey = key; pins.clear(); overlay.replaceChildren();
@@ -138,5 +198,9 @@ export function createViewportHost(document: Document, session: SyntheticSession
   }
   return { root, view: view.root, stageTools: view.stageTools, render,
     get connected() { return Boolean(runtime?.read().ready && !error); },
-    dispose() { disposed = true; windows.dispose(); runtime?.dispose(); author.dispose(); view.dispose(); retry.removeEventListener('click', tryAgain); root.remove(); } };
+    get pickingConnected() { return Boolean(active && runtime?.read().ready && runtime.pick && !error); },
+    dispose() { disposed = true; gesture = null; pressed.clear(); gestureGeneration++; windows.dispose(); runtime?.dispose(); author.dispose(); view.dispose();
+      canvas.removeEventListener('pointerdown', down, true); canvas.removeEventListener('pointermove', move, true); canvas.removeEventListener('pointerup', up, true);
+      canvas.removeEventListener('pointercancel', cancel, true); canvas.removeEventListener('lostpointercapture', lost, true);
+      retry.removeEventListener('click', tryAgain); root.remove(); } };
 }

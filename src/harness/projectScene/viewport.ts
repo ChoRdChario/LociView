@@ -5,12 +5,14 @@ import { defaultPose, fittedPose, placementMatrix, switchProjection, type Camera
 import type { ViewportFactory, ViewportObservation } from './viewportHost';
 import { readProjectCamera, readSolidBackground, type SolidBackground } from './viewHistory';
 import type { DisplayCapture } from './viewSession';
+import { pickResidentSurface, type ResidentSurface } from './viewportPicking';
 
 /** Existing Three.js dependency, exact synthetic fixture only. No model loaders or Native controller. */
 export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
   let renderer: THREE.WebGLRenderer | null = null, controls: OrbitControls | null = null;
   let camera: THREE.PerspectiveCamera | THREE.OrthographicCamera | null = null;
   const scene = new THREE.Scene(), models = new THREE.Group(); scene.add(models); scene.background = new THREE.Color('#e8e6e2');
+  const resident = new Map<string, ResidentSurface>();
   scene.add(new THREE.HemisphereLight(0xffffff, 0x77736e, 2));
   const light = new THREE.DirectionalLight(0xffffff, 2); light.position.set(3, 5, 4); scene.add(light);
   const poses = new Map<string, CameraPose>();
@@ -20,6 +22,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
   let pose = defaultPose(), display: SyntheticDisplay | null = null, modelKey = '', active = false, disposed = false, applying = false;
   let issue: string | null = null, contextLost = false, dragging = false, axis: ViewportObservation['axis'] = null, serial = 0, raf = 0, lastObservation = '';
   let width = 1, height = 1;
+  let pickEpoch = 0;
   const errorText = (e: unknown) => e instanceof Error ? e.message : '3D表示を開始できません。';
   function observePose() {
     if (!camera || !controls) return;
@@ -48,12 +51,14 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
     poses.set(display.sceneId, pose); backgrounds.set(display.sceneId, background); entryPending = false; axis = null;
   }
   function clearModels() {
+    resident.clear();
     for (const child of [...models.children]) {
       child.traverse(node => { if (node instanceof THREE.Mesh) { node.geometry.dispose(); (node.material as THREE.Material).dispose(); } });
       models.remove(child);
     }
   }
   function release() {
+    pickEpoch++;
     observePose(); cancelAnimationFrame(raf); raf = 0; controls?.dispose(); controls = null; camera = null;
     clearModels(); renderer?.dispose(); renderer = null; modelKey = ''; dragging = false;
   }
@@ -61,6 +66,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
   function buildModels() {
     if (!display || !renderer) return;
     const key = JSON.stringify([display.models.map(m => m.binding.id), display.materials]); if (key === modelKey) return;
+    pickEpoch++;
     clearModels();
     try {
       for (const model of display.models) {
@@ -76,12 +82,14 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
         mesh.matrix.copy(placementMatrix(model.representation.representationToAsset)); mesh.matrixAutoUpdate = false;
         asset.matrix.copy(placementMatrix(model.binding.assetToProject)); asset.matrixAutoUpdate = false;
         asset.add(mesh); models.add(asset);
+        resident.set(model.binding.assetId, { mesh, asset });
       }
       modelKey = key;
     } catch (e) { clearModels(); throw e; }
   }
   function installPose() {
     if (!renderer) return;
+    pickEpoch++;
     const previousCamera = camera, previousControls = controls, previousBackground = scene.background, previousTouchAction = canvas.style.touchAction;
     applying = true;
     try {
@@ -98,7 +106,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
       controls.addEventListener('start', () => { dragging = true; serial++; changed(); });
       controls.addEventListener('end', () => { dragging = false; observePose(); serial++; changed(); });
       controls.addEventListener('change', () => {
-        if (!applying) { try { axis = null; observePose(); updateClipping(); serial++; } catch (e) { fail(e); } }
+        if (!applying) { try { axis = null; observePose(); updateClipping(); serial++; pickEpoch++; } catch (e) { fail(e); } }
       });
       controls.update();
       scene.background = new THREE.Color().setRGB(...background.colorSrgb, THREE.SRGBColorSpace);
@@ -127,7 +135,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
       // Reserve before notification: ready -> host render -> ensure may reenter synchronously.
       raf = requestAnimationFrame(draw);
       renderer.render(scene, camera);
-      const fingerprint = JSON.stringify([serial, width, height, display?.token, display?.pins, pose, background]);
+      const fingerprint = JSON.stringify([serial, width, height, display?.token, display?.pins, display?.preview, pose, background]);
       if (fingerprint !== lastObservation) { lastObservation = fingerprint; changed(); }
     } catch (e) { fail(e); }
   }
@@ -135,6 +143,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
     if (!active || disposed || issue || !display) return;
     const rect = canvas.getBoundingClientRect(); if (rect.width <= 0 || rect.height <= 0) return;
     const resized = width !== rect.width || height !== rect.height; width = rect.width; height = rect.height;
+    if (resized) pickEpoch++;
     try {
       if (!renderer) {
         renderer = new THREE.WebGLRenderer({ canvas, antialias: true }); renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -167,16 +176,22 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed) => {
       buildModels(); serial++;
     },
     setActive(next) { if (!next && active) release(); active = next; ensure(); },
+    pick(target, x, y) {
+      if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || !display) return null;
+      return pickResidentSurface(display, target, resident, camera, new THREE.Vector2(x * 2 / width - 1, 1 - y * 2 / height));
+    },
     read() {
-      const pins = display?.pins.map(pin => {
-        const p = new THREE.Vector3(...pin.position); if (camera) { camera.updateMatrixWorld(true); p.project(camera); }
-        return { id: pin.id, x: (p.x + 1) * width / 2, y: (1 - p.y) * height / 2,
+      const project = (position: readonly [number, number, number]) => {
+        const p = new THREE.Vector3(...position); if (camera) { camera.updateMatrixWorld(true); p.project(camera); }
+        return { x: (p.x + 1) * width / 2, y: (1 - p.y) * height / 2,
           visible: Boolean(camera && p.z >= -1 && p.z <= 1 && Math.abs(p.x) <= 1 && Math.abs(p.y) <= 1) };
-      }) ?? [];
+      };
+      const pins = display?.pins.map(pin => ({ id: pin.id, ...project(pin.position) })) ?? [];
       return { token: JSON.stringify([serial, display?.sceneId, display?.projectFrameId, display?.bounds, width, height, pose, background]),
+        pickToken: String(pickEpoch),
         ready: Boolean(active && renderer && camera && !issue), issue,
         notice: [notice, ...(display?.materialNotices ?? []), ...Object.values(display?.materials ?? {}).flatMap(m => 'issue' in m ? [m.issue] : [])].filter(Boolean).join(' ') || null,
-        dragging, projection: pose.projection.kind, axis, pins };
+        dragging, projection: pose.projection.kind, axis, pins, preview: display?.preview ? project(display.preview) : undefined };
     },
     camera(intent) {
       if (!active || !renderer || issue || !display || dragging) throw new Error('3D表示を確認してください。');

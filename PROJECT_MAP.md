@@ -36,8 +36,9 @@ model-copy material re-keying. Unsupported blend/dither stays diagnosed, not
 silently replaced. Two known synthetic PNGs now connect attachment add/description/
 order/confirmed deletion, comparison-window images and explicit delete/edit
 recovery. Independent Caption copies have fresh attachment IDs and retain the
-immutable image; tags remain an empty-fixture limitation. Next is the finite
-complete-provider and gated durable-file boundary, not further detached UI parts.
+immutable image; tags remain an empty-fixture limitation. The finite provider
+connection is now closed in development scope as summarized below. Its successive
+stages are history, not separate current next tasks; durable-file gates remain.
 Provider stage A now validates the amended decoded Project root and all 14 record
 maps, preserving unknown fields. This is `valid-records` only, not authoritative
 SceneResources. Stage B now has whole-record graph inspection and actual immutable
@@ -70,7 +71,11 @@ New Caption/pin creation now connects explicit model/AssetFrame coordinates /
 surface confirmation to one fresh Caption/membership and verified acknowledgment.
 It retains cancellation/retry, and new Captions support media, independent copies
 and continuing exchange, including anchors on verified model copies. Direct
-viewport position selection/preview is next; manual coordinates do not prove it.
+viewport position selection/preview now connects the selected resident fixture
+surface to the same confirmation path. CPU/mounted evidence covers transforms,
+clipping, occlusion, gesture cancellation and retained retry; real pointer/render
+acceptance is still pending. Next is the connected UI evidence boundary, not a
+new provider or detached component campaign.
 Real Project, storage, package and current-app activation retain their gates.
 
 For a fresh Codex session, read `tasks/handoff.md` after this map and the

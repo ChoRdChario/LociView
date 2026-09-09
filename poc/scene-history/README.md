@@ -33,6 +33,10 @@ initial Scene membership in one original command. Explicit owner/frame/current
 class/manual evidence is checked at its causal parent; later aggregate receives
 may include additional memberships and independent copies. This feeds the existing
 host's add-pin mode with exact retained retry, not a new schema or durable write.
+The same host also accepts provisional positions from its exact resident fixture
+surface. A separate preview and XYZ correction precede confirmation; failed
+admission retains that proposal. CPU intersection and mounted gesture tests are
+root checks; the actual-candidate mounted retry case also retains this preview.
 `development-browser.ts` now initializes this pair before mounting the existing
 development UI. One session acknowledgment coordinator handles all editors and
 team commands, retaining the same draft/plan/IDs until success. Retried admission
@@ -200,9 +204,25 @@ acceptance remain later work. This is not durable storage or offline evidence.
 For the later browser batch, select a model in `モデル`, choose a synthetic model
 update and receive it as the other actor. The same shared Caption keeps its text
 and position but requests pin review when its surface changed. Select that Caption,
-use `ピンを移動`, enter development coordinates, explicitly choose the current
-surface and confirm. Exchange both ways again. This is coordinate input for the
-synthetic fixture, not 3D picking/gizmo or real model-file replacement.
+use `ピンを移動`, select a visible point on that model's surface, inspect
+`仮の位置` and use `位置を確定`. Numeric XYZ and the explicit surface control
+remain available as an alternative. Exchange both ways again. This is the exact
+synthetic triangle connection, not a gizmo or real model-file replacement.
+
+For new Caption creation in that same batch, open `キャプション`, select
+`追加先モデル`, then `ピンを追加`. Select a visible point on that model without
+dragging: `仮の位置` and XYZ should change, but the Caption list must not gain a
+record until `位置を確定`. Correct XYZ once and confirm; the new Caption should
+be selected for editing. Enter/apply its title/body, switch `操作する人` and
+receive the update. Its owner and position must be preserved. Repeat position
+selection with `ピンを移動`, then `取り消す` and `操作を取り消す`: the confirmed
+pin must not move. A camera drag or a miss must not replace the provisional
+position. A hidden, back-facing or occluded target is not an alternative model.
+Use `視点` / `全体表示` or a viewing direction to expose the selected surface
+before starting placement. Do not force a graphics failure or reload to test
+durability; this page deliberately has no durable save. Report the failing step
+and visible message together if a check fails; never clear evidence by retrying
+the old storage probes. Native pointer/render/IME and iPhone remain unverified.
 
 For the same later batch, each actor can select Scene `設備の確認`, open
 `既存のキャプションを追加`, select `入口の記録` and use `このシーンに追加`.

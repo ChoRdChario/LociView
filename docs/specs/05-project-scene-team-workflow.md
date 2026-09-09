@@ -1188,6 +1188,45 @@ stale owner evidence, missing manual evidence and identity mutation. Read-only
 review cleared the missing-evidence fix. Executed scope is code/mounted only;
 direct viewport picking, browser/IME/device and durable/file gates remain open.
 
+**Direct-position connection (from `b04cd43`):** the same host may propose an
+AssetFrame position from its exact resident opaque fixture triangle under the
+explicitly selected model. Use the current rendered mesh, sidedness, constant
+material visibility and camera clip; unrelated opaque surfaces may reject an
+occluded candidate but never become the selected target. No unrendered/unsupported
+model, hidden owner or automatic family/model relationship participates. The hit
+is transformed from ProjectFrame through inverse Asset-to-Project exactly once.
+The resident Representation identifies its current family/class; it is not guessed
+from geometry or names. A preview and the numeric XYZ editor share one transient
+candidate. Confirm uses the existing complete source-less `manual` anchor, not
+saved triangle/source/normal provenance. Cancel and failed admission keep their
+existing meanings; preview never writes history or replaces the confirmed marker.
+
+Bind pointer start/end to the same Scene/model snapshot, camera, viewport size
+and position, and active renderer instance. Accept a primary unmodified pointer
+release only after OrbitControls has ended; reject actual camera change, movement
+over a development-only 4 CSS-pixel click slop, multiple pointers, cancel/lost
+capture and stale/hidden/context-loss transitions. Click slop is a transient input
+implementation detail, not a ratified picking-radius/performance guarantee. Keep
+numeric input as a non-pointer path; no requirement becomes drag-only. A miss
+retains the previous candidate and reports that it was not changed.
+
+Acceptance is exact CPU triangle intersection plus existing DOM/controller tests:
+nonidentity Representation/Asset transforms, perspective/orthographic clip and
+backface/material/occlusion rules; rejected drag/multi-pointer/stale gestures;
+preview -> numeric correction -> confirmation or cancellation and exact retry.
+GPU/native input and physical-iPhone acceptance remain the batched external lane.
+This adds no general profile, GS/Point/proxy/gizmo support or storage activation.
+
+Observed bounded result: exact resident picking, a separate provisional marker,
+numeric correction and the existing confirmed creation/move/cancel/retry path
+are now connected. CPU intersections cover transforms, side/material/occlusion
+and perspective/orthographic clipping, including the viewport's negative near
+plane. Mounted pointer guards reject drag, multi-pointer, capture loss, hidden
+host, resize/camera/context changes; failed admission retains the proposal.
+The independent review's orthographic ray-origin issue is fixed and its regression
+passes. Root/scoped types, full root tests and both builds pass; executed counts
+are in current todo. No GPU, native pointer, IME, device or durable-file PASS.
+
 **Historical implementation plan — complete provider (from `5225110`):** this is
 one finite implementation boundary derived from §§13.3/13.4 and specifications
 01/02, not adoption of the candidate, a new wire format, decoder or numeric policy.

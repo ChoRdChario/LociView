@@ -10,6 +10,8 @@ import { planModelList } from '../../src/ui/projectScene/modelListState';
 import { value } from '../../src/scene/types';
 import { resolveFixtureMaterial, sourceColorSrgb, sourceMaterialIntent } from '../../src/harness/projectScene/materialHistory';
 import { RecordedDocument, record, type RecordedNode } from './domRecorder';
+import { planPinMode } from '../../src/ui/projectScene/pinModeState';
+import { pickResidentSurface } from '../../src/harness/projectScene/viewportPicking';
 
 const tracker = vi.hoisted(() => ({ renderers: [] as any[], controls: [] as any[], resize: [] as (() => void)[],
   raf: new Map<number, () => void>(), nextRaf: 0, fail: false }));
@@ -36,9 +38,9 @@ const control = (root: RecordedNode, text: string) => descendants(root).find(n =
 const labeled = (root: RecordedNode, label: string) => descendants(root).find(n => n.attributes.get('aria-label') === label)!;
 function fakeCanvas() {
   const doc = new RecordedDocument(), canvas = doc.createElement('canvas');
-  let size = { width: 0, height: 0 };
+  let size = { width: 0, height: 0, left: 0, top: 0 };
   Object.assign(canvas, { getBoundingClientRect: () => size });
-  return { canvas, show(width = 800, height = 600) { size = { width, height }; tracker.resize.forEach(f => f()); } };
+  return { canvas, show(width = 800, height = 600) { size = { width, height, left: 0, top: 0 }; tracker.resize.forEach(f => f()); } };
 }
 beforeEach(() => {
   tracker.renderers.length = tracker.controls.length = tracker.resize.length = 0; tracker.raf.clear(); tracker.fail = false;
@@ -49,6 +51,91 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance', () => {
+  it('picks the current resident triangle with both transforms, perspective/orthographic clip, side, visibility and occlusion', () => {
+    const s = new SyntheticSession(); s.acceptPin(planPinMode(s.pinContext(), { kind: 'target', assetId: f.equipment }));
+    s.acceptPin(planPinMode(s.pinContext(), { kind: 'add' })); const target = s.pinSurfaceTarget()!;
+    const display = syntheticDisplay(s.snapshot, s.sceneId, null, null), model = display.models.find(m => m.binding.assetId === f.equipment)!;
+    const assetPoint = new THREE.Vector3(1 / 3, 1 / 3, 0).applyMatrix4(placementMatrix(model.representation.representationToAsset));
+    const world = assetPoint.clone().applyMatrix4(placementMatrix(model.binding.assetToProject));
+    const canvas = fakeCanvas(), v = createSyntheticViewport(canvas.canvas as unknown as HTMLCanvasElement, () => {});
+    v.update(display); v.setActive(true); canvas.show();
+    const look = (side: number) => v.recall!({ camera: { position: [world.x, world.y, world.z + side * 4], target: world.toArray(),
+      up: [0, 1, 0], projection: { kind: 'perspective', verticalFovRadians: 0.7 } }, background: { kind: 'solid', colorSrgb: [0.5, 0.5, 0.5] } });
+    const hit = () => v.pick!(target, 400, 300);
+    look(1);
+    for (const projection of ['perspective', 'orthographic'] as const) {
+      v.camera({ kind: 'projection', projection });
+      hit()!.forEach((n, i) => expect(n).toBeCloseTo(assetPoint.toArray()[i]!, 9));
+      const camera = tracker.controls.at(-1).object as THREE.PerspectiveCamera | THREE.OrthographicCamera;
+      const oldNear = camera.near, oldFar = camera.far; camera.near = 5; camera.far = 8; camera.updateProjectionMatrix(); expect(hit()).toBe(null);
+      camera.near = oldNear; camera.far = oldFar; camera.updateProjectionMatrix();
+    }
+    expect(v.pick!({ ...target, bindingId: 'stale' }, 400, 300)).toBe(null);
+    expect(v.pick!(target, -1, 300)).toBe(null); expect(v.pick!(target, Number.NaN, 300)).toBe(null);
+    v.recall!({ camera: { position: [world.x, world.y, world.z - 4], target: [world.x, world.y, world.z - 5], up: [0, 1, 0],
+      projection: { kind: 'orthographic', verticalSpan: 4 } }, background: { kind: 'solid', colorSrgb: [0.5, 0.5, 0.5] } });
+    expect(tracker.controls.at(-1).object.near).toBeLessThan(0);
+    hit()!.forEach((n, i) => expect(n).toBeCloseTo(assetPoint.toArray()[i]!, 9));
+    look(-1); expect(hit()).toBe(null);
+    const double = resolveFixtureMaterial({ ...sourceMaterialIntent, appearance: { doubleSided: true } });
+    v.update({ ...display, materials: { ...display.materials, [f.equipment]: double } }); expect(hit()).not.toBe(null);
+    const hidden = resolveFixtureMaterial({ ...sourceMaterialIntent, appearance: { chroma: { keyColorSrgb: sourceColorSrgb, tolerance: 0, softness: 0 } } });
+    v.update({ ...display, materials: { ...display.materials, [f.equipment]: hidden } }); expect(hit()).toBe(null);
+    const cutoffZero = resolveFixtureMaterial({ ...sourceMaterialIntent, appearance: { doubleSided: true, chroma: { keyColorSrgb: sourceColorSrgb, tolerance: 0, softness: 0 } },
+      compositing: { ...sourceMaterialIntent.compositing, coverage: { policy: 'mask', alphaCutoff: 0 } } });
+    v.update({ ...display, materials: { ...display.materials, [f.equipment]: cutoffZero } }); expect(hit()).not.toBe(null);
+    v.update({ ...display, materials: { ...display.materials, [f.equipment]: { issue: '未対応' } } }); expect(hit()).toBe(null);
+    v.update(display); look(1);
+    const group = tracker.renderers[0].scene.children[0] as THREE.Group;
+    const index = display.models.findIndex(m => m.binding.assetId === target.assetId), asset = group.children[index] as THREE.Group, mesh = asset.children[0] as THREE.Mesh;
+    const occluder = new THREE.Group(), otherMesh = mesh.clone(); occluder.matrix.copy(asset.matrix); occluder.matrix.elements[14]! += 1;
+    occluder.matrixAutoUpdate = false; occluder.add(otherMesh);
+    const resident = new Map([[target.assetId, { asset, mesh }], [f.structure, { asset: occluder, mesh: otherMesh }]]);
+    expect(pickResidentSurface(display, target, resident, tracker.controls.at(-1).object, new THREE.Vector2(0, 0))).toBe(null);
+    occluder.visible = false; expect(pickResidentSurface(display, target, resident, tracker.controls.at(-1).object, new THREE.Vector2(0, 0))).not.toBe(null);
+    canvas.canvas.fire('webglcontextlost', { preventDefault() {} }); expect(hit()).toBe(null); v.dispose();
+  });
+
+  it('connects stationary release to preview/XYZ/confirm and rejects drag, multitouch, cancel, changed camera/rect and hidden host', async () => {
+    const doc = new RecordedDocument(), s = new SyntheticSession(); let display: any, ready = true, dragging = false, epoch = 0, notify = () => {};
+    let rect = { left: 10, top: 20, width: 800, height: 600 }, calls = 0;
+    const workspace = createDevelopmentWorkspace(doc.asDocument(), s, { viewportFactory: (canvas, changed) => {
+      Object.assign(canvas, { getBoundingClientRect: () => rect }); notify = changed;
+      return { update: d => { display = d; }, setActive() {}, camera() {}, retry() {}, dispose() {},
+        capture: () => ({ camera: { position: [0, 0, 4], target: [0, 0, 0], up: [0, 1, 0], projection: { kind: 'perspective', verticalFovRadians: 0.7 } },
+          background: { kind: 'solid', colorSrgb: [0.5, 0.5, 0.5] } }),
+        pick: (_target, x, y) => { calls++; expect([x, y]).toEqual([400, 300]); return [0.5, 0.25, 0]; },
+        read: () => ({ token: 'view', pickToken: String(epoch), ready, dragging, issue: null, projection: 'perspective', axis: null,
+          pins: [], preview: display?.preview ? { x: 400, y: 300, visible: true } : undefined }) };
+    } });
+    const root = record(workspace.root), canvas = labeled(root, '合成モデルの3D表示');
+    const choose = labeled(root, '追加先モデル'); choose.value = f.equipment; choose.fire('change'); control(root, 'ピンを追加').fire('click');
+    const initial = s.snapshot, event = { pointerId: 1, isPrimary: true, button: 0, clientX: 410, clientY: 320 };
+    canvas.fire('pointerdown', event); dragging = true; notify(); canvas.fire('pointerup', event); dragging = false; notify(); await Promise.resolve();
+    expect(calls).toBe(1); expect(s.snapshot).toBe(initial); expect(s.pinCoordinates?.coordinates).toEqual(['0.5', '0.25', '0']);
+    const ghost = descendants(root).find(n => n.className === 'lv-development-pin-preview')!; expect(ghost.hidden).toBe(false);
+    const before = display.preview; const coords = labeled(root, 'ピン座標・開発用'), x = labeled(coords, 'X'); x.value = '1'; x.fire('input');
+    expect(display.preview).not.toEqual(before); expect(s.snapshot).toBe(initial);
+    const retained = s.pinCoordinates;
+    for (const reject of ['drag', 'multi', 'cancel', 'capture', 'camera', 'resize', 'context', 'hidden'] as const) {
+      canvas.fire('pointerdown', event);
+      if (reject === 'drag') canvas.fire('pointermove', { ...event, clientX: 430 });
+      if (reject === 'multi') { canvas.fire('pointerdown', { ...event, pointerId: 2, isPrimary: false }); canvas.fire('pointerup', { ...event, pointerId: 2 }); }
+      if (reject === 'cancel') canvas.fire('pointercancel', event);
+      if (reject === 'capture') canvas.fire('lostpointercapture', event);
+      if (reject === 'camera') epoch++;
+      if (reject === 'resize') rect = { ...rect, width: rect.width + 10 };
+      if (reject === 'context') { ready = false; notify(); ready = true; notify(); }
+      if (reject === 'hidden') { root.hidden = true; workspace.render(); root.hidden = false; workspace.render(); }
+      canvas.fire('pointerup', event); await Promise.resolve(); expect(calls, reject).toBe(1); expect(s.pinCoordinates).toBe(retained);
+    }
+    control(labeled(root, 'ピンの操作'), '取り消す').fire('click'); control(root, '操作を取り消す').fire('click');
+    expect(s.snapshot).toBe(initial); expect(ghost.hidden).toBe(true);
+    rect = { ...rect, width: 800 }; control(root, 'ピンを追加').fire('click'); canvas.fire('pointerdown', event); canvas.fire('pointerup', event); await Promise.resolve();
+    control(root, '位置を確定').fire('click'); expect(Object.keys(s.snapshot.resources.captions)).toHaveLength(3); expect(ghost.hidden).toBe(true);
+    expect(s.snapshot.resources.captions[s.memory.selectedCaptionId!]!.anchor).toMatchObject({ kind: 'value', value: { positionAsset: [0.5, 0.25, 0] } });
+    workspace.dispose();
+  });
   it('projects pins only once and fits all eight semantic corners, independent of pins and color filters', () => {
     const project = createSyntheticProject(), display = syntheticDisplay(project, f.overview, null, f.shared);
     const model = display.models.find(m => m.binding.assetId === f.equipment)!;

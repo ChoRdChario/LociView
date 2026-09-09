@@ -109,8 +109,9 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     if (task === 'captions') list.render(captionContext);
     if (task === 'models') modelList.render(session.modelContext());
     const current = session.composition;
-    disconnected.textContent = viewport.connected ? '合成モデルの表示です。3D上の位置指定・ギズモは未接続です。' :
-      '3D描画・ピン配置は未接続です。ここではシーンの構成を確認できます。';
+    disconnected.textContent = viewport.pickingConnected ? '合成モデルの表示です。ピンの追加・移動中は、選んだモデルの面から位置を指定できます。' : viewport.connected ?
+      '合成モデルの表示です。位置は座標で指定できます。3D上の位置選択は未接続です。' :
+      '3D表示は未接続です。シーンの構成と座標入力を確認できます。';
     sceneName.textContent = current.name.kind === 'value' ? current.name.value : 'シーン名を確認';
     const names = current.assets.map(asset => {
       const version = modelVersion(asset.assetId, asset.projection.bindingId, session.modelVersions);

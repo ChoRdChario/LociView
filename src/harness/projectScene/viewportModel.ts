@@ -16,6 +16,8 @@ export interface SyntheticDisplay {
   readonly token: string; readonly sceneId: string; readonly projectFrameId: string;
   readonly models: readonly FixtureModelClosure[]; readonly pins: readonly DisplayPin[];
   readonly bounds: Bounds | null; readonly selectedId: string | null;
+  /** UI-only proposed position, distinct from the confirmed Caption markers. */
+  readonly preview?: V3;
   readonly materials?: Readonly<Record<string, ReturnType<typeof resolveFixtureMaterial> | { readonly issue: string }>>;
   readonly materialNotices?: readonly string[];
   readonly entry?: { readonly kind: 'none' } | { readonly kind: 'blocked'; readonly reason: string } | { readonly kind: 'ready'; readonly payload: DisplayCapture };

@@ -41,7 +41,7 @@ export function createModelUpdateControls(document: Document, session: Synthetic
 export function createPinCoordinateControls(document: Document, session: SyntheticSession, changed: () => void) {
   const root = document.createElement('section'); root.className = 'lv-development-coordinates';
   root.setAttribute('aria-label', 'ピン座標・開発用');
-  const note = document.createElement('p'); note.textContent = '合成モデル内の座標です。3D上の位置選択・ギズモは未接続です。'; root.append(note);
+  const note = document.createElement('p'); note.textContent = 'モデル内の座標を入力して位置を調整できます。'; root.append(note);
   const inputs = ['X', 'Y', 'Z'].map(axis => {
     const label = document.createElement('label'); label.textContent = axis;
     const input = document.createElement('input'); input.type = 'text'; input.inputMode = 'decimal'; input.setAttribute('aria-label', axis);

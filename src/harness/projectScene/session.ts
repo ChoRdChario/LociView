@@ -30,6 +30,7 @@ import { SyntheticMediaSession, type MediaContext } from './mediaSession';
 import { mediaSeed, projectMediaHistory } from './mediaHistory';
 import { previewHistory } from './historyPort';
 import { WorkingAcknowledgment, afterWorking, type WorkingResult } from './acknowledgment';
+import type { PinSurfaceTarget } from './viewportPicking';
 
 export interface SyntheticPinInput {
   readonly coordinates: readonly [string, string, string]; readonly familyId: string | null;
@@ -394,6 +395,31 @@ export class SyntheticSession {
     const anchor = caption?.anchor.kind === 'value' && caption.anchor.value.kind === 'asset' ? caption.anchor.value : null;
     const needsFamily = !anchor || !version?.projection.anchorCompatibilityIds.includes(anchor.authoredAnchorCompatibilityId);
     return { mode, input: this.pinInput, families: version?.families ?? [], needsFamily };
+  }
+  pinSurfaceTarget(ignorePending = false): PinSurfaceTarget | null {
+    if (!ignorePending && (this.workingBlock || this.textPending || this.viewportDragging || this.windowDragging)) return null;
+    const context = this.pinContext(), mode = context.memory.mode;
+    if (!mode || context.source.kind !== 'ready') return null;
+    const target = context.source.models.find(m => m.assetId === mode.target.assetId);
+    if (!target || target.token !== mode.target.token || (mode.kind === 'add' ? target.addBlock : target.moveBlock)) return null;
+    const asset = this.project.resources.assets[target.assetId], projection = asset?.projection;
+    const version = projection?.kind === 'value' ? modelVersion(asset!.id, projection.value.bindingId, this.modelVersions) : undefined;
+    if (!version || version.families.length !== 1) return null;
+    const family = version.families[0]!;
+    return { token: this.project.state.token, sceneId: this.sceneId, assetId: version.assetId, assetFrameId: version.projection.assetFrameId,
+      bindingId: version.projection.bindingId, revisionId: version.projection.revisionId,
+      representationId: version.closure.representation.id, familyId: family.id, compatibilityId: family.compatibilityId };
+  }
+  get pinPreviewAnchor() {
+    if (!this.pinSurfaceTarget(true)) return null;
+    return this.preparePinAnchor().anchor ?? null;
+  }
+  acceptPinSurface(target: PinSurfaceTarget, position: readonly [number, number, number]): boolean {
+    if (JSON.stringify(target) !== JSON.stringify(this.pinSurfaceTarget()) || !position.every(Number.isFinite))
+      return this.refuse('表示が変わっています。指定中の位置は保持しています。');
+    const accepted = this.changePinCoordinates({ coordinates: position.map(n => String(n || 0)) as [string, string, string], familyId: target.familyId });
+    if (accepted) this.message = '仮の位置を表示しています。位置を確認して確定してください。';
+    return accepted;
   }
   private preparePinAnchor(): { anchor?: Anchor; issue: string | null } {
     try {

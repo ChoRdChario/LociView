@@ -69,8 +69,11 @@ it does not activate the ordinary UI, real storage, files or adoption.
 New Caption/pin creation now also connects explicit model/coordinates/surface to
 the same verified acknowledgment. Created records support subsequent edits/media,
 independent keep-both copies and continuing exchange; anchors on verified model
-copies remain owned by that model. Direct viewport picking/preview is next, not
-proved by manual coordinate inputs. Current execution counts and remaining gates
+copies remain owned by that model. Direct viewport picking/preview now connects
+the exact selected resident surface to confirmation/cancellation and retry.
+CPU/mounted checks cover transforms, clipping, material/occlusion and rejected
+gestures; they do not prove native input or raster output. Next is connected UI
+evidence, not more detached provider components. Current execution counts and remaining gates
 are recorded at the top of todo; no new browser/device/storage credit.
 
 Current scheduling amendment (2026-09-09): specification 05 §13.4 is PO approved
@@ -104,7 +107,8 @@ sidedness and hard chroma. This is fixed opaque triangle evidence only, not
 blend/dither adoption. Fixed PNG media now connects add/description/order/removal,
 window images, causal delete/edit choices and independent attachment copies in
 the same host. Tags remain empty-fixture-only; real media files/storage and
-gated durable-file services remain pending. Next is the complete-provider boundary.
+gated durable-file services remain pending. The following records the successive
+provider stages, not new next tasks; C's current connection is summarized above.
 Its stage A now has one decoded whole-root record admission entry, covering the
 amended 14 maps and canonical known values while preserving unknown data. A
 `valid-records` result is not a valid Project/provider. Stage B now additionally

@@ -34,8 +34,9 @@
 > tag support remains empty-fixture-only. Failure retains exact commands/drafts.
 > Current todo records tests and independent review.
 > File/storage effects remain unconnected; do not claim full model-copy admission,
-> renderer adoption, integrated v2 or rendered acceptance. Next:
-> the finite complete-provider/gated durable boundary. Real file inputs and
+> renderer adoption, integrated v2 or rendered acceptance. The finite provider
+> connection is now closed in development scope as described below; intermediate
+> A/B/C statements record implementation order, not current tasks. Real file inputs and
 > image pan/pinch/filters remain pending, not removed conveniences.
 > Provider stage A now checks the decoded amended root/all record kinds and
 > preserves unknown subtrees. This is structural success only; B must validate
@@ -68,8 +69,11 @@
 > model, AssetFrame coordinates and surface, creating one membership through the
 > same verified acknowledgment. Cancel/IME/stale/retry, new-Caption independent
 > copies/media/second exchange and pin creation on model copies have code/mounted
-> evidence. Direct canvas picking/preview is next; coordinates are not its proof.
-> No detached guard campaign or real storage activation before its gates.
+> evidence. Direct canvas position selection/preview now connects the selected
+> resident fixture surface to the same confirmation/cancel/retry path. CPU and
+> mounted checks cover transforms, clipping, occlusion and gesture cancellation;
+> no native-input/raster PASS. Next is connected UI evidence, not another guard
+> campaign; real storage activation remains behind its separately named gates.
 > One finite boundary, not new per-record tasks; no additional manual test hold.
 > Windows Computer Use initialized but stopped automatically on unsafe-to-resolve
 > Chrome URL; no browser input/PASS or bypass. Keep the existing batched UI lane.

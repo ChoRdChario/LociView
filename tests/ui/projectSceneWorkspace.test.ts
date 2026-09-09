@@ -135,7 +135,7 @@ describe('connected synthetic development host (not rendered, storage or TEAM-FL
     expect(button(root, 'ウィンドウを表示').disabled).toBe(false); expect(button(root, '比較に残す').disabled).toBe(false);
     button(root, 'ウィンドウを表示').fire('click'); expect(workspace.session.message).toBe('');
     const text = descendants(root).map(n => n.textContent).join('\n');
-    expect(text).toContain('再読み込みで失われます'); expect(text).toContain('3D描画・ピン配置は未接続');
+    expect(text).toContain('再読み込みで失われます'); expect(text).toContain('3D表示は未接続です。シーンの構成と座標入力を確認できます。');
     expect(text).toContain('未保存'); expect(text).not.toContain('保存済み');
     button(root, 'マテリアル').fire('click'); expect(label(root, 'タイトル')).toBeDefined();
     button(root, '視点').fire('click'); expect(button(root, '+X').disabled).toBe(true);

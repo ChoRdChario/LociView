@@ -4,35 +4,64 @@
 
 PO approved building the whole workflow thinly before subsystem polish. Authority:
 specification 05 §13.4; final completion remains `TEAM-FLOW-01` in §12.6.
-The completed journal Chrome recheck below stays closed; no new manual test is
+The completed journal Chrome recheck below stays closed; no journal rerun is
 requested. Synthetic two-person model/pin/history and independent Caption/model-copy loops now exist; browser,
 IME and device acceptance remain pending, not implied by its DOM tests.
 
 ### Current checkpoint / next implementation
 
-New Caption/pin creation is now connected in the same served verified host.
-It uses explicit model / AssetFrame XYZ / surface selection, creates an independent
-Caption and one Scene membership, then opens the editor only after confirmation.
-Cancellation creates nothing; admission failure retains the exact proposal/change
-for retry. New Captions also participate in media, Scene inclusion, independent
-keep-both copies and a second exchange. Captions can be placed on verified model
-copies and moved without rebinding their owner.
+Direct position selection/preview is now connected in the same served verified
+host. A visible surface on the explicitly chosen model proposes AssetFrame XYZ;
+the provisional marker and numeric editor precede confirmation. Confirm creates
+one Caption/membership or moves the existing owned pin. Cancellation changes
+nothing; failed admission retains the same proposal and original change for retry.
+New Captions retain media, independent copies and continuing two-person exchange.
+This is exact synthetic opaque-triangle scope, not general model admission.
 
-Verification: root/scoped TypeScript PASS; root 105 files / 1858 PASS / 21 existing
-TODO; candidate 4 files / 65 PASS, including 8 mounted scenarios. Ordinary/harness
-builds PASS with existing warnings; parsed maps 13/9 have zero candidate/provider
-sources. Independent review found one creation-only missing-evidence path; exact
-manual evidence is now required and its refusal regression passes. Reviewer
-confirmed no remaining bounded-diff blocker. No browser, IME, iPhone, offline/PWA,
-durable storage or adoption PASS. HTTP delivery/transform of the dev entry and
-changed modules succeeds; it is not browser execution. Official quota 69% remains.
+Verification: root/scoped TypeScript PASS; root 105 files / 1860 PASS / 21 existing
+TODO; focused viewport/workspace 16 PASS; actual-candidate mounted acknowledgment
+8 PASS. Reuse the preceding 65-case candidate result for unchanged history/source
+coverage. Ordinary/harness builds PASS with existing warnings; parsed maps 13/9
+contain zero candidate/provider sources. Independent review's orthographic
+negative-near ray-origin issue is fixed with a passing regression; no remaining
+bounded-diff blocker. Dev HTML and changed modules return HTTP 200. That is delivery,
+not browser execution. No native pointer, raster, IME, iPhone, offline/PWA,
+durable-save or adoption PASS. Official quota 68% remains; no reset redeemed.
 
-Next: connect direct position selection/preview on the existing synthetic 3D
-viewport, reusing this creation/correction/confirmation/retry path. Keep manual
-coordinates as a non-pointer alternative. State exact supported surface/hit and
-gesture boundaries before coding; do not infer a model or rebind a pin. No new
-provider/probe campaign or manual approval hold. Real-file/storage gates remain.
-- [ ] Connect bounded direct viewport position selection and provisional preview.
+Short meta-audit / next decision: this closes the essential missing direct
+creation/correction interaction, rather than adding a detached component. A
+read-only sequencing check identifies no mandatory additional implementation
+before UI measurement under 05 §13.4. The next finite exit is the same host's
+batched two-person/two-round UI walk: creation/correction, retained drafts,
+independent copies and recovery, followed by fixes for observed defects. Reuse
+the existing browser batch in `poc/scene-history/README.md`; no new page/probe or
+repeat of the closed journal tests. Existing automation remains unavailable;
+do not repeat unchanged initialization/URL-safety failures or bypass them.
+
+- [ ] Record the connected browser walk and correct any concrete findings.
+- [ ] Keep native IME/pointer/render and physical-iPhone evidence separate; no
+  offline/PWA claim from this memory-only development page.
+
+Real storage/file activation requires the S1/S2 prerequisites in the table below.
+Do not silently promote the candidate, add convenience-only work indefinitely,
+or treat an unavailable browser as proof of UI success. Gated production services
+and the full TEAM-FLOW-01 remain open. No new general profile, dependency, renderer
+port, GS/Point/proxy/gizmo, real data, ordinary-entry or release action.
+
+### Completed direct-position slice — from `b04cd43`
+
+Started clean, 44 ahead of local tracking, no fetch, quota 69%. Reused the resident
+Three.js geometry/material, selected owner and common confirmation/retry path.
+
+- [x] Connect exact resident picking, transient preview and numeric correction.
+- [x] Verify Representation/Asset transforms, camera clipping, sidedness/material
+  visibility and opaque occlusion without selecting another model.
+- [x] Reject drag, multi-pointer, cancel/capture loss and changed camera/viewport/
+  source/hidden-host/context state; retain preview and exact failure/retry.
+- [x] Execute final checks, read-only review and align current documentation.
+
+No generated source locator or automatic model relation; numeric input remains
+the non-pointer alternative. GPU/native input/device checks are not replaced.
 
 ### Previous checkpoint — async host and new-Caption plan
 

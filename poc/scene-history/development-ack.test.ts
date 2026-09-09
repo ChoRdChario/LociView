@@ -77,6 +77,9 @@ describe('verified candidate through the existing mounted host; not browser or d
     expect(s.snapshot).toBe(initial); expect(pair[0].exportUpdate().changes).toHaveLength(0);
     s.acceptList(planCaptionList(s.captionContext(), { kind: 'search', query: '絞り込みを保持' })); team.render();
     button(work, 'ピンを追加').fire('click'); const coords = label(work, 'ピン座標・開発用');
+    const surfaceTarget = s.pinSurfaceTarget()!;
+    expect(s.acceptPinSurface(surfaceTarget, [0.5, 0.25, 0])).toBe(true); team.render();
+    expect(s.pinPreviewAnchor).toMatchObject({ positionAsset: [0.5, 0.25, 0] });
     for (const [axis, raw] of [['X', '1'], ['Y', '2'], ['Z', '3']]) { const input = label(coords, axis!); input.value = raw!; input.fire('input'); }
     const family = label(coords, 'ピンを置く表面'); family.value = s.pinCoordinateContext().families[0]!.id; family.fire('change');
     const x = label(coords, 'X'); x.fire('compositionstart'); expect(button(strip, '位置を確定').disabled).toBe(true);
@@ -84,6 +87,8 @@ describe('verified candidate through the existing mounted host; not browser or d
     fail = true; button(strip, '位置を確定').fire('click'); expect(s.snapshot).toBe(initial); await settled(s, true);
     const stagedToken = tokens.at(-1), retained = s.pinCoordinates;
     expect(retained?.coordinates).toEqual(['1', '2', '3']); expect(s.snapshot).toBe(initial);
+    expect(s.pinPreviewAnchor).toMatchObject({ positionAsset: [1, 2, 3] });
+    expect(s.acceptPinSurface(surfaceTarget, [9, 9, 9])).toBe(false); expect(s.pinCoordinates).toBe(retained);
     button(strip, '位置を確定').fire('click'); expect(tokens.at(-1)).toBe(stagedToken);
     fail = false; button(work, '更新を再試行').fire('click'); await settled(s);
     expect(tokens.at(-1)).toBe(stagedToken); expect(s.snapshot.state.token).toBe(stagedToken);
