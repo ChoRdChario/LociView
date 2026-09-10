@@ -35,7 +35,9 @@ export function createTeamWorkspace<F extends WorkingHistoryFactory>(document: D
   label.append(actor);
   const receive = make('button', '相手の更新を受け取る'), retry = make('button', '同じ更新を再受信');
   receive.type = retry.type = 'button';
-  const status = make('p', '2人分の編集をこのページ内で試せます。ファイル交換・保存は未接続です。');
+  const saved = sessions.every(s => s.savedDevelopment);
+  const status = make('p', saved ? '2人分の合成データを、このブラウザに保存して試せます。' :
+    '2人分の編集をこのページ内で試せます。ファイル交換・保存は未接続です。');
   status.setAttribute('role', 'status');
   const instructions = make('p', 'それぞれの編集を適用してから、相手の更新を受け取ります。');
   toolbar.append(label, receive, retry, instructions, status);
@@ -279,6 +281,6 @@ export function createTeamWorkspace<F extends WorkingHistoryFactory>(document: D
   }
   render();
   return { root, sessions, histories, render,
-    hasChanges: () => sessions.some(s => s.pending !== null) || histories.some((h, i) => h.read().token !== initial[i]),
+    hasChanges: () => sessions.some(s => s.pending !== null) || (!saved && histories.some((h, i) => h.read().token !== initial[i])),
     dispose() { disposed = true; materialConflicts?.dispose(); workspaces.forEach(w => w.dispose()); root.remove(); } };
 }

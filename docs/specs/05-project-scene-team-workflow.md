@@ -1210,15 +1210,15 @@ gates. The later §13.4 permits earlier connected synthetic development delivery
 
 ### 13.4 Approved sequencing — thin whole workflow first (2026-09-09)
 
-**PROPOSED, awaiting PO confirmation (2026-09-10): isolated saved-development
-mode in the same host.** This is not active authorization and does not replace
-the page-memory contract below. The service connection at `2abb57a` permits a
+**PO-approved (2026-09-11): isolated saved-development
+mode in the same host.** The PO approved the proposed opt-in addition; the
+default page-memory mode below remains available. The service connection at `2abb57a` permits a
 finite next step without pretending that product adoption has passed: add an
 explicit opt-in to save/reopen only the same synthetic two-participant workspace
 in dedicated development storage. Keep the current memory mode and ordinary
 home unchanged. No existing v1/Native Project or arbitrary user file is admitted.
 
-On approval, reuse the existing BrowserPorts, full development-source service,
+Reuse the existing BrowserPorts, full development-source service,
 command encoder and shared UI. Do not create a new probe page or parallel UI.
 One bounded implementation connects initialization → confirmed local edits →
 two-participant receive/explicit conflict choices → reload/reopen → recovery.
@@ -1230,6 +1230,18 @@ write retains the same draft/change bytes, without an implicit memory fallback,
 silent reset, automatic winner or data clearing. Do not label these saves as
 ordinary production Project durability.
 
+Implementation boundary: retain a closed development pair manifest with two
+distinct participant locators, stable actor IDs and separate fixed exchange-base
+heads. The shared full seed has only the immutable service foundation control;
+do not introduce source-managed/birth registrations without their corresponding
+atomic UI choices. A pair-ready marker follows both validated initializations.
+An incomplete initialization is a visible failure, never permission to reseed.
+Before journal side effects, retain the exact authored source plus a bounded
+working descriptor. Local resubmission may reuse an unowned staging transaction
+only with its original transaction ID, target and exact base dependencies; it
+never reauthors the change. Remote retry retains its exact source. Reopen exposes
+pending work explicitly and only publishes the journal's acknowledged view.
+
 Reuse the latest mounted team/pin/model/media/view/material tests and the 135
 isolated service/journal checks. Add only the missing host/persistence seam and
 one connected saved two-round/reopen/retry check, then batch native browser input
@@ -1239,6 +1251,17 @@ and format adoption. Runtime adoption, real data/import/export, portable migrati
 artifact/recipe/wire, main/release, PWA/offline and physical-iPhone gates are not
 waived by approval of this development-only mode. The complete product/UI goal
 remains open after this intermediate connection.
+
+**Bounded code connection (2026-09-11):** `development-saved.ts` and
+`development-saved-browser.ts` now connect this opt-in to the existing entry,
+team workspace and acknowledgment controls. The default mode remains memory-only.
+Node-backed saved-driver tests cover two rounds, explicit choices, original-byte
+reopen/replay, pre-prepared/durable interruption, mounted recovery, descriptor
+replacement failure and uncertain cleanup response. They do not execute the
+browser pair manifest or prove actual OPFS/IndexedDB persistence. Browser input,
+initialization/reopen and physical-device acceptance remain pending; the current
+permitted browser-control bootstrap fails before selection. No product adoption,
+general file exchange or offline/PWA claim follows from this code checkpoint.
 
 **PO-approved Scene-first interaction amendment (2026-09-10, from `4ad055c`):**
 in the same synthetic development host, replace required model preselection for

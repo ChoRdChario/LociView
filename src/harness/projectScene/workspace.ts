@@ -22,13 +22,15 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   const header = make('header'); header.className = 'lv-development-header';
   const brand = make('span', 'LociView'); brand.className = 'lv-development-brand';
   const name = make('h1', 'シーンと記録の編集');
-  const notice = make('p', '開発用・合成データのみ。変更は保存されず、再読み込みで失われます。');
+  const notice = make('p', session.savedDevelopment ?
+    '開発用・合成データのみ。適用した変更はこのブラウザに保存します。未適用の入力は再読み込みで失われます。' :
+    '開発用・合成データのみ。変更は保存されず、再読み込みで失われます。');
   notice.className = 'lv-development-notice';
   const message = make('p'); message.className = 'lv-development-message';
   const working = make('section'), workingStatus = make('p'), retryWorking = make('button', '更新を再試行');
   working.setAttribute('aria-label', '更新の確認'); workingStatus.setAttribute('role', 'status');
   retryWorking.type = 'button'; working.append(workingStatus, retryWorking);
-  retryWorking.addEventListener('click', () => { session.acknowledgment.retry(); afterAction(); });
+  retryWorking.addEventListener('click', () => { session.retryWorking(); afterAction(); });
   message.setAttribute('role', 'status'); message.setAttribute('aria-live', 'polite');
   const content = make('div'); content.className = 'lv-development-content';
   const stage = make('section'); stage.className = 'lv-development-stage'; stage.setAttribute('aria-label', 'シーンの構成');
@@ -44,7 +46,8 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   materialPanel.className = viewPanel.className = 'lv-development-pending-panel';
   materialPanel.append(make('h2', 'マテリアル'), make('p', '表面の選択・色の調整は未接続です。'));
   viewPanel.append(make('h2', '視点'), make('p', '全体表示・方向プリセット・保存した視点は未接続です。'));
-  const footer = make('footer', options.team ?
+  const footer = make('footer', session.savedDevelopment ?
+    '保存するのはこの開発画面の合成データだけです。実プロジェクト・ファイル交換には未対応です。' : options.team ?
     '更新の受信はこのページ内の2人分の編集だけが対象です。ファイルの読込・保存は未接続です。' :
     'ファイルの読込・保存・共同編集は未接続です。既存プロジェクトには触れません。');
   footer.className = 'lv-development-footer';
@@ -88,7 +91,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     if (disposed) return;
     working.hidden = !session.workingBlock;
     workingStatus.textContent = session.workingBlock ? `${session.workingBlock}${session.acknowledgment.error ? ` ${session.acknowledgment.error}` : ''}` : '';
-    retryWorking.hidden = session.acknowledgment.state !== 'failed';
+    retryWorking.hidden = session.acknowledgment.state !== 'failed' && session.savedStatus?.kind !== 'failed';
     // Keep editors mounted and draft DOM intact, but prevent overlapping native input.
     content.inert = header.inert = !!session.workingBlock;
     content.setAttribute('aria-busy', String(session.acknowledgment.state === 'checking'));
@@ -107,7 +110,9 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
       message.textContent = '入力中の状態を保持しています。操作を完了してから切り替えてください。';
       message.hidden = false; return;
     }
-    navigation.render({ scenes: session.snapshot.state, session: session.session, pending: session.pending, save: { kind: 'unsaved' } });
+    navigation.render({ scenes: session.snapshot.state, session: session.session, pending: session.pending,
+      save: !session.savedDevelopment ? { kind: 'unsaved' } : session.acknowledgment.state === 'checking' ? { kind: 'saving' } :
+        session.workingBlock ? { kind: 'recovery', message: '' } : { kind: session.pending ? 'unsaved' : 'saved' } });
     const task = session.session.task;
     editor.hidden = windowActions.hidden = navigation.sceneControl.hidden = pin.actions.hidden = task !== 'captions';
     navigation.sceneContext.hidden = task === 'captions';

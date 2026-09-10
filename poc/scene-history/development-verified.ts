@@ -19,6 +19,7 @@ export interface VerifiedDevelopmentSnapshot extends HistorySnapshot {
   readonly source: HistorySnapshot; readonly provider: Provider; readonly project: SyntheticProject;
 }
 export interface VerifiedDevelopmentHistory {
+  readonly storage?: 'saved-development';
   read(): VerifiedDevelopmentSnapshot;
   status(): Readonly<{ kind: 'idle' | 'checking' | 'failed'; error?: string }>;
   write(token: string, changes: Readonly<Record<string, string>>): Promise<VerifiedDevelopmentSnapshot>;
@@ -33,7 +34,7 @@ const equal = (a: readonly string[], b: readonly string[]) => [...a].sort().join
 function fail(message = '更新を適用できません。元の編集は保持しています。'): never { throw new Error(message); }
 
 /** Presentation extras keep their source IDs; the new provider alone supplies display authority. */
-function projectFromProvider(commands: HistorySnapshot, provider: Provider): SyntheticProject {
+export function projectFromProvider(commands: HistorySnapshot, provider: Provider): SyntheticProject {
   const known = projectHistory(commands), details = provider.details.mutable;
   const field = <T>(map: keyof typeof details, id: string, name: string) => details[map][id]?.[name] as Field<T> | undefined;
   const missing = <T>(): Field<T> => ({ kind: 'unresolved', reason: 'missing' });
@@ -50,7 +51,8 @@ function projectFromProvider(commands: HistorySnapshot, provider: Provider): Syn
   })) } as SyntheticProject['viewData'];
   const materialData = known.materialData && { ...known.materialData, records: Object.fromEntries(Object.entries(known.materialData.records).map(([id, m]) =>
     [id, { ...m, ...provider.resources.materials[id], appearance: field('materialOverridesById', id, 'appearance')!, compositing: field('materialOverridesById', id, 'compositing')! }])) } as SyntheticProject['materialData'];
-  const mediaData = known.mediaData && { ...known.mediaData, records: Object.fromEntries(Object.entries(known.mediaData.records).map(([id, row]) => {
+  const mediaData = known.mediaData && { ...known.mediaData, records: Object.fromEntries(Object.entries(known.mediaData.records).filter(([id]) =>
+    !!details.captionAttachmentsById[id]).map(([id, row]) => {
     const fields = details.captionAttachmentsById[id]!, availability = provider.details.attachments[id];
     const alt = fields.altText!, lifecycle = fields.lifecycle as typeof row.lifecycle;
     const active = lifecycle.kind === 'value' && lifecycle.value.state === 'active';
@@ -64,7 +66,8 @@ function projectFromProvider(commands: HistorySnapshot, provider: Provider): Syn
 }
 
 /** Existing explicit fixture selections establish construction authority; never a conflict winner. */
-function verifierFor(commands: HistorySnapshot): ProjectContentVerifier {
+export function verifierFor(commands: HistorySnapshot,
+  readBytes?: Parameters<typeof developmentContentVerifier>[1]): ProjectContentVerifier {
   const known = projectHistory(commands), authorities = new Map<string, { variantFamilyId: string; representationId: string; payloadDigest: string }>();
   for (const [key, cell] of Object.entries(commands.cells)) if (/^asset\/ast_[0-9a-f]{32}\/binding$/.test(key)) {
     for (const target of cell.kind === 'value' ? [cell.value] : cell.candidates.map(c => c.value)) {
@@ -72,7 +75,7 @@ function verifierFor(commands: HistorySnapshot): ProjectContentVerifier {
       authorities.set(record.id, { variantFamilyId: record.variantFamilyId, representationId: record.id, payloadDigest: record.payloadDigest });
     }
   }
-  return developmentContentVerifier([...authorities.values()]);
+  return developmentContentVerifier([...authorities.values()], readBytes);
 }
 
 /** Same isolated pinned candidate, with async admission before publication. No Repo/files/network. */

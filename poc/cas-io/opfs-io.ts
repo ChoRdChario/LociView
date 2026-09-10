@@ -11,11 +11,11 @@ export class OpfsIo implements Io {
   payloadReads = 0;
   payloadWrites = 0;
   private constructor(private readonly root: FileSystemDirectoryHandle) {}
-  static async open(run: string): Promise<OpfsIo> {
+  static async open(run: string, savedScene = false): Promise<OpfsIo> {
     if (!/^[0-9a-f]{32}$/.test(run)) throw new Error('invalid synthetic run');
     if (!navigator.storage?.getDirectory || !navigator.locks) throw new Error('OPFS またはブラウザの保存ロックを利用できません。');
     const origin = await navigator.storage.getDirectory();
-    const area = await origin.getDirectoryHandle(AREA, { create: true });
+    const area = await origin.getDirectoryHandle(savedScene ? 'lociview-synthetic-scene-cas-20260911' : AREA, { create: true });
     return new OpfsIo(await area.getDirectoryHandle(run, { create: true }));
   }
   async exclusive<T>(task: () => Promise<T>, options?: { wait: boolean }): Promise<T> {

@@ -1,14 +1,15 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **Current decision (2026-09-10, after `2abb57a`):** full synthetic source/service
-> persistence is connected, but the existing UI remains page-memory. 05 §13.4 now
-> contains one PROPOSED opt-in saved-development mode, awaiting PO confirmation:
-> same host, synthetic data and dedicated storage only; no product adoption or
-> real files. On approval connect the journal-backed pair to existing controls,
-> not another probe. Browser bootstrap failed before selection this turn; the
-> Windows alternative cannot control the ChatGPT desktop surface under its skill.
-> No new rendered/input/storage acceptance, browser switch or server startup.
-> Current todo contains the exact decision and finite acceptance; usage 57% left.
+> **Current implementation (2026-09-11, from `2c27890`):** PO approved the opt-in
+> saved-development mode in 05 §13.4. The existing host now connects two saved
+> synthetic histories, separate fixed exchange bases, acknowledged-head UI and
+> exact retained retry/recovery. Default memory mode/ordinary home are unchanged;
+> no real files or product adoption. `保存・再開を試す` starts separate synthetic
+> data; keep its resulting URL to reopen. Partial initialization fails visibly
+> without reseeding or memory fallback. Node/mounted tests and browser evidence
+> remain distinct. The prescribed Browser bootstrap still fails before selection
+> (`node:process` unavailable); no real browser storage/input PASS. Current todo
+> owns final executed evidence and the next finite exit; usage 55% left.
 
 > **Current continuation (2026-09-10, after readiness `77a22b0`):** PO approved
 > keeping unplaced Captions editable. Specification 05 §9.4 defines the proposed

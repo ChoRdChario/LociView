@@ -11,7 +11,7 @@ export class NodeFiles implements Files {
   constructor(readonly root: string) {}
   path(key: string): string {
     require(!/[^\x21-\x7e]/.test(key), 'invalid file key');
-    require(/^(?:(?:control|inventory)\.json|metadata\/[0-9a-f]{64}\.amchange|journal\/[0-9a-f]{32}\/(?:journal\.json|source-metadata\.am|original-source\.bin|changes\/[0-9]{8}\.amchange|artifacts\/[0-9a-f]{64}\.bin))$/.test(key), 'invalid file key');
+    require(/^(?:(?:control|inventory|working)\.json|working\/[0-9a-f]{32}\.am|metadata\/[0-9a-f]{64}\.amchange|journal\/[0-9a-f]{32}\/(?:journal\.json|source-metadata\.am|original-source\.bin|changes\/[0-9]{8}\.amchange|artifacts\/[0-9a-f]{64}\.bin))$/.test(key), 'invalid file key');
     const path = resolve(this.root, key); require(path.startsWith(resolve(this.root) + sep), 'path outside probe'); return path;
   }
   async read(key: string, limit: number): Promise<Uint8Array | null> {

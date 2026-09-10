@@ -88,7 +88,16 @@ export class SyntheticSession {
     }
   }
   get snapshot() { return this.project; }
-  get workingBlock() { return this.acknowledgment.block; }
+  get savedDevelopment() { return this.authority?.storage === 'saved-development'; }
+  get savedStatus() { return this.authority?.status?.(); }
+  get workingBlock() { return this.acknowledgment.block ?? (this.savedStatus?.kind === 'failed' ?
+    this.savedStatus.error ?? '未完了の保存があります。更新を再試行してください。' : null); }
+  retryWorking() {
+    if (this.acknowledgment.state === 'failed') return this.acknowledgment.retry();
+    if (this.authority?.retry && this.savedStatus?.kind === 'failed')
+      return this.applyWorking(() => this.authority!.retry!(), () => this.refreshHistory());
+    return false;
+  }
   /** One confirmation/retry path for every editor and team command. */
   applyWorking(action: () => WorkingResult<unknown>, confirmed: () => void,
     failed: (error: unknown) => void = error => { this.message = this.errorText(error); }): boolean {
@@ -355,7 +364,7 @@ export class SyntheticSession {
       const prepared = draft.prepared ?? moveFixtureModel(draft.source, fresh('bnd'), position);
       this.placement = freezeSynthetic({ ...draft, prepared });
       return this.applyWorking(() => this.publishModelVersion(draft.token, versionFromClosure(prepared)), () => {
-        this.placement = null; this.message = 'モデルの配置を適用しました。保存は未接続です。';
+        this.placement = null; this.message = `モデルの配置を適用しました。${this.savedDevelopment ? '' : '保存は未接続です。'}`;
       });
     } catch (error) { return this.refuse(this.errorText(error)); }
   }
@@ -522,7 +531,7 @@ export class SyntheticSession {
             throw new Error('追加済みです。一覧からキャプションを選択してください。');
           const list = captionListView(this.captionContext().source, this.memory);
           const filtered = adding && (!list.selectionVisible || list.rows.find(r => r.item.id === captionId)?.colorHidden);
-          this.message = `${adding ? 'キャプションを追加しました。' : 'ピン座標を適用しました。'}${filtered ? '絞り込みで一覧またはピンが非表示です。' : ''}保存は未接続です。`;
+          this.message = `${adding ? 'キャプションを追加しました。' : 'ピン座標を適用しました。'}${filtered ? '絞り込みで一覧またはピンが非表示です。' : ''}${this.savedDevelopment ? '' : '保存は未接続です。'}`;
         }, failed);
       }
       this.pinFeedback = { kind: 'idle' }; return true;

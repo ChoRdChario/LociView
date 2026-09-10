@@ -94,6 +94,18 @@ export class JournalCandidate {
       return { parts };
     });
   }
+  /** Exact previously authored local command, retained by the saved development host. */
+  async localOriginal(tx: string, original: Uint8Array): Promise<'published' | 'noop'> {
+    transaction(tx); const bytes = original.slice(), decoded = A.decodeChange(bytes);
+    require(bytes.length > 0 && bytes.length <= LIMIT.part &&
+      decoded.message === `lociview:transaction:v1:${tx}`, 'invalid original local command');
+    return this.prepare(tx, 'localCommand', [], base => {
+      const existing = index(base).get(decoded.hash);
+      if (existing) { require(sha(existing.bytes) === sha(bytes), 'original bytes differ'); return { parts: [] }; }
+      require(same([...decoded.deps].sort(), heads(base)), 'local source base changed; original edit retained');
+      return { parts: [bytes] };
+    }, true);
+  }
   async preparedMigration(tx: string, source: MigrationSource, originalInput: Uint8Array,
     retained: RetainedBlob[], stagedBlobs: Ref[] = []): Promise<'published' | 'noop'> {
     require(this.migration, 'migration verifier unavailable'); transaction(tx);
@@ -157,10 +169,15 @@ export class JournalCandidate {
   private async prepare(tx: string, kind: Batch['kind'], staged: Ref[], build: (base: Doc) => {
     parts: Uint8Array[]; source?: Uint8Array; batchSource?: RemoteSource;
   } | Promise<{ parts: Uint8Array[]; source?: Uint8Array; batchSource?: RemoteSource;
-    migrationSource?: MigrationSource; original?: Uint8Array; retained?: RetainedBlob[] }>): Promise<'published' | 'noop'> {
+    migrationSource?: MigrationSource; original?: Uint8Array; retained?: RetainedBlob[] }>, retainedLocal = false): Promise<'published' | 'noop'> {
     return this.ports.exclusive(async () => {
       const control = await this.ports.control(); require(!control.pending, 'unfinished journal; read-only');
-      require(!await this.ports.files.read(journalPath(tx), LIMIT.journal), 'transaction already exists');
+      const existing = await this.ports.files.read(journalPath(tx), LIMIT.journal);
+      if (existing) {
+        const prior = decodeJournal(existing);
+        require(retainedLocal && kind === 'localCommand' && prior.state === 'staging' &&
+          prior.purpose === kind && prior.transactionId === tx && same(prior.target, this.target), 'transaction already exists');
+      }
       const base = await this.ports.current(); validateRoot(base, this.target);
       require(same(heads(base), control.publishedHeads), 'unpublished receiver base');
       const built = await build(base);

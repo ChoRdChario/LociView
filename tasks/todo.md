@@ -9,43 +9,67 @@ requested. Synthetic two-person model/pin/history and independent Caption/model-
 The scoped PO result below closes only the listed interaction checks; broader
 rendered, IME, device and durable-file acceptance remain pending.
 
-### Current decision — isolated saved-development host approval (2026-09-10)
+### Current implementation — isolated saved-development host (2026-09-11)
 
-Start clean `2abb57a`; prior turn is progress: complete development-source/domain
-and guarded journal connection committed, not the full UI goal. Account remaining
-57%; pause only below 10%. Do not start another independent provider/probe.
+PO approved the opt-in addition in 05 §13.4. Start clean `2c27890`, ahead 7 /
+behind 0 against tracked origin; account remaining 56%. Root is the sole writer.
+The next slice connects the existing screen to saved synthetic histories, not
+another provider or probe. Ordinary home, real files and default memory mode stay unchanged.
 
-- [x] Recheck current Git, usage, approved host and browser/platform interfaces.
-- [ ] Exercise the current host through the permitted browser surface. BLOCKED
-  in this environment; no new rendered/input/storage credit (details below).
-- [x] Resolve the exact distinction between isolated saved development and gated
-  production storage; write one bounded next-implementation/approval decision.
-- [x] Independently check that decision and update current handoff. No product
-  schema/adoption or ordinary data activation without the applicable authority.
+- [x] Record PO approval and the finite saved-host boundary before code changes.
+- [x] Reuse BrowserPorts with async initial/final domain and actual CAS validation;
+  use a dedicated development run with separately retained participant bases.
+- [x] Connect the existing command/UI pair to acknowledged journal heads. Keep
+  old view and recovery on interruption, exact bytes/drafts on retry and visible
+  boot failure without implicit memory fallback.
+- [x] Verify saved two-round exchange, explicit conflict choice, reopen and retry;
+  reuse existing interaction tests and run the standard checks sequentially.
+- [x] Attempt the permitted browser lane, record actual evidence or the precise
+  environment blocker; independent final review and synchronized handoff.
 
-Current browser attempt: the prescribed browser-client bootstrap failed before
-selection with an unsupported built-in module import (`node:process`). No Browser
-tab was controlled. The Windows alternative initialized, but its target appeared
-as the ChatGPT desktop surface, which the computer-use skill excludes. No app
-input, configuration change, Chrome switch or simulated browser PASS was made.
-The local 5173 listener was absent; no unused server was started. This is not a
-new LociView runtime defect or a repetition of the earlier accepted Chrome batch.
+Completion is this connected synthetic save/reopen path with executed evidence,
+not product durability, runtime/profile adoption or TEAM-FLOW-01 completion.
+Stop on a specification conflict, required product adoption or usage below 10%.
+No dependencies, real Project/file admission, wire/migration recipe, main/Pages,
+PWA/offline or physical-iPhone acceptance is included.
 
-Independent scope review: 03's persistence experiments are not themselves gated
-on full technology adoption. However, 05 §13.4 currently declares this host to be
-page-memory. The smallest new PO decision is an explicit opt-in, synthetic-only
-saved-development mode in that same host. Its exact proposed boundary and finite
-acceptance are now in 05 §13.4; do not demand blanket G1/profile/wire approval for
-this experiment, and do not implement the changed host promise before consent.
+Review / executed evidence (2026-09-11):
 
-After consent: reuse BrowserPorts with async final closure and initial checks,
-connect the existing host/encoder to the journal-backed pair and dedicated run
-storage, preserve exact source and exchange bases, expose save/recovery failure,
-and verify the existing two-round workflow across reopen. No new probe, arbitrary
-file, real Project, product format/adoption or device/offline claim. UI rendering
-still needs a permitted working browser lane; do not ask for another tiny journal
-manual test. Goal remains active, awaiting this one scope choice; first occurrence
-of this specific approval blocker, not eligible for a blocked goal transition.
+- Candidate typecheck PASS; isolated suite 9 files / 138 tests PASS. After the
+  final missing-working-source boot guard, its saved/recovery test was rerun PASS,
+  including mounted recovery and exact original bytes. Candidate typecheck rerun PASS.
+- Root `npm run typecheck` PASS. `npm test -- --maxWorkers=2` ran all 105 files:
+  1,867 PASS, 21 existing TODO, and one existing CLI startup exceeded its 5-second
+  limit. That exact test passed alone in 992 ms with the same limit and no code
+  change. Do not describe the first full run as a clean pass.
+- `npm run build` PASS; existing chunk/import warnings unchanged. Targeted scan
+  confirms the saved-development storage namespace is absent from ordinary JS
+  output. No dependency, version, main, Pages or Service Worker source changes.
+- Independent read-only final review found two retained-descriptor ownership /
+  uncertain-write defects; both fixed and rechecked. Final missing-source refusal
+  also reviewed. No remaining blocker was found in this bounded code path.
+- Vite started at `127.0.0.1:5173`; existing host plus entry and saved modules
+  returned HTTP 200. This is transform/transport evidence only. The prescribed
+  Browser bootstrap still fails on `node:process` before browser selection. No
+  browser switch, settings bypass or actual input/storage/OPFS/IDB PASS is claimed.
+- Node tests retain each participant's base via test setup. They do not execute
+  the browser pair-manifest reopen; that real browser lane remains explicitly open.
+
+Next decision / exit: run the finite same-host saved-workflow batch in
+`tasks/uiux-handoff.md` through a working permitted browser lane (or the deferred
+human Chrome batch). Keep its exact resulting URL for reopen. Do not reopen the
+old journal tests or start another provider/probe while that UI evidence is missing.
+This is a code checkpoint, not completion of the overall product/UI goal. Usage
+remains above the PO's 10% pause threshold (last check: 55% remaining).
+
+### Previous decision — saved-development proposal (2026-09-10; approved above)
+
+At `2abb57a`, independent review separated G1 persistence experiments from full
+technology adoption. 05 §13.4 then proposed the explicit opt-in synthetic-only
+saved mode. PO approved it on 2026-09-11; this approval wait is closed.
+The earlier Browser bootstrap failure and computer-use surface exclusion gained
+no UI acceptance. Current implementation/evidence above supersedes that next-step
+proposal; do not reinstate a blanket adoption prerequisite for this experiment.
 
 ### Completed work — full development source through the durable service (2026-09-10)
 

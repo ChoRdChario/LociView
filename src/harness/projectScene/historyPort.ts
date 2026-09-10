@@ -41,6 +41,7 @@ export type DevelopmentHistoryFactory = (seed: Readonly<Record<string, string>>,
   validate: (snapshot: HistorySnapshot, previous?: HistorySnapshot) => void) => readonly [DevelopmentHistory, DevelopmentHistory];
 /** Serve-only verified pair. UI imports no candidate or provider implementation. */
 export interface VerifiedHistoryPort {
+  readonly storage?: 'saved-development';
   read(): HistorySnapshot & { readonly project: SyntheticProject };
   status(): Readonly<{ kind: 'idle' | 'checking' | 'failed'; error?: string }>;
   write(token: string, changes: Readonly<Record<string, string>>): Promise<HistorySnapshot>;

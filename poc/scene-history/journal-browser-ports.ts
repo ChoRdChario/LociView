@@ -9,19 +9,21 @@ import { OpfsIo } from '../cas-io/opfs-io';
 import { withRepoStorage } from './journal-repo';
 
 const AREA = 'lociview-isolated-journal-20260908';
+export const SAVED_AREA = 'lociview-synthetic-scene-20260911';
 export const runLock = (run: string) => `${AREA}:${run}:writer`;
 const absent = (error: unknown) => error instanceof DOMException && error.name === 'NotFoundError';
 export class BrowserFiles implements Files {
   private constructor(private readonly root: FileSystemDirectoryHandle) {}
-  static async open(run: string): Promise<BrowserFiles> {
+  static async open(run: string, areaName: typeof AREA | typeof SAVED_AREA = AREA): Promise<BrowserFiles> {
     transaction(run);
     require(typeof navigator.storage?.getDirectory === 'function' && navigator.locks, 'OPFS/ブラウザの保存ロックが必要です');
     const root = await navigator.storage.getDirectory();
-    const area = await root.getDirectoryHandle(AREA, { create: true });
+    require(areaName === AREA || areaName === SAVED_AREA, 'invalid development area');
+    const area = await root.getDirectoryHandle(areaName, { create: true });
     return new BrowserFiles(await area.getDirectoryHandle(run, { create: true }));
   }
   private async handle(key: string, create: boolean): Promise<FileSystemFileHandle | null> {
-    require(!/[^\x21-\x7e]/.test(key) && /^(?:(?:control|inventory|session|evidence)\.json|journal\/[0-9a-f]{32}\/(?:journal\.json|source-metadata\.am|changes\/[0-9]{8}\.amchange))$/.test(key), 'invalid browser file key');
+    require(!/[^\x21-\x7e]/.test(key) && /^(?:(?:control|inventory|session|evidence|pair|working)\.json|working\/[0-9a-f]{32}\.am|journal\/[0-9a-f]{32}\/(?:journal\.json|source-metadata\.am|original-source\.bin|artifacts\/[0-9a-f]{64}\.bin|changes\/[0-9]{8}\.amchange))$/.test(key), 'invalid browser file key');
     const names = key.split('/'); let directory = this.root;
     try {
       for (const name of names.slice(0, -1)) directory = await directory.getDirectoryHandle(name, { create });
@@ -67,15 +69,15 @@ export class BrowserPorts implements Ports {
   private owned = false;
   private constructor(readonly run: string, readonly files: BrowserFiles, readonly session: BrowserSession,
     private readonly storage: IndexedDBStorageAdapter, readonly casIo: OpfsIo, private readonly cas: CasCandidate,
-    readonly finalClosure: (doc: Doc) => Ref[]) {}
+    readonly finalClosure: (doc: Doc) => Ref[] | Promise<Ref[]>, private readonly saved = false) {}
   static async open(run: string, files: BrowserFiles, session: BrowserSession,
-    closure: (doc: Doc) => Ref[], storage = new IndexedDBStorageAdapter(`${AREA}-${run}`)): Promise<BrowserPorts> {
+    closure: (doc: Doc) => Ref[] | Promise<Ref[]>, storage = new IndexedDBStorageAdapter(`${AREA}-${run}`), saved = false): Promise<BrowserPorts> {
     transaction(run); decodeSession(jsonBytes(session));
-    const io = await OpfsIo.open(run);
-    return new BrowserPorts(run, files, session, storage, io, new CasCandidate(io), closure);
+    const io = await OpfsIo.open(run, saved);
+    return new BrowserPorts(run, files, session, storage, io, new CasCandidate(io), closure, saved);
   }
   fresh(): Promise<BrowserPorts> {
-    return BrowserPorts.open(this.run, this.files, this.session, this.finalClosure, this.storage);
+    return BrowserPorts.open(this.run, this.files, this.session, this.finalClosure, this.storage, this.saved);
   }
   async exclusive<T>(fn: () => Promise<T>): Promise<T> {
     return navigator.locks.request(runLock(this.run), { mode: 'exclusive', ifAvailable: true }, async lock => {
@@ -140,6 +142,8 @@ export class BrowserPorts implements Ports {
   async initialize(doc: Doc, initial: Ref[]) {
     require(this.owned && !await this.files.read('control.json', LIMIT.journal), 'already initialized or missing lease');
     validateRoot(doc, this.session.target); refs(initial);
+    const closure = await this.finalClosure(doc); refs(closure);
+    for (const ref of closure) require(initial.some(r => same(r, ref)) && await this.hasVerified(ref), 'initial closure not verified');
     await withRepoStorage(this.storage, () => this.owned, async backend => {
       this.session.documentId = parseAutomergeUrl(generateAutomergeUrl()).documentId;
       await backend.saveDoc(this.session.documentId as DocumentId, doc);

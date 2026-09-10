@@ -146,13 +146,14 @@ export function projectHistory(snapshot: HistorySnapshot, previous?: HistorySnap
   return freezeSynthetic(result);
 }
 export interface SyntheticAuthority {
+  readonly storage?: 'saved-development';
   read(): SyntheticProject;
   write(token: string, changes: Readonly<Record<string, string>>): WorkingResult<SyntheticProject>;
   status?(): Readonly<{ kind: 'idle' | 'checking' | 'failed'; error?: string }>;
   retry?(): WorkingResult<SyntheticProject>;
 }
 export function historyAuthority(history: WorkingHistory): SyntheticAuthority {
-  if ('status' in history) return { read: () => history.read().project,
+  if ('status' in history) return { storage: history.storage, read: () => history.read().project,
     write: (token, changes) => afterWorking(history.write(token, changes), () => history.read().project),
     status: () => history.status(), retry: () => afterWorking(history.retry(), () => history.read().project) };
   return { read: () => projectHistory(history.read()),

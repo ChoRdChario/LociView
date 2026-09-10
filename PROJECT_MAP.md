@@ -23,9 +23,11 @@ connects the complete existing development source to same-head managed/birth
 inspection and actual temporary-CAS verification. Original parts survive local
 editing, interruption/reopen and replay under an explicit candidate-only flat
 profile. This does not connect durable UI, real conversion or product wire.
-The finite next decision is now proposed in 05 §13.4: PO confirmation for an
-opt-in synthetic-only saved-development mode in the same host. No new provider/
-probe campaign or product adoption is implied. Measured requirements remain separate. See
+PO approved 05 §13.4's opt-in synthetic-only saved-development mode on 2026-09-11.
+The same host now connects the journal-backed pair, exact retained retry and
+published-head recovery, with dedicated development OPFS/IDB wiring. Default
+memory mode and ordinary home stay unchanged. Node/mounted evidence is separate
+from still-pending actual browser storage/input; no product adoption is implied. See
 `tasks/todo.md` top. No old journal rerun or immediate human test.
 
 2026-09-10: PO reports the five prescribed camera/pin/window manual groups PASS
