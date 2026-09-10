@@ -11,6 +11,15 @@
 > (`node:process` unavailable); no real browser storage/input PASS. Current todo
 > owns final executed evidence and the next finite exit; usage 55% left.
 
+> **Saved-entry correction (2026-09-11, after `43a06e4`):** PO's browser failed
+> before evaluating the saved module. The journal's full Automerge browser entry
+> pulled raw Wasm ESM unsupported by root Vite; entry HTTP 200 had not tested its
+> dependencies. The shared import now uses the already-initialized slim API;
+> Node initialization is test-only. The client-HTTP graph regression fails before
+> and passes after the correction; saved/reopen tests also pass. Keep the same
+> saved URL and reload, without data deletion or recreation. This fixes module
+> transport, not proof of actual browser storage/input; current todo owns checks.
+
 > **Current continuation (2026-09-10, after readiness `77a22b0`):** PO approved
 > keeping unplaced Captions editable. Specification 05 §9.4 defines the proposed
 > atomic mapping and late-input rules; 06 §§4.1/5.1/8–9 define base evidence,

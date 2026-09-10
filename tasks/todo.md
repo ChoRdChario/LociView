@@ -11,6 +11,40 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — isolated saved-development host (2026-09-11)
 
+#### Correction — saved entry dependency loading (2026-09-11)
+
+PO screenshot at `43a06e4` fails before the saved module evaluates. The Vite log
+shows unsupported raw Wasm ESM integration; the entry module itself still returns
+200. The full Automerge import in the journal chain selects a browser bundler
+entry, unlike the existing explicitly initialized slim development runtime.
+
+- [x] Reproduce the transitive import/server error without touching saved data.
+- [x] Use the existing explicit Wasm initialization path for the shared candidate;
+  preserve Node-test and old isolated-browser startup, without new dependencies.
+- [x] Check the transitive served module graph/Wasm URL and regression evidence,
+  obtain independent review, and update the handoff with the exact limitation.
+
+This fixes the approved saved host, not schema/storage or product adoption. Keep
+the existing saved URL and data. Do not reset a run, clear browser data, add a
+Wasm plugin or change ordinary Pages/PWA configuration to hide the failure.
+Acceptance: no raw Wasm module in this served entry graph; required URLs load,
+existing commands/tests remain valid. Real browser evaluation remains distinct.
+
+The shared journal now imports the slim API already initialized by both browser
+hosts. Node-only tests initialize it in an isolated setup file. A new actual
+client-HTTP graph regression reproduces the raw-Wasm failure before the fix and
+passes afterward, following the saved dynamic entry and checking the Wasm asset
+bytes. It uses a separate optimizer cache and closes its own loopback server.
+The user's existing server remains available; its journal module now resolves
+the slim entry. No saved run or browser data was reset. Independent read-only
+review found no remaining scoped blocker. Focused checks: 4 files / 25 tests PASS
+(module graph, saved workflow, Repo reopen and package purposes); candidate and
+root typechecks PASS. Root `npm test -- --maxWorkers=1`: 105 files / 1,868 PASS,
+21 existing TODO, no failure. `npm run build` PASS through Workbox completion,
+with the existing chunk/import warnings. Diff whitespace check PASS. The running
+5173 host serves the slim module and actual Wasm bytes (200 / Wasm magic checked),
+not an HTML fallback. Actual saved-mode browser evaluation is still unverified.
+
 PO approved the opt-in addition in 05 §13.4. Start clean `2c27890`, ahead 7 /
 behind 0 against tracked origin; account remaining 56%. Root is the sole writer.
 The next slice connects the existing screen to saved synthetic histories, not

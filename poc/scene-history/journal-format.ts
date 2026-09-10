@@ -1,5 +1,6 @@
 // Disposable protocol adapter, NOT a production ProjectDocV2 schema/validator.
-import * as A from '@automerge/automerge';
+// Browser hosts initialize the pinned Wasm explicitly; do not import the bundler's raw Wasm entry.
+import * as A from '@automerge/automerge/slim';
 import { NativeSha256 } from '../../src/nativeGs/sha256';
 import { parseJsonWithoutDuplicateMembers } from '../../src/core/json';
 import { readFlatAtomicHistory } from './atomic-read';
