@@ -11,7 +11,70 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — approved S1 service entry (2026-09-11)
 
-#### Active persistence slice (2026-09-11)
+#### Browser-host connection — implemented, real-browser acceptance pending (2026-09-11)
+
+Start clean `6a9c2ed`. Connect the approved service to a fresh synthetic-only
+namespace in the same development entry; keep old `storage=saved` runs intact.
+
+- [x] Specify exact fixture/inventory/browser/host acceptance before editing.
+- [x] Add atomic title+body command and actual OPFS/IndexedDB/Web Locks wiring.
+- [x] Construct only the two existing known model/Caption/Scene fixtures; publish
+  verified body inventory and reuse persistent content facts on cold reopen.
+- [x] Reuse existing viewport, Scene list, filters, windows and text editor through
+  a limited authority. Unconnected mutations fail closed, including Shift+click.
+- [x] Verify cold reopen, retry, read-only second opener, disposal and dependency
+  loading with existing test seams; attempt Browser, record honest limitations.
+- [x] Independent review, root matrix, docs and checkpoint; continue in scope without
+  renewed PO approval. No old-run conversion, real data, wire, new dependency,
+  physical-iOS/PWA claim, main, Pages/SW or deployment.
+
+The Browser skill bootstrap currently fails before browser selection with
+`node:process` unavailable. Do not claim raster/input/device PASS or substitute
+an unapproved automation surface. This does not block host implementation and
+mounted/port/HTTP checks; collect any necessary human browser batch only after
+the actionable connection is ready.
+
+Review: the same development entry now offers `新しい保存方式を試す`, a new
+`storage=metadata` run. It mounts the existing Scene/Caption interface over the
+production-quality S1 service, not the PoC pair. Title+body Apply is one original
+change and journal. Other authoring remains available in the old modes but is
+explicitly unconnected in this new mode. No existing data is converted or deleted.
+Four added host tests exercise the mounted recorded DOM plus memory-backed ports:
+atomic Apply/cold reopen, read-only second opener and close refusal, original-byte
+retry after publication failure, and cold initialization recovery without reseeding.
+They are not physical OPFS/IndexedDB, native input, page-termination or iOS evidence.
+The existing HTTP import-graph regression now traverses both saved entries and
+local Wasm; PASS. One initial command used a nonexistent test config and did not
+run tests; the corrected existing journal config passed. No failure is credited.
+Independent review closed non-creating DB-open race protection, BFCache reload,
+read-only recovery refresh and exact import allowlists; no scoped blocker remains.
+The first full run had two host-test polling timeouts under parallel load, not a
+storage assertion failure. Replace short polling with the existing acknowledgment
+subscription and a bounded test-case timeout; keep saved-state assertions intact.
+The final full run below, not that failed run, determines the result.
+Final verification: typecheck PASS; ordinary production build PASS (unchanged
+mixed-import/large-chunk warnings); root 109 files / 1,900 PASS / 21 TODO, exit 0.
+The 1,000 ms polling deadline is gone; tests await the actual completion notice.
+HTTP graph PASS (both modes/local Wasm), `git diff --check` PASS. Ordinary build
+still contains no new metadata development entry. No private source input was
+read or added. No server/tunnel was left running by this slice. Commit only the
+listed source/tests/docs; push is not necessary for this local connection checkpoint.
+Remaining account usage was 46%; this is not a usage-based stop.
+
+Next finite implementation boundary: extend typed command routing in this same
+new host to already-approved editing operations (pin/Scene/model membership),
+reusing its original-change/journal/acknowledgment path. Specify the exact command
+allowlist and acceptance before each extension. Do not add another storage probe,
+invent package policy, ask to approve S1 again, or reopen old passed PO tests.
+Human browser checks are batched in uiux-handoff; do not require per-button replies.
+Real-data/product activation, full G1-A/C, wire/migration and iOS remain separate.
+
+Short meta-audit: `6a9c2ed`, branch `g0-baseline`, tracked origin ahead 14 / behind 0
+at start. This slice closes source-to-existing-editor wiring, not another auxiliary
+gate campaign. No dependency, public sample, old save, main/Pages/SW configuration,
+tunnel or deployment change. Full product completion remains TEAM-FLOW-01.
+
+#### Completed preceding persistence slice (2026-09-11)
 
 Start clean `d4d665d` on `g0-baseline`. The approved order still closes a missing
 product storage boundary, not another probe. Root writes; independent reviewers

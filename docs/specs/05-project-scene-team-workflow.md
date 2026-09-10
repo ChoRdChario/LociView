@@ -1297,6 +1297,50 @@ missing/suspect inventory. Use existing synthetic fixtures and injected storage
 faults. Browser OPFS/IndexedDB wiring, physical iOS, arbitrary untrusted binary
 resource isolation, remote exchange and full S1/TEAM-FLOW-01 remain unclosed.
 
+**S1 new synthetic browser host — implementation contract (2026-09-11):**
+
+Use the existing `dev.html?mode=project-scene` entry with a separate explicit
+`storage=metadata` option and fresh technical run identity. Never load/convert
+the old saved pair or activate ordinary home. A dedicated OPFS root, IndexedDB
+database and project-lifetime Web Lock isolate each new run. Existing database
+presence is checked before constructing the pinned adapter (whose constructor
+can create storage). Missing/partial storage is visible repair, not reseeding.
+New creation requires an empty dedicated root; an initial immutable fixture
+descriptor precedes body preparation. Creation interruption before a metadata
+journal may resume only that exact retained descriptor/known body plan.
+
+The initial records derive independently from the existing two-Scene/two-model/
+two-Caption fixture and empty remaining collections. Only exact original triangle
+bodies and their existing declared profile are admitted. The application writes
+and checks their full BlobRefs and byte digests before publishing immutable local
+inventory receipts. Current inventory/presence checks read those receipts and
+body file sizes; cached content facts still revalidate exact immutable records
+and verifier version. No new generic decoder or media input is implied.
+
+Reuse `createDevelopmentWorkspace` with a narrow `SyntheticAuthority`, not the
+PoC flat-history/pair interface. Its synchronous view is the last verified
+published provider. Title and body edited together form one original command
+and one transaction; they are not separately saved under one Apply acknowledgment.
+Scene navigation, camera presets, selection/filtering and comparison windows
+remain local viewing operations. This initial saved-service mode exposes only
+Caption text writes; color changes, pin/model edits, Scene authoring, material,
+media, Saved View authoring and exchange are labelled unconnected and rejected
+at handler/authority boundaries. Existing memory/old saved modes retain them.
+This temporary activation limit does not delete any product requirement.
+
+The exclusive editor may activate only after fresh saved-state inspection.
+A second opener is read-only and never seeds or retries writes. Pending changes
+retain old display and explicit recovery; no fake fixture view replaces a
+missing provider. Disposal stops new work, drains tracked writes and releases
+the lease; pagehide never promises an asynchronous save completed. Unapplied
+drafts, active saves and pending recovery retain navigation warnings.
+
+Acceptance combines mounted existing UI with the production service, independent
+storage opens, exact dual-field transaction/retry, changed-field persistence,
+read-only refusal, cold zero-body verification and local Wasm/module loading.
+Browser input/raster, physical iOS and offline/PWA evidence remain separately
+required, not inferred from HTTP or memory-backed port tests.
+
 ### 13.3 Approved scheduling exception — validators and UI components (2026-09-08)
 
 The PO explicitly approved advancing storage-neutral data validation and reusable

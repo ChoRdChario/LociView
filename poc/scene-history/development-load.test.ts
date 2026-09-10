@@ -12,7 +12,7 @@ it('serves the complete saved-development client import graph with explicit Wasm
     const address = server.httpServer!.address();
     if (!address || typeof address === 'string') throw Error('missing development listener');
     const origin = `http://127.0.0.1:${address.port}`;
-    const queue = ['/poc/scene-history/development-browser.ts'], visited = new Set<string>();
+    const queue = ['/poc/scene-history/development-browser.ts', '/src/harness/projectScene/metadataBrowser.ts'], visited = new Set<string>();
     let wasmAssets = 0;
     while (queue.length) {
       const url = new URL(queue.shift()!, origin).href;
@@ -51,6 +51,7 @@ it('serves the complete saved-development client import graph with explicit Wasm
     }
     expect([...visited].some(url => url.includes('/development-saved-browser.ts'))).toBe(true);
     expect([...visited].some(url => url.includes('/journal-format.ts'))).toBe(true);
+    expect([...visited].some(url => url.includes('/src/projectMetadata/session.ts'))).toBe(true);
     expect(wasmAssets).toBeGreaterThan(0);
   } finally { await server.close(); }
 }, 60_000);

@@ -236,8 +236,9 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
       const source = readFileSync(path, 'utf8');
       const metadataFoundation = /[\\/]projectMetadata[\\/](format|source)\.ts$/.test(path);
       const metadataService = /[\\/]projectMetadata[\\/](persistence|repository|journal|contentEvidence|session)\.ts$/.test(path);
-      // 05 §13.2 permits these services, but no incoming ordinary/saved-host activation.
-      if (!metadataFoundation && !metadataService) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectMetadata\//);
+      // 05 §13.2 permits this exact new synthetic host, never ordinary/old saved activation.
+      const metadataHost = /[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host)\.ts$/.test(path);
+      if (!metadataFoundation && !metadataService && !metadataHost) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectMetadata\//);
       if (/[\\/](scene|domain)[\\/]/.test(path)) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
         const providerImports = path.replaceAll('\\', '/').endsWith('/scene/projectProvider.ts') ? [
@@ -265,6 +266,21 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         const name = path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '');
         expect(imports.every(p => byFile[name]!.includes(p!)), path).toBe(true);
         expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
+      } else if (/[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Browser)\.ts$/.test(path)) {
+        const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
+        const byFile: Record<string, string[]> = {
+          metadataFixture: ['./fixture', './modelFixture', './modelClosure', '../../domain/values', '../../scene/projectProvider',
+            '../../scene/types', '../../projectMetadata/source', '../../projectMetadata/persistence'],
+          metadataStorage: ['../../platform/fs', '../../domain/projectContentChecks', '../../domain/values', '../../projectMetadata/contentEvidence',
+            '../../projectMetadata/source', '../../projectMetadata/persistence', './metadataFixture'],
+          metadataHost: ['../../platform/fs', '../../platform/projectLock', '../../projectMetadata/session', '../../projectMetadata/repository',
+            '../../projectMetadata/persistence', '../../projectMetadata/journal', './metadataFixture', './metadataStorage', './historyProjection'],
+          metadataBrowser: ['@automerge/automerge/slim', '@automerge/automerge/automerge.wasm?url', '@automerge/automerge-repo-storage-indexeddb',
+            '../../platform/opfs', '../../platform/projectLock', './metadataHost', './session', './workspace', './viewport'],
+        };
+        const name = path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '');
+        expect(imports.every(p => byFile[name]!.includes(p!)), path).toBe(true);
+        if (name !== 'metadataBrowser') expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
       } else if (/[\\/]ui[\\/]projectScene[\\/]/.test(path)) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
         // 05 §13.3 permits the existing side-effect-free presentation helper,

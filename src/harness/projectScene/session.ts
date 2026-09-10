@@ -46,7 +46,7 @@ const unknown = <T>(): Field<T> => ({ kind: 'unresolved', reason: 'invalid' });
 const emptyMemory = (): SceneUiMemory => Object.freeze({ selectedCaptionId: null, listScrollTop: 0,
   search: '', pinColors: null, ownerFilter: { kind: 'all' as const } });
 
-/** Development-only state. Optional isolated memory-history authority; never durable save. */
+/** Development-only UI state. Optional authority owns memory or confirmed saved history. */
 export class SyntheticSession {
   readonly acknowledgment = new WorkingAcknowledgment();
   readonly views = new SyntheticViewSession(() => this.project, () => this.sceneId,
@@ -89,6 +89,9 @@ export class SyntheticSession {
   }
   get snapshot() { return this.project; }
   get savedDevelopment() { return this.authority?.storage === 'saved-development'; }
+  get captionTextOnly() { return this.authority?.writeScope === 'caption-text'; }
+  get readOnly() { return this.authority?.readOnly === true; }
+  get editingRestriction() { return this.readOnly ? 'このタブは閲覧専用です。' : this.captionTextOnly ? 'この保存経路ではタイトル・本文だけを編集できます。' : null; }
   get savedStatus() { return this.authority?.status?.(); }
   get workingBlock() { return this.acknowledgment.block ?? (this.savedStatus?.kind === 'failed' ?
     this.savedStatus.error ?? '未完了の保存があります。更新を再試行してください。' : null); }
@@ -251,6 +254,7 @@ export class SyntheticSession {
       }) }, memory: this.includes.get(this.sceneId)!, pending: this.pending, mutationBlock: null, feedback: this.includeFeedback };
   }
   acceptInclude(plan: CaptionIncludePlan): boolean {
+    if (this.editingRestriction) return this.refuse(this.editingRestriction);
     const failed = (error: unknown) => { this.includeFeedback = { kind: 'failed', message: this.errorText(error) }; this.refuse(this.errorText(error)); };
     try {
       if (this.workingBlock) throw new Error(this.workingBlock);
@@ -276,7 +280,7 @@ export class SyntheticSession {
     if (source.kind === 'ready' && !this.drafts.has(source.caption.id))
       this.drafts.set(source.caption.id, beginCaptionDraft(source)!);
     const draft = source.kind === 'ready' ? this.drafts.get(source.caption.id)! : null;
-    return { source, draft, mutationBlock: this.workingBlock ?? (this.windowDragging ? 'ウィンドウの移動を終えてください。' : this.placement ? 'モデルの配置を確定するか、取り消してください。' :
+    return { source, draft, readonlyFields: this.captionTextOnly ? ['color'] : [], mutationBlock: this.workingBlock ?? (this.readOnly ? 'このタブは閲覧専用です。' : this.windowDragging ? 'ウィンドウの移動を終えてください。' : this.placement ? 'モデルの配置を確定するか、取り消してください。' :
       this.pinInput ? 'ピンの操作を確定するか、取り消してください。' : null), feedback: this.detailFeedback };
   }
   modelContext(): ModelListContext {
@@ -337,6 +341,7 @@ export class SyntheticSession {
   }
   get modelPlacement() { return this.placement; }
   beginModelPlacement(): boolean {
+    if (this.editingRestriction) return this.refuse(this.editingRestriction);
     const ctx = this.modelUpdateContext();
     if (this.pending || ctx.issue || !ctx.current || !ctx.assetId) return this.refuse(ctx.issue ?? '入力を確定し、モデルを選択してください。');
     this.placement = freezeSynthetic({ token: ctx.token, sceneId: this.sceneId, assetId: ctx.assetId, source: ctx.current.closure,
@@ -406,6 +411,7 @@ export class SyntheticSession {
     return { mode, input: this.pinInput, families: version?.families ?? [], needsFamily };
   }
   pinSurfaceTarget(ignorePending = false, duringGizmo = false): PinSurfaceTarget | null {
+    if (this.editingRestriction) return null;
     if (!ignorePending && (this.workingBlock || this.textPending || this.pinInputComposing || (!duringGizmo && this.viewportDragging) || this.windowDragging)) return null;
     const context = this.pinContext(), mode = context.memory.mode;
     if (!mode || context.source.kind !== 'ready') return null;
@@ -414,12 +420,14 @@ export class SyntheticSession {
     return this.surfaceTarget(target.assetId);
   }
   pinShortcutTarget(): PinSurfaceTarget | null {
+    if (this.editingRestriction) return null;
     const context = this.pinContext();
     return !context.memory.mode && !pinActionIssue(context, 'add') && context.memory.addTargetId
       ? this.surfaceTarget(context.memory.addTargetId) : null;
   }
   /** Exact eligible models for a user-selected visible surface; no chosen owner yet. */
   pinCreationTargets(): readonly PinSurfaceTarget[] {
+    if (this.editingRestriction) return [];
     const context = this.pinContext();
     if (context.source.kind !== 'ready' || context.memory.mode || this.workingBlock || context.otherPending ||
       this.pinInputComposing) return [];
@@ -485,6 +493,7 @@ export class SyntheticSession {
     this.pinFeedback = { kind: 'idle' }; return true;
   }
   acceptPin(plan: PinModePlan): boolean {
+    if (this.editingRestriction) return this.refuse(this.editingRestriction);
     const failed = (error: unknown) => { this.pinFeedback = { kind: 'failed', message: this.errorText(error) }; this.refuse(this.errorText(error)); };
     try {
       if (this.workingBlock) throw new Error(this.workingBlock);
@@ -602,11 +611,12 @@ export class SyntheticSession {
       const changes = Object.fromEntries(Object.entries(event.changes).map(([field, text]) => [captionKey(old.id, field as 'title' | 'body' | 'color'), text!]));
       return this.applyWorking(() => this.writeProject(event.token, changes, local), () => {
         this.drafts.set(old.id, acceptCaptionApply(event, context.draft!, this.detailSource()));
-        this.detailFeedback = { kind: 'idle' }; this.message = '変更を適用しました。このページ内だけの変更です。';
+        this.detailFeedback = { kind: 'idle' }; this.message = this.savedDevelopment ? '変更を保存しました。' : '変更を適用しました。このページ内だけの変更です。';
       }, failed);
     } catch (error) { failed(error); return false; }
   }
   acceptModel(plan: ModelListPlan): boolean {
+    if (this.editingRestriction && plan.kind !== 'change') return this.refuse(this.editingRestriction);
     if (this.workingBlock) return this.refuse(this.workingBlock);
     if (plan.kind === 'blocked') return this.refuse(plan.reason);
     if (!modelListPlanIsCurrent(plan, this.modelContext())) return this.refuse('所属状態が変わっています。選び直してください。');

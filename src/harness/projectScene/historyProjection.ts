@@ -147,6 +147,8 @@ export function projectHistory(snapshot: HistorySnapshot, previous?: HistorySnap
 }
 export interface SyntheticAuthority {
   readonly storage?: 'saved-development';
+  readonly writeScope?: 'caption-text';
+  readonly readOnly?: boolean;
   read(): SyntheticProject;
   write(token: string, changes: Readonly<Record<string, string>>): WorkingResult<SyntheticProject>;
   status?(): Readonly<{ kind: 'idle' | 'checking' | 'failed'; error?: string }>;

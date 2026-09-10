@@ -127,7 +127,7 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
       const issue = captionDraftFieldIssue(next, field);
       // Validation errors stay editable; source conflicts/stale baselines stay explicit.
       const unavailable = current?.kind !== 'value';
-      control.input.readOnly = owned?.composing !== field && (!owned || unavailable || next.mutationBlock !== null || inFlight);
+      control.input.readOnly = owned?.composing !== field && (!owned || unavailable || next.mutationBlock !== null || inFlight || !!next.readonlyFields?.includes(field));
       control.note.textContent = [issue, raw !== undefined && issue && '入力内容は未適用です。'].filter(Boolean).join(' ');
       control.note.hidden = !control.note.textContent;
       control.review.hidden = !issue || source.kind !== 'ready';

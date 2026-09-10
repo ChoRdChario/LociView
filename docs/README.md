@@ -73,8 +73,11 @@ shortcut. The new Repository/Session/journal now connects that source to fenced
 Repo storage, independent stored readback and marker-last publication, with exact
 retained retry. Persistent immutable content facts exclude the metadata token and
 require current inventory/presence. Synthetic memory-port tests cover this service;
-browser storage/inventory host wiring, physical iOS and UI activation remain
-pending. Source-only `reopen` itself is still not a saved-workspace receipt.
+the new `storage=metadata` development mode now wires OPFS/IndexedDB/Web Locks,
+exact synthetic-body inventory and the existing title/body editor to that service.
+Old saved runs and ordinary home remain unchanged. Actual browser/input and
+physical iOS evidence remain pending; source-only `reopen` itself is still not a
+saved-workspace receipt. Current todo owns the remaining typed-command connection.
 
 Current readiness review (2026-09-10): `tasks/todo.md` top separates approved
 outcomes, exact wire/migration design gaps and remaining storage/device evidence.

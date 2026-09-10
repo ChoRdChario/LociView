@@ -32,6 +32,7 @@ export interface DetailContext {
   readonly source: DetailSource;
   readonly draft: CaptionDraft | null;
   readonly mutationBlock: string | null;
+  readonly readonlyFields?: readonly CaptionEditField[];
   readonly feedback: DetailFeedback;
 }
 export const hasCaptionDraft = (draft: CaptionDraft | null): boolean =>
@@ -97,6 +98,7 @@ export function captionApplyIssue(context: DetailContext): string | null {
   if (count.kind !== 'value' || !Number.isSafeInteger(count.value) || count.value < 1)
     return '影響するシーンを確認してください。';
   for (const field of Object.keys(context.draft.edits) as CaptionEditField[]) {
+    if (context.readonlyFields?.includes(field)) return 'この項目の編集は未接続です。';
     const issue = captionDraftFieldIssue(context, field); if (issue) return issue;
   }
   return Object.keys(context.draft.edits).length ? null : '変更はありません。';

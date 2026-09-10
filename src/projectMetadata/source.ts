@@ -93,11 +93,16 @@ export class ProjectMetadataSource {
 
   /** Prepared, NOT saved. Session still needs full-provider/lease/journal authority. */
   async prepareCaptionText(expectedToken: string, captionId: string, field: 'title' | 'body', text: string, transactionId?: string): Promise<ProjectMetadataSource> {
+    return this.prepareCaptionTexts(expectedToken, captionId, { [field]: text }, transactionId);
+  }
+  /** A single Apply may edit both text fields, but still creates one original change. */
+  async prepareCaptionTexts(expectedToken: string, captionId: string, input: Readonly<Partial<Record<'title' | 'body', string>>>, transactionId?: string): Promise<ProjectMetadataSource> {
     if (expectedToken !== this.token) fail('stale-token');
-    if (!['title', 'body'].includes(field)) fail('caption-field');
+    const edits = cloneCanonicalValue(input, this.limits) as JsonObject, names = Object.keys(edits);
+    if (!names.length || names.some(field => !['title', 'body'].includes(field))) fail('caption-field');
     const inspection = await inspectProjectCandidates(this.read(), this.limits);
     if (inspection.kind !== 'project-candidate-inspection') return fail('candidate-read');
-    const required = ['id', 'lifecycle', field];
+    const required = ['id', 'lifecycle', ...names];
     for (const name of required) {
       const f = inspection.fields.find(f => f.path.join('/') === `captionsById/${captionId}/${name}`);
       if (!f?.valid || f.candidates.length !== 1) return fail('caption-unresolved');
@@ -107,11 +112,10 @@ export class ProjectMetadataSource {
     }
     if (inspection.issues.some(i => i.path[0] === 'captionsById' && i.path[1] === captionId &&
       (i.path.length === 2 || required.includes(i.path[2]!)) && ['invalid', 'review', 'orphan'].includes(i.kind))) fail('caption-unresolved');
-    const value = cloneCanonicalValue(text, this.limits);
-    checkMutableField(new ProjectRecordFields(), 'captionsById', field, value);
+    for (const field of names) checkMutableField(new ProjectRecordFields(), 'captionsById', field, edits[field]!);
     if (transactionId !== undefined && !/^[0-9a-f]{32}$/.test(transactionId)) fail('transaction-id');
     const doc = A.change(A.clone(this.doc), transactionId ? { message: `lociview:transaction:v1:${transactionId}` } : {},
-      draft => { draft.captionsById[captionId][field] = scalar(value, this.limits); });
+      draft => { for (const field of names) draft.captionsById[captionId][field] = scalar(edits[field]!, this.limits); });
     return ProjectMetadataSource.validated(doc, this.proof, this.limits);
   }
 }

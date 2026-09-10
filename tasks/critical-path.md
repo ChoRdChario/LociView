@@ -396,10 +396,12 @@ The S1 scheduling approval and prior Desktop acceptance remain valid.
 The source-adapter foundation and Repository/Session now connect empty-root
 creation, original Caption commands, retained journal/retry and marker-last
 publication on synthetic memory storage ports. Persistent content facts require
-fresh inventory/presence and do not reuse a stale metadata token. The next exit
-is actual browser storage/inventory wiring in the existing host for new synthetic
-workspaces, not another source/probe campaign. No old saved history is converted;
-browser/device/adoption evidence remains distinct from these service tests.
+fresh inventory/presence and do not reuse a stale metadata token. New synthetic
+`storage=metadata` host wiring now exists: OPFS/IndexedDB/Web Locks, immutable
+fixture inventory and existing editor with atomic title/body Apply. No old saved
+history is converted. Mounted memory-port and HTTP tests do not establish actual
+browser/device/adoption acceptance. Next connect remaining approved typed edits
+through this same service; batch browser evidence, not another source/probe campaign.
 
 The ten latest executable commits through `d8f52d1` implement reusable Scene,
 record-admission and four-tab UI parts, with source-isolation tests deliberately

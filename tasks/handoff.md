@@ -1,5 +1,20 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **Latest connection (2026-09-11, after `6a9c2ed`):** the same development entry
+> offers `新しい保存方式を試す`, a new synthetic-only `storage=metadata` run.
+> Dedicated OPFS/IndexedDB/Web Locks and fixture inventory connect the S1 service
+> to the existing editor; title+body Apply produces one original change/journal.
+> Old saved runs and ordinary home are untouched. Four host tests cover mounted
+> recorded DOM/memory-port save, cold reopen, readonly/close and exact retry.
+> HTTP dependency/Wasm regression passes. Independent review findings are fixed.
+> Final checks: typecheck/build PASS; 109 files / 1,900 PASS / 21 TODO. Two initial
+> full-suite polling timeouts were replaced with actual completion notifications;
+> the final complete run is clean. No dependency, public data or deploy change.
+> Browser bootstrap still fails before selection (`node:process` unavailable),
+> so actual input/raster/OPFS/IDB/iOS remains pending. Current todo owns final
+> matrix and next typed-command extension; uiux-handoff owns one later manual
+> batch. Do not request S1 approval again or repeat the closed old saved-host tests.
+
 > **Latest implementation (2026-09-11, after `d4d665d`):** the new-workspace service
 > connects original initialization/Caption commands to fenced pinned-Repo storage,
 > an exact retained journal and marker-last publication. Independent stored reopen,

@@ -66,9 +66,13 @@ export class MetadataProjectSession {
   }
 
   async create(records: { schema: JsonObject; identity: JsonObject } & JsonObject): Promise<MetadataSessionRead> {
+    return this.createFromSource(ProjectMetadataSource.bootstrap(records.schema, records.identity, this.limits).initialize(records));
+  }
+  /** Host-retained initialization originals; never a package importer. */
+  async createFromSource(source: ProjectMetadataSource): Promise<MetadataSessionRead> {
     return underWriteLease(this.fs, async () => {
       if ((await this.read()).state !== 'empty') fail('workspace-not-empty');
-      const source = ProjectMetadataSource.bootstrap(records.schema, records.identity, this.limits).initialize(records);
+      if (source.originalChanges().length !== 2) fail('initialization-source');
       const transactionId = newId();
       this.retained = { start: { transactionId, repositoryId: transactionId, predecessor: null,
         purpose: 'initialize', proof: source.proof, baseHeads: [] }, parts: source.originalChanges() };
@@ -78,6 +82,9 @@ export class MetadataProjectSession {
   }
 
   async editCaption(expectedToken: string, captionId: string, field: 'title' | 'body', text: string): Promise<MetadataSessionRead> {
+    return this.editCaptionTexts(expectedToken, captionId, { [field]: text });
+  }
+  async editCaptionTexts(expectedToken: string, captionId: string, edits: Readonly<Partial<Record<'title' | 'body', string>>>): Promise<MetadataSessionRead> {
     return underWriteLease(this.fs, async () => {
       const read = await this.read();
       if (read.state !== 'ready' || !read.source || read.source.token !== expectedToken) return fail('command-not-ready');
@@ -86,7 +93,12 @@ export class MetadataProjectSession {
       if (!durable || durable.token !== read.source.token) return fail('command-base-changed');
       await this.checked(durable, false);
       const transactionId = newId();
-      const prepared = await durable.prepareCaptionText(expectedToken, captionId, field, normalizeCaptionText(field, text), transactionId);
+      const normalized: Partial<Record<'title' | 'body', string>> = {};
+      for (const [field, text] of Object.entries(edits)) {
+        if ((field !== 'title' && field !== 'body') || typeof text !== 'string') return fail('caption-field');
+        normalized[field] = normalizeCaptionText(field, text);
+      }
+      const prepared = await durable.prepareCaptionTexts(expectedToken, captionId, normalized, transactionId);
       const known = new Set(durable.originalChanges().map(b => A.decodeChange(b).hash));
       const parts = prepared.originalChanges().filter(b => !known.has(A.decodeChange(b).hash));
       if (!parts.length) return read; // An unchanged value has no storage transaction.

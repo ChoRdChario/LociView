@@ -23,9 +23,13 @@ fenced pinned-Repo repository, retained journal, Caption command session and
 marker-last publication. Persistent content facts are keyed independently of
 metadata tokens and rechecked against the supplied durable-inventory port.
 Synthetic memory-port tests cover independent stored reopen, exact retry, old
-published-head isolation and cold fact reuse. Browser OPFS/IndexedDB and real
-inventory/profile host wiring remain next; no ordinary/saved-host activation,
-physical-device evidence or storage adoption follows from these service tests.
+published-head isolation and cold fact reuse. The same development entry now
+offers `新しい保存方式を試す` (`storage=metadata`): dedicated OPFS/IndexedDB/Web
+Locks wiring plus exact synthetic-body inventory, mounting the existing UI with
+atomic title/body saving. The old saved pair and ordinary home are unchanged.
+Mounted memory-port and HTTP dependency tests pass; actual browser/device/storage
+adoption remains unverified. Next extend approved typed editing commands in this
+same host; see todo for the finite boundary and uiux-handoff for batched checks.
 
 Current task (2026-09-10, after readiness checkpoint `77a22b0`): PO approved
 unplaced-Caption preservation. Specification 05 §9.4 proposes its exact atomic
