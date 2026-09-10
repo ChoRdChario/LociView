@@ -1258,10 +1258,15 @@ team workspace and acknowledgment controls. The default mode remains memory-only
 Node-backed saved-driver tests cover two rounds, explicit choices, original-byte
 reopen/replay, pre-prepared/durable interruption, mounted recovery, descriptor
 replacement failure and uncertain cleanup response. They do not execute the
-browser pair manifest or prove actual OPFS/IndexedDB persistence. Browser input,
-initialization/reopen and physical-device acceptance remain pending; the current
-permitted browser-control bootstrap fails before selection. No product adoption,
-general file exchange or offline/PWA claim follows from this code checkpoint.
+browser pair manifest or prove actual OPFS/IndexedDB persistence. The permitted
+browser-control bootstrap failed before selection. Separately, after the module
+loading correction at served `f341833`, the PO reported all four prescribed
+Desktop groups PASS: distinct-field edits/two-way receive, same-URL reopen for
+both participants, explicit concurrent-title selection/propagation, and replay
+with unchanged content/count followed by final reopen. This closes the limited
+manual saved-host batch, not host fault injection, cross-tab/process behavior,
+physical-device acceptance or full `TEAM-FLOW-01`. No product adoption, general
+file exchange or offline/PWA claim follows from this receipt.
 
 **PO-approved Scene-first interaction amendment (2026-09-10, from `4ad055c`):**
 in the same synthetic development host, replace required model preselection for

@@ -81,8 +81,10 @@ activation; exact wire/profile/whole-converter and adoption inputs remain open.
 05 §13.4's finite intermediate step was PO-approved on 2026-09-11: explicit opt-in
 synthetic-only save/reopen in the same development host. The journal-backed pair,
 separate retained bases, acknowledged-head UI and exact retry now connect to
-dedicated development OPFS/IDB ports. Node/mounted checks are not browser storage
-or input acceptance; this does not adopt a product format or pass a technology gate.
+dedicated development OPFS/IDB ports. Node/mounted checks are distinct from the
+subsequent PO-reported four-group Desktop PASS at served `f341833`: text exchange,
+both-participant reload, explicit title choice and replay/final reload. This
+closes that saved-host batch, not faults, devices, offline or a technology gate.
 No ordinary-runtime change or renewed unplaced-preservation question.
 
 2026-09-10: PO reports the five prescribed camera/pin/window groups PASS at

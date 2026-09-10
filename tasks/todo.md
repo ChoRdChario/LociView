@@ -11,6 +11,29 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — isolated saved-development host (2026-09-11)
 
+#### PO-reported Desktop acceptance — four saved-workflow groups PASS (2026-09-11)
+
+At served development checkpoint `f341833`, after the saved-entry correction,
+the PO reports all four prescribed groups PASS:
+
+- [x] Different Caption fields edited by the two participants, applied and
+  received in both directions without losing either edit.
+- [x] Same-URL reload retains both participants' applied text.
+- [x] Concurrent different titles remain explicit alternatives; the chosen title
+  reaches the other participant while the prior body remains unchanged.
+- [x] Repeated receive changes no content/count; another reload retains the final
+  result for both participants.
+
+This closes the saved-host Desktop batch and its prior manual hold. It is
+PO-reported browser evidence, not an agent-observed trace or a measured browser
+version. No private run locator is recorded. Do not request this batch again.
+This does not cover interrupted writes in this host, cross-tab/process crashes,
+real-file exchange, offline/PWA, physical iPhone or full `TEAM-FLOW-01`. Existing
+Node/journal fault evidence remains separate. Account remaining 54%; no pause.
+
+Documentation-only receipt: synchronize current navigation/acceptance and check
+the next approved boundary; reuse `f341833` executable evidence unchanged.
+
 #### Correction — saved entry dependency loading (2026-09-11)
 
 PO screenshot at `43a06e4` fails before the saved module evaluates. The Vite log
@@ -43,7 +66,8 @@ root typechecks PASS. Root `npm test -- --maxWorkers=1`: 105 files / 1,868 PASS,
 21 existing TODO, no failure. `npm run build` PASS through Workbox completion,
 with the existing chunk/import warnings. Diff whitespace check PASS. The running
 5173 host serves the slim module and actual Wasm bytes (200 / Wasm magic checked),
-not an HTML fallback. Actual saved-mode browser evaluation is still unverified.
+not an HTML fallback. At that code checkpoint actual saved-mode browser evaluation
+was unverified; the later PO report above closes only its four listed groups.
 
 PO approved the opt-in addition in 05 §13.4. Start clean `2c27890`, ahead 7 /
 behind 0 against tracked origin; account remaining 56%. Root is the sole writer.
@@ -85,16 +109,22 @@ Review / executed evidence (2026-09-11):
 - Vite started at `127.0.0.1:5173`; existing host plus entry and saved modules
   returned HTTP 200. This is transform/transport evidence only. The prescribed
   Browser bootstrap still fails on `node:process` before browser selection. No
-  browser switch, settings bypass or actual input/storage/OPFS/IDB PASS is claimed.
+  browser switch or settings bypass occurred. This tool attempt provides no actual
+  input/storage/OPFS/IDB PASS; the later PO browser report is recorded separately above.
 - Node tests retain each participant's base via test setup. They do not execute
-  the browser pair-manifest reopen; that real browser lane remains explicitly open.
+  the browser pair-manifest reopen; the later PO same-URL reopen report is distinct.
 
-Next decision / exit: run the finite same-host saved-workflow batch in
-`tasks/uiux-handoff.md` through a working permitted browser lane (or the deferred
-human Chrome batch). Keep its exact resulting URL for reopen. Do not reopen the
-old journal tests or start another provider/probe while that UI evidence is missing.
-This is a code checkpoint, not completion of the overall product/UI goal. Usage
-remains above the PO's 10% pause threshold (last check: 55% remaining).
+The finite saved-host batch is now complete; preserve its URL/data and do not
+reopen the old journal or this saved-text batch. Independent boundary review
+identifies S1 production metadata/storage as the next connection, under 05
+§13.2/§13.4, not another synthetic probe or arbitrary-file entry. Before activation,
+close the still-missing G1-A/C adoption evidence (including applicable physical
+iOS, scale/concurrency/durability and sink/security checks) and obtain the
+applicable PO adoption decisions. Candidate-only flat-root data is not the product
+empty-root bootstrap in 02 §4. Existing partial PASS must be reused but cannot
+waive that gap. S2's proposed 06/07 wire/migration ratification stays separate.
+The next decision package should list only these outstanding inputs, not expand
+the scope or silently promote PoC code. No new manual test is requested now.
 
 ### Previous decision — saved-development proposal (2026-09-10; approved above)
 

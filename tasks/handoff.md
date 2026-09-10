@@ -1,5 +1,14 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **Latest PO result (2026-09-11, served `f341833`):** all four saved-host Desktop
+> groups PASS: distinct-field editing and two-way receive, both participants'
+> same-URL reload, explicit concurrent-title choice and propagation, replay with
+> no duplicates and final reload. This closes that manual hold; do not ask for
+> the same batch again. Evidence is PO-reported, not agent-observed. Host fault
+> injection, real files, offline/PWA, physical iPhone and full `TEAM-FLOW-01` remain
+> outside this receipt. Earlier browser-pending statements below are historical
+> for these four groups only. Current todo owns the next approved-boundary check.
+
 > **Current implementation (2026-09-11, from `2c27890`):** PO approved the opt-in
 > saved-development mode in 05 §13.4. The existing host now connects two saved
 > synthetic histories, separate fixed exchange bases, acknowledged-head UI and

@@ -26,9 +26,11 @@ profile. This does not connect durable UI, real conversion or product wire.
 PO approved 05 §13.4's opt-in synthetic-only saved-development mode on 2026-09-11.
 The same host now connects the journal-backed pair, exact retained retry and
 published-head recovery, with dedicated development OPFS/IDB wiring. Default
-memory mode and ordinary home stay unchanged. Node/mounted evidence is separate
-from still-pending actual browser storage/input; no product adoption is implied. See
-`tasks/todo.md` top. No old journal rerun or immediate human test.
+memory mode and ordinary home stay unchanged. At served `f341833`, the PO reports
+four saved-host Desktop groups PASS: text exchange, both-participant reload,
+explicit title choice and replay/final reload. This closes that manual batch,
+not host fault/device/offline or product adoption. See `tasks/todo.md` top for
+exact scope and the next boundary; no repeat journal or saved-text test.
 
 2026-09-10: PO reports the five prescribed camera/pin/window manual groups PASS
 at `7540478`; this supersedes their pending status below only for that scope.
