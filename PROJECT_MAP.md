@@ -10,12 +10,14 @@
 
 ## Start here
 
-2026-09-11 next decision: after the saved-host Desktop PASS, `tasks/todo.md` now
-contains a finite G1-A/C residual table. 05 §13.2 proposes S1 service implementation
-before aggregate adoption with new synthetic-only development activation; this
-ordering/root-dependency addition is not yet approved. Product empty-root bootstrap
-is already specified. No runtime change or repeat manual batch follows from the
-decision package.
+2026-09-11 current implementation: PO explicitly approved 05 §13.2's S1 service
+implementation before aggregate adoption, new synthetic-only development activation
+and the three pinned root dependencies. `tasks/todo.md` owns its finite plan and
+remaining G1-A/C inputs. Product empty-root bootstrap is already specified;
+ordinary home, old saved data, real files and product adoption remain unchanged.
+Dependency preflight installed those pins and the PO-approved Repo-only uuid
+11.1.1 fix. Runtime audit is clear; the five unchanged toolchain findings remain
+recorded in todo. The narrow security hold is closed; S1 implementation proceeds.
 
 Current task (2026-09-10, after readiness checkpoint `77a22b0`): PO approved
 unplaced-Caption preservation. Specification 05 §9.4 proposes its exact atomic

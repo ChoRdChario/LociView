@@ -1174,13 +1174,13 @@ A gate failure, specification conflict,
 unproven migration relation, new P0/P1, required scope expansion or release/
 destructive boundary stops the slice and returns to Product Owner review.
 
-**Proposed scheduling amendment (2026-09-11; NOT YET APPROVED):** following
+**PO-approved scheduling amendment (2026-09-11):** following
 the saved-host Desktop receipt, permit implementation of the S1 production-quality
 metadata/storage service before aggregate G1-A/C adoption, while keeping its
 activation limited to newly created synthetic workspaces in the existing development
-host. This changes the implementation order above, not any hard-pass requirement
-or a product support/adoption claim. Until explicitly approved, §13.2's existing
-ordering remains authoritative.
+host. The PO explicitly approved this order and the three pinned root dependencies.
+This supersedes only §13.2's gate-before-implementation ordering, not any hard-pass
+requirement or a product support/adoption claim. Real-data activation remains gated.
 
 The first bounded slice would create the approved 02 §4 empty-root bootstrap and
 external lineage proof, then append initial Project/Scene contents in later original
@@ -1193,6 +1193,10 @@ Use the existing pinned candidate versions only: Automerge 3.4.1, Repo 2.5.6 and
 its IndexedDB adapter 2.5.6. Moving these to root dependencies is part of the
 requested approval, with lockfile review and `npm audit` before acceptance; it
 does not authorize unrelated upgrades or accept new vulnerability findings.
+The PO subsequently approved a Repo 2.5.6-only `uuid` override to 11.1.1 for
+GHSA-w5hq-g745-h8pq, conditional on exact API compatibility, lockfile review and
+fresh audit. The top-level three pins remain unchanged; no other dependency
+upgrade or toolchain vulnerability waiver follows.
 
 The service must separate immutable verified-content evidence from a metadata
 snapshot: a Caption-only command and cold recovery check verified inventory and

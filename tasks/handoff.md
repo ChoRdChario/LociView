@@ -1,6 +1,21 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **Current decision package (2026-09-11, from `36f2fa2`):** the PO asked to
+> **Current authorization (2026-09-11, from `a26350c`):** PO explicitly approved
+> the S1 implementation-order exception and three pinned root dependencies in
+> 05 §13.2. Proceed with the finite creation/edit/save/reopen service; retain
+> existing saved runs, ordinary home and real-data/adoption gates. The proposal's
+> pending-approval statements below are now historical, not a reason to stop again.
+
+> **Dependency preflight (2026-09-11):** approved exact packages/lockfile added;
+> no service or UI activation yet. Audit found three new runtime-chain moderate
+> entries for one uuid advisory, plus five unchanged toolchain entries. Independent
+> review found no Repo calls to the affected UUID functions, but this is not a
+> root-scope waiver. PO then approved the Repo-only uuid 11.1.1 override; it is
+> installed, actual Repo compatibility passes and runtime audit is clear. The
+> five unchanged toolchain findings remain separate. S1 order stays approved;
+> do not ask for the original dependency/ordering or closed manual tests again.
+
+> **Historical decision package (2026-09-11, from `36f2fa2`):** the PO asked to
 > continue; root and two read-only reviewers matched the existing CAS/metadata
 > evidence to remaining G1-A/C requirements without repeating tests. Empty-root
 > bootstrap is already accepted engineering scope, not a new policy question.

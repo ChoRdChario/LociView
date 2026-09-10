@@ -61,9 +61,12 @@ If observed code conflicts with the applicable compatibility or accepted future 
 
 2026-09-11 decision package: `tasks/todo.md` distinguishes reused G1-A/C evidence,
 actual remaining platform/scale/security inputs and the separate S2 wire gates.
-The NOT-YET-APPROVED amendment in 05 §13.2 proposes earlier S1 implementation,
-limited to new synthetic development workspaces until product adoption. It does
-not change the already accepted empty-root contract, current code or gate status.
+The PO-approved amendment in 05 §13.2 allows earlier S1 implementation and the
+three pinned root dependencies, limited to new synthetic development workspaces
+until product adoption. It does not waive the empty-root contract or gate status.
+The approved Repo-only uuid 11.1.1 override closes the dependency preflight hold:
+runtime audit is clear and actual Repo API compatibility passes. The five unchanged
+toolchain findings remain separate; this is not product service/adoption credit.
 
 Current readiness review (2026-09-10): `tasks/todo.md` top separates approved
 outcomes, exact wire/migration design gaps and remaining storage/device evidence.

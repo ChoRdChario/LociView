@@ -19,9 +19,17 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@automerge/automerge": "3.4.1",
+    "@automerge/automerge-repo": "2.5.6",
+    "@automerge/automerge-repo-storage-indexeddb": "2.5.6",
     "@sparkjsdev/spark": "2.1.0",
     "@zip.js/zip.js": "^2.7.52",
     "three": "0.180.0"
+  },
+  "overrides": {
+    "@automerge/automerge-repo@2.5.6": {
+      "uuid": "11.1.1"
+    }
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

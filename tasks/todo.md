@@ -9,7 +9,93 @@ requested. Synthetic two-person model/pin/history and independent Caption/model-
 The scoped PO result below closes only the listed interaction checks; broader
 rendered, IME, device and durable-file acceptance remain pending.
 
-### Current step — finite S1 adoption inputs (2026-09-11)
+### Current implementation — approved S1 service entry (2026-09-11)
+
+PO explicitly approved the preceding ordering/dependency proposal. Start clean
+`a26350c`, ahead 11 / behind 0 against tracked origin; account remaining 53%.
+Root is the sole writer. Existing saved runs and ordinary home remain unchanged.
+
+PO subsequently approved the exact Repo-only uuid 11.1.1 override. This closes
+the authorization hold below; execute compatibility/audit checks, commit the
+dependency-only boundary, then continue the already approved S1 service. Current
+account remaining 52%; no additional product or human-test approval is needed.
+
+- [x] Record approval of the precise 05 §13.2 exception, not aggregate adoption.
+- [x] Add exactly the three approved root dependencies, review lockfile and audit.
+- [x] Resolve the new root-scope dependency audit finding below before service
+  activation; the original implementation-order approval remains valid.
+- [ ] Specify/review the bounded product metadata service and its creation/edit/
+  acknowledgment/reopen/retry contract, then implement it without PoC promotion.
+- [ ] Execute focused plus required root checks, independently review and update
+  the handoff with service connection versus remaining UI/device/product gates.
+
+Reuse current domain/Scene and exact-source durability assertions. No separate
+probe page, old-run migration, arbitrary user file, wire, GC, main/Pages or release.
+Stop on unaccepted security findings, specification conflict or usage below 10%.
+
+#### Dependency remediation result (2026-09-11)
+
+The approved Repo-only override is installed. Actual root Repo resolves uuid
+11.1.1; isolated PoC locks are unchanged. One executable compatibility test passes
+Repo create/import, generated document URLs, legacy UUID parse, storage identity,
+flush and independent-repository exact-head/original-byte reopen. Fresh runtime
+audit (`--omit=dev`) exits 0 with zero findings. Full audit exits 1 with only the
+five unchanged toolchain entries (three moderate / two high). Independent
+read-only lock/resolution review found no out-of-scope changes. The original S1
+security hold is closed; no request to accept the uuid vulnerability remains.
+Override-tree verification: root typecheck and build PASS; 106 test files /
+1,869 PASS / 21 TODO; saved-development module-graph regression 1 PASS. The
+new test's storage/document ID brand mismatch was corrected without changing
+the production dependency path. This is the dependency-only checkpoint, not a
+durability or service completion claim.
+
+The following pre-remediation record explains the decision, not a current hold.
+
+The three exact root dependencies and their lockfile are installed with lifecycle
+scripts disabled. There are 21 new lock entries (including platform-optional
+packages), no removed entries or pre-existing version/integrity changes; only
+`debug`/`ms` lose their dev-only classification. No service source, UI connection,
+saved-data conversion or runtime fallback has been implemented in this turn.
+
+Fresh `npm audit --json` exits 1: eight affected package entries, six moderate and
+two high. This is not eight independent vulnerabilities:
+
+| Origin | Affected entries | Treatment |
+|---|---|---|
+| Added runtime dependency chain | `uuid` 9.0.1, Repo 2.5.6, IndexedDB adapter 2.5.6: three moderate entries from one advisory | New root-scope finding; not covered by the previous isolated-localhost acceptance |
+| Existing unchanged toolchain | `@vitest/mocker`/`vitest` 3.2.7, `baseline-browser-mapping` 2.10.44, `browserslist` 4.28.6, `fast-uri` 3.1.5: three moderate / two high entries | Already present in the starting lockfile; no unrelated upgrade or release waiver in this slice |
+
+The [uuid advisory](https://github.com/uuidjs/uuid/security/advisories/GHSA-w5hq-g745-h8pq)
+concerns `v3`/`v5`/`v6` caller-provided output buffers. Independent source review
+finds Repo uses only `v4`, `parse` and `validate`, with no route to those vulnerable
+calls. This narrows exposure but does not dismiss the audit or approve a waiver.
+
+**Recommended next decision:** approve an override confined to Repo 2.5.6's
+transitive `uuid`, pinning 11.1.1 (a patched version), followed by checks of Repo's
+exact UUID calls, root/module-load regression and a fresh audit. Keep all three
+approved top-level versions unchanged. This 9→11 transitive override has not been
+applied or represented as already compatible. Do not run a broad `npm audit fix`.
+Unchanged toolchain findings stay explicitly open for a separate bounded security
+maintenance slice; they are not caused by this addition and do not reopen manual
+Caption tests. No human browser check is requested for this preflight.
+
+Implementation note from read-only review: pinned Repo `flush` is experimental;
+handle events are not acknowledgment, and shutdown may flush again. The new
+adapter must fence late/cleanup writes and independently reopen exact original
+changes before publishing. Do not copy the PoC writer or switch back to full
+browser imports; retain explicit local-Wasm initialization with `/slim`.
+
+Verification on the dependency-only executable diff: root `npm run typecheck`
+PASS; `npm test -- --maxWorkers=1` 105 files / 1,868 PASS / 21 TODO;
+`npm run build` PASS through Workbox completion (existing chunk and mixed-import
+warnings only). Existing saved-host module-graph regression: 1 PASS after root
+dependency re-optimization; this is a transport/load check, not browser execution.
+Audit remains nonzero as detailed above. Independent read-only dependency and
+final-diff review completed; the ordering-word correction is reflected in 05.
+These checks do not prove the not-yet-written service or add device/offline credit.
+The pre-remediation changes were left uncommitted for the now-approved fix.
+
+### Completed decision package — finite S1 adoption inputs (2026-09-11)
 
 PO asks to continue after the four-group Desktop PASS. Start clean `36f2fa2`,
 ahead 10 / behind 0 against tracked origin; account remaining 54%. This continues
@@ -60,7 +146,8 @@ for this decision package. Documentation-only diff/reference checks reuse
 `f341833`'s executed typecheck, 1,868 PASS / 21 TODO and build evidence.
 Independent read-only review confirms the exact six-document proposal/evidence
 boundary with no blocking finding. That review approves the decision materials,
-not the proposed implementation-order/dependency exception; PO approval is pending.
+not the implementation-order/dependency exception; the subsequent PO approval
+above now authorizes that exact scope. Do not reinstate the approval wait.
 
 ### Current implementation — isolated saved-development host (2026-09-11)
 
