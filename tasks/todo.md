@@ -11,14 +11,66 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — approved S1 service entry (2026-09-11)
 
-Completed source slice after dependency checkpoint `179f1c7`: implement the reviewed private
+#### Active persistence slice (2026-09-11)
+
+Start clean `d4d665d` on `g0-baseline`. The approved order still closes a missing
+product storage boundary, not another probe. Root writes; independent reviewers
+inspect the pinned Repo seam and journal contract read-only.
+
+- [x] Specify the private new-workspace journal/repository/session boundary.
+- [x] Connect original initialization and one Caption command to fenced Repo
+  storage, retained exact parts, independent readback and marker-last publication.
+- [x] Preserve published heads read-only on failure; cold retry reuses retained
+  changes, accepts valid local concurrent history and is idempotent.
+- [x] Persist immutable content facts independently of metadata tokens; recheck
+  exact request, inventory/presence and facts during cold verification.
+- [x] Run focused fault tests, one independent review, root checks and update
+  handoff. No new human test is required for an unconnected service.
+
+Reuse existing source/domain fixtures and WorkspaceFS authority. The content
+executor/inventory remain explicit ports; this does not implement a new format
+profile or a general BlobStore. New synthetic UI activation follows their real
+host wiring, not a passing in-memory adapter test. No ordinary entry, existing
+saved-run conversion, remote package admission, dependency or release change.
+Stop on a specification conflict, new authority requirement or below-10% usage.
+
+Focused result: 14 new service cases plus 25 existing source/isolation cases PASS.
+One earlier interrupted-publication case failed: pinned Automerge's
+`getAllChanges(view)` ignores historical view heads. The repository now walks
+exact original dependencies to select only published ancestors and verifies
+the resulting heads; the formerly failing case passes. Also close independent
+review findings for null receipt refusal, total stored-chunk budgets, published
+transaction inclusion, exact §8 local seal, author-only NFC and additional local
+heads after metadata durability. No failed check is treated as PASS.
+
+This is a stored-service boundary exercised with memory-backed storage adapters,
+not browser OPFS/IndexedDB, physical iOS or saved-host activation. The persistent
+fact cache invokes an explicit inventory/presence port; a real inventory/profile
+implementation is still required at the next host connection. A cold incomplete
+staging record without a complete descriptor fails to repair state; same-session
+retry retains exact parts. No data is silently deleted/reseeded to recover it.
+Final exact-tree matrix: typecheck PASS; production build PASS through Workbox
+(existing mixed-import/large-chunk warnings only); 108 files / 1,896 PASS / 21 TODO,
+exit 0. Independent reviewers confirmed their focused corrections; no current
+failure remains in these executed checks. `git diff --check` PASS. No extra PO
+approval or human test is requested for this disconnected service. Next integrate this service into a
+separate new synthetic namespace in the existing development host, keeping the
+old populated-format runs and ordinary app untouched.
+
+Short meta-audit: reusable source now reaches original-change storage, publication
+and cold fact reuse instead of remaining an isolated metadata component. This
+advances S1 but not TEAM-FLOW-01 completion. Existing dependency/dev-tool findings
+and real-device/adoption gates are unchanged. Tracked-origin baseline was ahead
+13 / behind 0; no fetch/push or server/tunnel change was performed in this slice.
+
+Preceding completed source slice after dependency checkpoint `179f1c7`: implement the reviewed private
 metadata source foundation specified in 05 §13.2. Reuse current domain/Scene
 fixtures and history inspectors; root remains sole writer. Finish with source
 bootstrap/initialization/Caption preparation/exact replay connected to those
 inspectors, focused tests, independent review and required root checks. No UI,
 durable acknowledgment, stored-run conversion or aggregate S1 claim follows.
-Next is the production persistence/journal/content-evidence connection, not a
-new disposable probe or another request for the already approved order.
+Its production persistence/journal/content-evidence connection is recorded above;
+do not restart a disposable probe or request the already approved order again.
 
 #### Metadata foundation result (2026-09-11)
 
@@ -34,15 +86,16 @@ new disposable probe or another request for the already approved order.
   scalar/forbidden keys and caller-supplied budgets. Typecheck/build PASS.
 - [x] Independent read-only architecture/diff review; fix the raw-key guard and
   close that specific finding. No broader review loop or new PoC was created.
-- [ ] Connect a production MetadataRepository/ProjectSession durability barrier,
+- [x] Connect a production MetadataRepository/ProjectSession durability barrier,
   exact retained journal/retry and persistent verified-content evidence before
-  any new synthetic saved UI activation. Full G1/device/real-file gates stay open.
+  any new synthetic saved UI activation (memory-port evidence above). Actual host
+  inventory/storage wiring and full G1/device/real-file gates stay open.
 
 This closes a source-adapter part of S1, not durable creation/edit/save/reopen.
 `ProjectMetadataSource.reopen` reconstructs retained bytes in memory: it does not
 read IndexedDB/OPFS, acknowledge a save or establish a worker memory guarantee.
 No ordinary entry or existing saved development run imports this module yet.
-The next service must consume these actual original changes, avoid Repo callbacks
+The service above consumes these actual original changes, avoids Repo callbacks
 as acknowledgments, and retain the last published view during failure/retry. Cold
 metadata-only recovery must verify evidence/inventory/presence without body rereads;
 the existing warm fixture verifier is test evidence only, not that implementation.
@@ -78,9 +131,9 @@ account remaining 52%; no additional product or human-test approval is needed.
 - [x] Add exactly the three approved root dependencies, review lockfile and audit.
 - [x] Resolve the new root-scope dependency audit finding below before service
   activation; the original implementation-order approval remains valid.
-- [ ] Specify/review the bounded product metadata service and its creation/edit/
+- [x] Specify/review the bounded product metadata service and its creation/edit/
   acknowledgment/reopen/retry contract, then implement it without PoC promotion.
-- [ ] Execute focused plus required root checks, independently review and update
+- [x] Execute focused plus required root checks, independently review and update
   the handoff with service connection versus remaining UI/device/product gates.
 
 Reuse current domain/Scene and exact-source durability assertions. No separate

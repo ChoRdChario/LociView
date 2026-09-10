@@ -92,7 +92,7 @@ export class ProjectMetadataSource {
   }
 
   /** Prepared, NOT saved. Session still needs full-provider/lease/journal authority. */
-  async prepareCaptionText(expectedToken: string, captionId: string, field: 'title' | 'body', text: string): Promise<ProjectMetadataSource> {
+  async prepareCaptionText(expectedToken: string, captionId: string, field: 'title' | 'body', text: string, transactionId?: string): Promise<ProjectMetadataSource> {
     if (expectedToken !== this.token) fail('stale-token');
     if (!['title', 'body'].includes(field)) fail('caption-field');
     const inspection = await inspectProjectCandidates(this.read(), this.limits);
@@ -109,7 +109,9 @@ export class ProjectMetadataSource {
       (i.path.length === 2 || required.includes(i.path[2]!)) && ['invalid', 'review', 'orphan'].includes(i.kind))) fail('caption-unresolved');
     const value = cloneCanonicalValue(text, this.limits);
     checkMutableField(new ProjectRecordFields(), 'captionsById', field, value);
-    const doc = A.change(A.clone(this.doc), draft => { draft.captionsById[captionId][field] = scalar(value, this.limits); });
+    if (transactionId !== undefined && !/^[0-9a-f]{32}$/.test(transactionId)) fail('transaction-id');
+    const doc = A.change(A.clone(this.doc), transactionId ? { message: `lociview:transaction:v1:${transactionId}` } : {},
+      draft => { draft.captionsById[captionId][field] = scalar(value, this.limits); });
     return ProjectMetadataSource.validated(doc, this.proof, this.limits);
   }
 }

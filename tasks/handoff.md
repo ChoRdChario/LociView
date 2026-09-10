@@ -1,14 +1,17 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **Latest implementation (2026-09-11, after `179f1c7`):** dependency remediation
-> is complete (runtime audit clear; five unchanged dev-tool entries still open).
-> `src/projectMetadata` implements empty-root lineage, original atomic inspection,
-> Caption text preparation and exact in-memory replay; 13 focused cases and the
-> existing synthetic Scene-provider connection pass. Independent read-only review
-> is closed. Final typecheck/build PASS; 107 files / 1,882 PASS / 21 TODO. No saved
-> data/UI or storage acknowledgment changed. Current todo owns the next
-> production Repository/Session/journal/cold-evidence
-> connection; no new PO approval or repeated browser test is needed to implement it.
+> **Latest implementation (2026-09-11, after `d4d665d`):** the new-workspace service
+> connects original initialization/Caption commands to fenced pinned-Repo storage,
+> an exact retained journal and marker-last publication. Independent stored reopen,
+> failure/retry, valid local concurrency and persistent content-fact reuse pass
+> synthetic memory-port tests. One interrupted-publication test exposed that
+> Automerge 3.4.1 `getAllChanges(view)` includes newer history; exact ancestor-byte
+> selection now fixes it. Independent review findings are corrected. Final
+> typecheck/build PASS; 108 files / 1,896 PASS / 21 TODO. Current todo owns the
+> scoped receipt. Next is actual browser storage/inventory wiring
+> for a new synthetic namespace in the existing host, not another disposable
+> probe. Ordinary UI/old saved data and real-file/device/adoption gates are unchanged.
+> No repeat of the already passed PO interaction tests is requested.
 
 > **Current authorization (2026-09-11, from `a26350c`):** PO explicitly approved
 > the S1 implementation-order exception and three pinned root dependencies in

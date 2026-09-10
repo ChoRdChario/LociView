@@ -1253,6 +1253,50 @@ Arbitrary untrusted binary admission/worker resource isolation, persistence,
 cold content evidence, conflict resolution commands, UI wiring and physical
 iOS remain the following S1 work. No saved PoC run is imported or converted.
 
+**S1 persistence connection — bounded implementation contract (2026-09-11):**
+
+New `projectMetadata` service modules may use the existing project-scoped
+WorkspaceFS/mutation authority and pinned Repo storage adapter. They remain
+disconnected from ordinary entries and existing saved runs. Repo is an I/O
+component only: no DocHandle, network adapter, automatic callback acknowledgment
+or model/storage fallback. Its hidden `storageSubsystem.loadDoc/saveDoc` seam is
+version-local, fenced for the entire write/readback operation, and independently
+reopened to compare original bytes and heads. Read-only open never seeds storage.
+
+The private new-workspace creation receipt retains the empty bootstrap and later
+initialization changes, withheld from readiness together. It is not a package
+batch or an extension of the §8 one-change local-command union. Subsequent Caption
+commands use §8's one original change, transaction message, captured durable
+dependencies, hashes, byte digests and retained ordinal parts. Their retry never
+reinvokes the command. Valid additional local concurrent history is retained and
+rechecked, not overwritten or rejected merely for having additional heads.
+
+Append-only internal transaction directories retain staging, verified descriptors,
+metadata-durable evidence and a final publication receipt linked to its predecessor.
+No rename/overwrite atomicity is assumed. Torn or inconsistent records fail closed;
+an unfinished transaction keeps the preceding published snapshot read-only (or
+creation incomplete if none exists). A save callback is not publication. Retry
+revalidates the complete retained batch, stored source and final content closure,
+then independently reads publication back; a repeated completed retry is a no-op.
+These private receipts are not ProjectDoc fields or a public wire/version promise.
+
+Persistent content facts are keyed by verifier/policy version, evidence scope,
+exact immutable records and context, excluding only the transient metadata token.
+The trusted executable byte/profile verifier and verified-inventory/presence port
+remain explicit dependencies, never imported metadata authority. Cold hits must
+check receipt integrity, exact request, current inventory/presence and current
+`checkContentFacts`, then return facts bound to the new token. Missing, corrupt,
+suspect or mismatched evidence cannot reuse cached facts. This is not a new
+BlobStore, ratified format profile or evidence that real bodies were verified.
+
+Acceptance: initialization and Caption save with independent reopen; pre-apply
+and post-save/pre-publication interruption; retained exact-byte retry and no-op;
+partial/corrupt journal refusal; missing storage and lost lease refusal; local
+concurrency preservation; cold content reuse without body reads and rejection of
+missing/suspect inventory. Use existing synthetic fixtures and injected storage
+faults. Browser OPFS/IndexedDB wiring, physical iOS, arbitrary untrusted binary
+resource isolation, remote exchange and full S1/TEAM-FLOW-01 remain unclosed.
+
 ### 13.3 Approved scheduling exception — validators and UI components (2026-09-08)
 
 The PO explicitly approved advancing storage-neutral data validation and reusable

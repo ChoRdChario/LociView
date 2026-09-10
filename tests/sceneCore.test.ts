@@ -228,15 +228,16 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
     expect(() => run(state, { ...resources, token: 'another' }, { kind: 'setDefault', sceneId: scb })).toThrow('token mismatch');
   });
 
-  it('isolates ordinary entries; only the approved development host and disconnected metadata source may use the new core', () => {
+  it('isolates ordinary entries; only the approved development host and disconnected metadata service may use the new core', () => {
     const walk = (path: string): string[] => readdirSync(path, { withFileTypes: true }).flatMap(entry => {
       const name = join(path, entry.name); return entry.isDirectory() ? walk(name) : [name];
     });
     for (const path of walk('src').filter(p => /\.(ts|tsx|js)$/.test(p))) {
       const source = readFileSync(path, 'utf8');
       const metadataFoundation = /[\\/]projectMetadata[\\/](format|source)\.ts$/.test(path);
-      // 05 §13.2 permits only this disconnected source foundation, not an app/storage connection.
-      if (!metadataFoundation) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectMetadata\//);
+      const metadataService = /[\\/]projectMetadata[\\/](persistence|repository|journal|contentEvidence|session)\.ts$/.test(path);
+      // 05 §13.2 permits these services, but no incoming ordinary/saved-host activation.
+      if (!metadataFoundation && !metadataService) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectMetadata\//);
       if (/[\\/](scene|domain)[\\/]/.test(path)) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
         const providerImports = path.replaceAll('\\', '/').endsWith('/scene/projectProvider.ts') ? [
@@ -250,6 +251,19 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           '../domain/projectGraphSupport', '../domain/projectRecords', '../domain/projectRecordFields',
           '../domain/values', '../domain/projectCandidates', '../domain/projectMutableFields', './format'];
         expect(imports.every(p => permitted.includes(p!)), path).toBe(true);
+        expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
+      } else if (metadataService) {
+        const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
+        const byFile: Record<string, string[]> = {
+          persistence: ['../core/json', '../domain/projectGraphSupport', '../domain/values', '../platform/fs', './format'],
+          repository: ['@automerge/automerge/slim', '@automerge/automerge-repo/slim', '../platform/fs', './format', './persistence', './source'],
+          journal: ['@automerge/automerge/slim', '../platform/fs', './format', './source', './persistence'],
+          contentEvidence: ['../domain/projectContentChecks', '../domain/values', '../platform/fs', './format', './persistence'],
+          session: ['@automerge/automerge/slim', '../platform/fs', '../domain/values', '../domain/projectContentChecks', '../domain/captionText', '../scene/projectProvider',
+            './format', './source', './repository', './journal', './persistence'],
+        };
+        const name = path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '');
+        expect(imports.every(p => byFile[name]!.includes(p!)), path).toBe(true);
         expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
       } else if (/[\\/]ui[\\/]projectScene[\\/]/.test(path)) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);

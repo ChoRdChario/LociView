@@ -69,9 +69,12 @@ runtime audit is clear and actual Repo API compatibility passes. The five unchan
 toolchain findings remain separate; this is not product service/adoption credit.
 The reusable `src/projectMetadata` foundation now creates empty-root lineage,
 preserves original atomic histories and prepares Caption text without a winner
-shortcut. Synthetic tests connect it to the existing Scene provider. Persistence,
-durable acknowledgment, cold verification and UI activation are still pending;
-its in-memory `reopen` is not a saved-workspace acceptance result.
+shortcut. The new Repository/Session/journal now connects that source to fenced
+Repo storage, independent stored readback and marker-last publication, with exact
+retained retry. Persistent immutable content facts exclude the metadata token and
+require current inventory/presence. Synthetic memory-port tests cover this service;
+browser storage/inventory host wiring, physical iOS and UI activation remain
+pending. Source-only `reopen` itself is still not a saved-workspace receipt.
 
 Current readiness review (2026-09-10): `tasks/todo.md` top separates approved
 outcomes, exact wire/migration design gaps and remaining storage/device evidence.
