@@ -1,5 +1,15 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **Latest implementation (2026-09-11, after `179f1c7`):** dependency remediation
+> is complete (runtime audit clear; five unchanged dev-tool entries still open).
+> `src/projectMetadata` implements empty-root lineage, original atomic inspection,
+> Caption text preparation and exact in-memory replay; 13 focused cases and the
+> existing synthetic Scene-provider connection pass. Independent read-only review
+> is closed. Final typecheck/build PASS; 107 files / 1,882 PASS / 21 TODO. No saved
+> data/UI or storage acknowledgment changed. Current todo owns the next
+> production Repository/Session/journal/cold-evidence
+> connection; no new PO approval or repeated browser test is needed to implement it.
+
 > **Current authorization (2026-09-11, from `a26350c`):** PO explicitly approved
 > the S1 implementation-order exception and three pinned root dependencies in
 > 05 §13.2. Proceed with the finite creation/edit/save/reopen service; retain

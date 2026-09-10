@@ -1,0 +1,161 @@
+import * as A from '@automerge/automerge/slim';
+import { parseJsonWithoutDuplicateMembers } from '../core/json';
+import { inspectAtomicHistory, type AtomicChange, type AtomicWrite, type HistoryReadLimits } from '../domain/atomicHistory';
+import { canonical, immutableKinds, same } from '../domain/projectGraphSupport';
+import { projectRecordMaps, checkProjectHeader } from '../domain/projectRecords';
+import { ProjectRecordFields } from '../domain/projectRecordFields';
+import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
+import type { ProjectCandidateInput } from '../domain/projectCandidates';
+
+export const adapterFormatVersion = 'lociview-automerge-atomic-map-1';
+export interface MetadataLimits extends HistoryReadLimits {
+  readonly maxChanges: number;
+  readonly maxChangeBytes: number;
+  readonly maxTotalBytes: number;
+  readonly maxOperations: number;
+}
+export interface MetadataProof {
+  readonly identity: JsonObject;
+  readonly envelope: Readonly<{ adapter: 'automerge'; adapterFormatVersion: typeof adapterFormatVersion;
+    lineageProof: Readonly<{ kind: 'automerge-root-change-v1'; rootChangeHash: string }> }>;
+}
+// Private physical encoding only; dynamic keys never leave this adapter as library objects.
+export type PhysicalDoc = A.Doc<Record<string, any>>;
+export class MetadataSourceError extends Error {
+  constructor(readonly code: string) { super(`Metadata source invalid (${code})`); this.name = 'MetadataSourceError'; }
+}
+export const fail = (code: string): never => { throw new MetadataSourceError(code); };
+export function checkLimits(limits: MetadataLimits): MetadataLimits {
+  for (const n of Object.values(limits)) if (!Number.isSafeInteger(n) || n <= 0) fail('limits');
+  const required = ['maxNodes', 'maxDepth', 'maxStringScalars', 'maxWork', 'maxChanges', 'maxChangeBytes', 'maxTotalBytes', 'maxOperations'];
+  if (required.some(k => !Object.hasOwn(limits, k))) fail('limits');
+  cloneCanonicalValue(null, limits);
+  return Object.freeze({ ...limits });
+}
+export function scalar(value: JsonValue, limits: MetadataLimits): A.ImmutableString {
+  return new A.ImmutableString(canonical(cloneCanonicalValue(value, limits)));
+}
+function decodeScalar(value: unknown, limits: MetadataLimits): JsonValue {
+  if (typeof value !== 'string' || value.length > limits.maxChangeBytes) fail('scalar');
+  try {
+    const decoded = cloneCanonicalValue(parseJsonWithoutDuplicateMembers(value as string), limits);
+    if (canonical(decoded) !== value) fail('canonical');
+    return decoded;
+  } catch { return fail('scalar'); }
+}
+export function checkedChanges(parts: readonly Uint8Array[], limits: MetadataLimits): Uint8Array[] {
+  if (!Array.isArray(parts) || parts.length > limits.maxChanges) fail('change-count');
+  let total = 0;
+  return parts.map(bytes => {
+    if (!(bytes instanceof Uint8Array) || !bytes.length || bytes.length > limits.maxChangeBytes) fail('change-bytes');
+    total += bytes.length; if (total > limits.maxTotalBytes) fail('total-bytes');
+    return bytes.slice();
+  });
+}
+export function checkedProof(input: MetadataProof, limits: MetadataLimits): MetadataProof {
+  const p = cloneCanonicalValue(input, limits) as unknown as MetadataProof;
+  if (!p || Object.keys(p).sort().join(',') !== 'envelope,identity' || !p.envelope ||
+    Object.keys(p.envelope).sort().join(',') !== 'adapter,adapterFormatVersion,lineageProof' ||
+    p.envelope.adapter !== 'automerge' || p.envelope.adapterFormatVersion !== adapterFormatVersion ||
+    !p.envelope.lineageProof || Object.keys(p.envelope.lineageProof).sort().join(',') !== 'kind,rootChangeHash' ||
+    p.envelope.lineageProof.kind !== 'automerge-root-change-v1' || !/^[0-9a-f]{64}$/.test(p.envelope.lineageProof.rootChangeHash)) fail('proof');
+  checkProjectHeader(new ProjectRecordFields(), 'identity', p.identity);
+  return p;
+}
+
+/** All raw structure before projection. No traversal of a materialized winner to recover paths. */
+export function inspectPhysical(doc: PhysicalDoc, inputProof: MetadataProof, limits: MetadataLimits): ProjectCandidateInput {
+  const proof = checkedProof(inputProof, limits), rootHash = proof.envelope.lineageProof.rootChangeHash;
+  const bytes = checkedChanges(A.getAllChanges(doc), limits);
+  if (!bytes.length) fail('empty-history');
+  const decoded = bytes.map(b => A.decodeChange(b));
+  const byHash = new Map(decoded.map(c => [c.hash, c]));
+  if (byHash.size !== decoded.length) fail('duplicate-change');
+  const roots = decoded.filter(c => !c.deps.length);
+  if (roots.length !== 1 || roots[0]!.hash !== rootHash) fail('root-proof');
+  const containers = new Map<string, { path: string[]; birth: string }>([['_root', { path: [], birth: rootHash }]]);
+  const occupied = new Set<string>(), ancestors = new Map<string, Set<string>>();
+  const changes: AtomicChange[] = [], scalars = new Map<string, { objectId: string; key: string }>();
+  let work = 0, operations = 0, schema: JsonObject | undefined, identity: JsonValue | undefined;
+  const charge = (n = 1) => { work += n; if (work > limits.maxWork) fail('work-limit'); };
+  // Order the read projection only. Encoded source bytes are never rewritten.
+  const pending = new Map(byHash);
+  while (pending.size) {
+    let advanced = false;
+    for (const [hash, change] of pending) {
+      charge(change.deps.length + 1);
+      if (!change.deps.every(dep => ancestors.has(dep))) continue;
+      const prior = new Set<string>();
+      for (const dep of change.deps) { prior.add(dep); for (const a of ancestors.get(dep)!) { charge(); prior.add(a); } }
+      ancestors.set(hash, prior);
+      const writes = new Map<string, AtomicWrite>();
+      for (const [offset, op] of change.ops.entries()) {
+        if (++operations > limits.maxOperations) fail('operation-limit'); charge();
+        const operationId = `${change.startOp + offset}@${change.actor}`, parent = containers.get(op.obj);
+        if (!parent || (parent.birth !== hash && !prior.has(parent.birth)) ||
+          typeof op.key !== 'string' || !op.key || ('insert' in op && op.insert)) fail('structure');
+        // An array of path strings does not exercise the domain's object-key guard.
+        cloneCanonicalValue({ [op.key]: null }, limits);
+        const path = [...parent!.path, op.key];
+        const address = canonical(path), root = parent!.path.length === 0;
+        if (op.action === 'makeMap') {
+          const rootCollection = root && hash === rootHash && (op.key === 'project' || Object.hasOwn(projectRecordMaps, op.key));
+          const record = !root && parent!.path.length === 1 && Object.hasOwn(projectRecordMaps, path[0]!) &&
+            !Object.hasOwn(immutableKinds, path[0]!);
+          if ((!rootCollection && !record) || (record && hash === rootHash) || op.pred.length || occupied.has(address)) fail('container-replacement');
+          occupied.add(address); containers.set(operationId, { path, birth: hash }); continue;
+        }
+        // Never erase/replace an established container, even if later restored.
+        if (occupied.has(address) || !['set', 'del'].includes(op.action)) fail('structure');
+        if (root && (op.key === 'project' || Object.hasOwn(projectRecordMaps, op.key))) fail('structure');
+        if (!root && parent!.path.length === 1 && parent!.path[0] !== 'project' && !Object.hasOwn(immutableKinds, path[0]!)) fail('record-scalar');
+        if (root && ['schema', 'identity'].includes(op.key) && (hash !== rootHash || op.action !== 'set')) fail('root-mutation');
+        if (hash === rootHash && (!root || !['schema', 'identity'].includes(op.key) || op.action !== 'set')) fail('populated-bootstrap');
+        const value = op.action === 'del' ? { kind: 'absent' as const } : (() => {
+          if (op.datatype !== undefined) fail('scalar-datatype');
+          return { kind: 'value' as const, value: decodeScalar(op.value, limits) };
+        })();
+        if (hash === rootHash) {
+          if (writes.has(address)) fail('root-rewrite');
+          if (op.key === 'schema' && value.kind === 'value') schema = value.value as JsonObject;
+          if (op.key === 'identity' && value.kind === 'value') identity = value.value;
+        }
+        scalars.set(address, { objectId: op.obj, key: op.key });
+        writes.set(address, { operationId, path, value });
+      }
+      // Schema is the separately checked source header, not an entity field.
+      changes.push({ id: hash, deps: [...change.deps].sort(), writes: [...writes.values()].filter(w => w.path[0] !== 'schema') });
+      pending.delete(hash); advanced = true;
+    }
+    if (!advanced) fail('incomplete-history');
+  }
+  const root = byHash.get(rootHash)!;
+  if (root.ops.length !== 3 + Object.keys(projectRecordMaps).length || !schema || !same(identity, proof.identity)) fail('bootstrap');
+  for (const key of ['project', ...Object.keys(projectRecordMaps)]) if (!occupied.has(canonical([key]))) fail('root-collections');
+  checkProjectHeader(new ProjectRecordFields(), 'schema', schema!);
+  const heads = A.getHeads(doc).sort(), token = `${adapterFormatVersion}:${rootHash}:${heads.join(',')}`;
+  const read = inspectAtomicHistory({ token, heads, changes }, { ...limits, maxWork: limits.maxWork - work });
+  if (read.kind !== 'atomic-history-inspection') return fail('atomic-history');
+  // Check the complete live field candidates against the library, not its winner.
+  for (const field of read.fields) {
+    charge(); const item = scalars.get(canonical(field.path))!;
+    const parentPath = containers.get(item.objectId)!.path;
+    let object: any = doc;
+    for (const key of parentPath) object = object[key];
+    if (A.getObjectId(object) !== item.objectId) fail('container-identity');
+    const present = field.candidates.filter(c => c.value.kind === 'value');
+    const actual = Object.entries(A.getConflicts(object, item.key) ?? {});
+    if (actual.length && (actual.length !== present.length || actual.some(([id, value]) => {
+      const candidate = present.find(c => c.operationId === id);
+      // Pinned getConflicts returns raw strings, unlike materialized ImmutableString fields.
+      return typeof value !== 'string' || !candidate || candidate.value.kind !== 'value' || canonical(candidate.value.value) !== value;
+    }))) fail('candidate-mismatch');
+    if (!present.length && Object.hasOwn(object, item.key)) fail('absent-mismatch');
+    if (present.length > 1 && !actual.length) fail('missing-conflicts');
+    if (present.length === 1) {
+      const value = object[item.key], c = present[0]!;
+      if (!(value instanceof A.ImmutableString) || c.value.kind !== 'value' || value.toString() !== canonical(c.value.value)) fail('value-mismatch');
+    }
+  }
+  return Object.freeze({ schema: schema!, recordMaps: Object.freeze(Object.keys(projectRecordMaps)), history: read.history });
+}

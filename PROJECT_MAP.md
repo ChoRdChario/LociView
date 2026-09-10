@@ -18,6 +18,11 @@ ordinary home, old saved data, real files and product adoption remain unchanged.
 Dependency preflight installed those pins and the PO-approved Repo-only uuid
 11.1.1 fix. Runtime audit is clear; the five unchanged toolchain findings remain
 recorded in todo. The narrow security hold is closed; S1 implementation proceeds.
+`src/projectMetadata` now implements the reusable empty-root/original-atomic-source
+foundation, Caption text preparation and exact in-memory replay. It reaches the
+existing domain/Scene provider on synthetic fixture evidence. No persistent
+Repository/Session, saved-host/ordinary UI connection or storage adoption follows;
+the next S1 link is durable journal/publication and cold verified-content evidence.
 
 Current task (2026-09-10, after readiness checkpoint `77a22b0`): PO approved
 unplaced-Caption preservation. Specification 05 §9.4 proposes its exact atomic

@@ -11,6 +11,60 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — approved S1 service entry (2026-09-11)
 
+Completed source slice after dependency checkpoint `179f1c7`: implement the reviewed private
+metadata source foundation specified in 05 §13.2. Reuse current domain/Scene
+fixtures and history inspectors; root remains sole writer. Finish with source
+bootstrap/initialization/Caption preparation/exact replay connected to those
+inspectors, focused tests, independent review and required root checks. No UI,
+durable acknowledgment, stored-run conversion or aggregate S1 claim follows.
+Next is the production persistence/journal/content-evidence connection, not a
+new disposable probe or another request for the already approved order.
+
+#### Metadata foundation result (2026-09-11)
+
+- [x] Implement `src/projectMetadata`: required empty bootstrap and external
+  exact-root proof; later all-map initialization; original-operation path/causal
+  inspection; read-only domain projection; Caption text preparation and exact
+  original change replay/reopen, with no materialized conflict winner.
+- [x] Reuse the full existing fixture through candidate checks and
+  `readProjectScene` with the existing synthetic content-verification port.
+- [x] Focused 13 cases PASS: source preservation, independent in-memory reopen,
+  duplicate no-op, distinct-field/same-value conflicts, absence and unknown data,
+  wrong root/identity, incomplete input, competing/recreated containers, malformed
+  scalar/forbidden keys and caller-supplied budgets. Typecheck/build PASS.
+- [x] Independent read-only architecture/diff review; fix the raw-key guard and
+  close that specific finding. No broader review loop or new PoC was created.
+- [ ] Connect a production MetadataRepository/ProjectSession durability barrier,
+  exact retained journal/retry and persistent verified-content evidence before
+  any new synthetic saved UI activation. Full G1/device/real-file gates stay open.
+
+This closes a source-adapter part of S1, not durable creation/edit/save/reopen.
+`ProjectMetadataSource.reopen` reconstructs retained bytes in memory: it does not
+read IndexedDB/OPFS, acknowledge a save or establish a worker memory guarantee.
+No ordinary entry or existing saved development run imports this module yet.
+The next service must consume these actual original changes, avoid Repo callbacks
+as acknowledgments, and retain the last published view during failure/retry. Cold
+metadata-only recovery must verify evidence/inventory/presence without body rereads;
+the existing warm fixture verifier is test evidence only, not that implementation.
+
+Short meta-audit: dependency authorization and its one new security issue are
+closed, then actual reusable source code replaced the missing product bootstrap
+and candidate mapping. Remaining persistence/UI links, not more foundation test
+counts, are the critical path. No repeat PO browser test is requested here.
+The first full test run exposed the older Scene import-isolation assertion, which
+predated the approved 05 §13.2 exception. Update only the exact two source files'
+domain/JSON/slim imports, and explicitly forbid incoming app/host imports of this
+foundation. This aligns the test with the accepted contract; it does not permit
+an ordinary-app, UI or storage connection. Preserve the failed-run receipt.
+That first full run had 106 passing files / 1 failed isolation assertion,
+1,881 PASS / 1 FAIL / 21 TODO; focused corrected isolation plus metadata source
+then passed 25 cases. Final full-suite rerun is required before checkpointing.
+Final rerun completed: 107 files / 1,882 PASS / 21 TODO, exit 0. Final typecheck
+PASS; production build PASS through Workbox completion. Independent review also
+approved the narrow import-isolation correction. This supersedes only the failed
+assertion's current status, not its recorded earlier result. No current failure
+remains in the executed checks; device/storage activation is still untested.
+
 PO explicitly approved the preceding ordering/dependency proposal. Start clean
 `a26350c`, ahead 11 / behind 0 against tracked origin; account remaining 53%.
 Root is the sole writer. Existing saved runs and ordinary home remain unchanged.

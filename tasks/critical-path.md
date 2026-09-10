@@ -393,6 +393,11 @@ next product milestone.
 The exact dependencies and approved Repo-only uuid fix are now installed; actual
 Repo compatibility and runtime audit close the narrow security hold in todo.
 The S1 scheduling approval and prior Desktop acceptance remain valid.
+The source-adapter foundation now implements empty-root lineage and original
+Caption history feeding existing Scene/provider checks. This is actual S1 code,
+not the persisted workspace chain. Next connect Repository/Session publication,
+retained journal/retry and cold content evidence, then the existing host for new
+synthetic workspaces; no old saved histories are converted.
 
 The ten latest executable commits through `d8f52d1` implement reusable Scene,
 record-admission and four-tab UI parts, with source-isolation tests deliberately

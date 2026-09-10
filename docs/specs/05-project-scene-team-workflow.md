@@ -1213,6 +1213,46 @@ applicable physical-iOS checks and explicit adoption still precede real-Project
 activation. S2 retains independent wire/recipe ratification. Failure of the new
 service is visible; no fallback silently reuses the old PoC writer.
 
+**S1 metadata foundation — implementation contract (2026-09-11):**
+
+The first reusable source module implements 02 §4 bootstrap and original atomic
+history without activating storage or UI. It is an intermediate part of the
+approved creation/edit/durable-reopen slice, not a new gate or its completion.
+The private adapter profile `lociview-automerge-atomic-map-1` uses pinned 3.4.1
+`/slim`: schema/identity are canonical JSON immutable scalars, Project and the
+14 record collections are permanent maps created in the first change. Mutable
+records have permanent child maps; each whole logical field is one canonical
+JSON immutable scalar, and an immutable record is one whole-record scalar.
+This is a library encoding, not a package/wire or logical-schema ratification.
+
+All raw operations are validated before last-write-per-field projection. Paths
+come from original container birth object IDs and causal ancestry, never from
+the library winner tree. Collection replacement and mutable-record deletion,
+recreation or competing container creation are outside this physical profile
+and rejected, including an invalid edit later undone inside the same change.
+Root schema/identity are immutable; the first change contains no Project fields
+or records. The external proof binds its exact hash and identity. Initial
+contents are a later change; bootstrap alone is not a ready Project.
+
+Canonical scalar decoding rejects duplicate/noncanonical JSON spellings and
+preserves unknown scalar siblings/subtrees without rebuilding known-only DTOs.
+Every original change byte, dependency, operation ID, absent candidate and
+same-value concurrent candidate is retained. The existing candidate/domain
+inspectors remain responsible for semantic validity and conflicts; this source
+adapter alone is neither a complete content verifier nor write acknowledgment.
+Normal Caption text preparation rejects stale tokens and unresolved target or
+lifecycle fields. A later ProjectSession must additionally require the full
+current provider, write lease, journal and durable barrier before applying it.
+
+Acceptance reuses the existing all-map fixture and neutral history assertions:
+empty bootstrap/later initialization; exact-byte reopen and duplicate no-op;
+distinct-field merge and explicit same-field conflict; absence/unknown retention;
+invalid structure/root proof rejected before projection; bounded configured
+input checks. Budgets are caller supplied, not new measured product limits.
+Arbitrary untrusted binary admission/worker resource isolation, persistence,
+cold content evidence, conflict resolution commands, UI wiring and physical
+iOS remain the following S1 work. No saved PoC run is imported or converted.
+
 ### 13.3 Approved scheduling exception — validators and UI components (2026-09-08)
 
 The PO explicitly approved advancing storage-neutral data validation and reusable

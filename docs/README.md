@@ -67,6 +67,11 @@ until product adoption. It does not waive the empty-root contract or gate status
 The approved Repo-only uuid 11.1.1 override closes the dependency preflight hold:
 runtime audit is clear and actual Repo API compatibility passes. The five unchanged
 toolchain findings remain separate; this is not product service/adoption credit.
+The reusable `src/projectMetadata` foundation now creates empty-root lineage,
+preserves original atomic histories and prepares Caption text without a winner
+shortcut. Synthetic tests connect it to the existing Scene provider. Persistence,
+durable acknowledgment, cold verification and UI activation are still pending;
+its in-memory `reopen` is not a saved-workspace acceptance result.
 
 Current readiness review (2026-09-10): `tasks/todo.md` top separates approved
 outcomes, exact wire/migration design gaps and remaining storage/device evidence.
