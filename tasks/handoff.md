@@ -1,5 +1,15 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **Current decision package (2026-09-11, from `36f2fa2`):** the PO asked to
+> continue; root and two read-only reviewers matched the existing CAS/metadata
+> evidence to remaining G1-A/C requirements without repeating tests. Empty-root
+> bootstrap is already accepted engineering scope, not a new policy question.
+> 05 §13.2 now labels one NOT-YET-APPROVED ordering amendment: implement the S1
+> production-quality service first with new synthetic-only development activation;
+> retain all product adoption/real-data gates. It includes exact pinned root
+> dependency introduction only if approved/reviewed/audited. Current todo owns
+> the finite residual table and first-slice acceptance. No code or gate changed.
+
 > **Latest PO result (2026-09-11, served `f341833`):** all four saved-host Desktop
 > groups PASS: distinct-field editing and two-way receive, both participants'
 > same-URL reload, explicit concurrent-title choice and propagation, replay with

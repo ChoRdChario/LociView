@@ -1174,6 +1174,41 @@ A gate failure, specification conflict,
 unproven migration relation, new P0/P1, required scope expansion or release/
 destructive boundary stops the slice and returns to Product Owner review.
 
+**Proposed scheduling amendment (2026-09-11; NOT YET APPROVED):** following
+the saved-host Desktop receipt, permit implementation of the S1 production-quality
+metadata/storage service before aggregate G1-A/C adoption, while keeping its
+activation limited to newly created synthetic workspaces in the existing development
+host. This changes the implementation order above, not any hard-pass requirement
+or a product support/adoption claim. Until explicitly approved, §13.2's existing
+ordering remains authoritative.
+
+The first bounded slice would create the approved 02 §4 empty-root bootstrap and
+external lineage proof, then append initial Project/Scene contents in later original
+changes. Connect creation → exact Caption command → durable acknowledgment →
+independent reopen, retaining original changes and the old published view on
+interruption/retry. No existing saved-development history is rebased, reseeded or
+converted; the populated FLAT_FORMAT remains isolated in its existing namespace.
+Implement a reviewed production service rather than copying the PoC into `src`.
+Use the existing pinned candidate versions only: Automerge 3.4.1, Repo 2.5.6 and
+its IndexedDB adapter 2.5.6. Moving these to root dependencies is part of the
+requested approval, with lockfile review and `npm audit` before acceptance; it
+does not authorize unrelated upgrades or accept new vulnerability findings.
+
+The service must separate immutable verified-content evidence from a metadata
+snapshot: a Caption-only command and cold recovery check verified inventory and
+presence without rereading/re-hashing existing large bodies. New or suspect bodies
+still require byte/profile verification. A development-only warm cache does not
+satisfy this requirement and is not a separate prerequisite project.
+
+Reuse the current domain/Scene core, exact-change and journal acceptance. First
+prove the new service on synthetic inputs; then connect that service to the same
+development UI without changing existing runs. No real user-file admission,
+ordinary home, migration or five-purpose wire, origin-wide destructive GC,
+new media/profile, release or Pages/SW change is included. Full G1-A/C evidence,
+applicable physical-iOS checks and explicit adoption still precede real-Project
+activation. S2 retains independent wire/recipe ratification. Failure of the new
+service is visible; no fallback silently reuses the old PoC writer.
+
 ### 13.3 Approved scheduling exception — validators and UI components (2026-09-08)
 
 The PO explicitly approved advancing storage-neutral data validation and reusable

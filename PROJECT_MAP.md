@@ -10,6 +10,13 @@
 
 ## Start here
 
+2026-09-11 next decision: after the saved-host Desktop PASS, `tasks/todo.md` now
+contains a finite G1-A/C residual table. 05 §13.2 proposes S1 service implementation
+before aggregate adoption with new synthetic-only development activation; this
+ordering/root-dependency addition is not yet approved. Product empty-root bootstrap
+is already specified. No runtime change or repeat manual batch follows from the
+decision package.
+
 Current task (2026-09-10, after readiness checkpoint `77a22b0`): PO approved
 unplaced-Caption preservation. Specification 05 §9.4 proposes its exact atomic
 state/bridge mapping; 06 §§4.1/5.1/8–9 specify retained base proof, history-free

@@ -59,6 +59,12 @@ If observed code conflicts with the applicable compatibility or accepted future 
 
 ## Known implementation drift
 
+2026-09-11 decision package: `tasks/todo.md` distinguishes reused G1-A/C evidence,
+actual remaining platform/scale/security inputs and the separate S2 wire gates.
+The NOT-YET-APPROVED amendment in 05 §13.2 proposes earlier S1 implementation,
+limited to new synthetic development workspaces until product adoption. It does
+not change the already accepted empty-root contract, current code or gate status.
+
 Current readiness review (2026-09-10): `tasks/todo.md` top separates approved
 outcomes, exact wire/migration design gaps and remaining storage/device evidence.
 05 §9.4 records PO-approved unplaced-Caption preservation and the proposed atomic

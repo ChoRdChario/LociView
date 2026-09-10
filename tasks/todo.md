@@ -9,6 +9,59 @@ requested. Synthetic two-person model/pin/history and independent Caption/model-
 The scoped PO result below closes only the listed interaction checks; broader
 rendered, IME, device and durable-file acceptance remain pending.
 
+### Current step — finite S1 adoption inputs (2026-09-11)
+
+PO asks to continue after the four-group Desktop PASS. Start clean `36f2fa2`,
+ahead 10 / behind 0 against tracked origin; account remaining 54%. This continues
+the approved work, not a declaration that G1-A/C or product format adoption passed.
+
+- [x] Bind existing CAS/metadata results to 03 §§4/6; distinguish executed,
+  code-only and genuinely missing inputs without rerunning completed human tests.
+- [x] Separate implementation work required by the accepted product bootstrap
+  from actual PO policy/adoption choices; select one finite next execution or
+  state the exact authorization required before it.
+- [x] Independently review the decision package and synchronize current handoff.
+
+Use the existing contracts/PoCs, not new probe pages, a new document series or
+another broad component campaign. No current-app storage activation, dependency
+adoption, private input, wire/migration change, release or physical-device route
+is authorized by a partial PASS. Documentation-only work reuses `f341833` checks;
+any executable change requires its exact acceptance before code and final checks.
+
+#### Result — one implementation-order decision, not another probe campaign
+
+| Boundary | Existing evidence to reuse | Still missing before product adoption |
+|---|---|---|
+| Original history / durable publication | Existing Node exact-byte/prefix/retry tests, closed browser journal batch, four-group saved-host Desktop PASS | Product adapter/domain connection, live multi-tab command workload/process interruption and physical-iOS evidence (03 §6) |
+| CAS / large bodies | CAS README's 17 Node cases, 500 MiB Node round-trip and PO saved-body readback; retention's 14 Node cases | Browser buffer/sink evidence, applicable iOS behavior and real root/GC connection. The missing first browser run log remains unknown, not failed (03 §4) |
+| Metadata-only I/O | Small journal inventory-presence checks avoid existing payload reads | Complete saved-source inspection currently rereads bodies through `development-saved-browser.ts`; warm-only caching would not close cold recovery. Address evidence reuse in S1, not a disposable cache detour (03 §6) |
+| Scale / security / limits | Fixed small candidate profiles and prior isolated audit only | Current 64-change journal budget/full-row list is not 10,000 Captions/50,000 changes. Product-scoped dependency/security/CSP/offline checks and approved limits remain (03 §§4/6) |
+| Package semantics | Existing five-purpose synthetic closures/base/privacy checks | Product wire/recipe/whole-file goldens are S2, not a new S1 entry condition (05 §13.2; proposed 06/07) |
+
+The empty-root bootstrap is already required by accepted 02 §4. Implementing it
+is engineering work, not a renewed PO policy choice. Keeping the development
+populated root as the product format would change the contract and is not proposed.
+No original saved run is to be rewritten. Aggregate G1-A/C remains incomplete,
+not declared failed. Prior moderate audit findings accepted for synthetic localhost
+are not blanket product acceptance; the target dependency scope must be audited.
+
+Recommendation: approve the precisely labelled scheduling amendment in 05 §13.2:
+implement the S1 production-quality service first, initially using only new
+synthetic workspaces in the existing host; retain all adoption/real-data gates.
+The first slice is approved-format creation → Caption edit → durable acknowledgment
+→ independent reopen/retry, reusing domain and journal assertions. The same pinned
+three candidate dependencies would enter the root scope only under that approval,
+with lockfile/security review. Do not implement this exception before approval.
+This avoids another open-ended PoC/test campaign while keeping old runs, ordinary
+home, real files, devices, migration/wire and release outside the activation scope.
+
+No new test run, private bytes, service restart or executable change was needed
+for this decision package. Documentation-only diff/reference checks reuse
+`f341833`'s executed typecheck, 1,868 PASS / 21 TODO and build evidence.
+Independent read-only review confirms the exact six-document proposal/evidence
+boundary with no blocking finding. That review approves the decision materials,
+not the proposed implementation-order/dependency exception; PO approval is pending.
+
 ### Current implementation — isolated saved-development host (2026-09-11)
 
 #### PO-reported Desktop acceptance — four saved-workflow groups PASS (2026-09-11)

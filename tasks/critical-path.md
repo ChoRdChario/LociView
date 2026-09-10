@@ -384,6 +384,13 @@ manual hold is closed; another individual validator is not the default next task
 
 ### Completion map and retained audit evidence
 
+2026-09-11: the four-group saved-host Desktop hold is closed. The finite adoption
+inputs are now recorded at the top of todo. Proposed 05 §13.2 amendment would
+advance S1 service implementation with synthetic-only activation, not waive
+G1-A/C or admit real files. It requires explicit approval. Empty-root creation is
+already specified; do not ask to choose it again or treat a warm-cache PoC as the
+next product milestone.
+
 The ten latest executable commits through `d8f52d1` implement reusable Scene,
 record-admission and four-tab UI parts, with source-isolation tests deliberately
 preventing current-app use. This is real component progress but no newly completed
