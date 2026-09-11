@@ -1341,6 +1341,43 @@ read-only refusal, cold zero-body verification and local Wasm/module loading.
 Browser input/raster, physical iOS and offline/PWA evidence remain separately
 required, not inferred from HTTP or memory-backed port tests.
 
+**S1 known PNG extension — implementation contract (2026-09-12):**
+
+Extend only `storage=metadata` to explicit introduction of the two existing tiny
+synthetic PNGs. The owned host resolves a selected known ID to its exact record
+and bytes. Never reseed an existing run or introduce media on ordinary open.
+Under the existing lease, validate intent, write staging intent, persist/compare/
+hash the known body and inventory, then author one original local command that
+adds the immutable whole-record MediaResource and mutable Attachment. Reuse an
+identical existing MediaResource; conflicting content/ID is refused, not replaced.
+Description/order edits and confirmed Attachment tombstones are metadata-only.
+No endpoint editing, implicit restore, media-body deletion or generic import.
+
+The local journal binds canonical newly introduced/explicitly restaged BlobRefs
+into the existing 02 §8 digest. Old private receipts omit this list and continue
+to mean the exact empty list; initialization digest is unchanged. In-memory
+preparation retains intent/IDs until exact original bytes exist; after that retries
+never reauthor. Cold incomplete staging remains visible repair. Prepared recovery
+verifies its saved media delta before publishing; it never recreates missing bodies
+from fixtures. New content-fact creation is limited to the exact just-staged media,
+not enabled for arbitrary existing content. Triangle executor/cache stays unchanged.
+
+This host additionally requests checks for retained unattached MediaResources so
+deleting the last Attachment does not create false repair. The opt-in inspection
+does not make inactive media a strong reference, package root or GC root. Its
+failures remain visible; no unverified diagnostic is simply discarded. The gallery
+uses the same provider and hash-checked saved PNG bytes (including cold opens),
+not the static source image as fallback. Caption candidate ownership, attachment
+availability and delete/edit review are preserved; unknown affected values refuse
+commands. Readonly permits gallery viewing, not registration or attachment edits.
+
+Acceptance: add both PNGs to a previously edited run; reuse without duplicate
+MediaResources; description/order/delete including the last attachment; cold
+reopen; retained ID/original-byte recovery; missing or same-size corrupt saved
+image refusal; no extra model-body reads and old mode compatibility. No real file,
+new format/profile, dependency, schema/wire, old saved-run conversion, deployment,
+browser/native-input/physical-iOS or aggregate G1/S1 acceptance follows.
+
 **S1 typed editing extension — implementation contract (2026-09-11):**
 
 Extend only the new synthetic saved host with existing user-intent commands:

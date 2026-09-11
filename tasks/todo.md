@@ -11,6 +11,59 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — approved S1 service entry (2026-09-11)
 
+#### Known media connection — implemented; real-browser acceptance pending (2026-09-12, from `b9d99a4`)
+
+- [x] Specify existing-run, blob-first registration and exact journal delta before implementation.
+- [x] Connect known PNG registration + Attachment creation, description/order/delete,
+  retained originals/retry, and same-provider saved-byte gallery in the current host.
+- [x] Verify existing-run preservation, reuse, last-attachment deletion, cold reopen,
+  exact failure recovery and missing/corrupt media refusal with the existing host tests.
+- [x] Independent read-only review; typecheck/build/HTTP graph/full tests; update docs/checkpoint.
+
+Scope/exit: two existing synthetic PNGs only, introduced by explicit Add into an
+existing `storage=metadata` run. Reuse the UI and 02 §8 blob-first localCommand;
+no new probe. Preserve original seed, prior edits, model content cache and old
+empty-blob receipts. MediaResource and Attachment are one original change; retry
+uses retained bytes/IDs, never image fallback or cold regeneration. Inspect retained
+unattached media explicitly without changing strong roots. Test only the new
+connection and recovery seams; reuse existing media/IME/UI tests. No real files,
+new media formats, dependency, wire/schema, migration, GC, ordinary home or deploy.
+Browser/raster/physical iOS remain a labelled later batch. Stop for contract conflict
+or new authority. Short meta-audit: prior material boundary closed; clean HEAD,
+tracked origin ahead 18 / behind 0; continue the connected workflow, not polish.
+
+Review: existing runs now explicitly register the two known images without changing
+their seeds, lineage or prior edits. Registration and attachment form one original
+change; description/order edits and confirmed tombstones reuse the same journal.
+Retained-media inspection is opt-in and does not change strong closure/GC roots.
+Gallery sources come from hash-checked saved PNGs, including readonly and cold
+reopen. Original Caption candidates and attachment availability remain authoritative.
+Two independent reviews have no remaining blocker. The storage review corrected
+full candidate validation to precede the prepared receipt. PNG reads are separate
+from inventory.inspect's no-body-I/O contract and do not change triangle caching.
+
+Five new host tests cover existing-run preservation, two-image UI add/edit/order/
+delete, readonly viewing, retained media after last deletion, reuse, failed
+publication, pre-blob failure/retry versus cold incomplete repair, exact cold
+prepared recovery, missing/same-size corruption and stale/conflict/unknown refusal.
+Focused host: 18 PASS; existing media/isolation: 15 PASS. Final sequential matrix:
+typecheck PASS, ordinary build PASS (unchanged mixed-import/large-chunk warnings),
+saved-development HTTP/Wasm import graph PASS (1 test), then
+`npm test -- --maxWorkers=2`: 109 files / 1,915 PASS / 21 TODO, exit 0.
+Diff check PASS. Public files, package/lock, ordinary entry and build configuration
+are unchanged. No persistent server/tunnel was started; the HTTP test owns its
+temporary server. No browser/native-storage/iOS/offline claim follows.
+No new PoC, dependency, private source access, generic decoder or product file input.
+
+Next finite boundary: existing synthetic model placement through this same service.
+Specify fresh immutable AssetBinding + active-binding update in one original
+command before connecting the existing gizmo preview/confirm/cancel and cold
+reopen. Reuse the current revision/body, preserve Caption Asset anchors and Scene
+memberships, and read no extra model bytes. Do not include geometry replacement,
+exchange, real files or a generic immutable-write API in that slice. Broader
+Scene/team/file/device completion remains open; do not turn this save connection
+into a product acceptance or reopen the old passed manual checks.
+
 #### Material connection — implemented, real-browser acceptance pending (from `c9c480a`)
 
 - [x] Specify typed create/appearance-edit/reset, exact target/candidate reservations,
@@ -58,7 +111,7 @@ public files, ordinary entry and deployment configuration are unchanged. Started
 clean `c9c480a`, tracked origin ahead 17 / behind 0. This closes material save/reopen
 in the bounded host, not browser/raster/physical-storage/iOS or aggregate adoption.
 
-Next finite boundary: attach the two existing known synthetic PNGs in this host.
+Next boundary at the material checkpoint (implemented above): attach the two existing known synthetic PNGs in this host.
 This needs verified media inventory/facts and immutable MediaResource introduction,
 not just enabling a button: existing runs have no media resources. First specify
 the exact introduction boundary. A fresh-run-only seed extension is within the

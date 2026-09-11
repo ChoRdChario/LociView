@@ -98,6 +98,7 @@ export class SyntheticSession {
   get colorReadOnly() { return this.captionTextOnly && !this.authority?.capabilities?.color; }
   get viewRestriction() { return this.readOnly || !this.authority?.capabilities?.views ? this.editingRestriction : null; }
   get materialRestriction() { return this.readOnly || !this.authority?.capabilities?.materials ? this.editingRestriction : null; }
+  get mediaRestriction() { return this.readOnly || !this.authority?.capabilities?.media ? this.editingRestriction : null; }
   get savedStatus() { return this.authority?.status?.(); }
   get workingBlock() { return this.acknowledgment.block ?? (this.savedStatus?.kind === 'failed' ?
     this.savedStatus.error ?? '未完了の保存があります。更新を再試行してください。' : null); }
@@ -193,12 +194,13 @@ export class SyntheticSession {
     const composing = this.searchComposing || [...this.includes.values()].some(m => m.composing) || [...this.models.values()].some(m => m.composing) ||
       [...this.drafts.values()].some(d => d.composing);
     return { project: this.project, sceneId: this.sceneId, captionId,
-      block: this.workingBlock ?? (other ? '移動中の操作を終えてください。' : composing ? '文字の入力を確定してください。' : this.views.pending || this.materials.pending ?
+      block: this.workingBlock ?? this.mediaRestriction ?? (other ? '移動中の操作を終えてください。' : composing ? '文字の入力を確定してください。' : this.views.pending || this.materials.pending ?
         '他の編集中の設定を適用するか取り消してください。' : source.kind !== 'ready' || !source.captions.some(c => c.id === captionId) ? 'キャプションを選択してください。' : null) };
   }
   private writeMedia(base: string, changes: Readonly<Record<string, string>>) {
+    if (this.mediaRestriction) throw new Error(this.mediaRestriction);
     if (base !== this.project.state.token) throw new Error('添付が更新されています。入力を保持しています。');
-    if (this.authority) return afterWorking(this.authority.write(base, changes), next => this.publish(next));
+    if (this.authority) return afterWorking(this.authority.write(base, changes, { sceneId: this.sceneId }), next => this.publish(next));
     const token = fresh('snapshot'), data = this.project.mediaData;
     const previous = { token: base, cells: data?.cells ?? Object.fromEntries(Object.entries(mediaSeed()).map(([k, text]) => [k, { kind: 'value' as const, value: text }])), causalChanges: data?.causalChanges };
     const mediaData = projectMediaHistory(previewHistory(previous, token, changes), Object.keys(this.project.resources.captions), previous);

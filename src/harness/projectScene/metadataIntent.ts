@@ -5,6 +5,7 @@ import type { Anchor, Membership } from '../../scene/types';
 import type { MetadataEdit } from '../../projectMetadata/commands';
 import type { SyntheticProject } from './fixture';
 import { metadataFixtureLimits as limits } from './metadataFixture';
+import { fixtureMedia } from './mediaHistory';
 
 const fail = (): never => { throw Error('この保存経路では対応していない編集です。'); };
 const keys = (v: object, expected: string[]) => { if (Object.keys(v).sort().join(',') !== expected.sort().join(',')) fail(); };
@@ -30,6 +31,29 @@ function membership(key: string, text: string): Membership {
 export function metadataIntent(changes: Readonly<Record<string, string>>, project: SyntheticProject,
   context?: { sceneId: string }): MetadataEdit {
   const rows = Object.entries(changes); if (!rows.length || rows.length > 6 || rows.some(([, v]) => typeof v !== 'string')) return fail();
+  if (rows[0]![0].startsWith('attachment/')) {
+    const attachmentId = rows[0]![0].split('/')[1]!;
+    if (!context?.sceneId || !/^att_[0-9a-f]{32}$/.test(attachmentId) || rows.some(([k]) => !k.startsWith(`attachment/${attachmentId}/`))) return fail();
+    const fields = Object.fromEntries(rows.map(([k, text]) => [k.slice(`attachment/${attachmentId}/`.length), text]));
+    if ('mediaResourceId' in fields) {
+      keys(fields, ['captionId', 'mediaResourceId', 'altText', 'orderKey', 'lifecycle']);
+      const life = parse(fields.lifecycle!); keys(life, ['state', 'eventId', 'reason']);
+      const media = fixtureMedia.find(m => m.record.id === fields.mediaResourceId);
+      if (!media || life.state !== 'active' || life.reason !== 'initial' || typeof life.eventId !== 'string') return fail();
+      return { kind: 'createAttachment', attachmentId, sceneId: context.sceneId, captionId: fields.captionId!,
+        media: media.record, orderKey: fields.orderKey!, altText: fields.altText!, eventId: life.eventId };
+    }
+    const caption = project.mediaData?.records[attachmentId]?.captionId;
+    if (caption?.kind !== 'value') return fail();
+    if ('lifecycle' in fields) {
+      keys(fields, ['lifecycle']); const life = parse(fields.lifecycle!); keys(life, ['state', 'eventId', 'reason']);
+      if (life.state !== 'deleted' || life.reason !== 'userDelete' || typeof life.eventId !== 'string') return fail();
+      return { kind: 'deleteAttachment', attachmentId, sceneId: context.sceneId, captionId: caption.value, eventId: life.eventId };
+    }
+    const name = Object.keys(fields)[0];
+    if (rows.length !== 1 || (name !== 'altText' && name !== 'orderKey')) return fail();
+    return { kind: 'editAttachment', attachmentId, sceneId: context.sceneId, captionId: caption.value, field: name, value: fields[name]! };
+  }
   if (rows[0]![0].startsWith('material/')) {
     const overrideId = rows[0]![0].split('/')[1]!;
     if (!context?.sceneId || !/^ovr_[0-9a-f]{32}$/.test(overrideId) || rows.some(([k]) => !k.startsWith(`material/${overrideId}/`))) return fail();

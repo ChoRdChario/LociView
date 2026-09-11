@@ -34,12 +34,14 @@ that same path, with original per-field versions and local recall. Exact Project
 Scene material override creation, appearance editing and confirmed reset now share
 that save/reopen path; routing reservations never become an invented empty slot.
 Existing lighting/sidedness/hard-chroma controls are connected, while a base-color
-input is not yet exposed. Model geometry/placement, media writes and exchange
-remain unconnected here.
+input is not yet exposed. Explicit known-PNG registration/attachment, description,
+order and confirmed attachment deletion now share that journal. Existing runs
+are not reseeded; the gallery uses verified saved bytes, not a fixture fallback.
+Model geometry/placement, real-file input and exchange remain unconnected here.
 The old saved pair and ordinary home are unchanged.
 Mounted memory-port and HTTP dependency tests pass; actual browser/device/storage
-adoption remains unverified. Next connect existing synthetic attachments/media in
-this same host; see todo for the finite boundary and uiux-handoff for batched checks.
+adoption remains unverified. Next connect existing synthetic model placement with
+the current body; see todo for the finite boundary and uiux-handoff for batched checks.
 
 Current task (2026-09-10, after readiness checkpoint `77a22b0`): PO approved
 unplaced-Caption preservation. Specification 05 §9.4 proposes its exact atomic

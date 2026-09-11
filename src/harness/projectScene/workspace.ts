@@ -127,10 +127,11 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     materialPanel.hidden = task !== 'materials'; viewPanel.hidden = task !== 'views';
     if (session.captionTextOnly) {
       notice.textContent = session.readOnly ? '閲覧専用のタブです。編集する場合は、編集用タブを閉じてから再読み込みしてください。' :
-        '開発用・合成データのみ。キャプション・シーンへの所属・視点・マテリアルを保存できます。未適用の入力は再読み込みで失われます。';
+        '開発用・合成データのみ。キャプション・シーンへの所属・視点・マテリアル・添付を保存できます。未適用の入力は再読み込みで失われます。';
       if (session.pinRestriction) pin.actions.hidden = pin.modeStrip.hidden = pinHelp.hidden = numeric.hidden = true;
       if (session.membershipRestriction) include.root.hidden = true;
-      placement.actions.hidden = placement.modeStrip.hidden = modelUpdate.root.hidden = media.root.hidden = true;
+      placement.actions.hidden = placement.modeStrip.hidden = modelUpdate.root.hidden = true;
+      if (session.mediaRestriction && !session.readOnly) media.root.hidden = true;
       material.root.hidden = !!session.materialRestriction && !session.readOnly; modelList.root.inert = !!session.membershipRestriction;
     }
     // A second visible-list pass restores the desired inner scroll after a tab was hidden.

@@ -83,7 +83,11 @@ Optional entry clear preserves domain absence rather than adding a nullable sche
 Exact Project/Scene material create/appearance-edit/confirmed reset now shares
 the same retained save/retry. Complete original routing reservations guard the
 existing lighting/sidedness/hard-chroma UI; no base-color input was added.
-Model geometry/placement, media writes and exchange stay
+Explicit known-PNG introduction/attachment and description/order/confirmed deletion
+now use that same service. Existing run seeds stay unchanged and the gallery
+uses verified saved image bytes. The blob delta is sealed with retained originals;
+unattached media inspection does not change strong roots. Model geometry/placement,
+real-file input and exchange stay
 unconnected in this new mode, not removed from old modes or product requirements.
 Old saved runs and ordinary home remain unchanged. Actual browser/input and
 physical iOS evidence remain pending; source-only `reopen` itself is still not a

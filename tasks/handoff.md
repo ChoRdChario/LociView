@@ -1,6 +1,18 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **Latest connection (2026-09-11, after `c9c480a`):** the same `storage=metadata`
+> **Latest connection (2026-09-12, from `b9d99a4`):** the same `storage=metadata`
+> host now saves explicit known-PNG registration/attachments, description/order
+> edits and confirmed attachment deletion. Existing run seeds and edits remain;
+> no fixture image substitutes for missing saved bytes. The journal binds the
+> blob delta and retains exact originals for retry/cold recovery. Last-attachment
+> deletion keeps the verified media resource/body. Five new host tests and two
+> independent reviews cover this bounded connection. Typecheck/build/HTTP graph
+> PASS; root two-worker tests: 109 files / 1,915 PASS / 21 TODO, exit 0.
+> Next: existing model placement via fresh binding and the same current body,
+> not geometry replacement, team wire or another probe. Ordinary home/old saved
+> modes and real-file input remain unchanged. Browser/iOS evidence stays batched.
+
+> **Preceding connection (2026-09-11, after `c9c480a`):** the same `storage=metadata`
 > host now persists exact Project/Scene material create/appearance-edit/confirmed
 > reset using the existing journal/retry. Complete original routing reservations
 > refuse duplicate/unresolved targets without a winner. Readonly inspection and

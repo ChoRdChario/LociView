@@ -13,7 +13,8 @@ export type ProjectContentInspection = Readonly<{ kind: 'rejected'; issue: Valid
 const repMap = 'representationsById', mediaMap = 'mediaResourcesById', revisionMap = 'assetRevisionsById';
 
 /** Runs the candidate admission itself. A caller-supplied typed inspection is not authority. */
-export async function inspectProjectContent(input: unknown, limits: HistoryReadLimits, verifier: ProjectContentVerifier): Promise<ProjectContentInspection> {
+export async function inspectProjectContent(input: unknown, limits: HistoryReadLimits, verifier: ProjectContentVerifier,
+  options: { verifyRetainedMedia?: boolean } = {}): Promise<ProjectContentInspection> {
   const candidates = await inspectProjectCandidates(input, limits); if (candidates.kind === 'rejected') return candidates;
   try {
     const scope = verifier.scope;
@@ -68,7 +69,10 @@ export async function inspectProjectContent(input: unknown, limits: HistoryReadL
       charge(); const result = await query('representation', [r], {}, [repMap, string(r.id), 'formatProfile']);
       repEvidence.set(canonical(r), result);
     }
-    for (const r of media.filter(r => required.has(string(r.id)))) await query('media', [r], {}, [mediaMap, string(r.id), 'blob']);
+    const checkedMedia = new Set<string>();
+    for (const r of media.filter(r => options.verifyRetainedMedia || required.has(string(r.id)))) {
+      checkedMedia.add(string(r.id)); await query('media', [r], {}, [mediaMap, string(r.id), 'blob']);
+    }
     const families = new Map<string, JsonObject[]>();
     for (const r of reps.filter(r => required.has(string(r.id)))) { const key = canonical([r.assetId!, r.variantFamilyId!]), family = families.get(key) ?? []; family.push(r); families.set(key, family); }
     for (const records of families.values()) {
@@ -124,7 +128,8 @@ export async function inspectProjectContent(input: unknown, limits: HistoryReadL
     }
     const issues = candidates.issues.filter(i => {
       if (i.kind !== 'unverified') return true;
-      if (i.code === 'verified-profile-content-bounds-catalog-required' || i.code === 'verified-media-bytes-required') return !required.has(i.path[1]!); // required members have individual executed checks above
+      if (i.code === 'verified-media-bytes-required') return !checkedMedia.has(i.path[1]!);
+      if (i.code === 'verified-profile-content-bounds-catalog-required') return !required.has(i.path[1]!);
       if (i.code === 'verified-source-index-range-required') return !anchorsChecked.has(i.path[1]!) || anchorsPending.has(i.path[1]!);
       if (i.code === 'verified-surface-equivalence-required') {
         const r = table(revisionMap)[i.path[1]!];

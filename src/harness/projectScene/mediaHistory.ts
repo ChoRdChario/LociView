@@ -16,15 +16,19 @@ export const fixtureMedia = freezeSynthetic(images.map(([label, base64], index) 
   return { record: { ...record, payloadDigest: fixtureRecordDigest('media-resource', record) }, base64 };
 }));
 export const mediaSeed = () => Object.fromEntries(fixtureMedia.map(m => [`media/${m.record.id}`, canonicalFixture(m.record)]));
+export interface MediaImage { readonly record: typeof fixtureMedia[number]['record']; readonly base64: string }
 export const attachmentFields = ['captionId', 'mediaResourceId', 'altText', 'orderKey', 'lifecycle'] as const;
 export const attachmentKey = (id: string, field: typeof attachmentFields[number]) => `attachment/${id}/${field}`;
 export interface SyntheticAttachment {
   readonly id: string; readonly captionId: Field<string>; readonly mediaResourceId: Field<string>;
   readonly altText: Field<string>; readonly orderKey: Field<string>; readonly lifecycle: Field<Lifecycle>;
   readonly captionCandidates: readonly string[]; readonly deleteEdit: boolean;
+  readonly available?: boolean;
 }
 export interface MediaData { readonly cells: Readonly<Record<string, HistoryCell>>; readonly records: Readonly<Record<string, SyntheticAttachment>>;
-  readonly causalChanges: readonly HistoryChange[] }
+  readonly causalChanges?: readonly HistoryChange[];
+  /** Explicit empty map forbids the old in-memory fixture fallback. */
+  readonly images?: Readonly<Record<string, MediaImage>> }
 export function normalizeAlt(text: string): string {
   scalarLength(text, 65_536, ['altText']); const normalized = text.normalize('NFC');
   scalarLength(normalized, 4096, ['altText']); if (singleLineControls.test(normalized)) throw new Error('説明は1行で入力してください。'); return normalized;
@@ -93,14 +97,16 @@ export function projectMediaHistory(snapshot: HistorySnapshot, captionIds: reado
 export function captionAttachments(data: MediaData | undefined, captionId: string) {
   const relevant = Object.values(data?.records ?? {}).filter(r => r.captionCandidates.includes(captionId) &&
     (r.deleteEdit || r.lifecycle.kind !== 'value' || r.lifecycle.value.state !== 'deleted'));
-  const ready = relevant.filter(r => !r.deleteEdit && r.lifecycle.kind === 'value' && r.lifecycle.value.state === 'active' &&
+  const ready = relevant.filter(r => r.available !== false && !r.deleteEdit && r.lifecycle.kind === 'value' && r.lifecycle.value.state === 'active' &&
     r.captionId.kind === 'value' && r.mediaResourceId.kind === 'value' && r.orderKey.kind === 'value');
   ready.sort((a, b) => { const x = (a.orderKey as { value: string }).value, y = (b.orderKey as { value: string }).value;
     return x < y ? -1 : x > y ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
   return { ready, review: relevant.filter(r => !ready.includes(r)) };
 }
-export function attachmentImage(row: SyntheticAttachment) {
-  return row.mediaResourceId.kind === 'value' ? fixtureMedia.find(m => m.record.id === (row.mediaResourceId as { value: string }).value) : undefined;
+export function attachmentImage(row: SyntheticAttachment, data?: MediaData) {
+  if (row.mediaResourceId.kind !== 'value') return undefined;
+  const id = row.mediaResourceId.value;
+  return data?.images !== undefined ? data.images[id] : fixtureMedia.find(m => m.record.id === id);
 }
 export function copyableAttachments(data: MediaData | undefined, captionId: string) {
   const rows = captionAttachments(data, captionId);

@@ -1,6 +1,6 @@
 import * as A from '@automerge/automerge/slim';
 import type { ProjectWorkspaceFS } from '../platform/fs';
-import type { JsonObject } from '../domain/values';
+import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import type { ProjectContentVerifier } from '../domain/projectContentChecks';
 import { normalizeCaptionText } from '../domain/captionText';
 import { readProjectScene, type ProjectProviderRead } from '../scene/projectProvider';
@@ -9,7 +9,13 @@ import { ProjectMetadataSource } from './source';
 import { MetadataRepository, type MetadataStorageFactory } from './repository';
 import { TransactionJournal, type JournalStart, type PreparedJournal } from './journal';
 import { equalBytes, json, newId, underWriteLease } from './persistence';
-import type { MetadataEdit } from './commands';
+import { planMetadataEdit, type MetadataEdit } from './commands';
+
+/** Owned finite content boundary. Stage may introduce bytes; recovery may only verify saved bytes. */
+export interface MetadataMediaPort {
+  stage(record: JsonObject, token: string): Promise<void>;
+  verify(blobs: readonly JsonObject[]): Promise<void>;
+}
 
 export type MetadataSessionRead = Readonly<{
   state: 'empty' | 'ready' | 'pending' | 'repair-required';
@@ -24,11 +30,13 @@ export class MetadataProjectSession {
   private readonly limits: MetadataLimits;
   private readonly repository: MetadataRepository;
   private readonly journal: TransactionJournal;
-  private retained: { start: JournalStart; parts: Uint8Array[] } | null = null;
+  private retained: { start: JournalStart; parts: Uint8Array[]; stagedBlobs?: JsonObject[];
+    introduction?: { source: ProjectMetadataSource; command: Extract<MetadataEdit, { kind: 'createAttachment' }> } } | null = null;
   private last: MetadataSessionRead = { state: 'empty', source: null, provider: null, publication: null };
   constructor(private readonly fs: ProjectWorkspaceFS, storage: MetadataStorageFactory, limits: MetadataLimits,
     /** Owned verifier, fresh durable inventory/evidence per request. Boolean permits initial fact creation only. */
-    private readonly verifier: (allowNewEvidence: boolean) => ProjectContentVerifier) {
+    private readonly verifier: (allowNewEvidence: boolean) => ProjectContentVerifier,
+    private readonly media?: MetadataMediaPort) {
     this.limits = checkLimits(limits); this.repository = new MetadataRepository(fs, storage, this.limits);
     this.journal = new TransactionJournal(fs, this.limits);
   }
@@ -48,7 +56,7 @@ export class MetadataProjectSession {
           if (!included || !equalBytes(included, bytes)) fail('published-transaction-missing');
         }
       }
-      const provider = await readProjectScene(source!.read(), this.limits, this.verifier(false));
+      const provider = await readProjectScene(source!.read(), this.limits, this.verifier(false), { verifyRetainedMedia: !!this.media });
       return this.last = Object.freeze({ state: pending ? 'pending' : this.providerReady(provider) ? 'ready' : 'repair-required',
         source: source!, provider, publication: published.start.transactionId });
     } catch {
@@ -58,7 +66,7 @@ export class MetadataProjectSession {
 
   /** Full current provider/content closure, never only a materialized Caption record. */
   private async checked(source: ProjectMetadataSource, allowNewEvidence: boolean): Promise<ProjectProviderRead> {
-    const provider = await readProjectScene(source.read(), this.limits, this.verifier(allowNewEvidence));
+    const provider = await readProjectScene(source.read(), this.limits, this.verifier(allowNewEvidence), { verifyRetainedMedia: !!this.media });
     if (!this.providerReady(provider) || provider.kind !== 'scene-provider' || provider.token !== source.token) fail('provider-not-ready');
     return provider;
   }
@@ -96,6 +104,7 @@ export class MetadataProjectSession {
   }
 
   async edit(expectedToken: string, command: MetadataEdit): Promise<MetadataSessionRead> {
+    command = cloneCanonicalValue(command, this.limits) as unknown as MetadataEdit;
     return underWriteLease(this.fs, async () => {
       const read = await this.read();
       if (read.state !== 'ready' || !read.source || read.source.token !== expectedToken) return fail('command-not-ready');
@@ -104,6 +113,15 @@ export class MetadataProjectSession {
       if (!durable || durable.token !== read.source.token) return fail('command-base-changed');
       const provider = await this.checked(durable, false);
       const transactionId = newId();
+      if (command.kind === 'createAttachment') {
+        if (!this.media || provider.kind !== 'scene-provider') fail('media-unconnected');
+        planMetadataEdit(provider as Extract<ProjectProviderRead, { kind: 'scene-provider' }>, command, this.limits);
+        const [doc] = A.applyChanges(A.init(), durable.originalChanges());
+        this.retained = { start: { transactionId, repositoryId: prior.start.repositoryId, predecessor: prior.start.transactionId,
+          purpose: 'localCommand', proof: durable.proof, baseHeads: A.getHeads(doc).sort() }, parts: [],
+          stagedBlobs: [command.media.blob as JsonObject], introduction: { source: durable, command } };
+        return this.resume();
+      }
       const prepared = durable.prepareEdit(expectedToken, command, provider, transactionId);
       const known = new Set(durable.originalChanges().map(b => A.decodeChange(b).hash));
       const parts = prepared.originalChanges().filter(b => !known.has(A.decodeChange(b).hash));
@@ -128,11 +146,29 @@ export class MetadataProjectSession {
       }
       const predecessor = entries.filter(e => e.publication).at(-1)?.start.transactionId ?? null;
       if (predecessor !== this.retained.start.predecessor) fail('retry-predecessor');
-      prepared = await this.journal.stage(this.retained.start, this.retained.parts);
+      if (this.retained.introduction) {
+        const { source, command } = this.retained.introduction;
+        await this.journal.begin(this.retained.start);
+        await this.media!.stage(command.media, source.token);
+        const durable = await this.repository.read(this.retained.start.repositoryId, source.proof);
+        if (!durable || durable.token !== source.token) return fail('media-base-changed');
+        const next = durable.prepareEdit(source.token, command, await this.checked(durable, false), this.retained.start.transactionId);
+        const known = new Set(durable.originalChanges().map(b => A.decodeChange(b).hash));
+        this.retained.parts = next.originalChanges().filter(b => !known.has(A.decodeChange(b).hash));
+        delete this.retained.introduction; // From here, retry can only replay these originals.
+      }
+      await this.verifyDelta(this.retained.stagedBlobs);
+      if (this.retained.stagedBlobs?.length) {
+        const stored = await this.repository.read(this.retained.start.repositoryId, this.retained.start.proof);
+        if (!stored) return fail('journal-base-missing');
+        await this.checked(stored.appendOriginal(this.retained.parts), false);
+      }
+      prepared = await this.journal.stage(this.retained.start, this.retained.parts, this.retained.stagedBlobs);
     } else if (pending?.prepared) prepared = pending.prepared;
     else if (pending) return fail('incomplete-staging-repair');
     else return this.read(); // Already published: no mutation or second publication.
 
+    await this.verifyDelta(prepared.stagedBlobs);
     const parts = await this.journal.validateParts(prepared), start = prepared.start;
     let stored = await this.repository.read(start.repositoryId, start.proof, undefined, start.purpose === 'initialize');
     if (start.purpose === 'localCommand') {
@@ -159,5 +195,10 @@ export class MetadataProjectSession {
     const read = await this.read();
     if (read.state !== 'ready' || read.source?.token !== stored!.token) fail('publication-readback');
     return read;
+  }
+  private async verifyDelta(blobs: readonly JsonObject[] = []): Promise<void> {
+    if (!blobs.length) return;
+    if (!this.media) fail('media-unconnected');
+    await this.media!.verify(blobs);
   }
 }

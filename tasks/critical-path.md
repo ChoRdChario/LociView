@@ -406,10 +406,13 @@ and entry set/clear now use that same journal with original per-field version
 guards; recall remains local. Project/Scene material create/appearance-edit/confirmed
 reset also uses the same path and complete original routing reservations. Existing
 lighting/sidedness/hard-chroma UI is connected; base-color input is not yet exposed.
-Model geometry/placement, media writes and exchange remain unconnected here. No old saved
+Explicit known-PNG registration/attachment, description/order/confirmed deletion
+now share the service, including existing-run preservation and exact blob/original
+change retry. Saved-byte gallery and retained-media checks never use image fallback
+or create strong roots. Model geometry/placement, real-file input and exchange remain unconnected here. No old saved
 history is converted. Mounted memory-port and HTTP tests do not establish actual
-browser/device/adoption acceptance. Next connect exact existing synthetic media/
-attachments through this same service; batch browser evidence, not another source/probe campaign.
+browser/device/adoption acceptance. Next connect existing synthetic model placement
+with the current body through this same service; batch browser evidence, not another source/probe campaign.
 
 The ten latest executable commits through `d8f52d1` implement reusable Scene,
 record-admission and four-tab UI parts, with source-isolation tests deliberately

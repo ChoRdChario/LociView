@@ -258,26 +258,27 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         const byFile: Record<string, string[]> = {
           persistence: ['../core/json', '../domain/projectGraphSupport', '../domain/values', '../platform/fs', './format'],
           repository: ['@automerge/automerge/slim', '@automerge/automerge-repo/slim', '../platform/fs', './format', './persistence', './source'],
-          journal: ['@automerge/automerge/slim', '../platform/fs', './format', './source', './persistence'],
+          journal: ['@automerge/automerge/slim', '../platform/fs', '../domain/values', '../domain/projectRecordFields', './format', './source', './persistence'],
           contentEvidence: ['../domain/projectContentChecks', '../domain/values', '../platform/fs', './format', './persistence'],
           session: ['@automerge/automerge/slim', '../platform/fs', '../domain/values', '../domain/projectContentChecks', '../domain/captionText', '../scene/projectProvider',
             './format', './source', './repository', './journal', './persistence', './commands'],
-          commands: ['../domain/values', '../domain/projectMutableFields', '../domain/projectRecordFields', '../domain/projectGraphSupport',
+          commands: ['../domain/values', '../domain/projectMutableFields', '../domain/projectRecordFields', '../domain/projectRecords', '../domain/projectGraphSupport',
             '../domain/materialIntent', '../scene/projectMaterialRoutes', '../scene/commands', '../scene/resolve', '../scene/types', '../scene/projectProvider', './format'],
         };
         const name = path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '');
         expect(imports.every(p => byFile[name]!.includes(p!)), path).toBe(true);
         expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
-      } else if (/[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Browser|Intent|Views|Materials)\.ts$/.test(path)) {
+      } else if (/[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Browser|Intent|Views|Materials|Media)\.ts$/.test(path)) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
         const byFile: Record<string, string[]> = {
           metadataFixture: ['./fixture', './modelFixture', './modelClosure', '../../domain/values', '../../scene/projectProvider',
-            '../../scene/types', '../../projectMetadata/source', '../../projectMetadata/persistence', './metadataViews', './metadataMaterials'],
+            '../../scene/types', '../../projectMetadata/source', '../../projectMetadata/persistence', './metadataViews', './metadataMaterials', './metadataMedia', './mediaHistory'],
           metadataStorage: ['../../platform/fs', '../../domain/projectContentChecks', '../../domain/values', '../../projectMetadata/contentEvidence',
-            '../../projectMetadata/source', '../../projectMetadata/persistence', './metadataFixture'],
+            '../../projectMetadata/source', '../../projectMetadata/persistence', '../../projectMetadata/session', './metadataFixture', './mediaHistory'],
           metadataHost: ['../../platform/fs', '../../platform/projectLock', '../../projectMetadata/session', '../../projectMetadata/repository',
             '../../projectMetadata/persistence', '../../projectMetadata/journal', './metadataFixture', './metadataStorage', './historyProjection', './metadataIntent'],
-          metadataIntent: ['../../core/json', '../../domain/values', '../../domain/captionText', '../../scene/types', '../../projectMetadata/commands', './fixture', './metadataFixture'],
+          metadataIntent: ['../../core/json', '../../domain/values', '../../domain/captionText', '../../scene/types', '../../projectMetadata/commands', './fixture', './metadataFixture', './mediaHistory'],
+          metadataMedia: ['../../scene/projectProvider', '../../scene/types', '../../domain/projectGraphSupport', './historyPort', './mediaHistory'],
           metadataViews: ['../../scene/projectProvider', '../../scene/types', '../../domain/projectGraphSupport', '../../domain/values', './viewHistory', './historyPort'],
           metadataMaterials: ['../../scene/projectProvider', '../../scene/projectMaterialRoutes', '../../scene/types', '../../domain/projectGraphSupport',
             '../../domain/materialIntent', './materialHistory', './historyPort'],

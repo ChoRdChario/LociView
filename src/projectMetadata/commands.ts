@@ -1,6 +1,7 @@
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
 import { checkMutableField, checkMutableRecord, type MutableRecordMap } from '../domain/projectMutableFields';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
+import { checkProjectRecord } from '../domain/projectRecords';
 import { list, object, same } from '../domain/projectGraphSupport';
 import { validateMaterialIntent } from '../domain/materialIntent';
 import { projectMaterialRoutes } from '../scene/projectMaterialRoutes';
@@ -23,8 +24,11 @@ export type MetadataEdit =
   | { kind: 'setEntryView'; sceneId: string; viewId: string | null }
   | { kind: 'createMaterial'; sceneId: string; overrideId: string; routing: JsonObject; appearance: JsonObject; compositing: JsonObject; eventId: string }
   | { kind: 'editMaterial'; sceneId: string; overrideId: string; appearance: JsonObject }
-  | { kind: 'resetMaterial'; sceneId: string; overrideId: string; eventId: string };
-export interface MetadataRecordEdit { map: MutableRecordMap; id: string; create: boolean; fields: JsonObject; remove?: readonly 'defaultViewId'[] }
+  | { kind: 'resetMaterial'; sceneId: string; overrideId: string; eventId: string }
+  | { kind: 'createAttachment'; sceneId: string; captionId: string; attachmentId: string; media: JsonObject; orderKey: string; altText: string; eventId: string }
+  | { kind: 'editAttachment'; sceneId: string; captionId: string; attachmentId: string; field: 'altText' | 'orderKey'; value: string }
+  | { kind: 'deleteAttachment'; sceneId: string; captionId: string; attachmentId: string; eventId: string };
+export interface MetadataRecordEdit { map: MutableRecordMap | 'mediaResourcesById'; id: string; create: boolean; fields: JsonObject; remove?: readonly 'defaultViewId'[] }
 type Provider = Extract<ProjectProviderRead, { kind: 'scene-provider' }>;
 const exact = <T>(field: Field<T> | undefined): T => field?.kind === 'value' ? field.value : fail('command-unresolved');
 const json = (v: unknown) => v as JsonValue;
@@ -130,6 +134,42 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       (intent.compositing.coverage.policy === 'inherit' && (intent.appearance.opacity ?? 1) < 1)) fail('material-unsupported');
   };
   switch (command.kind) {
+    case 'createAttachment': case 'editAttachment': case 'deleteAttachment': {
+      shape(raw, command.kind === 'createAttachment' ? ['kind', 'sceneId', 'captionId', 'attachmentId', 'media', 'orderKey', 'altText', 'eventId'] :
+        command.kind === 'editAttachment' ? ['kind', 'sceneId', 'captionId', 'attachmentId', 'field', 'value'] :
+          ['kind', 'sceneId', 'captionId', 'attachmentId', 'eventId']);
+      row('scenesById', command.sceneId); row('captionsById', command.captionId);
+      memberships('caption', command.sceneId, command.captionId);
+      const scene = resolveScene(provider.state, provider.resources, command.sceneId);
+      if (scene.kind !== 'ready' || !scene.composition.captions.some(c => c.captionId === command.captionId)) fail('attachment-scene');
+      // Unresolved ownership/order cannot disappear from the set being reordered.
+      for (const [id, r] of Object.entries(provider.details.mutable.captionAttachmentsById)) {
+        const owner = exact(r.captionId), life = object(exact(r.lifecycle));
+        if (owner !== command.captionId || life.state === 'deleted') continue;
+        exact(provider.details.attachments[id]); exact(r.orderKey);
+      }
+      if (command.kind === 'createAttachment') {
+        const media = command.media; checkProjectRecord(c, 'mediaResourcesById', media);
+        c.id(media.id!, 'med', []); if (c.unknown) fail('media-unknown');
+        const prior = provider.details.immutable.mediaResourcesById[media.id as string];
+        if (prior) { if (!same(exact(prior), media)) fail('media-record-mismatch'); }
+        else result.push({ map: 'mediaResourcesById', id: media.id as string, create: true, fields: media });
+        add('captionAttachmentsById', command.attachmentId, { id: command.attachmentId, captionId: command.captionId,
+          mediaResourceId: media.id!, altText: command.altText, orderKey: command.orderKey,
+          lifecycle: { state: 'active', reason: 'initial', eventId: command.eventId } }, true);
+      } else {
+        const r = row('captionAttachmentsById', command.attachmentId), target = exact(provider.details.attachments[command.attachmentId]);
+        if (target.captionId !== command.captionId) fail('attachment-owner');
+        for (const name of ['captionId', 'mediaResourceId', 'lifecycle']) {
+          checkMutableField(c, 'captionAttachmentsById', name, exact(r[name])); if (c.unknown) fail('attachment-unknown');
+        }
+        if (command.kind === 'editAttachment') {
+          if (!['altText', 'orderKey'].includes(command.field)) fail('attachment-field');
+          add('captionAttachmentsById', command.attachmentId, { [command.field]: command.value });
+        } else add('captionAttachmentsById', command.attachmentId, { lifecycle: { state: 'deleted', reason: 'userDelete', eventId: command.eventId } });
+      }
+      break;
+    }
     case 'editCaption': {
       shape(raw, ['kind', 'captionId', 'edits']); c.id(command.captionId, 'cap', []);
       const fields = command.edits as JsonObject, names = Object.keys(fields);

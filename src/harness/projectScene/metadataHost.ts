@@ -30,7 +30,7 @@ export async function openMetadataHost(options: MetadataHostOptions) {
     const entries = await journal.entries();
     // Only a known, unpublished initialization can create its isolated database.
     connection = await options.openStorage(lease.holdsWriteLock && entries.length === 0);
-    const content = new MetadataFixtureContent(fs), service = new MetadataProjectSession(fs, connection.factory, limits, allow => content.verifier(allow));
+    const content = new MetadataFixtureContent(fs), service = new MetadataProjectSession(fs, connection.factory, limits, allow => content.verifier(allow), content);
     let last = await service.read(), busy = false, closed = false, failure = '';
     if (last.state === 'repair-required') throw Error('保存内容を確認できません。データは保持しています。');
     if (!fresh && lease.holdsWriteLock) lease.activateAfterDurableReload();
@@ -46,7 +46,7 @@ export async function openMetadataHost(options: MetadataHostOptions) {
     const ready = (read: MetadataSessionRead) => {
       last = read;
       if (read.state !== 'ready' || !read.provider) throw Error('未完了の保存があります。元の変更から復旧してください。');
-      return metadataProjectView(read.provider);
+      return metadataProjectView(read.provider, content.images);
     };
     const initialize = async () => {
       await underWriteLease(fs, () => content.prepare());
@@ -57,9 +57,9 @@ export async function openMetadataHost(options: MetadataHostOptions) {
     }
     const authority: SyntheticAuthority = {
       storage: 'saved-development', writeScope: 'caption-text',
-      capabilities: { pins: true, membership: true, color: true, views: true, materials: true },
+      capabilities: { pins: true, membership: true, color: true, views: true, materials: true, media: true },
       get readOnly() { return fs.mutationAuthority.accessState !== 'editable' || closed; },
-      read: () => { if (!last.provider) throw Error('保存した画面はまだありません。'); return metadataProjectView(last.provider); },
+      read: () => { if (!last.provider) throw Error('保存した画面はまだありません。'); return metadataProjectView(last.provider, content.images); },
       status: () => ({ kind: busy ? 'checking' : failure || last.state !== 'ready' ? 'failed' : 'idle', error: failure || '未完了の保存があります。' }),
       write: (token, changes, context) => execute(async () => {
         if (authority.readOnly) throw Error('このタブは閲覧専用です。');

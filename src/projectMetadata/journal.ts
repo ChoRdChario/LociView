@@ -1,5 +1,7 @@
 import * as A from '@automerge/automerge/slim';
 import type { ProjectWorkspaceFS } from '../platform/fs';
+import type { JsonObject } from '../domain/values';
+import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { checkedProof, fail, type MetadataLimits, type MetadataProof } from './format';
 import { ProjectMetadataSource } from './source';
 import { digest, equalBytes, json, metadataPath, readReceipt, technicalId, writeReceipt } from './persistence';
@@ -13,16 +15,16 @@ export interface JournalStart {
   baseHeads: string[];
 }
 interface Part { ordinal: number; expectedChangeHash: string; dependencies: string[]; byteLength: number; bytesSha256: string }
-export interface PreparedJournal { start: JournalStart; changes: Part[]; exactChangeSetDigest: string }
+export interface PreparedJournal { start: JournalStart; changes: Part[]; exactChangeSetDigest: string; stagedBlobs?: JsonObject[] }
 interface Durable { transactionId: string; exactChangeSetDigest: string }
 export interface Publication extends Durable { heads: string[] }
 export interface JournalEntry { start: JournalStart; prepared: PreparedJournal | null; publication: Publication | null }
 const sorted = (s: readonly string[]) => [...s].sort();
-async function seal(start: JournalStart, changes: Part[]): Promise<string> {
+async function seal(start: JournalStart, changes: Part[], stagedBlobs: readonly JsonObject[] = []): Promise<string> {
   if (start.purpose === 'initialize') return digest(new TextEncoder().encode(`lociview:private-initialization:jcs-v1\n${json({ start, changes })}`));
-  // Exact 02 §8 local-command digest. This first service adds no new BlobRefs.
+  // Exact 02 §8 local-command digest. Old receipts retain the empty-list digest.
   const value = { transactionId: start.transactionId,
-    target: { identity: start.proof.identity, metadataEnvelope: start.proof.envelope }, purpose: 'localCommand', stagedBlobs: [],
+    target: { identity: start.proof.identity, metadataEnvelope: start.proof.envelope }, purpose: 'localCommand', stagedBlobs,
     metadataBatch: { kind: 'localCommand', baseHeads: start.baseHeads, changes } };
   return digest(new TextEncoder().encode(`lociview:v2:metadata-change-set:jcs-v1\n${json(value)}`));
 }
@@ -80,7 +82,11 @@ export class TransactionJournal {
     return chain;
   }
 
-  async stage(start: JournalStart, parts: readonly Uint8Array[]): Promise<PreparedJournal> {
+  async begin(start: JournalStart): Promise<void> {
+    validateStart(start, this.limits);
+    await writeReceipt(this.fs, this.path(start.transactionId, 'staging.json'), start, this.limits);
+  }
+  async stage(start: JournalStart, parts: readonly Uint8Array[], stagedBlobs: readonly JsonObject[] = []): Promise<PreparedJournal> {
     validateStart(start, this.limits);
     const changes: Part[] = [];
     for (const [ordinal, bytes] of parts.entries()) {
@@ -88,7 +94,7 @@ export class TransactionJournal {
       changes.push({ ordinal, expectedChangeHash: c.hash, dependencies: sorted(c.deps),
         byteLength: bytes.length, bytesSha256: await digest(bytes) });
     }
-    const prepared = { start, changes, exactChangeSetDigest: await seal(start, changes) };
+    const prepared = { start, changes, ...(stagedBlobs.length ? { stagedBlobs: [...stagedBlobs] } : {}), exactChangeSetDigest: await seal(start, changes, stagedBlobs) };
     await this.validatePrepared(start, prepared);
     await writeReceipt(this.fs, this.path(start.transactionId, 'staging.json'), start, this.limits);
     for (const [ordinal, bytes] of parts.entries()) {
@@ -104,9 +110,14 @@ export class TransactionJournal {
   }
 
   private async validatePrepared(start: JournalStart, p: PreparedJournal): Promise<void> {
-    if (!p || Object.keys(p).sort().join(',') !== 'changes,exactChangeSetDigest,start' || json(start) !== json(p.start) ||
+    if (!p || !['changes,exactChangeSetDigest,start', 'changes,exactChangeSetDigest,stagedBlobs,start'].includes(Object.keys(p).sort().join(',')) || json(start) !== json(p.start) ||
       !Array.isArray(p.changes) || p.changes.length !== (start.purpose === 'initialize' ? 2 : 1) ||
-      p.exactChangeSetDigest !== await seal(start, p.changes)) fail('journal-descriptors');
+      p.exactChangeSetDigest !== await seal(start, p.changes, p.stagedBlobs)) fail('journal-descriptors');
+    if (p.stagedBlobs !== undefined) {
+      if (start.purpose !== 'localCommand' || !Array.isArray(p.stagedBlobs) || p.stagedBlobs.length !== 1) fail('journal-blob-delta');
+      const check = new ProjectRecordFields(); check.blob(p.stagedBlobs[0]!, []);
+      if (check.unknown) fail('journal-blob-delta');
+    }
     let total = 0; const seen = new Set<string>();
     for (const [ordinal, part] of p.changes.entries()) {
       if (Object.keys(part).sort().join(',') !== 'byteLength,bytesSha256,dependencies,expectedChangeHash,ordinal' ||

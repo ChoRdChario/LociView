@@ -39,8 +39,9 @@ function freeze<T>(v: T): T {
 }
 
 /** The sole plain-data entry for this scoped read pair; runs admission and executable content checks itself. */
-export async function readProjectScene(input: unknown, limits: HistoryReadLimits, verifier: ProjectContentVerifier): Promise<ProjectProviderRead> {
-  const inspection = await inspectProjectContent(input, limits, verifier); if (inspection.kind === 'rejected') return inspection;
+export async function readProjectScene(input: unknown, limits: HistoryReadLimits, verifier: ProjectContentVerifier,
+  options: { verifyRetainedMedia?: boolean } = {}): Promise<ProjectProviderRead> {
+  const inspection = await inspectProjectContent(input, limits, verifier, options); if (inspection.kind === 'rejected') return inspection;
   try { return project(inspection, limits); }
   catch (error) { if (error instanceof DomainValidationError) return Object.freeze({ kind: 'rejected', issue: error.issue }); throw error; }
 }

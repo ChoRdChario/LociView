@@ -24,15 +24,19 @@ import { materialBucket, materialKey, materialTarget, type MaterialRouting } fro
 import { syntheticDisplay } from '../../src/harness/projectScene/viewportModel';
 import { canonicalFixture } from '../../src/harness/projectScene/modelClosure';
 import { metadataModels } from '../../src/harness/projectScene/metadataFixture';
+import { fixtureMedia, captionAttachments } from '../../src/harness/projectScene/mediaHistory';
 import { RecordedDocument, record, type RecordedNode } from './domRecorder';
 
 class FaultFS extends MemoryFS {
-  rejectPublication = false; writes = 0;
+  rejectPublication = false; rejectImage = false; writes = 0;
   override async writeText(path: string, data: string) {
     if (this.rejectPublication && path.endsWith('/published.json')) throw Error('synthetic quota');
     this.writes++; return super.writeText(path, data);
   }
-  override async writeBytes(path: string, data: Uint8Array) { this.writes++; return super.writeBytes(path, data); }
+  override async writeBytes(path: string, data: Uint8Array) {
+    if (this.rejectImage && fixtureMedia.some(m => path.endsWith(`${m.record.blob.digest}.bin`))) throw Error('synthetic image quota');
+    this.writes++; return super.writeBytes(path, data);
+  }
 }
 function fixture() {
   const base = new FaultFS(), coordinator = ProjectMutationCoordinator.local();
@@ -104,8 +108,142 @@ async function apply(s: SyntheticSession, edits: { title?: string; body?: string
   const plan = planCaptionApply(s.detailContext()); if (plan.kind !== 'apply') throw Error(plan.reason);
   await acknowledge(s, () => { s.acceptDetail(plan); });
 }
+function mediaHost(s: SyntheticSession) {
+  select(s); const w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s), root = record(w.root), panel = area(root, 'メディア');
+  return { w, root, panel, async add(index: number) {
+    setInput(named(panel, 'メディアを選択'), fixtureMedia[index]!.record.id);
+    await acknowledge(s, () => button(panel, 'メディアを追加').fire('click')); w.render();
+  }, async remove() {
+    button(panel, '添付を削除').fire('click');
+    const confirm = descendants(panel).find(n => n.tag === 'section' && n.children.some(c => c.textContent.includes('画像本体と別キャプション')))!;
+    await acknowledge(s, () => button(confirm, '添付を削除').fire('click')); w.render();
+  } };
+}
 
 describe('new synthetic saved host (memory ports and recorded DOM, not real browser/iOS acceptance)', { timeout: 15_000 }, () => {
+  it('adds saved PNGs to an existing edited run, edits/reorders/removes attachments and cold-reopens retained media without reseeding', async () => {
+    const h = fixture(), initial = await h.open(true), initialSession = new SyntheticSession(initial.authority); select(initialSession);
+    await apply(initialSession, { title: '先の作業を保持' });
+    const originals = initial.read().source!.originalChanges(), seedPaths = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.includes('/seed/'));
+    const seedBytes = await Promise.all(seedPaths.map(p => h.base.readBytes(p))); await initial.dispose();
+    const host = await h.open(), s = new SyntheticSession(host.authority), ui = mediaHost(s);
+    expect(s.snapshot.mediaData!.images).toEqual({}); expect(ui.panel.hidden).toBe(false);
+    await ui.add(0); expect(s.acknowledgment.state).toBe('idle'); await ui.add(1); expect(s.acknowledgment.state).toBe('idle');
+    const rows = () => captionAttachments(s.snapshot.mediaData, f.shared).ready, first = rows()[0]!.id;
+    expect(rows()).toHaveLength(2); expect(host.read().source!.originalChanges()).toHaveLength(originals.length + 2);
+    const gallery = area(named(ui.root, 'キャプションのウィンドウ'), '添付メディア');
+    expect(descendants(gallery).filter(n => n.tag === 'img').map(n => (n as unknown as HTMLImageElement).src)).toEqual(fixtureMedia.map(m => `data:image/png;base64,${m.base64}`));
+    button(ui.panel, '説明を編集').fire('click'); setInput(named(ui.panel, 'メディアの説明'), '保存した説明');
+    await acknowledge(s, () => button(ui.panel, '説明を適用').fire('click')); ui.w.render();
+    expect(rows()[0]!.altText).toEqual({ kind: 'value', value: '保存した説明' });
+    await acknowledge(s, () => button(ui.panel, '後へ').fire('click')); ui.w.render(); expect(rows()[1]!.id).toBe(first);
+    const reader = await h.open(), readonly = new SyntheticSession(reader.authority), readUI = mediaHost(readonly);
+    expect(button(readUI.panel, 'メディアを追加').disabled).toBe(true); expect(button(readUI.panel, '説明を編集').disabled).toBe(true);
+    const readGallery = area(named(readUI.root, 'キャプションのウィンドウ'), '添付メディア');
+    button(readGallery, '拡大').fire('click'); expect(button(readGallery, '縮小')).toBeDefined();
+    expect(readonly.media.add(readonly.mediaContext(), fixtureMedia[0]!.record.id)).toBe(false);
+    readUI.w.dispose(); await reader.dispose();
+    await ui.remove(); await ui.remove(); expect(rows()).toHaveLength(0); expect(host.read().state).toBe('ready');
+    expect(Object.keys(s.snapshot.mediaData!.records)).toHaveLength(2);
+    expect(s.snapshot.resources.captions[f.shared]!.title).toEqual({ kind: 'value', value: '先の作業を保持' });
+    expect(await Promise.all(seedPaths.map(p => h.base.readBytes(p)))).toEqual(seedBytes);
+    expect(host.content.counts.bodyBytes).toBe(0); ui.w.dispose(); await host.dispose();
+    const cold = await h.open(), cs = new SyntheticSession(cold.authority), cu = mediaHost(cs);
+    expect(cold.read().state).toBe('ready'); expect(Object.keys(cs.snapshot.mediaData!.images!)).toHaveLength(2);
+    expect(captionAttachments(cs.snapshot.mediaData, f.shared).ready).toHaveLength(0);
+    await cu.add(0); expect(cs.acknowledgment.state).toBe('idle');
+    expect(captionAttachments(cs.snapshot.mediaData, f.shared).ready[0]!.id).not.toBe(first);
+    const provider = cold.read().provider!; if (provider.kind !== 'scene-provider') throw Error('provider');
+    expect(Object.keys(provider.details.immutable.mediaResourcesById)).toHaveLength(2); expect(cold.content.counts.bodyBytes).toBe(0);
+    cu.w.dispose(); await cold.dispose();
+  });
+
+  it('retains PNG attachment ID and original journal bytes across failed publication and exact recovery', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority), ui = mediaHost(s);
+    h.base.rejectPublication = true; await ui.add(0); expect(s.acknowledgment.state).toBe('failed');
+    expect(captionAttachments(s.snapshot.mediaData, f.shared).ready).toHaveLength(0);
+    const paths = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.includes('/journal/') && p.endsWith('.amchange'));
+    const bytes = await Promise.all(paths.map(p => h.base.readBytes(p))), failed = s.media.failed!;
+    const preparedPaths = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.endsWith('/blobsVerified.json'));
+    const prepared = await Promise.all(preparedPaths.map(async p => JSON.parse((await h.base.readText(p))!)));
+    expect(prepared.find(p => p.start.purpose === 'localCommand').stagedBlobs).toEqual([fixtureMedia[0]!.record.blob]);
+    h.base.rejectPublication = false; await acknowledge(s, () => { s.retryWorking(); }); ui.w.render();
+    expect(s.acknowledgment.state).toBe('idle'); expect(s.media.failed).toBeNull();
+    const id = Object.keys(failed.changes)[0]!.split('/')[1]!;
+    expect(captionAttachments(s.snapshot.mediaData, f.shared).ready.map(r => r.id)).toEqual([id]);
+    expect(await Promise.all(paths.map(p => h.base.readBytes(p)))).toEqual(bytes);
+    await host.authority.retry!(); expect(Object.keys(host.authority.read().mediaData!.records)).toEqual([id]);
+    ui.w.dispose(); await host.dispose(); const cold = await h.open(); expect(cold.authority.read().mediaData!.records[id]).toBeDefined(); await cold.dispose();
+  });
+
+  it('retains a pre-blob-failure intent for same-host retry but never cold-regenerates incomplete staging', async () => {
+    for (const coldRecovery of [false, true]) {
+      const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority), ui = mediaHost(s);
+      h.base.rejectImage = true; await ui.add(0); expect(s.acknowledgment.state).toBe('failed');
+      const id = Object.keys(s.media.failed!.changes)[0]!.split('/')[1]!; h.base.rejectImage = false;
+      if (!coldRecovery) {
+        await acknowledge(s, () => { s.retryWorking(); }); expect(s.acknowledgment.state).toBe('idle');
+        expect(captionAttachments(s.snapshot.mediaData, f.shared).ready.map(r => r.id)).toEqual([id]);
+      }
+      ui.w.dispose(); await host.dispose();
+      const cold = await h.open();
+      if (coldRecovery) {
+        expect(cold.read().state).toBe('pending'); await expect(cold.authority.retry!()).rejects.toThrow();
+        expect(cold.authority.read().mediaData!.images).toEqual({});
+        expect((await h.base.list(`${metadataArea}/${h.run}/`)).some(p => p.endsWith(`${fixtureMedia[0]!.record.blob.digest}.bin`))).toBe(false);
+      }
+      await cold.dispose();
+    }
+  });
+
+  it('refuses missing and same-size corrupt saved PNGs on cold open or prepared recovery; never uses fixture fallback', async () => {
+    for (const pending of [false, true]) for (const corrupt of [false, true]) {
+      const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority), ui = mediaHost(s);
+      h.base.rejectPublication = pending; await ui.add(0);
+      expect(s.acknowledgment.state).toBe(pending ? 'failed' : 'idle');
+      ui.w.dispose(); await host.dispose(); h.base.rejectPublication = false;
+      const paths = await h.base.list(`${metadataArea}/${h.run}/`), path = paths.find(p => p.endsWith(`${fixtureMedia[0]!.record.blob.digest}.bin`))!;
+      const bytes = (await h.base.readBytes(path))!;
+      if (corrupt) { bytes[bytes.length - 1] = bytes[bytes.length - 1]! ^ 1; await h.base.writeBytes(path, bytes); }
+      else await h.base.remove(path);
+      if (pending) {
+        const cold = await h.open(); expect(cold.read().state).toBe('pending');
+        await expect(cold.authority.retry!()).rejects.toThrow(); expect(cold.authority.read().mediaData!.images).toEqual({}); await cold.dispose();
+      } else await expect(h.open()).rejects.toThrow(/保存内容/);
+      if (corrupt) expect(await h.base.readBytes(path)).toEqual(bytes); else expect(await h.base.exists(path)).toBe(false);
+    }
+  });
+
+  it('cold-recovers the exact prepared media change and refuses stale, cross-caption, conflict and unknown attachment edits', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority), ui = mediaHost(s);
+    h.base.rejectPublication = true; await ui.add(0);
+    const paths = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.includes('/journal/') && p.endsWith('.amchange'));
+    const bytes = await Promise.all(paths.map(p => h.base.readBytes(p)));
+    ui.w.dispose(); await host.dispose(); h.base.rejectPublication = false;
+    const cold = await h.open(); expect(cold.read().state).toBe('pending'); await cold.authority.retry!();
+    expect(await Promise.all(paths.map(p => h.base.readBytes(p)))).toEqual(bytes);
+    const source = cold.read().source!, provider = cold.read().provider!, id = Object.keys(cold.authority.read().mediaData!.records)[0]!;
+    const tx = 'b'.repeat(32), edit: MetadataEdit = { kind: 'editAttachment', sceneId: f.overview, captionId: f.shared, attachmentId: id, field: 'altText', value: '説明' };
+    expect(() => source.prepareEdit('stale', edit, provider, tx)).toThrow(/stale/);
+    expect(() => source.prepareEdit(source.token, { ...edit, captionId: f.second }, provider, tx)).toThrow(/owner/);
+    const read = (value: ProjectMetadataSource) => readProjectScene(value.read(), metadataFixtureLimits, cold.content.verifier(false), { verifyRetainedMedia: true });
+    const first = source.prepareEdit(source.token, edit, provider, tx);
+    const second = source.prepareEdit(source.token, { ...edit, value: '別の説明' }, provider, 'c'.repeat(32));
+    const conflict = first.appendOriginal(second.originalChanges()), cp = await read(conflict);
+    const data = metadataProjectView(cp, cold.content.images).mediaData!;
+    expect(data.records[id]!.altText.kind).toBe('unresolved'); expect(data.cells[`attachment/${id}/altText`]).toBeUndefined();
+    expect(captionAttachments(data, f.shared).ready).toHaveLength(1); // Image stays viewable while description needs review.
+    expect(() => conflict.prepareEdit(conflict.token, edit, cp, tx)).toThrow(/unresolved/);
+    const [raw] = A.applyChanges(A.init<any>(), source.originalChanges());
+    const changed = A.change(A.clone(raw), d => {
+      d.captionAttachmentsById[id].lifecycle = new A.ImmutableString(canonicalFixture({
+        state: 'active', eventId: `evt_${tx}`, reason: 'initial', futurePolicy: true }));
+    });
+    const unknown = ProjectMetadataSource.reopen(A.getAllChanges(changed), source.proof, metadataFixtureLimits);
+    const awaitProvider = await read(unknown);
+    expect(() => unknown.prepareEdit(unknown.token, edit, awaitProvider, tx)).toThrow(/unknown/);
+    expect(cold.read().source!.token).toBe(source.token); expect(cold.content.counts.bodyBytes).toBe(0); await cold.dispose();
+  });
   it('saves exact Project/Scene material effects, confirmed reset and tombstones through cold reopen; readonly permits inspection only', async () => {
     const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority), ui = materialHost(s);
     const before = host.read().source!.originalChanges().length, bodies = host.content.counts.bodyBytes;

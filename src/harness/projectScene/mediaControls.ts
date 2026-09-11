@@ -3,7 +3,7 @@ import { fixtureMedia, type SyntheticAttachment } from './mediaHistory';
 import type { SyntheticProject } from './fixture';
 import type { SyntheticMediaSession, MediaContext } from './mediaSession';
 
-/** Known fixture URLs only. Never render a URI supplied by history or an imported label. */
+/** Known generated or verified saved PNG bytes only. Never render a URI from history/imported labels. */
 export function createMediaGallery(document: Document, read: () => SyntheticProject, captionId: string) {
   const root = document.createElement('section'); root.className = 'lv-development-media-gallery'; root.setAttribute('aria-label', '添付メディア');
   const items = new Map<string, { root: HTMLElement; image: HTMLImageElement; label: HTMLElement; error: HTMLElement; retry: HTMLButtonElement;
@@ -11,13 +11,13 @@ export function createMediaGallery(document: Document, read: () => SyntheticProj
   let disposed = false, previousOrder = '';
   const notice = document.createElement('p'); notice.setAttribute('role', 'status'); root.append(notice);
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const n = document.createElement(tag); n.textContent = text; return n; };
-  const src = (row: SyntheticAttachment) => `data:image/png;base64,${attachmentImage(row)!.base64}`;
+  const src = (row: SyntheticAttachment) => `data:image/png;base64,${attachmentImage(row, read().mediaData)!.base64}`;
   function render() {
     if (disposed) return; const rows = captionAttachments(read().mediaData, captionId);
     const active = new Set(rows.ready.map(r => r.id));
     for (const [id, card] of items) if (!active.has(id)) { card.root.remove(); items.delete(id); }
     rows.ready.forEach((row, i) => {
-      const media = attachmentImage(row)!; let card = items.get(row.id);
+      const media = attachmentImage(row, read().mediaData)!; let card = items.get(row.id);
       if (!card) {
         const section = make('figure'), image = make('img'), label = make('figcaption'), error = make('p'), retry = make('button', '画像を再試行'), toggle = make('button', '拡大');
         retry.type = toggle.type = 'button'; image.draggable = false; error.setAttribute('role', 'status'); section.append(image, label, toggle, error, retry);
@@ -26,7 +26,7 @@ export function createMediaGallery(document: Document, read: () => SyntheticProj
         const show = () => { if (disposed || items.get(row.id) !== held) return; held.image.hidden = held.failed;
           held.error.textContent = held.failed ? '画像を表示できません。添付情報は保持しています。' : ''; held.retry.hidden = !held.failed;
           held.root.className = held.expanded ? 'is-expanded' : ''; held.toggle.textContent = held.expanded ? '縮小' : '拡大'; held.toggle.setAttribute('aria-expanded', String(held.expanded));
-          held.toggle.setAttribute('aria-label', `${held.toggle.textContent} ${fixtureMedia.find(m => m.record.id === held.mediaId)?.record.label ?? '画像'}`); };
+          held.toggle.setAttribute('aria-label', `${held.toggle.textContent} ${attachmentImage(row, read().mediaData)?.record.label ?? '画像'}`); };
         image.addEventListener('error', () => { held.failed = true; show(); }); image.addEventListener('load', () => { held.failed = false; show(); });
         retry.addEventListener('click', () => { if (disposed || items.get(row.id) !== held) return;
           const current = captionAttachments(read().mediaData, captionId).ready.find(r => r.id === row.id); if (!current) return;
@@ -78,7 +78,7 @@ export function createMediaControls(document: Document, session: SyntheticMediaS
     if (confirming && (confirming.ctx.project.state.token !== current.project.state.token || confirming.ctx.captionId !== current.captionId || d || current.block)) { confirming = null; confirm.hidden = true; }
     const next = JSON.stringify([current.project.state.token, current.captionId, Boolean(d), current.block]); if (key === next) return; key = next;
     list.replaceChildren(...rows.ready.map((row, i) => {
-      const card = make('section'), media = attachmentImage(row)!;
+      const card = make('section'), media = attachmentImage(row, current.project.mediaData)!;
       card.setAttribute('aria-label', `添付 ${i + 1} ${media.record.label}`); card.append(make('p', `${i + 1}. ${media.record.label}`));
       const alt = make('p', row.altText.kind === 'value' ? row.altText.value : '説明の更新候補を確認してください。');
       const edit = button('説明を編集'), earlier = button('前へ'), later = button('後へ'), remove = button('添付を削除');
