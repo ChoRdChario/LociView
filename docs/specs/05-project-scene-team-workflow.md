@@ -1341,6 +1341,48 @@ read-only refusal, cold zero-body verification and local Wasm/module loading.
 Browser input/raster, physical iOS and offline/PWA evidence remain separately
 required, not inferred from HTTP or memory-backed port tests.
 
+**S1 typed editing extension — implementation contract (2026-09-11):**
+
+Extend only the new synthetic saved host with existing user-intent commands:
+Caption title/body/color edit; manual Asset-anchor add/move; Scene Caption/model
+include/exclude. An add creates the permanent Caption field map and its Scene
+membership field map in one original change, with empty text and the existing
+default color. Moving a pin changes only its atomic anchor; its owner Asset and
+frame must remain the same. The explicitly selected current Scene/model/family
+must be resolved and included. Confirmation creates source-less manual evidence,
+never fabricated mesh/GS picking evidence or inferred owner matching.
+
+The service plans from its own fresh verified provider under the existing lease.
+Reuse Scene membership domain commands; an exclusion writes only the chosen
+membership lifecycle, not the resource, its other memberships or unknown fields.
+Unknown/conflicting affected endpoints, lifecycle, field or semantic duplicate
+reservations block ordinary commands rather than choosing a winner. New IDs
+must be absent across all physical record maps, including tombstones. Every
+command is canonical-cloned, explicitly shaped and field-validated; no generic
+patch/import API is exposed through the host. Preserve scalar-field atomicity,
+original changes and existing content-fact/marker-last recovery rules.
+
+The old flat UI payloads are only an internal compatibility seam: an exact
+allowlisted translator creates typed commands, with selected Scene context.
+The new source never adopts or copies a PoC document. Only pin/membership/color
+capabilities are enabled; model geometry/placement, Scene creation/rename UI,
+material/media/Saved View writes and exchange remain unconnected in this mode.
+Newly added Caption owners/templates must come from the verified provider, not
+from the two initial fixture IDs. No reseeding, migration or new wire follows.
+
+Acceptance adds the existing host's pin add/gizmo-confirm/cancel, color edit,
+shared Scene include/exclude/reinclude, model exclude/reinclude and cold reopen, plus exact-byte
+retry and stale/conflicting/rebinding refusal. Existing input and pure Scene
+tests remain reusable evidence; actual browser/native input and iOS acceptance
+are still separate and may not be inferred from these tests.
+
+The existing Caption membership picker must expose `このシーンから外す` for
+an explicitly selected included Caption, beside the non-deletion consequence.
+It removes only the current Scene's exact resolved membership and preserves the
+Caption and all other Scene memberships. Absent/deleted/unresolved membership,
+stale selection, pending drafts, composition or saving refuse this command.
+Re-inclusion creates a fresh membership; no tombstone or resource is reused.
+
 ### 13.3 Approved scheduling exception — validators and UI components (2026-09-08)
 
 The PO explicitly approved advancing storage-neutral data validation and reusable

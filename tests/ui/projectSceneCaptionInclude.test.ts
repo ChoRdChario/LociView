@@ -74,7 +74,7 @@ describe('disconnected existing-Project Caption inclusion', () => {
     const ctx = selected(), plan = planCaptionInclude(ctx, { kind: 'include' });
     for (const patch of [{ mutationBlock: '' }, { pending: 'pinMove' as const }, { memory: { ...ctx.memory, composing: true } },
       { source: { ...ctx.source, token: 'new' } }]) expect(captionIncludePlanIsCurrent(plan, { ...ctx, ...patch })).toBe(false);
-    expect(captionIncludeIssue({ ...ctx, feedback: { kind: 'applying' } })).toContain('追加中');
+    expect(captionIncludeIssue({ ...ctx, feedback: { kind: 'applying' } })).toContain('変更中');
     expect(planCaptionInclude({ ...ctx, feedback: { kind: 'failed', message: '再試行' } }, { kind: 'include' }).kind).toBe('include');
   });
 
@@ -99,5 +99,22 @@ describe('disconnected existing-Project Caption inclusion', () => {
     expect(h.controls.render({ ...h.context, source: { ...h.context.source, sceneId: 'other' } })).toBe(false);
     h.search.fire('compositionend'); expect(h.context.memory.composing).toBe(false); expect(h.context.memory.query).toBe('調査');
     const count = h.events.length; h.controls.dispose(); h.search.fire('input'); h.include.fire('click'); expect(h.events).toHaveLength(count);
+  });
+
+  it('offers membership-only exclusion for an included selection and refuses pending, absent, stale or conflicting state', () => {
+    const h = host(); h.choices.value = second; h.choices.fire('change');
+    expect(h.include.textContent).toBe('このシーンから外す'); expect(h.include.disabled).toBe(false);
+    expect(h.selected.textContent).toContain('他のシーンには影響しません');
+    h.include.fire('click'); const plan = h.events.at(-1)!;
+    expect(plan).toMatchObject({ kind: 'exclude', captionId: second, sceneId: scene });
+    expect(captionIncludePlanIsCurrent(plan, h.context)).toBe(true);
+    for (const patch of [{ mutationBlock: '閲覧専用' }, { pending: 'text' as const },
+      { memory: { ...h.context.memory, composing: true } }, { source: { ...h.context.source, token: 'new' } }])
+      expect(captionIncludePlanIsCurrent(plan, { ...h.context, ...patch })).toBe(false);
+    expect(planCaptionInclude(selected(), { kind: 'exclude' }).kind).toBe('blocked');
+    const src = source();
+    const conflicting = { ...h.context, source: { ...src, items: src.items.map(row => ({ ...row, membership: unresolved<'absent' | 'included'>() })) } };
+    expect(planCaptionInclude(conflicting, { kind: 'exclude' }).kind).toBe('blocked');
+    h.render(conflicting); expect(h.include.disabled).toBe(true); h.controls.dispose();
   });
 });

@@ -6,14 +6,14 @@ import { captionIncludeIssue, captionIncludeView, planCaptionInclude,
 export function createCaptionIncludeControls(document: Document, onPlan: (plan: CaptionIncludePlan) => void) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const node = document.createElement(tag); node.textContent = text; return node; };
   const root = make('details'); root.className = 'lv-caption-include';
-  const summary = make('summary', '既存のキャプションを追加');
+  const summary = make('summary', 'キャプションの追加・除外');
   const searchLabel = make('label', '検索'), search = make('input'); search.type = 'search'; search.setAttribute('aria-label', '検索'); searchLabel.append(search);
   const choiceLabel = make('label', 'キャプション'), choices = make('select'); choices.size = 6;
   choices.setAttribute('aria-label', 'キャプション'); choiceLabel.append(choices);
   const selected = make('p'), status = make('p'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   const include = make('button', 'このシーンに追加'), review = make('button', '状態を確認'); include.type = review.type = 'button';
   root.append(summary, searchLabel, choiceLabel, selected, status, include, review);
-  let context: CaptionIncludeContext | undefined, disposed = false, fingerprint = '';
+  let context: CaptionIncludeContext | undefined, disposed = false, fingerprint = '', action: 'include' | 'exclude' = 'include';
   const cleanups: (() => void)[] = [];
   const listen = (node: HTMLElement, event: string, action: () => void) => { node.addEventListener(event, action); cleanups.push(() => node.removeEventListener(event, action)); };
   const request = (intent: CaptionIncludeIntent) => {
@@ -26,15 +26,18 @@ export function createCaptionIncludeControls(document: Document, onPlan: (plan: 
   listen(search, 'input', () => request({ kind: 'search', query: search.value }));
   listen(search, 'compositionend', () => { request({ kind: 'search', query: search.value }); request({ kind: 'compose', active: false }); });
   listen(choices, 'change', () => request({ kind: 'select', captionId: choices.value || null }));
-  listen(include, 'click', () => { if (!include.disabled) request({ kind: 'include' }); });
+  listen(include, 'click', () => { if (!include.disabled) request({ kind: action }); });
   listen(review, 'click', () => { if (!review.disabled) request({ kind: 'review' }); });
   function render(next: CaptionIncludeContext): boolean {
     if (disposed) return false;
     if (context && (context.memory.composing || context.feedback.kind === 'applying') && context.source.sceneId !== next.source.sceneId) {
-      status.textContent = '入力または追加処理を完了してください。'; return false;
+      status.textContent = '入力または変更処理を完了してください。'; return false;
     }
     context = next;
-    const view = captionIncludeView(next), issue = captionIncludeIssue(next), busy = next.feedback.kind === 'applying';
+    const view = captionIncludeView(next), busy = next.feedback.kind === 'applying';
+    action = view.selected?.membership.kind === 'value' && view.selected.membership.value === 'included' ? 'exclude' : 'include';
+    const issue = captionIncludeIssue(next, action);
+    include.textContent = action === 'exclude' ? 'このシーンから外す' : 'このシーンに追加';
     if (!next.memory.composing && search.value !== next.memory.query) search.value = next.memory.query;
     search.readOnly = busy && !next.memory.composing; choices.disabled = busy || Boolean(view.issue) || next.memory.composing;
     const options = view.rows.map(row => ({ id: row.item.id, label: `${captionTitle(row.item)} — ${captionOwnerLabel(row.item)}` +
@@ -51,9 +54,10 @@ export function createCaptionIncludeControls(document: Document, onPlan: (plan: 
     }
     choices.value = next.memory.captionId ?? '';
     selected.textContent = view.selected ? `${captionTitle(view.selected.caption)} — ${captionOwnerLabel(view.selected.caption)}` +
-      (view.selected.caption.pin === 'ownerHidden' ? '。モデルは非表示のままです。' : '') : '';
+      (action === 'exclude' ? '。キャプション自体や他のシーンには影響しません。' :
+        view.selected.caption.pin === 'ownerHidden' ? '。モデルは非表示のままです。' : '') : '';
     selected.hidden = !selected.textContent;
-    status.textContent = [next.feedback.kind === 'failed' && `追加できませんでした。${next.feedback.message} 選択は保持しています。`,
+    status.textContent = [next.feedback.kind === 'failed' && `変更できませんでした。${next.feedback.message} 選択は保持しています。`,
       issue, !view.issue && !view.rows.length && '該当するキャプションはありません。'].filter(Boolean).join(' ');
     include.disabled = issue !== null;
     review.hidden = !view.selected || (view.selected.lifecycle.kind === 'value' && view.selected.lifecycle.value === 'active' && view.selected.membership.kind === 'value');

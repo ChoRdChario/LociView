@@ -1,6 +1,22 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **Latest connection (2026-09-11, after `6a9c2ed`):** the same development entry
+> **Latest connection (2026-09-11, after `b40b698`):** `storage=metadata` now
+> connects Caption text/color, pin add/move and Scene Caption/model include/exclude
+> to the same S1 journal/save/reopen service. Preview/cancel stays local; new pin
+> IDs and fields persist atomically. Exclusion removes only the selected Scene
+> reference, never the Caption/model or other Scenes. Unknown/conflicting old
+> values block replacement without choosing a winner. Independent source and UI
+> review findings are closed. Typecheck/build/HTTP graph PASS; the final full run
+> with two workers passes 109 files / 1,904 tests / 21 TODO. The first high-load
+> run timed out in two unchanged filesystem tests; no assertion was weakened.
+> Current todo retains both results and the checkpoint boundary.
+> Next is existing Saved View authoring/save/recall in this same host, beginning
+> with exact per-field history versions, not a new source or storage probe.
+> Model geometry/placement, material/media/Saved View writes and exchange remain
+> unconnected in this mode; old modes retain them. No migration or ordinary-home
+> change. Batch actual-browser/iOS evidence later; do not request S1 approval again.
+
+> **Preceding connection (2026-09-11, after `6a9c2ed`):** the same development entry
 > offers `新しい保存方式を試す`, a new synthetic-only `storage=metadata` run.
 > Dedicated OPFS/IndexedDB/Web Locks and fixture inventory connect the S1 service
 > to the existing editor; title+body Apply produces one original change/journal.
@@ -11,8 +27,8 @@
 > full-suite polling timeouts were replaced with actual completion notifications;
 > the final complete run is clean. No dependency, public data or deploy change.
 > Browser bootstrap still fails before selection (`node:process` unavailable),
-> so actual input/raster/OPFS/IDB/iOS remains pending. Current todo owns final
-> matrix and next typed-command extension; uiux-handoff owns one later manual
+> so actual input/raster/OPFS/IDB/iOS remains pending. Current todo supersedes this
+> checkpoint's title/body-only limit; uiux-handoff owns one later manual
 > batch. Do not request S1 approval again or repeat the closed old saved-host tests.
 
 > **Latest implementation (2026-09-11, after `d4d665d`):** the new-workspace service

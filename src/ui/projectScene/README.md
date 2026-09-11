@@ -184,6 +184,10 @@ choice. Unknown title/body/owner fields do not prohibit independent membership
 inclusion. A selected item remains identifiable outside search or during source
 loss; search/IME and failure stay local. No picker selection changes the current
 editor, and no inclusion request copies content, re-anchors or shows its owner.
+For an included selection the same action becomes `このシーンから外す`, with
+the non-deletion consequence beside it. Exclusion has the same pending/IME/token
+and conflict guards; the host rechecks the exact current membership before
+tombstoning only that reference. Other Scenes and the Caption remain unchanged.
 
 The later host must bind `include` to the existing Scene `include` command for
 that exact Caption/Scene, supply fresh membership/event IDs and order, recheck

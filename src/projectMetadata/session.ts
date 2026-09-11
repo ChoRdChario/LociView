@@ -9,6 +9,7 @@ import { ProjectMetadataSource } from './source';
 import { MetadataRepository, type MetadataStorageFactory } from './repository';
 import { TransactionJournal, type JournalStart, type PreparedJournal } from './journal';
 import { equalBytes, json, newId, underWriteLease } from './persistence';
+import type { MetadataEdit } from './commands';
 
 export type MetadataSessionRead = Readonly<{
   state: 'empty' | 'ready' | 'pending' | 'repair-required';
@@ -56,9 +57,10 @@ export class MetadataProjectSession {
   }
 
   /** Full current provider/content closure, never only a materialized Caption record. */
-  private async checked(source: ProjectMetadataSource, allowNewEvidence: boolean): Promise<void> {
+  private async checked(source: ProjectMetadataSource, allowNewEvidence: boolean): Promise<ProjectProviderRead> {
     const provider = await readProjectScene(source.read(), this.limits, this.verifier(allowNewEvidence));
     if (!this.providerReady(provider) || provider.kind !== 'scene-provider' || provider.token !== source.token) fail('provider-not-ready');
+    return provider;
   }
   private providerReady(provider: ProjectProviderRead): boolean {
     return provider.kind === 'scene-provider' && provider.inspection.checks.every(c => c.outcome === 'verified') &&
@@ -85,20 +87,24 @@ export class MetadataProjectSession {
     return this.editCaptionTexts(expectedToken, captionId, { [field]: text });
   }
   async editCaptionTexts(expectedToken: string, captionId: string, edits: Readonly<Partial<Record<'title' | 'body', string>>>): Promise<MetadataSessionRead> {
+    const normalized: Partial<Record<'title' | 'body', string>> = {};
+    for (const [field, text] of Object.entries(edits)) {
+      if ((field !== 'title' && field !== 'body') || typeof text !== 'string') return fail('caption-field');
+      normalized[field] = normalizeCaptionText(field, text);
+    }
+    return this.edit(expectedToken, { kind: 'editCaption', captionId, edits: normalized });
+  }
+
+  async edit(expectedToken: string, command: MetadataEdit): Promise<MetadataSessionRead> {
     return underWriteLease(this.fs, async () => {
       const read = await this.read();
       if (read.state !== 'ready' || !read.source || read.source.token !== expectedToken) return fail('command-not-ready');
       const entries = await this.journal.entries(), prior = entries.at(-1)!;
       const durable = await this.repository.read(prior.start.repositoryId, prior.start.proof);
       if (!durable || durable.token !== read.source.token) return fail('command-base-changed');
-      await this.checked(durable, false);
+      const provider = await this.checked(durable, false);
       const transactionId = newId();
-      const normalized: Partial<Record<'title' | 'body', string>> = {};
-      for (const [field, text] of Object.entries(edits)) {
-        if ((field !== 'title' && field !== 'body') || typeof text !== 'string') return fail('caption-field');
-        normalized[field] = normalizeCaptionText(field, text);
-      }
-      const prepared = await durable.prepareCaptionTexts(expectedToken, captionId, normalized, transactionId);
+      const prepared = durable.prepareEdit(expectedToken, command, provider, transactionId);
       const known = new Set(durable.originalChanges().map(b => A.decodeChange(b).hash));
       const parts = prepared.originalChanges().filter(b => !known.has(A.decodeChange(b).hash));
       if (!parts.length) return read; // An unchanged value has no storage transaction.

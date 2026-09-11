@@ -47,13 +47,18 @@ export function createMetadataFixture(run: string): ProjectMetadataSource {
 export function metadataProjectView(provider: ProjectProviderRead): SyntheticProject {
   if (provider.kind !== 'scene-provider') throw Error('保存したシーンを確認できません。');
   const names: Record<string, string> = {}, colors: Record<string, ReturnType<typeof value<string>>> = {};
+  const captionOwners: Record<string, { assetId: string; assetFrameId: string }> = {}, captionTemplates: Record<string, string> = {};
   for (const [id, row] of Object.entries(provider.details.mutable.assetsById)) {
     if (row.label?.kind === 'value' && typeof row.label.value === 'string') names[id] = row.label.value;
   }
   for (const [id, row] of Object.entries(provider.details.mutable.captionsById)) {
+    captionTemplates[id] = id;
+    const anchor = provider.resources.captions[id]?.anchor;
+    if (anchor?.kind === 'value' && anchor.value.kind === 'asset')
+      captionOwners[id] = { assetId: anchor.value.assetId, assetFrameId: anchor.value.assetFrameId };
     if (row.colorSrgb?.kind === 'value' && Array.isArray(row.colorSrgb.value))
       colors[id] = value(`#${row.colorSrgb.value.map(v => Math.round(Number(v) * 255).toString(16).padStart(2, '0')).join('')}`);
   }
   return freezeSynthetic({ ...initial, state: provider.state, resources: provider.resources,
-    modelNames: names, colors, modelVersions: metadataModels });
+    modelNames: names, colors, captionOwners, captionTemplates, modelVersions: metadataModels });
 }

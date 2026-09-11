@@ -11,7 +11,76 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — approved S1 service entry (2026-09-11)
 
-#### Browser-host connection — implemented, real-browser acceptance pending (2026-09-11)
+#### Typed editing connection — implemented, real-browser acceptance pending (after `b40b698`)
+
+- [x] Specify one-change commands for Caption text/color, manual pin add/move,
+  and existing Scene Caption/model include/exclude. No geometry/binding authoring.
+- [x] Revalidate on the fresh verified provider, preserve unresolved candidates,
+  original bytes and permanent record maps, and reuse retained journal/retry.
+- [x] Connect existing gizmo/Shift+click and membership controls with granular
+  capabilities; derive newly created Caption display helpers from the provider.
+- [x] Test the same host through add/edit/include/exclude/reopen and fault retry,
+  plus stale/conflicting/owner-rebind refusal. Reuse existing input/membership tests.
+- [x] Independent review, typecheck/full tests/build and docs/checkpoint. No repeat
+  PO permission or old manual test; browser/iOS remain a separately batched lane.
+
+Acceptance: each confirmed operation produces at most one original change, no
+success before durable publication, cold reads do not load model bodies, and
+new Caption IDs/positions/colors/memberships survive reopen. Preview/cancel stays
+local. Real files, model body/transform replacement, generic Scene authoring UI,
+material/media/Saved View writes, exchange, wire/schema/dependency/deploy changes
+are excluded. Stop on a specification conflict or new authority requirement.
+
+Review: seven host tests now cover the mounted existing editor and memory-backed
+storage ports. Confirmed pin creation publishes one Caption and membership in
+one original change; preview/cancel writes nothing. Move retains the owner/frame;
+text/color and both Caption/model memberships survive cold reopen with zero
+model-body reads. A failed pin save retries the same IDs and original bytes.
+Stale/conflicting anchors, hidden target models, owner/family rebinding and
+duplicate IDs are refused. This is not real browser or physical storage evidence.
+
+Independent review closed two concrete gaps: recursively refuse unknown old
+anchor/lifecycle subtrees before overwriting their atomic value; expose Caption
+exclusion, not only model exclusion. The existing membership picker now changes
+its action to `このシーンから外す` for an included selection and states the
+non-deletion consequence. The host rechecks exactly one current edge. Tests
+exercise its actual recorded-DOM button, other-Scene preservation, fresh-edge
+re-inclusion and retained tombstone after reopen. No data or old mode is removed.
+Focused tests: six files / 60 PASS, including the existing pin/viewport/workspace
+and persistence cases. One added test first lacked a TypeScript union narrowing;
+the guard was corrected, and typecheck passed. HTTP import graph and ordinary
+build PASS; no new dependency or ordinary-entry connection. Final matrix below.
+
+Final verification: typecheck PASS; ordinary build PASS (unchanged mixed-import
+and large-chunk warnings); HTTP saved-entry/local-Wasm graph PASS. The first
+root run overlapped build/HTTP work and timed out in two unchanged filesystem/
+evidence tests (5 s and 20 s limits). No assertion or timeout was weakened.
+`npm test -- --maxWorkers=2`, with no competing build, then passed all 109 files /
+1,904 tests / 21 TODO, exit 0; both former timeouts passed. `git diff --check`
+PASS. Ports 5173/5184/5185/5186 have no listener at closure; this slice leaves no
+test server there. No private representative sources were read or added; public,
+dependencies, ordinary entry and deployment configuration are unchanged. Remaining
+account usage is 44%; this is a completed bounded checkpoint, not a usage stop.
+
+Short meta-audit: start clean `b40b698`, `g0-baseline`, tracked origin ahead 15 /
+behind 0. This slice connects day-to-day edits to the same new save/reopen path,
+not a new probe or a broadened adoption claim. Browser bootstrap's existing
+`node:process` limitation remains; do not retry a broken automation surface or
+ask for the old already-passed PO batch. The next finite extension stays within
+the existing host and approved command/service boundary; no separate permission
+is needed until a product/wire/schema/adoption decision is encountered.
+
+Next finite implementation boundary: connect existing Saved View authoring to
+this same new saved host. Reuse existing create/recapture/name/order/delete and
+Scene entry-view commands. Specify the provider-to-viewData cells/versions seam
+from original history first; neither equal values nor the whole snapshot token
+may substitute for per-field causal versions. No new body, wire or dependency.
+Acceptance is save/recall/cold reopen, exact retry and stale/conflict/referenced
+delete refusal. Keep model geometry/binding, material/media and exchange out of
+that slice. A read-only scheduling review supports this choice because it extends
+the record-and-return user flow without reopening a binary-admission workstream.
+
+#### Preceding browser-host connection — title/body-only checkpoint (2026-09-11)
 
 Start clean `6a9c2ed`. Connect the approved service to a fresh synthetic-only
 namespace in the same development entry; keep old `storage=saved` runs intact.
@@ -61,7 +130,7 @@ read or added. No server/tunnel was left running by this slice. Commit only the
 listed source/tests/docs; push is not necessary for this local connection checkpoint.
 Remaining account usage was 46%; this is not a usage-based stop.
 
-Next finite implementation boundary: extend typed command routing in this same
+Next boundary at that checkpoint (now completed above): extend typed command routing in this same
 new host to already-approved editing operations (pin/Scene/model membership),
 reusing its original-change/journal/acknowledgment path. Specify the exact command
 allowlist and acceptance before each extension. Do not add another storage probe,

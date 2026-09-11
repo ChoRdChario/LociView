@@ -5,6 +5,8 @@ import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { checkMutableField } from '../domain/projectMutableFields';
 import { immutableKinds, object, same } from '../domain/projectGraphSupport';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
+import type { ProjectProviderRead } from '../scene/projectProvider';
+import { planMetadataEdit, type MetadataEdit } from './commands';
 import { adapterFormatVersion, checkedChanges, checkedProof, checkLimits, fail, inspectPhysical, scalar, MetadataSourceError,
   type MetadataLimits, type MetadataProof, type PhysicalDoc } from './format';
 
@@ -89,6 +91,24 @@ export class ProjectMetadataSource {
       if (error instanceof MetadataSourceError) throw error;
       return fail('append-original');
     }
+  }
+
+  /** Internal typed command preparation; the Session supplies its own verified read. */
+  prepareEdit(expectedToken: string, command: MetadataEdit, provider: ProjectProviderRead, transactionId: string): ProjectMetadataSource {
+    if (expectedToken !== this.token || provider.kind !== 'scene-provider' || provider.token !== this.token) return fail('stale-token');
+    if (!/^[0-9a-f]{32}$/.test(transactionId)) return fail('transaction-id');
+    const edits = planMetadataEdit(provider, command, this.limits), creating = new Set<string>();
+    for (const edit of edits) if (edit.create) {
+      if (creating.has(edit.id) || Object.keys(projectRecordMaps).some(map => Object.hasOwn(this.doc[map], edit.id))) fail('record-id-exists');
+      creating.add(edit.id);
+    }
+    const doc = A.change(A.clone(this.doc), { message: `lociview:transaction:v1:${transactionId}` }, draft => {
+      for (const edit of edits) {
+        if (edit.create) draft[edit.map][edit.id] = {};
+        for (const [field, value] of Object.entries(edit.fields)) draft[edit.map][edit.id][field] = scalar(value, this.limits);
+      }
+    });
+    return ProjectMetadataSource.validated(doc, this.proof, this.limits);
   }
 
   /** Prepared, NOT saved. Session still needs full-provider/lease/journal authority. */

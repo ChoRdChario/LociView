@@ -23,11 +23,11 @@ export interface CaptionIncludeContext {
 }
 export type CaptionIncludeIntent = Readonly<{ kind: 'search'; query: string }> |
   Readonly<{ kind: 'compose'; active: boolean }> | Readonly<{ kind: 'select'; captionId: string | null }> |
-  Readonly<{ kind: 'include' | 'review' }>;
+  Readonly<{ kind: 'include' | 'exclude' | 'review' }>;
 interface Base { readonly token: string; readonly sceneId: string; readonly baseMemory: CaptionIncludeMemory }
 export type CaptionIncludePlan = Readonly<{ kind: 'blocked'; reason: string }> |
   (Base & Readonly<{ kind: 'change'; memory: CaptionIncludeMemory }>) |
-  (Base & Readonly<{ kind: 'include' | 'review'; captionId: string }>);
+  (Base & Readonly<{ kind: 'include' | 'exclude' | 'review'; captionId: string }>);
 
 export function captionIncludeView(context: CaptionIncludeContext) {
   const { source, memory } = context;
@@ -40,9 +40,9 @@ export function captionIncludeView(context: CaptionIncludeContext) {
   return { issue, items, rows: visible.map(row => ({ ...row, entry: byId.get(row.item.id)! })),
     selected: items.find(item => item.caption.id === memory.captionId) };
 }
-export function captionIncludeIssue(context: CaptionIncludeContext): string | null {
+export function captionIncludeIssue(context: CaptionIncludeContext, action: 'include' | 'exclude' = 'include'): string | null {
   const view = captionIncludeView(context);
-  if (context.feedback.kind === 'applying') return 'シーンに追加中です。';
+  if (context.feedback.kind === 'applying') return '変更中です。';
   if (context.mutationBlock !== null) return context.mutationBlock || '現在は変更できません。';
   if (context.memory.composing) return '文字の入力を確定してください。';
   if (context.pending) return sceneSwitchReason(context.pending);
@@ -51,7 +51,8 @@ export function captionIncludeIssue(context: CaptionIncludeContext): string | nu
   const item = view.selected;
   if (item.lifecycle.kind !== 'value' || item.membership.kind !== 'value') return 'キャプションとシーンの状態を確認してください。';
   if (item.lifecycle.value === 'deleted') return '削除済みです。キャプションの状態を確認してください。';
-  return item.membership.value === 'included' ? 'このシーンに追加済みです。' : null;
+  return action === 'exclude' ? (item.membership.value === 'absent' ? 'このシーンには含まれていません。' : null) :
+    item.membership.value === 'included' ? 'このシーンに追加済みです。' : null;
 }
 export function planCaptionInclude(context: CaptionIncludeContext, intent: CaptionIncludeIntent): CaptionIncludePlan {
   const { source, memory } = context, view = captionIncludeView(context);
@@ -62,11 +63,11 @@ export function planCaptionInclude(context: CaptionIncludeContext, intent: Capti
   if (intent.kind === 'search') return change({ query: intent.query });
   if (intent.kind === 'compose') return change({ composing: intent.active });
   if (view.issue) return { kind: 'blocked', reason: view.issue };
-  if (context.feedback.kind === 'applying') return { kind: 'blocked', reason: 'シーンに追加中です。' };
+  if (context.feedback.kind === 'applying') return { kind: 'blocked', reason: '変更中です。' };
   if (intent.kind === 'select') return intent.captionId === null || view.items.some(item => item.caption.id === intent.captionId)
     ? change({ captionId: intent.captionId }) : { kind: 'blocked', reason: 'キャプションを選び直してください。' };
-  if (intent.kind === 'include') {
-    const issue = captionIncludeIssue(context); if (issue) return { kind: 'blocked', reason: issue };
+  if (intent.kind === 'include' || intent.kind === 'exclude') {
+    const issue = captionIncludeIssue(context, intent.kind); if (issue) return { kind: 'blocked', reason: issue };
   } else if (!view.selected || context.pending || memory.composing) {
     return { kind: 'blocked', reason: sceneSwitchReason(context.pending) || '入力を確定し、キャプションを選択してください。' };
   }

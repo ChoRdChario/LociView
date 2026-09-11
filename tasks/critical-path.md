@@ -398,7 +398,11 @@ creation, original Caption commands, retained journal/retry and marker-last
 publication on synthetic memory storage ports. Persistent content facts require
 fresh inventory/presence and do not reuse a stale metadata token. New synthetic
 `storage=metadata` host wiring now exists: OPFS/IndexedDB/Web Locks, immutable
-fixture inventory and existing editor with atomic title/body Apply. No old saved
+fixture inventory and existing editor with typed Caption text/color, manual pin
+add/move and both Caption/model membership edits using original-change journal
+publication. Caption exclusion keeps the resource and all other Scenes; re-add
+uses a new edge. Preview/cancel writes nothing. Model geometry/placement,
+material/media/Saved View writes and exchange remain unconnected here. No old saved
 history is converted. Mounted memory-port and HTTP tests do not establish actual
 browser/device/adoption acceptance. Next connect remaining approved typed edits
 through this same service; batch browser evidence, not another source/probe campaign.

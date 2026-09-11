@@ -127,10 +127,11 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     materialPanel.hidden = task !== 'materials'; viewPanel.hidden = task !== 'views';
     if (session.captionTextOnly) {
       notice.textContent = session.readOnly ? '閲覧専用のタブです。編集する場合は、編集用タブを閉じてから再読み込みしてください。' :
-        '開発用・合成データのみ。タイトル・本文を保存できます。その他の編集は未接続です。未適用の入力は再読み込みで失われます。';
-      pin.actions.hidden = pin.modeStrip.hidden = pinHelp.hidden = numeric.hidden = include.root.hidden = true;
+        '開発用・合成データのみ。キャプションとシーンへの所属を保存できます。未適用の入力は再読み込みで失われます。';
+      if (session.pinRestriction) pin.actions.hidden = pin.modeStrip.hidden = pinHelp.hidden = numeric.hidden = true;
+      if (session.membershipRestriction) include.root.hidden = true;
       placement.actions.hidden = placement.modeStrip.hidden = modelUpdate.root.hidden = media.root.hidden = true;
-      material.root.hidden = true; modelList.root.inert = true;
+      material.root.hidden = true; modelList.root.inert = !!session.membershipRestriction;
     }
     // A second visible-list pass restores the desired inner scroll after a tab was hidden.
     if (task === 'captions') list.render(captionContext);
@@ -139,7 +140,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     disconnected.textContent = viewport.pickingConnected ? '合成モデルの表示です。ピンの追加・移動中は、選んだモデルの面から位置を指定できます。' : viewport.connected ?
       '合成モデルの表示です。位置は座標で指定できます。3D上の位置選択は未接続です。' :
       '3D表示は未接続です。シーンの構成と座標入力を確認できます。';
-    if (session.captionTextOnly) disconnected.textContent = '合成モデルの表示です。この保存経路ではピンの追加・移動は未接続です。';
+    if (session.pinRestriction && session.captionTextOnly) disconnected.textContent = '合成モデルの表示です。このタブではピンを編集できません。';
     sceneName.textContent = current.name.kind === 'value' ? current.name.value : 'シーン名を確認';
     const names = current.assets.map(asset => {
       const version = modelVersion(asset.assetId, asset.projection.bindingId, session.modelVersions);

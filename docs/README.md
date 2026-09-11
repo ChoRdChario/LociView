@@ -74,10 +74,14 @@ Repo storage, independent stored readback and marker-last publication, with exac
 retained retry. Persistent immutable content facts exclude the metadata token and
 require current inventory/presence. Synthetic memory-port tests cover this service;
 the new `storage=metadata` development mode now wires OPFS/IndexedDB/Web Locks,
-exact synthetic-body inventory and the existing title/body editor to that service.
+exact synthetic-body inventory and the existing editor to that service. Typed
+Caption text/color, manual pin add/move and Scene Caption/model include/exclude
+now share its journal and exact retry; one added pin is one original change.
+Model geometry/placement, material/media/Saved View writes and exchange stay
+unconnected in this new mode, not removed from old modes or product requirements.
 Old saved runs and ordinary home remain unchanged. Actual browser/input and
 physical iOS evidence remain pending; source-only `reopen` itself is still not a
-saved-workspace receipt. Current todo owns the remaining typed-command connection.
+saved-workspace receipt. Current todo owns the next remaining typed-command slice.
 
 Current readiness review (2026-09-10): `tasks/todo.md` top separates approved
 outcomes, exact wire/migration design gaps and remaining storage/device evidence.

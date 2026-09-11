@@ -7,6 +7,7 @@ import { TransactionJournal } from '../../projectMetadata/journal';
 import { createMetadataFixture, metadataFixtureLimits as limits, metadataProjectView } from './metadataFixture';
 import { MetadataFixtureContent, readMetadataSeed, writeMetadataSeed } from './metadataStorage';
 import type { SyntheticAuthority } from './historyProjection';
+import { metadataIntent } from './metadataIntent';
 
 export const metadataArea = 'lociview-development-metadata-1';
 export interface MetadataHostOptions {
@@ -56,20 +57,13 @@ export async function openMetadataHost(options: MetadataHostOptions) {
     }
     const authority: SyntheticAuthority = {
       storage: 'saved-development', writeScope: 'caption-text',
+      capabilities: { pins: true, membership: true, color: true },
       get readOnly() { return fs.mutationAuthority.accessState !== 'editable' || closed; },
       read: () => { if (!last.provider) throw Error('保存した画面はまだありません。'); return metadataProjectView(last.provider); },
       status: () => ({ kind: busy ? 'checking' : failure || last.state !== 'ready' ? 'failed' : 'idle', error: failure || '未完了の保存があります。' }),
-      write: (token, changes) => execute(async () => {
+      write: (token, changes, context) => execute(async () => {
         if (authority.readOnly) throw Error('このタブは閲覧専用です。');
-        const rows = Object.entries(changes), edits: Partial<Record<'title' | 'body', string>> = {};
-        let caption: string | undefined;
-        for (const [key, text] of rows) {
-          const match = /^caption\/(cap_[0-9a-f]{32})\/(title|body)$/.exec(key);
-          if (!match || (caption && caption !== match[1])) throw Error('この保存経路ではタイトル・本文だけを編集できます。');
-          caption = match[1]!; edits[match[2] as 'title' | 'body'] = text;
-        }
-        if (!caption || !rows.length || rows.length > 2) throw Error('編集するキャプションを確認してください。');
-        return ready(await service.editCaptionTexts(token, caption, edits));
+        return ready(await service.edit(token, metadataIntent(changes, authority.read(), context)));
       }),
       retry: () => execute(async () => {
         if (authority.readOnly) throw Error('このタブは閲覧専用です。');

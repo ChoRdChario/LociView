@@ -91,7 +91,10 @@ export class SyntheticSession {
   get savedDevelopment() { return this.authority?.storage === 'saved-development'; }
   get captionTextOnly() { return this.authority?.writeScope === 'caption-text'; }
   get readOnly() { return this.authority?.readOnly === true; }
-  get editingRestriction() { return this.readOnly ? 'このタブは閲覧専用です。' : this.captionTextOnly ? 'この保存経路ではタイトル・本文だけを編集できます。' : null; }
+  get editingRestriction() { return this.readOnly ? 'このタブは閲覧専用です。' : this.captionTextOnly ? 'この保存経路では未接続の編集です。' : null; }
+  get pinRestriction() { return this.readOnly || !this.authority?.capabilities?.pins ? this.editingRestriction : null; }
+  get membershipRestriction() { return this.readOnly || !this.authority?.capabilities?.membership ? this.editingRestriction : null; }
+  get colorReadOnly() { return this.captionTextOnly && !this.authority?.capabilities?.color; }
   get savedStatus() { return this.authority?.status?.(); }
   get workingBlock() { return this.acknowledgment.block ?? (this.savedStatus?.kind === 'failed' ?
     this.savedStatus.error ?? '未完了の保存があります。更新を再試行してください。' : null); }
@@ -114,7 +117,7 @@ export class SyntheticSession {
     });
   }
   private writeProject(base: string, changes: Readonly<Record<string, string>>, local: SyntheticProject) {
-    return this.authority ? afterWorking(this.authority.write(base, changes), next => this.publish(next)) : this.publish(local);
+    return this.authority ? afterWorking(this.authority.write(base, changes, { sceneId: this.sceneId }), next => this.publish(next)) : this.publish(local);
   }
   get session() { return this.navigation; }
   get sceneId() { return this.navigation.sceneId!; }
@@ -178,7 +181,8 @@ export class SyntheticSession {
       [...this.drafts.values()].some(d => d.composing) ? 'composition' : this.views.pending ?? this.media.pending;
     return this.materials.context(other);
   }
-  acceptMaterial(plan: MaterialPlan) { const accepted = this.materials.accept(plan, this.materialContext()); this.message = this.materials.message; return accepted; }
+  acceptMaterial(plan: MaterialPlan) { if (this.editingRestriction) return this.refuse(this.editingRestriction);
+    const accepted = this.materials.accept(plan, this.materialContext()); this.message = this.materials.message; return accepted; }
   mediaContext(): MediaContext {
     const source = this.captionContext().source, captionId = this.memory.selectedCaptionId;
     const other = this.windowDragging || this.viewportDragging || this.placement || this.pinInput;
@@ -254,7 +258,7 @@ export class SyntheticSession {
       }) }, memory: this.includes.get(this.sceneId)!, pending: this.pending, mutationBlock: null, feedback: this.includeFeedback };
   }
   acceptInclude(plan: CaptionIncludePlan): boolean {
-    if (this.editingRestriction) return this.refuse(this.editingRestriction);
+    if (this.membershipRestriction) return this.refuse(this.membershipRestriction);
     const failed = (error: unknown) => { this.includeFeedback = { kind: 'failed', message: this.errorText(error) }; this.refuse(this.errorText(error)); };
     try {
       if (this.workingBlock) throw new Error(this.workingBlock);
@@ -263,13 +267,24 @@ export class SyntheticSession {
       if (plan.kind === 'change') this.includes.set(this.sceneId, plan.memory);
       else if (plan.kind === 'review') return this.refuse('画面上部で重複した項目・更新の競合を確認してください。');
       else {
-        const membershipId = fresh('scm'), prepared = planSceneCommand(this.project.state, this.project.resources,
-          { kind: 'include', sceneId: this.sceneId, resourceKind: 'caption', resourceId: plan.captionId, membershipId, orderKey: 'Z' }, fresh('evt'));
+        const edges = Object.values(this.project.state.captionMemberships).filter(e => e.sceneId === this.sceneId &&
+          e.resourceId === plan.captionId && (e.lifecycle.kind !== 'value' || e.lifecycle.value.state !== 'deleted'));
+        if (plan.kind === 'exclude' && (edges.length !== 1 || edges[0]!.lifecycle.kind !== 'value'))
+          throw new Error('所属状態が変わっています。選び直してください。');
+        const membershipId = plan.kind === 'include' ? fresh('scm') : edges[0]!.id;
+        const command = plan.kind === 'include' ? { kind: 'include' as const, sceneId: this.sceneId,
+          resourceKind: 'caption' as const, resourceId: plan.captionId, membershipId, orderKey: 'Z' } :
+          { kind: 'exclude' as const, resourceKind: 'caption' as const, membershipId };
+        const prepared = planSceneCommand(this.project.state, this.project.resources, command, fresh('evt'));
         const state = previewScenePlan(this.project.state, prepared, fresh('snapshot'));
         return this.applyWorking(() => this.writeProject(plan.token,
           { [membershipKey(membershipId)]: JSON.stringify(state.captionMemberships[membershipId]) },
           { ...this.project, state, resources: { ...this.project.resources, token: state.token } }), () => {
-          this.message = 'このシーンに追加しました。キャプションの内容と所有モデルは変わりません。'; this.includeFeedback = { kind: 'idle' };
+          if (plan.kind === 'exclude' && this.memory.selectedCaptionId === plan.captionId)
+            this.navigation = Object.freeze({ ...this.navigation, sceneMemory: Object.freeze({ ...this.navigation.sceneMemory,
+              [this.sceneId]: Object.freeze({ ...this.memory, selectedCaptionId: null }) }) });
+          this.message = plan.kind === 'include' ? 'このシーンに追加しました。' : 'このシーンから外しました。キャプションは残っています。';
+          this.includeFeedback = { kind: 'idle' };
         }, failed);
       }
       this.includeFeedback = { kind: 'idle' }; return true;
@@ -280,7 +295,7 @@ export class SyntheticSession {
     if (source.kind === 'ready' && !this.drafts.has(source.caption.id))
       this.drafts.set(source.caption.id, beginCaptionDraft(source)!);
     const draft = source.kind === 'ready' ? this.drafts.get(source.caption.id)! : null;
-    return { source, draft, readonlyFields: this.captionTextOnly ? ['color'] : [], mutationBlock: this.workingBlock ?? (this.readOnly ? 'このタブは閲覧専用です。' : this.windowDragging ? 'ウィンドウの移動を終えてください。' : this.placement ? 'モデルの配置を確定するか、取り消してください。' :
+    return { source, draft, readonlyFields: this.colorReadOnly ? ['color'] : [], mutationBlock: this.workingBlock ?? (this.readOnly ? 'このタブは閲覧専用です。' : this.windowDragging ? 'ウィンドウの移動を終えてください。' : this.placement ? 'モデルの配置を確定するか、取り消してください。' :
       this.pinInput ? 'ピンの操作を確定するか、取り消してください。' : null), feedback: this.detailFeedback };
   }
   modelContext(): ModelListContext {
@@ -411,7 +426,7 @@ export class SyntheticSession {
     return { mode, input: this.pinInput, families: version?.families ?? [], needsFamily };
   }
   pinSurfaceTarget(ignorePending = false, duringGizmo = false): PinSurfaceTarget | null {
-    if (this.editingRestriction) return null;
+    if (this.pinRestriction) return null;
     if (!ignorePending && (this.workingBlock || this.textPending || this.pinInputComposing || (!duringGizmo && this.viewportDragging) || this.windowDragging)) return null;
     const context = this.pinContext(), mode = context.memory.mode;
     if (!mode || context.source.kind !== 'ready') return null;
@@ -420,14 +435,14 @@ export class SyntheticSession {
     return this.surfaceTarget(target.assetId);
   }
   pinShortcutTarget(): PinSurfaceTarget | null {
-    if (this.editingRestriction) return null;
+    if (this.pinRestriction) return null;
     const context = this.pinContext();
     return !context.memory.mode && !pinActionIssue(context, 'add') && context.memory.addTargetId
       ? this.surfaceTarget(context.memory.addTargetId) : null;
   }
   /** Exact eligible models for a user-selected visible surface; no chosen owner yet. */
   pinCreationTargets(): readonly PinSurfaceTarget[] {
-    if (this.editingRestriction) return [];
+    if (this.pinRestriction) return [];
     const context = this.pinContext();
     if (context.source.kind !== 'ready' || context.memory.mode || this.workingBlock || context.otherPending ||
       this.pinInputComposing) return [];
@@ -493,7 +508,7 @@ export class SyntheticSession {
     this.pinFeedback = { kind: 'idle' }; return true;
   }
   acceptPin(plan: PinModePlan): boolean {
-    if (this.editingRestriction) return this.refuse(this.editingRestriction);
+    if (this.pinRestriction) return this.refuse(this.pinRestriction);
     const failed = (error: unknown) => { this.pinFeedback = { kind: 'failed', message: this.errorText(error) }; this.refuse(this.errorText(error)); };
     try {
       if (this.workingBlock) throw new Error(this.workingBlock);
@@ -616,7 +631,7 @@ export class SyntheticSession {
     } catch (error) { failed(error); return false; }
   }
   acceptModel(plan: ModelListPlan): boolean {
-    if (this.editingRestriction && plan.kind !== 'change') return this.refuse(this.editingRestriction);
+    if (this.membershipRestriction && plan.kind !== 'change') return this.refuse(this.membershipRestriction);
     if (this.workingBlock) return this.refuse(this.workingBlock);
     if (plan.kind === 'blocked') return this.refuse(plan.reason);
     if (!modelListPlanIsCurrent(plan, this.modelContext())) return this.refuse('所属状態が変わっています。選び直してください。');
