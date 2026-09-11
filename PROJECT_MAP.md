@@ -23,6 +23,9 @@ real-file/wire adoption remains separately gated. Latest UI complaints do not se
 Competing known ready-model statuses now support complete model/placement comparison
 and explicit causal selection in the same host, including saved retry/cold replay.
 This does not resolve every scalar/lifecycle conflict or connect model copies.
+Duplicate model memberships now have explicit keep-one saving in that host;
+only the other observed edges are tombstoned, not models or Captions. Independent
+model copies remain next, with the bounded root/facts design recorded in 05 §13.2.
 
 2026-09-11 current implementation: PO explicitly approved 05 §13.2's S1 service
 implementation before aggregate adoption, new synthetic-only development activation

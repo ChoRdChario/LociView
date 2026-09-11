@@ -106,7 +106,7 @@ export async function openMetadataHost(options: MetadataHostOptions) {
       }),
     };
     const demos = new Map<string, FullMetadataSource>();
-    const demoSource = async (kind: 'title' | 'membership' | 'model'): Promise<FullMetadataSource> => {
+    const demoSource = async (kind: 'title' | 'membership' | 'model' | 'assetMembership'): Promise<FullMetadataSource> => {
       const cached = demos.get(kind); if (cached) return cached;
       const packageId = kind === 'title' ? `pkg_${run}` : `pkg_${(await digest(new TextEncoder().encode(`synthetic-${kind}:${run}`))).slice(0, 32)}`;
       const previous = (await journal.entries()).find(e => e.prepared?.remote?.source.packageId === packageId);
@@ -135,19 +135,20 @@ export async function openMetadataHost(options: MetadataHostOptions) {
             expectedBindingId: current.projection.bindingId, revisionId: target.projection.revisionId,
             binding: cloneCanonicalValue(binding, limits) as JsonObject }, provider, newId());
         } else remote = kind === 'title' ? await seed.prepareCaptionText(seed.token, fixtureIds.shared, 'title', '配布された記録') :
-          seed.prepareEdit(seed.token, { kind: 'include', sceneId: fixtureIds.detail, resourceKind: 'caption', resourceId: fixtureIds.second,
-            membershipId: `scm_${newId()}`, orderKey: 'B', eventId: `evt_${newId()}` },
+          seed.prepareEdit(seed.token, { kind: 'include', sceneId: fixtureIds.detail,
+            resourceKind: kind === 'assetMembership' ? 'asset' : 'caption', resourceId: kind === 'assetMembership' ? fixtureIds.structure : fixtureIds.second,
+            membershipId: `${kind === 'assetMembership' ? 'sam' : 'scm'}_${newId()}`, orderKey: 'B', eventId: `evt_${newId()}` },
           await readProjectScene(seed.read(), limits, content.verifier(false)), newId());
         demoInput = { packageId, metadataBytes: remote.encodeFullSource(), proof: remote.proof, remoteHeads: remote.heads };
       }
       demos.set(kind, demoInput);
       return demoInput;
     };
-    const receive = (expectedToken: string, input?: FullMetadataSource, demo: 'title' | 'membership' | 'model' = 'title') => execute(async () => {
+    const receive = (expectedToken: string, input?: FullMetadataSource, demo: 'title' | 'membership' | 'model' | 'assetMembership' = 'title') => execute(async () => {
       if (authority.readOnly) throw Error('このタブは閲覧専用です。');
       return ready(await service.receiveFullSource(expectedToken, input ?? await demoSource(demo)));
     }, '更新を受け取れません。');
-    const resolve = (expectedToken: string, command: Extract<MetadataEdit, { kind: 'resolveCaptionText' | 'resolveCaptionMembership' | 'resolveAssetStatus' }>) => execute(async () => {
+    const resolve = (expectedToken: string, command: Extract<MetadataEdit, { kind: 'resolveCaptionText' | 'resolveCaptionMembership' | 'resolveAssetMembership' | 'resolveAssetStatus' }>) => execute(async () => {
       if (authority.readOnly) throw Error('このタブは閲覧専用です。');
       return ready(await service.edit(expectedToken, command));
     }, '競合を解消できません。');

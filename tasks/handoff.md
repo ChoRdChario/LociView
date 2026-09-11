@@ -1,5 +1,12 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-12 モデル重複登録keep-one（`53d7692`から）:** 新metadataの同じ受信欄で
+> 合成「モデルのシーン登録」を受け、どの登録を残すか明示選択して保存できる。
+> 他の重複edgeだけ解除し、モデル・Caption・他Sceneは不変更。両選択・retry・再開・
+> 再受信・後着edgeの再競合を確認。独立copyはまだ未接続とUIで明示。
+> 次は05 §13.2に記載したfresh root／完全ID remap／新record限定factsの縦断接続。
+> 最終matrixはtodo先頭。新たな描画・実機・offline・実データ受入れは追加していない。
+
 > **2026-09-12 モデルstatus競合の解消（`0f28455`から）:** 新metadata hostで各候補の
 > モデル・配置を比較し、明示選択した一つを保存できる。Caption・添付・所属は保持。
 > 合成モデル更新の受信も同じ欄へ接続。失敗retry・cold replay・後着競合の再発を確認。

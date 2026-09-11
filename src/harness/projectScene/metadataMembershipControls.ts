@@ -1,13 +1,13 @@
 import type { openMetadataHost } from './metadataHost';
 import type { SyntheticSession } from './session';
-import { captionCopySource, captionMembershipGroups, type CaptionMembershipResolution } from '../../projectMetadata/membership';
+import { captionCopySource, captionMembershipGroups, assetMembershipGroups, type CaptionMembershipResolution, type AssetMembershipResolution } from '../../projectMetadata/membership';
 import { newId } from '../../projectMetadata/persistence';
 import { metadataFixtureLimits as limits } from './metadataFixture';
 
 /** The same saved host, with an explicit entity-level decision (not a duplicate button). */
 export function createMetadataMembershipControls(document: Document, host: Awaited<ReturnType<typeof openMetadataHost>>,
-  session: SyntheticSession, composing: () => boolean, changed: () => void) {
-  const root = document.createElement('ul'); root.setAttribute('aria-label', '重複した登録');
+  session: SyntheticSession, composing: () => boolean, changed: () => void, kind: 'caption' | 'asset' = 'caption') {
+  const root = document.createElement('ul'); root.setAttribute('aria-label', kind === 'asset' ? '重複したモデル登録' : '重複した登録');
   type Form = { root: HTMLLIElement; token: string; original: HTMLSelectElement; choice: HTMLSelectElement;
     apply: HTMLButtonElement; cancel: HTMLButtonElement; message: HTMLParagraphElement; copyReady: boolean };
   const forms = new Map<string, Form>();
@@ -16,26 +16,31 @@ export function createMetadataMembershipControls(document: Document, host: Await
   const blocked = () => session.readOnly || !!session.pending && session.pending !== 'text' || composing();
   const render = () => {
     const provider = host.read().provider, nodes: HTMLLIElement[] = [], seen = new Set<string>();
-    if (provider?.kind === 'scene-provider') for (const group of captionMembershipGroups(provider, limits)) {
+    const groups = provider?.kind === 'scene-provider' ? kind === 'caption' ? captionMembershipGroups(provider, limits) :
+      assetMembershipGroups(provider, limits).map(({ assetId, ...g }) => ({ ...g, captionId: assetId })) : [];
+    if (provider?.kind === 'scene-provider') for (const group of groups) {
       const { sceneId, captionId, edgeIds } = group, key = `${sceneId}/${captionId}`;
       seen.add(key); let form = forms.get(key);
       if (!form || form.token !== provider.token && !dirty(form)) {
         const item = document.createElement('li'), heading = document.createElement('p'), preview = document.createElement('p');
         const original = document.createElement('select'), choice = document.createElement('select'), message = document.createElement('p');
         const apply = document.createElement('button'), cancel = document.createElement('button');
-        const title = provider.resources.captions[captionId]?.title, scene = provider.state.scenes[sceneId]?.name;
-        heading.textContent = `${scene?.kind === 'value' ? scene.value : 'シーン'}：${title?.kind === 'value' ? title.value : 'キャプション'}の登録が重複しています。`;
+        const title = kind === 'caption' ? provider.resources.captions[captionId]?.title : provider.details.mutable.assetsById[captionId]?.label;
+        const scene = provider.state.scenes[sceneId]?.name;
+        heading.textContent = `${scene?.kind === 'value' ? scene.value : 'シーン'}：${title?.kind === 'value' ? title.value : kind === 'caption' ? 'キャプション' : 'モデル'}の登録が重複しています。`;
         original.setAttribute('aria-label', '元として残す登録'); choice.setAttribute('aria-label', '重複の解消方法');
         const option = (select: HTMLSelectElement, value: string, label: string) => {
           const o = document.createElement('option'); o.value = value; o.textContent = label; select.append(o);
         };
         option(original, '', '元として残す登録を選択'); edgeIds.forEach((id, i) => option(original, id, `登録 ${i + 1}`));
-        option(choice, '', '解消方法を選択'); option(choice, 'one', '一つを残す'); option(choice, 'both', '両方残す（別々に編集）');
+        option(choice, '', '解消方法を選択'); option(choice, 'one', '一つを残す');
+        if (kind === 'caption') option(choice, 'both', '両方残す（別々に編集）');
         let copy: ReturnType<typeof captionCopySource> | undefined;
-        try { copy = captionCopySource(provider, captionId, limits); } catch { /* Explain the blocked copy, never substitute projected content. */ }
-        preview.textContent = copy ? `同じ記録への登録が${edgeIds.length}件あります。「一つを残す」は重複した登録だけを解除します。「両方残す」は本文・ピン位置・添付${copy.attachments.length}件をコピーします。他のシーンの元の記録は変わりません。` :
+        try { if (kind === 'caption') copy = captionCopySource(provider, captionId, limits); } catch { /* Explain the blocked copy, never substitute projected content. */ }
+        preview.textContent = kind === 'asset' ? `同じモデルへの登録が${edgeIds.length}件あります。「一つを残す」は重複登録だけを解除します。モデル本体・キャプション・他のシーンは変わりません。独立したモデルとして両方残す操作は、まだこの開発画面に接続されていません。` :
+          copy ? `同じ記録への登録が${edgeIds.length}件あります。「一つを残す」は重複した登録だけを解除します。「両方残す」は本文・ピン位置・添付${copy.attachments.length}件をコピーします。他のシーンの元の記録は変わりません。` :
           '同じ記録への登録です。両方残すには、記録と添付の未解決の内容を先に確認してください。他のシーンの元の記録は変わりません。';
-        const otherScenes = [...new Set(Object.values(provider.state.captionMemberships).filter(e => e.resourceId === captionId &&
+        const otherScenes = [...new Set(Object.values(kind === 'caption' ? provider.state.captionMemberships : provider.state.assetMemberships).filter(e => e.resourceId === captionId &&
           e.sceneId !== sceneId && e.lifecycle.kind === 'value' && e.lifecycle.value.state === 'active').map(e => e.sceneId))];
         if (otherScenes.length) preview.textContent += ` 元の記録を参照するシーン：${otherScenes.map(id => {
           const name = provider.state.scenes[id]?.name; return name?.kind === 'value' ? name.value : '名称の確認が必要なシーン';
@@ -49,7 +54,10 @@ export function createMetadataMembershipControls(document: Document, host: Await
         apply.addEventListener('click', () => {
           if (blocked() || current.token !== host.read().source?.token || !edgeIds.includes(original.value) ||
             !['one', 'both'].includes(choice.value) || choice.value === 'both' && !copy) return;
-          const command: CaptionMembershipResolution = { kind: 'resolveCaptionMembership', sceneId, captionId,
+          const command: CaptionMembershipResolution | AssetMembershipResolution = kind === 'asset' ? {
+            kind: 'resolveAssetMembership', sceneId, assetId: captionId, observedMembershipIds: edgeIds,
+            originalMembershipId: original.value, choice: 'one', eventId: `evt_${newId()}`,
+          } : { kind: 'resolveCaptionMembership', sceneId, captionId,
             observedMembershipIds: edgeIds, originalMembershipId: original.value, choice: choice.value as 'one' | 'both', eventId: `evt_${newId()}`,
             copies: choice.value === 'one' ? [] : edgeIds.filter(id => id !== original.value).map(sourceMembershipId => ({
               sourceMembershipId, captionId: `cap_${newId()}`, membershipId: `scm_${newId()}`,

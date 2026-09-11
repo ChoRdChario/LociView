@@ -11,12 +11,13 @@ import { value, type Anchor, type Field, type Membership } from '../scene/types'
 import type { ProjectProviderRead } from '../scene/projectProvider';
 import { fail, type MetadataLimits } from './format';
 import { normalizeCaptionText } from '../domain/captionText';
-import { planCaptionMembershipResolution, type CaptionMembershipResolution } from './membership';
+import { planCaptionMembershipResolution, planAssetMembershipResolution, type CaptionMembershipResolution, type AssetMembershipResolution } from './membership';
 import { metadataImmutableReader } from './records';
 import { assetStatusCandidates } from './assetStatus';
 
 export type MetadataEdit =
   | CaptionMembershipResolution
+  | AssetMembershipResolution
   | { kind: 'resolveAssetStatus'; assetId: string; operationId: string }
   | { kind: 'activatePreparedRevision'; sceneId: string; assetId: string; expectedBindingId: string; revisionId: string; binding: JsonObject }
   | { kind: 'moveAsset'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject }
@@ -157,6 +158,7 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       result.push({ map: 'assetsById', id: command.assetId, create: false, fields: { status: selected!.status } }); break;
     }
     case 'resolveCaptionMembership': return planCaptionMembershipResolution(provider, command, limits);
+    case 'resolveAssetMembership': return planAssetMembershipResolution(provider, command, limits);
     case 'activatePreparedRevision': {
       shape(raw, ['kind', 'sceneId', 'assetId', 'expectedBindingId', 'revisionId', 'binding']);
       row('scenesById', command.sceneId); row('assetsById', command.assetId);

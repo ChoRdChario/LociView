@@ -14,6 +14,8 @@
 > exchange-base/delta and
 > real-data adoption retain their gates. Latest UI feedback does not
 > automatically set priority. Old saved-host Desktop PASS remains narrowly scoped.
+> Explicit model membership keep-one now saves only the other observed edge's
+> tombstone, retaining resources and other Scenes; keep-both is still pending.
 > Candidate history/CAS/journal proofs remain partial, not storage adoption or
 > integrated S1 completion. Section 8 owns the current completion map.
 > The older Native candidate execution plan below remains historical evidence,

@@ -15,6 +15,10 @@ export interface CaptionMembershipResolution {
   observedMembershipIds: string[]; originalMembershipId: string; choice: 'one' | 'both'; eventId: string;
   copies: { sourceMembershipId: string; captionId: string; membershipId: string; attachments: IdCopy[]; tags: IdCopy[] }[];
 }
+export interface AssetMembershipResolution {
+  kind: 'resolveAssetMembership'; sceneId: string; assetId: string;
+  observedMembershipIds: string[]; originalMembershipId: string; choice: 'one'; eventId: string;
+}
 const edgeMap = 'sceneCaptionMembershipsById';
 const shape = (o: object, keys: string[]) => {
   if (Object.keys(o).sort().join(',') !== keys.sort().join(',')) fail('membership-resolution-shape');
@@ -81,14 +85,14 @@ function candidateReader(provider: Provider, limits: MetadataLimits) {
   return { records, exact, active, complete, related, charge };
 }
 
-export function captionMembershipGroups(provider: Provider, limits: MetadataLimits) {
-  const r = candidateReader(provider, limits), groups = new Map<string, { sceneId: string; captionId: string; edgeIds: string[] }>();
-  for (const [id] of r.records.get(edgeMap) ?? []) {
+function membershipGroups(provider: Provider, limits: MetadataLimits, map: 'sceneCaptionMembershipsById' | 'sceneAssetMembershipsById', field: 'captionId' | 'assetId') {
+  const r = candidateReader(provider, limits), groups = new Map<string, { sceneId: string; resourceId: string; edgeIds: string[] }>();
+  for (const [id] of r.records.get(map) ?? []) {
     try {
-      r.active(edgeMap, id);
-      const sceneId = r.exact(edgeMap, id, 'sceneId'), captionId = r.exact(edgeMap, id, 'captionId');
-      if (typeof sceneId !== 'string' || typeof captionId !== 'string') continue;
-      const key = `${sceneId}/${captionId}`, g = groups.get(key) ?? { sceneId, captionId, edgeIds: [] };
+      r.active(map, id);
+      const sceneId = r.exact(map, id, 'sceneId'), resourceId = r.exact(map, id, field);
+      if (typeof sceneId !== 'string' || typeof resourceId !== 'string') continue;
+      const key = `${sceneId}/${resourceId}`, g = groups.get(key) ?? { sceneId, resourceId, edgeIds: [] };
       g.edgeIds.push(id); groups.set(key, g);
     } catch (error) {
       if (error instanceof MetadataSourceError && error.code === 'membership-resolution-limit') throw error;
@@ -96,6 +100,26 @@ export function captionMembershipGroups(provider: Provider, limits: MetadataLimi
     }
   }
   return [...groups.values()].filter(g => g.edgeIds.length > 1).map(g => ({ ...g, edgeIds: g.edgeIds.sort() }));
+}
+export function captionMembershipGroups(provider: Provider, limits: MetadataLimits) {
+  return membershipGroups(provider, limits, edgeMap, 'captionId').map(({ resourceId, ...g }) => ({ ...g, captionId: resourceId }));
+}
+export function assetMembershipGroups(provider: Provider, limits: MetadataLimits) {
+  return membershipGroups(provider, limits, 'sceneAssetMembershipsById', 'assetId').map(({ resourceId, ...g }) => ({ ...g, assetId: resourceId }));
+}
+
+/** Keep-one removes duplicate registrations only, never the resource or its history. */
+export function planAssetMembershipResolution(provider: Provider, command: AssetMembershipResolution, limits: MetadataLimits): MetadataRecordEdit[] {
+  shape(command, ['kind', 'sceneId', 'assetId', 'observedMembershipIds', 'originalMembershipId', 'choice', 'eventId']);
+  const r = candidateReader(provider, limits), guard = new ProjectRecordFields(), map = 'sceneAssetMembershipsById';
+  guard.id(command.sceneId, 'scn', []); guard.id(command.assetId, 'ast', []); guard.id(command.eventId, 'evt', []);
+  r.active('scenesById', command.sceneId); r.active('assetsById', command.assetId);
+  const ids = r.related(map, { sceneId: command.sceneId, assetId: command.assetId });
+  if (command.choice !== 'one' || ids.length < 2 || !sameIds(command.observedMembershipIds, ids) || !ids.includes(command.originalMembershipId))
+    fail('membership-resolution-candidates');
+  for (const id of ids) r.complete(map, id);
+  return ids.filter(id => id !== command.originalMembershipId).map(id => ({ map, id, create: false,
+    fields: { lifecycle: { state: 'deleted', reason: 'conflictResolution', eventId: command.eventId } } }));
 }
 
 export function captionCopySource(provider: Provider, captionId: string, limits: MetadataLimits) {

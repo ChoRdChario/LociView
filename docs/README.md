@@ -26,6 +26,8 @@ Latest bounded connection: metadata model-status candidates can be compared and
 explicitly resolved without changing Caption data. The synthetic host also receives
 model updates; ordinary-file, rendered/device and aggregate team acceptance remain
 pending. Todo and the inventory retain remaining model-copy and adoption boundaries.
+Model membership keep-one is also connected; independently editable model
+keep-both still awaits its complete remap/content-fact implementation.
 
 ## Classification
 

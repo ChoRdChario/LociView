@@ -501,6 +501,58 @@ function mediaHost(s: SyntheticSession) {
 }
 
 describe('new synthetic saved host (memory ports and recorded DOM, not real browser/iOS acceptance)', { timeout: 15_000 }, () => {
+  it.each([1, 2])('retains explicitly selected model registration %s without deleting a model or Caption, retry/cold replay and late edge', async selectedIndex => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority), seed = host.read().source!;
+    const seedProvider = host.read().provider!;
+    s.acceptNavigation(planNavigation(s.snapshot.state, s.session, s.pending, { kind: 'scene', sceneId: f.detail }));
+    await acknowledge(s, () => { s.acceptModel(planModelList(s.modelContext(), { kind: 'membership', assetId: f.structure, included: true })); });
+    const before = s.snapshot, bodyReads = host.content.counts.bodyBytes;
+    const ui = createMetadataReceiveControls(new RecordedDocument().asDocument(), host, s, () => {}), root = record(ui.root);
+    setInput(named(root, '受信する合成更新'), 'assetMembership');
+    await acknowledge(s, () => button(root, '開発用の更新を受け取る').fire('click'));
+    const list = named(root, '重複したモデル登録'), original = named(list, '元として残す登録'), choice = named(list, '重複の解消方法');
+    const confirm = button(list, '登録の重複を解消');
+    expect(original.children).toHaveLength(3); expect(original.value).toBe(''); expect(choice.value).toBe(''); expect(confirm.disabled).toBe(true);
+    expect(choice.children.some(c => c.value === 'both')).toBe(false);
+    expect(descendants(list).some(n => n.textContent.includes('キャプション・他のシーンは変わりません'))).toBe(true);
+    const ids = original.children.slice(1).map(c => c.value), chosen = ids[selectedIndex - 1]!;
+    const token = host.read().source!.token, command = { kind: 'resolveAssetMembership' as const, sceneId: f.detail, assetId: f.structure,
+      observedMembershipIds: ids, originalMembershipId: chosen, choice: 'one' as const, eventId: `evt_${'e'.repeat(32)}` };
+    const writes = [h.base.writes, h.fault.writes];
+    await expect(host.resolve(seed.token, command)).rejects.toThrow();
+    await expect(host.resolve(token, { ...command, observedMembershipIds: ids.slice(1) })).rejects.toThrow();
+    await expect(host.resolve(token, { ...command, originalMembershipId: 'sam_' + 'f'.repeat(32) })).rejects.toThrow();
+    expect([h.base.writes, h.fault.writes]).toEqual(writes); expect(host.read().state).toBe('ready');
+    const reader = await h.open(); await expect(reader.resolve(token, command)).rejects.toThrow(/閲覧専用/); await reader.dispose();
+    setInput(original, chosen); setInput(choice, 'one'); expect(confirm.disabled).toBe(false);
+    s.setSearchComposing(true); ui.render(); expect(confirm.disabled).toBe(true);
+    s.setSearchComposing(false); ui.render();
+    h.base.rejectPublication = true; await acknowledge(s, () => confirm.fire('click'));
+    expect(s.acknowledgment.state).toBe('failed'); expect(original.value).toBe(chosen); expect(ui.hasChanges()).toBe(true);
+    expect(host.read().source!.token).toBe(token);
+    const paths = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.endsWith('.amchange'));
+    const bytes = await Promise.all(paths.map(p => h.base.readBytes(p)));
+    h.base.rejectPublication = false; await acknowledge(s, () => { s.retryWorking(); });
+    expect(s.acknowledgment.state).toBe('idle'); expect(ui.hasChanges()).toBe(false);
+    expect(await Promise.all(paths.map(p => h.base.readBytes(p)))).toEqual(bytes);
+    const current = s.snapshot, activeEdges = Object.values(current.state.assetMemberships).filter(e =>
+      e.sceneId === f.detail && e.resourceId === f.structure && e.lifecycle.kind === 'value' && e.lifecycle.value.state === 'active');
+    expect(activeEdges.map(e => e.id)).toEqual([chosen]);
+    expect(current.resources).toEqual({ ...before.resources, token: current.resources.token }); expect(current.modelVersions).toEqual(before.modelVersions);
+    expect(current.state.captionMemberships).toEqual(before.state.captionMemberships);
+    for (const e of Object.values(before.state.assetMemberships).filter(e => e.sceneId !== f.detail)) expect(current.state.assetMemberships[e.id]).toEqual(e);
+    const saved = host.read().source!, saveCount = [h.base.writes, h.fault.writes];
+    ui.dispose(); await host.dispose(); const cold = await h.open();
+    await cold.receive(saved.token, undefined, 'assetMembership'); expect(cold.read().source!.originalChanges()).toEqual(saved.originalChanges());
+    expect([h.base.writes, h.fault.writes]).toEqual(saveCount); expect(cold.content.counts.bodyBytes).toBe(0);
+    const late = seed.prepareEdit(seed.token, { kind: 'include', sceneId: f.detail, resourceKind: 'asset', resourceId: f.structure,
+      membershipId: `sam_${'d'.repeat(32)}`, orderKey: 'C', eventId: `evt_${'d'.repeat(32)}` }, seedProvider, 'd'.repeat(32));
+    await cold.receive(saved.token, fullSource(late, 997));
+    const lateUi = createMetadataReceiveControls(new RecordedDocument().asDocument(), cold, new SyntheticSession(cold.authority), () => {});
+    expect(named(named(record(lateUi.root), '重複したモデル登録'), '元として残す登録').children).toHaveLength(3);
+    expect(host.content.counts.bodyBytes).toBe(bodyReads); lateUi.dispose(); await cold.dispose();
+  });
+
   it('connects explicit independent copies, retained draft/failed publication, cold replay and independent editing', async () => {
     const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority);
     s.acceptNavigation(planNavigation(s.snapshot.state, s.session, s.pending, { kind: 'scene', sceneId: f.detail }));

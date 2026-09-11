@@ -11,6 +11,53 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — approved S1 service entry (2026-09-11)
 
+#### Active next slice — explicit model membership resolution (from `53d7692`)
+
+Meta-audit: active-model status resolution is committed and verified; 62-group
+practical team scope remains incomplete. The next dependency is independent
+model copies, not another acceptance-only probe. Complete model copy requires
+fresh-ID model projection/content facts and an explicit parent-history boundary.
+Do not discard parent relationships or replenish old missing evidence silently.
+
+- [x] Connect keep-one model memberships first: exact observed IDs, explicit
+  retained edge, all affected edges shown, only other observed edges tombstoned.
+  Preserve models, Captions and other Scenes; stale/unknown/ambiguous refusal.
+- [x] Fix the copy parent-reference and narrowly scoped new-record facts design
+  before the keep-both implementation; seek PO only for an actual product-policy
+  decision. Ordinary read/cold retry must never regenerate existing missing facts.
+- [ ] Extend the same metadata host for complete known model-copy remap,
+  independent editing, retained save/retry and a second full-source exchange.
+
+Reuse existing membership UI and saved host tests; no new PoC, arbitrary duplicate
+tool, wire, general profile/importer, ordinary-home activation or device claim.
+Checkpoint a proven vertical boundary, not a partially successful copy command.
+
+Keep-one result: the existing receiver/form now accepts a synthetic model Scene
+registration, enumerates both exact edges with no initial original selection,
+and saves only the other edge's tombstone. Models, Captions and other Scenes
+remain unchanged. Both explicit choices, rejected stale/incomplete/readonly
+requests, failed-publication exact retry, cold demo replay/no-op and a previously
+unseen edge reopening the conflict PASS in recorded-DOM/storage-port tests.
+Independent source/UI reviews have no mandatory findings. Final root matrix below
+exited 0: 109 files / 1,957 PASS / 21 existing TODO (118.27 s). Typecheck/build
+and diff-check PASS; existing build chunk warnings remain. Do not credit
+rendered/input/device acceptance from these synthetic tests.
+
+Next: model keep-both's complete fresh-ID closure and scoped fact preparation,
+then return exchange. Read-only contract review found fresh independent root
+consistent with 05 §8/01 optional-parent same-owner rules: preserve current
+transform AND method; do not copy old parent IDs into a new Asset or change the
+original's history. The exact bounded implementation clarification is in 05
+§13.2. No new PO policy was ratified and no general historical-copy rule added.
+
+Parallel 06/07 audit confirms their §10 lists remain technical approval inputs,
+not a completed ratification pack. No new companion/probe is needed. Add exact
+profile/golden/defaults (including Native pinScale), delta/base completion and
+history-free privacy/remap evidence to the existing proposals; budget guarantees
+still need Desktop/iOS measurements. Already approved five purposes, explicit
+conflicts/independent copies and unplaced records must not be re-asked as product
+choices. This work stays parallel to copy/S1 and does not authorize wire activation.
+
 #### Completed bounded slice — prepared model update/team loop (2026-09-12, from `0afad01`)
 
 Previous goal turn was progress: independent Caption copies landed with final

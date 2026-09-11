@@ -1624,6 +1624,53 @@ resolved before copy; this command is not scalar keep-both or general duplicatio
 Existing memory/old saved sources are evidence only, not implementation imports.
 Reuse saved host/media/failure ports for the new command's acceptance.
 
+**Model membership resolution implementation boundary (2026-09-12):**
+The model-membership keep-one command follows §8 independently of keep-both:
+`resolveAssetMembership` carries Scene/Asset, all observed active edge IDs,
+explicit original edge and an event ID. It tombstones only the other observed
+edges in one original change. Unknown endpoints that could reach that key and
+unresolved edge fields reject; no inferred winner or geometry/Caption deletion.
+An incomplete copy implementation must not be offered as a successful keep-both.
+
+Next bounded keep-both implementation rebuilds only the confirmed active editable
+closure of the exact known triangle. It is not a historical clone. The new
+Asset's fresh root binding preserves the source's current numeric transform and
+`method`, but has no `parentBindingId` pointing back into the original Asset.
+The original Asset, its complete binding history and all original Caption anchors
+remain unchanged. This implements §8's independent active-copy semantics; it is
+not permission to remove a parent from existing records or omit unknown source/
+proxy/compatibility relationships. The fixture's parent→method default must not
+silently change a copied manual placement to import. Current fixture revisions
+have no revision parent; unsupported relationships block the copy until their
+complete remap exists.
+
+Carry a complete fresh map for Asset/frame, binding/revision/Representation,
+family/compatibility, material layout/slot, Scene edge and any effective material
+override. Keep numeric frames, source semantics, profile and BlobRef unchanged;
+recompute immutable metadata digests and validate every output. Re-key the
+confirmed effective Scene-then-Project material as a Scene override for the copy.
+Do not redirect other Scenes or existing Caption anchors.
+
+Fresh Representation IDs require their own content requests/facts; a receipt
+keyed to the original record cannot become a receipt for the copy. Use a bounded
+owned new-record fact-preparation port with a read-only complete `base`/`next`
+plan. Only IDs absent from the base's complete original history qualify. Validate
+the complete exact known rekeyed record and existing durable blob inventory;
+unknown fields/profiles/relationships, new body bytes and existing missing facts
+do not gain a replenishment path. Limit fact creation to the new requests, never
+pass allow-new-evidence to the complete final provider. This does not adopt a
+general importer, a fact-transfer wire or a new persistence receipt format.
+
+Local and remote operations retain exact prepared original changes/full source
+before staging these facts under the existing journal lease. Validate the final
+candidate with ordinary no-new-evidence checks before publication. Same-writer
+preparation retry uses the retained plan/IDs/bytes; after the prepared journal
+marker, all retry/cold reads verify only already stored evidence. An incomplete
+preparation after cold interruption remains explicit repair, not silent rebuild.
+Use existing saved host tests for local independent move/material edit, two-party
+return/no-op/cold reopen, retry and missing/unknown evidence refusal. No new PoC
+page or intermediate human gate is needed for this synthetic-only command.
+
 **Bounded prepared-revision implementation (2026-09-12):**
 The already-approved synthetic metadata host may prepare its two known geometry
 versions before initial publication. Active seed Assets remain on the initial
