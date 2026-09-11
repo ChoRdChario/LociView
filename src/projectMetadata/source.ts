@@ -106,6 +106,7 @@ export class ProjectMetadataSource {
       for (const edit of edits) {
         if (edit.create) draft[edit.map][edit.id] = {};
         for (const [field, value] of Object.entries(edit.fields)) draft[edit.map][edit.id][field] = scalar(value, this.limits);
+        for (const field of edit.remove ?? []) delete draft[edit.map][edit.id][field];
       }
     });
     return ProjectMetadataSource.validated(doc, this.proof, this.limits);

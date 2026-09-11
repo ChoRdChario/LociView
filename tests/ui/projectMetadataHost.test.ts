@@ -14,8 +14,12 @@ import { planPinMode } from '../../src/ui/projectScene/pinModeState';
 import { planCaptionInclude } from '../../src/ui/projectScene/captionIncludeState';
 import { planModelList } from '../../src/ui/projectScene/modelListState';
 import { readProjectScene } from '../../src/scene/projectProvider';
-import { metadataFixtureLimits } from '../../src/harness/projectScene/metadataFixture';
+import { metadataFixtureLimits, metadataProjectView } from '../../src/harness/projectScene/metadataFixture';
 import type { MetadataEdit } from '../../src/projectMetadata/commands';
+import { ProjectMetadataSource } from '../../src/projectMetadata/source';
+import { planViewAuthor } from '../../src/ui/projectScene/viewAuthoringState';
+import { planView } from '../../src/ui/projectScene/viewState';
+import { SyntheticViewSession, type DisplayCapture } from '../../src/harness/projectScene/viewSession';
 import { RecordedDocument, record, type RecordedNode } from './domRecorder';
 
 class FaultFS extends MemoryFS {
@@ -43,6 +47,27 @@ function fixture() {
   return { base, rows, fault, createCalls, open, run };
 }
 const descendants = (node: RecordedNode): RecordedNode[] => [node, ...node.children.flatMap(descendants)];
+const button = (r: RecordedNode, text: string) => descendants(r).find(n => n.tag === 'button' && n.textContent === text)!;
+const picker = (r: RecordedNode, label: string) => descendants(r).find(n => n.tag === 'select' && n.attributes.get('aria-label') === label)!;
+const area = (r: RecordedNode, label: string) => descendants(r).find(n => n.tag === 'section' && n.attributes.get('aria-label') === label)!;
+const displayCapture = (): DisplayCapture => ({ camera: { position: [1, 2, 8], target: [0, 0, 0], up: [0, 1, 0],
+  projection: { kind: 'perspective', verticalFovRadians: 0.7 } }, background: { kind: 'solid', colorSrgb: [0.1234567, 0.42, 0.8] } });
+function viewHost(s: SyntheticSession) {
+  let capture = displayCapture(), cameraToken = 0; const recalls: DisplayCapture[] = [];
+  const w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s, { viewportFactory: () => ({
+    update() {}, setActive() {}, read: () => ({ token: String(cameraToken), ready: true, issue: null, dragging: false,
+      projection: 'perspective', axis: null, pins: [] }), capture: () => capture,
+    recall: p => { recalls.push(p); }, camera() {}, retry() {}, dispose() {},
+  }) });
+  const r = record(w.root); button(r, '視点').fire('click'); const author = area(r, '視点の作成と管理');
+  const name = descendants(author).find(n => n.tag === 'input')!;
+  return { w, r, author, recalls, picker: picker(r, '保存した視点'),
+    capture(next: DisplayCapture) { capture = next; cameraToken++; w.render(); },
+    name(text: string) { name.value = text; name.fire('input'); },
+    async add(text: string) { button(author, '視点を作る').fire('click'); this.name(text);
+      await acknowledge(s, () => button(author, '視点を追加').fire('click')); w.render(); return this.picker.value; },
+  };
+}
 const select = (s: SyntheticSession, captionId = f.shared) => s.acceptList(planCaptionList(s.captionContext(), { kind: 'select', captionId }));
 async function acknowledge(s: SyntheticSession, action: () => void) {
   let unsubscribe = () => {};
@@ -219,5 +244,109 @@ describe('new synthetic saved host (memory ports and recorded DOM, not real brow
     const conflictView = await readProjectScene(conflict.read(), metadataFixtureLimits, host.content.verifier(false));
     expect(() => conflict.prepareEdit(conflict.token, command, conflictView, tx)).toThrow(/unresolved/);
     expect(host.read().source!.token).toBe(source.token); await host.dispose();
+  });
+
+  it('connects saved View create/recapture/rename/order/entry/confirmed-delete and cold recall through the mounted controls', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority), ui = viewHost(s);
+    const initialChanges = host.read().source!.originalChanges().length;
+    const first = await ui.add('最初の視点'); expect(first).toMatch(/^view_/);
+    expect(s.acknowledgment.state).toBe('idle'); expect(host.read().source!.originalChanges()).toHaveLength(initialChanges + 1);
+    expect(s.snapshot.viewData!.records[first]!.background).toEqual({ kind: 'value', value: displayCapture().background });
+    expect(ui.recalls).toHaveLength(0); button(area(ui.r, '保存した視点'), '表示').fire('click');
+    expect(ui.recalls).toEqual([displayCapture()]);
+    const next = { ...displayCapture(), camera: { ...displayCapture().camera, position: [3, 4, 9] as const } };
+    ui.capture(next); button(ui.author, '編集').fire('click'); ui.name('入口');
+    button(ui.author, '現在の表示を使用').fire('click');
+    await acknowledge(s, () => button(ui.author, '変更を適用').fire('click')); ui.w.render();
+    expect(s.snapshot.viewData!.records[first]!.camera).toEqual({ kind: 'value', value: next.camera });
+    const second = await ui.add('別の視点');
+    await acknowledge(s, () => button(ui.author, '前へ').fire('click')); ui.w.render();
+    const rows = s.snapshot.viewData!.records;
+    expect(rows[second]!.orderKey.kind === 'value' && rows[first]!.orderKey.kind === 'value' &&
+      rows[second]!.orderKey.value < rows[first]!.orderKey.value).toBe(true);
+    ui.picker.value = first; ui.picker.fire('change');
+    const entry = area(ui.r, '開始時の設定'), choice = picker(entry, 'シーンを開いたときの視点');
+    const oldVersion = s.snapshot.viewData!.versions[`scene/${f.overview}/entry`];
+    choice.value = first; choice.fire('change');
+    await acknowledge(s, () => button(entry, '設定を適用').fire('click')); ui.w.render();
+    expect(ui.recalls).toHaveLength(1); expect(button(ui.author, '削除').disabled).toBe(true);
+    choice.value = ''; choice.fire('change');
+    await acknowledge(s, () => button(entry, '設定を適用').fire('click')); ui.w.render();
+    expect(s.snapshot.state.scenes[f.overview]!.defaultViewId).toEqual({ kind: 'value', value: null });
+    expect(s.snapshot.viewData!.versions[`scene/${f.overview}/entry`]).not.toBe(oldVersion);
+    const p = host.read().provider!; if (p.kind !== 'scene-provider') throw Error('provider');
+    expect(p.details.mutable.scenesById[f.overview]!.defaultViewId).toEqual({ kind: 'value', value: undefined });
+    button(ui.author, '削除').fire('click');
+    expect(s.snapshot.viewData!.records[first]!.lifecycle).toMatchObject({ value: { state: 'active' } });
+    await acknowledge(s, () => button(ui.author, '削除する').fire('click')); ui.w.render();
+    expect(s.snapshot.viewData!.records[first]!.lifecycle).toMatchObject({ value: { state: 'deleted' } });
+    const reader = await h.open(), readSession = new SyntheticSession(reader.authority), readUI = viewHost(readSession);
+    expect(readUI.author.hidden).toBe(true);
+    readUI.picker.value = second; readUI.picker.fire('change'); button(area(readUI.r, '保存した視点'), '表示').fire('click');
+    expect(readUI.recalls).toHaveLength(1); expect(picker(area(readUI.r, '開始時の設定'), 'シーンを開いたときの視点').disabled).toBe(true);
+    readUI.w.dispose(); await reader.dispose(); ui.w.dispose(); await host.dispose();
+    const cold = await h.open(), coldSession = new SyntheticSession(cold.authority), coldUI = viewHost(coldSession);
+    expect(cold.content.counts.bodyBytes).toBe(0); expect(cold.authority.read().viewData!.records[first]!.lifecycle).toMatchObject({ value: { state: 'deleted' } });
+    coldUI.picker.value = second; coldUI.picker.fire('change'); button(area(coldUI.r, '保存した視点'), '表示').fire('click');
+    expect(coldUI.recalls).toEqual([next]);
+    expect(cold.read().source!.originalChanges()).toHaveLength(initialChanges + 7);
+    coldUI.w.dispose(); await cold.dispose();
+  });
+
+  it('retains a failed View capture and original ID/bytes until exact retry confirms the same draft', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority), ui = viewHost(s);
+    h.base.rejectPublication = true; await ui.add('復旧する視点');
+    expect(s.acknowledgment.state).toBe('failed'); expect(Object.keys(s.snapshot.viewData!.records)).toHaveLength(0);
+    expect(s.views.pending).toBe('text');
+    const paths = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.endsWith('.amchange'));
+    const bytes = await Promise.all(paths.map(p => h.base.readBytes(p)));
+    ui.capture({ ...displayCapture(), background: { kind: 'solid', colorSrgb: [1, 1, 1] } });
+    h.base.rejectPublication = false; await acknowledge(s, () => { s.retryWorking(); }); ui.w.render();
+    expect(s.acknowledgment.state).toBe('idle'); expect(s.views.pending).toBeNull();
+    const id = ui.picker.value; expect(s.snapshot.viewData!.records[id]!.background).toEqual({ kind: 'value', value: displayCapture().background });
+    expect(await Promise.all(paths.map(p => h.base.readBytes(p)))).toEqual(bytes);
+    await host.authority.retry!(); expect(Object.keys(host.authority.read().viewData!.records)).toEqual([id]);
+    ui.w.dispose(); await host.dispose(); const cold = await h.open();
+    expect(cold.authority.read().viewData!.records[id]).toBeDefined(); await cold.dispose();
+  });
+
+  it('uses original per-field versions for recapture and refuses stale, conflicting, cross-Scene and referenced View writes', async () => {
+    const h = fixture(), host = await h.open(true), seed = host.read().source!, provider = host.read().provider!, tx = 'b'.repeat(32);
+    const id = `view_${'a'.repeat(32)}`, camera = { ...displayCapture().camera }, background = { ...displayCapture().background };
+    const created = seed.prepareEdit(seed.token, { kind: 'createView', viewId: id, sceneId: f.overview,
+      projectFrameId: host.authority.read().resources.projectFrameId, name: '視点', orderKey: 'A', camera, background, eventId: `evt_${tx}` }, provider, tx);
+    const read = (source: ProjectMetadataSource) => readProjectScene(source.read(), metadataFixtureLimits, host.content.verifier(false));
+    const original = await read(created); let current = metadataProjectView(original);
+    const view = new SyntheticViewSession(() => current, () => f.overview, () => false);
+    const runtime = { kind: 'ready' as const, token: 'camera', sceneId: f.overview, projectFrameId: current.resources.projectFrameId,
+      projection: 'perspective' as const, axis: null, bounds: { kind: 'value' as const, value: 'available' as const } };
+    const context = () => view.context(runtime, null), author = () => view.authorContext(context(), displayCapture);
+    expect(view.accept(planView(context(), { kind: 'select', viewId: id }), context(), () => {})).toBe(true);
+    expect(view.acceptAuthor(planViewAuthor(author(), { kind: 'edit' }), author())).toBe(true);
+    expect(view.acceptAuthor(planViewAuthor(author(), { kind: 'capture' }), author())).toBe(true);
+    const key = `view/${id}/camera`, version = current.viewData!.versions[key];
+    const unrelated = created.prepareEdit(created.token, { kind: 'editCaption', captionId: f.shared, edits: { title: '別の編集' } }, original, tx);
+    current = metadataProjectView(await read(unrelated)); expect(current.viewData!.versions[key]).toBe(version);
+    expect(planViewAuthor(author(), { kind: 'apply' }).kind).toBe('apply');
+    const edit = { kind: 'editView' as const, sceneId: f.overview, viewId: id, edits: { camera, background } };
+    expect(() => created.prepareEdit('stale', edit, original, tx)).toThrow(/stale/);
+    expect(() => created.prepareEdit(created.token, { ...edit, sceneId: f.detail }, original, tx)).toThrow(/scope/);
+    const referenced = created.prepareEdit(created.token, { kind: 'setEntryView', sceneId: f.overview, viewId: id }, original, tx);
+    const referencedProvider = await read(referenced);
+    expect(() => referenced.prepareEdit(referenced.token, { kind: 'deleteView', sceneId: f.overview, viewId: id, eventId: `evt_${tx}` }, referencedProvider, tx)).toThrow(/referenced/);
+    const [raw] = A.applyChanges(A.init<any>(), created.originalChanges());
+    const same = A.change(A.clone(raw), d => { const old = d.viewsById[id].camera; delete d.viewsById[id].camera; d.viewsById[id].camera = old; });
+    const explicitSame = ProjectMetadataSource.reopen(A.getAllChanges(same), created.proof, metadataFixtureLimits);
+    current = metadataProjectView(await read(explicitSame)); expect(current.viewData!.records[id]!.camera).toEqual({ kind: 'value', value: camera });
+    expect(current.viewData!.versions[key]).not.toBe(version); expect(planViewAuthor(author(), { kind: 'apply' }).kind).toBe('blocked');
+    const alternate = created.prepareEdit(created.token, { ...edit, edits: { camera: { ...camera, position: [3, 4, 9] }, background } }, original, tx);
+    const back = alternate.prepareEdit(alternate.token, edit, await read(alternate), tx);
+    current = metadataProjectView(await read(back)); expect(current.viewData!.versions[key]).not.toBe(version);
+    expect(planViewAuthor(author(), { kind: 'apply' }).kind).toBe('blocked');
+    const conflict = explicitSame.appendOriginal(alternate.originalChanges()), conflictProvider = await read(conflict);
+    current = metadataProjectView(conflictProvider); expect(current.viewData!.records[id]!.camera.kind).toBe('unresolved');
+    expect(current.viewData!.cells[key]).toBeUndefined();
+    expect(() => conflict.prepareEdit(conflict.token, edit, conflictProvider, tx)).toThrow(/unresolved/);
+    expect(host.read().source!.token).toBe(seed.token); await host.dispose();
   });
 });

@@ -1,6 +1,18 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **Latest connection (2026-09-11, after `b40b698`):** `storage=metadata` now
+> **Latest connection (2026-09-11, after `1fe2857`):** the same `storage=metadata`
+> host now connects Saved View creation/recapture/name/order/confirmed deletion
+> and Scene entry set/clear to its existing journal/retry. View recall is local,
+> and entry assignment never recalls immediately. Exact original per-field IDs
+> preserve stale/conflict detection; optional entry absence is not a schema change.
+> Mounted memory-port create/reopen/readonly/retry tests pass and independent
+> reviews have no scoped blocker. Typecheck/build/HTTP graph PASS; full two-worker
+> run 109 files / 1,907 PASS / 21 TODO, exit 0. Next is exact Project/Scene material
+> override editing/reset with the existing catalogs; current todo owns its boundary.
+> Real browser/physical storage/iOS remains pending; old modes and ordinary home
+> are unchanged. Do not repeat the old PO batch or ask for S1 permission again.
+
+> **Preceding connection (2026-09-11, after `b40b698`):** `storage=metadata` now
 > connects Caption text/color, pin add/move and Scene Caption/model include/exclude
 > to the same S1 journal/save/reopen service. Preview/cancel stays local; new pin
 > IDs and fields persist atomically. Exclusion removes only the selected Scene
@@ -10,7 +22,7 @@
 > with two workers passes 109 files / 1,904 tests / 21 TODO. The first high-load
 > run timed out in two unchanged filesystem tests; no assertion was weakened.
 > Current todo retains both results and the checkpoint boundary.
-> Next is existing Saved View authoring/save/recall in this same host, beginning
+> Next at that checkpoint was existing Saved View authoring/save/recall, beginning
 > with exact per-field history versions, not a new source or storage probe.
 > Model geometry/placement, material/media/Saved View writes and exchange remain
 > unconnected in this mode; old modes retain them. No migration or ordinary-home

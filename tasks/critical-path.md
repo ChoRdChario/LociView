@@ -401,10 +401,12 @@ fresh inventory/presence and do not reuse a stale metadata token. New synthetic
 fixture inventory and existing editor with typed Caption text/color, manual pin
 add/move and both Caption/model membership edits using original-change journal
 publication. Caption exclusion keeps the resource and all other Scenes; re-add
-uses a new edge. Preview/cancel writes nothing. Model geometry/placement,
-material/media/Saved View writes and exchange remain unconnected here. No old saved
+uses a new edge. Preview/cancel writes nothing. Saved View create/edit/order/delete
+and entry set/clear now use that same journal with original per-field version
+guards; recall remains local. Model geometry/placement, material/media writes
+and exchange remain unconnected here. No old saved
 history is converted. Mounted memory-port and HTTP tests do not establish actual
-browser/device/adoption acceptance. Next connect remaining approved typed edits
+browser/device/adoption acceptance. Next connect exact existing material overrides
 through this same service; batch browser evidence, not another source/probe campaign.
 
 The ten latest executable commits through `d8f52d1` implement reusable Scene,

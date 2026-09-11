@@ -1383,6 +1383,45 @@ Caption and all other Scene memberships. Absent/deleted/unresolved membership,
 stale selection, pending drafts, composition or saving refuse this command.
 Re-inclusion creates a fresh membership; no tombstone or resource is reused.
 
+**S1 Saved View extension — implementation contract (2026-09-11):**
+
+Extend that same synthetic saved host to the already specified View authoring and
+entry operations. Typed commands create a fresh Scene-owned View; edit name,
+order, or a captured camera/background pair; tombstone an explicitly confirmed
+unreferenced View; and set/clear the selected Scene's entry pointer. The source
+checks fresh provider, active lifecycle, exact Scene/ProjectFrame and all affected
+old field values before one original change. Unknown atomic subtrees and unresolved
+affected fields refuse replacement. Creation never sets entry. Ordering uses the
+existing exact-neighbor UI planner and token guard, without collection rebalance.
+Camera and background capture stay paired in one change, with exact radian FOV or
+orthographic span and solid sRGB; transparent background remains unsupported in
+this bounded host. No model/Caption membership, body or material is changed.
+
+The defaultViewId wire/domain field is optional, not nullable. Setting adds/updates
+that scalar after the existing Scene command validates the reference; clearing
+deletes only that optional field in the same permanent Scene map. The UI alone
+projects absence to null. Missing/deleted/other-Scene View references and any
+unresolved Scene entry that could reference a deleted View refuse ordinary edits.
+No new schema or generic delete/patch API follows.
+
+The small host ViewData projection uses provider-owned values and the original
+candidate path/changeId/operationId/value-kind sets already exposed by inspection.
+Stable sorted candidate identity strings are per-field versions. Never derive
+these versions from value hashes, wall-clock time or the whole snapshot token.
+An initially unwritten entry and an explicit later absence have different version
+evidence. Unknown/unresolved values are not replaced by a winner or placeholder;
+only resolved fields become acknowledgment cells. Source/Provider contracts are
+unchanged. Recall and camera navigation remain local; setting entry does not
+recall it, and refresh does not reapply Scene entry. Read-only openers cannot
+author or change entry. The same retained journal owns all save/retry evidence.
+
+Acceptance reuses existing View UI tests and adds new saved-host mounted create/
+rename/recapture/order/entry/delete, independent cold reopen and exact-byte retry.
+Unrelated Caption edits preserve camera field versions; explicit same-value and
+ABA camera changes alter them; conflicts, stale source, cross-Scene targets and
+referenced deletion are refused. Actual browser, physical storage/iOS, offline
+and aggregate adoption remain separate, not inferred from memory-backed ports.
+
 ### 13.3 Approved scheduling exception — validators and UI components (2026-09-08)
 
 The PO explicitly approved advancing storage-neutral data validation and reusable

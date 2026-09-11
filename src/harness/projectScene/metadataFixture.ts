@@ -6,6 +6,7 @@ import type { ProjectProviderRead } from '../../scene/projectProvider';
 import { value } from '../../scene/types';
 import { ProjectMetadataSource, type MetadataLimits } from '../../projectMetadata/source';
 import { newId } from '../../projectMetadata/persistence';
+import { metadataViewData } from './metadataViews';
 
 export const metadataFixtureLimits: MetadataLimits = { maxNodes: 100_000, maxDepth: 32, maxStringScalars: 65_536,
   maxWork: 1_000_000, maxChanges: 1000, maxChangeBytes: 1_000_000, maxTotalBytes: 8_000_000, maxOperations: 20_000 };
@@ -60,5 +61,5 @@ export function metadataProjectView(provider: ProjectProviderRead): SyntheticPro
       colors[id] = value(`#${row.colorSrgb.value.map(v => Math.round(Number(v) * 255).toString(16).padStart(2, '0')).join('')}`);
   }
   return freezeSynthetic({ ...initial, state: provider.state, resources: provider.resources,
-    modelNames: names, colors, captionOwners, captionTemplates, modelVersions: metadataModels });
+    modelNames: names, colors, captionOwners, captionTemplates, modelVersions: metadataModels, viewData: metadataViewData(provider) });
 }

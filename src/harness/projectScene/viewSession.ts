@@ -22,7 +22,8 @@ export class SyntheticViewSession {
   private entryFeedback: ViewContext['entryFeedback'] = { kind: 'idle' };
   private cameraFeedback: ViewContext['cameraFeedback'] = { kind: 'idle' };
   constructor(private readonly read: () => SyntheticProject, private readonly scene: () => string,
-    private readonly write: WorkingWrite, private readonly block: () => string | null = () => null) {}
+    private readonly write: WorkingWrite, private readonly block: () => string | null = () => null,
+    private readonly mutationBlock: () => string | null = () => null) {}
   get pending(): 'composition' | 'text' | null {
     return [...this.drafts.values()].some(d => d.composing) ? 'composition' :
       this.drafts.size || [...this.memories.values()].some(m => m.entryDraft) ? 'text' : null;
@@ -32,7 +33,7 @@ export class SyntheticViewSession {
     const p = this.read();
     return { source: { kind: 'ready', token: p.state.token, sceneId: this.scene(), projectFrameId: p.resources.projectFrameId,
       views: Object.values(p.viewData?.records ?? {}), entryViewId: p.state.scenes[this.scene()]!.defaultViewId },
-      memory: this.memory, runtime, mutationBlock: this.block() ?? block, cameraBlock: this.block() ?? block,
+      memory: this.memory, runtime, mutationBlock: this.block() ?? this.mutationBlock() ?? block, cameraBlock: this.block() ?? block,
       cameraFeedback: this.cameraFeedback, entryFeedback: this.entryFeedback };
   }
   authorContext(view: ViewContext, take: (() => DisplayCapture) | undefined): ViewAuthorContext {
@@ -61,6 +62,7 @@ export class SyntheticViewSession {
       else this.cameraFeedback = { kind: 'failed', message: message(e) }; };
     try {
       if (this.block()) throw new Error(this.block()!);
+      if (entryAction && this.mutationBlock()) throw new Error(this.mutationBlock()!);
       if (plan.kind === 'blocked') throw new Error(plan.reason);
       if (!viewPlanIsCurrent(plan, context)) throw new Error('視点の状態が変わっています。操作を選び直してください。');
       if (plan.kind === 'change') {
@@ -92,6 +94,7 @@ export class SyntheticViewSession {
     const failed = (e: unknown) => { this.authorFeedback = { kind: 'failed', message: message(e) }; };
     try {
       if (this.block()) throw new Error(this.block()!);
+      if (this.mutationBlock()) throw new Error(this.mutationBlock()!);
       const draft = this.drafts.get(this.scene()) ?? null;
       if (event.kind === 'input') {
         if (event.baseDraft !== draft || event.draft.sceneId !== this.scene()) throw new Error('編集中の視点を確認してください。');

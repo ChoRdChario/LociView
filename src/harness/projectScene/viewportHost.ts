@@ -61,7 +61,7 @@ export function createViewportHost(document: Document, session: SyntheticSession
     }); changed();
   });
   const author = createViewAuthorControls(document, event => {
-    if (session.editingRestriction) return;
+    if (session.viewRestriction) return;
     if (disposed) return;
     const take = runtime?.capture ? () => runtime!.capture!() : undefined;
     const before = session.views.authorContext(currentContext(), take);
@@ -105,7 +105,7 @@ export function createViewportHost(document: Document, session: SyntheticSession
       if (author.render({ ...authorContext, view: { ...context, memory: authorConfirmationMemory } })) authorConfirmationMemory = undefined;
     }
     author.render(authorContext);
-    author.root.hidden = !!session.editingRestriction;
+    author.root.hidden = !!session.viewRestriction;
     const observed = runtime?.read();
     if (!observed?.ready || observed.manipulating || error) { gesture = null; gestureGeneration++; }
     const rect = canvas.getBoundingClientRect?.();

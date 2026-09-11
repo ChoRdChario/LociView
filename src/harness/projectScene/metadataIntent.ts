@@ -30,6 +30,38 @@ function membership(key: string, text: string): Membership {
 export function metadataIntent(changes: Readonly<Record<string, string>>, project: SyntheticProject,
   context?: { sceneId: string }): MetadataEdit {
   const rows = Object.entries(changes); if (!rows.length || rows.length > 6 || rows.some(([, v]) => typeof v !== 'string')) return fail();
+  if (rows[0]![0].startsWith('scene/')) {
+    if (rows.length !== 1 || !context?.sceneId || rows[0]![0] !== `scene/${context.sceneId}/entry`) return fail();
+    const raw: unknown = parseJsonWithoutDuplicateMembers(rows[0]![1]);
+    if (raw !== null && (typeof raw !== 'string' || !/^view_[0-9a-f]{32}$/.test(raw))) return fail();
+    return { kind: 'setEntryView', sceneId: context.sceneId, viewId: raw };
+  }
+  if (rows[0]![0].startsWith('view/')) {
+    const viewId = rows[0]![0].split('/')[1]!;
+    if (!context?.sceneId || !/^view_[0-9a-f]{32}$/.test(viewId) ||
+      rows.some(([k]) => !k.startsWith(`view/${viewId}/`))) return fail();
+    const fields = Object.fromEntries(rows.map(([key, text]) => [key.slice(`view/${viewId}/`.length), text]));
+    if ('identity' in fields) {
+      keys(fields, ['identity', 'name', 'order', 'camera', 'background', 'lifecycle']);
+      const identity = parse(fields.identity!), life = parse(fields.lifecycle!);
+      keys(identity, ['id', 'sceneId', 'projectFrameId']); keys(life, ['state', 'eventId', 'reason']);
+      if (identity.id !== viewId || identity.sceneId !== context.sceneId || identity.projectFrameId !== project.resources.projectFrameId ||
+        life.state !== 'active' || life.reason !== 'initial' || typeof life.eventId !== 'string') return fail();
+      return { kind: 'createView', sceneId: context.sceneId, viewId, projectFrameId: project.resources.projectFrameId,
+        name: fields.name!, orderKey: fields.order!, camera: parse(fields.camera!), background: parse(fields.background!), eventId: life.eventId };
+    }
+    if ('lifecycle' in fields) {
+      keys(fields, ['lifecycle']); const life = parse(fields.lifecycle!); keys(life, ['state', 'eventId', 'reason']);
+      if (life.state !== 'deleted' || life.reason !== 'userDelete' || typeof life.eventId !== 'string') return fail();
+      return { kind: 'deleteView', sceneId: context.sceneId, viewId, eventId: life.eventId };
+    }
+    if (Object.keys(fields).some(k => !['name', 'order', 'camera', 'background'].includes(k))) return fail();
+    return { kind: 'editView', sceneId: context.sceneId, viewId, edits: {
+      ...(fields.name !== undefined ? { name: fields.name } : {}), ...(fields.order !== undefined ? { orderKey: fields.order } : {}),
+      ...(fields.camera !== undefined ? { camera: parse(fields.camera) } : {}),
+      ...(fields.background !== undefined ? { background: parse(fields.background) } : {}),
+    } };
+  }
   const captions = rows.filter(([key]) => key.startsWith('caption/'));
   if (captions.length) {
     const captionId = captions[0]![0].split('/')[1]!;

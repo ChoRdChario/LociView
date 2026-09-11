@@ -77,7 +77,10 @@ the new `storage=metadata` development mode now wires OPFS/IndexedDB/Web Locks,
 exact synthetic-body inventory and the existing editor to that service. Typed
 Caption text/color, manual pin add/move and Scene Caption/model include/exclude
 now share its journal and exact retry; one added pin is one original change.
-Model geometry/placement, material/media/Saved View writes and exchange stay
+Saved View create/recapture/name/order/delete and Scene entry set/clear also use
+that path; exact original field versions protect retained captures and entry drafts.
+Optional entry clear preserves domain absence rather than adding a nullable schema.
+Model geometry/placement, material/media writes and exchange stay
 unconnected in this new mode, not removed from old modes or product requirements.
 Old saved runs and ordinary home remain unchanged. Actual browser/input and
 physical iOS evidence remain pending; source-only `reopen` itself is still not a

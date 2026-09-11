@@ -11,6 +11,64 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — approved S1 service entry (2026-09-11)
 
+#### Saved View connection — implemented, real-browser acceptance pending (after `1fe2857`)
+
+- [x] Specify typed create/edit/delete/entry commands and the existing field-history
+  projection, including optional entry absence and unknown-value preservation.
+- [x] Connect provider-owned records and original candidate IDs to View UI cells/
+  versions; never substitute value equality or a whole-Project token for a field version.
+- [x] Enable existing authoring/entry controls through the same journal/retry path;
+  keep recall local, preserve captured pose/solid sRGB and block referenced deletion.
+- [x] Verify mounted save/recall/reopen, retained retry, causal stale/conflict guards
+  and entry-set/clear without immediate recall. Reuse existing View/viewport cases.
+- [x] Independent read-only review, typecheck/build/HTTP graph and full tests with
+  two workers (no competing build), then update navigation docs/checkpoint.
+
+Scope/exit: new synthetic `storage=metadata` only, exact existing Saved View flow
+through durable publication. No new body, wire, dependency, general scene authoring,
+model transform/binding, material/media, team exchange, ordinary home or deployment.
+Current clean `1fe2857` closes the previous pin/membership boundary; this extends
+record-and-return workflow instead of another storage probe. User approved continuing;
+no repeated PO approval/manual batch is needed. Stop on specification conflict,
+new authority or product policy. Actual browser/iOS evidence remains separately pending.
+
+Review: the same saved development editor now creates, renames, recaptures,
+reorders, explicitly deletes and sets/clears entry Views. Recall stays local;
+entry assignment does not immediately recall. The optional entry field is removed
+on clear, not changed to a new nullable schema. No reseeding, old-history conversion,
+new binary or domain/provider API was required. Field versions use existing
+original candidate IDs, not equal values or the Project token. Unknown old values
+and unresolved edits/entry references remain refused. Read-only opening retains
+recall/camera but blocks both entry changes and authoring.
+
+Three added host tests (10 total) cover the mounted create-through-delete loop,
+cold saved recall, exact captured-color retry and retained IDs, unchanged versions
+after Caption-only editing, explicit same-value and ABA camera stale rejection,
+concurrent capture refusal, other-Scene scope and referenced-delete rejection.
+Both independent reviewers found no scoped blocker. Focused four files / 36 PASS;
+typecheck PASS after correcting a test fixture's structural TypeScript type.
+Ordinary build and the complete development HTTP/Wasm graph PASS. Actual native
+input, OPFS/IndexedDB and physical iOS acceptance are not inferred from these tests.
+
+Final checks: typecheck PASS; ordinary build PASS (unchanged mixed-import and
+large-chunk warnings); HTTP saved-entry/local-Wasm graph PASS; full
+`npm test -- --maxWorkers=2` 109 files / 1,907 PASS / 21 TODO, exit 0.
+`git diff --check` PASS. No runtime failure or new dependency; private inputs,
+public data, ordinary home and deployment configuration were not changed.
+Short meta-audit: started clean `1fe2857`, tracked origin ahead 16 / behind 0.
+One connected return-to-saved-view workflow is now closed in code/memory-port
+scope. Retain the existing browser bootstrap limitation and later manual batch;
+it is not a reason to repeat old PO tests or start another storage probe.
+
+Next finite boundary: connect the existing exact Project/Scene material override
+UI to this host. Reuse the known triangle catalogs/content facts and retained
+save/retry. Limit to create/appearance-edit/explicit reset, existing solid color,
+lighting, sidedness and hard chroma. First specify actual Project identity and
+provider material projection/duplicate routing reservations; never choose a
+winner. New blend/dither policy, model binding, media, exchange and binaries are
+excluded. A read-only priority check confirms the existing catalogs suffice;
+no new product-policy or dependency permission is required for that connection.
+
 #### Typed editing connection — implemented, real-browser acceptance pending (after `b40b698`)
 
 - [x] Specify one-change commands for Caption text/color, manual pin add/move,
@@ -70,7 +128,7 @@ ask for the old already-passed PO batch. The next finite extension stays within
 the existing host and approved command/service boundary; no separate permission
 is needed until a product/wire/schema/adoption decision is encountered.
 
-Next finite implementation boundary: connect existing Saved View authoring to
+Next boundary at the pin checkpoint (now completed above): connect existing Saved View authoring to
 this same new saved host. Reuse existing create/recapture/name/order/delete and
 Scene entry-view commands. Specify the provider-to-viewData cells/versions seam
 from original history first; neither equal values nor the whole snapshot token

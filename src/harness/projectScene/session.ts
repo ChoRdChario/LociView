@@ -50,7 +50,8 @@ const emptyMemory = (): SceneUiMemory => Object.freeze({ selectedCaptionId: null
 export class SyntheticSession {
   readonly acknowledgment = new WorkingAcknowledgment();
   readonly views = new SyntheticViewSession(() => this.project, () => this.sceneId,
-    (token, changes, done, failed) => this.applyWorking(() => this.writeViews(token, changes), done, failed), () => this.workingBlock);
+    (token, changes, done, failed) => this.applyWorking(() => this.writeViews(token, changes), done, failed),
+    () => this.workingBlock, () => this.viewRestriction);
   readonly materials = new SyntheticMaterialSession(() => this.project, () => this.sceneId,
     (token, changes, done, failed) => this.applyWorking(() => this.writeMaterials(token, changes), done, failed), () => this.workingBlock);
   readonly media = new SyntheticMediaSession(() => this.mediaContext(),
@@ -95,6 +96,7 @@ export class SyntheticSession {
   get pinRestriction() { return this.readOnly || !this.authority?.capabilities?.pins ? this.editingRestriction : null; }
   get membershipRestriction() { return this.readOnly || !this.authority?.capabilities?.membership ? this.editingRestriction : null; }
   get colorReadOnly() { return this.captionTextOnly && !this.authority?.capabilities?.color; }
+  get viewRestriction() { return this.readOnly || !this.authority?.capabilities?.views ? this.editingRestriction : null; }
   get savedStatus() { return this.authority?.status?.(); }
   get workingBlock() { return this.acknowledgment.block ?? (this.savedStatus?.kind === 'failed' ?
     this.savedStatus.error ?? '未完了の保存があります。更新を再試行してください。' : null); }
@@ -163,8 +165,9 @@ export class SyntheticSession {
     this.project = freezeSynthetic(next);
   }
   private writeViews(base: string, changes: Readonly<Record<string, string>>) {
+    if (this.viewRestriction) throw new Error(this.viewRestriction);
     if (base !== this.project.state.token) throw new Error('視点が更新されています。入力を保持しています。');
-    if (this.authority) return afterWorking(this.authority.write(base, changes), next => this.publish(next));
+    if (this.authority) return afterWorking(this.authority.write(base, changes, { sceneId: this.sceneId }), next => this.publish(next));
     const token = fresh('snapshot'), previous = { token: base, cells: this.project.viewData?.cells ??
       Object.fromEntries(Object.entries(viewHistorySeed()).map(([key, text]) => [key, { kind: 'value' as const, value: text }])),
       cellVersions: this.project.viewData?.versions };

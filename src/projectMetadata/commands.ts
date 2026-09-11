@@ -13,8 +13,13 @@ export type MetadataEdit =
   | { kind: 'addPin'; sceneId: string; captionId: string; membershipId: string; eventId: string; anchor: Anchor }
   | { kind: 'movePin'; sceneId: string; captionId: string; anchor: Anchor }
   | { kind: 'include'; sceneId: string; resourceKind: 'asset' | 'caption'; resourceId: string; membershipId: string; orderKey: string; eventId: string }
-  | { kind: 'exclude'; resourceKind: 'asset' | 'caption'; membershipId: string; eventId: string };
-export interface MetadataRecordEdit { map: MutableRecordMap; id: string; create: boolean; fields: JsonObject }
+  | { kind: 'exclude'; resourceKind: 'asset' | 'caption'; membershipId: string; eventId: string }
+  | { kind: 'createView'; sceneId: string; viewId: string; projectFrameId: string; name: string; orderKey: string;
+      camera: JsonObject; background: JsonObject; eventId: string }
+  | { kind: 'editView'; sceneId: string; viewId: string; edits: { name?: string; orderKey?: string; camera?: JsonObject; background?: JsonObject } }
+  | { kind: 'deleteView'; sceneId: string; viewId: string; eventId: string }
+  | { kind: 'setEntryView'; sceneId: string; viewId: string | null };
+export interface MetadataRecordEdit { map: MutableRecordMap; id: string; create: boolean; fields: JsonObject; remove?: readonly 'defaultViewId'[] }
 type Provider = Extract<ProjectProviderRead, { kind: 'scene-provider' }>;
 const exact = <T>(field: Field<T> | undefined): T => field?.kind === 'value' ? field.value : fail('command-unresolved');
 const json = (v: unknown) => v as JsonValue;
@@ -31,18 +36,18 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
     if (!r || exact(r.id) !== id || object(exact(r.lifecycle)).state !== 'active') return fail('command-inactive');
     return r;
   };
-  const add = (map: MutableRecordMap, id: string, fields: JsonObject, create = false) => {
+  const add = (map: MutableRecordMap, id: string, fields: JsonObject, create = false, remove: readonly 'defaultViewId'[] = []) => {
     if (create) checkMutableRecord(c, map, fields);
     else {
       const r = row(map, id);
-      for (const [name, v] of Object.entries(fields)) {
+      for (const [name, v] of [...Object.entries(fields), ...remove.map(name => [name, undefined] as const)]) {
         if (map === 'captionsById' && r[name]?.kind !== 'value') fail('caption-unresolved');
         const oldCheck = new ProjectRecordFields(); checkMutableField(oldCheck, map, name, exact(r[name]));
         if (oldCheck.unknown) fail('command-unknown-value');
         checkMutableField(c, map, name, v);
       }
     }
-    if (c.unknown) fail('command-unknown'); result.push({ map, id, fields, create });
+    if (c.unknown) fail('command-unknown'); result.push({ map, id, fields, create, ...(remove.length ? { remove } : {}) });
   };
   // Unprojectable memberships still reserve semantic keys. Never make a duplicate
   // merely because one endpoint/lifecycle was omitted from the resolved Scene table.
@@ -71,6 +76,16 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
     if (!model || model.assetFrameId !== anchor.assetFrameId || model.revisionId !== anchor.authoredAssetRevisionId ||
       !model.anchorCompatibilityIds.includes(anchor.authoredAnchorCompatibilityId)) return fail('pin-model-changed');
     return resolved.composition;
+  };
+  const view = (sceneId: string, viewId: string) => {
+    c.id(sceneId, 'scn', []); c.id(viewId, 'view', []); row('scenesById', sceneId);
+    const r = row('viewsById', viewId);
+    if (exact(r.sceneId) !== sceneId || exact(r.projectFrameId) !== provider.resources.projectFrameId) fail('view-scope');
+    return r;
+  };
+  const capture = (camera: JsonObject, background: JsonObject) => {
+    c.camera(camera, []); c.background(background, []);
+    if (background.kind !== 'solid') fail('view-solid-only');
   };
   switch (command.kind) {
     case 'editCaption': {
@@ -120,6 +135,38 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       memberships(kind, sceneId, resourceId);
       const plan = planSceneCommand(provider.state, provider.resources, command, command.eventId);
       edge(kind, (kind === 'asset' ? plan.next.assetMemberships : plan.next.captionMemberships)[command.membershipId]!, command.kind === 'include'); break;
+    }
+    case 'createView': {
+      shape(raw, ['kind', 'sceneId', 'viewId', 'projectFrameId', 'name', 'orderKey', 'camera', 'background', 'eventId']);
+      row('scenesById', command.sceneId);
+      if (command.projectFrameId !== provider.resources.projectFrameId) fail('view-frame');
+      capture(command.camera, command.background);
+      add('viewsById', command.viewId, { id: command.viewId, sceneId: command.sceneId, projectFrameId: command.projectFrameId,
+        name: command.name, orderKey: command.orderKey, camera: command.camera, background: command.background,
+        lifecycle: { state: 'active', eventId: command.eventId, reason: 'initial' } }, true); break;
+    }
+    case 'editView': {
+      shape(raw, ['kind', 'sceneId', 'viewId', 'edits']); view(command.sceneId, command.viewId);
+      const fields = command.edits as JsonObject, names = Object.keys(fields);
+      if (!names.length || names.some(n => !['name', 'orderKey', 'camera', 'background'].includes(n)) ||
+        ('orderKey' in fields && names.length !== 1) || ('camera' in fields) !== ('background' in fields)) fail('view-fields');
+      if ('camera' in fields) capture(command.edits.camera!, command.edits.background!);
+      add('viewsById', command.viewId, fields); break;
+    }
+    case 'deleteView': {
+      shape(raw, ['kind', 'sceneId', 'viewId', 'eventId']); view(command.sceneId, command.viewId);
+      for (const r of Object.values(provider.details.mutable.scenesById))
+        if (exact(r.defaultViewId) === command.viewId) fail('view-referenced');
+      add('viewsById', command.viewId, { lifecycle: { state: 'deleted', eventId: command.eventId, reason: 'userDelete' } }); break;
+    }
+    case 'setEntryView': {
+      shape(raw, ['kind', 'sceneId', 'viewId']);
+      if (command.viewId !== null) view(command.sceneId, command.viewId);
+      // Existing Scene command validates same-Scene reference and resolved capture.
+      planSceneCommand(provider.state, provider.resources, { kind: 'setView', sceneId: command.sceneId, viewId: command.viewId },
+        `evt_${'0'.repeat(32)}`); // Pure validation only; no lifecycle/event is authored.
+      add('scenesById', command.sceneId, command.viewId === null ? {} : { defaultViewId: command.viewId }, false,
+        command.viewId === null ? ['defaultViewId'] : []); break;
     }
     default: fail('command-kind');
   }
