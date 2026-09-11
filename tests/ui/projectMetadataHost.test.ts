@@ -14,7 +14,10 @@ import { planPinMode } from '../../src/ui/projectScene/pinModeState';
 import { planCaptionInclude } from '../../src/ui/projectScene/captionIncludeState';
 import { planModelList } from '../../src/ui/projectScene/modelListState';
 import { readProjectScene } from '../../src/scene/projectProvider';
-import { metadataFixtureLimits, metadataProjectView } from '../../src/harness/projectScene/metadataFixture';
+import { metadataFixtureLimits, metadataProjectView, createMetadataFixture, metadataPreparedModels } from '../../src/harness/projectScene/metadataFixture';
+import { inspectProjectCandidates } from '../../src/domain/projectCandidates';
+import { writeMetadataSeed } from '../../src/harness/projectScene/metadataStorage';
+import { underWriteLease } from '../../src/projectMetadata/persistence';
 import type { MetadataEdit } from '../../src/projectMetadata/commands';
 import { ProjectMetadataSource } from '../../src/projectMetadata/source';
 import { planViewAuthor } from '../../src/ui/projectScene/viewAuthoringState';
@@ -22,7 +25,9 @@ import { planView } from '../../src/ui/projectScene/viewState';
 import { SyntheticViewSession, type DisplayCapture } from '../../src/harness/projectScene/viewSession';
 import { materialBucket, materialKey, materialTarget, type MaterialRouting } from '../../src/harness/projectScene/materialHistory';
 import { syntheticDisplay } from '../../src/harness/projectScene/viewportModel';
-import { canonicalFixture, fixtureRecordDigest, moveFixtureModel } from '../../src/harness/projectScene/modelClosure';
+import { canonicalFixture, fixtureRecordDigest, moveFixtureModel, createFixtureModel, fixtureModelIds } from '../../src/harness/projectScene/modelClosure';
+import { metadataProviderReady } from '../../src/projectMetadata/session';
+import { metadataImmutableReader } from '../../src/projectMetadata/records';
 import { modelClosureKey } from '../../src/harness/projectScene/modelHistory';
 import type { JsonObject } from '../../src/domain/values';
 import { metadataModels } from '../../src/harness/projectScene/metadataFixture';
@@ -104,7 +109,194 @@ async function acknowledge(s: SyntheticSession, action: () => void) {
   } finally { unsubscribe(); }
 }
 
+const fullSource = (source: ProjectMetadataSource, n: number) => ({ packageId: `pkg_${n.toString(16).padStart(32, '0')}`,
+  metadataBytes: source.encodeFullSource(), proof: source.proof, remoteHeads: source.heads });
+async function updateModel(s: SyntheticSession) {
+  selectModel(s); const c = s.modelUpdateContext(), version = c.choices[0]!;
+  await acknowledge(s, () => { s.acceptModelUpdate({ token: c.token, sceneId: c.sceneId,
+    assetId: c.assetId!, bindingId: version.projection.bindingId }); });
+}
+async function correctPin(s: SyntheticSession, position: readonly [number, number, number]) {
+  expect(select(s)).toBe(true);
+  expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'move' }))).toBe(true);
+  expect(s.acceptPinSurface(s.pinSurfaceTarget()!, position, true)).toBe(true);
+  const plan = planPinMode(s.pinContext(), { kind: 'finish' });
+  await acknowledge(s, () => { s.acceptPin(plan); });
+  expect(s.acknowledgment.state).toBe('idle');
+}
+
+describe('saved prepared model activation and two-participant loop; synthetic evidence only', () => {
+  it('requires explicit choice, preserves placement/records and corrects only the selected pin after update', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority), media = mediaHost(s);
+    await media.add(0); media.w.dispose();
+    const w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s), root = record(w.root);
+    selectModel(s); button(root, 'モデル').fire('click'); w.render();
+    expect(s.beginModelPlacement()).toBe(true); expect(s.changeModelPlacement(['6', '2', '1'])).toBe(true);
+    await acknowledge(s, () => { s.finishModelPlacement(); }); w.render();
+    const before = s.snapshot, source = host.read().source!, current = s.modelUpdateContext().current!.closure;
+    const choose = picker(root, '更新する合成モデル'), confirm = button(root, 'このモデルに更新');
+    expect(confirm.disabled).toBe(true); setInput(choose, choose.children[1]!.value);
+    expect(confirm.disabled).toBe(false); expect(s.snapshot).toBe(before);
+    setInput(choose, ''); expect(confirm.disabled).toBe(true); expect(host.read().source!.token).toBe(source.token);
+    setInput(choose, choose.children[1]!.value); h.base.rejectPublication = true;
+    await acknowledge(s, () => confirm.fire('click')); w.render(); expect(s.acknowledgment.state).toBe('failed');
+    expect(s.snapshot).toBe(before); expect(host.read().source!.token).toBe(source.token);
+    const parts = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.endsWith('.amchange'));
+    const bytes = await Promise.all(parts.map(p => h.base.readBytes(p)));
+    const prepared = source.appendOriginal(bytes.map(b => b!));
+    const targetProvider = await readProjectScene(prepared.read(), metadataFixtureLimits, host.content.verifier(false));
+    if (targetProvider.kind !== 'scene-provider') throw Error('prepared update');
+    const pendingBinding = targetProvider.resources.assets[f.equipment]!.projection;
+    expect(pendingBinding.kind).toBe('value');
+    h.base.rejectPublication = false; await acknowledge(s, () => { s.retryWorking(); }); w.render();
+    expect(s.acknowledgment.state).toBe('idle'); expect(host.read().source!.token).toBe(prepared.token);
+    expect(await Promise.all(parts.map(p => h.base.readBytes(p)))).toEqual(bytes);
+    const updated = s.modelUpdateContext().current!.closure;
+    expect(updated.binding.id).toBe(pendingBinding.kind === 'value' ? pendingBinding.value.bindingId : undefined);
+    expect(updated.binding.id).not.toBe(s.modelUpdateContext().choices[0]!.projection.bindingId);
+    expect(updated.binding).toMatchObject({ parentBindingId: current.binding.id, method: 'manual', assetToProject: current.binding.assetToProject });
+    expect(updated.shape).toBe('updated'); expect(s.modelUpdateContext().current!.label).toBe('形状を更新したモデル');
+    expect(s.snapshot.resources.captions).toEqual(before.resources.captions);
+    expect(s.snapshot.mediaData).toEqual(before.mediaData);
+    expect(s.snapshot.state.captionMemberships).toEqual(before.state.captionMemberships);
+    for (const scene of [f.overview, f.detail]) expect(syntheticDisplay(s.snapshot, scene, null, null).models.find(m => m.binding.assetId === f.equipment)!.revision.id).toBe(updated.revision.id);
+    expect(s.composition.captions.find(c => c.captionId === f.shared)!.marker).toBe('needsReview');
+    await correctPin(s, [3, 2, 1]);
+    expect(s.composition.captions.find(c => c.captionId === f.shared)!.marker).toBe('visible');
+    expect(s.snapshot.resources.captions[f.shared]!.anchor).toMatchObject({ value: { positionAsset: [3, 2, 1], authoredAssetRevisionId: updated.revision.id } });
+    expect(s.snapshot.resources.captions[f.second]).toEqual(before.resources.captions[f.second]);
+    const history = host.read().source!.originalChanges(); w.dispose(); await host.dispose();
+    const cold = await h.open(); expect(cold.read().state).toBe('ready'); expect(cold.read().source!.originalChanges()).toEqual(history);
+    expect(cold.content.counts.bodyBytes).toBe(0); await cold.dispose();
+  });
+
+  it('refuses unverified inactive targets before journal, preserves old ready state and never repairs facts on reopen', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority); selectModel(s);
+    const seed = host.read().source!, provider = host.read().provider!, ctx = s.modelUpdateContext(), target = ctx.choices[0]!;
+    if (provider.kind !== 'scene-provider') throw Error('provider');
+    expect(() => metadataImmutableReader(provider, { ...metadataFixtureLimits, maxWork: provider.inspection.workUsed })).toThrow(/work/);
+    const closure = createFixtureModel({ ...fixtureModelIds(target.closure), binding: `bnd_${'c'.repeat(32)}` }, 'updated',
+      ctx.current!.closure.binding.assetToProject, ctx.current!.projection.bindingId);
+    const command: Extract<MetadataEdit, { kind: 'activatePreparedRevision' }> = { kind: 'activatePreparedRevision', sceneId: f.overview,
+      assetId: f.equipment, expectedBindingId: ctx.current!.projection.bindingId, revisionId: target.projection.revisionId,
+      binding: JSON.parse(canonicalFixture(closure.binding)) };
+    for (const invalid of [{ ...command, expectedBindingId: target.projection.bindingId }, { ...command, assetId: f.structure },
+      { ...command, binding: { ...command.binding, id: ctx.current!.projection.bindingId } },
+      { ...command, binding: { ...command.binding, assetToProject: { ...closure.binding.assetToProject, translation: [9, 9, 9] } } }])
+      expect(() => seed.prepareEdit(seed.token, invalid, provider, 'd'.repeat(32))).toThrow();
+    const remote = seed.prepareEdit(seed.token, command, provider, 'd'.repeat(32));
+    const facts = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.includes('/evidence/'));
+    const targetFacts: string[] = [];
+    for (const path of facts) if ((await h.base.readText(path))!.includes(target.closure.representation.id)) targetFacts.push(path);
+    expect(targetFacts.length).toBeGreaterThan(0); for (const path of targetFacts) await h.base.remove(path);
+    const files = await h.base.list(`${metadataArea}/${h.run}/`), writes = h.base.writes, repoWrites = h.fault.writes, bytes = host.content.counts.bodyBytes;
+    await updateModel(s);
+    expect(s.acknowledgment.state).toBe('idle'); expect(s.acknowledgment.error).toBeTruthy();
+    expect(host.read().state).toBe('ready'); expect(host.read().source!.token).toBe(seed.token); expect(s.retryWorking()).toBe(false);
+    await expect(host.receive(seed.token, fullSource(remote, 1))).rejects.toThrow();
+    await host.authority.retry!(); expect(host.read().state).toBe('ready');
+    expect(await h.base.list(`${metadataArea}/${h.run}/`)).toEqual(files); expect(h.base.writes).toBe(writes); expect(h.fault.writes).toBe(repoWrites);
+    expect(host.content.counts.bodyBytes).toBe(bytes); await host.dispose();
+    const cold = await h.open(); expect(cold.read().state).toBe('ready'); expect(cold.read().source!.token).toBe(seed.token);
+    for (const path of targetFacts) expect(await h.base.exists(path)).toBe(false);
+    expect(cold.content.counts.bodyBytes).toBe(0); await cold.dispose();
+  });
+
+  it('exchanges two saved model/pin rounds with local text, exact interrupted recovery and no-op replay', async () => {
+    const a = fixture(), first = await a.open(true), initial = new SyntheticSession(first.authority), media = mediaHost(initial);
+    await media.add(0); media.w.dispose(); const original = first.read().source!.originalChanges(); await first.dispose();
+    // Independent synthetic device storage copied at distribution; not a package encoder or wire acceptance.
+    const b = fixture(); for (const path of await a.base.list(`${metadataArea}/${a.run}/`)) await b.base.writeBytes(path, (await a.base.readBytes(path))!);
+    for (const [key, value] of a.rows) b.rows.set(key, value.slice());
+    let ah = await a.open(), bh = await b.open(), sa = new SyntheticSession(ah.authority), sb = new SyntheticSession(bh.authority);
+    let wa = createDevelopmentWorkspace(new RecordedDocument().asDocument(), sa), wb = createDevelopmentWorkspace(new RecordedDocument().asDocument(), sb);
+    const attachment = captionAttachments(sa.snapshot.mediaData, f.shared).ready[0]!.id;
+    for (let round = 1; round <= 2; round++) {
+      select(sb); await apply(sb, { body: `参加者の記録${round}` }); select(sa); await apply(sa, { title: `担当者の記録${round}` });
+      const oldAnchor = sb.snapshot.resources.captions[f.shared]!.anchor;
+      await updateModel(sa); expect(sa.acknowledgment.state).toBe('idle');
+      const send = fullSource(ah.read().source!, round * 2), before = bh.read().source!;
+      if (round === 1) {
+        b.base.rejectPublication = true; await expect(bh.receive(before.token, send)).rejects.toThrow();
+        expect(bh.read().source!.token).toBe(before.token); expect(bh.read().state).toBe('pending');
+        const parts = (await b.base.list(`${metadataArea}/${b.run}/`)).filter(p => p.endsWith('.amchange'));
+        const bytes = await Promise.all(parts.map(p => b.base.readBytes(p)));
+        wb.dispose(); await bh.dispose(); b.base.rejectPublication = false; bh = await b.open();
+        expect(bh.read().state).toBe('pending'); await bh.authority.retry!();
+        expect(await Promise.all(parts.map(p => b.base.readBytes(p)))).toEqual(bytes);
+        sb = new SyntheticSession(bh.authority); wb = createDevelopmentWorkspace(new RecordedDocument().asDocument(), sb);
+      } else { await bh.receive(before.token, send); sb.refreshHistory(); }
+      expect(sb.snapshot.resources.captions[f.shared]!.body).toEqual({ kind: 'value', value: `参加者の記録${round}` });
+      expect(sb.snapshot.resources.captions[f.shared]!.anchor).toEqual(oldAnchor);
+      expect(sb.composition.captions.find(c => c.captionId === f.shared)!.marker).toBe('needsReview');
+      await correctPin(sb, [round, 2, 3]);
+      const reply = fullSource(bh.read().source!, round * 2 + 1);
+      await ah.receive(ah.read().source!.token, reply); sa.refreshHistory();
+      expect(sa.snapshot.resources.captions[f.shared]!.title).toEqual({ kind: 'value', value: `担当者の記録${round}` });
+      expect(sa.snapshot.resources.captions[f.shared]!.body).toEqual({ kind: 'value', value: `参加者の記録${round}` });
+      expect(sa.composition.captions.find(c => c.captionId === f.shared)!.marker).toBe('visible');
+      expect(captionAttachments(sa.snapshot.mediaData, f.shared).ready[0]!.id).toBe(attachment);
+      const heads = ah.read().source!.heads, writes = a.base.writes;
+      await ah.receive(ah.read().source!.token, reply); expect(ah.read().source!.heads).toEqual(heads); expect(a.base.writes).toBe(writes);
+      expect(heads).toEqual(bh.read().source!.heads);
+      for (const originalPart of original) expect(ah.read().source!.originalChanges()).toContainEqual(originalPart);
+      wa.dispose(); wb.dispose(); await ah.dispose(); await bh.dispose();
+      ah = await a.open(); bh = await b.open(); sa = new SyntheticSession(ah.authority); sb = new SyntheticSession(bh.authority);
+      wa = createDevelopmentWorkspace(new RecordedDocument().asDocument(), sa); wb = createDevelopmentWorkspace(new RecordedDocument().asDocument(), sb);
+      expect(ah.read().source!.heads).toEqual(heads); expect(bh.read().source!.heads).toEqual(heads);
+      expect(ah.content.counts.bodyBytes).toBe(0); expect(bh.content.counts.bodyBytes).toBe(0);
+    }
+    wa.dispose(); wb.dispose(); await ah.dispose(); await bh.dispose();
+  }, 20000);
+});
+
 describe('saved model translation; synthetic storage/DOM evidence only', () => {
+  it('prepares declared model versions without publishing a preparation candidate', async () => {
+    const h = fixture(), host = await h.open(true);
+    expect(host.read().state).toBe('ready');
+    const s = new SyntheticSession(host.authority); selectModel(s);
+    expect(host.read().source!.originalChanges()).toHaveLength(2);
+    expect(s.modelUpdateContext().current!.closure.shape).toBe('original');
+    expect(s.modelUpdateContext().choices.map(v => v.closure.shape)).toEqual(['updated']);
+    const provider = host.read().provider!;
+    expect(provider.kind).toBe('scene-provider');
+    if (provider.kind !== 'scene-provider') throw Error('provider');
+    expect(provider.issues.some(i => i.code === 'verified-profile-content-bounds-catalog-required')).toBe(true);
+    expect(metadataProviderReady(provider, metadataFixtureLimits)).toBe(true);
+    const inactiveRep = s.modelUpdateContext().choices[0]!.closure.representation.id;
+    // Readiness follows all active roots/strong candidate edges, never current Scene or a chosen winner.
+    const candidates = provider.inspection.candidates;
+    expect(metadataProviderReady({ ...provider, inspection: { ...provider.inspection, candidates: { ...candidates,
+      knownActiveRoots: [...candidates.knownActiveRoots, inactiveRep] } } }, metadataFixtureLimits)).toBe(false);
+    expect(metadataProviderReady({ ...provider, inspection: { ...provider.inspection, candidates: { ...candidates,
+      knownReferences: [...candidates.knownReferences, { ...candidates.knownReferences[0]!,
+        from: candidates.knownActiveRoots[0]!, to: inactiveRep, strength: 'strong' }] } } }, metadataFixtureLimits)).toBe(false);
+    const history = host.read().source!.originalChanges(), facts = await h.base.list(`${metadataArea}/${h.run}/`);
+    expect(facts.filter(p => p.includes('/evidence/')).length).toBeGreaterThan(0);
+    await host.dispose(); const cold = await h.open();
+    expect(cold.read().source!.originalChanges()).toEqual(history); expect(cold.content.counts.bodyBytes).toBe(0);
+    await cold.dispose();
+  });
+
+  it('retains an old seed without prepared revisions or body replenishment, and keeps placement editable', async () => {
+    const h = fixture(), seed = createMetadataFixture(h.run), inspection = await inspectProjectCandidates(seed.read(), metadataFixtureLimits);
+    if (inspection.kind !== 'project-candidate-inspection') throw Error('seed');
+    const records = structuredClone(inspection.unambiguousRecords) as Record<string, any>;
+    for (const v of metadataPreparedModels.filter(v => v.closure.shape === 'updated')) {
+      delete records.assetBindingsById[v.projection.bindingId]; delete records.assetRevisionsById[v.projection.revisionId];
+      delete records.representationsById[v.closure.representation.id];
+    }
+    const old = ProjectMetadataSource.bootstrap(records.schema, records.identity, metadataFixtureLimits).initialize(records);
+    const lease = await ProjectMutationCoordinator.local().tryAcquire(h.base, `${metadataArea}/${h.run}`, `old-seed:${h.run}`);
+    lease.activateNewProject(); await underWriteLease(lease.workspace, () => writeMetadataSeed(lease.workspace, old));
+    lease.beginClose(); await lease.waitForWorkspaceIdle(); lease.sealWorkspaceWritesForRelease(); lease.release();
+    const host = await h.open(true), s = new SyntheticSession(host.authority); selectModel(s);
+    expect(s.modelUpdateContext().choices).toHaveLength(0); expect(s.beginModelPlacement()).toBe(true); expect(s.finishModelPlacement()).toBe(true);
+    const files = await h.base.list(`${metadataArea}/${h.run}/`);
+    expect(files.filter(p => p.includes('fixture-content/') && p.endsWith('.bin'))).toHaveLength(1);
+    expect(host.read().source!.originalChanges()).toEqual(old.originalChanges());
+    await host.dispose();
+  });
   it('connects mounted preview/cancel/confirm, consecutive bindings and shared-Scene cold reopen without model body reads', async () => {
     const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority);
     const original = s.snapshot, changes = host.read().source!.originalChanges().length, count = host.content.counts.bodyBytes;
@@ -140,7 +332,7 @@ describe('saved model translation; synthetic storage/DOM evidence only', () => {
     const cold = await h.open(), reopened = new SyntheticSession(cold.authority); selectModel(reopened);
     expect(reopened.modelUpdateContext().current!.closure.binding.id).toBe(parent);
     expect(reopened.modelUpdateContext().current!.closure.binding.assetToProject.translation).toEqual([7, 3, 2]);
-    expect(reopened.modelUpdateContext().choices).toHaveLength(0); expect(cold.content.counts.bodyBytes).toBe(0);
+    expect(reopened.modelUpdateContext().choices.map(v => v.closure.shape)).toEqual(['updated']); expect(cold.content.counts.bodyBytes).toBe(0);
     expect(reopened.beginModelPlacement()).toBe(true); expect(reopened.finishModelPlacement()).toBe(true);
     expect(cold.read().source!.originalChanges()).toHaveLength(changes + 2); await cold.dispose();
   });

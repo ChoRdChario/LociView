@@ -130,7 +130,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
         '開発用・合成データのみ。キャプション・シーンへの所属・視点・マテリアル・添付・モデル位置を保存できます。未適用の入力は再読み込みで失われます。';
       if (session.pinRestriction) pin.actions.hidden = pin.modeStrip.hidden = pinHelp.hidden = numeric.hidden = true;
       if (session.membershipRestriction) include.root.hidden = true;
-      modelUpdate.root.hidden = true;
+      if (session.modelUpdateRestriction) modelUpdate.root.hidden = true;
       if (session.placementRestriction) placement.actions.hidden = placement.modeStrip.hidden = true;
       if (session.mediaRestriction && !session.readOnly) media.root.hidden = true;
       material.root.hidden = !!session.materialRestriction && !session.readOnly; modelList.root.inert = !!session.membershipRestriction;

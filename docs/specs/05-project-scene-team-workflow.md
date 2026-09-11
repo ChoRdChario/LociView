@@ -1624,7 +1624,7 @@ resolved before copy; this command is not scalar keep-both or general duplicatio
 Existing memory/old saved sources are evidence only, not implementation imports.
 Reuse saved host/media/failure ports for the new command's acceptance.
 
-**Next bounded prepared-revision implementation (2026-09-12):**
+**Bounded prepared-revision implementation (2026-09-12):**
 The already-approved synthetic metadata host may prepare its two known geometry
 versions before initial publication. Active seed Assets remain on the initial
 version; a separate immutable prepared catalog carries the additional revision
@@ -1645,6 +1645,41 @@ correction. Confirm update/cancel, all-Scene effect, pin correction, retry/cold
 reopen and full-source two-party exchange without new body reads or source reset.
 No user-body importer, new wire/delta/base receipt, general revision manager,
 same-surface assertion, content-evidence format change or real-data adoption.
+
+Implementation clarification for retained inactive revisions: a provider DTO is
+only active-display authority, not a source-record preparation DTO. A future
+activation target is read from complete equal valid known immutable candidates;
+no ambiguous value is selected. Before journaling, its activated candidate must
+pass all current provider/content checks. The new metadata service may retain
+the exact `verified-profile-content-bounds-catalog-required` diagnostic for a
+Representation outside the complete known active strong closure without treating
+the whole Project as unready. All executed checks, unknown/invalid and other
+unverified issues remain blocking. This does not verify an inactive body, grant
+display authority, add a GC root or request weak historical bytes. Domain provider
+projection remains unchanged. Initial detached target verification supplies facts;
+normal activation/receive/reopen cannot manufacture missing facts.
+
+Implemented evidence is limited to the synthetic metadata host and storage/DOM
+ports: prepared original/updated activation, explicit pin correction, two complete
+source exchange rounds, old seed preservation, local and remote publication retry,
+replay and cold reopen. It does not close file purposes, exchange-base/delta,
+real-data, rendering/device/offline gates or the whole practical-team candidate.
+
+**Next finite command under §8 — explicit active-model conflict choice:**
+For a same-Asset `status` conflict, compare all complete valid known source
+candidates and their verified binding/revision/placement, with no initial choice.
+`resolveAssetStatus` carries the exact source token, Asset and selected candidate
+operation ID. Require resolved active lifecycle, all observed valid candidates
+and their required stored content; reject unknown/incomplete/stale choices before
+journaling. Assign only the selected complete status after every observed change
+in one causal command; no new binding, combined placement or inferred pin repair.
+Retain original candidates/history, Caption data and all Scene references. Use the
+existing service, conflict controls and exact retry path. Acceptance covers two
+prepared update/placement branches, no authoritative model before selection,
+explicit whole-Project selection, failed-publication retry/cold reopen/no-op and
+an unseen later candidate reopening conflict. Independent model copy, general
+lifecycle resolution, body introduction, wire/migration and ordinary activation
+are separate subsequent work.
 
 ### 13.3 Approved scheduling exception — validators and UI components (2026-09-08)
 

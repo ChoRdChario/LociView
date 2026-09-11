@@ -1,7 +1,8 @@
 # 実装・接続の全体棚卸し
 
 > CURRENT INVENTORY / 2026-09-12。全体監査基点: `b73315b851f627ca61029cfb73caf23f6e4829bd`。
-> その後の実装差分: 新metadataの完全履歴受信・Caption文言の明示解消・重複Captionの独立コピーを限定接続。
+> その後の実装差分: 新metadataの完全履歴受信・Caption文言の明示解消・重複Captionの独立コピー、
+> 準備済みモデル切替とpin修正の保存・二人二巡を限定接続。
 > 保存・復旧・再受信までの合成テストが通る。実ファイル／実機受入れは未完了。
 > 新しい仕様・採用判断ではない。承認済み要件と現行code/testsの距離を記録する。
 > 実装順は最新のUI指摘順ではなく、依存関係と `TEAM-FLOW-01` への効果から選ぶ。
@@ -14,15 +15,15 @@
 ## 1. 結論と数え方
 
 ユーザーが行う作業を **64機能群** に整理すると、新metadata保存画面へ限定接続済みが
-**19群**、残りが **45群**。その45群は下記の内訳になる。
-「19/64完成」といった完成率・工数には換算しない。小さい部品接続と
-移行／チーム受信では仕事量が大きく違い、接続済み19群も合成データ限定だからである。
+**20群**、残りが **44群**。その44群は下記の内訳になる。
+「20/64完成」といった完成率・工数には換算しない。小さい部品接続と
+移行／チーム受信では仕事量が大きく違い、接続済み20群も合成データ限定だからである。
 
 | 排他的な主分類 | 群数 | 意味 |
 |---|---:|---|
-| 接続済み | 19 | 新metadata hostで操作・必要な保存まで接続。既知三角形／2 PNGという限定範囲、実機受入れは別 |
-| 部品未接続 | 8 | 新系統のUI部品・pure planner等はあるが、対象群全体の画面・実データ・typed command／保存のいずれかが未接続。T01/T03/T04は限定接続まで進んだ |
-| 別経路のみ | 26 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
+| 接続済み | 20 | 新metadata hostで操作・必要な保存まで接続。既知三角形／2 PNGという限定範囲、実機受入れは別 |
+| 部品未接続 | 9 | 新系統のUI部品・pure planner等はあるが、対象群全体の画面・実データ・typed command／保存のいずれかが未接続。T01〜T04は限定接続まで進んだ |
+| 別経路のみ | 24 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
 | 新規実装 | 11 | 新契約の利用者向け経路がまだない。schema・検証・設計案があっても実装済みとは数えない |
 
 - 一つの行は、共有する前提・保存境界を持つ「利用者の作業群」。同一ViewのCRUD等は一群。
@@ -74,7 +75,7 @@
 | M05 | モデルを一時的に隠す／単独表示する | 部品未接続 | temporarilyHidden型はあるが操作intent/runtime未接続。Scene所属を変更して代用しない。 | [src/ui/projectScene/modelListState.ts:12](../src/ui/projectScene/modelListState.ts) / [docs/specs/05-project-scene-team-workflow.md:198](../docs/specs/05-project-scene-team-workflow.md) |
 | M06 | モデルの平行移動を調整する | 接続済み | gizmo＋数値、preview/cancel/confirm、immutable binding保存と再開。既知・同一geometryのみ。 | [src/harness/projectScene/session.ts:368](../src/harness/projectScene/session.ts) / [tests/ui/projectMetadataHost.test.ts:106](../tests/ui/projectMetadataHost.test.ts) |
 | M07 | モデルを回転・均等拡大縮小する | 別経路のみ | Nativeにはある。新typed command・UIはtranslation限定。 | [src/projectMetadata/commands.ts:15](../src/projectMetadata/commands.ts) / [src/nativeGs/viewer.ts:703](../src/nativeGs/viewer.ts) |
-| M08 | モデルを差し替えて要確認のピンを直す | 別経路のみ | memory／旧savedは合成更新ループあり。新metadataのrevision/body紹介・active binding更新・要確認・明示補正未接続。 | [src/harness/projectScene/workspace.ts:133](../src/harness/projectScene/workspace.ts) / [src/harness/projectScene/teamWorkspace.ts:240](../src/harness/projectScene/teamWorkspace.ts) |
+| M08 | モデルを差し替えて要確認のピンを直す | 接続済み | 新metadataの初期準備済みoriginal／updatedを明示切替。全Sceneの配置・Caption本文／位置／添付を保持し、異なる表面は要確認→手動補正。保存・exact retry・再開・二巡を確認。利用者の新しい本体導入はM01等、通常home／実機は未受入れ。 | [src/projectMetadata/commands.ts](../src/projectMetadata/commands.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
 | M09 | Projectからモデルを削除する | 別経路のみ | Nativeには依存確認あり。新command/UIなし。05のScene所属・Caption・material参照ガードが必要。 | [src/projectMetadata/commands.ts:14](../src/projectMetadata/commands.ts) / [src/nativeGs/app.ts:3767](../src/nativeGs/app.ts) / [docs/specs/05-project-scene-team-workflow.md:299](../docs/specs/05-project-scene-team-workflow.md) |
 | M10 | GSの配置補助モデルと配置可否を確認する | 別経路のみ | Nativeの明示same-Asset Proxyだけのpickを未継承。Proxyなしでは既存Caption保持、新配置拒否。 | [src/nativeGs/app.ts:380](../src/nativeGs/app.ts) / [tests/nativeGs/schemaResolver.test.ts:869](../tests/nativeGs/schemaResolver.test.ts) |
 | M11 | ピンの表示サイズを調整する | 別経路のみ | 新hostは固定寸法。Nativeの倍率UIを継承し、v2のpresentation保存単位も契約に合わせる。 | [src/harness/projectScene/workspace.css:90](../src/harness/projectScene/workspace.css) / [src/nativeGs/app.ts:1841](../src/nativeGs/app.ts) |
@@ -138,8 +139,8 @@
 
 | ID | 機能群／利用者の結果 | 状態 | 現在の境界・残り | コード／既存受入れ参照（行番号は監査時点） |
 |---|---|---|---|---|
-| T01 | 配布された更新を手元の記録を保って受け取る | 部品未接続 | 新serviceの完全source受信／remote journalと既知合成タイトルのUI受信を接続。手元編集・競合候補・exact retry・cold reopen・再受信no-opを確認。参加者間のモデル更新・要確認との全体接続はM08と同時確認。実ファイルはF01/F02。 | [src/projectMetadata/session.ts](../src/projectMetadata/session.ts) / [src/projectMetadata/remote.ts](../src/projectMetadata/remote.ts) / [tests/projectMetadataPersistence.test.ts](../tests/projectMetadataPersistence.test.ts) |
-| T02 | 元の配布状態を保持し、変更分を繰り返し返す | 別経路のみ | 旧savedの固定base/deltaあり。新serviceのexchange-base記録・source-derived delta／往復・no-op未接続。portable wireはF02。 | [poc/scene-history/development-saved.ts:149](../poc/scene-history/development-saved.ts) / [docs/specs/05-project-scene-team-workflow.md:1064](../docs/specs/05-project-scene-team-workflow.md) |
+| T01 | 配布された更新を手元の記録を保って受け取る | 部品未接続 | 新serviceの完全source受信／remote journalと合成タイトル／登録のUI受信を接続。準備済みモデル切替・手元本文保持・要確認・明示補正の二人二巡を保存ポートで確認。モデル交換の通常UI／実ファイルは未接続、F01/F02参照。 | [src/projectMetadata/session.ts](../src/projectMetadata/session.ts) / [src/projectMetadata/remote.ts](../src/projectMetadata/remote.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
+| T02 | 元の配布状態を保持し、変更分を繰り返し返す | 部品未接続 | 新serviceの完全source往復は原履歴を保持し二巡・no-op・中断復旧・再開まで確認。専用exchange-base記録・source-derived deltaは未接続。旧savedの固定base/deltaを流用済みとはしない。portable wireはF02、06の批准境界を維持。 | [src/projectMetadata/session.ts](../src/projectMetadata/session.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) / [docs/specs/06-project-package-wire.md](../docs/specs/06-project-package-wire.md) |
 | T03 | 同じ項目の競合を比較し、明示的に解消する | 部品未接続 | Caption title/bodyの候補比較→明示選択／手動文言→1変更の保存・cold retryを接続。同値候補も明示解消し、元履歴を保持。他のfield／binding／lifecycle等は未接続。 | [src/harness/projectScene/metadataConflictControls.ts](../src/harness/projectScene/metadataConflictControls.ts) / [src/projectMetadata/commands.ts](../src/projectMetadata/commands.ts) |
 | T04 | 重複所属で片方／両方を選び、独立項目として残す | 部品未接続 | 新service/hostのCaption重複は明示的な元登録選択→片方／独立した両方を接続。本文・anchor・添付・tag所属の完全コピー、optional不在、別Scene不変更、exact retry／cold replayを確認。モデル独立copyとdeep remapは未接続。 | [src/projectMetadata/membership.ts](../src/projectMetadata/membership.ts) / [src/harness/projectScene/metadataMembershipControls.ts](../src/harness/projectScene/metadataMembershipControls.ts) / [tests/projectMetadataPersistence.test.ts](../tests/projectMetadataPersistence.test.ts) |
 
@@ -275,6 +276,9 @@ Project一覧とCaption削除は必要だが、ユーザーが最後に挙げた
      一つで安全に閉じられなければfield解消→独立copyの順に小さく分ける。
 
 3. **モデル更新と手元のCaption修正を同じ保存経路で往復させる（M08/T02）**
+   - 現在: 準備済み2形状の明示切替→要確認→pin補正を保存ポートの二人二巡で確認。
+     手元title/body、原履歴、添付IDを保持し、中断復旧・cold reopen・no-opまで通る。
+     一般的な本体紹介、専用exchange-base/delta、通常のファイル受け渡しUIは未接続。
    - 目的: 今回のチーム運用改修の動機を直接満たす。
    - 完了条件: まず既知合成bodyの紹介／revision切替をblob-firstで保存し、
      同じAssetを使う全Sceneへ反映。Caption座標・本文・添付・所属を保持し、

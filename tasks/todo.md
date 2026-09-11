@@ -11,6 +11,94 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — approved S1 service entry (2026-09-11)
 
+#### Completed bounded slice — prepared model update/team loop (2026-09-12, from `0afad01`)
+
+Previous goal turn was progress: independent Caption copies landed with final
+matrix/review in `0afad01`. Rechecked clean `g0-baseline`; full practical-team
+candidate remains incomplete. Push denial is separate, not a local-work blocker.
+Target/purpose/acceptance and exclusions are in 05 §13.2's prepared-revision
+paragraph and below. Independent scope review found no new approval requirement.
+
+- [x] Prepare declared original/updated synthetic revisions and exact content facts
+  before initial publication; preserve old seeds and prohibit reopen replenishment.
+- [x] Add typed atomic revision activation and reuse the existing model choice,
+  confirmation and pin correction controls; preserve current placement and records.
+- [x] Run two saved participants through model update, local Caption retention,
+  explicit pin correction, full-source return/re-receive and a second round.
+- [x] Verify changed paths and root matrix with independent review; update
+  inventory/handoff. Checkpoint this slice, then continue the approved scope.
+
+Reuse the existing metadata host and its body/repository/failure test ports.
+Missing acceptance is the new saved geometry/team round trip, not another journal
+PoC. No new wire/delta, user files, same-surface assertion, old-run reset, dependency,
+renderer change or adoption/iPhone/offline claim. Stop only for actual specification
+conflict or new authority; no new human test for each intermediate command.
+
+Implementation discrepancy/replan: inactive Representation diagnostics propagate
+to the provider's inactive revision/binding DTO, and the current metadata service
+rejects every unverified diagnostic. Thus a seed retaining both known revisions
+cannot initialize. Do not change domain projection or request weak historical
+bodies. Treat only the exact inactive profile-evidence diagnostic outside the
+known active strong closure as non-blocking to readiness; every executed content
+check and other issue stays enforced. Read a future target's complete equal,
+valid immutable candidates for preparation only, then validate its activated
+candidate with the full provider before any journal. Independent review approved
+this bounded clarification; no domain projection/GC rule changed.
+
+Review/result: prepared original/updated geometry now activates through one
+typed fresh-manual-binding/status change. Shared placement (including rotation/
+scale), Caption content/anchor, attachments and Scene memberships remain intact.
+Explicit pin correction alone changes its authored position/class. Two independent
+saved-port participants switch original→updated→original over two full-source
+rounds while retaining both parties' text and attachment ID. Interrupted receive
+keeps the old publication; cold retry uses retained original parts, replay writes
+nothing and both cold-reopened heads agree. This is not Contribution/base-delta
+or general new-revision/file/real-device acceptance. Old seed initialization is
+preserved; cold opening never replenishes prepared records/facts/bodies.
+
+Independent review found and closed two issues: detached target validation must
+precede retained-save state, and complete immutable candidate reads need one
+indexed, metered lookup instead of repeated unbounded scans. Host preflight
+refusal now remains an operation error, not a false incomplete-save/retry state.
+Missing inactive target facts reject activation/receive with no writes, original
+heads retained and ordinary ready reopen. Readiness tests cover all active roots
+and strong candidate references, not just the displayed Scene. Empty old-run
+update choices are explained/disabled without disabling placement.
+
+Verification: typecheck and build PASS (existing chunk warnings); root
+`npm test -- --maxWorkers=2`: 109 files / 1,952 PASS / 21 existing TODO, exit 0
+(111.47 s). A final additional assertion in the existing mounted-update test
+also PASS: local activation publication failure/retry retains the exact fresh
+binding and original parts. Final typecheck and diff-check PASS. Focused
+service/host/isolation run: 80 PASS. Read-only service/UI/acceptance reviews have
+no remaining mandatory findings. Browser skill initialization again fails on
+`node:process` before browser selection; no raster/input/iPhone/offline evidence
+is claimed and no repeated human checkpoint is requested. Inventory recount:
+64 = 20 connected / 9 partial / 24 other-path / 11 new. M08 is synthetic-only;
+T01/T02 remain partial. Full practical-team candidate remains incomplete.
+
+#### Next finite slice — explicit active-model conflict resolution (T03)
+
+- [ ] Reuse complete status candidates and compare each candidate's known model/
+  placement; no initial winner, projection or inferred transform combination.
+- [ ] Add typed `resolveAssetStatus` with exact source token, Asset and chosen
+  operation ID; validate active lifecycle, every candidate and saved closure.
+  Write only the chosen complete status after all candidates in one causal edit.
+- [ ] Reuse existing comparison/receive/save UI for two conflicting prepared
+  updates (or placement/update), explicit selection, retained Caption data,
+  failed-publication retry, cold replay and unseen-change conflict recurrence.
+
+Purpose: an accepted model conflict currently suppresses the Asset everywhere;
+ordinary revision activation requires a resolved current projection, so it cannot
+recover that state. Close this dead end before independent model copies. Scope is
+05 §8's typed scalar choice plus the synthetic metadata host, not lifecycle-wide
+resolution, new bindings, geometry import, remaps, new wire/dependencies or gates.
+Afterward implement model membership keep-one/independent-both with explicit
+complete fresh-ID remap; current fixed-ID content/projection helpers do not yet
+admit those copies. Do not hide an unresolved parent/reference by dropping it.
+Stop only on actual contract conflict/new authority; ordinary implementation
+sequencing does not require a fresh PO checkpoint. See 05 §13.2 for acceptance.
+
 #### Active continuation — independent Caption copies (2026-09-12, from `d229c11`)
 
 The full practical-team candidate remains the goal, not this synthetic milestone.
@@ -32,7 +120,7 @@ dependencies, stale choices, invalid remaps or reused IDs refuse without writes.
   in the existing metadata host; retain the same IDs/bytes through failed saves.
 - [x] Reuse service/host tests for independent edits/attachments, original other-Scene
   references, cold retry, no-op and unseen-edge conflicts; review and checkpoint.
-- [ ] Continue prepared model revision activation and the saved two-party round trip.
+- [x] Continue prepared model revision activation and the saved two-party round trip.
 
 No general duplication, inferred relation, real file/wire/schema, new dependency,
 destructive user-data reset or device/release claim. Existing saved runs are not

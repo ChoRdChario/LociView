@@ -1,6 +1,6 @@
 import type { WorkspaceFS } from '../../platform/fs';
 import { ProjectMutationCoordinator } from '../../platform/projectLock';
-import { MetadataProjectSession, type MetadataSessionRead } from '../../projectMetadata/session';
+import { MetadataProjectSession, metadataProviderReady, type MetadataSessionRead } from '../../projectMetadata/session';
 import type { MetadataStorageFactory } from '../../projectMetadata/repository';
 import { digest, newId, technicalId, underWriteLease } from '../../projectMetadata/persistence';
 import { TransactionJournal } from '../../projectMetadata/journal';
@@ -12,6 +12,8 @@ import type { FullMetadataSource } from '../../projectMetadata/remote';
 import { fixtureIds } from './fixture';
 import type { MetadataEdit } from '../../projectMetadata/commands';
 import { readProjectScene } from '../../scene/projectProvider';
+import { createFixtureModel, fixtureModelIds } from './modelClosure';
+import { cloneCanonicalValue, type JsonObject } from '../../domain/values';
 
 export const metadataArea = 'lociview-development-metadata-1';
 export interface MetadataHostOptions {
@@ -51,7 +53,7 @@ export async function openMetadataHost(options: MetadataHostOptions) {
           last = await service.read();
           if (last.state === 'ready') throw Error(`${refusedMessage}保存内容は保持しています。${error instanceof Error ? error.message : ''}`);
         }
-        failure = '保存を完了できません。変更を保持しています。再試行してください。'; throw Error(failure);
+        failure = '保存を完了できません。変更を保持しています。再試行してください。'; throw Error(failure, { cause: error });
       }
       finally { busy = false; if (operation === work) operation = undefined; }
     };
@@ -61,7 +63,26 @@ export async function openMetadataHost(options: MetadataHostOptions) {
       return metadataProjectView(read.provider, content.images);
     };
     const initialize = async () => {
-      await underWriteLease(fs, () => content.prepare());
+      await underWriteLease(fs, async () => {
+        const prepared = await content.prepare(seed);
+        const provider = await readProjectScene(seed.read(), limits, content.verifier(true));
+        if (provider.kind !== 'scene-provider' || !metadataProviderReady(provider, limits)) throw Error('初期モデルを確認できません。');
+        for (const model of prepared.filter(m => m.closure.shape === 'updated')) {
+          const current = provider.resources.assets[model.assetId]?.projection;
+          const scene = Object.values(provider.state.assetMemberships).find(e => e.resourceId === model.assetId &&
+            e.lifecycle.kind === 'value' && e.lifecycle.value.state === 'active');
+          if (current?.kind !== 'value' || !scene) throw Error('準備するモデルの配置を確認できません。');
+          const binding = provider.details.immutable.assetBindingsById[current.value.bindingId];
+          if (binding?.kind !== 'value') throw Error('準備するモデルの配置を確認できません。');
+          const target = createFixtureModel({ ...fixtureModelIds(model.closure), binding: `bnd_${newId()}` }, model.closure.shape,
+            binding.value.assetToProject as unknown as Parameters<typeof createFixtureModel>[2], current.value.bindingId);
+          const candidate = seed.prepareEdit(seed.token, { kind: 'activatePreparedRevision', sceneId: scene.sceneId, assetId: model.assetId,
+            expectedBindingId: current.value.bindingId, revisionId: model.projection.revisionId,
+            binding: cloneCanonicalValue(target.binding, limits) as JsonObject }, provider, newId());
+          const checked = await readProjectScene(candidate.read(), limits, content.verifier(true));
+          if (!metadataProviderReady(checked, limits)) throw Error('更新モデルの準備を確認できません。');
+        }
+      });
       return ready(await service.createFromSource(seed));
     };
     if (last.state === 'empty' && options.create && lease.holdsWriteLock) {
@@ -69,14 +90,14 @@ export async function openMetadataHost(options: MetadataHostOptions) {
     }
     const authority: SyntheticAuthority = {
       storage: 'saved-development', writeScope: 'caption-text',
-      capabilities: { pins: true, membership: true, color: true, views: true, materials: true, media: true, placement: true },
+      capabilities: { pins: true, membership: true, color: true, views: true, materials: true, media: true, placement: true, preparedRevision: true },
       get readOnly() { return fs.mutationAuthority.accessState !== 'editable' || closed; },
       read: () => { if (!last.provider) throw Error('保存した画面はまだありません。'); return metadataProjectView(last.provider, content.images); },
       status: () => ({ kind: busy ? 'checking' : failure || last.state !== 'ready' ? 'failed' : 'idle', error: failure || '未完了の保存があります。' }),
       write: (token, changes, context) => execute(async () => {
         if (authority.readOnly) throw Error('このタブは閲覧専用です。');
         return ready(await service.edit(token, metadataIntent(changes, authority.read(), context)));
-      }),
+      }, '変更を適用できません。'),
       retry: () => execute(async () => {
         if (authority.readOnly) throw Error('このタブは閲覧専用です。');
         const before = await service.read();

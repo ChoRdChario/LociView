@@ -39,10 +39,16 @@ export function metadataIntent(changes: Readonly<Record<string, string>>, projec
     const closure = readFixtureModel(rows[1]![1]);
     const p = project.resources.assets[assetId]?.projection;
     const prior = p?.kind === 'value' && project.modelVersions?.find(v => v.assetId === assetId && v.projection.bindingId === p.value.bindingId);
-    if (!prior || closure.binding.id !== bindingId || closure.binding.assetId !== assetId ||
-      canonicalFixture({ ...closure, binding: prior.closure.binding }) !== canonicalFixture(prior.closure)) return fail();
-    return { kind: 'moveAsset', assetId, sceneId: context.sceneId, expectedBindingId: prior.projection.bindingId,
-      binding: cloneCanonicalValue(closure.binding, limits) as JsonObject };
+    if (!prior || closure.binding.id !== bindingId || closure.binding.assetId !== assetId) return fail();
+    if (closure.revision.id === prior.closure.revision.id) {
+      if (canonicalFixture({ ...closure, binding: prior.closure.binding }) !== canonicalFixture(prior.closure)) return fail();
+      return { kind: 'moveAsset', assetId, sceneId: context.sceneId, expectedBindingId: prior.projection.bindingId,
+        binding: cloneCanonicalValue(closure.binding, limits) as JsonObject };
+    }
+    const target = project.modelVersions?.find(v => v.assetId === assetId && v.projection.revisionId === closure.revision.id);
+    if (!target || canonicalFixture({ ...closure, binding: target.closure.binding }) !== canonicalFixture(target.closure)) return fail();
+    return { kind: 'activatePreparedRevision', assetId, sceneId: context.sceneId, expectedBindingId: prior.projection.bindingId,
+      revisionId: closure.revision.id, binding: cloneCanonicalValue(closure.binding, limits) as JsonObject };
   }
   if (rows[0]![0].startsWith('attachment/')) {
     const attachmentId = rows[0]![0].split('/')[1]!;

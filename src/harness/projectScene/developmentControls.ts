@@ -20,6 +20,8 @@ export function createModelUpdateControls(document: Document, session: Synthetic
   function render() {
     if (disposed) return;
     context = session.modelUpdateContext();
+    context = { ...context, issue: session.modelUpdateRestriction ?? context.issue ??
+      (!context.choices.length ? '更新できるモデルはありません。' : null) };
     const next = JSON.stringify([context.token, context.sceneId, context.assetId]);
     if (next !== scope) {
       chosen = ''; scope = next;

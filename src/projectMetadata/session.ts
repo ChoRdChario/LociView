@@ -26,6 +26,27 @@ export type MetadataSessionRead = Readonly<{
   publication: string | null;
 }>;
 
+/** Readiness of the whole Project; inactive weak records retain their diagnostics. */
+export function metadataProviderReady(provider: ProjectProviderRead, limits: MetadataLimits): boolean {
+  if (provider.kind !== 'scene-provider' || provider.inspection.checks.some(c => c.outcome !== 'verified')) return false;
+  const candidates = provider.inspection.candidates, active = new Set(candidates.knownActiveRoots), queue = [...active];
+  const outgoing = new Map<string, string[]>(); let work = provider.inspection.workUsed;
+  const charge = () => { if (++work > limits.maxWork) fail('provider-readiness-limit'); };
+  for (const edge of candidates.knownReferences) {
+    charge(); if (edge.strength !== 'strong') continue;
+    const targets = outgoing.get(edge.from) ?? []; targets.push(edge.to); outgoing.set(edge.from, targets);
+  }
+  for (let i = 0; i < queue.length; i++) for (const id of outgoing.get(queue[i]!) ?? []) {
+    charge(); if (!active.has(id)) { active.add(id); queue.push(id); }
+  }
+  return !provider.issues.some(issue => {
+    charge();
+    if (issue.kind === 'unverified' && issue.code === 'verified-profile-content-bounds-catalog-required' && issue.path.length === 3 &&
+      issue.path[0] === 'representationsById' && issue.path[2] === 'formatProfile' && !active.has(issue.path[1]!)) return false;
+    return ['invalid', 'unverified'].includes(issue.kind) || issue.code === 'opaque-data-protection-required';
+  });
+}
+
 /** New synthetic-workspace service; ordinary ProjectStore/UI and old saved runs do not import it. */
 export class MetadataProjectSession {
   private readonly limits: MetadataLimits;
@@ -77,10 +98,7 @@ export class MetadataProjectSession {
     if (!this.providerReady(provider) || provider.kind !== 'scene-provider' || provider.token !== source.token) fail('provider-not-ready');
     return provider;
   }
-  private providerReady(provider: ProjectProviderRead): boolean {
-    return provider.kind === 'scene-provider' && provider.inspection.checks.every(c => c.outcome === 'verified') &&
-      !provider.issues.some(i => ['invalid', 'unverified'].includes(i.kind) || i.code === 'opaque-data-protection-required');
-  }
+  private providerReady(provider: ProjectProviderRead): boolean { return metadataProviderReady(provider, this.limits); }
 
   async create(records: { schema: JsonObject; identity: JsonObject } & JsonObject): Promise<MetadataSessionRead> {
     return this.createFromSource(ProjectMetadataSource.bootstrap(records.schema, records.identity, this.limits).initialize(records));
@@ -133,10 +151,10 @@ export class MetadataProjectSession {
       const known = new Set(durable.originalChanges().map(b => A.decodeChange(b).hash));
       const parts = prepared.originalChanges().filter(b => !known.has(A.decodeChange(b).hash));
       if (!parts.length) return read; // An unchanged value has no storage transaction.
+      await this.checked(prepared, false); // Refused preparation must not become a pending save.
       const [doc] = A.applyChanges(A.init(), durable.originalChanges());
       this.retained = { start: { transactionId, repositoryId: prior.start.repositoryId, predecessor: prior.start.transactionId,
         purpose: 'localCommand', proof: durable.proof, baseHeads: A.getHeads(doc).sort() }, parts };
-      await this.checked(prepared, false);
       return this.resume();
     });
   }

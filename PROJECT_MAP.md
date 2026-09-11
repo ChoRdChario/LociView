@@ -12,11 +12,13 @@
 
 2026-09-12 whole-scope inventory: [tasks/implementation-inventory.md](tasks/implementation-inventory.md)
 maps all 41 UI tasks plus accepted Scene/team extensions to 64 work groups:
-19 connected in the synthetic metadata host; 8 component-level gaps, 26 other-path
+20 connected in the synthetic metadata host; 9 component-level gaps, 24 other-path
 connections and 11 new-path implementations remain. These are not completion or
 effort percentages. Approved full-source receive (02 §8) and explicit Caption
 text resolution and independent Caption membership copies now have bounded
-new-service/host paths. Model copies and the model-update/team loop remain;
+new-service/host paths. Prepared model activation, explicit pin correction and
+two saved full-source team rounds now work in synthetic storage ports. Model
+copies, remaining scalar conflicts and exchange-base/delta still remain;
 real-file/wire adoption remains separately gated. Latest UI complaints do not set priority.
 
 2026-09-11 current implementation: PO explicitly approved 05 §13.2's S1 service
@@ -52,8 +54,13 @@ gizmo preview/confirm/cancel. Saved model payloads, original Caption coordinates
 and Scene memberships remain unchanged. Full-source receive now retains local
 changes/candidates and original remote bytes through hidden apply/recovery/no-op.
 Caption title/body candidates can be explicitly chosen or manually combined;
-no winner is selected by default. Geometry replacement, real-file input, independent
-copies and participant exchange remain unconnected here.
+no winner is selected by default. Independent Caption copies are now connected.
+Fresh synthetic seeds prepare original/updated geometry and verification facts;
+explicit activation preserves placement and records, and pins remain needs-review
+until manually corrected. Saved-port two-party tests cover two full-source rounds,
+local text, interruption/recovery/no-op and cold reopen. Old seeds are not refilled.
+General body introduction, model copies, exchange-base/delta, ordinary file UI
+and real-file input remain unconnected here.
 The old saved pair and ordinary home are unchanged.
 Mounted memory-port and HTTP dependency tests pass; actual browser/device/storage
 adoption remains unverified. The consolidated new-host Desktop batch remains

@@ -12,9 +12,11 @@ import type { ProjectProviderRead } from '../scene/projectProvider';
 import { fail, type MetadataLimits } from './format';
 import { normalizeCaptionText } from '../domain/captionText';
 import { planCaptionMembershipResolution, type CaptionMembershipResolution } from './membership';
+import { metadataImmutableReader } from './records';
 
 export type MetadataEdit =
   | CaptionMembershipResolution
+  | { kind: 'activatePreparedRevision'; sceneId: string; assetId: string; expectedBindingId: string; revisionId: string; binding: JsonObject }
   | { kind: 'moveAsset'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject }
   | { kind: 'editCaption'; captionId: string; edits: { title?: string; body?: string; colorSrgb?: readonly number[] } }
   | { kind: 'resolveCaptionText'; captionId: string; field: 'title' | 'body';
@@ -146,6 +148,35 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
   };
   switch (command.kind) {
     case 'resolveCaptionMembership': return planCaptionMembershipResolution(provider, command, limits);
+    case 'activatePreparedRevision': {
+      shape(raw, ['kind', 'sceneId', 'assetId', 'expectedBindingId', 'revisionId', 'binding']);
+      row('scenesById', command.sceneId); row('assetsById', command.assetId);
+      memberships('asset', command.sceneId, command.assetId);
+      const resolved = resolveScene(provider.state, provider.resources, command.sceneId);
+      const projection = resolved.kind === 'ready' ? resolved.composition.assets.find(a => a.assetId === command.assetId)?.projection : undefined;
+      if (!projection || projection.bindingId !== command.expectedBindingId || projection.revisionId === command.revisionId) fail('revision-stale');
+      const old = exact(provider.details.immutable.assetBindingsById[command.expectedBindingId]), next = command.binding;
+      const readImmutable = metadataImmutableReader(provider, limits);
+      const revision = readImmutable('assetRevisionsById', command.revisionId);
+      checkProjectRecord(c, 'assetBindingsById', old); checkProjectRecord(c, 'assetBindingsById', next);
+      checkProjectRecord(c, 'assetRevisionsById', revision);
+      if (revision.id !== command.revisionId || revision.assetId !== command.assetId || !list(revision.representationIds).length) fail('revision-target');
+      for (const id of list(revision.representationIds)) {
+        const rep = readImmutable('representationsById', String(id));
+        checkProjectRecord(c, 'representationsById', rep);
+        if (rep.assetId !== command.assetId) fail('revision-target');
+      }
+      if (c.unknown) fail('revision-unknown');
+      shape(old, ['id', 'assetId', 'assetRevisionId', 'assetToProject', 'method', 'payloadDigest', ...(old.parentBindingId ? ['parentBindingId'] : [])]);
+      shape(next, ['id', 'assetId', 'assetRevisionId', 'assetToProject', 'method', 'payloadDigest', 'parentBindingId']);
+      if (next.id === old.id || next.assetId !== command.assetId || old.assetId !== command.assetId ||
+        old.assetRevisionId !== projection!.revisionId || next.assetRevisionId !== command.revisionId || next.parentBindingId !== old.id ||
+        next.method !== 'manual' || !same(old.assetToProject, next.assetToProject)) fail('revision-placement');
+      // Target content/family facts are rechecked by Session before any journal.
+      // Caption authored coordinates/classes remain untouched and may need review.
+      result.push({ map: 'assetBindingsById', id: next.id as string, create: true, fields: next });
+      add('assetsById', command.assetId, { status: { kind: 'ready', activeBindingId: next.id! } }); break;
+    }
     case 'moveAsset': {
       shape(raw, ['kind', 'sceneId', 'assetId', 'expectedBindingId', 'binding']);
       row('scenesById', command.sceneId); row('assetsById', command.assetId);

@@ -1,5 +1,5 @@
 import { createSyntheticProject, freezeSynthetic, type SyntheticProject } from './fixture';
-import { syntheticVersions } from './modelFixture';
+import { syntheticVersions, syntheticPreparedVersions } from './modelFixture';
 import { fixtureModelBytes } from './modelClosure';
 import { cloneCanonicalValue, type JsonObject } from '../../domain/values';
 import type { ProjectProviderRead } from '../../scene/projectProvider';
@@ -19,6 +19,8 @@ export const metadataModels = syntheticVersions.filter(v => {
   const asset = initial.resources.assets[v.assetId];
   return asset?.projection.kind === 'value' && asset.projection.value.bindingId === v.projection.bindingId;
 });
+/** Initial active Assets stay separate from the optional prepared revision catalog. */
+export const metadataPreparedModels = syntheticPreparedVersions;
 const field = <T>(v: { kind: 'value'; value: T } | { kind: 'unresolved'; reason: unknown }): T => {
   if (v.kind !== 'value') throw Error('合成データの初期値がありません。'); return v.value;
 };
@@ -36,8 +38,8 @@ export function createMetadataFixture(run: string): ProjectMetadataSource {
       frame: { id: initial.resources.projectFrameId, handedness: 'right', upAxis: '+Y', unit: { kind: 'unknown' } } },
     assetsById: byId(metadataModels.map(m => ({ id: m.assetId, label: initial.modelNames[m.assetId], assetFrameId: m.projection.assetFrameId,
       status: { kind: 'ready', activeBindingId: m.projection.bindingId }, lifecycle: field(initial.resources.assets[m.assetId]!.lifecycle) }))),
-    assetBindingsById: byId(metadataModels.map(m => m.closure.binding)), assetRevisionsById: byId(metadataModels.map(m => m.closure.revision)),
-    representationsById: byId(metadataModels.map(m => m.closure.representation)),
+    assetBindingsById: byId(metadataPreparedModels.map(m => m.closure.binding)), assetRevisionsById: byId(metadataPreparedModels.map(m => m.closure.revision)),
+    representationsById: byId(metadataPreparedModels.map(m => m.closure.representation)),
     captionsById: byId(Object.values(initial.resources.captions).map(c => ({ id: c.id, title: field(c.title), body: field(c.body),
       colorSrgb: field(initial.colors[c.id]!).slice(1).match(/../g)!.map(v => parseInt(v, 16) / 255),
       anchor: field(c.anchor), lifecycle: field(c.lifecycle) }))),
@@ -72,6 +74,6 @@ export function metadataProjectView(provider: ProjectProviderRead, images: NonNu
       colors[id] = value(`#${row.colorSrgb.value.map(v => Math.round(Number(v) * 255).toString(16).padStart(2, '0')).join('')}`);
   }
   return freezeSynthetic({ ...initial, projectId, state: provider.state, resources: provider.resources,
-    modelNames: names, colors, captionOwners, captionTemplates, modelVersions: metadataModelVersions(provider),
+    modelNames: names, colors, captionOwners, captionTemplates, modelVersions: metadataModelVersions(provider, metadataFixtureLimits),
     viewData: metadataViewData(provider), materialData: metadataMaterialData(provider), mediaData: metadataMediaData(provider, images) });
 }

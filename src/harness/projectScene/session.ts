@@ -101,6 +101,7 @@ export class SyntheticSession {
   get materialRestriction() { return this.readOnly || !this.authority?.capabilities?.materials ? this.editingRestriction : null; }
   get mediaRestriction() { return this.readOnly || !this.authority?.capabilities?.media ? this.editingRestriction : null; }
   get placementRestriction() { return this.readOnly || !this.authority?.capabilities?.placement ? this.editingRestriction : null; }
+  get modelUpdateRestriction() { return this.readOnly || !this.authority?.capabilities?.preparedRevision ? this.editingRestriction : null; }
   get savedStatus() { return this.authority?.status?.(); }
   get workingBlock() { return this.acknowledgment.block ?? (this.savedStatus?.kind === 'failed' ?
     this.savedStatus.error ?? '未完了の保存があります。更新を再試行してください。' : null); }
@@ -341,10 +342,12 @@ export class SyntheticSession {
   }
   acceptModelUpdate(plan: ModelUpdatePlan): boolean {
     try {
+      if (this.modelUpdateRestriction) throw Error(this.modelUpdateRestriction);
       const context = this.modelUpdateContext(); let version = modelVersion(plan.assetId, plan.bindingId, this.modelVersions);
       if (context.issue || plan.token !== context.token || plan.sceneId !== context.sceneId || plan.assetId !== context.assetId ||
         !version || !context.choices.includes(version)) throw new Error(context.issue ?? '対象が更新されています。モデルを選び直してください。');
-      if (context.current && canonicalFixture(context.current.closure.binding.assetToProject) !== canonicalFixture(version.closure.binding.assetToProject)) {
+      if (context.current && (this.authority?.capabilities?.preparedRevision ||
+        canonicalFixture(context.current.closure.binding.assetToProject) !== canonicalFixture(version.closure.binding.assetToProject))) {
         version = versionFromClosure(createFixtureModel({ ...fixtureModelIds(version.closure), binding: fresh('bnd') }, version.closure.shape,
           context.current.closure.binding.assetToProject, context.current.projection.bindingId));
       }

@@ -31,9 +31,15 @@ export const syntheticVersions: readonly SyntheticModelVersion[] = freezeSynthet
   }));
 export const modelVersion = (assetId: string, bindingId: string, versions = syntheticVersions) => versions.find(v =>
   v.assetId === assetId && v.projection.bindingId === bindingId);
+/** Exact two-version catalog; the separate same-surface experiment is not prepared. */
+export const syntheticPreparedVersions = syntheticVersions.filter(v => {
+  const initialAsset = initial.resources.assets[v.assetId]?.projection;
+  return v.closure.shape === 'updated' || initialAsset?.kind === 'value' && initialAsset.value.bindingId === v.projection.bindingId;
+});
 
 export function versionFromClosure(closure: FixtureModelClosure): SyntheticModelVersion {
-  const known = syntheticVersions.find(v => v.projection.bindingId === closure.binding.id);
+  const known = syntheticVersions.find(v => v.projection.bindingId === closure.binding.id) ??
+    syntheticVersions.find(v => v.assetId === closure.binding.assetId && v.projection.revisionId === closure.revision.id);
   return freezeSynthetic({ assetId: closure.binding.assetId, label: known?.label ?? (closure.binding.parentBindingId ? '位置を変更したモデル' : '合成モデル'),
     projection: { assetFrameId: closure.assetFrame.id, bindingId: closure.binding.id, revisionId: closure.revision.id,
       representationIds: closure.revision.representationIds, anchorCompatibilityIds: closure.revision.anchorCompatibilityClasses.map(c => c.id) },

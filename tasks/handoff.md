@@ -1,5 +1,17 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-12 prepared-model / pin team loop (from `0afad01`):** 新metadataの
+> fresh seedはoriginal／updatedの既知本体・検証根拠を初期公開前に準備する。
+> 明示したモデル更新はfresh manual bindingを一度だけ保存し、全Sceneの配置と
+> Caption本文・anchor・添付・所属を保持。表面が変わったpinは手動修正まで要確認。
+> 二人分の独立保存ポートで二巡、ローカル本文、更新／受信失敗のexact retry、
+> cold reopen／no-opを確認。旧seedには補充せず、欠けたtarget factsは書込み前拒否。
+> 限定検査80 PASS。最終matrix／reviewはtodo先頭。新wire・通常home・実データは未変更。
+> ブラウザ初期化は再び失敗し、描画・実入力・実機・offline受入れを追加していない。
+> 次は残るモデル競合／独立copy。専用exchange-base/deltaと実データ採用は別gate。
+> 現在の棚卸しは20接続／9部分／24別経路／11新規（64群、完成率ではない）。
+> 以前の進捗記録は以下。goal全体未完了、push拒否は回避せずローカル作業継続。
+
 > **2026-09-12 Caption独立copy接続 (`d229c11`から):** 新metadata service/同じ開発画面で
 > 重複したCaption登録を比較し、明示的に一つ／独立した両方を残せる。
 > 本文・anchor・添付・tag所属の完全候補を使用し、不在の任意fieldも維持。

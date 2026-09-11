@@ -8,7 +8,9 @@
 > persistence exist; real-data/ordinary-app adoption and integrated team flow do not.
 > 02 §8 full-source receive and Caption text resolution now have bounded new
 > service/host paths, now including independent Caption membership copies.
-> Next: saved model-update/team rounds and remaining model copies. Latest UI feedback does not
+> Prepared model/pin updates now make two saved full-source rounds in synthetic
+> ports. Next: remaining model status/copy conflicts; exchange-base/delta and
+> real-data adoption retain their gates. Latest UI feedback does not
 > automatically set priority. Old saved-host Desktop PASS remains narrowly scoped.
 > Candidate history/CAS/journal proofs remain partial, not storage adoption or
 > integrated S1 completion. Section 8 owns the current completion map.
@@ -416,7 +418,9 @@ change retry. Saved-byte gallery and retained-media checks never use image fallb
 or create strong roots. Project-wide model translation now persists a fresh binding
 and active status atomically, with same-provider current projection, shared gizmo
 preview/cancel and exact retry. Saved model payload, Caption Asset coordinates
-and memberships remain unchanged. Model geometry, real-file input and exchange remain unconnected here. No old saved
+and memberships remain unchanged. Prepared synthetic geometry activation and
+explicit pin correction now share full-source saved two-party rounds; general
+body introduction, real-file input, exchange-base/delta and model copies remain. No old saved
 history is converted. Mounted memory-port and HTTP tests do not establish actual
 browser/device/adoption acceptance. Next is the consolidated new-host Desktop
 batch (uiux-handoff); do not reopen passed probes. Full S1 and TEAM-FLOW-01 remain open.

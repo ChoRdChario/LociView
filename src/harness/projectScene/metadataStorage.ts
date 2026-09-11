@@ -4,7 +4,9 @@ import type { JsonObject } from '../../domain/values';
 import { PersistentContentVerifier, type VerifiedInventoryPort } from '../../projectMetadata/contentEvidence';
 import { ProjectMetadataSource, type MetadataProof } from '../../projectMetadata/source';
 import { digest, equalBytes, json, metadataPath, readReceipt, writeReceipt } from '../../projectMetadata/persistence';
-import { metadataModels, metadataSeedBody, metadataFixtureLimits as limits } from './metadataFixture';
+import { metadataPreparedModels, metadataFixtureLimits as limits } from './metadataFixture';
+import { canonicalFixture, fixtureModelBytes } from './modelClosure';
+import { inspectProjectCandidates } from '../../domain/projectCandidates';
 import { fixtureMedia, type MediaImage } from './mediaHistory';
 import type { MetadataMediaPort } from '../../projectMetadata/session';
 
@@ -44,7 +46,7 @@ export class MetadataFixtureContent implements VerifiedInventoryPort, MetadataMe
   constructor(private readonly fs: ProjectWorkspaceFS) {}
   private bodyPath(hash: string) { return metadataPath(this.fs, `fixture-content/${hash}.bin`); }
   private inventoryPath(hash: string) { return metadataPath(this.fs, `fixture-inventory/${hash}.json`); }
-  private known(record: JsonObject) { return metadataModels.find(m => json(m.closure.representation) === json(record)); }
+  private known(record: JsonObject) { return metadataPreparedModels.find(m => json(m.closure.representation) === json(record)); }
   private knownMedia(record: JsonObject) { return fixtureMedia.find(m => json(m.record) === json(record)); }
   private mediaReceipt(record: typeof fixtureMedia[number]['record']) { return { version: 'synthetic-png-inventory-1', blob: record.blob }; }
   async stage(record: JsonObject, token: string): Promise<void> {
@@ -78,9 +80,28 @@ export class MetadataFixtureContent implements VerifiedInventoryPort, MetadataMe
     if (bytes.length !== blob.byteLength || await digest(bytes) !== blob.digest) throw Error('保存した画像本体が一致しません。');
     this.images[id] = { record: media.record, base64: btoa(String.fromCharCode(...bytes)) };
   }
-  async prepare(): Promise<void> {
+  async prepare(seed: ProjectMetadataSource) {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
-    const bytes = metadataSeedBody(), expected = metadataModels[0]!.closure.representation;
+    const inspection = await inspectProjectCandidates(seed.read(), limits);
+    if (inspection.kind !== 'project-candidate-inspection' || inspection.hasUnknownFields) throw Error('初期モデルの宣言を確認できません。');
+    const models = [];
+    for (const field of inspection.fields.filter(f => f.path[0] === 'representationsById')) {
+      const value = field.candidates[0]?.value;
+      const known = field.valid && field.candidates.length === 1 && value?.kind === 'value' && this.known(value.value as JsonObject);
+      if (!known) throw Error('初期モデルの宣言を確認できません。');
+      for (const [map, record] of [['assetRevisionsById', known.closure.revision], ['assetBindingsById', known.closure.binding]] as const) {
+        const f = inspection.fields.find(f => f.path[0] === map && f.path[1] === record.id), v = f?.candidates[0]?.value;
+        if (!f?.valid || f.candidates.length !== 1 || v?.kind !== 'value' || canonicalFixture(v.value) !== canonicalFixture(record))
+          throw Error('初期モデルの参照を確認できません。');
+      }
+      models.push(known);
+    }
+    if (!models.length) throw Error('初期モデルがありません。');
+    for (const model of models) await this.prepareBody(model);
+    return models;
+  }
+  private async prepareBody(model: typeof metadataPreparedModels[number]) {
+    const bytes = fixtureModelBytes(model.closure.shape), expected = model.closure.representation;
     if (await digest(bytes) !== expected.blob.digest || bytes.length !== expected.blob.byteLength) throw Error('合成モデルの内容が一致しません。');
     const path = this.bodyPath(expected.blob.digest), prior = await this.fs.readBytes(path);
     if (prior && !equalBytes(prior, bytes)) throw Error('保存した合成モデルが一致しません。上書きしていません。');
@@ -144,7 +165,7 @@ export class MetadataFixtureContent implements VerifiedInventoryPort, MetadataMe
     const known = this.known(request.records[0]!)!, record = known.closure.representation;
     const bytes = await this.fs.readBytes(this.bodyPath(record.blob.digest));
     if (!bytes) return response('missing'); this.counts.bodyBytes += bytes.length;
-    if (await digest(bytes) !== record.blob.digest || !equalBytes(bytes, metadataSeedBody())) return response('failed');
+    if (await digest(bytes) !== record.blob.digest || !equalBytes(bytes, fixtureModelBytes(known.closure.shape))) return response('failed');
     const decoded = JSON.parse(new TextDecoder().decode(bytes)) as { positions: number[]; indices: number[] };
     const points = decoded.positions.map((p, i) => p + record.representationToAsset.translation[i % 3]!);
     const axes = [0, 1, 2].map(i => points.filter((_, j) => j % 3 === i));
