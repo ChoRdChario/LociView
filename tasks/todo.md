@@ -11,6 +11,78 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — approved S1 service entry (2026-09-11)
 
+#### Active continuation — independent Caption copies (2026-09-12, from `d229c11`)
+
+The full practical-team candidate remains the goal, not this synthetic milestone.
+Previous turn made runtime progress: full-source receive and text resolution.
+PO explicitly approved sending the 21 pending commits to the named origin/branch;
+the environment rejected push again. Do not bypass that external-action denial.
+Continue approved local implementation; push remains separately pending.
+
+Next finite slice under 05 §8: receive concurrent SceneCaptionMemberships, compare
+their exact IDs, explicitly keep one or keep both as independently editable
+Captions. Read complete candidate records (not unresolved/known-only projections),
+preserve optional absence, immutable media/tag definitions and original anchors.
+Copies receive fresh Caption/edge/attachment/tag-membership IDs in one causal
+command; other Scenes continue referencing the original. Unknown/unresolved copy
+dependencies, stale choices, invalid remaps or reused IDs refuse without writes.
+
+- [x] Add complete-candidate membership discovery and typed keep-one/keep-both planner.
+- [x] Connect comparison, explicit original choice and independent-copy confirmation
+  in the existing metadata host; retain the same IDs/bytes through failed saves.
+- [x] Reuse service/host tests for independent edits/attachments, original other-Scene
+  references, cold retry, no-op and unseen-edge conflicts; review and checkpoint.
+- [ ] Continue prepared model revision activation and the saved two-party round trip.
+
+No general duplication, inferred relation, real file/wire/schema, new dependency,
+destructive user-data reset or device/release claim. Existing saved runs are not
+reseeded. Device/browser checks stay batched; stop only at actual new authority
+or contract conflict. New geometry bodies require explicit finite preparation next.
+
+Review: Caption membership resolution is now connected, not model keep-both.
+Each copy preserves full resolved Caption/attachment/tag-membership data and
+optional absence, uses fresh independent IDs, retains original other-Scene
+references and shares immutable media/tag definitions. One causal edit is
+published after durable confirmation; cold retry reuses exact bytes and IDs.
+Unseen later memberships re-open the conflict; old remote source replay is no-op.
+Independent review caught deleted-child/concurrent-edit omission and unmetered
+quadratic loops; both are fixed with regression coverage and read-only rereview.
+UI review found no blocker; switching the selected synthetic update now clears
+the previous update's status. Saved-host/recorded-DOM evidence is not browser
+acceptance. Browser bootstrap again fails before browser selection, so no new
+rendering/input/iPhone/offline claim. Final tree: typecheck/build PASS;
+`npm test -- --maxWorkers=2`: 109 files / 1,947 PASS / 21 existing TODO, exit 0
+(101.78 s). Relevant persistence/host/isolation: 75 PASS within that matrix.
+Independent final review has no remaining mandatory findings. `git diff --check`
+and inventory recount (64 = 19 connected / 8 partial / 26 other-path / 11 new) PASS.
+The intermediate rejection test initially targeted a proven unrelated Scene edge;
+it was corrected to the ambiguous target edge, without broadening the planner's
+refusal scope. No additional human test is requested for this narrow intermediate slice.
+
+Next approved finite slice: activate an explicitly selected, already-prepared
+synthetic geometry revision. Keep active seed models separate from the prepared
+revision catalog; only fresh runs contain the additional immutable records.
+Prepare exact original/updated bodies and target verification facts before initial
+publication, using a detached candidate and the existing verifier. Publish the
+original seed, not the preparation candidate. Old runs are never reseeded and
+missing facts on reopen are never automatically regenerated. A typed command
+creates a fresh binding and updates Asset status once, preserving placement,
+Caption anchor/text/attachments and every Scene membership. Different surface
+compatibility remains needs-review until explicit pin correction. Reuse the
+existing model-update controls and full-source receive for two-party exchanges;
+no file/wire, real data, same-surface assertion or contentEvidence schema change.
+
+Parallel ratification check: the five-stage completion plan is distinct from
+05's S1–S3 numbering. 06/07 do not block the next prepared synthetic model loop.
+Before real Project activation (stage 2), close genuinely missing G1-A/C and
+physical-device evidence/adoption. Before five-purpose bytes (stage 3), ratify
+06 §10's exact manifest/adapter/ZIP/sink/delta/base/inventory policies and goldens.
+Before conversion, close 07 §10's source profiles/builders/defaults/shared
+introduction/prepared descriptor/output goldens, including Native pinScale and
+later frozen-v1 copy variants. Capacity/count/workspace guarantees must come
+from evidence and a bundled PO decision, not synthetic limits. Keep one decision
+packet in 06/07; raw-model new Project flow need not wait for every legacy adapter.
+
 #### Approved practical-team candidate plan / full-source receive (2026-09-12)
 
 PO approved the complete five-stage plan: (1) saved team loop, (2) real-data

@@ -223,6 +223,63 @@ function mediaHost(s: SyntheticSession) {
 }
 
 describe('new synthetic saved host (memory ports and recorded DOM, not real browser/iOS acceptance)', { timeout: 15_000 }, () => {
+  it('connects explicit independent copies, retained draft/failed publication, cold replay and independent editing', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority);
+    s.acceptNavigation(planNavigation(s.snapshot.state, s.session, s.pending, { kind: 'scene', sceneId: f.detail }));
+    s.acceptInclude(planCaptionInclude(s.includeContext(), { kind: 'select', captionId: f.second }));
+    await acknowledge(s, () => { s.acceptInclude(planCaptionInclude(s.includeContext(), { kind: 'include' })); });
+    const before = s.snapshot, count = host.content.counts.bodyBytes;
+    const ui = createMetadataReceiveControls(new RecordedDocument().asDocument(), host, s, () => {}), root = record(ui.root);
+    setInput(named(root, '受信する合成更新'), 'membership');
+    await acknowledge(s, () => button(root, '開発用の更新を受け取る').fire('click'));
+    const list = named(root, '重複した登録'), original = named(list, '元として残す登録'), choice = named(list, '重複の解消方法');
+    const confirm = button(list, '登録の重複を解消');
+    expect(descendants(list).some(n => n.textContent.includes('元の記録を参照するシーン：全体'))).toBe(true);
+    expect(original.value).toBe(''); expect(choice.value).toBe(''); expect(confirm.disabled).toBe(true);
+    setInput(original, original.children[1]!.value); expect(confirm.disabled).toBe(true);
+    setInput(choice, 'both'); expect(confirm.disabled).toBe(false); expect(ui.hasChanges()).toBe(true);
+    const token = host.read().source!.token; s.setSearchComposing(true); ui.render();
+    expect(confirm.disabled).toBe(true); confirm.fire('click'); expect(host.read().source!.token).toBe(token);
+    s.setSearchComposing(false); ui.render();
+    h.base.rejectPublication = true; await acknowledge(s, () => confirm.fire('click'));
+    expect(s.acknowledgment.state).toBe('failed'); expect(Object.keys(s.snapshot.resources.captions)).toHaveLength(2);
+    expect(choice.value).toBe('both'); expect(ui.hasChanges()).toBe(true);
+    const retained = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.endsWith('.amchange'));
+    const bytes = await Promise.all(retained.map(p => h.base.readBytes(p)));
+    h.base.rejectPublication = false; await acknowledge(s, () => { s.retryWorking(); });
+    expect(s.acknowledgment.state).toBe('idle'); expect(ui.hasChanges()).toBe(false);
+    expect(await Promise.all(retained.map(p => h.base.readBytes(p)))).toEqual(bytes);
+    const copyId = Object.keys(s.snapshot.resources.captions).find(id => !before.resources.captions[id])!;
+    expect(select(s, copyId)).toBe(true); await apply(s, { body: '別々に編集した本文' });
+    expect(s.snapshot.resources.captions[f.second]).toEqual(before.resources.captions[f.second]);
+    const source = host.read().source!, writes = h.fault.writes;
+    ui.dispose(); await host.dispose(); const cold = await h.open();
+    await cold.receive(source.token, undefined, 'membership');
+    expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges()); expect(h.fault.writes).toBe(writes);
+    expect(cold.authority.read().resources.captions[copyId]!.body).toEqual({ kind: 'value', value: '別々に編集した本文' });
+    expect(host.content.counts.bodyBytes).toBe(count); expect(cold.content.counts.bodyBytes).toBe(0); await cold.dispose();
+  });
+
+  it('retains a stale membership decision and does not resolve on behalf of a readonly reader', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority);
+    s.acceptNavigation(planNavigation(s.snapshot.state, s.session, s.pending, { kind: 'scene', sceneId: f.detail }));
+    s.acceptInclude(planCaptionInclude(s.includeContext(), { kind: 'select', captionId: f.second }));
+    await acknowledge(s, () => { s.acceptInclude(planCaptionInclude(s.includeContext(), { kind: 'include' })); });
+    await host.receive(host.read().source!.token, undefined, 'membership'); s.refreshHistory();
+    const ui = createMetadataReceiveControls(new RecordedDocument().asDocument(), host, s, () => {}), root = record(ui.root);
+    const original = named(root, '元として残す登録'), choice = named(root, '重複の解消方法');
+    setInput(original, original.children[1]!.value); setInput(choice, 'one');
+    const reader = await h.open(), rs = new SyntheticSession(reader.authority);
+    const ru = createMetadataReceiveControls(new RecordedDocument().asDocument(), reader, rs, () => {});
+    expect(button(record(ru.root), '登録の重複を解消').disabled).toBe(true); ru.dispose(); await reader.dispose();
+    select(s); await apply(s, { body: '別の記録の編集' }); ui.render(); const token = host.read().source!.token;
+    expect(named(root, '重複の解消方法')).toBe(choice); expect(choice.value).toBe('one'); expect(ui.hasChanges()).toBe(true);
+    const confirm = button(root, '登録の重複を解消'); expect(confirm.disabled).toBe(true); confirm.fire('click');
+    expect(host.read().source!.token).toBe(token);
+    button(root, '選択を取り消す').fire('click'); expect(named(root, '重複の解消方法').value).toBe('');
+    expect(ui.hasChanges()).toBe(false); ui.dispose(); await host.dispose();
+  });
+
   it('receives through the mounted control, retains a draft and text candidates, and cold-replays the same source', async () => {
     const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority); select(s);
     await apply(s, { title: '手元のタイトル' });

@@ -2,7 +2,7 @@ import type { WorkspaceFS } from '../../platform/fs';
 import { ProjectMutationCoordinator } from '../../platform/projectLock';
 import { MetadataProjectSession, type MetadataSessionRead } from '../../projectMetadata/session';
 import type { MetadataStorageFactory } from '../../projectMetadata/repository';
-import { technicalId, underWriteLease } from '../../projectMetadata/persistence';
+import { digest, newId, technicalId, underWriteLease } from '../../projectMetadata/persistence';
 import { TransactionJournal } from '../../projectMetadata/journal';
 import { createMetadataFixture, metadataFixtureLimits as limits, metadataProjectView } from './metadataFixture';
 import { MetadataFixtureContent, readMetadataSeed, writeMetadataSeed } from './metadataStorage';
@@ -11,6 +11,7 @@ import { metadataIntent } from './metadataIntent';
 import type { FullMetadataSource } from '../../projectMetadata/remote';
 import { fixtureIds } from './fixture';
 import type { MetadataEdit } from '../../projectMetadata/commands';
+import { readProjectScene } from '../../scene/projectProvider';
 
 export const metadataArea = 'lociview-development-metadata-1';
 export interface MetadataHostOptions {
@@ -83,10 +84,12 @@ export async function openMetadataHost(options: MetadataHostOptions) {
         return ready(await service.retry());
       }),
     };
-    let demoInput: FullMetadataSource | undefined;
-    const demoSource = async (): Promise<FullMetadataSource> => {
-      if (demoInput) return demoInput;
-      const previous = (await journal.entries()).find(e => e.prepared?.remote?.source.packageId === `pkg_${run}`);
+    const demos = new Map<string, FullMetadataSource>();
+    const demoSource = async (kind: 'title' | 'membership'): Promise<FullMetadataSource> => {
+      const cached = demos.get(kind); if (cached) return cached;
+      const packageId = kind === 'title' ? `pkg_${run}` : `pkg_${(await digest(new TextEncoder().encode(`synthetic-membership:${run}`))).slice(0, 32)}`;
+      const previous = (await journal.entries()).find(e => e.prepared?.remote?.source.packageId === packageId);
+      let demoInput: FullMetadataSource;
       if (previous?.prepared?.remote) {
         const descriptor = previous.prepared.remote.source, path = journal.path(previous.start.transactionId, 'source-metadata.am');
         const file = await fs.readStream(path);
@@ -97,16 +100,20 @@ export async function openMetadataHost(options: MetadataHostOptions) {
         demoInput = { packageId: descriptor.packageId, metadataBytes: bytes, proof: previous.start.proof, remoteHeads: descriptor.remoteHeads };
       } else {
         // Branch from the original synthetic seed, not the receiver's edited state.
-        const remote = await seed.prepareCaptionText(seed.token, fixtureIds.shared, 'title', '配布された記録');
-        demoInput = { packageId: `pkg_${run}`, metadataBytes: remote.encodeFullSource(), proof: remote.proof, remoteHeads: remote.heads };
+        const remote = kind === 'title' ? await seed.prepareCaptionText(seed.token, fixtureIds.shared, 'title', '配布された記録') :
+          seed.prepareEdit(seed.token, { kind: 'include', sceneId: fixtureIds.detail, resourceKind: 'caption', resourceId: fixtureIds.second,
+            membershipId: `scm_${newId()}`, orderKey: 'B', eventId: `evt_${newId()}` },
+          await readProjectScene(seed.read(), limits, content.verifier(false)), newId());
+        demoInput = { packageId, metadataBytes: remote.encodeFullSource(), proof: remote.proof, remoteHeads: remote.heads };
       }
+      demos.set(kind, demoInput);
       return demoInput;
     };
-    const receive = (expectedToken: string, input?: FullMetadataSource) => execute(async () => {
+    const receive = (expectedToken: string, input?: FullMetadataSource, demo: 'title' | 'membership' = 'title') => execute(async () => {
       if (authority.readOnly) throw Error('このタブは閲覧専用です。');
-      return ready(await service.receiveFullSource(expectedToken, input ?? await demoSource()));
+      return ready(await service.receiveFullSource(expectedToken, input ?? await demoSource(demo)));
     }, '更新を受け取れません。');
-    const resolve = (expectedToken: string, command: Extract<MetadataEdit, { kind: 'resolveCaptionText' }>) => execute(async () => {
+    const resolve = (expectedToken: string, command: Extract<MetadataEdit, { kind: 'resolveCaptionText' | 'resolveCaptionMembership' }>) => execute(async () => {
       if (authority.readOnly) throw Error('このタブは閲覧専用です。');
       return ready(await service.edit(expectedToken, command));
     }, '競合を解消できません。');

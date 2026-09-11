@@ -12,11 +12,11 @@
 
 2026-09-12 whole-scope inventory: [tasks/implementation-inventory.md](tasks/implementation-inventory.md)
 maps all 41 UI tasks plus accepted Scene/team extensions to 64 work groups:
-19 connected in the synthetic metadata host; 7 component-level gaps, 27 other-path
+19 connected in the synthetic metadata host; 8 component-level gaps, 26 other-path
 connections and 11 new-path implementations remain. These are not completion or
 effort percentages. Approved full-source receive (02 §8) and explicit Caption
-text resolution now have bounded new-service/host paths. Next are independent
-membership copies and the model-update/team loop;
+text resolution and independent Caption membership copies now have bounded
+new-service/host paths. Model copies and the model-update/team loop remain;
 real-file/wire adoption remains separately gated. Latest UI complaints do not set priority.
 
 2026-09-11 current implementation: PO explicitly approved 05 §13.2's S1 service

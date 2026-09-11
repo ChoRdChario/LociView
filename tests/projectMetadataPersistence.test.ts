@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as A from '@automerge/automerge'; // Node-only local Wasm initialization.
 import { MemoryFS, type ProjectMutationAuthority } from '../src/platform/fs';
-import { MetadataProjectSession } from '../src/projectMetadata/session';
+import { MetadataProjectSession, type MetadataSessionRead } from '../src/projectMetadata/session';
 import { MetadataRepository, type MetadataStorageFactory, type MetadataStoragePort } from '../src/projectMetadata/repository';
 import { PersistentContentVerifier, type VerifiedInventoryPort } from '../src/projectMetadata/contentEvidence';
 import { TransactionJournal } from '../src/projectMetadata/journal';
@@ -12,6 +12,8 @@ import type { JsonObject } from '../src/domain/values';
 import { inspectAtomicHistory } from '../src/domain/atomicHistory';
 import { fixture, id, limits as valueLimits } from './helpers/projectRecordsFixture';
 import { developmentContentVerifier } from '../poc/scene-history/content-verifier';
+import { planMetadataEdit, type MetadataEdit } from '../src/projectMetadata/commands';
+import { captionMembershipGroups, type CaptionMembershipResolution } from '../src/projectMetadata/membership';
 
 const limits: MetadataLimits = { ...valueLimits, maxWork: 1_000_000, maxChanges: 100,
   maxChangeBytes: 1_000_000, maxTotalBytes: 4_000_000, maxOperations: 10_000 };
@@ -61,6 +63,133 @@ function textCandidates(source: NonNullable<Awaited<ReturnType<MetadataProjectSe
 }
 const fullSource = (source: ProjectMetadataSource): FullMetadataSource => ({
   packageId: id('pkg'), metadataBytes: source.encodeFullSource(), proof: source.proof, remoteHeads: source.heads,
+});
+function checked(read: MetadataSessionRead) {
+  if (read.provider?.kind !== 'scene-provider') throw Error('Expected a verified provider');
+  return { ...read, provider: read.provider };
+}
+
+async function duplicateCaptionSetup(reverse = false) {
+  const h = setup(), records = h.records as Record<string, any>;
+  records.scenesById[id('scn', 2)] = { id: id('scn', 2), name: '詳細', orderKey: 'B', lifecycle: records.scenesById[id('scn')].lifecycle };
+  records.sceneAssetMembershipsById[id('sam', 2)] = { ...records.sceneAssetMembershipsById[id('sam')], id: id('sam', 2), sceneId: id('scn', 2) };
+  delete records.captionsById[id('cap')].colorSrgb;
+  delete records.captionAttachmentsById[id('att')].altText;
+  records.captionAttachmentsById[id('att', 2)] = { ...records.captionAttachmentsById[id('att')], id: id('att', 2), altText: '後の添付' };
+  const writer = h.session(), first = checked(await writer.create(h.records));
+  const include = (n: number): MetadataEdit => ({ kind: 'include', sceneId: id('scn', 2), resourceKind: 'caption', resourceId: id('cap'),
+    membershipId: id('scm', n), orderKey: 'B', eventId: id('evt', n) });
+  const remote = first.source!.prepareEdit(first.source!.token, include(reverse ? 2 : 3), first.provider!, '1'.repeat(32));
+  const local = await writer.edit(first.source!.token, include(reverse ? 3 : 2));
+  const merged = checked(await writer.receiveFullSource(local.source!.token, fullSource(remote)));
+  const command: CaptionMembershipResolution = { kind: 'resolveCaptionMembership', sceneId: id('scn', 2), captionId: id('cap'),
+    observedMembershipIds: [id('scm', 2), id('scm', 3)], originalMembershipId: id('scm', 2), choice: 'both', eventId: id('evt', 8),
+    copies: [{ sourceMembershipId: id('scm', 3), captionId: id('cap', 8), membershipId: id('scm', 8),
+      attachments: [{ sourceId: id('att'), targetId: id('att', 9) }, { sourceId: id('att', 2), targetId: id('att', 8) }],
+      tags: [{ sourceId: id('tgm'), targetId: id('tgm', 8) }] }] };
+  return { ...h, writer, first, remote, merged, command };
+}
+
+describe('complete-source Caption membership resolution on the metadata service', () => {
+  it.each([false, true])('keeps independent content, anchors, attachments and tags; reverse receive=%s', async reverse => {
+    const h = await duplicateCaptionSetup(reverse), token = h.merged.source!.token, bodies = h.fault.bodies;
+    expect(captionMembershipGroups(h.merged.provider!, limits)).toEqual([{ sceneId: id('scn', 2), captionId: id('cap'), edgeIds: [id('scm', 2), id('scm', 3)] }]);
+    const done = checked(await h.writer.edit(token, h.command)), r = done.provider.details.mutable;
+    expect(done.source!.originalChanges()).toHaveLength(h.merged.source!.originalChanges().length + 1);
+    expect(captionMembershipGroups(done.provider!, limits)).toEqual([]);
+    expect(r.captionsById[id('cap', 8)]!.body).toEqual(r.captionsById[id('cap')]!.body);
+    expect(r.captionsById[id('cap', 8)]!.anchor).toEqual(r.captionsById[id('cap')]!.anchor);
+    expect(r.captionsById[id('cap', 8)]!.colorSrgb).toEqual({ kind: 'value', value: undefined });
+    expect(r.captionAttachmentsById[id('att', 9)]!.altText).toEqual({ kind: 'value', value: undefined });
+    expect(r.captionAttachmentsById[id('att', 8)]!.orderKey).toEqual({ kind: 'value', value: '0000000000002' });
+    expect(r.captionAttachmentsById[id('att', 9)]!.orderKey).toEqual({ kind: 'value', value: '0000000000001' });
+    expect(r.captionTagMembershipsById[id('tgm', 8)]!.tagId).toEqual(r.captionTagMembershipsById[id('tgm')]!.tagId);
+    expect(r.sceneCaptionMembershipsById[id('scm')]).toEqual(h.first.provider!.details.mutable.sceneCaptionMembershipsById[id('scm')]);
+    const edit = async (command: MetadataEdit) => h.writer.edit((await h.writer.read()).source!.token, command);
+    await edit({ kind: 'editCaption', captionId: id('cap', 8), edits: { body: 'コピーだけの本文' } });
+    const anchor = (h.records as Record<string, any>).captionsById[id('cap')].anchor;
+    await edit({ kind: 'movePin', sceneId: id('scn', 2), captionId: id('cap', 8), anchor: { ...anchor, positionAsset: [1, 2, 3] } });
+    await edit({ kind: 'editAttachment', sceneId: id('scn', 2), captionId: id('cap', 8), attachmentId: id('att', 8), field: 'altText', value: 'コピーの説明' });
+    const reopened = checked(await h.session().read());
+    expect(reopened.provider!.details.mutable.captionsById[id('cap')]).toEqual(h.first.provider!.details.mutable.captionsById[id('cap')]);
+    expect(reopened.provider!.details.mutable.captionAttachmentsById[id('att', 2)]).toEqual(h.first.provider!.details.mutable.captionAttachmentsById[id('att', 2)]);
+    expect(reopened.provider!.details.mutable.captionsById[id('cap', 8)]!.body).toEqual({ kind: 'value', value: 'コピーだけの本文' });
+    const files = h.fs.writes;
+    expect((await h.writer.receiveFullSource(reopened.source!.token, fullSource(h.remote))).source!.token).toBe(reopened.source!.token);
+    expect(h.fs.writes).toBe(files); expect(h.fault.bodies).toBe(bodies);
+    const unseen = h.first.source!.prepareEdit(h.first.source!.token, { kind: 'include', sceneId: id('scn', 2), resourceKind: 'caption',
+      resourceId: id('cap'), membershipId: id('scm', 4), orderKey: 'B', eventId: id('evt', 4) }, h.first.provider!, '2'.repeat(32));
+    const later = checked(await h.writer.receiveFullSource(reopened.source!.token, fullSource(unseen)));
+    expect(captionMembershipGroups(later.provider!, limits)[0]!.edgeIds).toEqual([id('scm', 2), id('scm', 4)]);
+    expect(Object.keys(later.provider!.details.mutable.captionsById)).toHaveLength(2);
+  });
+
+  it.each([false, true])('keeps one only after the explicit observed-edge choice; reverse receive=%s', async reverse => {
+    const h = await duplicateCaptionSetup(reverse);
+    const done = checked(await h.writer.edit(h.merged.source!.token, { ...h.command, choice: 'one', copies: [] }));
+    expect(Object.keys(done.provider!.details.mutable.captionsById)).toHaveLength(1);
+    expect(done.provider!.details.mutable.captionsById).toEqual(h.first.provider!.details.mutable.captionsById);
+    expect(captionMembershipGroups(done.provider!, limits)).toHaveLength(0);
+    expect(done.provider!.state.captionMemberships[id('scm', 2)]!.lifecycle).toEqual(
+      { kind: 'value', value: { state: 'active', reason: 'initial', eventId: id('evt', 2) } });
+  });
+
+  it('rejects stale/incomplete choices and missing/colliding child IDs without writes', async () => {
+    const h = await duplicateCaptionSetup(), token = h.merged.source!.token, writes = h.fs.writes, rows = h.fault.writes;
+    const copy = h.command.copies[0]!;
+    for (const command of [{ ...h.command, observedMembershipIds: [id('scm', 2)] },
+      { ...h.command, copies: [{ ...copy, attachments: [] }] }, { ...h.command, copies: [{ ...copy, tags: [] }] },
+      { ...h.command, copies: [{ ...copy, captionId: id('cap') }] },
+      { ...h.command, copies: [{ ...copy, attachments: copy.attachments.map(c => ({ ...c, targetId: id('att', 8) })) }] }])
+      await expect(h.writer.edit(token, command)).rejects.toThrow();
+    await expect(h.writer.edit('stale', h.command)).rejects.toThrow();
+    expect((await h.writer.read()).source!.token).toBe(token); expect(h.fs.writes).toBe(writes); expect(h.fault.writes).toBe(rows);
+  });
+
+  it('cold-recovers the same copy IDs and bytes after publication failure, without a partial copy', async () => {
+    const h = await duplicateCaptionSetup(); h.fs.reject = p => p.endsWith('/published.json');
+    await expect(h.writer.edit(h.merged.source!.token, h.command)).rejects.toThrow();
+    const journal = new TransactionJournal(h.fs, limits), entry = (await journal.entries()).at(-1)!.prepared!;
+    const bytes = await journal.validateParts(entry), pending = checked(await h.session().read());
+    expect(pending.state).toBe('pending'); expect(pending.source!.token).toBe(h.merged.source!.token);
+    expect(Object.keys(pending.provider!.details.mutable.captionsById)).toHaveLength(1);
+    h.fs.reject = () => false; const done = checked(await h.session().retry());
+    expect(done.source!.originalChanges()).toEqual(h.merged.source!.appendOriginal(bytes).originalChanges());
+    expect(Object.keys(done.provider!.details.mutable.captionsById)).toEqual([id('cap'), id('cap', 8)]);
+    expect((await h.session().retry()).source!.token).toBe(done.source!.token);
+  });
+
+  it('does not omit a deleted attachment with a concurrent edit or hide a candidate enumeration limit', async () => {
+    const h = await duplicateCaptionSetup(), first = h.first;
+    const deleted = first.source!.prepareEdit(first.source!.token, { kind: 'deleteAttachment', sceneId: id('scn'), captionId: id('cap'),
+      attachmentId: id('att', 2), eventId: id('evt', 7) }, first.provider, '7'.repeat(32));
+    const edited = first.source!.prepareEdit(first.source!.token, { kind: 'editAttachment', sceneId: id('scn'), captionId: id('cap'),
+      attachmentId: id('att', 2), field: 'altText', value: '同時編集を失わない' }, first.provider, '8'.repeat(32));
+    const concurrent = deleted.appendOriginal(edited.originalChanges());
+    const received = checked(await h.writer.receiveFullSource(h.merged.source!.token, fullSource(concurrent)));
+    expect(received.provider.issues.some(i => i.code === 'concurrent-delete-edit' && i.path[1] === id('att', 2))).toBe(true);
+    const writes = h.fs.writes, token = received.source!.token;
+    await expect(h.writer.edit(token, h.command)).rejects.toThrow(/membership-resolution-delete-edit/);
+    expect(h.fs.writes).toBe(writes); expect((await h.writer.read()).source!.token).toBe(token);
+    expect(() => captionMembershipGroups(received.provider, { ...limits, maxWork: received.provider.inspection.candidates.fields.length + 2 }))
+      .toThrow(/membership-resolution-limit/);
+  });
+
+  it('refuses unknown fields and ambiguous ownership/content from the complete candidates, not the projected DTO', async () => {
+    const h = await duplicateCaptionSetup(), provider = h.merged.provider;
+    for (const [map, name] of [['captionsById', 'body'], ['captionAttachmentsById', 'captionId'], ['captionTagMembershipsById', 'captionId'],
+      ['sceneCaptionMembershipsById', 'captionId']] as const) {
+      const changed = structuredClone(provider), field = changed.inspection.candidates.fields.find(f => f.path[0] === map && f.path[2] === name &&
+        (map !== 'sceneCaptionMembershipsById' || f.path[1] === id('scm', 2)))!;
+      const candidates = field.candidates as unknown as { operationId: string; value: { kind: string; value: unknown } }[];
+      candidates.push({ ...candidates[0]!, operationId: '999@alternate', value: { kind: 'value', value: name === 'captionId' ? id('cap', 99) : '別の本文' } });
+      expect(() => planMetadataEdit(changed, h.command, limits)).toThrow();
+    }
+    const changed = structuredClone(provider), fields = changed.inspection.candidates.fields as unknown as Record<string, unknown>[];
+    fields.push({ ...fields.find(f => (f.path as string[]).join('/') === `captionsById/${id('cap')}/title`)!,
+      path: ['captionsById', id('cap'), 'futureField'], hasUnknownFields: true });
+    expect(() => planMetadataEdit(changed, h.command, limits)).toThrow(/unresolved|unknown/);
+  });
 });
 
 describe('new-workspace metadata persistence service (memory ports, not device/activation evidence)', () => {

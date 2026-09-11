@@ -11,8 +11,10 @@ import { value, type Anchor, type Field, type Membership } from '../scene/types'
 import type { ProjectProviderRead } from '../scene/projectProvider';
 import { fail, type MetadataLimits } from './format';
 import { normalizeCaptionText } from '../domain/captionText';
+import { planCaptionMembershipResolution, type CaptionMembershipResolution } from './membership';
 
 export type MetadataEdit =
+  | CaptionMembershipResolution
   | { kind: 'moveAsset'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject }
   | { kind: 'editCaption'; captionId: string; edits: { title?: string; body?: string; colorSrgb?: readonly number[] } }
   | { kind: 'resolveCaptionText'; captionId: string; field: 'title' | 'body';
@@ -143,6 +145,7 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       (intent.compositing.coverage.policy === 'inherit' && (intent.appearance.opacity ?? 1) < 1)) fail('material-unsupported');
   };
   switch (command.kind) {
+    case 'resolveCaptionMembership': return planCaptionMembershipResolution(provider, command, limits);
     case 'moveAsset': {
       shape(raw, ['kind', 'sceneId', 'assetId', 'expectedBindingId', 'binding']);
       row('scenesById', command.sceneId); row('assetsById', command.assetId);

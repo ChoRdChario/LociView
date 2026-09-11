@@ -7,8 +7,8 @@
 > 41 UI tasks. New metadata source/repository/journal and bounded synthetic UI
 > persistence exist; real-data/ordinary-app adoption and integrated team flow do not.
 > 02 §8 full-source receive and Caption text resolution now have bounded new
-> service/host paths. Next: independent membership copies and saved model-update/
-> team rounds. Latest UI feedback does not
+> service/host paths, now including independent Caption membership copies.
+> Next: saved model-update/team rounds and remaining model copies. Latest UI feedback does not
 > automatically set priority. Old saved-host Desktop PASS remains narrowly scoped.
 > Candidate history/CAS/journal proofs remain partial, not storage adoption or
 > integrated S1 completion. Section 8 owns the current completion map.

@@ -1,5 +1,15 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-12 Caption独立copy接続 (`d229c11`から):** 新metadata service/同じ開発画面で
+> 重複したCaption登録を比較し、明示的に一つ／独立した両方を残せる。
+> 本文・anchor・添付・tag所属の完全候補を使用し、不在の任意fieldも維持。
+> 別Sceneの元記録は変更しない。retryは元bytes/IDs、再受信no-op、未観測edgeは再競合。
+> 独立レビュー指摘を修正済み。検証結果・次sliceはtodo先頭。モデルcopyは未接続。
+> 最終tree: typecheck/build PASS、root 109 files / 1,947 PASS / 21既存TODO。
+> 次は準備済み合成revisionの切替→pin修正→二人の往復。旧run再seedや実データ活性化なし。
+> pushはPOの明示承認後も環境審査で拒否。回避せず、ローカル実装を継続する。
+> 全実用チーム版のgoalは未完了。Browser接続はまだ失敗し、実機合格は追加していない。
+
 > **Current implementation approval (2026-09-12):** PO approved the practical
 > team-candidate plan. M13/M14 stay later; 62 groups define this candidate's scope.
 > Full-source receive under 02 §8 and Caption title/body explicit resolution are

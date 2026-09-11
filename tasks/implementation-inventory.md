@@ -1,7 +1,7 @@
 # 実装・接続の全体棚卸し
 
 > CURRENT INVENTORY / 2026-09-12。全体監査基点: `b73315b851f627ca61029cfb73caf23f6e4829bd`。
-> その後の実装差分: 新metadataの完全履歴受信とCaption文言の明示解消を限定接続。
+> その後の実装差分: 新metadataの完全履歴受信・Caption文言の明示解消・重複Captionの独立コピーを限定接続。
 > 保存・復旧・再受信までの合成テストが通る。実ファイル／実機受入れは未完了。
 > 新しい仕様・採用判断ではない。承認済み要件と現行code/testsの距離を記録する。
 > 実装順は最新のUI指摘順ではなく、依存関係と `TEAM-FLOW-01` への効果から選ぶ。
@@ -21,8 +21,8 @@
 | 排他的な主分類 | 群数 | 意味 |
 |---|---:|---|
 | 接続済み | 19 | 新metadata hostで操作・必要な保存まで接続。既知三角形／2 PNGという限定範囲、実機受入れは別 |
-| 部品未接続 | 7 | 新系統のUI部品・pure planner等はあるが、対象群全体の画面・実データ・typed command／保存のいずれかが未接続。T01/T03は限定接続まで進んだ |
-| 別経路のみ | 27 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
+| 部品未接続 | 8 | 新系統のUI部品・pure planner等はあるが、対象群全体の画面・実データ・typed command／保存のいずれかが未接続。T01/T03/T04は限定接続まで進んだ |
+| 別経路のみ | 26 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
 | 新規実装 | 11 | 新契約の利用者向け経路がまだない。schema・検証・設計案があっても実装済みとは数えない |
 
 - 一つの行は、共有する前提・保存境界を持つ「利用者の作業群」。同一ViewのCRUD等は一群。
@@ -141,7 +141,7 @@
 | T01 | 配布された更新を手元の記録を保って受け取る | 部品未接続 | 新serviceの完全source受信／remote journalと既知合成タイトルのUI受信を接続。手元編集・競合候補・exact retry・cold reopen・再受信no-opを確認。参加者間のモデル更新・要確認との全体接続はM08と同時確認。実ファイルはF01/F02。 | [src/projectMetadata/session.ts](../src/projectMetadata/session.ts) / [src/projectMetadata/remote.ts](../src/projectMetadata/remote.ts) / [tests/projectMetadataPersistence.test.ts](../tests/projectMetadataPersistence.test.ts) |
 | T02 | 元の配布状態を保持し、変更分を繰り返し返す | 別経路のみ | 旧savedの固定base/deltaあり。新serviceのexchange-base記録・source-derived delta／往復・no-op未接続。portable wireはF02。 | [poc/scene-history/development-saved.ts:149](../poc/scene-history/development-saved.ts) / [docs/specs/05-project-scene-team-workflow.md:1064](../docs/specs/05-project-scene-team-workflow.md) |
 | T03 | 同じ項目の競合を比較し、明示的に解消する | 部品未接続 | Caption title/bodyの候補比較→明示選択／手動文言→1変更の保存・cold retryを接続。同値候補も明示解消し、元履歴を保持。他のfield／binding／lifecycle等は未接続。 | [src/harness/projectScene/metadataConflictControls.ts](../src/harness/projectScene/metadataConflictControls.ts) / [src/projectMetadata/commands.ts](../src/projectMetadata/commands.ts) |
-| T04 | 重複所属で片方／両方を選び、独立項目として残す | 別経路のみ | 旧hostのCaption／モデル独立copyあり。新typed resolution、deep remap、依存blobs保持、再受信no-op未接続。 | [src/harness/projectScene/membershipResolution.ts](../src/harness/projectScene/membershipResolution.ts) / [src/harness/projectScene/teamWorkspace.ts:92](../src/harness/projectScene/teamWorkspace.ts) |
+| T04 | 重複所属で片方／両方を選び、独立項目として残す | 部品未接続 | 新service/hostのCaption重複は明示的な元登録選択→片方／独立した両方を接続。本文・anchor・添付・tag所属の完全コピー、optional不在、別Scene不変更、exact retry／cold replayを確認。モデル独立copyとdeep remapは未接続。 | [src/projectMetadata/membership.ts](../src/projectMetadata/membership.ts) / [src/harness/projectScene/metadataMembershipControls.ts](../src/harness/projectScene/metadataMembershipControls.ts) / [tests/projectMetadataPersistence.test.ts](../tests/projectMetadataPersistence.test.ts) |
 
 ### ファイル・移行
 
@@ -263,6 +263,8 @@ Project一覧とCaption削除は必要だが、ユーザーが最後に挙げた
      実データ・通常home・新依存・iPhone/PWA合格。06の未批准delta interfaceは採用しない。
 
 2. **受け取った競合を利用者が解消して、再び編集できるまで（T03/T04）**
+   - 現在: Caption文言と重複Captionの独立copyまで新保存経路で接続済み。
+     モデルcopy、binding/lifecycle等の解消を残す。全T03/T04完了ではない。
    - 目的: 受信できるがreadonlyで行き止まり、という状態を残さない。
    - 完了条件: 同一fieldは候補比較→明示選択／手動編集。重複所属は片方か、
      別々に編集できる独立Caption／モデルを両方保持。

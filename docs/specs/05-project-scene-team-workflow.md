@@ -1598,6 +1598,54 @@ failure/cold retry and continued edit; actual rendering remains the batched lane
 Independent Caption/model copies and non-text conflicts remain the next finite
 commands, not implied by this text-resolution implementation.
 
+**Independent Caption membership resolution implementation (2026-09-12):**
+`resolveCaptionMembership` carries Scene/Caption IDs, the complete observed active
+edge IDs, explicitly selected original edge, `one`/`both`, a fresh event ID and
+the complete source-edge to fresh Caption/edge/attachment/tag-membership ID maps.
+Recompute reservations from complete current candidates, including edges omitted
+from normal projection by duplicate-key review. Unknown/ambiguous endpoints that
+could reach this key block this resolution; unrelated proven-different keys do not.
+Keep-one tombstones only the other observed edges. Keep-both also copies each
+other edge's confirmed Caption content into an independent resource in this Scene.
+
+Copy complete current fields, preserving optional absence. Unknown or unresolved
+copy fields/dependencies fail closed rather than being omitted or copied as a
+materialized winner. Copy active attachments/tag memberships under fresh IDs;
+retain immutable MediaResources, Project tag definitions and exact anchor ownership.
+Preserve attachment ordering, assigning ordered keys only if fresh-ID tie-breaking
+would otherwise change equal-key order. All outputs and graph/content closure
+validate before one local journal publication. Repeated retry uses the original
+generated IDs/bytes; replay adds nothing and a later unseen edge can conflict again.
+
+The same development host exposes a labelled synthetic membership update plus
+comparison/explicit original and keep-one/independent-both choices, showing the
+original's other Scene references before confirmation. Text conflicts must be
+resolved before copy; this command is not scalar keep-both or general duplication.
+Existing memory/old saved sources are evidence only, not implementation imports.
+Reuse saved host/media/failure ports for the new command's acceptance.
+
+**Next bounded prepared-revision implementation (2026-09-12):**
+The already-approved synthetic metadata host may prepare its two known geometry
+versions before initial publication. Active seed Assets remain on the initial
+version; a separate immutable prepared catalog carries the additional revision
+and Representation. In the initialization write lease, retain exact declared
+body bytes/inventory and verify both active and detached updated candidates
+through the existing provider/content verifier, then publish only the initial
+seed. Old seeds/runs must not gain records, bodies or facts by reseeding on reopen.
+
+`activatePreparedRevision` is an explicit local command with Scene/Asset IDs,
+expected current binding, selected stored revision and a fresh manual binding.
+Require exact current resolved ownership/placement and known complete target
+records. Preserve the current asset-to-project transform and every Caption
+anchor/text/attachment/Scene membership; author a fresh binding plus Asset status
+in one original change. Later reads/edits/receive keep new-evidence permission
+disabled: missing target facts fail closed. Reuse existing model choice/confirm
+controls; different compatibility keeps pins needs-review until explicit manual
+correction. Confirm update/cancel, all-Scene effect, pin correction, retry/cold
+reopen and full-source two-party exchange without new body reads or source reset.
+No user-body importer, new wire/delta/base receipt, general revision manager,
+same-surface assertion, content-evidence format change or real-data adoption.
+
 ### 13.3 Approved scheduling exception — validators and UI components (2026-09-08)
 
 The PO explicitly approved advancing storage-neutral data validation and reusable
