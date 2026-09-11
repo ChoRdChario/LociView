@@ -28,6 +28,11 @@ only the other observed edges are tombstoned, not models or Captions. Independen
 known-Mesh copies now remap current closure/material with scoped fresh-record
 facts (05 §13.2), retaining original Caption ownership and other Scenes. Root
 verification is recorded in todo; no general model-profile or real-data adoption.
+Caption anchor/color conflicts now have complete explicit choices in that same
+host. Position comparison is a labelled nonauthoritative preview; optional color
+absence survives causal resolution and ordinary editing. Saved two-person return,
+exact retry/cold recovery and replay are tested; remaining conflict kinds and
+rendered/device acceptance stay open. Next bounded connection is Scene authoring.
 
 2026-09-11 current implementation: PO explicitly approved 05 §13.2's S1 service
 implementation before aggregate adoption, new synthetic-only development activation

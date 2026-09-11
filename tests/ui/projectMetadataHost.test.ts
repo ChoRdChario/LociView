@@ -32,12 +32,14 @@ import { readMetadataModel } from '../../src/harness/projectScene/metadataModelR
 import { metadataProviderReady } from '../../src/projectMetadata/session';
 import { metadataImmutableReader } from '../../src/projectMetadata/records';
 import { assetStatusCandidates } from '../../src/projectMetadata/assetStatus';
+import { captionFieldCandidates } from '../../src/projectMetadata/captionCandidates';
 import { modelClosureKey } from '../../src/harness/projectScene/modelHistory';
 import type { JsonObject } from '../../src/domain/values';
 import { metadataModels } from '../../src/harness/projectScene/metadataFixture';
 import { fixtureMedia, captionAttachments } from '../../src/harness/projectScene/mediaHistory';
 import { RecordedDocument, record, type RecordedNode } from './domRecorder';
 import { createMetadataReceiveControls } from '../../src/harness/projectScene/metadataReceiveControls';
+import type { SyntheticDisplay } from '../../src/harness/projectScene/viewportModel';
 
 class FaultFS extends MemoryFS {
   rejectPublication = false; rejectImage = false; writes = 0;
@@ -117,6 +119,150 @@ async function acknowledge(s: SyntheticSession, action: () => void) {
 
 const fullSource = (source: ProjectMetadataSource, n: number) => ({ packageId: `pkg_${n.toString(16).padStart(32, '0')}`,
   metadataBytes: source.encodeFullSource(), proof: source.proof, remoteHeads: source.heads });
+describe('saved Caption position/color conflict resolution; synthetic ports and recorded DOM only', () => {
+  it('causally resolves absent/absent color candidates once, including exact cold retry and recipient replay', async () => {
+    const h = fixture(), host = await h.open(true), seed = host.read().source!;
+    const receiver = fixture();
+    for (const path of await h.base.list(`${metadataArea}/${h.run}/`)) await receiver.base.writeBytes(path, (await h.base.readBytes(path))!);
+    for (const [key, data] of h.rows) receiver.rows.set(key, data.slice());
+    const [doc] = A.applyChanges(A.init<any>(), seed.originalChanges());
+    const first = A.change(A.clone(doc), d => { delete d.captionsById[f.shared].colorSrgb; });
+    const second = A.change(A.clone(doc), d => { delete d.captionsById[f.shared].colorSrgb; });
+    const merged = seed.appendOriginal([...A.getChanges(doc, first), ...A.getChanges(doc, second)]);
+    const input = fullSource(merged, 921); await host.receive(seed.token, input);
+    const provider = host.read().provider!; if (provider.kind !== 'scene-provider') throw Error('provider');
+    const choices = captionFieldCandidates(provider, f.shared, 'colorSrgb', metadataFixtureLimits);
+    expect(choices).toHaveLength(2); expect(choices.every(c => c.value.kind === 'absent')).toBe(true);
+    h.base.rejectPublication = true;
+    await expect(host.resolve(merged.token, { kind: 'resolveCaptionField', captionId: f.shared,
+      field: 'colorSrgb', operationId: choices[0]!.operationId })).rejects.toThrow();
+    expect(host.read().source!.token).toBe(merged.token);
+    const paths = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.endsWith('.amchange'));
+    const bytes = await Promise.all(paths.map(p => h.base.readBytes(p)));
+    await host.dispose(); h.base.rejectPublication = false;
+    const cold = await h.open(); expect(cold.read().state).toBe('pending'); await cold.authority.retry!();
+    expect(await Promise.all(paths.map(p => h.base.readBytes(p)))).toEqual(bytes);
+    const resolved = cold.read().source!;
+    expect(resolved.originalChanges()).toHaveLength(merged.originalChanges().length + 1);
+    const inspection = await inspectProjectCandidates(resolved.read(), metadataFixtureLimits);
+    if (inspection.kind !== 'project-candidate-inspection') throw Error('inspection');
+    const field = inspection.fields.find(fld => fld.path.join('/') === `captionsById/${f.shared}/colorSrgb`)!;
+    expect(field.candidates).toHaveLength(1); expect(field.candidates[0]!.value).toEqual({ kind: 'absent' });
+    const [physical] = A.applyChanges(A.init<any>(), resolved.originalChanges());
+    expect(Object.hasOwn(physical.captionsById[f.shared], 'colorSrgb')).toBe(false);
+    const count = h.base.writes; await cold.receive(resolved.token, input); expect(h.base.writes).toBe(count);
+    const reopened = await receiver.open();
+    await reopened.receive(seed.token, fullSource(resolved, 922)); expect(reopened.read().source!.heads).toEqual(resolved.heads);
+    const rp = reopened.read().provider!; if (rp.kind !== 'scene-provider') throw Error('provider');
+    expect(rp.details.mutable.captionsById[f.shared]!.colorSrgb).toEqual({ kind: 'value', value: undefined });
+    await reopened.receive(resolved.token, input); expect(reopened.read().source!.heads).toEqual(resolved.heads);
+    await reopened.dispose(); await cold.dispose();
+  });
+
+  it.each(['anchor', 'colorSrgb'] as const)('chooses complete %s candidates, previews without authority, retries and returns editable data', async field => {
+    const a = fixture(), seedHost = await a.open(true); await seedHost.dispose();
+    const b = fixture(); for (const path of await a.base.list(`${metadataArea}/${a.run}/`)) await b.base.writeBytes(path, (await a.base.readBytes(path))!);
+    for (const [key, bytes] of a.rows) b.rows.set(key, bytes.slice());
+    const ah = await a.open(), bh = await b.open(), sa = new SyntheticSession(ah.authority), sb = new SyntheticSession(bh.authority);
+    let display: SyntheticDisplay | undefined;
+    const doc = new RecordedDocument().asDocument(), wa = createDevelopmentWorkspace(doc, sa, { viewportFactory: () => ({
+      update(next) { display = next; }, setActive() {}, read: () => ({ token: 'comparison', ready: true, issue: null, dragging: false,
+        projection: 'perspective', axis: null, pins: [], preview: { x: 20, y: 30, visible: true } }), camera() {}, retry() {}, dispose() {},
+    }) });
+    const wb = createDevelopmentWorkspace(new RecordedDocument().asDocument(), sb);
+    select(sa); select(sb);
+    if (field === 'anchor') { await correctPin(sa, [1, 2, 3]); await correctPin(sb, [3, 2, 1]); }
+    else { await apply(sa, { color: '#334455' }); await apply(sb, { color: '#abcdef' }); }
+    await apply(sa, { body: '手元の本文を保持' });
+    const remote = fullSource(bh.read().source!, 901);
+    await ah.receive(ah.read().source!.token, remote); sa.refreshHistory(); wa.render();
+    const conflicted = ah.read().source!, provider = ah.read().provider!;
+    if (provider.kind !== 'scene-provider') throw Error('provider');
+    const candidates = captionFieldCandidates(provider, f.shared, field, metadataFixtureLimits);
+    expect(candidates).toHaveLength(2);
+    const chosen = candidates[1]!, command = { kind: 'resolveCaptionField' as const, captionId: f.shared, field, operationId: chosen.operationId };
+    const ui = createMetadataReceiveControls(doc, ah, sa, wa.render), root = record(ui.root);
+    const form = named(root, '未解決の候補').children.find(n => descendants(n).some(n => n.textContent.includes(field === 'anchor' ? 'ピン位置' : 'ピンの色')))!;
+    const selectChoice = descendants(form).find(n => n.tag === 'select')!, confirm = button(form, '競合を解消');
+    expect(selectChoice.value).toBe(''); expect(confirm.disabled).toBe(true); expect(sa.captionComparisonPreview).toBeNull();
+    expect(selectChoice.children.some(n => n.value === 'manual')).toBe(false);
+    expect(display!.pins.some(p => p.id === f.shared)).toBe(false);
+    const writes = a.base.writes; setInput(selectChoice, chosen.operationId); wa.render();
+    expect(a.base.writes).toBe(writes); expect(ah.read().source!.token).toBe(conflicted.token);
+    if (field === 'anchor') {
+      expect(display!.preview).toBeDefined(); expect(display!.pinEdit).toBeUndefined();
+      expect(record(wa.root).children.length).toBeGreaterThan(0);
+      const marker = descendants(record(wa.root)).find(n => n.className === 'lv-development-pin-preview')!;
+      expect(marker.textContent).toBe('候補 2（未確定）'); expect(display!.pins.some(p => p.id === f.shared)).toBe(false);
+      button(form, '取り消す').fire('click'); wa.render(); expect(display!.preview).toBeUndefined();
+      const again = named(root, '未解決の候補').children[0]!;
+      setInput(descendants(again).find(n => n.tag === 'select')!, chosen.operationId);
+    }
+    const freshForm = named(root, '未解決の候補').children[0]!;
+    a.base.rejectPublication = true; await acknowledge(sa, () => button(freshForm, '競合を解消').fire('click'));
+    expect(sa.acknowledgment.state).toBe('failed'); expect(ah.read().source!.token).toBe(conflicted.token);
+    const parts = (await a.base.list(`${metadataArea}/${a.run}/`)).filter(p => p.endsWith('.amchange'));
+    const originalParts = await Promise.all(parts.map(p => a.base.readBytes(p)));
+    a.base.rejectPublication = false; await acknowledge(sa, () => { sa.retryWorking(); }); wa.render(); ui.render();
+    expect(sa.acknowledgment.state).toBe('idle'); expect(await Promise.all(parts.map(p => a.base.readBytes(p)))).toEqual(originalParts);
+    const resolved = ah.read().provider!; if (resolved.kind !== 'scene-provider') throw Error('provider');
+    expect(resolved.details.mutable.captionsById[f.shared]![field]).toEqual({ kind: 'value', value: chosen.value.kind === 'value' ? chosen.value.value : undefined });
+    expect(ah.read().source!.originalChanges()).toHaveLength(conflicted.originalChanges().length + 1);
+    expect(sa.snapshot.resources.captions[f.shared]!.body).toEqual({ kind: 'value', value: '手元の本文を保持' });
+    expect(sa.snapshot.state.captionMemberships).toEqual(provider.state.captionMemberships);
+    if (field === 'anchor') await correctPin(sa, [4, 2, 3]); else { select(sa); await apply(sa, { color: '#123456' }); }
+    await bh.receive(bh.read().source!.token, fullSource(ah.read().source!, 902)); sb.refreshHistory();
+    expect(sb.snapshot.resources.captions[f.shared]).toEqual(sa.snapshot.resources.captions[f.shared]);
+    if (field === 'anchor') await correctPin(sb, [5, 2, 3]); else { select(sb); await apply(sb, { color: '#654321' }); }
+    await ah.receive(ah.read().source!.token, fullSource(bh.read().source!, 903)); sa.refreshHistory();
+    const received = ah.read().source!, count = a.base.writes;
+    await ah.receive(received.token, remote); expect(a.base.writes).toBe(count); expect(ah.read().source!.token).toBe(received.token);
+    // A stale command cannot repeat the earlier choice after subsequent edits.
+    await expect(ah.resolve(conflicted.token, command)).rejects.toThrow(); expect(ah.read().state).toBe('ready');
+    const finalHeads = received.heads; ui.dispose(); wa.dispose(); wb.dispose(); await ah.dispose(); await bh.dispose();
+    const cold = await a.open(); expect(cold.read().source!.heads).toEqual(finalHeads); expect(cold.content.counts.bodyBytes).toBe(0); await cold.dispose();
+  }, 30_000);
+
+  it('keeps explicit color absence through save/reopen, resumes editing, and rejects incomplete/lifecycle/stale choices without writes', async () => {
+    const h = fixture(), host = await h.open(true), seed = host.read().source!;
+    const [doc] = A.applyChanges(A.init<any>(), seed.originalChanges());
+    const absent = A.change(A.clone(doc), d => { delete d.captionsById[f.shared].colorSrgb; });
+    const present = A.change(A.clone(doc), d => { d.captionsById[f.shared].colorSrgb = new A.ImmutableString('[0.2,0.4,0.6]'); });
+    const merged = seed.appendOriginal([...A.getChanges(doc, absent), ...A.getChanges(doc, present)]);
+    await host.receive(seed.token, fullSource(merged, 911));
+    const s = new SyntheticSession(host.authority), provider = host.read().provider!; if (provider.kind !== 'scene-provider') throw Error('provider');
+    const candidates = captionFieldCandidates(provider, f.shared, 'colorSrgb', metadataFixtureLimits);
+    const choice = candidates.find(c => c.value.kind === 'absent')!;
+    const command = { kind: 'resolveCaptionField' as const, captionId: f.shared, field: 'colorSrgb' as const, operationId: choice.operationId };
+    const source = host.read().source!, writes = h.base.writes;
+    for (const invalid of [{ ...command, operationId: 'missing' }, { ...command, field: 'title' }, { ...command, captionId: f.second }])
+      await expect(host.resolve(source.token, invalid as typeof command)).rejects.toThrow();
+    const unknownProvider = { ...provider, inspection: { ...provider.inspection, candidates: { ...provider.inspection.candidates,
+      fields: provider.inspection.candidates.fields.map(fld => fld.path.join('/') === `captionsById/${f.shared}/colorSrgb` ? { ...fld, hasUnknownFields: true } : fld) } } };
+    expect(() => source.prepareEdit(source.token, command, unknownProvider, 'c'.repeat(32))).toThrow();
+    const blockedProvider = { ...provider, issues: [...provider.issues, { path: ['captionsById', f.shared], code: 'concurrent-delete-edit', kind: 'review' as const }] };
+    expect(() => source.prepareEdit(source.token, command, blockedProvider, 'c'.repeat(32))).toThrow();
+    const reader = await h.open(); await expect(reader.resolve(source.token, command)).rejects.toThrow(); await reader.dispose();
+    expect(h.base.writes).toBe(writes);
+    await host.resolve(source.token, command); s.refreshHistory(); select(s);
+    const w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s), root = record(w.root);
+    expect(s.snapshot.unsetCaptionColors).toContain(f.shared);
+    expect(s.detailContext().source).toMatchObject({ kind: 'ready', caption: { color: { kind: 'value', value: '' } } });
+    expect(descendants(root).some(n => n.textContent.includes('未設定（標準色で表示）'))).toBe(true);
+    await apply(s, { body: '色を補完しない' });
+    const current = host.read().provider!; if (current.kind !== 'scene-provider') throw Error('provider');
+    expect(current.details.mutable.captionsById[f.shared]!.colorSrgb).toEqual({ kind: 'value', value: undefined });
+    w.dispose(); await host.dispose(); const cold = await h.open(), cs = new SyntheticSession(cold.authority); select(cs);
+    expect(cs.snapshot.unsetCaptionColors).toContain(f.shared);
+    const cw = createDevelopmentWorkspace(new RecordedDocument().asDocument(), cs), cr = record(cw.root);
+    const picker = named(cr, '色を選択'); setInput(picker, '#334455'); setInput(picker, '#a08045');
+    await acknowledge(cs, () => button(cr, '変更を適用').fire('click')); cw.render();
+    expect(cs.acknowledgment.state).toBe('idle'); expect(cs.snapshot.unsetCaptionColors).not.toContain(f.shared);
+    const final = cold.read().provider!; if (final.kind !== 'scene-provider') throw Error('provider');
+    expect(final.details.mutable.captionsById[f.shared]!.colorSrgb).toEqual({ kind: 'value', value: [160 / 255, 128 / 255, 69 / 255] });
+    cw.dispose(); await cold.dispose();
+  });
+});
 async function updateModel(s: SyntheticSession) {
   selectModel(s); const c = s.modelUpdateContext(), version = c.choices[0]!;
   await acknowledge(s, () => { s.acceptModelUpdate({ token: c.token, sceneId: c.sceneId,

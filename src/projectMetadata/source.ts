@@ -121,7 +121,7 @@ export class ProjectMetadataSource {
       // as deletion of only its rivals. Our atomic profile requires a whole-field
       // write: remove all observed values, then set the explicit choice in the
       // SAME change. No intermediate absence is published or saved separately.
-      if (command.kind === 'resolveCaptionText') delete draft.captionsById[command.captionId][command.field];
+      if (command.kind === 'resolveCaptionText' || command.kind === 'resolveCaptionField') delete draft.captionsById[command.captionId][command.field];
       if (command.kind === 'resolveAssetStatus') delete draft.assetsById[command.assetId].status;
       for (const edit of edits) {
         if (edit.map === 'mediaResourcesById' || edit.map === 'assetBindingsById' || edit.map === 'assetRevisionsById' || edit.map === 'representationsById') {
@@ -130,7 +130,15 @@ export class ProjectMetadataSource {
         }
         if (edit.create) draft[edit.map][edit.id] = {};
         for (const [field, value] of Object.entries(edit.fields)) draft[edit.map][edit.id][field] = scalar(value, this.limits);
-        for (const field of edit.remove ?? []) delete draft[edit.map][edit.id][field];
+        for (const field of edit.remove ?? []) {
+          // Concurrent absent/absent candidates have no materialized property.
+          // A bare delete would emit no operation and leave their causal conflict
+          // unresolved. Write then delete in this SAME change; the adapter keeps
+          // its final absent operation, never a displayed or separately saved color.
+          if (command.kind === 'resolveCaptionField' && field === 'colorSrgb')
+            draft[edit.map][edit.id][field] = scalar([0, 0, 0], this.limits);
+          delete draft[edit.map][edit.id][field];
+        }
       }
     });
     return ProjectMetadataSource.validated(doc, this.proof, this.limits);

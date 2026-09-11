@@ -15,11 +15,13 @@ import { planCaptionMembershipResolution, planAssetMembershipResolution, type Ca
 import { metadataImmutableReader } from './records';
 import { assetStatusCandidates } from './assetStatus';
 import { planAssetMembershipCopies } from './modelMembership';
+import { captionFieldCandidates, type CaptionChoiceField } from './captionCandidates';
 
 export type MetadataEdit =
   | CaptionMembershipResolution
   | AssetMembershipResolution
   | { kind: 'resolveAssetStatus'; assetId: string; operationId: string }
+  | { kind: 'resolveCaptionField'; captionId: string; field: CaptionChoiceField; operationId: string }
   | { kind: 'activatePreparedRevision'; sceneId: string; assetId: string; expectedBindingId: string; revisionId: string; binding: JsonObject }
   | { kind: 'moveAsset'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject }
   | { kind: 'editCaption'; captionId: string; edits: { title?: string; body?: string; colorSrgb?: readonly number[] } }
@@ -40,7 +42,7 @@ export type MetadataEdit =
   | { kind: 'createAttachment'; sceneId: string; captionId: string; attachmentId: string; media: JsonObject; orderKey: string; altText: string; eventId: string }
   | { kind: 'editAttachment'; sceneId: string; captionId: string; attachmentId: string; field: 'altText' | 'orderKey'; value: string }
   | { kind: 'deleteAttachment'; sceneId: string; captionId: string; attachmentId: string; eventId: string };
-export interface MetadataRecordEdit { map: MutableRecordMap | 'mediaResourcesById' | 'assetBindingsById' | 'assetRevisionsById' | 'representationsById'; id: string; create: boolean; fields: JsonObject; remove?: readonly 'defaultViewId'[] }
+export interface MetadataRecordEdit { map: MutableRecordMap | 'mediaResourcesById' | 'assetBindingsById' | 'assetRevisionsById' | 'representationsById'; id: string; create: boolean; fields: JsonObject; remove?: readonly ('defaultViewId' | 'colorSrgb')[] }
 type Provider = Extract<ProjectProviderRead, { kind: 'scene-provider' }>;
 const exact = <T>(field: Field<T> | undefined): T => field?.kind === 'value' ? field.value : fail('command-unresolved');
 const json = (v: unknown) => v as JsonValue;
@@ -151,6 +153,15 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       (intent.compositing.coverage.policy === 'inherit' && (intent.appearance.opacity ?? 1) < 1)) fail('material-unsupported');
   };
   switch (command.kind) {
+    case 'resolveCaptionField': {
+      shape(raw, ['kind', 'captionId', 'field', 'operationId']);
+      const candidates = captionFieldCandidates(provider, command.captionId, command.field, limits);
+      const selected = candidates.find(c => c.operationId === command.operationId);
+      if (!selected) return fail('caption-resolution-choice');
+      result.push({ map: 'captionsById', id: command.captionId, create: false,
+        fields: selected.value.kind === 'value' ? { [command.field]: selected.value.value } : {},
+        ...(selected.value.kind === 'absent' ? { remove: ['colorSrgb'] as const } : {}) }); break;
+    }
     case 'resolveAssetStatus': {
       shape(raw, ['kind', 'assetId', 'operationId']);
       const candidates = assetStatusCandidates(provider, command.assetId, limits);

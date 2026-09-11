@@ -209,6 +209,15 @@ export function createViewportHost(document: Document, session: SyntheticSession
       windows.render({ source: session.captionContext().source, memory: session.windowMemory,
         selectedId: session.memory.selectedCaptionId, moveBlock: session.pending ? sceneSwitchReason(session.pending) : null });
       display = syntheticDisplay(session.snapshot, session.sceneId, session.memory.pinColors, session.memory.selectedCaptionId, session.modelPlacementProposal());
+      preview.textContent = '仮の位置';
+      const comparison = session.captionComparisonPreview;
+      if (comparison) {
+        const anchor = comparison.anchor;
+        const owner = anchor.kind === 'asset' ? display.models.find(m => m.binding.assetId === anchor.assetId && m.assetFrame.id === anchor.assetFrameId) : undefined;
+        const position = anchor.kind === 'project' && anchor.projectFrameId === display.projectFrameId ? anchor.positionProject :
+          anchor.kind === 'asset' && owner ? pointInProject(anchor.positionAsset, owner.binding.assetToProject) : undefined;
+        if (position) { display = { ...display, preview: position }; preview.textContent = comparison.label; }
+      }
       const proposed = session.pinPreviewAnchor;
       const owner = proposed?.kind === 'asset' ? display.models.find(m => m.binding.assetId === proposed.assetId) : undefined;
       if (proposed?.kind === 'asset' && owner) {

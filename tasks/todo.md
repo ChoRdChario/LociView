@@ -11,7 +11,68 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — approved S1 service entry (2026-09-11)
 
-#### Current slice — independent model membership copies (from `72a64bd`)
+#### Completed slice — resolve competing Caption positions/colors (from `452cdec`)
+
+Short meta-audit: the previous independent-model-copy slice is committed with
+final tests and independent review. New-service receive/update/copy loops now
+work on known synthetic data. Existing pin/color edits still produce conflicts
+that cannot be cleared in this host; close this user dead end before Scene CRUD.
+
+- [x] Add typed complete-candidate anchor/color selection, including explicit
+  optional color absence, full causal history and active-lifecycle guards.
+- [x] Reuse the current comparison UI and viewport ghost for labelled read-only
+  position inspection; no authoritative pin or initial winner before saving.
+- [x] Verify two participants can choose, resume normal pin/color editing and
+  return changes; exact failed-save/cold retry, replay and stale/unknown refusal.
+  Run the final tree matrix and independent review, then checkpoint.
+
+Target/acceptance: 05 §8 and the finite §13.2 clarification. Existing journal,
+host, text-conflict UI and pin mechanisms are reused. No new PoC or schema,
+unplaced authoring, ownership inference, automatic position correction, wire,
+real-data activation or device claim. Additional field/lifecycle conflicts stay
+visible and are not counted complete by this slice. Stop only for a conflicting
+contract/new authority; human checks stay in the consolidated new-host batch.
+
+Review/result: complete anchor/color candidates now reach the same typed journal
+and comparison UI. Position ghosts are labelled, noninteractive and not saved
+pins. Optional color absence remains absent through text editing, cold reopen
+and return; an explicit color edit is distinguishable from the display fallback.
+Independent review found absent/absent deletion emitted no causal write; the
+limited same-change set/delete fix and cold-retry/recipient regression close it.
+The first new regression had an incorrectly preseeded second test port; corrected
+to an independent clone of the original distribution before receive. No runtime
+guard was relaxed. Final root: 109 files / 1,965 PASS / 21 existing TODO, exit 0
+(134.30 s); typecheck/build/diff-check PASS, unchanged build chunk warnings.
+Independent core/persistence and UI reviews have no remaining mandatory findings.
+No new browser evidence: the earlier initialization failure still leaves raster,
+native input, physical iPhone and offline acceptance pending. No wire or adoption
+claim. Inventory remains 20 connected / 9 partial / 24 other-path / 11 new.
+
+#### Next approved slice — basic Scene authoring (P04/P05)
+
+Target: add create/name/Project-default controls below the existing Caption-tab
+Scene list. This closes a basic workflow gap after saved receive/copy/edit loops,
+not a new mock or Project catalog. Reuse 05 §4.2 and the existing Scene planner.
+
+- [ ] Add typed metadata create/rename/set-default commands, complete source
+  membership checks, and a narrowly scoped project.defaultSceneId header write.
+- [ ] Connect the existing workspace through a metadata-only Scene-authoring
+  capability. Initialize only new Scene local memories on create/receive;
+  preserve existing drafts, selections, windows and camera state.
+- [ ] Verify create → Caption registration → rename/default → save/reopen/team
+  receive with the existing host tests; exact failed-save IDs/bytes, stale and
+  incomplete-source refusal. Run final matrix/review/checkpoint.
+
+Creation copies only the current source Scene's resolved active model membership
+order under fresh IDs, never Caption/material/View/default. Show the consequence
+before confirmation. Ordinary rename/default must not overwrite conflicts.
+IME, pending input, readonly and failure remain visible; successful creation may
+select the new Scene only as a separate local navigation action. No Scene delete,
+reorder/general duplicate, Project catalog/import, unplaced schema, new media,
+wire, real-data/device/adoption expansion. Missing numeric/policy/wire decisions
+stay in the existing approval packet and do not block this approved command work.
+
+#### Completed slice — independent model membership copies (from `72a64bd`)
 
 2026-09-12 continuation from clean `72a64bd`: keep-both now closes the recorded
 root/facts boundary using the existing host, journal and model/material controls.

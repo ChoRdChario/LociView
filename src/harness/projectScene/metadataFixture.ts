@@ -61,6 +61,7 @@ export function metadataProjectView(provider: ProjectProviderRead, images: NonNu
   const projectId = (original.value as JsonObject).projectId;
   if (typeof projectId !== 'string') throw Error('保存したプロジェクトの識別情報を確認できません。');
   const names: Record<string, string> = {}, colors: Record<string, ReturnType<typeof value<string>>> = {};
+  const unsetCaptionColors: string[] = [];
   const captionOwners: Record<string, { assetId: string; assetFrameId: string }> = {}, captionTemplates: Record<string, string> = {};
   for (const [id, row] of Object.entries(provider.details.mutable.assetsById)) {
     if (row.label?.kind === 'value' && typeof row.label.value === 'string') names[id] = row.label.value;
@@ -72,8 +73,11 @@ export function metadataProjectView(provider: ProjectProviderRead, images: NonNu
       captionOwners[id] = { assetId: anchor.value.assetId, assetFrameId: anchor.value.assetFrameId };
     if (row.colorSrgb?.kind === 'value' && Array.isArray(row.colorSrgb.value))
       colors[id] = value(`#${row.colorSrgb.value.map(v => Math.round(Number(v) * 255).toString(16).padStart(2, '0')).join('')}`);
+    else if (row.colorSrgb?.kind === 'value' && row.colorSrgb.value === undefined) {
+      colors[id] = value('#a08045'); unsetCaptionColors.push(id);
+    }
   }
   return freezeSynthetic({ ...initial, projectId, state: provider.state, resources: provider.resources,
-    modelNames: names, colors, captionOwners, captionTemplates, modelVersions: metadataModelVersions(provider, metadataFixtureLimits),
+    modelNames: names, colors, unsetCaptionColors, captionOwners, captionTemplates, modelVersions: metadataModelVersions(provider, metadataFixtureLimits),
     viewData: metadataViewData(provider), materialData: metadataMaterialData(provider), mediaData: metadataMediaData(provider, images) });
 }

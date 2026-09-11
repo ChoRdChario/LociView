@@ -70,6 +70,7 @@ export class SyntheticSession {
   private pinProposal: PinProposal | null = null;
   private pinInputComposing = false;
   private placement: ModelPlacementDraft | null = null;
+  private captionComparison: { token: string; sceneId: string; captionId: string; anchor: Anchor; label: string } | null = null;
   private pinFeedback: PinModeContext['feedback'] = { kind: 'idle' };
   private searchComposing = false;
   private viewportDragging = false;
@@ -128,6 +129,13 @@ export class SyntheticSession {
   }
   get session() { return this.navigation; }
   get sceneId() { return this.navigation.sceneId!; }
+  setCaptionComparison(value: { token: string; captionId: string; anchor: Anchor; label: string } | null) {
+    this.captionComparison = value ? { ...value, sceneId: this.sceneId } : null;
+  }
+  get captionComparisonPreview() {
+    const p = this.captionComparison;
+    return p && p.token === this.project.state.token && p.sceneId === this.sceneId && !this.workingBlock && !this.pinInput && !this.placement ? p : null;
+  }
   get memory() { return this.navigation.sceneMemory[this.sceneId]!; }
   get pending(): PendingInteraction | null {
     const text = this.textPending;
@@ -249,7 +257,7 @@ export class SyntheticSession {
     const sceneIds = new Set(edges.map(e => e.sceneId));
     const count = edges.some(e => e.lifecycle.kind !== 'value') || sceneIds.size !== edges.length
       ? unknown<number>() : value(sceneIds.size);
-    return { ...base, kind: 'ready', caption, sceneCount: count };
+    return { ...base, kind: 'ready', caption: this.project.unsetCaptionColors?.includes(caption.id) ? { ...caption, color: value('') } : caption, sceneCount: count };
   }
   includeContext(): CaptionIncludeContext {
     const { state, resources, colors, modelNames } = this.project;

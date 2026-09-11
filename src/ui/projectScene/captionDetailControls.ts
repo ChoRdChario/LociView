@@ -128,14 +128,15 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
       // Validation errors stay editable; source conflicts/stale baselines stay explicit.
       const unavailable = current?.kind !== 'value';
       control.input.readOnly = owned?.composing !== field && (!owned || unavailable || next.mutationBlock !== null || inFlight || !!next.readonlyFields?.includes(field));
-      control.note.textContent = [issue, raw !== undefined && issue && '入力内容は未適用です。'].filter(Boolean).join(' ');
+      control.note.textContent = [issue, raw !== undefined && issue && '入力内容は未適用です。',
+        field === 'color' && raw === undefined && current?.kind === 'value' && current.value === '' && '未設定（標準色で表示）'].filter(Boolean).join(' ');
       control.note.hidden = !control.note.textContent;
       control.review.hidden = !issue || source.kind !== 'ready';
       control.review.disabled = inFlight || Boolean(owned?.composing);
     }
     const color = fields.get('color')!;
-    picker.hidden = color.input.readOnly || !/^#[0-9a-f]{6}$/i.test(color.input.value);
-    picker.disabled = color.input.readOnly; if (!picker.hidden) picker.value = color.input.value;
+    picker.hidden = color.input.readOnly || color.input.value !== '' && !/^#[0-9a-f]{6}$/i.test(color.input.value);
+    picker.disabled = color.input.readOnly; if (!picker.hidden) picker.value = color.input.value || '#a08045';
     const sceneCount = source.kind === 'ready' && source.sceneCount.kind === 'value' ? source.sceneCount.value : null;
     impact.textContent = sceneCount !== null && Number.isSafeInteger(sceneCount) && sceneCount > 1
       ? `${sceneCount}シーンで共有されています。変更はすべてに反映されます。` : sceneCount === 1 ? '' : '影響するシーンを確認してください。';

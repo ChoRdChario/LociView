@@ -149,7 +149,7 @@ export async function openMetadataHost(options: MetadataHostOptions) {
       if (authority.readOnly) throw Error('このタブは閲覧専用です。');
       return ready(await service.receiveFullSource(expectedToken, input ?? await demoSource(demo)));
     }, '更新を受け取れません。');
-    const resolve = (expectedToken: string, command: Extract<MetadataEdit, { kind: 'resolveCaptionText' | 'resolveCaptionMembership' | 'resolveAssetMembership' | 'resolveAssetStatus' }>) => execute(async () => {
+    const resolve = (expectedToken: string, command: Extract<MetadataEdit, { kind: 'resolveCaptionText' | 'resolveCaptionField' | 'resolveCaptionMembership' | 'resolveAssetMembership' | 'resolveAssetStatus' }>) => execute(async () => {
       if (authority.readOnly) throw Error('このタブは閲覧専用です。');
       return ready(await service.edit(expectedToken, command));
     }, '競合を解消できません。');

@@ -16,6 +16,8 @@ export interface SyntheticProject {
   readonly resources: SceneResources;
   readonly modelNames: Readonly<Record<string, string>>;
   readonly colors: Readonly<Record<string, Field<string>>>;
+  /** UI-only distinction: standard display color is not a persisted color value. */
+  readonly unsetCaptionColors?: readonly string[];
   /** Declared creation root; copied resources still have independent editable cells. */
   readonly captionTemplates: Readonly<Record<string, string>>;
   /** Immutable command-side owner/frame evidence, never a replacement for provider anchors. */

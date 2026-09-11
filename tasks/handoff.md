@@ -1,11 +1,18 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-12 位置・色の競合から再編集へ（`452cdec`から）:** 新metadata hostの同じ比較欄で
+> 完全なanchor/color候補を選び、保存後に通常編集・相手への返送を続けられる。
+> 位置候補は非確定previewのみ。色の不在を保持し、不在同士も明示した因果変更で解消。
+> 独立レビュー指摘を修正済み。最終109 files／1,965 PASS／21既存TODO、型・build PASS。
+> 詳細はtodo先頭。次は承認済みScene作成・名前・開始Sceneを同じUI／保存経路へ接続。
+> 実ブラウザ・実機・offline・通常home／実データ受入れは増えていない。goal全体未完了。
+
 > **2026-09-12 モデル独立copy（`72a64bd`から）:** 同じmetadata hostの「両方残す」で
 > 現在の既知Mesh・配置・materialをfresh IDへ完全remap。元Captionと他Sceneは不変更。
 > コピー同士の配置／material編集、二人二巡、exact retry／cold reopenを確認。
 > 初期seedの所有者取り違え回帰を修正済み。最終root 109 files／1,961 PASS／21既存TODO、
 > typecheck/build・独立レビュー完了。正確な範囲と失敗／修正履歴はtodo先頭。
-> 次は既存ピン位置／色競合の明示解消→再編集の行き止まりを閉じ、その後Scene基本管理。
+> 当時の次sliceだったピン位置／色競合は先頭記録を参照。現在はScene基本管理へ進む。
 > 実ブラウザ初期化は失敗。実入力・実機・offline・通常home／実データの受入れなし。
 
 > **以前のkeep-one checkpoint（`53d7692`から）:** 新metadataの同じ受信欄で

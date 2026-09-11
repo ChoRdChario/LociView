@@ -141,7 +141,7 @@
 |---|---|---|---|---|
 | T01 | 配布された更新を手元の記録を保って受け取る | 部品未接続 | 新serviceの完全source受信／remote journalと合成タイトル／登録のUI受信を接続。準備済みモデル切替・手元本文保持・要確認・明示補正の二人二巡を保存ポートで確認。モデル交換の通常UI／実ファイルは未接続、F01/F02参照。 | [src/projectMetadata/session.ts](../src/projectMetadata/session.ts) / [src/projectMetadata/remote.ts](../src/projectMetadata/remote.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
 | T02 | 元の配布状態を保持し、変更分を繰り返し返す | 部品未接続 | 新serviceの完全source往復は原履歴を保持し二巡・no-op・中断復旧・再開まで確認。専用exchange-base記録・source-derived deltaは未接続。旧savedの固定base/deltaを流用済みとはしない。portable wireはF02、06の批准境界を維持。 | [src/projectMetadata/session.ts](../src/projectMetadata/session.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) / [docs/specs/06-project-package-wire.md](../docs/specs/06-project-package-wire.md) |
-| T03 | 同じ項目の競合を比較し、明示的に解消する | 部品未接続 | Caption title/bodyの明示選択／手動文言と、既知ready-model statusの全候補比較／明示選択を1変更の保存・cold retryへ接続。元履歴・Captionを保持、後着更新は再競合。他のfield／lifecycle等は未接続。 | [src/harness/projectScene/metadataConflictControls.ts](../src/harness/projectScene/metadataConflictControls.ts) / [src/harness/projectScene/metadataAssetStatusControls.ts](../src/harness/projectScene/metadataAssetStatusControls.ts) / [src/projectMetadata/commands.ts](../src/projectMetadata/commands.ts) |
+| T03 | 同じ項目の競合を比較し、明示的に解消する | 部品未接続 | Caption title/bodyの明示選択／手動文言、anchor/colorの完全候補選択（任意色の不在保持）、既知ready-model status比較を1変更の保存・cold retryへ接続。位置は非確定の比較表示、解消後は通常編集と再送が可能。元履歴・Captionを保持、後着更新は再競合。他field／lifecycle等は未接続。 | [src/harness/projectScene/metadataConflictControls.ts](../src/harness/projectScene/metadataConflictControls.ts) / [src/harness/projectScene/metadataAssetStatusControls.ts](../src/harness/projectScene/metadataAssetStatusControls.ts) / [src/projectMetadata/commands.ts](../src/projectMetadata/commands.ts) |
 | T04 | 重複所属で片方／両方を選び、独立項目として残す | 部品未接続 | Captionの完全独立copyとモデルkeep-oneに加え、既知Meshのfresh root／完全ID remap／Scene material copyを接続。元Caption・他Scene不変更、コピーの独立配置／material編集と二人二巡、exact retry／cold reopenを確認。最終結果はtodo先頭。一般Point/GS/Proxy等のcopy closure・実ファイル／実機は未完了。 | [src/projectMetadata/membership.ts](../src/projectMetadata/membership.ts) / [src/projectMetadata/modelMembership.ts](../src/projectMetadata/modelMembership.ts) / [src/harness/projectScene/metadataMembershipControls.ts](../src/harness/projectScene/metadataMembershipControls.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
 
 ### ファイル・移行
@@ -264,8 +264,8 @@ Project一覧とCaption削除は必要だが、ユーザーが最後に挙げた
      実データ・通常home・新依存・iPhone/PWA合格。06の未批准delta interfaceは採用しない。
 
 2. **受け取った競合を利用者が解消して、再び編集できるまで（T03/T04）**
-   - 現在: Caption文言と重複Caption／既知Meshの独立copy、モデルstatusを限定接続。
-     次は既存Caption位置／色の競合から再編集へ戻る経路。他field／lifecycle、
+   - 現在: Caption文言・位置・色の競合から再編集、重複Caption／既知Meshの独立copy、
+     モデルstatusを限定接続。次はScene作成・名称・開始Sceneの基本管理。他field／lifecycle、
      一般model profile等を残し、全T03/T04完了ではない。
    - 目的: 受信できるがreadonlyで行き止まり、という状態を残さない。
    - 完了条件: 同一fieldは候補比較→明示選択／手動編集。重複所属は片方か、

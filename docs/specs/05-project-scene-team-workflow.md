@@ -1624,6 +1624,37 @@ resolved before copy; this command is not scalar keep-both or general duplicatio
 Existing memory/old saved sources are evidence only, not implementation imports.
 Reuse saved host/media/failure ports for the new command's acceptance.
 
+**Caption position/color resolution implementation boundary (2026-09-12):**
+Under §8 the existing metadata host may select a complete `anchor` or `colorSrgb`
+candidate with exact source token, Caption ID, field and candidate operation ID.
+Require complete valid known candidates and active unambiguous Caption lifecycle;
+delete/edit ambiguity is not a field-resolution action. Preserve optional color
+absence as absence, not a default value. Use one original causal change after all
+observed candidates, even when the chosen value equals the library's winner.
+Keep other fields, attachments, Scene membership and original history unchanged.
+For absent/absent color candidates, the pinned adapter must still emit a causal
+field write: set a valid scalar then delete it inside the same change. Only the
+final absent write is projected; original bytes retain both operations. A bare
+delete or an empty change is not resolution. In the existing synthetic host,
+resolved absence uses its existing standard color for display only, with a
+separate unset marker. Ordinary text edits must not persist that display color;
+explicit color input must remain distinguishable from absence.
+
+Position choice preserves the complete authored owner/frame/revision/class and
+optional evidence; it does not combine coordinates or infer a model relation.
+An older authored compatibility class may remain needs-review after selection.
+Existing manual pin correction handles the next user action, not resolution.
+Only a labelled noninteractive preview may show a candidate in the existing
+viewport before confirmation, with the current exact visible owner's transform.
+If its frame/owner is not available, explain why no preview is shown. Preview
+does not switch Scene, reveal a hidden model, alter camera or become a saved pin.
+
+Reuse existing comparison and saved-host tests for explicit/no-default choice,
+full candidate/absence retention, stale/unknown/lifecycle refusal, same-original
+save retry/cold reopen, normal editing after resolution and two-person return/
+replay. No new ProjectAnchor/unplaced authoring, general re-anchor or schema,
+new wire/body input, separate PoC or intermediate human gate is included.
+
 **Model membership resolution implementation boundary (2026-09-12):**
 The model-membership keep-one command follows §8 independently of keep-both:
 `resolveAssetMembership` carries Scene/Asset, all observed active edge IDs,

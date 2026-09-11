@@ -30,6 +30,10 @@ Model membership keep-one and known-Mesh independent keep-both now share the
 saved host: complete nominal-ID remap, retained original Caption ownership,
 scoped new-record facts and independent placement/material. Final evidence is
 in todo; no general model-copy, wire or real-file acceptance is implied.
+The same host also resolves complete Caption anchor/color candidates, preserving
+optional absence and the authored anchor. Read-only position preview does not
+publish a winner. Normal editing/return resumes after saved resolution; evidence
+and remaining conflict/UI-device boundaries are recorded in todo and the inventory.
 
 ## Classification
 
