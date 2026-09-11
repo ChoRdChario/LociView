@@ -8,6 +8,7 @@ import { modelHistorySeed, projectModelHistory } from './modelHistory';
 import { projectViewHistory, viewHistorySeed } from './viewHistory';
 import { projectMaterialHistory } from './materialHistory';
 import { mediaSeed, projectMediaHistory } from './mediaHistory';
+import type { SceneAuthoringCommand } from '../../scene/commands';
 
 export const captionKey = (id: string, field: 'title' | 'body' | 'color' | 'anchor' | 'template' | 'identity') => `caption/${id}/${field}`;
 export const bindingKey = (id: string) => `asset/${id}/binding`;
@@ -148,10 +149,11 @@ export function projectHistory(snapshot: HistorySnapshot, previous?: HistorySnap
 export interface SyntheticAuthority {
   readonly storage?: 'saved-development';
   readonly writeScope?: 'caption-text';
-  readonly capabilities?: Readonly<{ pins: boolean; membership: boolean; color: boolean; views?: boolean; materials?: boolean; media?: boolean; placement?: boolean; preparedRevision?: boolean }>;
+  readonly capabilities?: Readonly<{ pins: boolean; membership: boolean; color: boolean; views?: boolean; materials?: boolean; media?: boolean; placement?: boolean; preparedRevision?: boolean; sceneAuthoring?: boolean }>;
   readonly readOnly?: boolean;
   read(): SyntheticProject;
   write(token: string, changes: Readonly<Record<string, string>>, context?: { sceneId: string }): WorkingResult<SyntheticProject>;
+  authorScene?(token: string, command: SceneAuthoringCommand): WorkingResult<SyntheticProject>;
   status?(): Readonly<{ kind: 'idle' | 'checking' | 'failed'; error?: string }>;
   retry?(): WorkingResult<SyntheticProject>;
 }

@@ -11,6 +11,7 @@ import { createCaptionIncludeControls } from '../../ui/projectScene/captionInclu
 import { createViewportHost, type ViewportFactory } from './viewportHost';
 import { createMaterialControls } from '../../ui/projectScene/materialControls';
 import { createMediaControls } from './mediaControls';
+import { createSceneAuthoringControls } from './sceneAuthoringControls';
 
 /** One mounted integration host. Components own their DOM; synthetic session owns all working/UI state. */
 export function createDevelopmentWorkspace(document: Document, session = new SyntheticSession(),
@@ -54,6 +55,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   let disposed = false;
   const afterAction = () => { render(); options.onAction?.(); };
   const navigation = createNavigationControls(document, plan => { session.acceptNavigation(plan); afterAction(); });
+  const sceneAuthoring = createSceneAuthoringControls(document, session, afterAction);
   const list = createCaptionListControls(document, plan => {
     const accepted = session.acceptList(plan); afterAction();
     if (accepted && plan.kind === 'change' && plan.intent === 'select') list.revealSelected();
@@ -86,7 +88,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   materialPanel.replaceChildren(material.root);
   const limited = make('p', 'この保存経路ではマテリアルの編集は未接続です。');
   materialPanel.append(limited); limited.hidden = !session.materialRestriction || session.readOnly;
-  sidebar.append(navigation.taskControl, navigation.sceneControl, navigation.sceneContext, pin.actions, pinHelp,
+  sidebar.append(navigation.taskControl, navigation.sceneControl, sceneAuthoring.root, navigation.sceneContext, pin.actions, pinHelp,
     list.root, windowActions, editor, include.root, modelList.root, placement.actions, modelUpdate.root, materialPanel, viewPanel);
   content.append(stage, sidebar); root.append(header, notice, working, message, content, footer);
   function render() {
@@ -106,7 +108,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     const listOkay = list.render(captionContext);
     const modelsOkay = modelList.render(session.modelContext());
     const materialOkay = material.render(session.materialContext());
-    media.render();
+    media.render(); sceneAuthoring.render();
     const pinsOkay = pin.render(session.pinContext()), includeOkay = include.render(session.includeContext()); coordinates.render(); modelUpdate.render(); placement.render();
     if (!detailOkay || !listOkay || !modelsOkay || !pinsOkay || !includeOkay || !materialOkay) {
       message.textContent = '入力中の状態を保持しています。操作を完了してから切り替えてください。';
@@ -116,6 +118,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
       save: !session.savedDevelopment ? { kind: 'unsaved' } : session.acknowledgment.state === 'checking' ? { kind: 'saving' } :
         session.workingBlock ? { kind: 'recovery', message: '' } : { kind: session.pending ? 'unsaved' : 'saved' } });
     const task = session.session.task;
+    sceneAuthoring.root.hidden = task !== 'captions' || !session.sceneAuthoringAvailable;
     editor.hidden = windowActions.hidden = navigation.sceneControl.hidden = pin.actions.hidden = task !== 'captions';
     navigation.sceneContext.hidden = task === 'captions';
     numeric.hidden = !session.pinCoordinates;

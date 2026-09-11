@@ -91,7 +91,7 @@ export async function openMetadataHost(options: MetadataHostOptions) {
     }
     const authority: SyntheticAuthority = {
       storage: 'saved-development', writeScope: 'caption-text',
-      capabilities: { pins: true, membership: true, color: true, views: true, materials: true, media: true, placement: true, preparedRevision: true },
+      capabilities: { pins: true, membership: true, color: true, views: true, materials: true, media: true, placement: true, preparedRevision: true, sceneAuthoring: true },
       get readOnly() { return fs.mutationAuthority.accessState !== 'editable' || closed; },
       read: () => { if (!last.provider) throw Error('保存した画面はまだありません。'); return metadataProjectView(last.provider, content.images); },
       status: () => ({ kind: busy ? 'checking' : failure || last.state !== 'ready' ? 'failed' : 'idle', error: failure || '未完了の保存があります。' }),
@@ -99,6 +99,11 @@ export async function openMetadataHost(options: MetadataHostOptions) {
         if (authority.readOnly) throw Error('このタブは閲覧専用です。');
         return ready(await service.edit(token, metadataIntent(changes, authority.read(), context)));
       }, '変更を適用できません。'),
+      authorScene: (token, command) => execute(async () => {
+        if (authority.readOnly) throw Error('このタブは閲覧専用です。');
+        if (!['createScene', 'renameScene', 'setDefaultScene'].includes(command.kind)) throw Error('シーンの操作を確認してください。');
+        return ready(await service.edit(token, command));
+      }, 'シーンを変更できません。'),
       retry: () => execute(async () => {
         if (authority.readOnly) throw Error('このタブは閲覧専用です。');
         const before = await service.read();

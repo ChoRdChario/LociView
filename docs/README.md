@@ -34,6 +34,10 @@ The same host also resolves complete Caption anchor/color candidates, preserving
 optional absence and the authored anchor. Read-only position preview does not
 publish a winner. Normal editing/return resumes after saved resolution; evidence
 and remaining conflict/UI-device boundaries are recorded in todo and the inventory.
+Basic Scene authoring is also connected: model-membership-only creation,
+explicit name/default commands, saved reopen and received Scene local-state
+initialization. Existing UI memory and source Scenes are preserved. The inventory
+counts P04/P05 only in the synthetic metadata path, not real-file/device acceptance.
 
 ## Classification
 

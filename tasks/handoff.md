@@ -1,10 +1,19 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-12 Scene基本管理（`468d9ea`から）:** Captionタブの「シーンを管理」から
+> 作成・改名・開始Scene設定を新metadata保存へ接続。作成は元Sceneのモデル所属のみ、
+> fresh ID／順序保持。Caption・material・View・defaultはコピーしない。
+> 相手からの新Scene受信で既存入力／windowを保持。保存中断の同一ID／bytes復旧も確認。
+> 最終root 109 files／1,969 PASS／21既存TODO、型・build・独立レビューPASS。
+> 棚卸し22接続／7部分／24別経路／11新規。実データ・描画・実機・offlineの追加受入れなし。
+> 次はC10 Caption全Project削除の確認UIと原子的tombstone。todoが次の有限境界を所有する。
+> 06の全5用途批准前にS2を活性化しないことを明記。仕様批准／実データ採用は未実施。
+
 > **2026-09-12 位置・色の競合から再編集へ（`452cdec`から）:** 新metadata hostの同じ比較欄で
 > 完全なanchor/color候補を選び、保存後に通常編集・相手への返送を続けられる。
 > 位置候補は非確定previewのみ。色の不在を保持し、不在同士も明示した因果変更で解消。
 > 独立レビュー指摘を修正済み。最終109 files／1,965 PASS／21既存TODO、型・build PASS。
-> 詳細はtodo先頭。次は承認済みScene作成・名前・開始Sceneを同じUI／保存経路へ接続。
+> 当時の次だったScene基本管理は先頭記録を参照。現在の次はtodoを参照。
 > 実ブラウザ・実機・offline・通常home／実データ受入れは増えていない。goal全体未完了。
 
 > **2026-09-12 モデル独立copy（`72a64bd`から）:** 同じmetadata hostの「両方残す」で

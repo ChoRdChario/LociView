@@ -2,7 +2,8 @@
 
 > CURRENT INVENTORY / 2026-09-12。全体監査基点: `b73315b851f627ca61029cfb73caf23f6e4829bd`。
 > その後の実装差分: 新metadataの完全履歴受信・Caption文言の明示解消・重複Captionの独立コピー、
-> 準備済みモデル切替とpin修正の保存・二人二巡、モデルstatusの明示解消、既知Mesh独立copyを限定接続。
+> 準備済みモデル切替とpin修正の保存・二人二巡、モデルstatus・Caption位置／色の明示解消、
+> 既知Mesh独立copy、Scene作成・名前／開始Sceneの設定を限定接続。
 > 保存・復旧・再受信までの合成テストが通る。実ファイル／実機受入れは未完了。
 > 新しい仕様・採用判断ではない。承認済み要件と現行code/testsの距離を記録する。
 > 実装順は最新のUI指摘順ではなく、依存関係と `TEAM-FLOW-01` への効果から選ぶ。
@@ -15,14 +16,14 @@
 ## 1. 結論と数え方
 
 ユーザーが行う作業を **64機能群** に整理すると、新metadata保存画面へ限定接続済みが
-**20群**、残りが **44群**。その44群は下記の内訳になる。
-「20/64完成」といった完成率・工数には換算しない。小さい部品接続と
-移行／チーム受信では仕事量が大きく違い、接続済み20群も合成データ限定だからである。
+**22群**、残りが **42群**。その42群は下記の内訳になる。
+「22/64完成」といった完成率・工数には換算しない。小さい部品接続と
+移行／チーム受信では仕事量が大きく違い、接続済み22群も合成データ限定だからである。
 
 | 排他的な主分類 | 群数 | 意味 |
 |---|---:|---|
-| 接続済み | 20 | 新metadata hostで操作・必要な保存まで接続。既知三角形／2 PNGという限定範囲、実機受入れは別 |
-| 部品未接続 | 9 | 新系統のUI部品・pure planner等はあるが、対象群全体の画面・実データ・typed command／保存のいずれかが未接続。T01〜T04は限定接続まで進んだ |
+| 接続済み | 22 | 新metadata hostで操作・必要な保存まで接続。既知三角形／2 PNGという限定範囲、実機受入れは別 |
+| 部品未接続 | 7 | 新系統のUI部品・pure planner等はあるが、対象群全体の画面・実データ・typed command／保存のいずれかが未接続。T01〜T04は限定接続まで進んだ |
 | 別経路のみ | 24 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
 | 新規実装 | 11 | 新契約の利用者向け経路がまだない。schema・検証・設計案があっても実装済みとは数えない |
 
@@ -45,7 +46,7 @@
 |---|---|---|
 | 通常home → Native | 実モデル／画像、DisplaySet、限定backup／collaboration／review／clean、旧Desktop・iPhone合格 | 新ProjectScene／継続因果履歴／新保存サービスの完成 |
 | project-scene memory／旧 `storage=saved` | 合成の2人チーム、更新・競合・独立copy・保存の限定ループ | 新metadata serviceまたは実ファイル製品wireの接続済み |
-| project-scene `storage=metadata` | 新source/repository/session/journalと20群の合成UI接続、限定履歴受信・明示解消 | 任意モデル／任意画像／実ファイルのチーム受信／通常home／offlineの合格 |
+| project-scene `storage=metadata` | 新source/repository/session/journalと22群の合成UI接続、限定履歴受信・明示解消 | 任意モデル／任意画像／実ファイルのチーム受信／通常home／offlineの合格 |
 
 ## 2. 全機能群
 
@@ -59,8 +60,8 @@
 | P01 | 実ファイルから新しいProjectを作る | 別経路のみ | 通常homeは内容判定→Native作成。新hostは固定合成runのみ。一般ファイルのadmission・初期Scene・body保存が必要。 | [src/ui/app.ts:635](../src/ui/app.ts) / [src/harness/projectScene/entry.ts:19](../src/harness/projectScene/entry.ts) / [tests/nativeGs/homeUi.test.ts:196](../tests/nativeGs/homeUi.test.ts) |
 | P02 | 端末内Projectを選択・切替・再開 | 別経路のみ | 新hostは正確なrun URLで再開。専用Project一覧／切替と、その離脱flowへの既存未保存保護の接続がない。開発mode切替確認・beforeunload自体は既存。 | [src/harness/projectScene/workspace.ts:23](../src/harness/projectScene/workspace.ts) / [src/harness/projectScene/entry.ts:57](../src/harness/projectScene/entry.ts) |
 | P03 | Scene選択と4タブの移動 | 接続済み | Caption上部のSceneリスト。検索・選択等はScene別UI状態。共有編集と分離。 | [src/ui/projectScene/navigationControls.ts:23](../src/ui/projectScene/navigationControls.ts) / [tests/ui/projectSceneNavigation.test.ts:36](../tests/ui/projectSceneNavigation.test.ts) |
-| P04 | Sceneを作る | 部品未接続 | core plannerはある。UI・typed metadata commandなし。元Sceneのモデル所属だけ複写する契約。 | [src/scene/commands.ts:102](../src/scene/commands.ts) / [tests/sceneCore.test.ts:151](../tests/sceneCore.test.ts) |
-| P05 | Scene名・Project開始Sceneを設定する | 部品未接続 | core rename/setDefaultのみ。操作UIと新保存commandなし。entry Saved Viewとは別。 | [src/scene/commands.ts:11](../src/scene/commands.ts) / [tests/sceneCore.test.ts:208](../tests/sceneCore.test.ts) |
+| P04 | Sceneを作る | 接続済み | CaptionタブのScene管理から作成し、新metadataへ保存。元Sceneの確定モデル所属だけを順序保持・fresh IDで複写。Caption/material/View/defaultはコピーせず、不完全sourceは拒否。 | [src/harness/projectScene/sceneAuthoringControls.ts](../src/harness/projectScene/sceneAuthoringControls.ts) / [src/projectMetadata/sceneAuthoring.ts](../src/projectMetadata/sceneAuthoring.ts) |
+| P05 | Scene名・Project開始Sceneを設定する | 接続済み | 同じScene管理UIから明示確定して新metadata保存。名前／default競合は通常操作で上書きしない。開始Sceneは次回起動に使い、現在Scene選択やentry Saved Viewとは別。 | [src/projectMetadata/sceneAuthoring.ts](../src/projectMetadata/sceneAuthoring.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
 | P06 | 既存CaptionをSceneへ追加／外す | 接続済み | 同じCaptionを参照。本文・他Scene・添付を保持。Project全体削除ではない。 | [src/ui/projectScene/captionIncludeControls.ts:38](../src/ui/projectScene/captionIncludeControls.ts) / [tests/ui/projectMetadataHost.test.ts:535](../tests/ui/projectMetadataHost.test.ts) |
 | P07 | 閲覧と編集を選んで開く | 別経路のみ | 新hostのロックによるread-onlyは利用者の閲覧モードではない。reviewを編集する場合の独立Project化も未接続。 | [src/harness/projectScene/workspace.ts:51](../src/harness/projectScene/workspace.ts) / [docs/specs/06-project-package-wire.md:24](../docs/specs/06-project-package-wire.md) |
 
@@ -265,7 +266,7 @@ Project一覧とCaption削除は必要だが、ユーザーが最後に挙げた
 
 2. **受け取った競合を利用者が解消して、再び編集できるまで（T03/T04）**
    - 現在: Caption文言・位置・色の競合から再編集、重複Caption／既知Meshの独立copy、
-     モデルstatusを限定接続。次はScene作成・名称・開始Sceneの基本管理。他field／lifecycle、
+     モデルstatusを限定接続。Scene作成・名称・開始Sceneの基本管理も接続。他field／lifecycle、
      一般model profile等を残し、全T03/T04完了ではない。
    - 目的: 受信できるがreadonlyで行き止まり、という状態を残さない。
    - 完了条件: 同一fieldは候補比較→明示選択／手動編集。重複所属は片方か、

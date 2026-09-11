@@ -124,6 +124,9 @@ export class ProjectMetadataSource {
       if (command.kind === 'resolveCaptionText' || command.kind === 'resolveCaptionField') delete draft.captionsById[command.captionId][command.field];
       if (command.kind === 'resolveAssetStatus') delete draft.assetsById[command.assetId].status;
       for (const edit of edits) {
+        if (edit.map === 'project') {
+          draft.project.defaultSceneId = scalar(edit.fields.defaultSceneId, this.limits); continue;
+        }
         if (edit.map === 'mediaResourcesById' || edit.map === 'assetBindingsById' || edit.map === 'assetRevisionsById' || edit.map === 'representationsById') {
           if (!edit.create) fail('immutable-replacement');
           draft[edit.map][edit.id] = scalar(edit.fields, this.limits); continue;

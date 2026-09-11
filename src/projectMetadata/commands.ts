@@ -1,11 +1,11 @@
-import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
+import { cloneCanonicalValue, normalizeSceneName, type JsonObject, type JsonValue } from '../domain/values';
 import { checkMutableField, checkMutableRecord, type MutableRecordMap } from '../domain/projectMutableFields';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { checkProjectRecord } from '../domain/projectRecords';
 import { list, object, same } from '../domain/projectGraphSupport';
 import { validateMaterialIntent } from '../domain/materialIntent';
 import { projectMaterialRoutes } from '../scene/projectMaterialRoutes';
-import { planSceneCommand } from '../scene/commands';
+import { planSceneCommand, type SceneAuthoringCommand } from '../scene/commands';
 import { resolveScene } from '../scene/resolve';
 import { value, type Anchor, type Field, type Membership } from '../scene/types';
 import type { ProjectProviderRead } from '../scene/projectProvider';
@@ -16,8 +16,10 @@ import { metadataImmutableReader } from './records';
 import { assetStatusCandidates } from './assetStatus';
 import { planAssetMembershipCopies } from './modelMembership';
 import { captionFieldCandidates, type CaptionChoiceField } from './captionCandidates';
+import { planSceneAuthoring } from './sceneAuthoring';
 
 export type MetadataEdit =
+  | SceneAuthoringCommand
   | CaptionMembershipResolution
   | AssetMembershipResolution
   | { kind: 'resolveAssetStatus'; assetId: string; operationId: string }
@@ -43,6 +45,7 @@ export type MetadataEdit =
   | { kind: 'editAttachment'; sceneId: string; captionId: string; attachmentId: string; field: 'altText' | 'orderKey'; value: string }
   | { kind: 'deleteAttachment'; sceneId: string; captionId: string; attachmentId: string; eventId: string };
 export interface MetadataRecordEdit { map: MutableRecordMap | 'mediaResourcesById' | 'assetBindingsById' | 'assetRevisionsById' | 'representationsById'; id: string; create: boolean; fields: JsonObject; remove?: readonly ('defaultViewId' | 'colorSrgb')[] }
+export type MetadataWrite = MetadataRecordEdit | { map: 'project'; id: 'defaultSceneId'; create: false; fields: { defaultSceneId: string } };
 type Provider = Extract<ProjectProviderRead, { kind: 'scene-provider' }>;
 const exact = <T>(field: Field<T> | undefined): T => field?.kind === 'value' ? field.value : fail('command-unresolved');
 const json = (v: unknown) => v as JsonValue;
@@ -50,14 +53,18 @@ const shape = (v: JsonObject, keys: string[]) => {
   if (Object.keys(v).sort().join(',') !== keys.sort().join(',')) fail('command-shape');
 };
 export function canonicalMetadataEdit(input: MetadataEdit, limits: MetadataLimits): MetadataEdit {
+  if ((input?.kind === 'createScene' || input?.kind === 'renameScene') && typeof input.name === 'string')
+    input = { ...input, name: normalizeSceneName(input.name) };
   if (input?.kind === 'resolveCaptionText' && input.choice?.kind === 'manual' && typeof input.choice.text === 'string')
     input = { ...input, choice: { ...input.choice, text: normalizeCaptionText(input.field, input.choice.text) } };
   return cloneCanonicalValue(input, limits) as unknown as MetadataEdit;
 }
 
 /** Plan only from the Session's fresh verified provider. Not a generic patch/import API. */
-export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits: MetadataLimits): readonly MetadataRecordEdit[] {
+export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits: MetadataLimits): readonly MetadataWrite[] {
   const command = canonicalMetadataEdit(input, limits), raw = command as unknown as JsonObject;
+  if (command.kind === 'createScene' || command.kind === 'renameScene' || command.kind === 'setDefaultScene')
+    return planSceneAuthoring(provider, command, limits);
   const c = new ProjectRecordFields(), result: MetadataRecordEdit[] = [];
   const row = (map: MutableRecordMap, id: string) => {
     const r = provider.details.mutable[map][id];

@@ -1624,6 +1624,34 @@ resolved before copy; this command is not scalar keep-both or general duplicatio
 Existing memory/old saved sources are evidence only, not implementation imports.
 Reuse saved host/media/failure ports for the new command's acceptance.
 
+**Scene authoring implementation boundary (2026-09-12):**
+The same metadata development host may expose §4.2 create, rename and explicit
+Project-default commands. Each carries an exact metadata token and typed intent,
+not a UI-to-storage patch. Creation names the current source Scene, fresh Scene
+and membership IDs and lifecycle event. Check complete source membership
+candidates, including unprojectable endpoints, before calling the existing Scene
+planner. Unknown or conflicting source membership never becomes a partial copy.
+Persist only the new Scene and its active Asset edges in one original change.
+Rename checks the exact active Scene and resolved name. Set-default checks the
+exact active target and resolved Project default; write only project.defaultSceneId
+through a dedicated header edit, preserving all other Project header fields.
+
+Use compact controls below the Caption-tab Scene selector. Creation explains
+that the Scene's models are inherited but Captions are not. Scene names are
+explicit nonempty input. Pending/composing input, stale selection, readonly and
+failed saves retain their existing guards. Allocate fresh IDs once per confirmed
+command and reuse original bytes for retry. After publication, initialize local
+memories only for newly observed Scenes, including received Scenes; preserve all
+existing Scene memories. Successful creation may select the new Scene through
+local navigation, never by changing the Project default. Default changes do not
+switch the current Scene; a cold open follows §4.1, with no inferred fallback.
+
+Reuse Scene core and metadata-host tests: create, register a Caption, rename,
+set-default, reopen and two-party receive; untouched source/other resources,
+stable copied membership order, original-ID/byte retry and incomplete/stale/
+conflicting-source rejection. No Scene delete/reorder/general-duplicate UI,
+new Project catalog, real-file activation, new schema/wire or device credit.
+
 **Caption position/color resolution implementation boundary (2026-09-12):**
 Under §8 the existing metadata host may select a complete `anchor` or `colorSrgb`
 candidate with exact source token, Caption ID, field and candidate operation ID.

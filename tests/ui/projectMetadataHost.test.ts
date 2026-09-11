@@ -119,6 +119,144 @@ async function acknowledge(s: SyntheticSession, action: () => void) {
 
 const fullSource = (source: ProjectMetadataSource, n: number) => ({ packageId: `pkg_${n.toString(16).padStart(32, '0')}`,
   metadataBytes: source.encodeFullSource(), proof: source.proof, remoteHeads: source.heads });
+describe('saved Scene authoring; synthetic ports and recorded DOM only', () => {
+  const sceneUI = (s: SyntheticSession) => {
+    const w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s), r = named(record(w.root), 'シーンの管理');
+    return { w, r, name: () => named(r, 'シーン名'),
+      begin(label: string) { button(r, label).fire('click'); },
+      async apply(label: string) { await acknowledge(s, () => button(r, label).fire('click')); w.render(); },
+    };
+  };
+  it('creates a named Scene, registers Captions, renames/sets default and exchanges without resetting local memory', async () => {
+    const a = fixture(), ah = await a.open(true), seed = ah.read().source!, original = ah.authority.read();
+    const b = fixture(); for (const path of await a.base.list(`${metadataArea}/${a.run}/`)) await b.base.writeBytes(path, (await a.base.readBytes(path))!);
+    for (const [key, bytes] of a.rows) b.rows.set(key, bytes.slice());
+    const bh = await b.open(), sa = new SyntheticSession(ah.authority), sb = new SyntheticSession(bh.authority);
+    const ui = sceneUI(sa), ub = sceneUI(sb); select(sb);
+    const windows = sb.windowMemory, memory = sb.memory;
+    const detail = sb.detailContext(); sb.acceptDetail({ kind: 'draft', baseDraft: detail.draft!,
+      draft: editCaptionDraft(detail.draft!, detail.source, 'body', '受信前の入力') });
+    ui.begin('シーンを作成'); expect(sa.pending).toBe('text'); expect(button(ui.r, '作成').disabled).toBe(true);
+    setInput(ui.name(), '  Cafe\u0301  '); await ui.apply('作成');
+    expect(sa.acknowledgment.state).toBe('idle'); const id = sa.sceneId;
+    expect(id).not.toBe(f.overview); expect(sa.snapshot.state.scenes[id]!.name).toEqual({ kind: 'value', value: '  Café  ' });
+    expect(sa.snapshot.state.defaultSceneId).toEqual(original.state.defaultSceneId);
+    expect(sa.snapshot.state.scenes[f.overview]).toEqual(original.state.scenes[f.overview]);
+    expect(sa.composition.assets.map(a => a.assetId)).toEqual([f.structure, f.equipment]);
+    expect(sa.composition.captions).toHaveLength(0); expect(sa.snapshot.resources).toMatchObject({ captions: original.resources.captions, views: original.resources.views, materials: original.resources.materials });
+    expect(sa.snapshot.state.scenes[id]!.defaultViewId).toEqual({ kind: 'value', value: null });
+    expect(sa.snapshot.state.captionMemberships).toEqual(original.state.captionMemberships);
+    sa.acceptInclude(planCaptionInclude(sa.includeContext(), { kind: 'select', captionId: f.shared }));
+    await acknowledge(sa, () => { sa.acceptInclude(planCaptionInclude(sa.includeContext(), { kind: 'include' })); });
+    expect(sa.composition.captions.map(c => c.captionId)).toEqual([f.shared]);
+    ui.begin('名前を変更'); setInput(ui.name(), '共同確認'); await ui.apply('変更');
+    ui.begin('開始シーンにする'); await ui.apply('設定');
+    expect(sa.snapshot.state.defaultSceneId).toEqual({ kind: 'value', value: id });
+    expect(sa.sceneId).toBe(id);
+    const changed = ah.read().source!; await bh.receive(seed.token, fullSource(changed, 931)); sb.refreshHistory(); ub.w.render();
+    expect(sb.sceneId).toBe(f.overview); expect(sb.windowMemory).toBe(windows); expect(sb.memory).toBe(memory);
+    expect(sb.detailContext().draft?.edits.body).toBe('受信前の入力');
+    sb.acceptDetail({ kind: 'cancel', draft: sb.detailContext().draft! });
+    expect(sb.acceptNavigation(planNavigation(sb.snapshot.state, sb.session, sb.pending, { kind: 'scene', sceneId: id }))).toBe(true);
+    ub.w.render(); expect(sb.captionContext().source.kind).toBe('ready'); expect(sb.windowMemory.sceneId).toBe(id);
+    ub.begin('名前を変更'); setInput(ub.name(), '参加者から返送'); await ub.apply('変更');
+    await ah.receive(changed.token, fullSource(bh.read().source!, 932)); sa.refreshHistory(); ui.w.render();
+    expect(sa.snapshot.state.scenes[id]!.name).toEqual({ kind: 'value', value: '参加者から返送' });
+    const heads = ah.read().source!.heads, writes = a.base.writes;
+    await ah.receive(ah.read().source!.token, fullSource(changed, 931)); expect(a.base.writes).toBe(writes);
+    ui.w.dispose(); ub.w.dispose(); await ah.dispose(); await bh.dispose();
+    const cold = await a.open(), cs = new SyntheticSession(cold.authority);
+    expect(cold.read().source!.heads).toEqual(heads); expect(cs.sceneId).toBe(id); expect(cs.composition.captions).toHaveLength(1);
+    await cold.dispose();
+  }, 30_000);
+
+  it('retains composing/stale Scene input and exact new IDs across failed publication and cold recovery', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority), ui = sceneUI(s);
+    const before = host.read().source!; ui.begin('シーンを作成'); setInput(ui.name(), '保存する確認');
+    ui.name().fire('compositionstart'); expect(s.pending).toBe('composition'); expect(button(ui.r, '作成').disabled).toBe(true);
+    expect(s.acceptNavigation(planNavigation(s.snapshot.state, s.session, s.pending, { kind: 'scene', sceneId: f.detail }))).toBe(false);
+    expect(s.applySceneAuthoring()).toBe(false); expect(host.read().source!.token).toBe(before.token);
+    ui.name().fire('compositionend'); h.base.rejectPublication = true; await ui.apply('作成');
+    expect(s.acknowledgment.state).toBe('failed'); expect(s.sceneId).toBe(f.overview); expect(s.sceneAuthoringDraft!.name).toBe('保存する確認');
+    expect(Object.keys(s.snapshot.state.scenes)).toHaveLength(2);
+    const paths = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.endsWith('.amchange'));
+    const bytes = await Promise.all(paths.map(p => h.base.readBytes(p)));
+    ui.w.dispose(); await host.dispose(); h.base.rejectPublication = false;
+    const cold = await h.open(); expect(cold.read().state).toBe('pending'); await cold.authority.retry!();
+    expect(await Promise.all(paths.map(p => h.base.readBytes(p)))).toEqual(bytes);
+    const cs = new SyntheticSession(cold.authority), ci = sceneUI(cs);
+    expect(Object.keys(cs.snapshot.state.scenes)).toHaveLength(3); expect(cs.sceneId).toBe(f.overview);
+    const count = cold.read().source!.originalChanges().length;
+    ci.begin('名前を変更'); setInput(ci.name(), '保持する名前');
+    const current = cold.read().source!, remote = await current.prepareCaptionText(current.token, f.shared, 'body', '同時受信');
+    await cold.receive(current.token, fullSource(remote, 933)); cs.refreshHistory(); ci.w.render();
+    expect(ci.name().value).toBe('保持する名前'); expect(button(ci.r, '変更').disabled).toBe(true);
+    expect(cs.applySceneAuthoring()).toBe(false); expect(cold.read().source!.originalChanges()).toHaveLength(count + 1);
+    button(ci.r, '取り消す').fire('click'); expect(cs.pending).toBeNull();
+    const readonly = await h.open(), rs = new SyntheticSession(readonly.authority), ri = sceneUI(rs);
+    expect(button(ri.r, 'シーンを作成').disabled).toBe(true); expect(rs.beginSceneAuthoring('create')).toBe(false);
+    ri.w.dispose(); await readonly.dispose(); ci.w.dispose(); await cold.dispose();
+  }, 30_000);
+
+  it('rejects ambiguous raw memberships and conflicting name/default without writes, and preserves equal-key source order', async () => {
+    const h = fixture(), host = await h.open(true), source = host.read().source!, provider = host.read().provider!;
+    if (provider.kind !== 'scene-provider') throw Error('provider');
+    const command = { kind: 'createScene' as const, sceneId: `scn_${'d'.repeat(32)}`, sourceSceneId: f.overview, activeSceneId: f.overview,
+      name: '新しい確認', orderKey: 'Z', membershipIds: [`sam_${'e'.repeat(32)}`, `sam_${'d'.repeat(32)}`], eventId: `evt_${'e'.repeat(32)}` };
+    const writes = h.base.writes;
+    for (const invalid of [{ ...command, activeSceneId: f.detail }, { ...command, name: '  ' }, { ...command, name: '不正\n改行' },
+      { ...command, sceneId: f.overview }, { ...command, membershipIds: [command.membershipIds[0]!, command.membershipIds[0]!] },
+      { ...command, membershipIds: [] }, { ...command, extra: true }])
+      await expect(host.authority.authorScene!(source.token, invalid)).rejects.toThrow();
+    await expect(host.authority.authorScene!('stale', command)).rejects.toThrow();
+    expect(h.base.writes).toBe(writes); expect(host.read().state).toBe('ready');
+    const [doc] = A.applyChanges(A.init<any>(), source.originalChanges());
+    const changed = (fn: (d: any) => void) => source.appendOriginal(A.getChanges(doc, A.change(A.clone(doc), fn)));
+    const read = (s: ProjectMetadataSource) => readProjectScene(s.read(), metadataFixtureLimits, host.content.verifier(false));
+    const sam = Object.values(provider.state.assetMemberships).find(e => e.sceneId === f.overview)!.id;
+    const one = changed(d => { d.sceneAssetMembershipsById[sam].sceneId = new A.ImmutableString(JSON.stringify(f.detail)); });
+    const two = changed(d => { delete d.sceneAssetMembershipsById[sam].sceneId; d.sceneAssetMembershipsById[sam].sceneId = new A.ImmutableString(JSON.stringify(f.overview)); });
+    const ambiguous = one.appendOriginal(two.originalChanges()), ap = await read(ambiguous);
+    expect(() => ambiguous.prepareEdit(ambiguous.token, command, ap, 'c'.repeat(32))).toThrow();
+    const unknown = changed(d => { d.sceneAssetMembershipsById[sam].future = new A.ImmutableString('true'); }), up = await read(unknown);
+    expect(() => unknown.prepareEdit(unknown.token, command, up, 'c'.repeat(32))).toThrow();
+    for (const field of ['name', 'default'] as const) {
+      const branch = (value: string) => changed(d => {
+        if (field === 'name') d.scenesById[f.overview].name = new A.ImmutableString(JSON.stringify(value));
+        else { delete d.project.defaultSceneId; d.project.defaultSceneId = new A.ImmutableString(JSON.stringify(value)); }
+      });
+      const conflict = branch(field === 'name' ? '名前1' : f.overview).appendOriginal(branch(field === 'name' ? '名前2' : f.detail).originalChanges());
+      const cp = await read(conflict), edit = field === 'name' ? { kind: 'renameScene' as const, sceneId: f.overview, name: '自動選択しない' } :
+        { kind: 'setDefaultScene' as const, sceneId: f.overview };
+      expect(() => conflict.prepareEdit(conflict.token, edit, cp, 'c'.repeat(32))).toThrow();
+    }
+    const equalOrder = changed(d => { for (const edge of Object.values(d.sceneAssetMembershipsById) as any[])
+      if (edge.sceneId.toString() === JSON.stringify(f.overview)) edge.orderKey = new A.ImmutableString('"A"'); });
+    const ep = await read(equalOrder); if (ep.kind !== 'scene-provider') throw Error('provider');
+    const expected = Object.values(ep.state.assetMemberships).filter(e => e.sceneId === f.overview).sort((a, b) => a.id < b.id ? -1 : 1).map(e => e.resourceId);
+    const created = equalOrder.prepareEdit(equalOrder.token, command, ep, 'c'.repeat(32)), cp = await read(created);
+    if (cp.kind !== 'scene-provider') throw Error('provider');
+    const copied = Object.values(cp.state.assetMemberships).filter(e => e.sceneId === command.sceneId)
+      .sort((a, b) => (a.orderKey as { value: string }).value < (b.orderKey as { value: string }).value ? -1 : 1);
+    expect(copied.map(e => e.resourceId)).toEqual(expected); expect(copied[0]!.orderKey).not.toEqual(copied[1]!.orderKey);
+    expect(cp.state.defaultSceneId).toEqual(ep.state.defaultSceneId); expect(cp.state.captionMemberships).toEqual(ep.state.captionMemberships);
+    await host.dispose();
+  });
+
+  it('ends an existing Scene IME draft after readonly transition without allowing any metadata write', async () => {
+    const h = fixture(), host = await h.open(true); let readOnly = false;
+    const s = new SyntheticSession({ ...host.authority, get readOnly() { return readOnly; } }), ui = sceneUI(s);
+    ui.begin('シーンを作成'); setInput(ui.name(), '入力'); ui.name().fire('compositionstart');
+    const token = host.read().source!.token, writes = h.base.writes;
+    readOnly = true; ui.w.render(); ui.name().value = '入力完了'; ui.name().fire('compositionend');
+    expect(s.sceneAuthoringDraft).toMatchObject({ name: '入力完了', composing: false });
+    expect(button(ui.r, '作成').disabled).toBe(true); expect(s.applySceneAuthoring()).toBe(false);
+    expect(button(ui.r, '取り消す').disabled).toBe(false); button(ui.r, '取り消す').fire('click');
+    expect(s.sceneAuthoringDraft).toBeNull(); expect(host.read().source!.token).toBe(token); expect(h.base.writes).toBe(writes);
+    ui.w.dispose(); await host.dispose();
+  });
+});
+
 describe('saved Caption position/color conflict resolution; synthetic ports and recorded DOM only', () => {
   it('causally resolves absent/absent color candidates once, including exact cold retry and recipient replay', async () => {
     const h = fixture(), host = await h.open(true), seed = host.read().source!;

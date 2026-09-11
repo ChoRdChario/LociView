@@ -12,7 +12,8 @@
 > ports. Known ready-model status conflicts now have explicit comparison/selection.
 > Known-Mesh independent model copies and Caption position/color conflict choices
 > now connect to that saved loop; read-only previews never select an authority.
-> Next: Scene create/name/default; other scalar/lifecycle conflicts, exchange-base/delta and
+> Scene create/name/default now connect to the saved host and local Scene memories.
+> Next: confirmed Project-wide Caption deletion; other scalar/lifecycle conflicts, exchange-base/delta and
 > real-data adoption retain their gates. Latest UI feedback does not
 > automatically set priority. Old saved-host Desktop PASS remains narrowly scoped.
 > Explicit model membership keep-one now saves only the other observed edge's

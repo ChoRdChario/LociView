@@ -11,6 +11,11 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — approved S1 service entry (2026-09-11)
 
+Current next decision (2026-09-12): the Scene authoring slice below is verified.
+Proceed with approved C10 confirmed Project-wide Caption deletion in the same
+host; do not replay completed position/color or Scene work. Real-data/06/07/
+device adoption is still gated, and the complete practical-team goal stays open.
+
 #### Completed slice — resolve competing Caption positions/colors (from `452cdec`)
 
 Short meta-audit: the previous independent-model-copy slice is committed with
@@ -48,18 +53,18 @@ No new browser evidence: the earlier initialization failure still leaves raster,
 native input, physical iPhone and offline acceptance pending. No wire or adoption
 claim. Inventory remains 20 connected / 9 partial / 24 other-path / 11 new.
 
-#### Next approved slice — basic Scene authoring (P04/P05)
+#### Completed slice — basic Scene authoring (P04/P05, from `468d9ea`)
 
 Target: add create/name/Project-default controls below the existing Caption-tab
 Scene list. This closes a basic workflow gap after saved receive/copy/edit loops,
 not a new mock or Project catalog. Reuse 05 §4.2 and the existing Scene planner.
 
-- [ ] Add typed metadata create/rename/set-default commands, complete source
+- [x] Add typed metadata create/rename/set-default commands, complete source
   membership checks, and a narrowly scoped project.defaultSceneId header write.
-- [ ] Connect the existing workspace through a metadata-only Scene-authoring
+- [x] Connect the existing workspace through a metadata-only Scene-authoring
   capability. Initialize only new Scene local memories on create/receive;
   preserve existing drafts, selections, windows and camera state.
-- [ ] Verify create → Caption registration → rename/default → save/reopen/team
+- [x] Verify create → Caption registration → rename/default → save/reopen/team
   receive with the existing host tests; exact failed-save IDs/bytes, stale and
   incomplete-source refusal. Run final matrix/review/checkpoint.
 
@@ -71,6 +76,40 @@ select the new Scene only as a separate local navigation action. No Scene delete
 reorder/general duplicate, Project catalog/import, unplaced schema, new media,
 wire, real-data/device/adoption expansion. Missing numeric/policy/wire decisions
 stay in the existing approval packet and do not block this approved command work.
+
+Review/result: Caption-tab Scene management now connects create/name/default to
+the new service. Creation copies the exact resolved active model memberships
+only; the source Scene, Captions, Views, materials and default remain unchanged.
+Successful creation navigates locally after publication. Explicit default is
+used on cold open and does not change another participant's current Scene.
+Newly created/received Scenes initialize local memories without resetting
+existing drafts/windows. Names follow the existing NFC/whitespace-preservation
+contract, not an invented trim policy (the initial test expectation was corrected).
+Independent UI review found readonly transitions could strand an existing IME
+composition; local composition-end/text retention/cancel now works with zero
+metadata writes. Core and final UI reviews have no remaining mandatory findings.
+Final root: 109 files / 1,969 PASS / 21 existing TODO, exit 0 (136.56 s);
+typecheck/build/diff-check PASS with unchanged build chunk warnings. Four saved
+Scene tests cover receive/return, original IDs/bytes across cold recovery,
+raw ambiguous/unknown membership refusal, name/default conflicts and equal-key
+membership order. No new browser, native-input, iPhone or offline evidence.
+Inventory is now 22 connected / 7 partial / 24 other-path / 11 new (64 groups),
+not completion percentages. P04/P05 are connected only in the synthetic host.
+
+Parallel wire review: 06 §10 now makes the existing complete five-purpose
+ratification-before-first-S2-byte boundary explicit. Workspace/Contribution
+implementation can precede backup/review/clean only after that full ratification.
+Raw-model Project creation need not wait for all legacy recipes. Exact profile/
+wire, measured budgets/output sink, base/delta receipts, history-free policy,
+initial migration artifacts and late-input evidence remain one approval packet;
+none is ratified by the current Scene work. Corrected 06's placement vector to
+distinguish whole-Anchor selection from independent membership keep-both.
+
+Next: C10 confirmed Project-wide Caption deletion, not merely Scene exclusion.
+Reuse raw candidate/reference guards and the same journal; write a complete
+observed tombstone set atomically, retain original history and model/media bytes,
+and keep unseen later edits/edges explicit. Record the finite command/UI plan
+before implementation; no unplaced schema or destructive filesystem cleanup.
 
 #### Completed slice — independent model membership copies (from `72a64bd`)
 

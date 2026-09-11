@@ -1,7 +1,7 @@
-import { planSceneCommand, previewScenePlan } from '../../scene/commands';
-import { chooseStartupScene, resolveScene } from '../../scene/resolve';
+import { planSceneCommand, previewScenePlan, type SceneAuthoringCommand } from '../../scene/commands';
+import { chooseStartupScene, resolveScene, memberships } from '../../scene/resolve';
 import { value, type Anchor, type Composition, type Field } from '../../scene/types';
-import { navigationPlanIsCurrent, type NavigationPlan, type NavigationSession, type PendingInteraction,
+import { navigationPlanIsCurrent, planNavigation, type NavigationPlan, type NavigationSession, type PendingInteraction,
   type SceneUiMemory } from '../../ui/projectScene/navigationState';
 import { captionListPlanIsCurrent, captionListView, planCaptionList, type CaptionListContext, type CaptionListItem,
   type CaptionListPlan } from '../../ui/projectScene/captionListState';
@@ -22,7 +22,7 @@ import { newPinModeMemory, pinActionIssue, pinModePlanIsCurrent, planPinMode, ty
 import { captionIncludePlanIsCurrent, newCaptionIncludeMemory, type CaptionIncludeContext,
   type CaptionIncludeMemory, type CaptionIncludePlan } from '../../ui/projectScene/captionIncludeState';
 import { SyntheticViewSession } from './viewSession';
-import { projectViewHistory, viewHistorySeed } from './viewHistory';
+import { projectViewHistory, viewHistorySeed, orderBetween } from './viewHistory';
 import { SyntheticMaterialSession } from './materialSession';
 import { projectMaterialHistory } from './materialHistory';
 import type { MaterialPlan } from '../../ui/projectScene/materialState';
@@ -37,6 +37,8 @@ export interface SyntheticPinInput {
   readonly coordinates: readonly [string, string, string]; readonly familyId: string | null;
 }
 export interface ModelUpdatePlan { readonly token: string; readonly sceneId: string; readonly assetId: string; readonly bindingId: string }
+export interface SceneAuthoringDraft { readonly kind: 'create' | 'rename' | 'default'; readonly token: string;
+  readonly sceneId: string; readonly name: string; readonly composing: boolean }
 export interface ModelPlacementDraft {
   readonly token: string; readonly sceneId: string; readonly assetId: string; readonly source: FixtureModelClosure;
   readonly coordinates: readonly [string, string, string]; readonly composing: boolean; readonly prepared?: FixtureModelClosure;
@@ -71,6 +73,7 @@ export class SyntheticSession {
   private pinInputComposing = false;
   private placement: ModelPlacementDraft | null = null;
   private captionComparison: { token: string; sceneId: string; captionId: string; anchor: Anchor; label: string } | null = null;
+  private sceneDraft: SceneAuthoringDraft | null = null;
   private pinFeedback: PinModeContext['feedback'] = { kind: 'idle' };
   private searchComposing = false;
   private viewportDragging = false;
@@ -103,6 +106,47 @@ export class SyntheticSession {
   get mediaRestriction() { return this.readOnly || !this.authority?.capabilities?.media ? this.editingRestriction : null; }
   get placementRestriction() { return this.readOnly || !this.authority?.capabilities?.placement ? this.editingRestriction : null; }
   get modelUpdateRestriction() { return this.readOnly || !this.authority?.capabilities?.preparedRevision ? this.editingRestriction : null; }
+  get sceneAuthoringAvailable() { return !!this.authority?.capabilities?.sceneAuthoring && !!this.authority.authorScene; }
+  get sceneAuthoringDraft() { return this.sceneDraft; }
+  beginSceneAuthoring(kind: SceneAuthoringDraft['kind']): boolean {
+    if (!this.sceneAuthoringAvailable || this.readOnly || this.pending) return this.refuse('入力を確定してからシーンを編集してください。');
+    const current = this.project.state.scenes[this.sceneId]!;
+    if (kind === 'rename' && current.name.kind !== 'value' || kind === 'default' && this.project.state.defaultSceneId.kind !== 'value')
+      return this.refuse('シーンの競合を先に解消してください。');
+    this.sceneDraft = { kind, token: this.project.state.token, sceneId: this.sceneId,
+      name: kind === 'create' ? '' : current.name.kind === 'value' ? current.name.value : '', composing: false };
+    this.message = ''; return true;
+  }
+  editSceneAuthoring(name: string, composing = this.sceneDraft?.composing ?? false) {
+    // A lease/readonly change must not strand local IME state or its final text.
+    if (this.sceneDraft && (!this.workingBlock && !this.readOnly || this.sceneDraft.composing && !composing))
+      this.sceneDraft = { ...this.sceneDraft, name, composing };
+  }
+  cancelSceneAuthoring() {
+    if (!this.workingBlock && !this.sceneDraft?.composing) { this.sceneDraft = null; this.message = ''; }
+  }
+  applySceneAuthoring(): boolean {
+    const d = this.sceneDraft;
+    if (!d || d.composing || !this.sceneAuthoringAvailable || this.readOnly || this.workingBlock || this.pending !== 'text') return false;
+    if (d.token !== this.project.state.token || d.sceneId !== this.sceneId) return this.refuse('内容が更新されています。入力を保持しています。取り消して選び直してください。');
+    try {
+      let command: SceneAuthoringCommand;
+      if (d.kind === 'create') {
+        const issues: import('../../scene/types').Issue[] = [];
+        const edges = memberships(this.project.state, this.project.state.assetMemberships, d.sceneId, this.project.resources.assets, issues);
+        if (issues.length) throw Error('モデルの登録を確認してからシーンを作成してください。');
+        const keys = Object.values(this.project.state.scenes).filter(s => s.lifecycle.kind !== 'value' || s.lifecycle.value.state !== 'deleted')
+          .map(s => { if (s.orderKey.kind !== 'value') throw Error('シーンの順序を確認してください。'); return s.orderKey.value; }).sort();
+        command = { kind: 'createScene', sceneId: fresh('scn'), sourceSceneId: d.sceneId, activeSceneId: this.sceneId,
+          name: d.name, orderKey: orderBetween(keys.at(-1) ?? null, null), membershipIds: edges.map(() => fresh('sam')), eventId: fresh('evt') };
+      } else command = d.kind === 'rename' ? { kind: 'renameScene', sceneId: d.sceneId, name: d.name } : { kind: 'setDefaultScene', sceneId: d.sceneId };
+      return this.applyWorking(() => afterWorking(this.authority!.authorScene!(d.token, command), next => this.publish(next)), () => {
+        this.sceneDraft = null;
+        if (command.kind === 'createScene') this.acceptNavigation(planNavigation(this.project.state, this.navigation, this.pending, { kind: 'scene', sceneId: command.sceneId }));
+        this.message = command.kind === 'createScene' ? 'シーンを作成しました。' : command.kind === 'renameScene' ? '名前を変更しました。' : '開始シーンを設定しました。';
+      });
+    } catch (error) { return this.refuse(this.errorText(error)); }
+  }
   get savedStatus() { return this.authority?.status?.(); }
   get workingBlock() { return this.acknowledgment.block ?? (this.savedStatus?.kind === 'failed' ?
     this.savedStatus.error ?? '未完了の保存があります。更新を再試行してください。' : null); }
@@ -142,10 +186,11 @@ export class SyntheticSession {
     return this.workingBlock ? 'update' : text === 'composition' ? text : this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : text;
   }
   private get textPending(): PendingInteraction | null {
+    if (this.sceneDraft?.composing) return 'composition';
     if (this.views.pending === 'composition' || this.materials.pending === 'composition' || this.media.pending === 'composition') return 'composition';
     if (this.placement?.composing || this.pinInputComposing || this.searchComposing || [...this.includes.values()].some(m => m.composing) || [...this.models.values()].some(m => m.composing) ||
       [...this.drafts.values()].some(d => d.composing !== null)) return 'composition';
-    return this.views.pending ?? this.materials.pending ?? this.media.pending ?? ([...this.drafts.values()].some(hasCaptionDraft) ? 'text' : null);
+    return this.views.pending ?? this.materials.pending ?? this.media.pending ?? (this.sceneDraft || [...this.drafts.values()].some(hasCaptionDraft) ? 'text' : null);
   }
   setSearchComposing(active: boolean) { this.searchComposing = active; }
   setViewportDragging(active: boolean): boolean { const changed = this.viewportDragging !== active; this.viewportDragging = active; return changed; }
@@ -175,6 +220,13 @@ export class SyntheticSession {
   private publish(next: SyntheticProject) {
     // Resolve before publishing any UI read port. No partial Scene/Resources token swap.
     for (const key of Object.keys(next.state.scenes)) this.compositionOf(next, key);
+    const memories = { ...this.navigation.sceneMemory };
+    for (const key of Object.keys(next.state.scenes)) if (!Object.hasOwn(memories, key)) {
+      memories[key] = emptyMemory(); this.windows.set(key, newCaptionWindowMemory(key));
+      this.includes.set(key, newCaptionIncludeMemory(key)); this.models.set(key, newModelListMemory(fixtureIds.project, key));
+      this.pins.set(key, newPinModeMemory(key));
+    }
+    this.navigation = Object.freeze({ ...this.navigation, sceneMemory: Object.freeze(memories) });
     this.project = freezeSynthetic(next);
   }
   private writeViews(base: string, changes: Readonly<Record<string, string>>) {

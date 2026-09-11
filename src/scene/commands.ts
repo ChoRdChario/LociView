@@ -4,6 +4,12 @@ import { active, memberships, sameSnapshot } from './resolve';
 import { DomainValidationError, normalizeSceneName } from '../domain/values';
 
 type EdgeKind = 'asset' | 'caption';
+/** Finite authoring surface shared by UI intent and the saved command service. */
+export type SceneAuthoringCommand =
+  | { kind: 'createScene'; sceneId: string; sourceSceneId: string; activeSceneId: string;
+      name: string; orderKey: string; membershipIds: readonly string[]; eventId: string }
+  | { kind: 'renameScene'; sceneId: string; name: string }
+  | { kind: 'setDefaultScene'; sceneId: string };
 export type SceneCommand =
   | { kind: 'initialize'; sceneId: string; name: string; orderKey: string;
       assets: readonly { assetId: string; membershipId: string; orderKey: string }[] }

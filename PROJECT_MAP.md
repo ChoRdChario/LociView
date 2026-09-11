@@ -12,7 +12,7 @@
 
 2026-09-12 whole-scope inventory: [tasks/implementation-inventory.md](tasks/implementation-inventory.md)
 maps all 41 UI tasks plus accepted Scene/team extensions to 64 work groups:
-20 connected in the synthetic metadata host; 9 component-level gaps, 24 other-path
+22 connected in the synthetic metadata host; 7 component-level gaps, 24 other-path
 connections and 11 new-path implementations remain. These are not completion or
 effort percentages. Approved full-source receive (02 §8) and explicit Caption
 text resolution and independent Caption membership copies now have bounded
@@ -32,7 +32,11 @@ Caption anchor/color conflicts now have complete explicit choices in that same
 host. Position comparison is a labelled nonauthoritative preview; optional color
 absence survives causal resolution and ordinary editing. Saved two-person return,
 exact retry/cold recovery and replay are tested; remaining conflict kinds and
-rendered/device acceptance stay open. Next bounded connection is Scene authoring.
+rendered/device acceptance stay open. Scene create/rename/Project-default now
+connect in the same host: model-membership-only creation, complete source guards,
+exact saved retry, new-Scene local memories on receive and preserved existing
+drafts/windows. Next is confirmed Project-wide Caption deletion, distinct from
+Scene exclusion; current code does not yet expose that action.
 
 2026-09-11 current implementation: PO explicitly approved 05 §13.2's S1 service
 implementation before aggregate adoption, new synthetic-only development activation

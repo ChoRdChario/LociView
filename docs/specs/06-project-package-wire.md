@@ -575,7 +575,7 @@ not identities or automatic choices shown to users.
 | Output completion unknown | Crash after successful sink close but before durable completion | No generated base promoted from prepared state; explicit uncertainty, receipt-based verification or fresh Workspace export |
 | Base survives inactive model | Retained Workspace requires a model no longer active at current heads; run GC then backup/restore | Base evidence and guaranteed body stay protected; restored base verifies; Caption-only delta performs zero reads/embedding of unchanged model body |
 | Late old-unplaced input | Baseline/input both unplaced while v2 Caption was explicitly placed; input changes only body | No anchor change; body integrates, current v2 placement survives; identical input replay adds no changes |
-| Concurrent actual placement | Old input placement differs from baseline; v2 also changed placement | Whole-anchor candidates retained; explicit keep-one/independent keep-both, no guessed owner/coordinate combination |
+| Concurrent actual placement | Old input placement differs from baseline; v2 also changed placement | Retain complete Anchor candidates for explicit whole-value selection; no guessed owner/coordinate combination. Independent keep-both applies only to the separate membership conflict, not to this scalar field |
 | History-free unplaced owner | Selected Scene includes unplaced Caption only; its known Asset is unresolved/outside Scene | Review includes Caption plus `unplacedOwner` without transform/model bytes; clean re-keys unresolved owner and membership, no fabricated binding or Scene-model edge |
 
 Unknown-owner input uses the same last vector with `ownerAssetId` absent: no
@@ -598,6 +598,16 @@ approval does not ratify this proposed wire/schema or execute those vectors.
 The proposal is reviewable, not yet an executable wire contract. Resolve these
 three grouped inputs once; do not grow another isolated browser page or treat a
 new documentation checkpoint as a technology gate pass.
+
+2026-09-12 sequencing clarification: 05 §7.5 requires the complete five-purpose
+wire/schema, budgets, privacy/recovery and golden contract before S2 reads or
+writes its first byte. Workspace/Contribution may be implemented before backup,
+review and clean only AFTER that complete ratification; a smaller implementation
+slice is not permission to ratify only two purposes. Raw-model new-Project work
+does not require every legacy converter first. Native/v1/LociMyu entry and late
+old-format receive require the exact applicable 07 recipe/artifact evidence;
+their implementation can follow the first new-Project team round without being
+removed from the practical candidate. Storage/device/adoption gates stay separate.
 
 1. **Exact wire/profile:** choose the format/version and adapter identifier,
    ZIP/ZIP64/compression/sink profile, summary classifier, complete backup
