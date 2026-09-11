@@ -235,7 +235,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
     for (const path of walk('src').filter(p => /\.(ts|tsx|js)$/.test(p))) {
       const source = readFileSync(path, 'utf8');
       const metadataFoundation = /[\\/]projectMetadata[\\/](format|source)\.ts$/.test(path);
-      const metadataService = /[\\/]projectMetadata[\\/](persistence|repository|journal|contentEvidence|session|commands)\.ts$/.test(path);
+      const metadataService = /[\\/]projectMetadata[\\/](persistence|repository|journal|contentEvidence|session|commands|remote)\.ts$/.test(path);
       // 05 §13.2 permits this exact new synthetic host, never ordinary/old saved activation.
       const metadataHost = /[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Intent)\.ts$/.test(path);
       if (!metadataFoundation && !metadataService && !metadataHost) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectMetadata\//);
@@ -258,17 +258,18 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         const byFile: Record<string, string[]> = {
           persistence: ['../core/json', '../domain/projectGraphSupport', '../domain/values', '../platform/fs', './format'],
           repository: ['@automerge/automerge/slim', '@automerge/automerge-repo/slim', '../platform/fs', './format', './persistence', './source'],
-          journal: ['@automerge/automerge/slim', '../platform/fs', '../domain/values', '../domain/projectRecordFields', './format', './source', './persistence'],
+          journal: ['@automerge/automerge/slim', '../platform/fs', '../domain/values', '../domain/projectRecordFields', './format', './source', './persistence', './remote'],
+          remote: ['@automerge/automerge/slim', '../domain/values', './format', './source', './persistence'],
           contentEvidence: ['../domain/projectContentChecks', '../domain/values', '../platform/fs', './format', './persistence'],
           session: ['@automerge/automerge/slim', '../platform/fs', '../domain/values', '../domain/projectContentChecks', '../domain/captionText', '../scene/projectProvider',
-            './format', './source', './repository', './journal', './persistence', './commands'],
+            './format', './source', './repository', './journal', './persistence', './commands', './remote'],
           commands: ['../domain/values', '../domain/projectMutableFields', '../domain/projectRecordFields', '../domain/projectRecords', '../domain/projectGraphSupport',
-            '../domain/materialIntent', '../scene/projectMaterialRoutes', '../scene/commands', '../scene/resolve', '../scene/types', '../scene/projectProvider', './format'],
+            '../domain/materialIntent', '../domain/captionText', '../scene/projectMaterialRoutes', '../scene/commands', '../scene/resolve', '../scene/types', '../scene/projectProvider', './format'],
         };
         const name = path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '');
         expect(imports.every(p => byFile[name]!.includes(p!)), path).toBe(true);
         expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
-      } else if (/[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Browser|Intent|Views|Materials|Media|Models)\.ts$/.test(path)) {
+      } else if (/[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Browser|Intent|Views|Materials|Media|Models|ReceiveControls|ConflictControls)\.ts$/.test(path)) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
         const byFile: Record<string, string[]> = {
           metadataFixture: ['./fixture', './modelFixture', './modelClosure', '../../domain/values', '../../scene/projectProvider',
@@ -276,7 +277,9 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           metadataStorage: ['../../platform/fs', '../../domain/projectContentChecks', '../../domain/values', '../../projectMetadata/contentEvidence',
             '../../projectMetadata/source', '../../projectMetadata/persistence', '../../projectMetadata/session', './metadataFixture', './mediaHistory'],
           metadataHost: ['../../platform/fs', '../../platform/projectLock', '../../projectMetadata/session', '../../projectMetadata/repository',
-            '../../projectMetadata/persistence', '../../projectMetadata/journal', './metadataFixture', './metadataStorage', './historyProjection', './metadataIntent'],
+            '../../projectMetadata/persistence', '../../projectMetadata/journal', './metadataFixture', './metadataStorage', './historyProjection', './metadataIntent', '../../projectMetadata/remote', './fixture', '../../projectMetadata/commands'],
+          metadataReceiveControls: ['./metadataHost', './session', './metadataConflictControls'],
+          metadataConflictControls: ['./metadataHost', './session'],
           metadataIntent: ['../../core/json', '../../domain/values', '../../domain/captionText', '../../scene/types', '../../projectMetadata/commands', './fixture', './metadataFixture', './mediaHistory', './modelClosure', './modelHistory'],
           metadataModels: ['../../scene/projectProvider', './modelClosure', './modelFixture'],
           metadataMedia: ['../../scene/projectProvider', '../../scene/types', '../../domain/projectGraphSupport', './historyPort', './mediaHistory'],
@@ -284,7 +287,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           metadataMaterials: ['../../scene/projectProvider', '../../scene/projectMaterialRoutes', '../../scene/types', '../../domain/projectGraphSupport',
             '../../domain/materialIntent', './materialHistory', './historyPort'],
           metadataBrowser: ['@automerge/automerge/slim', '@automerge/automerge/automerge.wasm?url', '@automerge/automerge-repo-storage-indexeddb',
-            '../../platform/opfs', '../../platform/projectLock', './metadataHost', './session', './workspace', './viewport'],
+            '../../platform/opfs', '../../platform/projectLock', './metadataHost', './session', './workspace', './viewport', './metadataReceiveControls'],
         };
         const name = path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '');
         expect(imports.every(p => byFile[name]!.includes(p!)), path).toBe(true);

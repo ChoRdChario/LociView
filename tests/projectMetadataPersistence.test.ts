@@ -5,8 +5,9 @@ import { MetadataProjectSession } from '../src/projectMetadata/session';
 import { MetadataRepository, type MetadataStorageFactory, type MetadataStoragePort } from '../src/projectMetadata/repository';
 import { PersistentContentVerifier, type VerifiedInventoryPort } from '../src/projectMetadata/contentEvidence';
 import { TransactionJournal } from '../src/projectMetadata/journal';
-import { json, underWriteLease, writeReceipt } from '../src/projectMetadata/persistence';
-import { type MetadataLimits } from '../src/projectMetadata/source';
+import { digest, json, underWriteLease, writeReceipt } from '../src/projectMetadata/persistence';
+import { ProjectMetadataSource, type MetadataLimits } from '../src/projectMetadata/source';
+import { planRemoteChanges, type FullMetadataSource } from '../src/projectMetadata/remote';
 import type { JsonObject } from '../src/domain/values';
 import { inspectAtomicHistory } from '../src/domain/atomicHistory';
 import { fixture, id, limits as valueLimits } from './helpers/projectRecordsFixture';
@@ -20,6 +21,10 @@ class FaultFS extends MemoryFS {
   override async writeText(path: string, value: string) {
     if (this.reject(path)) throw new DOMException('synthetic quota', 'QuotaExceededError');
     this.writes++; await super.writeText(path, value);
+  }
+  override async writeBytes(path: string, value: Uint8Array) {
+    if (this.reject(path)) throw new DOMException('synthetic quota', 'QuotaExceededError');
+    this.writes++; await super.writeBytes(path, value);
   }
 }
 function setup(fs = new FaultFS()) {
@@ -54,8 +59,186 @@ function textCandidates(source: NonNullable<Awaited<ReturnType<MetadataProjectSe
   if (read.kind !== 'atomic-history-inspection') throw Error('test history rejected');
   return read.fields.find(f => f.path.join('/') === `captionsById/${id('cap')}/${name}`)!.candidates.map(c => c.value);
 }
+const fullSource = (source: ProjectMetadataSource): FullMetadataSource => ({
+  packageId: id('pkg'), metadataBytes: source.encodeFullSource(), proof: source.proof, remoteHeads: source.heads,
+});
 
 describe('new-workspace metadata persistence service (memory ports, not device/activation evidence)', () => {
+  it('receives a full remote history, retains local edits and cold-replays without a second transaction or body read', async () => {
+    const h = setup(), writer = h.session(), first = await writer.create(h.records), reads = h.fault.bodies;
+    const local = await writer.editCaption(first.source!.token, id('cap'), 'body', '手元の本文');
+    const r1 = await first.source!.prepareCaptionText(first.source!.token, id('cap'), 'title', '配布の途中');
+    const remote = await r1.prepareCaptionText(r1.token, id('cap'), 'title', '配布されたタイトル');
+    const input = fullSource(remote), done = await writer.receiveFullSource(local.source!.token, input);
+    const expected = local.source!.appendOriginal(remote.originalChanges());
+    expect(done.state).toBe('ready'); expect(done.source!.originalChanges()).toEqual(expected.originalChanges());
+    expect(textCandidates(done.source!, 'body')).toEqual([{ kind: 'value', value: '手元の本文' }]);
+    expect(textCandidates(done.source!, 'title')).toEqual([{ kind: 'value', value: '配布されたタイトル' }]);
+    const entries = await new TransactionJournal(h.fs, limits).entries(), p = entries.at(-1)!.prepared!;
+    expect(p.start.purpose).toBe('remotePackageMerge'); expect(p.changes).toHaveLength(2);
+    expect(p.remote!.expectedFinalHeads).toEqual(expected.heads);
+    expect(await h.fs.readBytes(`v2/metadata/journal/${done.publication}/source-metadata.am`)).toEqual(input.metadataBytes);
+    const cold = h.session(), reopened = await cold.read(), writes = h.fault.writes, files = h.fs.writes;
+    expect(reopened.source!.originalChanges()).toEqual(expected.originalChanges());
+    expect((await cold.receiveFullSource(reopened.source!.token, input)).publication).toBe(done.publication);
+    expect(h.fault.writes).toBe(writes); expect(h.fs.writes).toBe(files); expect(h.fault.bodies).toBe(reads);
+  });
+
+  it('retains a diamond source and semantic candidates without selecting a winner or blocking an unrelated field', async () => {
+    const h = setup(), writer = h.session(), first = await writer.create(h.records);
+    const left = await first.source!.prepareCaptionText(first.source!.token, id('cap'), 'title', '候補A');
+    const right = await first.source!.prepareCaptionText(first.source!.token, id('cap'), 'title', '候補B');
+    const fork = left.appendOriginal(right.originalChanges());
+    const diamond = await fork.prepareCaptionText(fork.token, id('cap'), 'body', '両分岐の後');
+    expect(A.decodeChange(diamond.originalChanges().at(-1)!).deps).toHaveLength(2);
+    const done = await writer.receiveFullSource(first.source!.token, fullSource(diamond));
+    expect(done.state).toBe('ready'); expect(textCandidates(done.source!, 'title')).toHaveLength(2);
+    await expect(writer.editCaption(done.source!.token, id('cap'), 'title', '勝手に上書き')).rejects.toThrow(/caption-unresolved/);
+    const changed = await writer.editCaption(done.source!.token, id('cap'), 'body', '独立した編集');
+    expect(changed.state).toBe('ready'); expect(textCandidates(changed.source!, 'title')).toHaveLength(2);
+  });
+
+  it('rejects wrong lineage, heads, truncated/dependency-incomplete source and stale input before writes', async () => {
+    const h = setup(), writer = h.session(), first = await writer.create(h.records);
+    const remote = await first.source!.prepareCaptionText(first.source!.token, id('cap'), 'title', '配布');
+    const other = ProjectMetadataSource.bootstrap(h.records.schema, h.records.identity, limits).initialize(h.records);
+    const input = fullSource(remote), writes = h.fault.writes, files = h.fs.writes;
+    for (const invalid of [fullSource(other), { ...input, remoteHeads: first.source!.heads },
+      { ...input, metadataBytes: input.metadataBytes.slice(0, -1) }, { ...input, metadataBytes: remote.originalChanges().at(-1)! }]) {
+      await expect(writer.receiveFullSource(first.source!.token, invalid)).rejects.toThrow();
+      expect((await writer.read()).source!.token).toBe(first.source!.token);
+    }
+    await expect(writer.receiveFullSource('stale', input)).rejects.toThrow(/receive-not-ready/);
+    expect(h.fault.writes).toBe(writes); expect(h.fs.writes).toBe(files);
+    expect((await new TransactionJournal(h.fs, limits).entries())).toHaveLength(1);
+  });
+
+  it('revalidates complete remote source on cold partial-apply recovery while another reader only sees the old publication', async () => {
+    const h = setup(), writer = h.session(), first = await writer.create(h.records);
+    const r1 = await first.source!.prepareCaptionText(first.source!.token, id('cap'), 'title', '最初');
+    const remote = await r1.prepareCaptionText(r1.token, id('cap'), 'body', '最後');
+    h.fault.save = true;
+    await expect(writer.receiveFullSource(first.source!.token, fullSource(remote))).rejects.toThrow();
+    const journal = new TransactionJournal(h.fs, limits), p = (await journal.entries()).at(-1)!.prepared!;
+    const parts = await journal.validateParts(p); expect(parts).toHaveLength(2);
+    h.fault.save = false;
+    await underWriteLease(h.fs, () => new MetadataRepository(h.fs, h.storage, limits).persist(p.start.repositoryId, first.source!.appendOriginal(parts.slice(0, 1))));
+    const reader = h.session(), pending = await reader.read();
+    expect(pending.state).toBe('pending'); expect(pending.source!.token).toBe(first.source!.token);
+    await expect(reader.receiveFullSource(first.source!.token, fullSource(remote))).rejects.toThrow(/receive-not-ready/);
+    await expect(reader.editCaption(first.source!.token, id('cap'), 'body', '拒否')).rejects.toThrow(/command-not-ready/);
+    const recovered = await h.session().retry();
+    expect(recovered.source!.originalChanges()).toEqual(remote.originalChanges());
+    expect((await journal.entries()).filter(e => e.publication)).toHaveLength(2);
+    expect((await h.session().retry()).publication).toBe(recovered.publication);
+  });
+
+  it('retains the copied full input across a source-write failure instead of regenerating it', async () => {
+    const h = setup(), writer = h.session(), first = await writer.create(h.records);
+    const remote = await first.source!.prepareCaptionText(first.source!.token, id('cap'), 'title', '元の更新');
+    const input = fullSource(remote), bytes = input.metadataBytes.slice();
+    h.fs.reject = path => path.endsWith('/source-metadata.am');
+    await expect(writer.receiveFullSource(first.source!.token, input)).rejects.toThrow();
+    input.metadataBytes.fill(0);
+    await expect(h.session().retry()).rejects.toThrow(/incomplete-staging-repair/);
+    h.fs.reject = () => false;
+    const done = await writer.retry();
+    expect(done.source!.originalChanges()).toEqual(remote.originalChanges());
+    expect(await h.fs.readBytes(`v2/metadata/journal/${done.publication}/source-metadata.am`)).toEqual(bytes);
+  });
+
+  it.each(['source', 'writer', 'acknowledged-loss'] as const)('refuses remote recovery after %s corruption without erasing evidence', async kind => {
+    const h = setup(), writer = h.session(), first = await writer.create(h.records);
+    const initialRows = new Map([...h.rows].map(([k, b]) => [k, b.slice()]));
+    const remote = await first.source!.prepareCaptionText(first.source!.token, id('cap'), 'title', '配布内容');
+    if (kind === 'acknowledged-loss') h.fs.reject = path => path.endsWith('/published.json');
+    else h.fault.save = true;
+    await expect(writer.receiveFullSource(first.source!.token, fullSource(remote))).rejects.toThrow();
+    h.fs.reject = () => false; h.fault.save = false;
+    const journal = new TransactionJournal(h.fs, limits), entry = (await journal.entries()).at(-1)!, p = entry.prepared!;
+    if (kind === 'source') {
+      const path = journal.path(p.start.transactionId, 'source-metadata.am'), bytes = (await h.fs.readBytes(path))!;
+      bytes[bytes.length - 1] = bytes[bytes.length - 1]! ^ 1; await h.fs.writeBytes(path, bytes);
+    } else if (kind === 'writer') {
+      const unexpected = await first.source!.prepareCaptionText(first.source!.token, id('cap'), 'body', '不意のwriter');
+      await underWriteLease(h.fs, () => new MetadataRepository(h.fs, h.storage, limits).persist(p.start.repositoryId, unexpected));
+    } else {
+      expect(entry.durable).not.toBeNull(); h.rows.clear(); for (const [k, bytes] of initialRows) h.rows.set(k, bytes.slice());
+    }
+    const writes = h.fault.writes, files = h.fs.writes;
+    await expect(h.session().retry()).rejects.toThrow(kind === 'source' ? /remote-source-digest/ : kind === 'writer' ? /remote-unexpected-writer/ : /remote-acknowledged-change-missing/);
+    expect(h.fault.writes).toBe(writes); expect(h.fs.writes).toBe(files);
+    expect((await journal.entries()).at(-1)!.publication).toBeNull();
+  });
+
+  it.each(['source-metadata.am', 'changes/00000000.amchange'])('does not recreate missing prepared remote %s on same-writer retry', async file => {
+    const h = setup(), writer = h.session(), initial = await writer.create(h.records);
+    const remote = await initial.source!.prepareCaptionText(initial.source!.token, id('cap'), 'title', '共有された変更');
+    h.fs.reject = path => path.endsWith('/published.json');
+    await expect(writer.receiveFullSource(initial.source!.token, fullSource(remote))).rejects.toThrow();
+    const journal = new TransactionJournal(h.fs, limits), entry = (await journal.entries()).at(-1)!;
+    expect(entry.durable).not.toBeNull();
+    const path = journal.path(entry.start.transactionId, file);
+    await h.fs.remove(path); h.fs.reject = () => false;
+    const writes = h.fs.writes, metadataWrites = h.fault.writes;
+    await expect(writer.retry()).rejects.toThrow();
+    expect(await h.fs.readBytes(path)).toBeNull();
+    expect(h.fs.writes).toBe(writes); expect(h.fault.writes).toBe(metadataWrites);
+    expect((await journal.entries()).at(-1)!.publication).toBeNull();
+  });
+
+  it('rejects a correctly hashed but incomplete remote set using the retained full source', async () => {
+    const h = setup(), first = await h.session().create(h.records), base = first.source!;
+    const one = await base.prepareCaptionText(base.token, id('cap'), 'title', '第一変更');
+    const remote = await one.prepareCaptionText(one.token, id('cap'), 'body', '第二変更');
+    const journal = new TransactionJournal(h.fs, limits), prior = (await journal.entries())[0]!;
+    const bytes = remote.encodeFullSource(), plan = planRemoteChanges(base, remote, limits), hash = await digest(bytes);
+    await underWriteLease(h.fs, () => journal.stage({ ...prior.start, transactionId: 'e'.repeat(32),
+      predecessor: prior.start.transactionId, purpose: 'remotePackageMerge', baseHeads: base.heads }, plan.parts.slice(0, 1), [],
+      { bytes, proof: { source: { packageId: id('pkg'), metadataSha256: hash, metadataByteLength: bytes.length,
+        metadataEnvelope: remote.proof.envelope, remoteHeads: remote.heads }, expectedFinalHeads: plan.final.heads } }));
+    const writes = h.fs.writes, metadataWrites = h.fault.writes;
+    await expect(h.session().retry()).rejects.toThrow(/remote-complete-set/);
+    expect(h.fs.writes).toBe(writes); expect(h.fault.writes).toBe(metadataWrites);
+    expect((await h.session().read()).source!.token).toBe(base.token);
+  });
+
+  it.each(['candidate', 'manual', 'equal'])('explicit %s resolution observes every candidate, preserves history and survives publication retry', async kind => {
+    const h = setup(), writer = h.session(), first = await writer.create(h.records), base = first.source!;
+    const local = await writer.editCaption(base.token, id('cap'), 'title', '同じ候補');
+    const remote = await base.prepareCaptionText(base.token, id('cap'), 'title', kind === 'equal' ? '同じ候補' : '共有の候補');
+    const merged = await writer.receiveFullSource(local.source!.token, fullSource(remote)), source = merged.source!;
+    if (merged.provider!.kind !== 'scene-provider') throw Error('test provider');
+    const candidates = merged.provider!.inspection.candidates.fields.find(f => f.path.join('/') === `captionsById/${id('cap')}/title`)!.candidates;
+    expect(candidates).toHaveLength(2);
+    const [materialized] = A.applyChanges(A.init<any>(), source.originalChanges());
+    const current = JSON.parse(String(materialized.captionsById[id('cap')].title));
+    const selected = candidates.find(c => c.value.kind === 'value' && c.value.value === current)!;
+    const command = { kind: 'resolveCaptionText' as const, captionId: id('cap'), field: 'title' as const,
+      choice: kind === 'manual' ? { kind: 'manual' as const, text: 'e\u0301' } : { kind: 'candidate' as const, operationId: selected.operationId } };
+    const files = h.fs.writes, writes = h.fault.writes;
+    await expect(writer.edit(source.token, { ...command, choice: { kind: 'candidate', operationId: 'absent' } })).rejects.toThrow(/resolution-choice/);
+    await expect(writer.edit(base.token, command)).rejects.toThrow(/command-not-ready/);
+    expect(h.fs.writes).toBe(files); expect(h.fault.writes).toBe(writes);
+    h.fs.reject = path => path.endsWith('/published.json');
+    await expect(writer.edit(source.token, command)).rejects.toThrow(/synthetic quota/);
+    expect((await h.session().read()).source!.token).toBe(source.token);
+    const journal = new TransactionJournal(h.fs, limits), p = (await journal.entries()).at(-1)!.prepared!;
+    const parts = await journal.validateParts(p); expect(parts).toHaveLength(1);
+    expect(A.decodeChange(parts[0]!).deps.sort()).toEqual(source.heads);
+    h.fs.reject = () => false; const resolved = await h.session().retry();
+    expect(textCandidates(resolved.source!, 'title')).toEqual([{ kind: 'value', value: kind === 'manual' ? 'é' : current }]);
+    const hashes = new Set(resolved.source!.originalChanges().map(b => A.decodeChange(b).hash));
+    expect(source.originalChanges().every(b => hashes.has(A.decodeChange(b).hash))).toBe(true);
+    expect(resolved.source!.originalChanges()).toHaveLength(source.originalChanges().length + 1);
+    const final = await h.session().editCaption(resolved.source!.token, id('cap'), 'title', '解消後の編集');
+    const replay = await h.session().receiveFullSource(final.source!.token, fullSource(remote));
+    expect(replay.source!.token).toBe(final.source!.token);
+    const unseen = await base.prepareCaptionText(base.token, id('cap'), 'title', 'まだ届いていなかった編集');
+    const reopened = await h.session().receiveFullSource(final.source!.token, fullSource(unseen));
+    expect(textCandidates(reopened.source!, 'title')).toHaveLength(2);
+  });
+
   it('creates later contents, saves a Caption and independently reopens exact originals with cold content hits', async () => {
     const h = setup(), writer = h.session();
     expect((await writer.read()).state).toBe('empty'); expect(h.rows.size).toBe(0);

@@ -5,27 +5,28 @@ import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { checkedProof, fail, type MetadataLimits, type MetadataProof } from './format';
 import { ProjectMetadataSource } from './source';
 import { digest, equalBytes, json, metadataPath, readReceipt, technicalId, writeReceipt } from './persistence';
+import { checkRemoteBatch, planRemoteChanges, type RemoteBatchProof } from './remote';
 
 export interface JournalStart {
   transactionId: string;
   predecessor: string | null;
   repositoryId: string;
-  purpose: 'initialize' | 'localCommand';
+  purpose: 'initialize' | 'localCommand' | 'remotePackageMerge';
   proof: MetadataProof;
   baseHeads: string[];
 }
 interface Part { ordinal: number; expectedChangeHash: string; dependencies: string[]; byteLength: number; bytesSha256: string }
-export interface PreparedJournal { start: JournalStart; changes: Part[]; exactChangeSetDigest: string; stagedBlobs?: JsonObject[] }
+export interface PreparedJournal { start: JournalStart; changes: Part[]; exactChangeSetDigest: string; stagedBlobs?: JsonObject[]; remote?: RemoteBatchProof }
 interface Durable { transactionId: string; exactChangeSetDigest: string }
 export interface Publication extends Durable { heads: string[] }
-export interface JournalEntry { start: JournalStart; prepared: PreparedJournal | null; publication: Publication | null }
+export interface JournalEntry { start: JournalStart; prepared: PreparedJournal | null; durable: Durable | null; publication: Publication | null }
 const sorted = (s: readonly string[]) => [...s].sort();
-async function seal(start: JournalStart, changes: Part[], stagedBlobs: readonly JsonObject[] = []): Promise<string> {
+async function seal(start: JournalStart, changes: Part[], stagedBlobs: readonly JsonObject[] = [], remote?: RemoteBatchProof): Promise<string> {
   if (start.purpose === 'initialize') return digest(new TextEncoder().encode(`lociview:private-initialization:jcs-v1\n${json({ start, changes })}`));
   // Exact 02 §8 local-command digest. Old receipts retain the empty-list digest.
   const value = { transactionId: start.transactionId,
-    target: { identity: start.proof.identity, metadataEnvelope: start.proof.envelope }, purpose: 'localCommand', stagedBlobs,
-    metadataBatch: { kind: 'localCommand', baseHeads: start.baseHeads, changes } };
+    target: { identity: start.proof.identity, metadataEnvelope: start.proof.envelope }, purpose: start.purpose, stagedBlobs,
+    metadataBatch: { kind: start.purpose, baseHeads: start.baseHeads, changes, ...(remote ?? {}) } };
   return digest(new TextEncoder().encode(`lociview:v2:metadata-change-set:jcs-v1\n${json(value)}`));
 }
 function heads(value: unknown): asserts value is string[] {
@@ -38,7 +39,7 @@ function validateStart(s: JournalStart, limits: MetadataLimits): void {
   checkedProof(s.proof, limits); heads(s.baseHeads);
   if (s.purpose === 'initialize') {
     if (s.predecessor !== null || s.baseHeads.length || s.repositoryId !== s.transactionId) fail('journal-initialize');
-  } else if (s.purpose !== 'localCommand' || s.predecessor === null || !s.baseHeads.length) fail('journal-purpose');
+  } else if (!['localCommand', 'remotePackageMerge'].includes(s.purpose) || s.predecessor === null || !s.baseHeads.length) fail('journal-purpose');
 }
 
 /** Append-only private receipts. Incomplete receipt bytes are repair state, never rewritten silently. */
@@ -49,7 +50,7 @@ export class TransactionJournal {
     const prefix = metadataPath(this.fs, 'journal/'), paths = await this.fs.list(prefix);
     const ids = [...new Set(paths.map(path => {
       const tail = path.slice(prefix.length);
-      if (!/^[0-9a-f]{32}\/(staging\.json|blobsVerified\.json|metadataDurable\.json|published\.json|changes\/[0-9]{8}\.amchange)$/.test(tail)) fail('journal-path');
+      if (!/^[0-9a-f]{32}\/(staging\.json|blobsVerified\.json|metadataDurable\.json|published\.json|source-metadata\.am|changes\/[0-9]{8}\.amchange)$/.test(tail)) fail('journal-path');
       return tail.split('/')[0]!;
     }))];
     if (ids.length > this.limits.maxChanges) fail('journal-count');
@@ -67,8 +68,11 @@ export class TransactionJournal {
         if (Object.keys(receipt).sort().join(',') !== keys || !prepared ||
           receipt.transactionId !== id || receipt.exactChangeSetDigest !== prepared.exactChangeSetDigest) fail('publication-receipt');
       }
-      if (publication) { heads(publication.heads); if (!publication.heads.length || !durable) fail('publication-before-durable'); }
-      entries.push({ start: start!, prepared, publication });
+      if (publication) {
+        heads(publication.heads); if (!publication.heads.length || !durable) fail('publication-before-durable');
+        if (prepared?.remote && json(publication.heads) !== json(prepared.remote.expectedFinalHeads)) fail('remote-publication-heads');
+      }
+      entries.push({ start: start!, prepared, durable, publication });
     }
     const chain: JournalEntry[] = []; let predecessor: string | null = null;
     while (chain.length < entries.length) {
@@ -86,7 +90,8 @@ export class TransactionJournal {
     validateStart(start, this.limits);
     await writeReceipt(this.fs, this.path(start.transactionId, 'staging.json'), start, this.limits);
   }
-  async stage(start: JournalStart, parts: readonly Uint8Array[], stagedBlobs: readonly JsonObject[] = []): Promise<PreparedJournal> {
+  async stage(start: JournalStart, parts: readonly Uint8Array[], stagedBlobs: readonly JsonObject[] = [],
+    remote?: { proof: RemoteBatchProof; bytes: Uint8Array }): Promise<PreparedJournal> {
     validateStart(start, this.limits);
     const changes: Part[] = [];
     for (const [ordinal, bytes] of parts.entries()) {
@@ -94,9 +99,21 @@ export class TransactionJournal {
       changes.push({ ordinal, expectedChangeHash: c.hash, dependencies: sorted(c.deps),
         byteLength: bytes.length, bytesSha256: await digest(bytes) });
     }
-    const prepared = { start, changes, ...(stagedBlobs.length ? { stagedBlobs: [...stagedBlobs] } : {}), exactChangeSetDigest: await seal(start, changes, stagedBlobs) };
+    const prepared = { start, changes, ...(stagedBlobs.length ? { stagedBlobs: [...stagedBlobs] } : {}),
+      ...(remote ? { remote: remote.proof } : {}), exactChangeSetDigest: await seal(start, changes, stagedBlobs, remote?.proof) };
     await this.validatePrepared(start, prepared);
     await writeReceipt(this.fs, this.path(start.transactionId, 'staging.json'), start, this.limits);
+    if (remote) {
+      const descriptor = remote.proof.source;
+      if (remote.bytes.length !== descriptor.metadataByteLength || await digest(remote.bytes) !== descriptor.metadataSha256) fail('remote-source-digest');
+      const path = this.path(start.transactionId, 'source-metadata.am'), prior = await this.fs.readStream(path);
+      if (prior) {
+        if (prior.size !== remote.bytes.length) fail('remote-source-size');
+        const bytes = await this.fs.readBytes(path);
+        if (!bytes || !equalBytes(bytes, remote.bytes)) fail('remote-source-exists');
+      } else await this.fs.writeBytes(path, remote.bytes);
+      await this.readRemoteSource(prepared);
+    }
     for (const [ordinal, bytes] of parts.entries()) {
       const path = this.path(start.transactionId, `changes/${String(ordinal).padStart(8, '0')}.amchange`);
       const prior = await this.fs.readBytes(path);
@@ -110,9 +127,12 @@ export class TransactionJournal {
   }
 
   private async validatePrepared(start: JournalStart, p: PreparedJournal): Promise<void> {
-    if (!p || !['changes,exactChangeSetDigest,start', 'changes,exactChangeSetDigest,stagedBlobs,start'].includes(Object.keys(p).sort().join(',')) || json(start) !== json(p.start) ||
-      !Array.isArray(p.changes) || p.changes.length !== (start.purpose === 'initialize' ? 2 : 1) ||
-      p.exactChangeSetDigest !== await seal(start, p.changes, p.stagedBlobs)) fail('journal-descriptors');
+    const remote = start.purpose === 'remotePackageMerge';
+    const keys = remote ? ['changes,exactChangeSetDigest,remote,start'] : ['changes,exactChangeSetDigest,start', 'changes,exactChangeSetDigest,stagedBlobs,start'];
+    if (!p || !keys.includes(Object.keys(p).sort().join(',')) || json(start) !== json(p.start) ||
+      !Array.isArray(p.changes) || (remote ? !p.changes.length || p.changes.length > this.limits.maxChanges : p.changes.length !== (start.purpose === 'initialize' ? 2 : 1))) fail('journal-descriptors');
+    if (remote) checkRemoteBatch(p.remote!, start.proof, this.limits);
+    if (p.exactChangeSetDigest !== await seal(start, p.changes, p.stagedBlobs, p.remote)) fail('journal-descriptors');
     if (p.stagedBlobs !== undefined) {
       if (start.purpose !== 'localCommand' || !Array.isArray(p.stagedBlobs) || p.stagedBlobs.length !== 1) fail('journal-blob-delta');
       const check = new ProjectRecordFields(); check.blob(p.stagedBlobs[0]!, []);
@@ -126,7 +146,7 @@ export class TransactionJournal {
         !/^[0-9a-f]{64}$/.test(part.expectedChangeHash) || seen.has(part.expectedChangeHash)) fail('journal-descriptor');
       seen.add(part.expectedChangeHash); total += part.byteLength; heads(part.dependencies);
       const expected = start.purpose === 'localCommand' ? start.baseHeads : ordinal === 0 ? [] : [p.changes[0]!.expectedChangeHash];
-      if (json(part.dependencies) !== json(expected)) fail('journal-dependencies');
+      if (!remote && json(part.dependencies) !== json(expected)) fail('journal-dependencies');
     }
     if (total > this.limits.maxTotalBytes) fail('journal-budget');
   }
@@ -149,9 +169,32 @@ export class TransactionJournal {
     return parts;
   }
 
+  private async readRemoteSource(p: PreparedJournal): Promise<ProjectMetadataSource> {
+    if (!p.remote) return fail('remote-descriptor');
+    const s = p.remote.source, path = this.path(p.start.transactionId, 'source-metadata.am');
+    const file = await this.fs.readStream(path);
+    if (!file || file.size !== s.metadataByteLength) fail('remote-source-size');
+    const bytes = await this.fs.readBytes(path);
+    if (!bytes || bytes.length !== s.metadataByteLength || await digest(bytes) !== s.metadataSha256) fail('remote-source-digest');
+    const source = ProjectMetadataSource.fromFullSource(bytes!, p.start.proof, this.limits);
+    if (json(source.heads) !== json(s.remoteHeads)) fail('remote-source-heads');
+    return source;
+  }
+
+  /** Recovery re-derives completeness from the retained full source and exact durable base. */
+  async validateRemote(p: PreparedJournal, base: ProjectMetadataSource): Promise<ProjectMetadataSource> {
+    const parts = await this.validateParts(p);
+    if (p.start.purpose !== 'remotePackageMerge' || !p.remote || json(base.heads) !== json(p.start.baseHeads)) fail('remote-base-heads');
+    const expected = planRemoteChanges(base, await this.readRemoteSource(p), this.limits);
+    if (parts.length !== expected.parts.length || parts.some((b, i) => !equalBytes(b, expected.parts[i]!)) ||
+      json(expected.final.heads) !== json(p.remote!.expectedFinalHeads)) fail('remote-complete-set');
+    return expected.final;
+  }
+
   async publish(p: PreparedJournal, source: ProjectMetadataSource): Promise<void> {
     const [doc] = A.applyChanges(A.init(), source.originalChanges());
     const receipt: Publication = { transactionId: p.start.transactionId, exactChangeSetDigest: p.exactChangeSetDigest, heads: sorted(A.getHeads(doc)) };
+    if (p.remote && json(receipt.heads) !== json(p.remote.expectedFinalHeads)) fail('remote-final-heads');
     await writeReceipt(this.fs, this.path(p.start.transactionId, 'metadataDurable.json'),
       { transactionId: receipt.transactionId, exactChangeSetDigest: receipt.exactChangeSetDigest }, this.limits);
     await writeReceipt(this.fs, this.path(p.start.transactionId, 'published.json'), receipt, this.limits);

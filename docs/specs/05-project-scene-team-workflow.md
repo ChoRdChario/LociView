@@ -1531,6 +1531,73 @@ failure retry without duplicate IDs, stale/duplicate/conflict/unknown/catalog
 refusal. Reuse existing material and viewport tests. Actual raster/input,
 OPFS/IndexedDB/iOS and adoption remain separate pending evidence.
 
+**PO-approved practical-team completion and full-source receive (2026-09-12):**
+the first completion target is a usable team candidate under TEAM-FLOW-01, with
+real files, ordinary Project/Scene/editing flows, five-purpose exchange and
+Desktop/physical-iPhone/offline acceptance. Inventory M13 full alignment and M14
+visual repair stay required later capabilities, not first-candidate blockers.
+The other 62 inventory groups remain connection/acceptance work. This changes
+scheduling only; real-data, wire/migration, dependency and release gates remain.
+
+First implement `MetadataProjectSession.receiveFullSource(expectedToken, input)`
+using accepted 02 §8, not proposed 06 delta/base-completion. Its internal input is
+complete metadata bytes plus source proof, declared remote heads and package ID;
+the identifier is not authentication or lineage. Copy and bound input, load the
+pinned complete source, verify actual root/identity/envelope/DAG/heads, then derive
+the complete missing original change set from a fresh durable base under the lease.
+Only already verified known synthetic bodies are allowed; validate the detached
+final strong/conflict/opaque closure. The existing host also verifies retained
+MediaResources; this slice does not claim general weak/historical-media import.
+Reject preflight without altering the existing Project or creating a journal.
+
+Add only the remote journal branch: fixed `source-metadata.am`, exact source
+descriptor, topologically ordered original parts, expected final heads and the
+02 §8 digest. Do not change old initialize/local receipt semantics. Keep source
+bytes across retry. Verify source-derived completeness, not only part hashes.
+Before publication, current history must be base plus an exact subset of this
+batch, then exactly the expected final heads; an unexpected writer is repair.
+If metadataDurable was acknowledged, missing acknowledged originals are repair,
+not a permission to silently rebuild them. Local retries still permit their
+previous legitimate extra concurrent heads. Zero missing changes create no
+metadata transaction/publication. No history is rolled back or squashed.
+
+Every pending reader sees only the prior publication read-only. Proper semantic
+conflicts remain candidates and block affected operations, not arbitrary unrelated
+fields; malformed source/missing required evidence never becomes a winner or a
+usable projection. Original source/parts survive failure; cold prepared recovery
+uses them exactly and incomplete non-resumable staging remains visible repair.
+Extend the existing synthetic host with an explicit bounded receive demonstration,
+not a new page or ordinary file importer. Existing source/persistence/host cases
+cover retained local changes, linear/diamond DAGs, semantic conflict, preflight
+rejection, partial apply, metadataDurable/publication faults, no-op and cold
+inventory reuse. One focused independent review and final root checks precede
+checkpoint; rendered/device acceptance remains separate. Subsequent slices add
+explicit resolution/independent copies and the saved model-update/team loop.
+
+**Next bounded command under the approved resolution contract (2026-09-12):**
+`resolveCaptionText` carries Caption ID, `title`/`body` and either an explicitly
+selected candidate operation ID or manually combined text. The session token
+binds the complete observed candidates. Require active, unambiguous Caption
+identity/lifecycle and valid known string candidates; stale/absent/invalid choices
+refuse before writing. Normal `editCaption` continues to reject unresolved fields.
+One new local causal command observes all candidates, including equal-valued
+candidates; selecting the currently materialized value must still resolve the
+conflict. Pinned Automerge can encode that assignment as a partial candidate
+deletion. The owned explicit-resolution authoring therefore deletes the observed
+field and writes the choice within the same original change, exposing no
+intermediate absence; the whole-field physical validation remains unchanged.
+Losing originals remain, unrelated fields are untouched and unseen
+concurrent edits can reopen the conflict. Only manual text is normalized as new
+author input. Use the existing local journal/retry, not a new receipt or wire.
+
+Connect comparison/explicit choice/manual text in the same synthetic receive area,
+with no default winner and no scalar keep-both. Preserve local drafts; block IME,
+readonly and in-flight interaction. Before confirmation name the affected Caption
+and field. Memory/DOM tests cover choice/manual/equal values, stale refusal,
+failure/cold retry and continued edit; actual rendering remains the batched lane.
+Independent Caption/model copies and non-text conflicts remain the next finite
+commands, not implied by this text-resolution implementation.
+
 ### 13.3 Approved scheduling exception — validators and UI components (2026-09-08)
 
 The PO explicitly approved advancing storage-neutral data validation and reusable

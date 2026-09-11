@@ -7,6 +7,7 @@ import { openMetadataHost, metadataArea } from './metadataHost';
 import { SyntheticSession } from './session';
 import { createDevelopmentWorkspace } from './workspace';
 import { createSyntheticViewport } from './viewport';
+import { createMetadataReceiveControls } from './metadataReceiveControls';
 
 /** Serve-only, new synthetic namespace. No old saved/ordinary entry is converted. */
 export async function createMetadataBrowserWorkspace(document: Document, run: string, create: boolean) {
@@ -42,6 +43,7 @@ export async function createMetadataBrowserWorkspace(document: Document, run: st
       } finally { guard?.close(); }
     } });
   let disposed = false, refreshing = false, workspace: ReturnType<typeof createDevelopmentWorkspace> | undefined;
+  let receiveControls: ReturnType<typeof createMetadataReceiveControls> | undefined;
   const root = document.createElement('section'), tools = document.createElement('section');
   const check = document.createElement('button'), restore = document.createElement('button'), status = document.createElement('p');
   check.type = restore.type = 'button'; check.textContent = '保存状態を確認'; restore.textContent = '保存を再試行';
@@ -49,7 +51,10 @@ export async function createMetadataBrowserWorkspace(document: Document, run: st
   const render = () => {
     if (disposed) return;
     if (!workspace && host.read().provider) {
-      workspace = createDevelopmentWorkspace(document, new SyntheticSession(host.authority), { viewportFactory: createSyntheticViewport });
+      workspace = createDevelopmentWorkspace(document, new SyntheticSession(host.authority), {
+        viewportFactory: createSyntheticViewport, onAction: () => receiveControls?.render() });
+      receiveControls = createMetadataReceiveControls(document, host, workspace.session, () => workspace?.render());
+      tools.append(receiveControls.root);
       root.append(workspace.root);
     }
     check.disabled = restore.disabled = refreshing;
@@ -57,6 +62,7 @@ export async function createMetadataBrowserWorkspace(document: Document, run: st
     if (!workspace) status.textContent = host.authority.readOnly ?
       '未完了の保存があります。このタブは閲覧専用です。編集用タブで復旧してください。' : '未完了の保存があります。元の変更から再試行できます。';
     workspace?.render();
+    receiveControls?.render();
   };
   const refresh = async (retry: boolean) => {
     if (disposed || refreshing) return;
@@ -79,8 +85,8 @@ export async function createMetadataBrowserWorkspace(document: Document, run: st
   try { render(); } catch (error) { workspace?.dispose(); await host.dispose(); throw error; }
   const dispose = () => {
     if (disposed) return; disposed = true; window.removeEventListener('pagehide', dispose);
-    workspace?.dispose(); root.remove(); void host.dispose();
+    receiveControls?.dispose(); workspace?.dispose(); root.remove(); void host.dispose();
   };
   window.addEventListener('pagehide', dispose);
-  return { root, hasChanges: () => host.hasPending() || !!workspace?.session.pending, dispose };
+  return { root, hasChanges: () => host.hasPending() || !!workspace?.session.pending || !!receiveControls?.hasChanges(), dispose };
 }

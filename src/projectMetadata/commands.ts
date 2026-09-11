@@ -10,10 +10,13 @@ import { resolveScene } from '../scene/resolve';
 import { value, type Anchor, type Field, type Membership } from '../scene/types';
 import type { ProjectProviderRead } from '../scene/projectProvider';
 import { fail, type MetadataLimits } from './format';
+import { normalizeCaptionText } from '../domain/captionText';
 
 export type MetadataEdit =
   | { kind: 'moveAsset'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject }
   | { kind: 'editCaption'; captionId: string; edits: { title?: string; body?: string; colorSrgb?: readonly number[] } }
+  | { kind: 'resolveCaptionText'; captionId: string; field: 'title' | 'body';
+      choice: { kind: 'candidate'; operationId: string } | { kind: 'manual'; text: string } }
   | { kind: 'addPin'; sceneId: string; captionId: string; membershipId: string; eventId: string; anchor: Anchor }
   | { kind: 'movePin'; sceneId: string; captionId: string; anchor: Anchor }
   | { kind: 'include'; sceneId: string; resourceKind: 'asset' | 'caption'; resourceId: string; membershipId: string; orderKey: string; eventId: string }
@@ -36,10 +39,15 @@ const json = (v: unknown) => v as JsonValue;
 const shape = (v: JsonObject, keys: string[]) => {
   if (Object.keys(v).sort().join(',') !== keys.sort().join(',')) fail('command-shape');
 };
+export function canonicalMetadataEdit(input: MetadataEdit, limits: MetadataLimits): MetadataEdit {
+  if (input?.kind === 'resolveCaptionText' && input.choice?.kind === 'manual' && typeof input.choice.text === 'string')
+    input = { ...input, choice: { ...input.choice, text: normalizeCaptionText(input.field, input.choice.text) } };
+  return cloneCanonicalValue(input, limits) as unknown as MetadataEdit;
+}
 
 /** Plan only from the Session's fresh verified provider. Not a generic patch/import API. */
 export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits: MetadataLimits): readonly MetadataRecordEdit[] {
-  const command = cloneCanonicalValue(input, limits) as unknown as MetadataEdit, raw = command as unknown as JsonObject;
+  const command = canonicalMetadataEdit(input, limits), raw = command as unknown as JsonObject;
   const c = new ProjectRecordFields(), result: MetadataRecordEdit[] = [];
   const row = (map: MutableRecordMap, id: string) => {
     const r = provider.details.mutable[map][id];
@@ -199,6 +207,31 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       const fields = command.edits as JsonObject, names = Object.keys(fields);
       if (!names.length || names.some(n => !['title', 'body', 'colorSrgb'].includes(n))) fail('caption-field');
       add('captionsById', command.captionId, fields); break;
+    }
+    case 'resolveCaptionText': {
+      shape(raw, ['kind', 'captionId', 'field', 'choice']); c.id(command.captionId, 'cap', []);
+      row('captionsById', command.captionId);
+      if (!['title', 'body'].includes(command.field)) fail('caption-field');
+      const field = provider.inspection.candidates.fields.find(f => f.path.length === 3 &&
+        f.path[0] === 'captionsById' && f.path[1] === command.captionId && f.path[2] === command.field);
+      if (!field?.valid || field.hasUnknownFields || field.candidates.length < 2 ||
+        field.candidates.some(v => v.value.kind !== 'value' || typeof v.value.value !== 'string' || !field.validOperationIds.includes(v.operationId)))
+        return fail('caption-resolution-candidates');
+      let text: string;
+      if (command.choice.kind === 'candidate') {
+        shape(command.choice as unknown as JsonObject, ['kind', 'operationId']);
+        const operationId = command.choice.operationId, selected = field.candidates.find(v => v.operationId === operationId);
+        if (!selected || selected.value.kind !== 'value' || typeof selected.value.value !== 'string') return fail('caption-resolution-choice');
+        text = selected.value.value;
+      } else if (command.choice.kind === 'manual') {
+        shape(command.choice as unknown as JsonObject, ['kind', 'text']);
+        if (typeof command.choice.text !== 'string') return fail('caption-field');
+        text = normalizeCaptionText(command.field, command.choice.text);
+      } else return fail('caption-resolution-choice');
+      checkMutableField(c, 'captionsById', command.field, text);
+      // Explicit resolution alone may replace a conflicted field. The source
+      // token and this complete candidate set bind the user's chosen context.
+      result.push({ map: 'captionsById', id: command.captionId, create: false, fields: { [command.field]: text } }); break;
     }
     case 'movePin': {
       shape(raw, ['kind', 'sceneId', 'captionId', 'anchor']);

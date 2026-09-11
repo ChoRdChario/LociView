@@ -2,10 +2,14 @@
 
 > Status: `PROJECTSCENE/TEAM CONTRACT RATIFIED; CONNECTED SYNTHETIC HOST AND LIMITED DESKTOP SAVE ACCEPTANCE; INTEGRATED S1–S3 OPEN`
 >
-> Updated: 2026-09-11 after PO-reported four-group saved-host Desktop PASS.
-> Specification 05 §§13.1/13.3 covers the implemented disconnected components;
-> §13.4's first connected synthetic development loop now exists; real product
-> services and rendered/device acceptance remain pending.
+> Updated: 2026-09-12 after the whole-scope source/connection audit at `b73315b`.
+> [Current inventory](implementation-inventory.md) maps 64 work groups and all
+> 41 UI tasks. New metadata source/repository/journal and bounded synthetic UI
+> persistence exist; real-data/ordinary-app adoption and integrated team flow do not.
+> 02 §8 full-source receive and Caption text resolution now have bounded new
+> service/host paths. Next: independent membership copies and saved model-update/
+> team rounds. Latest UI feedback does not
+> automatically set priority. Old saved-host Desktop PASS remains narrowly scoped.
 > Candidate history/CAS/journal proofs remain partial, not storage adoption or
 > integrated S1 completion. Section 8 owns the current completion map.
 > The older Native candidate execution plan below remains historical evidence,

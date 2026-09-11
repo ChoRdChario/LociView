@@ -11,6 +11,143 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — approved S1 service entry (2026-09-11)
 
+#### Approved practical-team candidate plan / full-source receive (2026-09-12)
+
+PO approved the complete five-stage plan: (1) saved team loop, (2) real-data
+single-user flow, (3) five-purpose files/conversion, (4) inherited features,
+(5) integrated Desktop/iPhone/offline acceptance. Inventory M13/M14 remain later
+product requirements; the other 62 groups define this candidate's connection and
+acceptance scope, not equal effort. No all-MVP, publication or release claim.
+Keep real-data adoption, 06/07 ratification and existing device gates separate;
+prepare their finite decision inputs alongside stage 1. No extra PoC series.
+
+Current finite slice: accepted 02 §8 full-source remote receive in the new
+synthetic metadata service and existing development host. Preserve all local
+receipts, source bytes, old saved runs and ordinary Native. Known already-saved
+model/media bodies only. No wire/delta/base advancement, new blobs or dependencies.
+
+- [x] Record approved scope, interfaces, failure and acceptance before runtime edits.
+- [x] Add bounded full-source encoding/admission and source-derived exact remote batches.
+- [x] Extend the journal/service for hidden apply, exact final heads, durable/cold
+  recovery, unexpected-writer refusal and replay no-op; retain local concurrency semantics.
+- [x] Connect a labelled synthetic receive action in the existing metadata host,
+  preserving drafts/readonly state and exposing unresolved candidates without winners.
+- [x] Connect Caption title/body comparison, explicit choice/manual text and one causal resolution.
+- [x] Reuse focused source/persistence/host tests and independent review.
+- [x] Finish final root matrix for the combined receive/text-resolution checkpoint.
+- [x] Update inventory/handoff and remaining implementation dependencies.
+
+Implemented next command: Caption title/body explicit candidate choice/manual text
+under existing 05 §8, with exact current token/candidate validation, active
+lifecycle, one original local change, losing history/draft preservation and
+same-value resolution. No default winner, scalar keep-both, model-copy remap,
+wire/schema or new body. Acceptance is written in 05 §13.2; reuse the same host
+and failure ports. Follow with membership independent-copy and model-update loop.
+
+Review: remote admission now validates the complete retained source, missing set
+and exact final heads; prepared/durable source or part loss cannot be recreated
+by the same writer. Preflight refusal creates no journal and does not offer an
+unrelated storage retry as receive success. Caption text resolution keeps every
+losing original, permits continued edits, and reopens a genuinely unseen conflict.
+Pinned same-value assignment was observed to delete only rival candidates; the
+explicit resolution writes delete+set in one change, keeping physical validation.
+Independent reviewers found and closed that authoring issue plus prepared-source
+loss, external-control redraw and unacknowledged input visibility. Focused final
+source/persistence/host/isolation: 65 PASS; latest UI regression pair: 2 PASS.
+Final tree: typecheck/build PASS; `npm test -- --maxWorkers=2`: 109 files,
+1,937 PASS / 21 existing TODO, exit 0. The initial isolation-test failure was
+resolved by enumerating only the approved new imports; ordinary entry stays
+isolated. Latest independent review has no remaining mandatory finding.
+Browser fresh bootstrap still fails before selection (`node:process`); no native
+render/input/storage/iPhone PASS. Serve-only dependency HTTP 200 was checked for
+the receive path; the temporary 5174 checker was stopped, existing 5173 untouched.
+Checkpoint scope: source/command/service/development host plus the approved
+plan/inventory documents. Package/lock/public/ordinary entry, renderer, deployment,
+Service Worker configuration and private imported inputs are unchanged. Inventory recount:
+64 groups = 19 connected / 7 partial-component gaps / 27 other-path-only / 11
+new-path gaps; T01/T03 are partial, not whole-team completion. M13/M14 remain later.
+
+Next implementation dependency, within approved stage 1: independent membership
+copy needs full-source field/attachment/tag handling and exact fresh-ID maps, not
+the known-only provider DTO. Model geometry update additionally needs prepared
+updated bytes, immutable records, inventory and target-specific content facts;
+only initial bodies are currently saved. Prefer the existing different-surface
+synthetic revision over introducing an unrelated surface-equivalence proof lane.
+Never reseed existing saved runs or let receive regenerate missing bodies. Write
+that finite preparation/activation acceptance before implementing the next slice.
+
+Parallel 06/07 preparation: existing purpose choices are already approved. The
+remaining technical packet must fix complete wire/golden vectors, source-profile
+migration mappings (including unresolved Native pinScale mapping), base receipt/
+completion, source-preserving atomic publication and exact capacity/compression/
+sink evidence. Do not invent numeric guarantees or treat current draft types as
+ratification. This packet does not block approved full-source service work.
+
+Acceptance: local+remote originals/heads, semantic conflicts retained, complete
+missing-set validation, interrupted staging/apply/publication and exact retry,
+no-op, corrupt/missing source/deps/required-content refusal, second-reader old
+publication and no extra existing model-body reads. No new native browser/iPhone
+credit from memory-port tests. Human checks stay batched; completed old checks
+are not reopened. Stop only at contract conflict/new authority or unsafe failure.
+
+#### Whole-scope implementation inventory — complete, docs only (2026-09-12)
+
+PO requests an exhaustive current-state inventory and dependency-led sequencing,
+not prioritization by the latest UI complaint. This audit changes documentation
+only; it does not activate home, formats, migration, exchange or destructive UI.
+
+- [x] Cross-check accepted product/Scene contract, 41-task coverage and current code/tests.
+- [x] Separate connected metadata-host features, old-host-only connections,
+  missing UI, missing service/behavior, deferred scope and evidence-only gates.
+- [x] Produce deduplicated counts, prerequisites and recommended implementation order.
+- [x] Independently review completeness and update the current navigation/checkpoint.
+
+Use `b73315b` as executable checkpoint. Existing worktree has only the preceding
+three feedback-document edits; preserve them. Do not count tests, technical
+substeps or device repeats as user features; do not use old unchecked gates as
+new scope. Reuse existing execution evidence rather than rerunning unchanged code.
+
+Result/review: [implementation-inventory.md](implementation-inventory.md) contains
+64 user-work groups: 19 synthetically connected, 5 component-level gaps, 29
+other-path-only implementations and 11 new-path implementations. The 45 remaining
+groups are not equal effort, and connected does not mean accepted real-file/device
+support. All original 41 tasks are mapped. Three read-only reviewers checked UI,
+models/rendering and persistence/team/migration. Corrections include visual-repair
+coverage, existing exit guards, unplaced schema status, material gate scope and
+required-closure blob retention. Tag/profile authoring remains a separate scope
+question, not a newly imposed requirement. Code was unchanged; use prior root
+checks plus this audit's counts/reference/diff validation, not a fresh test claim.
+
+Next recommended bounded slice: new synthetic metadata-service full-source receive
+under accepted 02 §8; then explicit resolution/independent copies, then saved model
+update plus continuing Caption work. Write exact acceptance before implementation.
+This is not 06 delta-wire adoption; real file, migration and ordinary-home activation
+retain their gates. Small UI connections may proceed when independent, without
+displacing the team-flow dependency. The new-host Desktop batch stays pending;
+no old passed human test is a prerequisite to this independent work.
+
+#### PO feedback / missing whole-workflow entries (2026-09-12, `b73315b`)
+
+PO reports the current result is broadly good, then asks where to choose/change
+the opened Project and notes missing Caption deletion. This is general positive
+feedback, not an itemized PASS for all eight groups or device/product acceptance.
+Read-only code inspection confirms two gaps in the new development host:
+
+- [ ] Project selection/switching: current saved runs reopen by their exact URLs;
+  there is no named Project list/switch UI or real-file import in this host. The
+  ordinary home has an existing Native Project list/file entry but is not connected
+  to the new metadata workspace. Do not present it as this host's working switch.
+- [ ] Project-wide Caption deletion: Scene inclusion/exclusion is connected, but
+  neither a delete-Caption control nor its typed metadata command is connected.
+  Follow 05 §4.3: separate `このシーンから外す` from `プロジェクトから削除`,
+  show affected Scenes/attachment dependencies and require explicit confirmation.
+
+These two gaps are inventory inputs, not automatic next-slice priorities. Choose
+order from full scope, dependencies and risk; do not equate URL reopen, lifecycle support or passing save tests with reachable
+Project/Caption management. This feedback record does not authorize ordinary-home
+activation, real-file/wire adoption or a destructive operation. No runtime change
+was made in response to this status question; exact implementation plan comes first.
+
 #### Model translation connection — implemented; Desktop batch pending (2026-09-12, from `c3a6ec1`)
 
 - [x] Specify typed translation-only binding command and transient model preview.
@@ -18,7 +155,7 @@ rendered, IME, device and durable-file acceptance remain pending.
 - [x] Reuse the translation gizmo for model preview/confirm/cancel; retain numeric alternative.
 - [x] Verify preservation, cold reopen, exact retry and refusal; independent review and root matrix.
 - [x] Update checkpoint and prepare a working Desktop link plus a consolidated human check.
-- [ ] PO Desktop check of the new metadata host, eight groups in uiux-handoff; result pending.
+- [ ] PO Desktop check of the new metadata host, eight groups in uiux-handoff; broadly positive feedback received, no itemized full PASS.
 
 Scope/exit: known synthetic models in the existing metadata host; Project-wide
 translation only. Preserve revision, Representation/body, rotation/scale, Caption

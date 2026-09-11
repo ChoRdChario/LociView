@@ -1,5 +1,30 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **Current implementation approval (2026-09-12):** PO approved the practical
+> team-candidate plan. M13/M14 stay later; 62 groups define this candidate's scope.
+> Full-source receive under 02 §8 and Caption title/body explicit resolution are
+> implemented in the new synthetic metadata service/host; final verification is
+> recorded at the top of todo. Next: independent membership copies and saved
+> model-update/team rounds. Exact current
+> acceptance is at the top of todo and 05 §13.2. Real-data, wire/migration and
+> device/release gates are not waived. Base is `b73315b`; use the commit containing
+> this receive/text-resolution checkpoint and the final review in todo. The whole
+> practical-team plan is not yet implemented. No new human check is requested now.
+> Final reviewed tree: typecheck/build PASS; root 109 files / 1,937 PASS / 21 TODO.
+> Browser rendering remains pending; no real-file, iPhone, offline or release claim.
+
+> **Pre-implementation audit (2026-09-12, `b73315b`):** PO requests a complete
+> implementation/connection inventory and dependency-led sequencing, not priority
+> based on the latest UI complaint. [Inventory](implementation-inventory.md) maps
+> 64 work groups and all 41 UI tasks; 19 are connected only within the synthetic
+> metadata host. The 45 remaining groups mix small UI connections, other-path
+> ports and new behavior; they are not equivalent effort. Recommended next is
+> approved full-source receive (02 §8) in the new service, then explicit conflict
+> resolution and model-update/team round trips. Contribution wire/real-data
+> activation remain gated. This turn is docs-only; no new test or product PASS.
+> The new-host Desktop batch remains pending, not a blanket stop on independent
+> authorized implementation; do not repeat old journal/saved-host checks.
+
 > **Latest connection (2026-09-12, from `c3a6ec1`):** model translation now uses
 > the metadata service: fresh immutable binding plus active status in one original
 > change, same-provider current model projection, exact retry and cold reopen.

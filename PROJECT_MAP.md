@@ -4,11 +4,20 @@
 > That baseline is a historical normalization anchor, not a checkout target. Use Git `HEAD` and `tasks/todo.md` for the active checkpoint.
 > A bounded, nondefault native production path now supports repeated ordinary Mesh, exact ASCII XYZ+RGB Point, or Graphdeco SH2/SH3 GS Asset imports, optional explicit per-GS Proxies, streamed portable backup, independent visibility and per-Asset manual position/rotation/uniform-scale alignment. It also supports DisplaySet-linked Caption/material/Saved-View state and purpose-separated collaboration/review/clean-copy package exchange. It does not pass G0/G0-S/G1 or adopt Spark permanently. Additional point profiles, full Alignment workflows, Automerge, content-addressed storage, and renderer backends remain `PROPOSED`.
 > Product visibility is per loaded Asset/layer, not per Mesh/GS kind. The current native `mixed` / `gs-only` / `mesh-only` values are bounded convenience filters; formal Compare is neither implemented nor selected as the next workstream.
-> The accepted future-v2 contract makes the Project a typed workspace and replaces DisplaySet presentation with persistent ProjectScenes. It also separates Team Workspace, Contribution, one-Scene review, complete backup and clean copy under continuing causal history. This is specified in ADR-0002 and `docs/specs/05-project-scene-team-workflow.md` but is not implemented; current Native DisplaySet/fixed-baseline behavior above remains the observed production path.
+> The accepted future-v2 contract makes the Project a typed workspace and replaces DisplaySet presentation with persistent ProjectScenes. It separates Team Workspace, Contribution, one-Scene review, complete backup and clean copy under continuing causal history. Reusable core/UI and a synthetic-only metadata service now exist; ordinary-app/real-file adoption and the whole team flow are not implemented. Current Native DisplaySet/fixed-baseline behavior remains the ordinary production path. See ADR-0002, specification 05 and the current inventory below.
 > The bounded direct LociMyu ZIP -> native adapter is implemented with exact Caption identity/source authority, a separately retained report and marker-last publication. On the private representative, six rows with an empty trimmed Caption ID are explicitly treated as empty input under the approved rule: 103 of 109 source rows became Captions, the source remained unchanged, and automated native publication plus portable restore passed. Product Owner Desktop and physical-iPhone acceptance, including Native Package Exchange restore and completely offline reopen, passed through checkpoint `5f2a19d`; no P0/P1 remains in these bounded Native lanes.
 > For the first public candidate, Caption image writes are PNG/JPEG/WebP/GIF. Existing HEIC/HEIF is handled by exporting a separate JPEG on the source device; direct HEIC bytes fail before publication. LociMyu HEIC/HEIF remains inventoried and reported, including an exact file-ID relation, but is not attached. The source ZIP remains unchanged, no decoder or Windows extension is required, and direct original-byte HEIC remains required post-candidate work.
 
 ## Start here
+
+2026-09-12 whole-scope inventory: [tasks/implementation-inventory.md](tasks/implementation-inventory.md)
+maps all 41 UI tasks plus accepted Scene/team extensions to 64 work groups:
+19 connected in the synthetic metadata host; 7 component-level gaps, 27 other-path
+connections and 11 new-path implementations remain. These are not completion or
+effort percentages. Approved full-source receive (02 §8) and explicit Caption
+text resolution now have bounded new-service/host paths. Next are independent
+membership copies and the model-update/team loop;
+real-file/wire adoption remains separately gated. Latest UI complaints do not set priority.
 
 2026-09-11 current implementation: PO explicitly approved 05 §13.2's S1 service
 implementation before aggregate adoption, new synthetic-only development activation
@@ -40,12 +49,16 @@ are not reseeded; the gallery uses verified saved bytes, not a fixture fallback.
 Project-wide model translation now shares that journal: fresh binding plus
 active status in one change, same-provider current projection and shared translation
 gizmo preview/confirm/cancel. Saved model payloads, original Caption coordinates
-and Scene memberships remain unchanged. Geometry replacement, real-file input
-and exchange remain unconnected here.
+and Scene memberships remain unchanged. Full-source receive now retains local
+changes/candidates and original remote bytes through hidden apply/recovery/no-op.
+Caption title/body candidates can be explicitly chosen or manually combined;
+no winner is selected by default. Geometry replacement, real-file input, independent
+copies and participant exchange remain unconnected here.
 The old saved pair and ordinary home are unchanged.
 Mounted memory-port and HTTP dependency tests pass; actual browser/device/storage
-adoption remains unverified. Next is the consolidated new-host Desktop batch;
-see todo for the finite boundary and uiux-handoff for steps. Browser connection
+adoption remains unverified. The consolidated new-host Desktop batch remains
+pending but does not block independent authorized work; use the inventory above
+for the next service boundary and uiux-handoff for human steps. Browser connection
 still fails before selection; do not restart old passed probe/manual lanes.
 
 Current task (2026-09-10, after readiness checkpoint `77a22b0`): PO approved
@@ -170,7 +183,7 @@ dev.html
   -> src/dev-entry.ts
     -> src/devharness.ts                 # default manual v1 harness
     -> src/harness/sparkHarness.ts       # ?mode=spark; isolated candidate only
-    -> src/harness/projectScene/entry.ts # ?mode=project-scene; synthetic in-memory host
+    -> src/harness/projectScene/entry.ts # ?mode=project-scene; synthetic memory/old-saved/new-metadata hosts
 ```
 
 For a normal task, read only the target file, its matching tests, and direct imports first.
@@ -188,8 +201,8 @@ For a normal task, read only the target file, its matching tests, and direct imp
 | `src/viewer` | Three.js loaders, material shader patch, single-model `ViewerCore` |
 | `src/nativeGs` | Version-1 native snapshot, streamed project-local binaries/packages, exact ASCII Point and SH2/SH3 GS admission, lazy Spark runtime, repeated Asset import, per-Asset visibility/alignment, DisplaySet/material/Caption/media state, legacy conversion and bounded package exchange |
 | `src/ui` | App shell, home, viewer screen, dialogs, tabs, and UI-only state |
-| `src/harness/projectScene` | Nondefault synthetic workspace; Scene/Caption/model controls, two-actor history port and exact triangle/pin viewport using existing Three.js. Candidate injection is serve-only from `poc/scene-history`, absent from both builds; no real Project, file, storage, general renderer adoption or rendered acceptance |
-| `src/ui/projectScene` | Reusable Scene/task navigation, save-state presentation, Caption list/pin filters/detail drafts, inclusion/pin modes, comparison-window state, viewing aids/entry-view, named-view/background controls, Project model inventory/Scene membership and exact-target material editor (05 §13.3); navigation/Caption/model controls now connected in synthetic development only (§13.4); no ordinary-app hookup, floating renderer or rendered acceptance |
+| `src/harness/projectScene` | Nondefault synthetic workspace: memory/old-saved two-actor loops and new metadata-service saved host, exact triangle/pin viewport using existing Three.js. Serve-only candidate injection is isolated from builds. New metadata host has bounded OPFS/IndexedDB/locks wiring; no real-file/ordinary-home adoption, new-host team exchange, general renderer or rendered/device acceptance. See implementation inventory for path-specific gaps |
+| `src/ui/projectScene` | Reusable Scene/task navigation, save-state presentation, Caption list/pin filters/detail drafts, inclusion/pin modes, floating comparison-window controls, viewing aids/entry-view, named-view/background components, Project model inventory/Scene membership and exact-target material editor. Many are connected to the synthetic hosts, but component presence alone is not host connection (for example background controls). No ordinary-app hookup or general rendered/device acceptance |
 | `tests` | Executable contracts for core, assets, I/O, and UI logic |
 | `public/samples` | Small deterministic files used by the manual viewer and iOS runbook |
 | `fixtures` | G0 fixture registry, provenance, hashes and small committed fixture metadata |

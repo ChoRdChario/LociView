@@ -53,8 +53,22 @@ export class ProjectMetadataSource {
     return new ProjectMetadataSource(doc, p, limits);
   }
 
+  /** Complete pinned metadata encoding, not a package writer or durable save. */
+  encodeFullSource(): Uint8Array { return A.save(this.doc).slice(); }
+
+  static fromFullSource(bytes: Uint8Array, proof: MetadataProof, requested: MetadataLimits): ProjectMetadataSource {
+    const limits = checkLimits(requested);
+    if (!(bytes instanceof Uint8Array) || !bytes.length || bytes.length > limits.maxTotalBytes) fail('full-source-budget');
+    try {
+      const doc = A.load<Record<string, any>>(bytes.slice(), { allowMissingChanges: false });
+      if (A.getMissingDeps(doc, []).length) fail('full-source-dependencies');
+      return ProjectMetadataSource.validated(doc, proof, limits);
+    } catch (error) { if (error instanceof MetadataSourceError) throw error; return fail('full-source-invalid'); }
+  }
+
   read() { return inspectPhysical(this.doc, this.proof, this.limits); }
   get token(): string { return this.read().history.token; }
+  get heads(): string[] { return A.getHeads(this.doc).sort(); }
   originalChanges(): Uint8Array[] { return A.getAllChanges(this.doc).map(b => b.slice()); }
 
   /** Bootstrap is withheld from Project readiness. Initialize in one later change. */
@@ -103,6 +117,11 @@ export class ProjectMetadataSource {
       creating.add(edit.id);
     }
     const doc = A.change(A.clone(this.doc), { message: `lociview:transaction:v1:${transactionId}` }, draft => {
+      // Pinned Automerge may encode assignment of the current conflict winner
+      // as deletion of only its rivals. Our atomic profile requires a whole-field
+      // write: remove all observed values, then set the explicit choice in the
+      // SAME change. No intermediate absence is published or saved separately.
+      if (command.kind === 'resolveCaptionText') delete draft.captionsById[command.captionId][command.field];
       for (const edit of edits) {
         if (edit.map === 'mediaResourcesById' || edit.map === 'assetBindingsById') {
           if (!edit.create) fail('immutable-replacement');

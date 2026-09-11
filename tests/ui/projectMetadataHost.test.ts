@@ -28,6 +28,7 @@ import type { JsonObject } from '../../src/domain/values';
 import { metadataModels } from '../../src/harness/projectScene/metadataFixture';
 import { fixtureMedia, captionAttachments } from '../../src/harness/projectScene/mediaHistory';
 import { RecordedDocument, record, type RecordedNode } from './domRecorder';
+import { createMetadataReceiveControls } from '../../src/harness/projectScene/metadataReceiveControls';
 
 class FaultFS extends MemoryFS {
   rejectPublication = false; rejectImage = false; writes = 0;
@@ -222,6 +223,89 @@ function mediaHost(s: SyntheticSession) {
 }
 
 describe('new synthetic saved host (memory ports and recorded DOM, not real browser/iOS acceptance)', { timeout: 15_000 }, () => {
+  it('receives through the mounted control, retains a draft and text candidates, and cold-replays the same source', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority); select(s);
+    await apply(s, { title: '手元のタイトル' });
+    const ctx = s.detailContext(), draft = editCaptionDraft(ctx.draft!, ctx.source, 'body', '入力中の本文');
+    s.acceptDetail({ kind: 'draft', baseDraft: ctx.draft!, draft });
+    const ui = createMetadataReceiveControls(new RecordedDocument().asDocument(), host, s, () => {}), root = record(ui.root);
+    const workspace = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s, { onAction: () => ui.render() });
+    const search = named(record(workspace.root), '検索');
+    const receive = button(root, '開発用の更新を受け取る'), before = host.read().source!.token, count = host.content.counts.bodyBytes;
+    search.fire('compositionstart'); expect(receive.disabled).toBe(true); receive.fire('click');
+    expect(host.read().source!.token).toBe(before); search.fire('compositionend');
+    expect(receive.disabled).toBe(false); await acknowledge(s, () => receive.fire('click'));
+    expect(s.detailContext().draft).toBe(draft); expect(s.snapshot.resources.captions[f.shared]!.title.kind).toBe('unresolved');
+    const texts = descendants(named(root, '未解決の候補')).map(n => n.textContent).join(' ');
+    expect(texts).toContain('手元のタイトル'); expect(texts).toContain('配布された記録');
+    await apply(s, { body: '入力中の本文' });
+    expect(s.snapshot.resources.captions[f.shared]!.body).toEqual({ kind: 'value', value: '入力中の本文' });
+    expect(host.content.counts.bodyBytes).toBe(count);
+    const source = host.read().source!, writes = h.fault.writes, files = h.base.writes;
+    await acknowledge(s, () => receive.fire('click')); expect(host.read().source!.token).toBe(source.token);
+    expect(h.fault.writes).toBe(writes); expect(h.base.writes).toBe(files);
+    const reader = await h.open(), readonly = new SyntheticSession(reader.authority);
+    const readonlyUI = createMetadataReceiveControls(new RecordedDocument().asDocument(), reader, readonly, () => {});
+    expect(button(record(readonlyUI.root), '開発用の更新を受け取る').disabled).toBe(true);
+    await expect(reader.receive(source.token)).rejects.toThrow(/閲覧専用/);
+    readonlyUI.dispose(); await reader.dispose(); workspace.dispose(); ui.dispose(); await host.dispose();
+    const cold = await h.open(); await cold.receive(source.token);
+    expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges());
+    expect(h.fault.writes).toBe(writes); expect(h.base.writes).toBe(files); await cold.dispose();
+  });
+
+  it('keeps old UI until remote publication retry, retaining original source bytes', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority), original = s.snapshot;
+    const ui = createMetadataReceiveControls(new RecordedDocument().asDocument(), host, s, () => {});
+    h.base.rejectPublication = true;
+    await acknowledge(s, () => button(record(ui.root), '開発用の更新を受け取る').fire('click'));
+    expect(s.acknowledgment.state).toBe('failed'); expect(s.snapshot).toBe(original);
+    const paths = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.endsWith('source-metadata.am') || p.endsWith('.amchange'));
+    const bytes = await Promise.all(paths.map(p => h.base.readBytes(p)));
+    h.base.rejectPublication = false; await acknowledge(s, () => { s.retryWorking(); });
+    expect(s.acknowledgment.state).toBe('idle'); expect(s.snapshot.resources.captions[f.shared]!.title).toEqual({ kind: 'value', value: '配布された記録' });
+    expect(await Promise.all(paths.map(p => h.base.readBytes(p)))).toEqual(bytes);
+    ui.dispose(); await host.dispose();
+  });
+
+  it('requires an explicit text resolution, preserves IME/manual draft and retries the same saved decision', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority); select(s);
+    await apply(s, { title: '手元の候補' });
+    const ui = createMetadataReceiveControls(new RecordedDocument().asDocument(), host, s, () => {}), root = record(ui.root);
+    await acknowledge(s, () => button(root, '開発用の更新を受け取る').fire('click'));
+    const list = named(root, '未解決の候補'), choice = descendants(list).find(n => n.tag === 'select')!;
+    const text = descendants(list).find(n => n.tag === 'textarea')!, confirm = button(list, '競合を解消');
+    expect(choice.value).toBe(''); expect(confirm.disabled).toBe(true); expect(ui.hasChanges()).toBe(false);
+    setInput(choice, 'manual'); setInput(text, '統合した文言'); expect(ui.hasChanges()).toBe(true);
+    expect(descendants(list).some(n => n.textContent === 'この選択・入力はまだ保存されていません。')).toBe(true);
+    const token = host.read().source!.token;
+    text.fire('compositionstart'); expect(confirm.disabled).toBe(true);
+    expect(button(root, '開発用の更新を受け取る').disabled).toBe(true); confirm.fire('click');
+    expect(host.read().source!.token).toBe(token); text.fire('compositionend');
+    h.base.rejectPublication = true; await acknowledge(s, () => confirm.fire('click'));
+    expect(s.acknowledgment.state).toBe('failed'); expect(text.value).toBe('統合した文言'); expect(ui.hasChanges()).toBe(true);
+    const paths = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.endsWith('.amchange'));
+    const bytes = await Promise.all(paths.map(p => h.base.readBytes(p)));
+    h.base.rejectPublication = false; await acknowledge(s, () => { s.retryWorking(); });
+    expect(s.acknowledgment.state).toBe('idle'); expect(ui.hasChanges()).toBe(false); expect(list.children).toHaveLength(0);
+    expect(s.snapshot.resources.captions[f.shared]!.title).toEqual({ kind: 'value', value: '統合した文言' });
+    expect(await Promise.all(paths.map(p => h.base.readBytes(p)))).toEqual(bytes);
+    ui.dispose(); await host.dispose();
+    const cold = await h.open(); expect(cold.authority.read().resources.captions[f.shared]!.title).toEqual({ kind: 'value', value: '統合した文言' });
+    await cold.dispose();
+  });
+
+  it('does not mislabel a preflight refusal as an incomplete save or acknowledge it through retry', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority), source = host.read().source!;
+    const files = h.base.writes, writes = h.fault.writes;
+    await acknowledge(s, () => { s.applyWorking(() => host.receive(source.token, { packageId: `pkg_${h.run}`,
+      metadataBytes: source.encodeFullSource(), proof: source.proof, remoteHeads: ['f'.repeat(64)] }), () => s.refreshHistory()); });
+    expect(s.acknowledgment.state).toBe('idle'); expect(s.acknowledgment.error).toContain('受け取れません');
+    expect(host.authority.status!().kind).toBe('idle'); expect(s.retryWorking()).toBe(false);
+    expect(h.base.writes).toBe(files); expect(h.fault.writes).toBe(writes);
+    select(s); await apply(s, { body: '拒否後も編集できる' }); expect(host.read().state).toBe('ready'); await host.dispose();
+  });
+
   it('adds saved PNGs to an existing edited run, edits/reorders/removes attachments and cold-reopens retained media without reseeding', async () => {
     const h = fixture(), initial = await h.open(true), initialSession = new SyntheticSession(initial.authority); select(initialSession);
     await apply(initialSession, { title: '先の作業を保持' });

@@ -8,6 +8,9 @@ import { createMetadataFixture, metadataFixtureLimits as limits, metadataProject
 import { MetadataFixtureContent, readMetadataSeed, writeMetadataSeed } from './metadataStorage';
 import type { SyntheticAuthority } from './historyProjection';
 import { metadataIntent } from './metadataIntent';
+import type { FullMetadataSource } from '../../projectMetadata/remote';
+import { fixtureIds } from './fixture';
+import type { MetadataEdit } from '../../projectMetadata/commands';
 
 export const metadataArea = 'lociview-development-metadata-1';
 export interface MetadataHostOptions {
@@ -35,12 +38,20 @@ export async function openMetadataHost(options: MetadataHostOptions) {
     if (last.state === 'repair-required') throw Error('保存内容を確認できません。データは保持しています。');
     if (!fresh && lease.holdsWriteLock) lease.activateAfterDurableReload();
     let operation: Promise<unknown> | undefined;
-    const execute = async <T>(action: () => Promise<T>): Promise<T> => {
+    const execute = async <T>(action: () => Promise<T>, refusedMessage?: string): Promise<T> => {
       if (closed || busy) throw Error('処理が完了するまでお待ちください。');
       busy = true; failure = '';
       const work = action(); operation = work;
       try { const result = await work; if (closed) throw Error('画面を閉じました。保存結果は再度開いて確認してください。'); return result; }
-      catch { failure = '保存を完了できません。変更を保持しています。再試行してください。'; throw Error(failure); }
+      catch (error) {
+        if (refusedMessage) {
+          // A rejected input is not an incomplete save. Do not offer a storage
+          // retry that would acknowledge the unchanged Project as a received one.
+          last = await service.read();
+          if (last.state === 'ready') throw Error(`${refusedMessage}保存内容は保持しています。${error instanceof Error ? error.message : ''}`);
+        }
+        failure = '保存を完了できません。変更を保持しています。再試行してください。'; throw Error(failure);
+      }
       finally { busy = false; if (operation === work) operation = undefined; }
     };
     const ready = (read: MetadataSessionRead) => {
@@ -72,8 +83,35 @@ export async function openMetadataHost(options: MetadataHostOptions) {
         return ready(await service.retry());
       }),
     };
+    let demoInput: FullMetadataSource | undefined;
+    const demoSource = async (): Promise<FullMetadataSource> => {
+      if (demoInput) return demoInput;
+      const previous = (await journal.entries()).find(e => e.prepared?.remote?.source.packageId === `pkg_${run}`);
+      if (previous?.prepared?.remote) {
+        const descriptor = previous.prepared.remote.source, path = journal.path(previous.start.transactionId, 'source-metadata.am');
+        const file = await fs.readStream(path);
+        if (!file || file.size !== descriptor.metadataByteLength || file.size > limits.maxTotalBytes)
+          throw Error('受信元の保存データを確認できません。');
+        const bytes = await fs.readBytes(path);
+        if (!bytes || bytes.length !== file.size) throw Error('受信元の保存データを確認できません。');
+        demoInput = { packageId: descriptor.packageId, metadataBytes: bytes, proof: previous.start.proof, remoteHeads: descriptor.remoteHeads };
+      } else {
+        // Branch from the original synthetic seed, not the receiver's edited state.
+        const remote = await seed.prepareCaptionText(seed.token, fixtureIds.shared, 'title', '配布された記録');
+        demoInput = { packageId: `pkg_${run}`, metadataBytes: remote.encodeFullSource(), proof: remote.proof, remoteHeads: remote.heads };
+      }
+      return demoInput;
+    };
+    const receive = (expectedToken: string, input?: FullMetadataSource) => execute(async () => {
+      if (authority.readOnly) throw Error('このタブは閲覧専用です。');
+      return ready(await service.receiveFullSource(expectedToken, input ?? await demoSource()));
+    }, '更新を受け取れません。');
+    const resolve = (expectedToken: string, command: Extract<MetadataEdit, { kind: 'resolveCaptionText' }>) => execute(async () => {
+      if (authority.readOnly) throw Error('このタブは閲覧専用です。');
+      return ready(await service.edit(expectedToken, command));
+    }, '競合を解消できません。');
     return {
-      authority, content, read: () => last, hasPending: () => busy || !!failure || !['ready'].includes(last.state),
+      authority, content, receive, resolve, read: () => last, hasPending: () => busy || !!failure || !['ready'].includes(last.state),
       refresh: () => execute(async () => { last = await service.read(); if (last.state === 'repair-required') throw Error('保存状態の確認が必要です。'); return last; }),
       async dispose() {
         if (closed) return; closed = true; lease.beginClose();

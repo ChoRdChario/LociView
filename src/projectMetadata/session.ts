@@ -8,8 +8,9 @@ import { checkLimits, fail, type MetadataLimits } from './format';
 import { ProjectMetadataSource } from './source';
 import { MetadataRepository, type MetadataStorageFactory } from './repository';
 import { TransactionJournal, type JournalStart, type PreparedJournal } from './journal';
-import { equalBytes, json, newId, underWriteLease } from './persistence';
-import { planMetadataEdit, type MetadataEdit } from './commands';
+import { digest, equalBytes, json, newId, underWriteLease } from './persistence';
+import { canonicalMetadataEdit, planMetadataEdit, type MetadataEdit } from './commands';
+import { checkRemoteStored, copyFullSource, planRemoteChanges, type FullMetadataSource, type RemoteBatchProof } from './remote';
 
 /** Owned finite content boundary. Stage may introduce bytes; recovery may only verify saved bytes. */
 export interface MetadataMediaPort {
@@ -31,6 +32,7 @@ export class MetadataProjectSession {
   private readonly repository: MetadataRepository;
   private readonly journal: TransactionJournal;
   private retained: { start: JournalStart; parts: Uint8Array[]; stagedBlobs?: JsonObject[];
+    remote?: { proof: RemoteBatchProof; bytes: Uint8Array };
     introduction?: { source: ProjectMetadataSource; command: Extract<MetadataEdit, { kind: 'createAttachment' }> } } | null = null;
   private last: MetadataSessionRead = { state: 'empty', source: null, provider: null, publication: null };
   constructor(private readonly fs: ProjectWorkspaceFS, storage: MetadataStorageFactory, limits: MetadataLimits,
@@ -54,6 +56,11 @@ export class MetadataProjectSession {
         for (const bytes of await this.journal.validateParts(entry.prepared!)) {
           const included = originals.get(A.decodeChange(bytes).hash);
           if (!included || !equalBytes(included, bytes)) fail('published-transaction-missing');
+        }
+        if (entry.prepared!.remote) {
+          const base = await this.repository.read(entry.start.repositoryId, entry.start.proof, entry.start.baseHeads);
+          if (!base) fail('remote-base-missing');
+          await this.journal.validateRemote(entry.prepared!, base!);
         }
       }
       const provider = await readProjectScene(source!.read(), this.limits, this.verifier(false), { verifyRetainedMedia: !!this.media });
@@ -104,7 +111,7 @@ export class MetadataProjectSession {
   }
 
   async edit(expectedToken: string, command: MetadataEdit): Promise<MetadataSessionRead> {
-    command = cloneCanonicalValue(command, this.limits) as unknown as MetadataEdit;
+    command = canonicalMetadataEdit(command, this.limits);
     return underWriteLease(this.fs, async () => {
       const read = await this.read();
       if (read.state !== 'ready' || !read.source || read.source.token !== expectedToken) return fail('command-not-ready');
@@ -130,6 +137,31 @@ export class MetadataProjectSession {
       this.retained = { start: { transactionId, repositoryId: prior.start.repositoryId, predecessor: prior.start.transactionId,
         purpose: 'localCommand', proof: durable.proof, baseHeads: A.getHeads(doc).sort() }, parts };
       await this.checked(prepared, false);
+      return this.resume();
+    });
+  }
+
+  /** Accepted full-source receive only. No package wire, new body staging or exchange-base update. */
+  async receiveFullSource(expectedToken: string, input: FullMetadataSource): Promise<MetadataSessionRead> {
+    const captured = copyFullSource(input, this.limits);
+    const remote = ProjectMetadataSource.fromFullSource(captured.metadataBytes, captured.proof, this.limits);
+    if (json(remote.heads) !== json(captured.remoteHeads)) fail('remote-source-heads');
+    const metadataSha256 = await digest(captured.metadataBytes);
+    return underWriteLease(this.fs, async () => {
+      const read = await this.read();
+      if (read.state !== 'ready' || !read.source || read.source.token !== expectedToken) return fail('receive-not-ready');
+      const prior = (await this.journal.entries()).at(-1)!;
+      const base = await this.repository.read(prior.start.repositoryId, prior.start.proof);
+      if (!base || base.token !== read.source.token) return fail('receive-base-changed');
+      const { parts, final } = planRemoteChanges(base, remote, this.limits);
+      // Validate the final required content/candidates without observing a transient prefix.
+      await this.checked(final, false);
+      if (!parts.length) return read;
+      this.retained = { start: { transactionId: newId(), repositoryId: prior.start.repositoryId,
+        predecessor: prior.start.transactionId, purpose: 'remotePackageMerge', proof: base.proof, baseHeads: base.heads },
+        parts, remote: { bytes: captured.metadataBytes, proof: {
+          source: { packageId: captured.packageId, metadataSha256, metadataByteLength: captured.metadataBytes.length,
+            metadataEnvelope: captured.proof.envelope, remoteHeads: remote.heads }, expectedFinalHeads: final.heads } } };
       return this.resume();
     });
   }
@@ -163,7 +195,10 @@ export class MetadataProjectSession {
         if (!stored) return fail('journal-base-missing');
         await this.checked(stored.appendOriginal(this.retained.parts), false);
       }
-      prepared = await this.journal.stage(this.retained.start, this.retained.parts, this.retained.stagedBlobs);
+      // Once prepared, disk is the recovery source. Never conceal loss of an
+      // acknowledged source/part by recreating it from this writer's memory.
+      prepared = pending?.prepared?.remote ? pending.prepared :
+        await this.journal.stage(this.retained.start, this.retained.parts, this.retained.stagedBlobs, this.retained.remote);
     } else if (pending?.prepared) prepared = pending.prepared;
     else if (pending) return fail('incomplete-staging-repair');
     else return this.read(); // Already published: no mutation or second publication.
@@ -171,12 +206,18 @@ export class MetadataProjectSession {
     await this.verifyDelta(prepared.stagedBlobs);
     const parts = await this.journal.validateParts(prepared), start = prepared.start;
     let stored = await this.repository.read(start.repositoryId, start.proof, undefined, start.purpose === 'initialize');
-    if (start.purpose === 'localCommand') {
+    if (start.purpose !== 'initialize') {
       if (!stored) fail('journal-base-missing');
       const base = await this.repository.read(start.repositoryId, start.proof, start.baseHeads);
       if (!base) fail('journal-base-missing');
     }
-    const next = stored ? stored.appendOriginal(parts) : ProjectMetadataSource.reopen(parts, start.proof, this.limits);
+    let next: ProjectMetadataSource;
+    if (start.purpose === 'remotePackageMerge') {
+      const base = await this.repository.read(start.repositoryId, start.proof, start.baseHeads);
+      if (!stored || !base) return fail('remote-base-missing');
+      next = await this.journal.validateRemote(prepared, base);
+      checkRemoteStored(stored, base, next, !!pending?.durable);
+    } else next = stored ? stored.appendOriginal(parts) : ProjectMetadataSource.reopen(parts, start.proof, this.limits);
     // Exact pending changes can coexist with legitimate extra local heads; never rebase or choose a winner.
     await this.checked(next, start.purpose === 'initialize');
     await this.repository.persist(start.repositoryId, next);
@@ -188,6 +229,7 @@ export class MetadataProjectSession {
       if (!saved || !equalBytes(saved, bytes)) fail('durable-change-missing');
     }
     await this.checked(stored!, false);
+    if (prepared.remote && json(stored!.heads) !== json(prepared.remote.expectedFinalHeads)) fail('remote-final-heads');
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
     await this.journal.publish(prepared, stored!);
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
