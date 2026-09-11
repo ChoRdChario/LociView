@@ -17,7 +17,8 @@ export class SyntheticMaterialSession {
   private prepared: { plan: MaterialEffect; id: string; changes: Readonly<Record<string, string>> } | null = null;
   message = '';
   constructor(private readonly read: () => SyntheticProject, private readonly scene: () => string,
-    private readonly write: WorkingWrite, private readonly block: () => string | null = () => null) {}
+    private readonly write: WorkingWrite, private readonly block: () => string | null = () => null,
+    private readonly mutationBlock: () => string | null = () => null) {}
   get pending(): PendingInteraction | null { return [...this.drafts.values()].some(d => d.composing) ? 'composition' : this.drafts.size ? 'text' : null; }
   context(otherPending: PendingInteraction | null): MaterialContext {
     const p = this.read(), sceneId = this.scene();
@@ -27,7 +28,7 @@ export class SyntheticMaterialSession {
       return b.kind !== 'value' ? b : value(b.value ? { id: b.value.id, target: routing.target, scope: routing.scope.kind,
         sceneId: routing.scope.kind === 'scene' ? sceneId : null, intent: b.value.intent } : null);
     };
-    return { source: { kind: 'ready', token: p.state.token, projectId: fixtureIds.project, sceneId, limits: materialLimits,
+    return { source: { kind: 'ready', token: p.state.token, projectId: p.projectId ?? fixtureIds.project, sceneId, limits: materialLimits,
       models: Object.values(p.resources.assets).map(asset => {
         const version = asset.projection.kind === 'value' ? (p.modelVersions ?? syntheticVersions).find(v => v.projection.bindingId === (asset.projection as { value: { bindingId: string } }).value.bindingId) : null;
         const name = value(p.modelNames[asset.id] ?? 'モデル');
@@ -37,7 +38,7 @@ export class SyntheticMaterialSession {
           fieldIssues: Object.fromEntries(materialFields.map(f => [f, f === 'opacity' || f === 'softness' ? '半透明の表示は未接続です。' : null])) as Record<typeof materialFields[number], string | null>,
           admit: materialCapability }]), reason: null };
       }) }, selection: this.selections.get(sceneId)!, draft: this.drafts.get(sceneId) ?? null, pending: otherPending,
-      mutationBlock: this.block(), feedback: this.feedback.get(sceneId) ?? { kind: 'idle' } };
+      mutationBlock: this.block() ?? this.mutationBlock(), feedback: this.feedback.get(sceneId) ?? { kind: 'idle' } };
   }
   accept(plan: MaterialPlan, context: MaterialContext): boolean {
     const failed = (e: unknown) => {
@@ -46,6 +47,7 @@ export class SyntheticMaterialSession {
     };
     try {
       if (this.block()) throw new Error(this.block()!);
+      if (this.mutationBlock() && !['select', 'review', 'cancel'].includes(plan.kind)) throw new Error(this.mutationBlock()!);
       if (plan.kind === 'blocked') throw new Error(plan.reason);
       if (!materialPlanIsCurrent(plan, context)) throw new Error('設定が更新されています。入力と操作対象を保持しています。');
       if (plan.kind === 'select') this.selections.set(this.scene(), plan.selection);

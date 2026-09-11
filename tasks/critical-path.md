@@ -403,11 +403,13 @@ add/move and both Caption/model membership edits using original-change journal
 publication. Caption exclusion keeps the resource and all other Scenes; re-add
 uses a new edge. Preview/cancel writes nothing. Saved View create/edit/order/delete
 and entry set/clear now use that same journal with original per-field version
-guards; recall remains local. Model geometry/placement, material/media writes
-and exchange remain unconnected here. No old saved
+guards; recall remains local. Project/Scene material create/appearance-edit/confirmed
+reset also uses the same path and complete original routing reservations. Existing
+lighting/sidedness/hard-chroma UI is connected; base-color input is not yet exposed.
+Model geometry/placement, media writes and exchange remain unconnected here. No old saved
 history is converted. Mounted memory-port and HTTP tests do not establish actual
-browser/device/adoption acceptance. Next connect exact existing material overrides
-through this same service; batch browser evidence, not another source/probe campaign.
+browser/device/adoption acceptance. Next connect exact existing synthetic media/
+attachments through this same service; batch browser evidence, not another source/probe campaign.
 
 The ten latest executable commits through `d8f52d1` implement reusable Scene,
 record-admission and four-tab UI parts, with source-isolation tests deliberately

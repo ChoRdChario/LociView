@@ -1,6 +1,20 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **Latest connection (2026-09-11, after `1fe2857`):** the same `storage=metadata`
+> **Latest connection (2026-09-11, after `c9c480a`):** the same `storage=metadata`
+> host now persists exact Project/Scene material create/appearance-edit/confirmed
+> reset using the existing journal/retry. Complete original routing reservations
+> refuse duplicate/unresolved targets without a winner. Readonly inspection and
+> actual Project identity are connected. The UI authors lighting/sidedness/hard
+> chroma; exact sRGB is retained by the source but no base-color input was added.
+> Typecheck/focused 40 tests/build/HTTP graph PASS; independent reviews have no
+> scoped blocker. Full two-worker root run: 109 files / 1,910 PASS / 21 TODO,
+> exit 0; diff-check PASS. No new binary,
+> reseeding, schema/dependency, old-mode or ordinary-home change. Next is known
+> synthetic media/attachments after specifying their missing inventory/introduction
+> boundary; never silently replace existing runs or use fixture-image fallback.
+> Browser/physical storage/iOS remains separately pending; no repeat PO batch.
+
+> **Preceding connection (2026-09-11, after `1fe2857`):** the same `storage=metadata`
 > host now connects Saved View creation/recapture/name/order/confirmed deletion
 > and Scene entry set/clear to its existing journal/retry. View recall is local,
 > and entry assignment never recalls immediately. Exact original per-field IDs

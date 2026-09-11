@@ -1422,6 +1422,45 @@ ABA camera changes alter them; conflicts, stale source, cross-Scene targets and
 referenced deletion are refused. Actual browser, physical storage/iOS, offline
 and aggregate adoption remain separate, not inferred from memory-backed ports.
 
+**S1 material extension — implementation contract (2026-09-11):**
+
+The same new synthetic saved host connects existing Project/Scene material UI.
+Three typed commands create a fresh override in one change, replace appearance
+only, or tombstone one explicitly confirmed override. Routing/compositing are
+not rewritten by editing/reset; permanent records and original bytes remain.
+Validate fresh token, active Asset/current verified binding and exact family,
+layout and logical slot. Scene scope requires the current active Scene; Project
+scope does not require Scene membership. Reuse the verified opaque/surface source
+catalogs, without rereading geometry or introducing a profile or binary.
+
+Before every create/edit/reset, inspect all original routing candidates and
+reserve every known semantic key. Only a resolved deleted lifecycle releases a
+reservation. Duplicate owners, unresolved affected routing/lifecycle/intent,
+unclassifiable routing and unknown affected atomic subtrees refuse ordinary writes;
+they never appear as an empty slot or choose a winner. Preserve unrelated fields.
+Validate appearance/compositing coupling; the bounded connection retains existing
+solid color, lighting, sidedness and hard chroma capability, not smooth blend,
+dither, soft chroma or transmission. No new renderer policy is adopted.
+The current UI authors lighting/sidedness/hard chroma; the typed command also
+preserves exact solid sRGB. It does not yet expose a base-color input; adding
+that control is a separate bounded UI completion, not part of this connection.
+
+The small host MaterialData projection uses the same provider values for display
+and acknowledgment. It retains original routing candidates for reservation;
+unclassifiable routes explicitly prevent proving absence, not synthetic targets.
+Only exact resolved fields yield acknowledgment cells. MaterialContext identifies
+the actual new Project, not the legacy synthetic fixture Project. Existing modes
+keep their existing identity. Drafts remain token/selection guarded and exact
+failed commands retain IDs and original bytes for retry. Read-only tabs may inspect
+targets/scopes but cannot author/reset. Scene overrides replace the whole Project
+intent; confirmed reset falls back to Project or source without nested merging.
+
+Acceptance: mounted Project/Scene create/edit/confirmed reset and visible-effect
+data, cold saved reopen, no extra model body reads, readonly inspection, exact
+failure retry without duplicate IDs, stale/duplicate/conflict/unknown/catalog
+refusal. Reuse existing material and viewport tests. Actual raster/input,
+OPFS/IndexedDB/iOS and adoption remain separate pending evidence.
+
 ### 13.3 Approved scheduling exception — validators and UI components (2026-09-08)
 
 The PO explicitly approved advancing storage-neutral data validation and reusable

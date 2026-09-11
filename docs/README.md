@@ -80,7 +80,10 @@ now share its journal and exact retry; one added pin is one original change.
 Saved View create/recapture/name/order/delete and Scene entry set/clear also use
 that path; exact original field versions protect retained captures and entry drafts.
 Optional entry clear preserves domain absence rather than adding a nullable schema.
-Model geometry/placement, material/media writes and exchange stay
+Exact Project/Scene material create/appearance-edit/confirmed reset now shares
+the same retained save/retry. Complete original routing reservations guard the
+existing lighting/sidedness/hard-chroma UI; no base-color input was added.
+Model geometry/placement, media writes and exchange stay
 unconnected in this new mode, not removed from old modes or product requirements.
 Old saved runs and ordinary home remain unchanged. Actual browser/input and
 physical iOS evidence remain pending; source-only `reopen` itself is still not a

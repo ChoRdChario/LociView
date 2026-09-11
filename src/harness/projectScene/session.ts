@@ -53,7 +53,7 @@ export class SyntheticSession {
     (token, changes, done, failed) => this.applyWorking(() => this.writeViews(token, changes), done, failed),
     () => this.workingBlock, () => this.viewRestriction);
   readonly materials = new SyntheticMaterialSession(() => this.project, () => this.sceneId,
-    (token, changes, done, failed) => this.applyWorking(() => this.writeMaterials(token, changes), done, failed), () => this.workingBlock);
+    (token, changes, done, failed) => this.applyWorking(() => this.writeMaterials(token, changes), done, failed), () => this.workingBlock, () => this.materialRestriction);
   readonly media = new SyntheticMediaSession(() => this.mediaContext(),
     (token, changes, done, failed) => this.applyWorking(() => this.writeMedia(token, changes), done, failed), () => this.workingBlock);
   private project = createSyntheticProject();
@@ -97,6 +97,7 @@ export class SyntheticSession {
   get membershipRestriction() { return this.readOnly || !this.authority?.capabilities?.membership ? this.editingRestriction : null; }
   get colorReadOnly() { return this.captionTextOnly && !this.authority?.capabilities?.color; }
   get viewRestriction() { return this.readOnly || !this.authority?.capabilities?.views ? this.editingRestriction : null; }
+  get materialRestriction() { return this.readOnly || !this.authority?.capabilities?.materials ? this.editingRestriction : null; }
   get savedStatus() { return this.authority?.status?.(); }
   get workingBlock() { return this.acknowledgment.block ?? (this.savedStatus?.kind === 'failed' ?
     this.savedStatus.error ?? '未完了の保存があります。更新を再試行してください。' : null); }
@@ -184,7 +185,7 @@ export class SyntheticSession {
       [...this.drafts.values()].some(d => d.composing) ? 'composition' : this.views.pending ?? this.media.pending;
     return this.materials.context(other);
   }
-  acceptMaterial(plan: MaterialPlan) { if (this.editingRestriction) return this.refuse(this.editingRestriction);
+  acceptMaterial(plan: MaterialPlan) {
     const accepted = this.materials.accept(plan, this.materialContext()); this.message = this.materials.message; return accepted; }
   mediaContext(): MediaContext {
     const source = this.captionContext().source, captionId = this.memory.selectedCaptionId;
@@ -204,8 +205,9 @@ export class SyntheticSession {
     this.publish({ ...this.project, state: { ...this.project.state, token }, resources: { ...this.project.resources, token }, mediaData });
   }
   private writeMaterials(base: string, changes: Readonly<Record<string, string>>) {
+    if (this.materialRestriction) throw new Error(this.materialRestriction);
     if (base !== this.project.state.token) throw new Error('設定が更新されています。入力を保持しています。');
-    if (this.authority) return afterWorking(this.authority.write(base, changes), next => this.publish(next));
+    if (this.authority) return afterWorking(this.authority.write(base, changes, { sceneId: this.sceneId }), next => this.publish(next));
     const token = fresh('snapshot'), previous = { token: base, cells: this.project.materialData?.cells ?? {} };
     const cells = { ...previous.cells, ...Object.fromEntries(Object.entries(changes).map(([key, text]) => [key, { kind: 'value' as const, value: text }])) };
     const data = projectMaterialHistory({ token, cells }, this.modelVersions.map(v => v.closure), previous);

@@ -20,6 +20,10 @@ import { ProjectMetadataSource } from '../../src/projectMetadata/source';
 import { planViewAuthor } from '../../src/ui/projectScene/viewAuthoringState';
 import { planView } from '../../src/ui/projectScene/viewState';
 import { SyntheticViewSession, type DisplayCapture } from '../../src/harness/projectScene/viewSession';
+import { materialBucket, materialKey, materialTarget, type MaterialRouting } from '../../src/harness/projectScene/materialHistory';
+import { syntheticDisplay } from '../../src/harness/projectScene/viewportModel';
+import { canonicalFixture } from '../../src/harness/projectScene/modelClosure';
+import { metadataModels } from '../../src/harness/projectScene/metadataFixture';
 import { RecordedDocument, record, type RecordedNode } from './domRecorder';
 
 class FaultFS extends MemoryFS {
@@ -50,6 +54,19 @@ const descendants = (node: RecordedNode): RecordedNode[] => [node, ...node.child
 const button = (r: RecordedNode, text: string) => descendants(r).find(n => n.tag === 'button' && n.textContent === text)!;
 const picker = (r: RecordedNode, label: string) => descendants(r).find(n => n.tag === 'select' && n.attributes.get('aria-label') === label)!;
 const area = (r: RecordedNode, label: string) => descendants(r).find(n => n.tag === 'section' && n.attributes.get('aria-label') === label)!;
+const named = (r: RecordedNode, label: string) => descendants(r).find(n => n.attributes.get('aria-label') === label)!;
+const setInput = (n: RecordedNode, text: string) => { n.value = text; n.fire(n.tag === 'select' ? 'change' : 'input'); };
+function materialHost(s: SyntheticSession) {
+  const w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s), r = record(w.root);
+  button(r, 'マテリアル').fire('click'); const panel = named(r, 'マテリアル');
+  setInput(named(panel, 'モデル'), f.equipment); const surface = named(panel, '面'); setInput(surface, surface.children[1]!.value);
+  return { w, panel, scope: (v: string) => setInput(named(panel, '適用範囲'), v),
+    begin: () => button(panel, '設定を編集').fire('click'), edit: (label: string, text: string) => setInput(named(panel, label), text),
+    async apply() { await acknowledge(s, () => button(panel, '変更を適用').fire('click')); w.render(); },
+    async reset() { button(panel, 'この範囲の設定を解除').fire('click');
+      await acknowledge(s, () => button(panel, '設定を解除する').fire('click')); w.render(); },
+  };
+}
 const displayCapture = (): DisplayCapture => ({ camera: { position: [1, 2, 8], target: [0, 0, 0], up: [0, 1, 0],
   projection: { kind: 'perspective', verticalFovRadians: 0.7 } }, background: { kind: 'solid', colorSrgb: [0.1234567, 0.42, 0.8] } });
 function viewHost(s: SyntheticSession) {
@@ -89,6 +106,129 @@ async function apply(s: SyntheticSession, edits: { title?: string; body?: string
 }
 
 describe('new synthetic saved host (memory ports and recorded DOM, not real browser/iOS acceptance)', { timeout: 15_000 }, () => {
+  it('saves exact Project/Scene material effects, confirmed reset and tombstones through cold reopen; readonly permits inspection only', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority), ui = materialHost(s);
+    const before = host.read().source!.originalChanges().length, bodies = host.content.counts.bodyBytes;
+    const display = (scene = f.overview) => syntheticDisplay(s.snapshot, scene, null, null).materials![f.equipment];
+    const state = s.snapshot.state, captions = s.snapshot.resources.captions;
+    expect(s.materialContext().source.projectId).toBe(`prj_${h.run}`);
+    expect(new SyntheticSession().materialContext().source.projectId).toBe(f.project);
+    expect(ui.panel.hidden).toBe(false);
+    ui.scope('project'); ui.begin(); ui.edit('照明', 'unlit'); await ui.apply();
+    expect(s.acknowledgment.state).toBe('idle'); expect(display()).toMatchObject({ unlit: true, doubleSided: false });
+    const projectId = Object.keys(s.snapshot.materialData!.records)[0]!;
+    ui.scope('scene'); ui.begin(); ui.edit('表示する面', 'double'); await ui.apply();
+    const sceneId = Object.keys(s.snapshot.materialData!.records).find(id => id !== projectId)!;
+    expect(display()).toMatchObject({ unlit: true, doubleSided: true });
+    expect(display(f.detail)).toMatchObject({ unlit: true, doubleSided: false });
+    ui.begin(); ui.edit('照明', 'lit'); await ui.apply(); expect(display()).toMatchObject({ unlit: false, doubleSided: true });
+    // Later Project editing leaves the whole Scene override independently double-sided.
+    ui.scope('project'); ui.begin(); ui.edit('照明', 'lit'); await ui.apply();
+    expect(display()).not.toEqual(display(f.detail));
+    ui.scope('scene'); button(ui.panel, 'この範囲の設定を解除').fire('click');
+    expect(s.snapshot.materialData!.records[sceneId]!.lifecycle).toMatchObject({ value: { state: 'active' } });
+    await acknowledge(s, () => button(ui.panel, '設定を解除する').fire('click')); ui.w.render();
+    expect(display()).toEqual(display(f.detail));
+    expect(s.snapshot.materialData!.records[sceneId]!.lifecycle).toMatchObject({ value: { state: 'deleted' } });
+    // Source-color hard chroma in another fresh Scene override, after reset releases the key.
+    ui.begin(); ui.edit('指定した色を透過', 'on'); ui.edit('透過する色', '#a8a29a'); await ui.apply();
+    expect(display()).toMatchObject({ visible: false }); expect(display(f.detail)).toMatchObject({ visible: true });
+    const expected = display();
+    expect(s.snapshot.state.assetMemberships).toEqual(state.assetMemberships);
+    expect(s.snapshot.state.captionMemberships).toEqual(state.captionMemberships);
+    expect(s.snapshot.resources.captions).toEqual(captions); expect(host.content.counts.bodyBytes).toBe(bodies);
+    const reader = await h.open(), readonly = new SyntheticSession(reader.authority), readUI = materialHost(readonly);
+    expect(readonly.readOnly).toBe(true); expect(readUI.panel.hidden).toBe(false); readUI.scope('project');
+    expect(readonly.materialContext().selection.scope).toBe('project'); expect(button(readUI.panel, '設定を編集').disabled).toBe(true);
+    expect(button(readUI.panel, 'この範囲の設定を解除').disabled).toBe(true);
+    readUI.w.dispose(); await reader.dispose(); ui.w.dispose(); await host.dispose();
+    const cold = await h.open(), coldSession = new SyntheticSession(cold.authority), coldUI = materialHost(coldSession);
+    expect(cold.content.counts.bodyBytes).toBe(0);
+    expect(syntheticDisplay(coldSession.snapshot, f.overview, null, null).materials![f.equipment]).toEqual(expected);
+    expect(coldSession.snapshot.materialData!.records[sceneId]!.lifecycle).toMatchObject({ value: { state: 'deleted' } });
+    expect(cold.read().source!.originalChanges()).toHaveLength(before + 6);
+    await coldUI.reset(); coldUI.scope('project'); await coldUI.reset();
+    expect(syntheticDisplay(coldSession.snapshot, f.overview, null, null).materials![f.equipment]).toMatchObject({ unlit: false, doubleSided: false, visible: true });
+    coldUI.w.dispose(); await cold.dispose();
+  });
+
+  it('retains a failed material draft, exact target, fresh override ID and original bytes until saved retry', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority), ui = materialHost(s);
+    ui.begin(); ui.edit('照明', 'unlit'); const draft = s.materialContext().draft, selection = s.materialContext().selection;
+    h.base.rejectPublication = true; await ui.apply();
+    expect(s.acknowledgment.state).toBe('failed'); expect(s.materialContext().draft).toBe(draft);
+    expect(s.materialContext().selection).toBe(selection); expect(Object.keys(s.snapshot.materialData!.records)).toHaveLength(0);
+    const paths = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.endsWith('.amchange'));
+    const bytes = await Promise.all(paths.map(p => h.base.readBytes(p)));
+    h.base.rejectPublication = false; await acknowledge(s, () => { s.retryWorking(); }); ui.w.render();
+    expect(s.acknowledgment.state).toBe('idle'); expect(s.materialContext().draft).toBeNull();
+    const ids = Object.keys(s.snapshot.materialData!.records); expect(ids).toHaveLength(1);
+    expect(await Promise.all(paths.map(p => h.base.readBytes(p)))).toEqual(bytes);
+    await host.authority.retry!(); expect(Object.keys(host.authority.read().materialData!.records)).toEqual(ids);
+    ui.w.dispose(); await host.dispose(); const cold = await h.open();
+    expect(Object.keys(cold.authority.read().materialData!.records)).toEqual(ids);
+    expect(syntheticDisplay(cold.authority.read(), f.overview, null, null).materials![f.equipment]).toMatchObject({ unlit: true }); await cold.dispose();
+  });
+
+  it('refuses stale/catalog/duplicate/conflicting/unknown material writes and never exposes reserved targets as empty', async () => {
+    const h = fixture(), host = await h.open(true), seed = host.read().source!, tx = 'c'.repeat(32), id = `ovr_${tx}`;
+    const target = materialTarget(metadataModels.find(m => m.assetId === f.equipment)!.closure);
+    const route: MaterialRouting = { scope: { kind: 'scene', sceneId: f.overview }, target };
+    const create: Extract<MetadataEdit, { kind: 'createMaterial' }> = { kind: 'createMaterial', sceneId: f.overview, overrideId: id,
+      routing: { scope: { ...route.scope }, target: { ...target } }, appearance: { lighting: 'unlit' },
+      compositing: { coverage: { policy: 'inherit' }, optics: 'inherit' }, eventId: `evt_${tx}` };
+    const read = (source: ProjectMetadataSource) => readProjectScene(source.read(), metadataFixtureLimits, host.content.verifier(false));
+    const initial = host.read().provider!;
+    expect(() => seed.prepareEdit('stale', create, initial, tx)).toThrow(/stale/);
+    expect(() => seed.prepareEdit(seed.token, { ...create, sceneId: f.detail }, initial, tx)).toThrow(/scene/);
+    expect(() => seed.prepareEdit(seed.token, { ...create, routing: { ...create.routing, target: { ...target, logicalMaterialSlotId: `slot_${tx}` } } }, initial, tx)).toThrow(/target/);
+    for (const patch of [{ appearance: { opacity: 0.5 } }, { appearance: { extra: true } },
+      { compositing: { coverage: { policy: 'ditherCoverage' }, optics: 'inherit' } },
+      { compositing: { coverage: { policy: 'inherit' }, optics: 'transmission' } }])
+      expect(() => seed.prepareEdit(seed.token, { ...create, ...patch } as MetadataEdit, initial, tx)).toThrow();
+    const made = seed.prepareEdit(seed.token, create, initial, tx), provider = await read(made);
+    const exactColor = [0.123456789, 0.42, 0.8];
+    const colored = made.prepareEdit(made.token, { kind: 'editMaterial', sceneId: f.overview, overrideId: id,
+      appearance: { baseColorSrgb: exactColor } }, provider, tx);
+    const coloredView = metadataProjectView(await read(colored));
+    expect(coloredView.materialData!.records[id]!.appearance).toEqual({ kind: 'value', value: { baseColorSrgb: exactColor } });
+    const unchanged = metadataProjectView(provider).materialData!.cells;
+    for (const field of ['routing', 'compositing', 'lifecycle'])
+      expect(coloredView.materialData!.cells[materialKey(id, field)]).toEqual(unchanged[materialKey(id, field)]);
+    const edit: MetadataEdit = { kind: 'editMaterial', sceneId: f.overview, overrideId: id, appearance: { doubleSided: true } };
+    const reset: MetadataEdit = { kind: 'resetMaterial', sceneId: f.overview, overrideId: id, eventId: `evt_${tx}` };
+    expect(() => made.prepareEdit(made.token, { ...create, overrideId: `ovr_${'d'.repeat(32)}` }, provider, tx)).toThrow(/reserved/);
+    const [raw] = A.applyChanges(A.init<any>(), made.originalChanges());
+    const altered = (change: (d: any) => void) => ProjectMetadataSource.reopen(A.getAllChanges(A.change(A.clone(raw), change)), made.proof, metadataFixtureLimits);
+    const unknown = altered(d => { d.materialOverridesById[id].appearance = new A.ImmutableString(canonicalFixture({ lighting: 'unlit', future: { retained: true } })); });
+    const unknownProvider = await read(unknown);
+    for (const command of [edit, reset]) expect(() => unknown.prepareEdit(unknown.token, command, unknownProvider, tx)).toThrow();
+    const alternateRoute = { ...route, scope: { kind: 'project' as const } };
+    const a = altered(d => { d.materialOverridesById[id].routing = new A.ImmutableString(canonicalFixture(alternateRoute)); });
+    const b = altered(d => { const old = d.materialOverridesById[id].routing; delete d.materialOverridesById[id].routing; d.materialOverridesById[id].routing = old; });
+    const conflict = a.appendOriginal(b.originalChanges()), conflicted = await read(conflict), projected = metadataProjectView(conflicted);
+    expect(materialBucket(projected.materialData, route).kind).toBe('unresolved');
+    expect(materialBucket(projected.materialData, alternateRoute).kind).toBe('unresolved');
+    expect(projected.materialData!.cells[materialKey(id, 'routing')]).toBeUndefined();
+    for (const command of [edit, reset, { ...create, overrideId: `ovr_${'e'.repeat(32)}` }])
+      expect(() => conflict.prepareEdit(conflict.token, command, conflicted, tx)).toThrow();
+    const duplicate = altered(d => { const copy = `ovr_${'f'.repeat(32)}`; d.materialOverridesById[copy] = {};
+      for (const [field, value] of Object.entries(d.materialOverridesById[id])) d.materialOverridesById[copy][field] = field === 'id' ? new A.ImmutableString(canonicalFixture(copy)) : value; });
+    const dupProvider = await read(duplicate), dupView = metadataProjectView(dupProvider);
+    expect(materialBucket(dupView.materialData, route).kind).toBe('unresolved');
+    for (const command of [edit, reset]) expect(() => duplicate.prepareEdit(duplicate.token, command, dupProvider, tx)).toThrow();
+    const unknownRoute = altered(d => { d.materialOverridesById[id].routing = new A.ImmutableString(canonicalFixture({ ...route, future: true })); });
+    const unknownRouteProvider = await read(unknownRoute);
+    expect(materialBucket(metadataProjectView(unknownRouteProvider).materialData, route).kind).toBe('unresolved');
+    for (const command of [edit, reset, { ...create, overrideId: `ovr_${'e'.repeat(32)}` }])
+      expect(() => unknownRoute.prepareEdit(unknownRoute.token, command, unknownRouteProvider, tx)).toThrow();
+    const absentRoute = altered(d => { delete d.materialOverridesById[id].routing; }), absentProvider = await read(absentRoute);
+    const uncertain = metadataProjectView(absentProvider).materialData!;
+    expect(uncertain.routingUncertain).toBe(true); expect(materialBucket(uncertain, route).kind).toBe('unresolved');
+    expect(materialBucket(uncertain, alternateRoute).kind).toBe('unresolved');
+    expect(() => absentRoute.prepareEdit(absentRoute.token, { ...create, overrideId: `ovr_${'e'.repeat(32)}` }, absentProvider, tx)).toThrow();
+    expect(host.read().source!.token).toBe(seed.token); await host.dispose();
+  });
   it('mounts the existing editor, applies title+body as one original change, and cold-reopens without reading model bodies', async () => {
     const h = fixture(), host = await h.open(true);
     expect(host.read().state).toBe('ready'); expect(host.content.counts.bodyBytes).toBeGreaterThan(0);

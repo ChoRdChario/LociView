@@ -10,6 +10,8 @@ export const fixtureIds = Object.freeze({ project: id('prj', 1), overview: id('s
   detail: id('scn', 2), structure: id('ast', 1), equipment: id('ast', 2),
   shared: id('cap', 1), second: id('cap', 2) });
 export interface SyntheticProject {
+  /** Explicit identity for new saved workspaces; old fixtures retain their fixed identity. */
+  readonly projectId?: string;
   readonly state: SceneState;
   readonly resources: SceneResources;
   readonly modelNames: Readonly<Record<string, string>>;

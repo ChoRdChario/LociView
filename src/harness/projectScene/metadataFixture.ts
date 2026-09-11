@@ -7,6 +7,7 @@ import { value } from '../../scene/types';
 import { ProjectMetadataSource, type MetadataLimits } from '../../projectMetadata/source';
 import { newId } from '../../projectMetadata/persistence';
 import { metadataViewData } from './metadataViews';
+import { metadataMaterialData } from './metadataMaterials';
 
 export const metadataFixtureLimits: MetadataLimits = { maxNodes: 100_000, maxDepth: 32, maxStringScalars: 65_536,
   maxWork: 1_000_000, maxChanges: 1000, maxChangeBytes: 1_000_000, maxTotalBytes: 8_000_000, maxOperations: 20_000 };
@@ -47,6 +48,13 @@ export function createMetadataFixture(run: string): ProjectMetadataSource {
 
 export function metadataProjectView(provider: ProjectProviderRead): SyntheticProject {
   if (provider.kind !== 'scene-provider') throw Error('保存したシーンを確認できません。');
+  const identity = provider.inspection.candidates.fields.find(f => f.path.length === 1 && f.path[0] === 'identity');
+  const original = identity?.candidates[0]?.value;
+  if (!identity?.valid || identity.candidates.length !== 1 || original?.kind !== 'value' ||
+    !original.value || typeof original.value !== 'object' || Array.isArray(original.value))
+    throw Error('保存したプロジェクトの識別情報を確認できません。');
+  const projectId = (original.value as JsonObject).projectId;
+  if (typeof projectId !== 'string') throw Error('保存したプロジェクトの識別情報を確認できません。');
   const names: Record<string, string> = {}, colors: Record<string, ReturnType<typeof value<string>>> = {};
   const captionOwners: Record<string, { assetId: string; assetFrameId: string }> = {}, captionTemplates: Record<string, string> = {};
   for (const [id, row] of Object.entries(provider.details.mutable.assetsById)) {
@@ -60,6 +68,7 @@ export function metadataProjectView(provider: ProjectProviderRead): SyntheticPro
     if (row.colorSrgb?.kind === 'value' && Array.isArray(row.colorSrgb.value))
       colors[id] = value(`#${row.colorSrgb.value.map(v => Math.round(Number(v) * 255).toString(16).padStart(2, '0')).join('')}`);
   }
-  return freezeSynthetic({ ...initial, state: provider.state, resources: provider.resources,
-    modelNames: names, colors, captionOwners, captionTemplates, modelVersions: metadataModels, viewData: metadataViewData(provider) });
+  return freezeSynthetic({ ...initial, projectId, state: provider.state, resources: provider.resources,
+    modelNames: names, colors, captionOwners, captionTemplates, modelVersions: metadataModels,
+    viewData: metadataViewData(provider), materialData: metadataMaterialData(provider) });
 }

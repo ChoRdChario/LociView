@@ -85,7 +85,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   viewPanel.replaceChildren(viewport.view);
   materialPanel.replaceChildren(material.root);
   const limited = make('p', 'この保存経路ではマテリアルの編集は未接続です。');
-  materialPanel.append(limited); limited.hidden = !session.captionTextOnly;
+  materialPanel.append(limited); limited.hidden = !session.materialRestriction || session.readOnly;
   sidebar.append(navigation.taskControl, navigation.sceneControl, navigation.sceneContext, pin.actions, pinHelp,
     list.root, windowActions, editor, include.root, modelList.root, placement.actions, modelUpdate.root, materialPanel, viewPanel);
   content.append(stage, sidebar); root.append(header, notice, working, message, content, footer);
@@ -127,11 +127,11 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     materialPanel.hidden = task !== 'materials'; viewPanel.hidden = task !== 'views';
     if (session.captionTextOnly) {
       notice.textContent = session.readOnly ? '閲覧専用のタブです。編集する場合は、編集用タブを閉じてから再読み込みしてください。' :
-        '開発用・合成データのみ。キャプション・シーンへの所属・視点を保存できます。未適用の入力は再読み込みで失われます。';
+        '開発用・合成データのみ。キャプション・シーンへの所属・視点・マテリアルを保存できます。未適用の入力は再読み込みで失われます。';
       if (session.pinRestriction) pin.actions.hidden = pin.modeStrip.hidden = pinHelp.hidden = numeric.hidden = true;
       if (session.membershipRestriction) include.root.hidden = true;
       placement.actions.hidden = placement.modeStrip.hidden = modelUpdate.root.hidden = media.root.hidden = true;
-      material.root.hidden = true; modelList.root.inert = !!session.membershipRestriction;
+      material.root.hidden = !!session.materialRestriction && !session.readOnly; modelList.root.inert = !!session.membershipRestriction;
     }
     // A second visible-list pass restores the desired inner scroll after a tab was hidden.
     if (task === 'captions') list.render(captionContext);

@@ -244,7 +244,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         const providerImports = path.replaceAll('\\', '/').endsWith('/scene/projectProvider.ts') ? [
           '../domain/projectContent', '../domain/projectGraphSupport', '../domain/projectMutableFields', '../domain/projectCandidates',
           '../domain/atomicHistory', '../domain/projectContentChecks',
-        ] : [];
+        ] : path.replaceAll('\\', '/').endsWith('/scene/projectMaterialRoutes.ts') ? ['../domain/projectGraphSupport'] : [];
         expect(imports.every(p => p?.startsWith('./') || p === '../domain/values' || providerImports.includes(p!))).toBe(true);
       } else if (metadataFoundation) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
@@ -263,22 +263,24 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           session: ['@automerge/automerge/slim', '../platform/fs', '../domain/values', '../domain/projectContentChecks', '../domain/captionText', '../scene/projectProvider',
             './format', './source', './repository', './journal', './persistence', './commands'],
           commands: ['../domain/values', '../domain/projectMutableFields', '../domain/projectRecordFields', '../domain/projectGraphSupport',
-            '../scene/commands', '../scene/resolve', '../scene/types', '../scene/projectProvider', './format'],
+            '../domain/materialIntent', '../scene/projectMaterialRoutes', '../scene/commands', '../scene/resolve', '../scene/types', '../scene/projectProvider', './format'],
         };
         const name = path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '');
         expect(imports.every(p => byFile[name]!.includes(p!)), path).toBe(true);
         expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
-      } else if (/[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Browser|Intent|Views)\.ts$/.test(path)) {
+      } else if (/[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Browser|Intent|Views|Materials)\.ts$/.test(path)) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
         const byFile: Record<string, string[]> = {
           metadataFixture: ['./fixture', './modelFixture', './modelClosure', '../../domain/values', '../../scene/projectProvider',
-            '../../scene/types', '../../projectMetadata/source', '../../projectMetadata/persistence', './metadataViews'],
+            '../../scene/types', '../../projectMetadata/source', '../../projectMetadata/persistence', './metadataViews', './metadataMaterials'],
           metadataStorage: ['../../platform/fs', '../../domain/projectContentChecks', '../../domain/values', '../../projectMetadata/contentEvidence',
             '../../projectMetadata/source', '../../projectMetadata/persistence', './metadataFixture'],
           metadataHost: ['../../platform/fs', '../../platform/projectLock', '../../projectMetadata/session', '../../projectMetadata/repository',
             '../../projectMetadata/persistence', '../../projectMetadata/journal', './metadataFixture', './metadataStorage', './historyProjection', './metadataIntent'],
           metadataIntent: ['../../core/json', '../../domain/values', '../../domain/captionText', '../../scene/types', '../../projectMetadata/commands', './fixture', './metadataFixture'],
           metadataViews: ['../../scene/projectProvider', '../../scene/types', '../../domain/projectGraphSupport', '../../domain/values', './viewHistory', './historyPort'],
+          metadataMaterials: ['../../scene/projectProvider', '../../scene/projectMaterialRoutes', '../../scene/types', '../../domain/projectGraphSupport',
+            '../../domain/materialIntent', './materialHistory', './historyPort'],
           metadataBrowser: ['@automerge/automerge/slim', '@automerge/automerge/automerge.wasm?url', '@automerge/automerge-repo-storage-indexeddb',
             '../../platform/opfs', '../../platform/projectLock', './metadataHost', './session', './workspace', './viewport'],
         };

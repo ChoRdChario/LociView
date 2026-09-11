@@ -1,7 +1,9 @@
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
 import { checkMutableField, checkMutableRecord, type MutableRecordMap } from '../domain/projectMutableFields';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
-import { object } from '../domain/projectGraphSupport';
+import { list, object, same } from '../domain/projectGraphSupport';
+import { validateMaterialIntent } from '../domain/materialIntent';
+import { projectMaterialRoutes } from '../scene/projectMaterialRoutes';
 import { planSceneCommand } from '../scene/commands';
 import { resolveScene } from '../scene/resolve';
 import { value, type Anchor, type Field, type Membership } from '../scene/types';
@@ -18,7 +20,10 @@ export type MetadataEdit =
       camera: JsonObject; background: JsonObject; eventId: string }
   | { kind: 'editView'; sceneId: string; viewId: string; edits: { name?: string; orderKey?: string; camera?: JsonObject; background?: JsonObject } }
   | { kind: 'deleteView'; sceneId: string; viewId: string; eventId: string }
-  | { kind: 'setEntryView'; sceneId: string; viewId: string | null };
+  | { kind: 'setEntryView'; sceneId: string; viewId: string | null }
+  | { kind: 'createMaterial'; sceneId: string; overrideId: string; routing: JsonObject; appearance: JsonObject; compositing: JsonObject; eventId: string }
+  | { kind: 'editMaterial'; sceneId: string; overrideId: string; appearance: JsonObject }
+  | { kind: 'resetMaterial'; sceneId: string; overrideId: string; eventId: string };
 export interface MetadataRecordEdit { map: MutableRecordMap; id: string; create: boolean; fields: JsonObject; remove?: readonly 'defaultViewId'[] }
 type Provider = Extract<ProjectProviderRead, { kind: 'scene-provider' }>;
 const exact = <T>(field: Field<T> | undefined): T => field?.kind === 'value' ? field.value : fail('command-unresolved');
@@ -86,6 +91,43 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
   const capture = (camera: JsonObject, background: JsonObject) => {
     c.camera(camera, []); c.background(background, []);
     if (background.kind !== 'solid') fail('view-solid-only');
+  };
+  const material = (sceneId: string, routing: JsonObject, owner?: string) => {
+    checkMutableField(c, 'materialOverridesById', 'routing', routing);
+    if (c.unknown) fail('material-unknown-routing');
+    row('scenesById', sceneId);
+    const scope = object(routing.scope), target = object(routing.target);
+    if (scope.kind === 'scene' && scope.sceneId !== sceneId) fail('material-scene');
+    const assetId = target.assetId as string; row('assetsById', assetId);
+    const projection = exact(provider.resources.assets[assetId]?.projection);
+    let found = false;
+    for (const repId of projection.representationIds) {
+      const rep = exact(provider.details.immutable.representationsById[repId]);
+      if (rep.assetId !== assetId || rep.variantFamilyId !== target.variantFamilyId || !rep.materialCatalog) continue;
+      const catalog = object(rep.materialCatalog); if (catalog.layoutId !== target.materialLayoutId) continue;
+      for (const slot of list(catalog.slots).map(object)) if (slot.logicalMaterialSlotId === target.logicalMaterialSlotId) {
+        if (!same(slot.sourceSemantics, { coverage: { kind: 'opaque' }, optics: 'surface', lighting: 'lit', doubleSided: false })) fail('material-source');
+        found = true;
+      }
+    }
+    if (!found) fail('material-target');
+    for (const [id, r] of Object.entries(provider.details.mutable.materialOverridesById)) {
+      if (r.lifecycle?.kind === 'value' && object(r.lifecycle.value).state === 'deleted') continue;
+      const reservations = projectMaterialRoutes(provider, id);
+      if (!reservations.complete) fail('material-routing-unresolved');
+      if (!reservations.routes.some(route => same(json(route), routing))) continue;
+      if (id !== owner || r.routing?.kind !== 'value' || r.lifecycle?.kind !== 'value' || reservations.hasUnknownFields)
+        fail('material-reserved');
+    }
+  };
+  const materialIntent = (appearance: JsonObject, compositing: JsonObject) => {
+    checkMutableField(c, 'materialOverridesById', 'appearance', appearance);
+    checkMutableField(c, 'materialOverridesById', 'compositing', compositing);
+    const intent = validateMaterialIntent({ appearance, compositing }, limits);
+    if (c.unknown || intent.compositing.optics === 'transmission' ||
+      ['smoothBlend', 'ditherCoverage'].includes(intent.compositing.coverage.policy) ||
+      (intent.appearance.chroma?.softness ?? 0) > 0 ||
+      (intent.compositing.coverage.policy === 'inherit' && (intent.appearance.opacity ?? 1) < 1)) fail('material-unsupported');
   };
   switch (command.kind) {
     case 'editCaption': {
@@ -167,6 +209,25 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
         `evt_${'0'.repeat(32)}`); // Pure validation only; no lifecycle/event is authored.
       add('scenesById', command.sceneId, command.viewId === null ? {} : { defaultViewId: command.viewId }, false,
         command.viewId === null ? ['defaultViewId'] : []); break;
+    }
+    case 'createMaterial': {
+      shape(raw, ['kind', 'sceneId', 'overrideId', 'routing', 'appearance', 'compositing', 'eventId']);
+      material(command.sceneId, command.routing); materialIntent(command.appearance, command.compositing);
+      add('materialOverridesById', command.overrideId, { id: command.overrideId, routing: command.routing,
+        appearance: command.appearance, compositing: command.compositing,
+        lifecycle: { state: 'active', eventId: command.eventId, reason: 'initial' } }, true); break;
+    }
+    case 'editMaterial': case 'resetMaterial': {
+      shape(raw, ['kind', 'sceneId', 'overrideId', command.kind === 'editMaterial' ? 'appearance' : 'eventId']);
+      const r = row('materialOverridesById', command.overrideId);
+      checkMutableField(c, 'materialOverridesById', 'lifecycle', exact(r.lifecycle));
+      const routing = exact(r.routing) as JsonObject, appearance = exact(r.appearance) as JsonObject, compositing = exact(r.compositing) as JsonObject;
+      exact(provider.resources.materials[command.overrideId]?.intent);
+      material(command.sceneId, routing, command.overrideId); materialIntent(appearance, compositing);
+      if (command.kind === 'editMaterial') {
+        materialIntent(command.appearance, compositing); add('materialOverridesById', command.overrideId, { appearance: command.appearance });
+      } else add('materialOverridesById', command.overrideId, { lifecycle: { state: 'deleted', eventId: command.eventId, reason: 'userDelete' } });
+      break;
     }
     default: fail('command-kind');
   }

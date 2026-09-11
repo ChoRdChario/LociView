@@ -11,6 +11,63 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — approved S1 service entry (2026-09-11)
 
+#### Material connection — implemented, real-browser acceptance pending (from `c9c480a`)
+
+- [x] Specify typed create/appearance-edit/reset, exact target/candidate reservations,
+  provider material projection and actual Project identity before implementation.
+- [x] Connect the existing material UI to the same fresh-provider journal/retry.
+  Retain whole Scene-over-Project precedence; reset only a confirmed override.
+- [x] Verify mounted appearance/scope/reset, cold reopen, exact retry and refusal
+  of stale, duplicate, unresolved, unsupported or unknown affected state.
+- [x] Independent read-only review, typecheck/build/HTTP graph, then full tests
+  with two workers; update navigation docs and checkpoint.
+
+Scope/exit: new synthetic `storage=metadata` only; existing lighting, sidedness
+and hard-chroma UI on the known verified triangle catalogs. Atomic solid sRGB
+values are preserved; a base-color authoring control does not yet exist and is
+not added in this connection. No renderer,
+new binary, dependency, schema/wire, migration, model binding/placement, media,
+team exchange, ordinary home or deployment. Stop on contract conflict or new
+authority. Browser/physical storage/iOS remain a later clearly labelled batch.
+Short meta-audit: clean `c9c480a` closes Saved Views; this connection extends the
+same saved workspace instead of adding another probe. The PO approved continuation.
+Reuse material core/UI/effect tests and the existing host faults; only the new
+storage connection and candidate reservation guards need added coverage.
+
+Review: existing Project/Scene material UI now persists lighting/sidedness/hard
+chroma through the same journal. Reset writes only a tombstone after confirmation;
+Scene intent remains a whole replacement. Source commands retain exact sRGB,
+routing/compositing, and complete original semantic reservations. Unknown/missing
+routes cannot become an empty slot. Actual Project identity is read from the same
+provider; readonly users can inspect targets/scopes but not author/reset.
+No existing run was reseeded and no new binary was introduced.
+
+Three added host tests cover mounted effects, both scope resets, cold reopen and
+zero extra body reads; retained draft/ID/original bytes after failed publication;
+and stale/catalog/duplicate/conflict/unknown/missing-route refusal. Exact service
+sRGB is tested separately from the UI, which lacks a base-color input. Initial
+test setup incorrectly addressed a nonexistent color input and used a mutable
+Automerge text value; those fixtures were corrected without adding UI or weakening
+the scalar boundary. The explicit dependency-isolation allowlist was updated.
+Typecheck PASS; focused 4 files / 40 PASS; ordinary build PASS with unchanged
+mixed-import/large-chunk warnings; saved-entry HTTP/Wasm graph PASS. Two independent
+read-only reviews found no scoped blocker. Final root run
+`npm test -- --maxWorkers=2`: 109 files / 1,910 PASS / 21 TODO, exit 0.
+`git diff --check` PASS. No runtime failure, new dependency or private source access;
+public files, ordinary entry and deployment configuration are unchanged. Started
+clean `c9c480a`, tracked origin ahead 17 / behind 0. This closes material save/reopen
+in the bounded host, not browser/raster/physical-storage/iOS or aggregate adoption.
+
+Next finite boundary: attach the two existing known synthetic PNGs in this host.
+This needs verified media inventory/facts and immutable MediaResource introduction,
+not just enabling a button: existing runs have no media resources. First specify
+the exact introduction boundary. A fresh-run-only seed extension is within the
+current approval; never silently reseed an existing run. If preserving the current
+run while adding media is selected, specify explicit immutable registration and
+binary/journal staging first. Do not substitute static fixture images for missing
+saved bytes. Real files/new formats/dependencies/wire and media-body deletion
+remain excluded. Continue the same finite workflow, not a separate storage probe.
+
 #### Saved View connection — implemented, real-browser acceptance pending (after `1fe2857`)
 
 - [x] Specify typed create/edit/delete/entry commands and the existing field-history
@@ -60,7 +117,7 @@ One connected return-to-saved-view workflow is now closed in code/memory-port
 scope. Retain the existing browser bootstrap limitation and later manual batch;
 it is not a reason to repeat old PO tests or start another storage probe.
 
-Next finite boundary: connect the existing exact Project/Scene material override
+Next boundary at the Saved View checkpoint (now completed above): connect the existing exact Project/Scene material override
 UI to this host. Reuse the known triangle catalogs/content facts and retained
 save/retry. Limit to create/appearance-edit/explicit reset, existing solid color,
 lighting, sidedness and hard chroma. First specify actual Project identity and

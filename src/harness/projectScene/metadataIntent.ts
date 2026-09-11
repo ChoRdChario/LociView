@@ -30,6 +30,24 @@ function membership(key: string, text: string): Membership {
 export function metadataIntent(changes: Readonly<Record<string, string>>, project: SyntheticProject,
   context?: { sceneId: string }): MetadataEdit {
   const rows = Object.entries(changes); if (!rows.length || rows.length > 6 || rows.some(([, v]) => typeof v !== 'string')) return fail();
+  if (rows[0]![0].startsWith('material/')) {
+    const overrideId = rows[0]![0].split('/')[1]!;
+    if (!context?.sceneId || !/^ovr_[0-9a-f]{32}$/.test(overrideId) || rows.some(([k]) => !k.startsWith(`material/${overrideId}/`))) return fail();
+    const fields = Object.fromEntries(rows.map(([k, text]) => [k.slice(`material/${overrideId}/`.length), text]));
+    if ('routing' in fields) {
+      keys(fields, ['routing', 'appearance', 'compositing', 'lifecycle']); const life = parse(fields.lifecycle!);
+      keys(life, ['state', 'eventId', 'reason']);
+      if (life.state !== 'active' || life.reason !== 'initial' || typeof life.eventId !== 'string') return fail();
+      return { kind: 'createMaterial', sceneId: context.sceneId, overrideId, routing: parse(fields.routing!),
+        appearance: parse(fields.appearance!), compositing: parse(fields.compositing!), eventId: life.eventId };
+    }
+    if ('appearance' in fields) {
+      keys(fields, ['appearance']); return { kind: 'editMaterial', sceneId: context.sceneId, overrideId, appearance: parse(fields.appearance!) };
+    }
+    keys(fields, ['lifecycle']); const life = parse(fields.lifecycle!); keys(life, ['state', 'eventId', 'reason']);
+    if (life.state !== 'deleted' || life.reason !== 'userDelete' || typeof life.eventId !== 'string') return fail();
+    return { kind: 'resetMaterial', sceneId: context.sceneId, overrideId, eventId: life.eventId };
+  }
   if (rows[0]![0].startsWith('scene/')) {
     if (rows.length !== 1 || !context?.sceneId || rows[0]![0] !== `scene/${context.sceneId}/entry`) return fail();
     const raw: unknown = parseJsonWithoutDuplicateMembers(rows[0]![1]);

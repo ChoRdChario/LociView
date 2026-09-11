@@ -13,7 +13,9 @@ export interface SyntheticMaterial extends Material {
   readonly candidates: readonly MaterialRouting[]; readonly appearance: Field<MaterialAppearance>;
   readonly compositing: Field<MaterialCompositing>; readonly intent: Field<MaterialIntent>;
 }
-export interface MaterialData { readonly cells: Readonly<Record<string, HistoryCell>>; readonly records: Readonly<Record<string, SyntheticMaterial>> }
+export interface MaterialData { readonly cells: Readonly<Record<string, HistoryCell>>; readonly records: Readonly<Record<string, SyntheticMaterial>>;
+  /** An unclassifiable original route prevents proving any target bucket empty. */
+  readonly routingUncertain?: boolean }
 export const materialKey = (id: string, field: string) => `material/${id}/${field}`;
 export const targetKey = (t: MaterialTarget) => canonicalFixture(t);
 export const routingKey = (r: MaterialRouting) => canonicalFixture(r);
@@ -62,6 +64,7 @@ export function projectMaterialHistory(snapshot: HistorySnapshot, models: readon
   return freezeSynthetic({ cells, records });
 }
 export function materialBucket(data: MaterialData | undefined, routing: MaterialRouting): Field<SyntheticMaterial | null> {
+  if (data?.routingUncertain) return unresolved();
   const key = routingKey(routing), rows = Object.values(data?.records ?? {}).filter(r => (r.lifecycle.kind !== 'value' || r.lifecycle.value.state !== 'deleted') && r.candidates.some(c => routingKey(c) === key));
   return !rows.length ? value(null) : rows.length !== 1 || rows[0]!.routing.kind !== 'value' || rows[0]!.lifecycle.kind !== 'value' ? unresolved() : value(rows[0]!);
 }

@@ -30,12 +30,16 @@ atomic Caption text/color, manual pin add/move and Scene Caption/model membershi
 saving. New Caption IDs and independent per-Scene exclusion/re-inclusion use the
 same original-change journal; previews/cancellation remain local. Saved View
 create/recapture/name/order/confirmed delete and Scene entry set/clear now use
-that same path, with original per-field versions and local recall. Model geometry/
-placement, material/media writes and exchange remain unconnected here.
+that same path, with original per-field versions and local recall. Exact Project/
+Scene material override creation, appearance editing and confirmed reset now share
+that save/reopen path; routing reservations never become an invented empty slot.
+Existing lighting/sidedness/hard-chroma controls are connected, while a base-color
+input is not yet exposed. Model geometry/placement, media writes and exchange
+remain unconnected here.
 The old saved pair and ordinary home are unchanged.
 Mounted memory-port and HTTP dependency tests pass; actual browser/device/storage
-adoption remains unverified. Next connect exact existing material overrides in this
-same host; see todo for the finite boundary and uiux-handoff for batched checks.
+adoption remains unverified. Next connect existing synthetic attachments/media in
+this same host; see todo for the finite boundary and uiux-handoff for batched checks.
 
 Current task (2026-09-10, after readiness checkpoint `77a22b0`): PO approved
 unplaced-Caption preservation. Specification 05 §9.4 proposes its exact atomic
