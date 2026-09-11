@@ -9,7 +9,9 @@
 > 02 §8 full-source receive and Caption text resolution now have bounded new
 > service/host paths, now including independent Caption membership copies.
 > Prepared model/pin updates now make two saved full-source rounds in synthetic
-> ports. Next: remaining model status/copy conflicts; exchange-base/delta and
+> ports. Known ready-model status conflicts now have explicit comparison/selection.
+> Next: independent model membership copies; other scalar/lifecycle conflicts,
+> exchange-base/delta and
 > real-data adoption retain their gates. Latest UI feedback does not
 > automatically set priority. Old saved-host Desktop PASS remains narrowly scoped.
 > Candidate history/CAS/journal proofs remain partial, not storage adoption or

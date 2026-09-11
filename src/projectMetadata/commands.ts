@@ -13,9 +13,11 @@ import { fail, type MetadataLimits } from './format';
 import { normalizeCaptionText } from '../domain/captionText';
 import { planCaptionMembershipResolution, type CaptionMembershipResolution } from './membership';
 import { metadataImmutableReader } from './records';
+import { assetStatusCandidates } from './assetStatus';
 
 export type MetadataEdit =
   | CaptionMembershipResolution
+  | { kind: 'resolveAssetStatus'; assetId: string; operationId: string }
   | { kind: 'activatePreparedRevision'; sceneId: string; assetId: string; expectedBindingId: string; revisionId: string; binding: JsonObject }
   | { kind: 'moveAsset'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject }
   | { kind: 'editCaption'; captionId: string; edits: { title?: string; body?: string; colorSrgb?: readonly number[] } }
@@ -147,6 +149,13 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       (intent.compositing.coverage.policy === 'inherit' && (intent.appearance.opacity ?? 1) < 1)) fail('material-unsupported');
   };
   switch (command.kind) {
+    case 'resolveAssetStatus': {
+      shape(raw, ['kind', 'assetId', 'operationId']);
+      const candidates = assetStatusCandidates(provider, command.assetId, limits);
+      const selected = candidates.find(c => c.operationId === command.operationId);
+      if (!selected) fail('asset-resolution-choice');
+      result.push({ map: 'assetsById', id: command.assetId, create: false, fields: { status: selected!.status } }); break;
+    }
     case 'resolveCaptionMembership': return planCaptionMembershipResolution(provider, command, limits);
     case 'activatePreparedRevision': {
       shape(raw, ['kind', 'sceneId', 'assetId', 'expectedBindingId', 'revisionId', 'binding']);

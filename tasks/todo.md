@@ -77,14 +77,20 @@ is claimed and no repeated human checkpoint is requested. Inventory recount:
 64 = 20 connected / 9 partial / 24 other-path / 11 new. M08 is synthetic-only;
 T01/T02 remain partial. Full practical-team candidate remains incomplete.
 
-#### Next finite slice — explicit active-model conflict resolution (T03)
+#### Completed bounded slice — explicit active-model conflict resolution (T03, from `0f28455`)
 
-- [ ] Reuse complete status candidates and compare each candidate's known model/
+Previous goal turn was progress: prepared model/pin team rounds were committed
+and verified in `0f28455`. This turn rechecked clean `g0-baseline`; full practical
+team scope and the separate push denial remain unchanged. Target and acceptance
+are the three finite items below and 05 §8/§13.2. Independent source/UI planning
+confirms the existing candidate provider and journal suffice; no adoption change.
+
+- [x] Reuse complete status candidates and compare each candidate's known model/
   placement; no initial winner, projection or inferred transform combination.
-- [ ] Add typed `resolveAssetStatus` with exact source token, Asset and chosen
+- [x] Add typed `resolveAssetStatus` with exact source token, Asset and chosen
   operation ID; validate active lifecycle, every candidate and saved closure.
   Write only the chosen complete status after all candidates in one causal edit.
-- [ ] Reuse existing comparison/receive/save UI for two conflicting prepared
+- [x] Reuse existing comparison/receive/save UI for two conflicting prepared
   updates (or placement/update), explicit selection, retained Caption data,
   failed-publication retry, cold replay and unseen-change conflict recurrence.
 
@@ -98,6 +104,21 @@ complete fresh-ID remap; current fixed-ID content/projection helpers do not yet
 admit those copies. Do not hide an unresolved parent/reference by dropping it.
 Stop only on actual contract conflict/new authority; ordinary implementation
 sequencing does not require a fresh PO checkpoint. See 05 §13.2 for acceptance.
+
+Review/result: complete known ready-status candidates now show model, position,
+rotation and scale independently of current projection. Explicit selection writes
+only the whole status once, preserving every Caption/attachment and Scene edge.
+The synthetic receiver can deliver a model update from retained seed history.
+Both choices, failed-publication exact retry, cold replay/no-op and a previously
+unseen update reintroducing a conflict PASS. Invalid/unknown/stale/readonly choices
+write nothing; stale model selection and concurrent IME draft remain visible.
+No default winner, inferred alignment, automatic pin repair or incomplete preview.
+
+Final tree: typecheck/build PASS; root `npm test -- --maxWorkers=2` exited 0:
+109 files / 1,955 PASS / 21 existing TODO (112.73 s). Read-only source and UI
+reviews have no mandatory findings. No browser/input/device/offline claim was
+added; their existing consolidated batch stays pending. T03 is still partial,
+not all-field/lifecycle resolution. Inventory remains 20/9/24/11 (64 groups).
 
 #### Active continuation — independent Caption copies (2026-09-12, from `d229c11`)
 

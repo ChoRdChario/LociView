@@ -106,9 +106,9 @@ export async function openMetadataHost(options: MetadataHostOptions) {
       }),
     };
     const demos = new Map<string, FullMetadataSource>();
-    const demoSource = async (kind: 'title' | 'membership'): Promise<FullMetadataSource> => {
+    const demoSource = async (kind: 'title' | 'membership' | 'model'): Promise<FullMetadataSource> => {
       const cached = demos.get(kind); if (cached) return cached;
-      const packageId = kind === 'title' ? `pkg_${run}` : `pkg_${(await digest(new TextEncoder().encode(`synthetic-membership:${run}`))).slice(0, 32)}`;
+      const packageId = kind === 'title' ? `pkg_${run}` : `pkg_${(await digest(new TextEncoder().encode(`synthetic-${kind}:${run}`))).slice(0, 32)}`;
       const previous = (await journal.entries()).find(e => e.prepared?.remote?.source.packageId === packageId);
       let demoInput: FullMetadataSource;
       if (previous?.prepared?.remote) {
@@ -121,7 +121,20 @@ export async function openMetadataHost(options: MetadataHostOptions) {
         demoInput = { packageId: descriptor.packageId, metadataBytes: bytes, proof: previous.start.proof, remoteHeads: descriptor.remoteHeads };
       } else {
         // Branch from the original synthetic seed, not the receiver's edited state.
-        const remote = kind === 'title' ? await seed.prepareCaptionText(seed.token, fixtureIds.shared, 'title', '配布された記録') :
+        let remote: typeof seed;
+        if (kind === 'model') {
+          const provider = await readProjectScene(seed.read(), limits, content.verifier(false));
+          if (provider.kind !== 'scene-provider') throw Error('更新元のモデルを確認できません。');
+          const versions = metadataProjectView(provider, content.images).modelVersions!;
+          const current = versions.find(v => v.assetId === fixtureIds.equipment && v.closure.shape === 'original');
+          const target = versions.find(v => v.assetId === fixtureIds.equipment && v.closure.shape === 'updated');
+          if (!current || !target) throw Error('この保存データには更新する合成モデルがありません。');
+          const binding = createFixtureModel({ ...fixtureModelIds(target.closure), binding: `bnd_${newId()}` }, 'updated',
+            current.closure.binding.assetToProject, current.projection.bindingId).binding;
+          remote = seed.prepareEdit(seed.token, { kind: 'activatePreparedRevision', sceneId: fixtureIds.overview, assetId: fixtureIds.equipment,
+            expectedBindingId: current.projection.bindingId, revisionId: target.projection.revisionId,
+            binding: cloneCanonicalValue(binding, limits) as JsonObject }, provider, newId());
+        } else remote = kind === 'title' ? await seed.prepareCaptionText(seed.token, fixtureIds.shared, 'title', '配布された記録') :
           seed.prepareEdit(seed.token, { kind: 'include', sceneId: fixtureIds.detail, resourceKind: 'caption', resourceId: fixtureIds.second,
             membershipId: `scm_${newId()}`, orderKey: 'B', eventId: `evt_${newId()}` },
           await readProjectScene(seed.read(), limits, content.verifier(false)), newId());
@@ -130,11 +143,11 @@ export async function openMetadataHost(options: MetadataHostOptions) {
       demos.set(kind, demoInput);
       return demoInput;
     };
-    const receive = (expectedToken: string, input?: FullMetadataSource, demo: 'title' | 'membership' = 'title') => execute(async () => {
+    const receive = (expectedToken: string, input?: FullMetadataSource, demo: 'title' | 'membership' | 'model' = 'title') => execute(async () => {
       if (authority.readOnly) throw Error('このタブは閲覧専用です。');
       return ready(await service.receiveFullSource(expectedToken, input ?? await demoSource(demo)));
     }, '更新を受け取れません。');
-    const resolve = (expectedToken: string, command: Extract<MetadataEdit, { kind: 'resolveCaptionText' | 'resolveCaptionMembership' }>) => execute(async () => {
+    const resolve = (expectedToken: string, command: Extract<MetadataEdit, { kind: 'resolveCaptionText' | 'resolveCaptionMembership' | 'resolveAssetStatus' }>) => execute(async () => {
       if (authority.readOnly) throw Error('このタブは閲覧専用です。');
       return ready(await service.edit(expectedToken, command));
     }, '競合を解消できません。');

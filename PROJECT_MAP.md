@@ -20,6 +20,9 @@ new-service/host paths. Prepared model activation, explicit pin correction and
 two saved full-source team rounds now work in synthetic storage ports. Model
 copies, remaining scalar conflicts and exchange-base/delta still remain;
 real-file/wire adoption remains separately gated. Latest UI complaints do not set priority.
+Competing known ready-model statuses now support complete model/placement comparison
+and explicit causal selection in the same host, including saved retry/cold replay.
+This does not resolve every scalar/lifecycle conflict or connect model copies.
 
 2026-09-11 current implementation: PO explicitly approved 05 §13.2's S1 service
 implementation before aggregate adoption, new synthetic-only development activation

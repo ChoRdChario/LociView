@@ -2,7 +2,7 @@
 
 > CURRENT INVENTORY / 2026-09-12。全体監査基点: `b73315b851f627ca61029cfb73caf23f6e4829bd`。
 > その後の実装差分: 新metadataの完全履歴受信・Caption文言の明示解消・重複Captionの独立コピー、
-> 準備済みモデル切替とpin修正の保存・二人二巡を限定接続。
+> 準備済みモデル切替とpin修正の保存・二人二巡、モデルstatusの明示解消を限定接続。
 > 保存・復旧・再受信までの合成テストが通る。実ファイル／実機受入れは未完了。
 > 新しい仕様・採用判断ではない。承認済み要件と現行code/testsの距離を記録する。
 > 実装順は最新のUI指摘順ではなく、依存関係と `TEAM-FLOW-01` への効果から選ぶ。
@@ -45,7 +45,7 @@
 |---|---|---|
 | 通常home → Native | 実モデル／画像、DisplaySet、限定backup／collaboration／review／clean、旧Desktop・iPhone合格 | 新ProjectScene／継続因果履歴／新保存サービスの完成 |
 | project-scene memory／旧 `storage=saved` | 合成の2人チーム、更新・競合・独立copy・保存の限定ループ | 新metadata serviceまたは実ファイル製品wireの接続済み |
-| project-scene `storage=metadata` | 新source/repository/session/journalと、今回19群の合成UI接続 | 任意モデル／任意画像／チーム受信／通常home／offlineの合格 |
+| project-scene `storage=metadata` | 新source/repository/session/journalと20群の合成UI接続、限定履歴受信・明示解消 | 任意モデル／任意画像／実ファイルのチーム受信／通常home／offlineの合格 |
 
 ## 2. 全機能群
 
@@ -141,7 +141,7 @@
 |---|---|---|---|---|
 | T01 | 配布された更新を手元の記録を保って受け取る | 部品未接続 | 新serviceの完全source受信／remote journalと合成タイトル／登録のUI受信を接続。準備済みモデル切替・手元本文保持・要確認・明示補正の二人二巡を保存ポートで確認。モデル交換の通常UI／実ファイルは未接続、F01/F02参照。 | [src/projectMetadata/session.ts](../src/projectMetadata/session.ts) / [src/projectMetadata/remote.ts](../src/projectMetadata/remote.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
 | T02 | 元の配布状態を保持し、変更分を繰り返し返す | 部品未接続 | 新serviceの完全source往復は原履歴を保持し二巡・no-op・中断復旧・再開まで確認。専用exchange-base記録・source-derived deltaは未接続。旧savedの固定base/deltaを流用済みとはしない。portable wireはF02、06の批准境界を維持。 | [src/projectMetadata/session.ts](../src/projectMetadata/session.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) / [docs/specs/06-project-package-wire.md](../docs/specs/06-project-package-wire.md) |
-| T03 | 同じ項目の競合を比較し、明示的に解消する | 部品未接続 | Caption title/bodyの候補比較→明示選択／手動文言→1変更の保存・cold retryを接続。同値候補も明示解消し、元履歴を保持。他のfield／binding／lifecycle等は未接続。 | [src/harness/projectScene/metadataConflictControls.ts](../src/harness/projectScene/metadataConflictControls.ts) / [src/projectMetadata/commands.ts](../src/projectMetadata/commands.ts) |
+| T03 | 同じ項目の競合を比較し、明示的に解消する | 部品未接続 | Caption title/bodyの明示選択／手動文言と、既知ready-model statusの全候補比較／明示選択を1変更の保存・cold retryへ接続。元履歴・Captionを保持、後着更新は再競合。他のfield／lifecycle等は未接続。 | [src/harness/projectScene/metadataConflictControls.ts](../src/harness/projectScene/metadataConflictControls.ts) / [src/harness/projectScene/metadataAssetStatusControls.ts](../src/harness/projectScene/metadataAssetStatusControls.ts) / [src/projectMetadata/commands.ts](../src/projectMetadata/commands.ts) |
 | T04 | 重複所属で片方／両方を選び、独立項目として残す | 部品未接続 | 新service/hostのCaption重複は明示的な元登録選択→片方／独立した両方を接続。本文・anchor・添付・tag所属の完全コピー、optional不在、別Scene不変更、exact retry／cold replayを確認。モデル独立copyとdeep remapは未接続。 | [src/projectMetadata/membership.ts](../src/projectMetadata/membership.ts) / [src/harness/projectScene/metadataMembershipControls.ts](../src/harness/projectScene/metadataMembershipControls.ts) / [tests/projectMetadataPersistence.test.ts](../tests/projectMetadataPersistence.test.ts) |
 
 ### ファイル・移行

@@ -122,6 +122,7 @@ export class ProjectMetadataSource {
       // write: remove all observed values, then set the explicit choice in the
       // SAME change. No intermediate absence is published or saved separately.
       if (command.kind === 'resolveCaptionText') delete draft.captionsById[command.captionId][command.field];
+      if (command.kind === 'resolveAssetStatus') delete draft.assetsById[command.assetId].status;
       for (const edit of edits) {
         if (edit.map === 'mediaResourcesById' || edit.map === 'assetBindingsById') {
           if (!edit.create) fail('immutable-replacement');

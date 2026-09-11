@@ -28,6 +28,7 @@ import { syntheticDisplay } from '../../src/harness/projectScene/viewportModel';
 import { canonicalFixture, fixtureRecordDigest, moveFixtureModel, createFixtureModel, fixtureModelIds } from '../../src/harness/projectScene/modelClosure';
 import { metadataProviderReady } from '../../src/projectMetadata/session';
 import { metadataImmutableReader } from '../../src/projectMetadata/records';
+import { assetStatusCandidates } from '../../src/projectMetadata/assetStatus';
 import { modelClosureKey } from '../../src/harness/projectScene/modelHistory';
 import type { JsonObject } from '../../src/domain/values';
 import { metadataModels } from '../../src/harness/projectScene/metadataFixture';
@@ -124,6 +125,91 @@ async function correctPin(s: SyntheticSession, position: readonly [number, numbe
   await acknowledge(s, () => { s.acceptPin(plan); });
   expect(s.acknowledgment.state).toBe('idle');
 }
+
+describe('saved explicit model status resolution; synthetic ports/DOM only', () => {
+  it.each([0, 1])('chooses complete candidate %s, preserves Caption data and retries exact bytes; unseen update conflicts again', async index => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority), media = mediaHost(s);
+    await media.add(0); media.w.dispose(); const seed = host.read().source!;
+    const w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s); select(s); await apply(s, { body: '手元の記録を保持' });
+    selectModel(s); const initial = s.modelUpdateContext().current!.closure;
+    expect(s.beginModelPlacement()).toBe(true); s.changeModelPlacement(['6', '2', '1']);
+    await acknowledge(s, () => { s.finishModelPlacement(); });
+    const records = s.snapshot.resources.captions, attachments = s.snapshot.mediaData;
+    const ui = createMetadataReceiveControls(new RecordedDocument().asDocument(), host, s, () => {}), root = record(ui.root);
+    setInput(picker(root, '受信する合成更新'), 'model');
+    await acknowledge(s, () => button(root, '開発用の更新を受け取る').fire('click'));
+    expect(host.read().state).toBe('ready'); expect(s.snapshot.resources.assets[f.equipment]!.projection.kind).toBe('unresolved');
+    for (const scene of [f.overview, f.detail]) expect(syntheticDisplay(s.snapshot, scene, null, null).models.some(m => m.binding.assetId === f.equipment)).toBe(false);
+    const source = host.read().source!, provider = host.read().provider!;
+    if (provider.kind !== 'scene-provider') throw Error('provider');
+    const candidates = assetStatusCandidates(provider, f.equipment, metadataFixtureLimits); expect(candidates).toHaveLength(2);
+    const list = named(root, 'モデルの競合'), choice = picker(list, '残すモデルと配置'), confirm = button(list, 'このモデルと配置を使う');
+    expect(choice.value).toBe(''); expect(confirm.disabled).toBe(true); expect(ui.hasChanges()).toBe(false);
+    expect(descendants(list).some(n => n.textContent.includes('6 / 2 / 1'))).toBe(true);
+    const selected = candidates[index]!; setInput(choice, selected.operationId); expect(ui.hasChanges()).toBe(true);
+    expect(confirm.disabled).toBe(false); expect(s.snapshot.resources.assets[f.equipment]!.projection.kind).toBe('unresolved');
+    h.base.rejectPublication = true; await acknowledge(s, () => confirm.fire('click'));
+    expect(s.acknowledgment.state).toBe('failed'); expect(choice.value).toBe(selected.operationId);
+    expect(host.read().source!.token).toBe(source.token);
+    const paths = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.endsWith('.amchange'));
+    const bytes = await Promise.all(paths.map(p => h.base.readBytes(p))), prepared = source.appendOriginal(bytes.map(b => b!));
+    h.base.rejectPublication = false; await acknowledge(s, () => { s.retryWorking(); });
+    expect(s.acknowledgment.state).toBe('idle'); expect(ui.hasChanges()).toBe(false); expect(list.children).toHaveLength(0);
+    expect(host.read().source!.token).toBe(prepared.token); expect(await Promise.all(paths.map(p => h.base.readBytes(p)))).toEqual(bytes);
+    expect(host.read().source!.originalChanges()).toHaveLength(source.originalChanges().length + 1);
+    expect(s.snapshot.resources.captions).toEqual(records); expect(s.snapshot.mediaData).toEqual(attachments);
+    const bound = s.snapshot.resources.assets[f.equipment]!.projection;
+    expect(bound).toMatchObject({ kind: 'value', value: { bindingId: selected.binding.id, revisionId: selected.revision.id } });
+    for (const scene of [f.overview, f.detail]) expect(syntheticDisplay(s.snapshot, scene, null, null).models.find(m => m.binding.assetId === f.equipment)!.binding).toEqual(selected.binding);
+    const frozen = host.read().source!.originalChanges(); ui.dispose(); w.dispose(); await host.dispose();
+    const cold = await h.open(); expect(cold.read().source!.originalChanges()).toEqual(frozen);
+    const count = h.base.writes; await cold.receive(cold.read().source!.token, undefined, 'model');
+    expect(h.base.writes).toBe(count); expect(cold.read().source!.originalChanges()).toEqual(frozen);
+    // An edit from before resolution is unseen, not a later serial overwrite.
+    const binding = moveFixtureModel(initial, `bnd_${'d'.repeat(32)}`, [9, 3, 2]).binding;
+    const earlierProvider = await readProjectScene(seed.read(), metadataFixtureLimits, cold.content.verifier(false));
+    const unseen = seed.prepareEdit(seed.token, { kind: 'moveAsset', sceneId: f.overview, assetId: f.equipment,
+      expectedBindingId: initial.binding.id, binding: JSON.parse(canonicalFixture(binding)) }, earlierProvider, 'e'.repeat(32));
+    await cold.receive(cold.read().source!.token, fullSource(unseen, 99));
+    expect(cold.read().state).toBe('ready'); expect(cold.authority.read().resources.assets[f.equipment]!.projection.kind).toBe('unresolved');
+    expect(cold.content.counts.bodyBytes).toBe(0); await cold.dispose();
+  });
+
+  it('retains stale selections and IME drafts, and rejects invalid/readonly choices without journaling', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority);
+    const w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s); select(s); await apply(s, { title: '手元のタイトル' });
+    selectModel(s); s.beginModelPlacement(); s.changeModelPlacement(['6', '2', '1']); await acknowledge(s, () => { s.finishModelPlacement(); });
+    await host.receive(host.read().source!.token, undefined, 'model'); s.refreshHistory();
+    await host.receive(host.read().source!.token); s.refreshHistory();
+    const source = host.read().source!, provider = host.read().provider!; if (provider.kind !== 'scene-provider') throw Error('provider');
+    const candidates = assetStatusCandidates(provider, f.equipment, metadataFixtureLimits), operationId = candidates[0]!.operationId;
+    const command = { kind: 'resolveAssetStatus' as const, assetId: f.equipment, operationId };
+    const writes = h.base.writes, repoWrites = h.fault.writes;
+    for (const invalid of [{ ...command, operationId: '' }, { ...command, assetId: f.structure }])
+      await expect(host.resolve(source.token, invalid)).rejects.toThrow();
+    await expect(host.resolve('stale', command)).rejects.toThrow();
+    expect(h.base.writes).toBe(writes); expect(h.fault.writes).toBe(repoWrites); expect(host.read().state).toBe('ready');
+    expect(() => assetStatusCandidates(provider, f.equipment, { ...metadataFixtureLimits, maxWork: provider.inspection.workUsed })).toThrow(/limit/);
+    const statusField = provider.inspection.candidates.fields.find(fld => fld.path.join('/') === `assetsById/${f.equipment}/status`)!;
+    const malformed = { ...provider, inspection: { ...provider.inspection, candidates: { ...provider.inspection.candidates,
+      fields: provider.inspection.candidates.fields.map(fld => fld === statusField ? { ...fld, hasUnknownFields: true } : fld) } } };
+    expect(() => source.prepareEdit(source.token, command, malformed, 'f'.repeat(32))).toThrow();
+    const reader = await h.open(); await expect(reader.resolve(source.token, command)).rejects.toThrow(/閲覧専用/); await reader.dispose();
+    const ui = createMetadataReceiveControls(new RecordedDocument().asDocument(), host, s, () => {}), root = record(ui.root), list = named(root, 'モデルの競合');
+    const choice = picker(list, '残すモデルと配置'), confirm = button(list, 'このモデルと配置を使う');
+    setInput(choice, operationId);
+    const texts = named(root, '未解決の候補'), method = descendants(texts).find(n => n.tag === 'select')!;
+    setInput(method, 'manual'); const text = descendants(texts).find(n => n.tag === 'textarea')!;
+    setInput(text, '編集中'); text.fire('compositionstart'); expect(confirm.disabled).toBe(true);
+    confirm.fire('click'); expect(host.read().source!.token).toBe(source.token); text.fire('compositionend'); expect(confirm.disabled).toBe(false);
+    const remote = await source.prepareCaptionText(source.token, f.shared, 'body', '後から届いた本文');
+    await host.receive(source.token, fullSource(remote, 88)); s.refreshHistory(); ui.render();
+    expect(choice.value).toBe(operationId); expect(confirm.disabled).toBe(true); expect(text.value).toBe('編集中');
+    expect(descendants(list).some(n => n.textContent.includes('内容が更新されています'))).toBe(true);
+    button(list, '選択を取り消す').fire('click'); expect(picker(list, '残すモデルと配置').value).toBe('');
+    ui.dispose(); w.dispose(); await host.dispose();
+  });
+});
 
 describe('saved prepared model activation and two-participant loop; synthetic evidence only', () => {
   it('requires explicit choice, preserves placement/records and corrects only the selected pin after update', async () => {

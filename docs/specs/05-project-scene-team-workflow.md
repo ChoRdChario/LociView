@@ -1681,6 +1681,17 @@ an unseen later candidate reopening conflict. Independent model copy, general
 lifecycle resolution, body introduction, wire/migration and ordinary activation
 are separate subsequent work.
 
+The initial status-resolution implementation is limited to competing `ready`
+bindings of active Assets. Unresolved-source statuses or lifecycle conflicts are
+not silently converted to a ready model; they retain diagnostics and require
+their later typed repair/resolution path. A labelled synthetic model-receive demo
+may branch from the saved original seed (never the edited receiver) and retain
+its exact source in the existing remote journal. If that seed has no prepared
+updated revision, reject without replenishing it. Compare all candidates separately
+from the authoritative viewport; show model/placement and all-Scene impact, select
+no candidate by default, and retain stale/failed/IME-protected choices. No preview
+is to become the current Asset before the saved causal choice is confirmed.
+
 ### 13.3 Approved scheduling exception — validators and UI components (2026-09-08)
 
 The PO explicitly approved advancing storage-neutral data validation and reusable

@@ -22,6 +22,11 @@ observed implementation.
 
 If observed code conflicts with the applicable compatibility or accepted future contract, stop and resolve the discrepancy explicitly. Neither side silently overwrites the other.
 
+Latest bounded connection: metadata model-status candidates can be compared and
+explicitly resolved without changing Caption data. The synthetic host also receives
+model updates; ordinary-file, rendered/device and aggregate team acceptance remain
+pending. Todo and the inventory retain remaining model-copy and adoption boundaries.
+
 ## Classification
 
 | Document | Status | Use |

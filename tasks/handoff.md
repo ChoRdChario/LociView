@@ -1,5 +1,13 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-12 モデルstatus競合の解消（`0f28455`から）:** 新metadata hostで各候補の
+> モデル・配置を比較し、明示選択した一つを保存できる。Caption・添付・所属は保持。
+> 合成モデル更新の受信も同じ欄へ接続。失敗retry・cold replay・後着競合の再発を確認。
+> root 109 files / 1,955 PASS / 21既存TODO、typecheck/build・独立レビュー完了。
+> T03全体／実ブラウザ／実機／offlineは未完了。次はモデル所属の独立copy。
+> 準備済み本体を再利用するが、fresh IDの完全remapと検証根拠を同じ保存経路へ接続する。
+> 旧PoCを本番へ昇格しない。通常home・実ファイル・06/07の批准境界は未変更。
+
 > **2026-09-12 prepared-model / pin team loop (from `0afad01`):** 新metadataの
 > fresh seedはoriginal／updatedの既知本体・検証根拠を初期公開前に準備する。
 > 明示したモデル更新はfresh manual bindingを一度だけ保存し、全Sceneの配置と
