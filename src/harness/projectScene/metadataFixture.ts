@@ -10,6 +10,7 @@ import { metadataViewData } from './metadataViews';
 import { metadataMaterialData } from './metadataMaterials';
 import { metadataMediaData } from './metadataMedia';
 import type { MediaData } from './mediaHistory';
+import { metadataModelVersions } from './metadataModels';
 
 export const metadataFixtureLimits: MetadataLimits = { maxNodes: 100_000, maxDepth: 32, maxStringScalars: 65_536,
   maxWork: 1_000_000, maxChanges: 1000, maxChangeBytes: 1_000_000, maxTotalBytes: 8_000_000, maxOperations: 20_000 };
@@ -71,6 +72,6 @@ export function metadataProjectView(provider: ProjectProviderRead, images: NonNu
       colors[id] = value(`#${row.colorSrgb.value.map(v => Math.round(Number(v) * 255).toString(16).padStart(2, '0')).join('')}`);
   }
   return freezeSynthetic({ ...initial, projectId, state: provider.state, resources: provider.resources,
-    modelNames: names, colors, captionOwners, captionTemplates, modelVersions: metadataModels,
+    modelNames: names, colors, captionOwners, captionTemplates, modelVersions: metadataModelVersions(provider),
     viewData: metadataViewData(provider), materialData: metadataMaterialData(provider), mediaData: metadataMediaData(provider, images) });
 }

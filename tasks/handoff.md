@@ -1,6 +1,23 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **Latest connection (2026-09-12, from `b9d99a4`):** the same `storage=metadata`
+> **Latest connection (2026-09-12, from `c3a6ec1`):** model translation now uses
+> the metadata service: fresh immutable binding plus active status in one original
+> change, same-provider current model projection, exact retry and cold reopen.
+> Shared gizmo preview/cancel changes resident transforms and Asset-anchored pin
+> display only, not original Caption coordinates, memberships or saved model
+> payloads. Numeric entry remains available; geometry replacement remains excluded.
+> Independent storage/UI reviews have no blocker. Typecheck/build/HTTP graph PASS;
+> root tests: 109 files / 1,919 PASS / 21 TODO. Package/lock/public/ordinary entry
+> and build configuration are unchanged. Browser setup still fails before
+> selection (`node:process`), so actual input/raster/native storage is not accepted.
+> Next: PO's consolidated eight-group **new metadata host** Desktop check in
+> uiux-handoff; old journal and old saved-mode PASS are not repeated. Server was
+> left running at `http://127.0.0.1:5173/`; verify availability before reissuing the
+> link. Enter `/dev.html?mode=project-scene`, select `新しい保存方式を試す` and keep
+> its resulting URL. No real files, tunnel or PWA/iPhone claim. The next S1/team
+> production slice remains open; do not imply full product completion.
+
+> **Preceding connection (2026-09-12, from `b9d99a4`):** the same `storage=metadata`
 > host now saves explicit known-PNG registration/attachments, description/order
 > edits and confirmed attachment deletion. Existing run seeds and edits remain;
 > no fixture image substitutes for missing saved bytes. The journal binds the

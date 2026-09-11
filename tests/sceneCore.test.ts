@@ -268,16 +268,17 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         const name = path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '');
         expect(imports.every(p => byFile[name]!.includes(p!)), path).toBe(true);
         expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
-      } else if (/[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Browser|Intent|Views|Materials|Media)\.ts$/.test(path)) {
+      } else if (/[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Browser|Intent|Views|Materials|Media|Models)\.ts$/.test(path)) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
         const byFile: Record<string, string[]> = {
           metadataFixture: ['./fixture', './modelFixture', './modelClosure', '../../domain/values', '../../scene/projectProvider',
-            '../../scene/types', '../../projectMetadata/source', '../../projectMetadata/persistence', './metadataViews', './metadataMaterials', './metadataMedia', './mediaHistory'],
+            '../../scene/types', '../../projectMetadata/source', '../../projectMetadata/persistence', './metadataViews', './metadataMaterials', './metadataMedia', './mediaHistory', './metadataModels'],
           metadataStorage: ['../../platform/fs', '../../domain/projectContentChecks', '../../domain/values', '../../projectMetadata/contentEvidence',
             '../../projectMetadata/source', '../../projectMetadata/persistence', '../../projectMetadata/session', './metadataFixture', './mediaHistory'],
           metadataHost: ['../../platform/fs', '../../platform/projectLock', '../../projectMetadata/session', '../../projectMetadata/repository',
             '../../projectMetadata/persistence', '../../projectMetadata/journal', './metadataFixture', './metadataStorage', './historyProjection', './metadataIntent'],
-          metadataIntent: ['../../core/json', '../../domain/values', '../../domain/captionText', '../../scene/types', '../../projectMetadata/commands', './fixture', './metadataFixture', './mediaHistory'],
+          metadataIntent: ['../../core/json', '../../domain/values', '../../domain/captionText', '../../scene/types', '../../projectMetadata/commands', './fixture', './metadataFixture', './mediaHistory', './modelClosure', './modelHistory'],
+          metadataModels: ['../../scene/projectProvider', './modelClosure', './modelFixture'],
           metadataMedia: ['../../scene/projectProvider', '../../scene/types', '../../domain/projectGraphSupport', './historyPort', './mediaHistory'],
           metadataViews: ['../../scene/projectProvider', '../../scene/types', '../../domain/projectGraphSupport', '../../domain/values', './viewHistory', './historyPort'],
           metadataMaterials: ['../../scene/projectProvider', '../../scene/projectMaterialRoutes', '../../scene/types', '../../domain/projectGraphSupport',

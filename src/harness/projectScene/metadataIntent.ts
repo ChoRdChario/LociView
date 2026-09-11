@@ -6,6 +6,8 @@ import type { MetadataEdit } from '../../projectMetadata/commands';
 import type { SyntheticProject } from './fixture';
 import { metadataFixtureLimits as limits } from './metadataFixture';
 import { fixtureMedia } from './mediaHistory';
+import { canonicalFixture, readFixtureModel } from './modelClosure';
+import { modelClosureKey } from './modelHistory';
 
 const fail = (): never => { throw Error('この保存経路では対応していない編集です。'); };
 const keys = (v: object, expected: string[]) => { if (Object.keys(v).sort().join(',') !== expected.sort().join(',')) fail(); };
@@ -31,6 +33,17 @@ function membership(key: string, text: string): Membership {
 export function metadataIntent(changes: Readonly<Record<string, string>>, project: SyntheticProject,
   context?: { sceneId: string }): MetadataEdit {
   const rows = Object.entries(changes); if (!rows.length || rows.length > 6 || rows.some(([, v]) => typeof v !== 'string')) return fail();
+  if (rows[0]![0].startsWith('asset/')) {
+    const assetId = rows[0]![0].split('/')[1]!, bindingId = rows[0]![1];
+    if (!context?.sceneId || rows.length !== 2 || rows[0]![0] !== `asset/${assetId}/binding` || rows[1]![0] !== modelClosureKey(bindingId)) return fail();
+    const closure = readFixtureModel(rows[1]![1]);
+    const p = project.resources.assets[assetId]?.projection;
+    const prior = p?.kind === 'value' && project.modelVersions?.find(v => v.assetId === assetId && v.projection.bindingId === p.value.bindingId);
+    if (!prior || closure.binding.id !== bindingId || closure.binding.assetId !== assetId ||
+      canonicalFixture({ ...closure, binding: prior.closure.binding }) !== canonicalFixture(prior.closure)) return fail();
+    return { kind: 'moveAsset', assetId, sceneId: context.sceneId, expectedBindingId: prior.projection.bindingId,
+      binding: cloneCanonicalValue(closure.binding, limits) as JsonObject };
+  }
   if (rows[0]![0].startsWith('attachment/')) {
     const attachmentId = rows[0]![0].split('/')[1]!;
     if (!context?.sceneId || !/^att_[0-9a-f]{32}$/.test(attachmentId) || rows.some(([k]) => !k.startsWith(`attachment/${attachmentId}/`))) return fail();

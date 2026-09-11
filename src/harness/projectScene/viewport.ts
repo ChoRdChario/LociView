@@ -1,15 +1,15 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { fixtureModelBytes } from './modelClosure';
-import { defaultPose, fittedPose, placementMatrix, switchProjection, type CameraPose, type SyntheticDisplay } from './viewportModel';
+import { defaultPose, fittedPose, placementMatrix, projectBounds, switchProjection, type CameraPose, type SyntheticDisplay } from './viewportModel';
 import type { ViewportFactory, ViewportObservation } from './viewportHost';
 import { readProjectCamera, readSolidBackground, type SolidBackground } from './viewHistory';
 import type { DisplayCapture } from './viewSession';
-import { pickResidentCreation, pickResidentSurface, type ResidentSurface } from './viewportPicking';
-import { createPinGizmo } from './pinGizmo';
+import { pickResidentCreation, pickResidentSurface, type PinSurfaceTarget, type ResidentSurface } from './viewportPicking';
+import { createPinGizmo, type ModelPlacementTarget } from './pinGizmo';
 
 /** Existing Three.js dependency, exact synthetic fixture only. No model loaders or Native controller. */
-export const createSyntheticViewport: ViewportFactory = (canvas, changed, proposePin) => {
+export const createSyntheticViewport: ViewportFactory = (canvas, changed, proposePin, proposeModel) => {
   let renderer: THREE.WebGLRenderer | null = null, controls: OrbitControls | null = null;
   let camera: THREE.PerspectiveCamera | THREE.OrthographicCamera | null = null;
   const scene = new THREE.Scene(), models = new THREE.Group(); scene.add(models); scene.background = new THREE.Color('#e8e6e2');
@@ -24,7 +24,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
   let issue: string | null = null, contextLost = false, dragging = false, axis: ViewportObservation['axis'] = null, serial = 0, raf = 0, lastObservation = '';
   let width = 1, height = 1;
   let pickEpoch = 0;
-  let gizmo: ReturnType<typeof createPinGizmo> | null = null;
+  let gizmo: ReturnType<typeof createPinGizmo<PinSurfaceTarget | ModelPlacementTarget>> | null = null;
   let pinPointerActive = false;
   function syncOrbit(manipulating = Boolean(gizmo?.dragging)) {
     if (controls) controls.enabled = !pinPointerActive && !manipulating;
@@ -103,6 +103,17 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
       modelKey = key;
     } catch (e) { clearModels(); throw e; }
   }
+  function previewModels() {
+    if (!display) return;
+    for (const model of display.models) {
+      const surface = resident.get(model.binding.assetId); if (!surface) continue;
+      const edit = display.modelEdit;
+      const placement = edit?.target.assetId === model.binding.assetId
+        ? { ...model.binding.assetToProject, translation: edit.position } : model.binding.assetToProject;
+      surface.asset.matrix.copy(placementMatrix(placement)); surface.asset.updateMatrixWorld(true);
+    }
+    updateClipping();
+  }
   function installPose() {
     if (!renderer) return;
     pickEpoch++;
@@ -120,9 +131,11 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
       if (![...camera.projectionMatrix.elements, ...camera.matrixWorld.elements].every(Number.isFinite)) throw new Error('表示範囲を確認してください。');
       // Register TransformControls before OrbitControls: handle-down disables orbit
       // before its listener sees that same event (including touch).
-      gizmo = proposePin ? createPinGizmo(canvas, scene, camera, (target, world) => {
+      gizmo = proposePin || proposeModel ? createPinGizmo<PinSurfaceTarget | ModelPlacementTarget>(canvas, scene, camera, (target, world) => {
+        if ('kind' in target) return !!proposeModel && !!display?.modelEdit?.enabled &&
+          JSON.stringify(target) === JSON.stringify(display.modelEdit.target) && proposeModel(target, world);
         const surface = resident.get(target.assetId);
-        if (!surface || JSON.stringify(target) !== JSON.stringify(display?.pinEdit?.target) || !display?.pinEdit?.enabled) return false;
+        if (!proposePin || !surface || JSON.stringify(target) !== JSON.stringify(display?.pinEdit?.target) || !display?.pinEdit?.enabled) return false;
         surface.asset.updateMatrixWorld(true);
         const p = surface.asset.worldToLocal(new THREE.Vector3(...world));
         return [p.x, p.y, p.z].every(Number.isFinite) && proposePin(target, [p.x || 0, p.y || 0, p.z || 0]);
@@ -137,7 +150,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
       controls.update();
       scene.background = new THREE.Color().setRGB(...background.colorSrgb, THREE.SRGBColorSpace);
       previousControls?.dispose();
-      previousGizmo?.dispose(); gizmo?.update(display?.pinEdit); syncOrbit();
+      previousGizmo?.dispose(); gizmo?.update(display?.modelEdit ?? display?.pinEdit); syncOrbit();
       // The old OrbitControls.disconnect resets this shared element to auto.
       canvas.style.touchAction = 'none';
     } catch (e) {
@@ -151,6 +164,11 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
   function updateClipping() {
     if (!camera || !display?.bounds) return;
     const min = new THREE.Vector3(...display.bounds.min), max = new THREE.Vector3(...display.bounds.max);
+    const edit = display.modelEdit, model = edit && display.models.find(m => m.binding.assetId === edit.target.assetId);
+    if (edit && model) {
+      const bounds = projectBounds(model.representation.logicalBoundsAsset, { ...model.binding.assetToProject, translation: edit.position });
+      min.min(new THREE.Vector3(...bounds.min)); max.max(new THREE.Vector3(...bounds.max));
+    }
     const radius = max.clone().sub(min).length() / 2, distance = camera.position.distanceTo(min.add(max).multiplyScalar(0.5));
     const far = Math.max(10, distance + radius * 4);
     if (!Number.isFinite(far)) throw new Error('表示範囲を確認してください。');
@@ -178,7 +196,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
         renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, 2));
         if (entryPending) enterScene();
         else { pose = poses.get(display.sceneId) ?? pose; background = backgrounds.get(display.sceneId) ?? background; }
-        installPose(); buildModels();
+        installPose(); buildModels(); previewModels();
       }
       if (resized || !raf) {
         renderer.setSize(width, height, false);
@@ -201,7 +219,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
       if (sceneChanged) observePose(); display = next;
       if (sceneChanged) { entryPending = true; if (renderer) { enterScene(); installPose(); } }
       else if (boundsChanged) { observePose(); installPose(); }
-      buildModels(); gizmo?.update(next.pinEdit); serial++;
+      buildModels(); previewModels(); gizmo?.update(next.modelEdit ?? next.pinEdit); serial++;
     },
     setActive(next) { if (!next && active) release(); active = next; ensure(); },
     setPinPointerActive(next) { pinPointerActive = next; syncOrbit(); },

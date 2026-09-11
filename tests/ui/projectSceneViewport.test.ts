@@ -93,6 +93,40 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance', () => {
+  it('previews model translation and anchored pins without changing source or camera; cancels/commits through the shared gizmo', () => {
+    const s = new SyntheticSession(), doc = new RecordedDocument();
+    const w = createDevelopmentWorkspace(doc.asDocument(), s, { viewportFactory: (canvas, changed, pin, model) => {
+      Object.assign(canvas, { getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }) });
+      return createSyntheticViewport(canvas, changed, pin, model);
+    } });
+    const root = record(w.root), original = s.snapshot;
+    s.acceptModel(planModelList(s.modelContext(), { kind: 'select', assetId: f.equipment }));
+    expect(s.beginModelPlacement()).toBe(true); w.render();
+    const g = tracker.gizmos.at(-1), camera = tracker.controls.at(-1), start = g.object.position.clone();
+    const display = syntheticDisplay(original, s.sceneId, null, null);
+    const index = display.models.findIndex(m => m.binding.assetId === f.equipment);
+    const resident = tracker.renderers[0].scene.children[0].children[index] as THREE.Group;
+    const previous = resident.matrix.clone();
+    g.dragging = true; expect(camera.enabled).toBe(false);
+    g.object.position.x += 3; g.dispatchEvent({ type: 'objectChange' });
+    expect(s.snapshot).toBe(original); expect(s.modelPlacement!.coordinates[0]).toBe(String(start.x + 3));
+    expect(resident.matrix.elements[12]).toBe(start.x + 3); expect(tracker.controls.at(-1)).toBe(camera);
+    const draft = syntheticDisplay(original, s.sceneId, null, null, s.modelPlacementProposal());
+    const pin = display.pins.find(p => p.id === f.shared)!;
+    expect(draft.pins.find(p => p.id === f.shared)!.position[0]).toBeCloseTo(pin.position[0] + 3);
+    expect(draft.bounds).toEqual(display.bounds); expect(draft.models).toEqual(display.models);
+    expect(control(root, '配置を確定').disabled).toBe(true);
+    labeled(root, '合成モデルの3D表示').fire('keydown', { key: 'Escape', preventDefault() {} });
+    expect(resident.matrix).toEqual(previous); expect(g.object.position.toArray()).toEqual(start.toArray());
+    g.dragging = true; g.object.position.z += 2; g.dispatchEvent({ type: 'objectChange' }); g.dragging = false;
+    control(root, '配置を取り消す').fire('click'); expect(s.snapshot).toBe(original); expect(resident.matrix).toEqual(previous);
+    expect(s.beginModelPlacement()).toBe(true); w.render();
+    g.dragging = true; g.object.position.z += 2; g.dispatchEvent({ type: 'objectChange' }); g.dragging = false;
+    control(root, '配置を確定').fire('click'); expect(s.modelPlacement).toBeNull();
+    expect(s.snapshot.resources.captions).toEqual(original.resources.captions);
+    expect(s.modelVersions.find(v => v.projection.bindingId === (s.snapshot.resources.assets[f.equipment]!.projection as any).value.bindingId)!.closure.binding.assetToProject.translation[2]).toBe(start.z + 2);
+    w.dispose();
+  });
   it.each(['perspective', 'orthographic'] as const)('uses Blender basic mouse navigation with actual Orbit (%s)', projection => {
     tracker.realOrbit = true;
     const canvas = fakeCanvas(); controlEventTarget(canvas.canvas as unknown as HTMLCanvasElement);

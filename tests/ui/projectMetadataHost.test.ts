@@ -22,7 +22,9 @@ import { planView } from '../../src/ui/projectScene/viewState';
 import { SyntheticViewSession, type DisplayCapture } from '../../src/harness/projectScene/viewSession';
 import { materialBucket, materialKey, materialTarget, type MaterialRouting } from '../../src/harness/projectScene/materialHistory';
 import { syntheticDisplay } from '../../src/harness/projectScene/viewportModel';
-import { canonicalFixture } from '../../src/harness/projectScene/modelClosure';
+import { canonicalFixture, fixtureRecordDigest, moveFixtureModel } from '../../src/harness/projectScene/modelClosure';
+import { modelClosureKey } from '../../src/harness/projectScene/modelHistory';
+import type { JsonObject } from '../../src/domain/values';
 import { metadataModels } from '../../src/harness/projectScene/metadataFixture';
 import { fixtureMedia, captionAttachments } from '../../src/harness/projectScene/mediaHistory';
 import { RecordedDocument, record, type RecordedNode } from './domRecorder';
@@ -90,6 +92,7 @@ function viewHost(s: SyntheticSession) {
   };
 }
 const select = (s: SyntheticSession, captionId = f.shared) => s.acceptList(planCaptionList(s.captionContext(), { kind: 'select', captionId }));
+const selectModel = (s: SyntheticSession) => s.acceptModel(planModelList(s.modelContext(), { kind: 'select', assetId: f.equipment }));
 async function acknowledge(s: SyntheticSession, action: () => void) {
   let unsubscribe = () => {};
   try {
@@ -99,6 +102,104 @@ async function acknowledge(s: SyntheticSession, action: () => void) {
     });
   } finally { unsubscribe(); }
 }
+
+describe('saved model translation; synthetic storage/DOM evidence only', () => {
+  it('connects mounted preview/cancel/confirm, consecutive bindings and shared-Scene cold reopen without model body reads', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority);
+    const original = s.snapshot, changes = host.read().source!.originalChanges().length, count = host.content.counts.bodyBytes;
+    let display: ReturnType<typeof syntheticDisplay> | undefined;
+    let propose: Parameters<import('../../src/harness/projectScene/viewportHost').ViewportFactory>[3];
+    const w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s, { viewportFactory: (_canvas, _changed, _pin, model) => {
+      propose = model; return { update: d => { display = d; }, setActive() {}, camera() {}, retry() {}, dispose() {},
+        read: () => ({ token: 'viewport', ready: true, issue: null, dragging: false, projection: 'perspective', axis: null, pins: [] }) };
+    } });
+    const root = record(w.root); button(root, 'モデル').fire('click'); selectModel(s); w.render();
+    const begin = button(root, 'モデルの位置を編集'); expect(begin.hidden).toBe(false); expect(begin.disabled).toBe(false);
+    begin.fire('click'); const proposal = display!.modelEdit!;
+    expect(propose!(proposal.target, [6, 2, 1])).toBe(true); expect(s.snapshot).toBe(original);
+    expect(display!.modelEdit!.position).toEqual([6, 2, 1]); expect(host.read().source!.originalChanges()).toHaveLength(changes);
+    button(root, '配置を取り消す').fire('click'); expect(display!.modelEdit).toBeUndefined(); expect(s.snapshot).toBe(original);
+    let parent = s.modelUpdateContext().current!.closure.binding.id;
+    for (const position of [[6, 2, 1], [7, 3, 2]] as const) {
+      begin.fire('click'); expect(propose!(display!.modelEdit!.target, position)).toBe(true);
+      await acknowledge(s, () => button(root, '配置を確定').fire('click')); w.render();
+      expect(s.acknowledgment.state).toBe('idle'); expect(s.modelPlacement).toBeNull();
+      const current = s.modelUpdateContext().current!.closure;
+      expect(current.binding).toMatchObject({ parentBindingId: parent, method: 'manual', assetToProject: { translation: position } });
+      expect(current.revision).toEqual(original.modelVersions!.find(v => v.assetId === f.equipment)!.closure.revision);
+      parent = current.binding.id;
+      for (const sceneId of [f.overview, f.detail]) expect(syntheticDisplay(s.snapshot, sceneId, null, null).models.find(m => m.binding.assetId === f.equipment)!.binding.assetToProject.translation).toEqual(position);
+    }
+    expect(s.snapshot.resources.captions).toEqual(original.resources.captions);
+    expect(s.snapshot.state.assetMemberships).toEqual(original.state.assetMemberships);
+    expect(s.snapshot.state.captionMemberships).toEqual(original.state.captionMemberships);
+    expect(host.content.counts.bodyBytes).toBe(count); expect(host.read().source!.originalChanges()).toHaveLength(changes + 2);
+    const reader = await h.open(), readSession = new SyntheticSession(reader.authority); selectModel(readSession);
+    expect(readSession.beginModelPlacement()).toBe(false); await reader.dispose(); w.dispose(); await host.dispose();
+    const cold = await h.open(), reopened = new SyntheticSession(cold.authority); selectModel(reopened);
+    expect(reopened.modelUpdateContext().current!.closure.binding.id).toBe(parent);
+    expect(reopened.modelUpdateContext().current!.closure.binding.assetToProject.translation).toEqual([7, 3, 2]);
+    expect(reopened.modelUpdateContext().choices).toHaveLength(0); expect(cold.content.counts.bodyBytes).toBe(0);
+    expect(reopened.beginModelPlacement()).toBe(true); expect(reopened.finishModelPlacement()).toBe(true);
+    expect(cold.read().source!.originalChanges()).toHaveLength(changes + 2); await cold.dispose();
+  });
+
+  it('retains the same prepared binding, draft and original bytes until publication retry', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority); selectModel(s);
+    const original = s.snapshot, changes = host.read().source!.originalChanges().length, count = host.content.counts.bodyBytes;
+    s.beginModelPlacement(); s.changeModelPlacement(['6', '2', '1']); h.base.rejectPublication = true;
+    await acknowledge(s, () => { s.finishModelPlacement(); });
+    expect(s.acknowledgment.state).toBe('failed'); expect(s.snapshot).toBe(original);
+    const binding = s.modelPlacement!.prepared!.binding.id;
+    expect(s.modelPlacementProposal()!.enabled).toBe(false); expect(s.changeModelPlacement(['8', '2', '1'])).toBe(false);
+    const paths = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.endsWith('.amchange'));
+    const bytes = await Promise.all(paths.map(p => h.base.readBytes(p)));
+    h.base.rejectPublication = false; await acknowledge(s, () => { s.retryWorking(); });
+    expect(s.acknowledgment.state).toBe('idle'); expect(s.modelPlacement).toBeNull();
+    expect(s.modelUpdateContext().current!.closure.binding.id).toBe(binding);
+    expect(await Promise.all(paths.map(p => h.base.readBytes(p)))).toEqual(bytes);
+    expect(host.read().source!.originalChanges()).toHaveLength(changes + 1); expect(host.content.counts.bodyBytes).toBe(count);
+    await host.authority.retry!(); expect(host.read().source!.originalChanges()).toHaveLength(changes + 1);
+    await host.dispose(); const cold = await h.open();
+    expect(cold.authority.read().modelVersions!.find(v => v.assetId === f.equipment)!.closure.binding.id).toBe(binding); await cold.dispose();
+  });
+
+  it('refuses stale/hidden/conflicting/unknown/reused bindings and non-translation or geometry intents', async () => {
+    const h = fixture(), host = await h.open(true), seed = host.read().source!, provider = host.read().provider!;
+    const prior = host.authority.read().modelVersions!.find(v => v.assetId === f.equipment)!.closure;
+    const closure = moveFixtureModel(prior, `bnd_${'d'.repeat(32)}`, [6, 2, 1]), tx = 'c'.repeat(32);
+    const command: Extract<MetadataEdit, { kind: 'moveAsset' }> = { kind: 'moveAsset', sceneId: f.overview, assetId: f.equipment,
+      expectedBindingId: prior.binding.id, binding: JSON.parse(canonicalFixture(closure.binding)) };
+    const read = (source: ProjectMetadataSource) => readProjectScene(source.read(), metadataFixtureLimits, host.content.verifier(false));
+    expect(() => seed.prepareEdit('stale', command, provider, tx)).toThrow(/stale/);
+    expect(() => seed.prepareEdit(seed.token, { ...command, expectedBindingId: `bnd_${tx}` }, provider, tx)).toThrow(/stale/);
+    for (const fields of [{ id: prior.binding.id }, { assetId: f.structure }, { assetRevisionId: `rev_${tx}` },
+      { assetToProject: { ...closure.binding.assetToProject, uniformScale: 2 } }]) {
+      expect(() => seed.prepareEdit(seed.token, { ...command, binding: JSON.parse(canonicalFixture({ ...command.binding, ...fields })) as JsonObject }, provider, tx)).toThrow();
+    }
+    if (provider.kind !== 'scene-provider') throw Error('provider');
+    const edge = Object.values(provider.state.assetMemberships).find(e => e.sceneId === f.overview && e.resourceId === f.equipment)!;
+    const hidden = seed.prepareEdit(seed.token, { kind: 'exclude', resourceKind: 'asset', membershipId: edge.id, eventId: `evt_${tx}` }, provider, tx);
+    const hiddenProvider = await read(hidden); expect(() => hidden.prepareEdit(hidden.token, command, hiddenProvider, tx)).toThrow(/stale/);
+    const a = seed.prepareEdit(seed.token, command, provider, tx);
+    const b = seed.prepareEdit(seed.token, { ...command, binding: JSON.parse(canonicalFixture(moveFixtureModel(prior, `bnd_${'e'.repeat(32)}`, [7, 2, 1]).binding)) }, provider, 'e'.repeat(32));
+    const conflict = a.appendOriginal(b.originalChanges()), conflictProvider = await read(conflict);
+    expect(() => conflict.prepareEdit(conflict.token, command, conflictProvider, tx)).toThrow();
+    expect(metadataProjectView(conflictProvider).modelVersions!.some(v => v.assetId === f.equipment)).toBe(false);
+    const raw = A.applyChanges(A.init<any>(), seed.originalChanges())[0];
+    const unknownBinding = { ...prior.binding, future: true };
+    const digest = fixtureRecordDigest('asset-binding-revision', unknownBinding);
+    const changed = A.change(A.clone(raw), d => { d.assetBindingsById[prior.binding.id] = new A.ImmutableString(canonicalFixture({ ...unknownBinding, payloadDigest: digest })); });
+    const unknown = ProjectMetadataSource.reopen(A.getAllChanges(changed), seed.proof, metadataFixtureLimits), unknownProvider = await read(unknown);
+    expect(() => unknown.prepareEdit(unknown.token, command, unknownProvider, tx)).toThrow();
+    expect(metadataProjectView(unknownProvider).modelVersions!.some(v => v.assetId === f.equipment)).toBe(false);
+    const changedGeometry = { ...closure, shape: 'updated' };
+    const writes = h.base.writes;
+    await expect(host.authority.write(seed.token, { [`asset/${f.equipment}/binding`]: closure.binding.id,
+      [modelClosureKey(closure.binding.id)]: canonicalFixture(changedGeometry) }, { sceneId: f.overview })).rejects.toThrow();
+    expect(h.base.writes).toBe(writes); expect(host.read().source!.token).toBe(seed.token); await host.dispose();
+  });
+});
 async function apply(s: SyntheticSession, edits: { title?: string; body?: string; color?: string }) {
   for (const [name, text] of Object.entries(edits)) {
     const ctx = s.detailContext();

@@ -86,12 +86,16 @@ existing lighting/sidedness/hard-chroma UI; no base-color input was added.
 Explicit known-PNG introduction/attachment and description/order/confirmed deletion
 now use that same service. Existing run seeds stay unchanged and the gallery
 uses verified saved image bytes. The blob delta is sealed with retained originals;
-unattached media inspection does not change strong roots. Model geometry/placement,
-real-file input and exchange stay
+unattached media inspection does not change strong roots. Project-wide model
+translation now uses a fresh binding/status change, same-provider model projection
+and the shared translation gizmo for preview/cancel/confirm. Original Caption
+coordinates, memberships and saved model payloads remain unchanged. Geometry
+replacement, real-file input and exchange stay
 unconnected in this new mode, not removed from old modes or product requirements.
 Old saved runs and ordinary home remain unchanged. Actual browser/input and
 physical iOS evidence remain pending; source-only `reopen` itself is still not a
-saved-workspace receipt. Current todo owns the next remaining typed-command slice.
+saved-workspace receipt. Current todo and uiux-handoff now lead to the consolidated
+new-host Desktop check, not repeated old probe acceptance.
 
 Current readiness review (2026-09-10): `tasks/todo.md` top separates approved
 outcomes, exact wire/migration design gaps and remaining storage/device evidence.

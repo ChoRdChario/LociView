@@ -57,7 +57,7 @@ export async function openMetadataHost(options: MetadataHostOptions) {
     }
     const authority: SyntheticAuthority = {
       storage: 'saved-development', writeScope: 'caption-text',
-      capabilities: { pins: true, membership: true, color: true, views: true, materials: true, media: true },
+      capabilities: { pins: true, membership: true, color: true, views: true, materials: true, media: true, placement: true },
       get readOnly() { return fs.mutationAuthority.accessState !== 'editable' || closed; },
       read: () => { if (!last.provider) throw Error('保存した画面はまだありません。'); return metadataProjectView(last.provider, content.images); },
       status: () => ({ kind: busy ? 'checking' : failure || last.state !== 'ready' ? 'failed' : 'idle', error: failure || '未完了の保存があります。' }),

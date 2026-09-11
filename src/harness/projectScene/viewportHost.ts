@@ -8,6 +8,7 @@ import type { PinModeMemory } from '../../ui/projectScene/pinModeState';
 import { value } from '../../scene/types';
 import { pointInProject, syntheticDisplay, type SyntheticDisplay, type V3 } from './viewportModel';
 import type { PinSurfaceTarget } from './viewportPicking';
+import type { ModelPlacementTarget } from './pinGizmo';
 import type { SyntheticSession } from './session';
 import type { DisplayCapture } from './viewSession';
 import { createMediaGallery } from './mediaControls';
@@ -32,7 +33,8 @@ export interface SyntheticViewport {
   pickCreation?(targets: readonly PinSurfaceTarget[], xCss: number, yCss: number): { target: PinSurfaceTarget; position: V3 } | null;
 }
 export type ViewportFactory = (canvas: HTMLCanvasElement, changed: () => void,
-  proposePin?: (target: PinSurfaceTarget, positionAsset: V3) => boolean) => SyntheticViewport;
+  proposePin?: (target: PinSurfaceTarget, positionAsset: V3) => boolean,
+  proposeModel?: (target: ModelPlacementTarget, positionProject: V3) => boolean) => SyntheticViewport;
 
 /** DOM/read-port adapter, not a second camera implementation or durable service. */
 export function createViewportHost(document: Document, session: SyntheticSession, changed: () => void, factory?: ViewportFactory) {
@@ -128,12 +130,15 @@ export function createViewportHost(document: Document, session: SyntheticSession
   const proposePin = (target: PinSurfaceTarget, position: V3) => {
     const accepted = session.acceptPinSurface(target, position, true); changed(); return accepted;
   };
-  try { runtime = factory?.(canvas, paint, proposePin); } catch (e) { error = text(e); }
+  const proposeModel = (target: ModelPlacementTarget, position: V3) => {
+    const accepted = session.acceptModelPosition(target, position); changed(); return accepted;
+  };
+  try { runtime = factory?.(canvas, paint, proposePin, proposeModel); } catch (e) { error = text(e); }
   const tryAgain = () => {
     if (disposed) return;
     gesture = null; pressed.clear(); gestureGeneration++;
     error = null;
-    try { if (!runtime) runtime = factory?.(canvas, paint, proposePin); else runtime.retry(); }
+    try { if (!runtime) runtime = factory?.(canvas, paint, proposePin, proposeModel); else runtime.retry(); }
     catch (e) { error = text(e); }
     render(true);
   };
@@ -203,7 +208,7 @@ export function createViewportHost(document: Document, session: SyntheticSession
     try {
       windows.render({ source: session.captionContext().source, memory: session.windowMemory,
         selectedId: session.memory.selectedCaptionId, moveBlock: session.pending ? sceneSwitchReason(session.pending) : null });
-      display = syntheticDisplay(session.snapshot, session.sceneId, session.memory.pinColors, session.memory.selectedCaptionId);
+      display = syntheticDisplay(session.snapshot, session.sceneId, session.memory.pinColors, session.memory.selectedCaptionId, session.modelPlacementProposal());
       const proposed = session.pinPreviewAnchor;
       const owner = proposed?.kind === 'asset' ? display.models.find(m => m.binding.assetId === proposed.assetId) : undefined;
       if (proposed?.kind === 'asset' && owner) {

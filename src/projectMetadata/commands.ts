@@ -12,6 +12,7 @@ import type { ProjectProviderRead } from '../scene/projectProvider';
 import { fail, type MetadataLimits } from './format';
 
 export type MetadataEdit =
+  | { kind: 'moveAsset'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject }
   | { kind: 'editCaption'; captionId: string; edits: { title?: string; body?: string; colorSrgb?: readonly number[] } }
   | { kind: 'addPin'; sceneId: string; captionId: string; membershipId: string; eventId: string; anchor: Anchor }
   | { kind: 'movePin'; sceneId: string; captionId: string; anchor: Anchor }
@@ -28,7 +29,7 @@ export type MetadataEdit =
   | { kind: 'createAttachment'; sceneId: string; captionId: string; attachmentId: string; media: JsonObject; orderKey: string; altText: string; eventId: string }
   | { kind: 'editAttachment'; sceneId: string; captionId: string; attachmentId: string; field: 'altText' | 'orderKey'; value: string }
   | { kind: 'deleteAttachment'; sceneId: string; captionId: string; attachmentId: string; eventId: string };
-export interface MetadataRecordEdit { map: MutableRecordMap | 'mediaResourcesById'; id: string; create: boolean; fields: JsonObject; remove?: readonly 'defaultViewId'[] }
+export interface MetadataRecordEdit { map: MutableRecordMap | 'mediaResourcesById' | 'assetBindingsById'; id: string; create: boolean; fields: JsonObject; remove?: readonly 'defaultViewId'[] }
 type Provider = Extract<ProjectProviderRead, { kind: 'scene-provider' }>;
 const exact = <T>(field: Field<T> | undefined): T => field?.kind === 'value' ? field.value : fail('command-unresolved');
 const json = (v: unknown) => v as JsonValue;
@@ -134,6 +135,29 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       (intent.compositing.coverage.policy === 'inherit' && (intent.appearance.opacity ?? 1) < 1)) fail('material-unsupported');
   };
   switch (command.kind) {
+    case 'moveAsset': {
+      shape(raw, ['kind', 'sceneId', 'assetId', 'expectedBindingId', 'binding']);
+      row('scenesById', command.sceneId); row('assetsById', command.assetId);
+      memberships('asset', command.sceneId, command.assetId);
+      const resolved = resolveScene(provider.state, provider.resources, command.sceneId);
+      const projection = resolved.kind === 'ready' ? resolved.composition.assets.find(a => a.assetId === command.assetId)?.projection : undefined;
+      if (!projection || projection.bindingId !== command.expectedBindingId) fail('placement-stale');
+      const old = exact(provider.details.immutable.assetBindingsById[command.expectedBindingId]), next = command.binding;
+      checkProjectRecord(c, 'assetBindingsById', old); checkProjectRecord(c, 'assetBindingsById', next);
+      if (c.unknown) fail('placement-unknown');
+      const before = object(old.assetToProject), after = object(next.assetToProject);
+      if (next.id === old.id || next.assetId !== command.assetId || old.assetId !== command.assetId ||
+        next.assetRevisionId !== old.assetRevisionId || old.assetRevisionId !== projection!.revisionId ||
+        next.parentBindingId !== old.id || next.method !== 'manual' ||
+        !same(before.rotationXYZW, after.rotationXYZW) || before.uniformScale !== after.uniformScale)
+        fail('placement-translation-only');
+      // No optional registration evidence or unknown subtree is silently discarded.
+      shape(old, ['id', 'assetId', 'assetRevisionId', 'assetToProject', 'method', 'payloadDigest', ...(old.parentBindingId ? ['parentBindingId'] : [])]);
+      shape(next, ['id', 'assetId', 'assetRevisionId', 'assetToProject', 'method', 'payloadDigest', 'parentBindingId']);
+      result.push({ map: 'assetBindingsById', id: next.id as string, create: true, fields: next });
+      add('assetsById', command.assetId, { status: { kind: 'ready', activeBindingId: next.id! } });
+      break;
+    }
     case 'createAttachment': case 'editAttachment': case 'deleteAttachment': {
       shape(raw, command.kind === 'createAttachment' ? ['kind', 'sceneId', 'captionId', 'attachmentId', 'media', 'orderKey', 'altText', 'eventId'] :
         command.kind === 'editAttachment' ? ['kind', 'sceneId', 'captionId', 'attachmentId', 'field', 'value'] :

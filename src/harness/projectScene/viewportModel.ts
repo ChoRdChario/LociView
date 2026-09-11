@@ -8,7 +8,7 @@ import { readProjectCamera, readSolidBackground } from './viewHistory';
 import type { DisplayCapture } from './viewSession';
 import { materialTarget, targetKey, resolveFixtureMaterial } from './materialHistory';
 import type { MaterialIntent } from '../../domain/materialIntent';
-import type { PinGizmoProposal } from './pinGizmo';
+import type { GizmoProposal, ModelPlacementTarget, PinGizmoProposal } from './pinGizmo';
 
 export type V3 = readonly [number, number, number];
 export interface Bounds { readonly min: V3; readonly max: V3 }
@@ -20,6 +20,7 @@ export interface SyntheticDisplay {
   /** UI-only proposed position, distinct from the confirmed Caption markers. */
   readonly preview?: V3;
   readonly pinEdit?: PinGizmoProposal;
+  readonly modelEdit?: GizmoProposal<ModelPlacementTarget>;
   readonly materials?: Readonly<Record<string, ReturnType<typeof resolveFixtureMaterial> | { readonly issue: string }>>;
   readonly materialNotices?: readonly string[];
   readonly entry?: { readonly kind: 'none' } | { readonly kind: 'blocked'; readonly reason: string } | { readonly kind: 'ready'; readonly payload: DisplayCapture };
@@ -45,7 +46,8 @@ export function projectBounds(bounds: Bounds, placement: FixturePlacement): Boun
     box.expandByPoint(new THREE.Vector3(...pointInProject([x, y, z], placement)));
   return { min: tuple(box.min), max: tuple(box.max) };
 }
-export function syntheticDisplay(project: SyntheticProject, sceneId: string, pinColors: readonly string[] | null, selectedId: string | null): SyntheticDisplay {
+export function syntheticDisplay(project: SyntheticProject, sceneId: string, pinColors: readonly string[] | null, selectedId: string | null,
+  modelEdit?: GizmoProposal<ModelPlacementTarget>): SyntheticDisplay {
   const resolved = resolveScene(project.state, project.resources, sceneId);
   if (resolved.kind !== 'ready') throw new Error('シーンの表示を確認してください。');
   const models = resolved.composition.assets.slice().sort((a, b) => a.assetId.localeCompare(b.assetId)).map(asset => {
@@ -81,7 +83,9 @@ export function syntheticDisplay(project: SyntheticProject, sceneId: string, pin
     if (!color || (pinColors !== null && !pinColors.includes(color))) continue;
     const anchor = caption.anchor.value;
     const model = anchor.kind === 'asset' ? models.find(m => m.binding.assetId === anchor.assetId) : null;
-    const position = anchor.kind === 'project' ? anchor.positionProject : model ? pointInProject(anchor.positionAsset, model.binding.assetToProject) : null;
+    const placement = model && modelEdit?.target.assetId === model.binding.assetId
+      ? { ...model.binding.assetToProject, translation: modelEdit.position } : model?.binding.assetToProject;
+    const position = anchor.kind === 'project' ? anchor.positionProject : placement ? pointInProject(anchor.positionAsset, placement) : null;
     if (position) pins.push({ id: caption.captionId, color, position,
       title: caption.title.kind === 'value' && caption.title.value.trim() ? caption.title.value : 'キャプション' });
   }
@@ -96,7 +100,7 @@ export function syntheticDisplay(project: SyntheticProject, sceneId: string, pin
       catch { /* Keep the explicit entry diagnostic; never fit or choose another View. */ }
     }
   }
-  return freezeSynthetic({ token: project.state.token, sceneId, projectFrameId: project.resources.projectFrameId, models, pins, selectedId, entry, materials, materialNotices: [...new Set(materialNotices)],
+  return freezeSynthetic({ token: project.state.token, sceneId, projectFrameId: project.resources.projectFrameId, models, pins, selectedId, entry, materials, modelEdit, materialNotices: [...new Set(materialNotices)],
     bounds: box.isEmpty() ? null : { min: tuple(box.min), max: tuple(box.max) } });
 }
 export const defaultPose = (): CameraPose => ({ position: [0, 1, 3], target: [0, 0, 0], up: [0, 1, 0],

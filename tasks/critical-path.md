@@ -409,10 +409,13 @@ lighting/sidedness/hard-chroma UI is connected; base-color input is not yet expo
 Explicit known-PNG registration/attachment, description/order/confirmed deletion
 now share the service, including existing-run preservation and exact blob/original
 change retry. Saved-byte gallery and retained-media checks never use image fallback
-or create strong roots. Model geometry/placement, real-file input and exchange remain unconnected here. No old saved
+or create strong roots. Project-wide model translation now persists a fresh binding
+and active status atomically, with same-provider current projection, shared gizmo
+preview/cancel and exact retry. Saved model payload, Caption Asset coordinates
+and memberships remain unchanged. Model geometry, real-file input and exchange remain unconnected here. No old saved
 history is converted. Mounted memory-port and HTTP tests do not establish actual
-browser/device/adoption acceptance. Next connect existing synthetic model placement
-with the current body through this same service; batch browser evidence, not another source/probe campaign.
+browser/device/adoption acceptance. Next is the consolidated new-host Desktop
+batch (uiux-handoff); do not reopen passed probes. Full S1 and TEAM-FLOW-01 remain open.
 
 The ten latest executable commits through `d8f52d1` implement reusable Scene,
 record-admission and four-tab UI parts, with source-isolation tests deliberately

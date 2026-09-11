@@ -31,6 +31,7 @@ import { mediaSeed, projectMediaHistory } from './mediaHistory';
 import { previewHistory } from './historyPort';
 import { WorkingAcknowledgment, afterWorking, type WorkingResult } from './acknowledgment';
 import type { PinSurfaceTarget } from './viewportPicking';
+import type { GizmoProposal, ModelPlacementTarget } from './pinGizmo';
 
 export interface SyntheticPinInput {
   readonly coordinates: readonly [string, string, string]; readonly familyId: string | null;
@@ -99,6 +100,7 @@ export class SyntheticSession {
   get viewRestriction() { return this.readOnly || !this.authority?.capabilities?.views ? this.editingRestriction : null; }
   get materialRestriction() { return this.readOnly || !this.authority?.capabilities?.materials ? this.editingRestriction : null; }
   get mediaRestriction() { return this.readOnly || !this.authority?.capabilities?.media ? this.editingRestriction : null; }
+  get placementRestriction() { return this.readOnly || !this.authority?.capabilities?.placement ? this.editingRestriction : null; }
   get savedStatus() { return this.authority?.status?.(); }
   get workingBlock() { return this.acknowledgment.block ?? (this.savedStatus?.kind === 'failed' ?
     this.savedStatus.error ?? '未完了の保存があります。更新を再試行してください。' : null); }
@@ -362,10 +364,28 @@ export class SyntheticSession {
         assets: { ...this.project.resources.assets, [asset.id]: { ...asset, projection: value(version.projection) } } } });
   }
   get modelPlacement() { return this.placement; }
+  get modelPlacementBusy() { return this.viewportDragging || !!this.workingBlock; }
+  modelPlacementProposal(): GizmoProposal<ModelPlacementTarget> | undefined {
+    const draft = this.placement, active = draft && this.project.resources.assets[draft.assetId]?.projection;
+    if (!draft || draft.token !== this.project.state.token || draft.sceneId !== this.sceneId || active?.kind !== 'value' ||
+      active.value.bindingId !== draft.source.binding.id || draft.coordinates.some(raw =>
+        !/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(raw.trim()) || !Number.isFinite(Number(raw)))) return;
+    return { target: { kind: 'model', token: draft.token, sceneId: draft.sceneId, assetId: draft.assetId, bindingId: draft.source.binding.id },
+      position: draft.coordinates.map(n => Number(n) || 0) as [number, number, number],
+      enabled: !this.placementRestriction && !this.workingBlock && !draft.composing };
+  }
+  acceptModelPosition(target: ModelPlacementTarget, position: readonly [number, number, number]): boolean {
+    const current = this.modelPlacementProposal();
+    if (!current?.enabled || JSON.stringify(target) !== JSON.stringify(current.target) || !position.every(Number.isFinite))
+      return this.refuse('モデルが更新されています。指定した位置は保持しています。');
+    return this.changeModelPlacement(position.map(n => String(n || 0)) as [string, string, string]);
+  }
   beginModelPlacement(): boolean {
-    if (this.editingRestriction) return this.refuse(this.editingRestriction);
+    if (this.placementRestriction) return this.refuse(this.placementRestriction);
     const ctx = this.modelUpdateContext();
     if (this.pending || ctx.issue || !ctx.current || !ctx.assetId) return this.refuse(ctx.issue ?? '入力を確定し、モデルを選択してください。');
+    const resolved = resolveScene(this.project.state, this.project.resources, this.sceneId);
+    if (resolved.kind !== 'ready' || !resolved.composition.assets.some(a => a.assetId === ctx.assetId)) return this.refuse('このシーンに表示したモデルを選択してください。');
     this.placement = freezeSynthetic({ token: ctx.token, sceneId: this.sceneId, assetId: ctx.assetId, source: ctx.current.closure,
       coordinates: ctx.current.closure.binding.assetToProject.translation.map(String) as [string, string, string], composing: false });
     this.message = ''; return true;
@@ -378,7 +398,9 @@ export class SyntheticSession {
   }
   finishModelPlacement(cancel = false): boolean {
     try {
+      if (this.placementRestriction) throw new Error(this.placementRestriction);
       if (this.workingBlock) throw new Error(this.workingBlock);
+      if (this.viewportDragging) throw new Error('移動操作を終えてから確定してください。');
       const draft = this.placement; if (!draft || draft.composing) throw new Error('入力を確定してください。');
       if (cancel) { this.placement = null; this.message = ''; return true; }
       const active = this.project.resources.assets[draft.assetId]?.projection;

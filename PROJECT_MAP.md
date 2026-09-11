@@ -37,11 +37,16 @@ Existing lighting/sidedness/hard-chroma controls are connected, while a base-col
 input is not yet exposed. Explicit known-PNG registration/attachment, description,
 order and confirmed attachment deletion now share that journal. Existing runs
 are not reseeded; the gallery uses verified saved bytes, not a fixture fallback.
-Model geometry/placement, real-file input and exchange remain unconnected here.
+Project-wide model translation now shares that journal: fresh binding plus
+active status in one change, same-provider current projection and shared translation
+gizmo preview/confirm/cancel. Saved model payloads, original Caption coordinates
+and Scene memberships remain unchanged. Geometry replacement, real-file input
+and exchange remain unconnected here.
 The old saved pair and ordinary home are unchanged.
 Mounted memory-port and HTTP dependency tests pass; actual browser/device/storage
-adoption remains unverified. Next connect existing synthetic model placement with
-the current body; see todo for the finite boundary and uiux-handoff for batched checks.
+adoption remains unverified. Next is the consolidated new-host Desktop batch;
+see todo for the finite boundary and uiux-handoff for steps. Browser connection
+still fails before selection; do not restart old passed probe/manual lanes.
 
 Current task (2026-09-10, after readiness checkpoint `77a22b0`): PO approved
 unplaced-Caption preservation. Specification 05 §9.4 proposes its exact atomic

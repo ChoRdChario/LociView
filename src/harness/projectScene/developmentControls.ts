@@ -97,7 +97,7 @@ export function createModelPlacementControls(document: Document, session: Synthe
   const begin = document.createElement('button'); begin.type = 'button'; begin.textContent = 'モデルの位置を編集';
   const state = document.createElement('p'); actions.append(state, begin);
   const heading = document.createElement('h2'), note = document.createElement('p');
-  note.textContent = '位置はプロジェクト全体で共通です。'; modeStrip.append(heading, note);
+  note.textContent = '矢印をドラッグして移動。位置はすべてのシーンで共通です。'; modeStrip.append(heading, note);
   const inputs = ['X', 'Y', 'Z'].map(axis => {
     const label = document.createElement('label'); label.textContent = axis;
     const input = document.createElement('input'); input.type = 'text'; input.inputMode = 'decimal'; input.setAttribute('aria-label', axis);
@@ -126,11 +126,11 @@ export function createModelPlacementControls(document: Document, session: Synthe
     if (disposed) return;
     const context = session.modelUpdateContext(), draft = session.modelPlacement;
     state.textContent = context.current ? `位置 ${context.current.closure.binding.assetToProject.translation.join(' / ')}` : '';
-    begin.disabled = Boolean(session.pending || context.issue || !context.current); modeStrip.hidden = !draft;
+    begin.disabled = Boolean(session.placementRestriction || session.pending || context.issue || !context.current); modeStrip.hidden = !draft;
     if (!draft) return;
     heading.textContent = `${session.snapshot.modelNames[draft.assetId] ?? 'モデル'}の位置`;
     inputs.forEach((input, i) => { if (input !== composing && input.value !== draft.coordinates[i]) input.value = draft.coordinates[i]!; });
-    apply.disabled = cancel.disabled = draft.composing;
+    apply.disabled = cancel.disabled = draft.composing || session.modelPlacementBusy;
   }
   return { actions, modeStrip, render, dispose() { disposed = true; cleanups.forEach(cleanup => cleanup()); actions.remove(); modeStrip.remove(); } };
 }

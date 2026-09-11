@@ -11,6 +11,57 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — approved S1 service entry (2026-09-11)
 
+#### Model translation connection — implemented; Desktop batch pending (2026-09-12, from `c3a6ec1`)
+
+- [x] Specify typed translation-only binding command and transient model preview.
+- [x] Connect fresh binding/status atomically and project current bindings from the same provider.
+- [x] Reuse the translation gizmo for model preview/confirm/cancel; retain numeric alternative.
+- [x] Verify preservation, cold reopen, exact retry and refusal; independent review and root matrix.
+- [x] Update checkpoint and prepare a working Desktop link plus a consolidated human check.
+- [ ] PO Desktop check of the new metadata host, eight groups in uiux-handoff; result pending.
+
+Scope/exit: known synthetic models in the existing metadata host; Project-wide
+translation only. Preserve revision, Representation/body, rotation/scale, Caption
+Asset coordinates and memberships. No extra model-body reads or new blobs. Reuse
+the existing journal and pointer cancellation; never mutate immutable source for
+preview. Inspection corrected the previous next-step wording: the existing gizmo
+was pin-only, and model placement had numeric inputs without 3D preview. Add only
+the missing model-target connection, not a new renderer or transform framework.
+Automated host/runtime evidence precedes one native Desktop batch; do not request
+old passed checks again. Geometry replacement, exchange, real files, rotation/
+scale UI, undo/restore, dependencies, schema/wire, migration, home and deploy are
+excluded. Stop for contract conflict/new authority. Short meta-audit: clean
+`c3a6ec1`, tracked origin ahead 19 / behind 0; this closes a real saved workflow.
+
+Review: model translation saves one fresh immutable binding plus active status
+through the same service/journal. Actual current bindings are projected from the
+verified provider; no initial-binding fallback. Gizmo previews move resident
+transforms and associated pins only; camera pose, immutable source and original
+Caption coordinates are unchanged. Numeric inputs remain an alternative. Cancel,
+consecutive saves, shared Scenes and cold reopen pass. Failed publication retains
+the prepared binding/draft and exact original bytes until acknowledged retry.
+Stale, readonly, excluded, conflicting, unknown and non-translation writes refuse.
+No saved/OPFS model payload is read or re-hashed; tiny known fixture reconstruction
+and CPU validation are outside that I/O claim. No new Blob or fixture was added.
+
+Three host groups plus one mocked-GPU/runtime group were added. Independent
+storage and UI reviews have no remaining blocker. Final sequential matrix:
+typecheck PASS; ordinary build PASS (unchanged mixed-import/large-chunk warnings);
+saved-development HTTP/Wasm graph 1 PASS; root two-worker tests 109 files /
+1,919 PASS / 21 TODO, exit 0; diff-check PASS. Package/lock/public/ordinary entry
+and build configuration remain unchanged. Browser setup again refused
+`node:process` before selection, so no raster/native-input/OPFS/iOS/offline PASS.
+
+Manual handoff: dev server started with `npm run dev -- --host 127.0.0.1`, actual
+URL `http://127.0.0.1:5173/`; dev page, entry and metadata modules returned HTTP
+200. Keep this server running for PO; no tunnel. Start at
+`/dev.html?mode=project-scene`, then `新しい保存方式を試す`; preserve the resulting
+URL. Use synthetic data only, report the eight new-host groups together, and
+retain a failed run instead of deleting/reseeding. Prior passed journal/old-save
+tests stay closed. After this bounded Desktop result, reassess the next approved
+S1 connection (remaining model introduction/replacement and durable team flow),
+not a new probe campaign. Full S1/S2, TEAM-FLOW-01 and device acceptance stay open.
+
 #### Known media connection — implemented; real-browser acceptance pending (2026-09-12, from `b9d99a4`)
 
 - [x] Specify existing-run, blob-first registration and exact journal delta before implementation.
@@ -55,9 +106,9 @@ are unchanged. No persistent server/tunnel was started; the HTTP test owns its
 temporary server. No browser/native-storage/iOS/offline claim follows.
 No new PoC, dependency, private source access, generic decoder or product file input.
 
-Next finite boundary: existing synthetic model placement through this same service.
+Next at that checkpoint: synthetic model placement through this same service.
 Specify fresh immutable AssetBinding + active-binding update in one original
-command before connecting the existing gizmo preview/confirm/cancel and cold
+command before connecting model translation preview/confirm/cancel and cold
 reopen. Reuse the current revision/body, preserve Caption Asset anchors and Scene
 memberships, and read no extra model bytes. Do not include geometry replacement,
 exchange, real files or a generic immutable-write API in that slice. Broader

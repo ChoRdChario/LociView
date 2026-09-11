@@ -104,7 +104,7 @@ export class ProjectMetadataSource {
     }
     const doc = A.change(A.clone(this.doc), { message: `lociview:transaction:v1:${transactionId}` }, draft => {
       for (const edit of edits) {
-        if (edit.map === 'mediaResourcesById') {
+        if (edit.map === 'mediaResourcesById' || edit.map === 'assetBindingsById') {
           if (!edit.create) fail('immutable-replacement');
           draft[edit.map][edit.id] = scalar(edit.fields, this.limits); continue;
         }

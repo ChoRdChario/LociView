@@ -1420,6 +1420,39 @@ Caption and all other Scene memberships. Absent/deleted/unresolved membership,
 stale selection, pending drafts, composition or saving refuse this command.
 Re-inclusion creates a fresh membership; no tombstone or resource is reused.
 
+**S1 model translation extension — implementation contract (2026-09-12):**
+
+In the same synthetic metadata host, a typed `moveAsset` intent introduces one
+fresh immutable binding and updates Asset.status in one original localCommand.
+The fresh provider must confirm the selected active Scene membership, Asset,
+expected current binding and revision. The new binding has method manual and
+parent=current binding, changes only translation, and preserves revision,
+rotation and positive uniform scale. Unknown old binding/transform/status,
+unresolved affected state, reused IDs or stale context refuse the command.
+No Blob is added and no saved model payload is re-read/re-hashed; reuse the existing
+retained journal and exact retry without regenerating IDs or original changes.
+The tiny known fixture's in-process reconstruction/validation is not a saved
+payload read and is not covered by this I/O statement.
+
+Runtime model versions come from the same provider's current binding and exact
+known revision/Representation records, never an initial-binding fallback. A
+transient Project-frame model-origin translation proposal reuses the pin gizmo's
+pointer arbitration and cancellation. Preview moves only the resident transform
+and associated visible Asset-anchored pins; source, immutable records and camera
+pose remain unchanged. Numeric input is an alternative. Confirm saves once;
+cancel restores the confirmed display. Failed acknowledgment retains the draft
+and exact prepared binding for retry. Geometry replacement remains unavailable.
+
+Acceptance: preview/cancel without writes; consecutive confirmed moves and cold
+reopen; shared-Scene placement with unchanged original Caption coordinates and
+memberships; same revision/body and zero extra model-byte reads; failed publication
+and exact retry; stale/readonly/conflict/unknown refusal. Existing pointer tests
+are reused, with model-target routing added. Actual raster/native pointer and
+OPFS/IndexedDB behavior need a later explicit Desktop batch. This does not close
+01 §9 alignment, full S1, TEAM-FLOW-01 or physical iOS. Rotation/scale authoring,
+model replacement, exchange, undo, Scene-specific transforms and new wire/schema
+are excluded.
+
 **S1 Saved View extension — implementation contract (2026-09-11):**
 
 Extend that same synthetic saved host to the already specified View authoring and

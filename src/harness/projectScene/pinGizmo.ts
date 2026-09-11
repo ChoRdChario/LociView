@@ -3,15 +3,19 @@ import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import type { PinSurfaceTarget } from './viewportPicking';
 import type { V3 } from './viewportModel';
 
-export interface PinGizmoProposal { readonly target: PinSurfaceTarget; readonly position: V3; readonly enabled: boolean }
+export interface GizmoProposal<T> { readonly target: T; readonly position: V3; readonly enabled: boolean }
+export type PinGizmoProposal = GizmoProposal<PinSurfaceTarget>;
+export interface ModelPlacementTarget {
+  readonly kind: 'model'; readonly token: string; readonly sceneId: string; readonly assetId: string; readonly bindingId: string;
+}
 
 /** Translation of a transient ProjectFrame marker, never a Caption/history write. */
-export function createPinGizmo(canvas: HTMLCanvasElement, scene: THREE.Scene, camera: THREE.Camera,
-  propose: (target: PinSurfaceTarget, position: V3) => boolean, activity: (dragging: boolean) => void) {
+export function createPinGizmo<T = PinSurfaceTarget>(canvas: HTMLCanvasElement, scene: THREE.Scene, camera: THREE.Camera,
+  propose: (target: T, position: V3) => boolean, activity: (dragging: boolean) => void) {
   const marker = new THREE.Object3D(), control = new TransformControls(camera, canvas), helper = control.getHelper();
   control.setMode('translate'); control.setSpace('world'); control.setSize(1);
   scene.add(marker, helper);
-  let current: PinGizmoProposal | undefined, disposed = false, syncing = false;
+  let current: GizmoProposal<T> | undefined, disposed = false, syncing = false;
   const pointers = new Set<number>(); let owner: number | null = null, blocked = false, releasing: number | null = null;
   const before = new THREE.Vector3(), accepted = new THREE.Vector3();
   const tuple = (): V3 => [marker.position.x, marker.position.y, marker.position.z];
@@ -62,7 +66,7 @@ export function createPinGizmo(canvas: HTMLCanvasElement, scene: THREE.Scene, ca
   canvas.addEventListener('lostpointercapture', lost, true); canvas.addEventListener('keydown', key);
   return {
     get dragging() { return control.dragging; },
-    update(next?: PinGizmoProposal) {
+    update(next?: GizmoProposal<T>) {
       const same = JSON.stringify(current?.target) === JSON.stringify(next?.target);
       if (control.dragging && (!same || !next?.enabled)) stop(false);
       current = next;
