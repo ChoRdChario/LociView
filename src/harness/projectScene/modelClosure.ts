@@ -53,7 +53,7 @@ export function allocateModelCopyIds(source: FixtureModelIds, fresh: (prefix: st
 }
 /** Closed supported fixture shape. Extra roles/relations are rejected, not copied by omission. */
 export function createFixtureModel(ids: FixtureModelIds, shape: 'original' | 'updated', placement: FixturePlacement,
-  parentBindingId?: string) {
+  parentBindingId?: string, method: 'manual' | 'import' = parentBindingId ? 'manual' : 'import') {
   fixtureIdsValid(ids); validPlacement(placement);
   if (shape !== 'original' && shape !== 'updated') throw new Error('合成モデルの形状を確認してください。');
   const bytes = fixtureModelBytes(shape), digest = fixtureSha256(bytes);
@@ -70,7 +70,7 @@ export function createFixtureModel(ids: FixtureModelIds, shape: 'original' | 'up
     anchorCompatibilityClasses: [{ id: ids.compatibility, targetVariantFamilyIds: [ids.family] }],
     provenance: { origin: 'import' as const, inputBlobDigests: [digest] } });
   const binding = sealed('asset-binding-revision', { id: ids.binding, assetId: ids.asset, assetRevisionId: ids.revision,
-    assetToProject: placement, method: parentBindingId ? 'manual' as const : 'import' as const,
+    assetToProject: placement, method,
     ...(parentBindingId ? { parentBindingId } : {}) });
   return freezeSynthetic({ shape, assetFrame: evidence(ids.assetFrame), representationFrame: evidence(ids.representationFrame),
     representation, revision, binding });
@@ -85,7 +85,8 @@ export function fixtureModelIds(c: FixtureModelClosure): FixtureModelIds {
 export function readFixtureModel(text: string): FixtureModelClosure {
   if (text.length > 65_536) throw new Error('合成モデルが大きすぎます。');
   const raw = cloneCanonicalValue(JSON.parse(text), { maxNodes: 4096, maxDepth: 16, maxStringScalars: 65_536 }) as unknown as FixtureModelClosure;
-  const expected = createFixtureModel(fixtureModelIds(raw), raw.shape, raw.binding.assetToProject, raw.binding.parentBindingId);
+  if (!['manual', 'import'].includes(raw.binding.method)) throw new Error('モデルの配置方法を確認してください。');
+  const expected = createFixtureModel(fixtureModelIds(raw), raw.shape, raw.binding.assetToProject, raw.binding.parentBindingId, raw.binding.method);
   if (canonicalFixture(raw) !== canonicalFixture(expected)) throw new Error('モデルの参照・本体・メタデータを確認してください。');
   return expected;
 }

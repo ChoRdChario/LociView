@@ -1,9 +1,17 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **2026-09-12 モデル重複登録keep-one（`53d7692`から）:** 新metadataの同じ受信欄で
+> **2026-09-12 モデル独立copy（`72a64bd`から）:** 同じmetadata hostの「両方残す」で
+> 現在の既知Mesh・配置・materialをfresh IDへ完全remap。元Captionと他Sceneは不変更。
+> コピー同士の配置／material編集、二人二巡、exact retry／cold reopenを確認。
+> 初期seedの所有者取り違え回帰を修正済み。最終root 109 files／1,961 PASS／21既存TODO、
+> typecheck/build・独立レビュー完了。正確な範囲と失敗／修正履歴はtodo先頭。
+> 次は既存ピン位置／色競合の明示解消→再編集の行き止まりを閉じ、その後Scene基本管理。
+> 実ブラウザ初期化は失敗。実入力・実機・offline・通常home／実データの受入れなし。
+
+> **以前のkeep-one checkpoint（`53d7692`から）:** 新metadataの同じ受信欄で
 > 合成「モデルのシーン登録」を受け、どの登録を残すか明示選択して保存できる。
 > 他の重複edgeだけ解除し、モデル・Caption・他Sceneは不変更。両選択・retry・再開・
-> 再受信・後着edgeの再競合を確認。独立copyはまだ未接続とUIで明示。
+> 再受信・後着edgeの再競合を確認。この時点では独立copyは未接続とUIで明示。
 > 次は05 §13.2に記載したfresh root／完全ID remap／新record限定factsの縦断接続。
 > 最終matrixはtodo先頭。新たな描画・実機・offline・実データ受入れは追加していない。
 

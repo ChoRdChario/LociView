@@ -3,6 +3,10 @@ import type { SyntheticSession } from './session';
 import { captionCopySource, captionMembershipGroups, assetMembershipGroups, type CaptionMembershipResolution, type AssetMembershipResolution } from '../../projectMetadata/membership';
 import { newId } from '../../projectMetadata/persistence';
 import { metadataFixtureLimits as limits } from './metadataFixture';
+import { assetCopySource } from '../../projectMetadata/modelMembership';
+import { readMetadataModel } from './metadataModelRecords';
+import { allocateModelCopyIds, createFixtureModel, fixtureModelIds } from './modelClosure';
+import type { JsonObject } from '../../domain/values';
 
 /** The same saved host, with an explicit entity-level decision (not a duplicate button). */
 export function createMetadataMembershipControls(document: Document, host: Awaited<ReturnType<typeof openMetadataHost>>,
@@ -34,10 +38,16 @@ export function createMetadataMembershipControls(document: Document, host: Await
         };
         option(original, '', '元として残す登録を選択'); edgeIds.forEach((id, i) => option(original, id, `登録 ${i + 1}`));
         option(choice, '', '解消方法を選択'); option(choice, 'one', '一つを残す');
-        if (kind === 'caption') option(choice, 'both', '両方残す（別々に編集）');
+        option(choice, 'both', '両方残す（別々に編集）');
         let copy: ReturnType<typeof captionCopySource> | undefined;
+        let modelCopy: { source: ReturnType<typeof assetCopySource>; model: ReturnType<typeof readMetadataModel> } | undefined;
         try { if (kind === 'caption') copy = captionCopySource(provider, captionId, limits); } catch { /* Explain the blocked copy, never substitute projected content. */ }
-        preview.textContent = kind === 'asset' ? `同じモデルへの登録が${edgeIds.length}件あります。「一つを残す」は重複登録だけを解除します。モデル本体・キャプション・他のシーンは変わりません。独立したモデルとして両方残す操作は、まだこの開発画面に接続されていません。` :
+        try { if (kind === 'asset') {
+          const source = assetCopySource(provider, sceneId, captionId, limits);
+          modelCopy = { source, model: readMetadataModel(source.asset.assetFrameId as string, source.binding, source.revision, source.representation) };
+        } } catch { /* Keep-one remains possible; incomplete copy never silently omits a dependency. */ }
+        preview.textContent = kind === 'asset' ? `同じモデルへの登録が${edgeIds.length}件あります。「一つを残す」は重複登録だけを解除します。モデル本体・キャプション・他のシーンは変わりません。` +
+          (modelCopy ? '「両方残す」は現在のモデル・配置・見え方を別項目にコピーします。キャプションは元モデルに残ります。' : '両方残すには、モデルと見え方の未解決の内容を先に確認してください。') :
           copy ? `同じ記録への登録が${edgeIds.length}件あります。「一つを残す」は重複した登録だけを解除します。「両方残す」は本文・ピン位置・添付${copy.attachments.length}件をコピーします。他のシーンの元の記録は変わりません。` :
           '同じ記録への登録です。両方残すには、記録と添付の未解決の内容を先に確認してください。他のシーンの元の記録は変わりません。';
         const otherScenes = [...new Set(Object.values(kind === 'caption' ? provider.state.captionMemberships : provider.state.assetMemberships).filter(e => e.resourceId === captionId &&
@@ -47,16 +57,23 @@ export function createMetadataMembershipControls(document: Document, host: Await
         }).join('、')}。`;
         apply.type = cancel.type = 'button'; apply.textContent = '登録の重複を解消'; cancel.textContent = '選択を取り消す';
         message.setAttribute('role', 'status'); item.append(heading, preview, original, choice, apply, cancel, message);
-        const current: Form = { root: item, token: provider.token, original, choice, apply, cancel, message, copyReady: !!copy };
+        const current: Form = { root: item, token: provider.token, original, choice, apply, cancel, message, copyReady: !!copy || !!modelCopy };
         forms.set(key, current); form = current;
         original.addEventListener('change', () => { render(); changed(); }); choice.addEventListener('change', () => { render(); changed(); });
         cancel.addEventListener('click', () => { if (session.workingBlock || composing()) return; forms.delete(key); render(); changed(); });
         apply.addEventListener('click', () => {
           if (blocked() || current.token !== host.read().source?.token || !edgeIds.includes(original.value) ||
-            !['one', 'both'].includes(choice.value) || choice.value === 'both' && !copy) return;
+            !['one', 'both'].includes(choice.value) || choice.value === 'both' && !copy && !modelCopy) return;
           const command: CaptionMembershipResolution | AssetMembershipResolution = kind === 'asset' ? {
             kind: 'resolveAssetMembership', sceneId, assetId: captionId, observedMembershipIds: edgeIds,
-            originalMembershipId: original.value, choice: 'one', eventId: `evt_${newId()}`,
+            originalMembershipId: original.value, choice: choice.value as 'one' | 'both', eventId: `evt_${newId()}`,
+            ...(choice.value === 'both' ? { copies: edgeIds.filter(id => id !== original.value).map(sourceMembershipId => {
+              const model = modelCopy!.model, ids = allocateModelCopyIds(fixtureModelIds(model), prefix => `${prefix}_${newId()}`);
+              const fresh = createFixtureModel(ids, model.shape, model.binding.assetToProject, undefined, model.binding.method);
+              return { sourceMembershipId, ids: { ...ids, membership: `sam_${newId()}` }, materialId: modelCopy!.source.material ? `ovr_${newId()}` : null,
+                representation: fresh.representation as unknown as JsonObject, revision: fresh.revision as unknown as JsonObject,
+                binding: fresh.binding as unknown as JsonObject };
+            }) } : {}),
           } : { kind: 'resolveCaptionMembership', sceneId, captionId,
             observedMembershipIds: edgeIds, originalMembershipId: original.value, choice: choice.value as 'one' | 'both', eventId: `evt_${newId()}`,
             copies: choice.value === 'one' ? [] : edgeIds.filter(id => id !== original.value).map(sourceMembershipId => ({

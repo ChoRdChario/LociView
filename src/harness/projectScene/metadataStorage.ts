@@ -9,6 +9,7 @@ import { canonicalFixture, fixtureModelBytes } from './modelClosure';
 import { inspectProjectCandidates } from '../../domain/projectCandidates';
 import { fixtureMedia, type MediaImage } from './mediaHistory';
 import type { MetadataMediaPort } from '../../projectMetadata/session';
+import { knownMetadataRepresentation } from './metadataModelRecords';
 
 interface Seed { version: 'synthetic-metadata-1'; proof: MetadataProof; parts: { size: number; digest: string }[] }
 export async function writeMetadataSeed(fs: ProjectWorkspaceFS, source: ProjectMetadataSource): Promise<void> {
@@ -46,7 +47,7 @@ export class MetadataFixtureContent implements VerifiedInventoryPort, MetadataMe
   constructor(private readonly fs: ProjectWorkspaceFS) {}
   private bodyPath(hash: string) { return metadataPath(this.fs, `fixture-content/${hash}.bin`); }
   private inventoryPath(hash: string) { return metadataPath(this.fs, `fixture-inventory/${hash}.json`); }
-  private known(record: JsonObject) { return metadataPreparedModels.find(m => json(m.closure.representation) === json(record)); }
+  private known(record: JsonObject) { return knownMetadataRepresentation(record); }
   private knownMedia(record: JsonObject) { return fixtureMedia.find(m => json(m.record) === json(record)); }
   private mediaReceipt(record: typeof fixtureMedia[number]['record']) { return { version: 'synthetic-png-inventory-1', blob: record.blob }; }
   async stage(record: JsonObject, token: string): Promise<void> {
@@ -87,7 +88,10 @@ export class MetadataFixtureContent implements VerifiedInventoryPort, MetadataMe
     const models = [];
     for (const field of inspection.fields.filter(f => f.path[0] === 'representationsById')) {
       const value = field.candidates[0]?.value;
-      const known = field.valid && field.candidates.length === 1 && value?.kind === 'value' && this.known(value.value as JsonObject);
+      // Initial seeds declare exact owners/revisions. Matching executable bytes
+      // for a later copy must never substitute a different seed Asset's IDs.
+      const known = field.valid && field.candidates.length === 1 && value?.kind === 'value' &&
+        metadataPreparedModels.find(m => json(m.closure.representation) === json(value.value));
       if (!known) throw Error('初期モデルの宣言を確認できません。');
       for (const [map, record] of [['assetRevisionsById', known.closure.revision], ['assetBindingsById', known.closure.binding]] as const) {
         const f = inspection.fields.find(f => f.path[0] === map && f.path[1] === record.id), v = f?.candidates[0]?.value;
@@ -135,7 +139,7 @@ export class MetadataFixtureContent implements VerifiedInventoryPort, MetadataMe
     return request.records.length ? 'verified-present' : 'unverified';
   }
   verifier(allowNewEvidence: boolean): ProjectContentVerifier {
-    const triangle = new PersistentContentVerifier(this.fs, limits, { scope: 'development-fixture', verify: q => this.execute(q) },
+    const triangle = new PersistentContentVerifier(this.fs, limits, { scope: 'development-fixture', verify: q => this.verifyModelRequest(q) },
       'synthetic-triangle-executor-1', this, allowNewEvidence);
     const media = this.mediaVerifier(false);
     return { scope: 'development-fixture', verify: q => q.fact === 'media' ? media.verify(q) : triangle.verify(q) };
@@ -158,11 +162,12 @@ export class MetadataFixtureContent implements VerifiedInventoryPort, MetadataMe
       return result;
     } };
   }
-  private async execute(request: ContentRequest): Promise<unknown> {
+  /** Read-only executable check used by explicit new-record preflight, never ordinary reopen. */
+  async verifyModelRequest(request: ContentRequest): Promise<unknown> {
     const response = (outcome: string, facts?: JsonObject) => ({ request, scope: 'development-fixture', outcome, ...(facts ? { facts } : {}) });
     if (!['representation', 'family-envelope'].includes(request.fact) || request.records.length !== 1 ||
       await this.inspect(request) !== 'verified-present') return response('unsupported');
-    const known = this.known(request.records[0]!)!, record = known.closure.representation;
+    const known = this.known(request.records[0]!)!, record = request.records[0]! as unknown as typeof known.closure.representation;
     const bytes = await this.fs.readBytes(this.bodyPath(record.blob.digest));
     if (!bytes) return response('missing'); this.counts.bodyBytes += bytes.length;
     if (await digest(bytes) !== record.blob.digest || !equalBytes(bytes, fixtureModelBytes(known.closure.shape))) return response('failed');

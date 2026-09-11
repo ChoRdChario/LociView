@@ -17,7 +17,10 @@ export interface CaptionMembershipResolution {
 }
 export interface AssetMembershipResolution {
   kind: 'resolveAssetMembership'; sceneId: string; assetId: string;
-  observedMembershipIds: string[]; originalMembershipId: string; choice: 'one'; eventId: string;
+  observedMembershipIds: string[]; originalMembershipId: string; choice: 'one' | 'both'; eventId: string;
+  copies?: { sourceMembershipId: string; ids: Record<'asset' | 'assetFrame' | 'representationFrame' | 'binding' | 'revision' | 'representation' |
+    'family' | 'compatibility' | 'layout' | 'slot' | 'membership', string>; materialId: string | null;
+    binding: JsonObject; revision: JsonObject; representation: JsonObject }[];
 }
 const edgeMap = 'sceneCaptionMembershipsById';
 const shape = (o: object, keys: string[]) => {
@@ -28,7 +31,7 @@ const sameIds = (a: readonly string[], b: readonly string[]) => {
 };
 
 /** Read complete source candidates, never the diagnostic/projection DTO. */
-function candidateReader(provider: Provider, limits: MetadataLimits) {
+export function candidateReader(provider: Provider, limits: MetadataLimits) {
   const records = new Map<string, Map<string, Map<string, CandidateField>>>();
   let work = 0;
   const charge = (n = 1) => { if ((work += n) > limits.maxWork) fail('membership-resolution-limit'); };
@@ -82,7 +85,7 @@ function candidateReader(provider: Provider, limits: MetadataLimits) {
     }
     return found.sort();
   };
-  return { records, exact, active, complete, related, charge };
+  return { records, exact, active, complete, related, charge, deleteEdits };
 }
 
 function membershipGroups(provider: Provider, limits: MetadataLimits, map: 'sceneCaptionMembershipsById' | 'sceneAssetMembershipsById', field: 'captionId' | 'assetId') {

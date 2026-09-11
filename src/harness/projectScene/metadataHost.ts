@@ -6,6 +6,7 @@ import { digest, newId, technicalId, underWriteLease } from '../../projectMetada
 import { TransactionJournal } from '../../projectMetadata/journal';
 import { createMetadataFixture, metadataFixtureLimits as limits, metadataProjectView } from './metadataFixture';
 import { MetadataFixtureContent, readMetadataSeed, writeMetadataSeed } from './metadataStorage';
+import { metadataModelFacts } from './metadataModelFacts';
 import type { SyntheticAuthority } from './historyProjection';
 import { metadataIntent } from './metadataIntent';
 import type { FullMetadataSource } from '../../projectMetadata/remote';
@@ -36,7 +37,7 @@ export async function openMetadataHost(options: MetadataHostOptions) {
     const entries = await journal.entries();
     // Only a known, unpublished initialization can create its isolated database.
     connection = await options.openStorage(lease.holdsWriteLock && entries.length === 0);
-    const content = new MetadataFixtureContent(fs), service = new MetadataProjectSession(fs, connection.factory, limits, allow => content.verifier(allow), content);
+    const content = new MetadataFixtureContent(fs), service = new MetadataProjectSession(fs, connection.factory, limits, allow => content.verifier(allow), content, metadataModelFacts(content));
     let last = await service.read(), busy = false, closed = false, failure = '';
     if (last.state === 'repair-required') throw Error('保存内容を確認できません。データは保持しています。');
     if (!fresh && lease.holdsWriteLock) lease.activateAfterDurableReload();

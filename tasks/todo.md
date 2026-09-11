@@ -11,7 +11,13 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — approved S1 service entry (2026-09-11)
 
-#### Active next slice — explicit model membership resolution (from `53d7692`)
+#### Current slice — independent model membership copies (from `72a64bd`)
+
+2026-09-12 continuation from clean `72a64bd`: keep-both now closes the recorded
+root/facts boundary using the existing host, journal and model/material controls.
+Two stored recipients exchange independently edited fresh-ID models. This is
+runtime progress, not whole-team completion or real-data adoption. Continue stage
+1's remaining ordinary-edit conflicts before Scene authoring; no new probe.
 
 Meta-audit: active-model status resolution is committed and verified; 62-group
 practical team scope remains incomplete. The next dependency is independent
@@ -25,7 +31,7 @@ Do not discard parent relationships or replenish old missing evidence silently.
 - [x] Fix the copy parent-reference and narrowly scoped new-record facts design
   before the keep-both implementation; seek PO only for an actual product-policy
   decision. Ordinary read/cold retry must never regenerate existing missing facts.
-- [ ] Extend the same metadata host for complete known model-copy remap,
+- [x] Extend the same metadata host for complete known model-copy remap,
   independent editing, retained save/retry and a second full-source exchange.
 
 Reuse existing membership UI and saved host tests; no new PoC, arbitrary duplicate
@@ -43,12 +49,45 @@ exited 0: 109 files / 1,957 PASS / 21 existing TODO (118.27 s). Typecheck/build
 and diff-check PASS; existing build chunk warnings remain. Do not credit
 rendered/input/device acceptance from these synthetic tests.
 
-Next: model keep-both's complete fresh-ID closure and scoped fact preparation,
-then return exchange. Read-only contract review found fresh independent root
+Keep-both now connects the complete fresh-ID closure and scoped fact preparation,
+including independent placement/material edits and two full-source return rounds.
+Read-only contract review found fresh independent root
 consistent with 05 §8/01 optional-parent same-owner rules: preserve current
 transform AND method; do not copy old parent IDs into a new Asset or change the
 original's history. The exact bounded implementation clarification is in 05
 §13.2. No new PO policy was ratified and no general historical-copy rule added.
+
+Verification/replan: the first final root run exposed six existing model-update
+regressions. Seed preparation had reused the new executable-payload matcher,
+which can return another fixture Asset with identical bytes. Initial seed lookup
+is now exact full-record matching again; nominal IDs are never inferred from
+body equality. Independent rereview finds no other owner substitution. The
+existing host matrix exercises both declared owners; the corrected 41-test host
+run passes, including the updated-geometry copy and both two-person rounds.
+
+Final executable tree: typecheck/build PASS (unchanged chunk warnings), root
+109 files / 1,961 PASS / 21 existing TODO, exit 0 (146.41 s). Diff-check PASS.
+Independent core/persistence/UI reviewers have no remaining mandatory findings.
+The initial failed run is not acceptance; the final rerun supersedes it. Fresh
+copy facts execute the exact small saved body checks; no model-body duplication.
+Cold reopen and replay do not reread those bodies or regenerate missing facts.
+Weak inactive introduced records do not acquire new body-read requirements.
+Browser skill initialization failed before browser selection (`node:process`),
+so rendering/input/OPFS/iPhone/offline acceptance remains pending. No repeated
+human checkpoint requested. Inventory remains 20/9/24/11: general profiles and
+real-file gates prevent treating T04 or the whole candidate as complete.
+
+Next finite slice, once this checkpoint is verified: explicit Caption anchor/
+color candidate resolution (05 §8). These existing two-person edits currently
+leave an unresolved pin/color that the ordinary editor refuses. Closing that
+return-to-edit path precedes Scene authoring; do not expand to all possible
+scalar conflicts at once. Full candidate selection only, optional color absence
+preserved, exact current token, active Caption lifecycle and no delete/edit
+ambiguity. Keep old authored model/revision/class and needs-review semantics;
+no automatic placement or partial anchor combination. Reuse current comparison
+UI, saved session/journal and pin controls for retry/cold/return/replay acceptance.
+No new schema, unplaced creation, model ownership inference, wire or real-data
+activation. Then connect approved Scene create/rename/default authoring.
 
 Parallel 06/07 audit confirms their §10 lists remain technical approval inputs,
 not a completed ratification pack. No new companion/probe is needed. Add exact

@@ -1,8 +1,9 @@
 import type { ProjectProviderRead } from '../../scene/projectProvider';
-import { canonicalFixture, readFixtureModel } from './modelClosure';
+import { canonicalFixture } from './modelClosure';
 import { syntheticPreparedVersions, versionFromClosure } from './modelFixture';
 import { metadataImmutableReader } from '../../projectMetadata/records';
 import type { MetadataLimits } from '../../projectMetadata/format';
+import { readMetadataModel } from './metadataModelRecords';
 
 /** Known stored geometry only; current and prepared choices never imply storage authority. */
 export function metadataModelVersions(provider: Extract<ProjectProviderRead, { kind: 'scene-provider' }>, limits: MetadataLimits) {
@@ -10,15 +11,11 @@ export function metadataModelVersions(provider: Extract<ProjectProviderRead, { k
   return Object.values(provider.resources.assets).flatMap(asset => {
     if (asset.lifecycle.kind !== 'value' || asset.lifecycle.value.state !== 'active' || asset.projection.kind !== 'value') return [];
     const p = asset.projection.value, records = provider.details.immutable;
-    const template = syntheticPreparedVersions.find(v => v.assetId === asset.id && v.projection.revisionId === p.revisionId);
     const binding = records.assetBindingsById[p.bindingId], revision = records.assetRevisionsById[p.revisionId];
-    const rep = template && records.representationsById[template.closure.representation.id];
-    if (!template || binding?.kind !== 'value' || revision?.kind !== 'value' || rep?.kind !== 'value' ||
-      canonicalFixture(revision.value) !== canonicalFixture(template.closure.revision) ||
-      canonicalFixture(rep.value) !== canonicalFixture(template.closure.representation) ||
-      p.assetFrameId !== template.closure.assetFrame.id)
+    const rep = p.representationIds.length === 1 && records.representationsById[p.representationIds[0]!];
+    if (binding?.kind !== 'value' || revision?.kind !== 'value' || !rep || rep.kind !== 'value')
       throw Error('保存したモデルの配置と本体を確認できません。');
-    const current = versionFromClosure(readFixtureModel(canonicalFixture({ ...template.closure, binding: binding.value })));
+    const current = versionFromClosure(readMetadataModel(p.assetFrameId, binding.value, revision.value, rep.value));
     if (canonicalFixture(current.projection) !== canonicalFixture(p)) throw Error('保存したモデルの参照が一致しません。');
     const choices = syntheticPreparedVersions.filter(v => {
       if (v.assetId !== asset.id || v.projection.revisionId === p.revisionId) return false;

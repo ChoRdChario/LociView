@@ -17,6 +17,8 @@ export interface MetadataMediaPort {
   stage(record: JsonObject, token: string): Promise<void>;
   verify(blobs: readonly JsonObject[]): Promise<void>;
 }
+export interface MetadataModelFactPlan { readonly baseToken: string; readonly finalToken: string; stage(): Promise<void> }
+export interface MetadataModelFactPort { plan(base: ProjectMetadataSource, next: ProjectMetadataSource): Promise<MetadataModelFactPlan | null> }
 
 export type MetadataSessionRead = Readonly<{
   state: 'empty' | 'ready' | 'pending' | 'repair-required';
@@ -53,13 +55,14 @@ export class MetadataProjectSession {
   private readonly repository: MetadataRepository;
   private readonly journal: TransactionJournal;
   private retained: { start: JournalStart; parts: Uint8Array[]; stagedBlobs?: JsonObject[];
+    modelFacts?: { plan: MetadataModelFactPlan; next: ProjectMetadataSource };
     remote?: { proof: RemoteBatchProof; bytes: Uint8Array };
     introduction?: { source: ProjectMetadataSource; command: Extract<MetadataEdit, { kind: 'createAttachment' }> } } | null = null;
   private last: MetadataSessionRead = { state: 'empty', source: null, provider: null, publication: null };
   constructor(private readonly fs: ProjectWorkspaceFS, storage: MetadataStorageFactory, limits: MetadataLimits,
     /** Owned verifier, fresh durable inventory/evidence per request. Boolean permits initial fact creation only. */
     private readonly verifier: (allowNewEvidence: boolean) => ProjectContentVerifier,
-    private readonly media?: MetadataMediaPort) {
+    private readonly media?: MetadataMediaPort, private readonly modelFacts?: MetadataModelFactPort) {
     this.limits = checkLimits(limits); this.repository = new MetadataRepository(fs, storage, this.limits);
     this.journal = new TransactionJournal(fs, this.limits);
   }
@@ -151,10 +154,12 @@ export class MetadataProjectSession {
       const known = new Set(durable.originalChanges().map(b => A.decodeChange(b).hash));
       const parts = prepared.originalChanges().filter(b => !known.has(A.decodeChange(b).hash));
       if (!parts.length) return read; // An unchanged value has no storage transaction.
-      await this.checked(prepared, false); // Refused preparation must not become a pending save.
+      const facts = await this.prepareModelFacts(durable, prepared);
+      if (!facts) await this.checked(prepared, false); // Refused preparation must not become a pending save.
       const [doc] = A.applyChanges(A.init(), durable.originalChanges());
       this.retained = { start: { transactionId, repositoryId: prior.start.repositoryId, predecessor: prior.start.transactionId,
-        purpose: 'localCommand', proof: durable.proof, baseHeads: A.getHeads(doc).sort() }, parts };
+        purpose: 'localCommand', proof: durable.proof, baseHeads: A.getHeads(doc).sort() }, parts,
+        ...(facts ? { modelFacts: { plan: facts, next: prepared } } : {}) };
       return this.resume();
     });
   }
@@ -173,11 +178,12 @@ export class MetadataProjectSession {
       if (!base || base.token !== read.source.token) return fail('receive-base-changed');
       const { parts, final } = planRemoteChanges(base, remote, this.limits);
       // Validate the final required content/candidates without observing a transient prefix.
-      await this.checked(final, false);
+      const facts = await this.prepareModelFacts(base, final);
+      if (!facts) await this.checked(final, false);
       if (!parts.length) return read;
       this.retained = { start: { transactionId: newId(), repositoryId: prior.start.repositoryId,
         predecessor: prior.start.transactionId, purpose: 'remotePackageMerge', proof: base.proof, baseHeads: base.heads },
-        parts, remote: { bytes: captured.metadataBytes, proof: {
+        parts, ...(facts ? { modelFacts: { plan: facts, next: final } } : {}), remote: { bytes: captured.metadataBytes, proof: {
           source: { packageId: captured.packageId, metadataSha256, metadataByteLength: captured.metadataBytes.length,
             metadataEnvelope: captured.proof.envelope, remoteHeads: remote.heads }, expectedFinalHeads: final.heads } } };
       return this.resume();
@@ -196,6 +202,15 @@ export class MetadataProjectSession {
       }
       const predecessor = entries.filter(e => e.publication).at(-1)?.start.transactionId ?? null;
       if (predecessor !== this.retained.start.predecessor) fail('retry-predecessor');
+      if (this.retained.modelFacts) {
+        const { plan, next } = this.retained.modelFacts;
+        await this.journal.begin(this.retained.start);
+        if (pending?.prepared) fail('model-facts-after-prepared');
+        const base = await this.repository.read(this.retained.start.repositoryId, this.retained.start.proof, this.retained.start.baseHeads);
+        if (!base || base.token !== plan.baseToken || next.token !== plan.finalToken) fail('model-facts-base');
+        await plan.stage(); await this.checked(next, false);
+        delete this.retained.modelFacts; // Prepared/cold recovery can only verify already stored facts.
+      }
       if (this.retained.introduction) {
         const { source, command } = this.retained.introduction;
         await this.journal.begin(this.retained.start);
@@ -260,5 +275,10 @@ export class MetadataProjectSession {
     if (!blobs.length) return;
     if (!this.media) fail('media-unconnected');
     await this.media!.verify(blobs);
+  }
+  private async prepareModelFacts(base: ProjectMetadataSource, next: ProjectMetadataSource) {
+    const plan = await this.modelFacts?.plan(base, next);
+    if (plan && (plan.baseToken !== base.token || plan.finalToken !== next.token)) fail('model-facts-token');
+    return plan ?? null;
   }
 }

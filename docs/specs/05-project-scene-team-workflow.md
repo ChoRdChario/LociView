@@ -1660,6 +1660,10 @@ unknown fields/profiles/relationships, new body bytes and existing missing facts
 do not gain a replenishment path. Limit fact creation to the new requests, never
 pass allow-new-evidence to the complete final provider. This does not adopt a
 general importer, a fact-transfer wire or a new persistence receipt format.
+An introduced record retained only in weak inactive history does not create a
+new body-read requirement: prepare only requests required by the complete final
+provider. Initial seed preparation still matches exact declared records/owners;
+an executable-body match must never substitute a different seed Asset's IDs.
 
 Local and remote operations retain exact prepared original changes/full source
 before staging these facts under the existing journal lease. Validate the final

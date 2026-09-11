@@ -424,7 +424,9 @@ and active status atomically, with same-provider current projection, shared gizm
 preview/cancel and exact retry. Saved model payload, Caption Asset coordinates
 and memberships remain unchanged. Prepared synthetic geometry activation and
 explicit pin correction now share full-source saved two-party rounds; general
-body introduction, real-file input, exchange-base/delta and model copies remain. No old saved
+body introduction, real-file input and exchange-base/delta remain. Known-Mesh
+independent copies now preserve the current placement/material and original
+Caption/other-Scene references; final verification is in todo. No old saved
 history is converted. Mounted memory-port and HTTP tests do not establish actual
 browser/device/adoption acceptance. Next is the consolidated new-host Desktop
 batch (uiux-handoff); do not reopen passed probes. Full S1 and TEAM-FLOW-01 remain open.

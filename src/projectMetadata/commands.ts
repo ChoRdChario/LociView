@@ -14,6 +14,7 @@ import { normalizeCaptionText } from '../domain/captionText';
 import { planCaptionMembershipResolution, planAssetMembershipResolution, type CaptionMembershipResolution, type AssetMembershipResolution } from './membership';
 import { metadataImmutableReader } from './records';
 import { assetStatusCandidates } from './assetStatus';
+import { planAssetMembershipCopies } from './modelMembership';
 
 export type MetadataEdit =
   | CaptionMembershipResolution
@@ -39,7 +40,7 @@ export type MetadataEdit =
   | { kind: 'createAttachment'; sceneId: string; captionId: string; attachmentId: string; media: JsonObject; orderKey: string; altText: string; eventId: string }
   | { kind: 'editAttachment'; sceneId: string; captionId: string; attachmentId: string; field: 'altText' | 'orderKey'; value: string }
   | { kind: 'deleteAttachment'; sceneId: string; captionId: string; attachmentId: string; eventId: string };
-export interface MetadataRecordEdit { map: MutableRecordMap | 'mediaResourcesById' | 'assetBindingsById'; id: string; create: boolean; fields: JsonObject; remove?: readonly 'defaultViewId'[] }
+export interface MetadataRecordEdit { map: MutableRecordMap | 'mediaResourcesById' | 'assetBindingsById' | 'assetRevisionsById' | 'representationsById'; id: string; create: boolean; fields: JsonObject; remove?: readonly 'defaultViewId'[] }
 type Provider = Extract<ProjectProviderRead, { kind: 'scene-provider' }>;
 const exact = <T>(field: Field<T> | undefined): T => field?.kind === 'value' ? field.value : fail('command-unresolved');
 const json = (v: unknown) => v as JsonValue;
@@ -158,7 +159,7 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       result.push({ map: 'assetsById', id: command.assetId, create: false, fields: { status: selected!.status } }); break;
     }
     case 'resolveCaptionMembership': return planCaptionMembershipResolution(provider, command, limits);
-    case 'resolveAssetMembership': return planAssetMembershipResolution(provider, command, limits);
+    case 'resolveAssetMembership': return command.choice === 'both' ? planAssetMembershipCopies(provider, command, limits) : planAssetMembershipResolution(provider, command, limits);
     case 'activatePreparedRevision': {
       shape(raw, ['kind', 'sceneId', 'assetId', 'expectedBindingId', 'revisionId', 'binding']);
       row('scenesById', command.sceneId); row('assetsById', command.assetId);

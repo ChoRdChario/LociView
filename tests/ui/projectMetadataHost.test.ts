@@ -25,7 +25,10 @@ import { planView } from '../../src/ui/projectScene/viewState';
 import { SyntheticViewSession, type DisplayCapture } from '../../src/harness/projectScene/viewSession';
 import { materialBucket, materialKey, materialTarget, type MaterialRouting } from '../../src/harness/projectScene/materialHistory';
 import { syntheticDisplay } from '../../src/harness/projectScene/viewportModel';
-import { canonicalFixture, fixtureRecordDigest, moveFixtureModel, createFixtureModel, fixtureModelIds } from '../../src/harness/projectScene/modelClosure';
+import { canonicalFixture, fixtureRecordDigest, moveFixtureModel, createFixtureModel, fixtureModelIds, allocateModelCopyIds } from '../../src/harness/projectScene/modelClosure';
+import { assetCopySource } from '../../src/projectMetadata/modelMembership';
+import { assetMembershipGroups, type AssetMembershipResolution } from '../../src/projectMetadata/membership';
+import { readMetadataModel } from '../../src/harness/projectScene/metadataModelRecords';
 import { metadataProviderReady } from '../../src/projectMetadata/session';
 import { metadataImmutableReader } from '../../src/projectMetadata/records';
 import { assetStatusCandidates } from '../../src/projectMetadata/assetStatus';
@@ -38,8 +41,10 @@ import { createMetadataReceiveControls } from '../../src/harness/projectScene/me
 
 class FaultFS extends MemoryFS {
   rejectPublication = false; rejectImage = false; writes = 0;
+  rejectEvidenceAfter: number | null = null;
   override async writeText(path: string, data: string) {
     if (this.rejectPublication && path.endsWith('/published.json')) throw Error('synthetic quota');
+    if (path.includes('/evidence/') && this.rejectEvidenceAfter !== null && this.rejectEvidenceAfter-- === 0) throw Error('synthetic evidence quota');
     this.writes++; return super.writeText(path, data);
   }
   override async writeBytes(path: string, data: Uint8Array) {
@@ -69,10 +74,10 @@ const picker = (r: RecordedNode, label: string) => descendants(r).find(n => n.ta
 const area = (r: RecordedNode, label: string) => descendants(r).find(n => n.tag === 'section' && n.attributes.get('aria-label') === label)!;
 const named = (r: RecordedNode, label: string) => descendants(r).find(n => n.attributes.get('aria-label') === label)!;
 const setInput = (n: RecordedNode, text: string) => { n.value = text; n.fire(n.tag === 'select' ? 'change' : 'input'); };
-function materialHost(s: SyntheticSession) {
+function materialHost(s: SyntheticSession, assetId: string = f.equipment) {
   const w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s), r = record(w.root);
   button(r, 'マテリアル').fire('click'); const panel = named(r, 'マテリアル');
-  setInput(named(panel, 'モデル'), f.equipment); const surface = named(panel, '面'); setInput(surface, surface.children[1]!.value);
+  setInput(named(panel, 'モデル'), assetId); const surface = named(panel, '面'); setInput(surface, surface.children[1]!.value);
   return { w, panel, scope: (v: string) => setInput(named(panel, '適用範囲'), v),
     begin: () => button(panel, '設定を編集').fire('click'), edit: (label: string, text: string) => setInput(named(panel, label), text),
     async apply() { await acknowledge(s, () => button(panel, '変更を適用').fire('click')); w.render(); },
@@ -124,6 +129,25 @@ async function correctPin(s: SyntheticSession, position: readonly [number, numbe
   const plan = planPinMode(s.pinContext(), { kind: 'finish' });
   await acknowledge(s, () => { s.acceptPin(plan); });
   expect(s.acknowledgment.state).toBe('idle');
+}
+function modelCopyCommand(host: Awaited<ReturnType<typeof openMetadataHost>>): AssetMembershipResolution {
+  const provider = host.read().provider!; if (provider.kind !== 'scene-provider') throw Error('provider');
+  const g = assetMembershipGroups(provider, metadataFixtureLimits)[0]!, source = assetCopySource(provider, g.sceneId, g.assetId, metadataFixtureLimits);
+  const model = readMetadataModel(source.asset.assetFrameId as string, source.binding, source.revision, source.representation);
+  let n = 3000; const fresh = (prefix: string) => `${prefix}_${(++n).toString(16).padStart(32, '0')}`;
+  return { kind: 'resolveAssetMembership', sceneId: g.sceneId, assetId: g.assetId, observedMembershipIds: g.edgeIds,
+    originalMembershipId: g.edgeIds[0]!, choice: 'both', eventId: fresh('evt'), copies: g.edgeIds.slice(1).map(sourceMembershipId => {
+      const ids = allocateModelCopyIds(fixtureModelIds(model), fresh), copy = createFixtureModel(ids, model.shape, model.binding.assetToProject, undefined, model.binding.method);
+      return { sourceMembershipId, ids: { ...ids, membership: fresh('sam') }, materialId: source.material ? fresh('ovr') : null,
+        binding: JSON.parse(canonicalFixture(copy.binding)), revision: JSON.parse(canonicalFixture(copy.revision)), representation: JSON.parse(canonicalFixture(copy.representation)) };
+    }) };
+}
+async function conflictingModel(h: ReturnType<typeof fixture>) {
+  const host = await h.open(true), s = new SyntheticSession(host.authority);
+  s.acceptNavigation(planNavigation(s.snapshot.state, s.session, s.pending, { kind: 'scene', sceneId: f.detail }));
+  await acknowledge(s, () => { s.acceptModel(planModelList(s.modelContext(), { kind: 'membership', assetId: f.structure, included: true })); });
+  await host.receive(host.read().source!.token, undefined, 'assetMembership'); s.refreshHistory();
+  return { host, s, command: modelCopyCommand(host) };
 }
 
 describe('saved explicit model status resolution; synthetic ports/DOM only', () => {
@@ -501,6 +525,151 @@ function mediaHost(s: SyntheticSession) {
 }
 
 describe('new synthetic saved host (memory ports and recorded DOM, not real browser/iOS acceptance)', { timeout: 15_000 }, () => {
+  it('rejects incomplete model copy remaps before journaling, preserves inactive missing evidence and refuses prepared-fact repair', async () => {
+    const h = fixture(), { host, command } = await conflictingModel(h), source = host.read().source!, provider = host.read().provider!;
+    const copy = command.copies![0]!, baseWrites = [h.base.writes, h.fault.writes];
+    const invalid: AssetMembershipResolution[] = [
+      { ...command, copies: [] }, { ...command, copies: [{ ...copy, ids: { ...copy.ids, assetFrame: 'frm_' + '3'.padStart(32, '0') } }] },
+      { ...command, copies: [{ ...copy, ids: { ...copy.ids, family: copy.ids.asset } }] },
+      { ...command, copies: [{ ...copy, representation: { ...copy.representation, role: 'pointPrimary' } }] },
+      { ...command, copies: [{ ...copy, binding: { ...copy.binding, parentBindingId: 'bnd_' + '1'.padStart(32, '0') } }] },
+      { ...command, copies: [{ ...copy, revision: { ...copy.revision, extra: true } }] },
+      { ...command, copies: [{ ...copy, materialId: 'ovr_' + 'e'.repeat(32) }] },
+    ];
+    for (const bad of invalid) await expect(host.resolve(source.token, bad)).rejects.toThrow();
+    await expect(host.resolve(source.token, { ...command, copies: [{ ...copy, representation: { ...copy.representation, payloadDigest: 'f'.repeat(64) } }] })).rejects.toThrow();
+    expect([h.base.writes, h.fault.writes]).toEqual(baseWrites); expect(host.read().state).toBe('ready');
+    if (provider.kind !== 'scene-provider') throw Error('provider');
+    const fields = provider.inspection.candidates.fields.map(field => field.path[0] === 'representationsById' && field.path[1] === 'rep_' + '1'.padStart(32, '0') ? { ...field, hasUnknownFields: true } : field);
+    expect(() => source.prepareEdit(source.token, command, { ...provider, inspection: { ...provider.inspection, candidates: { ...provider.inspection.candidates, fields } } }, 'd'.repeat(32))).toThrow();
+    // An old inactive missing receipt must not be silently regenerated by the new-record path.
+    const old = metadataPreparedModels.find(v => v.assetId === f.structure && v.closure.shape === 'updated')!.closure.representation.id;
+    const oldPaths: string[] = [];
+    for (const path of await h.base.list(`${metadataArea}/${h.run}/`)) if (path.includes('/evidence/') && (await h.base.readText(path))!.includes(old)) oldPaths.push(path);
+    for (const path of oldPaths) await h.base.remove(path);
+    { // A prepared-copy publication failure retains exact originals but does not permit fact repair.
+      h.base.rejectPublication = true; await expect(host.resolve(source.token, command)).rejects.toThrow();
+      expect(host.read().state).toBe('pending'); const preparedFacts: string[] = [];
+      for (const path of await h.base.list(`${metadataArea}/${h.run}/`)) if (path.includes('/evidence/') && (await h.base.readText(path))!.includes(copy.ids.representation)) preparedFacts.push(path);
+      expect(preparedFacts).toHaveLength(2); for (const path of oldPaths) expect(await h.base.exists(path)).toBe(false);
+      await h.base.remove(preparedFacts[0]!); h.base.rejectPublication = false;
+      const reads = host.content.counts.bodyBytes; await expect(host.authority.retry!()).rejects.toThrow();
+      expect(await h.base.exists(preparedFacts[0]!)).toBe(false); expect(host.content.counts.bodyBytes).toBe(reads);
+      expect(host.read().source!.token).toBe(source.token); await host.dispose();
+      const cold = await h.open(); await expect(cold.authority.retry!()).rejects.toThrow();
+      expect(await h.base.exists(preparedFacts[0]!)).toBe(false); expect(cold.content.counts.bodyBytes).toBe(0); await cold.dispose();
+    }
+  });
+
+  it('retries a partial new-model fact preparation with the same copy IDs and no acknowledged fact replenishment', async () => {
+    const h = fixture(), { host, command } = await conflictingModel(h), source = host.read().source!, copy = command.copies![0]!;
+    h.base.rejectEvidenceAfter = 1; await expect(host.resolve(source.token, command)).rejects.toThrow();
+    expect(host.read().state).toBe('pending'); expect(host.read().source!.token).toBe(source.token);
+    const saved: string[] = [];
+    for (const path of await h.base.list(`${metadataArea}/${h.run}/`)) if (path.includes('/evidence/') && (await h.base.readText(path))!.includes(copy.ids.representation)) saved.push(path);
+    expect(saved).toHaveLength(1); const first = await h.base.readText(saved[0]!);
+    h.base.rejectEvidenceAfter = null; await host.authority.retry!();
+    expect(host.read().state).toBe('ready'); expect(await h.base.readText(saved[0]!)).toBe(first);
+    expect(host.read().source!.originalChanges()).toHaveLength(source.originalChanges().length + 1);
+    const project = host.authority.read(); expect(project.resources.assets[copy.ids.asset]).toBeDefined();
+    expect(Object.keys(project.resources.assets)).toHaveLength(3);
+    const bytes = host.read().source!.originalChanges(); await host.dispose(); const cold = await h.open();
+    expect(cold.read().source!.originalChanges()).toEqual(bytes); expect(cold.content.counts.bodyBytes).toBe(0); await cold.dispose();
+  });
+
+  it('receives a retained inactive model copy without requiring weak content or creating its facts', async () => {
+    const h = fixture(), { host, command } = await conflictingModel(h), source = host.read().source!, provider = host.read().provider!;
+    const copy = source.prepareEdit(source.token, command, provider, 'b'.repeat(32)), ids = command.copies![0]!.ids;
+    const [doc] = A.applyChanges(A.init<Record<string, any>>(), copy.originalChanges());
+    const deleted = A.change(doc, draft => {
+      for (const [map, id] of [['assetsById', ids.asset], ['sceneAssetMembershipsById', ids.membership]])
+        draft[map!][id!].lifecycle = new A.ImmutableString(canonicalFixture({ state: 'deleted', reason: 'userDelete', eventId: 'evt_' + 'b'.repeat(32) }));
+    });
+    const remote = ProjectMetadataSource.reopen(A.getAllChanges(deleted), source.proof, metadataFixtureLimits), reads = host.content.counts.bodyBytes;
+    const oldFacts = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.includes('/evidence/'));
+    await host.receive(source.token, fullSource(remote, 905)); expect(host.read().state).toBe('ready');
+    expect(host.content.counts.bodyBytes).toBe(reads);
+    expect((await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.includes('/evidence/'))).toEqual(oldFacts);
+    await host.dispose();
+  });
+
+  it('keeps independent model copies with placement/material, exact save retry and two saved recipients returning original history', async () => {
+    const a = fixture(), initial = await a.open(true); await initial.dispose();
+    const b = fixture(); for (const path of await a.base.list(`${metadataArea}/${a.run}/`)) await b.base.writeBytes(path, (await a.base.readBytes(path))!);
+    for (const [key, bytes] of a.rows) b.rows.set(key, bytes.slice());
+    let ah = await a.open(), bh = await b.open(), sa = new SyntheticSession(ah.authority), sb = new SyntheticSession(bh.authority);
+    let wa = createDevelopmentWorkspace(new RecordedDocument().asDocument(), sa), wb = createDevelopmentWorkspace(new RecordedDocument().asDocument(), sb);
+    const move = async (s: SyntheticSession, assetId: string, x: string) => {
+      expect(s.acceptModel(planModelList(s.modelContext(), { kind: 'select', assetId }))).toBe(true);
+      expect(s.beginModelPlacement()).toBe(true); s.changeModelPlacement([x, '2', '1']);
+      await acknowledge(s, () => { s.finishModelPlacement(); }); expect(s.acknowledgment.state).toBe('idle');
+    };
+    await move(sa, f.structure, '6');
+    const update = sa.modelUpdateContext(), nextVersion = update.choices[0]!;
+    await acknowledge(sa, () => { sa.acceptModelUpdate({ token: update.token, sceneId: update.sceneId,
+      assetId: f.structure, bindingId: nextVersion.projection.bindingId }); });
+    expect(sa.acknowledgment.state).toBe('idle');
+    const mat = materialHost(sa, f.structure); mat.scope('project'); mat.begin(); mat.edit('照明', 'unlit'); await mat.apply(); mat.w.dispose();
+    for (const s of [sa, sb]) {
+      s.acceptNavigation(planNavigation(s.snapshot.state, s.session, s.pending, { kind: 'scene', sceneId: f.detail }));
+      await acknowledge(s, () => { s.acceptModel(planModelList(s.modelContext(), { kind: 'membership', assetId: f.structure, included: true })); });
+    }
+    select(sb); await apply(sb, { body: '参加者の記録' });
+    await ah.receive(ah.read().source!.token, fullSource(bh.read().source!, 900)); sa.refreshHistory();
+    const before = sa.snapshot, original = before.modelVersions!.find(v => v.assetId === f.structure)!;
+    const bodies = (await a.base.list(`${metadataArea}/${a.run}/`)).filter(p => p.includes('/fixture-content/'));
+    const bodyBytes = await Promise.all(bodies.map(p => a.base.readBytes(p)));
+    const ui = createMetadataReceiveControls(new RecordedDocument().asDocument(), ah, sa, () => {}), root = record(ui.root);
+    const list = named(root, '重複したモデル登録'), originalChoice = named(list, '元として残す登録'), choice = named(list, '重複の解消方法');
+    setInput(originalChoice, originalChoice.children[1]!.value); setInput(choice, 'both');
+    const confirm = button(list, '登録の重複を解消'); expect(confirm.disabled).toBe(false);
+    a.base.rejectPublication = true; const token = ah.read().source!.token;
+    await acknowledge(sa, () => confirm.fire('click')); expect(sa.acknowledgment.state).toBe('failed');
+    expect(ah.read().source!.token).toBe(token); expect(choice.value).toBe('both');
+    const parts = (await a.base.list(`${metadataArea}/${a.run}/`)).filter(p => p.endsWith('.amchange'));
+    const originals = await Promise.all(parts.map(p => a.base.readBytes(p)));
+    a.base.rejectPublication = false; await acknowledge(sa, () => { sa.retryWorking(); });
+    expect(sa.acknowledgment.state).toBe('idle'); expect(ui.hasChanges()).toBe(false);
+    expect(await Promise.all(parts.map(p => a.base.readBytes(p)))).toEqual(originals);
+    const copy = sa.snapshot.modelVersions!.find(v => !before.resources.assets[v.assetId])!; expect(copy).toBeDefined();
+    expect(copy.closure.binding.parentBindingId).toBeUndefined(); expect(copy.closure.binding.method).toBe('manual');
+    expect(copy.closure.shape).toBe('updated');
+    expect(copy.closure.binding.assetToProject).toEqual(original.closure.binding.assetToProject);
+    expect(copy.closure.representation.blob).toEqual(original.closure.representation.blob);
+    expect(sa.snapshot.resources.captions).toEqual(before.resources.captions);
+    expect(sa.snapshot.state.captionMemberships).toEqual(before.state.captionMemberships);
+    expect(syntheticDisplay(sa.snapshot, f.overview, null, null).models.some(m => m.binding.assetId === copy.assetId)).toBe(false);
+    const ownMaterial = Object.values(sa.snapshot.materialData!.records).find(m => m.routing.kind === 'value' && m.routing.value.target.assetId === copy.assetId)!;
+    expect(ownMaterial.appearance).toEqual({ kind: 'value', value: { lighting: 'unlit' } });
+    expect(ownMaterial.routing.kind === 'value' && ownMaterial.routing.value.scope).toEqual({ kind: 'scene', sceneId: f.detail });
+    await move(sa, copy.assetId, '9'); const copiedMaterial = materialHost(sa, copy.assetId);
+    copiedMaterial.scope('scene'); copiedMaterial.begin(); copiedMaterial.edit('照明', 'lit'); await copiedMaterial.apply(); copiedMaterial.w.dispose();
+    expect(sa.snapshot.modelVersions!.find(v => v.assetId === f.structure)!.closure).toEqual(original.closure);
+    expect(await Promise.all(bodies.map(p => a.base.readBytes(p)))).toEqual(bodyBytes);
+    expect((await a.base.list(`${metadataArea}/${a.run}/`)).filter(p => p.includes('/fixture-content/'))).toEqual(bodies);
+    const sent = fullSource(ah.read().source!, 901); b.base.rejectPublication = true;
+    await expect(bh.receive(bh.read().source!.token, sent)).rejects.toThrow(); expect(bh.read().state).toBe('pending');
+    wb.dispose(); await bh.dispose(); b.base.rejectPublication = false; bh = await b.open(); await bh.authority.retry!();
+    sb = new SyntheticSession(bh.authority); wb = createDevelopmentWorkspace(new RecordedDocument().asDocument(), sb);
+    sb.acceptNavigation(planNavigation(sb.snapshot.state, sb.session, sb.pending, { kind: 'scene', sceneId: f.detail }));
+    expect(bh.content.counts.bodyBytes).toBe(0); await move(sb, copy.assetId, '7');
+    const reply = fullSource(bh.read().source!, 902); await ah.receive(ah.read().source!.token, reply); sa.refreshHistory();
+    expect(sa.snapshot.modelVersions!.find(v => v.assetId === copy.assetId)!.closure.binding.assetToProject.translation).toEqual([7, 2, 1]);
+    expect(sa.snapshot.resources.captions).toEqual(before.resources.captions);
+    const writes = [a.base.writes, a.fault.writes], reads = ah.content.counts.bodyBytes;
+    await ah.receive(ah.read().source!.token, reply); expect([a.base.writes, a.fault.writes]).toEqual(writes); expect(ah.content.counts.bodyBytes).toBe(reads);
+    // Second round changes the original independently while the participant adds more Caption text.
+    select(sb); await apply(sb, { body: '参加者の二巡目の記録' }); await move(sa, f.structure, '12');
+    await bh.receive(bh.read().source!.token, fullSource(ah.read().source!, 903)); sb.refreshHistory();
+    expect(sb.snapshot.modelVersions!.find(v => v.assetId === copy.assetId)!.closure.binding.assetToProject.translation).toEqual([7, 2, 1]);
+    await ah.receive(ah.read().source!.token, fullSource(bh.read().source!, 904)); sa.refreshHistory();
+    expect(sa.snapshot.resources.captions[f.shared]!.body).toEqual({ kind: 'value', value: '参加者の二巡目の記録' });
+    const saved = ah.read().source!; ui.dispose(); wa.dispose(); wb.dispose(); await ah.dispose(); await bh.dispose();
+    ah = await a.open(); bh = await b.open(); expect(ah.read().source!.heads).toEqual(bh.read().source!.heads);
+    expect(ah.read().source!.originalChanges()).toEqual(saved.originalChanges()); expect(ah.content.counts.bodyBytes).toBe(0);
+    await ah.dispose(); await bh.dispose();
+  }, 40_000);
+
   it.each([1, 2])('retains explicitly selected model registration %s without deleting a model or Caption, retry/cold replay and late edge', async selectedIndex => {
     const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority), seed = host.read().source!;
     const seedProvider = host.read().provider!;
@@ -513,7 +682,7 @@ describe('new synthetic saved host (memory ports and recorded DOM, not real brow
     const list = named(root, '重複したモデル登録'), original = named(list, '元として残す登録'), choice = named(list, '重複の解消方法');
     const confirm = button(list, '登録の重複を解消');
     expect(original.children).toHaveLength(3); expect(original.value).toBe(''); expect(choice.value).toBe(''); expect(confirm.disabled).toBe(true);
-    expect(choice.children.some(c => c.value === 'both')).toBe(false);
+    expect(choice.children.some(c => c.value === 'both')).toBe(true);
     expect(descendants(list).some(n => n.textContent.includes('キャプション・他のシーンは変わりません'))).toBe(true);
     const ids = original.children.slice(1).map(c => c.value), chosen = ids[selectedIndex - 1]!;
     const token = host.read().source!.token, command = { kind: 'resolveAssetMembership' as const, sceneId: f.detail, assetId: f.structure,

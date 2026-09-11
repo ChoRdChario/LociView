@@ -18,14 +18,16 @@ effort percentages. Approved full-source receive (02 §8) and explicit Caption
 text resolution and independent Caption membership copies now have bounded
 new-service/host paths. Prepared model activation, explicit pin correction and
 two saved full-source team rounds now work in synthetic storage ports. Model
-copies, remaining scalar conflicts and exchange-base/delta still remain;
+copies now have the bounded known-Mesh path below; remaining scalar conflicts and exchange-base/delta remain;
 real-file/wire adoption remains separately gated. Latest UI complaints do not set priority.
 Competing known ready-model statuses now support complete model/placement comparison
 and explicit causal selection in the same host, including saved retry/cold replay.
-This does not resolve every scalar/lifecycle conflict or connect model copies.
+This does not resolve every scalar/lifecycle conflict.
 Duplicate model memberships now have explicit keep-one saving in that host;
 only the other observed edges are tombstoned, not models or Captions. Independent
-model copies remain next, with the bounded root/facts design recorded in 05 §13.2.
+known-Mesh copies now remap current closure/material with scoped fresh-record
+facts (05 §13.2), retaining original Caption ownership and other Scenes. Root
+verification is recorded in todo; no general model-profile or real-data adoption.
 
 2026-09-11 current implementation: PO explicitly approved 05 §13.2's S1 service
 implementation before aggregate adoption, new synthetic-only development activation
@@ -65,7 +67,7 @@ Fresh synthetic seeds prepare original/updated geometry and verification facts;
 explicit activation preserves placement and records, and pins remain needs-review
 until manually corrected. Saved-port two-party tests cover two full-source rounds,
 local text, interruption/recovery/no-op and cold reopen. Old seeds are not refilled.
-General body introduction, model copies, exchange-base/delta, ordinary file UI
+General body introduction/copy profiles, exchange-base/delta, ordinary file UI
 and real-file input remain unconnected here.
 The old saved pair and ordinary home are unchanged.
 Mounted memory-port and HTTP dependency tests pass; actual browser/device/storage
