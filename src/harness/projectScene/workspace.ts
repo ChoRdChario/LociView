@@ -148,7 +148,8 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
       if (session.modelUpdateRestriction) modelUpdate.root.hidden = true;
       if (session.placementRestriction) placement.actions.hidden = placement.modeStrip.hidden = true;
       if (session.mediaRestriction && !session.readOnly) media.root.hidden = true;
-      material.root.hidden = !!session.materialRestriction && !session.readOnly; modelList.root.inert = !!session.membershipRestriction;
+      material.root.hidden = !!session.materialRestriction && !session.readOnly;
+      // Membership writes are guarded individually; readonly users can still inspect and hide models locally.
     }
     // A second visible-list pass restores the desired inner scroll after a tab was hidden.
     if (task === 'captions') list.render(captionContext);

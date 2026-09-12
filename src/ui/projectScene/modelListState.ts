@@ -16,9 +16,11 @@ export type ModelListSource = Readonly<{ token: string; projectId: string; scene
 export interface ModelListMemory {
   readonly projectId: string; readonly sceneId: string; readonly assetId: string | null;
   readonly query: string; readonly filter: 'all' | 'included'; readonly scrollTop: number; readonly composing: boolean;
+  /** Local display only; never a second durable Scene-membership list. */
+  readonly hiddenAssetIds: readonly string[];
 }
 export const newModelListMemory = (projectId: string, sceneId: string): ModelListMemory =>
-  Object.freeze({ projectId, sceneId, assetId: null, query: '', filter: 'all', scrollTop: 0, composing: false });
+  Object.freeze({ projectId, sceneId, assetId: null, query: '', filter: 'all', scrollTop: 0, composing: false, hiddenAssetIds: Object.freeze([]) });
 interface Scope { readonly token: string; readonly projectId: string; readonly sceneId: string }
 export type ModelMembershipPlan = Scope & Readonly<{ kind: 'membership'; assetId: string }> &
   (Readonly<{ action: 'include' }> | Readonly<{ action: 'exclude'; membershipId: string }>);
@@ -29,11 +31,14 @@ export interface ModelListContext {
   readonly feedback: Readonly<{ kind: 'idle' }> | Readonly<{ kind: 'applying'; plan: ModelMembershipPlan }> |
     Readonly<{ kind: 'failed'; plan: ModelMembershipPlan; message: string }>;
 }
-export type ModelListIntent = Readonly<{ kind: 'search'; query: string }> | Readonly<{ kind: 'filter'; filter: ModelListMemory['filter'] }> |
+export type ModelVisibilityIntent = Readonly<{ kind: 'visibility'; action: 'hide' | 'show' | 'isolate'; assetId: string }> |
+  Readonly<{ kind: 'visibility'; action: 'showAll' }>;
+export type ModelListIntent = ModelVisibilityIntent | Readonly<{ kind: 'search'; query: string }> | Readonly<{ kind: 'filter'; filter: ModelListMemory['filter'] }> |
   Readonly<{ kind: 'compose'; active: boolean }> | Readonly<{ kind: 'scroll'; top: number }> |
   Readonly<{ kind: 'select'; assetId: string | null }> | Readonly<{ kind: 'membership'; assetId: string; included: boolean }> |
   Readonly<{ kind: 'review'; assetId: string | null }> | Readonly<{ kind: 'reveal' | 'retry' }>;
 export type ModelListPlan = Readonly<{ kind: 'blocked'; reason: string }> | Readonly<{ kind: 'unchanged' }> |
+  (Scope & Readonly<{ kind: 'visibility'; intent: ModelVisibilityIntent; baseMemory: ModelListMemory; memory: ModelListMemory }>) |
   (Scope & Readonly<{ kind: 'change'; action: ModelListIntent['kind']; baseMemory: ModelListMemory; memory: ModelListMemory }>) |
   (Scope & Readonly<{ kind: 'review'; assetId: string | null }>) | ModelMembershipPlan;
 export const modelListName = (item: ModelListItem): string => item.name.kind === 'value'
@@ -104,6 +109,30 @@ export function planModelList(context: ModelListContext, intent: ModelListIntent
   if (intent.kind === 'filter') return intent.filter === 'all' || intent.filter === 'included' ? change({ filter: intent.filter }) : block('絞り込み条件を選び直してください。');
   const scopeProblem = scopeIssue(context); if (scopeProblem) return block(scopeProblem);
   const view = modelListView(context);
+  if (intent.kind === 'visibility') {
+    if (context.pending) return block(sceneSwitchReason(context.pending));
+    if (memory.composing) return block('文字の入力を確定してください。');
+    if (context.feedback.kind === 'applying') return block('シーンへの所属を変更中です。');
+    const hidden = new Set(memory.hiddenAssetIds);
+    if (intent.action === 'showAll') hidden.clear();
+    else {
+      if (view.issue) return block(view.issue);
+      const eligible = (item: ModelListItem) => !view.membershipIssues.get(item.id) &&
+        item.lifecycle.kind === 'value' && item.lifecycle.value === 'active' &&
+        item.membership.kind === 'value' && item.membership.value.kind === 'included' &&
+        item.display.kind === 'value' && ['visible', 'temporarilyHidden'].includes(item.display.value);
+      const target = view.byId.get(intent.assetId);
+      if (!target || !eligible(target)) return block(target?.displayReason || 'このシーンの表示できるモデルを選択してください。');
+      if (intent.action === 'hide') hidden.add(intent.assetId);
+      else hidden.delete(intent.assetId);
+      // Snapshot action, not a persistent mode that guesses the visibility of future additions.
+      if (intent.action === 'isolate') for (const item of view.items)
+        if (item.id !== intent.assetId && eligible(item)) hidden.add(item.id);
+    }
+    const hiddenAssetIds = Object.freeze([...hidden].sort());
+    return JSON.stringify(hiddenAssetIds) === JSON.stringify(memory.hiddenAssetIds) ? { kind: 'unchanged' } :
+      Object.freeze({ kind: 'visibility', ...scope, intent, baseMemory: memory, memory: Object.freeze({ ...memory, hiddenAssetIds }) });
+  }
   if (intent.kind === 'review') {
     if (intent.assetId !== null && !view.items.some(item => item.id === intent.assetId) && memory.assetId !== intent.assetId &&
       !(context.feedback.kind !== 'idle' && context.feedback.plan.assetId === intent.assetId)) return block('確認するモデルを選択してください。');
@@ -131,6 +160,12 @@ export function planModelList(context: ModelListContext, intent: ModelListIntent
 export function modelListPlanIsCurrent(plan: ModelListPlan, context: ModelListContext): boolean {
   if (plan.kind === 'blocked') return false;
   if (plan.kind === 'unchanged') return true;
+  if (plan.kind === 'visibility') {
+    if (plan.baseMemory !== context.memory || plan.token !== context.source.token ||
+      plan.projectId !== context.source.projectId || plan.sceneId !== context.source.sceneId) return false;
+    const current = planModelList(context, plan.intent);
+    return current.kind === 'visibility' && JSON.stringify(current.memory) === JSON.stringify(plan.memory);
+  }
   if (plan.kind === 'change') {
     if (plan.baseMemory !== context.memory) return false;
     if (['search', 'compose', 'scroll', 'filter'].includes(plan.action)) return true;

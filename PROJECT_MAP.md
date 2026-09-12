@@ -10,6 +10,13 @@
 
 ## Start here
 
+2026-09-13 M05 connection: the same Model tab offers temporary hide/show,
+this-model-only and show-all, with local Caption-owner recovery also in readonly
+views. Scene membership/history/Saved Views do not change. Loaded residents,
+camera and Caption windows/text stay; hidden Asset pins/hits/gizmos are suppressed,
+ProjectAnchor is independent. Scope and exact checks are in todo/05 §3.2;
+rendered/device acceptance remains in the existing batch.
+
 2026-09-13 V04 connection: the same View tab now mounts solid-background
 picker/HEX/standard/apply/cancel. Display-only edits preserve camera/axis/controls;
 exact read-back is inside rollback, so failed confirmation remains retryable.
@@ -51,9 +58,9 @@ Do not repeat the delegation question. No package reader/writer or ordinary rout
 
 2026-09-12 whole-scope inventory: [tasks/implementation-inventory.md](tasks/implementation-inventory.md)
 maps all 41 UI tasks plus accepted Scene/team extensions to 64 work groups:
-29 connected in bounded metadata/validation hosts; 5 component-level gaps, 20 other-path
+30 connected in bounded metadata/validation hosts; 4 component-level gaps, 20 other-path
 connections and 10 new-path implementations remain. P01/P02 are static-GLB/PNG
-validation-only; C07/V04 now connect both hosts and the other 25 originate in the synthetic host. These are not completion or
+validation-only; C07/V04/M05 now connect both hosts and the other 25 originate in the synthetic host. These are not completion or
 effort percentages. Approved full-source receive (02 §8) and explicit Caption
 text resolution and independent Caption membership copies now have bounded
 new-service/host paths. Prepared model activation, explicit pin correction and

@@ -1,5 +1,18 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-13 M05一時表示接続（`7db036c`後）:** モデルタブへ「隠す／表示」
+> 「このモデルだけ表示」「すべて表示」を接続。Scene別local stateで、共有所属・履歴・
+> Saved Viewは変更しない。読み込み済みモデル／カメラ／本文・windowを保持し、所有pin・
+> 接続線・hit・gizmo・比較previewを抑制。ProjectAnchorは独立、Captionからlocal再表示可能。
+> readonlyでも利用可。新規モデルは表示、明示re-includeは成功後だけ当該hideを解除、
+> cold再開時は一時hideを解除。初回test補助コード不備は修正、対象73 PASS。
+> 最終型／buildと111 files・2,040 PASS・21既存TODO・失敗0。独立修正review必須残件なし。
+> exact結果とindex確認はtodoを参照。実描画・実機・offlineは既存Desktop一括手順に残す。
+> 棚卸し30/4/20/10。小UI接続を連鎖させず、次はF01/F02の有限な契約確認へ戻す。
+> 未承認は06 §12.6のreview→編集copy対応保持と§11の隔離実装／採用gate分離。
+> 段取り委任やauto方針承認をwire批准にしない。通常home・schema・外部保存は未変更。
+> ブラウザ修復・pushの同一再試行はしない。
+
 > **2026-09-13 V04背景操作接続（`c6c166f`後）:** 同じ視点タブへpicker／HEX／標準色／
 > 適用／取消を接続。カメラ・軸・Orbit・gizmoを作り直さず、表示色だけ変更する。
 > 視点へ残す場合だけ既存commandを使う。readonlyの表示調整と共有編集を区別。

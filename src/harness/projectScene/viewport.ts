@@ -118,6 +118,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
     if (!display) return;
     for (const model of display.models) {
       const surface = resident.get(model.binding.assetId); if (!surface) continue;
+      surface.asset.visible = !display.hiddenAssetIds?.includes(model.binding.assetId);
       const edit = display.modelEdit;
       const placement = edit?.target.assetId === model.binding.assetId
         ? proposedPlacement(model.binding.assetToProject, edit) : model.binding.assetToProject;
@@ -241,6 +242,8 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
     update(next) {
       const sceneChanged = display?.sceneId !== next.sceneId;
       const boundsChanged = JSON.stringify(display?.bounds) !== JSON.stringify(next.bounds);
+      const visibilityChanged = JSON.stringify(display?.hiddenAssetIds) !== JSON.stringify(next.hiddenAssetIds);
+      if (visibilityChanged) pickEpoch++;
       if (sceneChanged) observePose(); display = next;
       if (sceneChanged) { entryPending = true; if (renderer) { enterScene(); installPose(); } }
       else if (boundsChanged) { observePose(); installPose(); }

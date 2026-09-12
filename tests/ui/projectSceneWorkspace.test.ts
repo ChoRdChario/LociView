@@ -34,6 +34,39 @@ const label = (root: RecordedNode, name: string) => by(root, n => n.attributes.g
 const button = (root: RecordedNode, text: string) => by(root, n => n.tag === 'button' && n.textContent === text);
 
 describe('connected synthetic development host (not rendered, storage or TEAM-FLOW acceptance)', () => {
+  it('keeps per-Scene local model visibility, Caption windows/drafts and pin recovery separate from shared membership', () => {
+    const s = new SyntheticSession(), original = s.snapshot;
+    s.setViewportState(true, [f.structure, f.equipment], null);
+    const hide = () => s.acceptModel(planModelList(s.modelContext(), { kind: 'visibility', action: 'hide', assetId: f.equipment }));
+    find(s, { kind: 'select', captionId: f.shared }); find(s, { kind: 'select', captionId: f.second });
+    find(s, { kind: 'select', captionId: f.shared }); const windows = s.windowMemory;
+    const oldTarget = s.pinCreationTargets().find(t => t.assetId === f.equipment)!;
+    const oldMove = planPinMode(s.pinContext(), { kind: 'move' });
+    edit(s, '未確定の本文は保持'); const draft = s.detailContext().draft;
+    expect(hide()).toBe(true); expect(s.detailContext().draft).toBe(draft); expect(s.windowMemory).toBe(windows);
+    expect(s.snapshot).toBe(original); expect(s.hiddenAssetIds).toEqual([f.equipment]);
+    expect(s.captionContext().source).toMatchObject({ kind: 'ready', captions: [expect.objectContaining({ id: f.shared, pin: 'ownerHidden' }), expect.anything()] });
+    expect(s.acceptPin(oldMove)).toBe(false); expect(s.acceptPinCreation(oldTarget, [1, 2, 3])).toBe(false);
+    expect(s.acceptModel(planModelList(s.modelContext(), { kind: 'visibility', action: 'show', assetId: f.equipment }))).toBe(true);
+    expect(s.detailContext().draft).toBe(draft);
+    // Applying the user's draft is a separate command, never a visibility side effect.
+    expect(s.acceptDetail(apply(s))).toBe(true); const edited = s.snapshot;
+    expect(hide()).toBe(true); expect(navigate(s, f.detail)).toBe(true); expect(s.hiddenAssetIds).toEqual([]);
+    expect(navigate(s, f.overview)).toBe(true); expect(s.hiddenAssetIds).toEqual([f.equipment]);
+    expect(find(s, { kind: 'showModel', captionId: f.shared })).toBe(true);
+    expect(s.hiddenAssetIds).toEqual([]); expect(s.snapshot).toBe(edited); expect(s.windowMemory).toBe(windows);
+    const planned = planModelList(s.modelContext(), { kind: 'visibility', action: 'hide', assetId: f.equipment });
+    expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'move' }))).toBe(true);
+    expect(s.acceptModel(planned)).toBe(false); const pin = s.pinContext();
+    expect(s.acceptPin(planPinMode(pin, { kind: 'cancel', confirmedMode: pin.memory.mode, confirmedProposal: pin.proposal }))).toBe(true);
+    s.setSearchComposing(true); expect(hide()).toBe(false); s.setSearchComposing(false);
+    s.setViewportDragging(true); expect(hide()).toBe(false); s.setViewportDragging(false);
+    expect(hide()).toBe(true);
+    s.acceptModel(planModelList(s.modelContext(), { kind: 'select', assetId: f.equipment }));
+    expect(s.beginModelPlacement()).toBe(false);
+    expect(toggle(s, false)).toBe(true); expect(toggle(s, true)).toBe(true);
+    expect(s.hiddenAssetIds).toEqual([]); expect(s.snapshot.resources.captions).toEqual(edited.resources.captions);
+  });
   it.each([false, true])('keeps working state truthful across failures, pending input and readonly (browser retention: %s)', saved => {
     const project = new SyntheticSession().snapshot;
     let readOnly = false, kind: 'idle' | 'checking' | 'failed' = 'idle';

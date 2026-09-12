@@ -1,6 +1,9 @@
 # 実装・接続の全体棚卸し
 
 > CURRENT INVENTORY / 2026-09-13。全体監査基点: `b73315b851f627ca61029cfb73caf23f6e4829bd`。
+> M05は同じモデルタブへ一時hide／単独表示／全表示を接続。Scene別local stateで、共有所属・
+> 履歴・Saved Viewを変更しない。resident／カメラ／Caption本文・windowを保持し、所有pin／hitを抑制。
+> Captionからlocal再表示、readonly、追加モデル、cold解除を既存testsで確認。実描画／実機は未受入れ。
 > V04は同じ視点タブへ背景入力・適用・取消を接続。表示だけの変更とViewへの記録を分離。
 > exact読戻しまでrollback可能とし、カメラ／軸／gizmo・入力を保持。実描画／実機は未受入れ。
 > C07は添付情報から一覧件数へ接続済み。metadata／限定GLB/PNGで追加・削除・retry・再開を確認。
@@ -34,14 +37,14 @@
 ## 1. 結論と数え方
 
 ユーザーが行う作業を **64機能群** に整理すると、新metadata保存画面へ限定接続済みが
-**29群**、残りが **35群**。その35群は下記の内訳になる。
-「29/64完成」といった完成率・工数には換算しない。小さい部品接続と
+**30群**、残りが **34群**。その34群は下記の内訳になる。
+「30/64完成」といった完成率・工数には換算しない。小さい部品接続と
 移行／チーム受信では仕事量が大きく違い、接続済みも下記の限定経路だからである。
 
 | 排他的な主分類 | 群数 | 意味 |
 |---|---:|---|
-| 接続済み | 29 | 新metadata hostで操作・必要な記録まで接続。従来25群は既知三角形／2 PNG起点、P01/P02は限定validation、C07/V04は両hostへ接続。実機受入れは別 |
-| 部品未接続 | 5 | 新系統のUI部品・pure planner等はあるが、対象群全体の画面・実データ・typed command／保存のいずれかが未接続。T01〜T04は限定接続まで進んだ |
+| 接続済み | 30 | 新metadata hostで操作・必要な記録まで接続。従来25群は既知三角形／2 PNG起点、P01/P02は限定validation、C07/V04/M05は両hostへ接続。実機受入れは別 |
+| 部品未接続 | 4 | 新系統のUI部品・pure planner等はあるが、対象群全体の画面・実データ・typed command／保存のいずれかが未接続。T01〜T04は限定接続まで進んだ |
 | 別経路のみ | 20 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
 | 新規実装 | 10 | 新契約の利用者向け経路がまだない。schema・検証・設計案があっても実装済みとは数えない |
 
@@ -92,7 +95,7 @@
 | M02 | 通常Pointを追加・表示・pickする | 別経路のみ | Nativeもexact ASCII float XYZ＋uchar RGB PLY限定。新hostへ未接続。一般点群対応とは呼ばない。 | [src/nativeGs/plyProfile.ts:351](../src/nativeGs/plyProfile.ts) / [tests/nativeGs/pointPresentation.test.ts:9](../tests/nativeGs/pointPresentation.test.ts) |
 | M03 | GSを追加・表示する | 別経路のみ | Nativeのexact Graphdeco SH2/SH3 profileを新hostに未接続。実body・resource lifecycleの検証が必要。 | [src/nativeGs/plyProfile.ts:305](../src/nativeGs/plyProfile.ts) / [src/harness/projectScene/viewport.ts:91](../src/harness/projectScene/viewport.ts) |
 | M04 | モデル選択・検索とScene所属を管理する | 接続済み | 既知モデルのinclude/exclude。Assetそのものは残る。 | [src/ui/projectScene/modelListState.ts:15](../src/ui/projectScene/modelListState.ts) / [tests/ui/projectMetadataHost.test.ts:535](../tests/ui/projectMetadataHost.test.ts) |
-| M05 | モデルを一時的に隠す／単独表示する | 部品未接続 | temporarilyHidden型はあるが操作intent/runtime未接続。Scene所属を変更して代用しない。 | [src/ui/projectScene/modelListState.ts:12](../src/ui/projectScene/modelListState.ts) / [docs/specs/05-project-scene-team-workflow.md:198](../docs/specs/05-project-scene-team-workflow.md) |
+| M05 | モデルを一時的に隠す／単独表示する | 接続済み | モデルタブのhide/show/isolate/全表示とCaptionからの復帰をlocal接続。Scene所属・履歴・Saved Viewは不変更。resident・カメラ・本文・windowを保持し、所有pin/hit/gizmoを抑制。readonly、Scene別保持、新規追加・cold解除は既存tests、実描画／実機は未受入れ。 | [src/ui/projectScene/modelListState.ts](../src/ui/projectScene/modelListState.ts) / [src/harness/projectScene/viewportHost.ts](../src/harness/projectScene/viewportHost.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
 | M06 | モデルの平行移動を調整する | 接続済み | gizmo＋数値、preview/cancel/confirm、immutable binding保存と再開。合成・validation静的GLBで同一geometryを保持。実入力受入れは別。 | [src/harness/projectScene/session.ts](../src/harness/projectScene/session.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
 | M07 | モデルを回転・均等拡大縮小する | 接続済み | 新metadataとvalidation GLBで移動／回転／均等拡縮gizmoと数値代替、全Scene共通のfresh binding保存／再開。原点基準、正scale、canonical回転、exact取消／retry、Caption原座標／本体保持。二人返送は合成経路のみ、実入力・実機は未受入れ。M13のpivot／fit／Undoではない。 | [src/projectMetadata/commands.ts](../src/projectMetadata/commands.ts) / [src/harness/projectScene/pinGizmo.ts](../src/harness/projectScene/pinGizmo.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
 | M08 | モデルを差し替えて要確認のピンを直す | 接続済み | 新metadataの初期準備済みoriginal／updatedを明示切替。全Sceneの配置・Caption本文／位置／添付を保持し、異なる表面は要確認→手動補正。保存・exact retry・再開・二巡を確認。利用者の新しい本体導入はM01等、通常home／実機は未受入れ。 | [src/projectMetadata/commands.ts](../src/projectMetadata/commands.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
@@ -334,7 +337,7 @@ PNG／GLB後入れ・配置・材質照明／表裏／hard chroma／解除も同
 | 7 | 他の実形式・閲覧補助と残るalignment／補修を継承・実装する | Point＋表示径＋pick、GS＋明示Proxy、複数material、rotation/scale、残るalignmentを形式／契約ごとに閉じる。M14はGS/repair-local transform/原子的revisionの前提が揃ってから。hard-maskと一般smooth透過を一括deferredにしない。従来UIをコピーして新Sceneの意味を変えない |
 | 8 | 通常homeからの全体受入れ | 新sourceでTEAM-FLOW-01をDesktopとphysical iPhone、保存／restart／offlineまで確認。a11y・短画面・IME等も安定treeでまとめる。Pages/SW/main/releaseへは現在の権限で進まない |
 
-V04背景入口は接続済み。残るC04追加色、C09resize、M05一時hide等は
+V04背景入口とM05一時hideは接続済み。残るC04追加色、C09resize等は
 小さな独立UI接続として、依存が揃い次第本筋の間に挟んでよい。
 全てのチーム・形式作業が終わるまで放置する意味ではない。
 ただし小改修を積み続けて受信・更新の本筋が進まない状態にはしない。

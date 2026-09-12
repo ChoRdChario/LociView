@@ -149,8 +149,9 @@ export function createModelPlacementControls(document: Document, session: Synthe
     const context = session.modelUpdateContext(), draft = session.modelPlacement;
     transforms.hidden = !session.modelTransformAvailable;
     begin.textContent = session.modelTransformAvailable ? 'モデルの配置を編集' : 'モデルの位置を編集';
-    state.textContent = context.current ? `位置 ${context.current.closure.binding.assetToProject.translation.join(' / ')}` : '';
-    begin.disabled = Boolean(session.placementRestriction || session.pending || context.issue || !context.current); modeStrip.hidden = !draft;
+    const hidden = context.assetId !== null && session.hiddenAssetIds.includes(context.assetId);
+    state.textContent = hidden ? 'モデルを表示してから配置を編集できます。' : context.current ? `位置 ${context.current.closure.binding.assetToProject.translation.join(' / ')}` : '';
+    begin.disabled = Boolean(hidden || session.placementRestriction || session.pending || context.issue || !context.current); modeStrip.hidden = !draft;
     if (!draft) return;
     heading.textContent = `${session.snapshot.modelNames[draft.assetId] ?? 'モデル'}の配置`;
     note.textContent = session.modelTransformAvailable ? '配置はすべてのシーンで共通です。回転・拡縮の中心はモデルの原点です。' : '矢印をドラッグして移動。位置はすべてのシーンで共通です。';

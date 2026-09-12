@@ -19,6 +19,8 @@ export interface DisplayPin { readonly id: string; readonly title: string; reado
 export interface SyntheticDisplay {
   readonly token: string; readonly sceneId: string; readonly projectFrameId: string;
   readonly models: readonly DisplayModelClosure[]; readonly pins: readonly DisplayPin[];
+  /** Residents remain loaded. This local filter controls rendering, bounds and picking only. */
+  readonly hiddenAssetIds?: readonly string[];
   readonly bounds: Bounds | null; readonly selectedId: string | null;
   /** UI-only proposed position, distinct from the confirmed Caption markers. */
   readonly preview?: V3;
@@ -51,7 +53,7 @@ export function projectBounds(bounds: Bounds, placement: FixturePlacement): Boun
   return { min: tuple(box.min), max: tuple(box.max) };
 }
 export function syntheticDisplay(project: SyntheticProject, sceneId: string, pinColors: readonly string[] | null, selectedId: string | null,
-  modelEdit?: GizmoProposal<ModelPlacementTarget>): SyntheticDisplay {
+  modelEdit?: GizmoProposal<ModelPlacementTarget>, hiddenAssetIds: readonly string[] = []): SyntheticDisplay {
   const resolved = resolveScene(project.state, project.resources, sceneId);
   if (resolved.kind !== 'ready') throw new Error('シーンの表示を確認してください。');
   const models = resolved.composition.assets.slice().sort((a, b) => a.assetId.localeCompare(b.assetId)).map(asset => {
@@ -82,7 +84,9 @@ export function syntheticDisplay(project: SyntheticProject, sceneId: string, pin
         ? ['見え方の設定に競合があります。この範囲の設定は適用していません。'] : [];
   });
   const box = new THREE.Box3();
+  const hidden = new Set(hiddenAssetIds);
   for (const model of models) {
+    if (hidden.has(model.binding.assetId)) continue;
     const b = projectBounds(model.representation.logicalBoundsAsset, model.binding.assetToProject);
     box.union(new THREE.Box3(new THREE.Vector3(...b.min), new THREE.Vector3(...b.max)));
   }
@@ -92,6 +96,7 @@ export function syntheticDisplay(project: SyntheticProject, sceneId: string, pin
     const color = captionColorKey(project.colors[caption.captionId] ?? { kind: 'unresolved', reason: 'invalid' });
     if (!color || (pinColors !== null && !pinColors.includes(color))) continue;
     const anchor = caption.anchor.value;
+    if (anchor.kind === 'asset' && hidden.has(anchor.assetId)) continue;
     const model = anchor.kind === 'asset' ? models.find(m => m.binding.assetId === anchor.assetId) : null;
     const placement = model && modelEdit?.target.assetId === model.binding.assetId
       ? proposedPlacement(model.binding.assetToProject, modelEdit) : model?.binding.assetToProject;
@@ -110,7 +115,7 @@ export function syntheticDisplay(project: SyntheticProject, sceneId: string, pin
       catch { /* Keep the explicit entry diagnostic; never fit or choose another View. */ }
     }
   }
-  return freezeSynthetic({ token: project.state.token, sceneId, projectFrameId: project.resources.projectFrameId, models, pins, selectedId, entry, materials, savedMaterials, modelEdit, materialNotices: [...new Set(materialNotices)],
+  return freezeSynthetic({ token: project.state.token, sceneId, projectFrameId: project.resources.projectFrameId, models, pins, hiddenAssetIds, selectedId, entry, materials, savedMaterials, modelEdit, materialNotices: [...new Set(materialNotices)],
     bounds: box.isEmpty() ? null : { min: tuple(box.min), max: tuple(box.max) } });
 }
 export const defaultPose = (): CameraPose => ({ position: [0, 1, 3], target: [0, 0, 0], up: [0, 1, 0],

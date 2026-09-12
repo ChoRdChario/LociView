@@ -3,7 +3,7 @@ import { modelListName, modelListPlanIsCurrent, modelListView, modelMembershipIs
 import { sceneSwitchReason } from './navigationState';
 
 let nextModelControl = 0;
-/** Complete Project inventory with Scene-membership intentions; no model/renderer/storage access. */
+/** Project inventory with separate membership and local visibility intentions; no direct renderer/storage access. */
 export function createModelListControls(document: Document, onPlan: (plan: ModelListPlan) => void) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const node = document.createElement(tag); node.textContent = text; return node; };
   const button = (text: string) => { const node = make('button', text); node.type = 'button'; return node; };
@@ -25,7 +25,11 @@ export function createModelListControls(document: Document, onPlan: (plan: Model
   const list = make('ul'); list.className = 'lv-model-list'; list.setAttribute('aria-label', 'プロジェクトのモデル一覧'); const empty = make('li');
   const details = make('section'), selectedName = make('h3'), scope = make('p', 'このモデルの配置・差し替えは、使用するすべてのシーンで共通です。');
   details.setAttribute('aria-label', 'モデルの設定範囲'); details.append(selectedName, scope);
-  root.append(filters, status, failure, recovery, reveal, count, consequence, list, details);
+  const visibility = make('div'), toggleVisibility = button('隠す'), isolate = button('このモデルだけ表示'), showAll = button('すべて表示');
+  visibility.className = 'lv-model-visibility'; visibility.setAttribute('role', 'group'); visibility.setAttribute('aria-label', '一時表示');
+  visibility.append(make('span', '一時表示'), toggleVisibility, isolate); details.append(visibility);
+  showAll.title = 'このシーンの一時的な非表示を解除します。';
+  root.append(filters, status, failure, recovery, reveal, count, consequence, list, details, showAll);
   let context: ModelListContext | undefined, disposed = false, composing = false, rendering = false, observedScrollTop = 0;
   const cleanups: (() => void)[] = [];
   const listen = (node: HTMLElement, name: string, handler: () => void) => { node.addEventListener(name, handler); cleanups.push(() => node.removeEventListener(name, handler)); };
@@ -50,6 +54,12 @@ export function createModelListControls(document: Document, onPlan: (plan: Model
   listen(search, 'compositionend', () => { request({ kind: 'search', query: search.value }); composing = false; request({ kind: 'compose', active: false }); });
   listen(filter, 'change', () => request({ kind: 'filter', filter: filter.value as 'all' | 'included' }));
   listen(reveal, 'click', () => request({ kind: 'reveal' }));
+  listen(toggleVisibility, 'click', () => {
+    if (!toggleVisibility.disabled && context?.memory.assetId) request({ kind: 'visibility', assetId: context.memory.assetId,
+      action: context.memory.hiddenAssetIds.includes(context.memory.assetId) ? 'show' : 'hide' });
+  });
+  listen(isolate, 'click', () => { if (!isolate.disabled && context?.memory.assetId) request({ kind: 'visibility', action: 'isolate', assetId: context.memory.assetId }); });
+  listen(showAll, 'click', () => { if (!showAll.disabled) request({ kind: 'visibility', action: 'showAll' }); });
   listen(recovery, 'click', () => request({ kind: 'review', assetId: context?.memory.assetId ?? null }));
   listen(retry, 'click', () => { if (!retry.disabled) request({ kind: 'retry' }); });
   listen(failureReview, 'click', () => { if (context?.feedback.kind === 'failed') request({ kind: 'review', assetId: context.feedback.plan.assetId }); });
@@ -129,6 +139,12 @@ export function createModelListControls(document: Document, onPlan: (plan: Model
     if (!children.length) { empty.textContent = view.issue ? 'モデル一覧を表示できません。' : view.total ? '条件に一致するモデルはありません。' : 'このプロジェクトにモデルはありません。'; children.push(empty); }
     orderNodes(children); list.scrollTop = next.memory.scrollTop; observedScrollTop = list.scrollTop;
     details.hidden = !view.selected || Boolean(deleted); selectedName.textContent = view.selected ? modelListName(view.selected) : '';
+    const target = next.memory.assetId, hidden = target !== null && next.memory.hiddenAssetIds.includes(target);
+    toggleVisibility.textContent = hidden ? '表示' : '隠す';
+    toggleVisibility.disabled = target === null || planModelList(next, { kind: 'visibility', action: hidden ? 'show' : 'hide', assetId: target }).kind === 'blocked';
+    isolate.disabled = target === null || planModelList(next, { kind: 'visibility', action: 'isolate', assetId: target }).kind === 'blocked';
+    showAll.hidden = next.memory.hiddenAssetIds.length === 0;
+    showAll.disabled = planModelList(next, { kind: 'visibility', action: 'showAll' }).kind === 'blocked';
     if (hadFocus && !root.contains(active)) search.focus({ preventScroll: true });
     // Stable focused nodes are left alone; re-focusing an IME input can disturb composition.
     rendering = false; return true;

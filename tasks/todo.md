@@ -28,7 +28,65 @@ Formal adoption still requires G1-A/C and applicable device evidence. No profile
 
 #### Active connected work — PO-approved limited real-file validation
 
-Current slice (2026-09-13, after `c6c166f`): connect V04's existing background
+Current slice (2026-09-13, after `7db036c`): connect M05 temporary model visibility
+in the existing metadata/limited-GLB host, within 05 §3.2.
+
+- [x] Add local hide/show/this-model-only/show-all intentions and Model-tab controls,
+  separate from durable membership. Guard stale scope, IME, pin/gizmo/camera and
+  competing view edits; readonly viewing stays available.
+- [x] Connect Scene-local memory to resident visibility, visible bounds, pins and
+  hit testing. Preserve camera, loaded model bodies, Caption lists/windows/drafts,
+  ProjectAnchor and error diagnostics. Caption recovery unhides an included owner
+  locally, without writing another membership.
+- [x] Reuse model-list/runtime/limited-GLB tests for recovery, per-Scene isolation,
+  cold reopen, zero metadata writes and failure states; run final-tree checks and
+  independent review, then update connection inventory and handoff.
+
+Implementation detail is recorded beside 05 §3.2 before source changes. Isolate
+is a one-shot local action over currently displayable Scene models, not a mode
+that hides future additions. Show-all clears this Scene's local hiding, not a
+history stack. No schema/storage/package/media/ordinary-home or release change.
+Actual browser/native/iPhone/offline evidence stays in the consolidated batch;
+the unchanged pre-binding browser failure is not retried or bypassed. Stop for a
+real accepted-contract conflict/new authority, not routine UI sequencing.
+After M05 reassess the open wire decision before further peripheral connections.
+
+M05 review: same-tab controls and Caption owner recovery are connected
+without shared writes. Residents stay loaded; visible bounds/pins/hits change,
+not camera pose or source data. Hidden models cannot start placement editing;
+Asset-owned comparison/placement previews are suppressed, ProjectAnchor is not.
+Self/independent review overlapped on these two guards; both are corrected.
+Explicit re-include clears only its target hide after acknowledgment. First
+typecheck found two new test-helper errors (recorded-node typing and exact pin
+cancel arguments); fixed. Initial scoped run was 72 PASS / 1 failed cancellation
+test, not a passing checkpoint. Corrected scoped run: 73 PASS in four existing
+files. Final executable tree: typecheck/build exit 0; root JSON success and terminal
+exit 0, 111 files, 2,040 PASS / 21 existing TODO / 0 failures, 231.67 s result span,
+two workers and unchanged 15-second default timeout. Existing per-test budgets
+and assertions remain. Expected injected-decoder/negative-test warnings and normal
+mixed-import/chunk build warnings remain. Normal build is not rendered evidence
+for the nondefault development entry. Independent correction review found no
+remaining mandatory issue; final independent exact-index review confirmed the
+19 intended files, clean cached diff-check and matching root JSON evidence, with
+no unstaged/untracked changes or false aggregate acceptance. No executable change
+followed final checks. No new rendered/native/device/offline evidence or
+normal-home/package activation. Inventory: 30 connected / 4 component /
+20 other-path / 10 new-path; not a completion percentage or TEAM-FLOW acceptance.
+
+Short meta-audit / next decision: C07/V04/M05 have closed their bounded real-host
+connections. Stop chaining small UI slices now; return to F01/F02's finite package
+implementation contract. Independent read-only dependency review confirms that
+05 §7.5 and 06 §10 require the five-purpose contract before any reader/writer.
+The remaining real decisions are 06 §12.6's review-to-edit family/class mapping
+and §11's explicit implementation-before-measured-adoption split. Neither was
+approved by routine sequencing delegation or autosave-policy approval. Reuse
+§12.1–12.5 rather than rewrite tables or create another PoC. After those decisions,
+close exact reconstruction/receipt/golden expectations and proceed to the existing
+full-source/journal/WorkspaceFS file loop. 07 physical migration can follow it.
+Do not infer the new schema or activate normal home. Browser/push repeated failures
+are unchanged; neither is a reason to inflate local test/polish scope.
+
+Previous slice (2026-09-13, after `c6c166f`): connect V04's existing background
 controls to the same view/runtime and saved View workflow. Previous turn made
 production progress by closing C07; the five-purpose decision remains unapproved.
 
@@ -77,7 +135,7 @@ The inventory is now 29 connected / 5 component / 20 other-path / 10 new-path;
 this is not completion credit for the whole 62-group team flow. The pending
 06 §12.6 decision still blocks its affected wire work, not approved local UI work.
 
-Next bounded candidate, not implemented by this slice: M05 temporary hide/isolate
+V04's then-next candidate (now connected above): M05 temporary hide/isolate
 in the same host, as already defined in 05 §3.2. Keep local Scene display state,
 membership/history and Saved Views separate. Preserve camera, Caption lists and
 windows; suppress hidden Asset pins/hit targets and restore visibility locally

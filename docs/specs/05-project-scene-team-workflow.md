@@ -216,6 +216,36 @@ marker is eligible whenever its Caption membership is active, independent of
 Scene Asset membership. UI model filters provide one explicit model-independent
 bucket rather than inventing an owner.
 
+**M05 bounded connection detail (2026-09-13):** the existing Model tab provides
+`隠す` / `表示`, `このモデルだけ表示`, and `すべて表示` independently of
+the Scene-membership checkbox. These are local per-Project/per-Scene display
+actions, also available to readonly viewers; they do not write membership,
+metadata, history, package scope or Saved Views. Hide IDs live only in the open
+session's existing UI memory. Scene switching retains each Scene's local choice;
+a cold Project reopen starts without temporary hiding.
+
+`このモデルだけ表示` shows the selected, valid included model and hides the
+other currently displayable included models. It is a one-shot action, not a
+persistent isolation mode: later additions are visible by default. `すべて表示`
+clears this Scene's local hide choices; it does not restore a prior hide stack
+or add absent memberships. Unavailable/conflicted/deleted models are not
+reclassified as temporarily hidden, and their diagnostics remain visible.
+An explicit membership re-include clears that Asset's local hide only after the
+shared include is acknowledged; a failed include preserves the previous choice.
+
+Keep already loaded residents while changing only their display flags; no body
+reload is needed. Visible bounds and explicit fit use the visible subset, but
+hide/show never auto-fits or changes the current pose/background/axis. Caption
+lists, open windows and unrelated text drafts remain. Asset-owned pins,
+connectors and placement hits are suppressed while hidden; ProjectAnchor remains
+independent even with no visible models. `モデルを表示` restores an included,
+temporarily hidden owner locally; only a genuinely absent membership uses the
+existing shared include command. Reject stale/IME/pin/gizmo/camera/competing View
+input before changing visibility. Reuse existing planner, recorded DOM, renderer
+and limited-GLB host tests for these invariants, readonly use, new additions,
+Scene isolation and cold reopen. These are bounded connection checks, not
+rendered, physical-iPhone, offline, adoption or TEAM-FLOW acceptance.
+
 ### 3.3 Caption, Saved View and material deltas
 
 The v2 `Caption` no longer contains `displaySetId` or an owning Scene field. A

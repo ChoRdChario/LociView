@@ -30,7 +30,7 @@ function membership(context: ModelListContext, assetId: string, included: boolea
 function host(initial = fixture()) {
   const document = new RecordedDocument(), plans: ModelListPlan[] = []; let context = initial;
   const controls = createModelListControls(document.asDocument(), plan => {
-    plans.push(plan); if (plan.kind === 'change' && modelListPlanIsCurrent(plan, context)) {
+    plans.push(plan); if ((plan.kind === 'change' || plan.kind === 'visibility') && modelListPlanIsCurrent(plan, context)) {
       context = { ...context, memory: plan.memory }; controls.render(context);
     }
   });
@@ -41,6 +41,47 @@ function host(initial = fixture()) {
 }
 
 describe('disconnected Project model inventory (pure/DOM contracts, not browser or write evidence)', () => {
+  it('connects local visibility controls in readonly state without changing membership, finding or future models', () => {
+    const one = { ...item(a, 'Engine', true), display: value('visible' as const) };
+    const two = { ...item(b, '脚庫', true), membership: value({ kind: 'included' as const, membershipId: id('sam', 2),
+      sceneId: scene, assetId: b, orderKey: value('B') }), display: value('visible' as const) };
+    const h = host(withItems({ ...fixture(), mutationBlock: '閲覧専用' }, [one, two]));
+    const source = h.context.source;
+    h.list.children[0]!.children[0]!.fire('click'); const memory = h.context.memory;
+    const visibility = h.root.children[8]!.children[2]!, hide = visibility.children[1]!, isolate = visibility.children[2]!;
+    expect(h.list.children[0]!.children[1]!.children[0]!.disabled).toBe(true);
+    expect(hide.disabled).toBe(false); hide.fire('click');
+    expect(h.context.memory).toEqual({ ...memory, hiddenAssetIds: [a] }); expect(hide.textContent).toBe('表示');
+    isolate.fire('click'); expect(h.context.memory.hiddenAssetIds).toEqual([b]);
+    expect(h.context.source).toBe(source); expect(h.plans.some(p => p.kind === 'membership')).toBe(false);
+    const fresh = id('ast', 3); h.render(withItems(h.context, [one, two, item(fresh, '追加')]));
+    expect(h.context.memory.hiddenAssetIds).not.toContain(fresh);
+    const showAll = h.root.children[9]!; expect(showAll.hidden).toBe(false); showAll.fire('click');
+    expect(h.context.memory.hiddenAssetIds).toEqual([]); expect(showAll.hidden).toBe(true);
+    expect(h.context.memory.assetId).toBe(a); h.controls.dispose();
+  });
+  it('rejects stale, conflicted, unavailable and incompatible local visibility while retaining show-all recovery', () => {
+    const base = withItems(fixture(), [{ ...item(a, 'Engine', true), display: value('visible') }]);
+    const intent = { kind: 'visibility', action: 'hide', assetId: a } as const, plan = planModelList(base, intent);
+    expect(plan.kind).toBe('visibility'); expect(modelListPlanIsCurrent(plan, base)).toBe(true);
+    for (const pending of ['pinMove', 'modelTransform', 'camera', 'window', 'composition', 'text', 'update'] as const) {
+      expect(planModelList({ ...base, pending }, intent).kind).toBe('blocked');
+      expect(modelListPlanIsCurrent(plan, { ...base, pending })).toBe(false);
+    }
+    expect(modelListPlanIsCurrent(plan, { ...base, memory: { ...base.memory } })).toBe(false);
+    expect(modelListPlanIsCurrent(plan, { ...base, source: { ...base.source, sceneId: otherScene } })).toBe(false);
+    expect(modelListPlanIsCurrent(plan, { ...base, source: { ...base.source, token: 'new' } })).toBe(false);
+    expect(planModelList({ ...base, memory: { ...base.memory, composing: true } }, intent).kind).toBe('blocked');
+    for (const invalid of [item(a, 'unavailable', true), item(a, 'absent'),
+      { ...item(a, 'deleted', true), lifecycle: value('deleted' as const) },
+      { ...item(a, 'unknown', true), display: value('visible' as const), membership: unresolved<any>() }])
+      expect(modelListPlanIsCurrent(plan, withItems(base, [invalid]))).toBe(false);
+    const unavailable: ModelListContext = { ...base, source: { ...base.source, kind: 'unavailable', reason: '表示失敗' },
+      memory: { ...base.memory, hiddenAssetIds: [a] } };
+    const recovery = planModelList(unavailable, { kind: 'visibility', action: 'showAll' });
+    expect(recovery.kind).toBe('visibility'); expect(modelListPlanIsCurrent(recovery, unavailable)).toBe(true);
+    expect(unavailable.source.kind).toBe('unavailable');
+  });
   it('lists all Project models, independently of rendering, without selecting a default', () => {
     let context = fixture(); const before = structuredClone(context), source = context.source;
     expect(modelListView(context).rows.map(row => row.item.id)).toEqual([a, b]); expect(context.memory.assetId).toBeNull();

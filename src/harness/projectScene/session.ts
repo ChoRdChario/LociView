@@ -379,6 +379,9 @@ export class SyntheticSession {
     const { resources, colors, modelNames, state } = this.project;
     const mediaCounts = captionAttachmentCounts(this.project.mediaData);
     const noMedia = this.authority?.capabilities?.media && !this.project.mediaData ? unknown<number>() : value(0);
+    const modelSource = this.modelContext().source;
+    const locallyHidden = new Set(modelSource.kind === 'ready' ? modelSource.items.filter(item =>
+      item.display.kind === 'value' && item.display.value === 'temporarilyHidden').map(item => item.id) : []);
     const result = resolveScene(state, resources, this.sceneId);
     const source = result.kind === 'blocked'
       ? { kind: 'unavailable' as const, token: state.token, sceneId: this.sceneId, reason: 'シーンの状態を確認してください。' }
@@ -388,7 +391,8 @@ export class SyntheticSession {
           const owner: CaptionListItem['owner'] = anchor.kind !== 'value' ? unknown() : anchor.value.kind === 'project'
             ? value({ kind: 'project' }) : value({ kind: 'asset', assetId: anchor.value.assetId,
               name: modelNames[anchor.value.assetId] === undefined ? unknown() : value(modelNames[anchor.value.assetId]!) });
-          const hidden = result.issues.some(i => i.entityId === caption.captionId && i.code === 'hidden-owner');
+          const hidden = result.issues.some(i => i.entityId === caption.captionId && i.code === 'hidden-owner') ||
+            (caption.marker === 'visible' && anchor.kind === 'value' && anchor.value.kind === 'asset' && locallyHidden.has(anchor.value.assetId));
           return { id: caption.captionId, title: caption.title, body: caption.body, owner,
             color: colors[caption.captionId] ?? unknown(), mediaCount: mediaCounts.get(caption.captionId) ?? noMedia,
             pin: hidden ? 'ownerHidden' : caption.marker === 'needsReview' ? 'needsReview' :
@@ -483,12 +487,18 @@ export class SyntheticSession {
           : value({ kind: 'absent' });
         return { id: asset.id, name: modelNames[asset.id] === undefined ? unknown<string>() : value(modelNames[asset.id]!),
           lifecycle: asset.lifecycle.kind === 'value' ? value(asset.lifecycle.value.state) : unknown<'active' | 'deleted'>(),
-          membership, display: value(!edge ? 'outsideScene' as const : this.viewportState.ready && this.viewportState.assetIds.includes(asset.id) ? 'visible' as const : 'unavailable' as const),
+          membership, display: value(!edge ? 'outsideScene' as const : membership.kind === 'value' &&
+            asset.lifecycle.kind === 'value' && asset.lifecycle.value.state === 'active' && asset.projection.kind === 'value' &&
+            this.viewportState.ready && this.viewportState.assetIds.includes(asset.id)
+            ? this.hiddenAssetIds.includes(asset.id) ? 'temporarilyHidden' as const : 'visible' as const : 'unavailable' as const),
           displayReason: !edge || (this.viewportState.ready && this.viewportState.assetIds.includes(asset.id)) ? null :
             asset.projection.kind !== 'value' || edges.length > 1 ? 'モデルの更新・所属の候補を確認してください。' :
               this.viewportState.issue ?? 'シーンに含まれています。3D表示を確認してください。' };
-      }) }, memory: this.models.get(this.sceneId)!, pending: this.workingBlock ? 'update' : this.assetDeletion ? 'text' : this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : null, mutationBlock: this.workingBlock, feedback: this.modelFeedback };
+      }) }, memory: this.models.get(this.sceneId)!, pending: this.workingBlock ? 'update' : this.textPending === 'composition' ? 'composition' :
+        this.assetDeletion ? 'text' : this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' :
+          this.pinInput ? 'pinMove' : this.views.pending, mutationBlock: this.workingBlock ?? this.membershipRestriction, feedback: this.modelFeedback };
   }
+  get hiddenAssetIds() { return this.models.get(this.sceneId)!.hiddenAssetIds; }
   get modelVersions() { return this.project.modelVersions ?? syntheticVersions; }
   modelUpdateContext() {
     const model = this.models.get(this.sceneId)!, asset = model.assetId ? this.project.resources.assets[model.assetId] : undefined;
@@ -535,7 +545,7 @@ export class SyntheticSession {
   get modelPlacementBusy() { return this.viewportDragging || !!this.workingBlock; }
   modelPlacementProposal(): GizmoProposal<ModelPlacementTarget> | undefined {
     const draft = this.placement, active = draft && this.project.resources.assets[draft.assetId]?.projection;
-    if (!draft || draft.token !== this.project.state.token || draft.sceneId !== this.sceneId || active?.kind !== 'value' ||
+    if (!draft || this.hiddenAssetIds.includes(draft.assetId) || draft.token !== this.project.state.token || draft.sceneId !== this.sceneId || active?.kind !== 'value' ||
       active.value.bindingId !== draft.source.binding.id || !draft.coordinates.every(finiteInput) ||
       !draft.angles.every(finiteInput) || !finiteInput(draft.scale) || Number(draft.scale) <= 0) return;
     return { target: { kind: 'model', token: draft.token, sceneId: draft.sceneId, assetId: draft.assetId, bindingId: draft.source.binding.id },
@@ -563,7 +573,7 @@ export class SyntheticSession {
     const ctx = this.modelUpdateContext();
     if (this.pending || ctx.issue || !ctx.current || !ctx.assetId) return this.refuse(ctx.issue ?? '入力を確定し、モデルを選択してください。');
     const resolved = resolveScene(this.project.state, this.project.resources, this.sceneId);
-    if (resolved.kind !== 'ready' || !resolved.composition.assets.some(a => a.assetId === ctx.assetId)) return this.refuse('このシーンに表示したモデルを選択してください。');
+    if (resolved.kind !== 'ready' || this.hiddenAssetIds.includes(ctx.assetId) || !resolved.composition.assets.some(a => a.assetId === ctx.assetId)) return this.refuse('このシーンに表示したモデルを選択してください。');
     if (ctx.current.closure.shape === 'saved-glb' && !this.authority?.transformModel) return this.refuse('実モデルの配置編集はこの画面では未接続です。');
     const source = ctx.current.closure.shape === 'saved-glb' ? ctx.current.closure : readFixtureModel(canonicalFixture(ctx.current.closure));
     this.placement = freezeSynthetic({ token: ctx.token, sceneId: this.sceneId, assetId: ctx.assetId, source,
@@ -646,11 +656,12 @@ export class SyntheticSession {
     const anchor = caption?.anchor.kind === 'value' ? caption.anchor.value : null;
     const models = items.map(item => {
       const asset = resources.assets[item.id]!, present = item.membership.kind === 'value' && item.membership.value.kind === 'included';
+      const hidden = this.hiddenAssetIds.includes(asset.id);
       return { assetId: asset.id, name: value(modelNames[asset.id] ?? 'モデル'),
-        token: JSON.stringify([asset.projection, asset.lifecycle, item.membership]),
-        addBlock: !present ? '追加先モデルをこのシーンに表示してください。' : asset.projection.kind !== 'value' ||
+        token: JSON.stringify([asset.projection, asset.lifecycle, item.membership, hidden]),
+        addBlock: !present || hidden ? '追加先モデルをこのシーンに表示してください。' : asset.projection.kind !== 'value' ||
           !modelVersion(asset.id, asset.projection.value.bindingId, this.modelVersions) ? 'モデルの状態を確認してください。' : null,
-        moveBlock: !present ? '所有モデルをこのシーンに表示してください。' : asset.projection.kind !== 'value'
+        moveBlock: !present || hidden ? '所有モデルをこのシーンに表示してください。' : asset.projection.kind !== 'value'
           ? 'モデルの更新候補を確認してください。' : null };
     });
     const selected = caption ? { captionId: caption.id, title: caption.title,
@@ -837,7 +848,10 @@ export class SyntheticSession {
         return this.acceptPin(planPinMode(this.pinContext(), { kind: 'move' }));
       }
       if (!plan.assetId) return this.refuse('対象のモデルを確認してください。');
-      return this.acceptModel(planModelList(this.modelContext(), { kind: 'membership', assetId: plan.assetId, included: true }));
+      const context = this.modelContext();
+      const item = context.source.kind === 'ready' ? context.source.items.find(item => item.id === plan.assetId) : undefined;
+      return this.acceptModel(planModelList(context, item?.membership.kind === 'value' && item.membership.value.kind === 'included'
+        ? { kind: 'visibility', action: 'show', assetId: plan.assetId } : { kind: 'membership', assetId: plan.assetId, included: true }));
     }
     this.message = ''; return true;
   }
@@ -879,11 +893,11 @@ export class SyntheticSession {
     } catch (error) { failed(error); return false; }
   }
   acceptModel(plan: ModelListPlan): boolean {
-    if (this.membershipRestriction && plan.kind !== 'change') return this.refuse(this.membershipRestriction);
+    if (this.membershipRestriction && plan.kind !== 'change' && plan.kind !== 'visibility' && plan.kind !== 'unchanged') return this.refuse(this.membershipRestriction);
     if (this.workingBlock) return this.refuse(this.workingBlock);
     if (plan.kind === 'blocked') return this.refuse(plan.reason);
     if (!modelListPlanIsCurrent(plan, this.modelContext())) return this.refuse('所属状態が変わっています。選び直してください。');
-    if (plan.kind === 'change') this.models.set(this.sceneId, plan.memory);
+    if (plan.kind === 'change' || plan.kind === 'visibility') this.models.set(this.sceneId, plan.memory);
     else if (plan.kind === 'review') return this.refuse('モデルの修復は未接続です。シーンへの追加・除外は操作できます。');
     else if (plan.kind === 'membership') {
       const failed = (error: unknown) => { this.modelFeedback = { kind: 'failed', plan, message: this.errorText(error) }; this.refuse(this.modelFeedback.message); };
@@ -897,6 +911,10 @@ export class SyntheticSession {
         const changed = state.assetMemberships[command.membershipId]!;
         return this.applyWorking(() => this.writeProject(plan.token, { [membershipKey(changed.id)]: JSON.stringify(changed) },
           { ...this.project, state, resources: { ...this.project.resources, token: state.token } }), () => {
+          if (plan.action === 'include') {
+            const memory = this.models.get(plan.sceneId)!;
+            this.models.set(plan.sceneId, freezeSynthetic({ ...memory, hiddenAssetIds: memory.hiddenAssetIds.filter(id => id !== plan.assetId) }));
+          }
           this.modelFeedback = { kind: 'idle' }; this.message = '';
         }, failed);
       } catch (error) { failed(error); return false; }

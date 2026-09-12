@@ -98,6 +98,42 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance', () => {
+  it('hides residents without reloading, preserves pose/axis, fits only visible models and leaves ProjectAnchor independent', () => {
+    const base = createSyntheticProject(), project = { ...base, resources: { ...base.resources,
+      captions: { ...base.resources.captions, [f.second]: { ...base.resources.captions[f.second]!,
+        anchor: value({ kind: 'project' as const, projectFrameId: base.resources.projectFrameId, positionProject: [2, 0, 0] as const }) } } } };
+    const s = new SyntheticSession(), targets = s.pinCreationTargets(), canvas = fakeCanvas();
+    const make = (hidden: readonly string[]) => {
+      const d = syntheticDisplay(project, f.overview, null, f.shared, undefined, hidden);
+      return { ...d, models: d.models.map(m => ({ ...m, shape: 'saved-glb' as const } as ValidationModelClosure)) };
+    };
+    const create = vi.fn((model: ValidationModelClosure) => {
+      const geometry = new THREE.PlaneGeometry(2, 2), material = new THREE.MeshStandardMaterial();
+      const asset = new THREE.Group(), mesh = new THREE.Mesh(geometry, material); asset.add(mesh); asset.matrixAutoUpdate = false;
+      asset.matrix.copy(placementMatrix(model.binding.assetToProject));
+      return { asset, mesh, dispose: vi.fn(() => asset.remove(mesh)) };
+    });
+    const v = sceneViewportFactory({ create, dispose() {} })(canvas.canvas as unknown as HTMLCanvasElement, () => {});
+    v.update(make([])); v.setActive(true); canvas.show(); v.camera({ kind: 'axis', axis: '+z' });
+    const captured = v.capture!(), pickToken = v.read().pickToken, surfaces = create.mock.results.map(r => r.value);
+    const projected = v.read().pins.find(p => p.id === f.shared)!;
+    const target = targets.find(t => t.assetId === f.equipment)!;
+    expect(v.pick!(target, projected.x, projected.y)).not.toBeNull();
+    const hidden = make([f.equipment]); v.update(hidden);
+    expect(hidden.models).toHaveLength(2); expect(hidden.pins.map(p => p.id)).toEqual([f.second]);
+    const visibleModel = hidden.models.find(m => m.binding.assetId === f.structure)!;
+    expect(hidden.bounds).toEqual(projectBounds(visibleModel.representation.logicalBoundsAsset, visibleModel.binding.assetToProject));
+    expect(v.capture!()).toEqual(captured); expect(v.read().axis).toBe('+z'); expect(v.read().pickToken).not.toBe(pickToken);
+    expect(v.pick!(target, projected.x, projected.y)).toBeNull(); expect(v.pickCreation!(targets, projected.x, projected.y)).toBeNull();
+    expect(surfaces[1].asset.visible).toBe(false); expect(create).toHaveBeenCalledTimes(2);
+    expect(surfaces.every(surface => surface.dispose.mock.calls.length === 0)).toBe(true);
+    v.camera({ kind: 'fit' }); expect(v.capture!().camera.target).toEqual(fittedPose(hidden.bounds!, defaultPose(), 800 / 600).target);
+    const fitted = v.capture!(), allHidden = make([f.structure, f.equipment]); v.update(allHidden);
+    expect(allHidden.bounds).toBeNull(); expect(v.read().pins.map(p => p.id)).toEqual([f.second]); expect(v.capture!()).toEqual(fitted);
+    v.update(make([])); expect(surfaces.every(surface => surface.asset.visible)).toBe(true); expect(v.capture!()).toEqual(fitted);
+    expect(create).toHaveBeenCalledTimes(2); v.dispose();
+    expect(surfaces.every(surface => surface.dispose.mock.calls.length === 1)).toBe(true);
+  });
   it('previews/cancels on the saved-resident branch without replacing nested content or moving the camera (injected geometry)', () => {
     const project = createSyntheticProject(), original = syntheticDisplay(project, f.overview, null, null);
     // This case tests port routing, not GLB admission: real byte/closure checks live in projectFiles.test.

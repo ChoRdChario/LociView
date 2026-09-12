@@ -31,6 +31,7 @@ import type { DisplayCapture } from '../src/harness/projectScene/viewSession';
 import type { ViewportFactory } from '../src/harness/projectScene/viewportHost';
 import { planPinMode } from '../src/ui/projectScene/pinModeState';
 import { planModelList } from '../src/ui/projectScene/modelListState';
+import { planCaptionList } from '../src/ui/projectScene/captionListState';
 import { RecordedDocument } from './ui/domRecorder';
 import { record, type RecordedNode } from './ui/domRecorder';
 import { createValidationWorkspace, type ValidationWorkspacePorts } from '../src/harness/projectScene/validationWorkspace';
@@ -220,10 +221,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     controls.render(); const cancel = root.children.find(n => n.textContent === '選択を取り消す')!;
     expect(cancel.hidden).toBe(false); cancel.fire('click'); expect(workspace.hasChanges()).toBe(false);
     const sceneId = s.sceneId, readModel = vi.spyOn(host.content, 'model'), file = { name: '3Dモデル', size: glb().length, arrayBuffer: vi.fn(async () => glb().buffer as ArrayBuffer) };
+    s.setViewportState(true, [initial.assetId], null);
+    expect(s.acceptModel(planModelList(s.modelContext(), { kind: 'visibility', action: 'hide', assetId: initial.assetId }))).toBe(true);
     for (let i = 0; i < 2; i++) {
       add.fire('click'); Object.assign(input, { files: [file] }); input.fire('change');
       await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
       expect(s.message).toBe(''); expect(s.snapshot.modelVersions).toHaveLength(i + 2);
+      expect(s.hiddenAssetIds).toEqual([initial.assetId]); // New additions are not captured by old hide choices.
       expect(workspace.hasChanges()).toBe(false); controls.render();
     }
     const versions = s.snapshot.modelVersions!; expect(new Set(versions.map(v => v.assetId)).size).toBe(3);
@@ -238,8 +242,43 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const parts = host.read().source!.originalChanges(); controls.dispose(); await workspace.dispose();
     const cold = await openValidationHost(options); expect(cold.read().source!.originalChanges()).toEqual(parts);
     expect(cold.authority.read().modelVersions!.find(v => v.assetId === added)!.closure.binding.assetToProject.translation).toEqual([1, 2, 3]);
-    expect(cold.authority.read().resources.captions[captionId]).toEqual(originalCaption); await cold.dispose();
+    expect(cold.authority.read().resources.captions[captionId]).toEqual(originalCaption);
+    const reopened = createSavedWorkspace(new RecordedDocument().asDocument(), cold);
+    expect(reopened.session!.hiddenAssetIds).toEqual([]); await reopened.dispose();
   }, 20_000);
+  it('lets readonly viewers hide and restore a real GLB from its Caption without writes, body reads or clearing the window', async () => {
+    const { host, workspace, options, captionId } = await openFileCaption();
+    const readOnly = await openValidationHost(options); expect(readOnly.authority.readOnly).toBe(true);
+    let display: ReturnType<typeof syntheticDisplay>, ready = true;
+    const viewport: ViewportFactory = () => ({ update(d) { display = d; }, setActive() {},
+      read: () => ({ token: 'display', ready, issue: ready ? null : 'injected display failure', dragging: false, projection: 'perspective', axis: null,
+        pins: display?.pins.map(p => ({ id: p.id, x: 30, y: 30, visible: true })) ?? [] }), camera() {}, retry() {}, dispose() {} });
+    const mounted = createSavedWorkspace(new RecordedDocument().asDocument(), readOnly, viewport), s = mounted.session!, root = record(mounted.root);
+    const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    const button = (text: string) => all(root).find(n => n.tag === 'button' && n.textContent === text)!;
+    const model = s.snapshot.modelVersions![0]!, original = s.snapshot, parts = readOnly.read().source!.originalChanges();
+    const readBody = vi.spyOn(readOnly.content, 'model'), write = vi.spyOn(readOnly.authority, 'write');
+    expect(s.acceptList(planCaptionList(s.captionContext(), { kind: 'select', captionId }))).toBe(true);
+    const window = s.windowMemory;
+    button('モデル').fire('click');
+    expect(s.acceptModel(planModelList(s.modelContext(), { kind: 'select', assetId: model.assetId }))).toBe(true); mounted.render();
+    const modelRoot = all(root).find(n => n.className === 'lv-model-browser')!; expect((modelRoot as unknown as HTMLElement).inert).not.toBe(true);
+    expect(all(modelRoot).find(n => n.type === 'checkbox')!.disabled).toBe(true);
+    expect(button('隠す').disabled).toBe(false); button('隠す').fire('click');
+    expect(display!.pins).toEqual([]); expect(s.captionContext().source).toMatchObject({ captions: [expect.objectContaining({ id: captionId, pin: 'ownerHidden' })] });
+    expect(s.windowMemory).toBe(window); expect(mounted.hasChanges()).toBe(false);
+    ready = false; mounted.render();
+    expect(s.modelContext().source).toMatchObject({ items: [expect.objectContaining({ display: { kind: 'value', value: 'unavailable' } })] });
+    expect(all(root).some(n => n.textContent === 'injected display failure' && !n.hidden)).toBe(true);
+    expect(button('すべて表示').disabled).toBe(false); button('すべて表示').fire('click');
+    expect(s.hiddenAssetIds).toEqual([]); expect(all(root).some(n => n.textContent === 'injected display failure' && !n.hidden)).toBe(true);
+    ready = true; mounted.render(); button('隠す').fire('click');
+    button('キャプション').fire('click'); expect(button('モデルを表示').disabled).toBe(false); button('モデルを表示').fire('click');
+    expect(s.hiddenAssetIds).toEqual([]); expect(display!.pins.map(p => p.id)).toContain(captionId); expect(s.windowMemory).toBe(window);
+    expect(s.snapshot).toBe(original); expect(readOnly.read().source!.originalChanges()).toEqual(parts);
+    expect(write).not.toHaveBeenCalled(); expect(readBody).not.toHaveBeenCalled();
+    await mounted.dispose(); await workspace.dispose();
+  });
   it('retains a failed new GLB body and exact changes for retry, then cold-recovers prepared addition only once', async () => {
     const { host, workspace, s, options, fs, store } = await openFileCaption();
     const bytes = glb(j => { j.nodes[0].translation = [8, 0, 0]; }), original = bytes.slice();
