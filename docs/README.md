@@ -43,6 +43,11 @@ Complete observed child tombstones are atomic; binary content and late conflicts
 are retained, as is unapplied input after a remote deletion. Source/endpoint guards,
 exact retry and cold reopen are covered by existing host tests; real-browser and
 device acceptance remain in the consolidated batch.
+Confirmed whole-Project model deletion (M09) now checks all Scene, Caption-anchor
+and material-routing candidates before changing Asset.lifecycle only. No cascade
+or binary erasure. Exact saved retry, independent reopen and late-reference
+retention are covered in the same host tests. Next is the streamed body/inventory
+connection needed for real Project creation; activation and adoption remain gated.
 
 ## Classification
 

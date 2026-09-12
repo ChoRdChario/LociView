@@ -4,6 +4,11 @@ import { active, memberships, sameSnapshot } from './resolve';
 import { DomainValidationError, normalizeSceneName } from '../domain/values';
 
 type EdgeKind = 'asset' | 'caption';
+export interface AssetDeletionCommand { kind: 'deleteAsset'; assetId: string; eventId: string }
+export interface AssetDeletionImpact {
+  assetId: string;
+  dependencies: readonly { kind: 'scene' | 'caption' | 'material'; id: string; sceneId: string | null; uncertain: boolean }[];
+}
 export interface CaptionDeletionCommand {
   kind: 'deleteCaption'; captionId: string; observedMembershipIds: readonly string[];
   observedAttachmentIds: readonly string[]; observedTagMembershipIds: readonly string[]; eventId: string;

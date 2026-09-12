@@ -13,6 +13,7 @@ import { createMaterialControls } from '../../ui/projectScene/materialControls';
 import { createMediaControls } from './mediaControls';
 import { createSceneAuthoringControls } from './sceneAuthoringControls';
 import { createCaptionDeletionControls } from './captionDeletionControls';
+import { createAssetDeletionControls } from './assetDeletionControls';
 
 /** One mounted integration host. Components own their DOM; synthetic session owns all working/UI state. */
 export function createDevelopmentWorkspace(document: Document, session = new SyntheticSession(),
@@ -77,6 +78,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   const material = createMaterialControls(document, plan => { session.acceptMaterial(plan); afterAction(); });
   const media = createMediaControls(document, session.media, afterAction);
   const captionDeletion = createCaptionDeletionControls(document, session, afterAction);
+  const assetDeletion = createAssetDeletionControls(document, session, afterAction);
   header.append(brand, name, navigation.saveStatus);
   const pinHelp = make('p', 'モデルの面をShift＋クリックで追加。追加・移動中は矢印をドラッグして調整できます。');
   pinHelp.className = 'lv-development-pin-help';
@@ -91,7 +93,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   const limited = make('p', 'この保存経路ではマテリアルの編集は未接続です。');
   materialPanel.append(limited); limited.hidden = !session.materialRestriction || session.readOnly;
   sidebar.append(navigation.taskControl, navigation.sceneControl, sceneAuthoring.root, navigation.sceneContext, pin.actions, pinHelp,
-    list.root, windowActions, editor, include.root, modelList.root, placement.actions, modelUpdate.root, materialPanel, viewPanel);
+    list.root, windowActions, editor, include.root, modelList.root, placement.actions, modelUpdate.root, assetDeletion.root, materialPanel, viewPanel);
   content.append(stage, sidebar); root.append(header, notice, working, message, content, footer);
   function render() {
     if (disposed) return;
@@ -110,7 +112,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     const listOkay = list.render(captionContext);
     const modelsOkay = modelList.render(session.modelContext());
     const materialOkay = material.render(session.materialContext());
-    media.render(); sceneAuthoring.render(); captionDeletion.render();
+    media.render(); sceneAuthoring.render(); captionDeletion.render(); assetDeletion.render();
     const pinsOkay = pin.render(session.pinContext()), includeOkay = include.render(session.includeContext()); coordinates.render(); modelUpdate.render(); placement.render();
     if (!detailOkay || !listOkay || !modelsOkay || !pinsOkay || !includeOkay || !materialOkay) {
       message.textContent = '入力中の状態を保持しています。操作を完了してから切り替えてください。';

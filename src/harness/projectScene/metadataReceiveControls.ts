@@ -28,7 +28,7 @@ export function createMetadataReceiveControls(document: Document, host: Awaited<
     const pending = session.pending;
     const provider = host.read().provider;
     const issues = provider?.kind === 'scene-provider' ? provider.issues.filter(i => i.kind === 'orphan' || i.code === 'concurrent-delete-edit' || i.code === 'pending-orphan-reference' ||
-      i.code === 'atomic-field-conflict' && i.path[2] === 'lifecycle' && ['captionsById', 'sceneCaptionMembershipsById', 'captionAttachmentsById', 'captionTagMembershipsById'].includes(i.path[0]!)) : [];
+      i.code === 'atomic-field-conflict' && i.path[2] === 'lifecycle' && ['assetsById', 'sceneAssetMembershipsById', 'materialOverridesById', 'captionsById', 'sceneCaptionMembershipsById', 'captionAttachmentsById', 'captionTagMembershipsById'].includes(i.path[0]!)) : [];
     review.hidden = !issues.length;
     reviewItems.replaceChildren(...[...new Set(issues.map(i => `${i.code === 'concurrent-delete-edit' ? '削除と編集が競合' : i.code === 'atomic-field-conflict' ? '削除・復元の状態が競合' : '参照先の確認が必要'}：${i.path.join(' / ')}`))].map(text => {
       const li = document.createElement('li'); li.textContent = text; return li;

@@ -42,6 +42,8 @@ import { createMetadataReceiveControls } from '../../src/harness/projectScene/me
 import type { SyntheticDisplay } from '../../src/harness/projectScene/viewportModel';
 import { captionDeletionImpact } from '../../src/projectMetadata/captionDeletion';
 import type { CaptionDeletionCommand } from '../../src/scene/commands';
+import { assetDeletionImpact } from '../../src/projectMetadata/assetDeletion';
+import { modelListView } from '../../src/ui/projectScene/modelListState';
 
 class FaultFS extends MemoryFS {
   rejectPublication = false; rejectImage = false; writes = 0;
@@ -121,6 +123,158 @@ async function acknowledge(s: SyntheticSession, action: () => void) {
 
 const fullSource = (source: ProjectMetadataSource, n: number) => ({ packageId: `pkg_${n.toString(16).padStart(32, '0')}`,
   metadataBytes: source.encodeFullSource(), proof: source.proof, remoteHeads: source.heads });
+describe('saved Asset deletion; synthetic ports and recorded DOM only', { timeout: 15000 }, () => {
+  const id = (p: string, n: number) => `${p}_${n.toString(16).padStart(32, '0')}`;
+  const scalar = (v: unknown) => new A.ImmutableString(canonicalFixture(v));
+  const raw = (source: ProjectMetadataSource, change: (doc: any) => void) => {
+    const [doc] = A.applyChanges(A.init<any>(), source.originalChanges());
+    return source.appendOriginal(A.getChanges(doc, A.change(A.clone(doc), change)));
+  };
+  const moveScene = (s: SyntheticSession, sceneId: string) => {
+    expect(s.acceptNavigation(planNavigation(s.snapshot.state, s.session, s.pending, { kind: 'scene', sceneId }))).toBe(true);
+  };
+  const clearReferences = async (s: SyntheticSession) => {
+    select(s); expect(s.beginCaptionDeletion()).toBe(true); await acknowledge(s, () => { s.confirmCaptionDeletion(); });
+    for (const sceneId of [f.overview, f.detail]) {
+      moveScene(s, sceneId); selectModel(s);
+      await acknowledge(s, () => { s.acceptModel(planModelList(s.modelContext(), { kind: 'membership', assetId: f.equipment, included: false })); });
+      expect(s.acknowledgment.state).toBe('idle');
+    }
+    moveScene(s, f.overview); selectModel(s);
+  };
+  const setup = async () => {
+    const h = fixture(), host = await h.open(true), seed = host.read().source!, s = new SyntheticSession(host.authority);
+    await clearReferences(s); return { h, host, s, seed };
+  };
+  const ui = (s: SyntheticSession) => {
+    const w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s); button(record(w.root), 'モデル').fire('click');
+    button(named(record(w.root), 'モデル'), '設備').fire('click');
+    return { w, root: named(record(w.root), 'モデルの削除') };
+  };
+  it('shows all dependency kinds and waits for explicit cleanup, then saves one Asset tombstone without touching models/bytes', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority), material = materialHost(s);
+    material.scope('project'); material.begin(); material.edit('照明', 'unlit'); await material.apply(); material.w.dispose();
+    const u = ui(s); button(u.root, 'プロジェクトから削除').fire('click');
+    expect(s.modelDeletion?.impact.dependencies.map(d => d.kind).sort()).toEqual(['caption', 'material', 'scene', 'scene']);
+    expect(descendants(u.root).filter(n => n.tag === 'li')).toHaveLength(4); expect(button(u.root, '削除する').disabled).toBe(true);
+    const writes = h.base.writes; expect(s.confirmAssetDeletion()).toBe(false); expect(h.base.writes).toBe(writes);
+    expect(s.modelUpdateContext().issue).toBe('削除の確認を終えてください。'); expect(s.beginModelPlacement()).toBe(false);
+    button(u.root, '取り消す').fire('click'); await clearReferences(s); u.w.render();
+    button(u.root, 'プロジェクトから削除').fire('click'); expect(s.modelDeletion!.impact.dependencies.map(d => d.kind)).toEqual(['material']);
+    button(u.root, '取り消す').fire('click'); u.w.dispose();
+    const reset = materialHost(s); reset.scope('project'); await reset.reset(); reset.w.dispose();
+    const final = ui(s), before = host.read().source!, original = s.snapshot, windows = s.windowMemory, captionMemory = s.memory;
+    const bin = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.endsWith('.bin') || p.includes('/evidence/'));
+    const bytes = await Promise.all(bin.map(p => h.base.readBytes(p))), bodyBytes = host.content.counts.bodyBytes;
+    expect(s.modelContext().memory.filter).toBe('all'); expect(modelListView(s.modelContext()).rows.map(r => r.item.id)).toContain(f.equipment);
+    button(final.root, 'プロジェクトから削除').fire('click'); expect(s.modelDeletion!.impact.dependencies).toEqual([]);
+    await acknowledge(s, () => button(final.root, '削除する').fire('click')); final.w.render();
+    expect(s.acknowledgment.state).toBe('idle'); expect(s.modelDeletion).toBeNull(); expect(s.modelContext().memory.assetId).toBeNull();
+    expect(s.snapshot.resources.assets[f.equipment]!.lifecycle).toMatchObject({ value: { state: 'deleted', reason: 'userDelete' } });
+    expect(modelListView(s.modelContext()).rows.map(r => r.item.id)).toEqual([f.structure]);
+    expect(s.snapshot.resources.assets[f.structure]).toEqual(original.resources.assets[f.structure]);
+    expect(s.snapshot.resources.captions).toEqual(original.resources.captions); expect(s.windowMemory).toBe(windows); expect(s.memory).toBe(captionMemory);
+    const after = host.read().source!; expect(after.originalChanges()).toHaveLength(before.originalChanges().length + 1);
+    const newChanges = after.read().history.changes.filter(c => !before.read().history.changes.some(b => b.id === c.id));
+    expect(newChanges.flatMap(c => c.writes.map(w => w.path))).toEqual([['assetsById', f.equipment, 'lifecycle']]);
+    expect(await Promise.all(bin.map(p => h.base.readBytes(p)))).toEqual(bytes); expect(host.content.counts.bodyBytes).toBe(bodyBytes);
+    final.w.dispose(); await host.dispose(); const cold = await h.open();
+    expect(cold.read().source!.token).toBe(after.token); expect(cold.authority.read().modelVersions!.some(v => v.assetId === f.equipment)).toBe(false); await cold.dispose();
+  });
+  it('keeps model selection until saved retry, rejects readonly/pending/stale confirmation and cold-recovers exact original bytes', async () => {
+    const { h, host, s } = await setup(); let external = true, readonly = false;
+    const guarded = new SyntheticSession({ ...host.authority, get readOnly() { return readonly; } }, () => external); const g = ui(guarded);
+    expect(guarded.beginAssetDeletion()).toBe(false); external = false;
+    guarded.setSearchComposing(true); expect(guarded.beginAssetDeletion()).toBe(false); guarded.setSearchComposing(false);
+    readonly = true; expect(guarded.beginAssetDeletion()).toBe(false); readonly = false;
+    expect(guarded.beginAssetDeletion()).toBe(true); external = true; expect(guarded.confirmAssetDeletion()).toBe(false); external = false;
+    readonly = true; expect(guarded.confirmAssetDeletion()).toBe(false); readonly = false;
+    const source = host.read().source!, p = host.read().provider!;
+    const remote = source.prepareEdit(source.token, { kind: 'renameScene', sceneId: f.overview, name: '変更後' }, p, 'a'.repeat(32));
+    await host.receive(source.token, fullSource(remote, 951)); guarded.refreshHistory(); g.w.render();
+    expect(button(g.root, '削除する').disabled).toBe(true); expect(guarded.confirmAssetDeletion()).toBe(false); guarded.cancelAssetDeletion();
+    expect(guarded.beginAssetDeletion()).toBe(true); const old = guarded.snapshot, memory = guarded.modelContext().memory;
+    h.base.rejectPublication = true; await acknowledge(guarded, () => { guarded.confirmAssetDeletion(); }); g.w.render();
+    expect(guarded.acknowledgment.state).toBe('failed'); expect(guarded.snapshot).toBe(old); expect(guarded.modelContext().memory).toBe(memory);
+    expect(modelListView(guarded.modelContext()).rows.some(r => r.item.id === f.equipment)).toBe(true); expect(guarded.cancelAssetDeletion()).toBe(false);
+    const paths = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.endsWith('.amchange')), bytes = await Promise.all(paths.map(p => h.base.readBytes(p)));
+    g.w.dispose(); await host.dispose(); h.base.rejectPublication = false; const cold = await h.open();
+    expect(cold.read().state).toBe('pending'); await cold.authority.retry!();
+    expect(cold.authority.read().resources.assets[f.equipment]!.lifecycle).toMatchObject({ value: { state: 'deleted' } });
+    expect(await Promise.all(paths.map(p => h.base.readBytes(p)))).toEqual(bytes); expect(s.snapshot.resources.assets[f.equipment]!.lifecycle).toMatchObject({ value: { state: 'active' } });
+    await cold.dispose();
+  });
+  it('retains late references and remote-deleted material drafts, with no automatic cascade or repeat publication', async () => {
+    const { h, host, s } = await setup(), seed = host.read().source!;
+    const other = fixture(); for (const path of await h.base.list(`${metadataArea}/${h.run}/`)) await other.base.writeBytes(path, (await h.base.readBytes(path))!);
+    for (const [key, bytes] of h.rows) other.rows.set(key, bytes.slice()); const recipient = await other.open(), rs = new SyntheticSession(recipient.authority);
+    const m = materialHost(rs); m.begin(); m.edit('照明', 'unlit'); const draft = rs.materialContext().draft;
+    expect(s.beginAssetDeletion()).toBe(true); await acknowledge(s, () => { s.confirmAssetDeletion(); }); const deleted = host.read().source!;
+    await recipient.receive(seed.token, fullSource(deleted, 960)); rs.refreshHistory(); m.w.render();
+    expect(rs.materialContext().draft).toBe(draft); expect(button(m.panel, '変更を適用').disabled).toBe(true);
+    button(m.panel, '取り消す').fire('click'); expect(rs.materialContext().draft).toBe(draft);
+    button(m.panel, '変更を取り消す').fire('click'); expect(rs.materialContext().draft).toBeNull(); expect(rs.pending).toBeNull(); m.w.dispose();
+    const late = seed.prepareEdit(seed.token, { kind: 'include', sceneId: f.detail, resourceKind: 'asset', resourceId: f.equipment,
+      membershipId: id('sam', 960), orderKey: 'Z', eventId: id('evt', 960) }, await readProjectScene(seed.read(), metadataFixtureLimits, host.content.verifier(false)), 'b'.repeat(32));
+    await host.receive(deleted.token, fullSource(late, 961)); const provider = host.read().provider!; if (provider.kind !== 'scene-provider') throw Error('provider');
+    expect(provider.issues.some(i => i.kind === 'orphan' && i.path.includes(id('sam', 960)))).toBe(true);
+    expect(provider.details.mutable.sceneAssetMembershipsById[id('sam', 960)]!.lifecycle).toMatchObject({ value: { state: 'active' } });
+    s.refreshHistory(); const controls = createMetadataReceiveControls(new RecordedDocument().asDocument(), host, s, () => {});
+    expect(named(record(controls.root), '削除と参照の要確認').hidden).toBe(false);
+    const token = host.read().source!.token, count = host.read().source!.originalChanges().length;
+    await host.receive(token, fullSource(late, 961)); expect(host.read().source!.token).toBe(token); expect(host.read().source!.originalChanges()).toHaveLength(count);
+    controls.dispose(); await host.dispose(); await recipient.dispose();
+  });
+  it('checks every raw anchor/routing/edge candidate, unresolved lifecycle and delete-edit, never just the current projection', async () => {
+    const { host, seed, s } = await setup(), clean = host.read().source!, provider = host.read().provider!;
+    const read = (source: ProjectMetadataSource) => readProjectScene(source.read(), metadataFixtureLimits, host.content.verifier(false));
+    const impact = async (source: ProjectMetadataSource) => { const p = await read(source); if (p.kind !== 'scene-provider') throw Error('provider'); return assetDeletionImpact(p, f.equipment, metadataFixtureLimits); };
+    const cmd: MetadataEdit = { kind: 'deleteAsset', assetId: f.equipment, eventId: id('evt', 970) };
+    expect(() => clean.prepareEdit('stale', cmd, provider, 'c'.repeat(32))).toThrow(/stale/);
+    expect(() => clean.prepareEdit(clean.token, { ...cmd, extra: true } as MetadataEdit, provider, 'c'.repeat(32))).toThrow(/shape/);
+    const revived = raw(clean, d => { d.captionsById[f.shared].lifecycle = scalar({ state: 'active', reason: 'restore', eventId: id('evt', 971) }); });
+    expect((await impact(revived)).dependencies.map(d => d.kind)).toEqual(['caption']);
+    const project = raw(revived, d => { d.captionsById[f.shared].anchor = scalar({ kind: 'project', projectFrameId: s.snapshot.resources.projectFrameId, positionProject: [0, 0, 0] }); });
+    expect((await impact(project)).dependencies).toEqual([]);
+    const anchor = s.snapshot.resources.captions[f.shared]!.anchor; if (anchor.kind !== 'value') throw Error('anchor');
+    const own = raw(revived, d => { delete d.captionsById[f.shared].anchor; d.captionsById[f.shared].anchor = scalar(anchor.value); });
+    expect((await impact(project.appendOriginal(own.originalChanges()))).dependencies).toMatchObject([{ kind: 'caption', uncertain: true }]);
+    const unknown = raw(project, d => { d.captionsById[f.shared].anchor = scalar({ kind: 'future' }); });
+    expect((await impact(unknown)).dependencies).toMatchObject([{ kind: 'caption', uncertain: true }]);
+    const edited = seed.prepareEdit(seed.token, { kind: 'editCaption', captionId: f.shared, edits: { body: '後着' } }, await read(seed), 'd'.repeat(32));
+    expect((await impact(clean.appendOriginal(edited.originalChanges()))).dependencies).toMatchObject([{ kind: 'caption', uncertain: true }]);
+    const target = materialTarget(metadataModels.find(m => m.assetId === f.equipment)!.closure);
+    const routing = { scope: { kind: 'project' }, target: { ...target } };
+    const withMaterial = raw(clean, d => { d.materialOverridesById[id('ovr', 972)] = { id: scalar(id('ovr', 972)), routing: scalar(routing),
+      lifecycle: scalar({ state: 'active', reason: 'initial', eventId: id('evt', 972) }), appearance: scalar({ lighting: 'unlit' }), compositing: scalar({ coverage: { policy: 'inherit' }, optics: 'inherit' }) }; });
+    expect((await impact(withMaterial)).dependencies.map(d => d.kind)).toEqual(['material']);
+    const otherTarget = materialTarget(metadataModels.find(m => m.assetId === f.structure)!.closure);
+    const x = raw(withMaterial, d => { d.materialOverridesById[id('ovr', 972)].routing = scalar({ scope: { kind: 'scene', sceneId: f.detail }, target: otherTarget }); });
+    const y = raw(withMaterial, d => { delete d.materialOverridesById[id('ovr', 972)].routing; d.materialOverridesById[id('ovr', 972)].routing = scalar(routing); });
+    expect((await impact(x)).dependencies).toEqual([]);
+    const cp = await read(x.appendOriginal(y.originalChanges())); if (cp.kind !== 'scene-provider') throw Error('provider');
+    expect(assetDeletionImpact(cp, f.equipment, metadataFixtureLimits).dependencies).toMatchObject([{ kind: 'material', uncertain: true }]);
+    expect(() => assetDeletionImpact(cp, f.equipment, { ...metadataFixtureLimits, maxWork: 1 })).toThrow(/limit/);
+    const edge = id('sam', 973), active = { state: 'active', reason: 'initial', eventId: id('evt', 973) };
+    const withEdge = raw(clean, d => { d.sceneAssetMembershipsById[edge] = { id: scalar(edge), sceneId: scalar(f.detail),
+      assetId: scalar(f.equipment), orderKey: scalar('Z'), lifecycle: scalar(active) }; });
+    expect((await impact(withEdge)).dependencies).toMatchObject([{ kind: 'scene', sceneId: f.detail, uncertain: false }]);
+    const otherEdge = raw(withEdge, d => { d.sceneAssetMembershipsById[edge].assetId = scalar(f.structure); });
+    const ownEdge = raw(withEdge, d => { delete d.sceneAssetMembershipsById[edge].assetId; d.sceneAssetMembershipsById[edge].assetId = scalar(f.equipment); });
+    expect((await impact(otherEdge)).dependencies).toEqual([]);
+    expect((await impact(otherEdge.appendOriginal(ownEdge.originalChanges()))).dependencies).toMatchObject([{ kind: 'scene', uncertain: true }]);
+    const deletedEdge = raw(withEdge, d => { d.sceneAssetMembershipsById[edge].lifecycle = scalar({ state: 'deleted', reason: 'userDelete', eventId: id('evt', 974) }); });
+    expect((await impact(deletedEdge)).dependencies).toEqual([]);
+    const restoredEdge = raw(withEdge, d => { d.sceneAssetMembershipsById[edge].lifecycle = scalar({ state: 'active', reason: 'restore', eventId: id('evt', 975) }); });
+    expect((await impact(deletedEdge.appendOriginal(restoredEdge.originalChanges()))).dependencies).toMatchObject([{ kind: 'scene', uncertain: true }]);
+    const unknownEdge = raw(withEdge, d => { d.sceneAssetMembershipsById[edge].assetId = scalar({ future: true }); });
+    expect((await impact(unknownEdge)).dependencies).toMatchObject([{ kind: 'scene', uncertain: true }]);
+    const unknownTarget = raw(clean, d => { d.assetsById[f.equipment].lifecycle = scalar({ state: 'future' }); });
+    await expect(impact(unknownTarget)).rejects.toThrow();
+    expect(host.read().source!.token).toBe(clean.token); await host.dispose();
+  });
+});
+
 describe('saved Caption deletion; synthetic ports and recorded DOM only', { timeout: 15000 }, () => {
   const id = (p: string, n: number) => `${p}_${n.toString(16).padStart(32, '0')}`;
   const rawChange = (source: ProjectMetadataSource, change: (doc: any) => void) => {

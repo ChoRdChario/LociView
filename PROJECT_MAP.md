@@ -12,7 +12,7 @@
 
 2026-09-12 whole-scope inventory: [tasks/implementation-inventory.md](tasks/implementation-inventory.md)
 maps all 41 UI tasks plus accepted Scene/team extensions to 64 work groups:
-23 connected in the synthetic metadata host; 7 component-level gaps, 24 other-path
+24 connected in the synthetic metadata host; 7 component-level gaps, 23 other-path
 connections and 10 new-path implementations remain. These are not completion or
 effort percentages. Approved full-source receive (02 §8) and explicit Caption
 text resolution and independent Caption membership copies now have bounded
@@ -23,6 +23,10 @@ real-file/wire adoption remains separately gated. Latest UI complaints do not se
 Confirmed Project-wide Caption deletion now writes the complete observed child
 tombstones through the same journal; original content and late conflicts remain.
 Unapplied input stays visible when a remote deletion removes its Caption.
+Confirmed Project-wide model deletion now inspects all raw Scene membership,
+Caption anchor and material routing candidates. Only a proven unreferenced Asset
+can be tombstoned; status, immutable records, history and bytes remain. Failed
+saves retain the old selection, and late references remain reviewable.
 Competing known ready-model statuses now support complete model/placement comparison
 and explicit causal selection in the same host, including saved retry/cold replay.
 This does not resolve every scalar/lifecycle conflict.
@@ -38,8 +42,9 @@ exact retry/cold recovery and replay are tested; remaining conflict kinds and
 rendered/device acceptance stay open. Scene create/rename/Project-default now
 connect in the same host: model-membership-only creation, complete source guards,
 exact saved retry, new-Scene local memories on receive and preserved existing
-drafts/windows. Next is confirmed Project-wide Caption deletion, distinct from
-Scene exclusion; current code does not yet expose that action.
+drafts/windows. Basic Caption/model deletion is now connected. Next is the
+streamed body-storage/inventory prerequisite for real Project creation/reopen,
+not another synthetic-run catalog. Real-data activation remains separately gated.
 
 2026-09-11 current implementation: PO explicitly approved 05 §13.2's S1 service
 implementation before aggregate adoption, new synthetic-only development activation

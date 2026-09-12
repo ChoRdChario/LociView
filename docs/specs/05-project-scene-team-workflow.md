@@ -300,6 +300,18 @@ deleted while its Scene names it as default. An Asset cannot be deleted while an
 active SceneAssetMembership, Asset-anchored Caption or MaterialOverride references
 it; the user must remove/re-anchor/tombstone each dependent item first.
 
+Finite M09 implementation boundary (2026-09-12): model deletion checks the whole
+raw candidate graph, not the current Scene or visible renderer objects. Every
+SceneAssetMembership.assetId, Caption.anchor and MaterialOverride.routing candidate
+must be proven unrelated or belong to a resolved deleted record without a concurrent
+delete/edit. Unknown or ambiguous potentially related values block deletion and
+remain visible for review. Active target identity/lifecycle is required, not a
+resolved display/status/name. Confirmation binds the current source token; one
+command updates Asset.lifecycle only to userDelete, preserving immutable model
+records, facts, original history and bytes. Late references are retained with
+review warnings, never silently cascaded. Ordinary dependency removal remains
+explicit; this slice does not add restoration, GC or general orphan repair.
+
 Deleting a Caption after confirmation tombstones the named Caption plus every
 causally observed active SceneCaptionMembership, attachment and tag membership in
 one command; unshared MediaResources become collectible only under the existing

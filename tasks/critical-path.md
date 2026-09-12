@@ -13,8 +13,9 @@
 > Known-Mesh independent model copies and Caption position/color conflict choices
 > now connect to that saved loop; read-only previews never select an authority.
 > Scene create/name/default now connect to the saved host and local Scene memories.
-> Next: confirmed Project-wide Caption deletion; other scalar/lifecycle conflicts, exchange-base/delta and
-> real-data adoption retain their gates. Latest UI feedback does not
+> Confirmed Project-wide Caption and dependency-guarded Asset deletion now connect.
+> Next: streamed body storage/inventory for Project creation/reopen; other
+> scalar/lifecycle conflicts, exchange-base/delta and real-data adoption retain their gates. Latest UI feedback does not
 > automatically set priority. Old saved-host Desktop PASS remains narrowly scoped.
 > Explicit model membership keep-one now saves only the other observed edge's
 > tombstone, retaining resources and other Scenes. Known-Mesh keep-both uses full
@@ -348,6 +349,14 @@ language, disposable PoCs and one writer.
 | `WS5` accepted native product + non-destructive compatibility conversion | Preserve the accepted Native Project product and conversion lanes; Compare remains excluded | Product functions and RC-A evidence are accepted; release preparation remains | Codex / PO / external reviewer | Accepted native checkpoints | `FIRST FROZEN-V1 LANE: PASS`; `DIRECT LOCIMYU PRODUCT ACCEPTANCE: PASS`; `NATIVE PACKAGE EXCHANGE: PASS`; `RC-A PRODUCT OWNER ACCEPTANCE: PASS` |
 
 ## 8. Current authorization boundary
+
+2026-09-12 bounded M09 progress: the same host now confirms model deletion only
+after all raw Scene/Caption/material references are absent. Only Asset.lifecycle
+changes; late refs, failed-save selection and remote-deleted drafts remain visible.
+Next is streamed body storage/inventory → metadata creation/independent reopen,
+under the approved nonactivated S1 boundary. No new synthetic-run catalog or
+PoC page. Real-data profiles, applicable physical-iOS and G1-A/C adoption remain
+separate before activation; package wire remains unratified. Final tests in todo.
 
 2026-09-12 bounded C10 progress: confirmed whole-Project Caption deletion now
 uses the new metadata command/journal in the existing synthetic host. Observed

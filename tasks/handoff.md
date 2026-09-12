@@ -1,11 +1,21 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-12 モデル全Project削除（`df6255f`から）:** 全Scene所属・Caption anchor・
+> material routingの原候補を調べ、参照ゼロを確認したAssetだけ削除状態へ。
+> 曖昧な依存を無視せず、本体・原履歴・後着参照を保持。保存失敗中は旧選択を残す。
+> remote削除後のmaterial入力は二段階の明示取消まで保持する。
+> 最終109 files／1,978 PASS／21既存TODO（2 workers）、型・build・独立レビューPASS。
+> 棚卸し24接続／7部分／23別経路／10新規。合成host限定であり完成率ではない。
+> 次は実Project作成／再開に必要なstream本体保存と検証済みinventoryを既存S1へ接続。
+> 実file／通常home／profile／06/07／実機採用は活性化しない。todoが有限境界を所有する。
+> 新ブラウザ・iPhone・offline受入れなし。実用チーム版全体は未完了。
+
 > **2026-09-12 Caption全Project削除（`6e2d9d8`から）:** 同じmetadata hostの編集欄から
 > 影響Scene・添付・tag登録を確認し、一つの変更で対象と観測済み全edgeを削除状態へ。
 > 共有本体・原履歴・競合候補は保持。保存失敗中は旧UI、後着の削除／編集・参照問題は警告。
 > remote削除後も未適用本文を表示し、明示取消できる。独立レビュー指摘は修正済み。
 > 最終109 files／1,974 PASS／21既存TODO（2 workers）、型・build・独立レビューPASS。
-> 次は依存ゼロを確認してからのモデル全Project削除M09。todoが有限境界を所有する。
+> 当時の次M09は先頭記録を参照。todoが現在の有限境界を所有する。
 > 棚卸し23接続／7部分／24別経路／10新規。件数を完成率・工数へ換算しない。
 > 実データ・描画・実機・offline受入れは追加されていない。実用チーム版全体は未完了。
 

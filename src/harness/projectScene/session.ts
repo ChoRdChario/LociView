@@ -1,4 +1,4 @@
-import { planSceneCommand, previewScenePlan, type SceneAuthoringCommand, type CaptionDeletionImpact, type CaptionDeletionCommand } from '../../scene/commands';
+import { planSceneCommand, previewScenePlan, type SceneAuthoringCommand, type CaptionDeletionImpact, type CaptionDeletionCommand, type AssetDeletionImpact } from '../../scene/commands';
 import { chooseStartupScene, resolveScene, memberships } from '../../scene/resolve';
 import { value, type Anchor, type Composition, type Field } from '../../scene/types';
 import { navigationPlanIsCurrent, planNavigation, type NavigationPlan, type NavigationSession, type PendingInteraction,
@@ -75,6 +75,7 @@ export class SyntheticSession {
   private captionComparison: { token: string; sceneId: string; captionId: string; anchor: Anchor; label: string } | null = null;
   private sceneDraft: SceneAuthoringDraft | null = null;
   private deletion: { token: string; sceneId: string; title: string; impact: CaptionDeletionImpact } | null = null;
+  private assetDeletion: { token: string; sceneId: string; name: string; impact: AssetDeletionImpact } | null = null;
   private pinFeedback: PinModeContext['feedback'] = { kind: 'idle' };
   private searchComposing = false;
   private viewportDragging = false;
@@ -110,6 +111,36 @@ export class SyntheticSession {
   get sceneAuthoringAvailable() { return !!this.authority?.capabilities?.sceneAuthoring && !!this.authority.authorScene; }
   get sceneAuthoringDraft() { return this.sceneDraft; }
   get captionDeletionAvailable() { return !!this.authority?.captionDeletionImpact && !!this.authority.deleteCaption; }
+  get assetDeletionAvailable() { return !!this.authority?.assetDeletionImpact && !!this.authority.deleteAsset; }
+  get modelDeletion() { return this.assetDeletion; }
+  get modelDeletionBlocked() { return this.captionDeletionBlocked || !!this.deletion; }
+  beginAssetDeletion(): boolean {
+    const assetId = this.models.get(this.sceneId)!.assetId;
+    if (!assetId || !this.assetDeletionAvailable || this.readOnly || this.pending || this.externalChanges())
+      return this.refuse('入力を確定してから削除対象を確認してください。');
+    try {
+      const impact = this.authority!.assetDeletionImpact!(this.project.state.token, assetId);
+      this.assetDeletion = { token: this.project.state.token, sceneId: this.sceneId, name: this.project.modelNames[assetId] ?? 'モデル名を確認', impact };
+      this.message = ''; return true;
+    } catch (error) { return this.refuse(this.errorText(error)); }
+  }
+  cancelAssetDeletion(): boolean {
+    if (this.workingBlock) return false;
+    this.assetDeletion = null; this.message = ''; return true;
+  }
+  confirmAssetDeletion(): boolean {
+    const d = this.assetDeletion;
+    if (!d || d.impact.dependencies.length || this.readOnly || this.workingBlock || this.pending !== 'text' || this.modelDeletionBlocked) return false;
+    if (d.token !== this.project.state.token || d.sceneId !== this.sceneId || d.impact.assetId !== this.models.get(this.sceneId)!.assetId)
+      return this.refuse('内容が更新されています。削除を取り消して、参照を確認し直してください。');
+    return this.applyWorking(() => afterWorking(this.authority!.deleteAsset!(d.token,
+      { kind: 'deleteAsset', assetId: d.impact.assetId, eventId: fresh('evt') }), next => this.publish(next)), () => {
+      this.assetDeletion = null;
+      for (const [key, memory] of this.models) if (memory.assetId === d.impact.assetId)
+        this.models.set(key, Object.freeze({ ...memory, assetId: null }));
+      this.message = 'プロジェクトからモデルを削除しました。';
+    });
+  }
   get captionDeletion() { return this.deletion; }
   get captionDeletionBlocked() { return this.externalChanges() || !!this.views.pending || !!this.materials.pending || !!this.media.pending ||
     !!this.sceneDraft || [...this.drafts.values()].some(hasCaptionDraft); }
@@ -229,7 +260,7 @@ export class SyntheticSession {
     if (this.views.pending === 'composition' || this.materials.pending === 'composition' || this.media.pending === 'composition') return 'composition';
     if (this.placement?.composing || this.pinInputComposing || this.searchComposing || [...this.includes.values()].some(m => m.composing) || [...this.models.values()].some(m => m.composing) ||
       [...this.drafts.values()].some(d => d.composing !== null)) return 'composition';
-    return this.views.pending ?? this.materials.pending ?? this.media.pending ?? (this.deletion || this.sceneDraft || [...this.drafts.values()].some(hasCaptionDraft) ? 'text' : null);
+    return this.views.pending ?? this.materials.pending ?? this.media.pending ?? (this.assetDeletion || this.deletion || this.sceneDraft || [...this.drafts.values()].some(hasCaptionDraft) ? 'text' : null);
   }
   setSearchComposing(active: boolean) { this.searchComposing = active; }
   setViewportDragging(active: boolean): boolean { const changed = this.viewportDragging !== active; this.viewportDragging = active; return changed; }
@@ -283,7 +314,7 @@ export class SyntheticSession {
       resources: { ...this.project.resources, token, views: result.data.records }, viewData: result.data });
   }
   materialContext() {
-    const other: PendingInteraction | null = this.workingBlock ? 'update' : this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' :
+    const other: PendingInteraction | null = this.workingBlock ? 'update' : this.assetDeletion ? 'text' : this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' :
       this.searchComposing || [...this.includes.values()].some(m => m.composing) || [...this.models.values()].some(m => m.composing) ||
       [...this.drafts.values()].some(d => d.composing) ? 'composition' : this.views.pending ?? this.media.pending;
     return this.materials.context(other);
@@ -296,7 +327,7 @@ export class SyntheticSession {
     const composing = this.searchComposing || [...this.includes.values()].some(m => m.composing) || [...this.models.values()].some(m => m.composing) ||
       [...this.drafts.values()].some(d => d.composing);
     return { project: this.project, sceneId: this.sceneId, captionId,
-      block: this.workingBlock ?? this.mediaRestriction ?? (this.deletion ? '削除の確認を終えてください。' : other ? '移動中の操作を終えてください。' : composing ? '文字の入力を確定してください。' : this.views.pending || this.materials.pending ?
+      block: this.workingBlock ?? this.mediaRestriction ?? (this.deletion || this.assetDeletion ? '削除の確認を終えてください。' : other ? '移動中の操作を終えてください。' : composing ? '文字の入力を確定してください。' : this.views.pending || this.materials.pending ?
         '他の編集中の設定を適用するか取り消してください。' : source.kind !== 'ready' || !source.captions.some(c => c.id === captionId) ? 'キャプションを選択してください。' : null) };
   }
   private writeMedia(base: string, changes: Readonly<Record<string, string>>) {
@@ -406,7 +437,7 @@ export class SyntheticSession {
     if (source.kind === 'ready' && !this.drafts.has(source.caption.id))
       this.drafts.set(source.caption.id, beginCaptionDraft(source)!);
     const draft = source.kind === 'ready' ? this.drafts.get(source.caption.id)! : source.captionId ? this.drafts.get(source.captionId) ?? null : null;
-    return { source, draft, readonlyFields: this.colorReadOnly ? ['color'] : [], mutationBlock: this.workingBlock ?? (this.deletion ? '削除の確認を終えてください。' : this.readOnly ? 'このタブは閲覧専用です。' : this.windowDragging ? 'ウィンドウの移動を終えてください。' : this.placement ? 'モデルの配置を確定するか、取り消してください。' :
+    return { source, draft, readonlyFields: this.colorReadOnly ? ['color'] : [], mutationBlock: this.workingBlock ?? (this.deletion || this.assetDeletion ? '削除の確認を終えてください。' : this.readOnly ? 'このタブは閲覧専用です。' : this.windowDragging ? 'ウィンドウの移動を終えてください。' : this.placement ? 'モデルの配置を確定するか、取り消してください。' :
       this.pinInput ? 'ピンの操作を確定するか、取り消してください。' : null), feedback: this.detailFeedback };
   }
   modelContext(): ModelListContext {
@@ -425,7 +456,7 @@ export class SyntheticSession {
           displayReason: !edge || (this.viewportState.ready && this.viewportState.assetIds.includes(asset.id)) ? null :
             asset.projection.kind !== 'value' || edges.length > 1 ? 'モデルの更新・所属の候補を確認してください。' :
               this.viewportState.issue ?? 'シーンに含まれています。3D表示を確認してください。' };
-      }) }, memory: this.models.get(this.sceneId)!, pending: this.workingBlock ? 'update' : this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : null, mutationBlock: this.workingBlock, feedback: this.modelFeedback };
+      }) }, memory: this.models.get(this.sceneId)!, pending: this.workingBlock ? 'update' : this.assetDeletion ? 'text' : this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : null, mutationBlock: this.workingBlock, feedback: this.modelFeedback };
   }
   get modelVersions() { return this.project.modelVersions ?? syntheticVersions; }
   modelUpdateContext() {
@@ -437,7 +468,7 @@ export class SyntheticSession {
       name: asset ? this.project.modelNames[asset.id] ?? 'モデル' : '',
       current: projection ? modelVersion(asset!.id, projection.bindingId, this.modelVersions) : undefined,
       choices: this.modelVersions.filter(v => v.assetId === asset?.id && v.projection.bindingId !== projection?.bindingId), sceneCount,
-      issue: this.workingBlock ?? (this.windowDragging ? 'ウィンドウの移動を終えてください。' : this.viewportDragging ? 'カメラ操作を終えてください。' : this.placement ? 'モデルの配置を確定するか、取り消してください。' : this.pinInput ? 'ピンの操作を確定するか、取り消してください。' : this.textPending === 'composition'
+      issue: this.workingBlock ?? (this.assetDeletion ? '削除の確認を終えてください。' : this.windowDragging ? 'ウィンドウの移動を終えてください。' : this.viewportDragging ? 'カメラ操作を終えてください。' : this.placement ? 'モデルの配置を確定するか、取り消してください。' : this.pinInput ? 'ピンの操作を確定するか、取り消してください。' : this.textPending === 'composition'
         ? '文字の入力を確定してください。' : !asset ? '一覧からモデルを選択してください。' :
           asset.lifecycle.kind !== 'value' || asset.lifecycle.value.state !== 'active' || !projection ? 'モデルの更新状態を確認してください。' : null) };
   }

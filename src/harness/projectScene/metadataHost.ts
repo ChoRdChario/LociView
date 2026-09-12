@@ -9,6 +9,7 @@ import { MetadataFixtureContent, readMetadataSeed, writeMetadataSeed } from './m
 import { metadataModelFacts } from './metadataModelFacts';
 import type { SyntheticAuthority } from './historyProjection';
 import { captionDeletionImpact } from '../../projectMetadata/captionDeletion';
+import { assetDeletionImpact } from '../../projectMetadata/assetDeletion';
 import { metadataIntent } from './metadataIntent';
 import type { FullMetadataSource } from '../../projectMetadata/remote';
 import { fixtureIds } from './fixture';
@@ -114,6 +115,15 @@ export async function openMetadataHost(options: MetadataHostOptions) {
         if (command.kind !== 'deleteCaption') throw Error('削除対象を確認してください。');
         return ready(await service.edit(token, command));
       }, 'キャプションを削除できません。'),
+      assetDeletionImpact: (token, assetId) => {
+        if (last.provider?.kind !== 'scene-provider' || token !== last.provider.state.token) throw Error('内容が更新されています。選び直してください。');
+        return assetDeletionImpact(last.provider, assetId, limits);
+      },
+      deleteAsset: (token, command) => execute(async () => {
+        if (authority.readOnly) throw Error('このタブは閲覧専用です。');
+        if (command.kind !== 'deleteAsset') throw Error('削除対象を確認してください。');
+        return ready(await service.edit(token, command));
+      }, 'モデルを削除できません。'),
       retry: () => execute(async () => {
         if (authority.readOnly) throw Error('このタブは閲覧専用です。');
         const before = await service.read();

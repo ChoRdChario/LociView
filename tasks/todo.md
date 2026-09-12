@@ -11,11 +11,67 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — approved S1 service entry (2026-09-11)
 
-Current next decision (2026-09-12): C10 is connected and verified below. Next is
-M09, confirmed Asset deletion only after all Scene/Caption/material dependencies
-have been explicitly removed. This closes basic Project cleanup without new
-storage/wire policy; do not replay completed Scene/Caption work. Real-data/06/07/
+Current next decision (2026-09-12): C10/M09 basic cleanup is connected below.
+Next close the streamed body-storage/inventory prerequisite for real Project
+creation/reopen, using the existing S1 service and WorkspaceFS. Do not create a
+synthetic-run catalog or another PoC page. Existing-host Desktop checks require
+no more feature additions and remain one consolidated batch. Real-data/06/07/
 device adoption remains gated, and the complete practical-team goal stays open.
+
+#### Next finite slice — streamed bodies and durable inventory for Project creation
+
+- [ ] Specify the minimal nonactivated BlobStore connection under 02 §7 and
+  05 §13.2: bounded stream/hash/size staging, immutable publish, verified inventory,
+  origin-wide publication lock or explicit single-writer authority. Reuse the
+  current incremental hash implementation and WorkspaceFS; no dependency/GC.
+- [ ] Connect that inventory to the existing content verifier and metadata
+  create/reopen service using synthetic source inputs, not fixture byte fallback.
+  A missing/corrupt/interrupted body must not publish a complete Project.
+- [ ] Verify exact saved bytes, independent reopen, interruption/quota/mismatch,
+  immutable deduplication and no body reads for Caption-only save/cold recovery.
+  Reuse existing service tests; final tree matrix and independent review.
+
+This serves P01/P02/M01/I02, but does not count any as complete until real-data
+admission, UI and acceptance connect. No user-file picker/FormatProfile, ordinary
+home, package writer/migration, GC, new dependency or numeric support guarantee.
+Before real-data activation bundle the exact supported profile/environment,
+measured limits, G1-A/C and applicable iOS evidence for PO adoption. New filesystem
+or locking semantics that cannot satisfy 02 §7 are a stop/replan, not a fallback
+to per-Project locking for shared CAS. Keep the existing saved namespaces intact.
+
+#### Completed slice — dependency-guarded Project-wide model deletion (M09, from `df6255f`)
+
+- [x] Add a raw-candidate dependency reader and typed deleteAsset command.
+  Require active target lifecycle and proven absence of all active Scene,
+  Caption-anchor and material-routing references, including outside this Scene.
+- [x] Connect dependency guidance and explicit confirmation beside the existing
+  Project-wide model list. Keep selection/display until saved acknowledgement;
+  block concurrent drafts, readonly, stale confirmation and failed publication.
+- [x] Verify each dependency blocker, explicit cleanup, one-change deletion,
+  retained model/history/bytes, exact retry/cold reopen, late references and
+  invalid/ambiguous source refusal. Use existing host tests, final sequential
+  typecheck/test/build and independent review; checkpoint the verified result.
+
+Acceptance is 05 §3.4. No cascade, physical erasure, restore/general orphan repair,
+re-anchor schema, new model profile, package/wire, real-data activation or device
+claim. If an old material/unknown relation cannot be explicitly removed through
+the available path, retain the blocker; do not loosen reference checks to finish.
+This is basic Project cleanup, not an additional synthetic polish workstream.
+
+Review/result: four tests on existing host ports/recorded DOM pass, including all
+three dependency classes, current/other Scene, Project/Asset anchor candidates,
+material routing candidates, unresolved endpoints/lifecycle, delete/edit and
+target-state refusal. Explicit cleanup allows exactly one Asset.lifecycle write;
+immutable/status/history/content and other selections are retained. Failed save
+keeps the old model until exact cold retry. Remote deletion preserves material
+input until the existing two-step cancellation; unseen later Scene edges remain
+orphan warnings and replay does not duplicate history. Initial test assumptions
+were corrected (AtomicChange.id, required projectFrameId and cancel confirmation),
+without relaxing runtime guards. Independent core/UI reviews have no mandatory
+findings. Final sequential root: 109 files / 1,978 PASS / 21 existing TODO, exit 0
+(149.39 s, two workers); typecheck/build PASS with unchanged build chunk warnings.
+Diff-check and inventory recount PASS. No new browser/real-data/iPhone/offline evidence. Inventory:
+24 connected / 7 partial / 23 other-path / 10 new, not completion percentages.
 
 #### Completed slice — confirmed Project-wide Caption deletion (C10, from `6e2d9d8`)
 
@@ -54,7 +110,7 @@ with unchanged build chunk warnings; final diff-check and inventory recount PASS
 or real-data acceptance added. Browser initialization remains unavailable as
 previously recorded; no new attempt or environment repair was made.
 
-Next finite target: M09 in the same model panel. Read all raw Scene-membership,
+The subsequent M09 target is now completed above. It reads all raw Scene-membership,
 Caption-anchor and material-routing candidates, not the visible Scene alone.
 Unknown/ambiguous possibly related endpoints and delete/edit issues block removal.
 Name dependencies and direct users to existing explicit removal/reset actions;
@@ -63,9 +119,9 @@ Asset.lifecycle only, preserving status, immutable records/facts/history/blobs.
 Reuse the existing journal/host acceptance for failed save/cold retry, late
 reference retention, stale/readonly/pending refusal. No general re-anchor,
 orphan repair, GC, wire, real-data or additional device authority is inferred.
-Write the finite M09 specification/plan before implementation. After basic
-management, prioritize the bundled new-storage/real-data entry dependencies
-instead of accumulating unrelated synthetic polish.
+Its finite specification/plan preceded implementation. After basic management,
+prioritize the bundled new-storage/real-data entry dependencies instead of
+accumulating unrelated synthetic polish.
 
 #### Completed slice — resolve competing Caption positions/colors (from `452cdec`)
 

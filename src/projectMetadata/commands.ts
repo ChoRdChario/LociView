@@ -18,10 +18,12 @@ import { planAssetMembershipCopies } from './modelMembership';
 import { captionFieldCandidates, type CaptionChoiceField } from './captionCandidates';
 import { planSceneAuthoring } from './sceneAuthoring';
 import { planCaptionDeletion } from './captionDeletion';
-import type { CaptionDeletionCommand } from '../scene/commands';
+import type { CaptionDeletionCommand, AssetDeletionCommand } from '../scene/commands';
+import { planAssetDeletion } from './assetDeletion';
 
 export type MetadataEdit =
   | CaptionDeletionCommand
+  | AssetDeletionCommand
   | SceneAuthoringCommand
   | CaptionMembershipResolution
   | AssetMembershipResolution
@@ -67,6 +69,7 @@ export function canonicalMetadataEdit(input: MetadataEdit, limits: MetadataLimit
 export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits: MetadataLimits): readonly MetadataWrite[] {
   const command = canonicalMetadataEdit(input, limits), raw = command as unknown as JsonObject;
   if (command.kind === 'deleteCaption') return planCaptionDeletion(provider, command, limits);
+  if (command.kind === 'deleteAsset') return planAssetDeletion(provider, command, limits);
   if (command.kind === 'createScene' || command.kind === 'renameScene' || command.kind === 'setDefaultScene')
     return planSceneAuthoring(provider, command, limits);
   const c = new ProjectRecordFields(), result: MetadataRecordEdit[] = [];
