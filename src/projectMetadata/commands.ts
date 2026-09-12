@@ -20,6 +20,7 @@ import { planSceneAuthoring } from './sceneAuthoring';
 import { planCaptionDeletion } from './captionDeletion';
 import type { CaptionDeletionCommand, AssetDeletionCommand } from '../scene/commands';
 import { planAssetDeletion } from './assetDeletion';
+import { defaultSceneCandidates } from './startupScene';
 
 export type MetadataEdit =
   | CaptionDeletionCommand
@@ -28,6 +29,7 @@ export type MetadataEdit =
   | CaptionMembershipResolution
   | AssetMembershipResolution
   | { kind: 'resolveAssetStatus'; assetId: string; operationId: string }
+  | { kind: 'resolveDefaultScene'; operationId: string }
   | { kind: 'resolveCaptionField'; captionId: string; field: CaptionChoiceField; operationId: string }
   | { kind: 'activatePreparedRevision'; sceneId: string; assetId: string; expectedBindingId: string; revisionId: string; binding: JsonObject }
   | { kind: 'moveAsset'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject }
@@ -69,6 +71,12 @@ export function canonicalMetadataEdit(input: MetadataEdit, limits: MetadataLimit
 /** Plan only from the Session's fresh verified provider. Not a generic patch/import API. */
 export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits: MetadataLimits): readonly MetadataWrite[] {
   const command = canonicalMetadataEdit(input, limits), raw = command as unknown as JsonObject;
+  if (command.kind === 'resolveDefaultScene') {
+    shape(raw, ['kind', 'operationId']);
+    const choice = defaultSceneCandidates(provider, limits).find(c => c.operationId === command.operationId);
+    if (!choice) return fail('startup-resolution-choice');
+    return [{ map: 'project', id: 'defaultSceneId', create: false, fields: { defaultSceneId: choice.sceneId } }];
+  }
   if (command.kind === 'deleteCaption') return planCaptionDeletion(provider, command, limits);
   if (command.kind === 'deleteAsset') return planAssetDeletion(provider, command, limits);
   if (command.kind === 'createScene' || command.kind === 'renameScene' || command.kind === 'setDefaultScene')

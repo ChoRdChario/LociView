@@ -14,6 +14,8 @@ rendered, IME, device and durable-file acceptance remain pending.
 Current next decision (2026-09-12): limited real-file activation is awaiting the
 explicit PO decision below. Approved M07 (rotation/uniform scale) now connects
 through the existing metadata host, not a new synthetic page or storage workstream.
+Startup-Scene conflict recovery also now reaches the same host before Session
+construction, closing a saved-Project cold-open dead end without choosing a Scene.
 No real-data or profile authority is inferred. C10/M09 basic cleanup and the nonactivated
 streamed body/inventory service are connected below. Next is actual Mesh/image
 inspection and initial Project construction, then saved-body viewport/gallery
@@ -22,6 +24,55 @@ run catalog/PoC page. Bundle the exact initial profile and limited real-file
 validation activation with PO; 05 §13.2 currently excludes user-file admission.
 Formal adoption still requires G1-A/C and applicable device evidence. No profile,
 06/07, ordinary-home or release authority is inferred from continued implementation.
+
+#### Completed implementation — explicit startup Scene conflict recovery (from `acd30d5`)
+
+The previous goal turn made verified runtime progress (M07, clean checkpoint).
+Real-file validation still has no PO answer. A bounded stage-1 defect remains:
+received default-Scene conflicts survive storage but cold SyntheticSession creation
+throws before conflict controls mount. Close that actual team-reopen dead end;
+do not substitute more synthetic polish for the pending real-data entry.
+
+- [x] Add one typed resolveDefaultScene candidate choice under 05 §§4.1/8, with
+  complete valid candidate and active-target guards; keep ordinary set-default
+  refusal and all original history. Use the existing atomic command/journal.
+- [x] Mount startup comparison before Session construction in the existing host.
+  No guessed Scene; mount after saved acknowledgement, preserve current Scene/
+  camera/drafts on warm resolution. Keep selected input, failure and exact retry.
+- [x] Reuse host/recorded-DOM tests for cold/warm, both/equal candidates, stale/
+  readonly/other drafts, save failure/cold retry, return/replay and disposal.
+  Final typecheck/test/build and one independent read-only review.
+
+Exit: a valid start-Scene conflict no longer strands an otherwise saved Project
+before the user can resolve it. No arbitrary missing/deleted-target repair,
+Scene-name/View/lifecycle resolution, new page, real file, wire/migration,
+dependency, ordinary home or actual-browser/iPhone acceptance. Unsupported
+candidates remain explicitly blocked, never dropped from the comparison.
+Stage-3 planning audit confirms 06/07 still need executable wire/limit/closure
+ratification; Native pinScale mapping is separately open for conversion. Existing
+five-purpose product decisions do not need reapproval. These do not block this
+approved command; do not infer wire/adoption authority from this continuation.
+
+Focused evidence: four memory-port/recorded-DOM cases pass (11.92 s): cold choice
+of either/equal candidate, warm Scene/camera-port/draft preservation, normal-write/
+IME/stale/readonly refusal, failed choice retained through same-host retry and
+independent cold journal recovery, returned original history/replay, and no late
+workspace construction after dispose. Corrected test-only noncanonical scalar
+and deletion-reason fixtures; resolved deleted lifecycle is checked before refusing
+the candidate, not confused with malformed input. The retry assertion observes
+checking-to-terminal state and exact bytes rather than incidental write counts.
+First root: 108 files / 1,989 PASS / 21 TODO, one isolation allowlist failure
+(167.18 s, terminal exit 1). Registered only the newly split development mount/
+startup controls and service's exact imports; ordinary entry and platform/network
+prohibitions remain. The existing isolation/core suite now passes all 12 tests.
+No browser bootstrap/server retry and no
+actual input, OPFS, iPhone or offline PASS. Inventory counts remain unchanged.
+Final typecheck/build pass; final root is 109 files / 1,990 PASS / 21 existing TODO
+(151.22 s, two workers, exit 0). Independent review has no remaining mandatory
+findings, including the corrected valid-deleted fixture and exact isolation list.
+Existing build chunk-size/mixed-import warnings remain. Cached diff-check passes.
+The pending real-file decision remains the next critical boundary, not approval
+inferred from automatic continuation; no push retry or new server was attempted.
 
 #### Completed implementation — M07 model rotation and uniform scale (from `d242b71`)
 

@@ -123,6 +123,7 @@ export class ProjectMetadataSource {
       // SAME change. No intermediate absence is published or saved separately.
       if (command.kind === 'resolveCaptionText' || command.kind === 'resolveCaptionField') delete draft.captionsById[command.captionId][command.field];
       if (command.kind === 'resolveAssetStatus') delete draft.assetsById[command.assetId].status;
+      if (command.kind === 'resolveDefaultScene') delete draft.project.defaultSceneId;
       for (const edit of edits) {
         if (edit.map === 'project') {
           draft.project.defaultSceneId = scalar(edit.fields.defaultSceneId, this.limits); continue;

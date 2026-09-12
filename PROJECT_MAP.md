@@ -53,6 +53,11 @@ While that decision is pending, approved M07 now connects rotation/uniform-scale
 gizmos/numeric alternatives to the same metadata journal. Exact cancel/retry,
 saved two-party return and cold reopen retain geometry and authored Caption
 coordinates. Actual browser/iPhone input remains unverified, not full alignment.
+Project startup-Scene conflict selection now connects before session construction
+in that same metadata host: no guessed Scene, one saved causal choice, exact
+recovery and post-ack mount. Warm sessions keep local navigation/camera/drafts.
+T03 remains partial; other scalar/lifecycle repair and actual-browser acceptance
+are not implied. The outstanding real-file entry remains the critical next decision.
 
 2026-09-11 current implementation: PO explicitly approved 05 §13.2's S1 service
 implementation before aggregate adoption, new synthetic-only development activation

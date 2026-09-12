@@ -16,6 +16,9 @@
 > Confirmed Project-wide Caption and dependency-guarded Asset deletion now connect.
 > M07 rotation/positive uniform scaling now connects to the same saved host while
 > limited real-file activation awaits PO. It is not M13/full alignment/device proof.
+> Startup-Scene conflicts now have pre-session explicit selection/saved recovery
+> in the same host, closing the cold-open dead end without guessing a Scene.
+> Warm Scene/camera/input stay local. This narrows T03; it does not complete it.
 > Nonactivated streamed body storage/inventory now reaches metadata creation/reopen
 > in memory-port tests. Next: actual format inspection/initial Project construction;
 > limited real-file activation needs the bundled PO decision. Other

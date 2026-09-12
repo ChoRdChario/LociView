@@ -1660,6 +1660,37 @@ failure/cold retry and continued edit; actual rendering remains the batched lane
 Independent Caption/model copies and non-text conflicts remain the next finite
 commands, not implied by this text-resolution implementation.
 
+**Startup Scene conflict recovery implementation contract (2026-09-12):**
+Under §§4.1/8, `resolveDefaultScene` selects one explicit candidate operation ID
+of Project.defaultSceneId at the exact source token. Inspect every candidate;
+require a valid, known required Scene ID and unambiguous active Scene lifecycle
+for each target. Never silently omit an unsupported/deleted/ambiguous candidate.
+An unresolved name uses a review label, not an invented name or a guessed Scene.
+One local causal command removes then writes the selected whole scalar in the
+same original change (also for equal values). Normal setDefaultScene still
+refuses a conflict. No new wire, header field or journal branch is introduced.
+
+At cold open in the existing metadata host, inspect the published startup edge
+before constructing SyntheticSession. If it conflicts, show all candidates and
+explicit selection in that same host; do not open the first Scene. Mount the
+workspace only after acknowledged saved resolution. A warm workspace keeps its
+current Scene, camera and draft objects; resolution changes the shared next-open
+default, not local navigation. Refuse confirmation during another pending input,
+composition, readonly, stale source or save; retain selection until explicit
+cancel or successful acknowledgement. Failed publication keeps the exact journal
+and selection; retry restores those original bytes, never regenerates a choice.
+Dirty choices participate in refresh/leave protection. Dispose prevents late
+callbacks from remounting, while host disposal still waits for active storage.
+Distinguish a saved semantic conflict from incomplete or failed persistence.
+
+Reuse existing host/DOM acceptance: cold conflict -> explicit choice -> saved
+startup, warm local-state preservation, both candidate orders/equal values,
+normal-write/stale/invalid/readonly refusal, failed save and exact cold recovery,
+returned resolution and replay, and no post-dispose remount. Unknown/missing/
+deleted/default lifecycle repair and Scene-name/View resolution remain outside
+this command, with no silent fallback. Real input/raster/device acceptance is
+still the consolidated lane; ordinary home and real-data gates are unchanged.
+
 **Independent Caption membership resolution implementation (2026-09-12):**
 `resolveCaptionMembership` carries Scene/Caption IDs, the complete observed active
 edge IDs, explicitly selected original edge, `one`/`both`, a fresh event ID and

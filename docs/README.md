@@ -55,6 +55,10 @@ The approved M07 model rotation/uniform-scale connection now joins translation
 in the existing metadata host, through a separate typed transformAsset command.
 Full-transform preview and exact cancel/save/retry are covered by host/viewport
 tests. M13 alignment and real-browser/device acceptance remain separate.
+The same host now handles startup-Scene conflicts before constructing its editor.
+One explicit candidate choice is saved before cold startup; warm local Scene and
+camera remain unchanged. Exact retry/readonly/late-disposal checks reuse existing
+host tests. This does not implement other scalar/lifecycle repair or real-file entry.
 
 ## Classification
 

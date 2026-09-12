@@ -1,5 +1,12 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-12 開始Scene競合の起動復旧（`acd30d5`から）:** 新metadataの再開時、
+> 開始Sceneを推測して開かず、同じ画面で全候補を比較・明示確定。保存ack後にworkspaceを生成。
+> warm解消では現在Scene・カメラ・入力を保持。readonly／保存失敗／元journal retryも既存host内。
+> 最終109 files／1,990 PASS／21既存TODO、型・build・独立レビューPASS。実browser／実機は未実施。
+> 棚卸し件数は不変（T03は他field／lifecycle等が残る）。次の本筋は限定実file入口のPO判断。
+> 通常home、実形式の採用、06/07、公開・pushの境界を越えていない。
+
 > **2026-09-12 M07モデル回転／均等拡縮（`d242b71`から）:** 実file入口の承認待ち中に、
 > 承認済みの既存機能を新metadata hostへ接続。モデル原点を基準にgizmo／度数／正倍率を
 > 仮表示し、確定でfresh binding＋statusを同時保存。Caption原座標／本体は保持。

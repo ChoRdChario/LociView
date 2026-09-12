@@ -4,10 +4,8 @@ import { IndexedDBStorageAdapter } from '@automerge/automerge-repo-storage-index
 import { OpfsFS } from '../../platform/opfs';
 import { ProjectMutationCoordinator } from '../../platform/projectLock';
 import { openMetadataHost, metadataArea } from './metadataHost';
-import { SyntheticSession } from './session';
-import { createDevelopmentWorkspace } from './workspace';
 import { createSyntheticViewport } from './viewport';
-import { createMetadataReceiveControls } from './metadataReceiveControls';
+import { createMetadataWorkspace } from './metadataWorkspace';
 
 /** Serve-only, new synthetic namespace. No old saved/ordinary entry is converted. */
 export async function createMetadataBrowserWorkspace(document: Document, run: string, create: boolean) {
@@ -42,51 +40,10 @@ export async function createMetadataBrowserWorkspace(document: Document, run: st
         return { factory: () => adapter, dispose: async () => connection.close() };
       } finally { guard?.close(); }
     } });
-  let disposed = false, refreshing = false, workspace: ReturnType<typeof createDevelopmentWorkspace> | undefined;
-  let receiveControls: ReturnType<typeof createMetadataReceiveControls> | undefined;
-  const root = document.createElement('section'), tools = document.createElement('section');
-  const check = document.createElement('button'), restore = document.createElement('button'), status = document.createElement('p');
-  check.type = restore.type = 'button'; check.textContent = '保存状態を確認'; restore.textContent = '保存を再試行';
-  status.setAttribute('role', 'status'); tools.append(check, restore, status); root.append(tools);
-  const render = () => {
-    if (disposed) return;
-    if (!workspace && host.read().provider) {
-      workspace = createDevelopmentWorkspace(document, new SyntheticSession(host.authority, () => receiveControls?.hasChanges() ?? false), {
-        viewportFactory: createSyntheticViewport, onAction: () => receiveControls?.render() });
-      receiveControls = createMetadataReceiveControls(document, host, workspace.session, () => workspace?.render());
-      tools.append(receiveControls.root);
-      root.append(workspace.root);
-    }
-    check.disabled = restore.disabled = refreshing;
-    restore.hidden = !!workspace || host.authority.readOnly || host.read().state === 'ready';
-    if (!workspace) status.textContent = host.authority.readOnly ?
-      '未完了の保存があります。このタブは閲覧専用です。編集用タブで復旧してください。' : '未完了の保存があります。元の変更から再試行できます。';
-    workspace?.render();
-    receiveControls?.render();
-  };
-  const refresh = async (retry: boolean) => {
-    if (disposed || refreshing) return;
-    // A readonly tab may re-read after the writer recovers. It cannot own drafts;
-    // an editable tab retains all pending input and never silently replaces it.
-    if (workspace && !workspace.session.readOnly && (workspace.session.pending || workspace.session.workingBlock && !retry)) {
-      status.textContent = '入力・保存を確定するか、取り消してから確認してください。'; return;
-    }
-    refreshing = true; check.disabled = restore.disabled = true;
-    try {
-      if (retry) await host.authority.retry!(); else await host.refresh();
-      if (disposed) return;
-      if (workspace && host.read().provider) workspace.session.refreshHistory();
-      status.textContent = host.read().state === 'ready' ? '保存した内容を確認しました。' : '未完了の保存があります。';
-    } catch (error) { if (!disposed) status.textContent = error instanceof Error ? error.message : '保存を確認できません。データは保持しています。'; }
-    finally { refreshing = false; render(); }
-  };
-  check.addEventListener('click', () => { void refresh(false); });
-  restore.addEventListener('click', () => { void refresh(true); });
-  try { render(); } catch (error) { workspace?.dispose(); await host.dispose(); throw error; }
-  const dispose = () => {
-    if (disposed) return; disposed = true; window.removeEventListener('pagehide', dispose);
-    receiveControls?.dispose(); workspace?.dispose(); root.remove(); void host.dispose();
-  };
+  let workspace: ReturnType<typeof createMetadataWorkspace>;
+  try { workspace = createMetadataWorkspace(document, host, createSyntheticViewport); }
+  catch (error) { await host.dispose(); throw error; }
+  const dispose = () => { window.removeEventListener('pagehide', dispose); void workspace.dispose(); };
   window.addEventListener('pagehide', dispose);
-  return { root, hasChanges: () => host.hasPending() || !!workspace?.session.pending || !!receiveControls?.hasChanges(), dispose };
+  return { root: workspace.root, hasChanges: workspace.hasChanges, dispose };
 }

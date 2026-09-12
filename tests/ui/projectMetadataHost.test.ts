@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as A from '@automerge/automerge'; // Node-only initialization, not browser evidence.
 import { MemoryFS } from '../../src/platform/fs';
 import { ProjectMutationCoordinator } from '../../src/platform/projectLock';
@@ -45,6 +45,8 @@ import { captionDeletionImpact } from '../../src/projectMetadata/captionDeletion
 import type { CaptionDeletionCommand } from '../../src/scene/commands';
 import { assetDeletionImpact } from '../../src/projectMetadata/assetDeletion';
 import { modelListView } from '../../src/ui/projectScene/modelListState';
+import { defaultSceneCandidates } from '../../src/projectMetadata/startupScene';
+import { createMetadataWorkspace } from '../../src/harness/projectScene/metadataWorkspace';
 
 class FaultFS extends MemoryFS {
   rejectPublication = false; rejectImage = false; writes = 0;
@@ -124,6 +126,130 @@ async function acknowledge(s: SyntheticSession, action: () => void) {
 
 const fullSource = (source: ProjectMetadataSource, n: number) => ({ packageId: `pkg_${n.toString(16).padStart(32, '0')}`,
   metadataBytes: source.encodeFullSource(), proof: source.proof, remoteHeads: source.heads });
+
+describe('saved startup Scene conflict recovery; memory ports and recorded DOM only', { timeout: 15000 }, () => {
+  const raw = (source: ProjectMetadataSource, change: (doc: any) => void) => {
+    const [doc] = A.applyChanges(A.init<any>(), source.originalChanges());
+    return source.appendOriginal(A.getChanges(doc, A.change(A.clone(doc), change)));
+  };
+  const branch = (source: ProjectMetadataSource, sceneId: string) => raw(source, doc => {
+    delete doc.project.defaultSceneId; doc.project.defaultSceneId = new A.ImmutableString(JSON.stringify(sceneId));
+  });
+  const setup = async (equal = false) => {
+    const h = fixture(), host = await h.open(true), source = host.read().source!;
+    const one = branch(source, f.overview), two = branch(source, equal ? f.overview : f.detail);
+    await host.receive(source.token, fullSource(one, 1200)); await host.receive(host.read().source!.token, fullSource(two, 1201));
+    return { h, host, source, one, two };
+  };
+  const choices = (host: Awaited<ReturnType<typeof openMetadataHost>>) => {
+    const p = host.read().provider!; if (p.kind !== 'scene-provider') throw Error('provider');
+    return defaultSceneCandidates(p, metadataFixtureLimits);
+  };
+  const ui = (host: Awaited<ReturnType<typeof openMetadataHost>>, viewport?: Parameters<typeof createMetadataWorkspace>[2]) => {
+    const mounted = createMetadataWorkspace(new RecordedDocument().asDocument(), host, viewport), root = record(mounted.root);
+    return { mounted, root, panel: named(root, '開始シーンの競合'), select: picker(root, '残す開始シーン') };
+  };
+  const until = async (check: () => void) => vi.waitFor(check, { timeout: 5000, interval: 10 });
+
+  it('cold-opens without a guessed Scene, resolves either/equal candidate atomically, returns history and replays without duplication', async () => {
+    for (const [target, equal] of [[f.overview, false], [f.detail, false], [f.overview, true]] as const) {
+      const { h, host: first, source } = await setup(equal), pending = first.read().source!, originalChanges = pending.originalChanges();
+      expect(first.read().state).toBe('ready'); expect(first.authority.read().state.defaultSceneId.kind).toBe('unresolved');
+      await first.dispose(); const host = await h.open(), u = ui(host), count = host.read().source!.originalChanges().length;
+      expect(u.mounted.session).toBeUndefined(); expect(u.panel.hidden).toBe(false); expect(u.select.value).toBe('');
+      expect(button(u.panel, '開始シーンを確定').disabled).toBe(true); expect(button(u.root, '保存を再試行').hidden).toBe(true);
+      const choice = choices(host).find(c => c.sceneId === target)!; setInput(u.select, choice.operationId);
+      expect(u.mounted.hasChanges()).toBe(true); const writes = h.base.writes;
+      button(u.root, '保存状態を確認').fire('click'); expect(h.base.writes).toBe(writes); expect(u.select.value).toBe(choice.operationId);
+      button(u.panel, '開始シーンを確定').fire('click'); await until(() => expect(u.mounted.session?.sceneId).toBe(target));
+      expect(u.panel.hidden).toBe(true); expect(u.mounted.hasChanges()).toBe(false);
+      const saved = host.read().source!; expect(saved.originalChanges()).toHaveLength(count + 1);
+      for (const part of originalChanges) expect(saved.originalChanges().some(p => Buffer.from(p).equals(Buffer.from(part)))).toBe(true);
+      expect(host.authority.read().resources.captions).toEqual(metadataProjectView((await readProjectScene(source.read(), metadataFixtureLimits, host.content.verifier(false)))).resources.captions);
+      await host.receive(saved.token, fullSource(pending, 1202)); u.mounted.session!.refreshHistory();
+      expect(host.read().source!.token).toBe(saved.token); expect(host.read().source!.originalChanges()).toHaveLength(count + 1);
+      const returned = pending.appendOriginal(saved.originalChanges()), rp = await readProjectScene(returned.read(), metadataFixtureLimits, host.content.verifier(false));
+      expect(rp.kind === 'scene-provider' && rp.state.defaultSceneId).toEqual({ kind: 'value', value: target });
+      await u.mounted.dispose(); const cold = await h.open(); expect(new SyntheticSession(cold.authority).sceneId).toBe(target); await cold.dispose();
+    }
+  });
+
+  it('preserves warm Scene/camera/draft state, blocks composition and stale choices, and leaves ordinary conflicting writes refused', async () => {
+    let recalls = 0; const camera = displayCapture();
+    const h = fixture(), host = await h.open(true), u = ui(host, () => ({ update() {}, setActive() {}, camera() {}, retry() {}, dispose() {},
+      capture: () => camera, recall: () => { recalls++; }, read: () => ({ token: 'camera', ready: true, issue: null, dragging: false,
+        projection: 'perspective', axis: null, pins: [] }) })), s = u.mounted.session!, seed = host.read().source!, initialRecalls = recalls;
+    select(s); const context = s.detailContext(), draft = editCaptionDraft(context.draft!, context.source, 'body', '未確定の追記');
+    s.acceptDetail({ kind: 'draft', baseDraft: context.draft!, draft }); const memory = s.memory, windows = s.windowMemory;
+    const conflict = branch(seed, f.overview).appendOriginal(branch(seed, f.detail).originalChanges());
+    await host.receive(seed.token, fullSource(conflict, 1210)); s.refreshHistory(); u.mounted.render();
+    expect(s.sceneId).toBe(f.overview); expect(s.memory).toBe(memory); expect(s.windowMemory).toBe(windows); expect(s.detailContext().draft).toBe(draft);
+    expect(button(u.panel, '開始シーンを確定').disabled).toBe(true);
+    // A retained editor/IME blocks this separate resolution command until explicitly cancelled.
+    s.setSearchComposing(true); u.mounted.render(); expect(u.select.disabled).toBe(true); s.setSearchComposing(false);
+    const detail = s.detailContext(); s.acceptDetail({ kind: 'cancel', draft: detail.draft! }); u.mounted.render();
+    const choice = choices(host).find(c => c.sceneId === f.detail)!; setInput(u.select, choice.operationId);
+    const before = host.read().source!, writes = h.base.writes;
+    await expect(host.authority.authorScene!(before.token, { kind: 'setDefaultScene', sceneId: f.detail })).rejects.toThrow();
+    await expect(host.resolve(before.token, { kind: 'resolveDefaultScene', operationId: 'unseen' })).rejects.toThrow();
+    await expect(host.resolve('stale', { kind: 'resolveDefaultScene', operationId: choice.operationId })).rejects.toThrow();
+    expect(h.base.writes).toBe(writes);
+    const remote = await before.prepareCaptionText(before.token, f.shared, 'title', '別の更新');
+    await host.receive(before.token, fullSource(remote, 1211)); s.refreshHistory(); u.mounted.render();
+    expect(u.select.value).toBe(choice.operationId); expect(button(u.panel, '開始シーンを確定').disabled).toBe(true);
+    button(u.panel, '取り消す').fire('click'); setInput(u.select, choices(host).find(c => c.sceneId === f.detail)!.operationId);
+    await acknowledge(s, () => button(u.panel, '開始シーンを確定').fire('click')); u.mounted.render();
+    expect(s.sceneId).toBe(f.overview); expect(s.memory).toBe(memory); expect(s.windowMemory).toBe(windows);
+    expect(recalls).toBe(initialRecalls); expect(camera).toEqual(displayCapture());
+    expect(s.snapshot.state.defaultSceneId).toEqual({ kind: 'value', value: f.detail }); await u.mounted.dispose();
+  });
+
+  it('retains failed choice and original journal through cold retry, and lets a readonly opener refresh only after the writer resolves', async () => {
+    const { h, host } = await setup(), reader = await h.open(), ro = ui(reader), u = ui(host);
+    expect(ro.select.disabled).toBe(true); expect(ro.mounted.session).toBeUndefined();
+    const choice = choices(host).find(c => c.sceneId === f.detail)!;
+    await expect(reader.resolve(reader.read().source!.token, { kind: 'resolveDefaultScene', operationId: choice.operationId })).rejects.toThrow(/閲覧専用/);
+    setInput(u.select, choice.operationId); h.base.rejectPublication = true;
+    button(u.panel, '開始シーンを確定').fire('click'); await until(() => expect(button(u.root, '保存を再試行').hidden).toBe(false));
+    expect(u.mounted.session).toBeUndefined(); expect(u.select.value).toBe(choice.operationId); expect(u.select.disabled).toBe(true);
+    expect(button(u.panel, '取り消す').disabled).toBe(true); expect(host.authority.read().state.defaultSceneId.kind).toBe('unresolved');
+    const paths = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.endsWith('.amchange'));
+    const parts = await Promise.all(paths.map(p => h.base.readBytes(p)));
+    button(u.root, '保存を再試行').fire('click'); expect(button(u.root, '保存を再試行').disabled).toBe(true);
+    await until(() => expect(button(u.root, '保存を再試行').disabled).toBe(false));
+    expect(u.select.value).toBe(choice.operationId); expect(await Promise.all(paths.map(p => h.base.readBytes(p)))).toEqual(parts);
+    await u.mounted.dispose(); h.base.rejectPublication = false;
+    const cold = await h.open(), reopened = ui(cold); expect(cold.read().state).toBe('pending'); expect(reopened.mounted.session).toBeUndefined();
+    button(reopened.root, '保存を再試行').fire('click'); await until(() => expect(reopened.mounted.session?.sceneId).toBe(f.detail));
+    expect(await Promise.all(paths.map(p => h.base.readBytes(p)))).toEqual(parts);
+    button(ro.root, '保存状態を確認').fire('click'); await until(() => expect(ro.mounted.session?.sceneId).toBe(f.detail));
+    expect(ro.mounted.session!.readOnly).toBe(true); await reopened.mounted.dispose(); await ro.mounted.dispose();
+  });
+
+  it('rejects incomplete target authority without writes, and never mounts a workspace after disposal of an in-flight confirmation', async () => {
+    const { host, source } = await setup(); const conflict = host.read().source!;
+    const deleted = raw(conflict, d => { d.scenesById[f.detail].lifecycle = new A.ImmutableString(canonicalFixture({ state: 'deleted', eventId: `evt_${'e'.repeat(32)}`, reason: 'userDelete' })); });
+    for (const corrupt of [deleted,
+      raw(conflict, d => { d.scenesById[f.detail].id = new A.ImmutableString(JSON.stringify(f.overview)); })]) {
+      const p = await readProjectScene(corrupt.read(), metadataFixtureLimits, host.content.verifier(false));
+      if (corrupt === deleted) {
+        expect(p.kind).toBe('scene-provider');
+        if (p.kind !== 'scene-provider') throw Error('provider');
+        expect(p.details.mutable.scenesById[f.detail]!.lifecycle).toMatchObject({ kind: 'value', value: { state: 'deleted', reason: 'userDelete' } });
+      }
+      expect(() => corrupt.prepareEdit(corrupt.token, { kind: 'resolveDefaultScene', operationId: choices(host)[0]!.operationId }, p, 'c'.repeat(32))).toThrow();
+    }
+    const p = await readProjectScene(source.read(), metadataFixtureLimits, host.content.verifier(false));
+    expect(() => source.prepareEdit(source.token, { kind: 'resolveDefaultScene', operationId: 'missing' }, p, 'c'.repeat(32))).toThrow();
+    let release!: () => void; const wait = new Promise<void>(resolve => { release = resolve; });
+    const gated = { ...host, resolve: async (...args: Parameters<typeof host.resolve>) => { const result = await host.resolve(...args); await wait; return result; } };
+    const u = ui(gated); setInput(u.select, choices(host)[0]!.operationId); button(u.panel, '開始シーンを確定').fire('click');
+    await until(() => expect(host.authority.read().state.defaultSceneId.kind).toBe('value'));
+    expect(u.mounted.session).toBeUndefined(); await u.mounted.dispose(); release(); await wait; await Promise.resolve();
+    expect(u.mounted.session).toBeUndefined(); expect(descendants(u.root).some(n => n.tag === 'main')).toBe(false);
+  });
+});
+
 describe('saved Asset deletion; synthetic ports and recorded DOM only', { timeout: 15000 }, () => {
   const id = (p: string, n: number) => `${p}_${n.toString(16).padStart(32, '0')}`;
   const scalar = (v: unknown) => new A.ImmutableString(canonicalFixture(v));
