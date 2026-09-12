@@ -1,5 +1,18 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-13 View競合の接続（`95ee28b`後）:** 名称／順序／camera／backgroundと
+> Scene開始Viewの全候補選択を同じmetadata画面・original journalへ接続。
+> 名前は手入力も可。不在／同値候補を含めて1因果変更で解消し、warm recallはしない。
+> 同名ViewをScene＋番号で識別。手元入力・元履歴・他fieldの競合を保持し、解消後の
+> 通常rename／recapture／reorder／entry／recall、返送・再受信・後着再競合・cold retryを検証。
+> 独立レビューの対象識別／限定import表を修正。最初の全体2件は新テストの5秒timeout。
+> 二巡4ケースだけを既存同種の15秒枠へ揃え、assertion・global既定・製品期限は不変更。
+> 最終型・build exit 0、root exit 0／JSON success、111 files／2,062 PASS／21既存TODO／失敗0。
+> 実行codeは以降不変更、詳細はtodo。T03・実画面／iPhone／offline・全fileチーム受入れは未完了。
+> 次は05 §3.4/§8のCaption本体の削除対編集／復元競合を同じ要確認欄へ限定接続。
+> 子tombstoneや後着edgeを勝手に変更せず、fresh lifecycle eventで明示解消する。
+> 06の既出2判断は未回答。wire／home／releaseに進まず、browser／pushの同一失敗を再試行しない。
+
 > **2026-09-13 Scene名競合の接続（`50f0872`後）:** 二人が同じScene名を変更した後、
 > 全候補から選ぶ／名前を入力する操作を既存metadata画面とjournalへ接続。
 > 通常renameの競合拒否を維持し、確定後に再編集可能。元履歴・手元入力・Sceneを保持。

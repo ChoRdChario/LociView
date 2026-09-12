@@ -10,6 +10,14 @@
 
 ## Start here
 
+2026-09-13 T03 Saved View connection: `projectMetadata/viewResolution.ts` supplies
+complete-candidate choices for View name/order/camera/background and Scene entry
+View through the same conflict form and original journal. Entry absence remains
+absence; resolving does not recall or alter the current Scene/camera/background.
+Scene/View labels disambiguate duplicate names. Normal operations resume only
+when their affected fields are resolved. Exact checks are in todo; lifecycle,
+ordinary-file team flow and rendered/device acceptance remain open.
+
 2026-09-13 T03 connection: the same metadata conflict form resolves Scene-name
 candidates or a valid manually entered name through the existing journal.
 Normal rename still refuses a conflict; only the chosen name changes. Original

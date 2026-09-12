@@ -48,6 +48,7 @@ import { modelListView } from '../../src/ui/projectScene/modelListState';
 import { defaultSceneCandidates } from '../../src/projectMetadata/startupScene';
 import { createMetadataWorkspace } from '../../src/harness/projectScene/metadataWorkspace';
 import { sceneNameCandidates } from '../../src/projectMetadata/sceneAuthoring';
+import { viewFieldCandidates, entryViewCandidates, type ViewChoiceField } from '../../src/projectMetadata/viewResolution';
 
 class FaultFS extends MemoryFS {
   rejectPublication = false; rejectImage = false; writes = 0;
@@ -128,6 +129,255 @@ async function acknowledge(s: SyntheticSession, action: () => void) {
 
 const fullSource = (source: ProjectMetadataSource, n: number) => ({ packageId: `pkg_${n.toString(16).padStart(32, '0')}`,
   metadataBytes: source.encodeFullSource(), proof: source.proof, remoteHeads: source.heads });
+
+describe('Saved View conflict resolution; saved memory ports and recorded DOM only', () => {
+  const id = `view_${'a'.repeat(32)}`, otherId = `view_${'b'.repeat(32)}`, tx = 'c'.repeat(32);
+  const jsonCapture = () => ({ camera: { ...displayCapture().camera }, background: { ...displayCapture().background } });
+  const labels = { name: '名前', orderKey: '並び順', camera: 'カメラ', background: '背景', defaultViewId: '開始視点' };
+  type TestedField = keyof typeof labels;
+  const raw = (source: ProjectMetadataSource, change: (doc: any) => void) => {
+    const [doc] = A.applyChanges(A.init<any>(), source.originalChanges());
+    return source.appendOriginal(A.getChanges(doc, A.change(A.clone(doc), change)));
+  };
+  const branch = (source: ProjectMetadataSource, field: TestedField, value: unknown) => raw(source, d => {
+    const record = field === 'defaultViewId' ? d.scenesById[f.overview] : d.viewsById[id];
+    delete record[field];
+    record[field] = new A.ImmutableString(canonicalFixture(value === undefined ? null : value));
+    if (value === undefined) delete record[field]; // Explicit absence even when it was already absent.
+  });
+  const setup = async (field: TestedField, first: unknown, second: unknown) => {
+    const h = fixture(), host = await h.open(true);
+    const read = (source: ProjectMetadataSource) => readProjectScene(source.read(), metadataFixtureLimits, host.content.verifier(false));
+    let seed = host.read().source!;
+    for (const [viewId, name, orderKey] of [[id, '入口', 'B'], [otherId, '奥', 'M']]) {
+      seed = seed.prepareEdit(seed.token, { kind: 'createView', viewId: viewId!, name: name!, orderKey: orderKey!,
+        sceneId: f.overview, projectFrameId: host.authority.read().resources.projectFrameId,
+        ...jsonCapture(), eventId: `evt_${tx}` }, await read(seed), tx);
+    }
+    const one = branch(seed, field, first), two = branch(seed, field, second);
+    await host.receive(host.read().source!.token, fullSource(one, 1500));
+    await host.receive(host.read().source!.token, fullSource(two, 1501));
+    const recalls: DisplayCapture[] = [], background = vi.fn();
+    const mount = createMetadataWorkspace(new RecordedDocument().asDocument(), host, () => ({
+      update() {}, setActive() {}, read: () => ({ token: 'camera', ready: true, issue: null, dragging: false,
+        projection: 'perspective', axis: null, pins: [] }), capture: displayCapture,
+      recall: value => { recalls.push(value); }, setBackground: background, camera() {}, retry() {}, dispose() {},
+    }));
+    const root = record(mount.root), s = mount.session!;
+    const choice = (name: TestedField = field) => descendants(root).find(n => n.tag === 'select' &&
+      n.attributes.get('aria-label')?.endsWith(`：${labels[name]}の解消方法`))!;
+    const form = (name: TestedField = field) => descendants(root).find(n => n.tag === 'li' && descendants(n).includes(choice(name)))!;
+    const choices = (name: TestedField = field) => {
+      const p = host.read().provider!; if (p.kind !== 'scene-provider') throw Error('provider');
+      return name === 'defaultViewId' ? entryViewCandidates(p, f.overview, metadataFixtureLimits).candidates :
+        viewFieldCandidates(p, id, name, metadataFixtureLimits).candidates;
+    };
+    const command = (operationId: string, name: TestedField = field): Extract<MetadataEdit, { kind: 'resolveEntryView' | 'resolveViewField' }> => name === 'defaultViewId' ?
+      { kind: 'resolveEntryView', sceneId: f.overview, operationId } :
+      { kind: 'resolveViewField', sceneId: f.overview, viewId: id, field: name, choice: { kind: 'candidate', operationId } };
+    return { h, host, read, seed, one, two, mount, root, s, recalls, background, choice, form, choices, command };
+  };
+
+  const fields: [ViewChoiceField, unknown, unknown][] = [
+    ['name', '入口の確認', '設備の確認'], ['orderKey', 'A', 'Z'],
+    ['camera', displayCapture().camera, { ...displayCapture().camera, position: [3, 2, 8], projection: { kind: 'orthographic', verticalSpan: 12.34567 } }],
+    ['background', displayCapture().background, { kind: 'solid', colorSrgb: [0.7654321, 0.4, 0.2] }],
+  ];
+  it.each(fields)('resolves complete %s atoms, returns editable history and replays without warm recall', async (field, first, second) => {
+    const u = await setup(field, first, second), { h, host, mount, s } = u, before = host.read().source!;
+    select(s); const detail = s.detailContext();
+    s.acceptDetail({ kind: 'draft', baseDraft: detail.draft!, draft: editCaptionDraft(detail.draft!, detail.source, 'body', '手元の入力を保持') });
+    const memory = s.memory, windows = s.windowMemory;
+    expect(u.choice().value).toBe(''); expect(button(u.form(), '競合を解消').disabled).toBe(true);
+    const copy = descendants(u.form()).map(n => n.textContent).join(' ');
+    if (field === 'orderKey') { expect(copy).toContain('奥」の後'); expect(copy).toContain('奥」の前'); }
+    if (field === 'camera') { expect(copy).toContain('縦幅 12.34567'); expect(copy).toContain('上方向 0 / 1 / 0'); }
+    if (field === 'background') expect(copy).toContain('0.7654321 / 0.4 / 0.2');
+    const selected = u.choices().find(c => c.value.kind === 'value' && canonicalFixture(c.value.value) === canonicalFixture(second))!;
+    setInput(u.choice(), selected.operationId);
+    expect(host.read().source!.token).toBe(before.token); expect(u.recalls).toHaveLength(0);
+    await acknowledge(s, () => button(u.form(), '競合を解消').fire('click')); mount.render();
+    expect(s.acknowledgment.state).toBe('idle'); expect(s.snapshot.viewData!.records[id]![field]).toEqual({ kind: 'value', value: second });
+    expect(u.recalls).toHaveLength(0); expect(u.background).not.toHaveBeenCalled();
+    expect(s.sceneId).toBe(f.overview); expect(s.memory).toBe(memory); expect(s.windowMemory).toBe(windows);
+    expect(s.detailContext().draft!.edits.body).toBe('手元の入力を保持');
+    const saved = host.read().source!;
+    expect(saved.originalChanges()).toHaveLength(before.originalChanges().length + 1);
+    for (const bytes of before.originalChanges()) expect(saved.originalChanges().some(b => Buffer.from(b).equals(Buffer.from(bytes)))).toBe(true);
+    // The participant can use ordinary edit (including recapture of camera+background) again.
+    const participant = u.one.appendOriginal(saved.originalChanges()), edits = field === 'name' ? { name: '二巡目の視点' } :
+      field === 'orderKey' ? { orderKey: 'C' } : jsonCapture();
+    const returned = participant.prepareEdit(participant.token, { kind: 'editView', sceneId: f.overview, viewId: id, edits }, await u.read(participant), tx);
+    await host.receive(saved.token, fullSource(returned, 1502)); s.refreshHistory(); mount.render();
+    const heads = host.read().source!.heads, writes = h.base.writes;
+    await host.receive(host.read().source!.token, fullSource(returned, 1502)); expect(h.base.writes).toBe(writes);
+    expect(u.recalls).toHaveLength(0); expect(u.background).not.toHaveBeenCalled();
+    await mount.dispose(); const cold = await h.open(); expect(cold.read().source!.heads).toEqual(heads);
+    const cs = new SyntheticSession(cold.authority), ui = viewHost(cs);
+    setInput(ui.picker, id); button(area(ui.r, '保存した視点'), '表示').fire('click'); expect(ui.recalls).toEqual([displayCapture()]);
+    button(ui.author, '編集').fire('click'); ui.name('通常編集が可能');
+    if (field === 'camera' || field === 'background') {
+      ui.capture({ ...displayCapture(), camera: { ...displayCapture().camera, position: [4, 5, 9] } });
+      button(ui.author, '現在の表示を使用').fire('click');
+    }
+    await acknowledge(cs, () => button(ui.author, '変更を適用').fire('click')); ui.w.render();
+    expect(cs.acknowledgment.state).toBe('idle'); expect(cs.snapshot.viewData!.records[id]!.name).toEqual({ kind: 'value', value: '通常編集が可能' });
+    if (field === 'camera' || field === 'background') expect(cs.snapshot.viewData!.records[id]!.camera).toMatchObject({ value: { position: [4, 5, 9] } });
+    if (field === 'orderKey') {
+      await acknowledge(cs, () => button(ui.author, '後へ').fire('click')); ui.w.render();
+      const order = cs.snapshot.viewData!.records[id]!.orderKey; expect(order.kind === 'value' && order.value > 'M').toBe(true);
+    }
+    const late = branch(u.seed, field, first);
+    await cold.receive(cold.read().source!.token, fullSource(late, 1505)); cs.refreshHistory(); ui.w.render();
+    expect(cs.snapshot.viewData!.records[id]![field].kind).toBe('unresolved'); expect(ui.recalls).toHaveLength(1);
+    ui.w.dispose(); await cold.dispose();
+  }, 15000); // Same bounded budget as existing saved-host roundtrips; no operation deadline or global timeout change.
+
+  it.each(['equal', 'manual'] as const)('resolves %s names in one causal change and leaves other field candidates untouched', async mode => {
+    const u = await setup('name', '同じ名前', '同じ名前'), beforeExtra = u.host.read().source!;
+    const a = branch(beforeExtra, 'camera', displayCapture().camera), b = branch(beforeExtra, 'camera', { ...displayCapture().camera, position: [9, 2, 8] });
+    await u.host.receive(beforeExtra.token, fullSource(a.appendOriginal(b.originalChanges()), 1503)); u.s.refreshHistory(); u.mount.render();
+    const before = u.host.read().source!, cameraChoices = u.choices('camera');
+    setInput(u.choice(), mode === 'equal' ? u.choices()[0]!.operationId : 'manual');
+    if (mode === 'manual') setInput(descendants(u.form()).find(n => n.tag === 'textarea')!, '  Cafe\u0301  ');
+    await acknowledge(u.s, () => button(u.form(), '競合を解消').fire('click')); u.mount.render();
+    expect(u.s.snapshot.viewData!.records[id]!.name).toEqual({ kind: 'value', value: mode === 'equal' ? '同じ名前' : '  Café  ' });
+    expect(u.host.read().source!.originalChanges()).toHaveLength(before.originalChanges().length + 1);
+    expect(u.choices('camera')).toEqual(cameraChoices); expect(u.s.snapshot.viewData!.records[id]!.camera.kind).toBe('unresolved');
+    expect(u.recalls).toHaveLength(0); await u.mount.dispose();
+  });
+
+  it.each(['distinct', 'absent', 'bothAbsent', 'equal'] as const)('resolves %s entry candidates without storing null or recalling on warm receive', async mode => {
+    const first = mode === 'bothAbsent' ? undefined : id, second = mode === 'distinct' ? otherId : mode === 'equal' ? id : undefined;
+    const u = await setup('defaultViewId', first, second), before = u.host.read().source!;
+    const selected = u.choices().find(c => second === undefined ? c.value.kind === 'absent' : c.value.kind === 'value' && c.value.value === second)!;
+    const copy = descendants(u.form()).map(n => n.textContent).join(' ');
+    expect(copy).toContain(second === undefined ? '開始視点なし' : second === id ? '入口' : '奥');
+    setInput(u.choice(), selected.operationId); await acknowledge(u.s, () => button(u.form(), '競合を解消').fire('click')); u.mount.render();
+    expect(u.s.acknowledgment.state).toBe('idle'); expect(u.s.snapshot.state.scenes[f.overview]!.defaultViewId).toEqual({ kind: 'value', value: second ?? null });
+    const p = u.host.read().provider!; if (p.kind !== 'scene-provider') throw Error('provider');
+    expect(p.details.mutable.scenesById[f.overview]!.defaultViewId).toEqual({ kind: 'value', value: second });
+    const saved = u.host.read().source!; expect(saved.originalChanges()).toHaveLength(before.originalChanges().length + 1);
+    expect(u.recalls).toHaveLength(0); expect(u.background).not.toHaveBeenCalled();
+    // Ordinary entry setting is available again from the same mounted workspace.
+    button(u.root, '視点').fire('click'); const entry = area(u.root, '開始時の設定');
+    setInput(picker(entry, 'シーンを開いたときの視点'), second === id ? otherId : id);
+    await acknowledge(u.s, () => button(entry, '設定を適用').fire('click')); u.mount.render();
+    expect(u.s.acknowledgment.state).toBe('idle'); expect(u.recalls).toHaveLength(0);
+    const heads = u.host.read().source!.heads;
+    await u.mount.dispose(); const cold = await u.h.open(); expect(cold.read().source!.heads).toEqual(heads); await cold.dispose();
+  });
+
+  it.each(['camera', 'defaultViewId'] as const)('keeps failed %s choices and reuses exact original journal on cold retry', async field => {
+    const u = await setup(field, field === 'camera' ? displayCapture().camera : id,
+      field === 'camera' ? displayCapture().camera : undefined), before = u.host.read().source!;
+    const chosen = field === 'camera' ? u.choices()[0]! : u.choices().find(c => c.value.kind === 'absent')!;
+    setInput(u.choice(), chosen.operationId); u.h.base.rejectPublication = true;
+    await acknowledge(u.s, () => button(u.form(), '競合を解消').fire('click')); u.mount.render();
+    expect(u.s.acknowledgment.state).toBe('failed'); expect(u.choice().value).toBe(chosen.operationId);
+    expect(u.host.read().source!.token).toBe(before.token); expect(u.recalls).toHaveLength(0);
+    const paths = (await u.h.base.list(`${metadataArea}/${u.h.run}/`)).filter(p => p.endsWith('.amchange'));
+    const bytes = await Promise.all(paths.map(p => u.h.base.readBytes(p)));
+    await u.mount.dispose(); u.h.base.rejectPublication = false;
+    const cold = await u.h.open(); expect(cold.read().state).toBe('pending'); await cold.authority.retry!();
+    expect(cold.read().source!.originalChanges()).toHaveLength(before.originalChanges().length + 1);
+    expect(await Promise.all(paths.map(p => u.h.base.readBytes(p)))).toEqual(bytes);
+    const snapshot = cold.authority.read();
+    expect(field === 'camera' ? snapshot.viewData!.records[id]!.camera : snapshot.state.scenes[f.overview]!.defaultViewId)
+      .toEqual({ kind: 'value', value: field === 'camera' ? displayCapture().camera : null });
+    const heads = cold.read().source!.heads; await cold.authority.retry!(); expect(cold.read().source!.heads).toEqual(heads); await cold.dispose();
+  });
+
+  it('distinguishes same-name Views and their Scenes in headings, entry choices and order descriptions', async () => {
+    const u = await setup('defaultViewId', id, otherId), source = u.host.read().source!;
+    const renamed = raw(source, d => {
+      for (const viewId of [id, otherId]) d.viewsById[viewId].name = new A.ImmutableString(JSON.stringify('同名'));
+    });
+    const third = `view_${'d'.repeat(32)}`;
+    const added = renamed.prepareEdit(renamed.token, { kind: 'createView', viewId: third, sceneId: f.detail,
+      projectFrameId: u.s.snapshot.resources.projectFrameId, name: '同名', orderKey: 'B', ...jsonCapture(), eventId: `evt_${tx}` }, await u.read(renamed), tx);
+    const changed = (x: number) => raw(added, d => {
+      for (const viewId of [id, third]) {
+        delete d.viewsById[viewId].camera;
+        d.viewsById[viewId].camera = new A.ImmutableString(canonicalFixture({ ...displayCapture().camera, position: [x, 2, 8] }));
+      }
+    });
+    const conflict = changed(3).appendOriginal(changed(4).originalChanges());
+    await u.host.receive(source.token, fullSource(conflict, 1506)); u.s.refreshHistory(); u.mount.render();
+    const selectors = descendants(u.root).filter(n => n.tag === 'select' && n.attributes.get('aria-label')?.endsWith('：カメラの解消方法'));
+    expect(selectors).toHaveLength(2);
+    expect(selectors.map(n => n.attributes.get('aria-label'))).toEqual(expect.arrayContaining([
+      expect.stringContaining('全体 › 同名（視点 1）'), expect.stringContaining('設備の確認 › 同名'),
+    ]));
+    const copy = descendants(u.form()).map(n => n.textContent).join(' ');
+    expect(copy).toContain('全体 › 同名（視点 1）'); expect(copy).toContain('全体 › 同名（視点 2）');
+    const order = branch(conflict, 'orderKey', 'A').appendOriginal(branch(conflict, 'orderKey', 'Z').originalChanges());
+    await u.host.receive(conflict.token, fullSource(order, 1507)); u.s.refreshHistory(); u.mount.render();
+    const orderCopy = descendants(u.form('orderKey')).map(n => n.textContent).join(' ');
+    expect(orderCopy).toContain('「全体 › 同名（視点 2）」の前'); expect(orderCopy).toContain('「全体 › 同名（視点 2）」の後');
+    expect(orderCopy).not.toContain('設備の確認'); await u.mount.dispose();
+  });
+
+  it('retains IME/invalid/stale View names and refuses readonly resolution with no writes', async () => {
+    const u = await setup('name', '入口', '別名'), before = u.host.read().source!;
+    setInput(u.choice(), 'manual'); const input = descendants(u.form()).find(n => n.tag === 'textarea')!;
+    for (const text of ['', ' ', '二\n行', 'x'.repeat(257)]) {
+      setInput(input, text); expect(button(u.form(), '競合を解消').disabled).toBe(true);
+      const writes = u.h.base.writes; button(u.form(), '競合を解消').fire('click'); expect(u.h.base.writes).toBe(writes);
+    }
+    setInput(input, '編集中'); input.fire('compositionstart'); expect(button(u.form(), '競合を解消').disabled).toBe(true);
+    const writes = u.h.base.writes; button(u.form(), '競合を解消').fire('click'); expect(u.h.base.writes).toBe(writes); input.fire('compositionend');
+    const remote = await before.prepareCaptionText(before.token, f.shared, 'title', '更新');
+    await u.host.receive(before.token, fullSource(remote, 1504)); u.s.refreshHistory(); u.mount.render();
+    expect(descendants(u.form()).find(n => n.tag === 'textarea')).toBe(input); expect(input.value).toBe('編集中');
+    expect(button(u.form(), '競合を解消').disabled).toBe(true);
+    await expect(u.host.resolve(before.token, u.command(u.choices()[0]!.operationId))).rejects.toThrow(/command-not-ready/);
+    button(u.form(), '取り消す').fire('click'); u.mount.render(); expect(u.choice().value).toBe('');
+    const reader = await u.h.open(), ro = createMetadataWorkspace(new RecordedDocument().asDocument(), reader);
+    const pick = descendants(record(ro.root)).find(n => n.tag === 'select' && n.attributes.get('aria-label')?.endsWith('：名前の解消方法'))!;
+    expect(pick.disabled).toBe(true);
+    await expect(reader.resolve(reader.read().source!.token, u.command(u.choices()[0]!.operationId))).rejects.toThrow(/閲覧専用/);
+    await ro.dispose(); await u.mount.dispose();
+  });
+
+  it('refuses invalid fields, unknown/partial atoms, deleted/ambiguous parents and wrong Scene/Frame references', async () => {
+    const u = await setup('camera', displayCapture().camera, displayCapture().camera), source = u.host.read().source!, provider = u.host.read().provider!;
+    const command = u.command(u.choices()[0]!.operationId), writes = u.h.base.writes;
+    for (const edit of [{ ...command, extra: true }, { ...command, sceneId: f.detail }, { ...command, field: 'lifecycle' },
+      { ...command, choice: { kind: 'manual', text: '勝手な値' } }, { ...command, choice: { kind: 'candidate', operationId: 'unknown' } }])
+      expect(() => source.prepareEdit(source.token, edit as MetadataEdit, provider, tx)).toThrow();
+    const variants = [
+      raw(source, d => { d.viewsById[id].camera = new A.ImmutableString(canonicalFixture({ ...displayCapture().camera, future: 1 })); }),
+      raw(source, d => { delete d.viewsById[id].camera; }),
+      raw(source, d => { d.viewsById[id].lifecycle = new A.ImmutableString(canonicalFixture({ state: 'deleted', reason: 'userDelete', eventId: `evt_${tx}` })); }),
+      raw(source, d => { d.viewsById[id].projectFrameId = new A.ImmutableString(JSON.stringify(`frm_${tx}`)); }),
+      raw(source, d => { d.viewsById[id].sceneId = new A.ImmutableString(JSON.stringify(f.detail)); }),
+      raw(source, d => { d.scenesById[f.overview].lifecycle = new A.ImmutableString(canonicalFixture({ state: 'deleted', reason: 'userDelete', eventId: `evt_${tx}` })); }),
+    ];
+    variants.push(variants[0]!.appendOriginal(branch(source, 'camera', displayCapture().camera).originalChanges())); // Valid plus unknown must not expose a valid subset.
+    for (const altered of variants) {
+      const p = await u.read(altered); expect(() => altered.prepareEdit(altered.token, command, p, tx)).toThrow();
+    }
+    const one = raw(source, d => { d.viewsById[id].sceneId = new A.ImmutableString(JSON.stringify(f.detail)); });
+    const two = raw(source, d => { delete d.viewsById[id].sceneId; d.viewsById[id].sceneId = new A.ImmutableString(JSON.stringify(f.overview)); });
+    const ambiguous = one.appendOriginal(two.originalChanges());
+    expect(() => ambiguous.prepareEdit(ambiguous.token, command, provider, tx)).toThrow();
+    const bp = await u.read(ambiguous); if (bp.kind !== 'scene-provider') throw Error('provider');
+    expect(() => viewFieldCandidates(bp, id, 'camera', metadataFixtureLimits)).toThrow();
+    const unsupported = branch(source, 'background', { kind: 'transparent' }).appendOriginal(branch(source, 'background', displayCapture().background).originalChanges());
+    const up = await u.read(unsupported); if (up.kind !== 'scene-provider') throw Error('provider');
+    expect(() => viewFieldCandidates(up, id, 'background', metadataFixtureLimits)).toThrow(/solid/);
+    const entry = branch(ambiguous, 'defaultViewId', id).appendOriginal(branch(ambiguous, 'defaultViewId', undefined).originalChanges());
+    const ep = await u.read(entry); if (ep.kind !== 'scene-provider') throw Error('provider');
+    expect(() => entryViewCandidates(ep, f.overview, metadataFixtureLimits)).toThrow();
+    for (const bad of [variants[2]!, variants[3]!, variants[4]!]) {
+      const e = branch(bad, 'defaultViewId', id).appendOriginal(branch(bad, 'defaultViewId', undefined).originalChanges());
+      const p = await u.read(e); if (p.kind !== 'scene-provider') throw Error('provider');
+      expect(() => entryViewCandidates(p, f.overview, metadataFixtureLimits)).toThrow();
+    }
+    expect(u.h.base.writes).toBe(writes); expect(u.host.read().source!.token).toBe(source.token); await u.mount.dispose();
+  });
+});
 
 describe('Scene name conflict resolution; saved memory ports and recorded DOM only', () => {
   const raw = (source: ProjectMetadataSource, change: (doc: any) => void) => {

@@ -1976,6 +1976,43 @@ failure/cold retry and continued edit; actual rendering remains the batched lane
 Independent Caption/model copies and non-text conflicts remain the next finite
 commands, not implied by this text-resolution implementation.
 
+**Saved View conflict connection under §8 (2026-09-13, implementation detail):**
+
+Extend the existing metadata-host comparison form and typed command boundary for
+`viewsById` name/orderKey/camera/background and `scenesById.defaultViewId`.
+Validate the complete candidate set, exact active identity/lifecycle/Scene/Frame
+and every known value. Reject incomplete/unknown candidates or ambiguous/deleted
+parents; never offer only a valid subset. Entry candidates may be absent, or name
+an active View in that same Scene and ProjectFrame; other unresolved View fields
+remain independent and still prevent their affected normal operations.
+
+Choose one original operation explicitly, or enter a name under the existing
+View-name normalization rules. No preselected winner. A camera choice includes
+position/target/up/projection as one atom; a background choice preserves the exact
+solid sRGB atom. Do not mix axes, average values, recapture or extend profiles.
+Show human-readable camera/projection and color values; order choices describe
+their position among currently resolved same-Scene Views (disclose unresolved
+neighbors), not an unexplained internal order key. Entry choices identify the
+View or `開始視点なし`.
+Use Scene plus View labels throughout; disambiguate repeated names with stable
+record-order numbers rather than exposing internal IDs. Only valid resolved
+same-Frame neighbors participate in order descriptions.
+
+Resolve only the chosen field causally after all observed originals, including
+equal values and absent/absent entry candidates. Keep the same source-token,
+original-change journal, one durable publication and exact retry contract. No
+warm recall or background/Scene change occurs on choice, resolution or receive;
+explicit recall and next-entry behavior keep their existing guards. Keep local
+drafts, windows, IME, stale/refused input and failed choices intact.
+
+Reuse metadata-host/View tests: complete/equal/absent choices, normal
+rename/reorder/recapture/entry/recall after resolution, other-field preservation,
+participant return and no-op replay, exact cold retry, malformed/unknown/parent
+refusal, stale/IME/readonly. No new page, lifecycle/ownership policy, general
+orphan repair, wire/schema/sink/dependency/profile/home or release change. A
+recorded DOM/fake viewport remains non-rendered evidence; the existing browser
+and physical-device acceptance batch remains open.
+
 **Scene-name conflict connection under §8 (2026-09-13):**
 The existing metadata host adds `resolveSceneName` with Scene ID and either a
 selected candidate operation ID or manually entered name. Require the exact

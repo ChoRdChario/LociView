@@ -3,7 +3,10 @@
 > CURRENT INVENTORY / 2026-09-13。全体監査基点: `b73315b851f627ca61029cfb73caf23f6e4829bd`。
 > T03のScene名競合も同じmetadata hostへ接続。全候補の明示選択／名前入力を同じjournalへ通し、
 > 通常renameの競合拒否・手元入力・原履歴を保持。等値候補／返送／cold retryは既存tests。
-> lifecycle／order／View等の解消と実画面受入れは残るため、分類数は変更しない。
+> View名／順序／camera／background、Scene開始Viewの競合も同じ候補UIへ接続。
+> 全候補とactiveな所有Scene／Frameを検証し、元の値を選択（名前は手入力も可）。
+> 不在の開始View・同値候補も1変更で解消し、warm recallはしない。検証の正確な状態はtodo。
+> lifecycle／他fieldの解消と実画面受入れは残るため、分類数は変更しない。
 > M05は同じモデルタブへ一時hide／単独表示／全表示を接続。Scene別local stateで、共有所属・
 > 履歴・Saved Viewを変更しない。resident／カメラ／Caption本文・windowを保持し、所有pin／hitを抑制。
 > Captionからlocal再表示、readonly、追加モデル、cold解除を既存testsで確認。実描画／実機は未受入れ。
@@ -167,7 +170,7 @@
 |---|---|---|---|---|
 | T01 | 配布された更新を手元の記録を保って受け取る | 部品未接続 | 新serviceの完全source受信／remote journalと合成タイトル／登録のUI受信を接続。準備済みモデル切替・手元本文保持・要確認・明示補正の二人二巡を保存ポートで確認。モデル交換の通常UI／実ファイルは未接続、F01/F02参照。 | [src/projectMetadata/session.ts](../src/projectMetadata/session.ts) / [src/projectMetadata/remote.ts](../src/projectMetadata/remote.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
 | T02 | 元の配布状態を保持し、変更分を繰り返し返す | 部品未接続 | 新serviceの完全source往復は原履歴を保持し二巡・no-op・中断復旧・再開まで確認。専用exchange-base記録・source-derived deltaは未接続。旧savedの固定base/deltaを流用済みとはしない。portable wireはF02、06の批准境界を維持。 | [src/projectMetadata/session.ts](../src/projectMetadata/session.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) / [docs/specs/06-project-package-wire.md](../docs/specs/06-project-package-wire.md) |
-| T03 | 同じ項目の競合を比較し、明示的に解消する | 部品未接続 | Caption title/bodyの明示選択／手動文言、anchor/colorの完全候補選択（任意色の不在保持）、既知ready-model status比較を1変更の保存・cold retryへ接続。開始Sceneも全候補の明示選択→保存後起動を同じhostに接続しcold行き止まりを修正。Scene名も全候補／手入力の解消→通常rename再開へ接続。warmのScene／camera／入力、元履歴を保持。位置は非確定の比較表示、解消後の再送・後着再競合も保持。他field／lifecycle等は未接続。 | [src/harness/projectScene/metadataConflictControls.ts](../src/harness/projectScene/metadataConflictControls.ts) / [src/harness/projectScene/metadataStartupControls.ts](../src/harness/projectScene/metadataStartupControls.ts) / [src/projectMetadata/commands.ts](../src/projectMetadata/commands.ts) |
+| T03 | 同じ項目の競合を比較し、明示的に解消する | 部品未接続 | Caption title/bodyの明示選択／手動文言、anchor/colorの完全候補選択（任意色の不在保持）、既知ready-model status比較を1変更の保存・cold retryへ接続。開始Sceneのcold行き止まりとScene名→通常renameを接続。View名／順序／camera／backgroundとScene開始Viewも全候補から選択し、通常編集・recall・開始設定へ復帰可能。warmのScene／camera／入力、元履歴を保持。位置は非確定の比較表示、解消後の再送・後着再競合も保持。他field／lifecycle等は未接続。 | [src/harness/projectScene/metadataConflictControls.ts](../src/harness/projectScene/metadataConflictControls.ts) / [src/harness/projectScene/metadataStartupControls.ts](../src/harness/projectScene/metadataStartupControls.ts) / [src/projectMetadata/viewResolution.ts](../src/projectMetadata/viewResolution.ts) / [src/projectMetadata/commands.ts](../src/projectMetadata/commands.ts) |
 | T04 | 重複所属で片方／両方を選び、独立項目として残す | 部品未接続 | Captionの完全独立copyとモデルkeep-oneに加え、既知Meshのfresh root／完全ID remap／Scene material copyを接続。元Caption・他Scene不変更、コピーの独立配置／material編集と二人二巡、exact retry／cold reopenを確認。最終結果はtodo先頭。一般Point/GS/Proxy等のcopy closure・実ファイル／実機は未完了。 | [src/projectMetadata/membership.ts](../src/projectMetadata/membership.ts) / [src/projectMetadata/modelMembership.ts](../src/projectMetadata/modelMembership.ts) / [src/harness/projectScene/metadataMembershipControls.ts](../src/harness/projectScene/metadataMembershipControls.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
 
 ### ファイル・移行

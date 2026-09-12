@@ -235,7 +235,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
     for (const path of walk('src').filter(p => /\.(ts|tsx|js)$/.test(p))) {
       const source = readFileSync(path, 'utf8');
       const metadataFoundation = /[\\/]projectMetadata[\\/](format|source)\.ts$/.test(path);
-      const metadataService = /[\\/]projectMetadata[\\/](persistence|repository|journal|contentEvidence|blobStream|blobStore|blobInventory|session|commands|remote|membership|records|assetStatus|modelMembership|modelAddition|captionCandidates|sceneAuthoring|captionDeletion|assetDeletion|startupScene)\.ts$/.test(path);
+      const metadataService = /[\\/]projectMetadata[\\/](persistence|repository|journal|contentEvidence|blobStream|blobStore|blobInventory|session|commands|remote|membership|records|assetStatus|modelMembership|modelAddition|captionCandidates|sceneAuthoring|viewResolution|captionDeletion|assetDeletion|startupScene)\.ts$/.test(path);
       // 05 §13.2 permits this exact new synthetic host, never ordinary/old saved activation.
       const metadataHost = /[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Intent|MembershipControls|Models|ModelFacts|AssetStatusControls|ConflictControls|StartupControls)\.ts$/.test(path);
       const validationFiles = /[\\/]projectFiles[\\/](validation|png|glb|glbMaterials|initialProject|content|creation|modelFacts)\.ts$/.test(path);
@@ -321,6 +321,8 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           assetDeletion: ['../scene/commands', '../scene/projectProvider', '../domain/projectCandidates', '../domain/projectRecordFields', '../domain/projectGraphSupport', './membership', './format', './commands'],
           sceneAuthoring: ['../scene/commands', '../scene/projectProvider', '../domain/projectRecordFields', '../domain/projectMutableFields',
             '../domain/projectRecords', '../domain/values', './membership', './commands', './format'],
+          viewResolution: ['../scene/projectProvider', '../domain/projectRecordFields', '../domain/projectMutableFields',
+            '../domain/values', './membership', './commands', './format'],
           contentEvidence: ['../domain/projectContentChecks', '../domain/values', '../platform/fs', './format', './persistence'],
           blobStream: ['../nativeGs/sha256'],
           blobStore: ['../platform/fs', '../platform/projectLock', '../domain/projectRecordFields', '../domain/values', './format', './persistence', './blobStream'],
@@ -329,7 +331,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
             './format', './source', './repository', './journal', './persistence', './commands', './remote'],
           startupScene: ['../scene/projectProvider', '../domain/projectRecords', '../domain/projectRecordFields', './membership', './format'],
           commands: ['../domain/values', '../domain/projectMutableFields', '../domain/projectRecordFields', '../domain/projectRecords', '../domain/projectGraphSupport',
-            '../domain/materialIntent', '../domain/captionText', '../scene/projectMaterialRoutes', '../scene/commands', '../scene/resolve', '../scene/types', '../scene/projectProvider', './format', './membership', './records', './assetStatus', './modelMembership', './captionCandidates', './sceneAuthoring', './captionDeletion', './assetDeletion', './startupScene', './modelAddition'],
+            '../domain/materialIntent', '../domain/captionText', '../scene/projectMaterialRoutes', '../scene/commands', '../scene/resolve', '../scene/types', '../scene/projectProvider', './format', './membership', './records', './assetStatus', './modelMembership', './captionCandidates', './sceneAuthoring', './viewResolution', './captionDeletion', './assetDeletion', './startupScene', './modelAddition'],
         };
         const name = path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '');
         expect(imports.every(p => byFile[name]!.includes(p!)), path).toBe(true);
@@ -345,9 +347,9 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
             '../../projectMetadata/persistence', '../../projectMetadata/journal', './metadataFixture', './metadataStorage', './historyProjection', './metadataIntent', '../../projectMetadata/remote', './fixture', '../../projectMetadata/commands', '../../scene/projectProvider', './modelClosure', '../../domain/values', './metadataModelFacts', '../../projectMetadata/captionDeletion', '../../projectMetadata/assetDeletion'],
           metadataReceiveControls: ['./metadataHost', './session', './metadataConflictControls', './metadataMembershipControls', './metadataAssetStatusControls'],
           metadataAssetStatusControls: ['three', './metadataHost', './session', '../../projectMetadata/assetStatus', './metadataFixture', './modelFixture'],
-          // Same approved conflict form: complete Scene-name candidates and pure input validation only.
+            // Same approved conflict form: complete Scene/View candidates and pure input validation only.
           metadataConflictControls: ['./metadataHost', './session', '../../projectMetadata/captionCandidates', './metadataFixture', '../../scene/types',
-            '../../projectMetadata/sceneAuthoring', '../../domain/values'],
+              '../../projectMetadata/sceneAuthoring', '../../domain/values', '../../projectMetadata/viewResolution'],
           metadataMembershipControls: ['./metadataHost', './session', '../../projectMetadata/membership', '../../projectMetadata/persistence', './metadataFixture',
             '../../projectMetadata/modelMembership', './metadataModelRecords', './modelClosure', '../../domain/values'],
           metadataIntent: ['../../core/json', '../../domain/values', '../../domain/captionText', '../../scene/types', '../../projectMetadata/commands', './fixture', './metadataFixture', './mediaHistory', './modelClosure', './modelHistory'],

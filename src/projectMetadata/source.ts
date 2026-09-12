@@ -125,6 +125,8 @@ export class ProjectMetadataSource {
       if (command.kind === 'resolveAssetStatus') delete draft.assetsById[command.assetId].status;
       if (command.kind === 'resolveDefaultScene') delete draft.project.defaultSceneId;
       if (command.kind === 'resolveSceneName') delete draft.scenesById[command.sceneId].name;
+      if (command.kind === 'resolveViewField') delete draft.viewsById[command.viewId][command.field];
+      if (command.kind === 'resolveEntryView') delete draft.scenesById[command.sceneId].defaultViewId;
       for (const edit of edits) {
         if (edit.map === 'project') {
           draft.project.defaultSceneId = scalar(edit.fields.defaultSceneId, this.limits); continue;
@@ -142,6 +144,8 @@ export class ProjectMetadataSource {
           // its final absent operation, never a displayed or separately saved color.
           if (command.kind === 'resolveCaptionField' && field === 'colorSrgb')
             draft[edit.map][edit.id][field] = scalar([0, 0, 0], this.limits);
+          if (command.kind === 'resolveEntryView' && field === 'defaultViewId')
+            draft[edit.map][edit.id][field] = scalar(null, this.limits);
           delete draft[edit.map][edit.id][field];
         }
       }

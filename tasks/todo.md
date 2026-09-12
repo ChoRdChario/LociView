@@ -28,6 +28,53 @@ Formal adoption still requires G1-A/C and applicable device evidence. No profile
 
 #### Active connected work — PO-approved limited real-file validation
 
+Current slice (2026-09-13, after `95ee28b`): connect the complete bounded Saved
+View conflict flow under 05 §3.3–3.4/§8. Read-only comparison found a concrete
+dead end: review actions direct users to nonexistent View/defaultView choices.
+Prefer this finite group to a wider lifecycle/orphan repair policy.
+
+- [x] Add explicit complete-candidate commands for View name/order/camera/background
+  and Scene entry View, reusing active-parent validation and the original journal.
+- [x] Extend the same comparison form; no preselection, automatic capture/recall,
+  numeric mixing, discarded drafts or hidden stale/failure states.
+- [x] Verify equal/absent candidates, normal post-resolution operations, original
+  history return/replay, cold retry, invalid scope and input guards in existing
+  tests; run final checks and independent read-only review, update handoff.
+
+Acceptance and exclusions are in 05's Saved View conflict implementation detail.
+No lifecycle/ownership/schema/wire/media/home change. Existing actual-browser and
+device batch stays pending; no unchanged broken browser or denied push retry.
+The two already-presented 06 decisions are still unanswered.
+
+Review so far: independent review corrected ambiguous same-name View targets by
+using Scene+View labels (duplicate-name numbers shared by headings/entry/order
+descriptions) and excluding invalid order neighbors. Exact import allowlists now
+include only the new read/planner module; isolation guards remain. Two initial
+test-helper JsonObject type errors were fixed. Scoped checks: first 16 PASS, then
+17 PASS including all 15 new cases and two existing regression/isolation checks.
+The first whole-root run is NOT a pass: 2,060 PASS / 2 new cases timed out at
+5,000 ms / 21 existing TODO. Only the four two-roundtrip/cold/normal-operation
+cases now have the same explicit 15,000 ms harness budget as existing saved-host
+roundtrip groups, independently reviewed as appropriate. Global defaults, other
+tests, every assertion and product deadlines are unchanged; this is not a numeric
+performance guarantee. Final executable tree: typecheck/build exited 0; corrected
+root terminal exit 0 and JSON success, 111 files / 2,062 PASS / 21 existing TODO /
+0 failed, 237.95 s result span, two workers. The build retains normal mixed-import/
+chunk warnings and is not rendered evidence for this development route. No source
+or test change followed those final checks. Independent source/test correction
+review reports no mandatory remainder. Inventory stays 30/4/20/10; T03 and the
+whole practical-team flow are not complete. No actual browser/iPhone/offline,
+new dependency, schema, wire, home or release evidence/activation was added.
+
+Next bounded target, independently inspected under accepted 05 §3.4/§8: Caption
+delete/edit lifecycle recovery. Offer explicit keep-deleted/restore-Caption
+choices with a fresh causal lifecycle event; retain all original contents,
+unrelated conflicts and drafts. Never revive child tombstones, delete late edges,
+physically remove bytes or imply general orphan repair. Reuse the existing review
+area/deletion tests and return restored records through the existing Scene-include
+operation. Write exact command/acceptance detail before implementation. This is
+not authority for Asset/Scene/View restoration or an all-deleted-items browser.
+
 Latest implementation slice (2026-09-13, after `50f0872`): close T03's Scene-name conflict dead
 end under 05 §8. Short audit: clean `g0-baseline`, previous turn made concrete
 job/receipt design progress; 06 decisions remain unanswered. Independent read-only

@@ -22,6 +22,7 @@ import type { CaptionDeletionCommand, AssetDeletionCommand } from '../scene/comm
 import { planAssetDeletion } from './assetDeletion';
 import { defaultSceneCandidates } from './startupScene';
 import { planAssetAddition, type AddAssetCommand } from './modelAddition';
+import { planViewResolution, type ViewResolution } from './viewResolution';
 
 export type MetadataEdit =
   | AddAssetCommand
@@ -29,6 +30,7 @@ export type MetadataEdit =
   | AssetDeletionCommand
   | SceneAuthoringCommand
   | SceneNameResolution
+  | ViewResolution
   | CaptionMembershipResolution
   | AssetMembershipResolution
   | { kind: 'resolveAssetStatus'; assetId: string; operationId: string }
@@ -66,7 +68,7 @@ const shape = (v: JsonObject, keys: string[]) => {
 export function canonicalMetadataEdit(input: MetadataEdit, limits: MetadataLimits): MetadataEdit {
   if ((input?.kind === 'createScene' || input?.kind === 'renameScene') && typeof input.name === 'string')
     input = { ...input, name: normalizeSceneName(input.name) };
-  if (input?.kind === 'resolveSceneName' && input.choice?.kind === 'manual' && typeof input.choice.text === 'string')
+  if ((input?.kind === 'resolveSceneName' || input?.kind === 'resolveViewField' && input.field === 'name') && input.choice?.kind === 'manual' && typeof input.choice.text === 'string')
     input = { ...input, choice: { ...input.choice, text: normalizeSceneName(input.choice.text) } };
   if (input?.kind === 'resolveCaptionText' && input.choice?.kind === 'manual' && typeof input.choice.text === 'string')
     input = { ...input, choice: { ...input.choice, text: normalizeCaptionText(input.field, input.choice.text) } };
@@ -78,6 +80,7 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
   const command = canonicalMetadataEdit(input, limits), raw = command as unknown as JsonObject;
   if (command.kind === 'addAsset') return planAssetAddition(provider, command, limits);
   if (command.kind === 'resolveSceneName') return planSceneNameResolution(provider, command, limits);
+  if (command.kind === 'resolveViewField' || command.kind === 'resolveEntryView') return planViewResolution(provider, command, limits);
   if (command.kind === 'resolveDefaultScene') {
     shape(raw, ['kind', 'operationId']);
     const choice = defaultSceneCandidates(provider, limits).find(c => c.operationId === command.operationId);
