@@ -1,5 +1,13 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-12 実GLB材質編集の第一段（`7b43264`後）:** validationの全材質slotを
+> exact source locatorで実描画Materialへ接続。照明／表裏／Project・Scene範囲／解除を
+> 保存し、元PNG/PBR・他instanceを保持。失敗draft・元change retry・cold再開も確認。
+> 最終110 files／2,016 PASS／21既存TODO、型・build・独立レビュー済み。既存5173の
+> 入口／変更module HTTP200。実描画・実入力・iPhone・offlineは未受入れ（一括手順5）。
+> 次は同じGLB範囲のhard chroma＋pick coverage。材質全体の完了とはしない。新profile／
+> 06/07／通常home／公開は別境界。ローカルcheckpoint、push制約は未変更。
+
 > **2026-09-12 開いたProjectへの静的GLB追加（`113ecad`後）:** validationのモデルタブに
 > 「3Dモデルを追加」を接続。選択時Sceneへ新Assetとして原子的に登録し、実本体・新facts・
 > journal保存後に追加表示を準備。同名／同bytesでも独立。旧モデル・Caption・カメラを保持。

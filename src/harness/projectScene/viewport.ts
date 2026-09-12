@@ -84,7 +84,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
   function fail(e: unknown) { issue = `3D表示を停止しました。${errorText(e)} 編集内容は保持しています。`; release(); serial++; changed(); }
   function buildModels() {
     if (!display || !renderer) return;
-    const key = JSON.stringify([display.models.map(m => m.binding.id), display.materials]); if (key === modelKey) return;
+    const key = JSON.stringify([display.models.map(m => m.binding.id), display.materials, display.savedMaterials]); if (key === modelKey) return;
     pickEpoch++;
     clearModels();
     try {
@@ -93,7 +93,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
         if (appearance && 'issue' in appearance) continue; // Diagnosed unsupported effect; no source-looking replacement.
         if (model.shape === 'saved-glb') {
           if (!saved) throw Error('実モデルの表示本体が未接続です。');
-          const surface = saved.create(model); models.add(surface.asset); resident.set(model.binding.assetId, surface); continue;
+          const surface = saved.create(model, display.savedMaterials?.[model.binding.assetId]); models.add(surface.asset); resident.set(model.binding.assetId, surface); continue;
         }
         const raw = JSON.parse(new TextDecoder().decode(fixtureModelBytes(model.shape))) as { positions: number[]; indices: number[] };
         const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(raw.positions, 3));
@@ -254,7 +254,8 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
         pickToken: String(pickEpoch),
         ready: Boolean(active && renderer && camera && !issue), issue,
         notice: [notice, alphaPicking ? '半透明・切り抜きの面へのピン配置は未接続です。原本の見た目は保持しています。' : null,
-          ...(display?.materialNotices ?? []), ...Object.values(display?.materials ?? {}).flatMap(m => 'issue' in m ? [m.issue] : [])].filter(Boolean).join(' ') || null,
+          ...(display?.materialNotices ?? []), ...Object.values(display?.materials ?? {}).flatMap(m => 'issue' in m ? [m.issue] : []),
+          ...Object.values(display?.savedMaterials ?? {}).flatMap(rows => Object.values(rows).flatMap(m => 'issue' in m ? [m.issue] : []))].filter(Boolean).join(' ') || null,
         dragging: dragging || !!gizmo?.dragging, manipulating: !!gizmo?.dragging,
         projection: pose.projection.kind, axis, pins, preview: display?.preview ? project(display.preview) : undefined };
     },

@@ -17,7 +17,8 @@ export interface ValidationModelClosure {
   readonly representation: JsonObject & { readonly id: string; readonly payloadDigest: string; readonly assetId: string; readonly variantFamilyId: string;
     readonly representationFrameId: string; readonly representationToAsset: FixturePlacement;
     readonly logicalBoundsAsset: { readonly min: readonly [number, number, number]; readonly max: readonly [number, number, number] };
-    readonly materialCatalog: { readonly layoutId: string; readonly slots: readonly { readonly logicalMaterialSlotId: string }[] } };
+    readonly materialCatalog: { readonly layoutId: string; readonly slots: readonly { readonly logicalMaterialSlotId: string;
+      readonly sourceLocator: JsonObject; readonly sourceSemantics: JsonObject }[] } };
 }
 export type DisplayModelClosure = FixtureModelClosure | ValidationModelClosure;
 /** Explicit placement edit; no model-content introduction or fixture reconstruction. */

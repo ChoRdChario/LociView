@@ -1414,6 +1414,42 @@ save. Use existing service/host/renderer tests, not a new PoC or generic file AP
 Other formats, existing old-namespace Projects, replacement/copy inference,
 material editing, wire/migration, ordinary home and formal adoption stay outside.
 
+Validation-GLB material connection reuses existing scoped MaterialOverride commands,
+the mounted editor and saved source catalog. Enumerate every logical slot with its
+exact family/layout/slot target; do not use only the first slot. Existing command
+source admission remains unchanged: opaque, surface optics, lit, front-sided
+originals. Other source slots remain identifiable but explicitly non-editable.
+This first render seam supports lighting inherit/lit/unlit and sidedness, preserving
+base-color factors, vertex colors, UVs/textures and the original PBR settings on
+reset. An existing baseColorSrgb intent may replace only the color factor, not the
+texture. It does not introduce a new color-edit control. Chroma, fractional alpha,
+mask/dither/blend/transmission and other original source semantics remain visible
+unconnected effects; never persist an unsupported candidate through this host.
+
+At actual GLTF decode, retain explicit material/primitive association with the
+inspected glTF material index or the proven implicit-default slot. Unknown or
+inconsistent associations fail display preparation. No name, arbitrary traversal
+order, geometry similarity or shared object inference may establish a source
+relation. Cloned instances carry that verified ephemeral mapping. Apply intent
+to exact slot clones only; never mutate cache templates, shared textures, original
+GLB bytes or another Asset/Scene. Lit rendering clones original PBR material;
+unlit rendering uses base color/map/vertex color without lighting. Returning to
+inherit/lit or removing an override recreates the original settings. Scene intent
+replaces the whole Project intent, not a per-field merge. Unsupported or conflicted
+effects must be diagnosed, never silently presented as successfully applied.
+
+Warm saved material edits need no model-body reads. Keep existing exact journal
+retry/cold reopen and UI draft/IME/readonly guards. Validation admission at the
+host rejects unsupported candidate effects before journaling. Renderer cache
+preparation validates applicable slot intents before acknowledging a saved view;
+display failure retains the existing failed/retry state, without repeating writes.
+Acceptance reuses existing tests: two slots with shared primitives, an implicit
+material, scene/project precedence, lighting/side/reset with textures/PBR retained,
+exact source mapping (including repeated nodes), body-read-free save/retry/cold
+reopen, invalid source/effect refusal and disposal. Browser/GPU/iPhone evidence
+remains separate. This seam does not finish all material capabilities, approve new
+profiles or change shader/dependency/wire/migration/ordinary-home/release boundaries.
+
 **S1 metadata foundation — implementation contract (2026-09-11):**
 
 The first reusable source module implements 02 §4 bootstrap and original atomic

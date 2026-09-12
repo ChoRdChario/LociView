@@ -1,0 +1,32 @@
+import { same } from '../../domain/projectGraphSupport';
+import { validateMaterialIntent, type MaterialIntent } from '../../domain/materialIntent';
+import type { JsonObject } from '../../domain/values';
+import type { MaterialTarget } from '../../scene/types';
+import type { ValidationModelClosure } from './modelTypes';
+
+export interface ValidationMaterialSlot { readonly target: MaterialTarget; readonly name: string;
+  readonly locator: JsonObject; readonly semantics: JsonObject }
+export type ValidationMaterialEffects = Readonly<Record<string, MaterialIntent | { readonly issue: string }>>;
+export function validationMaterialSlots(c: ValidationModelClosure): readonly ValidationMaterialSlot[] {
+  return c.representation.materialCatalog.slots.map(slot => ({ target: { assetId: c.binding.assetId,
+    variantFamilyId: c.representation.variantFamilyId, materialLayoutId: c.representation.materialCatalog.layoutId,
+    logicalMaterialSlotId: slot.logicalMaterialSlotId }, locator: slot.sourceLocator, semantics: slot.sourceSemantics,
+    name: slot.sourceLocator.kind === 'gltfMaterial' ? `材質 ${Number(slot.sourceLocator.materialIndex) + 1}` : '既定の材質' }));
+}
+export function validationMaterialSourceIssue(slot: ValidationMaterialSlot): string | null {
+  return same(slot.semantics, { coverage: { kind: 'opaque' }, optics: 'surface', lighting: 'lit', doubleSided: false }) ? null :
+    'この元材質の編集は未接続です。原本の設定を保持しています。';
+}
+/** One capability boundary for edit admission and slot-clone rendering. */
+export function validationMaterialIssue(slot: ValidationMaterialSlot, input: MaterialIntent): string | null {
+  const source = validationMaterialSourceIssue(slot); if (source) return source;
+  try {
+    const intent = validateMaterialIntent(input, { maxNodes: 4096, maxDepth: 16, maxStringScalars: 65536 }), a = intent.appearance, c = intent.compositing;
+    if (Object.keys(intent).sort().join(',') !== 'appearance,compositing' ||
+      Object.keys(a).some(k => !['lighting', 'doubleSided', 'baseColorSrgb', 'opacity'].includes(k)) || (a.opacity !== undefined && a.opacity !== 1) ||
+      !same(c, { coverage: { policy: c.coverage.policy }, optics: c.optics }) ||
+      !['inherit', 'opaque'].includes(c.coverage.policy) || !['inherit', 'surface'].includes(c.optics))
+      return 'この見え方は実モデルへ未接続です。設定は変更していません。';
+    return null;
+  } catch { return '材質の設定を確認してください。'; }
+}

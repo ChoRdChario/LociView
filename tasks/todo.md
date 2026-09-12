@@ -28,6 +28,48 @@ Formal adoption still requires G1-A/C and applicable device evidence. No profile
 
 #### Active connected work — PO-approved limited real-file validation
 
+Completed bounded connection: actual static-GLB material slots through the existing
+scoped editor and metadata journal. Preserve the original source; connect exact
+slot mapping and lighting/side/reset without changing current command semantics.
+
+- [x] Specify the finite catalog/source/renderer/ack boundary in 05 §13.2.
+- [x] Map actual decoded materials to inspected source locators; isolate clones
+  and preserve original PBR/textures during lighting/side/reset.
+- [x] Connect all slot choices and supported effects to existing commands; reject
+  unsupported candidates before save and retain diagnostics/drafts/retry.
+- [x] Reuse multi-slot/source/precedence/save/recovery/disposal tests, run final
+  checks and read-only review, then update coverage/handoff/manual batch.
+
+Material first-step result: all catalog slots are exposed with exact target and
+source-locator mapping (including implicit default, reused primitives/nodes and
+unused declared materials). Lighting/side/reset affect instance clones only;
+source PNG/PBR remains unchanged. Project/Scene precedence, failed-save draft
+retention, exact retry/cold reopen and zero warm body reads reuse existing tests.
+Unsupported source/effects fail before journaling; diagnosed incoming effects
+remain visible as issues, not silently reported as applied. Read-only review found
+no mandatory correctness issue; repeated locator lookup was made constant-time.
+Final typecheck/build exit 0; root 110 files / 2,016 PASS / 21 existing TODO /
+zero failures (272.52 s, two workers, 15 s default timeout; terminal exit 0 and
+JSON success verified). Original mixed-import/large-chunk warnings remain.
+Three bounded cases extend the existing projectFiles suite; unchanged renderer,
+material UI and architecture checks also pass in the root run. Independent
+renderer/host/test reviews have no mandatory findings. Existing 5173 entry and
+the three changed validation modules return HTTP 200, not GPU/browser/device
+PASS. No new server/tunnel/private input, schema/dependency, ordinary-home,
+Service Worker source or release change. Local checkpoint; push policy unchanged.
+
+Short meta-audit: this slice closes another saved real-file user action in stage 2.
+Inventory stays 27/7/20/10 because other profiles/effects remain unconnected;
+connected counts are not completion percentages. No repeated PoC or human test
+gate was added. Keep TEAM-FLOW-01, actual-browser/device and stage-3 wire/migration
+ratification as the remaining critical path, not general storage expansion.
+
+Next bounded connection: approved hard chroma for these same opaque/lit/front
+GLB slots, with texture/vertex color and matching picking coverage. This is not
+a new product-policy question and does not mark material editing complete.
+Keep baseColor input UI, soft/fractional alpha, new source/profile admission,
+wire/migration, ordinary-home activation and deployment outside this slice.
+
 Completed bounded connection: add one static GLB as a new independent Asset in the
 selected Scene of an opened validation Project. Reuse one-model construction,
 the existing journal/fact boundary and editor; extend only missing renderer
@@ -62,8 +104,8 @@ Existing 5173 entry/new UI/fact modules return HTTP 200, not rendered evidence.
 No new server/tunnel, private source, dependency, wire/schema, ordinary home,
 Service Worker source or release change. Inventory remains 27/7/20/10 because
 M01's other Mesh formats remain unconnected. Local checkpoint only; the prior
-push restriction is unchanged and is not retried. The next bounded connection
-is actual GLB material editing after its existing route is checked; stage-3
+push restriction is unchanged and is not retried. The subsequent GLB material
+connection is recorded above; stage-3
 technical ratification remains separate and is not inferred from this approval.
 
 Short meta-audit: this slice closes an opened-Project user action rather than

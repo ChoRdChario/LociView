@@ -11,6 +11,7 @@ import { materialTarget, targetKey, resolveFixtureMaterial } from './materialHis
 import type { MaterialIntent } from '../../domain/materialIntent';
 import type { GizmoProposal, ModelPlacementTarget, PinGizmoProposal } from './pinGizmo';
 import { proposedPlacement } from './modelTransform';
+import { validationMaterialSlots, validationMaterialIssue, type ValidationMaterialEffects } from './validationMaterials';
 
 export type V3 = readonly [number, number, number];
 export interface Bounds { readonly min: V3; readonly max: V3 }
@@ -24,6 +25,7 @@ export interface SyntheticDisplay {
   readonly pinEdit?: PinGizmoProposal;
   readonly modelEdit?: GizmoProposal<ModelPlacementTarget>;
   readonly materials?: Readonly<Record<string, ReturnType<typeof resolveFixtureMaterial> | { readonly issue: string }>>;
+  readonly savedMaterials?: Readonly<Record<string, ValidationMaterialEffects>>;
   readonly materialNotices?: readonly string[];
   readonly entry?: { readonly kind: 'none' } | { readonly kind: 'blocked'; readonly reason: string } | { readonly kind: 'ready'; readonly payload: DisplayCapture };
 }
@@ -62,11 +64,13 @@ export function syntheticDisplay(project: SyntheticProject, sceneId: string, pin
     try { return [c.binding.assetId, resolveFixtureMaterial(intent)]; }
     catch (e) { return [c.binding.assetId, { issue: e instanceof Error ? e.message : '見え方を確認してください。' }]; }
   }));
-  for (const model of models.filter(c => c.shape === 'saved-glb')) {
-    if (resolved.composition.materials.some(m => m.target.assetId === model.binding.assetId))
-      throw Error('保存した実モデルの材質変更は、この表示経路ではまだ適用できません。');
-  }
-  const activeTargets = new Set(models.map(m => targetKey(materialTarget(m))));
+  const savedMaterials = Object.fromEntries(models.filter(c => c.shape === 'saved-glb').map(model => [model.binding.assetId,
+    Object.fromEntries(validationMaterialSlots(model).flatMap(slot => {
+      const intent = resolved.composition.materials.find(m => targetKey(m.target) === targetKey(slot.target))?.intent as MaterialIntent | undefined;
+      if (!intent) return []; const issue = validationMaterialIssue(slot, intent);
+      return [[slot.target.logicalMaterialSlotId, issue ? { issue } : intent]];
+    }))]));
+  const activeTargets = new Set(models.flatMap(m => m.shape === 'saved-glb' ? validationMaterialSlots(m).map(s => targetKey(s.target)) : [targetKey(materialTarget(m))]));
   const materialNotices = Object.values(project.materialData?.records ?? {}).flatMap(r => {
     if (r.lifecycle.kind === 'value' && r.lifecycle.value.state === 'deleted') return [];
     if (r.routing.kind !== 'value') return ['見え方の適用先に競合があります。'];
@@ -106,7 +110,7 @@ export function syntheticDisplay(project: SyntheticProject, sceneId: string, pin
       catch { /* Keep the explicit entry diagnostic; never fit or choose another View. */ }
     }
   }
-  return freezeSynthetic({ token: project.state.token, sceneId, projectFrameId: project.resources.projectFrameId, models, pins, selectedId, entry, materials, modelEdit, materialNotices: [...new Set(materialNotices)],
+  return freezeSynthetic({ token: project.state.token, sceneId, projectFrameId: project.resources.projectFrameId, models, pins, selectedId, entry, materials, savedMaterials, modelEdit, materialNotices: [...new Set(materialNotices)],
     bounds: box.isEmpty() ? null : { min: tuple(box.min), max: tuple(box.max) } });
 }
 export const defaultPose = (): CameraPose => ({ position: [0, 1, 3], target: [0, 0, 0], up: [0, 1, 0],

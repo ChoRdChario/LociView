@@ -22,6 +22,9 @@ import type { MediaImage, MediaFileAddition } from './mediaHistory';
 import type { ModelPlacementCommand, ModelFileAddition } from './modelTypes';
 import { orderBetween } from './viewHistory';
 import { resolveScene } from '../../scene/resolve';
+import { validationMaterialSlots, validationMaterialIssue } from './validationMaterials';
+import { same } from '../../domain/projectGraphSupport';
+import type { MaterialIntent } from '../../domain/materialIntent';
 
 export const validationArea = 'lociview-development-validation-1';
 export interface ValidationHostOptions {
@@ -116,11 +119,24 @@ export async function openValidationHost(options: ValidationHostOptions) {
     };
     const authority: SyntheticAuthority = {
       storage: 'saved-development', writeScope: 'caption-text',
-      capabilities: { pins: true, membership: true, color: true, views: true, media: true, sceneAuthoring: true, placement: true, transform: true },
+      capabilities: { pins: true, membership: true, color: true, views: true, media: true, materials: true, sceneAuthoring: true, placement: true, transform: true },
       get readOnly() { return closed || fs.mutationAuthority.accessState !== 'editable'; },
       read: () => { if (!project) throw Error('プロジェクトの作成が未完了です。'); return project; },
       status: () => ({ kind: busy ? 'checking' : failure || last.state !== 'ready' ? 'failed' : 'idle', error: failure || '保存が未完了です。' }),
-      write: (token, changes, context) => execute(async () => { editable(); return ready(await session.edit(token, metadataIntent(changes, authority.read(), context))); }, true),
+      write: (token, changes, context) => execute(async () => {
+        editable(); const command = metadataIntent(changes, authority.read(), context);
+        if (command.kind === 'createMaterial' || command.kind === 'editMaterial') {
+          const current = command.kind === 'editMaterial' ? project?.materialData?.records[command.overrideId] : undefined;
+          const routing = command.kind === 'createMaterial' ? command.routing : current?.routing.kind === 'value' ? current.routing.value : null;
+          const compositing = command.kind === 'createMaterial' ? command.compositing : current?.compositing.kind === 'value' ? current.compositing.value : null;
+          const slots = project?.modelVersions?.flatMap(v => v.closure.shape === 'saved-glb' ? validationMaterialSlots(v.closure) : []) ?? [];
+          const slot = slots.find(s => same(s.target as unknown as JsonObject, routing?.target as JsonObject | undefined));
+          if (!slot || !compositing) throw Error('設定するモデルと材質を確認してください。');
+          const issue = validationMaterialIssue(slot, { appearance: command.appearance, compositing } as MaterialIntent);
+          if (issue) throw Error(issue);
+        }
+        return ready(await session.edit(token, command));
+      }, true),
       authorScene: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
       captionDeletionImpact: (token, id) => { if (last.provider?.kind !== 'scene-provider' || token !== last.provider.token) throw Error('内容が更新されています。'); return captionDeletionImpact(last.provider, id, limits); },
       deleteCaption: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),

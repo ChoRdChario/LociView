@@ -8,6 +8,8 @@ import { listValidationProjects } from './validationCatalog';
 import { createValidationWorkspace } from './validationWorkspace';
 import { prepareValidationResidents } from './validationRender';
 import { sceneViewportFactory } from './viewport';
+import { syntheticDisplay } from './viewportModel';
+import type { SyntheticProject } from './fixture';
 
 // Conservative execution budgets for this development lane, not measured product capacity.
 export const validationBrowserLimits: FileValidationLimits = { maxFileBytes: 64 * 1024 * 1024,
@@ -26,7 +28,16 @@ export async function createValidationBrowserWorkspace(document: Document, run?:
     render: async host => {
       const resident = await prepareValidationResidents(host.authority.read().modelVersions!, host.content);
       try {
-        const detach = host.setDisplayPreparation(next => resident.prepare(next.modelVersions!));
+        const prepare = async (next: SyntheticProject) => {
+          await resident.prepare(next.modelVersions!);
+          for (const scene of Object.values(next.state.scenes)) {
+            if (scene.lifecycle.kind !== 'value' || scene.lifecycle.value.state !== 'active') continue;
+            const display = syntheticDisplay(next, scene.id, null, null);
+            for (const model of display.models) if (model.shape === 'saved-glb') resident.validate(model, display.savedMaterials?.[model.binding.assetId]);
+          }
+        };
+        await prepare(host.authority.read());
+        const detach = host.setDisplayPreparation(prepare);
         return { factory: sceneViewportFactory(resident), dispose: () => { detach(); resident.dispose(); } };
       } catch (error) { resident.dispose(); throw error; }
     },

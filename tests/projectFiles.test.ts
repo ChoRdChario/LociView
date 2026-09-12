@@ -37,6 +37,11 @@ import { planMetadataEdit } from '../src/projectMetadata/commands';
 import { prepareValidationModel, sealValidationRecord } from '../src/projectFiles/initialProject';
 import { validationModelFacts } from '../src/projectFiles/modelFacts';
 import { planNavigation } from '../src/ui/projectScene/navigationState';
+import { planMaterial, materialTargetKey, editMaterialDraft, type MaterialIntentRequest } from '../src/ui/projectScene/materialState';
+import { validationMaterialSlots, validationMaterialIssue } from '../src/harness/projectScene/validationMaterials';
+import { materialKey } from '../src/harness/projectScene/materialHistory';
+import { canonicalFixture } from '../src/harness/projectScene/modelClosure';
+import type { MaterialIntent } from '../src/domain/materialIntent';
 
 const budget: FileValidationLimits = { maxFileBytes: 1_000_000, maxJsonBytes: 100_000, maxItems: 10_000, maxValues: 100_000, maxPixels: 10_000 };
 const png = Uint8Array.from(atob(fixtureMedia[0]!.base64), c => c.charCodeAt(0));
@@ -86,13 +91,13 @@ class TestFS extends MemoryFS {
     return { size: file.size, stream: () => { this.reads++; return file.stream(); } }; }
 }
 
-async function openFileCaption() {
+async function openFileCaption(modelBytes = glb()) {
   const fs = new TestFS(), locks = lockManager(), run = newId(), factory = storageFactory();
   const coordinator = ProjectMutationCoordinator.browser(locks);
   const store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
   const options = { base: fs, coordinator, store, fileLimits: budget, decode, run,
     openStorage: async () => ({ factory, dispose: async () => {} }) };
-  const initial = prepareValidationCreation(await prepareValidationProject({ run, title: '追加の検証', models: [{ label: '3Dモデル', bytes: glb() }] }, budget, decode));
+  const initial = prepareValidationCreation(await prepareValidationProject({ run, title: '追加の検証', models: [{ label: '3Dモデル', bytes: modelBytes }] }, budget, decode));
   const host = await openValidationHost({ ...options, initial }), workspace = createSavedWorkspace(new RecordedDocument().asDocument(), host);
   const s = workspace.session!, model = s.snapshot.modelVersions![0]!;
   s.setViewportState(true, [model.assetId], null); s.acceptPinCreation(s.pinCreationTargets()[0]!, [3, 0.5, 0]);
@@ -102,6 +107,94 @@ async function openFileCaption() {
 }
 
 describe('limited real-format validation (synthetic GLB bytes, injected PNG decoder, memory storage)', () => {
+  it('maps all GLB slots by explicit primitive association and edits instance clones without changing PNG/PBR originals', async () => {
+    vi.stubGlobal('self', globalThis);
+    const bitmap = { width: 64, height: 48, close: vi.fn() };
+    vi.stubGlobal('createImageBitmap', vi.fn(async () => bitmap));
+    try {
+      const bytes = glb(j => {
+        j.materials.push({ pbrMetallicRoughness: { baseColorFactor: [0.7, 0.4, 0.1, 1] } }, {}); // Includes an unused declared slot.
+        const p = j.meshes[0].primitives[0];
+        j.meshes[0].primitives = [{ ...p, material: 1 }, p, { attributes: { POSITION: 0 } }, { ...p }];
+        j.nodes.push({ mesh: 0, translation: [-3, 0, 0] }); j.scenes[0].nodes.push(1);
+      }, true);
+      const { host, workspace, s } = await openFileCaption(bytes), c = s.snapshot.modelVersions![0]!.closure;
+      if (c.shape !== 'saved-glb') throw Error('saved model');
+      const slots = validationMaterialSlots(c), slot = slots.find(v => v.locator.kind === 'gltfMaterial' && v.locator.materialIndex === 0)!;
+      expect(slots).toHaveLength(4);
+      const inspected = await host.content.model(c.representation), decoded = await decodeValidationModel(inspected);
+      const originals: THREE.MeshStandardMaterial[] = [];
+      decoded.root.traverse(n => { if (n instanceof THREE.Mesh) originals.push(n.material as THREE.MeshStandardMaterial); });
+      expect(originals).toHaveLength(8);
+      expect(originals.map(m => decoded.materialLocators.get(m))).toEqual([1, 0, null, 0, 1, 0, null, 0].map(i => i === null ?
+        { kind: 'representationMaterial', slotIndex: 0 } : { kind: 'gltfMaterial', materialIndex: i }));
+      const residents = await prepareValidationResidents(s.snapshot.modelVersions!, host.content, async () => decoded);
+      const intent: MaterialIntent = { appearance: { lighting: 'unlit', doubleSided: true, baseColorSrgb: [0.3, 0.4, 0.5] }, compositing: { coverage: { policy: 'inherit' }, optics: 'inherit' } };
+      const changed = residents.create(c, { [slot.target.logicalMaterialSlotId]: intent }), untouched = residents.create(c);
+      const mats = (root: THREE.Object3D) => { const result: (THREE.MeshStandardMaterial | THREE.MeshBasicMaterial)[] = [];
+        root.traverse(n => { if (n instanceof THREE.Mesh) result.push(n.material); }); return result; };
+      const edited = mats(changed.mesh), expectedColor = new THREE.Color().setRGB(0.3, 0.4, 0.5, THREE.SRGBColorSpace);
+      for (const i of [1, 3, 5, 7]) {
+        expect(edited[i]).toBeInstanceOf(THREE.MeshBasicMaterial); expect(edited[i]!.side).toBe(THREE.DoubleSide);
+        expect(edited[i]!.color).toEqual(expectedColor); expect(edited[i]!.map).toBe(originals[i]!.map);
+      }
+      for (const i of [0, 2, 4, 6]) { expect(edited[i]).toBeInstanceOf(THREE.MeshStandardMaterial); expect(edited[i]!.color).toEqual(originals[i]!.color); }
+      expect(edited[1]).toBe(edited[3]); expect(mats(untouched.mesh)[1]).not.toBe(edited[1]);
+      changed.dispose!(); const reset = residents.create(c), restored = mats(reset.mesh)[1] as THREE.MeshStandardMaterial;
+      expect(restored).toBeInstanceOf(THREE.MeshStandardMaterial); expect(restored.roughness).toBe(0.7); expect(restored.color.r).toBe(0.2);
+      expect(restored.map).toBe(originals[1]!.map); expect(restored.side).toBe(THREE.FrontSide); expect(bitmap.close).not.toHaveBeenCalled();
+      expect(inspected.bytes).toEqual(bytes); expect(originals[1]!.color.r).toBe(0.2);
+      reset.dispose!(); untouched.dispose!(); residents.dispose(); expect(bitmap.close).toHaveBeenCalledOnce(); await workspace.dispose();
+    } finally { vi.unstubAllGlobals(); }
+  });
+  it('connects saved GLB material scope/edit/reset and cold reopen; failed save retains draft and never reloads warm model bodies', async () => {
+    const { host, workspace, s, fs, options } = await openFileCaption(glb(j => { j.materials.push({}); }));
+    const c = s.snapshot.modelVersions![0]!.closure; if (c.shape !== 'saved-glb') throw Error('saved model');
+    const residents = await prepareValidationResidents(s.snapshot.modelVersions!, host.content);
+    const detach = host.setDisplayPreparation(async next => {
+      await residents.prepare(next.modelVersions!); const display = syntheticDisplay(next, s.sceneId, null, null);
+      for (const m of display.models) if (m.shape === 'saved-glb') residents.validate(m, display.savedMaterials?.[m.binding.assetId]);
+    });
+    const request = (r: MaterialIntentRequest) => { const plan = planMaterial(s.materialContext(), r); expect(plan.kind).not.toBe('blocked');
+      expect(s.acceptMaterial(plan)).toBe(plan.kind !== 'apply' && plan.kind !== 'remove'); };
+    const change = (field: 'lighting' | 'doubleSided', text: string) => { const draft = s.materialContext().draft!;
+      expect(s.acceptMaterial({ kind: 'draft', baseDraft: draft, draft: editMaterialDraft(draft, field, text) })).toBe(true); };
+    request({ kind: 'model', assetId: c.binding.assetId });
+    const context = s.materialContext(); if (context.source.kind !== 'ready') throw Error('ready');
+    const surfaces = context.source.models[0]!.surfaces; if (surfaces.kind !== 'value') throw Error('surfaces');
+    expect(surfaces.value).toHaveLength(2); expect(surfaces.value.every(v => v.fieldIssues.lighting === null && v.fieldIssues.chroma)).toBe(true);
+    const slot = validationMaterialSlots(c).find(v => v.locator.materialIndex === 0)!;
+    request({ kind: 'surface', key: materialTargetKey(slot.target) }); request({ kind: 'scope', scope: 'project' });
+    const reads = fs.reads, before = s.snapshot;
+    request({ kind: 'begin' }); change('lighting', 'unlit'); fs.reject = p => p.endsWith('/published.json'); request({ kind: 'apply' });
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('failed'));
+    expect(s.snapshot).toBe(before); expect(s.materialContext().draft?.edits.lighting).toBe('unlit'); expect(host.hasPending()).toBe(true);
+    fs.reject = () => false; s.retryWorking(); await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+    expect(s.materialContext().draft).toBeNull();
+    const effect = () => syntheticDisplay(s.snapshot, s.sceneId, null, null).savedMaterials![c.binding.assetId]![slot.target.logicalMaterialSlotId];
+    expect(effect()).toMatchObject({ appearance: { lighting: 'unlit' } });
+    request({ kind: 'scope', scope: 'scene' }); request({ kind: 'begin' }); change('lighting', 'lit'); change('doubleSided', 'double'); request({ kind: 'apply' });
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle')); expect(effect()).toMatchObject({ appearance: { lighting: 'lit', doubleSided: true } });
+    request({ kind: 'remove' }); await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle')); expect(effect()).toMatchObject({ appearance: { lighting: 'unlit' } });
+    expect(fs.reads).toBe(reads); const parts = host.read().source!.originalChanges(), sceneId = s.sceneId;
+    detach(); residents.dispose(); await workspace.dispose(); const cold = await openValidationHost(options);
+    expect(cold.read().source!.originalChanges()).toEqual(parts);
+    expect(syntheticDisplay(cold.authority.read(), sceneId, null, null).savedMaterials![c.binding.assetId]![slot.target.logicalMaterialSlotId]).toMatchObject({ appearance: { lighting: 'unlit' } });
+    await cold.dispose();
+  }, 20_000);
+  it('rejects unsupported saved material edits before journal mutation and exposes non-editable original source semantics', async () => {
+    const { host, workspace, s, fs } = await openFileCaption(glb(j => { j.materials.push({ alphaMode: 'MASK', doubleSided: true }); }));
+    const c = s.snapshot.modelVersions![0]!.closure; if (c.shape !== 'saved-glb') throw Error('saved model');
+    const slots = validationMaterialSlots(c), intent: MaterialIntent = { appearance: { lighting: 'unlit' }, compositing: { coverage: { policy: 'inherit' }, optics: 'inherit' } };
+    expect(validationMaterialIssue(slots.find(v => v.locator.materialIndex === 1)!, intent)).toContain('未接続');
+    const slot = slots.find(v => v.locator.materialIndex === 0)!, id = `ovr_${newId()}`, token = s.snapshot.state.token;
+    const changes = Object.fromEntries(Object.entries({ routing: { scope: { kind: 'project' }, target: slot.target },
+      appearance: { chroma: { keyColorSrgb: [1, 0, 0], tolerance: 0, softness: 0 } }, compositing: intent.compositing,
+      lifecycle: { state: 'active', eventId: `evt_${newId()}`, reason: 'initial' } }).map(([k, v]) => [materialKey(id, k), canonicalFixture(v)]));
+    const paths = await fs.list(''); await expect(host.authority.write(token, changes, { sceneId: s.sceneId })).rejects.toThrow('未接続');
+    expect(host.read().source!.token).toBe(token); expect(host.hasPending()).toBe(false); expect(await fs.list('')).toEqual(paths);
+    await workspace.dispose();
+  });
   it('adds one GLB in the captured Scene through the model tab; invalid selection remains cancellable and equal bytes create independent Assets', async () => {
     const { host, workspace, s, options, captionId } = await openFileCaption();
     const initial = s.snapshot.modelVersions![0]!, originalCaption = s.snapshot.resources.captions[captionId];

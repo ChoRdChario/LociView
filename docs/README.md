@@ -74,6 +74,10 @@ Opened-Project GLB addition now goes through one atomic addAsset command and the
 existing journal delta-body field. New facts are limited to the exact owned input;
 old evidence cannot be regenerated. Missing renderer residents are staged before
 UI acknowledgment, without reopening the editor or changing the camera.
+All exact static-GLB material slots now connect Project/Scene lighting/side/reset
+to isolated renderer clones. Original textures/PBR survive reset and unsupported
+source/effects are diagnosed. Hard chroma and matching picking remain next;
+this is not completion of all real-material effects or GPU/device acceptance.
 Other file and real-model editing connections remain; no ordinary entry, existing
 Project or migration has changed.
 

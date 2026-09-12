@@ -8,6 +8,7 @@ import { syntheticVersions } from './modelFixture';
 import { canonicalFixture } from './modelClosure';
 import { materialBucket, materialCapability, materialKey, materialLimits, materialTarget, sourceMaterialIntent, type MaterialRouting } from './materialHistory';
 import type { WorkingWrite } from './acknowledgment';
+import { validationMaterialSlots, validationMaterialSourceIssue, validationMaterialIssue } from './validationMaterials';
 
 const fresh = (prefix: string) => `${prefix}_${crypto.randomUUID().replaceAll('-', '')}`;
 export class SyntheticMaterialSession {
@@ -33,7 +34,13 @@ export class SyntheticMaterialSession {
         const version = asset.projection.kind === 'value' ? (p.modelVersions ?? syntheticVersions).find(v => v.projection.bindingId === (asset.projection as { value: { bindingId: string } }).value.bindingId) : null;
         const name = value(p.modelNames[asset.id] ?? 'モデル');
         if (!version) return { assetId: asset.id, name, surfaces: { kind: 'unresolved' as const, reason: 'conflict' as const }, reason: 'モデルの更新候補を確認してください。' };
-        if (version.closure.shape === 'saved-glb') return { assetId: asset.id, name, surfaces: value([]), reason: '原本の材質で表示しています。実モデルの材質編集は未接続です。' };
+        if (version.closure.shape === 'saved-glb') return { assetId: asset.id, name, reason: null,
+          surfaces: value(validationMaterialSlots(version.closure).map(slot => ({ target: slot.target, name: value(slot.name),
+            project: record({ scope: { kind: 'project' }, target: slot.target }), scene: record({ scope: { kind: 'scene', sceneId }, target: slot.target }),
+            sourceIntent: value(sourceMaterialIntent),
+            fieldIssues: Object.fromEntries(materialFields.map(f => [f, validationMaterialSourceIssue(slot) ??
+              (f === 'lighting' || f === 'doubleSided' ? null : 'この設定は実モデルへ未接続です。')])) as Record<typeof materialFields[number], string | null>,
+            admit: (intent: MaterialIntent) => validationMaterialIssue(slot, intent) }))) };
         const target = materialTarget(version.closure), project = record({ scope: { kind: 'project' }, target }), scene = record({ scope: { kind: 'scene', sceneId }, target });
         return { assetId: asset.id, name, surfaces: value([{ target, name: value('表面'), project, scene, sourceIntent: value(sourceMaterialIntent),
           fieldIssues: Object.fromEntries(materialFields.map(f => [f, f === 'opacity' || f === 'softness' ? '半透明の表示は未接続です。' : null])) as Record<typeof materialFields[number], string | null>,

@@ -7,14 +7,19 @@ import type { ValidationModelClosure, DisplayModelVersion } from './modelTypes';
 import type { ResidentSurface } from './viewportPicking';
 import { placementMatrix } from './viewportModel';
 import { canonical, same } from '../../domain/projectGraphSupport';
+import type { JsonObject } from '../../domain/values';
+import { validationMaterialSlots, validationMaterialIssue, type ValidationMaterialEffects } from './validationMaterials';
 
-export interface SavedModelResidentPort { create(model: ValidationModelClosure): ResidentSurface; dispose(): void }
-export interface ValidationResidentCache extends SavedModelResidentPort { prepare(versions: readonly DisplayModelVersion[]): Promise<void> }
-export interface DecodedValidationModel { root: THREE.Object3D; dispose(): void }
+export interface SavedModelResidentPort { create(model: ValidationModelClosure, effects?: ValidationMaterialEffects): ResidentSurface; dispose(): void }
+export interface ValidationResidentCache extends SavedModelResidentPort { prepare(versions: readonly DisplayModelVersion[]): Promise<void>;
+  validate(c: ValidationModelClosure, effects?: ValidationMaterialEffects): void }
+export interface DecodedValidationModel { root: THREE.Object3D; materialLocators: ReadonlyMap<THREE.Material, JsonObject>; dispose(): void }
 
 /** No arbitrary URL/path input. The caller supplies already inspected, owned GLB bytes. */
 export async function decodeValidationModel(source: ValidatedGlb): Promise<DecodedValidationModel> {
   const manager = new THREE.LoadingManager(), owned = new Set<ImageBitmap>();
+  const materialLocators = new Map<THREE.Material, JsonObject>();
+  const sourceLocators = new Set(source.materials.map(s => canonical(s.sourceLocator!)));
   const all = new THREE.Group(); let failed = false, closed = false;
   manager.setURLModifier(url => { if (!url.startsWith('blob:')) throw Error('外部参照のあるモデルは表示できません。'); return url; });
   manager.onError = () => { failed = true; };
@@ -24,7 +29,7 @@ export async function decodeValidationModel(source: ValidatedGlb): Promise<Decod
     all.traverse(node => { if (node instanceof THREE.Mesh) for (const material of Array.isArray(node.material) ? node.material : [node.material]) {
       for (const field of Object.values(material)) if (field instanceof THREE.Texture) owned.delete(field.source.data as ImageBitmap);
     } });
-    disposeModelResources(all); for (const bitmap of owned) bitmap.close(); owned.clear();
+    disposeModelResources(all); for (const bitmap of owned) bitmap.close(); owned.clear(); materialLocators.clear();
   };
   class TrackedImages extends THREE.ImageBitmapLoader {
     override load(url: string, done?: (bitmap: ImageBitmap) => void, progress?: (event: ProgressEvent) => void, error?: (e: unknown) => void) {
@@ -38,19 +43,42 @@ export async function decodeValidationModel(source: ValidatedGlb): Promise<Decod
     const loader = new GLTFLoader(manager);
     loader.register(parser => ({ name: 'LOCIVIEW_validation_saved_png', beforeRoot: async () => {
       parser.textureLoader = new TrackedImages(manager).setOptions({ premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+    }, loadMesh: async index => {
+      const mesh = await parser.loadMesh(index);
+      if (closed) { disposeModelResources(mesh); throw Error('モデルの表示を取り消しました。'); }
+      all.add(mesh); // Own resources before inspecting; load failure can precede scene construction.
+      mesh.traverse(node => {
+        if (!(node instanceof THREE.Mesh)) return;
+        // Pinned loader supplies primitives; its declaration currently omits that field.
+        const association = parser.associations.get(node) as { meshes?: number; primitives?: number } | undefined, primitiveIndex = association?.primitives;
+        if (association?.meshes !== index || !Number.isSafeInteger(primitiveIndex)) throw Error('材質と面の対応を確認できません。');
+        const primitive = parser.json.meshes[index]?.primitives[primitiveIndex!];
+        if (!primitive || Array.isArray(node.material)) throw Error('材質の対応形式が未対応です。');
+        const materialIndex = parser.associations.get(node.material)?.materials;
+        const locator: JsonObject = primitive.material === undefined ? { kind: 'representationMaterial', slotIndex: 0 } :
+          { kind: 'gltfMaterial', materialIndex: primitive.material };
+        if (materialIndex !== primitive.material || !sourceLocators.has(canonical(locator)) ||
+          materialLocators.has(node.material) && !same(materialLocators.get(node.material), locator))
+          throw Error('保存した材質と表示する面が一致しません。');
+        materialLocators.set(node.material, locator);
+      });
+      return mesh;
     } }));
     const gltf = await loader.parseAsync(source.bytes.slice().buffer as ArrayBuffer, '');
     all.add(...gltf.scenes); const root = gltf.scene;
     if (failed || !root) throw Error('モデルのテクスチャを表示できません。');
     let triangles = 0;
     root.updateMatrixWorld(true);
-    root.traverse(node => { if (node instanceof THREE.Mesh) triangles += (node.geometry.index?.count ?? node.geometry.getAttribute('position').count) / 3; });
+    root.traverse(node => { if (node instanceof THREE.Mesh) {
+      if (Array.isArray(node.material) || !materialLocators.has(node.material)) throw Error('表示する材質の対応がありません。');
+      triangles += (node.geometry.index?.count ?? node.geometry.getAttribute('position').count) / 3;
+    } });
     const expected = source.surfaceRanges.reduce((n, r) => n + Number(r.count), 0);
     const bounds = new THREE.Box3().setFromObject(root, true), actual = [...bounds.min.toArray(), ...bounds.max.toArray()];
     if (triangles !== expected || actual.some((v, i) => !Number.isFinite(v) ||
       Math.abs(v - [...source.bounds.min, ...source.bounds.max][i]!) > 1e-6 * Math.max(1, Math.abs(v))))
       throw Error('保存したモデルと描画した形状が一致しません。');
-    return { root, dispose };
+    return { root, materialLocators, dispose };
   } catch (error) { dispose(); throw error; }
 }
 
@@ -78,12 +106,27 @@ export async function prepareValidationResidents(versions: readonly DisplayModel
     } catch (error) { for (const item of staged.values()) item.model.dispose(); throw error; }
     finally { preparing = false; }
   };
+  const validate = (c: ValidationModelClosure, effects: ValidationMaterialEffects = {}) => {
+    const item = templates.get(c.representation.id), slots = validationMaterialSlots(c);
+    if (closed || !item || item.record !== canonical(c.representation)) throw Error('保存したモデルの表示本体を再確認してください。');
+    if (Object.keys(effects).some(id => !slots.some(s => s.target.logicalMaterialSlotId === id))) throw Error('材質の適用先がありません。');
+    for (const slot of slots) {
+      const effect = effects[slot.target.logicalMaterialSlotId];
+      if (effect && !('issue' in effect)) {
+        const issue = validationMaterialIssue(slot, effect); if (issue) throw Error(issue);
+        for (const [material, locator] of item.model.materialLocators) if (same(locator, slot.locator) && !(material instanceof THREE.MeshStandardMaterial))
+          throw Error('元の材質の設定を確認してください。');
+      }
+    }
+  };
   try {
     await prepare(versions);
-    return { dispose, prepare, create(c) {
+    return { dispose, prepare, validate, create(c, effects = {}) {
+      validate(c, effects);
       const item = templates.get(c.representation.id);
       if (closed || !item || item.record !== canonical(c.representation)) throw Error('保存したモデルの表示本体を再確認してください。');
       const root = item.model.root.clone(true), asset = new THREE.Group();
+      const slots = validationMaterialSlots(c), byLocator = new Map(slots.map(s => [canonical(s.locator), s]));
       const geometries = new Map<THREE.BufferGeometry, THREE.BufferGeometry>(), materials = new Map<THREE.Material, THREE.Material>();
       let released = false;
       const release = () => { if (released) return; released = true; live.delete(release); asset.removeFromParent();
@@ -92,7 +135,28 @@ export async function prepareValidationResidents(versions: readonly DisplayModel
         root.traverse(node => { if (node instanceof THREE.Mesh) {
           if (!geometries.has(node.geometry)) geometries.set(node.geometry, node.geometry.clone());
           node.geometry = geometries.get(node.geometry)!;
-          const clone = (m: THREE.Material) => { if (!materials.has(m)) materials.set(m, m.clone()); return materials.get(m)!; };
+          const clone = (m: THREE.Material) => {
+            if (materials.has(m)) return materials.get(m)!;
+            const locator = item.model.materialLocators.get(m), slot = locator && byLocator.get(canonical(locator));
+            if (!slot) throw Error('表示する面と材質の対応を確認できません。');
+            const effect = effects[slot.target.logicalMaterialSlotId];
+            let result = m.clone(); materials.set(m, result);
+            if (effect && 'issue' in effect) result.visible = false;
+            else if (effect) {
+              if (!(m instanceof THREE.MeshStandardMaterial)) throw Error('元の材質の設定を確認してください。');
+              const a = effect.appearance;
+              if (a.lighting === 'unlit') {
+                result.dispose(); result = new THREE.MeshBasicMaterial({ color: m.color.clone(), map: m.map,
+                  vertexColors: m.vertexColors, side: m.side, opacity: m.opacity, alphaMap: m.alphaMap, alphaTest: m.alphaTest,
+                  transparent: m.transparent, toneMapped: m.toneMapped, depthTest: m.depthTest, depthWrite: m.depthWrite, visible: m.visible });
+                materials.set(m, result);
+              }
+              if (a.baseColorSrgb) (result as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial).color.setRGB(...a.baseColorSrgb as [number, number, number], THREE.SRGBColorSpace);
+              if (a.doubleSided !== undefined) result.side = a.doubleSided ? THREE.DoubleSide : THREE.FrontSide;
+              if (a.opacity !== undefined) result.opacity = a.opacity;
+            }
+            return result;
+          };
           node.material = Array.isArray(node.material) ? node.material.map(clone) : clone(node.material);
         } });
         const representation = new THREE.Group(); representation.matrix.copy(placementMatrix(c.representation.representationToAsset)); representation.matrixAutoUpdate = false;
