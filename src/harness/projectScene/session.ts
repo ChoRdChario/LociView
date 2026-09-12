@@ -16,7 +16,7 @@ import { createSyntheticProject, fixtureIds, freezeSynthetic, type SyntheticProj
 import { bindingKey, captionKey, membershipKey, type SyntheticAuthority } from './historyProjection';
 import { decodeSyntheticAnchor, modelVersion, syntheticVersions, versionFromClosure } from './modelFixture';
 import { canonicalFixture, createFixtureModel, fixtureModelIds, moveFixtureModel, readFixtureModel, type FixtureModelClosure } from './modelClosure';
-import type { DisplayModelVersion, DisplayModelClosure } from './modelTypes';
+import type { DisplayModelVersion, DisplayModelClosure, ModelFileAddition } from './modelTypes';
 import { modelClosureKey } from './modelHistory';
 import { newPinModeMemory, pinActionIssue, pinModePlanIsCurrent, planPinMode, type PinModeContext,
   type PinModeMemory, type PinModePlan, type PinProposal } from '../../ui/projectScene/pinModeState';
@@ -28,7 +28,7 @@ import { SyntheticMaterialSession } from './materialSession';
 import { projectMaterialHistory } from './materialHistory';
 import type { MaterialPlan } from '../../ui/projectScene/materialState';
 import { SyntheticMediaSession, type MediaContext } from './mediaSession';
-import { mediaSeed, projectMediaHistory } from './mediaHistory';
+import { mediaSeed, projectMediaHistory, type MediaFileSelection } from './mediaHistory';
 import { previewHistory } from './historyPort';
 import { WorkingAcknowledgment, afterWorking, type WorkingResult } from './acknowledgment';
 import type { PinSurfaceTarget } from './viewportPicking';
@@ -86,6 +86,23 @@ export class SyntheticSession {
   private sceneDraft: SceneAuthoringDraft | null = null;
   private deletion: { token: string; sceneId: string; title: string; impact: CaptionDeletionImpact } | null = null;
   private assetDeletion: { token: string; sceneId: string; name: string; impact: AssetDeletionImpact } | null = null;
+  private modelFile: { token: string; command: ModelFileAddition } | null = null;
+  get modelFileAdditionAvailable() { return !!this.authority?.addModelFile; }
+  get hasModelFileSelection() { return !!this.modelFile; }
+  cancelModelFile() { if (this.workingBlock) return false; this.modelFile = null; this.message = ''; return true; }
+  addModelFile(expected: { token: string; sceneId: string }, file: MediaFileSelection) {
+    if (!this.authority?.addModelFile || this.readOnly || this.pending || this.externalChanges() ||
+      expected.token !== this.project.state.token || expected.sceneId !== this.sceneId)
+      return this.refuse('入力を確定し、追加先のシーンを確認してください。');
+    const selection = { token: expected.token, command: { sceneId: expected.sceneId, assetId: fresh('ast'), file } };
+    this.modelFile = selection;
+    return this.applyWorking(() => afterWorking(this.authority!.addModelFile!(selection.token, selection.command), next => this.publish(next)), () => {
+      if (!this.project.modelVersions?.some(v => v.assetId === selection.command.assetId) ||
+        !this.composition.assets.some(a => a.assetId === selection.command.assetId)) throw Error('モデルの追加を確認できません。入力を保持しています。');
+      this.models.set(this.sceneId, { ...this.models.get(this.sceneId)!, assetId: selection.command.assetId, query: '' });
+      this.modelFile = null; this.message = '';
+    });
+  }
   private pinFeedback: PinModeContext['feedback'] = { kind: 'idle' };
   private searchComposing = false;
   private viewportDragging = false;
@@ -270,7 +287,7 @@ export class SyntheticSession {
     if (this.views.pending === 'composition' || this.materials.pending === 'composition' || this.media.pending === 'composition') return 'composition';
     if (this.placement?.composing || this.pinInputComposing || this.searchComposing || [...this.includes.values()].some(m => m.composing) || [...this.models.values()].some(m => m.composing) ||
       [...this.drafts.values()].some(d => d.composing !== null)) return 'composition';
-    return this.views.pending ?? this.materials.pending ?? this.media.pending ?? (this.assetDeletion || this.deletion || this.sceneDraft || [...this.drafts.values()].some(hasCaptionDraft) ? 'text' : null);
+    return this.views.pending ?? this.materials.pending ?? this.media.pending ?? (this.modelFile || this.assetDeletion || this.deletion || this.sceneDraft || [...this.drafts.values()].some(hasCaptionDraft) ? 'text' : null);
   }
   setSearchComposing(active: boolean) { this.searchComposing = active; }
   setViewportDragging(active: boolean): boolean { const changed = this.viewportDragging !== active; this.viewportDragging = active; return changed; }

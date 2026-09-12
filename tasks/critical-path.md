@@ -23,8 +23,10 @@
 > in memory-port tests. PO approved the limited static-GLB/PNG validation entry.
 > It now connects new-Project creation/list/reopen, saved-body read/render and
 > existing pin/text/PNG edits in the same dev host (`storage=validation`).
-> Actual-browser/device acceptance is pending; further file introduction and real
-> model transforms/material editing remain. Do not restore a resolved approval wait. Other
+> PNG after-addition, GLB placement and opened-Project independent GLB addition now
+> connect to the same host. Body/fact/render failures retain exact retry; no source
+> matching or replacement is inferred. Actual-browser/device acceptance, other
+> formats and real-model material editing remain. Do not restore a resolved approval wait. Other
 > scalar/lifecycle conflicts, exchange-base/delta and real-data adoption retain their gates. Latest UI feedback does not
 > automatically set priority. Old saved-host Desktop PASS remains narrowly scoped.
 > Explicit model membership keep-one now saves only the other observed edge's

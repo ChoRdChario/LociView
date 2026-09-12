@@ -32,6 +32,11 @@ import { RecordedDocument } from './ui/domRecorder';
 import { record, type RecordedNode } from './ui/domRecorder';
 import { createValidationWorkspace, type ValidationWorkspacePorts } from '../src/harness/projectScene/validationWorkspace';
 import { createMediaControls } from '../src/harness/projectScene/mediaControls';
+import { createModelAdditionControls } from '../src/harness/projectScene/modelAdditionControls';
+import { planMetadataEdit } from '../src/projectMetadata/commands';
+import { prepareValidationModel, sealValidationRecord } from '../src/projectFiles/initialProject';
+import { validationModelFacts } from '../src/projectFiles/modelFacts';
+import { planNavigation } from '../src/ui/projectScene/navigationState';
 
 const budget: FileValidationLimits = { maxFileBytes: 1_000_000, maxJsonBytes: 100_000, maxItems: 10_000, maxValues: 100_000, maxPixels: 10_000 };
 const png = Uint8Array.from(atob(fixtureMedia[0]!.base64), c => c.charCodeAt(0));
@@ -97,6 +102,148 @@ async function openFileCaption() {
 }
 
 describe('limited real-format validation (synthetic GLB bytes, injected PNG decoder, memory storage)', () => {
+  it('adds one GLB in the captured Scene through the model tab; invalid selection remains cancellable and equal bytes create independent Assets', async () => {
+    const { host, workspace, s, options, captionId } = await openFileCaption();
+    const initial = s.snapshot.modelVersions![0]!, originalCaption = s.snapshot.resources.captions[captionId];
+    s.acceptNavigation(planNavigation(s.snapshot.state, s.session, s.pending, { kind: 'task', task: 'models' }));
+    const controls = createModelAdditionControls(new RecordedDocument().asDocument(), s, () => controls.render()), root = record(controls.root);
+    const add = root.children.find(n => n.tag === 'button')!, input = root.children.find(n => n.type === 'file')!;
+    Object.assign(input, { click: vi.fn() }); controls.render(); expect(root.hidden).toBe(false);
+    const base = host.read().source!.token;
+    add.fire('click'); Object.assign(input, { files: [{ name: '不正', size: 3, arrayBuffer: async () => new Uint8Array(3).buffer }] }); input.fire('change');
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+    expect(host.hasPending()).toBe(false); expect(host.read().source!.token).toBe(base); expect(workspace.hasChanges()).toBe(true);
+    controls.render(); const cancel = root.children.find(n => n.textContent === '選択を取り消す')!;
+    expect(cancel.hidden).toBe(false); cancel.fire('click'); expect(workspace.hasChanges()).toBe(false);
+    const sceneId = s.sceneId, readModel = vi.spyOn(host.content, 'model'), file = { name: '3Dモデル', size: glb().length, arrayBuffer: vi.fn(async () => glb().buffer as ArrayBuffer) };
+    for (let i = 0; i < 2; i++) {
+      add.fire('click'); Object.assign(input, { files: [file] }); input.fire('change');
+      await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+      expect(s.message).toBe(''); expect(s.snapshot.modelVersions).toHaveLength(i + 2);
+      expect(workspace.hasChanges()).toBe(false); controls.render();
+    }
+    const versions = s.snapshot.modelVersions!; expect(new Set(versions.map(v => v.assetId)).size).toBe(3);
+    expect(new Set(versions.map(v => (v.closure.representation.blob as JsonObject).digest)).size).toBe(1);
+    expect(s.snapshot.resources.captions[captionId]).toEqual(originalCaption);
+    expect(versions.find(v => v.assetId === initial.assetId)).toEqual(initial); expect(readModel.mock.calls.every(([r]) => r.id !== initial.closure.representation.id)).toBe(true);
+    expect(Object.values(s.snapshot.state.assetMemberships).every(m => m.sceneId === sceneId)).toBe(true);
+    const added = s.modelContext().memory.assetId!; expect(added).not.toBe(initial.assetId);
+    s.setViewportState(true, versions.map(v => v.assetId), null); expect(s.beginModelPlacement()).toBe(true);
+    s.changeModelPlacement(['1', '2', '3']); s.finishModelPlacement();
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+    const parts = host.read().source!.originalChanges(); controls.dispose(); await workspace.dispose();
+    const cold = await openValidationHost(options); expect(cold.read().source!.originalChanges()).toEqual(parts);
+    expect(cold.authority.read().modelVersions!.find(v => v.assetId === added)!.closure.binding.assetToProject.translation).toEqual([1, 2, 3]);
+    expect(cold.authority.read().resources.captions[captionId]).toEqual(originalCaption); await cold.dispose();
+  }, 20_000);
+  it('retains a failed new GLB body and exact changes for retry, then cold-recovers prepared addition only once', async () => {
+    const { host, workspace, s, options, fs, store } = await openFileCaption();
+    const bytes = glb(j => { j.nodes[0].translation = [8, 0, 0]; }), original = bytes.slice();
+    const file = { name: '追加', size: bytes.length, arrayBuffer: vi.fn(async () => bytes.buffer as ArrayBuffer) };
+    vi.spyOn(store, 'put').mockRejectedValueOnce(Error('injected GLB quota'));
+    s.addModelFile({ token: s.snapshot.state.token, sceneId: s.sceneId }, file);
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('failed'));
+    expect(host.read().state).toBe('pending'); expect(s.snapshot.modelVersions).toHaveLength(1); expect(s.cancelModelFile()).toBe(false);
+    bytes.fill(0); s.retryWorking(); await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+    expect(file.arrayBuffer).toHaveBeenCalledOnce(); expect(s.snapshot.modelVersions).toHaveLength(2);
+    expect((s.snapshot.modelVersions!.find(v => v.assetId === s.modelContext().memory.assetId)!.closure.representation.blob as JsonObject).digest).toBe(await digest(original));
+    fs.reject = p => p.endsWith('/published.json');
+    s.addModelFile({ token: s.snapshot.state.token, sceneId: s.sceneId }, { name: 'さらに追加', size: glb().length, arrayBuffer: async () => glb().buffer as ArrayBuffer });
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('failed')); expect(s.snapshot.modelVersions).toHaveLength(2);
+    const paths = (await fs.list(`${validationArea}/${options.run}/`)).filter(p => p.endsWith('.amchange'));
+    const originals = await Promise.all(paths.map(p => fs.readBytes(p)));
+    await workspace.dispose(); fs.reject = () => false;
+    const cold = await openValidationHost(options); expect(cold.read().state).toBe('pending'); await cold.authority.retry!();
+    expect(cold.authority.read().modelVersions).toHaveLength(3);
+    const parts = cold.read().source!.originalChanges(), publication = cold.read().publication;
+    for (const b of originals) expect(parts.some(p => p.length === b!.length && p.every((v, i) => v === b![i]))).toBe(true);
+    await cold.authority.retry!(); expect(cold.read().publication).toBe(publication); expect(cold.read().source!.originalChanges()).toEqual(parts); await cold.dispose();
+  }, 20_000);
+  it('retains old display after new GLB publication fails to render and retries the same Asset without reopening the editor', async () => {
+    const { host, workspace, s } = await openFileCaption(), old = s.snapshot;
+    const prepare = vi.fn().mockRejectedValueOnce(Error('injected model display')).mockResolvedValue(undefined);
+    const detach = host.setDisplayPreparation(prepare), file = { name: '表示確認', size: glb().length, arrayBuffer: vi.fn(async () => glb().buffer as ArrayBuffer) };
+    s.addModelFile({ token: s.snapshot.state.token, sceneId: s.sceneId }, file);
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('failed'));
+    expect(host.read().state).toBe('ready'); expect(host.hasPending()).toBe(true); expect(s.snapshot).toBe(old);
+    expect(host.authority.read().state.token).toBe(old.state.token); expect(s.hasModelFileSelection).toBe(true);
+    const parts = host.read().source!.originalChanges(), publication = host.read().publication;
+    s.retryWorking(); await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+    expect(s.snapshot.modelVersions).toHaveLength(2); expect(s.hasModelFileSelection).toBe(false);
+    expect(host.read().publication).toBe(publication); expect(host.read().source!.originalChanges()).toEqual(parts);
+    expect(prepare).toHaveBeenCalledTimes(2); expect(file.arrayBuffer).toHaveBeenCalledOnce(); detach(); await workspace.dispose();
+  }, 15_000);
+  it('does not replenish acknowledged new model evidence on retry, and cold unprepared addition remains repair-required', async () => {
+    for (const phase of ['new-fact', 'lost-fact', 'cold-unprepared'] as const) {
+      const { host, workspace, s, options, fs } = await openFileCaption();
+      const prefix = `${validationArea}/${options.run}/`, before = await fs.list(prefix), token = s.snapshot.state.token;
+      let attempted = false;
+      fs.reject = p => phase === 'new-fact' ? p.includes('/evidence/') && !before.includes(p) && (attempted = true) : p.endsWith('/changes/00000000.amchange');
+      s.addModelFile({ token, sceneId: s.sceneId }, { name: '障害確認', size: glb().length, arrayBuffer: async () => glb().buffer as ArrayBuffer });
+      await vi.waitFor(() => expect(s.acknowledgment.state).toBe('failed'));
+      expect(host.read().source!.token).toBe(token); expect(s.snapshot.modelVersions).toHaveLength(1);
+      fs.reject = () => false;
+      if (phase === 'new-fact') {
+        expect(attempted).toBe(true); s.retryWorking(); await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+        expect(s.snapshot.modelVersions).toHaveLength(2); await workspace.dispose();
+      } else if (phase === 'lost-fact') {
+        const added = (await fs.list(prefix)).find(p => p.includes('/evidence/') && !before.includes(p)); expect(added).toBeDefined();
+        await fs.remove(added!); s.retryWorking(); await vi.waitFor(() => expect(s.acknowledgment.state).toBe('failed'));
+        expect(await fs.readBytes(added!)).toBeNull(); expect(s.snapshot.modelVersions).toHaveLength(1); await workspace.dispose();
+      } else {
+        await workspace.dispose(); const cold = await openValidationHost(options); expect(cold.read().state).toBe('pending');
+        await expect(cold.authority.retry!()).rejects.toThrow('incomplete-staging-repair');
+        expect(cold.authority.read().modelVersions).toHaveLength(1); await cold.dispose();
+      }
+    }
+  }, 20_000);
+  it('rejects stale/read-only/oversized model additions before reading and rejects historical nested identity collisions', async () => {
+    const { host, workspace, s, options } = await openFileCaption();
+    const file = { name: 'GLB', size: glb().length, arrayBuffer: vi.fn(async () => glb().buffer as ArrayBuffer) };
+    const command = { sceneId: s.sceneId, assetId: `ast_${newId()}`, file }, token = s.snapshot.state.token;
+    await expect(host.authority.addModelFile!('stale', command)).rejects.toThrow('更新');
+    await expect(host.authority.addModelFile!(token, { ...command, file: { ...file, size: budget.maxFileBytes } })).rejects.toThrow('上限');
+    const readonly = await openValidationHost(options); await expect(readonly.authority.addModelFile!(token, command)).rejects.toThrow('閲覧専用'); await readonly.dispose();
+    expect(file.arrayBuffer).not.toHaveBeenCalled(); const source = host.read().source!, provider = host.read().provider!;
+    if (provider.kind !== 'scene-provider') throw Error('provider');
+    const { body: _body, ...records } = await prepareValidationModel({ label: '独立モデル', bytes: glb() }, budget, decode);
+    const edit = { kind: 'addAsset' as const, sceneId: s.sceneId, ...records, membership: { id: `sam_${newId()}`, sceneId: s.sceneId,
+      assetId: records.asset.id!, orderKey: 'Z', lifecycle: { state: 'active', reason: 'initial', eventId: `evt_${newId()}` } } };
+    expect(planMetadataEdit(provider, edit, metadata)).toHaveLength(5);
+    const old = s.snapshot.modelVersions![0]!.closure;
+    for (const change of [() => { edit.asset = { ...edit.asset, assetFrameId: old.assetFrame.id }; }, () => { edit.asset = { ...edit.asset, id: old.binding.assetId }; },
+      () => { (edit.representation.materialCatalog as any).slots[0].logicalMaterialSlotId = old.representation.materialCatalog.slots[0]!.logicalMaterialSlotId; }]) {
+      const saved = structuredClone(edit); change(); expect(() => planMetadataEdit(provider, edit, metadata)).toThrow(); Object.assign(edit, saved);
+    }
+    const prepared = await host.content.prepareModel({ label: '所有する入力', bytes: glb() }, `ast_${newId()}`);
+    const other = { ...edit, ...prepared, membership: { ...edit.membership, assetId: prepared.asset.id! } };
+    const corrupt = await sealValidationRecord('representation', { ...prepared.representation, logicalBoundsAsset: { min: [0, 0, 0], max: [1, 1, 1] } });
+    await expect(validationModelFacts(host.content).plan(source, source.prepareEdit(token, { ...other, representation: corrupt }, provider, newId()))).rejects.toThrow();
+    expect(host.hasPending()).toBe(false); expect(host.read().source!.token).toBe(token); await workspace.dispose();
+  }, 15_000);
+  it('prepares added residents atomically, retains old geometry after partial decode failure and disposes late completion', async () => {
+    const prepared = await prepareValidationProject({ run: newId(), title: '表示準備', models: [0, 1, 2].map(i => ({ label: `${i}`, bytes: glb() })) }, budget, decode);
+    const initial = prepareValidationCreation(prepared), fs = new TestFS(), locks = lockManager();
+    const coordinator = ProjectMutationCoordinator.browser(locks), run = prepared.records.identity.projectId!.toString().slice(4);
+    const store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1000000, maxChunks: 10000, metadata }, locks);
+    const host = await openValidationHost({ run, initial, base: fs, coordinator, store, fileLimits: budget, decode,
+      openStorage: async () => ({ factory: storageFactory(), dispose: async () => {} }) });
+    const versions = host.authority.read().modelVersions!, releases: ReturnType<typeof vi.fn>[] = [];
+    let fail = false; const decoder = vi.fn(async (source: Awaited<ReturnType<typeof inspectValidationGlb>>) => {
+      if (fail && releases.length === 2) throw Error('second new decode');
+      const model = await decodeValidationModel(source), dispose = vi.fn(model.dispose); releases.push(dispose); return { ...model, dispose };
+    });
+    const reads = vi.spyOn(host.content, 'model'), cache = await prepareValidationResidents([versions[0]!], host.content, decoder);
+    const old = cache.create(versions[0]!.closure as any); fail = true;
+    await expect(cache.prepare(versions)).rejects.toThrow('second new decode'); expect(releases[0]).not.toHaveBeenCalled(); expect(releases[1]).toHaveBeenCalledOnce();
+    expect(old.asset.children).toHaveLength(1); expect(() => cache.create(versions[1]!.closure as any)).toThrow();
+    fail = false; await cache.prepare(versions); expect(reads.mock.calls.filter(([r]) => r.id === versions[0]!.closure.representation.id)).toHaveLength(1);
+    cache.create(versions[1]!.closure as any).dispose!(); old.dispose!(); cache.dispose();
+    let finish!: (value: any) => void; const delayed = await prepareValidationResidents([], host.content, () => new Promise(resolve => { finish = resolve; }));
+    const pending = delayed.prepare([versions[0]!]); await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
+    delayed.dispose(); const release = vi.fn(); finish({ root: new THREE.Group(), dispose: release }); await expect(pending).rejects.toThrow('閉じ'); expect(release).toHaveBeenCalledOnce();
+    await host.dispose();
+  }, 15_000);
   it('previews/cancels and saves GLB placement only, preserving nested geometry, pin coordinates and body evidence on reopen', async () => {
     const { host, workspace, s, options, captionId, fs } = await openFileCaption();
     const old = s.snapshot, source = old.modelVersions![0]!.closure, reads = fs.reads, parts = host.read().source!.originalChanges();

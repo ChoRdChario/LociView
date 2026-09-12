@@ -1376,6 +1376,44 @@ Actual browser/iPhone evidence remains pending with the consolidated batch.
 Model addition/copy/revision changes, material editing, nonuniform/negative scale,
 alpha-aware picking, ordinary home and formal adoption are not part of this seam.
 
+The next validation-only connection adds one static GLB to an opened Project as
+a new independent Asset in the explicitly selected Scene. Reuse the initial
+builder's one-model records, strict content inspection and identity placement;
+preserve source coordinates. Same names or bytes never imply replacement or
+shared editable identity (CAS may reuse identical body bytes). The finite typed
+`addAsset` command creates one Asset, revision, representation, root binding and
+Scene membership in one original change. All record and nested declaration IDs
+must be fresh against retained history; exact schema, ownership, closure and
+current active Scene are checked before beginning a transaction.
+
+An owned validation model-fact plan inspects only the newly prepared body before
+journal start; old model evidence uses persisted receipts/inventory. Keep original
+changes, input identities and exact blob refs, begin the existing local-command
+journal, stage new GLB bytes and only their content facts, then publish once after
+full verification. Carry new refs through existing `stagedBlobs`; delta verification
+accepts only the already scoped PNG/GLB bodies. No journal schema/wire change or
+fallback fixture evidence. After preparation, cold recovery uses stored originals,
+body and evidence. Before preparation, an interrupted cold run remains visibly
+incomplete/repair-required, as with PNG introduction; no automatic rebuild claim.
+
+Before the UI acknowledges the added Asset, prepare only missing representations
+in a temporary renderer cache. Commit the new resident templates only when all
+decodes succeed. Keep the editor, old residents, camera and selection/draft state;
+do not remount the entire Project to add a model. Display failure after publication
+retains old UI plus failed input; retry prepares display and confirms the same
+saved Asset without another command. Late-disposed preparations release their
+resources without cache publication. The model-tab `3Dモデルを追加` picker captures
+Scene/token and a fresh Asset ID; input/IME/save/read-only guards remain in force.
+
+Acceptance: independent addition/current-Scene-only membership and later pin/
+placement editing/cold reopen; equal-name/equal-byte independence; stale/read-only/
+limits/unknown/collision refusal; body/fact/metadata interruption and exact retry/
+prepared cold recovery; zero extra old-body reads; new-body corruption/evidence
+mismatch refusal; partial/failed/late-disposed render preparation without duplicate
+save. Use existing service/host/renderer tests, not a new PoC or generic file API.
+Other formats, existing old-namespace Projects, replacement/copy inference,
+material editing, wire/migration, ordinary home and formal adoption stay outside.
+
 **S1 metadata foundation — implementation contract (2026-09-11):**
 
 The first reusable source module implements 02 §4 bootstrap and original atomic

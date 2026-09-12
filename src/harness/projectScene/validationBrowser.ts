@@ -25,7 +25,10 @@ export async function createValidationBrowserWorkspace(document: Document, run?:
     open: (id, initial) => openValidationHost({ ...options, run: id, initial, openStorage: create => storage(id, create) }),
     render: async host => {
       const resident = await prepareValidationResidents(host.authority.read().modelVersions!, host.content);
-      return { factory: sceneViewportFactory(resident), dispose: resident.dispose };
+      try {
+        const detach = host.setDisplayPreparation(next => resident.prepare(next.modelVersions!));
+        return { factory: sceneViewportFactory(resident), dispose: () => { detach(); resident.dispose(); } };
+      } catch (error) { resident.dispose(); throw error; }
     },
     selected: id => {
       const url = new URL(location.href); url.searchParams.delete('create');

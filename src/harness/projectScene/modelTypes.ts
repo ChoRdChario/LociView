@@ -1,6 +1,9 @@
 import type { JsonObject } from '../../domain/values';
 import type { AssetProjection } from '../../scene/types';
 import type { FixtureModelClosure, FixturePlacement } from './modelClosure';
+import type { MediaFileSelection } from './mediaHistory';
+
+export interface ModelFileAddition { readonly sceneId: string; readonly assetId: string; readonly file: MediaFileSelection }
 
 /** Saved read projection only. Complete immutable records remain attached, not reconstructed as fixtures. */
 export interface ValidationModelClosure {

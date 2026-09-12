@@ -11,6 +11,9 @@
 > read/render port、既存pin/text/PNG編集へ接続。memory-port／記録DOMで検証。
 > 開いたCaptionへのPNG後入れも同じjournal／galleryへ接続。他still-image形式は残るためI02の主分類は不変。
 > 実GLBのM06/M07も既存gizmoとtyped binding保存へ限定接続。原GLB／Caption座標は保持。分類数は不変。
+> 開いたProjectへの静的GLB追加もモデルタブへ接続。新Asset／現在Scene所属を原子的に保存し、
+> 追加本体の表示準備後に確認する。失敗時は旧表示・元入力を保持。同名／同bytesを同一Assetとはしない。
+> 他Mesh形式・実描画／実機が残るためM01分類と27/7/20/10の件数は据え置く。
 > P01/P02をこの限定経路で接続済みへ。実描画／実入力／実機／正式採用は未受入れ。
 > M07は同じmetadata hostでモデル回転・正の均等拡縮、preview／取消／保存／再開へ接続。
 > 新しい仕様・採用判断ではない。承認済み要件と現行code/testsの距離を記録する。
@@ -55,7 +58,7 @@
 | 通常home → Native | 実モデル／画像、DisplaySet、限定backup／collaboration／review／clean、旧Desktop・iPhone合格 | 新ProjectScene／継続因果履歴／新保存サービスの完成 |
 | project-scene memory／旧 `storage=saved` | 合成の2人チーム、更新・競合・独立copy・保存の限定ループ | 新metadata serviceまたは実ファイル製品wireの接続済み |
 | project-scene `storage=metadata` | 新source/repository/session/journalと25群の合成UI接続、限定履歴受信・明示解消 | 任意モデル／任意画像／実ファイルのチーム受信／通常home／offlineの合格 |
-| project-scene `storage=validation` | 新規静的GLB/PNG Projectの作成・専用一覧・再開、実保存本体のread/renderと既存pin/text/PNG編集 | 実描画／実入力／実機／正式profile採用、追加file・実モデル編集・実チームwireの完成 |
+| project-scene `storage=validation` | 新規静的GLB/PNG Projectの作成・専用一覧・再開、実本体read/render、pin/text/PNG編集、GLB/PNG後入れとGLB配置 | 実描画／実入力／実機／正式profile採用、他形式・実モデル材質・実チームwireの完成 |
 
 ## 2. 全機能群
 
@@ -78,7 +81,7 @@
 
 | ID | 機能群／利用者の結果 | 状態 | 現在の境界・残り | コード／既存受入れ参照（行番号は監査時点） |
 |---|---|---|---|---|
-| M01 | Meshを追加・表示する | 別経路のみ | validation新規作成時の静的GLB本体／元材質表示は限定接続。開いたProjectへの追加と、NativeのglTF/OBJ/STL/Mesh PLY等は新経路へ未接続。部分接続を行全体の完了としない。 | [src/harness/projectScene/validationRender.ts](../src/harness/projectScene/validationRender.ts) / [src/nativeGs/storage.ts:519](../src/nativeGs/storage.ts) |
+| M01 | Meshを追加・表示する | 別経路のみ | validation静的GLBの新規作成／開いたProjectへの独立追加／元材質表示は限定接続。追加は現在Sceneのみ、exact保存・表示retryで重複させない。NativeのglTF/OBJ/STL/Mesh PLY等は新経路へ未接続。部分接続を行全体の完了としない。 | [src/harness/projectScene/validationHost.ts](../src/harness/projectScene/validationHost.ts) / [src/harness/projectScene/validationRender.ts](../src/harness/projectScene/validationRender.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
 | M02 | 通常Pointを追加・表示・pickする | 別経路のみ | Nativeもexact ASCII float XYZ＋uchar RGB PLY限定。新hostへ未接続。一般点群対応とは呼ばない。 | [src/nativeGs/plyProfile.ts:351](../src/nativeGs/plyProfile.ts) / [tests/nativeGs/pointPresentation.test.ts:9](../tests/nativeGs/pointPresentation.test.ts) |
 | M03 | GSを追加・表示する | 別経路のみ | Nativeのexact Graphdeco SH2/SH3 profileを新hostに未接続。実body・resource lifecycleの検証が必要。 | [src/nativeGs/plyProfile.ts:305](../src/nativeGs/plyProfile.ts) / [src/harness/projectScene/viewport.ts:91](../src/harness/projectScene/viewport.ts) |
 | M04 | モデル選択・検索とScene所属を管理する | 接続済み | 既知モデルのinclude/exclude。Assetそのものは残る。 | [src/ui/projectScene/modelListState.ts:15](../src/ui/projectScene/modelListState.ts) / [tests/ui/projectMetadataHost.test.ts:535](../tests/ui/projectMetadataHost.test.ts) |
@@ -311,7 +314,8 @@ source/schema・互換性の矛盾、受信／破壊境界に新しい製品判�
 実inventory→metadata作成／独立再開は非活性S1サービスのmemory-port試験で接続。
 続く内容検査・初期Project→保存本体のread/render→作成／選択／再開は、POの
 限定承認後に静的GLB/PNG用として接続済み。実描画／実入力の一括Desktop確認は未実施。
-次は段階2に残る追加file導入と実モデル編集の接続であり、追加の汎用storage、
+PNG／GLB後入れとGLB配置も同じ経路へ接続済み。次は段階2の実モデル材質等の接続と
+stage 3 wire/migrationの技術判断の一括整理であり、追加の汎用storage、
 合成run一覧、新PoCへ戻らない。正式profile／G1-A/C・必要実機・採用判断と通常homeは
 別境界。既存新hostの一括Desktop確認は追加機能を前提としない。
 

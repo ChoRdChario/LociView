@@ -9,6 +9,7 @@ import { placementMatrix } from './viewportModel';
 import { canonical, same } from '../../domain/projectGraphSupport';
 
 export interface SavedModelResidentPort { create(model: ValidationModelClosure): ResidentSurface; dispose(): void }
+export interface ValidationResidentCache extends SavedModelResidentPort { prepare(versions: readonly DisplayModelVersion[]): Promise<void> }
 export interface DecodedValidationModel { root: THREE.Object3D; dispose(): void }
 
 /** No arbitrary URL/path input. The caller supplies already inspected, owned GLB bytes. */
@@ -55,21 +56,31 @@ export async function decodeValidationModel(source: ValidatedGlb): Promise<Decod
 
 /** Reusable resident cache, scoped to one opened validation Project; never shared metadata. */
 export async function prepareValidationResidents(versions: readonly DisplayModelVersion[], content: Pick<ValidationContent, 'model'>,
-  decode: (source: ValidatedGlb) => Promise<DecodedValidationModel> = decodeValidationModel): Promise<SavedModelResidentPort> {
+  decode: (source: ValidatedGlb) => Promise<DecodedValidationModel> = decodeValidationModel): Promise<ValidationResidentCache> {
   const templates = new Map<string, { record: string; model: DecodedValidationModel }>();
-  const live = new Set<() => void>(); let closed = false;
+  const live = new Set<() => void>(); let closed = false, preparing = false;
   const dispose = () => { if (closed) return; closed = true; for (const release of [...live]) release();
     for (const item of templates.values()) item.model.dispose(); templates.clear(); };
-  try {
-    for (const version of versions) {
+  const prepare = async (next: readonly DisplayModelVersion[]) => {
+    if (closed || preparing) throw Error('モデルの表示準備を完了してください。');
+    preparing = true; const staged = new Map<string, { record: string; model: DecodedValidationModel }>();
+    try { for (const version of next) {
       const c = version.closure; if (c.shape !== 'saved-glb') throw Error('実モデルの保存本体を選択してください。');
       const key = c.representation.id, record = canonical(c.representation);
-      if (templates.has(key)) { if (templates.get(key)!.record !== record) throw Error('モデルの本体が一致しません。'); continue; }
+      const previous = templates.get(key) ?? staged.get(key);
+      if (previous) { if (previous.record !== record) throw Error('モデルの本体が一致しません。'); continue; }
       const source = await content.model(c.representation);
       if (!same(source.bounds, c.representation.logicalBoundsAsset)) throw Error('保存したモデルの範囲が一致しません。');
-      templates.set(key, { record, model: await decode(source) });
+      staged.set(key, { record, model: await decode(source) });
+      if (closed) throw Error('画面を閉じました。');
     }
-    return { dispose, create(c) {
+      for (const [key, item] of staged) templates.set(key, item);
+    } catch (error) { for (const item of staged.values()) item.model.dispose(); throw error; }
+    finally { preparing = false; }
+  };
+  try {
+    await prepare(versions);
+    return { dispose, prepare, create(c) {
       const item = templates.get(c.representation.id);
       if (closed || !item || item.record !== canonical(c.representation)) throw Error('保存したモデルの表示本体を再確認してください。');
       const root = item.model.root.clone(true), asset = new THREE.Group();

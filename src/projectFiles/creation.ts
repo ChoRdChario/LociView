@@ -5,6 +5,7 @@ import { MetadataProjectSession } from '../projectMetadata/session';
 import type { MetadataStorageFactory } from '../projectMetadata/repository';
 import { digest, equalBytes, metadataPath, readReceipt, underWriteLease, writeReceipt } from '../projectMetadata/persistence';
 import { ValidationContent, readValidationBody } from './content';
+import { validationModelFacts } from './modelFacts';
 import type { PreparedValidationProject } from './initialProject';
 import type { PngDecoder } from './png';
 import { fileError, validationMetadataLimits as metadataLimits, type FileValidationLimits } from './validation';
@@ -38,7 +39,7 @@ async function writeInitial(fs: ProjectWorkspaceFS, source: ProjectMetadataSourc
 export function validationProjectService(fs: ProjectWorkspaceFS, storage: MetadataStorageFactory, store: OriginBlobStore,
   limits: FileValidationLimits, decode?: PngDecoder) {
   const content = new ValidationContent(fs, store, limits, decode);
-  return { content, session: new MetadataProjectSession(fs, storage, metadataLimits, allow => content.verifier(allow), content) };
+  return { content, session: new MetadataProjectSession(fs, storage, metadataLimits, allow => content.verifier(allow), content, validationModelFacts(content)) };
 }
 /** Capture once; repeated execution uses identical source/IDs/bytes after a failed attempt. */
 export function prepareValidationCreation(input: PreparedValidationProject) {

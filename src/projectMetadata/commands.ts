@@ -21,8 +21,10 @@ import { planCaptionDeletion } from './captionDeletion';
 import type { CaptionDeletionCommand, AssetDeletionCommand } from '../scene/commands';
 import { planAssetDeletion } from './assetDeletion';
 import { defaultSceneCandidates } from './startupScene';
+import { planAssetAddition, type AddAssetCommand } from './modelAddition';
 
 export type MetadataEdit =
+  | AddAssetCommand
   | CaptionDeletionCommand
   | AssetDeletionCommand
   | SceneAuthoringCommand
@@ -71,6 +73,7 @@ export function canonicalMetadataEdit(input: MetadataEdit, limits: MetadataLimit
 /** Plan only from the Session's fresh verified provider. Not a generic patch/import API. */
 export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits: MetadataLimits): readonly MetadataWrite[] {
   const command = canonicalMetadataEdit(input, limits), raw = command as unknown as JsonObject;
+  if (command.kind === 'addAsset') return planAssetAddition(provider, command, limits);
   if (command.kind === 'resolveDefaultScene') {
     shape(raw, ['kind', 'operationId']);
     const choice = defaultSceneCandidates(provider, limits).find(c => c.operationId === command.operationId);

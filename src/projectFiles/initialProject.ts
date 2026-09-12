@@ -24,6 +24,31 @@ const label = validationFileLabel;
 const fresh = (prefix: string) => `${prefix}_${newId()}`;
 export const identityPlacement = () => ({ translation: [0, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 });
 
+export async function prepareValidationModel(input: ValidationFile, limits: FileValidationLimits, decode?: PngDecoder, assetId = fresh('ast')) {
+  checkFileLimits(limits);
+  if (!/^ast_[0-9a-f]{32}$/.test(assetId)) return fileError('追加するモデルの識別情報を確認してください。');
+  const name = validationFileLabel(input.label), inspected = await inspectValidationGlb(input.bytes.slice(), limits, decode);
+  const ref: StoredBlobRef = { algorithm: 'sha256', digest: await digest(inspected.bytes), byteLength: inspected.bytes.length, mediaType: 'model/gltf-binary' };
+  const revisionId = fresh('rev'), representationId = fresh('rep'), bindingId = fresh('bnd');
+  const familyId = fresh('fam'), compatibilityId = fresh('cmp'), layoutId = fresh('lay');
+  const slots = inspected.materials.map(material => ({ ...material, logicalMaterialSlotId: fresh('slot') }))
+    .sort((a, b) => a.logicalMaterialSlotId.localeCompare(b.logicalMaterialSlotId));
+  const representation = await sealValidationRecord('representation', {
+    id: representationId, assetId, representationFrameId: fresh('frm'), contentKind: 'mesh', purposes: ['source', 'display'], role: 'meshPrimary',
+    variantFamilyId: familyId, formatProfile: await validationGlbProfile(), blob: ref as unknown as JsonObject,
+    representationToAsset: { ...identityPlacement(), reflection: 'none' }, logicalBoundsAsset: inspected.bounds,
+    derivedFrom: [], materialCatalog: { layoutId, slots },
+  });
+  const revision = await sealValidationRecord('asset-revision', { id: revisionId, assetId, representationIds: [representationId],
+    anchorCompatibilityClasses: [{ id: compatibilityId, targetVariantFamilyIds: [familyId] }],
+    provenance: { origin: 'import', sourceMediaType: ref.mediaType, inputBlobDigests: [ref.digest] } });
+  const binding = await sealValidationRecord('asset-binding-revision', { id: bindingId, assetId, assetRevisionId: revisionId,
+    assetToProject: identityPlacement(), method: 'import' });
+  const asset: JsonObject = { id: assetId, label: name, assetFrameId: fresh('frm'), status: { kind: 'ready', activeBindingId: bindingId },
+    lifecycle: { state: 'active', reason: 'initial', eventId: fresh('evt') } };
+  return { asset, revision, representation, binding, body: { ref, bytes: inspected.bytes } };
+}
+
 /** New local identities from inspected files, never inferred from filenames or another Project. */
 export async function prepareValidationProject(input: { run: string; title: string; models: readonly ValidationFile[]; media?: readonly ValidationFile[] },
   limits: FileValidationLimits, decode?: PngDecoder): Promise<PreparedValidationProject> {
@@ -48,26 +73,11 @@ export async function prepareValidationProject(input: { run: string; title: stri
   records.identity = { projectId: `prj_${run}`, historyEpoch: fresh('hep'), lineageSeed: newId() + newId() };
   records.project = { title, defaultSceneId: sceneId, frame: { id: frameId, handedness: 'right', upAxis: '+Y', unit: { kind: 'meters', metersPerProjectUnit: 1 } } };
   add('scenesById', { id: sceneId, name: '全体', orderKey: 'A', lifecycle: active() });
-  const profile = await validationGlbProfile();
   for (const [index, file] of models.entries()) {
-    const name = label(file.label), inspected = await inspectValidationGlb(file.bytes, limits, decode), ref = await blob(inspected.bytes, 'model/gltf-binary');
-    const assetId = fresh('ast'), revisionId = fresh('rev'), representationId = fresh('rep'), bindingId = fresh('bnd');
-    const familyId = fresh('fam'), compatibilityId = fresh('cmp'), layoutId = fresh('lay');
-    const slots = inspected.materials.map(material => ({ ...material, logicalMaterialSlotId: fresh('slot') }))
-      .sort((a, b) => a.logicalMaterialSlotId.localeCompare(b.logicalMaterialSlotId));
-    add('representationsById', await sealValidationRecord('representation', {
-      id: representationId, assetId, representationFrameId: fresh('frm'), contentKind: 'mesh', purposes: ['source', 'display'], role: 'meshPrimary',
-      variantFamilyId: familyId, formatProfile: profile, blob: ref as unknown as JsonObject,
-      representationToAsset: { ...identityPlacement(), reflection: 'none' }, logicalBoundsAsset: inspected.bounds,
-      derivedFrom: [], materialCatalog: { layoutId, slots },
-    }));
-    add('assetRevisionsById', await sealValidationRecord('asset-revision', { id: revisionId, assetId, representationIds: [representationId],
-      anchorCompatibilityClasses: [{ id: compatibilityId, targetVariantFamilyIds: [familyId] }],
-      provenance: { origin: 'import', sourceMediaType: ref.mediaType, inputBlobDigests: [ref.digest] } }));
-    add('assetBindingsById', await sealValidationRecord('asset-binding-revision', { id: bindingId, assetId, assetRevisionId: revisionId,
-      assetToProject: identityPlacement(), method: 'import' }));
-    add('assetsById', { id: assetId, label: name, assetFrameId: fresh('frm'), status: { kind: 'ready', activeBindingId: bindingId }, lifecycle: active() });
-    add('sceneAssetMembershipsById', { id: fresh('sam'), sceneId, assetId, orderKey: `A${index.toString(36).padStart(8, '0')}`, lifecycle: active() });
+    const model = await prepareValidationModel(file, limits, decode); blobs.push(model.body);
+    add('representationsById', model.representation); add('assetRevisionsById', model.revision);
+    add('assetBindingsById', model.binding); add('assetsById', model.asset);
+    add('sceneAssetMembershipsById', { id: fresh('sam'), sceneId, assetId: model.asset.id!, orderKey: `A${index.toString(36).padStart(8, '0')}`, lifecycle: active() });
   }
   for (const file of media) {
     const name = label(file.label), bytes = file.bytes.slice(); await inspectValidationPng(bytes, limits, decode);

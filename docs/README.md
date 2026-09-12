@@ -70,6 +70,10 @@ render port and existing pin/text/PNG editor. Recorded-DOM/memory-port evidence
 is not actual browser/device acceptance. Adding a PNG to an opened Caption now
 uses that same media editor/journal; body/save/display failures retain exact retry.
 Actual GLB placement also uses existing gizmos and typed binding-only persistence.
+Opened-Project GLB addition now goes through one atomic addAsset command and the
+existing journal delta-body field. New facts are limited to the exact owned input;
+old evidence cannot be regenerated. Missing renderer residents are staged before
+UI acknowledgment, without reopening the editor or changing the camera.
 Other file and real-model editing connections remain; no ordinary entry, existing
 Project or migration has changed.
 

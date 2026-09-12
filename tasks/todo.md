@@ -28,7 +28,50 @@ Formal adoption still requires G1-A/C and applicable device evidence. No profile
 
 #### Active connected work — PO-approved limited real-file validation
 
-Current bounded connection: actual GLB placement using the existing M07 gizmo,
+Completed bounded connection: add one static GLB as a new independent Asset in the
+selected Scene of an opened validation Project. Reuse one-model construction,
+the existing journal/fact boundary and editor; extend only missing renderer
+residents after durable save. Same names/bytes do not imply shared identity.
+
+- [x] Write the finite addAsset/body/fact/render/ack contract in 05 §13.2.
+- [x] Extract one-model construction, validate atomic fresh Asset closure and
+  connect new-body staging/facts with exact journal recovery.
+- [x] Add the model-tab file picker and missing-resident preparation, retaining
+  old camera/editor/data on failure and acknowledging only the saved new Asset.
+- [x] Reuse bounded existing tests for independent addition/guards/fault phases/
+  cold recovery/renderer disposal; run final-tree checks and independent review.
+- [x] Update inventory, handoff and the consolidated manual batch. No ordinary
+  home/profile/wire/migration/device exposure or dependency change is included.
+
+GLB addition result: model-tab selection captures Scene/token/fresh Asset ID;
+one `addAsset` change creates the complete independent closure/membership.
+Exact owned input prepares only the new representation/family facts. The existing
+localCommand stagedBlobs field carries one GLB; remote receive still refuses new
+bodies. Prepared recovery uses original stored changes/facts/body, with no
+replenishment after acknowledged loss. New resident templates remain temporary
+until every decode succeeds, preserving the old editor/camera and resource cache.
+Post-publication display failure stays failed; retry confirms the same Asset.
+Six additions to the existing projectFiles tests cover normal/cancel/same-byte
+independence, stale/readonly/budget/ID/content refusal, body/fact/save faults,
+prepared cold retry, unprepared repair, lost evidence and partial/late renderer
+disposal. Focused 34 tests pass. Read-only service/renderer/UI review has no
+mandatory findings. Final typecheck/build exit 0; root 110 files / 2,013 PASS /
+21 existing TODO / zero failures (176.22 s), terminal exit 0 and JSON success.
+Existing build warnings and pending actual-browser/iPhone evidence remain.
+Existing 5173 entry/new UI/fact modules return HTTP 200, not rendered evidence.
+No new server/tunnel, private source, dependency, wire/schema, ordinary home,
+Service Worker source or release change. Inventory remains 27/7/20/10 because
+M01's other Mesh formats remain unconnected. Local checkpoint only; the prior
+push restriction is unchanged and is not retried. The next bounded connection
+is actual GLB material editing after its existing route is checked; stage-3
+technical ratification remains separate and is not inferred from this approval.
+
+Short meta-audit: this slice closes an opened-Project user action rather than
+adding a PoC or generic storage layer. Keep the approved stage-2 path toward
+TEAM-FLOW-01; actual-browser/device, ordinary entry and wire/migration remain
+explicit acceptance/authority lanes, not hidden completion credit.
+
+Completed bounded connection: actual GLB placement using the existing M07 gizmo,
 typed `transformAsset` command and saved-body renderer. Same source bytes,
 representation/revision and Caption coordinates; only placement binding/status
 changes. No additional profile or product decision is required by read-only audit.

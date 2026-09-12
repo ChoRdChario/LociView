@@ -1,5 +1,15 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-12 開いたProjectへの静的GLB追加（`113ecad`後）:** validationのモデルタブに
+> 「3Dモデルを追加」を接続。選択時Sceneへ新Assetとして原子的に登録し、実本体・新facts・
+> journal保存後に追加表示を準備。同名／同bytesでも独立。旧モデル・Caption・カメラを保持。
+> 新body/facts失敗・exact retry・prepared cold復旧・表示失敗後の重複しない再確認を既存testsへ追加。
+> 110 files／2,013 PASS／21既存TODO、型・build・read-only独立レビュー済み。
+> 既存5173の入口／新module HTTP200。実描画・実入力・iPhone・offline受入れは未完了。
+> 一括Desktop手順4に追加。次は承認済み静的GLBの材質編集への既存経路接続、通常home／
+> 他形式profile／06/07／公開は別境界。ローカルcheckpoint、push制約は未変更のため再試行しない。
+> 以下の「モデル後入れ未接続」は過去checkpoint。棚卸しM01は他形式を含むため分類数を増やさない。
+
 > **2026-09-12 実GLBの配置編集（`6801ea4`後）:** validation hostで既存の
 > 移動／回転／均等拡縮gizmo・数値代替・確定／取消を有効化。更新はfresh manual bindingと
 > Asset.statusのみ。元GLB・材質・revision・Caption原座標は保持、warm保存の本体再読込なし。

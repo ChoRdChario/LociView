@@ -1,6 +1,6 @@
 import type { WorkspaceFS } from '../../platform/fs';
 import { ProjectMutationCoordinator } from '../../platform/projectLock';
-import { technicalId } from '../../projectMetadata/persistence';
+import { technicalId, newId } from '../../projectMetadata/persistence';
 import { TransactionJournal } from '../../projectMetadata/journal';
 import type { MetadataStorageFactory } from '../../projectMetadata/repository';
 import type { OriginBlobStore } from '../../projectMetadata/blobStore';
@@ -19,7 +19,9 @@ import type { SyntheticProject } from './fixture';
 import type { SyntheticAuthority } from './historyProjection';
 import type { SavedWorkspaceHost } from './savedHost';
 import type { MediaImage, MediaFileAddition } from './mediaHistory';
-import type { ModelPlacementCommand } from './modelTypes';
+import type { ModelPlacementCommand, ModelFileAddition } from './modelTypes';
+import { orderBetween } from './viewHistory';
+import { resolveScene } from '../../scene/resolve';
 
 export const validationArea = 'lociview-development-validation-1';
 export interface ValidationHostOptions {
@@ -48,6 +50,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
     connection = await options.openStorage(fresh && !!options.initial && lease.holdsWriteLock);
     const { content, session } = validationProjectService(fs, connection.factory, options.store, options.fileLimits, options.decode);
     let last = await session.read(), project: SyntheticProject | undefined;
+    let prepareDisplay: ((next: SyntheticProject) => Promise<void>) | undefined;
     const images: Record<string, MediaImage> = {};
     const projectView = async (read: MetadataSessionRead) => {
       if (read.source && read.source.proof.identity.projectId !== `prj_${run}`) throw Error('保存領域とプロジェクトが一致しません。');
@@ -57,7 +60,10 @@ export async function openValidationHost(options: ValidationHostOptions) {
         if (field.kind !== 'value') throw Error('保存した画像の情報を確認できません。');
         if (!images[id]) images[id] = { record: field.value as unknown as MediaImage['record'], base64: base64(await content.image(field.value)) };
       }
-      project = { ...metadataProjectView(read.provider, { ...images }, versions), mediaChoices: Object.values(images).map(i => i.record), validationFiles: true };
+      const next = { ...metadataProjectView(read.provider, { ...images }, versions), mediaChoices: Object.values(images).map(i => i.record), validationFiles: true };
+      await prepareDisplay?.(next);
+      if (closed) throw Error('画面を閉じました。保存内容は再度開いて確認してください。');
+      project = next;
     };
     await projectView(last);
     if (!fresh && lease.holdsWriteLock && last.state !== 'repair-required') lease.activateAfterDurableReload();
@@ -78,7 +84,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
       const result = await ready(before.state === 'empty' && options.initial ? await options.initial.persist(fs, options.store, session) :
         before.state === 'empty' || entries.length === 1 && entries[0]!.start.purpose === 'initialize' && before.state !== 'ready'
           ? await resumeValidationCreation(fs, session, `prj_${run}`) : await session.retry());
-      content.releasePreparedImages(); return result;
+      content.releasePreparedImages(); content.releasePreparedModels(); return result;
     };
     if (fresh) { try { await execute(resume); } catch { /* Keep the prepared creation object and the visible failure for explicit retry. */ } }
     const editable = () => { if (closed || fs.mutationAuthority.accessState !== 'editable') throw Error('このタブは閲覧専用です。'); };
@@ -121,6 +127,38 @@ export async function openValidationHost(options: ValidationHostOptions) {
       assetDeletionImpact: (token, id) => { if (last.provider?.kind !== 'scene-provider' || token !== last.provider.token) throw Error('内容が更新されています。'); return assetDeletionImpact(last.provider, id, limits); },
       deleteAsset: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
       addMediaFile,
+      addModelFile: (token, input: ModelFileAddition) => {
+        const target = { sceneId: input.sceneId, assetId: input.assetId }, selected = input.file;
+        const file = { name: selected.name, size: selected.size, arrayBuffer: selected.arrayBuffer.bind(selected) };
+        return execute(async () => {
+          editable(); const before = await session.read();
+          if (before.state !== 'ready' || before.source?.token !== token || before.provider?.kind !== 'scene-provider')
+            throw Error('対象が更新されています。シーンを選び直してください。');
+          const view = authority.read(), scene = resolveScene(view.state, view.resources, target.sceneId);
+          if (scene.kind !== 'ready') throw Error('追加先のシーンを確認してください。');
+          const edges = Object.values(view.state.assetMemberships).filter(e => e.sceneId === target.sceneId);
+          if (edges.some(e => e.lifecycle.kind !== 'value' || e.orderKey.kind !== 'value')) throw Error('モデル一覧の未解決の状態を確認してください。');
+          const orders = edges.filter(e => e.lifecycle.kind === 'value' && e.lifecycle.value.state === 'active')
+            .map(e => (e.orderKey as { value: string }).value).sort();
+          const orderKey = orderBetween(orders.at(-1) ?? null, null), bodies = new Map<string, number>();
+          for (const map of [before.provider.details.immutable.representationsById, before.provider.details.immutable.mediaResourcesById])
+            for (const field of Object.values(map)) {
+              if (field.kind !== 'value') throw Error('保存した本体の情報を確認してください。');
+              const b = field.value.blob as { digest: string; byteLength: number }; bodies.set(b.digest, b.byteLength);
+            }
+          if (!Number.isSafeInteger(file.size) || file.size <= 0 || [...bodies.values()].reduce((sum, size) => sum + size, file.size) > options.fileLimits.maxFileBytes)
+            throw Error('モデルを含む合計がこの検証の上限を超えています。');
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          if (bytes.length !== file.size) throw Error('選択したモデルの大きさが一致しません。');
+          const records = await content.prepareModel({ label: file.name, bytes }, target.assetId);
+          try {
+            const result = await ready(await session.edit(token, { kind: 'addAsset', sceneId: target.sceneId, ...records,
+              membership: { id: `sam_${newId()}`, sceneId: target.sceneId, assetId: target.assetId, orderKey,
+                lifecycle: { state: 'active', reason: 'initial', eventId: `evt_${newId()}` } } }));
+            content.releasePreparedModels(); return result;
+          } catch (error) { if ((await session.read()).state === 'ready') content.releasePreparedModels(); throw error; }
+        }, true);
+      },
       transformModel: (token, input: ModelPlacementCommand) => {
         const captured = cloneCanonicalValue(input as unknown as JsonObject, limits) as unknown as ModelPlacementCommand;
         return execute(async () => {
@@ -142,7 +180,10 @@ export async function openValidationHost(options: ValidationHostOptions) {
     const host: SavedWorkspaceHost = { authority, limits, read: () => last, hasPending: () => busy || !!failure || last.state !== 'ready',
       refresh: () => execute(async () => { last = await session.read(); await projectView(last); return last; }),
       resolve: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
-      dispose: async () => { await dispose(); content.releasePreparedImages(); } };
-    return { ...host, content };
+      dispose: async () => { await dispose(); content.releasePreparedImages(); content.releasePreparedModels(); prepareDisplay = undefined; } };
+    return { ...host, content, setDisplayPreparation(callback: (next: SyntheticProject) => Promise<void>) {
+      if (closed || prepareDisplay) throw Error('モデル表示の接続を確認してください。');
+      prepareDisplay = callback; return () => { if (prepareDisplay === callback) prepareDisplay = undefined; };
+    } };
   } catch (error) { await dispose(); throw error; }
 }

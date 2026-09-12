@@ -17,7 +17,7 @@ export interface MetadataMediaPort {
   stage(record: JsonObject, token: string): Promise<void>;
   verify(blobs: readonly JsonObject[]): Promise<void>;
 }
-export interface MetadataModelFactPlan { readonly baseToken: string; readonly finalToken: string; stage(): Promise<void> }
+export interface MetadataModelFactPlan { readonly baseToken: string; readonly finalToken: string; readonly stagedBlobs?: readonly JsonObject[]; stage(): Promise<void> }
 export interface MetadataModelFactPort { plan(base: ProjectMetadataSource, next: ProjectMetadataSource): Promise<MetadataModelFactPlan | null> }
 
 export type MetadataSessionRead = Readonly<{
@@ -159,7 +159,7 @@ export class MetadataProjectSession {
       const [doc] = A.applyChanges(A.init(), durable.originalChanges());
       this.retained = { start: { transactionId, repositoryId: prior.start.repositoryId, predecessor: prior.start.transactionId,
         purpose: 'localCommand', proof: durable.proof, baseHeads: A.getHeads(doc).sort() }, parts,
-        ...(facts ? { modelFacts: { plan: facts, next: prepared } } : {}) };
+        ...(facts ? { modelFacts: { plan: facts, next: prepared }, stagedBlobs: facts.stagedBlobs?.map(b => JSON.parse(json(b)) as JsonObject) } : {}) };
       return this.resume();
     });
   }
@@ -179,6 +179,7 @@ export class MetadataProjectSession {
       const { parts, final } = planRemoteChanges(base, remote, this.limits);
       // Validate the final required content/candidates without observing a transient prefix.
       const facts = await this.prepareModelFacts(base, final);
+      if (facts?.stagedBlobs?.length) fail('receive-new-body-unconnected');
       if (!facts) await this.checked(final, false);
       if (!parts.length) return read;
       this.retained = { start: { transactionId: newId(), repositoryId: prior.start.repositoryId,
