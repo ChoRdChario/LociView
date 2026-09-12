@@ -97,11 +97,28 @@ export function projectMediaHistory(snapshot: HistorySnapshot, captionIds: reado
   for (const captionId of captionIds) if (Object.values(records).filter(r => r.captionCandidates.includes(captionId)).length > 4096) fail();
   return freezeSynthetic({ cells, records, causalChanges: snapshot.causalChanges ?? [] });
 }
+function readyAttachment(r: SyntheticAttachment) {
+  return r.available !== false && !r.deleteEdit && r.lifecycle.kind === 'value' && r.lifecycle.value.state === 'active' &&
+    r.captionId.kind === 'value' && r.mediaResourceId.kind === 'value' && r.orderKey.kind === 'value';
+}
+/** Same visibility/review boundary as the gallery, indexed once for the whole list. */
+export function captionAttachmentCounts(data: MediaData | undefined): ReadonlyMap<string, Field<number>> {
+  const counts = new Map<string, Field<number>>();
+  for (const row of Object.values(data?.records ?? {})) {
+    if (!row.deleteEdit && row.lifecycle.kind === 'value' && row.lifecycle.value.state === 'deleted') continue;
+    const ready = readyAttachment(row);
+    for (const captionId of new Set(row.captionCandidates)) {
+      const previous = counts.get(captionId);
+      if (previous?.kind === 'unresolved') continue;
+      counts.set(captionId, ready ? value((previous?.value ?? 0) + 1) : { kind: 'unresolved', reason: 'invalid' });
+    }
+  }
+  return counts;
+}
 export function captionAttachments(data: MediaData | undefined, captionId: string) {
   const relevant = Object.values(data?.records ?? {}).filter(r => r.captionCandidates.includes(captionId) &&
     (r.deleteEdit || r.lifecycle.kind !== 'value' || r.lifecycle.value.state !== 'deleted'));
-  const ready = relevant.filter(r => r.available !== false && !r.deleteEdit && r.lifecycle.kind === 'value' && r.lifecycle.value.state === 'active' &&
-    r.captionId.kind === 'value' && r.mediaResourceId.kind === 'value' && r.orderKey.kind === 'value');
+  const ready = relevant.filter(readyAttachment);
   ready.sort((a, b) => { const x = (a.orderKey as { value: string }).value, y = (b.orderKey as { value: string }).value;
     return x < y ? -1 : x > y ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
   return { ready, review: relevant.filter(r => !ready.includes(r)) };

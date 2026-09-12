@@ -2,17 +2,64 @@ import { describe, expect, it } from 'vitest';
 import { inflateSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { inspectNativeImageSource } from '../../src/nativeGs/imageMediaAdmission';
-import { fixtureMedia, captionAttachments, projectMediaHistory, mediaSeed, normalizeAlt } from '../../src/harness/projectScene/mediaHistory';
+import { fixtureMedia, captionAttachments, captionAttachmentCounts, projectMediaHistory, mediaSeed, normalizeAlt, type SyntheticAttachment } from '../../src/harness/projectScene/mediaHistory';
 import { SyntheticSession } from '../../src/harness/projectScene/session';
 import { createDevelopmentWorkspace } from '../../src/harness/projectScene/workspace';
 import { fixtureIds as f } from '../../src/harness/projectScene/fixture';
 import { planCaptionList } from '../../src/ui/projectScene/captionListState';
+import { planNavigation } from '../../src/ui/projectScene/navigationState';
 import { RecordedDocument, record, type RecordedNode } from './domRecorder';
 const nodes = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(nodes)];
 const named = (r: RecordedNode, label: string) => nodes(r).find(n => n.attributes.get('aria-label') === label)!;
 const button = (r: RecordedNode, text: string) => nodes(r).find(n => n.tag === 'button' && n.textContent === text)!;
 const choose = (s: SyntheticSession) => s.acceptList(planCaptionList(s.captionContext(), { kind: 'select', captionId: f.shared }));
+const count = (s: SyntheticSession, id = f.shared) => {
+  const source = s.captionContext().source; if (source.kind !== 'ready') throw Error('list unavailable');
+  return source.captions.find(c => c.id === id)!.mediaCount;
+};
 describe('same-host known PNG media connection; not decoder adoption, raster, IME or persistence', () => {
+  it('counts attachments rather than shared bytes or Scene memberships, including the Project inclusion list', () => {
+    const s = new SyntheticSession(); choose(s);
+    expect(count(s)).toEqual({ kind: 'value', value: 0 });
+    for (let i = 0; i < 2; i++) expect(s.media.add(s.mediaContext(), fixtureMedia[0]!.record.id)).toBe(true);
+    expect(count(s)).toEqual({ kind: 'value', value: 2 });
+    const source = s.includeContext().source;
+    expect(source.kind === 'ready' && source.items.find(i => i.caption.id === f.shared)!.caption.mediaCount).toEqual({ kind: 'value', value: 2 });
+    expect(s.acceptList(planCaptionList(s.captionContext(), { kind: 'select', captionId: f.second }))).toBe(true);
+    expect(s.media.add(s.mediaContext(), fixtureMedia[0]!.record.id)).toBe(true);
+    expect(count(s, f.second)).toEqual({ kind: 'value', value: 1 }); expect(count(s)).toEqual({ kind: 'value', value: 2 });
+    expect(s.acceptNavigation(planNavigation(s.snapshot.state, s.session, s.pending, { kind: 'scene', sceneId: f.detail }))).toBe(true);
+    expect(count(s)).toEqual({ kind: 'value', value: 2 });
+  });
+  it.each(['owner', 'media', 'order', 'lifecycle', 'deleteEdit', 'unavailable'] as const)('keeps %s ambiguity visible instead of reporting a partial total', kind => {
+    const s = new SyntheticSession(); choose(s); s.media.add(s.mediaContext(), fixtureMedia[0]!.record.id);
+    const row = captionAttachments(s.snapshot.mediaData, f.shared).ready[0]!;
+    const unresolved = { kind: 'unresolved' as const, reason: 'conflict' as const };
+    const overrides: Partial<SyntheticAttachment> = kind === 'owner' ? { captionId: unresolved, captionCandidates: [f.shared, f.second, f.shared] } :
+      kind === 'media' ? { mediaResourceId: unresolved } : kind === 'order' ? { orderKey: unresolved } :
+      kind === 'lifecycle' ? { lifecycle: unresolved } : kind === 'deleteEdit' ? { deleteEdit: true,
+        lifecycle: { kind: 'value', value: { state: 'deleted', eventId: 'evt_test', reason: 'userDelete' } } } : { available: false };
+    const data = { ...s.snapshot.mediaData!, records: { [row.id]: row, uncertain: { ...row, id: 'uncertain', ...overrides } } };
+    const counts = captionAttachmentCounts(data); expect(counts.get(f.shared)?.kind).toBe('unresolved');
+    if (kind === 'owner') expect(counts.get(f.second)?.kind).toBe('unresolved');
+    const project = { ...s.snapshot, mediaData: data };
+    const review = new SyntheticSession({ read: () => project, write: () => { throw Error('read-only check'); } });
+    const ui = createDevelopmentWorkspace(new RecordedDocument().asDocument(), review), r = record(ui.root);
+    expect(nodes(named(r, 'キャプション')).some(n => n.textContent.includes('メディアを確認'))).toBe(true); ui.dispose();
+  });
+  it('excludes resolved deletion, preserves counts for alt-text conflicts and does not invent missing saved media', () => {
+    const s = new SyntheticSession(); choose(s); s.media.add(s.mediaContext(), fixtureMedia[0]!.record.id);
+    const row = captionAttachments(s.snapshot.mediaData, f.shared).ready[0]!;
+    const data = { ...s.snapshot.mediaData!, records: {
+      [row.id]: { ...row, captionCandidates: [f.shared, f.shared], altText: { kind: 'unresolved' as const, reason: 'conflict' as const } },
+      deleted: { ...row, id: 'deleted', lifecycle: { kind: 'value' as const, value: { state: 'deleted' as const, eventId: 'evt_test', reason: 'userDelete' as const } } } } };
+    expect(captionAttachmentCounts(data).get(f.shared)).toEqual({ kind: 'value', value: 1 });
+    const absent = new SyntheticSession({ capabilities: { pins: false, membership: false, color: false, media: true }, read: () => new SyntheticSession().snapshot,
+      write: () => { throw Error('read-only check'); } });
+    expect(count(absent).kind).toBe('unresolved');
+    const included = absent.includeContext().source;
+    expect(included.kind === 'ready' && included.items.every(i => i.caption.mediaCount.kind === 'unresolved')).toBe(true);
+  });
   it('verifies both exact fixture PNG byte/digest/CRC/pixel layouts with existing inspection', async () => {
     const crc = (bytes: Uint8Array) => { let c = 0xffffffff; for (const v of bytes) { c ^= v; for (let i = 0; i < 8; i++) c = (c >>> 1) ^ (c & 1 ? 0xedb88320 : 0); } return (c ^ 0xffffffff) >>> 0; };
     for (const m of fixtureMedia) {
@@ -36,6 +83,7 @@ describe('same-host known PNG media connection; not decoder adoption, raster, IM
     picker.value = fixtureMedia[0]!.record.id; picker.fire('change'); button(panel, 'メディアを追加').fire('click');
     picker.value = fixtureMedia[1]!.record.id; picker.fire('change'); button(panel, 'メディアを追加').fire('click');
     expect(captionAttachments(session.snapshot.mediaData, f.shared).ready).toHaveLength(2);
+    expect(nodes(named(r, 'キャプション')).some(n => n.textContent === 'メディア 2')).toBe(true);
     const windows = named(r, 'キャプションのウィンドウ'), gallery = named(windows, '添付メディア'), firstImage = nodes(gallery).find(n => n.tag === 'img')!;
     button(gallery, '拡大').fire('click'); expect(session.memory.selectedCaptionId).toBe(f.shared); expect(button(gallery, '縮小').attributes.get('aria-expanded')).toBe('true');
     button(panel, '説明を編集').fire('click'); const input = named(panel, 'メディアの説明');
@@ -51,6 +99,7 @@ describe('same-host known PNG media connection; not decoder adoption, raster, IM
     button(panel, '添付を削除').fire('click'); expect(captionAttachments(session.snapshot.mediaData, f.shared).ready).toHaveLength(2);
     const confirmation = nodes(panel).filter(n => n.tag === 'section').find(n => n.children.some(c => c.textContent.includes('画像本体と別キャプション')))!;
     button(confirmation, '添付を削除').fire('click'); expect(captionAttachments(session.snapshot.mediaData, f.shared).ready).toHaveLength(1);
+    expect(nodes(named(r, 'キャプション')).some(n => n.textContent === 'メディア 1')).toBe(true);
     expect(Object.keys(session.snapshot.mediaData!.records)).toHaveLength(2); expect(nodes(gallery).filter(n => n.tag === 'img')).toHaveLength(1); w.dispose();
   });
   it('rejects immutable resource mutation and invalid alt text, without interpreting any history URL', () => {

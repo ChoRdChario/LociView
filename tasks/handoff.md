@@ -1,5 +1,15 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-13 C07添付件数接続（`517f4da`後）:** 既存Caption一覧の常時0を実添付数へ接続。
+> 同じ画像も添付ごとに数え、確定削除を除外。不明な参照／順序／利用可否は「メディアを確認」。
+> galleryと同じ条件を共用し、画像本体を再読込せず一度の集計で一覧へ渡す。
+> metadata／限定GLB/PNGの追加・削除・失敗retry・cold再開を既存testsで確認。
+> 最終root 111 files／2,032 PASS／21既存TODO、型・build・独立レビューが通過。
+> 初回のtest補助コードの2失敗は修正済み、詳細はtodo。実画面／実機／offlineは未確認。
+> UI実測は既存Desktop一括手順へ追加。Codexブラウザは接続前に失敗し、修復依頼は繰り返さない。
+> 棚卸し28/6/20/10へ更新。次の独立候補はV04背景操作の既存部品接続。
+> 未回答の06 §12.6を承認扱いにしない。通常home・wire・schema・push制約は不変更。
+
 > **2026-09-13 ファイル設計の具体化／新しい判断点（docs-only、codeは`f51f8af`）:**
 > 06 §12に14 mapのfield／privacy、保護対象、変更要約、有限guard、ZIP配置を記載。
 > 独立レビューで現validationの累積64 MiB制限の説明を訂正。他の必須指摘なし。

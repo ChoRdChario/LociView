@@ -10,13 +10,21 @@
 
 ## Start here
 
+2026-09-13 C07 connection: existing metadata/limited GLB-PNG lists now show
+attachment-derived counts, with unresolved relations shown for review rather than
+as zero. Same-image attachments count separately; confirmed deletion, failed
+publication/retry and cold reopen retain the correct acknowledged state. No new
+storage/wire/layout. Final typecheck/build and 111 files / 2,032 tests PASS;
+21 existing TODO remain. Browser setup still fails before binding, so actual
+rendered/device acceptance remains in the existing Desktop batch.
+
 2026-09-13 package design update: 06 §12 supplies concrete field/privacy, inventory,
 summary and finite execution tables, independently reviewed but still proposed.
 §12.6 identifies a real review-to-edit gap: flattened review data lack the
 class-to-model-family partition required by the editable domain. The recommended
 snapshot-local mapping amendment needs PO approval; no schema/writer changed.
 Finish its reconstruction/receipt/golden contract afterward, not a new PoC.
-Current runtime remains `f51f8af`; the whole five-purpose gate is not closed.
+At that docs-only checkpoint runtime was `f51f8af`; the five-purpose gate remains open.
 
 2026-09-13 bounded state correction: Scene development/metadata/validation hosts
 now label internal acknowledgment as browser resume data, not file-save success.
@@ -36,9 +44,9 @@ Do not repeat the delegation question. No package reader/writer or ordinary rout
 
 2026-09-12 whole-scope inventory: [tasks/implementation-inventory.md](tasks/implementation-inventory.md)
 maps all 41 UI tasks plus accepted Scene/team extensions to 64 work groups:
-27 connected in bounded metadata/validation hosts; 7 component-level gaps, 20 other-path
+28 connected in bounded metadata/validation hosts; 6 component-level gaps, 20 other-path
 connections and 10 new-path implementations remain. P01/P02 are static-GLB/PNG
-validation-only; the other 25 originate in the synthetic host. These are not completion or
+validation-only; C07 now connects both hosts and the other 25 originate in the synthetic host. These are not completion or
 effort percentages. Approved full-source receive (02 §8) and explicit Caption
 text resolution and independent Caption membership copies now have bounded
 new-service/host paths. Prepared model activation, explicit pin correction and

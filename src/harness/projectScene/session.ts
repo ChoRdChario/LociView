@@ -28,7 +28,7 @@ import { SyntheticMaterialSession } from './materialSession';
 import { projectMaterialHistory } from './materialHistory';
 import type { MaterialPlan } from '../../ui/projectScene/materialState';
 import { SyntheticMediaSession, type MediaContext } from './mediaSession';
-import { mediaSeed, projectMediaHistory, type MediaFileSelection } from './mediaHistory';
+import { mediaSeed, projectMediaHistory, captionAttachmentCounts, type MediaFileSelection } from './mediaHistory';
 import { previewHistory } from './historyPort';
 import { WorkingAcknowledgment, afterWorking, type WorkingResult } from './acknowledgment';
 import type { PinSurfaceTarget } from './viewportPicking';
@@ -377,6 +377,8 @@ export class SyntheticSession {
   }
   captionContext(): CaptionListContext {
     const { resources, colors, modelNames, state } = this.project;
+    const mediaCounts = captionAttachmentCounts(this.project.mediaData);
+    const noMedia = this.authority?.capabilities?.media && !this.project.mediaData ? unknown<number>() : value(0);
     const result = resolveScene(state, resources, this.sceneId);
     const source = result.kind === 'blocked'
       ? { kind: 'unavailable' as const, token: state.token, sceneId: this.sceneId, reason: 'シーンの状態を確認してください。' }
@@ -388,7 +390,7 @@ export class SyntheticSession {
               name: modelNames[anchor.value.assetId] === undefined ? unknown() : value(modelNames[anchor.value.assetId]!) });
           const hidden = result.issues.some(i => i.entityId === caption.captionId && i.code === 'hidden-owner');
           return { id: caption.captionId, title: caption.title, body: caption.body, owner,
-            color: colors[caption.captionId] ?? unknown(), mediaCount: value(0),
+            color: colors[caption.captionId] ?? unknown(), mediaCount: mediaCounts.get(caption.captionId) ?? noMedia,
             pin: hidden ? 'ownerHidden' : caption.marker === 'needsReview' ? 'needsReview' :
               caption.marker === 'visible' ? 'visible' : 'unavailable' };
         }) };
@@ -412,13 +414,15 @@ export class SyntheticSession {
   }
   includeContext(): CaptionIncludeContext {
     const { state, resources, colors, modelNames } = this.project;
+    const mediaCounts = captionAttachmentCounts(this.project.mediaData);
+    const noMedia = this.authority?.capabilities?.media && !this.project.mediaData ? unknown<number>() : value(0);
     return { source: { kind: 'ready', token: state.token, sceneId: this.sceneId,
       items: Object.values(resources.captions).map(caption => {
         const anchor = caption.anchor.kind === 'value' ? caption.anchor.value : null;
         const edges = Object.values(state.captionMemberships).filter(e => e.sceneId === this.sceneId && e.resourceId === caption.id &&
           (e.lifecycle.kind !== 'value' || e.lifecycle.value.state !== 'deleted'));
         return { caption: { id: caption.id, title: caption.title, body: caption.body, color: colors[caption.id] ?? unknown<string>(),
-          mediaCount: value(0), pin: anchor?.kind === 'asset' && !this.composition.assets.some(asset => asset.assetId === anchor.assetId)
+          mediaCount: mediaCounts.get(caption.id) ?? noMedia, pin: anchor?.kind === 'asset' && !this.composition.assets.some(asset => asset.assetId === anchor.assetId)
             ? 'ownerHidden' as const : 'unavailable' as const, owner: anchor?.kind === 'asset' ? value({ kind: 'asset' as const,
             assetId: anchor.assetId, name: value(modelNames[anchor.assetId] ?? 'モデル') }) : unknown<CaptionListItem['owner'] extends Field<infer T> ? T : never>() },
           lifecycle: caption.lifecycle.kind === 'value' ? value(caption.lifecycle.value.state) : unknown<'active' | 'deleted'>(),

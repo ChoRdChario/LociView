@@ -28,7 +28,56 @@ Formal adoption still requires G1-A/C and applicable device evidence. No profile
 
 #### Active connected work — PO-approved limited real-file validation
 
-Current next slice (2026-09-13, after `f51f8af`): finish 06 §11.3's closed
+Current slice (2026-09-13, after `517f4da`): connect C07's real attachment counts
+to the existing Caption lists. Previous turn made progress by committing the wire
+design and identifying a new review-to-edit contract decision. That decision is
+still unapproved; this independent, already-approved stage-2 connection does not
+change it or authorize package/schema work.
+
+- [x] Replace constant-zero list/include counts with one-pass attachment-derived
+  counts. Resolved deletion is excluded; unresolved relationship/availability
+  remains visibly unconfirmed, never a guessed count. Shared media count per
+  attachment, not per stored binary or Scene membership.
+- [x] Reuse media/metadata/validation tests for add/remove, shared Scene lists,
+  failed publication, retry and cold reopen; no additional PoC or file profiles.
+- [x] Run scoped and final-tree checks, independent read-only review, and update
+  the inventory/handoff with exact connection and rendered-evidence boundaries.
+
+Acceptance: existing rendered list component receives the real acknowledged
+attachment state and its existing review presentation; no model-body reads or
+per-Caption full attachment scans. No new labels/control/layout, persistence,
+media support, wire/schema, normal-home or release change. Codex browser skill
+setup was rechecked this turn; it still fails before binding on the prohibited
+runtime import. No browser tab or screenshot was inspected. Do not bypass the
+selected browser or repeatedly ask the user to repair it; rendered acceptance
+remains in the consolidated batch, not a claimed pass for this slice.
+
+C07 review: the list and Project-inclusion context now use the gallery's existing
+ready/review rules via one attachment index per context. Known deletion is omitted;
+alt-text-only conflict does not erase a known image count. Missing mediaData in a
+media-capable host is unconfirmed, not the empty synthetic fixture. Two source
+files and three existing test files changed; storage, input, layout and wire did not.
+Independent read-only code review found no mandatory issue. Initial typecheck
+found a missing test import and incomplete test capability object; both fixed.
+The first focused run was 99 PASS / 2 failures from that missing import, not a
+passing checkpoint. Final exact-tree typecheck/build exit 0; root 111 files,
+2,032 PASS / 21 existing TODO / 0 failures, JSON success and terminal exit 0
+(229.05 s reported result span), two workers and 15-second default timeout.
+Existing assertions/per-test timeouts remain; normal mixed-import/chunk warnings
+remain. No subsequent executable change. Browser initialization failed before
+binding; recorded DOM is not rendered/device/offline acceptance. The existing
+Desktop batch now checks the count after add/remove/reopen; no extra PO run asked.
+
+Short meta-audit: C07 closes an actual approved connection while §12.6 awaits
+its separate product decision; it is not substitute completion for file exchange.
+Inventory is now 28 connected / 6 component gaps / 20 other-path / 10 new-path
+groups (64 total; M13/M14 still later). Next independent candidate is V04's
+existing background control connection to the current view workflow, after a
+bounded dependency check; do not grow another generic storage or review workstream.
+The package decision/real-browser/device lanes remain open and are not inferred
+approved from this continued goal.
+
+Previous design slice (2026-09-13, after `f51f8af`): finish 06 §11.3's closed
 five-purpose implementation-design tables. Previous goal turn is progress:
 truthful working-data presentation, verified source/test tree and reviewed save-
 point/output design were committed; worktree is clean at this slice's start.

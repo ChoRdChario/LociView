@@ -1,6 +1,8 @@
 # 実装・接続の全体棚卸し
 
-> CURRENT INVENTORY / 2026-09-12。全体監査基点: `b73315b851f627ca61029cfb73caf23f6e4829bd`。
+> CURRENT INVENTORY / 2026-09-13。全体監査基点: `b73315b851f627ca61029cfb73caf23f6e4829bd`。
+> C07は添付情報から一覧件数へ接続済み。metadata／限定GLB/PNGで追加・削除・retry・再開を確認。
+> 不明な添付を0件にせず、同じ画像の複数添付は各1件。実画面・実機・offline受入れは別。
 > その後の実装差分: 新metadataの完全履歴受信・Caption文言の明示解消・重複Captionの独立コピー、
 > 準備済みモデル切替とpin修正の保存・二人二巡、モデルstatus・Caption位置／色の明示解消、
 > 既知Mesh独立copy、Scene作成・名前／開始Scene設定、確認付きCaption／モデル全Project削除を限定接続。
@@ -13,7 +15,7 @@
 > 実GLBのM06/M07も既存gizmoとtyped binding保存へ限定接続。原GLB／Caption座標は保持。分類数は不変。
 > 開いたProjectへの静的GLB追加もモデルタブへ接続。新Asset／現在Scene所属を原子的に保存し、
 > 追加本体の表示準備後に確認する。失敗時は旧表示・元入力を保持。同名／同bytesを同一Assetとはしない。
-> 他Mesh形式・実描画／実機が残るためM01分類と27/7/20/10の件数は据え置く。
+> 他Mesh形式・実描画／実機が残るためM01分類は据え置く。現在の分類数は下記§1。
 > 実GLB全slotの正確な材質対応と照明／表裏／scope解除を接続。原PNG/PBRと保存retryを保持。
 > hard chromaとCPU候補面ごとのGPU可視判定も接続。判定失敗では配置せず、元材質と描画状態を保持。
 > shader／記録renderer／保存テストの証拠であり、実GPU・実機は未確認。他形式が残るためA02全体の完了とは数えない。
@@ -30,14 +32,14 @@
 ## 1. 結論と数え方
 
 ユーザーが行う作業を **64機能群** に整理すると、新metadata保存画面へ限定接続済みが
-**27群**、残りが **37群**。その37群は下記の内訳になる。
-「27/64完成」といった完成率・工数には換算しない。小さい部品接続と
+**28群**、残りが **36群**。その36群は下記の内訳になる。
+「28/64完成」といった完成率・工数には換算しない。小さい部品接続と
 移行／チーム受信では仕事量が大きく違い、接続済みも下記の限定経路だからである。
 
 | 排他的な主分類 | 群数 | 意味 |
 |---|---:|---|
-| 接続済み | 27 | 新metadata hostで操作・必要な保存まで接続。25群は既知三角形／2 PNG起点、P01/P02は新validation hostの静的GLB/PNG限定。実機受入れは別 |
-| 部品未接続 | 7 | 新系統のUI部品・pure planner等はあるが、対象群全体の画面・実データ・typed command／保存のいずれかが未接続。T01〜T04は限定接続まで進んだ |
+| 接続済み | 28 | 新metadata hostで操作・必要な保存まで接続。従来25群は既知三角形／2 PNG起点、P01/P02は限定validation、C07は両hostへ接続。実機受入れは別 |
+| 部品未接続 | 6 | 新系統のUI部品・pure planner等はあるが、対象群全体の画面・実データ・typed command／保存のいずれかが未接続。T01〜T04は限定接続まで進んだ |
 | 別経路のみ | 20 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
 | 新規実装 | 10 | 新契約の利用者向け経路がまだない。schema・検証・設計案があっても実装済みとは数えない |
 
@@ -60,7 +62,7 @@
 |---|---|---|
 | 通常home → Native | 実モデル／画像、DisplaySet、限定backup／collaboration／review／clean、旧Desktop・iPhone合格 | 新ProjectScene／継続因果履歴／新保存サービスの完成 |
 | project-scene memory／旧 `storage=saved` | 合成の2人チーム、更新・競合・独立copy・保存の限定ループ | 新metadata serviceまたは実ファイル製品wireの接続済み |
-| project-scene `storage=metadata` | 新source/repository/session/journalと25群の合成UI接続、限定履歴受信・明示解消 | 任意モデル／任意画像／実ファイルのチーム受信／通常home／offlineの合格 |
+| project-scene `storage=metadata` | 新source/repository/session/journalと従来25群＋C07の合成UI接続、限定履歴受信・明示解消 | 任意モデル／任意画像／実ファイルのチーム受信／通常home／offlineの合格 |
 | project-scene `storage=validation` | 新規静的GLB/PNG Projectの作成・専用一覧・再開、実本体read/render、pin/text/PNG編集、GLB/PNG後入れ・配置・材質照明／表裏／hard chroma／解除 | 実描画／実入力／実機／正式profile採用、他形式・残る材質効果・実チームwireの完成 |
 
 ## 2. 全機能群
@@ -109,7 +111,7 @@
 | C04 | 選んだ分類色で続けてピンを追加する | 別経路のみ | 新規色が固定。Nativeの「追加色」状態を未継承。絞り込み色／既存色編集とは別。 | [src/harness/projectScene/session.ts:574](../src/harness/projectScene/session.ts) / [src/nativeGs/app.ts:2584](../src/nativeGs/app.ts) |
 | C05 | Scene内のCaptionを検索・選択する | 接続済み | タイトル／本文検索と選択保持。タグ・添付説明の拡張検索は含めない。 | [src/ui/projectScene/captionListControls.ts:14](../src/ui/projectScene/captionListControls.ts) / [tests/ui/projectSceneCaptionList.test.ts:41](../tests/ui/projectSceneCaptionList.test.ts) |
 | C06 | カラーサークルで一覧とピンを絞り込む | 接続済み | 全色／空集合、選択を失わない再表示経路。 | [src/ui/projectScene/captionListControls.ts:23](../src/ui/projectScene/captionListControls.ts) / [tests/ui/projectSceneCaptionList.test.ts:66](../tests/ui/projectSceneCaptionList.test.ts) |
-| C07 | 一覧で添付の有無・件数を見分ける | 部品未接続 | 部品は件数を描くがhostは常にmediaCount=0を渡す。実データ接続漏れ。 | [src/ui/projectScene/captionListControls.ts:90](../src/ui/projectScene/captionListControls.ts) / [src/harness/projectScene/session.ts:232](../src/harness/projectScene/session.ts) |
+| C07 | 一覧で添付の有無・件数を見分ける | 接続済み | metadata／限定GLB/PNG hostの添付recordを一回集計して一覧へ渡す。確定削除除外、曖昧な参照等は要確認、同じblobの複数添付も各1件。追加・削除・失敗後retry・cold reopenは既存tests、実画面／実機は未受入れ。 | [src/harness/projectScene/mediaHistory.ts](../src/harness/projectScene/mediaHistory.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) / [tests/ui/projectSceneMedia.test.ts](../tests/ui/projectSceneMedia.test.ts) |
 | C08 | 複数Captionウィンドウを比較する | 接続済み | 順次開く・前面化・個別×・移動／キーボード・並べる・意味のある位置への接続線。 | [src/ui/projectScene/captionWindowControls.ts:26](../src/ui/projectScene/captionWindowControls.ts) / [tests/ui/projectSceneWindowConnection.test.ts:34](../tests/ui/projectSceneWindowConnection.test.ts) |
 | C09 | Captionウィンドウのサイズを変える | 別経路のみ | 新部品にresize入力なし。WindowRect型にサイズがあるだけでは操作可能としない。 | [src/ui/projectScene/captionWindowControls.ts:79](../src/ui/projectScene/captionWindowControls.ts) / [src/nativeGs/captionWindows.ts:663](../src/nativeGs/captionWindows.ts) |
 | C10 | Project全体からCaptionを削除する | 接続済み | 影響Scene・添付・tag登録を確認し、Captionと観測済み全edgeを原子的tombstone。本文競合・Media/Tag/モデル本体を保持。保存失敗中は旧UI、exact retry／cold reopen、後着edge/delete-editの保持と警告、未適用入力の明示取消を確認。復元・一般参照修復UIは別。 | [src/projectMetadata/captionDeletion.ts](../src/projectMetadata/captionDeletion.ts) / [src/harness/projectScene/captionDeletionControls.ts](../src/harness/projectScene/captionDeletionControls.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
@@ -330,7 +332,7 @@ PNG／GLB後入れ・配置・材質照明／表裏／hard chroma／解除も同
 | 7 | 他の実形式・閲覧補助と残るalignment／補修を継承・実装する | Point＋表示径＋pick、GS＋明示Proxy、複数material、rotation/scale、残るalignmentを形式／契約ごとに閉じる。M14はGS/repair-local transform/原子的revisionの前提が揃ってから。hard-maskと一般smooth透過を一括deferredにしない。従来UIをコピーして新Sceneの意味を変えない |
 | 8 | 通常homeからの全体受入れ | 新sourceでTEAM-FLOW-01をDesktopとphysical iPhone、保存／restart／offlineまで確認。a11y・短画面・IME等も安定treeでまとめる。Pages/SW/main/releaseへは現在の権限で進まない |
 
-C07添付件数、V04背景入口、C04追加色、C09resize、M05一時hide等は
+残るV04背景入口、C04追加色、C09resize、M05一時hide等は
 小さな独立UI接続として、依存が揃い次第本筋の間に挟んでよい。
 全てのチーム・形式作業が終わるまで放置する意味ではない。
 ただし小改修を積み続けて受信・更新の本筋が進まない状態にはしない。

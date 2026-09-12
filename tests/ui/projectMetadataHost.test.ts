@@ -1681,6 +1681,7 @@ describe('new synthetic saved host (memory ports and recorded DOM, not real brow
     await ui.add(0); expect(s.acknowledgment.state).toBe('idle'); await ui.add(1); expect(s.acknowledgment.state).toBe('idle');
     const rows = () => captionAttachments(s.snapshot.mediaData, f.shared).ready, first = rows()[0]!.id;
     expect(rows()).toHaveLength(2); expect(host.read().source!.originalChanges()).toHaveLength(originals.length + 2);
+    expect(descendants(named(ui.root, 'キャプション')).some(n => n.textContent === 'メディア 2')).toBe(true);
     const gallery = area(named(ui.root, 'キャプションのウィンドウ'), '添付メディア');
     expect(descendants(gallery).filter(n => n.tag === 'img').map(n => (n as unknown as HTMLImageElement).src)).toEqual(fixtureMedia.map(m => `data:image/png;base64,${m.base64}`));
     button(ui.panel, '説明を編集').fire('click'); setInput(named(ui.panel, 'メディアの説明'), '保存した説明');
@@ -1694,6 +1695,7 @@ describe('new synthetic saved host (memory ports and recorded DOM, not real brow
     expect(readonly.media.add(readonly.mediaContext(), fixtureMedia[0]!.record.id)).toBe(false);
     readUI.w.dispose(); await reader.dispose();
     await ui.remove(); await ui.remove(); expect(rows()).toHaveLength(0); expect(host.read().state).toBe('ready');
+    expect(descendants(named(ui.root, 'キャプション')).some(n => n.textContent.includes('メディア '))).toBe(false);
     expect(Object.keys(s.snapshot.mediaData!.records)).toHaveLength(2);
     expect(s.snapshot.resources.captions[f.shared]!.title).toEqual({ kind: 'value', value: '先の作業を保持' });
     expect(await Promise.all(seedPaths.map(p => h.base.readBytes(p)))).toEqual(seedBytes);
@@ -1702,6 +1704,7 @@ describe('new synthetic saved host (memory ports and recorded DOM, not real brow
     expect(cold.read().state).toBe('ready'); expect(Object.keys(cs.snapshot.mediaData!.images!)).toHaveLength(2);
     expect(captionAttachments(cs.snapshot.mediaData, f.shared).ready).toHaveLength(0);
     await cu.add(0); expect(cs.acknowledgment.state).toBe('idle');
+    expect(descendants(named(cu.root, 'キャプション')).some(n => n.textContent === 'メディア 1')).toBe(true);
     expect(captionAttachments(cs.snapshot.mediaData, f.shared).ready[0]!.id).not.toBe(first);
     const provider = cold.read().provider!; if (provider.kind !== 'scene-provider') throw Error('provider');
     expect(Object.keys(provider.details.immutable.mediaResourcesById)).toHaveLength(2); expect(cold.content.counts.bodyBytes).toBe(0);
