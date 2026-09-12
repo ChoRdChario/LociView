@@ -239,7 +239,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
       // 05 §13.2 permits this exact new synthetic host, never ordinary/old saved activation.
       const metadataHost = /[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Intent|MembershipControls|Models|ModelFacts|AssetStatusControls|ConflictControls|StartupControls)\.ts$/.test(path);
       const validationFiles = /[\\/]projectFiles[\\/](validation|png|glb|glbMaterials|initialProject|content|creation|modelFacts)\.ts$/.test(path);
-      const validationDisplay = /[\\/]harness[\\/]projectScene[\\/](modelTypes|validationProjection|validationRender|validationMaterials)\.ts$/.test(path);
+      const validationDisplay = /[\\/]harness[\\/]projectScene[\\/](modelTypes|validationProjection|validationRender|validationMaterials|validationCoverage)\.ts$/.test(path);
       const validationHost = /[\\/]harness[\\/]projectScene[\\/](savedHost|validationHost|validationCatalog|validationWorkspace|validationBrowser|browserMetadataStorage)\.ts$/.test(path);
       if (!metadataFoundation && !metadataService && !metadataHost && !validationFiles && !validationDisplay && !validationHost) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectMetadata\//);
       if (/[\\/](scene|domain)[\\/]/.test(path)) {
@@ -272,8 +272,9 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         const byFile: Record<string, string[]> = {
           modelTypes: ['../../domain/values', '../../scene/types', './modelClosure', './mediaHistory'],
           validationProjection: ['../../scene/projectProvider', '../../projectMetadata/records', '../../domain/projectGraphSupport', '../../projectFiles/validation', './fixture', './modelTypes'],
-          validationRender: ['three', 'three/addons/loaders/GLTFLoader.js', '../../viewer/loaders', '../../projectFiles/glb', '../../projectFiles/content', './modelTypes', './viewportPicking', './viewportModel', '../../domain/projectGraphSupport', '../../domain/values', './validationMaterials'],
+          validationRender: ['three', 'three/addons/loaders/GLTFLoader.js', '../../viewer/loaders', '../../viewer/hardChroma', '../../projectFiles/glb', '../../projectFiles/content', './modelTypes', './viewportPicking', './viewportModel', '../../domain/projectGraphSupport', '../../domain/values', './validationMaterials'],
           validationMaterials: ['../../domain/projectGraphSupport', '../../domain/materialIntent', '../../domain/values', '../../scene/types', './modelTypes'],
+          validationCoverage: ['three', '../../viewer/hardChroma', './viewportPicking'],
         };
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
         expect(imports.every(p => byFile[path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '')]!.includes(p!)), path).toBe(true);
@@ -382,7 +383,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           '../../ui/projectScene/pinModeState', '../../ui/projectScene/pinModeControls',
           '../../ui/projectScene/modelListState', '../../ui/projectScene/modelListControls'];
         if (/[\\/]viewport(?:Model)?\.ts$/.test(path)) permitted.push('three');
-        if (path.replaceAll('\\', '/').endsWith('/viewport.ts')) permitted.push('three/addons/controls/OrbitControls.js');
+        if (path.replaceAll('\\', '/').endsWith('/viewport.ts')) permitted.push('three/addons/controls/OrbitControls.js', '../../viewer/hardChroma');
         if (/[\\/](viewportHost|viewSession)\.ts$/.test(path)) permitted.push('../../ui/projectScene/viewControls', '../../ui/projectScene/viewState',
           '../../ui/projectScene/viewAuthoringState', '../../ui/projectScene/viewAuthoringControls');
         if (path.replaceAll('\\', '/').endsWith('/viewHistory.ts')) permitted.push('../../domain/values');

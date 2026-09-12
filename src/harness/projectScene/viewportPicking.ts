@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { SyntheticDisplay, V3 } from './viewportModel';
+import { hardChroma } from '../../viewer/hardChroma';
 
 /** Ephemeral exact resident target; never saved source provenance or an inferred relation. */
 export interface PinSurfaceTarget {
@@ -8,10 +9,11 @@ export interface PinSurfaceTarget {
   readonly familyId: string; readonly compatibilityId: string;
 }
 export interface ResidentSurface { readonly mesh: THREE.Object3D; readonly asset: THREE.Group; dispose?(): void }
+export type PickCoverage = (hit: THREE.Intersection<THREE.Object3D>, material: THREE.Material) => 'covered' | 'discarded' | 'unknown';
 
 /** Other resident models can occlude, never become the requested target. */
 export function pickResidentSurface(display: SyntheticDisplay, target: PinSurfaceTarget,
-  resident: ReadonlyMap<string, ResidentSurface>, camera: THREE.Camera, ndc: THREE.Vector2): V3 | null {
+  resident: ReadonlyMap<string, ResidentSurface>, camera: THREE.Camera, ndc: THREE.Vector2, coverage?: PickCoverage): V3 | null {
   if (![ndc.x, ndc.y].every(Number.isFinite) || Math.abs(ndc.x) > 1 || Math.abs(ndc.y) > 1 ||
     display.token !== target.token || display.sceneId !== target.sceneId) return null;
   const model = display.models.find(m => m.binding.assetId === target.assetId), selected = resident.get(target.assetId);
@@ -28,38 +30,40 @@ export function pickResidentSurface(display: SyntheticDisplay, target: PinSurfac
     if (!surface.asset.visible || !surface.mesh.visible) return undefined;
     surface.asset.updateMatrixWorld(true);
     // Camera near/far planes are not Euclidean ray distances, especially for orthographic views.
-    return ray.intersectObject(surface.mesh, true).find(result => {
-      if (!(result.object instanceof THREE.Mesh)) return false;
+    for (const result of ray.intersectObject(surface.mesh, true)) {
+      if (!(result.object instanceof THREE.Mesh)) continue;
       let node: THREE.Object3D | null = result.object;
-      while (node) { if (!node.visible) return false; node = node.parent; }
+      let visible = true;
+      while (node) { if (!node.visible) { visible = false; break; } node = node.parent; }
+      if (!visible) continue;
       const materials = result.object.material, material = Array.isArray(materials) ? materials[result.face?.materialIndex ?? -1] : materials;
-      if (!material?.visible) return false;
+      if (!material?.visible) continue;
       const p = result.point.clone().project(camera);
-      return [p.x, p.y, p.z].every(Number.isFinite) && p.z >= -1 && p.z <= 1;
-    });
+      if (![p.x, p.y, p.z].every(Number.isFinite) || p.z < -1 || p.z > 1) continue;
+      const decision = hardChroma(material) ? coverage?.(result, material) ?? 'unknown' :
+        material.transparent || material.alphaTest > 0 || material.opacity < 1 ? 'unknown' : 'covered';
+      if (decision !== 'discarded') return { result, decision };
+    }
+    return undefined;
   }
   const chosen = hit(selected); if (!chosen) return null;
-  const material = (chosen.object as THREE.Mesh).material;
-  const chosenMaterial = Array.isArray(material) ? material[chosen.face?.materialIndex ?? -1] : material;
-  // Until alpha-aware picking is connected, do not put a pin on an invisible texture hole
-  // or pick through a potentially transparent foreground. Surface choice stays explicit.
-  if (!chosenMaterial || chosenMaterial.transparent || chosenMaterial.alphaTest > 0 || chosenMaterial.opacity < 1) return null;
+  if (chosen.decision !== 'covered') return null;
   for (const [id, surface] of resident) {
     if (id === target.assetId) continue;
     const occluder = hit(surface);
     // Numerically indistinguishable opaque surfaces have no safe front winner.
-    const tolerance = 1e-9 * Math.max(1, chosen.distance, occluder?.distance ?? 0);
-    if (occluder && occluder.distance <= chosen.distance + tolerance) return null;
+    const tolerance = 1e-9 * Math.max(1, chosen.result.distance, occluder?.result.distance ?? 0);
+    if (occluder && occluder.result.distance <= chosen.result.distance + tolerance) return null;
   }
-  const p = selected.asset.worldToLocal(chosen.point.clone());
+  const p = selected.asset.worldToLocal(chosen.result.point.clone());
   return [p.x, p.y, p.z].every(Number.isFinite) ? [p.x || 0, p.y || 0, p.z || 0] : null;
 }
 
 /** Creation only: the user's visible surface supplies its exact model identity. */
 export function pickResidentCreation(display: SyntheticDisplay, targets: readonly PinSurfaceTarget[],
-  resident: ReadonlyMap<string, ResidentSurface>, camera: THREE.Camera, ndc: THREE.Vector2) {
+  resident: ReadonlyMap<string, ResidentSurface>, camera: THREE.Camera, ndc: THREE.Vector2, coverage?: PickCoverage) {
   const hits = targets.flatMap(target => {
-    const position = pickResidentSurface(display, target, resident, camera, ndc);
+    const position = pickResidentSurface(display, target, resident, camera, ndc, coverage);
     return position ? [{ target, position }] : [];
   });
   return hits.length === 1 ? hits[0]! : null;

@@ -9,6 +9,7 @@ import { placementMatrix } from './viewportModel';
 import { canonical, same } from '../../domain/projectGraphSupport';
 import type { JsonObject } from '../../domain/values';
 import { validationMaterialSlots, validationMaterialIssue, type ValidationMaterialEffects } from './validationMaterials';
+import { patchHardChroma } from '../../viewer/hardChroma';
 
 export interface SavedModelResidentPort { create(model: ValidationModelClosure, effects?: ValidationMaterialEffects): ResidentSurface; dispose(): void }
 export interface ValidationResidentCache extends SavedModelResidentPort { prepare(versions: readonly DisplayModelVersion[]): Promise<void>;
@@ -154,6 +155,7 @@ export async function prepareValidationResidents(versions: readonly DisplayModel
               if (a.baseColorSrgb) (result as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial).color.setRGB(...a.baseColorSrgb as [number, number, number], THREE.SRGBColorSpace);
               if (a.doubleSided !== undefined) result.side = a.doubleSided ? THREE.DoubleSide : THREE.FrontSide;
               if (a.opacity !== undefined) result.opacity = a.opacity;
+              if (a.chroma) patchHardChroma(result as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial, a.chroma);
             }
             return result;
           };

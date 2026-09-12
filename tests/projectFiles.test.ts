@@ -42,6 +42,7 @@ import { validationMaterialSlots, validationMaterialIssue } from '../src/harness
 import { materialKey } from '../src/harness/projectScene/materialHistory';
 import { canonicalFixture } from '../src/harness/projectScene/modelClosure';
 import type { MaterialIntent } from '../src/domain/materialIntent';
+import { hardChroma } from '../src/viewer/hardChroma';
 
 const budget: FileValidationLimits = { maxFileBytes: 1_000_000, maxJsonBytes: 100_000, maxItems: 10_000, maxValues: 100_000, maxPixels: 10_000 };
 const png = Uint8Array.from(atob(fixtureMedia[0]!.base64), c => c.charCodeAt(0));
@@ -129,7 +130,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(originals.map(m => decoded.materialLocators.get(m))).toEqual([1, 0, null, 0, 1, 0, null, 0].map(i => i === null ?
         { kind: 'representationMaterial', slotIndex: 0 } : { kind: 'gltfMaterial', materialIndex: i }));
       const residents = await prepareValidationResidents(s.snapshot.modelVersions!, host.content, async () => decoded);
-      const intent: MaterialIntent = { appearance: { lighting: 'unlit', doubleSided: true, baseColorSrgb: [0.3, 0.4, 0.5] }, compositing: { coverage: { policy: 'inherit' }, optics: 'inherit' } };
+      const intent: MaterialIntent = { appearance: { lighting: 'unlit', doubleSided: true, baseColorSrgb: [0.3, 0.4, 0.5],
+        chroma: { keyColorSrgb: [0.1, 0.2, 0.3], tolerance: 0.2, softness: 0 } }, compositing: { coverage: { policy: 'inherit' }, optics: 'inherit' } };
       const changed = residents.create(c, { [slot.target.logicalMaterialSlotId]: intent }), untouched = residents.create(c);
       const mats = (root: THREE.Object3D) => { const result: (THREE.MeshStandardMaterial | THREE.MeshBasicMaterial)[] = [];
         root.traverse(n => { if (n instanceof THREE.Mesh) result.push(n.material); }); return result; };
@@ -137,12 +139,17 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       for (const i of [1, 3, 5, 7]) {
         expect(edited[i]).toBeInstanceOf(THREE.MeshBasicMaterial); expect(edited[i]!.side).toBe(THREE.DoubleSide);
         expect(edited[i]!.color).toEqual(expectedColor); expect(edited[i]!.map).toBe(originals[i]!.map);
+        expect(hardChroma(edited[i]!)).toEqual({ keyColorSrgb: [0.1, 0.2, 0.3], tolerance: 0.2 });
       }
-      for (const i of [0, 2, 4, 6]) { expect(edited[i]).toBeInstanceOf(THREE.MeshStandardMaterial); expect(edited[i]!.color).toEqual(originals[i]!.color); }
+      for (const i of [0, 2, 4, 6]) {
+        expect(edited[i]).toBeInstanceOf(THREE.MeshStandardMaterial); expect(edited[i]!.color).toEqual(originals[i]!.color);
+        expect(hardChroma(edited[i]!)).toBeUndefined();
+      }
       expect(edited[1]).toBe(edited[3]); expect(mats(untouched.mesh)[1]).not.toBe(edited[1]);
       changed.dispose!(); const reset = residents.create(c), restored = mats(reset.mesh)[1] as THREE.MeshStandardMaterial;
       expect(restored).toBeInstanceOf(THREE.MeshStandardMaterial); expect(restored.roughness).toBe(0.7); expect(restored.color.r).toBe(0.2);
       expect(restored.map).toBe(originals[1]!.map); expect(restored.side).toBe(THREE.FrontSide); expect(bitmap.close).not.toHaveBeenCalled();
+      expect(hardChroma(restored)).toBeUndefined(); expect(hardChroma(originals[1]!)).toBeUndefined();
       expect(inspected.bytes).toEqual(bytes); expect(originals[1]!.color.r).toBe(0.2);
       reset.dispose!(); untouched.dispose!(); residents.dispose(); expect(bitmap.close).toHaveBeenCalledOnce(); await workspace.dispose();
     } finally { vi.unstubAllGlobals(); }
@@ -157,29 +164,30 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     });
     const request = (r: MaterialIntentRequest) => { const plan = planMaterial(s.materialContext(), r); expect(plan.kind).not.toBe('blocked');
       expect(s.acceptMaterial(plan)).toBe(plan.kind !== 'apply' && plan.kind !== 'remove'); };
-    const change = (field: 'lighting' | 'doubleSided', text: string) => { const draft = s.materialContext().draft!;
+    const change = (field: 'lighting' | 'doubleSided' | 'chroma' | 'keyColor', text: string) => { const draft = s.materialContext().draft!;
       expect(s.acceptMaterial({ kind: 'draft', baseDraft: draft, draft: editMaterialDraft(draft, field, text) })).toBe(true); };
     request({ kind: 'model', assetId: c.binding.assetId });
     const context = s.materialContext(); if (context.source.kind !== 'ready') throw Error('ready');
     const surfaces = context.source.models[0]!.surfaces; if (surfaces.kind !== 'value') throw Error('surfaces');
-    expect(surfaces.value).toHaveLength(2); expect(surfaces.value.every(v => v.fieldIssues.lighting === null && v.fieldIssues.chroma)).toBe(true);
+    expect(surfaces.value).toHaveLength(2); expect(surfaces.value.every(v => v.fieldIssues.chroma === null && v.fieldIssues.softness)).toBe(true);
     const slot = validationMaterialSlots(c).find(v => v.locator.materialIndex === 0)!;
     request({ kind: 'surface', key: materialTargetKey(slot.target) }); request({ kind: 'scope', scope: 'project' });
     const reads = fs.reads, before = s.snapshot;
-    request({ kind: 'begin' }); change('lighting', 'unlit'); fs.reject = p => p.endsWith('/published.json'); request({ kind: 'apply' });
+    request({ kind: 'begin' }); change('lighting', 'unlit'); change('chroma', 'on'); change('keyColor', '#ff0000');
+    fs.reject = p => p.endsWith('/published.json'); request({ kind: 'apply' });
     await vi.waitFor(() => expect(s.acknowledgment.state).toBe('failed'));
     expect(s.snapshot).toBe(before); expect(s.materialContext().draft?.edits.lighting).toBe('unlit'); expect(host.hasPending()).toBe(true);
     fs.reject = () => false; s.retryWorking(); await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
     expect(s.materialContext().draft).toBeNull();
     const effect = () => syntheticDisplay(s.snapshot, s.sceneId, null, null).savedMaterials![c.binding.assetId]![slot.target.logicalMaterialSlotId];
-    expect(effect()).toMatchObject({ appearance: { lighting: 'unlit' } });
+    expect(effect()).toMatchObject({ appearance: { lighting: 'unlit', chroma: { keyColorSrgb: [1, 0, 0], tolerance: 0.1, softness: 0 } } });
     request({ kind: 'scope', scope: 'scene' }); request({ kind: 'begin' }); change('lighting', 'lit'); change('doubleSided', 'double'); request({ kind: 'apply' });
     await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle')); expect(effect()).toMatchObject({ appearance: { lighting: 'lit', doubleSided: true } });
     request({ kind: 'remove' }); await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle')); expect(effect()).toMatchObject({ appearance: { lighting: 'unlit' } });
     expect(fs.reads).toBe(reads); const parts = host.read().source!.originalChanges(), sceneId = s.sceneId;
     detach(); residents.dispose(); await workspace.dispose(); const cold = await openValidationHost(options);
     expect(cold.read().source!.originalChanges()).toEqual(parts);
-    expect(syntheticDisplay(cold.authority.read(), sceneId, null, null).savedMaterials![c.binding.assetId]![slot.target.logicalMaterialSlotId]).toMatchObject({ appearance: { lighting: 'unlit' } });
+    expect(syntheticDisplay(cold.authority.read(), sceneId, null, null).savedMaterials![c.binding.assetId]![slot.target.logicalMaterialSlotId]).toMatchObject({ appearance: { lighting: 'unlit', chroma: { keyColorSrgb: [1, 0, 0], tolerance: 0.1, softness: 0 } } });
     await cold.dispose();
   }, 20_000);
   it('rejects unsupported saved material edits before journal mutation and exposes non-editable original source semantics', async () => {
@@ -189,7 +197,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(validationMaterialIssue(slots.find(v => v.locator.materialIndex === 1)!, intent)).toContain('未接続');
     const slot = slots.find(v => v.locator.materialIndex === 0)!, id = `ovr_${newId()}`, token = s.snapshot.state.token;
     const changes = Object.fromEntries(Object.entries({ routing: { scope: { kind: 'project' }, target: slot.target },
-      appearance: { chroma: { keyColorSrgb: [1, 0, 0], tolerance: 0, softness: 0 } }, compositing: intent.compositing,
+      appearance: { chroma: { keyColorSrgb: [1, 0, 0], tolerance: 0, softness: 0.1 } }, compositing: intent.compositing,
       lifecycle: { state: 'active', eventId: `evt_${newId()}`, reason: 'initial' } }).map(([k, v]) => [materialKey(id, k), canonicalFixture(v)]));
     const paths = await fs.list(''); await expect(host.authority.write(token, changes, { sceneId: s.sceneId })).rejects.toThrow('未接続');
     expect(host.read().source!.token).toBe(token); expect(host.hasPending()).toBe(false); expect(await fs.list('')).toEqual(paths);

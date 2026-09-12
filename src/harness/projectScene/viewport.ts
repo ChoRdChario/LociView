@@ -9,6 +9,8 @@ import { pickResidentCreation, pickResidentSurface, type PinSurfaceTarget, type 
 import { createPinGizmo, type ModelPlacementTarget } from './pinGizmo';
 import { proposedPlacement } from './modelTransform';
 import type { SavedModelResidentPort } from './validationRender';
+import { hardChroma } from '../../viewer/hardChroma';
+import { createValidationCoverage, coveragePixel } from './validationCoverage';
 
 /** The saved resident port is explicit; the default still accepts only exact synthetic fixtures. */
 export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFactory => (canvas, changed, proposePin, proposeModel) => {
@@ -26,6 +28,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
   let issue: string | null = null, contextLost = false, dragging = false, axis: ViewportObservation['axis'] = null, serial = 0, raf = 0, lastObservation = '';
   let width = 1, height = 1;
   let pickEpoch = 0;
+  let coverageProbe: ReturnType<typeof createValidationCoverage> | null = null, coverageIssue: string | null = null;
   let gizmo: ReturnType<typeof createPinGizmo<PinSurfaceTarget | ModelPlacementTarget>> | null = null;
   let pinPointerActive = false;
   function syncOrbit(manipulating = Boolean(gizmo?.dragging)) {
@@ -67,6 +70,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
     poses.set(display.sceneId, pose); backgrounds.set(display.sceneId, background); entryPending = false; axis = null;
   }
   function clearModels() {
+    coverageProbe?.dispose(); coverageProbe = null; coverageIssue = null;
     for (const surface of resident.values()) surface.dispose?.();
     resident.clear();
     for (const child of [...models.children]) {
@@ -217,6 +221,20 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
   const resize = new ResizeObserver(ensure); resize.observe(canvas);
   const lost = (event: Event) => { event.preventDefault(); contextLost = true; fail(new Error('描画環境の復旧を待って再試行してください。')); };
   const restored = () => { contextLost = false; issue = '描画環境が復旧しました。3D表示を再試行してください。'; serial++; changed(); };
+  function pickSample(x: number, y: number) {
+    const ndc = new THREE.Vector2(x * 2 / width - 1, 1 - y * 2 / height);
+    let needed = false;
+    for (const surface of resident.values()) surface.mesh.traverse(node => {
+      if (node instanceof THREE.Mesh && (Array.isArray(node.material) ? node.material : [node.material]).some(m => hardChroma(m))) needed = true;
+    });
+    if (!needed) return { ndc, coverage: undefined };
+    if (!renderer || !camera) throw Error('3D表示を確認してください。');
+    const pixel = coveragePixel(x, y, width, height, renderer.getDrawingBufferSize(new THREE.Vector2()));
+    if (!pixel) return null;
+    coverageProbe ??= createValidationCoverage(renderer); coverageIssue = null;
+    return { ndc: pixel.ndc, coverage: coverageProbe.begin(camera, pixel, error => { coverageIssue = errorText(error); }) };
+  }
+  function reportPickIssue() { if (coverageIssue) { serial++; changed(); } }
   canvas.addEventListener('webglcontextlost', lost);
   canvas.addEventListener('webglcontextrestored', restored);
   return {
@@ -232,11 +250,15 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
     setPinPointerActive(next) { pinPointerActive = next; syncOrbit(); },
     pick(target, x, y) {
       if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || gizmo?.dragging || !display) return null;
-      return pickResidentSurface(display, target, resident, camera, new THREE.Vector2(x * 2 / width - 1, 1 - y * 2 / height));
+      try { const sample = pickSample(x, y); if (!sample) return null;
+        const result = pickResidentSurface(display, target, resident, camera, sample.ndc, sample.coverage); reportPickIssue(); return coverageIssue ? null : result;
+      } catch (error) { coverageIssue = errorText(error); reportPickIssue(); return null; }
     },
     pickCreation(targets, x, y) {
       if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || gizmo?.dragging || !display) return null;
-      return pickResidentCreation(display, targets, resident, camera, new THREE.Vector2(x * 2 / width - 1, 1 - y * 2 / height));
+      try { const sample = pickSample(x, y); if (!sample) return null;
+        const result = pickResidentCreation(display, targets, resident, camera, sample.ndc, sample.coverage); reportPickIssue(); return coverageIssue ? null : result;
+      } catch (error) { coverageIssue = errorText(error); reportPickIssue(); return null; }
     },
     read() {
       const project = (position: readonly [number, number, number]) => {
@@ -253,7 +275,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
       return { token: JSON.stringify([serial, display?.sceneId, display?.projectFrameId, display?.bounds, width, height, pose, background]),
         pickToken: String(pickEpoch),
         ready: Boolean(active && renderer && camera && !issue), issue,
-        notice: [notice, alphaPicking ? '半透明・切り抜きの面へのピン配置は未接続です。原本の見た目は保持しています。' : null,
+        notice: [notice, coverageIssue, alphaPicking ? '半透明・切り抜きの面へのピン配置は未接続です。原本の見た目は保持しています。' : null,
           ...(display?.materialNotices ?? []), ...Object.values(display?.materials ?? {}).flatMap(m => 'issue' in m ? [m.issue] : []),
           ...Object.values(display?.savedMaterials ?? {}).flatMap(rows => Object.values(rows).flatMap(m => 'issue' in m ? [m.issue] : []))].filter(Boolean).join(' ') || null,
         dragging: dragging || !!gizmo?.dragging, manipulating: !!gizmo?.dragging,

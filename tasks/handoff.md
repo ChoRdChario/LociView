@@ -1,5 +1,15 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-12 実GLBのhard色抜き接続（`40da7ef`後）:** 同じ限定validation材質欄に
+> 「指定した色を透過」を接続。元factor／texture／頂点色の照明前binary判定を共有し、
+> CPU候補の三角形だけGPUで可視確認。抜けた面のみ通過し、判定失敗ではpinを置かない。
+> source／他slot／保存draftを保持。query資源解放・描画状態復元・scope／retry／cold再開を検査。
+> 最終111 files／2,021 PASS／21既存TODO、型・build・独立レビュー済み。HTTP200は確認、
+> 実GPU／実入力／iPhone／offlineは未受入れ。texture・UV1・mipmap・頂点色・DPRは一括手順5へ。
+> 次はstage 3の06/07技術判断を既存案から一括整理し、未批准の実装直前に放置しない。
+> 材質全体・TEAM-FLOW-01の完了ではない。新profile／通常home／公開は未変更。
+> 新server／tunnel／private入力なし。ローカルcheckpoint、push制約は未変更。
+
 > **2026-09-12 実GLB材質編集の第一段（`7b43264`後）:** validationの全材質slotを
 > exact source locatorで実描画Materialへ接続。照明／表裏／Project・Scene範囲／解除を
 > 保存し、元PNG/PBR・他instanceを保持。失敗draft・元change retry・cold再開も確認。

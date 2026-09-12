@@ -39,7 +39,7 @@ export class SyntheticMaterialSession {
             project: record({ scope: { kind: 'project' }, target: slot.target }), scene: record({ scope: { kind: 'scene', sceneId }, target: slot.target }),
             sourceIntent: value(sourceMaterialIntent),
             fieldIssues: Object.fromEntries(materialFields.map(f => [f, validationMaterialSourceIssue(slot) ??
-              (f === 'lighting' || f === 'doubleSided' ? null : 'この設定は実モデルへ未接続です。')])) as Record<typeof materialFields[number], string | null>,
+              (['lighting', 'doubleSided', 'chroma', 'keyColor', 'tolerance'].includes(f) ? null : 'この設定は実モデルへ未接続です。')])) as Record<typeof materialFields[number], string | null>,
             admit: (intent: MaterialIntent) => validationMaterialIssue(slot, intent) }))) };
         const target = materialTarget(version.closure), project = record({ scope: { kind: 'project' }, target }), scene = record({ scope: { kind: 'scene', sceneId }, target });
         return { assetId: asset.id, name, surfaces: value([{ target, name: value('表面'), project, scene, sourceIntent: value(sourceMaterialIntent),

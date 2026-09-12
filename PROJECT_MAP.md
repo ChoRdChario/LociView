@@ -55,8 +55,10 @@ now uses one atomic new-Asset command, owned-body/fact staging and temporary
 resident preparation before UI acknowledgment. Names/equal bytes never imply
 shared identity; saved/render failure retries the same Asset. Exact GLB catalog
 slots now connect scoped lighting/side/reset to cloned renderer materials, retaining
-source PNG/PBR and saved retry. Hard chroma/picking coverage is the next material
-connection; other source semantics and formats remain limited. Continue the recorded Desktop batch, not
+source PNG/PBR and saved retry. Hard chroma now shares an exact pre-lighting
+predicate with a GPU boolean check of each CPU-picked triangle; unknown coverage
+refuses placement. Shader/renderer-protocol tests are not actual GPU acceptance.
+Other source semantics and formats remain limited. Continue the recorded Desktop batch, not
 further generic storage or a synthetic-run catalog. Limited real-file validation was explicitly
 approved after `023aa59`; formal profiles/device/adoption and ordinary home remain gated.
 Completed before that approval, M07 connects rotation/uniform-scale
@@ -75,7 +77,7 @@ are in todo. The existing development entry now activates the limited
 Creation/reopen, existing pin/text/PNG edits and safe switching are covered in
 memory-port/recorded-DOM tests; actual GPU/input/device acceptance remains pending.
 Ordinary entry and old Projects have not activated this service. Other file
-formats, remaining material effects and alpha-aware picking remain.
+formats, fractional-alpha material effects/picking and actual GPU validation remain.
 
 2026-09-11 current implementation: PO explicitly approved 05 §13.2's S1 service
 implementation before aggregate adoption, new synthetic-only development activation

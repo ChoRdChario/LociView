@@ -23,10 +23,11 @@ export function validationMaterialIssue(slot: ValidationMaterialSlot, input: Mat
   try {
     const intent = validateMaterialIntent(input, { maxNodes: 4096, maxDepth: 16, maxStringScalars: 65536 }), a = intent.appearance, c = intent.compositing;
     if (Object.keys(intent).sort().join(',') !== 'appearance,compositing' ||
-      Object.keys(a).some(k => !['lighting', 'doubleSided', 'baseColorSrgb', 'opacity'].includes(k)) || (a.opacity !== undefined && a.opacity !== 1) ||
+      Object.keys(a).some(k => !['lighting', 'doubleSided', 'baseColorSrgb', 'opacity', 'chroma'].includes(k)) || (a.opacity !== undefined && a.opacity !== 1) ||
+      a.chroma && (a.chroma.softness !== 0 || Object.keys(a.chroma).sort().join(',') !== 'keyColorSrgb,softness,tolerance') ||
       !same(c, { coverage: { policy: c.coverage.policy }, optics: c.optics }) ||
       !['inherit', 'opaque'].includes(c.coverage.policy) || !['inherit', 'surface'].includes(c.optics))
-      return 'この見え方は実モデルへ未接続です。設定は変更していません。';
+      return 'この見え方は実モデルへ未接続です。';
     return null;
   } catch { return '材質の設定を確認してください。'; }
 }

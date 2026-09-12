@@ -76,8 +76,11 @@ old evidence cannot be regenerated. Missing renderer residents are staged before
 UI acknowledgment, without reopening the editor or changing the camera.
 All exact static-GLB material slots now connect Project/Scene lighting/side/reset
 to isolated renderer clones. Original textures/PBR survive reset and unsupported
-source/effects are diagnosed. Hard chroma and matching picking remain next;
-this is not completion of all real-material effects or GPU/device acceptance.
+source/effects are diagnosed. Hard chroma now uses the same binary pre-lighting
+predicate for display and exact CPU-candidate coverage checks. Unknown GPU coverage
+blocks placement; owned query resources are released and renderer state restored.
+Shader/protocol/injected-pick tests are not real GPU/device acceptance or completion
+of all real-material effects. Other source semantics and fractional alpha stay outside this lane.
 Other file and real-model editing connections remain; no ordinary entry, existing
 Project or migration has changed.
 

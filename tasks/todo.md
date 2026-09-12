@@ -28,6 +28,54 @@ Formal adoption still requires G1-A/C and applicable device evidence. No profile
 
 #### Active connected work — PO-approved limited real-file validation
 
+Completed bounded connection: hard chroma plus matching triangle-coverage checks
+for the approved validation GLB lane. Previous goal turn was progress (`40da7ef`):
+scoped actual-material editing closed with root checks; worktree rechecked clean.
+This completes a missing user-visible part of the same stage-2 action, without
+starting another PoC/storage lane or claiming whole-team completion.
+
+- [x] Record exact hard-mask/CPU-target/GPU-boolean boundary and finite acceptance
+  in 05 §13.2; independent contract/renderer investigation confirms no new policy.
+- [x] Connect the shared Standard/Basic hard-chroma predicate and existing fields;
+  preserve source PBR/textures and pre-journal unsupported refusal.
+- [x] Verify each exact CPU candidate's coverage protocol at the canonical pixel, preserving
+  selected-Asset/occlusion/unknown guards and all renderer resources/state.
+- [x] Extend existing bounded shader/pick/material tests; run final typecheck/test/
+  build and independent review; update inventory/handoff/consolidated manual batch.
+
+Exclusions/stop conditions: do not add soft alpha/new source profiles, alter sampler
+semantics, infer target relations or accept unknown coverage. Runtime errors remain
+visible. Real GPU/device acceptance stays separate; genuine contract conflicts or
+new wire/migration/adoption choices stop only that boundary, not accepted work.
+
+Hard-chroma result: actual-slot clones preserve original texture/PBR and use the
+normalized, linear, pre-lighting binary predicate. Picking uses the same predicate
+on one owned triangle with original attributes/samplers and a translated 2x2
+viewport; target/position remain CPU-derived. Only proven holes are skipped.
+Unknown coverage, compile/context/readback errors and the 128-query ceiling refuse
+placement visibly. Renderer state is restored and query resources are disposed;
+failed programs are evicted before retry. Existing saved scope/draft/exact-retry/
+cold-reopen checks now exercise hard chroma, including affected/unaffected slots.
+Independent renderer/host/test reviews found no remaining mandatory defect.
+One test-only Map inference error was fixed by an explicit Object3D value type;
+final typecheck/build exit 0. Final root: 111 files / 2,021 PASS / 21 existing TODO /
+zero failures, 215.25 s, terminal exit 0 and JSON success. The type annotation has
+no runtime change; the final root includes the updated viewport and slot assertions.
+Existing mixed-import/large-chunk build warnings remain. Existing 5173 entry and
+new coverage/shader modules return HTTP 200. No actual GPU, browser-input, iPhone
+or offline PASS; texture/mipmap/UV1/vertex-color/DPR checks join the same manual
+batch. No new server/tunnel/private input, dependency/schema, ordinary-home or
+Service Worker source change. Checkpoint remains local under the existing push policy.
+
+Short meta-audit: this closes the finite stage-2 GLB material/pin connection, not
+all A02 formats or TEAM-FLOW-01. Inventory remains 27/7/20/10. The next priority is
+the already-required stage-3 technical ratification package, not additional
+material polish or a new PoC. Reuse 06/07 proposals to specify the unresolved wire,
+profile and migration choices with finite acceptance, obtain read-only review,
+then present only the decisions requiring PO authority. Do not infer ratification
+or block unrelated approved connections. Actual-browser/device and ordinary-home
+adoption remain separate lanes; no redundant human recheck is requested here.
+
 Completed bounded connection: actual static-GLB material slots through the existing
 scoped editor and metadata journal. Preserve the original source; connect exact
 slot mapping and lighting/side/reset without changing current command semantics.
@@ -64,11 +112,10 @@ connected counts are not completion percentages. No repeated PoC or human test
 gate was added. Keep TEAM-FLOW-01, actual-browser/device and stage-3 wire/migration
 ratification as the remaining critical path, not general storage expansion.
 
-Next bounded connection: approved hard chroma for these same opaque/lit/front
-GLB slots, with texture/vertex color and matching picking coverage. This is not
-a new product-policy question and does not mark material editing complete.
-Keep baseColor input UI, soft/fractional alpha, new source/profile admission,
-wire/migration, ordinary-home activation and deployment outside this slice.
+The subsequent hard-chroma connection is completed above, with actual GPU
+acceptance still pending. BaseColor input UI, soft/fractional alpha, new source/
+profile admission, wire/migration activation, ordinary-home and deployment were
+not added to that slice.
 
 Completed bounded connection: add one static GLB as a new independent Asset in the
 selected Scene of an opened validation Project. Reuse one-model construction,

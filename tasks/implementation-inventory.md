@@ -15,7 +15,8 @@
 > 追加本体の表示準備後に確認する。失敗時は旧表示・元入力を保持。同名／同bytesを同一Assetとはしない。
 > 他Mesh形式・実描画／実機が残るためM01分類と27/7/20/10の件数は据え置く。
 > 実GLB全slotの正確な材質対応と照明／表裏／scope解除を接続。原PNG/PBRと保存retryを保持。
-> hard chroma／pick coverageは直後の実装項目。他形式が残るためA02全体の完了とは数えない。
+> hard chromaとCPU候補面ごとのGPU可視判定も接続。判定失敗では配置せず、元材質と描画状態を保持。
+> shader／記録renderer／保存テストの証拠であり、実GPU・実機は未確認。他形式が残るためA02全体の完了とは数えない。
 > P01/P02をこの限定経路で接続済みへ。実描画／実入力／実機／正式採用は未受入れ。
 > M07は同じmetadata hostでモデル回転・正の均等拡縮、preview／取消／保存／再開へ接続。
 > 新しい仕様・採用判断ではない。承認済み要件と現行code/testsの距離を記録する。
@@ -60,7 +61,7 @@
 | 通常home → Native | 実モデル／画像、DisplaySet、限定backup／collaboration／review／clean、旧Desktop・iPhone合格 | 新ProjectScene／継続因果履歴／新保存サービスの完成 |
 | project-scene memory／旧 `storage=saved` | 合成の2人チーム、更新・競合・独立copy・保存の限定ループ | 新metadata serviceまたは実ファイル製品wireの接続済み |
 | project-scene `storage=metadata` | 新source/repository/session/journalと25群の合成UI接続、限定履歴受信・明示解消 | 任意モデル／任意画像／実ファイルのチーム受信／通常home／offlineの合格 |
-| project-scene `storage=validation` | 新規静的GLB/PNG Projectの作成・専用一覧・再開、実本体read/render、pin/text/PNG編集、GLB/PNG後入れ・配置・材質照明／表裏／解除 | 実描画／実入力／実機／正式profile採用、他形式・残る材質効果・実チームwireの完成 |
+| project-scene `storage=validation` | 新規静的GLB/PNG Projectの作成・専用一覧・再開、実本体read/render、pin/text/PNG編集、GLB/PNG後入れ・配置・材質照明／表裏／hard chroma／解除 | 実描画／実入力／実機／正式profile採用、他形式・残る材質効果・実チームwireの完成 |
 
 ## 2. 全機能群
 
@@ -102,7 +103,7 @@
 
 | ID | 機能群／利用者の結果 | 状態 | 現在の境界・残り | コード／既存受入れ参照（行番号は監査時点） |
 |---|---|---|---|---|
-| C01 | 面選択／Shift＋クリックでピンを追加する | 接続済み | exact hitを仮対象にし、gizmo確認して保存。合成Mesh限定。入力誤認でカメラ操作にしない経路あり。 | [src/harness/projectScene/session.ts:560](../src/harness/projectScene/session.ts) / [tests/ui/projectSceneViewport.test.ts:165](../tests/ui/projectSceneViewport.test.ts) |
+| C01 | 面選択／Shift＋クリックでピンを追加する | 接続済み | exact hitを仮対象にし、gizmo確認して保存。合成Meshとvalidation静的GLBへ限定接続。hard chromaは候補面だけをGPU判定し、不明なら拒否。実GPU／実入力受入れは別。 | [src/harness/projectScene/session.ts:560](../src/harness/projectScene/session.ts) / [tests/ui/projectSceneViewport.test.ts:165](../tests/ui/projectSceneViewport.test.ts) |
 | C02 | 既存ピンを後から移動する | 接続済み | 同じAsset内のgizmo／数値・取消／確定。別Assetへのre-anchorとは別。 | [src/harness/projectScene/session.ts:511](../src/harness/projectScene/session.ts) / [tests/ui/projectMetadataHost.test.ts:535](../tests/ui/projectMetadataHost.test.ts) |
 | C03 | タイトル・本文・ピン色を編集する | 接続済み | 一つのsource commandで保存・再開。 | [src/ui/projectScene/captionDetailControls.ts:30](../src/ui/projectScene/captionDetailControls.ts) / [tests/ui/projectMetadataHost.test.ts:471](../tests/ui/projectMetadataHost.test.ts) |
 | C04 | 選んだ分類色で続けてピンを追加する | 別経路のみ | 新規色が固定。Nativeの「追加色」状態を未継承。絞り込み色／既存色編集とは別。 | [src/harness/projectScene/session.ts:574](../src/harness/projectScene/session.ts) / [src/nativeGs/app.ts:2584](../src/nativeGs/app.ts) |
@@ -137,8 +138,8 @@
 
 | ID | 機能群／利用者の結果 | 状態 | 現在の境界・残り | コード／既存受入れ参照（行番号は監査時点） |
 |---|---|---|---|---|
-| A01 | 対象／Scene・Project範囲を選び、照明・表裏・hard chromaを編集／解除する | 接続済み | 既知三角形の全操作に加え、validation GLB全slotの照明／表裏／解除を接続。GLB hard chromaは次項目。scope優先順位・元材質・入力retryを保持。 | [src/harness/projectScene/materialSession.ts](../src/harness/projectScene/materialSession.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
-| A02 | 実Meshのmaterial／textureと複数slotを扱う | 別経路のみ | 静的GLBの全slotと実decoded材質をsource locatorで厳密対応。instance cloneへの照明／表裏とreset時PNG/PBR保持を限定接続。他Mesh形式・残る効果・Representation選択は未接続。元からunlit/両面/MASK/BLENDは原本表示のみ、編集しない。 | [src/harness/projectScene/validationRender.ts](../src/harness/projectScene/validationRender.ts) / [src/harness/projectScene/validationMaterials.ts](../src/harness/projectScene/validationMaterials.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
+| A01 | 対象／Scene・Project範囲を選び、照明・表裏・hard chromaを編集／解除する | 接続済み | 既知三角形に加え、validation GLB全slotの照明／表裏／hard chroma／解除を接続。scope優先順位・元材質・入力retryを保持。実GPU／実機は未受入れ。 | [src/harness/projectScene/materialSession.ts](../src/harness/projectScene/materialSession.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
+| A02 | 実Meshのmaterial／textureと複数slotを扱う | 別経路のみ | 静的GLBの全slotと実decoded材質をsource locatorで厳密対応。instance cloneへの照明／表裏／hard chromaとreset時PNG/PBR保持を限定接続。他Mesh形式・残る効果・Representation選択は未接続。元からunlit/両面/MASK/BLENDは原本表示のみ、編集しない。 | [src/harness/projectScene/validationRender.ts](../src/harness/projectScene/validationRender.ts) / [src/harness/projectScene/validationMaterials.ts](../src/harness/projectScene/validationMaterials.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
 | A03 | 不透明度・soft chromaを安全な対応範囲で使う | 別経路のみ | UI intentはあるが新hostは拒否。承認済みmask/dither等の対応を明示しprofile/G0を確認。黙った変換は禁止。G1-Dが必要なのはExperimental smoothBlendで、滑らかな透過の一般保証は非対象。 | [src/harness/projectScene/materialSession.ts:37](../src/harness/projectScene/materialSession.ts) / [docs/specs/01-domain-rendering.md:449](../docs/specs/01-domain-rendering.md) |
 
 ### 保存
@@ -316,8 +317,8 @@ source/schema・互換性の矛盾、受信／破壊境界に新しい製品判�
 実inventory→metadata作成／独立再開は非活性S1サービスのmemory-port試験で接続。
 続く内容検査・初期Project→保存本体のread/render→作成／選択／再開は、POの
 限定承認後に静的GLB/PNG用として接続済み。実描画／実入力の一括Desktop確認は未実施。
-PNG／GLB後入れ・配置・材質照明／表裏／解除も同じ経路へ接続済み。次は実GLB hard chroma／pick coverageと
-stage 3 wire/migrationの技術判断の一括整理であり、追加の汎用storage、
+PNG／GLB後入れ・配置・材質照明／表裏／hard chroma／解除も同じ経路へ限定接続済み。
+次はstage 3 wire/migrationの技術判断の一括整理と残る承認済み接続であり、追加の汎用storage、
 合成run一覧、新PoCへ戻らない。正式profile／G1-A/C・必要実機・採用判断と通常homeは
 別境界。既存新hostの一括Desktop確認は追加機能を前提としない。
 

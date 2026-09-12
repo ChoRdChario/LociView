@@ -15,6 +15,7 @@ import { pickResidentSurface } from '../../src/harness/projectScene/viewportPick
 import { degreesRotation, proposedPlacement } from '../../src/harness/projectScene/modelTransform';
 import type { GizmoProposal, ModelPlacementTarget } from '../../src/harness/projectScene/pinGizmo';
 import type { ValidationModelClosure } from '../../src/harness/projectScene/modelTypes';
+import { patchHardChroma } from '../../src/viewer/hardChroma';
 
 const tracker = vi.hoisted(() => ({ renderers: [] as any[], controls: [] as any[], resize: [] as (() => void)[],
   raf: new Map<number, () => void>(), nextRaf: 0, fail: false, gizmos: [] as any[], realOrbit: false }));
@@ -364,6 +365,34 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     expect(pickResidentSurface(display, target, resident, tracker.controls.at(-1).object, new THREE.Vector2(0, 0))).toBe(null);
     occluder.visible = false; expect(pickResidentSurface(display, target, resident, tracker.controls.at(-1).object, new THREE.Vector2(0, 0))).not.toBe(null);
     canvas.canvas.fire('webglcontextlost', { preventDefault() {} }); expect(hit()).toBe(null); v.dispose();
+  });
+
+  it('skips only proven chroma holes within the selected Asset and across occluders (injected coverage, not GPU evidence)', () => {
+    const s = new SyntheticSession(); s.acceptPin(planPinMode(s.pinContext(), { kind: 'target', assetId: f.equipment }));
+    s.acceptPin(planPinMode(s.pinContext(), { kind: 'add' })); const target = s.pinSurfaceTarget()!;
+    const display = syntheticDisplay(s.snapshot, s.sceneId, null, null), model = display.models.find(m => m.binding.assetId === target.assetId)!;
+    const asset = new THREE.Group(), mesh = new THREE.Group(); asset.matrix.copy(placementMatrix(model.binding.assetToProject)); asset.matrixAutoUpdate = false; asset.add(mesh);
+    const frontMaterial = new THREE.MeshStandardMaterial(), backMaterial = new THREE.MeshStandardMaterial(), otherMaterial = new THREE.MeshStandardMaterial();
+    for (const material of [frontMaterial, backMaterial, otherMaterial]) patchHardChroma(material, { keyColorSrgb: [0, 0, 0], tolerance: 0 });
+    const geometry = new THREE.PlaneGeometry(2, 2), front = new THREE.Mesh(geometry, frontMaterial), back = new THREE.Mesh(geometry, backMaterial);
+    front.position.z = 1; mesh.add(front, back); asset.updateMatrixWorld(true);
+    const other = new THREE.Group(), otherMesh = new THREE.Mesh(geometry, otherMaterial); other.matrix.copy(asset.matrix); other.matrixAutoUpdate = false;
+    otherMesh.position.z = 2; other.add(otherMesh);
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100), center = new THREE.Vector3(0, 0, 0).applyMatrix4(asset.matrix);
+    camera.position.copy(center).add(new THREE.Vector3(0, 0, 4)); camera.lookAt(center);
+    const resident = new Map<string, { asset: THREE.Group; mesh: THREE.Object3D }>([[target.assetId, { asset, mesh }]]), ndc = new THREE.Vector2(0, 0);
+    expect(pickResidentSurface(display, target, resident, camera, ndc)).toBeNull();
+    const decisions = new Map([[frontMaterial, 'discarded'], [backMaterial, 'covered'], [otherMaterial, 'discarded']] as const);
+    const coverage = vi.fn((_hit: unknown, material: THREE.Material) => decisions.get(material as THREE.MeshStandardMaterial) ?? 'unknown');
+    expect(pickResidentSurface(display, target, resident, camera, ndc, coverage)?.[2]).toBeCloseTo(0);
+    resident.set(f.structure, { asset: other, mesh: otherMesh });
+    expect(pickResidentSurface(display, target, resident, camera, ndc, coverage)?.[2]).toBeCloseTo(0);
+    decisions.set(otherMaterial, 'covered'); expect(pickResidentSurface(display, target, resident, camera, ndc, coverage)).toBeNull();
+    decisions.delete(otherMaterial); expect(pickResidentSurface(display, target, resident, camera, ndc, coverage)).toBeNull();
+    other.visible = false; decisions.set(frontMaterial, 'covered');
+    expect(pickResidentSurface(display, target, resident, camera, ndc, coverage)?.[2]).toBeCloseTo(1);
+    decisions.delete(frontMaterial); expect(pickResidentSurface(display, target, resident, camera, ndc, coverage)).toBeNull();
+    geometry.dispose(); for (const material of [frontMaterial, backMaterial, otherMaterial]) material.dispose();
   });
 
   it('connects stationary release to preview/XYZ/confirm and rejects drag, multitouch, cancel, changed camera/rect and hidden host', async () => {

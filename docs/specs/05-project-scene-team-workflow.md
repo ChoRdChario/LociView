@@ -1450,6 +1450,48 @@ reopen, invalid source/effect refusal and disposal. Browser/GPU/iPhone evidence
 remains separate. This seam does not finish all material capabilities, approve new
 profiles or change shader/dependency/wire/migration/ordinary-home/release boundaries.
 
+The next validation-GLB connection adds existing hard chroma (softness zero) to
+the same editable source slots. Use 01 §4.2 exactly: source linear factor times
+texture/vertex contributions (or replacement factor from baseColorSrgb), evaluated
+before lighting, with `length(colorLinear-keyLinear)/sqrt(3) <= tolerance` discarded.
+Do not reinterpret already-linear glTF factors/vertex colors as sRGB. Inherited
+hard chroma is binary coverage; surviving fragments keep alpha one and depth writes.
+Source opaque ignores source image alpha. Do not reuse legacy smoothstep/blend
+chroma, change the original texture filtering, or admit fractional/soft effects.
+The existing explicit opaque+chroma rejection remains; explicit mask/dither/blend
+policies remain outside this bounded host's current admission.
+
+Texture-aware verification remains an internal boolean coverage check for an
+already known CPU triangle candidate, not GPU ID/depth positioning or automatic
+cross-Asset selection. Both CPU ray and GPU check use the same canonical drawing-
+buffer pixel center, camera, transforms, material and current token. The probe
+renders only that triangle with all original interpolated attributes and the
+same sampler/hard-chroma predicate, not the entire Mesh. Use an even-origin 2x2
+target and a translated original-sized viewport, retaining the original camera
+and derivative-quad alignment without allocating a full-screen target. Only the
+probe's final output is a binary marker. Do not change visible-material sampling.
+Canonical center coverage is not a guarantee about fractional MSAA edge coverage.
+
+The picker skips proven discarded candidates, then chooses the nearest covered
+candidate within the selected Asset. Other Assets' proven discarded faces do not
+occlude; covered or unknown foreground does. Existing identity, visibility, sidedness,
+clipping and equal-depth ambiguity guards remain. Missing shader support, compile/
+context/readback errors and exhausted work are unknown, never transparency. The
+development execution ceiling is 128 GPU candidate checks per pointer operation;
+exceeding it refuses placement with a visible retry/viewpoint instruction, not a
+capacity/latency guarantee. Query resources are transient and disposed on model
+change/close; original textures are shared read-only. Restore all modified renderer
+state in finally and retain current saved data/drafts after query failure.
+
+Acceptance extends current shader/material/picking tests for the normalized hard
+boundary, Standard/Basic source preservation, multiple/normalized attributes,
+same-Asset holes and other-Asset occlusion, canonical fractional-DPR sampling,
+state/resource restoration, failed readback and the finite-work refusal. Reuse the
+existing saved material retry/reopen checks; add no PoC. Actual texture/vertex/mipmap
+GPU output and iPhone verification stay pending until measured on the exact build.
+No new profile, dependency, package/wire, source relation, ordinary entry or release
+permission is implied by this internal coverage implementation.
+
 **S1 metadata foundation — implementation contract (2026-09-11):**
 
 The first reusable source module implements 02 §4 bootstrap and original atomic
