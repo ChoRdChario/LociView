@@ -235,7 +235,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
     for (const path of walk('src').filter(p => /\.(ts|tsx|js)$/.test(p))) {
       const source = readFileSync(path, 'utf8');
       const metadataFoundation = /[\\/]projectMetadata[\\/](format|source)\.ts$/.test(path);
-      const metadataService = /[\\/]projectMetadata[\\/](persistence|repository|journal|contentEvidence|session|commands|remote|membership|records|assetStatus|modelMembership|captionCandidates|sceneAuthoring|captionDeletion|assetDeletion)\.ts$/.test(path);
+      const metadataService = /[\\/]projectMetadata[\\/](persistence|repository|journal|contentEvidence|blobStream|blobStore|blobInventory|session|commands|remote|membership|records|assetStatus|modelMembership|captionCandidates|sceneAuthoring|captionDeletion|assetDeletion)\.ts$/.test(path);
       // 05 §13.2 permits this exact new synthetic host, never ordinary/old saved activation.
       const metadataHost = /[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Intent|MembershipControls|Models|ModelFacts|AssetStatusControls|ConflictControls)\.ts$/.test(path);
       if (!metadataFoundation && !metadataService && !metadataHost) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectMetadata\//);
@@ -273,6 +273,9 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           sceneAuthoring: ['../scene/commands', '../scene/projectProvider', '../domain/projectRecordFields', '../domain/projectMutableFields',
             '../domain/projectRecords', '../domain/values', './membership', './commands', './format'],
           contentEvidence: ['../domain/projectContentChecks', '../domain/values', '../platform/fs', './format', './persistence'],
+          blobStream: ['../nativeGs/sha256'],
+          blobStore: ['../platform/fs', '../platform/projectLock', '../domain/projectRecordFields', '../domain/values', './format', './persistence', './blobStream'],
+          blobInventory: ['../domain/projectContentChecks', '../domain/values', './contentEvidence', './format', './blobStore'],
           session: ['@automerge/automerge/slim', '../platform/fs', '../domain/values', '../domain/projectContentChecks', '../domain/captionText', '../scene/projectProvider',
             './format', './source', './repository', './journal', './persistence', './commands', './remote'],
           commands: ['../domain/values', '../domain/projectMutableFields', '../domain/projectRecordFields', '../domain/projectRecords', '../domain/projectGraphSupport',

@@ -5,6 +5,8 @@
 > 準備済みモデル切替とpin修正の保存・二人二巡、モデルstatus・Caption位置／色の明示解消、
 > 既知Mesh独立copy、Scene作成・名前／開始Scene設定、確認付きCaption／モデル全Project削除を限定接続。
 > 保存・復旧・再受信までの合成テストが通る。実ファイル／実機受入れは未完了。
+> 非活性のstream本体保存・実inventory→metadata作成／再開もserviceテストで接続。
+> 既存hostへのこのstoreの接続・実形式検査は未実施であり、機能群の件数は増やさない。
 > 新しい仕様・採用判断ではない。承認済み要件と現行code/testsの距離を記録する。
 > 実装順は最新のUI指摘順ではなく、依存関係と `TEAM-FLOW-01` への効果から選ぶ。
 
@@ -227,7 +229,7 @@ LociMyuからのタブ構成、Sceneに相当する記録切替、直接色選�
 
 | ID | 境界 | 再利用できるもの | 残りの種類・具体的な不足 |
 |---|---|---|---|
-| E01 | 保存／CAS／GC／大容量I/O | 新original-byte journal、metadata-only cold evidence、隔離CAS17ケース・retention14ケース、500 MiB保存本体のPO readback | **実装＋証拠**。一般blob source/sink、全Project/conflict/opaque/未完了journal等のroot producer、origin-wide GC、bounded browser/iOS出力、実中断。過去の500 MiB最初の完了ログ不明をFAIL扱いせず、同じreadbackを繰り返さない |
+| E01 | 保存／CAS／GC／大容量I/O | 新original-byte journal、metadata-only cold evidence、非活性OriginBlobStoreのbounded stream／保存後検証／不変receipt／実inventory→metadata作成・再開、隔離CAS・retentionと500 MiB保存本体のPO readback | **実装＋証拠**。新storeの実OPFS・Web Locks・iOS証拠とhost接続、全Project/conflict/opaque/未完了journal等のroot producer、origin-wide GC、bounded browser/iOS出力、実中断。MemoryFSの一般bytes試験をプラットフォーム採用証拠にせず、過去の500 MiB最初の完了ログ不明をFAIL扱いして同じreadbackを繰り返さない |
 | E02 | 実モデル・Representation／renderer | 旧Nativeの限定Mesh/Point/GS/Proxy、各loader、known triangle content verifier | **実装＋採用**。実body admission、Frame/catalog/texture/family証拠、Representation選択と対応外の局所的fallback、資源解放。shared-view合成・hard mask・dither等の各gateを確認。M01–M03/A02と補修操作M14の技術前提で、同じ作業をここで重複加算しない |
 | E03 | 新wire・移行recipe | 5-purposeの意味的closure PoC、原履歴／prepared migrationの隔離証拠 | **技術批准＋実装**。06はexact wire/profile/limits、full/delta/base completion、privacy/copy規則、whole-file goldens。07は実source inspection、recipe/golden、managed unit/birth artifact／baseline journal。設計案を採用済みとしない |
 | E04 | 規模・安全性・アクセシビリティ | 最終rootテスト、限定hostのfocus／失敗／古いtoken防御、既存runtime audit | **実装確認＋証拠**。10k Caption/50k changes、規定多tab workload、10k UI virtualizationとopen/edit budget達成、メモリ・CSP・不正入力、200%/狭幅/IME/keyboard/contrast/44pxの総合確認。未測定を性能FAILにしない。5件の既存toolchain audit findingsは未解消、runtimeの狭いhold解消とは別 |
@@ -298,12 +300,12 @@ source/schema・互換性の矛盾、受信／破壊境界に新しい製品判�
 
 ### その後の接続順と、先行可能な小作業
 
-2026-09-12: P04/P05/C10/M09は限定接続済み。次は⑤の実データ経路に必要な
-stream本体保存→検証済みinventory→Project作成／独立再開を非活性S1サービスとして
-接続する。02 §7のorigin単位排他・増分hash・marker-last・既存本体の非再読込を
-既存保存サービスへつなぐ。合成run一覧や新PoCは作らず、実file／profile／通常homeは
-G1-A/C・必要実機と採用判断の後に活性化する。既存新hostの一括Desktop確認は
-これ以上の機能追加を前提としない。
+2026-09-12: P04/P05/C10/M09は限定接続済み。⑤の前提となるstream本体保存→
+実inventory→metadata作成／独立再開は非活性S1サービスのmemory-port試験で接続。
+次は実形式の内容検査・初期Project構築→保存本体のviewport/gallery→作成／選択／再開。
+追加の汎用storage、合成run一覧、新PoCへ戻らない。限定検証用の実file入口も
+現行05 §13.2の範囲外なので一括してPOへ提案する。正式なprofile／G1-A/C・必要実機・
+採用判断と通常homeは別境界。既存新hostの一括Desktop確認は追加機能を前提としない。
 
 | 順 | 閉じる結果 | 依存と扱い |
 |---|---|---|

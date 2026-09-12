@@ -42,9 +42,13 @@ exact retry/cold recovery and replay are tested; remaining conflict kinds and
 rendered/device acceptance stay open. Scene create/rename/Project-default now
 connect in the same host: model-membership-only creation, complete source guards,
 exact saved retry, new-Scene local memories on receive and preserved existing
-drafts/windows. Basic Caption/model deletion is now connected. Next is the
-streamed body-storage/inventory prerequisite for real Project creation/reopen,
-not another synthetic-run catalog. Real-data activation remains separately gated.
+drafts/windows. Basic Caption/model deletion is now connected. The nonactivated
+streamed body store and actual saved-body inventory now connect to metadata
+creation/reopen in memory-port tests, without fixture fallback or Caption-only
+body rereads. The existing host has not mounted this store. Next is actual format
+inspection/Project construction and saved-body viewer/gallery, not further generic
+storage or a synthetic-run catalog. Limited real-file activation requires an
+explicit decision; formal profiles/device/adoption and ordinary home remain gated.
 
 2026-09-11 current implementation: PO explicitly approved 05 §13.2's S1 service
 implementation before aggregate adoption, new synthetic-only development activation

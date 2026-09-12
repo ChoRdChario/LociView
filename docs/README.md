@@ -46,8 +46,11 @@ device acceptance remain in the consolidated batch.
 Confirmed whole-Project model deletion (M09) now checks all Scene, Caption-anchor
 and material-routing candidates before changing Asset.lifecycle only. No cascade
 or binary erasure. Exact saved retry, independent reopen and late-reference
-retention are covered in the same host tests. Next is the streamed body/inventory
-connection needed for real Project creation; activation and adoption remain gated.
+retention are covered in the same host tests. A nonactivated bounded body store
+now supplies actual durable inventory/saved handles to metadata creation/reopen
+tests (02 §7.1); no runtime fixture fallback or existing-host change. Next is actual
+Mesh/image inspection and initial Project construction. Limited real-file entry,
+profile/device/adoption and normal-home activation remain separate decisions.
 
 ## Classification
 

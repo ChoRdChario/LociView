@@ -852,6 +852,48 @@ CAS bytes are immutable, and persistent collection is distinct from runtime resi
 
 A persistent derivative becomes eligible for grace-period GC only after a new immutable revision/binding that omits it is durably active and every other protection root has disappeared. If any strongly referenced digest is missing, the project opens degraded/read-only for repair and collaboration/history-free export refuses; the implementation never describes the absence as ordinary cache eviction.
 
+### 7.1 Nonactivated S1 streamed-body connection (2026-09-12)
+
+Under 05 §13.2's implementation-before-adoption permission, add a production
+service for bounded stream staging and verified byte inventory, with synthetic
+service tests only. This is not FormatProfile, real-file, browser/iOS, GC or CAS
+adoption. Existing Native and saved-development namespaces remain unchanged.
+
+- All instances use the fixed private `v2/cas` root and reserved `v2-cas` lock
+  identity through ProjectMutationCoordinator's Web Locks backend. The root,
+  identity and scoped writer are not caller-selectable. Missing/busy locks refuse
+  writes; no tab-local fallback. Deterministic fake LockManager tests do not
+  count as actual browser locking evidence.
+- Caller-owned execution limits bound blob bytes, each input chunk and chunk
+  count; these are not supported-device limits. Reuse incremental NativeSha256.
+  Stream with backpressure, cancellation and exact optional digest/size checks.
+- Each attempt writes a fresh opaque object ID, then reopens and incrementally
+  checks its saved bytes. Only afterward write a canonical write-once digest
+  receipt naming that object and byte length. No atomic rename or in-place body
+  overwrite is assumed. Receipt publication is serialized by the shared lock.
+  MIME stays in the complete BlobRef, not digest identity or format authority.
+- A prior digest receipt is reused only after verifying its body. An interrupted
+  unacknowledged attempt can leave an unreferenced object; retry uses a fresh
+  attempt, never advertises a partial body. Remove only a newly-created redundant
+  object after successful deduplication. A torn receipt or inconsistent published
+  body is repair state, not permission to rewrite prior bytes. Persist observed
+  corruption where writable; inspection must not trust a known-suspect digest.
+- Inventory inspection checks durable receipt, suspicion and body presence/size
+  without reading body bytes. Explicit verify/export reads the complete stream;
+  same-size corruption is not claimed detectable by a metadata-only reopen.
+  Profile/geometry/media facts still come from the existing executable verifier,
+  keyed by the complete original request, never from a blob receipt.
+- Connect this inventory and streamed handles to PersistentContentVerifier and
+  the existing metadata creation/reopen service. Initial fixture executors are
+  test-only and must read the saved handles, without fixture-byte fallback.
+  Retained Caption-only saves/recovery reuse facts without rereading model bodies.
+
+Acceptance: bounded stream/readback and dedup; missing/busy lock refusal across
+independent store instances; mismatch/quota/cancel/interruption without false
+publication; missing/corrupt body refusal; exact metadata save/reopen/retry using
+saved bodies. No new page, user-file picker, decoder, format/wire/schema adoption,
+new dependency, storage migration or collection operation.
+
 ## 8. Cross-store transaction journal
 
 OPFS and IndexedDB do not share one atomic transaction. The same journal protocol covers a one-change local command and a collaboration-package merge containing multiple original Automerge changes. A local command has exactly one entry; it is rejected if it cannot fit the G0 metadata-change budget. A package merge preserves the original remote change bytes and causal graph instead of squashing them into a new local change. The durable journal holds:

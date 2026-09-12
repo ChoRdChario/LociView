@@ -11,23 +11,25 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — approved S1 service entry (2026-09-11)
 
-Current next decision (2026-09-12): C10/M09 basic cleanup is connected below.
-Next close the streamed body-storage/inventory prerequisite for real Project
-creation/reopen, using the existing S1 service and WorkspaceFS. Do not create a
-synthetic-run catalog or another PoC page. Existing-host Desktop checks require
-no more feature additions and remain one consolidated batch. Real-data/06/07/
-device adoption remains gated, and the complete practical-team goal stays open.
+Current next decision (2026-09-12): C10/M09 basic cleanup and the nonactivated
+streamed body/inventory service are connected below. Next is actual Mesh/image
+inspection and initial Project construction, then saved-body viewport/gallery
+and create/select/reopen. Do not generalize storage further or create a synthetic
+run catalog/PoC page. Bundle the exact initial profile and limited real-file
+validation activation with PO; 05 §13.2 currently excludes user-file admission.
+Formal adoption still requires G1-A/C and applicable device evidence. No profile,
+06/07, ordinary-home or release authority is inferred from continued implementation.
 
-#### Next finite slice — streamed bodies and durable inventory for Project creation
+#### Completed implementation — streamed bodies and durable inventory (from `041ebbf`)
 
-- [ ] Specify the minimal nonactivated BlobStore connection under 02 §7 and
+- [x] Specify the minimal nonactivated BlobStore connection under 02 §7.1 and
   05 §13.2: bounded stream/hash/size staging, immutable publish, verified inventory,
   origin-wide publication lock or explicit single-writer authority. Reuse the
   current incremental hash implementation and WorkspaceFS; no dependency/GC.
-- [ ] Connect that inventory to the existing content verifier and metadata
+- [x] Connect that inventory to the existing content verifier and metadata
   create/reopen service using synthetic source inputs, not fixture byte fallback.
   A missing/corrupt/interrupted body must not publish a complete Project.
-- [ ] Verify exact saved bytes, independent reopen, interruption/quota/mismatch,
+- [x] Verify exact saved bytes, independent reopen, interruption/quota/mismatch,
   immutable deduplication and no body reads for Caption-only save/cold recovery.
   Reuse existing service tests; final tree matrix and independent review.
 
@@ -38,6 +40,41 @@ Before real-data activation bundle the exact supported profile/environment,
 measured limits, G1-A/C and applicable iOS evidence for PO adoption. New filesystem
 or locking semantics that cannot satisfy 02 §7 are a stop/replan, not a fallback
 to per-Project locking for shared CAS. Keep the existing saved namespaces intact.
+
+Review/result: OriginBlobStore uses fixed origin-wide write authority, bounded
+streams, saved-byte readback and immutable digest receipts. Independent instances
+deduplicate verified bodies; interrupted objects do not become inventory. Missing
+locks/body, quota, mismatched bytes and suspect receipts fail without publication.
+The actual inventory and saved handles now feed normal MetadataProjectSession
+creation, save, cold reopen/retry in existing memory-port tests. Test-only content
+executors read those saved handles; an unseeded body cannot use fixture fallback.
+Caption-only publication and recovery do not reread model bodies. Same-size bit
+rot is detected on explicit stream verification, not claimed by size-only inventory.
+Independent reviews required saved-chunk normalization, strict receipt object IDs
+and persistent suspicion on a failed read; all three are fixed and re-reviewed.
+Four focused service tests and the 12 boundary tests pass; typecheck passes.
+First root run had 107 passing files / 1,929 tests and two fixture-provenance suite
+failures because specification 02 differed from the Git index. After staging that
+exact specification, both suites / 53 tests pass without changing verifier rules.
+Final sequential root: 109 files / 1,982 PASS / 21 existing TODO, exit 0
+(141.97 s, two workers). Typecheck/build and independent reviews pass; unchanged
+build chunk warnings remain. This is not browser/OPFS/iPhone/offline adoption.
+The existing development host still uses its earlier synthetic body provider;
+it has not mounted this store. No test assertion, timeout or fixture verifier was
+relaxed to obtain the pass. Final diff-check is clean.
+Inventory counts stay 24 connected / 7 partial / 23 other-path / 10 new.
+
+Next boundary proposal (not authorized activation): start with self-contained
+static GLB and PNG in newly created validation Projects in the existing dev host.
+Specify content inspection, immutable record construction and missing/unsupported
+content refusal before implementation. No external resources or silent default
+geometry; consume verified saved bodies in the viewport/gallery. Publish a Project
+in its list only after marker-last creation, then reopen it independently. This
+is the first format slice, not removal of the remaining approved formats/media.
+Obtain a single PO decision for this limited validation entry before user-file
+activation; keep existing Projects and normal home unchanged. Formal adoption and
+exact-build physical-iPhone/HTTPS authority remain separate. No numeric support
+guarantee or current Native profile/evidence is copied into the new path.
 
 #### Completed slice — dependency-guarded Project-wide model deletion (M09, from `df6255f`)
 

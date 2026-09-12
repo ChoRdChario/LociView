@@ -1,5 +1,15 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-12 stream本体保存（`041ebbf`から）:** 非活性S1のOriginBlobStoreと
+> 実保存inventoryをmetadata作成・保存・独立再開へ接続。原本streamを増分検証し、
+> 保存後の再検証・origin排他・不変receiptで公開。中断／quota／破損は未公開のまま。
+> 既存serviceテストでは保存本体を読み、fixture fallbackなし。Caption保存／復旧は
+> model本体を再読込しない。既存dev hostへのこのstoreの接続・実file／実機は未実施。
+> 最終109 files／1,982 PASS／21既存TODO、型・build・独立レビューPASS。棚卸しは不変。
+> 次は実形式検査→初期Project→保存本体表示。exact結果と承認境界はtodo。
+> 新規Projectだけの限定実file検証を一括提案する。通常homeや正式採用はまだ変更しない。
+> 以下の過去checkpointの「次」ではなく、todo先頭を現行境界として読む。
+
 > **2026-09-12 モデル全Project削除（`df6255f`から）:** 全Scene所属・Caption anchor・
 > material routingの原候補を調べ、参照ゼロを確認したAssetだけ削除状態へ。
 > 曖昧な依存を無視せず、本体・原履歴・後着参照を保持。保存失敗中は旧選択を残す。

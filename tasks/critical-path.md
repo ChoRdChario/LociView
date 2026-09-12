@@ -14,7 +14,9 @@
 > now connect to that saved loop; read-only previews never select an authority.
 > Scene create/name/default now connect to the saved host and local Scene memories.
 > Confirmed Project-wide Caption and dependency-guarded Asset deletion now connect.
-> Next: streamed body storage/inventory for Project creation/reopen; other
+> Nonactivated streamed body storage/inventory now reaches metadata creation/reopen
+> in memory-port tests. Next: actual format inspection/initial Project construction;
+> limited real-file activation needs the bundled PO decision. Other
 > scalar/lifecycle conflicts, exchange-base/delta and real-data adoption retain their gates. Latest UI feedback does not
 > automatically set priority. Old saved-host Desktop PASS remains narrowly scoped.
 > Explicit model membership keep-one now saves only the other observed edge's
@@ -350,10 +352,19 @@ language, disposable PoCs and one writer.
 
 ## 8. Current authorization boundary
 
+2026-09-12 bounded body-service progress: fixed origin-wide stream publication,
+saved-body inventory and normal metadata create/reopen now connect in service
+tests. No fallback to known fixture bytes. This does not activate a real-file
+profile, existing UI host or browser/device adoption. Next close actual format
+inspection and Project construction, then saved-body viewport/gallery and the
+Project selector. Bundle limited validation-entry authority before crossing
+05 §13.2's real-file restriction; formal G1-A/C/iOS adoption remains separate.
+No further generic storage/PoC campaign. Final evidence and exact plan are in todo.
+
 2026-09-12 bounded M09 progress: the same host now confirms model deletion only
 after all raw Scene/Caption/material references are absent. Only Asset.lifecycle
 changes; late refs, failed-save selection and remote-deleted drafts remain visible.
-Next is streamed body storage/inventory → metadata creation/independent reopen,
+The subsequent streamed body storage/inventory slice is recorded above. It connects metadata creation/independent reopen,
 under the approved nonactivated S1 boundary. No new synthetic-run catalog or
 PoC page. Real-data profiles, applicable physical-iOS and G1-A/C adoption remain
 separate before activation; package wire remains unratified. Final tests in todo.

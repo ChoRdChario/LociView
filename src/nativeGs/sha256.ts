@@ -13,7 +13,7 @@ function rotateRight(value: number, bits: number): number {
   return (value >>> bits) | (value << (32 - bits));
 }
 
-/** Small incremental SHA-256 used only for native-project stream verification. */
+/** Incremental SHA-256 for native streams and the nonactivated S1 body store. */
 export class NativeSha256 {
   private readonly state = new Uint32Array([
     0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
