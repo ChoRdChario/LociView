@@ -1,5 +1,17 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-12 限定実file入口のPO承認:** 静的GLB（外部参照なし・内蔵PNG）＋
+> 添付PNG、新規検証Project、既存開発hostでの読込・編集・保存・再開を明示承認。
+> 05 §13.2とtodo先頭が現行実装範囲。以下の承認待ちは過去checkpoint。
+> 通常home・既存Project・正式採用・06/07・実機HTTPS・公開は変更しない。
+
+> **2026-09-12 実fileサービス接続（`023aa59`から）:** strict GLB/PNG検査、fresh
+> Project構築、実保存本体の証拠、初期作成のexact中断復旧を既存metadata serviceへ接続。
+> 対象58テスト・型・build・独立レビューを確認。root終了後のfresh cacheは現行110 files
+> 全件failed=falseだがterminal集計は欠落しており、合計件数のPASS根拠にはしない（todo）。
+> UI／viewport／実browser／実機は未接続・未確認。次は同じ開発hostの実本体表示と
+> 新規検証Projectの作成／一覧／再開。承認済みなので再承認待ちへ戻さない。
+
 > **2026-09-12 次の接続を実file検証に固定（`9ce0b83`後・文書のみ）:**
 > 05 §13.2とtodo先頭へ、既存開発host・新規検証Project・静的GLB（内蔵PNG）＋
 > 添付PNGの限定入口案を集約。まだPO承認待ちで、runtimeは合成データ限定のまま。

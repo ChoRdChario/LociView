@@ -11,25 +11,25 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — approved S1 service entry (2026-09-11)
 
-Current next decision (2026-09-12): limited real-file activation is awaiting the
-explicit PO decision below. Approved M07 (rotation/uniform scale) now connects
+Current implementation (2026-09-12): PO explicitly approved limited real-file
+activation below. Approved M07 (rotation/uniform scale) now connects
 through the existing metadata host, not a new synthetic page or storage workstream.
 Startup-Scene conflict recovery also now reaches the same host before Session
 construction, closing a saved-Project cold-open dead end without choosing a Scene.
-No real-data or profile authority is inferred. C10/M09 basic cleanup and the nonactivated
+C10/M09 basic cleanup and the nonactivated
 streamed body/inventory service are connected below. Next is actual Mesh/image
 inspection and initial Project construction, then saved-body viewport/gallery
 and create/select/reopen. Do not generalize storage further or create a synthetic
-run catalog/PoC page. Bundle the exact initial profile and limited real-file
-validation activation with PO; 05 §13.2 currently excludes user-file admission.
+run catalog/PoC page. The exact limited validation exception is now approved in
+05 §13.2; other user-file profiles remain outside this first slice.
 Formal adoption still requires G1-A/C and applicable device evidence. No profile,
 06/07, ordinary-home or release authority is inferred from continued implementation.
 
-#### Next connected work — limited real-file validation (PENDING PO decision)
+#### Active connected work — PO-approved limited real-file validation
 
-The proposed exception and acceptance are consolidated in 05 §13.2 under
-`PENDING PO decision — limited real-file validation entry`. Runtime remains
-synthetic-only. The immediate request is one limited validation entry, not
+The approved exception and acceptance are consolidated in 05 §13.2 under
+`PO-approved limited real-file validation entry`. Runtime at entry remains
+synthetic-only. Implement one limited validation entry, not
 ordinary-home adoption, a generic GLB guarantee or package/migration approval.
 
 - [x] Check actual reusable admission behavior: existing Native Mesh validation
@@ -37,25 +37,52 @@ ordinary-home adoption, a generic GLB guarantee or package/migration approval.
   A partially rendered model is not sufficient saved-content evidence.
 - [x] Specify the finite validation scope and create → saved-body display →
   select/reopen exit in the existing specification, preserving later formats.
-- [ ] Obtain explicit PO approval for newly created validation Projects using
+- [x] Obtain explicit PO approval for newly created validation Projects using
   self-contained static GLB (embedded PNG only) and attached PNG in the same host.
-- [ ] After approval, implement strict admission and immutable initial records,
-  then consume saved geometry/material/PNG without fixture or silent defaults.
+- [x] Implement strict admission, immutable initial records and actual saved-body
+  evidence on the existing metadata service; keep original creation bytes for retry.
+- [ ] Consume saved geometry/material/PNG in the same development viewport/gallery
+  without fixture or silent defaults; expose the approved opt-in file entry.
 - [ ] Connect marker-last creation, Project selection and independent reopen,
   including visible incomplete creation, unsaved-input protection and exact retry.
 - [ ] Reuse existing tests, final-tree checks and independent review; consolidate
   actual-browser and required device evidence before adoption, not new PoC pages.
 
 Review: this is the next critical stage-2 workflow. M07 and startup-Scene recovery
-were genuine approved runtime progress, but do not answer the real-file decision.
-Do not keep filling that wait with isolated UI polish or broad storage work. The
+were genuine approved runtime progress; the real-file decision is now answered.
+Do not substitute isolated UI polish or broad storage work for this connection. The
 remaining scalar/lifecycle and inheritance work is not claimed complete. The
 stage-3 06/07 issue list is finite but not yet an executable ratified wire/recipe;
 Native pinScale mapping remains a converter-specific issue, not a prerequisite
-for new-Project validation. This checkpoint changes documents only: diff/contract
-checks apply, with no repeated runtime test matrix or new browser/device pass.
-Diff-check and independent read-only contract review pass with no mandatory
-corrections. Runtime stays at `9ce0b83`; limited real-file approval is still absent.
+for new-Project validation. The preceding `023aa59` proposal checkpoint changed
+documents only and passed diff-check/independent review. This approval starts
+implementation; no new runtime/browser/device PASS is claimed yet.
+
+Implementation/result in progress: `projectFiles` now inspects actual static GLB
+and PNG bytes, constructs fresh Project/Scene/model/media records, stages exact
+blobs through OriginBlobStore, and supplies `development-validation` content facts
+to the existing MetadataProjectSession. No Native profile/fixture is reused as
+authority. PNG tests inject the decoder; actual browser pixel evidence remains
+pending. Six focused cases cover bounds/material source locators, rejected inputs,
+PNG CRC/decode failures, saved body/pin/title/cold reopen, corruption and two early
+creation/publication fault phases. Initial original source is retained before
+journal start; an unprepared initialization can resume only with matching originals
+and start, while prepared missing bytes remain repair (including same-host retry).
+Independent reviews fixed matrix/TRS display mismatch, repeated-index work
+accounting, and unprepared cold initialization; targeted rechecks have no remaining
+mandatory findings. The existing persistence/isolation suites and new file cases
+pass together: 58 tests / 34.71 s. Final typecheck and build exit 0. The root test
+process ended and its fresh result cache covers all 110 current test files with
+zero failures; terminal summary/exit was lost at context rollover, so no aggregate
+test-count or terminal PASS is claimed from that cache. Do not duplicate this
+matrix solely for the lost display: retain the focused evidence and run the next
+root matrix at the next meaningful executable-tree boundary. Build retains only
+the existing mixed-import/large-chunk warnings. Independent review and diff-check
+have no remaining mandatory findings in this finite service slice.
+No UI/browser/OPFS/device/offline acceptance is added and inventory counts do not
+change. Next: real read-projection/viewport port and the same-host file selector,
+new validation namespace, ready/incomplete list and unsaved-safe Project switching.
+No human test request is needed until that connected screen is usable.
 
 #### Completed implementation — explicit startup Scene conflict recovery (from `acd30d5`)
 

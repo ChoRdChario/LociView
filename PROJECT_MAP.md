@@ -47,9 +47,9 @@ streamed body store and actual saved-body inventory now connect to metadata
 creation/reopen in memory-port tests, without fixture fallback or Caption-only
 body rereads. The existing host has not mounted this store. Next is actual format
 inspection/Project construction and saved-body viewer/gallery, not further generic
-storage or a synthetic-run catalog. Limited real-file activation requires an
-explicit decision; formal profiles/device/adoption and ordinary home remain gated.
-While that decision is pending, approved M07 now connects rotation/uniform-scale
+storage or a synthetic-run catalog. Limited real-file validation was explicitly
+approved after `023aa59`; formal profiles/device/adoption and ordinary home remain gated.
+Completed before that approval, M07 connects rotation/uniform-scale
 gizmos/numeric alternatives to the same metadata journal. Exact cancel/retry,
 saved two-party return and cold reopen retain geometry and authored Caption
 coordinates. Actual browser/iPhone input remains unverified, not full alignment.
@@ -57,7 +57,11 @@ Project startup-Scene conflict selection now connects before session constructio
 in that same metadata host: no guessed Scene, one saved causal choice, exact
 recovery and post-ack mount. Warm sessions keep local navigation/camera/drafts.
 T03 remains partial; other scalar/lifecycle repair and actual-browser acceptance
-are not implied. The outstanding real-file entry remains the critical next decision.
+are not implied. `src/projectFiles` now connects strict static GLB/PNG inspection,
+fresh immutable Project construction and saved-body evidence to the existing
+metadata service. Initial-source exact recovery and generated-file memory tests
+are in todo; the actual file UI/read-projection/viewport connection is next.
+Existing development and ordinary entries have not activated this service yet.
 
 2026-09-11 current implementation: PO explicitly approved 05 §13.2's S1 service
 implementation before aggregate adoption, new synthetic-only development activation

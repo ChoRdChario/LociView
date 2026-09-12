@@ -11,7 +11,7 @@ export interface ContentRequest {
   readonly records: readonly JsonObject[];
   readonly context: JsonObject;
 }
-export type EvidenceScope = 'development-fixture' | 'ratified-profile';
+export type EvidenceScope = 'development-fixture' | 'development-validation' | 'ratified-profile';
 export interface ProjectContentVerifier {
   readonly scope: EvidenceScope;
   /** Application-owned executable service; never deserialize a verifier from a package. */

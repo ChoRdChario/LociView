@@ -18,7 +18,7 @@ export async function inspectProjectContent(input: unknown, limits: HistoryReadL
   const candidates = await inspectProjectCandidates(input, limits); if (candidates.kind === 'rejected') return candidates;
   try {
     const scope = verifier.scope;
-    if (scope !== 'development-fixture' && scope !== 'ratified-profile') reject('value', ['evidenceScope']);
+    if (scope !== 'development-fixture' && scope !== 'development-validation' && scope !== 'ratified-profile') reject('value', ['evidenceScope']);
     let work = candidates.workUsed;
     const charge = (amount = 1) => { work += amount; if (work > limits.maxWork) reject('limit', ['contentWork']); };
     const checked = (map: string) => candidates.fields.filter(f => f.path.length === 2 && f.path[0] === map).flatMap(f => {

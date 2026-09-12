@@ -192,6 +192,31 @@ export class MetadataProjectSession {
 
   async retry(): Promise<MetadataSessionRead> { return underWriteLease(this.fs, () => this.resume()); }
 
+  /** Owned initial-source receipt only. Complete an unprepared first initialization, never a merge. */
+  async recoverInitialization(source: ProjectMetadataSource): Promise<MetadataSessionRead> {
+    return underWriteLease(this.fs, async () => {
+      const entries = await this.journal.entries(), pending = entries.find(e => !e.publication);
+      if (!pending || pending.prepared) return this.resume();
+      const start = pending.start, parts = source.originalChanges();
+      if (entries.length !== 1 || start.purpose !== 'initialize' || start.predecessor !== null || start.baseHeads.length ||
+        json(start.proof) !== json(source.proof) || parts.length !== 2 ||
+        this.retained && json(this.retained.start) !== json(start)) return fail('initial-recovery-source');
+      const expected = parts.map((_, i) => this.journal.path(start.transactionId, `changes/${String(i).padStart(8, '0')}.amchange`));
+      const paths = await this.fs.list(this.journal.path(start.transactionId, 'changes/'));
+      if (paths.some(path => !expected.includes(path))) return fail('initial-recovery-extra-part');
+      for (const [i, path] of expected.entries()) {
+        const existing = await this.fs.readStream(path);
+        if (existing) {
+          if (existing.size !== parts[i]!.length) return fail('initial-recovery-part');
+          const bytes = await this.fs.readBytes(path);
+          if (!bytes || !equalBytes(bytes, parts[i]!)) return fail('initial-recovery-part');
+        }
+      }
+      await this.checked(source, true);
+      this.retained = { start, parts }; return this.resume();
+    });
+  }
+
   private async resume(): Promise<MetadataSessionRead> {
     const entries = await this.journal.entries(), pending = entries.find(e => !e.publication);
     let prepared: PreparedJournal;
@@ -230,7 +255,7 @@ export class MetadataProjectSession {
       }
       // Once prepared, disk is the recovery source. Never conceal loss of an
       // acknowledged source/part by recreating it from this writer's memory.
-      prepared = pending?.prepared?.remote ? pending.prepared :
+      prepared = pending?.prepared ??
         await this.journal.stage(this.retained.start, this.retained.parts, this.retained.stagedBlobs, this.retained.remote);
     } else if (pending?.prepared) prepared = pending.prepared;
     else if (pending) return fail('incomplete-staging-repair');

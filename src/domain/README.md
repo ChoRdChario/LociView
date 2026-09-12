@@ -83,7 +83,7 @@ workstreams. These modules do not provide connected authority yet.
   and source-local ranges. Known active strong closure controls byte requests;
   weak-only history never forces a source read. Individual unmet evidence is
   replaced only by its matching check, retaining all other issues and candidates.
-  Development-fixture scope cannot claim ratified-profile authority. The result
+  Development-fixture and development-validation scopes cannot claim ratified-profile authority. The result
   itself supplies no SceneResources. `src/scene/projectProvider.ts` now invokes
   this entry and maps affected fields/strong closures into a scope-labelled
   same-token pair, retaining all source/diagnostics. C's host switch remains open.

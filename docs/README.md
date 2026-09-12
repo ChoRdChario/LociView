@@ -60,6 +60,13 @@ One explicit candidate choice is saved before cold startup; warm local Scene and
 camera remain unchanged. Exact retry/readonly/late-disposal checks reuse existing
 host tests. This does not implement other scalar/lifecycle repair or real-file entry.
 
+After explicit PO approval, `projectFiles` adds static GLB/PNG validation and
+fresh Project creation through the same saved metadata service. Its transient
+`development-validation` evidence is not a ratified format/adoption claim.
+Generated-file tests cover actual saved bytes, pin/title edits, independent reopen
+and exact incomplete-initialization recovery. UI/renderer activation is still the
+next connection; no ordinary entry, existing Project or migration has changed.
+
 ## Classification
 
 | Document | Status | Use |

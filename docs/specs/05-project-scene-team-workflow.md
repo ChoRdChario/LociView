@@ -1237,14 +1237,14 @@ applicable physical-iOS checks and explicit adoption still precede real-Project
 activation. S2 retains independent wire/recipe ratification. Failure of the new
 service is visible; no fallback silently reuses the old PoC writer.
 
-**PENDING PO decision — limited real-file validation entry (2026-09-12):**
+**PO-approved limited real-file validation entry (2026-09-12):**
 
-This is a proposed exception to synthetic-only development activation above,
-not an approved profile, an implementation receipt or general adoption. The
+PO explicitly approved enabling this exception to synthetic-only development
+activation above. This is not an implementation receipt or general adoption. The
 critical next connected task is actual file inspection → new Project creation →
 saved-body rendering → select/reopen, not another synthetic catalog or PoC page.
-Obtain one explicit PO decision on this validation scope before activating it;
-automatic continuation of the approved plan is not that decision.
+The approval covers implementing and activating the following finite validation
+scope; ordinary-home and formal adoption gates below are unchanged.
 
 - **Scope:** newly created validation Projects in the existing development host;
   self-contained static GLB Mesh with embedded PNG textures, and attached PNG.
@@ -1287,6 +1287,30 @@ automatic continuation of the approved plan is not that decision.
   old-data migration, five-purpose wire, added dependencies, new formats, GC,
   Pages/Service Worker/release and iPhone HTTPS exposure remain outside this
   exception. Required new authority stops only its affected boundary.
+
+Finite implementation notes for that validation entry: use an owned
+`development-validation` evidence scope, distinct from synthetic fixtures and
+ratified profiles; this is transient evidence, not a wire/schema change. The first
+GLB executor reads version-2 JSON/BIN, one declared/default scene, static triangle
+primitives and core metallic-roughness materials (including unlit). Sparse
+accessors, animation/skin/morph, other primitive types and unimplemented
+extensions are explicitly rejected, never silently ignored. Names/extras remain
+source data, not identity authority. Embedded PNGs are integrity-checked and
+decoded; declared numeric values, references, geometry and bounds must be valid.
+Implementation budgets are explicit caller constraints, not newly adopted
+capacity guarantees. Reuse existing scene/content commands and Three rendering;
+do not widen the legacy reader to achieve this validation.
+
+Creation retains its exact two original changes and proof in a hash-bound local
+initial-source receipt before beginning the service journal. If initialization
+stops after journal.start but before prepared, a finite internal recovery method
+may reuse only those same saved originals and the existing initialize start:
+same proof, empty base, no predecessor, no published Project, exact existing part
+bytes and no extra ordinals. Missing unacknowledged parts may be completed;
+different/torn parts fail without overwrite. Prepared journals always recover
+from their stored parts, never refill missing acknowledged bytes from memory or
+the initial-source receipt. No new transaction/source IDs, migration or wire
+format follows from this recovery seam.
 
 **S1 metadata foundation — implementation contract (2026-09-11):**
 

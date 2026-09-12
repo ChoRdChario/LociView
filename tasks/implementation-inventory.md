@@ -6,7 +6,9 @@
 > 既知Mesh独立copy、Scene作成・名前／開始Scene設定、確認付きCaption／モデル全Project削除を限定接続。
 > 保存・復旧・再受信までの合成テストが通る。実ファイル／実機受入れは未完了。
 > 非活性のstream本体保存・実inventory→metadata作成／再開もserviceテストで接続。
-> 既存hostへのこのstoreの接続・実形式検査は未実施であり、機能群の件数は増やさない。
+> 静的GLB／PNGの限定検査・初期Project構築・実保存本体のevidenceが新serviceへ接続。
+> GLBのpin編集→独立再開はmemory-portで検証。既存hostへの実file UI／renderer接続は
+> まだ未実施であり、機能群の件数は増やさない。限定入口はPO承認済み、実機採用は別。
 > M07は同じmetadata hostでモデル回転・正の均等拡縮、preview／取消／保存／再開へ接続。
 > 新しい仕様・採用判断ではない。承認済み要件と現行code/testsの距離を記録する。
 > 実装順は最新のUI指摘順ではなく、依存関係と `TEAM-FLOW-01` への効果から選ぶ。
