@@ -1477,6 +1477,44 @@ OPFS/IndexedDB behavior need a later explicit Desktop batch. This does not close
 model replacement, exchange, undo, Scene-specific transforms and new wire/schema
 are excluded.
 
+**S1 M07 rotation/uniform-scale extension — implementation contract (2026-09-12):**
+
+The approved practical-team plan includes rotation and uniform scaling. This
+extension supersedes only the preceding M06 slice's rotation/scale exclusion,
+in the same new metadata development host and known saved geometry. Existing
+memory/old-saved modes keep their earlier authoring capabilities.
+
+A typed `transformAsset` command reuses the complete `moveAsset` authority and
+dependency guards but accepts the existing canonical quaternion and positive
+uniform scale as well as translation. It creates a fresh manual binding with
+parent=current binding and identical revision, then changes Asset.status in the
+same journal transaction. `moveAsset` remains translation-only. Unknown evidence,
+affected conflicts, stale membership/binding and reused IDs still refuse. Existing
+Caption coordinates, surface classes, geometry bytes and Scene membership remain.
+
+The nearby placement controls offer Move/Rotate/Scale with a gizmo and finite
+numeric position/degrees/positive-scale alternatives. Rotation is about the Asset
+origin, represented in ProjectFrame; degree fields use XYZ Euler input, while
+the authored quaternion remains canonical. Reading an unchanged numeric display
+must not rewrite its original quaternion. All scale handles propose one positive
+uniform scale, never reflection or nonuniform stretch. Invalid numeric input is
+retained, cannot confirm and never becomes an invented default transform.
+
+Preview changes the resident model and Asset-anchored pin positions together,
+not camera, source/history or saved state. Mode changes, Esc/pointer cancellation,
+multiple pointers and lost authority reuse the existing input arbitration; do not
+make pin gizmos rotate/scale. Confirm writes once; cancellation restores the saved
+display. Failed publication retains the exact prepared binding/original changes
+and draft for retry. No additional body read is needed for these metadata edits.
+
+Acceptance reuses existing placement, actual Orbit handler arbitration, mocked
+Transform callback and saved-host tests; these are not native browser input:
+rotation and uniform-scale preview/cancel, input guards, full preview/clipping/pin
+consistency, unchanged source/body/other Scene data, explicit saved status conflict
+resolution, two-recipient return, exact retry/cold reopen and repeat no-op. Actual
+browser/iPhone input remains in the consolidated batch; no new profile, real-file
+activation, arbitrary pivot, M13 alignment/Undo or M14 repair is included.
+
 **S1 Saved View extension — implementation contract (2026-09-11):**
 
 Extend that same synthetic saved host to the already specified View authoring and

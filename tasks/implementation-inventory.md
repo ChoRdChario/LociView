@@ -7,6 +7,7 @@
 > 保存・復旧・再受信までの合成テストが通る。実ファイル／実機受入れは未完了。
 > 非活性のstream本体保存・実inventory→metadata作成／再開もserviceテストで接続。
 > 既存hostへのこのstoreの接続・実形式検査は未実施であり、機能群の件数は増やさない。
+> M07は同じmetadata hostでモデル回転・正の均等拡縮、preview／取消／保存／再開へ接続。
 > 新しい仕様・採用判断ではない。承認済み要件と現行code/testsの距離を記録する。
 > 実装順は最新のUI指摘順ではなく、依存関係と `TEAM-FLOW-01` への効果から選ぶ。
 
@@ -18,15 +19,15 @@
 ## 1. 結論と数え方
 
 ユーザーが行う作業を **64機能群** に整理すると、新metadata保存画面へ限定接続済みが
-**24群**、残りが **40群**。その40群は下記の内訳になる。
-「24/64完成」といった完成率・工数には換算しない。小さい部品接続と
-移行／チーム受信では仕事量が大きく違い、接続済み24群も合成データ限定だからである。
+**25群**、残りが **39群**。その39群は下記の内訳になる。
+「25/64完成」といった完成率・工数には換算しない。小さい部品接続と
+移行／チーム受信では仕事量が大きく違い、接続済み25群も合成データ限定だからである。
 
 | 排他的な主分類 | 群数 | 意味 |
 |---|---:|---|
-| 接続済み | 24 | 新metadata hostで操作・必要な保存まで接続。既知三角形／2 PNGという限定範囲、実機受入れは別 |
+| 接続済み | 25 | 新metadata hostで操作・必要な保存まで接続。既知三角形／2 PNGという限定範囲、実機受入れは別 |
 | 部品未接続 | 7 | 新系統のUI部品・pure planner等はあるが、対象群全体の画面・実データ・typed command／保存のいずれかが未接続。T01〜T04は限定接続まで進んだ |
-| 別経路のみ | 23 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
+| 別経路のみ | 22 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
 | 新規実装 | 10 | 新契約の利用者向け経路がまだない。schema・検証・設計案があっても実装済みとは数えない |
 
 - 一つの行は、共有する前提・保存境界を持つ「利用者の作業群」。同一ViewのCRUD等は一群。
@@ -77,7 +78,7 @@
 | M04 | モデル選択・検索とScene所属を管理する | 接続済み | 既知モデルのinclude/exclude。Assetそのものは残る。 | [src/ui/projectScene/modelListState.ts:15](../src/ui/projectScene/modelListState.ts) / [tests/ui/projectMetadataHost.test.ts:535](../tests/ui/projectMetadataHost.test.ts) |
 | M05 | モデルを一時的に隠す／単独表示する | 部品未接続 | temporarilyHidden型はあるが操作intent/runtime未接続。Scene所属を変更して代用しない。 | [src/ui/projectScene/modelListState.ts:12](../src/ui/projectScene/modelListState.ts) / [docs/specs/05-project-scene-team-workflow.md:198](../docs/specs/05-project-scene-team-workflow.md) |
 | M06 | モデルの平行移動を調整する | 接続済み | gizmo＋数値、preview/cancel/confirm、immutable binding保存と再開。既知・同一geometryのみ。 | [src/harness/projectScene/session.ts:368](../src/harness/projectScene/session.ts) / [tests/ui/projectMetadataHost.test.ts:106](../tests/ui/projectMetadataHost.test.ts) |
-| M07 | モデルを回転・均等拡大縮小する | 別経路のみ | Nativeにはある。新typed command・UIはtranslation限定。 | [src/projectMetadata/commands.ts:15](../src/projectMetadata/commands.ts) / [src/nativeGs/viewer.ts:703](../src/nativeGs/viewer.ts) |
+| M07 | モデルを回転・均等拡大縮小する | 接続済み | 新metadataで移動／回転／均等拡縮のgizmoと数値代替、全Scene共通のfresh binding保存・二人返送・再開。原点基準、正scale、canonical回転、exact取消／retry、Caption原座標／本体保持。既知Mesh限定、native入力・実機は未受入れ。M13のpivot／fit／Undoではない。 | [src/projectMetadata/commands.ts](../src/projectMetadata/commands.ts) / [src/harness/projectScene/pinGizmo.ts](../src/harness/projectScene/pinGizmo.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
 | M08 | モデルを差し替えて要確認のピンを直す | 接続済み | 新metadataの初期準備済みoriginal／updatedを明示切替。全Sceneの配置・Caption本文／位置／添付を保持し、異なる表面は要確認→手動補正。保存・exact retry・再開・二巡を確認。利用者の新しい本体導入はM01等、通常home／実機は未受入れ。 | [src/projectMetadata/commands.ts](../src/projectMetadata/commands.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
 | M09 | Projectからモデルを削除する | 接続済み | 全Scene所属・Caption anchor・material routingの原候補を検査し、参照ゼロのAssetだけ確認付きtombstone。未知／曖昧な参照は拒否。保存前の選択、本体／原履歴、後着参照と相手の未適用入力を保持。exact retry／cold reopen／再受信を限定hostで確認。cascade・物理消去・一般参照修復なし。 | [src/projectMetadata/assetDeletion.ts](../src/projectMetadata/assetDeletion.ts) / [src/harness/projectScene/assetDeletionControls.ts](../src/harness/projectScene/assetDeletionControls.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
 | M10 | GSの配置補助モデルと配置可否を確認する | 別経路のみ | Nativeの明示same-Asset Proxyだけのpickを未継承。Proxyなしでは既存Caption保持、新配置拒否。 | [src/nativeGs/app.ts:380](../src/nativeGs/app.ts) / [tests/nativeGs/schemaResolver.test.ts:869](../tests/nativeGs/schemaResolver.test.ts) |

@@ -51,6 +51,10 @@ now supplies actual durable inventory/saved handles to metadata creation/reopen
 tests (02 §7.1); no runtime fixture fallback or existing-host change. Next is actual
 Mesh/image inspection and initial Project construction. Limited real-file entry,
 profile/device/adoption and normal-home activation remain separate decisions.
+The approved M07 model rotation/uniform-scale connection now joins translation
+in the existing metadata host, through a separate typed transformAsset command.
+Full-transform preview and exact cancel/save/retry are covered by host/viewport
+tests. M13 alignment and real-browser/device acceptance remain separate.
 
 ## Classification
 

@@ -42,7 +42,9 @@ export function metadataIntent(changes: Readonly<Record<string, string>>, projec
     if (!prior || closure.binding.id !== bindingId || closure.binding.assetId !== assetId) return fail();
     if (closure.revision.id === prior.closure.revision.id) {
       if (canonicalFixture({ ...closure, binding: prior.closure.binding }) !== canonicalFixture(prior.closure)) return fail();
-      return { kind: 'moveAsset', assetId, sceneId: context.sceneId, expectedBindingId: prior.projection.bindingId,
+      const before = prior.closure.binding.assetToProject, after = closure.binding.assetToProject;
+      const translationOnly = canonicalFixture(before.rotationXYZW) === canonicalFixture(after.rotationXYZW) && before.uniformScale === after.uniformScale;
+      return { kind: translationOnly ? 'moveAsset' : 'transformAsset', assetId, sceneId: context.sceneId, expectedBindingId: prior.projection.bindingId,
         binding: cloneCanonicalValue(closure.binding, limits) as JsonObject };
     }
     const target = project.modelVersions?.find(v => v.assetId === assetId && v.projection.revisionId === closure.revision.id);

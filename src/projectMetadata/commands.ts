@@ -31,6 +31,7 @@ export type MetadataEdit =
   | { kind: 'resolveCaptionField'; captionId: string; field: CaptionChoiceField; operationId: string }
   | { kind: 'activatePreparedRevision'; sceneId: string; assetId: string; expectedBindingId: string; revisionId: string; binding: JsonObject }
   | { kind: 'moveAsset'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject }
+  | { kind: 'transformAsset'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject }
   | { kind: 'editCaption'; captionId: string; edits: { title?: string; body?: string; colorSrgb?: readonly number[] } }
   | { kind: 'resolveCaptionText'; captionId: string; field: 'title' | 'body';
       choice: { kind: 'candidate'; operationId: string } | { kind: 'manual'; text: string } }
@@ -214,7 +215,7 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       result.push({ map: 'assetBindingsById', id: next.id as string, create: true, fields: next });
       add('assetsById', command.assetId, { status: { kind: 'ready', activeBindingId: next.id! } }); break;
     }
-    case 'moveAsset': {
+    case 'moveAsset': case 'transformAsset': {
       shape(raw, ['kind', 'sceneId', 'assetId', 'expectedBindingId', 'binding']);
       row('scenesById', command.sceneId); row('assetsById', command.assetId);
       memberships('asset', command.sceneId, command.assetId);
@@ -227,8 +228,8 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       const before = object(old.assetToProject), after = object(next.assetToProject);
       if (next.id === old.id || next.assetId !== command.assetId || old.assetId !== command.assetId ||
         next.assetRevisionId !== old.assetRevisionId || old.assetRevisionId !== projection!.revisionId ||
-        next.parentBindingId !== old.id || next.method !== 'manual' ||
-        !same(before.rotationXYZW, after.rotationXYZW) || before.uniformScale !== after.uniformScale)
+        next.parentBindingId !== old.id || next.method !== 'manual') fail('placement-binding');
+      if (command.kind === 'moveAsset' && (!same(before.rotationXYZW, after.rotationXYZW) || before.uniformScale !== after.uniformScale))
         fail('placement-translation-only');
       // No optional registration evidence or unknown subtree is silently discarded.
       shape(old, ['id', 'assetId', 'assetRevisionId', 'assetToProject', 'method', 'payloadDigest', ...(old.parentBindingId ? ['parentBindingId'] : [])]);

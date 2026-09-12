@@ -32,6 +32,7 @@ import { previewHistory } from './historyPort';
 import { WorkingAcknowledgment, afterWorking, type WorkingResult } from './acknowledgment';
 import type { PinSurfaceTarget } from './viewportPicking';
 import type { GizmoProposal, ModelPlacementTarget } from './pinGizmo';
+import { degreesRotation, finiteInput, isCanonicalRotation, rotationDegrees, type ModelManipulation, type ModelTransformMode } from './modelTransform';
 
 export interface SyntheticPinInput {
   readonly coordinates: readonly [string, string, string]; readonly familyId: string | null;
@@ -42,6 +43,8 @@ export interface SceneAuthoringDraft { readonly kind: 'create' | 'rename' | 'def
 export interface ModelPlacementDraft {
   readonly token: string; readonly sceneId: string; readonly assetId: string; readonly source: FixtureModelClosure;
   readonly coordinates: readonly [string, string, string]; readonly composing: boolean; readonly prepared?: FixtureModelClosure;
+  readonly angles: readonly [string, string, string]; readonly scale: string;
+  readonly rotation: ModelManipulation['rotationXYZW']; readonly mode: ModelTransformMode;
 }
 
 const fresh = (prefix: string) => `${prefix}_${crypto.randomUUID().replaceAll('-', '')}`;
@@ -499,20 +502,31 @@ export class SyntheticSession {
         assets: { ...this.project.resources.assets, [asset.id]: { ...asset, projection: value(version.projection) } } } });
   }
   get modelPlacement() { return this.placement; }
+  get modelTransformAvailable() { return !!this.authority?.capabilities?.transform; }
   get modelPlacementBusy() { return this.viewportDragging || !!this.workingBlock; }
   modelPlacementProposal(): GizmoProposal<ModelPlacementTarget> | undefined {
     const draft = this.placement, active = draft && this.project.resources.assets[draft.assetId]?.projection;
     if (!draft || draft.token !== this.project.state.token || draft.sceneId !== this.sceneId || active?.kind !== 'value' ||
-      active.value.bindingId !== draft.source.binding.id || draft.coordinates.some(raw =>
-        !/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(raw.trim()) || !Number.isFinite(Number(raw)))) return;
+      active.value.bindingId !== draft.source.binding.id || !draft.coordinates.every(finiteInput) ||
+      !draft.angles.every(finiteInput) || !finiteInput(draft.scale) || Number(draft.scale) <= 0) return;
     return { target: { kind: 'model', token: draft.token, sceneId: draft.sceneId, assetId: draft.assetId, bindingId: draft.source.binding.id },
       position: draft.coordinates.map(n => Number(n) || 0) as [number, number, number],
+      ...(this.modelTransformAvailable ? { manipulation: { mode: draft.mode, rotationXYZW: draft.rotation, uniformScale: Number(draft.scale) } } : {}),
       enabled: !this.placementRestriction && !this.workingBlock && !draft.composing };
   }
-  acceptModelPosition(target: ModelPlacementTarget, position: readonly [number, number, number]): boolean {
+  acceptModelPosition(target: ModelPlacementTarget, position: readonly [number, number, number], manipulation?: ModelManipulation): boolean {
     const current = this.modelPlacementProposal();
     if (!current?.enabled || JSON.stringify(target) !== JSON.stringify(current.target) || !position.every(Number.isFinite))
       return this.refuse('モデルが更新されています。指定した位置は保持しています。');
+    if (manipulation) {
+      if (!this.modelTransformAvailable || manipulation.mode !== this.placement!.mode || !Number.isFinite(manipulation.uniformScale) || manipulation.uniformScale <= 0) return false;
+      try {
+        const { prepared: _prepared, ...draft } = this.placement!;
+        if (!isCanonicalRotation(manipulation.rotationXYZW)) return false;
+        const rotation = manipulation.rotationXYZW;
+        this.placement = freezeSynthetic({ ...draft, rotation, angles: rotationDegrees(rotation), scale: String(manipulation.uniformScale) });
+      } catch { return false; }
+    }
     return this.changeModelPlacement(position.map(n => String(n || 0)) as [string, string, string]);
   }
   beginModelPlacement(): boolean {
@@ -522,7 +536,9 @@ export class SyntheticSession {
     const resolved = resolveScene(this.project.state, this.project.resources, this.sceneId);
     if (resolved.kind !== 'ready' || !resolved.composition.assets.some(a => a.assetId === ctx.assetId)) return this.refuse('このシーンに表示したモデルを選択してください。');
     this.placement = freezeSynthetic({ token: ctx.token, sceneId: this.sceneId, assetId: ctx.assetId, source: ctx.current.closure,
-      coordinates: ctx.current.closure.binding.assetToProject.translation.map(String) as [string, string, string], composing: false });
+      coordinates: ctx.current.closure.binding.assetToProject.translation.map(String) as [string, string, string], composing: false,
+      angles: rotationDegrees(ctx.current.closure.binding.assetToProject.rotationXYZW), rotation: ctx.current.closure.binding.assetToProject.rotationXYZW,
+      scale: String(ctx.current.closure.binding.assetToProject.uniformScale), mode: 'translate' });
     this.message = ''; return true;
   }
   changeModelPlacement(coordinates: readonly [string, string, string], composing = false): boolean {
@@ -531,21 +547,42 @@ export class SyntheticSession {
     const { prepared: _prepared, ...old } = this.placement;
     this.placement = freezeSynthetic({ ...old, coordinates: [...coordinates] as [string, string, string], composing }); return true;
   }
+  changeModelTransform(angles: readonly [string, string, string], scale: string, composing = false): boolean {
+    if (!this.modelTransformAvailable || !this.placement) return false;
+    const finishingLocalComposition = this.placement.composing && !composing && !this.placement.prepared;
+    if ((this.workingBlock || this.placementRestriction) && !finishingLocalComposition) return false;
+    const { prepared: _prepared, ...old } = this.placement;
+    let rotation = old.rotation;
+    if (angles.some((v, i) => v !== old.angles[i])) {
+      try { rotation = degreesRotation(angles); } catch { /* Retain invalid numeric input; proposal/confirmation refuses. */ }
+    }
+    this.placement = freezeSynthetic({ ...old, angles: [...angles] as [string, string, string], rotation, scale, composing }); return true;
+  }
+  setModelTransformMode(mode: ModelTransformMode): boolean {
+    if (!this.modelTransformAvailable || !this.placement || this.placement.composing || this.modelPlacementBusy || this.placementRestriction ||
+      !['translate', 'rotate', 'scale'].includes(mode)) return false;
+    this.placement = freezeSynthetic({ ...this.placement, mode }); return true;
+  }
   finishModelPlacement(cancel = false): boolean {
     try {
-      if (this.placementRestriction) throw new Error(this.placementRestriction);
       if (this.workingBlock) throw new Error(this.workingBlock);
       if (this.viewportDragging) throw new Error('移動操作を終えてから確定してください。');
       const draft = this.placement; if (!draft || draft.composing) throw new Error('入力を確定してください。');
       if (cancel) { this.placement = null; this.message = ''; return true; }
+      if (this.placementRestriction) throw new Error(this.placementRestriction);
       const active = this.project.resources.assets[draft.assetId]?.projection;
       if (draft.token !== this.project.state.token || draft.sceneId !== this.sceneId || active?.kind !== 'value' || active.value.bindingId !== draft.source.binding.id)
         throw new Error('モデルが更新されています。指定した位置は保持しています。');
       if (draft.coordinates.some(raw => !/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(raw.trim()) || !Number.isFinite(Number(raw))))
         throw new Error('X・Y・Zを有限の数値で指定してください。');
+      if (!draft.angles.every(finiteInput) || !finiteInput(draft.scale) || Number(draft.scale) <= 0)
+        throw new Error('回転角は有限の数値、倍率は0より大きい数値で指定してください。');
       const position = draft.coordinates.map(raw => Number(raw) || 0) as [number, number, number];
-      if (position.every((n, i) => n === draft.source.binding.assetToProject.translation[i])) { this.placement = null; this.message = '位置は変更されていません。'; return true; }
-      const prepared = draft.prepared ?? moveFixtureModel(draft.source, fresh('bnd'), position);
+      const placement = { translation: position, rotationXYZW: draft.rotation, uniformScale: Number(draft.scale) };
+      if (canonicalFixture(placement) === canonicalFixture(draft.source.binding.assetToProject)) { this.placement = null; this.message = '配置は変更されていません。'; return true; }
+      const prepared = draft.prepared ?? (this.modelTransformAvailable
+        ? createFixtureModel({ ...fixtureModelIds(draft.source), binding: fresh('bnd') }, draft.source.shape, placement, draft.source.binding.id)
+        : moveFixtureModel(draft.source, fresh('bnd'), position));
       this.placement = freezeSynthetic({ ...draft, prepared });
       return this.applyWorking(() => this.publishModelVersion(draft.token, versionFromClosure(prepared)), () => {
         this.placement = null; this.message = `モデルの配置を適用しました。${this.savedDevelopment ? '' : '保存は未接続です。'}`;

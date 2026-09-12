@@ -105,6 +105,16 @@ export function createModelPlacementControls(document: Document, session: Synthe
     const input = document.createElement('input'); input.type = 'text'; input.inputMode = 'decimal'; input.setAttribute('aria-label', axis);
     label.append(input); modeStrip.append(label); return input;
   });
+  const transforms = document.createElement('section'); transforms.className = 'lv-model-transform'; transforms.setAttribute('aria-label', '回転・均等拡縮'); modeStrip.append(transforms);
+  const modes = (['translate', 'rotate', 'scale'] as const).map((mode, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = ['移動', '回転', '均等拡縮'][i]!;
+    transforms.append(b); return { b, mode };
+  });
+  const transformInputs = ['回転X（度）', '回転Y（度）', '回転Z（度）', '倍率'].map(name => {
+    const label = document.createElement('label'); label.textContent = name;
+    const input = document.createElement('input'); input.type = 'text'; input.inputMode = 'decimal'; input.setAttribute('aria-label', name);
+    label.append(input); transforms.append(label); return input;
+  });
   const apply = document.createElement('button'), cancel = document.createElement('button');
   apply.type = cancel.type = 'button'; apply.textContent = '配置を確定'; cancel.textContent = '配置を取り消す'; modeStrip.append(apply, cancel);
   let disposed = false, composing: HTMLInputElement | null = null;
@@ -116,23 +126,41 @@ export function createModelPlacementControls(document: Document, session: Synthe
     if (disposed || !session.modelPlacement) return;
     session.changeModelPlacement([inputs[0]!.value, inputs[1]!.value, inputs[2]!.value], composing !== null); changed();
   };
+  const updateTransform = () => {
+    if (disposed || !session.modelPlacement) return;
+    session.changeModelTransform([transformInputs[0]!.value, transformInputs[1]!.value, transformInputs[2]!.value], transformInputs[3]!.value, composing !== null); changed();
+  };
   for (const input of inputs) {
     listen(input, 'input', update);
     listen(input, 'compositionstart', () => { composing = input; update(); });
     listen(input, 'compositionend', () => { composing = null; update(); });
   }
+  for (const input of transformInputs) {
+    listen(input, 'input', updateTransform);
+    listen(input, 'compositionstart', () => { composing = input; updateTransform(); });
+    listen(input, 'compositionend', () => { composing = null; updateTransform(); });
+  }
+  modes.forEach(({ b, mode }) => listen(b, 'click', () => { if (!disposed && !b.disabled) { session.setModelTransformMode(mode); changed(); } }));
   listen(begin, 'click', () => { if (!disposed && !begin.disabled) { session.beginModelPlacement(); changed(); } });
   listen(apply, 'click', () => { if (!disposed && !apply.disabled) { session.finishModelPlacement(); changed(); } });
   listen(cancel, 'click', () => { if (!disposed && !cancel.disabled) { session.finishModelPlacement(true); changed(); } });
   function render() {
     if (disposed) return;
     const context = session.modelUpdateContext(), draft = session.modelPlacement;
+    transforms.hidden = !session.modelTransformAvailable;
+    begin.textContent = session.modelTransformAvailable ? 'モデルの配置を編集' : 'モデルの位置を編集';
     state.textContent = context.current ? `位置 ${context.current.closure.binding.assetToProject.translation.join(' / ')}` : '';
     begin.disabled = Boolean(session.placementRestriction || session.pending || context.issue || !context.current); modeStrip.hidden = !draft;
     if (!draft) return;
-    heading.textContent = `${session.snapshot.modelNames[draft.assetId] ?? 'モデル'}の位置`;
-    inputs.forEach((input, i) => { if (input !== composing && input.value !== draft.coordinates[i]) input.value = draft.coordinates[i]!; });
-    apply.disabled = cancel.disabled = draft.composing || session.modelPlacementBusy;
+    heading.textContent = `${session.snapshot.modelNames[draft.assetId] ?? 'モデル'}の配置`;
+    note.textContent = session.modelTransformAvailable ? '配置はすべてのシーンで共通です。回転・拡縮の中心はモデルの原点です。' : '矢印をドラッグして移動。位置はすべてのシーンで共通です。';
+    inputs.forEach((input, i) => { if (input !== composing && input.value !== draft.coordinates[i]) input.value = draft.coordinates[i]!;
+      input.parentElement!.hidden = draft.mode !== 'translate'; input.disabled = session.modelPlacementBusy; });
+    transformInputs.forEach((input, i) => { const text = i === 3 ? draft.scale : draft.angles[i]!; if (input !== composing && input.value !== text) input.value = text;
+      input.parentElement!.hidden = i === 3 ? draft.mode !== 'scale' : draft.mode !== 'rotate'; input.disabled = session.modelPlacementBusy; });
+    modes.forEach(({ b, mode }) => { b.disabled = draft.composing || session.modelPlacementBusy || !!session.placementRestriction; b.setAttribute('aria-pressed', String(draft.mode === mode)); });
+    cancel.disabled = draft.composing || session.modelPlacementBusy;
+    apply.disabled = cancel.disabled || !!session.placementRestriction;
   }
   return { actions, modeStrip, render, dispose() { disposed = true; cleanups.forEach(cleanup => cleanup()); actions.remove(); modeStrip.remove(); } };
 }

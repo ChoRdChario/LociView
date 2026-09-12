@@ -12,6 +12,8 @@ import { resolveFixtureMaterial, sourceColorSrgb, sourceMaterialIntent } from '.
 import { RecordedDocument, record, type RecordedNode } from './domRecorder';
 import { planPinMode } from '../../src/ui/projectScene/pinModeState';
 import { pickResidentSurface } from '../../src/harness/projectScene/viewportPicking';
+import { degreesRotation, proposedPlacement } from '../../src/harness/projectScene/modelTransform';
+import type { GizmoProposal, ModelPlacementTarget } from '../../src/harness/projectScene/pinGizmo';
 
 const tracker = vi.hoisted(() => ({ renderers: [] as any[], controls: [] as any[], resize: [] as (() => void)[],
   raf: new Map<number, () => void>(), nextRaf: 0, fail: false, gizmos: [] as any[], realOrbit: false }));
@@ -46,7 +48,8 @@ vi.mock('three/addons/controls/TransformControls.js', async () => {
     constructor(readonly camera: any) { super(); tracker.gizmos.push(this); }
     get dragging() { return this.busy; }
     set dragging(value: boolean) { if (value === this.busy) return; this.busy = value; this.dispatchEvent({ type: 'dragging-changed', value }); }
-    getHelper() { return this.helper; } setMode() {} setSpace() {} setSize() {}
+    mode = 'translate'; space = 'world';
+    getHelper() { return this.helper; } setMode(mode: string) { this.mode = mode; } setSpace(space: string) { this.space = space; } setSize() {}
     attach(object: any) { this.object = object; } detach() { this.object = undefined; }
     dispose() { this.disposed = true; }
   } };
@@ -93,6 +96,38 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance', () => {
+  it('previews full model transforms/pins, restores exact rotation on Esc and turns every scale handle into uniform scale', () => {
+    const project = createSyntheticProject(), original = syntheticDisplay(project, f.overview, null, null);
+    const model = original.models.find(m => m.binding.assetId === f.equipment)!, canvas = fakeCanvas();
+    let proposal: GizmoProposal<ModelPlacementTarget> = { target: { kind: 'model', token: original.token, sceneId: f.overview,
+      assetId: f.equipment, bindingId: model.binding.id }, position: model.binding.assetToProject.translation, enabled: true,
+      manipulation: { mode: 'rotate', rotationXYZW: [0, 0, 0, 1 - 2e-13], uniformScale: 1.5 } };
+    const v = createSyntheticViewport(canvas.canvas as unknown as HTMLCanvasElement, () => {}, undefined, (target, position, manipulation) => {
+      proposal = { target, position, manipulation, enabled: true };
+      v.update(syntheticDisplay(project, f.overview, null, null, proposal)); return true;
+    });
+    v.update(syntheticDisplay(project, f.overview, null, null, proposal)); v.setActive(true); canvas.show();
+    const g = tracker.gizmos.at(-1), orbit = tracker.controls.at(-1), camera = orbit.object.position.clone(), before = proposal;
+    expect(g.mode).toBe('rotate'); g.dragging = true; expect(orbit.enabled).toBe(false);
+    g.object.quaternion.set(...degreesRotation(['0', '0', '90'])); g.dispatchEvent({ type: 'objectChange' });
+    const rotated = syntheticDisplay(project, f.overview, null, null, proposal), placement = proposedPlacement(model.binding.assetToProject, proposal);
+    const group = tracker.renderers[0].scene.children[0].children[original.models.findIndex(m => m.binding.assetId === f.equipment)];
+    expect(group.matrix).toEqual(placementMatrix(placement));
+    const anchor = project.resources.captions[f.shared]!.anchor; if (anchor.kind !== 'value' || anchor.value.kind !== 'asset') throw Error('anchor');
+    const expectedPin = new THREE.Vector3(...anchor.value.positionAsset).applyMatrix4(placementMatrix(placement));
+    expect(rotated.pins.find(p => p.id === f.shared)!.position).toEqual(expectedPin.toArray()); expect(orbit.object.position).toEqual(camera);
+    canvas.canvas.fire('keydown', { key: 'Escape', preventDefault() {} }); expect(proposal).toEqual(before); expect(orbit.enabled).toBe(true);
+    for (const axis of ['X', 'Y', 'Z', 'XY', 'YZ', 'XZ', 'XYZ']) {
+      proposal = { ...before, manipulation: { ...before.manipulation!, mode: 'scale' } }; v.update(syntheticDisplay(project, f.overview, null, null, proposal));
+      g.axis = axis; g.dragging = true;
+      for (const component of axis.toLowerCase()) g.object.scale[component] *= 2;
+      g.dispatchEvent({ type: 'objectChange' }); expect(proposal.manipulation!.uniformScale).toBe(3); expect(g.object.scale.toArray()).toEqual([3, 3, 3]);
+      canvas.canvas.fire('keydown', { key: 'Escape', preventDefault() {} }); expect(proposal.manipulation!.uniformScale).toBe(1.5);
+    }
+    g.axis = 'X'; g.dragging = true; g.object.scale.x = -2; g.dispatchEvent({ type: 'objectChange' });
+    expect(g.dragging).toBe(false); expect(proposal.manipulation!.uniformScale).toBe(1.5); expect(g.object.scale.toArray()).toEqual([1.5, 1.5, 1.5]);
+    expect(project).toEqual(createSyntheticProject()); v.dispose();
+  });
   it('previews model translation and anchored pins without changing source or camera; cancels/commits through the shared gizmo', () => {
     const s = new SyntheticSession(), doc = new RecordedDocument();
     const w = createDevelopmentWorkspace(doc.asDocument(), s, { viewportFactory: (canvas, changed, pin, model) => {

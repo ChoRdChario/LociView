@@ -25,6 +25,7 @@ import { planView } from '../../src/ui/projectScene/viewState';
 import { SyntheticViewSession, type DisplayCapture } from '../../src/harness/projectScene/viewSession';
 import { materialBucket, materialKey, materialTarget, type MaterialRouting } from '../../src/harness/projectScene/materialHistory';
 import { syntheticDisplay } from '../../src/harness/projectScene/viewportModel';
+import { degreesRotation, rotationDegrees } from '../../src/harness/projectScene/modelTransform';
 import { canonicalFixture, fixtureRecordDigest, moveFixtureModel, createFixtureModel, fixtureModelIds, allocateModelCopyIds } from '../../src/harness/projectScene/modelClosure';
 import { assetCopySource } from '../../src/projectMetadata/modelMembership';
 import { assetMembershipGroups, type AssetMembershipResolution } from '../../src/projectMetadata/membership';
@@ -1006,7 +1007,7 @@ describe('saved model translation; synthetic storage/DOM evidence only', () => {
         read: () => ({ token: 'viewport', ready: true, issue: null, dragging: false, projection: 'perspective', axis: null, pins: [] }) };
     } });
     const root = record(w.root); button(root, 'モデル').fire('click'); selectModel(s); w.render();
-    const begin = button(root, 'モデルの位置を編集'); expect(begin.hidden).toBe(false); expect(begin.disabled).toBe(false);
+    const begin = button(root, 'モデルの配置を編集'); expect(begin.hidden).toBe(false); expect(begin.disabled).toBe(false);
     begin.fire('click'); const proposal = display!.modelEdit!;
     expect(propose!(proposal.target, [6, 2, 1])).toBe(true); expect(s.snapshot).toBe(original);
     expect(display!.modelEdit!.position).toEqual([6, 2, 1]); expect(host.read().source!.originalChanges()).toHaveLength(changes);
@@ -1090,6 +1091,99 @@ describe('saved model translation; synthetic storage/DOM evidence only', () => {
     await expect(host.authority.write(seed.token, { [`asset/${f.equipment}/binding`]: closure.binding.id,
       [modelClosureKey(closure.binding.id)]: canonicalFixture(changedGeometry) }, { sceneId: f.overview })).rejects.toThrow();
     expect(h.base.writes).toBe(writes); expect(host.read().source!.token).toBe(seed.token); await host.dispose();
+  });
+});
+describe('M07 saved model rotation and positive uniform scale', () => {
+  it('connects degree/scale controls, invalid input and IME guards, cancel and exact saved cold reopen without body reads', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority); selectModel(s);
+    const w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s), root = record(w.root);
+    const original = s.snapshot, before = s.modelUpdateContext().current!.closure, bytes = host.content.counts.bodyBytes, n = host.read().source!.originalChanges().length;
+    button(root, 'モデルの配置を編集').fire('click'); const strip = area(root, 'モデル配置・開発用');
+    const rotation = named(strip, '回転Z（度）'), scale = named(strip, '倍率');
+    button(strip, '回転').fire('click'); expect(rotation.parentElement!.hidden).toBe(false); expect(scale.parentElement!.hidden).toBe(true);
+    rotation.fire('compositionstart'); setInput(rotation, '90'); w.render();
+    expect(button(strip, '回転').disabled).toBe(true); expect(s.finishModelPlacement()).toBe(false);
+    rotation.fire('compositionend'); button(strip, '均等拡縮').fire('click'); setInput(scale, '-1'); w.render();
+    expect(s.modelPlacementProposal()).toBeUndefined(); expect(s.finishModelPlacement()).toBe(false);
+    expect(s.snapshot).toBe(original); expect(scale.value).toBe('-1');
+    setInput(scale, '2'); button(strip, '回転').fire('click'); w.render();
+    expect(s.modelPlacementProposal()!.manipulation!.mode).toBe('rotate');
+    expect(s.modelPlacementProposal()!.manipulation!.uniformScale).toBe(2);
+    expect(s.snapshot).toBe(original); button(strip, '配置を取り消す').fire('click');
+    expect(s.modelPlacement).toBeNull(); expect(host.read().source!.originalChanges()).toHaveLength(n);
+    button(root, 'モデルの配置を編集').fire('click');
+    button(strip, '回転').fire('click'); setInput(rotation, '90'); button(strip, '均等拡縮').fire('click'); setInput(scale, '2');
+    await acknowledge(s, () => button(strip, '配置を確定').fire('click')); w.render();
+    expect(s.acknowledgment.state).toBe('idle'); const saved = s.modelUpdateContext().current!.closure;
+    expect(saved.binding.assetToProject.rotationXYZW).toEqual(degreesRotation(['0', '0', '90']));
+    expect(saved.binding.assetToProject.uniformScale).toBe(2); expect(saved.binding.parentBindingId).toBe(before.binding.id);
+    expect(saved.representation).toEqual(before.representation); expect(saved.revision).toEqual(before.revision);
+    expect(s.snapshot.resources.captions).toEqual(original.resources.captions);
+    expect(s.snapshot.state.assetMemberships).toEqual(original.state.assetMemberships);
+    for (const scene of [f.overview, f.detail]) expect(syntheticDisplay(s.snapshot, scene, null, null).models.find(m => m.binding.assetId === f.equipment)!.binding).toEqual(saved.binding);
+    expect(host.read().source!.originalChanges()).toHaveLength(n + 1); expect(host.content.counts.bodyBytes).toBe(bytes);
+    w.dispose(); await host.dispose(); const cold = await h.open(), c = new SyntheticSession(cold.authority); selectModel(c);
+    expect(c.modelUpdateContext().current!.closure.binding).toEqual(saved.binding); expect(cold.content.counts.bodyBytes).toBe(0);
+    c.beginModelPlacement(); c.changeModelTransform(c.modelPlacement!.angles, c.modelPlacement!.scale);
+    expect(c.finishModelPlacement()).toBe(true); expect(cold.read().source!.originalChanges()).toHaveLength(n + 1);
+    await cold.dispose();
+  });
+  it('retains full transform/original changes on failed publication and exchanges two saved rounds without duplicate history', async () => {
+    const a = fixture(), initial = await a.open(true); await initial.dispose();
+    const b = fixture(); for (const path of await a.base.list(`${metadataArea}/${a.run}/`)) await b.base.writeBytes(path, (await a.base.readBytes(path))!);
+    for (const [key, bytes] of a.rows) b.rows.set(key, bytes.slice());
+    const ah = await a.open(), bh = await b.open(), sa = new SyntheticSession(ah.authority), sb = new SyntheticSession(bh.authority); selectModel(sa); selectModel(sb);
+    const old = sa.snapshot; sa.beginModelPlacement(); sa.changeModelTransform(['20', '30', '40'], '3'); a.base.rejectPublication = true;
+    await acknowledge(sa, () => { sa.finishModelPlacement(); }); expect(sa.acknowledgment.state).toBe('failed'); expect(sa.snapshot).toBe(old);
+    const prepared = sa.modelPlacement!.prepared!, paths = (await a.base.list(`${metadataArea}/${a.run}/`)).filter(p => p.endsWith('.amchange'));
+    const savedBytes = await Promise.all(paths.map(p => a.base.readBytes(p)));
+    expect(sa.changeModelTransform(['0', '0', '0'], '1')).toBe(false);
+    a.base.rejectPublication = false; await acknowledge(sa, () => { sa.retryWorking(); });
+    expect(sa.modelUpdateContext().current!.closure.binding).toEqual(prepared.binding);
+    expect(await Promise.all(paths.map(p => a.base.readBytes(p)))).toEqual(savedBytes);
+    await bh.receive(bh.read().source!.token, fullSource(ah.read().source!, 970)); sb.refreshHistory();
+    expect(sb.modelUpdateContext().current!.closure.binding).toEqual(prepared.binding);
+    sb.beginModelPlacement(); sb.changeModelTransform(['40', '50', '60'], '4'); await acknowledge(sb, () => { sb.finishModelPlacement(); });
+    await ah.receive(ah.read().source!.token, fullSource(bh.read().source!, 971)); sa.refreshHistory();
+    expect(sa.modelUpdateContext().current!.closure.binding).toEqual(sb.modelUpdateContext().current!.closure.binding);
+    const n = ah.read().source!.originalChanges().length;
+    await ah.receive(ah.read().source!.token, fullSource(bh.read().source!, 971)); expect(ah.read().source!.originalChanges()).toHaveLength(n);
+    const final = sa.modelUpdateContext().current!.closure.binding; await ah.dispose(); await bh.dispose();
+    const cold = await a.open(); expect(cold.authority.read().modelVersions!.find(v => v.assetId === f.equipment)!.closure.binding).toEqual(final); await cold.dispose();
+  });
+  it('preserves exact original quaternion on cancellation and rejects invalid/stale transform commands and old-host authoring', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority); selectModel(s);
+    const prior = s.modelUpdateContext().current!.closure, rotation = [0, 0, 0, 1 - 2e-13] as const;
+    const bound = createFixtureModel({ ...fixtureModelIds(prior), binding: `bnd_${'4'.repeat(32)}` }, prior.shape,
+      { ...prior.binding.assetToProject, rotationXYZW: rotation }, prior.binding.id);
+    await host.authority.write(s.snapshot.state.token, { [`asset/${f.equipment}/binding`]: bound.binding.id,
+      [modelClosureKey(bound.binding.id)]: canonicalFixture(bound) }, { sceneId: f.overview }); s.refreshHistory();
+    const n = host.read().source!.originalChanges().length; s.beginModelPlacement(); s.setModelTransformMode('rotate'); const p = s.modelPlacementProposal()!;
+    s.acceptModelPosition(p.target, p.position, { mode: 'rotate', rotationXYZW: degreesRotation(['0', '0', '30']), uniformScale: p.manipulation!.uniformScale });
+    expect(s.acceptModelPosition(p.target, p.position, p.manipulation)).toBe(true);
+    expect(s.modelPlacement!.rotation).toEqual(rotation); expect(s.finishModelPlacement()).toBe(true); expect(host.read().source!.originalChanges()).toHaveLength(n);
+    const source = host.read().source!, provider = host.read().provider!;
+    const next = createFixtureModel({ ...fixtureModelIds(bound), binding: `bnd_${'5'.repeat(32)}` }, bound.shape,
+      { ...bound.binding.assetToProject, rotationXYZW: degreesRotation(['0', '20', '0']), uniformScale: 2 }, bound.binding.id);
+    const cmd = { kind: 'transformAsset' as const, sceneId: f.overview, assetId: f.equipment, expectedBindingId: bound.binding.id, binding: next.binding as unknown as JsonObject };
+    expect(() => source.prepareEdit('stale', cmd, provider, 'f'.repeat(32))).toThrow();
+    for (const transform of [{ ...next.binding.assetToProject, uniformScale: 0 }, { ...next.binding.assetToProject, uniformScale: -2 },
+      { ...next.binding.assetToProject, rotationXYZW: [0, 0, 0, -1] }, { ...next.binding.assetToProject, rotationXYZW: [0, 0, 0, 2] }]) {
+      const binding = { ...next.binding, assetToProject: transform }; const invalid = { ...binding, payloadDigest: fixtureRecordDigest('asset-binding-revision', binding) };
+      expect(() => source.prepareEdit(source.token, { ...cmd, binding: invalid }, provider, 'f'.repeat(32))).toThrow();
+    }
+    const readOnly = await h.open(), rs = new SyntheticSession(readOnly.authority); selectModel(rs); expect(rs.beginModelPlacement()).toBe(false);
+    let becameReadonly = false;
+    const guarded = new SyntheticSession({ ...host.authority, get readOnly() { return becameReadonly; } }); selectModel(guarded);
+    const ui = createDevelopmentWorkspace(new RecordedDocument().asDocument(), guarded), root = record(ui.root);
+    button(root, 'モデルの配置を編集').fire('click'); button(root, '回転').fire('click');
+    const input = named(root, '回転Z（度）'); input.fire('compositionstart'); input.value = '25'; input.fire('input');
+    becameReadonly = true; ui.render(); input.value = '35'; input.fire('compositionend');
+    expect(guarded.modelPlacement!.composing).toBe(false); expect(guarded.modelPlacement!.angles[2]).toBe('35');
+    expect(input.value).toBe('35'); expect(button(root, '配置を確定').disabled).toBe(true); expect(guarded.finishModelPlacement()).toBe(false);
+    button(root, '配置を取り消す').fire('click'); expect(guarded.modelPlacement).toBeNull(); expect(host.read().source!.originalChanges()).toHaveLength(n); ui.dispose();
+    const old = new SyntheticSession(); selectModel(old); old.beginModelPlacement(); expect(old.setModelTransformMode('rotate')).toBe(false);
+    expect(old.changeModelTransform(rotationDegrees(rotation), '2')).toBe(false); await readOnly.dispose(); await host.dispose();
   });
 });
 async function apply(s: SyntheticSession, edits: { title?: string; body?: string; color?: string }) {

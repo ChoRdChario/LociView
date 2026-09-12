@@ -9,6 +9,7 @@ import type { DisplayCapture } from './viewSession';
 import { materialTarget, targetKey, resolveFixtureMaterial } from './materialHistory';
 import type { MaterialIntent } from '../../domain/materialIntent';
 import type { GizmoProposal, ModelPlacementTarget, PinGizmoProposal } from './pinGizmo';
+import { proposedPlacement } from './modelTransform';
 
 export type V3 = readonly [number, number, number];
 export interface Bounds { readonly min: V3; readonly max: V3 }
@@ -84,7 +85,7 @@ export function syntheticDisplay(project: SyntheticProject, sceneId: string, pin
     const anchor = caption.anchor.value;
     const model = anchor.kind === 'asset' ? models.find(m => m.binding.assetId === anchor.assetId) : null;
     const placement = model && modelEdit?.target.assetId === model.binding.assetId
-      ? { ...model.binding.assetToProject, translation: modelEdit.position } : model?.binding.assetToProject;
+      ? proposedPlacement(model.binding.assetToProject, modelEdit) : model?.binding.assetToProject;
     const position = anchor.kind === 'project' ? anchor.positionProject : placement ? pointInProject(anchor.positionAsset, placement) : null;
     if (position) pins.push({ id: caption.captionId, color, position,
       title: caption.title.kind === 'value' && caption.title.value.trim() ? caption.title.value : 'キャプション' });

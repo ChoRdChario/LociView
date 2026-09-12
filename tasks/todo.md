@@ -11,7 +11,10 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — approved S1 service entry (2026-09-11)
 
-Current next decision (2026-09-12): C10/M09 basic cleanup and the nonactivated
+Current next decision (2026-09-12): limited real-file activation is awaiting the
+explicit PO decision below. Approved M07 (rotation/uniform scale) now connects
+through the existing metadata host, not a new synthetic page or storage workstream.
+No real-data or profile authority is inferred. C10/M09 basic cleanup and the nonactivated
 streamed body/inventory service are connected below. Next is actual Mesh/image
 inspection and initial Project construction, then saved-body viewport/gallery
 and create/select/reopen. Do not generalize storage further or create a synthetic
@@ -19,6 +22,50 @@ run catalog/PoC page. Bundle the exact initial profile and limited real-file
 validation activation with PO; 05 §13.2 currently excludes user-file admission.
 Formal adoption still requires G1-A/C and applicable device evidence. No profile,
 06/07, ordinary-home or release authority is inferred from continued implementation.
+
+#### Completed implementation — M07 model rotation and uniform scale (from `d242b71`)
+
+- [x] Extend the existing placement draft/gizmo with explicit rotate/scale modes
+  and degree/positive-scale alternatives. Preview the whole transform and attached
+  pins; preserve camera, source and old saved state until confirmation.
+- [x] Add a typed transformAsset command on the same immutable binding/journal;
+  keep moveAsset translation-only, original geometry/Caption coordinates and
+  exact failed-save retry. Enable new authoring only in the new metadata host.
+- [x] Reuse current gizmo/viewport/host tests for cancel/IME/stale/readonly,
+  positive uniform scale/canonical rotation, saved rounds/cold reopen and no extra
+  body reads. Final typecheck/test/build and independent read-only review.
+
+Acceptance/finite contract: 05 §13.2 M07 extension. Existing field types only.
+No real files, profile/adoption, arbitrary pivot, nonuniform/reflection transforms,
+auto alignment, M13/M14, Undo, migration/wire, dependency or ordinary-home change.
+Recorded DOM/library-handler evidence does not replace pending actual browser/
+physical-iPhone input. This required model-editing connection may proceed while
+the real-file decision is pending; it does not close that dependency.
+
+Review/result: model-only Move/Rotate/Scale reuses the near-viewport editor and
+gizmo. Numeric fields are shown for the selected mode; active buttons are distinct.
+One typed transformAsset writes fresh binding and active status in the existing
+journal. Prior moveAsset remains translation-only. Preview models, Asset pins and
+clipping use the same full transform, retaining camera and original Caption data.
+Three saved-host tests pass: controls/IME/invalid-input/cancel/save/cold reopen with
+no extra body reads; failed publication retains full draft/original bytes and two
+saved recipients return/replay changes; exact original quaternion/no-op plus
+noncanonical, nonpositive, stale, readonly and old-host authoring refusal.
+Viewport regression covers all seven scale handles, full model/pin preview,
+unchanged camera, negative-scale rejection and exact Esc restoration. Independent
+review found YZ-scale no-op, cancellation renormalization and readonly-transition
+IME/cancel dead ends; all are fixed and re-reviewed. A started local composition
+can finish and retain its last value after readonly, then be explicitly cancelled;
+shared confirmation and prepared-publication retry guards stay enforced.
+Initial control-block insertion and recorded DOM parentElement gaps
+were corrected; no runtime guard/expectation was relaxed. Final typecheck and
+build pass. The post-fix root passed 109 files / 1,986 tests / 21 existing TODO
+(160.95 s, two workers, exit 0); independent read-only reviews have no remaining
+mandatory findings. Build retains the existing chunk-size/mixed-import warnings.
+Browser skill bootstrap fails before
+selection (`node:process` forbidden); no server was started or actual input/raster/
+OPFS/iPhone/offline PASS added. Human checks remain one consolidated batch.
+Inventory is 25 connected / 7 partial / 22 other-path / 10 new, not completion %.
 
 #### Completed implementation — streamed bodies and durable inventory (from `041ebbf`)
 

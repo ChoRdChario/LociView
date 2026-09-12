@@ -9,6 +9,7 @@ export class RecordedNode {
   scrollTop = 0; clientHeight = 0; offsetTop = 0; offsetHeight = 0;
   focusCalls: unknown[] = []; listeners = new Map<string, Set<(event: Event) => void>>();
   constructor(readonly tag: string, readonly document: RecordedDocument) {}
+  get parentElement() { return this.parent; }
   setAttribute(key: string, value: string) { this.attributes.set(key, value); }
   append(...nodes: RecordedNode[]) { for (const node of nodes) this.insertBefore(node, null); }
   insertBefore(node: RecordedNode, before: RecordedNode | null) {

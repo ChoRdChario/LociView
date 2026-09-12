@@ -14,6 +14,8 @@
 > now connect to that saved loop; read-only previews never select an authority.
 > Scene create/name/default now connect to the saved host and local Scene memories.
 > Confirmed Project-wide Caption and dependency-guarded Asset deletion now connect.
+> M07 rotation/positive uniform scaling now connects to the same saved host while
+> limited real-file activation awaits PO. It is not M13/full alignment/device proof.
 > Nonactivated streamed body storage/inventory now reaches metadata creation/reopen
 > in memory-port tests. Next: actual format inspection/initial Project construction;
 > limited real-file activation needs the bundled PO decision. Other
@@ -351,6 +353,13 @@ language, disposable PoCs and one writer.
 | `WS5` accepted native product + non-destructive compatibility conversion | Preserve the accepted Native Project product and conversion lanes; Compare remains excluded | Product functions and RC-A evidence are accepted; release preparation remains | Codex / PO / external reviewer | Accepted native checkpoints | `FIRST FROZEN-V1 LANE: PASS`; `DIRECT LOCIMYU PRODUCT ACCEPTANCE: PASS`; `NATIVE PACKAGE EXCHANGE: PASS`; `RC-A PRODUCT OWNER ACCEPTANCE: PASS` |
 
 ## 8. Current authorization boundary
+
+2026-09-12 M07 bounded progress: model-only rotation/uniform-scale gizmos and
+numeric alternatives now create fresh manual bindings through the same journal.
+Exact cancel/retry, stored two-party return and cold reopen are tested; unchanged
+geometry and Caption coordinates remain. Full actual-input/device evidence is
+pending. This approved connection does not authorize the outstanding real-file
+entry or reopen M13/M14 scope. Todo holds exact final-tree evidence.
 
 2026-09-12 bounded body-service progress: fixed origin-wide stream publication,
 saved-body inventory and normal metadata create/reopen now connect in service

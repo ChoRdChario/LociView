@@ -12,7 +12,7 @@
 
 2026-09-12 whole-scope inventory: [tasks/implementation-inventory.md](tasks/implementation-inventory.md)
 maps all 41 UI tasks plus accepted Scene/team extensions to 64 work groups:
-24 connected in the synthetic metadata host; 7 component-level gaps, 23 other-path
+25 connected in the synthetic metadata host; 7 component-level gaps, 22 other-path
 connections and 10 new-path implementations remain. These are not completion or
 effort percentages. Approved full-source receive (02 §8) and explicit Caption
 text resolution and independent Caption membership copies now have bounded
@@ -49,6 +49,10 @@ body rereads. The existing host has not mounted this store. Next is actual forma
 inspection/Project construction and saved-body viewer/gallery, not further generic
 storage or a synthetic-run catalog. Limited real-file activation requires an
 explicit decision; formal profiles/device/adoption and ordinary home remain gated.
+While that decision is pending, approved M07 now connects rotation/uniform-scale
+gizmos/numeric alternatives to the same metadata journal. Exact cancel/retry,
+saved two-party return and cold reopen retain geometry and authored Caption
+coordinates. Actual browser/iPhone input remains unverified, not full alignment.
 
 2026-09-11 current implementation: PO explicitly approved 05 §13.2's S1 service
 implementation before aggregate adoption, new synthetic-only development activation

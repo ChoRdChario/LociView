@@ -7,6 +7,7 @@ import { readProjectCamera, readSolidBackground, type SolidBackground } from './
 import type { DisplayCapture } from './viewSession';
 import { pickResidentCreation, pickResidentSurface, type PinSurfaceTarget, type ResidentSurface } from './viewportPicking';
 import { createPinGizmo, type ModelPlacementTarget } from './pinGizmo';
+import { proposedPlacement } from './modelTransform';
 
 /** Existing Three.js dependency, exact synthetic fixture only. No model loaders or Native controller. */
 export const createSyntheticViewport: ViewportFactory = (canvas, changed, proposePin, proposeModel) => {
@@ -109,7 +110,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
       const surface = resident.get(model.binding.assetId); if (!surface) continue;
       const edit = display.modelEdit;
       const placement = edit?.target.assetId === model.binding.assetId
-        ? { ...model.binding.assetToProject, translation: edit.position } : model.binding.assetToProject;
+        ? proposedPlacement(model.binding.assetToProject, edit) : model.binding.assetToProject;
       surface.asset.matrix.copy(placementMatrix(placement)); surface.asset.updateMatrixWorld(true);
     }
     updateClipping();
@@ -131,9 +132,9 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
       if (![...camera.projectionMatrix.elements, ...camera.matrixWorld.elements].every(Number.isFinite)) throw new Error('表示範囲を確認してください。');
       // Register TransformControls before OrbitControls: handle-down disables orbit
       // before its listener sees that same event (including touch).
-      gizmo = proposePin || proposeModel ? createPinGizmo<PinSurfaceTarget | ModelPlacementTarget>(canvas, scene, camera, (target, world) => {
+      gizmo = proposePin || proposeModel ? createPinGizmo<PinSurfaceTarget | ModelPlacementTarget>(canvas, scene, camera, (target, world, manipulation) => {
         if ('kind' in target) return !!proposeModel && !!display?.modelEdit?.enabled &&
-          JSON.stringify(target) === JSON.stringify(display.modelEdit.target) && proposeModel(target, world);
+          JSON.stringify(target) === JSON.stringify(display.modelEdit.target) && proposeModel(target, world, manipulation);
         const surface = resident.get(target.assetId);
         if (!proposePin || !surface || JSON.stringify(target) !== JSON.stringify(display?.pinEdit?.target) || !display?.pinEdit?.enabled) return false;
         surface.asset.updateMatrixWorld(true);
@@ -166,7 +167,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
     const min = new THREE.Vector3(...display.bounds.min), max = new THREE.Vector3(...display.bounds.max);
     const edit = display.modelEdit, model = edit && display.models.find(m => m.binding.assetId === edit.target.assetId);
     if (edit && model) {
-      const bounds = projectBounds(model.representation.logicalBoundsAsset, { ...model.binding.assetToProject, translation: edit.position });
+      const bounds = projectBounds(model.representation.logicalBoundsAsset, proposedPlacement(model.binding.assetToProject, edit));
       min.min(new THREE.Vector3(...bounds.min)); max.max(new THREE.Vector3(...bounds.max));
     }
     const radius = max.clone().sub(min).length() / 2, distance = camera.position.distanceTo(min.add(max).multiplyScalar(0.5));

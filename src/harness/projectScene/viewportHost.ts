@@ -9,6 +9,7 @@ import { value } from '../../scene/types';
 import { pointInProject, syntheticDisplay, type SyntheticDisplay, type V3 } from './viewportModel';
 import type { PinSurfaceTarget } from './viewportPicking';
 import type { ModelPlacementTarget } from './pinGizmo';
+import type { ModelManipulation } from './modelTransform';
 import type { SyntheticSession } from './session';
 import type { DisplayCapture } from './viewSession';
 import { createMediaGallery } from './mediaControls';
@@ -34,7 +35,7 @@ export interface SyntheticViewport {
 }
 export type ViewportFactory = (canvas: HTMLCanvasElement, changed: () => void,
   proposePin?: (target: PinSurfaceTarget, positionAsset: V3) => boolean,
-  proposeModel?: (target: ModelPlacementTarget, positionProject: V3) => boolean) => SyntheticViewport;
+  proposeModel?: (target: ModelPlacementTarget, positionProject: V3, manipulation?: ModelManipulation) => boolean) => SyntheticViewport;
 
 /** DOM/read-port adapter, not a second camera implementation or durable service. */
 export function createViewportHost(document: Document, session: SyntheticSession, changed: () => void, factory?: ViewportFactory) {
@@ -130,8 +131,8 @@ export function createViewportHost(document: Document, session: SyntheticSession
   const proposePin = (target: PinSurfaceTarget, position: V3) => {
     const accepted = session.acceptPinSurface(target, position, true); changed(); return accepted;
   };
-  const proposeModel = (target: ModelPlacementTarget, position: V3) => {
-    const accepted = session.acceptModelPosition(target, position); changed(); return accepted;
+  const proposeModel = (target: ModelPlacementTarget, position: V3, manipulation?: ModelManipulation) => {
+    const accepted = session.acceptModelPosition(target, position, manipulation); changed(); return accepted;
   };
   try { runtime = factory?.(canvas, paint, proposePin, proposeModel); } catch (e) { error = text(e); }
   const tryAgain = () => {

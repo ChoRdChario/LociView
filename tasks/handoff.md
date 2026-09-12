@@ -1,5 +1,14 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-12 M07モデル回転／均等拡縮（`d242b71`から）:** 実file入口の承認待ち中に、
+> 承認済みの既存機能を新metadata hostへ接続。モデル原点を基準にgizmo／度数／正倍率を
+> 仮表示し、確定でfresh binding＋statusを同時保存。Caption原座標／本体は保持。
+> YZ面handle・Esc原回転のexact復元・閲覧専用移行時のIME/取消を修正し独立再レビュー済み。
+> 最終109 files／1,986 PASS／21既存TODO、型・build・独立レビューPASS。詳細はtodo。
+> 棚卸し25接続／7部分／22別経路／10新規。実browser初期化は再失敗、実機合格なし。
+> 次の本筋は実形式→Project作成／選択／再開。先の限定実file有効化のPO回答は未着。
+> 継続通知を承認と扱わず、通常home／正式採用／06/07／HTTPS等の境界を維持する。
+
 > **2026-09-12 stream本体保存（`041ebbf`から）:** 非活性S1のOriginBlobStoreと
 > 実保存inventoryをmetadata作成・保存・独立再開へ接続。原本streamを増分検証し、
 > 保存後の再検証・origin排他・不変receiptで公開。中断／quota／破損は未公開のまま。
