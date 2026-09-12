@@ -887,3 +887,359 @@ space loss retaining the old point; manual download re-selection; and explicit
 restore cancellation. Record exact output bytes and which content the receipt
 covers. Rendered/native file-dialog, physical-iPhone and offline acceptance remain
 separate; current DOM/storage-port tests cannot supply them.
+
+## 12. Concrete field, summary and execution tables (proposed, 2026-09-13)
+
+This is the pre-code design for §11.3, not an adopted wire, implementation or
+measured product limit. The current source reference is `f51f8af`. The complete
+five-purpose contract still needs the review-to-edit decision in §12.6 and the
+applicable §10–11 gate; do not present these tables alone as S2 permission.
+No current Native/v1 file or `atomic-map-1` source is reinterpreted.
+
+### 12.1 Pinned candidate identifiers and field actions
+
+Candidate literals are `format: 'lociview-project-package'`, `wireVersion: '1'`,
+summary algorithm `lociview-project-summary-1`, and review schema
+`{kind:'lociview-project-scene-review',version:'1'}`. Metadata retains §11.1's exact
+adapter/envelope and major-2 domain semantics. Review schema is a separate object,
+not a ProjectDoc schema. These new literals reserve no published compatibility.
+Control bytes, paths, checksum and original-change descriptors follow §§3–4.
+
+For the tables below: **retain** copies the validated canonical value (including
+optional absence); **re-key** uses one complete typed old-to-new ID map;
+**rebuild** constructs only the stated new fields; **omit** excludes known source
+fields with preflight disclosure. Every changed immutable payload gets a fresh ID
+and its exact 02 immutable digest recomputed after all references are mapped.
+No source ID, actor or timestamp is reused to create the fresh lineage/lifecycle.
+Sorted ID sets are sorted again after re-keying; ordered memberships retain their
+orderKey, and non-set array order is preserved. Equal classes remain equal and
+distinct classes remain distinct, including frames, families, layouts and slots.
+
+The input allowlist is recursive, not just a list of output fields. Unknown fields,
+unknown nested keys/discriminators or unclassified references within the applicable
+export scope block history-free output, even inside an object otherwise scheduled
+for omission. A recognized migration subtree may be omitted only by its pinned
+policy, not because its key happens to contain `migration`. Unrelated Scene-local
+conflicts outside a review closure do not block it; unresolved inclusion/reachability
+is not evidence that an item is outside. Causal output instead preserves unknown
+minor content and its conservative inventory. Never use a generic JSON copy/filter.
+
+| Source unit | Clean editable output | One-Scene review output |
+|---|---|---|
+| schema / identity / project | Rebuild schema, fresh Project/epoch/seed/root. Retain title and frame values, re-key frame ID/defaultSceneId. | Omit source identity/schema/history. Rebuild snapshot schema/ID; retain title/frame values, re-key frame; defaultSceneId is the sole selected Scene. |
+| assetsById | Re-key id/assetFrameId; retain label; transform status as below; fresh lifecycle. | Rebuild visual/nonvisual owner from §5.1, never copy status/lifecycle/binding/revision. Visual label retained. |
+| assetRevisionsById | Re-key id/assetId/representationIds and each anchorCompatibilityClasses id/targetVariantFamilyIds. Omit parentRevisionId and materialCompatibilityMaps. Transform provenance; re-digest. | Omit records. Derive only the compatible-class membership required by §5.1; see §12.6 before defining edit conversion. |
+| assetBindingsById | Re-key id/assetId/assetRevisionId; retain assetToProject/method/residual; omit parentBindingId; re-digest. | Omit records; flatten the authoritative assetToProject into the appropriate visual/positioned-owner record. |
+| representationsById | Re-key id/assetId/representationFrameId/variantFamilyId/derivedFrom; retain contentKind/purposes/role/formatProfile/blob/representationToAsset/logicalBoundsAsset. Transform catalog/class fields below; omit derivation; re-digest. | Include presentation closure only; re-key the same included identities/classes. Remove source from purposes; omit derivedFrom/derivation/payloadDigest. Retain the other §5.1 presentation fields, not source-only records or payloads. |
+| mediaResourcesById | Re-key id; retain blob/mediaKind/label; re-digest. | Same field actions, limited to included Caption attachment closure. |
+| captionsById | Re-key id; retain title/body/colorSrgb; transform anchor below; fresh lifecycle. | Same text/color/anchor actions for included Captions; omit lifecycle. |
+| captionAttachmentsById | Re-key id/captionId/mediaResourceId; retain altText/orderKey; fresh lifecycle. | Same fields for included attachments; omit lifecycle. |
+| captionTagsById | Re-key id; retain label/colorSrgb/orderKey; fresh lifecycle. | Same fields for reached tags; omit lifecycle. |
+| captionTagMembershipsById | Re-key id/captionId/tagId; fresh lifecycle. | Same fields for included edges; omit lifecycle. |
+| scenesById | All active Scenes: re-key id/defaultViewId; retain name/orderKey; fresh lifecycle. | Exactly selected Scene with those actions, no lifecycle; only the confirmed optional-entry omission in 05 §7.3 is allowed. |
+| sceneAssetMembershipsById | Re-key id/sceneId/assetId; retain orderKey; fresh lifecycle. | Selected Scene's active edges, same actions without lifecycle. |
+| sceneCaptionMembershipsById | Re-key id/sceneId/captionId; retain orderKey; fresh lifecycle. | Selected Scene's active edges, same actions without lifecycle; filters/windows do not remove entries. |
+| viewsById | Re-key id/sceneId/projectFrameId; retain name/orderKey/camera/background; fresh lifecycle. | Selected Scene's active views with same actions, no lifecycle. |
+| materialOverridesById | Re-key id/routing IDs; retain appearance/compositing; fresh lifecycle. | Same actions for the selected Scene's applicable intent, no lifecycle. Preserve Scene-over-Project precedence, not a renderer's materialized default. |
+
+Clean includes active resources even when no Scene references them. Its immutable
+set is their current editable strong closure, not every immutable record ever
+written. Resolved deleted resources are omitted; unresolved lifecycle/inclusion
+cannot be treated as resolved deletion. Review uses only 05 §7.3's closure.
+
+| Nested type / exact fields | Closed action |
+|---|---|
+| Project frame | Re-key id; retain handedness/upAxis/unit.kind and applicable metersPerProjectUnit. Unknown units stay unknown. |
+| Lifecycle state/eventId/reason | Clean rebuilds active, fresh evt ID, reason initial; review omits whole object. Source lifecycle conflicts block included state. |
+| Asset ready status | Retain kind; re-key activeBindingId. Do not populate unresolved fields. |
+| Asset unresolved status | Retain kind/reason/expectedLabel/pendingAssetToProject; omit expectedDigest as a nonincluded source-matching hint. Remain unresolved, never fabricate binding/geometry. |
+| Transform / bounds | Retain translation/rotationXYZW/uniformScale; Representation transform also retains reflection. Retain AABB min/max. Never infer axes, units or transform. |
+| BlobRef / formatProfile | Retain algorithm/digest/byteLength/mediaType and profile id/specificationSha256. Copy exact verified body bytes, not re-encoded models/images. Profile admission is a separate prerequisite. |
+| Revision provenance | Retain origin and optional tool.id/tool.version/sourceMediaType; retain inputBlobDigests only for included resource blobs, sorted unique; required empty array remains present. |
+| Representation derivation | Known kind/tool/parameterDigest/inputBlobDigests object is omitted in both history-free purposes. No parameter-descriptor policy exists to justify retaining its required arbitrary digest. Clean retains strong derivedFrom/editable source bytes; it does not promise the old derivation audit. |
+| Representation classes | Re-key compositeGroupId/targetGsVariantFamilyIds/proxyForGsVariantFamilyId as applicable. Keep role-specific constraints and class/family/patch partition; no guessed compatibility. |
+| Material catalog | Re-key layoutId and slots.logicalMaterialSlotId; retain optional displayName. Retain sourceLocator.kind plus the applicable materialIndex or slotIndex only with its Representation. |
+| SourceMaterialSemantics | Retain coverage.kind and mask alphaCutoff, optics, lighting, doubleSided; do not invent omitted defaults. |
+| ProjectAnchor | Retain kind/positionProject/normalProject; re-key projectFrameId. |
+| AssetAnchor common | Retain kind/positionAsset/allowed normalAsset; re-key assetId/assetFrameId/authoredAnchorCompatibilityId. Preserve needsReview and absence; do not turn an anchor into a ProjectAnchor. |
+| Manual hitEvidence | Retain method manual only, with no normal/confidence/source. Clean sets authoredAssetRevisionId to the rebuilt active revision only for an active compatible class; otherwise omit. Review always omits authored revision. |
+| Nonmanual hitEvidence | Retain method/allowed confidence. Clean re-keys authoredAssetRevisionId and complete source together only when both are already in the editable closure and owner/method/content/role/surface validation passes; otherwise omit both. Review omits both. An absent hitEvidence remains absent, with no weak authored revision retained or invented manual method. |
+| Permitted hitEvidence.source | Re-key representationId; retain surfaceRef.kind and its exact variant fields: mesh nodeIndex/primitiveIndex/triangleIndex/barycentric; point nodeIndex/primitiveIndex/pointIndex; splat sourceSplatIndex. Never import an old body only to preserve weak evidence. |
+| Saved View camera/background | Retain position/target/up, projection.kind plus verticalFovRadians or verticalSpan; background.kind and solid colorSrgb. No invented color on transparent background. |
+| Material routing | Retain scope.kind; re-key applicable sceneId and target.assetId/variantFamilyId/materialLayoutId/logicalMaterialSlotId. |
+| Material appearance | Retain optional opacity/baseColorSrgb/lighting/doubleSided and chroma.keyColorSrgb/tolerance/softness. Preserve absence/inherit without renderer-dependent substitution. |
+| Material compositing | Retain coverage.policy/applicable alphaCutoff and optics. Unsupported rendering is reported, not rewritten into another intent. |
+| Technical/private state | Omit source history/actors/times, deleted values, recognized migration/report/source evidence, exchange bases, participant/device profiles, UI state, local handles/paths/object URLs. Original embedded blob metadata and current user text remain disclosed content, not promised anonymous. |
+
+`Asset.pinScale` and `anchor.kind:'unplaced'` are not current known domain
+capabilities: 07 §10.2 / 05 §9.4's amendments remain distinct. Do not silently omit
+them to make a current-profile export succeed. The current profile refuses affected
+history-free input; the later accepted field policy must retain pinScale on clean
+and each applicable review owner, and preserve unplaced's optional owner without
+invented coordinates/frame/class. These requirements remain practical-team work.
+
+### 12.2 Protected inventory: portability is not garbage collection
+
+Compute roots from the complete admitted source and all live candidates at the
+frozen heads. The current `blobInventory.ts` only verifies named Representation/
+Media bodies; it is not an export closure or GC oracle. Verify semantic BlobRefs
+individually, but deduplicate physical entries by raw digest/length. An inconsistent
+descriptor under one digest rejects; a MIME alias does not duplicate physical bytes.
+
+| Root | Local protection | Portable causal content |
+|---|---|---|
+| Current strong | All active resources and their strong closure, including unshown Assets/Captions, every active revision Representation and editable derivedFrom source | Workspace/backup include; Contribution includes the exact required part not guaranteed by its verified selected base. |
+| Every live conflict | Union of status/binding/lifecycle/attachment/other reference candidates and their closure; no winner projection | Same rule; valid semantic conflicts remain original history and protected bodies. |
+| Opaque minor data | Conservatively retained verified inventory; never shrink by inspecting strings for apparent references | Preserve the complete trustworthy opaque inventory in same-lineage output. Inability to establish it blocks output rather than claiming an empty closure. |
+| Recognized migration continuity | Active/conflicting managed plan/baseline/registered strong evidence under the exact adapter | Include required portable continuity. An unsupported physical migration profile is refused; this table does not adopt it. |
+| Retained Workspace base | Original manifest/metadata evidence plus the guaranteed payload inventory for each available base | Backup includes table/evidence/guaranteed bodies. Workspace normally excludes table/evidence; body overlap with its own strong/opaque closure remains included. Contribution does not transport the table. |
+| Explicit retention pin | The exact payload protected by an approved explicit choice | Backup includes; Workspace only when independently required or conservatively opaque. This adds no automatic retention-pin UI or policy. |
+| Unfinished journal | Original source/changes/base/derived evidence and staged payloads through recovery | Not a portable finished snapshot. Recover or refuse output; never package an applied prefix as complete backup. |
+| Active output/job/receipt handoff | Frozen inputs, artifact and evidence until completion/base handoff or safe cancellation | Do not recursively put previous ZIPs/jobs into another ZIP. They remain local protection roots only. |
+
+Weak parent revision/binding links and merely historical immutable records do not
+by themselves retain model bytes. Original metadata history still remains intact.
+An acknowledged missing required body is repair state, not a cache eviction.
+GC must consider the union across all Projects/jobs; this wire proposal authorizes
+no physical collection or automatic deletion of retained bases/manual points.
+
+Proposed `protected-inventory.json` is the closed object
+`{schema:'lociview-protected-inventory-1', blobs:[{sha256,byteLength,reasons}]}`.
+The array is sorted/unique by digest and includes exactly backup's physical blob
+entries. `reasons` is a nonempty sorted/unique set from
+`current | conflict | opaque | migration | exchangeBase | retentionPin`; multiple
+roots share one entry. Evidence control files stay in §4.1's separate descriptors.
+Recompute derivable reasons from the verified metadata/base evidence. Imported
+opaque/explicit-retention declarations conservatively preserve their stated bytes;
+they are not proof of semantic reference or permission to reclaim anything else.
+False missing/current/conflict/migration/base claims reject; local job roots alone
+cannot add entries to a completed backup. Restore must disclose retained-only data.
+
+### 12.3 Exact automatic summary classification
+
+For `lociview-project-summary-1`, the closed object has exactly `algorithm`, `scope`,
+`entityClasses`, `fieldClasses`, `blobEntryCount`, `blobBytes`. Positive class counts
+are sorted lexicographically by class and zero-count entries are omitted. Counts
+are safe integers. Blob counts/bytes equal the actual manifest `blobs`, not evidence
+files or all blobs mentioned by history. Scope is `entireHistory` for Workspace/
+backup, `baseDelta` for Contribution, `snapshot` for review/clean.
+
+| Entity class | Atomic field classes (prefix with the entity class and a dot) |
+|---|---|
+| project | schema, identity, title, frame, defaultSceneId |
+| assetsById | id, lifecycle, label, assetFrameId, status |
+| captionsById | id, lifecycle, title, body, colorSrgb, anchor |
+| captionAttachmentsById | id, lifecycle, captionId, mediaResourceId, altText, orderKey |
+| captionTagsById | id, lifecycle, label, colorSrgb, orderKey |
+| captionTagMembershipsById | id, lifecycle, captionId, tagId |
+| scenesById | id, lifecycle, name, orderKey, defaultViewId |
+| sceneAssetMembershipsById | id, lifecycle, sceneId, assetId, orderKey |
+| sceneCaptionMembershipsById | id, lifecycle, sceneId, captionId, orderKey |
+| viewsById | id, lifecycle, sceneId, name, orderKey, projectFrameId, camera, background |
+| materialOverridesById | id, lifecycle, routing, appearance, compositing |
+| assetRevisionsById / assetBindingsById / representationsById / mediaResourcesById | record (one whole immutable record, not an invented history of nested fields) |
+| opaque | field (generic unknown unit; never emit its raw path/key/ID/value) |
+
+In causal scopes, inspect the selected original change set from its exact source
+DAG: all target-reachable changes, or D = T − B. Count the distinct addressed
+entity for each class and distinct addressed entity for each field class, regardless
+of whether that value survives, is absent, equals an old value or conflicts. Root
+schema/identity and project fields address one Project entity. Only bootstrap
+collection/container construction is structural and excluded. Resolve every
+operation's address from verified object creation/ancestry, not from a current
+library winner or actor/time sort. Unsupported physical operations reject input.
+
+Scan all original scalar operations, including multiple operations at one address
+in a change. `inspectPhysical()` currently collapses same-change writes and omits
+schema from its normalized AtomicHistory; that projection alone is insufficient
+for this classifier. Original operation inspection must preserve unknown-value
+accounting even if a later same-change write overwrites it. Known mutable fields
+map to the listed class; immutable records map to record, not arbitrary JSON paths.
+
+An unknown root scalar addresses one opaque unit per original root key. An unknown
+Project/record field or nested value addresses its containing Project/record once
+in opaque.field as well as any known class applicable to that write. Opaque counts
+therefore may overlap known counts; totals must not sum the classes as disjoint
+entities. Absence at an unknown address still counts. The output contains only
+dictionary labels/counts; local address sets never become shared user content.
+
+For snapshot scope, count only constructed output entities/present fields, with
+the review's sole Scene classified as scenesById, flattened Assets as assetsById
+record, and immutable snapshot records as record. Add `assetsById.record` for
+this snapshot-only flattening; snapshot header schema/snapshotId are structural,
+not source identity. Clean counts its constructed semantic fields, not old history
+or its generated bootstrap lifecycle operations. Opaque is forbidden in snapshots.
+Receivers independently recompute summaries after validating the exact purpose,
+source/base/snapshot; any discrepancy rejects before publication.
+
+Minimum independent expectations: edit-then-revert of one Caption body counts one
+Caption and one captionsById.body; two captions edited repeatedly count two, not
+the number of writes; unknown value overwritten within one change still counts
+opaque; two edits of one status count one atomic status, not nested key counts;
+empty D has empty class arrays and zero blob delta; snapshot excludes all source
+history counts; backup's extra evidence files do not inflate blob counts.
+
+### 12.4 Finite validation execution descriptor
+
+Candidate descriptor ID: `lociview-project-package-validation-1`. These are
+explicit development stop limits, NOT an iPhone promise, product capacity or
+relaxation of a lower existing source-profile guard. They must be checked both
+before allocation from declarations and against observed bytes/work. Reject the
+whole operation on excess; never truncate histories, lists, bodies or candidates.
+The container allowance admits the existing 500 MiB streaming acceptance target
+without itself proving it. It does not admit a 500 MiB model to the existing
+64 MiB file-inspection lane or extend any renderer/profile.
+
+| Counter / unit | Proposed maximum / exact rule |
+|---|---|
+| Entire archive | 805,306,368 bytes (768 MiB), additionally all ZIP32 fields/offsets must be representable without sentinels |
+| Declared/observed nonmanifest payload | 671,088,640 bytes (640 MiB), including metadata, changes, snapshot and backup evidence |
+| Physical blob bytes | 536,870,912 bytes (512 MiB), both per entry and aggregate; at most 1,024 unique digests |
+| ZIP entry count | 4,096 including both manifest entries and every evidence file |
+| Container metadata inspection | 4,194,304 bytes total for local headers/descriptors/central directory/end records; payload reads use separate budgets |
+| Control JSON | 1,048,576 bytes per manifest/inventory/base table/journal-receipt control; 4,194,304 bytes aggregate per package controls, including retained base manifests |
+| Review snapshot | 8,000,000 bytes, separate from the smaller control-JSON bound |
+| Each full metadata source or original-change set | 8,000,000 bytes; 1,000 changes; 1,000,000 bytes/change; 20,000 physical operations. Receiver union also fits the current metadata guard. |
+| Each head/dependency set | 1,000 hashes; 100,000 dependency references in the complete package proof |
+| Canonical semantic/control values | depth 32; 100,000 nodes per inspected value tree; 65,536 Unicode scalars per string; stricter domain label/text limits also apply |
+| History inspection | 1,000,000 charged steps per source; shared package-plus-base budget 100,000 operations, 1,000,000 decoded nodes and 5,000,000 charged steps |
+| Closure work | 100,000 records, 200,000 edges, 1,000,000 charged visits; shared across roots, not reset for each conflict candidate |
+| Local exchange bases in a backup | 16 records; 32 unique manifest/metadata evidence entries; 16,777,216 total raw evidence bytes. No automatic expiry to fit the bound. |
+| Paths | Exact fixed/derived names only, each at most 128 UTF-8 bytes; ASCII spelling, no directories, slash aliases, case/NFC alternatives or comments |
+| ZIP encoding | Single volume, STORE, fixed DOS epoch 1980-01-01 00:00:00; central/local names and flags agree; equal compressed/uncompressed size (including zero). Reject ZIP64/encryption/special files/archive and entry comments, undeclared prefixes/suffixes and arbitrary extra fields. |
+| Reader/writer buffers | Input/application chunks at most 16,777,216 bytes; shared application-owned I/O-buffer ceiling 67,108,864 bytes. Charge header buffers and clones too; backpressure before a new allocation. |
+| Stream calls | At most 100,000 reads/chunks per stream and 1,000,000 across one package job; count zero-length chunks too |
+| Active work | One package operation per origin; one coalesced automatic pending indication per Project. At most 16 unfinished package-job records per Project, then recovery rather than auto-deletion/new work. |
+| Additional staging space | At most 2,147,483,648 bytes per sink, with a separate 16,777,216-byte safety reserve requested where free-space inspection exists; use the exact staged-space formula below, not archive size alone |
+
+Header CRC-32, 32-bit sizes and offsets must match measured content. The writer
+uses the following exact ZIP32 form for every entry: local signature 0x04034b50,
+version-needed 20, flags 0x0808 (UTF-8 plus data descriptor), method 0, DOS time 0,
+DOS date 33, zero local CRC/sizes, exact filename length and zero extra length.
+The payload is followed by the 16-byte signed descriptor 0x08074b50, CRC-32,
+compressed size and equal uncompressed size. Central records use 0x02014b50,
+version-made-by 20 (DOS), version-needed 20, the same flags/method/date/name, measured
+CRC/sizes, disk/internal/external attributes 0, no extra/comment, and the exact
+local offset. Central order equals local order. EOCD 0x06054b50 has zero disk
+fields/comment, matching entry counts and exact central offset/length; it is last.
+All numeric ZIP fields are little-endian. Do not accept alternate descriptor forms,
+extra fields, prefix/suffix bytes or library-default time/attributes. The golden
+layout checks these fields independently of the selected ZIP library.
+Hash/checksum agreement does not authenticate
+the author. A detected nested ZIP/container inside an entry is rejected unless the
+exact already-approved model/media profile explicitly defines that embedded shape;
+an opaque blob declaration alone is not a nested-archive permission.
+
+Count additional workspace demand as the sum of owned input spool, new CAS bodies,
+retained original source/wire/derived/receiver parts, new base evidence, output or
+replacement artifacts, and journal/receipt overhead. Avoid double-counting an
+already verified shared digest, but do not remove a required physical copy from the
+formula merely because it has equal bytes. External replacement separately reserves
+the new artifact/copy while the previous usable point remains. If the chosen sink
+cannot describe its maximum additional copies, it is not eligible for automatic
+replacement; use §11.4's supported fallback. Quota estimates are advisory, so every
+write/close/verify/receipt failure must still preserve old authoritative state.
+
+The current limited validation host also applies 64 MiB to cumulative bodies:
+`validationHost.ts` checks all existing Representation/Media digest sizes plus
+the selected file before each model/image addition. This proposal does not relax
+that admission guard. Its 768 MiB archive / 512 MiB physical-blob descriptor is a
+separate proposed package-processing limit; a 500 MiB synthetic stream fixture
+does not establish admission of a real model or a larger validation Project.
+Existing GLB JSON 4 MiB, 100,000 model items, 8,000,000 accessor values and
+16,777,216 image pixels remain. Source/union metadata guards cannot be increased
+just because the surrounding ZIP allowance is larger. Stored streams currently
+allow their own read accounting; the package's shared counters must be enforced
+separately, not assumed from `blobInventory` or `storedBlobStream`.
+
+Current `A.load` allocates before the later physical/node/work inspection. Encoded
+byte limits plus post-decode counters are therefore NOT proof of bounded malicious
+decoder memory. The implementation/adoption evidence must account for that stage
+and demonstrate safe failure/isolation; never label the I/O-buffer ceiling as total
+browser/Wasm/GPU memory. This descriptor is an execution contract to prove, not
+evidence that enforcement already exists. Boundary cases must test exactly N and
+N+1, declaration/observation disagreement, zero-length/read storms and aggregate
+work across all retained bases. Keep the 500 MiB/zero-unchanged-body-read acceptance
+target and physical-iPhone measurements open until actually executed in scope.
+
+### 12.5 Expected vector inputs before implementation bytes
+
+Use synthetic IDs/records and fixed test randomness, never private source metadata.
+The production allocator remains CSPRNG. Exact adapter change bytes, manifest
+checksums and whole-archive goldens are generated only after the closed contract
+is approved, then independently checked against these expectations. Placeholders
+are not golden bytes, and updating a golden to match a failing implementation is
+not acceptance.
+
+- Five legal purpose variants contain only §3's branch fields and exact derived
+  entries. One illegal branch field or undeclared ZIP entry rejects before writes.
+- For the existing sibling-target vector in §9.1, wire D and receiver M remain
+  separately derived original sets. Backup/reopen retains the declared Workspace
+  base even after local edits; empty receive adds no metadata or duplicate receipt.
+- History-free input with two family/class pairs, source-only resources, unshown
+  active Captions/tags, a nonvisual owner, optional absent color/view, and nested
+  provenance sentinels must follow every table row. Unknown nested values block,
+  not disappear. Review-to-edit has the unresolved expected behavior in §12.6;
+  do not supply an implementation-selected expected result.
+- Summary checks include same-change overwritten unknown content, absent writes,
+  edit/revert, two records with many edits, immutable atomic writes, empty delta,
+  snapshot-only counting and backup evidence versus blob totals.
+- Inventory checks distinguish inactive historical records from retained-base
+  protection, all conflicting endpoints, opaque/retention declarations and active
+  output jobs. No recursive job/archive inclusion or same-digest duplicate bytes.
+- Every §12.4 guard is checked at its own boundary and under combined pressure;
+  source/derived/receiver histories and both old/new automatic points never share
+  a fictitious single-buffer/single-file capacity credit. §9's original-byte,
+  interruption, hostile-input, privacy, two-round and actual-device vectors remain.
+
+### 12.6 Actual remaining review-to-edit compatibility decision
+
+The current proposal cannot reconstruct an editable visual Asset faithfully from
+its flattened review form. 01 §3.1 and `projectModelGraph.ts` require a complete
+nonoverlapping partition of all visual families into anchor-compatibility classes.
+02 §9.3 / §5.1 above deliberately retain only compatible class IDs, not the
+class-to-family mapping. With two families and two classes, swapping their pairing
+produces the same current review data. 05 §7.3 nevertheless requires explicit
+editing to create a fresh clean Project. The phrase "ordinary history-free
+reconstruction" does not supply the missing relation; order/name/geometry inference
+or one invented all-family class would violate the accepted rules.
+
+Recommended amendment for PO decision, NOT yet applied to the schema:
+
+1. Add snapshot-local `anchorClassPartition` to visual review Assets, entries
+   `{id,targetVariantFamilyIds}` covering every included visual family exactly
+   once, not just classes used by included Captions. IDs are re-keyed, targets
+   name only included families; source identity/history and omitted body bytes
+   remain excluded. View retains the existing compatible-ID membership for its
+   export-time status, including classes whose source families were not included.
+2. On explicit edit-copy, create fresh classes from that recorded included-family
+   partition and preserve class/family equality with one typed mapping. Restricting
+   a source class to its included families creates a new class, not an assertion
+   of shared lineage/surface with the source. Pins whose old class has no included
+   target family retain owner/position and their separate class ID but become
+   needsReview in the editable copy; explain this count/effect before confirmation.
+   Do not guess a replacement model/family or move the pin. Existing needsReview
+   remains needsReview. Nonvisual owners retain §5.1's unresolved/list-only mapping.
+3. Keep ordinary local View mode and Workspace/Contribution unchanged. The amendment
+   affects only the explicit conversion of a separately cut-out review file into
+   an independent editable Project; it is not an extra restriction on participants.
+
+This changes the review's topology-omission policy, closed snapshot fields and the
+stated edit-copy effect. It needs explicit contract approval, not an implementation
+shortcut under sequencing delegation. The smaller alternative—mark every review
+pin needsReview on edit—unnecessarily degrades even fully represented models and
+is not recommended. Requiring a different file instead would remove the accepted
+direct edit-copy capability. No new schema or fallback has been implemented.
+
+Read-only analysis independently confirmed the missing partition. Finish the
+decision and resulting exact snapshot/reconstruction/golden contract before
+claiming §11.3's complete five-purpose gate closed. Native/v1/LociMyu migration's
+different physical-profile decision remains in 07 §10.2, not hidden inside this
+review change. Neither issue invalidates the approved full-source service already
+implemented; package reader/writer authority still follows 05 §7.5.
+
+Design review: independent read-only review found one incorrect description of
+the current validation host's cumulative 64 MiB guard; §12.4 now states the actual
+code boundary. No other mandatory issue was reported in the field/summary/root/
+execution tables. This is design review, not approval of the §12.6 amendment,
+completion of reconstruction/golden bytes, or executable package acceptance.

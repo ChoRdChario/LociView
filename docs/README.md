@@ -6,6 +6,13 @@ observed implementation.
 
 ## Purpose-specific authority
 
+2026-09-13 concrete package design: [06 §12](specs/06-project-package-wire.md#12-concrete-field-summary-and-execution-tables-proposed-2026-09-13)
+records field/privacy, inventory, summary and finite execution tables. Independent
+review corrected the description of the current cumulative validation limit.
+Its §12.6 review-to-edit mapping amendment is a new PO decision, not an adopted
+schema. The five-purpose contract/reconstruction/goldens remain incomplete;
+no package runtime or acceptance is added. See todo for the exact next boundary.
+
 2026-09-13 bounded display correction: the existing Scene hosts distinguish browser
 resume data from external file saving, including edit feedback and the validation
 Project catalog. Pending/failure/recovery/readonly states remain visible. This is

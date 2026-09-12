@@ -1,5 +1,16 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-13 ファイル設計の具体化／新しい判断点（docs-only、codeは`f51f8af`）:**
+> 06 §12に14 mapのfield／privacy、保護対象、変更要約、有限guard、ZIP配置を記載。
+> 独立レビューで現validationの累積64 MiB制限の説明を訂正。他の必須指摘なし。
+> ただし閲覧用切出しには、編集copyに必要なモデルfamilyとpin classの対応が不足。
+> §12.6に「含めたモデルの対応を保持し、省いたモデルのpinだけ編集時に要確認」を提案。
+> 元位置・所有者を保持し、名前／順番／形状から対応を推測しない。schema変更は未批准。
+> 次はこの新しい契約判断をPOへ提示し、承認後に復元／receipt／goldenの具体化を完了する。
+> 五用途仕様完成／writer実装承認とはしない。通常の閲覧mode・チーム受信は不変更。
+> docs diffを検査し、既存source検証は下記を再利用。新テスト／実機PASSは追加していない。
+> 保存頻度の委任・外部auto不可時の代替方針を再質問しない。push制約も変更なし。
+
 > **2026-09-13 最新表示修正／保存点設計:** Sceneのmemory／metadata／限定validation画面で、
 > 内部ackをfile「保存済み」とするheader・編集結果・Project一覧・案内を修正。
 > 「再開用データのみ」と未確定／更新中／失敗／復旧／閲覧を区別し、draft・元履歴を保持。

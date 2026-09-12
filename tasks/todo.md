@@ -28,6 +28,45 @@ Formal adoption still requires G1-A/C and applicable device evidence. No profile
 
 #### Active connected work — PO-approved limited real-file validation
 
+Current next slice (2026-09-13, after `f51f8af`): finish 06 §11.3's closed
+five-purpose implementation-design tables. Previous goal turn is progress:
+truthful working-data presentation, verified source/test tree and reviewed save-
+point/output design were committed; worktree is clean at this slice's start.
+
+- [x] Pin history-free field actions against current domain/accepted
+  privacy contracts; distinguish proposed unplaced/pin-scale schema amendments.
+- [x] Pin protected-inventory roots, original-write summary attribution and all
+  finite validation execution guards, without product/device capacity claims.
+- [x] Independently review the resulting concrete proposal, synchronize existing
+  indexes/handoff and present only the actual remaining approval boundary.
+
+Purpose: unblock real-file Workspace/Contribution work, not another storage PoC.
+Production scope for this slice is zero runtime: no reader/writer, schema change,
+new dependency, migration activation, normal home or deployment. Reuse the current
+source/journal/canonical/ZIP evidence and specify missing exact vectors before code.
+Target is a reviewable closed design, not wire adoption or TEAM-FLOW acceptance.
+Stop if closure would require changing accepted privacy, relationships, conflict
+choice, old-reader compatibility or a product capacity guarantee. Sequencing,
+save wording and the no-external-autosave fallback are already delegated/approved.
+
+Slice review: 06 §12 now records all 14 map/nested field actions, privacy omissions,
+protected roots, raw-operation summary classification, finite development guards
+and strict ZIP32 layout. Independent review found one incorrect description of
+the existing cumulative 64 MiB validation limit; corrected against source. No
+other mandatory table issue was reported. This is docs-only; runtime remains
+`f51f8af`, whose executed checks below are unchanged, not rerun as new evidence.
+
+Actual stop boundary: review's flattened data omit the class-to-model-family
+partition that the editable domain requires. 05 §7.3 requires a review-to-clean
+edit path, so the five-purpose design is NOT closed. 06 §12.6 proposes preserving
+only the included snapshot-local partition and explicitly flagging pins whose
+model family was excluded when making an editable copy. No relation is guessed.
+That new snapshot/privacy/compatibility decision needs PO approval; sequencing
+and autosave fallback do not. After it, finish the exact reconstruction/receipt/
+golden contract and applicable implementation approval before a package writer.
+07's physical migration profile remains a distinct decision. No runtime, feature
+count, real-browser/iPhone/offline acceptance or adoption credit is added here.
+
 Latest autosave refinement (2026-09-13): one latest automatic point per Project,
 replaced by the next successful update; no automatic generations. Manual points
 may have user names and are protected from automatic overwrite. PO delegates

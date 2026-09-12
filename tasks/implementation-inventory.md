@@ -167,7 +167,7 @@
 | F01 | 自己完結したTeam Workspaceファイルを配布・開く | 新規実装 | 5-purposeの合成semantic proofのみ。実manifest／writer／reader／preflightは06未批准。T01は内部受信、こちらはportableファイル。 | [docs/specs/06-project-package-wire.md:3](../docs/specs/06-project-package-wire.md) / [poc/scene-history/purposes.ts](../poc/scene-history/purposes.ts) |
 | F02 | Contributionファイルを書き出し・取り込む | 新規実装 | base依存delta＋必要blobsのportable実装なし。旧Native collaborationとは契約が違う。 | [docs/specs/06-project-package-wire.md:24](../docs/specs/06-project-package-wire.md) / [docs/specs/06-project-package-wire.md:531](../docs/specs/06-project-package-wire.md) |
 | F03 | 完全backupを書き出し・明示確認して復元する | 別経路のみ | 旧Nativeで実装あり。新history／保護inventory／exchange-base付きwhole Projectのwire接続は別実装。 | [src/nativeGs/packageExchange.ts](../src/nativeGs/packageExchange.ts) / [docs/specs/06-project-package-wire.md:24](../docs/specs/06-project-package-wire.md) |
-| F04 | 一つのSceneを閲覧用に共有する | 別経路のみ | 旧Nativeのreview相当あり。新history-free closure／privacy検査／View入口は未接続。 | [src/nativeGs/packageSnapshots.ts](../src/nativeGs/packageSnapshots.ts) / [docs/specs/06-project-package-wire.md:24](../docs/specs/06-project-package-wire.md) |
+| F04 | 一つのSceneを閲覧用に共有する | 別経路のみ | 旧Nativeのreview相当あり。新history-free closure／privacy検査／View入口は未接続。編集copyに必要なfamily対応不足とsnapshot改訂案は06 §12.6（未批准）。 | [src/nativeGs/packageSnapshots.ts](../src/nativeGs/packageSnapshots.ts) / [docs/specs/06-project-package-wire.md:24](../docs/specs/06-project-package-wire.md) |
 | F05 | 全Sceneを独立Projectとして複製して渡す | 別経路のみ | 旧Native clean相当あり。新全Projectのre-key／fresh history／元へContribution不可は未接続。 | [src/nativeGs/packageSnapshots.ts](../src/nativeGs/packageSnapshots.ts) / [docs/specs/06-project-package-wire.md:24](../docs/specs/06-project-package-wire.md) |
 | F06 | 現Native Projectを新Project/Sceneへ変換する | 新規実装 | 新recipe・共有導入artifact・変換writer未実装。旧sourceを変更しない。 | [docs/specs/07-project-scene-migration.md:3](../docs/specs/07-project-scene-migration.md) |
 | F07 | frozen v1を新Project/Sceneへ変換する | 新規実装 | 旧readerの互換性維持と新writerを接続する移行は未実装。 | [docs/specs/07-project-scene-migration.md:3](../docs/specs/07-project-scene-migration.md) |
@@ -336,6 +336,12 @@ C07添付件数、V04背景入口、C04追加色、C09resize、M05一時hide等�
 ただし小改修を積み続けて受信・更新の本筋が進まない状態にはしない。
 
 ## 6. 明示deferred／判断未確定（64群へ加算しない）
+
+2026-09-13追記: 06 §12に具体的field／privacy、inventory、要約、有限guardを整理。
+独立レビュー済みだが、§12.6の閲覧切出し→編集copyの対応情報不足が新しい契約判断。
+含めたモデルの対応だけ残す改訂を提案中で、五用途の完全な閉鎖／wire実装承認ではない。
+策定順・auto頻度・外部auto不可時の代替は委任／承認済みであり、下記のgate未批准と混同しない。
+runtime／機能群の分類数は変更しない。07物理移行profileは別判断のまま。
 
 2026-09-13: 06 §11に実装・採用gateの段階分離を提案（PO未承認）。全五用途の閉じた
 契約と具体的guard値・独立レビューを先に固定し、既存validation内で実装・証明を得る案。

@@ -10,6 +10,14 @@
 
 ## Start here
 
+2026-09-13 package design update: 06 §12 supplies concrete field/privacy, inventory,
+summary and finite execution tables, independently reviewed but still proposed.
+§12.6 identifies a real review-to-edit gap: flattened review data lack the
+class-to-model-family partition required by the editable domain. The recommended
+snapshot-local mapping amendment needs PO approval; no schema/writer changed.
+Finish its reconstruction/receipt/golden contract afterward, not a new PoC.
+Current runtime remains `f51f8af`; the whole five-purpose gate is not closed.
+
 2026-09-13 bounded state correction: Scene development/metadata/validation hosts
 now label internal acknowledgment as browser resume data, not file-save success.
 Header, edit feedback and Project catalog retain pending/failure/recovery/readonly
