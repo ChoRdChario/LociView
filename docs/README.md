@@ -68,6 +68,12 @@ Complete observed child tombstones are atomic; binary content and late conflicts
 are retained, as is unapplied input after a remote deletion. Source/endpoint guards,
 exact retry and cold reopen are covered by existing host tests; real-browser and
 device acceptance remain in the consolidated batch.
+The same review area also resolves Caption delete/edit and delete/restore
+conflicts with an explicit parent-only event. Child tombstones and ambiguous
+references are not repaired or resurrected; original contents remain. The
+existing Scene-inclusion flow can reuse a restored unplaced Caption. This is a
+bounded T03 connection, not general restoration or complete team acceptance;
+final verification is recorded in todo.
 Confirmed whole-Project model deletion (M09) now checks all Scene, Caption-anchor
 and material-routing candidates before changing Asset.lifecycle only. No cascade
 or binary erasure. Exact saved retry, independent reopen and late-reference

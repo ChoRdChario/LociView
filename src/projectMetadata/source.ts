@@ -122,6 +122,7 @@ export class ProjectMetadataSource {
       // write: remove all observed values, then set the explicit choice in the
       // SAME change. No intermediate absence is published or saved separately.
       if (command.kind === 'resolveCaptionText' || command.kind === 'resolveCaptionField') delete draft.captionsById[command.captionId][command.field];
+      if (command.kind === 'resolveCaptionLifecycle') delete draft.captionsById[command.captionId].lifecycle;
       if (command.kind === 'resolveAssetStatus') delete draft.assetsById[command.assetId].status;
       if (command.kind === 'resolveDefaultScene') delete draft.project.defaultSceneId;
       if (command.kind === 'resolveSceneName') delete draft.scenesById[command.sceneId].name;

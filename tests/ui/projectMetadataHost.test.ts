@@ -41,7 +41,7 @@ import { fixtureMedia, captionAttachments } from '../../src/harness/projectScene
 import { RecordedDocument, record, type RecordedNode } from './domRecorder';
 import { createMetadataReceiveControls } from '../../src/harness/projectScene/metadataReceiveControls';
 import type { SyntheticDisplay } from '../../src/harness/projectScene/viewportModel';
-import { captionDeletionImpact } from '../../src/projectMetadata/captionDeletion';
+import { captionDeletionImpact, captionLifecycleRecovery, type CaptionLifecycleResolution } from '../../src/projectMetadata/captionDeletion';
 import type { CaptionDeletionCommand } from '../../src/scene/commands';
 import { assetDeletionImpact } from '../../src/projectMetadata/assetDeletion';
 import { modelListView } from '../../src/ui/projectScene/modelListState';
@@ -800,6 +800,223 @@ describe('saved Caption deletion; synthetic ports and recorded DOM only', { time
     const b = fixture(); for (const path of await a.base.list(`${metadataArea}/${a.run}/`)) await b.base.writeBytes(path, (await a.base.readBytes(path))!);
     for (const [key, bytes] of a.rows) b.rows.set(key, bytes.slice()); return b;
   };
+  const recoveryCommand = (host: Awaited<ReturnType<ReturnType<typeof fixture>['open']>>, state: 'active' | 'deleted', event = 980): CaptionLifecycleResolution => {
+    const p = host.read().provider!; if (p.kind !== 'scene-provider') throw Error('provider');
+    const source = captionLifecycleRecovery(p, f.shared, metadataFixtureLimits);
+    return { kind: 'resolveCaptionLifecycle', captionId: f.shared, state, eventId: id('evt', event),
+      observedOperationIds: source.lifecycle.candidates.map(c => c.operationId) };
+  };
+  const deleteAndEdit = async (host: Awaited<ReturnType<ReturnType<typeof fixture>['open']>>, lateEdge = false) => {
+    const seed = host.read().source!, provider = host.read().provider!;
+    let remote = seed.prepareEdit(seed.token, { kind: 'editCaption', captionId: f.shared, edits: { body: '削除と同時に届いた記録' } }, provider, '7'.repeat(32));
+    if (lateEdge) remote = rawChange(remote, d => {
+      const edge = Object.values(d.sceneCaptionMembershipsById).find((e: any) => String(e.captionId) === canonicalFixture(f.shared)) as any;
+      d.sceneCaptionMembershipsById[id('scm', 981)] = { ...edge, id: scalar(id('scm', 981)) };
+    });
+    await host.authority.deleteCaption!(seed.token, command(host)); const deleted = host.read().source!;
+    await host.receive(deleted.token, fullSource(remote, 981)); return { seed, deleted, remote };
+  };
+  it.each(['active', 'deleted'] as const)('resolves a single deleted candidate to %s, preserves all children and returns original history without duplication', async state => {
+    const a = fixture(), ah = await a.open(true), b = await clonePorts(a), bh = await b.open();
+    const { seed, deleted, remote } = await deleteAndEdit(ah, true);
+    await bh.receive(seed.token, fullSource(remote, 981)); await bh.receive(bh.read().source!.token, fullSource(deleted, 982));
+    expect(bh.read().source!.token).toBe(ah.read().source!.token);
+    const before = ah.read().source!, p = ah.read().provider!; if (p.kind !== 'scene-provider') throw Error('provider');
+    const impact = captionLifecycleRecovery(p, f.shared, metadataFixtureLimits);
+    expect(impact.deleteEdit).toBe(true); expect(impact.lifecycle.candidates).toHaveLength(1);
+    expect(impact.children.some(c => c.state === 'deleted')).toBe(true);
+    expect(impact.children.some(c => c.id === id('scm', 981) && c.state === 'active')).toBe(true);
+    const s = new SyntheticSession(ah.authority), scene = s.sceneId, memory = s.memory, windows = s.windowMemory;
+    const controls = createMetadataReceiveControls(new RecordedDocument().asDocument(), ah, s, () => {});
+    const region = named(record(controls.root), 'キャプションの削除・復元'), choice = descendants(region).find(n => n.tag === 'select')!;
+    expect(choice.value).toBe(''); expect(button(region, '選択を確定').disabled).toBe(true);
+    expect(descendants(region).some(n => n.textContent.includes('削除済み・復元しません'))).toBe(true);
+    expect(descendants(region).some(n => n.textContent.includes('親の復元後に再表示'))).toBe(true);
+    setInput(choice, state); await acknowledge(s, () => button(region, '選択を確定').fire('click')); controls.render();
+    expect(s.acknowledgment.state).toBe('idle'); const after = ah.read().source!, q = ah.read().provider!;
+    if (q.kind !== 'scene-provider') throw Error('provider');
+    expect(after.originalChanges()).toHaveLength(before.originalChanges().length + 1);
+    expect(q.resources.captions[f.shared]!.lifecycle).toMatchObject({ kind: 'value', value: { state, reason: state === 'active' ? 'restore' : 'conflictResolution' } });
+    expect(q.resources.captions[f.shared]!.body).toEqual({ kind: 'value', value: '削除と同時に届いた記録' });
+    expect(q.issues.some(i => i.code === 'concurrent-delete-edit')).toBe(false);
+    // Parent recovery changes reference diagnostics, not the original child atoms.
+    const untouched = (v: typeof p) => v.inspection.candidates.fields.filter(c =>
+      c.path.join('/') !== `captionsById/${f.shared}/lifecycle`).map(c => ({ path: c.path, candidates: c.candidates }));
+    expect(untouched(q)).toEqual(untouched(p));
+    const { lifecycle: _beforeLife, ...captionBefore } = p.details.mutable.captionsById[f.shared]!;
+    const { lifecycle: _afterLife, ...captionAfter } = q.details.mutable.captionsById[f.shared]!;
+    expect(captionAfter).toEqual(captionBefore); expect(q.details.immutable).toEqual(p.details.immutable);
+    expect(q.details.mutable.captionsById[f.second]).toEqual(p.details.mutable.captionsById[f.second]);
+    expect(q.issues.some(i => i.kind === 'orphan' && i.path.includes(id('scm', 981)))).toBe(state === 'deleted');
+    expect(s.composition.captions.some(c => c.captionId === f.shared)).toBe(state === 'active');
+    expect(s.sceneId).toBe(scene); expect(s.memory).toBe(memory); expect(s.windowMemory).toBe(windows);
+    expect(named(record(controls.root), '削除と参照の要確認').hidden).toBe(false);
+    expect(descendants(region).some(n => n.textContent.includes(state === 'active' ? 'キャプションを復元しました' : '削除状態を確定しました'))).toBe(true);
+    await bh.receive(bh.read().source!.token, fullSource(after, 983));
+    expect(bh.read().source!.token).toBe(after.token);
+    const token = after.token, count = after.originalChanges().length;
+    await ah.receive(token, fullSource(bh.read().source!, 984)); await bh.receive(token, fullSource(after, 983));
+    expect(ah.read().source!.originalChanges()).toHaveLength(count); expect(bh.read().source!.token).toBe(token);
+    controls.dispose(); await ah.dispose(); const cold = await a.open();
+    expect(cold.read().source!.token).toBe(token); expect(cold.read().source!.originalChanges()).toEqual(after.originalChanges());
+    await cold.dispose(); await bh.dispose();
+  });
+  it('restores only the parent with competing restore/text/anchor candidates, and reuses it via a fresh Scene registration', async () => {
+    const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority), media = mediaHost(s);
+    await media.add(0); media.w.dispose();
+    const tagged = rawChange(host.read().source!, d => {
+      d.captionTagsById[id('tag', 985)] = { id: scalar(id('tag', 985)), label: scalar('確認'), orderKey: scalar('A'),
+        lifecycle: scalar({ state: 'active', reason: 'initial', eventId: id('evt', 985) }) };
+      d.captionTagMembershipsById[id('tgm', 985)] = { id: scalar(id('tgm', 985)), captionId: scalar(f.shared), tagId: scalar(id('tag', 985)),
+        lifecycle: scalar({ state: 'active', reason: 'initial', eventId: id('evt', 985) }) };
+    });
+    await host.receive(host.read().source!.token, fullSource(tagged, 985));
+    const { seed } = await deleteAndEdit(host);
+    const one = rawChange(seed, d => {
+      d.captionsById[f.shared].lifecycle = scalar({ state: 'active', reason: 'restore', eventId: id('evt', 986) });
+      d.captionsById[f.shared].body = scalar('復元側の本文');
+      d.captionsById[f.shared].anchor = scalar({ kind: 'project', projectFrameId: s.snapshot.resources.projectFrameId, positionProject: [2, 3, 4] });
+    });
+    const two = rawChange(seed, d => { d.captionsById[f.shared].anchor = scalar({ kind: 'project', projectFrameId: s.snapshot.resources.projectFrameId, positionProject: [5, 6, 7] }); });
+    await host.receive(host.read().source!.token, fullSource(one.appendOriginal(two.originalChanges()), 986));
+    const before = host.read().provider!; if (before.kind !== 'scene-provider') throw Error('provider');
+    const recovery = captionLifecycleRecovery(before, f.shared, metadataFixtureLimits);
+    expect(recovery.lifecycle.candidates).toHaveLength(2);
+    expect(recovery.children.filter(c => c.state === 'deleted').map(c => c.kind)).toEqual(expect.arrayContaining(['scene', 'attachment', 'tag']));
+    const bins = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.endsWith('.bin'));
+    const bytes = await Promise.all(bins.map(p => h.base.readBytes(p)));
+    await host.resolve(host.read().source!.token, recoveryCommand(host, 'active', 987)); s.refreshHistory();
+    const after = host.read().provider!; if (after.kind !== 'scene-provider') throw Error('provider');
+    expect(after.resources.captions[f.shared]!.body.kind).toBe('unresolved');
+    expect(after.resources.captions[f.shared]!.anchor.kind).toBe('unresolved');
+    expect(after.details.mutable.captionAttachmentsById).toEqual(before.details.mutable.captionAttachmentsById);
+    expect(after.details.mutable.captionTagMembershipsById).toEqual(before.details.mutable.captionTagMembershipsById);
+    expect(after.state.captionMemberships).toEqual(before.state.captionMemberships);
+    expect(s.composition.captions.some(c => c.captionId === f.shared)).toBe(false);
+    expect(await Promise.all(bins.map(p => h.base.readBytes(p)))).toEqual(bytes);
+    // Existing Scene include creates a new edge; original child tombstones stay intact.
+    s.acceptInclude(planCaptionInclude(s.includeContext(), { kind: 'select', captionId: f.shared }));
+    expect(planCaptionInclude(s.includeContext(), { kind: 'include' }).kind).toBe('include');
+    await acknowledge(s, () => { s.acceptInclude(planCaptionInclude(s.includeContext(), { kind: 'include' })); });
+    expect(s.acknowledgment.state).toBe('idle');
+    const included = host.read().provider!; if (included.kind !== 'scene-provider') throw Error('provider');
+    const edges = Object.values(included.state.captionMemberships).filter(e => e.resourceId === f.shared);
+    expect(edges).toHaveLength(recovery.children.filter(c => c.kind === 'scene').length + 1);
+    for (const child of recovery.children.filter(c => c.kind === 'scene'))
+      expect(included.details.mutable.sceneCaptionMembershipsById[child.id]).toEqual(before.details.mutable.sceneCaptionMembershipsById[child.id]);
+    expect(included.resources.captions[f.shared]!.body).toEqual(after.resources.captions[f.shared]!.body);
+    await host.dispose();
+  });
+  it('retains unapplied local input, blocks IME/readonly/stale choices, and enables scalar resolution only after parent recovery', async () => {
+    const h = fixture(), host = await h.open(true); let readonly = false;
+    const s = new SyntheticSession({ ...host.authority, get readOnly() { return readonly; } });
+    select(s); const w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s), detail = named(record(w.root), 'キャプションの詳細');
+    setInput(named(detail, '本文'), '未適用の原稿');
+    const { seed } = await deleteAndEdit(host);
+    const extra = rawChange(seed, d => { d.captionsById[f.shared].body = scalar('もう一つの原文'); });
+    await host.receive(host.read().source!.token, fullSource(extra, 988)); s.refreshHistory(); w.render();
+    const controls = createMetadataReceiveControls(new RecordedDocument().asDocument(), host, s, () => {}), root = record(controls.root);
+    const region = named(root, 'キャプションの削除・復元');
+    let choice = descendants(region).find(n => n.tag === 'select')!;
+    const textForm = descendants(root).find(n => n.tag === 'li' && descendants(n).some(c => c.tag === 'textarea'))!;
+    const scalarChoice = descendants(textForm).find(n => n.tag === 'select')!;
+    setInput(scalarChoice, scalarChoice.children[1]!.value); expect(button(textForm, '競合を解消').disabled).toBe(true);
+    setInput(choice, 'active'); const token = host.read().source!.token, writes = h.base.writes;
+    s.setSearchComposing(true); controls.render(); button(region, '選択を確定').fire('click'); expect(host.read().source!.token).toBe(token);
+    s.setSearchComposing(false); readonly = true; controls.render();
+    expect(button(region, '選択を確定').disabled).toBe(true); button(region, '選択を確定').fire('click'); readonly = false;
+    expect(h.base.writes).toBe(writes); expect(named(detail, '本文').value).toBe('未適用の原稿');
+    const other = await host.read().source!.prepareCaptionText(token, f.second, 'body', '別の変更');
+    await host.receive(token, fullSource(other, 989)); s.refreshHistory(); controls.render();
+    expect(choice.value).toBe('active'); expect(button(region, '選択を確定').disabled).toBe(true);
+    button(region, '取り消す').fire('click'); choice = descendants(region).find(n => n.tag === 'select')!;
+    expect(choice.value).toBe(''); setInput(choice, 'active');
+    await acknowledge(s, () => button(region, '選択を確定').fire('click')); w.render(); controls.render();
+    expect(s.acknowledgment.state).toBe('idle'); expect(named(detail, '本文').value).toBe('未適用の原稿');
+    // A selected scalar form stays stale, never auto-applies its candidate.
+    expect(button(textForm, '競合を解消').disabled).toBe(true); expect(scalarChoice.value).not.toBe('');
+    button(textForm, '取り消す').fire('click');
+    const fresh = descendants(root).find(n => n.tag === 'li' && descendants(n).some(c => c.tag === 'textarea'))!;
+    const freshChoice = descendants(fresh).find(n => n.tag === 'select')!; setInput(freshChoice, freshChoice.children[1]!.value);
+    expect(button(fresh, '競合を解消').disabled).toBe(false); expect(s.pending).toBe('text');
+    controls.dispose(); w.dispose(); await host.dispose();
+  });
+  it('recovers failed publication cold using the same lifecycle event and original bytes, with no-op retry', async () => {
+    const h = fixture(), host = await h.open(true); await deleteAndEdit(host);
+    const before = host.read().source!, c = recoveryCommand(host, 'active', 990);
+    h.base.rejectPublication = true; await expect(host.resolve(before.token, c)).rejects.toThrow('変更を保持しています');
+    expect(host.read().source!.token).toBe(before.token);
+    const paths = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.endsWith('.amchange'));
+    const bytes = await Promise.all(paths.map(p => h.base.readBytes(p))); await host.dispose();
+    h.base.rejectPublication = false; const cold = await h.open(); expect(cold.read().state).toBe('pending');
+    await cold.authority.retry!(); const after = cold.read().source!;
+    expect(cold.authority.read().resources.captions[f.shared]!.lifecycle).toMatchObject({ value: { state: 'active', reason: 'restore', eventId: c.eventId } });
+    expect(after.originalChanges()).toHaveLength(before.originalChanges().length + 1);
+    expect(await Promise.all(paths.map(p => h.base.readBytes(p)))).toEqual(bytes);
+    await cold.authority.retry!(); expect(cold.read().source!.originalChanges()).toEqual(after.originalChanges());
+    await cold.dispose(); const reopened = await h.open(); expect(reopened.read().source!.token).toBe(after.token); await reopened.dispose();
+  });
+  it('discloses an ambiguous child without choosing its parent and retains the mounted decision until exact same-host retry', async () => {
+    const h = fixture(), host = await h.open(true), media = mediaHost(new SyntheticSession(host.authority));
+    await media.add(0); media.w.dispose(); await deleteAndEdit(host, true);
+    const source = rawChange(host.read().source!, d => {
+      const original = Object.values(d.captionAttachmentsById)[0] as any;
+      d.captionAttachmentsById[id('att', 993)] = { ...original, id: scalar(id('att', 993)),
+        lifecycle: scalar({ state: 'active', reason: 'initial', eventId: id('evt', 993) }) };
+    });
+    const branch = (captionId: string) => rawChange(source, d => {
+      delete d.captionAttachmentsById[id('att', 993)].captionId;
+      d.captionAttachmentsById[id('att', 993)].captionId = scalar(captionId);
+    });
+    await host.receive(host.read().source!.token, fullSource(branch(f.shared).appendOriginal(branch(f.second).originalChanges()), 993));
+    const provider = host.read().provider!; if (provider.kind !== 'scene-provider') throw Error('provider');
+    expect(captionLifecycleRecovery(provider, f.shared, metadataFixtureLimits).children.find(c => c.id === id('att', 993))?.uncertain).toBe(true);
+    const ui = createMetadataWorkspace(new RecordedDocument().asDocument(), host), s = ui.session!;
+    const region = named(record(ui.root), 'キャプションの削除・復元'), choice = descendants(region).find(n => n.tag === 'select')!;
+    expect(descendants(region).some(n => n.textContent.includes('対応先を要確認'))).toBe(true);
+    setInput(choice, 'active'); expect(ui.hasChanges()).toBe(true);
+    const before = host.read().source!; h.base.rejectPublication = true;
+    await acknowledge(s, () => button(region, '選択を確定').fire('click')); ui.render();
+    expect(s.acknowledgment.state).toBe('failed'); expect(host.read().source!.token).toBe(before.token);
+    expect(choice.value).toBe('active'); expect(button(region, '取り消す').disabled).toBe(true);
+    const paths = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.endsWith('.amchange'));
+    const bytes = await Promise.all(paths.map(p => h.base.readBytes(p))); h.base.rejectPublication = false;
+    await acknowledge(s, () => { s.retryWorking(); expect(s.acknowledgment.state).toBe('checking'); }); ui.render();
+    expect(s.acknowledgment.state).toBe('idle'); expect(ui.hasChanges()).toBe(false);
+    expect(host.read().source!.originalChanges()).toHaveLength(before.originalChanges().length + 1);
+    expect(await Promise.all(paths.map(p => h.base.readBytes(p)))).toEqual(bytes);
+    const after = host.read().provider!; if (after.kind !== 'scene-provider') throw Error('provider');
+    const edge = (p: typeof after) => p.inspection.candidates.fields.find(c => c.path.join('/') === `captionAttachmentsById/${id('att', 993)}/captionId`);
+    expect(edge(after)?.candidates).toEqual(edge(provider)?.candidates); expect(edge(after)?.candidates).toHaveLength(2);
+    expect(descendants(region).some(n => n.textContent.includes('キャプションの追加・除外'))).toBe(true);
+    await ui.dispose();
+  });
+  it('refuses incomplete observations, reused events and invalid history without publication; normal tombstones are not generalized restore', async () => {
+    const h = fixture(), host = await h.open(true), initial = host.read().provider!;
+    if (initial.kind !== 'scene-provider') throw Error('provider');
+    expect(() => captionLifecycleRecovery(initial, f.shared, metadataFixtureLimits)).toThrow('not-conflicted');
+    const { seed, deleted } = await deleteAndEdit(host);
+    const deletedProvider = await readProjectScene(deleted.read(), metadataFixtureLimits, host.content.verifier(false));
+    if (deletedProvider.kind !== 'scene-provider') throw Error('provider');
+    expect(() => captionLifecycleRecovery(deletedProvider, f.shared, metadataFixtureLimits)).toThrow('not-conflicted');
+    const source = host.read().source!, provider = host.read().provider!, c = recoveryCommand(host, 'active', 991), writes = h.base.writes;
+    for (const bad of [{ ...c, observedOperationIds: [] }, { ...c, observedOperationIds: [...c.observedOperationIds, ...c.observedOperationIds] },
+      { ...c, observedOperationIds: ['unknown'] }, { ...c, eventId: id('evt', 902) }, { ...c, eventId: 'invalid' },
+      { ...c, state: 'unknown' }, { ...c, extra: true }, { ...c, captionId: f.second }])
+      expect(() => source.prepareEdit(source.token, bad as MetadataEdit, provider, '8'.repeat(32))).toThrow();
+    await expect(host.resolve('stale', c)).rejects.toThrow(); expect(h.base.writes).toBe(writes);
+    for (const invalid of [
+      rawChange(deleted, d => { d.captionsById[f.shared].body = scalar('削除を観測した後の不正編集'); }),
+      rawChange(deleted, d => { d.captionsById[f.shared].lifecycle = scalar({ state: 'active', reason: 'initial', eventId: id('evt', 992) }); }),
+      rawChange(seed, d => { d.captionsById[f.shared].id = scalar(f.second); }),
+      rawChange(seed, d => { d.captionsById[f.shared].future = scalar({ unknown: true }); }),
+    ]) {
+      const merged = source.appendOriginal(invalid.originalChanges()), p = await readProjectScene(merged.read(), metadataFixtureLimits, host.content.verifier(false));
+      if (p.kind === 'scene-provider') expect(() => captionLifecycleRecovery(p, f.shared, metadataFixtureLimits)).toThrow();
+      expect(() => merged.prepareEdit(merged.token, c, p, '8'.repeat(32))).toThrow();
+    }
+    expect(host.read().source!.token).toBe(source.token); expect(host.read().state).toBe('ready'); await host.dispose();
+  });
   it('confirms every observed edge, tombstones in one change and preserves scalar candidates/shared content through reopen', async () => {
     const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority), media = mediaHost(s);
     await media.add(0); const initial = host.read().source!, edge = Object.values(s.snapshot.state.captionMemberships).find(e => e.resourceId === f.shared)!;

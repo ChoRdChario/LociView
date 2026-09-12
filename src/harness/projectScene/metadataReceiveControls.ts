@@ -3,6 +3,7 @@ import type { SyntheticSession } from './session';
 import { createMetadataConflictControls } from './metadataConflictControls';
 import { createMetadataMembershipControls } from './metadataMembershipControls';
 import { createMetadataAssetStatusControls } from './metadataAssetStatusControls';
+import { createMetadataCaptionLifecycleControls } from './metadataCaptionLifecycleControls';
 
 /** Labelled controls in the existing synthetic host, not a file-import interface. */
 export function createMetadataReceiveControls(document: Document, host: Awaited<ReturnType<typeof openMetadataHost>>,
@@ -11,9 +12,11 @@ export function createMetadataReceiveControls(document: Document, host: Awaited<
   const note = document.createElement('p'), status = document.createElement('p');
   const review = document.createElement('section'), reviewNote = document.createElement('p'), reviewItems = document.createElement('ul');
   review.setAttribute('aria-label', '削除と参照の要確認'); reviewNote.setAttribute('role', 'status');
-  reviewNote.textContent = '削除と編集、または参照先の状態を確認してください。元の変更は保持しています。この画面では修復は未接続です。';
+  reviewNote.textContent = '削除と編集、または参照先の状態を確認してください。元の変更は保持しています。キャプション本体以外の修復は未接続です。';
   review.append(reviewNote, reviewItems);
   const conflicts = createMetadataConflictControls(document, host, session, () => { render(); changed(); });
+  const lifecycle = createMetadataCaptionLifecycleControls(document, host, session, conflicts.composing, () => { render(); changed(); });
+  review.append(lifecycle.root);
   const memberships = createMetadataMembershipControls(document, host, session, conflicts.composing, () => { render(); changed(); });
   const assetMemberships = createMetadataMembershipControls(document, host, session, conflicts.composing, () => { render(); changed(); }, 'asset');
   const models = createMetadataAssetStatusControls(document, host, session, conflicts.composing, () => { render(); changed(); });
@@ -29,7 +32,9 @@ export function createMetadataReceiveControls(document: Document, host: Awaited<
     const provider = host.read().provider;
     const issues = provider?.kind === 'scene-provider' ? provider.issues.filter(i => i.kind === 'orphan' || i.code === 'concurrent-delete-edit' || i.code === 'pending-orphan-reference' ||
       i.code === 'atomic-field-conflict' && i.path[2] === 'lifecycle' && ['assetsById', 'sceneAssetMembershipsById', 'materialOverridesById', 'captionsById', 'sceneCaptionMembershipsById', 'captionAttachmentsById', 'captionTagMembershipsById'].includes(i.path[0]!)) : [];
-    review.hidden = !issues.length;
+    lifecycle.render();
+    review.hidden = !issues.length && !lifecycle.hasChanges() && !lifecycle.hasResult();
+    reviewNote.hidden = !issues.length;
     reviewItems.replaceChildren(...[...new Set(issues.map(i => `${i.code === 'concurrent-delete-edit' ? '削除と編集が競合' : i.code === 'atomic-field-conflict' ? '削除・復元の状態が競合' : '参照先の確認が必要'}：${i.path.join(' / ')}`))].map(text => {
       const li = document.createElement('li'); li.textContent = text; return li;
     }));
@@ -55,5 +60,5 @@ export function createMetadataReceiveControls(document: Document, host: Awaited<
     render(); changed();
   });
   const unsubscribe = session.acknowledgment.subscribe(render);
-  render(); return { root, render, hasChanges: () => conflicts.hasChanges() || memberships.hasChanges() || models.hasChanges() || assetMemberships.hasChanges(), dispose: unsubscribe };
+  render(); return { root, render, hasChanges: () => conflicts.hasChanges() || lifecycle.hasChanges() || memberships.hasChanges() || models.hasChanges() || assetMemberships.hasChanges(), dispose: unsubscribe };
 }

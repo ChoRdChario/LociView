@@ -130,7 +130,8 @@ export function createMetadataConflictControls(document: Document, host: Awaited
         });
         if (isText) option('manual', isName ? '名前を入力' : '文言を入力'); apply.type = cancel.type = 'button';
         apply.textContent = '競合を解消'; cancel.textContent = '取り消す'; message.setAttribute('role', 'status');
-        const ready = isView || isEntry ? !!checkedView : isScene ? !!checkedScene : isText || !!checked;
+        const life = provider.resources.captions[recordId]?.lifecycle;
+        const ready = isView || isEntry ? !!checkedView : isScene ? !!checkedScene : isText ? life?.kind === 'value' && life.value.state === 'active' : !!checked;
         if (!ready) message.textContent = '候補を確認できないため解消できません。元の変更は保持しています。';
         item.append(heading, values, options, previewNote, text, apply, cancel, message);
         const current: Form = { root: item, token: provider.token, select: options, text, apply, cancel, message, composing: false, ready, isScene, isName, recordId, fieldName, heading };

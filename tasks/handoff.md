@@ -1,5 +1,18 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-13 Caption削除競合の復旧（`06e2eda`後）:** 同じmetadata要確認欄で
+> 「削除状態を維持／キャプションを復元」を明示選択。単一deleted候補＋同時編集も対象。
+> 親だけにfresh eventを追加し、元本文／位置候補、子tombstone、後着／曖昧edgeを保持。
+> 未配置の復元後は「キャプションの追加・除外」へ案内。自動の子復元や関係推測はしない。
+> 同一画面／coldのexact retry、返送・再受信、IME／readonly／stale／入力保持を既存testsで検証。
+> 最初のrootは既存membership逆順受信の5秒timeoutが1件。該当2ケースは単独PASS。
+> code／assertion／timeout不変更で1並列へ。最終root exit 0、111 files／2,069 PASS／
+> 21既存TODO／失敗0（501.45秒）。型・buildもexit 0。独立source/testレビュー必須残件なし。
+> T03全体・実画面／iPhone／offline・外部ファイルでのチーム運用は未完了。詳細はtodo。
+> 次はP07 local View/Edit。既存openViewのlock-free閲覧を限定validation一覧／画面へ接続し、
+> 編集はlock取得とdurable再読込後だけ開始する。通常home・wire・review変換・外部保存は非対象。
+> 06の既出2判断は未回答。既知browser／push失敗は条件が変わらない限り再試行しない。
+
 > **2026-09-13 View競合の接続（`95ee28b`後）:** 名称／順序／camera／backgroundと
 > Scene開始Viewの全候補選択を同じmetadata画面・original journalへ接続。
 > 名前は手入力も可。不在／同値候補を含めて1因果変更で解消し、warm recallはしない。

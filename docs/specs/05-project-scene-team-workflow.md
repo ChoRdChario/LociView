@@ -1976,6 +1976,48 @@ failure/cold retry and continued edit; actual rendering remains the batched lane
 Independent Caption/model copies and non-text conflicts remain the next finite
 commands, not implied by this text-resolution implementation.
 
+**Caption lifecycle recovery under §3.4/§8 (2026-09-13, implementation detail):**
+
+The existing metadata review area offers a parent-only `resolveCaptionLifecycle`
+command for exact `concurrent-delete-edit` diagnostics (including a single current
+deleted lifecycle candidate), or a checked current candidate set containing both
+deleted and active states. Do not turn an ordinary tombstone/all-active conflict
+into a general restore operation. Validate identity, every current Caption field
+candidate and historical-invalid/unknown issues without requiring scalar/anchor
+conflicts to be resolved first. Invalid history (event reuse, initial after delete,
+edit after delete without restore, identity mutation) is not repaired by appending
+another event.
+
+The metadata service's existing whole-source admission remains unchanged,
+including its unverified-evidence refusals. This command does not broaden weak
+surface-index evidence admission or adopt an additional input profile.
+
+Confirmation binds source token, Caption ID, the complete observed lifecycle
+operation-ID set and a fresh event ID. Write only Caption.lifecycle: deleted with
+`conflictResolution`, or active with `restore`, causally after all current source
+heads. Both choices require one new event, never copying an old lifecycle value
+or considering keep-deleted a no-op. Retain this command/event and original bytes
+across failures; existing journal checks/publication/retry are unchanged.
+
+Before confirmation identify the Caption, show all retained title/body/anchor/
+color candidates and list related Scene/attachment/tag records, including deleted
+and potentially related ambiguous records. No default choice. Parent restoration
+does not revive a child tombstone; unchanged late active edges may become usable
+again and must be disclosed. Keeping deletion leaves their orphan warnings. No
+source relation is inferred, no child or blob is changed, and no unrelated field
+winner/Scene/camera is selected. Invalid/unknown input remains visible with a
+refusal, not a partial count masquerading as a complete dependency list.
+
+Keep local drafts and failed/stale choices, guard composing/readonly and refresh
+without replacing dirty forms. Scalar resolution stays blocked while the Caption
+lifecycle is unresolved/deleted. A restored unplaced Caption is reusable through
+the existing explicit Scene-include action (fresh membership, no old-edge restore).
+Reuse deletion/metadata-host tests for both receive orders, single-deleted+edit,
+delete/restore, unresolved text/anchor, late edges and child tombstones, fresh-event
+refusal, failed publication/exact cold retry, return/no-op replay and UI guards.
+No new page, storage/wire/profile/home, general restoration/orphan repair or
+rendered/device acceptance is implied.
+
 **Saved View conflict connection under §8 (2026-09-13, implementation detail):**
 
 Extend the existing metadata-host comparison form and typed command boundary for

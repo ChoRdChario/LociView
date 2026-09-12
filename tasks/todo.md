@@ -28,6 +28,60 @@ Formal adoption still requires G1-A/C and applicable device evidence. No profile
 
 #### Active connected work — PO-approved limited real-file validation
 
+Current slice (2026-09-13, after `06e2eda`): Caption delete/edit and delete/restore
+recovery under 05 §3.4/§8. Short audit: clean g0-baseline; preceding turn closed
+the Saved View dead end with exact final evidence (progress, not a wait). The
+review area had no Caption lifecycle action at this slice's start. Reuse that area,
+source/journal and deletion tests; do not create another page or storage lane.
+
+- [x] Specify and add a closed explicit Caption lifecycle command: complete
+  observed lifecycle candidates, current source token and fresh retained event.
+- [x] Show retained Caption contents and related active/deleted/uncertain edges;
+  connect keep-deleted/restore with no default, stale/IME/draft/retry protection.
+- [x] Verify parent-only writes, child tombstone/late-edge preservation, existing
+  Scene include after restoration, two-party replay/cold recovery and refusals;
+  run final checks/independent review, update handoff and inventory.
+
+The exact implementation detail is in 05 §8. No general deleted-items browser,
+child cascade/restore, Asset/Scene/View restoration, byte deletion, new package/
+schema/profile/dependency/home/release authority. Existing actual-browser/device
+batch and two 06 decisions remain pending; do not retry unchanged browser/push
+failures. Stop for a genuine contract conflict, not routine implementation details.
+
+Review: parent-only recovery now connects through the existing metadata review
+area. Child tombstones, late active/ambiguous attachments and other Caption
+candidates remain; the visible completion message points to the existing
+Caption-inclusion control. Source admission is unchanged. Independent source/test
+review found no mandatory remainder. Scoped checks: 16 PASS (including existing
+regressions/isolation), plus the added mounted ambiguous-attachment/exact-retry
+case PASS. Early scoped failures exposed and corrected a null-prototype anchor
+description coercion; test expectations were corrected to compare original child
+atoms, not reference diagnostics, and to use the existing wrapped-error/async
+retry contract. Scene endpoints remain immutable; the ambiguity case uses an
+attachment parent, not an invalid Scene endpoint edit. Seven new cases reuse the
+existing deletion suite's 15-second per-case harness budget; no timeout or product
+guarantee changed. Typecheck/build exited 0. The first root is NOT a pass:
+2,068 PASS / one unchanged membership reverse-receive test timed out at 5 seconds /
+21 existing TODO, 111 files, 396.20 seconds. Its two receive-order cases pass alone
+without modification. Final root terminal exit 0: 111 files / 2,069 PASS /
+21 existing TODO / zero failed, 501.45 seconds, one worker without concurrent
+typecheck/build. Source, tests, assertions and timeouts are unchanged from the
+first root; typecheck/build exit 0 still cover the final executable tree. Normal
+build mixed-import/chunk warnings remain. Independent source/test review found
+no mandatory remainder. Inventory stays 30/4/20/10, T03 remains partial. No new
+actual browser/iPhone/offline, external file output or whole-team acceptance.
+
+Next bounded target after this checkpoint: P07 local View/Edit in the existing
+limited validation workspace. Read-only triage found both new hosts always ask
+for a mutation lease, although platform `openView()` already supplies lock-free,
+write-denying View mode. Reuse the existing catalog/workspace, lock tests and
+limited-file tests; open an existing Project deliberately for viewing, then start
+editing only after lock acquisition and durable reload. Preserve pending input,
+IME and failed work; if another writer or unsupported lock prevents Edit, remain
+truthfully in View. No new wire/schema, review-to-clean conversion, external file
+save, ordinary home, shared-data URL, input profile or adoption/release scope.
+This advances a complete local user operation, not adjacent conflict-field counts.
+
 Current slice (2026-09-13, after `95ee28b`): connect the complete bounded Saved
 View conflict flow under 05 §3.3–3.4/§8. Read-only comparison found a concrete
 dead end: review actions direct users to nonexistent View/defaultView choices.

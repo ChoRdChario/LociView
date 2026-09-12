@@ -17,7 +17,7 @@ import { assetStatusCandidates } from './assetStatus';
 import { planAssetMembershipCopies } from './modelMembership';
 import { captionFieldCandidates, type CaptionChoiceField } from './captionCandidates';
 import { planSceneAuthoring, planSceneNameResolution, type SceneNameResolution } from './sceneAuthoring';
-import { planCaptionDeletion } from './captionDeletion';
+import { planCaptionDeletion, planCaptionLifecycleResolution, type CaptionLifecycleResolution } from './captionDeletion';
 import type { CaptionDeletionCommand, AssetDeletionCommand } from '../scene/commands';
 import { planAssetDeletion } from './assetDeletion';
 import { defaultSceneCandidates } from './startupScene';
@@ -27,6 +27,7 @@ import { planViewResolution, type ViewResolution } from './viewResolution';
 export type MetadataEdit =
   | AddAssetCommand
   | CaptionDeletionCommand
+  | CaptionLifecycleResolution
   | AssetDeletionCommand
   | SceneAuthoringCommand
   | SceneNameResolution
@@ -88,6 +89,7 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
     return [{ map: 'project', id: 'defaultSceneId', create: false, fields: { defaultSceneId: choice.sceneId } }];
   }
   if (command.kind === 'deleteCaption') return planCaptionDeletion(provider, command, limits);
+  if (command.kind === 'resolveCaptionLifecycle') return planCaptionLifecycleResolution(provider, command, limits);
   if (command.kind === 'deleteAsset') return planAssetDeletion(provider, command, limits);
   if (command.kind === 'createScene' || command.kind === 'renameScene' || command.kind === 'setDefaultScene')
     return planSceneAuthoring(provider, command, limits);

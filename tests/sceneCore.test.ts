@@ -237,7 +237,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
       const metadataFoundation = /[\\/]projectMetadata[\\/](format|source)\.ts$/.test(path);
       const metadataService = /[\\/]projectMetadata[\\/](persistence|repository|journal|contentEvidence|blobStream|blobStore|blobInventory|session|commands|remote|membership|records|assetStatus|modelMembership|modelAddition|captionCandidates|sceneAuthoring|viewResolution|captionDeletion|assetDeletion|startupScene)\.ts$/.test(path);
       // 05 §13.2 permits this exact new synthetic host, never ordinary/old saved activation.
-      const metadataHost = /[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Intent|MembershipControls|Models|ModelFacts|AssetStatusControls|ConflictControls|StartupControls)\.ts$/.test(path);
+      const metadataHost = /[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Intent|MembershipControls|Models|ModelFacts|AssetStatusControls|ConflictControls|CaptionLifecycleControls|StartupControls)\.ts$/.test(path);
       const validationFiles = /[\\/]projectFiles[\\/](validation|png|glb|glbMaterials|initialProject|content|creation|modelFacts)\.ts$/.test(path);
       const validationDisplay = /[\\/]harness[\\/]projectScene[\\/](modelTypes|validationProjection|validationRender|validationMaterials|validationCoverage)\.ts$/.test(path);
       const validationHost = /[\\/]harness[\\/]projectScene[\\/](savedHost|validationHost|validationCatalog|validationWorkspace|validationBrowser|browserMetadataStorage)\.ts$/.test(path);
@@ -317,7 +317,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           modelAddition: ['../domain/projectRecords', '../domain/projectRecordFields', '../domain/projectMutableFields', '../domain/projectGraphSupport',
             '../domain/values', '../scene/projectProvider', './membership', './commands', './format'],
           captionCandidates: ['../scene/projectProvider', '../domain/projectMutableFields', '../domain/projectRecordFields', './membership', './format'],
-          captionDeletion: ['../scene/commands', '../scene/projectProvider', '../domain/projectRecordFields', './membership', './format', './commands'],
+          captionDeletion: ['../scene/commands', '../scene/projectProvider', '../domain/projectRecordFields', './membership', './format', './commands', '../domain/projectMutableFields', '../domain/values'],
           assetDeletion: ['../scene/commands', '../scene/projectProvider', '../domain/projectCandidates', '../domain/projectRecordFields', '../domain/projectGraphSupport', './membership', './format', './commands'],
           sceneAuthoring: ['../scene/commands', '../scene/projectProvider', '../domain/projectRecordFields', '../domain/projectMutableFields',
             '../domain/projectRecords', '../domain/values', './membership', './commands', './format'],
@@ -336,7 +336,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         const name = path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '');
         expect(imports.every(p => byFile[name]!.includes(p!)), path).toBe(true);
         expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
-      } else if (/[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Browser|Intent|Views|Materials|Media|Models|ModelFacts|ModelRecords|ReceiveControls|ConflictControls|MembershipControls|AssetStatusControls|Workspace|StartupControls)\.ts$/.test(path)) {
+      } else if (/[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Browser|Intent|Views|Materials|Media|Models|ModelFacts|ModelRecords|ReceiveControls|ConflictControls|CaptionLifecycleControls|MembershipControls|AssetStatusControls|Workspace|StartupControls)\.ts$/.test(path)) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
         const byFile: Record<string, string[]> = {
           metadataFixture: ['./fixture', './modelFixture', './modelClosure', '../../domain/values', '../../scene/projectProvider',
@@ -345,7 +345,8 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
             '../../projectMetadata/source', '../../projectMetadata/persistence', '../../projectMetadata/session', './metadataFixture', './mediaHistory', './modelClosure', '../../domain/projectCandidates', './metadataModelRecords'],
           metadataHost: ['../../platform/fs', '../../platform/projectLock', '../../projectMetadata/session', '../../projectMetadata/repository',
             '../../projectMetadata/persistence', '../../projectMetadata/journal', './metadataFixture', './metadataStorage', './historyProjection', './metadataIntent', '../../projectMetadata/remote', './fixture', '../../projectMetadata/commands', '../../scene/projectProvider', './modelClosure', '../../domain/values', './metadataModelFacts', '../../projectMetadata/captionDeletion', '../../projectMetadata/assetDeletion'],
-          metadataReceiveControls: ['./metadataHost', './session', './metadataConflictControls', './metadataMembershipControls', './metadataAssetStatusControls'],
+          metadataReceiveControls: ['./metadataHost', './session', './metadataConflictControls', './metadataMembershipControls', './metadataAssetStatusControls', './metadataCaptionLifecycleControls'],
+          metadataCaptionLifecycleControls: ['./metadataHost', './session', '../../projectMetadata/captionDeletion', './metadataFixture', '../../projectMetadata/persistence', '../../scene/types'],
           metadataAssetStatusControls: ['three', './metadataHost', './session', '../../projectMetadata/assetStatus', './metadataFixture', './modelFixture'],
             // Same approved conflict form: complete Scene/View candidates and pure input validation only.
           metadataConflictControls: ['./metadataHost', './session', '../../projectMetadata/captionCandidates', './metadataFixture', '../../scene/types',
