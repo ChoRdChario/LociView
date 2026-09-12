@@ -18,7 +18,8 @@ import type { Anchor } from '../src/scene/types';
 import * as THREE from 'three';
 import { validationModelVersions } from '../src/harness/projectScene/validationProjection';
 import { metadataProjectView } from '../src/harness/projectScene/metadataFixture';
-import { syntheticDisplay } from '../src/harness/projectScene/viewportModel';
+import { syntheticDisplay, pointInProject } from '../src/harness/projectScene/viewportModel';
+import { degreesRotation } from '../src/harness/projectScene/modelTransform';
 import { prepareValidationResidents, decodeValidationModel } from '../src/harness/projectScene/validationRender';
 import { pickResidentSurface } from '../src/harness/projectScene/viewportPicking';
 import { fixtureModelIds } from '../src/harness/projectScene/modelClosure';
@@ -96,6 +97,79 @@ async function openFileCaption() {
 }
 
 describe('limited real-format validation (synthetic GLB bytes, injected PNG decoder, memory storage)', () => {
+  it('previews/cancels and saves GLB placement only, preserving nested geometry, pin coordinates and body evidence on reopen', async () => {
+    const { host, workspace, s, options, captionId, fs } = await openFileCaption();
+    const old = s.snapshot, source = old.modelVersions![0]!.closure, reads = fs.reads, parts = host.read().source!.originalChanges();
+    expect(s.acceptModel(planModelList(s.modelContext(), { kind: 'select', assetId: source.binding.assetId }))).toBe(true);
+    expect(s.beginModelPlacement()).toBe(true); s.setModelTransformMode('rotate');
+    s.changeModelTransform(['0', '0', '90'], '2', true); expect(s.finishModelPlacement()).toBe(false);
+    s.changeModelTransform(['0', '0', '90'], '0', false); expect(s.modelPlacementProposal()).toBeUndefined(); expect(s.finishModelPlacement()).toBe(false);
+    s.changeModelTransform(['0', '0', '90'], '2'); const proposal = s.modelPlacementProposal()!;
+    expect(s.acceptModelPosition(proposal.target, [10, 2, -1], proposal.manipulation)).toBe(true);
+    const placement = { translation: [10, 2, -1] as const, rotationXYZW: degreesRotation(['0', '0', '90']), uniformScale: 2 };
+    const preview = syntheticDisplay(s.snapshot, s.sceneId, null, captionId, s.modelPlacementProposal());
+    const anchor = old.resources.captions[captionId]!.anchor;
+    if (anchor.kind !== 'value' || anchor.value.kind !== 'asset') throw Error('expected authored Asset anchor');
+    expect(preview.pins[0]!.position).toEqual(pointInProject(anchor.value.positionAsset, placement));
+    expect(preview.models[0]!.representation).toEqual(source.representation); expect(s.snapshot).toBe(old);
+    expect(s.finishModelPlacement(true)).toBe(true); expect(host.read().source!.originalChanges()).toEqual(parts);
+    expect(syntheticDisplay(s.snapshot, s.sceneId, null, captionId).pins[0]!.position).toEqual(pointInProject(anchor.value.positionAsset, source.binding.assetToProject));
+    s.beginModelPlacement(); s.changeModelPlacement(['10', '2', '-1']); s.changeModelTransform(['0', '0', '90'], '2'); s.finishModelPlacement();
+    const prepared = s.modelPlacement!.preparedBindingId;
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+    expect(s.modelPlacement).toBeNull(); const saved = s.snapshot.modelVersions![0]!.closure;
+    expect(saved.binding).toMatchObject({ id: prepared, method: 'manual', parentBindingId: source.binding.id, assetRevisionId: source.revision.id, assetToProject: placement });
+    expect(saved.revision).toEqual(source.revision); expect(saved.representation).toEqual(source.representation);
+    expect(saved.assetFrame).toEqual(source.assetFrame); expect(saved.representationFrame).toEqual(source.representationFrame);
+    expect(s.snapshot.resources.captions).toEqual(old.resources.captions); expect(s.snapshot.state.assetMemberships).toEqual(old.state.assetMemberships);
+    expect(fs.reads).toBe(reads); expect(host.read().source!.originalChanges()).toHaveLength(parts.length + 1);
+    const residentReads = vi.spyOn(host.content, 'model'), residents = await prepareValidationResidents(old.modelVersions!, host.content);
+    if (source.shape !== 'saved-glb' || saved.shape !== 'saved-glb') throw Error('expected saved model');
+    const originalResident = residents.create(source), movedResident = residents.create(saved);
+    expect(new THREE.Box3().setFromObject(originalResident.mesh).min.x).toBe(2);
+    expect(movedResident.asset.matrix.elements.slice(12, 15)).toEqual(placement.translation);
+    expect(movedResident.mesh.position).toEqual(originalResident.mesh.position);
+    expect(residentReads).toHaveBeenCalledOnce(); originalResident.dispose?.(); movedResident.dispose?.(); residents.dispose();
+    const after = host.read().source!.originalChanges(); s.beginModelPlacement(); expect(s.finishModelPlacement()).toBe(true);
+    expect(host.read().source!.originalChanges()).toEqual(after); await workspace.dispose();
+    const cold = await openValidationHost(options);
+    expect(cold.authority.read().modelVersions![0]!.closure.binding).toEqual(saved.binding);
+    expect(cold.authority.read().resources.captions).toEqual(old.resources.captions);
+    expect(cold.read().source!.originalChanges()).toEqual(after); await cold.dispose();
+  }, 15_000);
+  it('keeps the exact GLB binding/draft on save failure, cold-recovers once and rejects stale/read-only/invalid transforms', async () => {
+    const { host, workspace, s, options, fs } = await openFileCaption();
+    const source = s.snapshot.modelVersions![0]!.closure, old = s.snapshot, reads = fs.reads;
+    s.acceptModel(planModelList(s.modelContext(), { kind: 'select', assetId: source.binding.assetId })); s.beginModelPlacement();
+    s.changeModelTransform(['20', '30', '40'], '3'); fs.reject = p => p.endsWith('/published.json'); s.finishModelPlacement();
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('failed'));
+    const bindingId = s.modelPlacement!.preparedBindingId!;
+    expect(s.snapshot).toBe(old); expect(workspace.hasChanges()).toBe(true); expect(s.finishModelPlacement(true)).toBe(false);
+    expect(s.changeModelTransform(['0', '0', '0'], '1')).toBe(false); expect(fs.reads).toBe(reads);
+    const paths = (await fs.list(`${validationArea}/${options.run}/`)).filter(p => p.endsWith('.amchange'));
+    const originals = await Promise.all(paths.map(p => fs.readBytes(p)));
+    fs.reject = () => false; s.retryWorking(); await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+    expect(s.snapshot.modelVersions![0]!.closure.binding.id).toBe(bindingId); expect(fs.reads).toBe(reads);
+    expect(await Promise.all(paths.map(p => fs.readBytes(p)))).toEqual(originals);
+    const token = host.read().source!.token, baseline = host.read().source!.originalChanges();
+    const command = { sceneId: s.sceneId, assetId: source.binding.assetId, expectedBindingId: bindingId, bindingId: `bnd_${newId()}`,
+      placement: { translation: [0, 0, 0] as const, rotationXYZW: [0, 0, 0, 1] as const, uniformScale: 2 } };
+    await expect(host.authority.transformModel!('stale', command)).rejects.toThrow();
+    await expect(host.authority.transformModel!(token, { ...command, expectedBindingId: source.binding.id })).rejects.toThrow();
+    await expect(host.authority.transformModel!(token, { ...command, sceneId: `scn_${newId()}` })).rejects.toThrow();
+    for (const placement of [{ ...command.placement, uniformScale: 0 }, { ...command.placement, uniformScale: -1 },
+      { ...command.placement, rotationXYZW: [0, 0, 0, 2] as const }]) await expect(host.authority.transformModel!(token, { ...command, placement })).rejects.toThrow();
+    const readonly = await openValidationHost(options);
+    await expect(readonly.authority.transformModel!(token, command)).rejects.toThrow('閲覧専用'); await readonly.dispose();
+    expect(host.hasPending()).toBe(false); expect(host.read().source!.originalChanges()).toEqual(baseline);
+    s.beginModelPlacement(); s.changeModelTransform(['40', '50', '60'], '4'); fs.reject = p => p.endsWith('/published.json'); s.finishModelPlacement();
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('failed')); const secondId = s.modelPlacement!.preparedBindingId!;
+    await workspace.dispose(); fs.reject = () => false;
+    const cold = await openValidationHost(options); expect(cold.read().state).toBe('pending'); await cold.authority.retry!();
+    expect(cold.authority.read().modelVersions![0]!.closure.binding.id).toBe(secondId);
+    const publication = cold.read().publication, after = cold.read().source!.originalChanges(); await cold.authority.retry!();
+    expect(cold.read().publication).toBe(publication); expect(cold.read().source!.originalChanges()).toEqual(after); await cold.dispose();
+  }, 15_000);
   it('adds a selected PNG through the existing media editor, retains invalid input and reopens the exact attachment', async () => {
     const { host, workspace, s, options, captionId } = await openFileCaption();
     const modelRead = vi.spyOn(host.content, 'model');

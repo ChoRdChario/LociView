@@ -10,6 +10,8 @@ import { assetDeletionImpact } from '../../projectMetadata/assetDeletion';
 import { prepareValidationCreation, resumeValidationCreation, validationProjectService } from '../../projectFiles/creation';
 import { validationMetadataLimits as limits, type FileValidationLimits } from '../../projectFiles/validation';
 import type { PngDecoder } from '../../projectFiles/png';
+import { sealValidationRecord } from '../../projectFiles/initialProject';
+import { cloneCanonicalValue, type JsonObject } from '../../domain/values';
 import { metadataProjectView } from './metadataFixture';
 import { validationModelVersions } from './validationProjection';
 import { metadataIntent } from './metadataIntent';
@@ -17,6 +19,7 @@ import type { SyntheticProject } from './fixture';
 import type { SyntheticAuthority } from './historyProjection';
 import type { SavedWorkspaceHost } from './savedHost';
 import type { MediaImage, MediaFileAddition } from './mediaHistory';
+import type { ModelPlacementCommand } from './modelTypes';
 
 export const validationArea = 'lociview-development-validation-1';
 export interface ValidationHostOptions {
@@ -107,7 +110,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
     };
     const authority: SyntheticAuthority = {
       storage: 'saved-development', writeScope: 'caption-text',
-      capabilities: { pins: true, membership: true, color: true, views: true, media: true, sceneAuthoring: true },
+      capabilities: { pins: true, membership: true, color: true, views: true, media: true, sceneAuthoring: true, placement: true, transform: true },
       get readOnly() { return closed || fs.mutationAuthority.accessState !== 'editable'; },
       read: () => { if (!project) throw Error('プロジェクトの作成が未完了です。'); return project; },
       status: () => ({ kind: busy ? 'checking' : failure || last.state !== 'ready' ? 'failed' : 'idle', error: failure || '保存が未完了です。' }),
@@ -118,6 +121,22 @@ export async function openValidationHost(options: ValidationHostOptions) {
       assetDeletionImpact: (token, id) => { if (last.provider?.kind !== 'scene-provider' || token !== last.provider.token) throw Error('内容が更新されています。'); return assetDeletionImpact(last.provider, id, limits); },
       deleteAsset: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
       addMediaFile,
+      transformModel: (token, input: ModelPlacementCommand) => {
+        const captured = cloneCanonicalValue(input as unknown as JsonObject, limits) as unknown as ModelPlacementCommand;
+        return execute(async () => {
+          editable(); const before = await session.read();
+          if (before.state !== 'ready' || before.source?.token !== token || before.provider?.kind !== 'scene-provider')
+            throw Error('モデルが更新されています。配置の入力を保持しています。');
+          const versions = await validationModelVersions(before.provider);
+          const source = versions.find(v => v.assetId === captured.assetId && v.projection.bindingId === captured.expectedBindingId)?.closure;
+          if (!source || source.shape !== 'saved-glb') throw Error('配置するモデルを確認してください。');
+          const binding = await sealValidationRecord('asset-binding-revision', { id: captured.bindingId, assetId: captured.assetId,
+            assetRevisionId: source.revision.id, parentBindingId: source.binding.id, method: 'manual',
+            assetToProject: captured.placement as unknown as JsonObject });
+          return ready(await session.edit(token, { kind: 'transformAsset', sceneId: captured.sceneId, assetId: captured.assetId,
+            expectedBindingId: captured.expectedBindingId, binding }));
+        }, true);
+      },
       retry: () => execute(async () => { editable(); return resume(); }),
     };
     const host: SavedWorkspaceHost = { authority, limits, read: () => last, hasPending: () => busy || !!failure || last.state !== 'ready',

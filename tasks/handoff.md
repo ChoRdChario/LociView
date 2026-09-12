@@ -1,5 +1,14 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-12 実GLBの配置編集（`6801ea4`後）:** validation hostで既存の
+> 移動／回転／均等拡縮gizmo・数値代替・確定／取消を有効化。更新はfresh manual bindingと
+> Asset.statusのみ。元GLB・材質・revision・Caption原座標は保持、warm保存の本体再読込なし。
+> old fixture writerは変更せず、typed transformAssetへ接続。元ID／changesでretry／cold復旧。
+> 最終110 files／2,007 PASS／21既存TODO、型・build・独立レビュー済み。
+> 既存5173入口／変更module HTTP200。実描画・実入力・実機は未受入れ。
+> 次は開いたvalidation Projectへの静的GLB追加。新形式／replacement推測／通常home／
+> 06/07／公開へは広げない。以下の「実モデル配置未接続」は過去checkpoint。
+
 > **2026-09-12 開いたProjectへのPNG追加（`2a8e773`後）:** 同じvalidation編集画面の
 > 「メディアを追加」でPNGを選び、選択Captionへ保存。「登録済みメディア」から再利用も可能。
 > 元bytesを保持したquota retry、prepared後のcold復旧、保存後の画像表示失敗からの

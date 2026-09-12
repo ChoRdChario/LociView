@@ -17,6 +17,11 @@ export interface ValidationModelClosure {
     readonly materialCatalog: { readonly layoutId: string; readonly slots: readonly { readonly logicalMaterialSlotId: string }[] } };
 }
 export type DisplayModelClosure = FixtureModelClosure | ValidationModelClosure;
+/** Explicit placement edit; no model-content introduction or fixture reconstruction. */
+export interface ModelPlacementCommand {
+  readonly sceneId: string; readonly assetId: string; readonly expectedBindingId: string;
+  readonly bindingId: string; readonly placement: FixturePlacement;
+}
 export interface DisplayModelVersion {
   readonly assetId: string; readonly label: string; readonly projection: AssetProjection;
   readonly families: readonly { readonly id: string; readonly name: string; readonly compatibilityId: string }[];

@@ -10,6 +10,7 @@
 > 同じdev hostの限定実file入口で、GLB/PNGからの作成・専用一覧・再開と実保存本体の
 > read/render port、既存pin/text/PNG編集へ接続。memory-port／記録DOMで検証。
 > 開いたCaptionへのPNG後入れも同じjournal／galleryへ接続。他still-image形式は残るためI02の主分類は不変。
+> 実GLBのM06/M07も既存gizmoとtyped binding保存へ限定接続。原GLB／Caption座標は保持。分類数は不変。
 > P01/P02をこの限定経路で接続済みへ。実描画／実入力／実機／正式採用は未受入れ。
 > M07は同じmetadata hostでモデル回転・正の均等拡縮、preview／取消／保存／再開へ接続。
 > 新しい仕様・採用判断ではない。承認済み要件と現行code/testsの距離を記録する。
@@ -82,8 +83,8 @@
 | M03 | GSを追加・表示する | 別経路のみ | Nativeのexact Graphdeco SH2/SH3 profileを新hostに未接続。実body・resource lifecycleの検証が必要。 | [src/nativeGs/plyProfile.ts:305](../src/nativeGs/plyProfile.ts) / [src/harness/projectScene/viewport.ts:91](../src/harness/projectScene/viewport.ts) |
 | M04 | モデル選択・検索とScene所属を管理する | 接続済み | 既知モデルのinclude/exclude。Assetそのものは残る。 | [src/ui/projectScene/modelListState.ts:15](../src/ui/projectScene/modelListState.ts) / [tests/ui/projectMetadataHost.test.ts:535](../tests/ui/projectMetadataHost.test.ts) |
 | M05 | モデルを一時的に隠す／単独表示する | 部品未接続 | temporarilyHidden型はあるが操作intent/runtime未接続。Scene所属を変更して代用しない。 | [src/ui/projectScene/modelListState.ts:12](../src/ui/projectScene/modelListState.ts) / [docs/specs/05-project-scene-team-workflow.md:198](../docs/specs/05-project-scene-team-workflow.md) |
-| M06 | モデルの平行移動を調整する | 接続済み | gizmo＋数値、preview/cancel/confirm、immutable binding保存と再開。既知・同一geometryのみ。 | [src/harness/projectScene/session.ts:368](../src/harness/projectScene/session.ts) / [tests/ui/projectMetadataHost.test.ts:106](../tests/ui/projectMetadataHost.test.ts) |
-| M07 | モデルを回転・均等拡大縮小する | 接続済み | 新metadataで移動／回転／均等拡縮のgizmoと数値代替、全Scene共通のfresh binding保存・二人返送・再開。原点基準、正scale、canonical回転、exact取消／retry、Caption原座標／本体保持。既知Mesh限定、native入力・実機は未受入れ。M13のpivot／fit／Undoではない。 | [src/projectMetadata/commands.ts](../src/projectMetadata/commands.ts) / [src/harness/projectScene/pinGizmo.ts](../src/harness/projectScene/pinGizmo.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
+| M06 | モデルの平行移動を調整する | 接続済み | gizmo＋数値、preview/cancel/confirm、immutable binding保存と再開。合成・validation静的GLBで同一geometryを保持。実入力受入れは別。 | [src/harness/projectScene/session.ts](../src/harness/projectScene/session.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
+| M07 | モデルを回転・均等拡大縮小する | 接続済み | 新metadataとvalidation GLBで移動／回転／均等拡縮gizmoと数値代替、全Scene共通のfresh binding保存／再開。原点基準、正scale、canonical回転、exact取消／retry、Caption原座標／本体保持。二人返送は合成経路のみ、実入力・実機は未受入れ。M13のpivot／fit／Undoではない。 | [src/projectMetadata/commands.ts](../src/projectMetadata/commands.ts) / [src/harness/projectScene/pinGizmo.ts](../src/harness/projectScene/pinGizmo.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
 | M08 | モデルを差し替えて要確認のピンを直す | 接続済み | 新metadataの初期準備済みoriginal／updatedを明示切替。全Sceneの配置・Caption本文／位置／添付を保持し、異なる表面は要確認→手動補正。保存・exact retry・再開・二巡を確認。利用者の新しい本体導入はM01等、通常home／実機は未受入れ。 | [src/projectMetadata/commands.ts](../src/projectMetadata/commands.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
 | M09 | Projectからモデルを削除する | 接続済み | 全Scene所属・Caption anchor・material routingの原候補を検査し、参照ゼロのAssetだけ確認付きtombstone。未知／曖昧な参照は拒否。保存前の選択、本体／原履歴、後着参照と相手の未適用入力を保持。exact retry／cold reopen／再受信を限定hostで確認。cascade・物理消去・一般参照修復なし。 | [src/projectMetadata/assetDeletion.ts](../src/projectMetadata/assetDeletion.ts) / [src/harness/projectScene/assetDeletionControls.ts](../src/harness/projectScene/assetDeletionControls.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
 | M10 | GSの配置補助モデルと配置可否を確認する | 別経路のみ | Nativeの明示same-Asset Proxyだけのpickを未継承。Proxyなしでは既存Caption保持、新配置拒否。 | [src/nativeGs/app.ts:380](../src/nativeGs/app.ts) / [tests/nativeGs/schemaResolver.test.ts:869](../tests/nativeGs/schemaResolver.test.ts) |

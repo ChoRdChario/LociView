@@ -1348,13 +1348,33 @@ it must not claim success or silently create a replacement. Invalid input create
 no pending transaction; the user can replace or explicitly cancel that selection.
 The existing combined validation-byte budget also bounds saved referenced input
 plus the new file, without converting it into a capacity guarantee. Existing
-model bodies are not reread for attachment-only edits. Real-model addition,
-transforms and material editing remain explicit later connections, not silent
-synthetic fallback. Alpha-mask/blended
+model bodies are not reread for attachment-only edits. Real-model addition and
+material editing remain explicit later connections; placement follows the bounded
+contract below, not a synthetic fallback. Alpha-mask/blended
 surface picking is unavailable pending an alpha-aware picker; source appearance
 is preserved and the limitation is visible. Browser execution budgets (64 MiB
 combined input, 4 MiB JSON, 100,000 structural items, 8,000,000 accessor values,
 16,777,216 image pixels) are caller refusal limits, not measured support promises.
+
+Validation-GLB placement connection reuses the already approved M07 semantics:
+Move/Rotate/positive uniform scale about the model origin, preview/confirm/cancel,
+same all-Scene Asset placement and unchanged Caption asset-local coordinates.
+Use the existing common read closure for the draft and an explicit typed host
+operation containing Scene, Asset, expected binding, one retained new binding ID
+and the confirmed transform. Do not route saved GLB through fixture factories.
+The host seals a fresh manual binding with the current binding as parent and the
+same revision, then submits existing `transformAsset` through the metadata
+session. Existing command validation rejects stale/unknown/conflicted ownership,
+invalid rotations/scales and read-only writes. No new schema/profile/fact executor
+is needed: representation, revision, bytes and material catalog stay unchanged.
+Save/retry does not reread existing bodies; cold rendering may load them normally.
+After failure, preserve the draft, prepared identity and original journal changes.
+Acceptance reuses current model-gizmo tests plus real-format host tests covering
+pin-following preview/cancel, exact binding-only save, failure/retry/cold reopen,
+same-value no-op, IME/read-only/stale refusal and unchanged resident content.
+Actual browser/iPhone evidence remains pending with the consolidated batch.
+Model addition/copy/revision changes, material editing, nonuniform/negative scale,
+alpha-aware picking, ordinary home and formal adoption are not part of this seam.
 
 **S1 metadata foundation — implementation contract (2026-09-11):**
 

@@ -69,6 +69,7 @@ now has opt-in `storage=validation`: file creation/list/reopen, actual saved-bod
 render port and existing pin/text/PNG editor. Recorded-DOM/memory-port evidence
 is not actual browser/device acceptance. Adding a PNG to an opened Caption now
 uses that same media editor/journal; body/save/display failures retain exact retry.
+Actual GLB placement also uses existing gizmos and typed binding-only persistence.
 Other file and real-model editing connections remain; no ordinary entry, existing
 Project or migration has changed.
 

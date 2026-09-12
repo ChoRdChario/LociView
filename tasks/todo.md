@@ -28,6 +28,39 @@ Formal adoption still requires G1-A/C and applicable device evidence. No profile
 
 #### Active connected work — PO-approved limited real-file validation
 
+Current bounded connection: actual GLB placement using the existing M07 gizmo,
+typed `transformAsset` command and saved-body renderer. Same source bytes,
+representation/revision and Caption coordinates; only placement binding/status
+changes. No additional profile or product decision is required by read-only audit.
+
+- [x] Specify the saved-GLB draft/typed host seam and finite acceptance in 05 §13.2.
+- [x] Connect preview/Move/Rotate/uniform-scale/confirm/cancel without fixture casts.
+- [x] Verify exact binding-only persistence, unchanged-body evidence, retries/cold
+  reopen, no-op and existing input/readonly/stale guards in the current tests.
+- [x] Run final-tree checks and independent read-only review; update existing
+  handoff/inventory/manual batch, retaining browser/device/adoption boundaries.
+
+Placement result: the validation host now exposes existing M07 placement controls.
+Saved GLB drafts retain their exact read closure; one explicit typed host operation
+seals a fresh manual binding and uses `transformAsset`. Fixture factories and
+string-history decoding remain unchanged. New representation/revision/fact schema
+is not introduced. The original ID remains prepared across failures; both success
+and recovery confirmation check the exact expected binding before clearing input.
+Focused 45 tests pass, including nested GLB, unchanged Caption/geometry/material,
+zero old-body reads during edits/retry, cancel/no-op/cold recovery and a separately
+labelled injected-resident/GPU-mock test. Independent code/test re-review has no
+mandatory findings. Final typecheck/build exit 0; root 110 files / 2,007 PASS /
+21 existing TODO / zero failures, terminal exit 0 and JSON success verified
+(177.23 s, two workers, 15 s per-test limit; assertions/skips unchanged).
+Build retains existing mixed-import/large-chunk warnings. Entry/session/host on
+existing 5173 return HTTP 200, not rendered/native-input evidence. No new server,
+tunnel, private source file, package wire or dependency was introduced. Final
+diff-check passes; local checkpoint only because the previously denied push
+environment has not changed. Inventory stays 27/7/20/10, with M06/M07 now also
+explicitly scoped to the validation GLB lane rather than inflated as new groups.
+Existing M07 input/Blender/gizmo and synthetic two-round tests remain in the root
+matrix. Actual browser/iPhone evidence is still pending; no fresh manual request.
+
 Completed bounded connection: add one PNG to the selected Caption after opening a
 validation Project. Reuse `createAttachment`, the existing media gallery and the
 save journal; no new page, format, storage schema or ordinary-home activation.
@@ -61,7 +94,8 @@ tunnel was started. Actual browser/OPFS/iPhone/offline remain pending. Inventory
 counts remain 27/7/20/10: I02 still has other still-image formats and actual-input
 acceptance missing. No private source bytes were used by this slice.
 
-Next critical connection: reuse model Move/Rotate/uniform-scale preview and
+Then-next connection at the PNG checkpoint (implemented in the current block above):
+reuse model Move/Rotate/uniform-scale preview and
 confirm/cancel on validation GLB. Create only a fresh manual binding and Asset
 status via existing typed commands; preserve representation/revision/material,
 authored Caption coordinates and saved-body evidence. Read-only investigation

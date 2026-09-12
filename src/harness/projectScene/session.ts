@@ -16,7 +16,7 @@ import { createSyntheticProject, fixtureIds, freezeSynthetic, type SyntheticProj
 import { bindingKey, captionKey, membershipKey, type SyntheticAuthority } from './historyProjection';
 import { decodeSyntheticAnchor, modelVersion, syntheticVersions, versionFromClosure } from './modelFixture';
 import { canonicalFixture, createFixtureModel, fixtureModelIds, moveFixtureModel, readFixtureModel, type FixtureModelClosure } from './modelClosure';
-import type { DisplayModelVersion } from './modelTypes';
+import type { DisplayModelVersion, DisplayModelClosure } from './modelTypes';
 import { modelClosureKey } from './modelHistory';
 import { newPinModeMemory, pinActionIssue, pinModePlanIsCurrent, planPinMode, type PinModeContext,
   type PinModeMemory, type PinModePlan, type PinProposal } from '../../ui/projectScene/pinModeState';
@@ -42,8 +42,9 @@ export interface ModelUpdatePlan { readonly token: string; readonly sceneId: str
 export interface SceneAuthoringDraft { readonly kind: 'create' | 'rename' | 'default'; readonly token: string;
   readonly sceneId: string; readonly name: string; readonly composing: boolean }
 export interface ModelPlacementDraft {
-  readonly token: string; readonly sceneId: string; readonly assetId: string; readonly source: FixtureModelClosure;
+  readonly token: string; readonly sceneId: string; readonly assetId: string; readonly source: DisplayModelClosure;
   readonly coordinates: readonly [string, string, string]; readonly composing: boolean; readonly prepared?: FixtureModelClosure;
+  readonly preparedBindingId?: string;
   readonly angles: readonly [string, string, string]; readonly scale: string;
   readonly rotation: ModelManipulation['rotationXYZW']; readonly mode: ModelTransformMode;
 }
@@ -528,7 +529,7 @@ export class SyntheticSession {
     if (manipulation) {
       if (!this.modelTransformAvailable || manipulation.mode !== this.placement!.mode || !Number.isFinite(manipulation.uniformScale) || manipulation.uniformScale <= 0) return false;
       try {
-        const { prepared: _prepared, ...draft } = this.placement!;
+        const { prepared: _prepared, preparedBindingId: _preparedId, ...draft } = this.placement!;
         if (!isCanonicalRotation(manipulation.rotationXYZW)) return false;
         const rotation = manipulation.rotationXYZW;
         this.placement = freezeSynthetic({ ...draft, rotation, angles: rotationDegrees(rotation), scale: String(manipulation.uniformScale) });
@@ -542,8 +543,8 @@ export class SyntheticSession {
     if (this.pending || ctx.issue || !ctx.current || !ctx.assetId) return this.refuse(ctx.issue ?? '入力を確定し、モデルを選択してください。');
     const resolved = resolveScene(this.project.state, this.project.resources, this.sceneId);
     if (resolved.kind !== 'ready' || !resolved.composition.assets.some(a => a.assetId === ctx.assetId)) return this.refuse('このシーンに表示したモデルを選択してください。');
-    if (ctx.current.closure.shape === 'saved-glb') return this.refuse('実モデルの配置編集はこの検証画面では未接続です。');
-    const source = readFixtureModel(canonicalFixture(ctx.current.closure));
+    if (ctx.current.closure.shape === 'saved-glb' && !this.authority?.transformModel) return this.refuse('実モデルの配置編集はこの画面では未接続です。');
+    const source = ctx.current.closure.shape === 'saved-glb' ? ctx.current.closure : readFixtureModel(canonicalFixture(ctx.current.closure));
     this.placement = freezeSynthetic({ token: ctx.token, sceneId: this.sceneId, assetId: ctx.assetId, source,
       coordinates: ctx.current.closure.binding.assetToProject.translation.map(String) as [string, string, string], composing: false,
       angles: rotationDegrees(ctx.current.closure.binding.assetToProject.rotationXYZW), rotation: ctx.current.closure.binding.assetToProject.rotationXYZW,
@@ -553,14 +554,14 @@ export class SyntheticSession {
   changeModelPlacement(coordinates: readonly [string, string, string], composing = false): boolean {
     if (this.workingBlock) return this.refuse(this.workingBlock);
     if (!this.placement) return false;
-    const { prepared: _prepared, ...old } = this.placement;
+    const { prepared: _prepared, preparedBindingId: _preparedId, ...old } = this.placement;
     this.placement = freezeSynthetic({ ...old, coordinates: [...coordinates] as [string, string, string], composing }); return true;
   }
   changeModelTransform(angles: readonly [string, string, string], scale: string, composing = false): boolean {
     if (!this.modelTransformAvailable || !this.placement) return false;
-    const finishingLocalComposition = this.placement.composing && !composing && !this.placement.prepared;
+    const finishingLocalComposition = this.placement.composing && !composing && !this.placement.prepared && !this.placement.preparedBindingId;
     if ((this.workingBlock || this.placementRestriction) && !finishingLocalComposition) return false;
-    const { prepared: _prepared, ...old } = this.placement;
+    const { prepared: _prepared, preparedBindingId: _preparedId, ...old } = this.placement;
     let rotation = old.rotation;
     if (angles.some((v, i) => v !== old.angles[i])) {
       try { rotation = degreesRotation(angles); } catch { /* Retain invalid numeric input; proposal/confirmation refuses. */ }
@@ -589,6 +590,21 @@ export class SyntheticSession {
       const position = draft.coordinates.map(raw => Number(raw) || 0) as [number, number, number];
       const placement = { translation: position, rotationXYZW: draft.rotation, uniformScale: Number(draft.scale) };
       if (canonicalFixture(placement) === canonicalFixture(draft.source.binding.assetToProject)) { this.placement = null; this.message = '配置は変更されていません。'; return true; }
+      if (draft.source.shape === 'saved-glb') {
+        if (!this.modelTransformAvailable || !this.authority?.transformModel) throw Error('実モデルの配置編集はこの画面では未接続です。');
+        const bindingId = draft.preparedBindingId ?? fresh('bnd');
+        this.placement = freezeSynthetic({ ...draft, preparedBindingId: bindingId });
+        return this.applyWorking(() => afterWorking(this.authority!.transformModel!(draft.token, { sceneId: draft.sceneId,
+          assetId: draft.assetId, expectedBindingId: draft.source.binding.id, bindingId, placement }), next => {
+          const saved = next.resources.assets[draft.assetId]?.projection;
+          if (saved?.kind !== 'value' || saved.value.bindingId !== bindingId) throw Error('モデルの配置の保存を確認できません。入力を保持しています。');
+          this.publish(next);
+        }), () => {
+          const saved = this.project.resources.assets[draft.assetId]?.projection;
+          if (saved?.kind !== 'value' || saved.value.bindingId !== bindingId) throw Error('モデルの配置の保存を確認できません。入力を保持しています。');
+          this.placement = null; this.message = 'モデルの配置を適用しました。';
+        });
+      }
       const prepared = draft.prepared ?? (this.modelTransformAvailable
         ? createFixtureModel({ ...fixtureModelIds(draft.source), binding: fresh('bnd') }, draft.source.shape, placement, draft.source.binding.id)
         : moveFixtureModel(draft.source, fresh('bnd'), position));

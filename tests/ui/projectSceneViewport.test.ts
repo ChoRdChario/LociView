@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { createSyntheticProject, fixtureIds as f } from '../../src/harness/projectScene/fixture';
 import { defaultPose, fittedPose, placementMatrix, projectBounds, switchProjection, syntheticDisplay } from '../../src/harness/projectScene/viewportModel';
 import { syntheticVersions } from '../../src/harness/projectScene/modelFixture';
-import { createSyntheticViewport } from '../../src/harness/projectScene/viewport';
+import { createSyntheticViewport, sceneViewportFactory } from '../../src/harness/projectScene/viewport';
 import { createDevelopmentWorkspace } from '../../src/harness/projectScene/workspace';
 import { SyntheticSession } from '../../src/harness/projectScene/session';
 import { planModelList } from '../../src/ui/projectScene/modelListState';
@@ -14,6 +14,7 @@ import { planPinMode } from '../../src/ui/projectScene/pinModeState';
 import { pickResidentSurface } from '../../src/harness/projectScene/viewportPicking';
 import { degreesRotation, proposedPlacement } from '../../src/harness/projectScene/modelTransform';
 import type { GizmoProposal, ModelPlacementTarget } from '../../src/harness/projectScene/pinGizmo';
+import type { ValidationModelClosure } from '../../src/harness/projectScene/modelTypes';
 
 const tracker = vi.hoisted(() => ({ renderers: [] as any[], controls: [] as any[], resize: [] as (() => void)[],
   raf: new Map<number, () => void>(), nextRaf: 0, fail: false, gizmos: [] as any[], realOrbit: false }));
@@ -96,6 +97,32 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance', () => {
+  it('previews/cancels on the saved-resident branch without replacing nested content or moving the camera (injected geometry)', () => {
+    const project = createSyntheticProject(), original = syntheticDisplay(project, f.overview, null, null);
+    // This case tests port routing, not GLB admission: real byte/closure checks live in projectFiles.test.
+    const model = original.models.find(m => m.binding.assetId === f.equipment)!;
+    const saved = { ...model, shape: 'saved-glb' } as ValidationModelClosure;
+    const asset = new THREE.Group(), inner = new THREE.Group(), geometry = new THREE.PlaneGeometry(), material = new THREE.MeshStandardMaterial({ color: '#2468ac' });
+    const mesh = new THREE.Mesh(geometry, material); inner.position.x = 3; inner.add(mesh); asset.add(inner); asset.matrixAutoUpdate = false;
+    const dispose = vi.fn(), create = vi.fn(() => ({ asset, mesh, dispose })), canvas = fakeCanvas();
+    let proposal: GizmoProposal<ModelPlacementTarget> = { target: { kind: 'model', token: original.token, sceneId: f.overview,
+      assetId: f.equipment, bindingId: model.binding.id }, position: model.binding.assetToProject.translation, enabled: true,
+      manipulation: { mode: 'rotate', rotationXYZW: model.binding.assetToProject.rotationXYZW, uniformScale: model.binding.assetToProject.uniformScale } };
+    const display = () => { const d = syntheticDisplay(project, f.overview, null, null, proposal);
+      return { ...d, models: d.models.map(m => m.binding.assetId === f.equipment ? saved : m) }; };
+    const viewport = sceneViewportFactory({ create, dispose: vi.fn() })(canvas.canvas as unknown as HTMLCanvasElement, () => {}, undefined, (target, position, manipulation) => {
+      proposal = { target, position, manipulation, enabled: true }; viewport.update(display()); return true;
+    });
+    viewport.update(display()); viewport.setActive(true); canvas.show();
+    const gizmo = tracker.gizmos.at(-1), orbit = tracker.controls.at(-1), camera = orbit.object.position.clone(), before = proposal;
+    gizmo.dragging = true; gizmo.object.quaternion.set(...degreesRotation(['0', '0', '90'])); gizmo.dispatchEvent({ type: 'objectChange' });
+    expect(asset.matrix).toEqual(placementMatrix(proposedPlacement(model.binding.assetToProject, proposal)));
+    expect(inner.position.x).toBe(3); expect(mesh.geometry).toBe(geometry); expect(mesh.material).toBe(material);
+    expect(create).toHaveBeenCalledOnce(); expect(orbit.object.position).toEqual(camera);
+    canvas.canvas.fire('keydown', { key: 'Escape', preventDefault() {} }); expect(proposal).toEqual(before);
+    expect(asset.matrix).toEqual(placementMatrix(model.binding.assetToProject)); expect(dispose).not.toHaveBeenCalled();
+    viewport.dispose(); expect(dispose).toHaveBeenCalledOnce(); geometry.dispose(); material.dispose();
+  });
   it('previews full model transforms/pins, restores exact rotation on Esc and turns every scale handle into uniform scale', () => {
     const project = createSyntheticProject(), original = syntheticDisplay(project, f.overview, null, null);
     const model = original.models.find(m => m.binding.assetId === f.equipment)!, canvas = fakeCanvas();
