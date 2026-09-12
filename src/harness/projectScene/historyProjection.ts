@@ -8,7 +8,7 @@ import { modelHistorySeed, projectModelHistory } from './modelHistory';
 import { projectViewHistory, viewHistorySeed } from './viewHistory';
 import { projectMaterialHistory } from './materialHistory';
 import { mediaSeed, projectMediaHistory } from './mediaHistory';
-import type { SceneAuthoringCommand } from '../../scene/commands';
+import type { SceneAuthoringCommand, CaptionDeletionCommand, CaptionDeletionImpact } from '../../scene/commands';
 
 export const captionKey = (id: string, field: 'title' | 'body' | 'color' | 'anchor' | 'template' | 'identity') => `caption/${id}/${field}`;
 export const bindingKey = (id: string) => `asset/${id}/binding`;
@@ -154,6 +154,8 @@ export interface SyntheticAuthority {
   read(): SyntheticProject;
   write(token: string, changes: Readonly<Record<string, string>>, context?: { sceneId: string }): WorkingResult<SyntheticProject>;
   authorScene?(token: string, command: SceneAuthoringCommand): WorkingResult<SyntheticProject>;
+  captionDeletionImpact?(token: string, captionId: string): CaptionDeletionImpact;
+  deleteCaption?(token: string, command: CaptionDeletionCommand): WorkingResult<SyntheticProject>;
   status?(): Readonly<{ kind: 'idle' | 'checking' | 'failed'; error?: string }>;
   retry?(): WorkingResult<SyntheticProject>;
 }

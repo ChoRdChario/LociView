@@ -1,12 +1,21 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-12 Caption全Project削除（`6e2d9d8`から）:** 同じmetadata hostの編集欄から
+> 影響Scene・添付・tag登録を確認し、一つの変更で対象と観測済み全edgeを削除状態へ。
+> 共有本体・原履歴・競合候補は保持。保存失敗中は旧UI、後着の削除／編集・参照問題は警告。
+> remote削除後も未適用本文を表示し、明示取消できる。独立レビュー指摘は修正済み。
+> 最終109 files／1,974 PASS／21既存TODO（2 workers）、型・build・独立レビューPASS。
+> 次は依存ゼロを確認してからのモデル全Project削除M09。todoが有限境界を所有する。
+> 棚卸し23接続／7部分／24別経路／10新規。件数を完成率・工数へ換算しない。
+> 実データ・描画・実機・offline受入れは追加されていない。実用チーム版全体は未完了。
+
 > **2026-09-12 Scene基本管理（`468d9ea`から）:** Captionタブの「シーンを管理」から
 > 作成・改名・開始Scene設定を新metadata保存へ接続。作成は元Sceneのモデル所属のみ、
 > fresh ID／順序保持。Caption・material・View・defaultはコピーしない。
 > 相手からの新Scene受信で既存入力／windowを保持。保存中断の同一ID／bytes復旧も確認。
 > 最終root 109 files／1,969 PASS／21既存TODO、型・build・独立レビューPASS。
 > 棚卸し22接続／7部分／24別経路／11新規。実データ・描画・実機・offlineの追加受入れなし。
-> 次はC10 Caption全Project削除の確認UIと原子的tombstone。todoが次の有限境界を所有する。
+> 当時の次C10は先頭記録を参照。todoが現在の次の有限境界を所有する。
 > 06の全5用途批准前にS2を活性化しないことを明記。仕様批准／実データ採用は未実施。
 
 > **2026-09-12 位置・色の競合から再編集へ（`452cdec`から）:** 新metadata hostの同じ比較欄で

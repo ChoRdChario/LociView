@@ -11,10 +11,61 @@ rendered, IME, device and durable-file acceptance remain pending.
 
 ### Current implementation — approved S1 service entry (2026-09-11)
 
-Current next decision (2026-09-12): the Scene authoring slice below is verified.
-Proceed with approved C10 confirmed Project-wide Caption deletion in the same
-host; do not replay completed position/color or Scene work. Real-data/06/07/
-device adoption is still gated, and the complete practical-team goal stays open.
+Current next decision (2026-09-12): C10 is connected and verified below. Next is
+M09, confirmed Asset deletion only after all Scene/Caption/material dependencies
+have been explicitly removed. This closes basic Project cleanup without new
+storage/wire policy; do not replay completed Scene/Caption work. Real-data/06/07/
+device adoption remains gated, and the complete practical-team goal stays open.
+
+#### Completed slice — confirmed Project-wide Caption deletion (C10, from `6e2d9d8`)
+
+- [x] Add a typed confirmed deletion command from the complete raw dependency
+  set. Atomically tombstone Caption and observed active Scene/attachment/tag
+  edges; preserve scalar candidates, Media/Tag/model/blob data.
+- [x] Connect confirmation in the existing editor through session and journal.
+  Keep old UI until durable acknowledgement; guard stale/IME/readonly/pending
+  input and retain remote-deleted local drafts with an explicit cancel path.
+- [x] Verify complete effects, cancel/stale/refusal, exact failed-save retry,
+  cold reopen, late edge/delete-edit retention and replay in existing host tests.
+  Run final typecheck/test/build, independent review and checkpoint.
+
+Acceptance: 05 §3.4/§4.3, not physical erasure. Unknown endpoint/lifecycle refuses
+deletion; content/order conflicts need not be resolved just to delete. Unseen
+later references remain visible for review. No restore/orphan repair, GC,
+unplaced schema, wire, real-data activation, new page or device claim. Human
+checks remain consolidated; stop only for contract conflict or new authority.
+
+Review/result: five C10 tests pass on the existing saved host ports/recorded DOM,
+including complete children with duplicate Scene edges, scalar conflict retention,
+old UI during failed publication, exact cold retry, both receive orders, unseen
+orphan/delete-edit and pure delete/restore warnings. Remote deletion retains the
+unapplied body for explicit cancellation. Independent core/UI reviews are clear
+after fixing deletion-time media entry and lifecycle-only warning coverage.
+Initial test assumptions were corrected (asynchronous acknowledgment returns
+false while pending; image setup already reads bytes; a same-value Automerge
+assignment alone does not create a competing candidate). No runtime guard relaxed.
+First full root run: 1,970 PASS, four existing membership tests timed out at 5 s
+while build also ran. Their isolated eight-test group passes without code/timeout
+changes. Final `npm test -- --maxWorkers=2`: 109 files / 1,974 PASS / 21 existing
+TODO, exit 0 (139.16 s). Two workers reduce contention, not a product performance
+guarantee; no timeout/expectation limit was increased. Typecheck and build PASS
+with unchanged build chunk warnings; final diff-check and inventory recount PASS
+(23 connected / 7 partial / 24 other-path / 10 new). No browser, iPhone, offline
+or real-data acceptance added. Browser initialization remains unavailable as
+previously recorded; no new attempt or environment repair was made.
+
+Next finite target: M09 in the same model panel. Read all raw Scene-membership,
+Caption-anchor and material-routing candidates, not the visible Scene alone.
+Unknown/ambiguous possibly related endpoints and delete/edit issues block removal.
+Name dependencies and direct users to existing explicit removal/reset actions;
+never cascade. Once dependencies are proven absent, one typed command tombstones
+Asset.lifecycle only, preserving status, immutable records/facts/history/blobs.
+Reuse the existing journal/host acceptance for failed save/cold retry, late
+reference retention, stale/readonly/pending refusal. No general re-anchor,
+orphan repair, GC, wire, real-data or additional device authority is inferred.
+Write the finite M09 specification/plan before implementation. After basic
+management, prioritize the bundled new-storage/real-data entry dependencies
+instead of accumulating unrelated synthetic polish.
 
 #### Completed slice — resolve competing Caption positions/colors (from `452cdec`)
 
@@ -105,7 +156,7 @@ initial migration artifacts and late-input evidence remain one approval packet;
 none is ratified by the current Scene work. Corrected 06's placement vector to
 distinguish whole-Anchor selection from independent membership keep-both.
 
-Next: C10 confirmed Project-wide Caption deletion, not merely Scene exclusion.
+Then-next (now completed above): C10 confirmed Project-wide Caption deletion, not merely Scene exclusion.
 Reuse raw candidate/reference guards and the same journal; write a complete
 observed tombstone set atomically, retain original history and model/media bytes,
 and keep unseen later edits/edges explicit. Record the finite command/UI plan
@@ -504,10 +555,10 @@ Read-only code inspection confirms two gaps in the new development host:
   there is no named Project list/switch UI or real-file import in this host. The
   ordinary home has an existing Native Project list/file entry but is not connected
   to the new metadata workspace. Do not present it as this host's working switch.
-- [ ] Project-wide Caption deletion: Scene inclusion/exclusion is connected, but
-  neither a delete-Caption control nor its typed metadata command is connected.
-  Follow 05 §4.3: separate `このシーンから外す` from `プロジェクトから削除`,
-  show affected Scenes/attachment dependencies and require explicit confirmation.
+- [x] Project-wide Caption deletion: the C10 slice above now connects the typed
+  command and confirmation, separate from `このシーンから外す`, with complete
+  observed children and retained late conflicts. Synthetic host only; broader
+  product/browser/device acceptance remains open.
 
 These two gaps are inventory inputs, not automatic next-slice priorities. Choose
 order from full scope, dependencies and risk; do not equate URL reopen, lifecycle support or passing save tests with reachable

@@ -38,6 +38,11 @@ Basic Scene authoring is also connected: model-membership-only creation,
 explicit name/default commands, saved reopen and received Scene local-state
 initialization. Existing UI memory and source Scenes are preserved. The inventory
 counts P04/P05 only in the synthetic metadata path, not real-file/device acceptance.
+Confirmed whole-Project Caption deletion (C10) also connects through this host.
+Complete observed child tombstones are atomic; binary content and late conflicts
+are retained, as is unapplied input after a remote deletion. Source/endpoint guards,
+exact retry and cold reopen are covered by existing host tests; real-browser and
+device acceptance remain in the consolidated batch.
 
 ## Classification
 

@@ -8,6 +8,7 @@ import { createMetadataFixture, metadataFixtureLimits as limits, metadataProject
 import { MetadataFixtureContent, readMetadataSeed, writeMetadataSeed } from './metadataStorage';
 import { metadataModelFacts } from './metadataModelFacts';
 import type { SyntheticAuthority } from './historyProjection';
+import { captionDeletionImpact } from '../../projectMetadata/captionDeletion';
 import { metadataIntent } from './metadataIntent';
 import type { FullMetadataSource } from '../../projectMetadata/remote';
 import { fixtureIds } from './fixture';
@@ -104,6 +105,15 @@ export async function openMetadataHost(options: MetadataHostOptions) {
         if (!['createScene', 'renameScene', 'setDefaultScene'].includes(command.kind)) throw Error('シーンの操作を確認してください。');
         return ready(await service.edit(token, command));
       }, 'シーンを変更できません。'),
+      captionDeletionImpact: (token, captionId) => {
+        if (last.provider?.kind !== 'scene-provider' || token !== last.provider.state.token) throw Error('内容が更新されています。選び直してください。');
+        return captionDeletionImpact(last.provider, captionId, limits);
+      },
+      deleteCaption: (token, command) => execute(async () => {
+        if (authority.readOnly) throw Error('このタブは閲覧専用です。');
+        if (command.kind !== 'deleteCaption') throw Error('削除対象を確認してください。');
+        return ready(await service.edit(token, command));
+      }, 'キャプションを削除できません。'),
       retry: () => execute(async () => {
         if (authority.readOnly) throw Error('このタブは閲覧専用です。');
         const before = await service.read();

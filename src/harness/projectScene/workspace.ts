@@ -12,6 +12,7 @@ import { createViewportHost, type ViewportFactory } from './viewportHost';
 import { createMaterialControls } from '../../ui/projectScene/materialControls';
 import { createMediaControls } from './mediaControls';
 import { createSceneAuthoringControls } from './sceneAuthoringControls';
+import { createCaptionDeletionControls } from './captionDeletionControls';
 
 /** One mounted integration host. Components own their DOM; synthetic session owns all working/UI state. */
 export function createDevelopmentWorkspace(document: Document, session = new SyntheticSession(),
@@ -75,12 +76,13 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   const viewport = createViewportHost(document, session, afterAction, options.viewportFactory);
   const material = createMaterialControls(document, plan => { session.acceptMaterial(plan); afterAction(); });
   const media = createMediaControls(document, session.media, afterAction);
+  const captionDeletion = createCaptionDeletionControls(document, session, afterAction);
   header.append(brand, name, navigation.saveStatus);
   const pinHelp = make('p', 'モデルの面をShift＋クリックで追加。追加・移動中は矢印をドラッグして調整できます。');
   pinHelp.className = 'lv-development-pin-help';
   const information = make('details'), informationLabel = make('summary', 'シーンの構成');
   information.className = 'lv-development-information'; information.append(informationLabel, composition);
-  editor.append(editorHeading, detail.root, media.root);
+  editor.append(editorHeading, detail.root, media.root, captionDeletion.root);
   const windowActions = make('section'); windowActions.className = 'lv-development-window-actions';
   windowActions.append(detail.windowActions, viewport.windowTools);
   stage.append(viewport.stageTools, pin.modeStrip, viewport.root, numeric, placement.modeStrip, information);
@@ -108,7 +110,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     const listOkay = list.render(captionContext);
     const modelsOkay = modelList.render(session.modelContext());
     const materialOkay = material.render(session.materialContext());
-    media.render(); sceneAuthoring.render();
+    media.render(); sceneAuthoring.render(); captionDeletion.render();
     const pinsOkay = pin.render(session.pinContext()), includeOkay = include.render(session.includeContext()); coordinates.render(); modelUpdate.render(); placement.render();
     if (!detailOkay || !listOkay || !modelsOkay || !pinsOkay || !includeOkay || !materialOkay) {
       message.textContent = '入力中の状態を保持しています。操作を完了してから切り替えてください。';

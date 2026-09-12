@@ -4,6 +4,16 @@ import { active, memberships, sameSnapshot } from './resolve';
 import { DomainValidationError, normalizeSceneName } from '../domain/values';
 
 type EdgeKind = 'asset' | 'caption';
+export interface CaptionDeletionCommand {
+  kind: 'deleteCaption'; captionId: string; observedMembershipIds: readonly string[];
+  observedAttachmentIds: readonly string[]; observedTagMembershipIds: readonly string[]; eventId: string;
+}
+export interface CaptionDeletionImpact {
+  captionId: string;
+  memberships: readonly { id: string; sceneId: string }[];
+  attachments: readonly { id: string; mediaResourceId: string }[];
+  tags: readonly { id: string; tagId: string }[];
+}
 /** Finite authoring surface shared by UI intent and the saved command service. */
 export type SceneAuthoringCommand =
   | { kind: 'createScene'; sceneId: string; sourceSceneId: string; activeSceneId: string;

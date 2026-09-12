@@ -12,14 +12,17 @@
 
 2026-09-12 whole-scope inventory: [tasks/implementation-inventory.md](tasks/implementation-inventory.md)
 maps all 41 UI tasks plus accepted Scene/team extensions to 64 work groups:
-22 connected in the synthetic metadata host; 7 component-level gaps, 24 other-path
-connections and 11 new-path implementations remain. These are not completion or
+23 connected in the synthetic metadata host; 7 component-level gaps, 24 other-path
+connections and 10 new-path implementations remain. These are not completion or
 effort percentages. Approved full-source receive (02 §8) and explicit Caption
 text resolution and independent Caption membership copies now have bounded
 new-service/host paths. Prepared model activation, explicit pin correction and
 two saved full-source team rounds now work in synthetic storage ports. Model
 copies now have the bounded known-Mesh path below; remaining scalar conflicts and exchange-base/delta remain;
 real-file/wire adoption remains separately gated. Latest UI complaints do not set priority.
+Confirmed Project-wide Caption deletion now writes the complete observed child
+tombstones through the same journal; original content and late conflicts remain.
+Unapplied input stays visible when a remote deletion removes its Caption.
 Competing known ready-model statuses now support complete model/placement comparison
 and explicit causal selection in the same host, including saved retry/cold replay.
 This does not resolve every scalar/lifecycle conflict.

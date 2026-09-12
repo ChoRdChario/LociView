@@ -1,4 +1,4 @@
-import { planSceneCommand, previewScenePlan, type SceneAuthoringCommand } from '../../scene/commands';
+import { planSceneCommand, previewScenePlan, type SceneAuthoringCommand, type CaptionDeletionImpact, type CaptionDeletionCommand } from '../../scene/commands';
 import { chooseStartupScene, resolveScene, memberships } from '../../scene/resolve';
 import { value, type Anchor, type Composition, type Field } from '../../scene/types';
 import { navigationPlanIsCurrent, planNavigation, type NavigationPlan, type NavigationSession, type PendingInteraction,
@@ -74,6 +74,7 @@ export class SyntheticSession {
   private placement: ModelPlacementDraft | null = null;
   private captionComparison: { token: string; sceneId: string; captionId: string; anchor: Anchor; label: string } | null = null;
   private sceneDraft: SceneAuthoringDraft | null = null;
+  private deletion: { token: string; sceneId: string; title: string; impact: CaptionDeletionImpact } | null = null;
   private pinFeedback: PinModeContext['feedback'] = { kind: 'idle' };
   private searchComposing = false;
   private viewportDragging = false;
@@ -81,7 +82,7 @@ export class SyntheticSession {
   private detailFeedback: DetailContext['feedback'] = { kind: 'idle' };
   private modelFeedback: ModelListContext['feedback'] = { kind: 'idle' };
   message = '';
-  constructor(private readonly authority?: SyntheticAuthority) {
+  constructor(private readonly authority?: SyntheticAuthority, private readonly externalChanges: () => boolean = () => false) {
     if (authority) this.project = authority.read();
     const sceneId = chooseStartupScene(this.project.state).sceneId;
     if (!sceneId) throw new Error('合成シーンを開けません。');
@@ -108,6 +109,44 @@ export class SyntheticSession {
   get modelUpdateRestriction() { return this.readOnly || !this.authority?.capabilities?.preparedRevision ? this.editingRestriction : null; }
   get sceneAuthoringAvailable() { return !!this.authority?.capabilities?.sceneAuthoring && !!this.authority.authorScene; }
   get sceneAuthoringDraft() { return this.sceneDraft; }
+  get captionDeletionAvailable() { return !!this.authority?.captionDeletionImpact && !!this.authority.deleteCaption; }
+  get captionDeletion() { return this.deletion; }
+  get captionDeletionBlocked() { return this.externalChanges() || !!this.views.pending || !!this.materials.pending || !!this.media.pending ||
+    !!this.sceneDraft || [...this.drafts.values()].some(hasCaptionDraft); }
+  beginCaptionDeletion(): boolean {
+    const captionId = this.memory.selectedCaptionId;
+    if (!captionId || !this.captionDeletionAvailable || this.readOnly || this.pending || this.externalChanges())
+      return this.refuse('入力を確定してから削除対象を確認してください。');
+    try {
+      const impact = this.authority!.captionDeletionImpact!(this.project.state.token, captionId);
+      const title = this.project.resources.captions[captionId]?.title;
+      this.deletion = { token: this.project.state.token, sceneId: this.sceneId, impact,
+        title: title?.kind === 'value' ? title.value || '無題' : 'タイトルに競合あり' };
+      this.message = ''; return true;
+    } catch (error) { return this.refuse(this.errorText(error)); }
+  }
+  cancelCaptionDeletion(): boolean {
+    if (this.workingBlock) return false;
+    this.deletion = null; this.message = ''; return true;
+  }
+  confirmCaptionDeletion(): boolean {
+    const d = this.deletion;
+    if (!d || this.readOnly || this.workingBlock || this.pending !== 'text' || this.captionDeletionBlocked) return false;
+    if (d.token !== this.project.state.token || d.sceneId !== this.sceneId || d.impact.captionId !== this.memory.selectedCaptionId)
+      return this.refuse('内容が更新されています。削除を取り消して、影響を確認し直してください。');
+    const { captionId, memberships, attachments, tags } = d.impact;
+    const command: CaptionDeletionCommand = { kind: 'deleteCaption', captionId, eventId: fresh('evt'),
+      observedMembershipIds: memberships.map(e => e.id), observedAttachmentIds: attachments.map(e => e.id), observedTagMembershipIds: tags.map(e => e.id) };
+    return this.applyWorking(() => afterWorking(this.authority!.deleteCaption!(d.token, command), next => this.publish(next)), () => {
+      this.deletion = null; this.drafts.delete(captionId);
+      this.navigation = Object.freeze({ ...this.navigation, sceneMemory: Object.freeze(Object.fromEntries(
+        Object.entries(this.navigation.sceneMemory).map(([id, m]) => [id, m.selectedCaptionId === captionId ? Object.freeze({ ...m, selectedCaptionId: null }) : m]))) });
+      for (const [id, m] of this.windows) this.windows.set(id, Object.freeze({ ...m,
+        retained: m.retained.filter(c => c !== captionId), dismissed: m.dismissed.filter(c => c !== captionId),
+        order: m.order.filter(c => c !== captionId), placements: m.placements.filter(c => c.captionId !== captionId) }));
+      this.message = 'プロジェクトから削除しました。';
+    });
+  }
   beginSceneAuthoring(kind: SceneAuthoringDraft['kind']): boolean {
     if (!this.sceneAuthoringAvailable || this.readOnly || this.pending) return this.refuse('入力を確定してからシーンを編集してください。');
     const current = this.project.state.scenes[this.sceneId]!;
@@ -190,7 +229,7 @@ export class SyntheticSession {
     if (this.views.pending === 'composition' || this.materials.pending === 'composition' || this.media.pending === 'composition') return 'composition';
     if (this.placement?.composing || this.pinInputComposing || this.searchComposing || [...this.includes.values()].some(m => m.composing) || [...this.models.values()].some(m => m.composing) ||
       [...this.drafts.values()].some(d => d.composing !== null)) return 'composition';
-    return this.views.pending ?? this.materials.pending ?? this.media.pending ?? (this.sceneDraft || [...this.drafts.values()].some(hasCaptionDraft) ? 'text' : null);
+    return this.views.pending ?? this.materials.pending ?? this.media.pending ?? (this.deletion || this.sceneDraft || [...this.drafts.values()].some(hasCaptionDraft) ? 'text' : null);
   }
   setSearchComposing(active: boolean) { this.searchComposing = active; }
   setViewportDragging(active: boolean): boolean { const changed = this.viewportDragging !== active; this.viewportDragging = active; return changed; }
@@ -257,7 +296,7 @@ export class SyntheticSession {
     const composing = this.searchComposing || [...this.includes.values()].some(m => m.composing) || [...this.models.values()].some(m => m.composing) ||
       [...this.drafts.values()].some(d => d.composing);
     return { project: this.project, sceneId: this.sceneId, captionId,
-      block: this.workingBlock ?? this.mediaRestriction ?? (other ? '移動中の操作を終えてください。' : composing ? '文字の入力を確定してください。' : this.views.pending || this.materials.pending ?
+      block: this.workingBlock ?? this.mediaRestriction ?? (this.deletion ? '削除の確認を終えてください。' : other ? '移動中の操作を終えてください。' : composing ? '文字の入力を確定してください。' : this.views.pending || this.materials.pending ?
         '他の編集中の設定を適用するか取り消してください。' : source.kind !== 'ready' || !source.captions.some(c => c.id === captionId) ? 'キャプションを選択してください。' : null) };
   }
   private writeMedia(base: string, changes: Readonly<Record<string, string>>) {
@@ -302,8 +341,10 @@ export class SyntheticSession {
     const captionId = this.memory.selectedCaptionId;
     const base = { token: list.token, sceneId: this.sceneId };
     const caption = list.kind === 'ready' ? list.captions.find(c => c.id === captionId) : undefined;
+    const lifecycle = captionId ? this.project.resources.captions[captionId]?.lifecycle : undefined;
     if (!caption) return { ...base, kind: 'unavailable', captionId,
-      reason: captionId ? 'キャプションの状態を確認してください。' : '右の一覧からキャプションを選択してください。' };
+      reason: lifecycle?.kind === 'value' && lifecycle.value.state === 'deleted' ? 'このキャプションは削除されました。' :
+        captionId ? 'キャプションの状態を確認してください。' : '右の一覧からキャプションを選択してください。' };
     const edges = Object.values(this.project.state.captionMemberships).filter(e => e.resourceId === caption.id &&
       (e.lifecycle.kind !== 'value' || e.lifecycle.value.state !== 'deleted'));
     const sceneIds = new Set(edges.map(e => e.sceneId));
@@ -364,8 +405,8 @@ export class SyntheticSession {
     const source = this.detailSource();
     if (source.kind === 'ready' && !this.drafts.has(source.caption.id))
       this.drafts.set(source.caption.id, beginCaptionDraft(source)!);
-    const draft = source.kind === 'ready' ? this.drafts.get(source.caption.id)! : null;
-    return { source, draft, readonlyFields: this.colorReadOnly ? ['color'] : [], mutationBlock: this.workingBlock ?? (this.readOnly ? 'このタブは閲覧専用です。' : this.windowDragging ? 'ウィンドウの移動を終えてください。' : this.placement ? 'モデルの配置を確定するか、取り消してください。' :
+    const draft = source.kind === 'ready' ? this.drafts.get(source.caption.id)! : source.captionId ? this.drafts.get(source.captionId) ?? null : null;
+    return { source, draft, readonlyFields: this.colorReadOnly ? ['color'] : [], mutationBlock: this.workingBlock ?? (this.deletion ? '削除の確認を終えてください。' : this.readOnly ? 'このタブは閲覧専用です。' : this.windowDragging ? 'ウィンドウの移動を終えてください。' : this.placement ? 'モデルの配置を確定するか、取り消してください。' :
       this.pinInput ? 'ピンの操作を確定するか、取り消してください。' : null), feedback: this.detailFeedback };
   }
   modelContext(): ModelListContext {
@@ -703,6 +744,7 @@ export class SyntheticSession {
       if (context.draft !== event.draft || event.draft.composing || context.feedback.kind === 'applying') return false;
       const clean = beginCaptionDraft(context.source);
       if (clean) this.drafts.set(clean.captionId, clean);
+      else this.drafts.delete(event.draft.captionId);
       this.detailFeedback = { kind: 'idle' }; this.message = ''; return true;
     }
     if (event.kind !== 'apply') return this.refuse('この開発版では状態修復は未接続です。');

@@ -349,6 +349,13 @@ language, disposable PoCs and one writer.
 
 ## 8. Current authorization boundary
 
+2026-09-12 bounded C10 progress: confirmed whole-Project Caption deletion now
+uses the new metadata command/journal in the existing synthetic host. Observed
+children are tombstoned together; original history, shared bytes and unseen
+later references/edits are retained. Remote-deleted local drafts remain visible
+and explicitly cancellable. Todo owns final validation/next slice. This adds no
+real-data adoption, rendered/device/offline or package-wire completion credit.
+
 ### 2026-09-09 approved sequencing — thin whole workflow
 
 The PO has now explicitly approved the early connected synthetic development

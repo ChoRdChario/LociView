@@ -308,6 +308,18 @@ A concurrent unseen dependent edge is retained as an orphan/reference conflict
 for explicit repair; it is not silently cascaded, and every conflict-required
 record/blob remains protected.
 
+Finite C10 implementation boundary (2026-09-12): confirmation binds the source
+token and complete observed membership/attachment/tag edge ID sets. All raw
+endpoint and lifecycle candidates are checked, including duplicate edges; a
+potentially related unknown/ambiguous endpoint refuses the action. Only resolved
+tombstones are excluded. The command changes lifecycle alone in one causal
+change, so unresolved title/body/anchor/color/order/alt-text need not be selected
+first. Confirmation names affected Scenes and attachments; Media/Tag definitions
+and model/binary bytes are not deleted. Until durable acknowledgement the old UI
+is retained. Remote deletion never silently discards local unapplied input;
+retain that input with explicit cancellation and show later reference/delete-edit
+issues on reopen. General restoration/orphan repair is not added by this slice.
+
 ## 4. Commands and state transitions
 
 Every durable user action below is one validated logical metadata command. The

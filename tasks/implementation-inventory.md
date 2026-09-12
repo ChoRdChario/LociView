@@ -3,7 +3,7 @@
 > CURRENT INVENTORY / 2026-09-12。全体監査基点: `b73315b851f627ca61029cfb73caf23f6e4829bd`。
 > その後の実装差分: 新metadataの完全履歴受信・Caption文言の明示解消・重複Captionの独立コピー、
 > 準備済みモデル切替とpin修正の保存・二人二巡、モデルstatus・Caption位置／色の明示解消、
-> 既知Mesh独立copy、Scene作成・名前／開始Sceneの設定を限定接続。
+> 既知Mesh独立copy、Scene作成・名前／開始Scene設定、確認付きCaption全Project削除を限定接続。
 > 保存・復旧・再受信までの合成テストが通る。実ファイル／実機受入れは未完了。
 > 新しい仕様・採用判断ではない。承認済み要件と現行code/testsの距離を記録する。
 > 実装順は最新のUI指摘順ではなく、依存関係と `TEAM-FLOW-01` への効果から選ぶ。
@@ -16,16 +16,16 @@
 ## 1. 結論と数え方
 
 ユーザーが行う作業を **64機能群** に整理すると、新metadata保存画面へ限定接続済みが
-**22群**、残りが **42群**。その42群は下記の内訳になる。
-「22/64完成」といった完成率・工数には換算しない。小さい部品接続と
-移行／チーム受信では仕事量が大きく違い、接続済み22群も合成データ限定だからである。
+**23群**、残りが **41群**。その41群は下記の内訳になる。
+「23/64完成」といった完成率・工数には換算しない。小さい部品接続と
+移行／チーム受信では仕事量が大きく違い、接続済み23群も合成データ限定だからである。
 
 | 排他的な主分類 | 群数 | 意味 |
 |---|---:|---|
-| 接続済み | 22 | 新metadata hostで操作・必要な保存まで接続。既知三角形／2 PNGという限定範囲、実機受入れは別 |
+| 接続済み | 23 | 新metadata hostで操作・必要な保存まで接続。既知三角形／2 PNGという限定範囲、実機受入れは別 |
 | 部品未接続 | 7 | 新系統のUI部品・pure planner等はあるが、対象群全体の画面・実データ・typed command／保存のいずれかが未接続。T01〜T04は限定接続まで進んだ |
 | 別経路のみ | 24 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
-| 新規実装 | 11 | 新契約の利用者向け経路がまだない。schema・検証・設計案があっても実装済みとは数えない |
+| 新規実装 | 10 | 新契約の利用者向け経路がまだない。schema・検証・設計案があっても実装済みとは数えない |
 
 - 一つの行は、共有する前提・保存境界を持つ「利用者の作業群」。同一ViewのCRUD等は一群。
   三つのモデル形式・五つのpackage目的・三つの移行元は異なる契約があるため別群。
@@ -35,8 +35,8 @@
 - 承認済み製品全体の棚卸しであり、64群すべてを現在の合成接続sliceや最初の
   candidate必須gateへ追加しない。完全alignmentやM14等の別gate能力は、その前提が
   揃った段階で扱う。閉じた旧Native受入れをこの件数で再オープンしない。
-- 「新規実装」はコードが全くないという意味ではない。たとえばC10は旧Nativeに削除があるが、
-  新しい因果関係付きの削除commandがない。F08も旧Native変換とは別の新Scene変換である。
+- 「新規実装」はコードが全くないという意味ではない。F08は旧Native変換とは別の
+  新Scene変換であり、旧経路だけでは新経路の完成と数えない。
 - 本書はソース・既存テスト・承認済み仕様の照合。新しい実ブラウザ操作／性能測定ではない。
   LociMyu継承は以前の記録された原本監査と実装を参照し、private原本を再収集していない。
 
@@ -46,7 +46,7 @@
 |---|---|---|
 | 通常home → Native | 実モデル／画像、DisplaySet、限定backup／collaboration／review／clean、旧Desktop・iPhone合格 | 新ProjectScene／継続因果履歴／新保存サービスの完成 |
 | project-scene memory／旧 `storage=saved` | 合成の2人チーム、更新・競合・独立copy・保存の限定ループ | 新metadata serviceまたは実ファイル製品wireの接続済み |
-| project-scene `storage=metadata` | 新source/repository/session/journalと22群の合成UI接続、限定履歴受信・明示解消 | 任意モデル／任意画像／実ファイルのチーム受信／通常home／offlineの合格 |
+| project-scene `storage=metadata` | 新source/repository/session/journalと23群の合成UI接続、限定履歴受信・明示解消 | 任意モデル／任意画像／実ファイルのチーム受信／通常home／offlineの合格 |
 
 ## 2. 全機能群
 
@@ -97,7 +97,7 @@
 | C07 | 一覧で添付の有無・件数を見分ける | 部品未接続 | 部品は件数を描くがhostは常にmediaCount=0を渡す。実データ接続漏れ。 | [src/ui/projectScene/captionListControls.ts:90](../src/ui/projectScene/captionListControls.ts) / [src/harness/projectScene/session.ts:232](../src/harness/projectScene/session.ts) |
 | C08 | 複数Captionウィンドウを比較する | 接続済み | 順次開く・前面化・個別×・移動／キーボード・並べる・意味のある位置への接続線。 | [src/ui/projectScene/captionWindowControls.ts:26](../src/ui/projectScene/captionWindowControls.ts) / [tests/ui/projectSceneWindowConnection.test.ts:34](../tests/ui/projectSceneWindowConnection.test.ts) |
 | C09 | Captionウィンドウのサイズを変える | 別経路のみ | 新部品にresize入力なし。WindowRect型にサイズがあるだけでは操作可能としない。 | [src/ui/projectScene/captionWindowControls.ts:79](../src/ui/projectScene/captionWindowControls.ts) / [src/nativeGs/captionWindows.ts:663](../src/nativeGs/captionWindows.ts) |
-| C10 | Project全体からCaptionを削除する | 新規実装 | 新typed command/UIなし。承認済み05に従い、観測済みScene所属・添付・tag edgeを同時tombstoneし、未観測の競合を保護するcommand実装が必要。 | [src/projectMetadata/commands.ts:14](../src/projectMetadata/commands.ts) / [docs/specs/05-project-scene-team-workflow.md:303](../docs/specs/05-project-scene-team-workflow.md) |
+| C10 | Project全体からCaptionを削除する | 接続済み | 影響Scene・添付・tag登録を確認し、Captionと観測済み全edgeを原子的tombstone。本文競合・Media/Tag/モデル本体を保持。保存失敗中は旧UI、exact retry／cold reopen、後着edge/delete-editの保持と警告、未適用入力の明示取消を確認。復元・一般参照修復UIは別。 | [src/projectMetadata/captionDeletion.ts](../src/projectMetadata/captionDeletion.ts) / [src/harness/projectScene/captionDeletionControls.ts](../src/harness/projectScene/captionDeletionControls.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
 | C11 | モデル非依存の既存Captionを読み、明示的にモデルへ置き直す | 新規実装 | domain/list読取の一部あり。実importとProjectAnchor→Assetのcommand/UIなし。移動入口はAsset以外を拒否。新ProjectAnchor作成は別途非対象。 | [src/scene/types.ts:36](../src/scene/types.ts) / [src/harness/projectScene/session.ts:442](../src/harness/projectScene/session.ts) |
 | C12 | 未配置の記録を失わず読み込み、後で配置する | 新規実装 | 未配置を保持・後配置する製品要件は承認済み、exact schema/recipeは提案・未実装。現在Anchor unionにもない。破損・競合を未配置扱いにして救済しない。 | [docs/specs/05-project-scene-team-workflow.md:784](../docs/specs/05-project-scene-team-workflow.md) / [src/scene/types.ts:36](../src/scene/types.ts) |
 

@@ -51,7 +51,7 @@ export async function createMetadataBrowserWorkspace(document: Document, run: st
   const render = () => {
     if (disposed) return;
     if (!workspace && host.read().provider) {
-      workspace = createDevelopmentWorkspace(document, new SyntheticSession(host.authority), {
+      workspace = createDevelopmentWorkspace(document, new SyntheticSession(host.authority, () => receiveControls?.hasChanges() ?? false), {
         viewportFactory: createSyntheticViewport, onAction: () => receiveControls?.render() });
       receiveControls = createMetadataReceiveControls(document, host, workspace.session, () => workspace?.render());
       tools.append(receiveControls.root);
