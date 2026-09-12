@@ -25,13 +25,45 @@ validation activation with PO; 05 §13.2 currently excludes user-file admission.
 Formal adoption still requires G1-A/C and applicable device evidence. No profile,
 06/07, ordinary-home or release authority is inferred from continued implementation.
 
+#### Next connected work — limited real-file validation (PENDING PO decision)
+
+The proposed exception and acceptance are consolidated in 05 §13.2 under
+`PENDING PO decision — limited real-file validation entry`. Runtime remains
+synthetic-only. The immediate request is one limited validation entry, not
+ordinary-home adoption, a generic GLB guarantee or package/migration approval.
+
+- [x] Check actual reusable admission behavior: existing Native Mesh validation
+  skips texture decode; the loader can substitute blocked external references.
+  A partially rendered model is not sufficient saved-content evidence.
+- [x] Specify the finite validation scope and create → saved-body display →
+  select/reopen exit in the existing specification, preserving later formats.
+- [ ] Obtain explicit PO approval for newly created validation Projects using
+  self-contained static GLB (embedded PNG only) and attached PNG in the same host.
+- [ ] After approval, implement strict admission and immutable initial records,
+  then consume saved geometry/material/PNG without fixture or silent defaults.
+- [ ] Connect marker-last creation, Project selection and independent reopen,
+  including visible incomplete creation, unsaved-input protection and exact retry.
+- [ ] Reuse existing tests, final-tree checks and independent review; consolidate
+  actual-browser and required device evidence before adoption, not new PoC pages.
+
+Review: this is the next critical stage-2 workflow. M07 and startup-Scene recovery
+were genuine approved runtime progress, but do not answer the real-file decision.
+Do not keep filling that wait with isolated UI polish or broad storage work. The
+remaining scalar/lifecycle and inheritance work is not claimed complete. The
+stage-3 06/07 issue list is finite but not yet an executable ratified wire/recipe;
+Native pinScale mapping remains a converter-specific issue, not a prerequisite
+for new-Project validation. This checkpoint changes documents only: diff/contract
+checks apply, with no repeated runtime test matrix or new browser/device pass.
+Diff-check and independent read-only contract review pass with no mandatory
+corrections. Runtime stays at `9ce0b83`; limited real-file approval is still absent.
+
 #### Completed implementation — explicit startup Scene conflict recovery (from `acd30d5`)
 
-The previous goal turn made verified runtime progress (M07, clean checkpoint).
-Real-file validation still has no PO answer. A bounded stage-1 defect remains:
+At entry, the previous goal turn had made verified runtime progress (M07, clean
+checkpoint), while real-file validation had no PO answer. The stage-1 defect was:
 received default-Scene conflicts survive storage but cold SyntheticSession creation
-throws before conflict controls mount. Close that actual team-reopen dead end;
-do not substitute more synthetic polish for the pending real-data entry.
+throws before conflict controls mount. This slice closed that team-reopen dead end;
+the real-data entry decision remains pending.
 
 - [x] Add one typed resolveDefaultScene candidate choice under 05 §§4.1/8, with
   complete valid candidate and active-target guards; keep ordinary set-default

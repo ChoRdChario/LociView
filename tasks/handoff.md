@@ -1,5 +1,13 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-12 次の接続を実file検証に固定（`9ce0b83`後・文書のみ）:**
+> 05 §13.2とtodo先頭へ、既存開発host・新規検証Project・静的GLB（内蔵PNG）＋
+> 添付PNGの限定入口案を集約。まだPO承認待ちで、runtimeは合成データ限定のまま。
+> 既存loaderの部分表示や画像decode省略を流用して合格にせず、保存済みモデル・材質・
+> 画像で作成→表示→選択／再開を通す。新たなPoCや合成UIの小修正で待ちを埋めない。
+> 既存Project／通常home／正式採用／06/07／実機HTTPS／公開の承認は含まない。
+> 継続通知をPO判断と扱わない。文書差分確認のみで、実行検証結果は直下のcheckpointを参照。
+
 > **2026-09-12 開始Scene競合の起動復旧（`acd30d5`から）:** 新metadataの再開時、
 > 開始Sceneを推測して開かず、同じ画面で全候補を比較・明示確定。保存ack後にworkspaceを生成。
 > warm解消では現在Scene・カメラ・入力を保持。readonly／保存失敗／元journal retryも既存host内。

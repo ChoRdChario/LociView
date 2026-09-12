@@ -1237,6 +1237,57 @@ applicable physical-iOS checks and explicit adoption still precede real-Project
 activation. S2 retains independent wire/recipe ratification. Failure of the new
 service is visible; no fallback silently reuses the old PoC writer.
 
+**PENDING PO decision — limited real-file validation entry (2026-09-12):**
+
+This is a proposed exception to synthetic-only development activation above,
+not an approved profile, an implementation receipt or general adoption. The
+critical next connected task is actual file inspection → new Project creation →
+saved-body rendering → select/reopen, not another synthetic catalog or PoC page.
+Obtain one explicit PO decision on this validation scope before activating it;
+automatic continuation of the approved plan is not that decision.
+
+- **Scope:** newly created validation Projects in the existing development host;
+  self-contained static GLB Mesh with embedded PNG textures, and attached PNG.
+  No external resources, animation, skinning, morph targets or unsupported
+  required extensions. This first slice does not remove other approved Native
+  model/media formats from the practical-team completion target.
+- **Admission:** inspect bytes and structure, not filenames. Validate all admitted
+  geometry, material/texture references and embedded/attached PNG content. An
+  existing loader producing some visible triangles is not sufficient: the Native
+  inspection can skip image decoding, and its loader can replace external URLs
+  with empty data plus warnings. Missing, corrupt or unsupported content must
+  not silently become omitted geometry, placeholder textures or default material
+  and then count as a successful import. Reuse existing parsers, PNG verification
+  and resource disposal only where they meet this stricter finite contract.
+- **Construction and persistence:** construct fresh immutable records and exact
+  content evidence from the admitted input using the existing metadata/service
+  and WorkspaceFS boundaries. Preserve source bytes and authored coordinates;
+  do not infer source relations, model equivalence or cross-model pin matching.
+  Reuse the streamed body store, verified inventory and marker-last creation.
+  Only a complete, verified Project becomes ready/selectable; interrupted creation
+  remains visible as incomplete, with an explicit recovery path, not as a ready
+  list entry. Existing saved namespaces and Projects are untouched.
+- **Connected use:** the viewport/gallery must read verified saved models, images
+  and materials, including an independent cold reopen, without fixture fallback.
+  Then connect create/select/reopen and the existing record/edit/save flow on that
+  same host. Keep temporary camera/filter/window state separate from shared edits.
+  Failed body or metadata persistence retains the original input and failed state;
+  exact saved-command retry never regenerates history or claims a completed save.
+- **Acceptance:** reuse current service/host tests for successful creation and
+  cold reopen, unsupported/missing/corrupt input refusal, interruption/retry,
+  switching without losing unsaved input, and unchanged original files/old
+  Projects. Render actual saved geometry, texture/material and attached image in
+  the available browser; record unavailable browser/device checks as pending.
+  Final executable-tree typecheck/test/build and independent review remain
+  required. Do not copy old Native or synthetic-only passes into this lane.
+- **Limits and exclusions:** record actual test environment and file sizes as
+  observations, not capacity/performance guarantees. Caller budgets are not a
+  measured support promise. Full G1-A/C, applicable physical-iOS checks and exact
+  profile ratification still precede formal real-Project adoption. Ordinary home,
+  old-data migration, five-purpose wire, added dependencies, new formats, GC,
+  Pages/Service Worker/release and iPhone HTTPS exposure remain outside this
+  exception. Required new authority stops only its affected boundary.
+
 **S1 metadata foundation — implementation contract (2026-09-11):**
 
 The first reusable source module implements 02 §4 bootstrap and original atomic
