@@ -7,8 +7,9 @@
 > 保存・復旧・再受信までの合成テストが通る。実ファイル／実機受入れは未完了。
 > 非活性のstream本体保存・実inventory→metadata作成／再開もserviceテストで接続。
 > 静的GLB／PNGの限定検査・初期Project構築・実保存本体のevidenceが新serviceへ接続。
-> GLBのpin編集→独立再開はmemory-portで検証。既存hostへの実file UI／renderer接続は
-> まだ未実施であり、機能群の件数は増やさない。限定入口はPO承認済み、実機採用は別。
+> 同じdev hostの限定実file入口で、GLB/PNGからの作成・専用一覧・再開と実保存本体の
+> read/render port、既存pin/text/PNG編集へ接続。memory-port／記録DOMで検証。
+> P01/P02をこの限定経路で接続済みへ。実描画／実入力／実機／正式採用は未受入れ。
 > M07は同じmetadata hostでモデル回転・正の均等拡縮、preview／取消／保存／再開へ接続。
 > 新しい仕様・採用判断ではない。承認済み要件と現行code/testsの距離を記録する。
 > 実装順は最新のUI指摘順ではなく、依存関係と `TEAM-FLOW-01` への効果から選ぶ。
@@ -21,15 +22,15 @@
 ## 1. 結論と数え方
 
 ユーザーが行う作業を **64機能群** に整理すると、新metadata保存画面へ限定接続済みが
-**25群**、残りが **39群**。その39群は下記の内訳になる。
-「25/64完成」といった完成率・工数には換算しない。小さい部品接続と
-移行／チーム受信では仕事量が大きく違い、接続済み25群も合成データ限定だからである。
+**27群**、残りが **37群**。その37群は下記の内訳になる。
+「27/64完成」といった完成率・工数には換算しない。小さい部品接続と
+移行／チーム受信では仕事量が大きく違い、接続済みも下記の限定経路だからである。
 
 | 排他的な主分類 | 群数 | 意味 |
 |---|---:|---|
-| 接続済み | 25 | 新metadata hostで操作・必要な保存まで接続。既知三角形／2 PNGという限定範囲、実機受入れは別 |
+| 接続済み | 27 | 新metadata hostで操作・必要な保存まで接続。25群は既知三角形／2 PNG起点、P01/P02は新validation hostの静的GLB/PNG限定。実機受入れは別 |
 | 部品未接続 | 7 | 新系統のUI部品・pure planner等はあるが、対象群全体の画面・実データ・typed command／保存のいずれかが未接続。T01〜T04は限定接続まで進んだ |
-| 別経路のみ | 22 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
+| 別経路のみ | 20 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
 | 新規実装 | 10 | 新契約の利用者向け経路がまだない。schema・検証・設計案があっても実装済みとは数えない |
 
 - 一つの行は、共有する前提・保存境界を持つ「利用者の作業群」。同一ViewのCRUD等は一群。
@@ -45,13 +46,14 @@
 - 本書はソース・既存テスト・承認済み仕様の照合。新しい実ブラウザ操作／性能測定ではない。
   LociMyu継承は以前の記録された原本監査と実装を参照し、private原本を再収集していない。
 
-### 三つの経路を混同しない
+### 経路を混同しない
 
 | 経路 | 実際に存在するもの | ここから主張してはいけないこと |
 |---|---|---|
 | 通常home → Native | 実モデル／画像、DisplaySet、限定backup／collaboration／review／clean、旧Desktop・iPhone合格 | 新ProjectScene／継続因果履歴／新保存サービスの完成 |
 | project-scene memory／旧 `storage=saved` | 合成の2人チーム、更新・競合・独立copy・保存の限定ループ | 新metadata serviceまたは実ファイル製品wireの接続済み |
-| project-scene `storage=metadata` | 新source/repository/session/journalと24群の合成UI接続、限定履歴受信・明示解消 | 任意モデル／任意画像／実ファイルのチーム受信／通常home／offlineの合格 |
+| project-scene `storage=metadata` | 新source/repository/session/journalと25群の合成UI接続、限定履歴受信・明示解消 | 任意モデル／任意画像／実ファイルのチーム受信／通常home／offlineの合格 |
+| project-scene `storage=validation` | 新規静的GLB/PNG Projectの作成・専用一覧・再開、実保存本体のread/renderと既存pin/text/PNG編集 | 実描画／実入力／実機／正式profile採用、追加file・実モデル編集・実チームwireの完成 |
 
 ## 2. 全機能群
 
@@ -62,8 +64,8 @@
 
 | ID | 機能群／利用者の結果 | 状態 | 現在の境界・残り | コード／既存受入れ参照（行番号は監査時点） |
 |---|---|---|---|---|
-| P01 | 実ファイルから新しいProjectを作る | 別経路のみ | 通常homeは内容判定→Native作成。新hostは固定合成runのみ。一般ファイルのadmission・初期Scene・body保存が必要。 | [src/ui/app.ts:635](../src/ui/app.ts) / [src/harness/projectScene/entry.ts:19](../src/harness/projectScene/entry.ts) / [tests/nativeGs/homeUi.test.ts:196](../tests/nativeGs/homeUi.test.ts) |
-| P02 | 端末内Projectを選択・切替・再開 | 別経路のみ | 新hostは正確なrun URLで再開。専用Project一覧／切替と、その離脱flowへの既存未保存保護の接続がない。開発mode切替確認・beforeunload自体は既存。 | [src/harness/projectScene/workspace.ts:23](../src/harness/projectScene/workspace.ts) / [src/harness/projectScene/entry.ts:57](../src/harness/projectScene/entry.ts) |
+| P01 | 実ファイルから新しいProjectを作る | 接続済み | 限定validation hostの内容判定→静的GLB/PNG検査→fresh Project/Scene→実本体保存。未完了はreadyにせずexact retry。通常home／他形式／正式採用は未接続・未受入れ。 | [src/harness/projectScene/validationWorkspace.ts](../src/harness/projectScene/validationWorkspace.ts) / [src/projectFiles/creation.ts](../src/projectFiles/creation.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
+| P02 | 端末内Projectを選択・切替・再開 | 接続済み | 専用validation一覧を保存serviceの公開状態からread-only生成。保存済みと未完了／要確認を区別、IME／未確定／保存途中の切替を拒否。既存namespace／通常homeは不変更。実browserは未確認。 | [src/harness/projectScene/validationCatalog.ts](../src/harness/projectScene/validationCatalog.ts) / [src/harness/projectScene/validationHost.ts](../src/harness/projectScene/validationHost.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
 | P03 | Scene選択と4タブの移動 | 接続済み | Caption上部のSceneリスト。検索・選択等はScene別UI状態。共有編集と分離。 | [src/ui/projectScene/navigationControls.ts:23](../src/ui/projectScene/navigationControls.ts) / [tests/ui/projectSceneNavigation.test.ts:36](../tests/ui/projectSceneNavigation.test.ts) |
 | P04 | Sceneを作る | 接続済み | CaptionタブのScene管理から作成し、新metadataへ保存。元Sceneの確定モデル所属だけを順序保持・fresh IDで複写。Caption/material/View/defaultはコピーせず、不完全sourceは拒否。 | [src/harness/projectScene/sceneAuthoringControls.ts](../src/harness/projectScene/sceneAuthoringControls.ts) / [src/projectMetadata/sceneAuthoring.ts](../src/projectMetadata/sceneAuthoring.ts) |
 | P05 | Scene名・Project開始Sceneを設定する | 接続済み | 同じScene管理UIから明示確定して新metadata保存。名前／default競合は通常操作で上書きしない。開始Sceneは次回起動に使い、現在Scene選択やentry Saved Viewとは別。 | [src/projectMetadata/sceneAuthoring.ts](../src/projectMetadata/sceneAuthoring.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
@@ -74,7 +76,7 @@
 
 | ID | 機能群／利用者の結果 | 状態 | 現在の境界・残り | コード／既存受入れ参照（行番号は監査時点） |
 |---|---|---|---|---|
-| M01 | Meshを追加・表示する | 別経路のみ | 新hostは既知三角形のみ。NativeのGLB/glTF/OBJ/STL/Mesh PLY読込と新body/provider/render-portの接続が必要。 | [src/harness/projectScene/metadataModels.ts:6](../src/harness/projectScene/metadataModels.ts) / [src/nativeGs/storage.ts:519](../src/nativeGs/storage.ts) |
+| M01 | Meshを追加・表示する | 別経路のみ | validation新規作成時の静的GLB本体／元材質表示は限定接続。開いたProjectへの追加と、NativeのglTF/OBJ/STL/Mesh PLY等は新経路へ未接続。部分接続を行全体の完了としない。 | [src/harness/projectScene/validationRender.ts](../src/harness/projectScene/validationRender.ts) / [src/nativeGs/storage.ts:519](../src/nativeGs/storage.ts) |
 | M02 | 通常Pointを追加・表示・pickする | 別経路のみ | Nativeもexact ASCII float XYZ＋uchar RGB PLY限定。新hostへ未接続。一般点群対応とは呼ばない。 | [src/nativeGs/plyProfile.ts:351](../src/nativeGs/plyProfile.ts) / [tests/nativeGs/pointPresentation.test.ts:9](../tests/nativeGs/pointPresentation.test.ts) |
 | M03 | GSを追加・表示する | 別経路のみ | Nativeのexact Graphdeco SH2/SH3 profileを新hostに未接続。実body・resource lifecycleの検証が必要。 | [src/nativeGs/plyProfile.ts:305](../src/nativeGs/plyProfile.ts) / [src/harness/projectScene/viewport.ts:91](../src/harness/projectScene/viewport.ts) |
 | M04 | モデル選択・検索とScene所属を管理する | 接続済み | 既知モデルのinclude/exclude。Assetそのものは残る。 | [src/ui/projectScene/modelListState.ts:15](../src/ui/projectScene/modelListState.ts) / [tests/ui/projectMetadataHost.test.ts:535](../tests/ui/projectMetadataHost.test.ts) |
@@ -305,15 +307,16 @@ source/schema・互換性の矛盾、受信／破壊境界に新しい製品判�
 
 2026-09-12: P04/P05/C10/M09は限定接続済み。⑤の前提となるstream本体保存→
 実inventory→metadata作成／独立再開は非活性S1サービスのmemory-port試験で接続。
-次は実形式の内容検査・初期Project構築→保存本体のviewport/gallery→作成／選択／再開。
-追加の汎用storage、合成run一覧、新PoCへ戻らない。限定検証用の実file入口も
-現行05 §13.2の範囲外なので一括してPOへ提案する。正式なprofile／G1-A/C・必要実機・
-採用判断と通常homeは別境界。既存新hostの一括Desktop確認は追加機能を前提としない。
+続く内容検査・初期Project→保存本体のread/render→作成／選択／再開は、POの
+限定承認後に静的GLB/PNG用として接続済み。実描画／実入力の一括Desktop確認は未実施。
+次は段階2に残る追加file導入と実モデル編集の接続であり、追加の汎用storage、
+合成run一覧、新PoCへ戻らない。正式profile／G1-A/C・必要実機・採用判断と通常homeは
+別境界。既存新hostの一括Desktop確認は追加機能を前提としない。
 
 | 順 | 閉じる結果 | 依存と扱い |
 |---|---|---|
 | 4 | Scene／Caption／Assetの基本管理を新sourceへ揃える | P04/P05/C10/C11/C12/M09。共通commandの原子性・参照ガードができたところから進める。入口だけを先に作って未保存・削除影響を隠さない |
-| 5 | 実Mesh＋実画像を一筋で導入→保存→再開し、Project選択へつなぐ | E01/E02の対応profileとG1-A/C・必要実機・採用条件を満たしてから実データを活性化。P01/P02/I02/M01を一緒の利用者flowとして閉じる。名前付き合成run一覧を作るだけでProject管理完成にしない |
+| 5 | 実Mesh＋実画像を一筋で導入→保存→再開し、Project選択へつなぐ | 05 §13.2の限定validation例外でP01/P02は接続。I02/M01の追加導入・他形式と実入力／実機は残る。通常homeと正式採用はE01/E02・G1-A/C・必要実機・採用条件を満たしてから。名前付き合成run一覧だけを完成としない |
 | 6 | チームファイルと移行を製品につなぐ | 06/07の有限な技術入力の整理は前三sliceと並行できる。批准後、full-source共通経路のTeamWorkspace/backup→Contribution→review/clean、実source移行とlate bridge。五つの目的の是非を再質問しない |
 | 7 | 他の実形式・閲覧補助と残るalignment／補修を継承・実装する | Point＋表示径＋pick、GS＋明示Proxy、複数material、rotation/scale、残るalignmentを形式／契約ごとに閉じる。M14はGS/repair-local transform/原子的revisionの前提が揃ってから。hard-maskと一般smooth透過を一括deferredにしない。従来UIをコピーして新Sceneの意味を変えない |
 | 8 | 通常homeからの全体受入れ | 新sourceでTEAM-FLOW-01をDesktopとphysical iPhone、保存／restart／offlineまで確認。a11y・短画面・IME等も安定treeでまとめる。Pages/SW/main/releaseへは現在の権限で進まない |

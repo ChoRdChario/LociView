@@ -11,6 +11,7 @@ import { metadataMaterialData } from './metadataMaterials';
 import { metadataMediaData } from './metadataMedia';
 import type { MediaData } from './mediaHistory';
 import { metadataModelVersions } from './metadataModels';
+import type { DisplayModelVersion } from './modelTypes';
 
 export const metadataFixtureLimits: MetadataLimits = { maxNodes: 100_000, maxDepth: 32, maxStringScalars: 65_536,
   maxWork: 1_000_000, maxChanges: 1000, maxChangeBytes: 1_000_000, maxTotalBytes: 8_000_000, maxOperations: 20_000 };
@@ -51,7 +52,8 @@ export function createMetadataFixture(run: string): ProjectMetadataSource {
   return ProjectMetadataSource.bootstrap(records.schema as JsonObject, records.identity as JsonObject, metadataFixtureLimits).initialize(records);
 }
 
-export function metadataProjectView(provider: ProjectProviderRead, images: NonNullable<MediaData['images']> = {}): SyntheticProject {
+export function metadataProjectView(provider: ProjectProviderRead, images: NonNullable<MediaData['images']> = {},
+  models?: readonly DisplayModelVersion[]): SyntheticProject {
   if (provider.kind !== 'scene-provider') throw Error('保存したシーンを確認できません。');
   const identity = provider.inspection.candidates.fields.find(f => f.path.length === 1 && f.path[0] === 'identity');
   const original = identity?.candidates[0]?.value;
@@ -77,7 +79,7 @@ export function metadataProjectView(provider: ProjectProviderRead, images: NonNu
       colors[id] = value('#a08045'); unsetCaptionColors.push(id);
     }
   }
-  return freezeSynthetic({ ...initial, projectId, state: provider.state, resources: provider.resources,
-    modelNames: names, colors, unsetCaptionColors, captionOwners, captionTemplates, modelVersions: metadataModelVersions(provider, metadataFixtureLimits),
+  return freezeSynthetic({ projectId, state: provider.state, resources: provider.resources,
+    modelNames: names, colors, unsetCaptionColors, captionOwners, captionTemplates, modelVersions: models ?? metadataModelVersions(provider, metadataFixtureLimits),
     viewData: metadataViewData(provider), materialData: metadataMaterialData(provider), mediaData: metadataMediaData(provider, images) });
 }

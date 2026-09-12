@@ -25,7 +25,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   const header = make('header'); header.className = 'lv-development-header';
   const brand = make('span', 'LociView'); brand.className = 'lv-development-brand';
   const name = make('h1', 'シーンと記録の編集');
-  const notice = make('p', session.savedDevelopment ?
+  const notice = make('p', session.snapshot.validationFiles ? '実ファイルの限定検証。適用した変更はこのブラウザに保存します。未適用の入力は保存されません。' : session.savedDevelopment ?
     '開発用・合成データのみ。適用した変更はこのブラウザに保存します。未適用の入力は再読み込みで失われます。' :
     '開発用・合成データのみ。変更は保存されず、再読み込みで失われます。');
   notice.className = 'lv-development-notice';
@@ -49,7 +49,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   materialPanel.className = viewPanel.className = 'lv-development-pending-panel';
   materialPanel.append(make('h2', 'マテリアル'), make('p', '表面の選択・色の調整は未接続です。'));
   viewPanel.append(make('h2', '視点'), make('p', '全体表示・方向プリセット・保存した視点は未接続です。'));
-  const footer = make('footer', session.savedDevelopment ?
+  const footer = make('footer', session.snapshot.validationFiles ? '静的GLB・PNGの限定検証です。ファイル交換と通常画面への接続は準備中です。' : session.savedDevelopment ?
     '保存するのはこの開発画面の合成データだけです。実プロジェクト・ファイル交換には未対応です。' : options.team ?
     '更新の受信はこのページ内の2人分の編集だけが対象です。ファイルの読込・保存は未接続です。' :
     'ファイルの読込・保存・共同編集は未接続です。既存プロジェクトには触れません。');

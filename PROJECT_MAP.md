@@ -12,8 +12,9 @@
 
 2026-09-12 whole-scope inventory: [tasks/implementation-inventory.md](tasks/implementation-inventory.md)
 maps all 41 UI tasks plus accepted Scene/team extensions to 64 work groups:
-25 connected in the synthetic metadata host; 7 component-level gaps, 22 other-path
-connections and 10 new-path implementations remain. These are not completion or
+27 connected in bounded metadata/validation hosts; 7 component-level gaps, 20 other-path
+connections and 10 new-path implementations remain. P01/P02 are static-GLB/PNG
+validation-only; the other 25 originate in the synthetic host. These are not completion or
 effort percentages. Approved full-source receive (02 §8) and explicit Caption
 text resolution and independent Caption membership copies now have bounded
 new-service/host paths. Prepared model activation, explicit pin correction and
@@ -45,9 +46,10 @@ exact saved retry, new-Scene local memories on receive and preserved existing
 drafts/windows. Basic Caption/model deletion is now connected. The nonactivated
 streamed body store and actual saved-body inventory now connect to metadata
 creation/reopen in memory-port tests, without fixture fallback or Caption-only
-body rereads. The existing host has not mounted this store. Next is actual format
-inspection/Project construction and saved-body viewer/gallery, not further generic
-storage or a synthetic-run catalog. Limited real-file validation was explicitly
+body rereads. The limited validation host now mounts this store with actual GLB/PNG
+inspection, Project creation/list/reopen and saved-body viewer/gallery. Next is
+remaining additional-file/edit connections and the recorded Desktop batch, not
+further generic storage or a synthetic-run catalog. Limited real-file validation was explicitly
 approved after `023aa59`; formal profiles/device/adoption and ordinary home remain gated.
 Completed before that approval, M07 connects rotation/uniform-scale
 gizmos/numeric alternatives to the same metadata journal. Exact cancel/retry,
@@ -60,8 +62,12 @@ T03 remains partial; other scalar/lifecycle repair and actual-browser acceptance
 are not implied. `src/projectFiles` now connects strict static GLB/PNG inspection,
 fresh immutable Project construction and saved-body evidence to the existing
 metadata service. Initial-source exact recovery and generated-file memory tests
-are in todo; the actual file UI/read-projection/viewport connection is next.
-Existing development and ordinary entries have not activated this service yet.
+are in todo. The existing development entry now activates the limited
+`storage=validation` file selector/Project list and saved-model read/render port.
+Creation/reopen, existing pin/text/PNG edits and safe switching are covered in
+memory-port/recorded-DOM tests; actual GPU/input/device acceptance remains pending.
+Ordinary entry and old Projects have not activated this service. Further file
+addition, real-model transforms/material editing and alpha-aware picking remain.
 
 2026-09-11 current implementation: PO explicitly approved 05 §13.2's S1 service
 implementation before aggregate adoption, new synthetic-only development activation

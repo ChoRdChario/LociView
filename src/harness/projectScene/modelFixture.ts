@@ -1,6 +1,7 @@
 import type { Anchor, AssetProjection } from '../../scene/types';
 import { createSyntheticProject, freezeSynthetic } from './fixture';
 import { createFixtureModel, type FixtureModelClosure } from './modelClosure';
+import type { DisplayModelVersion } from './modelTypes';
 
 /** Known synthetic read projections, NOT imported immutable records or verified model bytes. */
 export interface SyntheticModelVersion {
@@ -29,8 +30,11 @@ export const syntheticVersions: readonly SyntheticModelVersion[] = freezeSynthet
       compatibility: version.families[0]!.compatibilityId, layout: id('lay', n + (index === 1 ? 10 : 0)), slot: id('slot', n + (index === 1 ? 10 : 0)) },
     index === 1 ? 'updated' : 'original', { translation: [n * 2, 0.5, 0], rotationXYZW: [0, 0, 0.6, 0.8], uniformScale: 1.5 }) }));
   }));
-export const modelVersion = (assetId: string, bindingId: string, versions = syntheticVersions) => versions.find(v =>
-  v.assetId === assetId && v.projection.bindingId === bindingId);
+export function modelVersion(assetId: string, bindingId: string): SyntheticModelVersion | undefined;
+export function modelVersion<T extends DisplayModelVersion>(assetId: string, bindingId: string, versions: readonly T[]): T | undefined;
+export function modelVersion(assetId: string, bindingId: string, versions: readonly DisplayModelVersion[] = syntheticVersions) {
+  return versions.find(v => v.assetId === assetId && v.projection.bindingId === bindingId);
+}
 /** Exact two-version catalog; the separate same-surface experiment is not prepared. */
 export const syntheticPreparedVersions = syntheticVersions.filter(v => {
   const initialAsset = initial.resources.assets[v.assetId]?.projection;
@@ -49,7 +53,7 @@ export function versionFromClosure(closure: FixtureModelClosure): SyntheticModel
 
 /** Validate every candidate; an older known class is valid review state, not an automatic rebind. */
 export function decodeSyntheticAnchor(text: string, owner: string | { readonly assetId: string; readonly assetFrameId: string },
-  versions = syntheticVersions): Anchor {
+  versions: readonly Pick<DisplayModelVersion, 'assetId' | 'projection' | 'families'>[] = syntheticVersions): Anchor {
   const baseline = typeof owner === 'string' ? initial.resources.captions[owner]?.anchor : undefined;
   const expected = typeof owner === 'string' ? initial.captionOwners[owner] : owner;
   if (!expected) throw new Error('キャプションの所有モデルを確認してください。');

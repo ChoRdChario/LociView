@@ -40,7 +40,8 @@ export type ViewportFactory = (canvas: HTMLCanvasElement, changed: () => void,
 /** DOM/read-port adapter, not a second camera implementation or durable service. */
 export function createViewportHost(document: Document, session: SyntheticSession, changed: () => void, factory?: ViewportFactory) {
   const root = document.createElement('section'); root.className = 'lv-development-viewport'; root.setAttribute('aria-label', '3D表示');
-  const canvas = document.createElement('canvas'); canvas.tabIndex = 0; canvas.setAttribute('aria-label', '合成モデルの3D表示');
+  const canvas = document.createElement('canvas'); canvas.tabIndex = 0;
+  canvas.setAttribute('aria-label', session.snapshot.modelVersions?.some(v => v.closure.shape === 'saved-glb') ? '3Dモデルの表示' : '合成モデルの3D表示');
   const overlay = document.createElement('div'); overlay.className = 'lv-development-pin-layer';
   const preview = document.createElement('div'); preview.className = 'lv-development-pin-preview'; preview.textContent = '仮の位置'; preview.hidden = true;
   const status = document.createElement('p'); status.setAttribute('role', 'status');

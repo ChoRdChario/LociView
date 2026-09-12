@@ -51,12 +51,11 @@ export function createMediaControls(document: Document, session: SyntheticMediaS
   const button = (s: string) => { const n = make('button', s); n.type = 'button'; return n; };
   const root = make('section'); root.className = 'lv-development-media'; root.setAttribute('aria-label', 'メディア');
   const picker = make('select'); picker.setAttribute('aria-label', 'メディアを選択'); const empty = make('option', 'メディアを選択'); empty.value = ''; picker.append(empty);
-  fixtureMedia.forEach(m => { const option = make('option', m.record.label); option.value = m.record.id; picker.append(option); });
   const add = button('メディアを追加'), note = make('p', '開発用の合成画像です。ファイルの読込みは未接続です。'), list = make('div'), status = make('p'); status.setAttribute('role', 'status');
   const editor = make('section'), input = make('input'), apply = button('説明を適用'), cancel = button('取り消す'), retry = button('再試行');
   input.setAttribute('aria-label', 'メディアの説明'); editor.append(input, apply, cancel);
   const confirm = make('section'), question = make('p'), yes = button('添付を削除'), no = button('戻る'); confirm.append(question, yes, no); confirm.hidden = true;
-  let current: MediaContext, confirming: { ctx: MediaContext; id: string } | null = null, key = '', disposed = false;
+  let current: MediaContext, confirming: { ctx: MediaContext; id: string } | null = null, key = '', choiceKey = '', disposed = false;
   root.append(picker, add, note, list, editor, retry, status, confirm);
   const act = (fn: () => void) => { if (disposed) return; fn(); changed(); };
   add.addEventListener('click', () => act(() => { session.add(current, picker.value); }));
@@ -70,6 +69,14 @@ export function createMediaControls(document: Document, session: SyntheticMediaS
   yes.addEventListener('click', () => act(() => { if (!confirming) return; session.remove(confirming.ctx, confirming.id); confirming = null; confirm.hidden = true; }));
   function render() {
     current = session.context(); const d = session.draft, rows = current.captionId ? captionAttachments(current.project.mediaData, current.captionId) : { ready: [], review: [] };
+    const choices = current.project.mediaChoices ?? fixtureMedia.map(m => m.record), nextChoices = JSON.stringify(choices.map(m => [m.id, m.label]));
+    if (choiceKey !== nextChoices) {
+      const selected = picker.value; choiceKey = nextChoices; picker.replaceChildren(empty);
+      choices.forEach(m => { const option = make('option', m.label); option.value = m.id; picker.append(option); });
+      picker.value = choices.some(m => m.id === selected) ? selected : '';
+    }
+    note.textContent = current.project.validationFiles ? choices.length ? '' : 'このプロジェクトには追加できるメディアがありません。' : '開発用の合成画像です。ファイルの読込みは未接続です。';
+    note.hidden = !note.textContent;
     root.hidden = !current.captionId && !d; picker.disabled = Boolean(current.block || d); add.disabled = picker.disabled || !picker.value;
     editor.hidden = !d; if (d && !d.composing && input.value !== d.raw) input.value = d.raw;
     apply.disabled = Boolean(d?.composing || current.block); cancel.disabled = Boolean(d?.composing);

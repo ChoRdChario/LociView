@@ -1,6 +1,7 @@
 import { cloneCanonicalValue, type JsonValue } from '../../domain/values';
 import { NativeSha256 } from '../../nativeGs/sha256';
 import { freezeSynthetic } from './fixture';
+import type { DisplayModelClosure } from './modelTypes';
 
 /** Exact tiny fixture port, not a ratified decoder profile, model importer or BlobStore. */
 export interface FixtureModelIds {
@@ -76,7 +77,8 @@ export function createFixtureModel(ids: FixtureModelIds, shape: 'original' | 'up
     representation, revision, binding });
 }
 export type FixtureModelClosure = ReturnType<typeof createFixtureModel>;
-export function fixtureModelIds(c: FixtureModelClosure): FixtureModelIds {
+export function fixtureModelIds(c: DisplayModelClosure): FixtureModelIds {
+  if (c.shape === 'saved-glb') throw Error('実モデルのコピー・更新はこの検証画面では未接続です。');
   return { asset: c.binding.assetId, assetFrame: c.assetFrame.id, representationFrame: c.representationFrame.id,
     binding: c.binding.id, revision: c.revision.id, representation: c.representation.id,
     family: c.representation.variantFamilyId, compatibility: c.revision.anchorCompatibilityClasses[0]!.id,
@@ -90,12 +92,13 @@ export function readFixtureModel(text: string): FixtureModelClosure {
   if (canonicalFixture(raw) !== canonicalFixture(expected)) throw new Error('モデルの参照・本体・メタデータを確認してください。');
   return expected;
 }
-export function remapFixtureModel(source: FixtureModelClosure, ids: FixtureModelIds): FixtureModelClosure {
-  readFixtureModel(canonicalFixture(source));
+export function remapFixtureModel(input: DisplayModelClosure, ids: FixtureModelIds): FixtureModelClosure {
+  const source = readFixtureModel(canonicalFixture(input));
   if (source.binding.parentBindingId) throw new Error('履歴を持つモデルの独立コピーは、この開発版では未接続です。');
   return createFixtureModel(ids, source.shape, source.binding.assetToProject);
 }
-export function moveFixtureModel(source: FixtureModelClosure, bindingId: string, translation: readonly [number, number, number]) {
+export function moveFixtureModel(input: DisplayModelClosure, bindingId: string, translation: readonly [number, number, number]) {
+  const source = readFixtureModel(canonicalFixture(input));
   return createFixtureModel({ ...fixtureModelIds(source), binding: bindingId }, source.shape,
     { ...source.binding.assetToProject, translation }, source.binding.id);
 }

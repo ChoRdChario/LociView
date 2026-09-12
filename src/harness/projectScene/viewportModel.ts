@@ -3,7 +3,8 @@ import { resolveScene } from '../../scene/resolve';
 import { captionColorKey } from '../../ui/projectScene/captionListState';
 import { freezeSynthetic, type SyntheticProject } from './fixture';
 import { modelVersion, syntheticVersions } from './modelFixture';
-import { readFixtureModel, canonicalFixture, type FixtureModelClosure, type FixturePlacement } from './modelClosure';
+import { readFixtureModel, canonicalFixture, type FixturePlacement } from './modelClosure';
+import type { DisplayModelClosure } from './modelTypes';
 import { readProjectCamera, readSolidBackground } from './viewHistory';
 import type { DisplayCapture } from './viewSession';
 import { materialTarget, targetKey, resolveFixtureMaterial } from './materialHistory';
@@ -16,7 +17,7 @@ export interface Bounds { readonly min: V3; readonly max: V3 }
 export interface DisplayPin { readonly id: string; readonly title: string; readonly color: string; readonly position: V3 }
 export interface SyntheticDisplay {
   readonly token: string; readonly sceneId: string; readonly projectFrameId: string;
-  readonly models: readonly FixtureModelClosure[]; readonly pins: readonly DisplayPin[];
+  readonly models: readonly DisplayModelClosure[]; readonly pins: readonly DisplayPin[];
   readonly bounds: Bounds | null; readonly selectedId: string | null;
   /** UI-only proposed position, distinct from the confirmed Caption markers. */
   readonly preview?: V3;
@@ -53,14 +54,18 @@ export function syntheticDisplay(project: SyntheticProject, sceneId: string, pin
   if (resolved.kind !== 'ready') throw new Error('シーンの表示を確認してください。');
   const models = resolved.composition.assets.slice().sort((a, b) => a.assetId.localeCompare(b.assetId)).map(asset => {
     const version = modelVersion(asset.assetId, asset.projection.bindingId, project.modelVersions ?? syntheticVersions);
-    if (!version) throw new Error('表示する合成モデルを確認してください。');
-    return readFixtureModel(canonicalFixture(version.closure));
+    if (!version) throw new Error('表示するモデルを確認してください。');
+    return version.closure.shape === 'saved-glb' ? version.closure : readFixtureModel(canonicalFixture(version.closure));
   });
-  const materials = Object.fromEntries(models.map(c => {
+  const materials = Object.fromEntries(models.filter(c => c.shape !== 'saved-glb').map(c => {
     const target = materialTarget(c), intent = resolved.composition.materials.find(m => targetKey(m.target) === targetKey(target))?.intent as MaterialIntent | undefined;
     try { return [c.binding.assetId, resolveFixtureMaterial(intent)]; }
     catch (e) { return [c.binding.assetId, { issue: e instanceof Error ? e.message : '見え方を確認してください。' }]; }
   }));
+  for (const model of models.filter(c => c.shape === 'saved-glb')) {
+    if (resolved.composition.materials.some(m => m.target.assetId === model.binding.assetId))
+      throw Error('保存した実モデルの材質変更は、この表示経路ではまだ適用できません。');
+  }
   const activeTargets = new Set(models.map(m => targetKey(materialTarget(m))));
   const materialNotices = Object.values(project.materialData?.records ?? {}).flatMap(r => {
     if (r.lifecycle.kind === 'value' && r.lifecycle.value.state === 'deleted') return [];

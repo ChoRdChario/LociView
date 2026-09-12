@@ -64,8 +64,11 @@ After explicit PO approval, `projectFiles` adds static GLB/PNG validation and
 fresh Project creation through the same saved metadata service. Its transient
 `development-validation` evidence is not a ratified format/adoption claim.
 Generated-file tests cover actual saved bytes, pin/title edits, independent reopen
-and exact incomplete-initialization recovery. UI/renderer activation is still the
-next connection; no ordinary entry, existing Project or migration has changed.
+and exact incomplete-initialization recovery. The same served development entry
+now has opt-in `storage=validation`: file creation/list/reopen, actual saved-body
+render port and existing pin/text/PNG editor. Recorded-DOM/memory-port evidence
+is not actual browser/device acceptance. Additional-file and real model-editing
+connections remain; no ordinary entry, existing Project or migration has changed.
 
 ## Classification
 

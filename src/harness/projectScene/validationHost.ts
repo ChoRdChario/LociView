@@ -1,0 +1,99 @@
+import type { WorkspaceFS } from '../../platform/fs';
+import { ProjectMutationCoordinator } from '../../platform/projectLock';
+import { technicalId } from '../../projectMetadata/persistence';
+import { TransactionJournal } from '../../projectMetadata/journal';
+import type { MetadataStorageFactory } from '../../projectMetadata/repository';
+import type { OriginBlobStore } from '../../projectMetadata/blobStore';
+import type { MetadataSessionRead } from '../../projectMetadata/session';
+import { captionDeletionImpact } from '../../projectMetadata/captionDeletion';
+import { assetDeletionImpact } from '../../projectMetadata/assetDeletion';
+import { prepareValidationCreation, resumeValidationCreation, validationProjectService } from '../../projectFiles/creation';
+import { validationMetadataLimits as limits, type FileValidationLimits } from '../../projectFiles/validation';
+import type { PngDecoder } from '../../projectFiles/png';
+import { metadataProjectView } from './metadataFixture';
+import { validationModelVersions } from './validationProjection';
+import { metadataIntent } from './metadataIntent';
+import type { SyntheticProject } from './fixture';
+import type { SyntheticAuthority } from './historyProjection';
+import type { SavedWorkspaceHost } from './savedHost';
+import type { MediaImage } from './mediaHistory';
+
+export const validationArea = 'lociview-development-validation-1';
+export interface ValidationHostOptions {
+  run: string; base: WorkspaceFS; coordinator: ProjectMutationCoordinator; store: OriginBlobStore;
+  fileLimits: FileValidationLimits; decode?: PngDecoder; initial?: ReturnType<typeof prepareValidationCreation>;
+  openStorage(allowCreate: boolean): Promise<{ factory: MetadataStorageFactory; dispose(): Promise<void> }>;
+}
+const base64 = (bytes: Uint8Array) => { let text = ''; for (let n = 0; n < bytes.length; n += 8192)
+  text += String.fromCharCode(...bytes.subarray(n, n + 8192)); return btoa(text); };
+
+/** New validation namespace only; no synthetic seed, guessed Project or old-store fallback. */
+export async function openValidationHost(options: ValidationHostOptions) {
+  const run = technicalId(options.run), root = `${validationArea}/${run}`;
+  if (options.initial && options.initial.source.proof.identity.projectId !== `prj_${run}`) throw Error('作成先を確認してください。');
+  const lease = await options.coordinator.tryAcquire(options.base, root, `${validationArea}:${run}`), fs = lease.workspace;
+  let connection: Awaited<ReturnType<ValidationHostOptions['openStorage']>> | undefined, operation: Promise<unknown> | undefined;
+  let closed = false, busy = false, failure = '';
+  const dispose = async () => { if (closed) return; closed = true; lease.beginClose();
+    try { await operation; } catch { /* Stored journal/initial input remain authoritative, never silently discarded. */ }
+    await lease.waitForWorkspaceIdle(); lease.sealWorkspaceWritesForRelease(); lease.release(); await connection?.dispose(); };
+  try {
+    const fresh = !(await options.base.list(`${root}/`)).length;
+    if (fresh && (!options.initial || !lease.holdsWriteLock)) throw Error('保存データがありません。プロジェクトを選び直してください。');
+    if (!fresh && options.initial) throw Error('作成先に保存データがあります。既存データは変更していません。');
+    if (fresh) lease.activateNewProject();
+    connection = await options.openStorage(fresh && !!options.initial && lease.holdsWriteLock);
+    const { content, session } = validationProjectService(fs, connection.factory, options.store, options.fileLimits, options.decode);
+    let last = await session.read(), project: SyntheticProject | undefined;
+    const images: Record<string, MediaImage> = {};
+    const projectView = async (read: MetadataSessionRead) => {
+      if (read.source && read.source.proof.identity.projectId !== `prj_${run}`) throw Error('保存領域とプロジェクトが一致しません。');
+      if (read.provider?.kind !== 'scene-provider') return;
+      const versions = await validationModelVersions(read.provider);
+      for (const [id, field] of Object.entries(read.provider.details.immutable.mediaResourcesById)) {
+        if (field.kind !== 'value') throw Error('保存した画像の情報を確認できません。');
+        if (!images[id]) images[id] = { record: field.value as unknown as MediaImage['record'], base64: base64(await content.image(field.value)) };
+      }
+      project = { ...metadataProjectView(read.provider, { ...images }, versions), mediaChoices: Object.values(images).map(i => i.record), validationFiles: true };
+    };
+    await projectView(last);
+    if (!fresh && lease.holdsWriteLock && last.state !== 'repair-required') lease.activateAfterDurableReload();
+    const ready = async (read: MetadataSessionRead) => { last = read; await projectView(read);
+      if (read.state !== 'ready' || !project) throw Error('保存が未完了です。元の変更から再試行してください。'); return project; };
+    const execute = async <T>(action: () => Promise<T>, inputCommand = false): Promise<T> => {
+      if (closed || busy) throw Error('処理の完了をお待ちください。'); busy = true; failure = '';
+      const work = action(); operation = work;
+      try { const result = await work; if (closed) throw Error('画面を閉じました。保存結果は再度開いて確認してください。'); return result; }
+      catch (error) { last = await session.read();
+        if (inputCommand && last.state === 'ready') throw error;
+        failure = error instanceof Error ? error.message : '保存できません。入力は保持しています。'; throw error; }
+      finally { busy = false; if (operation === work) operation = undefined; }
+    };
+    const resume = async () => {
+      const before = await session.read(), entries = await new TransactionJournal(fs, limits).entries();
+      return ready(before.state === 'empty' && options.initial ? await options.initial.persist(fs, options.store, session) :
+        before.state === 'empty' || entries.length === 1 && entries[0]!.start.purpose === 'initialize' && before.state !== 'ready'
+          ? await resumeValidationCreation(fs, session, `prj_${run}`) : await session.retry());
+    };
+    if (fresh) { try { await execute(resume); } catch { /* Keep the prepared creation object and the visible failure for explicit retry. */ } }
+    const editable = () => { if (closed || fs.mutationAuthority.accessState !== 'editable') throw Error('このタブは閲覧専用です。'); };
+    const authority: SyntheticAuthority = {
+      storage: 'saved-development', writeScope: 'caption-text',
+      capabilities: { pins: true, membership: true, color: true, views: true, media: true, sceneAuthoring: true },
+      get readOnly() { return closed || fs.mutationAuthority.accessState !== 'editable'; },
+      read: () => { if (!project) throw Error('プロジェクトの作成が未完了です。'); return project; },
+      status: () => ({ kind: busy ? 'checking' : failure || last.state !== 'ready' ? 'failed' : 'idle', error: failure || '保存が未完了です。' }),
+      write: (token, changes, context) => execute(async () => { editable(); return ready(await session.edit(token, metadataIntent(changes, authority.read(), context))); }, true),
+      authorScene: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
+      captionDeletionImpact: (token, id) => { if (last.provider?.kind !== 'scene-provider' || token !== last.provider.token) throw Error('内容が更新されています。'); return captionDeletionImpact(last.provider, id, limits); },
+      deleteCaption: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
+      assetDeletionImpact: (token, id) => { if (last.provider?.kind !== 'scene-provider' || token !== last.provider.token) throw Error('内容が更新されています。'); return assetDeletionImpact(last.provider, id, limits); },
+      deleteAsset: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
+      retry: () => execute(async () => { editable(); return resume(); }),
+    };
+    const host: SavedWorkspaceHost = { authority, limits, read: () => last, hasPending: () => busy || !!failure || last.state !== 'ready',
+      refresh: () => execute(async () => { last = await session.read(); await projectView(last); return last; }),
+      resolve: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true), dispose };
+    return { ...host, content };
+  } catch (error) { await dispose(); throw error; }
+}

@@ -18,10 +18,13 @@ let factory: import('./historyPort').WorkingHistoryFactory | undefined;
 let bootFailure = '';
 const url = new URL(location.href), savedMode = url.searchParams.get('storage') === 'saved';
 const metadataMode = url.searchParams.get('storage') === 'metadata';
+const validationMode = url.searchParams.get('storage') === 'validation';
 let metadataWorkspace: Awaited<ReturnType<typeof import('./metadataBrowser')['createMetadataBrowserWorkspace']>> | undefined;
 if (import.meta.env.DEV) {
   try {
-    if (metadataMode) {
+    if (validationMode) {
+      metadataWorkspace = await (await import('./validationBrowser')).createValidationBrowserWorkspace(document, url.searchParams.get('run') ?? undefined);
+    } else if (metadataMode) {
       metadataWorkspace = await (await import('./metadataBrowser')).createMetadataBrowserWorkspace(document,
         url.searchParams.get('run') ?? '', url.searchParams.get('create') === '1');
       url.searchParams.delete('create'); history.replaceState(null, '', url);
@@ -35,7 +38,7 @@ if (import.meta.env.DEV) {
   }
 }
 // Do not replace an editable workspace after asynchronous initialization.
-const workspace = metadataWorkspace ?? (factory ? createTeamWorkspace(document, factory, createSyntheticViewport) : savedMode || metadataMode ? (() => {
+const workspace = metadataWorkspace ?? (factory ? createTeamWorkspace(document, factory, createSyntheticViewport) : savedMode || metadataMode || validationMode ? (() => {
   const root = document.createElement('section'), title = document.createElement('h1'), error = document.createElement('p');
   title.textContent = '保存した開発画面を開けません'; error.textContent = bootFailure || '開発サーバーで開いてください。';
   error.setAttribute('role', 'alert');
@@ -50,7 +53,7 @@ const workspace = metadataWorkspace ?? (factory ? createTeamWorkspace(document, 
   return { ...single, hasChanges: () => single.session.snapshot !== initial || single.session.pending !== null };
 })());
 document.body.replaceChildren(workspace.root);
-if (import.meta.env.DEV && !savedMode && !metadataMode) {
+if (import.meta.env.DEV && !savedMode && !metadataMode && !validationMode) {
   const optIn = document.createElement('button'); optIn.type = 'button'; optIn.textContent = '保存・再開を試す';
   const help = document.createElement('p'); help.textContent = '別の合成データで開始します。いまの編集は移しません。';
   optIn.addEventListener('click', () => {
@@ -69,6 +72,15 @@ if (import.meta.env.DEV && !savedMode && !metadataMode) {
   });
   section.append(metadata);
 }
+if (import.meta.env.DEV && !validationMode) {
+  const validate = document.createElement('button'); validate.type = 'button'; validate.textContent = '実ファイルで検証';
+  validate.addEventListener('click', () => {
+    if (workspace.hasChanges()) { window.alert('入力・保存を確定するか、取り消してから開いてください。'); return; }
+    const target = new URL(location.href); target.searchParams.set('storage', 'validation');
+    target.searchParams.delete('run'); target.searchParams.delete('create'); location.assign(target.href);
+  });
+  workspace.root.prepend(validate);
+}
 // Refuse silent loss of memory edits, unconfirmed input, or pending saved work.
 const beforeUnload = (event: BeforeUnloadEvent) => {
   if (workspace.hasChanges()) {
@@ -77,7 +89,7 @@ const beforeUnload = (event: BeforeUnloadEvent) => {
 };
 window.addEventListener('beforeunload', beforeUnload);
 // The new host releases its lock on pagehide; a BFCache return needs a fresh lease/read.
-const onPageShow = (event: PageTransitionEvent) => { if (metadataMode && event.persisted) location.reload(); };
+const onPageShow = (event: PageTransitionEvent) => { if ((metadataMode || validationMode) && event.persisted) location.reload(); };
 window.addEventListener('pageshow', onPageShow);
 if (import.meta.hot) import.meta.hot.dispose(() => {
   window.removeEventListener('pageshow', onPageShow);

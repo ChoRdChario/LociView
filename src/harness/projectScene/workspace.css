@@ -116,3 +116,17 @@
 .lv-development-media-gallery .is-expanded img { width: 100%; }
 .lv-development-media-gallery figcaption { font-size: 12px; overflow-wrap: anywhere; }
 .lv-development-media-gallery p:empty { display: none; }
+.lv-validation-host { color: #312f2d; font: 14px/1.5 system-ui, sans-serif; }
+.lv-validation-home { max-width: 948px; margin: 0 auto; padding: 24px; }
+.lv-validation-home h1 { font-size: 22px; font-weight: 500; }
+.lv-validation-home h2 { margin-top: 28px; font-size: 17px; font-weight: 500; }
+.lv-validation-home form { display: grid; gap: 14px; margin: 24px 0; }
+.lv-validation-home label { display: grid; gap: 6px; }
+.lv-validation-host > button, .lv-validation-host > p { margin: 12px 20px; }
+.lv-validation-home :is(input, button), .lv-validation-host > button {
+  box-sizing: border-box; min-height: 44px; padding: 8px 12px; border: 1px solid #817c78;
+  border-radius: 2px; color: #312f2d; background: #faf9f8; font: inherit;
+}
+.lv-validation-home form > button { justify-self: start; background: #413d39; color: #faf9f8; }
+.lv-validation-host button:active:not(:disabled) { box-shadow: inset 0 1px 3px #817c78; }
+.lv-validation-home button:disabled { border-style: dashed; }

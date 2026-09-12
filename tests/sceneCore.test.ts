@@ -239,7 +239,9 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
       // 05 §13.2 permits this exact new synthetic host, never ordinary/old saved activation.
       const metadataHost = /[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Intent|MembershipControls|Models|ModelFacts|AssetStatusControls|ConflictControls|StartupControls)\.ts$/.test(path);
       const validationFiles = /[\\/]projectFiles[\\/](validation|png|glb|glbMaterials|initialProject|content|creation)\.ts$/.test(path);
-      if (!metadataFoundation && !metadataService && !metadataHost && !validationFiles) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectMetadata\//);
+      const validationDisplay = /[\\/]harness[\\/]projectScene[\\/](modelTypes|validationProjection|validationRender)\.ts$/.test(path);
+      const validationHost = /[\\/]harness[\\/]projectScene[\\/](savedHost|validationHost|validationCatalog|validationWorkspace|validationBrowser|browserMetadataStorage)\.ts$/.test(path);
+      if (!metadataFoundation && !metadataService && !metadataHost && !validationFiles && !validationDisplay && !validationHost) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectMetadata\//);
       if (/[\\/](scene|domain)[\\/]/.test(path)) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
         const providerImports = path.replaceAll('\\', '/').endsWith('/scene/projectProvider.ts') ? [
@@ -247,6 +249,33 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           '../domain/atomicHistory', '../domain/projectContentChecks',
         ] : path.replaceAll('\\', '/').endsWith('/scene/projectMaterialRoutes.ts') ? ['../domain/projectGraphSupport'] : [];
         expect(imports.every(p => p?.startsWith('./') || p === '../domain/values' || providerImports.includes(p!))).toBe(true);
+      } else if (validationHost) {
+        const byFile: Record<string, string[]> = {
+          savedHost: ['./metadataHost'],
+          validationHost: ['../../platform/fs', '../../platform/projectLock', '../../projectMetadata/persistence', '../../projectMetadata/journal',
+            '../../projectMetadata/repository', '../../projectMetadata/blobStore', '../../projectMetadata/session', '../../projectMetadata/captionDeletion',
+            '../../projectMetadata/assetDeletion', '../../projectFiles/creation', '../../projectFiles/validation', '../../projectFiles/png',
+            './metadataFixture', './validationProjection', './metadataIntent', './fixture', './historyProjection', './savedHost', './mediaHistory'],
+          validationCatalog: ['./validationHost', '../../projectFiles/creation'],
+          validationWorkspace: ['../../projectMetadata/persistence', '../../projectFiles/initialProject', '../../projectFiles/creation',
+            '../../projectFiles/validation', '../../projectFiles/png', './validationHost', './validationCatalog', './metadataWorkspace', './viewportHost'],
+          validationBrowser: ['../../platform/opfs', '../../platform/projectLock', '../../projectMetadata/blobStore', '../../projectFiles/validation',
+            './browserMetadataStorage', './validationHost', './validationCatalog', './validationWorkspace', './validationRender', './viewport'],
+          browserMetadataStorage: ['@automerge/automerge/slim', '@automerge/automerge/automerge.wasm?url', '@automerge/automerge-repo-storage-indexeddb'],
+        };
+        const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
+        const name = path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '');
+        expect(imports.every(p => byFile[name]!.includes(p!)), path).toBe(true);
+        if (name !== 'browserMetadataStorage') expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
+      } else if (validationDisplay) {
+        const byFile: Record<string, string[]> = {
+          modelTypes: ['../../domain/values', '../../scene/types', './modelClosure'],
+          validationProjection: ['../../scene/projectProvider', '../../projectMetadata/records', '../../domain/projectGraphSupport', '../../projectFiles/validation', './fixture', './modelTypes'],
+          validationRender: ['three', 'three/addons/loaders/GLTFLoader.js', '../../viewer/loaders', '../../projectFiles/glb', '../../projectFiles/content', './modelTypes', './viewportPicking', './viewportModel', '../../domain/projectGraphSupport'],
+        };
+        const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
+        expect(imports.every(p => byFile[path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '')]!.includes(p!)), path).toBe(true);
+        expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
       } else if (validationFiles) {
         const byFile: Record<string, string[]> = {
           validation: ['../core/json', '../domain/values', '../projectMetadata/format', '../projectMetadata/persistence'],
@@ -303,7 +332,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
         const byFile: Record<string, string[]> = {
           metadataFixture: ['./fixture', './modelFixture', './modelClosure', '../../domain/values', '../../scene/projectProvider',
-            '../../scene/types', '../../projectMetadata/source', '../../projectMetadata/persistence', './metadataViews', './metadataMaterials', './metadataMedia', './mediaHistory', './metadataModels'],
+            '../../scene/types', '../../projectMetadata/source', '../../projectMetadata/persistence', './metadataViews', './metadataMaterials', './metadataMedia', './mediaHistory', './metadataModels', './modelTypes'],
           metadataStorage: ['../../platform/fs', '../../domain/projectContentChecks', '../../domain/values', '../../projectMetadata/contentEvidence',
             '../../projectMetadata/source', '../../projectMetadata/persistence', '../../projectMetadata/session', './metadataFixture', './mediaHistory', './modelClosure', '../../domain/projectCandidates', './metadataModelRecords'],
           metadataHost: ['../../platform/fs', '../../platform/projectLock', '../../projectMetadata/session', '../../projectMetadata/repository',
@@ -323,9 +352,9 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           metadataMaterials: ['../../scene/projectProvider', '../../scene/projectMaterialRoutes', '../../scene/types', '../../domain/projectGraphSupport',
             '../../domain/materialIntent', './materialHistory', './historyPort'],
           // Same approved development entry, including recovery before a Scene/session exists.
-          metadataWorkspace: ['./metadataHost', './session', './workspace', './viewportHost', './metadataReceiveControls', './metadataStartupControls', '../../scene/resolve'],
-          metadataStartupControls: ['./metadataHost', './session', './acknowledgment', '../../projectMetadata/startupScene', './metadataFixture'],
-          metadataBrowser: ['@automerge/automerge/slim', '@automerge/automerge/automerge.wasm?url', '@automerge/automerge-repo-storage-indexeddb',
+          metadataWorkspace: ['./metadataHost', './session', './workspace', './viewportHost', './metadataReceiveControls', './metadataStartupControls', '../../scene/resolve', './savedHost'],
+          metadataStartupControls: ['./savedHost', './session', './acknowledgment', '../../projectMetadata/startupScene'],
+          metadataBrowser: ['./browserMetadataStorage',
             '../../platform/opfs', '../../platform/projectLock', './metadataHost', './viewport', './metadataWorkspace'],
         };
         const name = path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '');

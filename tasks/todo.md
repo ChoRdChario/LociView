@@ -17,9 +17,10 @@ through the existing metadata host, not a new synthetic page or storage workstre
 Startup-Scene conflict recovery also now reaches the same host before Session
 construction, closing a saved-Project cold-open dead end without choosing a Scene.
 C10/M09 basic cleanup and the nonactivated
-streamed body/inventory service are connected below. Next is actual Mesh/image
-inspection and initial Project construction, then saved-body viewport/gallery
-and create/select/reopen. Do not generalize storage further or create a synthetic
+streamed body/inventory service are connected below. The limited static-GLB/PNG
+validation host now connects creation, saved-body display, selection and reopen.
+Continue remaining stage-2 additional-file/edit connections and the pending
+real-browser batch. Do not generalize storage further or create a synthetic
 run catalog/PoC page. The exact limited validation exception is now approved in
 05 §13.2; other user-file profiles remain outside this first slice.
 Formal adoption still requires G1-A/C and applicable device evidence. No profile,
@@ -28,8 +29,8 @@ Formal adoption still requires G1-A/C and applicable device evidence. No profile
 #### Active connected work — PO-approved limited real-file validation
 
 The approved exception and acceptance are consolidated in 05 §13.2 under
-`PO-approved limited real-file validation entry`. Runtime at entry remains
-synthetic-only. Implement one limited validation entry, not
+`PO-approved limited real-file validation entry`. Runtime before this work was
+synthetic-only. This implements one limited validation entry, not
 ordinary-home adoption, a generic GLB guarantee or package/migration approval.
 
 - [x] Check actual reusable admission behavior: existing Native Mesh validation
@@ -41,12 +42,14 @@ ordinary-home adoption, a generic GLB guarantee or package/migration approval.
   self-contained static GLB (embedded PNG only) and attached PNG in the same host.
 - [x] Implement strict admission, immutable initial records and actual saved-body
   evidence on the existing metadata service; keep original creation bytes for retry.
-- [ ] Consume saved geometry/material/PNG in the same development viewport/gallery
+- [x] Consume saved geometry/material/PNG in the same development viewport/gallery
   without fixture or silent defaults; expose the approved opt-in file entry.
-- [ ] Connect marker-last creation, Project selection and independent reopen,
+- [x] Connect marker-last creation, Project selection and independent reopen,
   including visible incomplete creation, unsaved-input protection and exact retry.
-- [ ] Reuse existing tests, final-tree checks and independent review; consolidate
-  actual-browser and required device evidence before adoption, not new PoC pages.
+- [x] Reuse existing tests, final-tree checks and independent review; record
+  unavailable actual-browser evidence and the consolidated manual steps.
+- [ ] Obtain actual-browser and required device evidence before formal adoption,
+  using the same connected host rather than new PoC pages.
 
 Review: this is the next critical stage-2 workflow. M07 and startup-Scene recovery
 were genuine approved runtime progress; the real-file decision is now answered.
@@ -83,6 +86,57 @@ No UI/browser/OPFS/device/offline acceptance is added and inventory counts do no
 change. Next: real read-projection/viewport port and the same-host file selector,
 new validation namespace, ready/incomplete list and unsaved-safe Project switching.
 No human test request is needed until that connected screen is usable.
+
+Next connected slice after `d7be6c7`: introduce a discriminated saved-model read
+projection and disposable resident port in the same development viewport. Reuse
+pin/camera/window controls and common Scene projection; do not cast real GLB into
+a fixture closure or substitute constant materials. Acceptance: exact saved IDs,
+geometry/PNG/material preservation, clean disposal, failed-load diagnostic, and
+unchanged fixture interaction tests. Then mount the validation-only host and file
+selection with fresh namespace, visible incomplete creation and safe switching.
+No new PoC, ordinary home, old namespace, wire, dependency or adoption. Stop only
+for a genuine contract/authority conflict; unavailable browser evidence remains
+separate from code/memory-port checks.
+
+Connected result after `d7be6c7`: the same served
+development entry now exposes `実ファイルで検証` / `storage=validation`. One
+content-inspected selection creates fresh static-GLB/PNG Projects, lists the
+dedicated namespace and reopens exact saved records/bodies. Incomplete creation
+is labelled and retried from original bytes, not reseeded. Pending save/input/IME
+blocks Project switching; closed asynchronous loads are disposed before mount.
+The editor reuses existing Scene/pin/text/media/window controls without synthetic
+demo receive or fixture media. Source GLB geometry/material/PNG uses the disposable
+read/render port. Fixture-only model transforms/copies/updates and real material
+editing remain disabled; transparent/cutout surface picking is explicitly
+unconnected rather than guessing a hit. Additional files after creation are not
+yet exposed. This is a limited validation connection, not ordinary-home adoption.
+
+Ten file/host/recorded-DOM cases pass, including actual-format generated bytes,
+exact creation/cold recovery, readonly and wrong-Project rejection, saved pin/text/
+PNG, content-vs-filename selection, IME/pending-switch protection and late-dispose.
+The render-port tests use actual GLTFLoader with injected PNG decoding, not GPU
+pixel evidence. Independent review fixed rejected-command versus pending-save
+classification, pre-publication initial Project-ID checking and creation-name IME.
+Browser skill bootstrap still fails before browser selection (`node:process`
+import denied); no rendered/native-input/device/offline PASS follows. The existing
+127.0.0.1:5173 server serves the changed entry and six new modules with HTTP 200;
+the accidentally redundant 5174 server was stopped. HTTP is not browser execution.
+No private source file was read, imported or written into tracked/public/dist.
+Next acceptance is the finite real-file Desktop batch in uiux-handoff, alongside
+remaining approved stage-2 connections. Do not reopen the old journal probes.
+
+Final verification: typecheck and build exit 0; root 110 files / 2,000 PASS /
+21 existing TODO, 244.63 s, exit 0, with two workers and a 15-second per-case
+execution timeout. Assertions/skips did not change. The first root run had three
+existing five-second timeout failures (1,997 passed); isolated completion showed
+5.081–5.858 s. That suite now uses the existing integration-suite 15-second budget.
+A following run was stopped after another pre-existing service case crossed five
+seconds; final CLI execution used 15 seconds consistently. No elapsed time is a
+product performance guarantee. Build keeps only existing mixed-import/large-chunk
+warnings. The final executable tree includes the post-publication display-failure
+retry fix and its recorded-DOM case; independent recheck closed that last finding.
+`diff --check` is clean. Inventory is now 27 connected / 7 partial / 20 other-path /
+10 new, with P01/P02 counted only in this approved validation lane, not completion.
 
 #### Completed implementation — explicit startup Scene conflict recovery (from `acd30d5`)
 

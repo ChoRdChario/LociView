@@ -1312,6 +1312,36 @@ from their stored parts, never refill missing acknowledged bytes from memory or
 the initial-source receipt. No new transaction/source IDs, migration or wire
 format follows from this recovery seam.
 
+Saved-body display connection uses a discriminated, plain-data model read DTO:
+fixture closures retain their exact validator; validation-GLB closures retain the
+actual complete saved binding/revision/representation plus frame IDs. File bytes,
+decoded images and Three resources stay outside shared snapshots in a disposable
+resident port. Existing pin/camera/window UI consumes the common projection; no
+fixture geometry, single-slot color or material default substitutes for real data.
+Fixture-only copy/update writers must reject the validation branch at execution,
+in addition to capability controls. Source GLB material/texture/alpha semantics
+are preserved; any missing decoder/texture result fails the display, never a
+partially successful model. This is an internal read/render connection, not a
+second storage authority or a change to the formal renderer adoption gate.
+
+The opt-in host uses `storage=validation` and a fixed new metadata namespace,
+with no lookup/creation fallback into previous namespaces. Reuse the existing
+browser Wasm/IndexedDB adapter guard and saved editor lifecycle; synthetic demo
+receive is optional and absent here. The selector enumerates published service
+state read-only; incomplete entries offer recovery, never the ready action.
+Cold initial-source recovery checks the expected Project ID before any source
+is handed to the writer. A rejected command with unchanged ready storage is not
+a pending save and must not enable no-op acknowledgement of unapplied input.
+Creation-name IME and editor draft/save state block creation/switch as appropriate.
+Late open/render results after disposal are drained and released, not mounted.
+The first connected selector introduces all selected models/PNG at creation;
+additional-file introduction and real-model transforms/material editing remain
+explicit later connections, not silent synthetic fallback. Alpha-mask/blended
+surface picking is unavailable pending an alpha-aware picker; source appearance
+is preserved and the limitation is visible. Browser execution budgets (64 MiB
+combined input, 4 MiB JSON, 100,000 structural items, 8,000,000 accessor values,
+16,777,216 image pixels) are caller refusal limits, not measured support promises.
+
 **S1 metadata foundation — implementation contract (2026-09-11):**
 
 The first reusable source module implements 02 §4 bootstrap and original atomic

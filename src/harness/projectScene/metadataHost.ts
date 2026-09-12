@@ -179,7 +179,7 @@ export async function openMetadataHost(options: MetadataHostOptions) {
       return ready(await service.edit(expectedToken, command));
     }, '競合を解消できません。');
     return {
-      authority, content, receive, resolve, read: () => last, hasPending: () => busy || !!failure || !['ready'].includes(last.state),
+      authority, content, receive, resolve, limits, read: () => last, hasPending: () => busy || !!failure || !['ready'].includes(last.state),
       refresh: () => execute(async () => { last = await service.read(); if (last.state === 'repair-required') throw Error('保存状態の確認が必要です。'); return last; }),
       async dispose() {
         if (closed) return; closed = true; lease.beginClose();

@@ -57,7 +57,7 @@ export class SyntheticMediaSession {
   retry() { return this.attempt(() => { if (!this.failed) fail('再試行する操作はありません。'); return this.execute(this.failed); }); }
   add(ctx: MediaContext, mediaId: string) { return this.attempt(() => {
     const captionId = this.check(ctx); if (this.draft) fail('編集中の説明を適用するか取り消してください。');
-    if (!fixtureMedia.some(m => m.record.id === mediaId)) fail('メディアを選択してください。');
+    if (!(ctx.project.mediaChoices ?? fixtureMedia.map(m => m.record)).some(m => m.id === mediaId)) fail('メディアを選択してください。');
     const rows = captionAttachments(ctx.project.mediaData, captionId); if (rows.review.length) fail('添付の未解決の状態を先に確認してください。');
     const id = fresh('att'), changes = Object.fromEntries(Object.entries({ captionId, mediaResourceId: mediaId, altText: '',
       orderKey: orderBetween(rows.ready.at(-1)?.orderKey.kind === 'value' ? (rows.ready.at(-1)!.orderKey as { value: string }).value : null, null),

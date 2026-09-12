@@ -1,8 +1,8 @@
 import { value, type Field, type Lifecycle, type Membership, type Scene, type SceneResources, type SceneState } from '../../scene/types';
-import type { SyntheticModelVersion } from './modelFixture';
+import type { DisplayModelVersion } from './modelTypes';
 import type { ViewData } from './viewHistory';
 import type { MaterialData } from './materialHistory';
-import type { MediaData } from './mediaHistory';
+import type { MediaData, MediaImage } from './mediaHistory';
 
 // Fixed synthetic identities, NOT a source-file importer or a persistent Project schema.
 const id = (prefix: string, n: number) => `${prefix}_${n.toString(16).padStart(32, '0')}`;
@@ -12,6 +12,9 @@ export const fixtureIds = Object.freeze({ project: id('prj', 1), overview: id('s
 export interface SyntheticProject {
   /** Explicit identity for new saved workspaces; old fixtures retain their fixed identity. */
   readonly projectId?: string;
+  readonly validationFiles?: boolean;
+  /** Explicit real saved catalog, including empty; omission is only for the old synthetic path. */
+  readonly mediaChoices?: readonly MediaImage['record'][];
   readonly state: SceneState;
   readonly resources: SceneResources;
   readonly modelNames: Readonly<Record<string, string>>;
@@ -22,7 +25,7 @@ export interface SyntheticProject {
   readonly captionTemplates: Readonly<Record<string, string>>;
   /** Immutable command-side owner/frame evidence, never a replacement for provider anchors. */
   readonly captionOwners: Readonly<Record<string, { readonly assetId: string; readonly assetFrameId: string }>>;
-  readonly modelVersions?: readonly SyntheticModelVersion[];
+  readonly modelVersions?: readonly DisplayModelVersion[];
   readonly viewData?: ViewData;
   readonly materialData?: MaterialData;
   /** Exact known command candidates for explicit review only, never rendering authority. */

@@ -53,10 +53,12 @@ export function prepareValidationCreation(input: PreparedValidationProject) {
   } };
 }
 /** A cold incomplete creation never regenerates its bootstrap or silently creates new content. */
-export async function resumeValidationCreation(fs: ProjectWorkspaceFS, session: MetadataProjectSession) {
+export async function resumeValidationCreation(fs: ProjectWorkspaceFS, session: MetadataProjectSession, expectedProjectId?: string) {
   const state = await session.read();
   if (state.state === 'ready') return state;
-  if (state.state === 'pending') return session.recoverInitialization(await readInitial(fs));
-  if (state.state !== 'empty') return fileError('未完了の保存を確認してください。');
-  return session.createFromSource(await readInitial(fs));
+  if (state.state !== 'pending' && state.state !== 'empty') return fileError('未完了の保存を確認してください。');
+  const source = await readInitial(fs);
+  if (expectedProjectId && source.proof.identity.projectId !== expectedProjectId)
+    return fileError('保存領域と初期プロジェクトが一致しません。');
+  return state.state === 'pending' ? session.recoverInitialization(source) : session.createFromSource(source);
 }

@@ -5,11 +5,17 @@ import type { ViewportFactory } from './viewportHost';
 import { createMetadataReceiveControls } from './metadataReceiveControls';
 import { createMetadataStartupControls } from './metadataStartupControls';
 import { chooseStartupScene } from '../../scene/resolve';
+import type { SavedWorkspaceHost, SavedWorkspaceTools } from './savedHost';
 
 /** Same served metadata workspace, split from browser I/O to verify cold-start recovery. */
 export function createMetadataWorkspace(document: Document, host: Awaited<ReturnType<typeof openMetadataHost>>, viewportFactory?: ViewportFactory) {
+  return createSavedWorkspace(document, host, viewportFactory, (session, changed) => createMetadataReceiveControls(document, host, session, changed));
+}
+/** Same editor/recovery controls, with optional host-owned tools; no synthetic demo in real-file mode. */
+export function createSavedWorkspace(document: Document, host: SavedWorkspaceHost, viewportFactory?: ViewportFactory,
+  extraTools?: (session: SyntheticSession, changed: () => void) => SavedWorkspaceTools) {
   let disposed = false, refreshing = false, feedback = '', workspace: ReturnType<typeof createDevelopmentWorkspace> | undefined;
-  let receiveControls: ReturnType<typeof createMetadataReceiveControls> | undefined;
+  let receiveControls: SavedWorkspaceTools | undefined;
   const root = document.createElement('section'), tools = document.createElement('section');
   const check = document.createElement('button'), restore = document.createElement('button'), status = document.createElement('p');
   check.type = restore.type = 'button'; check.textContent = '保存状態を確認'; restore.textContent = '保存を再試行';
@@ -24,8 +30,8 @@ export function createMetadataWorkspace(document: Document, host: Awaited<Return
       workspace = createDevelopmentWorkspace(document, new SyntheticSession(host.authority,
         () => !!receiveControls?.hasChanges() || startup.hasChanges()), {
         viewportFactory, onAction: () => { receiveControls?.render(); startup.render(); } });
-      receiveControls = createMetadataReceiveControls(document, host, workspace.session, () => render());
-      tools.append(receiveControls.root); root.append(workspace.root);
+      receiveControls = extraTools?.(workspace.session, () => render());
+      if (receiveControls) tools.append(receiveControls.root); root.append(workspace.root);
     }
     check.disabled = restore.disabled = refreshing || startup.busy() || workspace?.session.acknowledgment.state === 'checking';
     restore.hidden = !!workspace || host.authority.readOnly || !host.hasPending() && !startup.recoveryPending();

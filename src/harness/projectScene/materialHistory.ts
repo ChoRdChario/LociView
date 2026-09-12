@@ -2,7 +2,8 @@ import { admitMaterialRecord } from '../../domain/materialRecords';
 import { validateMaterialIntent, type MaterialIntent, type MaterialAppearance, type MaterialCompositing } from '../../domain/materialIntent';
 import { value, type Field, type Lifecycle, type Material, type MaterialTarget } from '../../scene/types';
 import { freezeSynthetic, createSyntheticProject } from './fixture';
-import { canonicalFixture, type FixtureModelClosure } from './modelClosure';
+import { canonicalFixture, readFixtureModel } from './modelClosure';
+import type { DisplayModelClosure } from './modelTypes';
 import type { HistoryCell, HistorySnapshot } from './historyPort';
 
 export const materialLimits = Object.freeze({ maxNodes: 4096, maxDepth: 16, maxStringScalars: 65_536 });
@@ -19,7 +20,7 @@ export interface MaterialData { readonly cells: Readonly<Record<string, HistoryC
 export const materialKey = (id: string, field: string) => `material/${id}/${field}`;
 export const targetKey = (t: MaterialTarget) => canonicalFixture(t);
 export const routingKey = (r: MaterialRouting) => canonicalFixture(r);
-export const materialTarget = (c: FixtureModelClosure): MaterialTarget => ({ assetId: c.binding.assetId, variantFamilyId: c.representation.variantFamilyId,
+export const materialTarget = (c: DisplayModelClosure): MaterialTarget => ({ assetId: c.binding.assetId, variantFamilyId: c.representation.variantFamilyId,
   materialLayoutId: c.representation.materialCatalog.layoutId, logicalMaterialSlotId: c.representation.materialCatalog.slots[0]!.logicalMaterialSlotId });
 const unresolved = <T>(): Field<T> => ({ kind: 'unresolved', reason: 'conflict' });
 const texts = (c: HistoryCell) => c.kind === 'value' ? [c.value] : c.candidates.map(v => v.value);
@@ -28,7 +29,8 @@ function fail(): never { throw new Error('マテリアルの内容・適用先�
 const parse = (text: string): unknown => { if (text.length > 65_536) fail(); const v: unknown = JSON.parse(text); if (canonicalFixture(v) !== text) fail(); return v; };
 
 /** Exact known catalog closure; not a general resource/history provider. */
-export function projectMaterialHistory(snapshot: HistorySnapshot, models: readonly FixtureModelClosure[], previous?: HistorySnapshot): MaterialData {
+export function projectMaterialHistory(snapshot: HistorySnapshot, models: readonly DisplayModelClosure[], previous?: HistorySnapshot): MaterialData {
+  models.forEach(model => readFixtureModel(canonicalFixture(model)));
   const cells = Object.fromEntries(Object.entries(snapshot.cells).filter(([k]) => k.startsWith('material/'))), records: Record<string, SyntheticMaterial> = {};
   const ids = new Set<string>(), catalog = new Set(models.map(c => targetKey(materialTarget(c))));
   for (const key of Object.keys(cells)) {
@@ -68,7 +70,8 @@ export function materialBucket(data: MaterialData | undefined, routing: Material
   const key = routingKey(routing), rows = Object.values(data?.records ?? {}).filter(r => (r.lifecycle.kind !== 'value' || r.lifecycle.value.state !== 'deleted') && r.candidates.some(c => routingKey(c) === key));
   return !rows.length ? value(null) : rows.length !== 1 || rows[0]!.routing.kind !== 'value' || rows[0]!.lifecycle.kind !== 'value' ? unresolved() : value(rows[0]!);
 }
-export function materialCopyIntent(data: MaterialData | undefined, sceneId: string, model: FixtureModelClosure): MaterialIntent | null {
+export function materialCopyIntent(data: MaterialData | undefined, sceneId: string, model: DisplayModelClosure): MaterialIntent | null {
+  readFixtureModel(canonicalFixture(model));
   const target = materialTarget(model);
   for (const scope of [{ kind: 'scene' as const, sceneId }, { kind: 'project' as const }]) {
     const bucket = materialBucket(data, { target, scope });

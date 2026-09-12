@@ -237,7 +237,7 @@ export function createTeamWorkspace<F extends WorkingHistoryFactory>(document: D
           description = `${name} — ${edge.lifecycle.kind === 'value' && edge.lifecycle.value.state === 'active' ? 'このシーンに含める' : 'このシーンから除外'}`;
         }
         if (key.startsWith('asset/')) {
-          const version = modelVersion(id!, candidate.value, session.snapshot.modelVersions);
+          const version = modelVersion(id!, candidate.value, session.snapshot.modelVersions ?? syntheticVersions);
           description = version ? `${version.label} — 位置 ${version.closure.binding.assetToProject.translation.join(' / ')}` : 'モデル候補を確認';
         }
         if (field === 'anchor') {

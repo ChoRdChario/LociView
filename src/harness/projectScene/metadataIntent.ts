@@ -59,10 +59,10 @@ export function metadataIntent(changes: Readonly<Record<string, string>>, projec
     if ('mediaResourceId' in fields) {
       keys(fields, ['captionId', 'mediaResourceId', 'altText', 'orderKey', 'lifecycle']);
       const life = parse(fields.lifecycle!); keys(life, ['state', 'eventId', 'reason']);
-      const media = fixtureMedia.find(m => m.record.id === fields.mediaResourceId);
+      const media = (project.mediaChoices ?? fixtureMedia.map(m => m.record)).find(m => m.id === fields.mediaResourceId);
       if (!media || life.state !== 'active' || life.reason !== 'initial' || typeof life.eventId !== 'string') return fail();
       return { kind: 'createAttachment', attachmentId, sceneId: context.sceneId, captionId: fields.captionId!,
-        media: media.record, orderKey: fields.orderKey!, altText: fields.altText!, eventId: life.eventId };
+        media, orderKey: fields.orderKey!, altText: fields.altText!, eventId: life.eventId };
     }
     const caption = project.mediaData?.records[attachmentId]?.captionId;
     if (caption?.kind !== 'value') return fail();

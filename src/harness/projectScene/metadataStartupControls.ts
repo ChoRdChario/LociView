@@ -1,11 +1,10 @@
-import type { openMetadataHost } from './metadataHost';
+import type { SavedWorkspaceHost } from './savedHost';
 import type { SyntheticSession } from './session';
 import { WorkingAcknowledgment } from './acknowledgment';
 import { defaultSceneCandidates } from '../../projectMetadata/startupScene';
-import { metadataFixtureLimits } from './metadataFixture';
 
 /** Also usable BEFORE a Scene/session exists. No implicit navigation or direct storage writes. */
-export function createMetadataStartupControls(document: Document, host: Awaited<ReturnType<typeof openMetadataHost>>,
+export function createMetadataStartupControls(document: Document, host: SavedWorkspaceHost,
   session: () => SyntheticSession | undefined, changed: () => void, otherInput: () => boolean) {
   const root = document.createElement('section'), heading = document.createElement('h2'), values = document.createElement('ul');
   const select = document.createElement('select'), apply = document.createElement('button'), cancel = document.createElement('button');
@@ -32,7 +31,7 @@ export function createMetadataStartupControls(document: Document, host: Awaited<
       const option = (value: string, label: string) => { const node = document.createElement('option'); node.value = value; node.textContent = label; select.append(node); };
       option('', '残す開始シーンを選択'); select.value = '';
       if (conflict) {
-        try { defaultSceneCandidates(provider, metadataFixtureLimits); ready = true; } catch { /* Show all, never accept a filtered subset. */ }
+        try { defaultSceneCandidates(provider, host.limits); ready = true; } catch { /* Show all, never accept a filtered subset. */ }
         field!.candidates.forEach((candidate, index) => {
           const id = candidate.value.kind === 'value' && typeof candidate.value.value === 'string' ? candidate.value.value : '';
           const scene = provider.state.scenes[id], name = scene?.name;

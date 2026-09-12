@@ -8,9 +8,10 @@ import type { DisplayCapture } from './viewSession';
 import { pickResidentCreation, pickResidentSurface, type PinSurfaceTarget, type ResidentSurface } from './viewportPicking';
 import { createPinGizmo, type ModelPlacementTarget } from './pinGizmo';
 import { proposedPlacement } from './modelTransform';
+import type { SavedModelResidentPort } from './validationRender';
 
-/** Existing Three.js dependency, exact synthetic fixture only. No model loaders or Native controller. */
-export const createSyntheticViewport: ViewportFactory = (canvas, changed, proposePin, proposeModel) => {
+/** The saved resident port is explicit; the default still accepts only exact synthetic fixtures. */
+export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFactory => (canvas, changed, proposePin, proposeModel) => {
   let renderer: THREE.WebGLRenderer | null = null, controls: OrbitControls | null = null;
   let camera: THREE.PerspectiveCamera | THREE.OrthographicCamera | null = null;
   const scene = new THREE.Scene(), models = new THREE.Group(); scene.add(models); scene.background = new THREE.Color('#e8e6e2');
@@ -66,6 +67,7 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
     poses.set(display.sceneId, pose); backgrounds.set(display.sceneId, background); entryPending = false; axis = null;
   }
   function clearModels() {
+    for (const surface of resident.values()) surface.dispose?.();
     resident.clear();
     for (const child of [...models.children]) {
       child.traverse(node => { if (node instanceof THREE.Mesh) { node.geometry.dispose(); (node.material as THREE.Material).dispose(); } });
@@ -89,6 +91,10 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
       for (const model of display.models) {
         const appearance = display.materials?.[model.binding.assetId];
         if (appearance && 'issue' in appearance) continue; // Diagnosed unsupported effect; no source-looking replacement.
+        if (model.shape === 'saved-glb') {
+          if (!saved) throw Error('実モデルの表示本体が未接続です。');
+          const surface = saved.create(model); models.add(surface.asset); resident.set(model.binding.assetId, surface); continue;
+        }
         const raw = JSON.parse(new TextDecoder().decode(fixtureModelBytes(model.shape))) as { positions: number[]; indices: number[] };
         const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(raw.positions, 3));
         geometry.setIndex(raw.indices); geometry.computeVertexNormals();
@@ -239,10 +245,16 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
           visible: Boolean(camera && p.z >= -1 && p.z <= 1 && Math.abs(p.x) <= 1 && Math.abs(p.y) <= 1) };
       };
       const pins = display?.pins.map(pin => ({ id: pin.id, ...project(pin.position) })) ?? [];
+      let alphaPicking = false;
+      for (const surface of resident.values()) if (surface.dispose) surface.mesh.traverse(node => {
+        if (node instanceof THREE.Mesh && (Array.isArray(node.material) ? node.material : [node.material])
+          .some(m => m.transparent || m.alphaTest > 0 || m.opacity < 1)) alphaPicking = true;
+      });
       return { token: JSON.stringify([serial, display?.sceneId, display?.projectFrameId, display?.bounds, width, height, pose, background]),
         pickToken: String(pickEpoch),
         ready: Boolean(active && renderer && camera && !issue), issue,
-        notice: [notice, ...(display?.materialNotices ?? []), ...Object.values(display?.materials ?? {}).flatMap(m => 'issue' in m ? [m.issue] : [])].filter(Boolean).join(' ') || null,
+        notice: [notice, alphaPicking ? '半透明・切り抜きの面へのピン配置は未接続です。原本の見た目は保持しています。' : null,
+          ...(display?.materialNotices ?? []), ...Object.values(display?.materials ?? {}).flatMap(m => 'issue' in m ? [m.issue] : [])].filter(Boolean).join(' ') || null,
         dragging: dragging || !!gizmo?.dragging, manipulating: !!gizmo?.dragging,
         projection: pose.projection.kind, axis, pins, preview: display?.preview ? project(display.preview) : undefined };
     },
@@ -271,3 +283,4 @@ export const createSyntheticViewport: ViewportFactory = (canvas, changed, propos
       canvas.removeEventListener('webglcontextlost', lost); canvas.removeEventListener('webglcontextrestored', restored); },
   };
 };
+export const createSyntheticViewport = sceneViewportFactory();

@@ -1,5 +1,14 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-12 実fileの同一host接続（`d7be6c7`後）:** 既存dev入口の「実ファイルで検証」
+> から新規GLB/PNG検証Projectの作成・一覧・再開、保存本体の形状／元材質／PNG表示へ接続。
+> 記録・ピン・添付保存とcold再開、未完了復旧、IME／切替保護、late-disposeを既存testsで確認。
+> 最終110 files／2,000 PASS／21既存TODO、型・build・独立レビュー済み（制限時間はtodo）。
+> Browser起動は既知の禁止importで失敗し、実描画・実入力は未確認。
+> 既存5173で新入口／module HTTP200。一時5174は停止。公開／通常home／既存Projectは不変更。
+> 追加file、実モデルの変形・材質編集・alpha対応pickは未接続。一括手動手順はuiux-handoff。
+> 限定有効化は承認済み。再承認待ちや合成PoC追加へ戻さず、残るstage-2接続を進める。
+
 > **2026-09-12 限定実file入口のPO承認:** 静的GLB（外部参照なし・内蔵PNG）＋
 > 添付PNG、新規検証Project、既存開発hostでの読込・編集・保存・再開を明示承認。
 > 05 §13.2とtodo先頭が現行実装範囲。以下の承認待ちは過去checkpoint。

@@ -14,8 +14,9 @@ import { modelListPlanIsCurrent, newModelListMemory, planModelList, type ModelLi
   type ModelListMemory, type ModelListPlan, type ModelMembership } from '../../ui/projectScene/modelListState';
 import { createSyntheticProject, fixtureIds, freezeSynthetic, type SyntheticProject } from './fixture';
 import { bindingKey, captionKey, membershipKey, type SyntheticAuthority } from './historyProjection';
-import { decodeSyntheticAnchor, modelVersion, syntheticVersions, versionFromClosure, type SyntheticModelVersion } from './modelFixture';
-import { canonicalFixture, createFixtureModel, fixtureModelIds, moveFixtureModel, type FixtureModelClosure } from './modelClosure';
+import { decodeSyntheticAnchor, modelVersion, syntheticVersions, versionFromClosure } from './modelFixture';
+import { canonicalFixture, createFixtureModel, fixtureModelIds, moveFixtureModel, readFixtureModel, type FixtureModelClosure } from './modelClosure';
+import type { DisplayModelVersion } from './modelTypes';
 import { modelClosureKey } from './modelHistory';
 import { newPinModeMemory, pinActionIssue, pinModePlanIsCurrent, planPinMode, type PinModeContext,
   type PinModeMemory, type PinModePlan, type PinProposal } from '../../ui/projectScene/pinModeState';
@@ -95,7 +96,7 @@ export class SyntheticSession {
     for (const key of Object.keys(this.project.state.scenes)) {
       this.windows.set(key, newCaptionWindowMemory(key));
       this.includes.set(key, newCaptionIncludeMemory(key));
-      this.models.set(key, newModelListMemory(fixtureIds.project, key)); this.pins.set(key, newPinModeMemory(key));
+      this.models.set(key, newModelListMemory(this.project.projectId ?? fixtureIds.project, key)); this.pins.set(key, newPinModeMemory(key));
     }
   }
   get snapshot() { return this.project; }
@@ -296,7 +297,7 @@ export class SyntheticSession {
     const memories = { ...this.navigation.sceneMemory };
     for (const key of Object.keys(next.state.scenes)) if (!Object.hasOwn(memories, key)) {
       memories[key] = emptyMemory(); this.windows.set(key, newCaptionWindowMemory(key));
-      this.includes.set(key, newCaptionIncludeMemory(key)); this.models.set(key, newModelListMemory(fixtureIds.project, key));
+      this.includes.set(key, newCaptionIncludeMemory(key)); this.models.set(key, newModelListMemory(this.project.projectId ?? fixtureIds.project, key));
       this.pins.set(key, newPinModeMemory(key));
     }
     this.navigation = Object.freeze({ ...this.navigation, sceneMemory: Object.freeze(memories) });
@@ -445,7 +446,7 @@ export class SyntheticSession {
   }
   modelContext(): ModelListContext {
     const { state, resources, modelNames } = this.project;
-    return { source: { kind: 'ready', projectId: fixtureIds.project, sceneId: this.sceneId, token: state.token,
+    return { source: { kind: 'ready', projectId: this.project.projectId ?? fixtureIds.project, sceneId: this.sceneId, token: state.token,
       items: Object.values(resources.assets).map(asset => {
         const edges = Object.values(state.assetMemberships).filter(e => e.resourceId === asset.id && e.sceneId === this.sceneId &&
           (e.lifecycle.kind !== 'value' || e.lifecycle.value.state !== 'deleted'));
@@ -481,9 +482,10 @@ export class SyntheticSession {
       const context = this.modelUpdateContext(); let version = modelVersion(plan.assetId, plan.bindingId, this.modelVersions);
       if (context.issue || plan.token !== context.token || plan.sceneId !== context.sceneId || plan.assetId !== context.assetId ||
         !version || !context.choices.includes(version)) throw new Error(context.issue ?? '対象が更新されています。モデルを選び直してください。');
+      const fixture = readFixtureModel(canonicalFixture(version.closure));
       if (context.current && (this.authority?.capabilities?.preparedRevision ||
         canonicalFixture(context.current.closure.binding.assetToProject) !== canonicalFixture(version.closure.binding.assetToProject))) {
-        version = versionFromClosure(createFixtureModel({ ...fixtureModelIds(version.closure), binding: fresh('bnd') }, version.closure.shape,
+        version = versionFromClosure(createFixtureModel({ ...fixtureModelIds(fixture), binding: fresh('bnd') }, fixture.shape,
           context.current.closure.binding.assetToProject, context.current.projection.bindingId));
       }
       const selected = version;
@@ -492,7 +494,7 @@ export class SyntheticSession {
       });
     } catch (error) { return this.refuse(this.errorText(error)); }
   }
-  private publishModelVersion(baseToken: string, version: SyntheticModelVersion) {
+  private publishModelVersion(baseToken: string, version: DisplayModelVersion) {
     const token = fresh('snapshot'), asset = this.project.resources.assets[version.assetId]!;
     const versions = this.modelVersions.some(v => v.projection.bindingId === version.projection.bindingId) ? this.modelVersions : [...this.modelVersions, version];
     const changes = { [bindingKey(asset.id)]: version.projection.bindingId,
@@ -535,7 +537,9 @@ export class SyntheticSession {
     if (this.pending || ctx.issue || !ctx.current || !ctx.assetId) return this.refuse(ctx.issue ?? '入力を確定し、モデルを選択してください。');
     const resolved = resolveScene(this.project.state, this.project.resources, this.sceneId);
     if (resolved.kind !== 'ready' || !resolved.composition.assets.some(a => a.assetId === ctx.assetId)) return this.refuse('このシーンに表示したモデルを選択してください。');
-    this.placement = freezeSynthetic({ token: ctx.token, sceneId: this.sceneId, assetId: ctx.assetId, source: ctx.current.closure,
+    if (ctx.current.closure.shape === 'saved-glb') return this.refuse('実モデルの配置編集はこの検証画面では未接続です。');
+    const source = readFixtureModel(canonicalFixture(ctx.current.closure));
+    this.placement = freezeSynthetic({ token: ctx.token, sceneId: this.sceneId, assetId: ctx.assetId, source,
       coordinates: ctx.current.closure.binding.assetToProject.translation.map(String) as [string, string, string], composing: false,
       angles: rotationDegrees(ctx.current.closure.binding.assetToProject.rotationXYZW), rotation: ctx.current.closure.binding.assetToProject.rotationXYZW,
       scale: String(ctx.current.closure.binding.assetToProject.uniformScale), mode: 'translate' });

@@ -15,13 +15,16 @@
 > Scene create/name/default now connect to the saved host and local Scene memories.
 > Confirmed Project-wide Caption and dependency-guarded Asset deletion now connect.
 > M07 rotation/positive uniform scaling now connects to the same saved host while
-> limited real-file activation awaits PO. It is not M13/full alignment/device proof.
+> the limited real-file decision was pending. It is not M13/full alignment/device proof.
 > Startup-Scene conflicts now have pre-session explicit selection/saved recovery
 > in the same host, closing the cold-open dead end without guessing a Scene.
 > Warm Scene/camera/input stay local. This narrows T03; it does not complete it.
 > Nonactivated streamed body storage/inventory now reaches metadata creation/reopen
-> in memory-port tests. Next: actual format inspection/initial Project construction;
-> limited real-file activation needs the bundled PO decision. Other
+> in memory-port tests. PO approved the limited static-GLB/PNG validation entry.
+> It now connects new-Project creation/list/reopen, saved-body read/render and
+> existing pin/text/PNG edits in the same dev host (`storage=validation`).
+> Actual-browser/device acceptance is pending; further file introduction and real
+> model transforms/material editing remain. Do not restore a resolved approval wait. Other
 > scalar/lifecycle conflicts, exchange-base/delta and real-data adoption retain their gates. Latest UI feedback does not
 > automatically set priority. Old saved-host Desktop PASS remains narrowly scoped.
 > Explicit model membership keep-one now saves only the other observed edge's
@@ -357,20 +360,27 @@ language, disposable PoCs and one writer.
 
 ## 8. Current authorization boundary
 
+2026-09-12 current: PO has approved the finite validation exception in 05 §13.2.
+Static-GLB/PNG creation, dedicated Project list/reopen and saved-body display/edit
+now connect in `storage=validation`; exact evidence and pending browser/device
+acceptance are in todo/uiux-handoff. This closes P01/P02 only within that lane.
+Continue the remaining stage-2 file/edit connections, without restoring an
+approval wait, promoting ordinary home or changing 06/07. The following bounded
+progress entries describe earlier checkpoints; their then-next tasks are historical.
+
 2026-09-12 M07 bounded progress: model-only rotation/uniform-scale gizmos and
 numeric alternatives now create fresh manual bindings through the same journal.
 Exact cancel/retry, stored two-party return and cold reopen are tested; unchanged
 geometry and Caption coordinates remain. Full actual-input/device evidence is
-pending. This approved connection does not authorize the outstanding real-file
-entry or reopen M13/M14 scope. Todo holds exact final-tree evidence.
+pending. M07 itself did not authorize the real-file entry; the subsequent explicit
+approval is recorded above. M13/M14 remain deferred. Todo holds exact evidence.
 
 2026-09-12 bounded body-service progress: fixed origin-wide stream publication,
 saved-body inventory and normal metadata create/reopen now connect in service
 tests. No fallback to known fixture bytes. This does not activate a real-file
-profile, existing UI host or browser/device adoption. Next close actual format
-inspection and Project construction, then saved-body viewport/gallery and the
-Project selector. Bundle limited validation-entry authority before crossing
-05 §13.2's real-file restriction; formal G1-A/C/iOS adoption remains separate.
+profile or browser/device adoption. Its then-next format/construction and
+viewport/gallery/selector work is now connected under the subsequent limited
+approval above; formal G1-A/C/iOS adoption remains separate.
 No further generic storage/PoC campaign. Final evidence and exact plan are in todo.
 
 2026-09-12 bounded M09 progress: the same host now confirms model deletion only

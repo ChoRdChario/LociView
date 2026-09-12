@@ -26,7 +26,7 @@ import { SyntheticViewSession, type DisplayCapture } from '../../src/harness/pro
 import { materialBucket, materialKey, materialTarget, type MaterialRouting } from '../../src/harness/projectScene/materialHistory';
 import { syntheticDisplay } from '../../src/harness/projectScene/viewportModel';
 import { degreesRotation, rotationDegrees } from '../../src/harness/projectScene/modelTransform';
-import { canonicalFixture, fixtureRecordDigest, moveFixtureModel, createFixtureModel, fixtureModelIds, allocateModelCopyIds } from '../../src/harness/projectScene/modelClosure';
+import { canonicalFixture, fixtureRecordDigest, moveFixtureModel, createFixtureModel, fixtureModelIds, allocateModelCopyIds, readFixtureModel } from '../../src/harness/projectScene/modelClosure';
 import { assetCopySource } from '../../src/projectMetadata/modelMembership';
 import { assetMembershipGroups, type AssetMembershipResolution } from '../../src/projectMetadata/membership';
 import { readMetadataModel } from '../../src/harness/projectScene/metadataModelRecords';
@@ -866,7 +866,7 @@ async function conflictingModel(h: ReturnType<typeof fixture>) {
   return { host, s, command: modelCopyCommand(host) };
 }
 
-describe('saved explicit model status resolution; synthetic ports/DOM only', () => {
+describe('saved explicit model status resolution; synthetic ports/DOM only', { timeout: 15_000 }, () => {
   it.each([0, 1])('chooses complete candidate %s, preserves Caption data and retries exact bytes; unseen update conflicts again', async index => {
     const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority), media = mediaHost(s);
     await media.add(0); media.w.dispose(); const seed = host.read().source!;
@@ -1279,7 +1279,7 @@ describe('M07 saved model rotation and positive uniform scale', () => {
   });
   it('preserves exact original quaternion on cancellation and rejects invalid/stale transform commands and old-host authoring', async () => {
     const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority); selectModel(s);
-    const prior = s.modelUpdateContext().current!.closure, rotation = [0, 0, 0, 1 - 2e-13] as const;
+    const prior = readFixtureModel(canonicalFixture(s.modelUpdateContext().current!.closure)), rotation = [0, 0, 0, 1 - 2e-13] as const;
     const bound = createFixtureModel({ ...fixtureModelIds(prior), binding: `bnd_${'4'.repeat(32)}` }, prior.shape,
       { ...prior.binding.assetToProject, rotationXYZW: rotation }, prior.binding.id);
     await host.authority.write(s.snapshot.state.token, { [`asset/${f.equipment}/binding`]: bound.binding.id,
