@@ -96,7 +96,7 @@ export async function openMetadataHost(options: MetadataHostOptions) {
       capabilities: { pins: true, membership: true, color: true, views: true, materials: true, media: true, placement: true, transform: true, preparedRevision: true, sceneAuthoring: true },
       get readOnly() { return fs.mutationAuthority.accessState !== 'editable' || closed; },
       read: () => { if (!last.provider) throw Error('保存した画面はまだありません。'); return metadataProjectView(last.provider, content.images); },
-      status: () => ({ kind: busy ? 'checking' : failure || last.state !== 'ready' ? 'failed' : 'idle', error: failure || '未完了の保存があります。' }),
+      status: () => ({ kind: busy ? 'checking' : failure || last.state !== 'ready' ? 'failed' : 'idle', error: failure || '未完了の更新があります。' }),
       write: (token, changes, context) => execute(async () => {
         if (authority.readOnly) throw Error('このタブは閲覧専用です。');
         return ready(await service.edit(token, metadataIntent(changes, authority.read(), context)));

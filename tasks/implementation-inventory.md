@@ -146,7 +146,7 @@
 
 | ID | 機能群／利用者の結果 | 状態 | 現在の境界・残り | コード／既存受入れ参照（行番号は監査時点） |
 |---|---|---|---|---|
-| S01 | 保存状態を確認し、同じ作業を再開する | 接続済み | new metadataのoriginal history＋marker-last＋cold reopen。正確なrun URL／合成内容限定。Project一覧ではない。 | [src/projectMetadata/session.ts:44](../src/projectMetadata/session.ts) / [tests/ui/projectMetadataHost.test.ts:471](../tests/ui/projectMetadataHost.test.ts) |
+| S01 | 保存状態を確認し、同じ作業を再開する | 接続済み | new metadataのoriginal history＋marker-last＋cold reopenと限定validation一覧。内部ackは「再開用データのみ」とし、未確定・失敗・復旧・閲覧状態を保持。外部file保存、最後のProjectの再開通知／完全な切替導線、実機受入れは未接続・未完了。 | [src/projectMetadata/session.ts](../src/projectMetadata/session.ts) / [src/ui/projectScene/navigationControls.ts](../src/ui/projectScene/navigationControls.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
 | S02 | 中断・保存失敗から元の変更で再試行する | 接続済み | 旧公開表示を保持、未完了は編集制限、exact originalsを再使用。一般ファイルimportの復旧まで保証しない。 | [src/projectMetadata/session.ts:137](../src/projectMetadata/session.ts) / [src/projectMetadata/journal.ts](../src/projectMetadata/journal.ts) |
 | S03 | 別タブから確認し、編集権を安全に扱う | 接続済み | readonly／refresh／lease handoffの限定接続。同時多人数編集・実機保証とは別。 | [src/harness/projectScene/metadataHost.ts](../src/harness/projectScene/metadataHost.ts) / [src/projectMetadata/persistence.ts](../src/projectMetadata/persistence.ts) |
 | S04 | オフラインで起動・作業・終了後に再開する | 別経路のみ | 旧Nativeの合格経路は新hostへ流用不可。普通の製品導線／offline保存基盤の接続と新実測が必要。SW変更は現在非対象。 | [tasks/uiux-handoff.md](../tasks/uiux-handoff.md) / [docs/specs/05-project-scene-team-workflow.md:1064](../docs/specs/05-project-scene-team-workflow.md) |

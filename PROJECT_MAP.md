@@ -10,11 +10,21 @@
 
 ## Start here
 
-2026-09-13 next decision: specification 06 §11 proposes a reviewed five-purpose
+2026-09-13 bounded state correction: Scene development/metadata/validation hosts
+now label internal acknowledgment as browser resume data, not file-save success.
+Header, edit feedback and Project catalog retain pending/failure/recovery/readonly
+states; external output and automatic checkpoints remain unimplemented. Current
+tests and the unavailable rendered-evidence lane are recorded in todo. Product
+contract 00 §2.2 fixes one latest auto point, named manual checkpoints and the
+approved browser-resume/manual-file fallback. 06 §11.4 drafts their artifact and
+completion protocol; neither its new wire nor a sink is thereby adopted.
+
+2026-09-13 technical design boundary: specification 06 §11 proposes a reviewed five-purpose
 validation-implementation stage before measured adoption, not removal of either
 gate or activation of an unratified format. Specification 07 §10.2 records pin-scale,
-unplaced and physical-migration-adapter gaps. PO approval of the gate split is
-pending; see current todo. No package reader/writer or ordinary route changed.
+unplaced and physical-migration-adapter gaps. Routine sequencing is now delegated;
+complete wire/receipt/limit contracts and compatibility approval remain distinct.
+Do not repeat the delegation question. No package reader/writer or ordinary route changed.
 
 2026-09-12 whole-scope inventory: [tasks/implementation-inventory.md](tasks/implementation-inventory.md)
 maps all 41 UI tasks plus accepted Scene/team extensions to 64 work groups:

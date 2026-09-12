@@ -68,7 +68,7 @@ or contextual details unless the user must decide something about it.
 
 | User-visible concept | Meaning | Must not be confused with |
 |---|---|---|
-| プロジェクト | The durable workspace containing models, Captions, media, Scenes and saved views | An exported file, a temporary view or a browser tab |
+| プロジェクト | The logical workspace containing models, Captions, media, Scenes and named views; a Project file carries the content defined by its purpose | A temporary view, browser tab or browser recovery copy being a file backup |
 | モデル | A logical 3D subject with one Project-wide active revision and alignment | A rendering mode, Scene or filename |
 | キャプション | One Project record normally tied to an explicitly chosen model location and reusable in multiple Scenes | A copied per-Scene note, generic image caption or inferred model relation |
 | メディア | Images and other content attached to a Caption | A separate model, surface material or an automatically inferred source relation |
@@ -126,11 +126,18 @@ There is one normal home at `/`.
 - Use one intent-based file entry, `ファイルを開く…`.
 - Do not ask the user to choose Native, legacy, backup, GS, Point or Mesh before
   the selected content has been inspected.
-- After selection, show only the detected purpose, what will happen, what will
-  be saved, and any choice or warning that changes the decision.
+- After selection, show only the detected purpose, what will happen, where the
+  content will go, and any choice or warning that changes the decision. Browser
+  retention does not mean the selected file has been updated (§9.1).
 - A model selected through the same entry proceeds to new-Project creation.
 - Existing on-device Projects remain a separate, scannable list with explicit
-  View, Edit and file-operation results.
+  View, Edit and file-operation results. Identify these as resumable work, not
+  independently backed-up files.
+- On successful last-Project resume, show its name with `最後のプロジェクトを再開しました`
+  and an adjacent `別のプロジェクトを開く` action. The same action remains reachable
+  in the workspace header/file area and leads to file opening and the resumable-
+  Project list. An explicit Project choice takes precedence; missing/incomplete
+  recovery data does not count as a successful resume.
 - Rare device/offline preparation belongs in contextual disclosure after it is
   relevant; it is not a competing start mode.
 
@@ -141,7 +148,8 @@ It supersedes the earlier header/owner-filter arrangement in the development hos
 
 The normal Desktop workspace has three stable regions:
 
-1. a shared header for Project identity, View/Edit state, save state,
+1. a shared header for Project identity, View/Edit state, external-file state
+   distinct from internal pending/failure state (§9.1),
    and file/help actions;
 2. the 3D stage, with frequent view recovery close to it;
 3. a right-side task area with four purpose-based tabs.
@@ -300,7 +308,7 @@ conflicts expose only their implemented resolution actions.
 ### 7.1 Core rules
 
 - Start with the user's object and desired result: `ファイルを開く`,
-  `3Dモデルを選択`, `メディアを追加`, `この端末へ保存`.
+  `3Dモデルを選択`, `メディアを追加`, `ファイルに保存` (external file only).
 - Give the product a grammatical subject. Avoid unexplained fragments such as
   `3Dを見て、場所に記録する`.
 - Use one stable term for one concept across home, preflight, workspace,
@@ -322,8 +330,8 @@ implementation detail or combines unrelated facts.
 Brevity does not apply to a hidden consequence. Show the following beside the
 affected action when relevant:
 
-- where work is stored and whether it is already durable;
-- whether other pending edits will be saved too;
+- whether work is only retained for browser recovery or reflected in a local file;
+- which changes/scope a file-save action includes and what remains unreflected;
 - whether a file can merge back, only open for review, or creates a new Project;
 - the exact scope and prerequisites of collaboration;
 - what original bytes, labels or metadata leave the device;
@@ -416,8 +424,8 @@ sufficient.
 - Modes such as pin placement, pin movement and model gizmo work show the active
   object, current mode and an always-reachable finish/cancel path close to the
   stage.
-- Save state is workspace-wide and remains visible across tab switches: `未保存`,
-  saving, saved and failed must not disappear because the user switched tabs.
+- External-file state and internal pending/failure state remain distinguishable
+  across tabs. Internal acknowledgment alone must never show `保存済み`; see §9.1.
 - Project identity and current Scene remain understandable across every tab.
   Local Scene selection, camera and filters are not shown as shared edits;
   membership, default Scene, Scene entry view and named Saved Views are.
@@ -431,6 +439,48 @@ sufficient.
   co-editing. The future team path distinguishes self-contained Team Workspace,
   base-dependent Contribution, one-Scene review, same-Project backup and
   independent clean copy.
+
+### 9.1 File save versus recovery data (PO approved 2026-09-13)
+
+> Classification: **Accepted requirement**, governed by product contract 00 §2.1.
+> **Current bounded implementation:** the Scene development/metadata/validation
+> hosts no longer map internal acknowledgment to `保存済み`. Their header, mutation
+> feedback, catalog and retention notice distinguish browser resume data from
+> file output. Code/recorded-DOM checks are not rendered/device acceptance;
+> external file output and complete resume/switch UX remain unconnected.
+
+- Internal working-data retention is not announced as Project save success. Where
+  necessary, say `ファイルに未反映の変更があります`; contextual help explains
+  that browser-held work is for resume and can be lost with site data. Do not
+  repeat storage-engine narration after each edit.
+- Reserve `保存しました` for confirmed reflection of the stated content in the
+  user's local file. Browser download handoff may say
+  `ダウンロードを開始しました。保存先で完了を確認してください。`;
+  generation/handoff/unknown completion never clears the external-file warning
+  as if a file write had been confirmed.
+- Successful resume identifies the actual Project and offers §4.1's other-Project
+  path. A transient notice is not the sole navigation. Missing or failed recovery
+  shows a concise failure and the file-open/recovery alternative, not a success.
+- Switching retains existing draft, failure and unreflected-change protections.
+  Do not silently discard them, infer a file write, or delete recovery data.
+  Cancellation must leave the current work available.
+
+Acceptance: internal acknowledgment without file success; scoped external-file
+success without acknowledging later/unincluded edits; download/cancel/failure/
+unknown completion; correct resumed identity and reachable other-Project path;
+missing recovery; and switching without silent loss. Reuse the existing host/UI
+tests and consolidated rendered/device batch when implementing this requirement.
+
+The PO's game-like backup direction is in product contract 00 §2.2: named manual
+checkpoints coexist with one latest automatic point per Project. Auto replaces
+only its own point after successful output, never a manual checkpoint. Recovery
+identifies the Project, time and manual/auto source; optional names are labels,
+not identity. Routine triggers are coalesced rather than generating distracting
+dialogs/downloads or heavy output per gesture. Browser-only resume data is not
+labelled file-saved. The PO-approved fallback without an available external sink
+is latest browser resume data plus explicit manual file saving, with a concise
+capability/permission explanation and no invented download completion. Concrete
+timing is delegated, not a new user decision at every edit.
 
 ## 10. Responsive behavior
 

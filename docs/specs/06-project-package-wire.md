@@ -643,6 +643,34 @@ This section is a concrete recommendation, NOT ratification and NOT an amendment
 already in effect. 05 §7.5 and §10 above still apply. The current implementation
 checkpoint is `0b2de6b`; no ProjectScene package reader/writer exists there.
 
+Later PO clarification: routine design/implementation/verification sequencing is
+delegated. The remaining boundary is approval of the complete concrete technical
+contract and any required gate amendment, not another request for that procedural
+delegation. This historical heading does not reopen an answered question.
+
+PO clarification (2026-09-13): distributor/participant/integrator are scenario
+actions, never fixed permissions (05 §6.1). The contract to settle describes what
+each of the five file purposes contains and does on open/integration, not who is
+allowed to perform those actions. Their purposes are already accepted; exact
+encoding, complete inclusion/omission, limits and implementation gates remain
+the proposed decisions below.
+
+Separately, product contract 00 §2.1 and UI guidelines §9.1 now record the accepted
+external-file-only `保存` language and identifiable last-Project resume with
+another-Project navigation. This presentation decision does not approve this
+section's implementation/adoption split or its artifact/receipt/base protocol.
+
+The subsequent game-like manual/automatic save direction is recorded in 00 §2.2.
+It concerns protected save points and recovery, not a new purpose discriminator
+or proof that an external autosave sink/rotation already exists. Its concrete
+sink and backup/Workspace packaging relationship still need design closure.
+The latest refinement fixes one replaced automatic point plus optionally named
+manual checkpoints, not generations; it does not authorize source-history/base
+truncation or infer identity from a checkpoint name. See 00 §2.2 for delegated
+coalescing and the PO-approved browser-resume/manual-file-save fallback where
+external autosave is unavailable. This closes that product choice, not the new
+wire, sink implementation or its measured adoption.
+
 The present gate requires completed golden/runtime and measured Desktop/iOS
 budget evidence before the first S2 reader/writer. Those observations depend on
 the new implementation, not just the old Native path. Do not resolve that dependency
@@ -687,12 +715,17 @@ Never pack all guards into one conflicting scalar or silently relax old profile
 validation. A new physical profile or compatibility amendment needs explicit PO
 approval and original-history proofs; it is not ratified by the package literal.
 
-The fallback decision is user-visible: say `ファイルを作成しました` when a verified
-in-app artifact is ready, and `ダウンロードを開始しました。保存先で完了を確認してください。`
+The proposed fallback must obey the accepted presentation rule in 00 §2.1: an
+in-app artifact is only ready for download, not a user-file save. Use, for example,
+`ダウンロードの準備ができました`, then
+`ダウンロードを開始しました。保存先で完了を確認してください。`
 after handing it to the browser. Neither event says the OS saved a file, a recipient
 received it or another person accepted it. The generated base describes the exact
 completed package, not delivery. Generation failure/cancellation records no completion.
 An unknown crash window remains unknown; file existence alone is not a receipt.
+Internal persistence or receipt completion must not mark Project edits as reflected
+in an external file. File-save success is limited to the exact content/scope whose
+external completion was confirmed, not newer edits or omitted Project data.
 
 Keep package/job roots until the verified artifact and durable receipt/base handoff
 complete. Never delete the retained base's proof/inventory merely because the
@@ -745,5 +778,112 @@ bytes. Golden generation alone, or updating expected bytes to match a bug, is no
 acceptance. No validator uses whatever table happens to be installed in a future
 library version; pin the reviewed table and rerun its compatibility vectors.
 
-Until PO answers this explicit gate-change request, only design work is authorized.
-Implementation progress elsewhere and permission to push do not approve this split.
+Until the closed technical contract and applicable gate are satisfied or explicitly
+amended, this proposal authorizes design, not a package reader/writer. Complete and
+review the concrete remaining contract once under the delegated sequencing; do
+not repeatedly ask the PO to delegate the same work. Implementation progress
+elsewhere and permission to push do not themselves ratify a new wire or profile.
+
+### 11.4 Save-point and output-completion protocol (design closure, 2026-09-13)
+
+This subsection applies the approved 00 §2.1–2.2 product choices to the existing
+five purposes. It is a concrete implementation-design proposal, not wire/profile
+ratification, an implemented sink or a relaxation of 05 §7.5. Routine sequencing
+and trigger/coalescing design are already delegated; do not ask for that same
+delegation again. Complete §11.3's tables and review remain necessary before code.
+
+#### User intents and package content
+
+| User intent | Artifact / record | Required distinction |
+|---|---|---|
+| Save a named checkpoint | `backup`, exact committed whole Project plus protected payloads and local exchange-base evidence | Same Project, not `clean`. The optional name is a display/suggested-filename label, not identity, a new purpose or a metadata edit. Do not silently overwrite an existing manual file. |
+| Update the automatic point | The same `backup` scope, one latest logical point for this Project | Never overwrite a manual checkpoint. Use a separate authorized sink and verified replacement protocol; otherwise use the approved browser-resume/manual-save fallback. |
+| Send the Project to someone | `teamWorkspace` | A self-contained starting point without the sender's local exchange-base table. Generation establishes only the exact retained Workspace base, not delivery, acceptance or a manual checkpoint. |
+| Send changes using a selected base | `contribution` | Exact original changes/new required bodies relative to that base; not a complete save point and never advances the base. |
+| Browse the current Project | Local View mode | No file creation or new lineage is required merely to disable editing. A URL mode switch does not transfer data or exclude private Scenes. |
+| Share only one Scene / start an independent Project | Existing `review` / `clean` purposes respectively | Contextual secondary actions with their existing scope/privacy/lineage preflight, not alternatives the user must decide between on every save. |
+
+Normal Save and automatic checkpointing therefore do not create new Workspace
+exchange bases or put them into the ProjectDoc. A backup retains already available
+bases without advancing them. Repeated latest-point replacement must not cause an
+ever-growing base table. Sending a Workspace remains a separate explicit intent.
+An explicit label supplied for a filename is not silently copied to the manifest's
+optional memo or shared Project title. Label/filename validation never proves purpose.
+
+#### One frozen result, separate generation and file receipts
+
+1. Finish or recover a pending internal transaction before capturing a point.
+   An unapplied draft is not silently included or discarded: explain that it has
+   not been applied and let the user finish/cancel it. Capture exact published
+   Project identity, envelope, heads, protected inventory and local-base snapshot
+   under the existing authority boundary. No renderer/materialized winner is an
+   export source. Valid unresolved candidates remain in a causal backup.
+2. Hold the corresponding metadata/body/base roots and create one fresh package
+   job/manifest. Stream all declared bytes and verify lengths/hashes. Reuse verified
+   unchanged-body inventory for planning, but do not pretend a complete external
+   backup can omit required bodies merely because the browser still has them.
+3. A successfully closed and read-back-verified OPFS artifact is `generated` only.
+   It can support a Workspace generation/base receipt under §11.1, but not an
+   external-file receipt. Bind the local receipt to the exact package/manifest,
+   content scope and immutable artifact, not a filename or current UI selection.
+4. A supported external sink may record file completion only after successful
+   close and read-back verification of that exact output. Browser download handoff
+   remains unconfirmed. In the manual fallback, offer explicit re-selection of
+   the downloaded file for streamed content verification; neither a checkbox nor
+   a download-start callback substitutes for that evidence. Do not request repeated
+   downloads automatically. Unknown/cancelled/failed output stays distinguishable.
+5. A file receipt covers only its frozen content. If another Project edit or an
+   included local-base update happened during output, retain the newer unreflected
+   state. Output completion does not move the active Scene, replace the Project,
+   acknowledge newer edits or prove that another person received anything.
+
+The same published heads alone do not identify a backup result: protected inventory
+and local exchange records can change without a Project edit. No-change suppression
+must compare the full captured input, excluding incidental package ID/timestamps.
+The exact persistent job/receipt shape belongs to the closed implementation contract;
+this subsection does not introduce an unversioned local schema.
+
+#### One logical auto point, failure-safe physical replacement
+
+Maintain at most one running automatic output and one coalesced pending indication
+per Project. Once the running job finishes, recheck the latest captured state;
+do not queue one whole file per edit. UI-only gestures may trigger a check but
+cannot create history or require unchanged output. Never race manual output,
+Project switching or recovery against an unverified state transition.
+
+An external automatic sink is eligible only if its implementation can preserve
+the previous usable point until the new output and its durable promotion receipt
+are verified. Writing over a single existing handle and hoping later read-back
+succeeds is insufficient. A bounded staged replacement may temporarily need both
+old and new physical artifacts; it is still one logical latest point, not user
+generation history. Space for that overlap must be admitted before output. After
+successful promotion, only the proven superseded automatic artifact may be cleaned
+up under the authorized sink policy; manual points and retained-base roots remain.
+Failed cleanup reports occupied space and must not run an unbounded new output queue.
+
+No currently unproved browser/file API is assumed to provide this protocol. Until
+an eligible authorized external sink exists, latest browser resume data plus
+explicit manual file saving is the supported fallback. Permission loss, missing
+space or inability to verify a replacement retains recoverable work and the old
+usable point. Do not weaken preservation or promise background/exit-time writes
+to present autosave as available. Cadence/backoff remains a measured implementation
+choice, not a new PO interval decision or a device performance guarantee.
+
+#### Resume / restore and finite acceptance
+
+Resume identifies the actual Project and source; an explicit file choice wins
+over a newer automatic point. A manual/auto backup chosen for recovery uses 05 §7.4's
+explicit same-Project restore, not an automatic causal merge or invisible rollback.
+Preflight identifies the point and current work that would be replaced. Declining
+keeps current drafts/Project intact. Successful file verification alone does not
+restore, switch or delete anything. Missing browser resume data offers file-open
+or applicable repair; it does not become a new empty Project or resume success.
+
+Reuse existing source/journal/body tests and add only the missing artifact/sink
+cases: named manual versus latest-auto independence; same heads with changed base
+inventory; edits during output; zero-change skip and burst coalescing; failure at
+staging/close/read-back/receipt/promotion; unknown crash completion; permission/
+space loss retaining the old point; manual download re-selection; and explicit
+restore cancellation. Record exact output bytes and which content the receipt
+covers. Rendered/native file-dialog, physical-iPhone and offline acceptance remain
+separate; current DOM/storage-port tests cannot supply them.

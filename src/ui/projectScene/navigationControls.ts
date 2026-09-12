@@ -2,18 +2,20 @@ import type { SceneState } from '../../scene/types';
 import { planNavigation, sceneChoices, sceneSwitchReason, taskLabels,
   type NavigationIntent, type NavigationPlan, type NavigationSession, type PendingInteraction, type TaskId } from './navigationState';
 
-export type SavePresentation =
-  | Readonly<{ kind: 'saved' | 'unsaved' | 'saving' | 'readOnly' }>
+/** Working-data state only. A browser acknowledgment is not a file-save receipt. */
+export type WorkingPresentation =
+  | Readonly<{ kind: 'retained' | 'pageOnly' | 'pending' | 'checking' | 'readOnly' }>
   | Readonly<{ kind: 'failed' | 'recovery'; message: string }>;
 export interface NavigationProps {
   readonly scenes: SceneState;
   readonly session: NavigationSession;
   readonly pending: PendingInteraction | null;
-  /** Supplied by the host. This component can never turn a failure into saved. */
-  readonly save: SavePresentation;
+  /** Historical slot name; no external-file completion state is representable here. */
+  readonly save: WorkingPresentation;
 }
-const saveLabels = Object.freeze({ saved: '保存済み', unsaved: '未保存', saving: '保存中…',
-  readOnly: '閲覧のみ', failed: '保存できませんでした', recovery: '未完了の処理があります' });
+const saveLabels = Object.freeze({ retained: '再開用データのみ', pageOnly: 'ページ内のみ',
+  pending: '未確定の操作があります', checking: '更新を確認中…',
+  readOnly: '閲覧のみ', failed: '更新できませんでした', recovery: '未完了の処理があります' });
 let nextInstance = 0;
 
 /**

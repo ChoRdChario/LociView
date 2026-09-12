@@ -22,7 +22,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const root = document.createElement('section'), navigation = document.createElement('section'), content = document.createElement('section');
   root.className = 'lv-validation-host'; navigation.className = 'lv-validation-home';
   const heading = document.createElement('h1'); heading.textContent = '実ファイルで検証';
-  const help = document.createElement('p'); help.textContent = '静的GLB（内蔵PNG・外部参照なし）とPNGを使います。検証用の新しいプロジェクトに保存します。既存プロジェクトは変更しません。';
+  const help = document.createElement('p'); help.textContent = '静的GLB（内蔵PNG・外部参照なし）とPNGを使います。新しい検証プロジェクトを作成します。再開用データはこのブラウザ内のみで、ファイル保存は未接続です。既存プロジェクトは変更しません。';
   const form = document.createElement('form'), title = document.createElement('input'), files = document.createElement('input');
   title.value = '新しいプロジェクト'; title.maxLength = 256; title.setAttribute('aria-label', 'プロジェクト名');
   files.type = 'file'; files.multiple = true; files.setAttribute('aria-label', '3Dモデルとメディアを選択');
@@ -33,7 +33,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const status = document.createElement('p'); status.setAttribute('role', 'status');
   const list = document.createElement('section'), refresh = document.createElement('button'), back = document.createElement('button');
   refresh.type = back.type = 'button'; refresh.textContent = '一覧を更新'; back.textContent = 'プロジェクトを選ぶ';
-  const listHeading = document.createElement('h2'); listHeading.textContent = 'この端末の検証プロジェクト';
+  const listHeading = document.createElement('h2'); listHeading.textContent = 'このブラウザの再開用データ';
   navigation.append(heading, help, form, listHeading, refresh, list); root.append(back, status, navigation, content);
   let host: Host | undefined, workspace: ReturnType<typeof createSavedWorkspace> | undefined;
   let resident: Awaited<ReturnType<ValidationWorkspacePorts['render']>> | undefined;
@@ -45,7 +45,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const execute = (action: () => Promise<void>) => {
     if (busy || disposed) return; busy = true; controls();
     const work = action(); operation = work;
-    void work.catch(error => { if (!disposed) status.textContent = error instanceof Error ? error.message : '処理できません。入力と保存データは保持しています。'; })
+    void work.catch(error => { if (!disposed) status.textContent = error instanceof Error ? error.message : '処理できません。入力と再開用データは保持しています。'; })
       .finally(() => { busy = false; if (operation === work) operation = undefined; if (!disposed) controls(); });
   };
   const closeCurrent = async () => {
@@ -54,7 +54,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (oldWorkspace) await oldWorkspace.dispose(); else await oldHost?.dispose(); oldResident?.dispose(); content.replaceChildren();
   };
   const ensureMaySwitch = () => {
-    if (composing || changed()) throw Error('入力・保存を確定するか、取り消してからプロジェクトを切り替えてください。');
+    if (composing || changed()) throw Error('入力・更新を確定するか、取り消してからプロジェクトを切り替えてください。');
   };
   const updateList = async () => {
     const entries = await ports.list(); if (disposed) return;
@@ -62,8 +62,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (!entries.length) { list.textContent = '検証プロジェクトはありません。'; return; }
     for (const item of entries) {
       const row = document.createElement('p'), name = document.createElement('span'), open = document.createElement('button');
-      name.textContent = `${item.title} — ${item.state === 'ready' ? '保存済み' : item.state === 'incomplete' ? '保存が未完了' : '要確認'} `;
-      open.type = 'button'; open.textContent = item.state === 'ready' ? '開く' : '保存状態を確認';
+      name.textContent = `${item.title} — ${item.state === 'ready' ? '再開用データ' : item.state === 'incomplete' ? '更新が未完了' : '要確認'} `;
+      open.type = 'button'; open.textContent = item.state === 'ready' ? '開く' : '再開用データを確認';
       open.addEventListener('click', () => execute(async () => { ensureMaySwitch(); await closeCurrent(); await openProject(item.run); }));
       row.append(name, open); list.append(row);
     }
@@ -73,12 +73,12 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     content.replaceChildren();
     if (host.read().state !== 'ready' || host.hasPending()) {
       const note = document.createElement('p'), retry = document.createElement('button');
-      note.textContent = host.authority.status?.().error || '保存が未完了です。元の変更から再試行してください。';
-      retry.type = 'button'; retry.textContent = '保存を再試行'; retry.disabled = !!host.authority.readOnly;
+      note.textContent = host.authority.status?.().error || '更新が未完了です。元の変更から再試行してください。';
+      retry.type = 'button'; retry.textContent = '更新を再試行'; retry.disabled = !!host.authority.readOnly;
       retry.addEventListener('click', () => execute(async () => { await host!.authority.retry!(); await mount(); }));
       content.append(note, retry); return;
     }
-    status.textContent = '保存したモデルを読み込んでいます。';
+    status.textContent = 'モデルを読み込んでいます。';
     const target = host, next = await ports.render(target);
     if (disposed || host !== target) { next.dispose(); return; }
     resident = next;
@@ -87,7 +87,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     status.textContent = '検証用プロジェクト。通常画面・オフライン・実機での受入れは未完了です。';
   };
   const openProject = async (run: string, initial?: ReturnType<typeof prepareValidationCreation>) => {
-    status.textContent = initial ? '検査した内容を保存しています。' : '保存内容を確認しています。';
+    status.textContent = initial ? 'プロジェクトを作成しています。' : '再開用データを確認しています。';
     const opened = await ports.open(run, initial);
     if (disposed) { await opened.dispose(); return; }
     host = opened; selected = run; ports.selected(run); navigation.hidden = true; await mount();

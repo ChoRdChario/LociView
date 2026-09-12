@@ -246,7 +246,7 @@ export class SyntheticSession {
   }
   get savedStatus() { return this.authority?.status?.(); }
   get workingBlock() { return this.acknowledgment.block ?? (this.savedStatus?.kind === 'failed' ?
-    this.savedStatus.error ?? '未完了の保存があります。更新を再試行してください。' : null); }
+    this.savedStatus.error ?? '未完了の更新があります。更新を再試行してください。' : null); }
   retryWorking() {
     if (this.acknowledgment.state === 'failed') return this.acknowledgment.retry();
     if (this.authority?.retry && this.savedStatus?.kind === 'failed')
@@ -870,7 +870,7 @@ export class SyntheticSession {
       const changes = Object.fromEntries(Object.entries(event.changes).map(([field, text]) => [captionKey(old.id, field as 'title' | 'body' | 'color'), text!]));
       return this.applyWorking(() => this.writeProject(event.token, changes, local), () => {
         this.drafts.set(old.id, acceptCaptionApply(event, context.draft!, this.detailSource()));
-        this.detailFeedback = { kind: 'idle' }; this.message = this.savedDevelopment ? '変更を保存しました。' : '変更を適用しました。このページ内だけの変更です。';
+        this.detailFeedback = { kind: 'idle' }; this.message = this.savedDevelopment ? '変更を適用しました。' : '変更を適用しました。このページ内だけの変更です。';
       }, failed);
     } catch (error) { failed(error); return false; }
   }

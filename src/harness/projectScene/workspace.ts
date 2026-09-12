@@ -26,9 +26,10 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   const header = make('header'); header.className = 'lv-development-header';
   const brand = make('span', 'LociView'); brand.className = 'lv-development-brand';
   const name = make('h1', 'シーンと記録の編集');
-  const notice = make('p', session.snapshot.validationFiles ? '実ファイルの限定検証。適用した変更はこのブラウザに保存します。未適用の入力は保存されません。' : session.savedDevelopment ?
-    '開発用・合成データのみ。適用した変更はこのブラウザに保存します。未適用の入力は再読み込みで失われます。' :
-    '開発用・合成データのみ。変更は保存されず、再読み込みで失われます。');
+  const retentionNotice = '再開用データはこのブラウザ内だけに保持します。サイトデータの削除で失われます。ファイル保存は未接続です。未適用の入力は再読み込みで失われます。';
+  const notice = make('p', session.snapshot.validationFiles ? `実ファイルの限定検証。${retentionNotice}` : session.savedDevelopment ?
+    `開発用・合成データのみ。${retentionNotice}` :
+    '開発用・合成データのみ。変更はこのページ内だけで、再読み込みで失われます。');
   notice.className = 'lv-development-notice';
   const message = make('p'); message.className = 'lv-development-message';
   const working = make('section'), workingStatus = make('p'), retryWorking = make('button', '更新を再試行');
@@ -51,7 +52,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   materialPanel.append(make('h2', 'マテリアル'), make('p', '表面の選択・色の調整は未接続です。'));
   viewPanel.append(make('h2', '視点'), make('p', '全体表示・方向プリセット・保存した視点は未接続です。'));
   const footer = make('footer', session.snapshot.validationFiles ? '静的GLB・PNGの限定検証です。ファイル交換と通常画面への接続は準備中です。' : session.savedDevelopment ?
-    '保存するのはこの開発画面の合成データだけです。実プロジェクト・ファイル交換には未対応です。' : options.team ?
+    '再開できるのはこの開発画面の合成データだけです。実プロジェクト・ファイル交換には未対応です。' : options.team ?
     '更新の受信はこのページ内の2人分の編集だけが対象です。ファイルの読込・保存は未接続です。' :
     'ファイルの読込・保存・共同編集は未接続です。既存プロジェクトには触れません。');
   footer.className = 'lv-development-footer';
@@ -105,6 +106,14 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     // Keep editors mounted and draft DOM intact, but prevent overlapping native input.
     content.inert = header.inert = !!session.workingBlock;
     content.setAttribute('aria-busy', String(session.acknowledgment.state === 'checking'));
+    // Refresh even when a child retains input and refuses to render. Failures
+    // precede readonly/idle, including memory-only and host-owned operations.
+    const stored = session.savedStatus;
+    navigation.render({ scenes: session.snapshot.state, session: session.session, pending: session.pending,
+      save: session.acknowledgment.state === 'checking' || stored?.kind === 'checking' ? { kind: 'checking' } :
+        session.acknowledgment.state === 'failed' || stored?.kind === 'failed' ? { kind: 'failed', message: session.acknowledgment.error || stored?.error || '' } :
+        session.workingBlock ? { kind: 'recovery', message: session.workingBlock } :
+        { kind: session.pending ? 'pending' : session.readOnly ? 'readOnly' : session.savedDevelopment ? 'retained' : 'pageOnly' } });
     viewport.render(!root.hidden);
     // Session admission aggregates all component pending-input rules before a Scene change.
     // Refresh every mounted recipient even while hidden; never unmount an editor to change tabs.
@@ -120,9 +129,6 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
       message.textContent = '入力中の状態を保持しています。操作を完了してから切り替えてください。';
       message.hidden = false; return;
     }
-    navigation.render({ scenes: session.snapshot.state, session: session.session, pending: session.pending,
-      save: !session.savedDevelopment ? { kind: 'unsaved' } : session.acknowledgment.state === 'checking' ? { kind: 'saving' } :
-        session.workingBlock ? { kind: 'recovery', message: '' } : { kind: session.pending ? 'unsaved' : 'saved' } });
     const task = session.session.task;
     sceneAuthoring.root.hidden = task !== 'captions' || !session.sceneAuthoringAvailable;
     editor.hidden = windowActions.hidden = navigation.sceneControl.hidden = pin.actions.hidden = task !== 'captions';
@@ -135,8 +141,8 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     placement.actions.hidden = task !== 'models';
     materialPanel.hidden = task !== 'materials'; viewPanel.hidden = task !== 'views';
     if (session.captionTextOnly) {
-      notice.textContent = session.readOnly ? '閲覧専用のタブです。編集する場合は、編集用タブを閉じてから再読み込みしてください。' :
-        '開発用・合成データのみ。キャプション・シーンへの所属・視点・マテリアル・添付・モデル位置を保存できます。未適用の入力は再読み込みで失われます。';
+      notice.textContent = (session.readOnly ? '閲覧専用のタブです。編集する場合は、編集用タブを閉じてから再読み込みしてください。' :
+        session.snapshot.validationFiles ? '実ファイルの限定検証。' : '開発用・合成データのみ。') + retentionNotice;
       if (session.pinRestriction) pin.actions.hidden = pin.modeStrip.hidden = pinHelp.hidden = numeric.hidden = true;
       if (session.membershipRestriction) include.root.hidden = true;
       if (session.modelUpdateRestriction) modelUpdate.root.hidden = true;

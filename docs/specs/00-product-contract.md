@@ -36,7 +36,7 @@ destructive merge and silent guessed linkage are never defaults.
 | `PROD-03` | A material or cross-Representation composition that cannot be rendered safely is diagnosed and degrades only the affected rendered model/material contribution; it does not require a separate Compare product mode or make unrelated visible Assets unusable. |
 | `PROD-04` | The initial supported GS interaction path raycasts only the invisible same-asset proxy explicitly related to the selected visible GS family. It converts that approximate hit to a transient candidate in the GS Asset's AssetFrame; the user then adjusts or confirms the ordinary Caption gizmo before a source-less manual anchor is saved. Hiding that GS Asset also removes its proxy from interaction. A selected visible Mesh Asset raycasts itself; an unrelated visual Mesh is never substituted for a GS proxy. The proxy is never the saved-position authority, and a proxy-less GS Asset is view-only for new placement. Missing, invalid, ambiguous, cross-asset or unregistered interaction data is reported and never guessed; direct splat picking and automatic proxy generation are not initial MVP requirements. |
 | `PROD-05` | A topology-changing Asset replacement preserves the logical Asset, AssetFrame and every Scene membership but never moves Captions or material overrides to a new surface silently. Unproven anchor/material compatibility becomes explicit review work. |
-| `PROD-06` | Data shown as durably saved survives a reload or process interruption covered by the durability gate. |
+| `PROD-06` | Acknowledged working data survives the reload/process interruptions covered by the durability gate. User-visible Project `保存` success additionally requires confirmed reflection of the stated content in a user-controlled local file; browser-held working data alone is not a saved file. See §2.1. |
 | `PROD-07` | A structurally valid same-lineage Contribution atomically retains all causal changes and required candidates/blobs even when it introduces a semantic conflict. Only the affected authoritative projection is blocked; an explicit causal resolution is required and arrival order never chooses a winner. Invalid lineage, dependency, integrity or blob input publishes no new head. |
 | `PROD-08` | Review/share exports one explicitly selected Scene and excludes edit history by construction. A clean editable copy contains the whole current Project under a new lineage. Exact backup, Team Workspace, Contribution, review/share and clean copy remain distinct purposes. |
 | `PROD-09` | Large GS and package paths degrade quality or refuse safely before browser memory pressure kills the page. |
@@ -52,6 +52,107 @@ destructive merge and silent guessed linkage are never defaults.
 | `PROD-19` | A Scene references a logical Asset rather than an exact model revision. Active Asset revision/alignment remains Project-wide supporting infrastructure. Older-revision Caption text/media changes remain integrable, while only unproven anchors/material mappings become `needsReview`; no user must replace the model independently merely to participate. |
 | `PROD-20` | `Project.defaultSceneId` and explicitly saved Named Views are shared. The momentary active Scene, free camera, selection, filters, temporary isolation, gizmo values and floating-window layout are local UI state and never silently enter Project history or package scope. |
 | `PROD-21` | Desktop and physical-iPhone layouts expose the same Project administration, Scene composition, model revision review, conflict resolution and package purposes. Responsive reflow may change layout and resource admission may fail safely before a write, but mobile is not a restricted contributor role. |
+
+### 2.1 File-save language and working-Project resume (PO approved 2026-09-13)
+
+This is an accepted user-facing requirement, not an implemented file sink or a
+new storage/wire adoption. It supersedes presentation that equates acknowledged
+browser persistence with a user-visible Project `保存済み` result. Technical
+references to durable storage, journal acknowledgments and saved source bytes
+elsewhere remain storage requirements, not permission to show file-save success.
+
+- Reserve Project `保存しました` / `保存済み` for confirmed reflection of the
+  stated Project content/scope in a user-controlled local file. Browser OPFS/IDB
+  writes, an in-app generated artifact, or download initiation alone do not meet
+  that condition. Missing completion evidence, cancellation and failure must not
+  become success. An export of a Contribution or one Scene cannot mark unrelated
+  whole-Project edits file-saved.
+- Continue retaining working data for recovery and verifying internal durable
+  acknowledgments. Do not downgrade these writes to volatile memory. Browser
+  site-data loss can remove the recovery copy; it is not a file backup. Clearly
+  distinguish changes not yet reflected in an external file from internal pending
+  operations/failures, without showing routine internal writes as save success.
+- When the last Project is actually resumed from browser-held data, identify it
+  and announce `最後のプロジェクトを再開しました`. Provide an immediately
+  reachable way to open another Project or select another recoverable Project;
+  keep that path reachable after the notice disappears. This does not require
+  silently opening the last Project on every startup or overriding an explicit
+  file/Project selection.
+- Missing, incomplete or damaged recovery data must not produce a resume-success
+  message or silently become a new empty Project. State what could not be resumed
+  and expose the applicable recovery/file-open path. Changing Projects must not
+  silently discard drafts or changes not yet reflected in a file, claim they
+  were saved, or delete the previous browser-held Project.
+
+Implementation acceptance must distinguish internal-ack-only, confirmed external
+file completion, download-only/cancel/failure/unknown completion, successful resume
+with another-Project navigation, and missing/damaged resume data. The bounded
+Scene development/metadata/validation hosts now distinguish browser resume data,
+page-only state, pending operations, failure and read-only state without internal
+acknowledgment producing `保存済み`. Mutation feedback and the validation catalog
+use the same distinction. This is code/recorded-DOM evidence only: external file
+output, complete resume/switch UX and rendered/device acceptance remain open in
+the existing connected workflow, not a separate PoC.
+
+### 2.2 Named manual checkpoints and one latest autosave (PO direction 2026-09-13)
+
+Manual and automatic save data coexist, using the game-save mental model. This
+is an accepted product direction, not an implemented autosave facility, a new
+package purpose or ratification of a concrete file sink/retention scheme.
+
+- A manual save is the checkpoint the user deliberately retains, with an optional
+  user-chosen name. Names distinguish checkpoints, not Project identity, exchange
+  base, package purpose or inferred source relationships.
+- Each Project has one latest automatic point, replaced by the next successful
+  update, not an automatic generation history. Automatic output never overwrites
+  a manual checkpoint. Both continue the same Project identity/history; an
+  autosave is not a clean independent Project.
+- Section 2.1 applies equally to `自動保存`: a confirmed user-controlled local
+  file result is required. Browser-only working-data retention remains resume
+  data, not a file backup. If the permitted external sink is unavailable or
+  completion is unknown, disclose that limitation instead of claiming autosave.
+- Each successful point represents a complete durable Project state, including
+  unresolved candidates where the applicable backup contract retains them; it
+  must not publish an intermediate mutation prefix or silently choose a winner.
+  A failed, cancelled or interrupted new output must preserve the prior usable
+  manual and automatic points. Replacement must preserve the usable old automatic
+  point until the new result is verified. Temporary staging for safe replacement
+  is not a user-visible generation history, and its extra space must be bounded.
+- Resume/recovery identifies the Project, point time and manual/automatic source.
+  An explicit file/point choice is not overridden by a newer automatic point.
+  Restoring a manual checkpoint must not silently replace current work or destroy
+  the current auto point. Existing draft/failure/Project-switch protections apply.
+
+Trigger timing and coalescing are delegated to implementation design, judged by
+file growth and interactive responsiveness, not repeated PO interval decisions.
+Use confirmed Project edits to mark pending output, coalesce bursts, skip unchanged
+content and serialize automatic outputs with bounded pending work. Pure camera,
+selection, filter and window changes must not create Project history or regenerate
+an unchanged Project file. A broad trigger may flush existing edits; it does not
+mean a full ZIP/model rewrite for every gesture. Prefer yielding/streaming and
+reusing verified unchanged-body information within the approved format. Do not
+claim background/close-time completion or bounded device performance without proof.
+
+Replacing the latest point does not authorize trimming causal history, retained
+exchange bases, conflict candidates, required blobs or unfinished-job roots.
+Minimize duplicate output and unnecessary work first. Track which exact content
+each manual/automatic result contains; completing an older output cannot mark
+newer edits file-saved. Neither point implies delivery to a teammate.
+
+The concrete external sink, bounded replacement working space and permission/
+platform behavior remain design and verification items. **PO approved the fallback
+on 2026-09-13:** where external autosave is unavailable, retain the latest browser
+resume data and offer explicit manual file saving. Clearly distinguish that
+recovery copy from a user-controlled file; do not claim equivalent protection or
+file-save completion under §2.1. State the limitation when it affects the current
+action, preserve recoverable work on denied/lost permission, and never replace
+automatic writing with repeated unsolicited download dialogs. A manual download
+still obeys §2.1's completion-evidence rule. This is a supported product fallback,
+not proof that a file sink or physical-device acceptance is implemented.
+Acceptance covers named manual/one-auto coexistence, burst coalescing and no-change
+skip, failed replacement preserving prior points, correct content-specific file
+completion labels, explicit recovery and large-model input responsiveness. No
+arbitrary interval, history truncation or physical-device guarantee is adopted.
 
 ## 3. Asset visibility and composition support
 

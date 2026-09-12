@@ -94,13 +94,13 @@ describe('disconnected ProjectScene navigation: UI intentions, not storage/rende
     expect(select.attributes.get('aria-describedby')).toBe(sceneRoot.children[2]!.id);
     expect(tasks.children.map(button => button.textContent)).toEqual(Object.values(taskLabels));
     expect(tasks.children[0]!.attributes.get('aria-pressed')).toBe('true');
-    expect(controls.saveStatus.textContent).toContain('保存できませんでした');
+    expect(controls.saveStatus.textContent).toContain('更新できませんでした');
     const optionsBefore = select.children;
     select.children.find(n => n.textContent === '比較')!.fire('click');
     expect(select.children[0]!.attributes.get('aria-pressed')).toBe('true'); expect(plans[0]).toMatchObject({ kind: 'change', enterScene: b });
-    expect(controls.saveStatus.textContent).toContain('保存できませんでした');
+    expect(controls.saveStatus.textContent).toContain('更新できませんでした');
     expect(props.save.kind).toBe('failed'); expect(props.session).toBe(session);
-    controls.render({ ...props, save: { kind: 'saving' } });
+    controls.render({ ...props, save: { kind: 'checking' } });
     expect(select.children).toBe(optionsBefore);
     controls.render({ ...props, pending: 'pinMove' });
     expect(select.children.every(n => n.disabled)).toBe(true); expect(sceneRoot.children[2]!.textContent).toContain('ピンの移動');
@@ -108,6 +108,18 @@ describe('disconnected ProjectScene navigation: UI intentions, not storage/rende
     select.children.find(n => n.textContent === '比較')!.fire('click'); expect(plans.at(-1)).toMatchObject({ kind: 'change', session: { task: 'models' } }); expect(select.children[0]!.attributes.get('aria-pressed')).toBe('true');
     const count = plans.length; controls.dispose(); tasks.children[0]!.fire('click'); select.children[0]?.fire('click');
     expect(plans).toHaveLength(count);
+  });
+
+  it('never presents working acknowledgments as file-save success', () => {
+    const { state, session } = fixture(), controls = createNavigationControls(documentPort, () => {});
+    const labels = { retained: '再開用データのみ', pageOnly: 'ページ内のみ', pending: '未確定の操作があります',
+      checking: '更新を確認中…', readOnly: '閲覧のみ' } as const;
+    for (const kind of Object.keys(labels) as (keyof typeof labels)[]) {
+      controls.render({ scenes: state, session, pending: null, save: { kind } });
+      expect(controls.saveStatus.textContent).toBe(labels[kind]);
+      expect(controls.saveStatus.textContent).not.toMatch(/保存済み|保存しました/);
+    }
+    controls.dispose();
   });
 
   it('passes imported strings as text and leaves no-Scene state recoverable without selecting an alternative', () => {
@@ -118,10 +130,10 @@ describe('disconnected ProjectScene navigation: UI intentions, not storage/rende
     const select = (controls.sceneControl as unknown as Node).children[1]!;
     expect(select.children[0]!.textContent).toBe(literal); expect(select.children[0]!.children).toEqual([]);
     expect(controls.saveStatus.textContent).toContain(literal);
-    controls.render({ scenes: { ...state, scenes: {} }, session: { ...session, sceneId: null }, pending: null, save: { kind: 'unsaved' } });
+    controls.render({ scenes: { ...state, scenes: {} }, session: { ...session, sceneId: null }, pending: null, save: { kind: 'pageOnly' } });
     expect(select.children.every(n => n.disabled)).toBe(true); expect(select.children).toEqual([]);
     expect((controls.sceneControl as unknown as Node).children[2]!.textContent).toContain('状態を確認');
-    expect(controls.saveStatus.textContent).toBe('未保存');
+    expect(controls.saveStatus.textContent).toBe('ページ内のみ');
   });
 
   it('explains a missing, deleted or unresolved current Scene without silently selecting an available alternative', () => {
@@ -133,7 +145,7 @@ describe('disconnected ProjectScene navigation: UI intentions, not storage/rende
         ? value({ state: 'deleted', eventId: 'evt_' + '2'.repeat(32), reason: 'userDelete' })
         : { kind: 'unresolved', reason: 'conflict' } };
       const controls = createNavigationControls(documentPort, plan => plans.push(plan));
-      const props: NavigationProps = { scenes: { ...state, scenes }, session, pending: null, save: { kind: 'unsaved' } };
+      const props: NavigationProps = { scenes: { ...state, scenes }, session, pending: null, save: { kind: 'pageOnly' } };
       controls.render(props);
       const root = controls.sceneControl as unknown as Node, select = root.children[1]!;
       const previousValue = currentState === 'unresolved' ? a : '';
@@ -145,7 +157,7 @@ describe('disconnected ProjectScene navigation: UI intentions, not storage/rende
       expect(plans).toEqual([]); expect(session.sceneId).toBe(a);
       select.children.find(n => n.textContent === '比較')!.fire('click');
       expect(plans.at(-1)).toMatchObject({ kind: 'change', enterScene: b });
-      expect(session.sceneId).toBe(a); expect(controls.saveStatus.textContent).toBe('未保存');
+      expect(session.sceneId).toBe(a); expect(controls.saveStatus.textContent).toBe('ページ内のみ');
       controls.render({ ...props, pending: 'text' });
       expect(select.children.every(n => n.disabled)).toBe(true);
       expect(root.children[2]!.textContent).toContain('現在のシーンを表示できません');

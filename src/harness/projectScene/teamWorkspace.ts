@@ -36,7 +36,7 @@ export function createTeamWorkspace<F extends WorkingHistoryFactory>(document: D
   const receive = make('button', '相手の更新を受け取る'), retry = make('button', '同じ更新を再受信');
   receive.type = retry.type = 'button';
   const saved = sessions.every(s => s.savedDevelopment);
-  const status = make('p', saved ? '2人分の合成データを、このブラウザに保存して試せます。' :
+  const status = make('p', saved ? '2人分の合成データを、このブラウザ内で再開して試せます。ファイル保存は未接続です。' :
     '2人分の編集をこのページ内で試せます。ファイル交換・保存は未接続です。');
   status.setAttribute('role', 'status');
   const instructions = make('p', 'それぞれの編集を適用してから、相手の更新を受け取ります。');

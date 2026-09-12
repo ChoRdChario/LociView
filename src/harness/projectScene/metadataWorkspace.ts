@@ -18,7 +18,7 @@ export function createSavedWorkspace(document: Document, host: SavedWorkspaceHos
   let receiveControls: SavedWorkspaceTools | undefined;
   const root = document.createElement('section'), tools = document.createElement('section');
   const check = document.createElement('button'), restore = document.createElement('button'), status = document.createElement('p');
-  check.type = restore.type = 'button'; check.textContent = '保存状態を確認'; restore.textContent = '保存を再試行';
+  check.type = restore.type = 'button'; check.textContent = '再開用データを確認'; restore.textContent = '更新を再試行';
   status.setAttribute('role', 'status'); tools.append(check, restore, status); root.append(tools);
   const startup = createMetadataStartupControls(document, host, () => workspace?.session, () => { feedback = ''; render(); },
     () => refreshing || !!receiveControls?.hasChanges());
@@ -36,15 +36,15 @@ export function createSavedWorkspace(document: Document, host: SavedWorkspaceHos
     check.disabled = restore.disabled = refreshing || startup.busy() || workspace?.session.acknowledgment.state === 'checking';
     restore.hidden = !!workspace || host.authority.readOnly || !host.hasPending() && !startup.recoveryPending();
     status.textContent = feedback || (!workspace ? host.hasPending() ?
-      host.authority.readOnly ? '保存が未完了です。編集用タブで復旧してください。' : '保存が未完了です。元の変更から再試行できます。' :
-      '開始シーンを確認してください。保存済みのシーンと記録は保持しています。' : '');
+      host.authority.readOnly ? '更新が未完了です。編集用タブで復旧してください。' : '更新が未完了です。元の変更から再試行できます。' :
+      '開始シーンを確認してください。シーンと記録は保持しています。' : '');
     workspace?.render(); receiveControls?.render(); startup.render();
   };
   const refresh = async (retry: boolean) => {
     if (disposed || refreshing || startup.busy()) return;
     if (!retry && startup.hasChanges() || workspace && !workspace.session.readOnly &&
       (workspace.session.pending || workspace.session.workingBlock && !retry)) {
-      feedback = '入力・保存を確定するか、取り消してから確認してください。'; render(); return;
+      feedback = '入力・更新を確定するか、取り消してから確認してください。'; render(); return;
     }
     feedback = '';
     if (retry && startup.recoveryPending()) { startup.retry(); render(); return; }
@@ -53,8 +53,8 @@ export function createSavedWorkspace(document: Document, host: SavedWorkspaceHos
       if (retry) await host.authority.retry!(); else await host.refresh();
       if (disposed) return;
       if (workspace && host.read().provider) workspace.session.refreshHistory();
-      feedback = host.read().state === 'ready' ? '保存した内容を確認しました。' : '未完了の保存があります。';
-    } catch (error) { if (!disposed) feedback = error instanceof Error ? error.message : '保存を確認できません。データは保持しています。'; }
+      feedback = host.read().state === 'ready' ? '再開用データを確認しました。' : '未完了の更新があります。';
+    } catch (error) { if (!disposed) feedback = error instanceof Error ? error.message : '再開用データを確認できません。データは保持しています。'; }
     finally { refreshing = false; render(); }
   };
   check.addEventListener('click', () => { void refresh(false); });

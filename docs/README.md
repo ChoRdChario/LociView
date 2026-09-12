@@ -6,12 +6,21 @@ observed implementation.
 
 ## Purpose-specific authority
 
-2026-09-13 decision pending: [06 §11](specs/06-project-package-wire.md#11-proposed-implementationadoption-split--po-decision-pending-2026-09-13)
+2026-09-13 bounded display correction: the existing Scene hosts distinguish browser
+resume data from external file saving, including edit feedback and the validation
+Project catalog. Pending/failure/recovery/readonly states remain visible. This is
+code/recorded-DOM evidence, not file output or rendered/device acceptance; see todo.
+00 §2.2's named manual/one-latest-auto points and browser-resume/manual-file fallback
+are approved. [06 §11.4](specs/06-project-package-wire.md#114-save-point-and-output-completion-protocol-design-closure-2026-09-13)
+drafts their purpose and completion protocol; it does not implement an autosave sink.
+
+2026-09-13 technical design boundary: [06 §11](specs/06-project-package-wire.md#11-proposed-implementationadoption-split--po-decision-pending-2026-09-13)
 proposes separating reviewed five-purpose validation implementation from measured
 wire/profile adoption, including truthful OPFS-generation/download completion.
 [07 §10.2](specs/07-project-scene-migration.md#102-concrete-mapping-decisions-and-implementation-boundary-proposed-2026-09-13)
-records concrete migration gaps. These are not approvals; 05's existing gates
-remain unchanged and no package/migration runtime was added.
+records concrete migration gaps. Routine sequencing is delegated, not repeatedly
+pending; complete wire/receipt/limit contracts and compatibility approval remain
+distinct. 05's gates remain unchanged and no package/migration runtime was added.
 
 | Purpose | Authority |
 |---|---|

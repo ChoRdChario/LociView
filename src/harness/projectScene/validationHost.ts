@@ -122,7 +122,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
       capabilities: { pins: true, membership: true, color: true, views: true, media: true, materials: true, sceneAuthoring: true, placement: true, transform: true },
       get readOnly() { return closed || fs.mutationAuthority.accessState !== 'editable'; },
       read: () => { if (!project) throw Error('プロジェクトの作成が未完了です。'); return project; },
-      status: () => ({ kind: busy ? 'checking' : failure || last.state !== 'ready' ? 'failed' : 'idle', error: failure || '保存が未完了です。' }),
+      status: () => ({ kind: busy ? 'checking' : failure || last.state !== 'ready' ? 'failed' : 'idle', error: failure || '更新が未完了です。' }),
       write: (token, changes, context) => execute(async () => {
         editable(); const command = metadataIntent(changes, authority.read(), context);
         if (command.kind === 'createMaterial' || command.kind === 'editMaterial') {

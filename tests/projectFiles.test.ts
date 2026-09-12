@@ -549,7 +549,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     button('プロジェクトを選ぶ').fire('click');
     await vi.waitFor(() => expect(u.selected).toBeNull());
     expect(released).toHaveBeenCalledOnce();
-    await vi.waitFor(() => expect(all(root).some(n => n.textContent === '選択から作成 — 保存済み ')).toBe(true));
+    await vi.waitFor(() => expect(all(root).some(n => n.textContent === '選択から作成 — 再開用データ ')).toBe(true));
     button('開く').fire('click'); await vi.waitFor(() => expect(u.selected).toBe(id));
     await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true));
     await u.dispose(); expect(released).toHaveBeenCalledTimes(2);
@@ -566,8 +566,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     reopened.authority.retry = async () => { const p = await originalRetry(); displayFailed = false; return p; };
     const afterSave = createValidationWorkspace(new RecordedDocument().asDocument(), { ...ports, open: async () => reopened }, id);
     const afterRoot = record(afterSave.root);
-    await vi.waitFor(() => expect(all(afterRoot).some(n => n.textContent === '保存を再試行')).toBe(true));
-    all(afterRoot).find(n => n.textContent === '保存を再試行')!.fire('click');
+    await vi.waitFor(() => expect(all(afterRoot).some(n => n.textContent === '更新を再試行')).toBe(true));
+    all(afterRoot).find(n => n.textContent === '更新を再試行')!.fire('click');
     await vi.waitFor(() => expect(all(afterRoot).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true));
     await afterSave.dispose();
   });

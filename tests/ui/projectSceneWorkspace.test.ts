@@ -34,6 +34,27 @@ const label = (root: RecordedNode, name: string) => by(root, n => n.attributes.g
 const button = (root: RecordedNode, text: string) => by(root, n => n.tag === 'button' && n.textContent === text);
 
 describe('connected synthetic development host (not rendered, storage or TEAM-FLOW acceptance)', () => {
+  it.each([false, true])('keeps working state truthful across failures, pending input and readonly (browser retention: %s)', saved => {
+    const project = new SyntheticSession().snapshot;
+    let readOnly = false, kind: 'idle' | 'checking' | 'failed' = 'idle';
+    const session = new SyntheticSession({ ...(saved ? { storage: 'saved-development' as const } : {}),
+      get readOnly() { return readOnly; }, read: () => project,
+      write: () => { throw Error('this presentation check must not write'); },
+      status: () => ({ kind, error: 'synthetic retained failure' }) });
+    const workspace = createDevelopmentWorkspace(new RecordedDocument().asDocument(), session), root = record(workspace.root);
+    const status = by(root, n => n.className === 'lv-save-status');
+    expect(status.dataset.state).toBe(saved ? 'retained' : 'pageOnly');
+    expect(status.textContent).not.toContain('synthetic retained failure');
+    kind = 'checking'; workspace.render(); expect(status.textContent).toBe('更新を確認中…');
+    readOnly = true; session.setSearchComposing(true); kind = 'failed'; workspace.render();
+    expect(status.dataset.state).toBe('failed'); expect(status.textContent).toContain('synthetic retained failure');
+    kind = 'idle'; workspace.render(); expect(status.textContent).toBe('未確定の操作があります');
+    session.setSearchComposing(false); workspace.render(); expect(status.textContent).toBe('閲覧のみ');
+    readOnly = false; workspace.render(); expect(status.textContent).toBe(saved ? '再開用データのみ' : 'ページ内のみ');
+    expect(descendants(root).map(n => n.textContent).join('\n')).not.toContain('保存済み');
+    workspace.dispose();
+  });
+
   it('arms surface selection without an owner; blocks Scene/editor changes and cancels before any hit', () => {
     const w = createDevelopmentWorkspace(new RecordedDocument().asDocument()), root = record(w.root), s = w.session, original = s.snapshot;
     button(root, 'ピンを追加').fire('click');
@@ -176,7 +197,7 @@ describe('connected synthetic development host (not rendered, storage or TEAM-FL
     button(root, 'ウィンドウを表示').fire('click'); expect(workspace.session.message).toBe('');
     const text = descendants(root).map(n => n.textContent).join('\n');
     expect(text).toContain('再読み込みで失われます'); expect(text).toContain('3D表示は未接続です。シーンの構成と座標入力を確認できます。');
-    expect(text).toContain('未保存'); expect(text).not.toContain('保存済み');
+    expect(text).toContain('ページ内のみ'); expect(text).not.toContain('保存済み');
     button(root, 'マテリアル').fire('click'); expect(label(root, 'タイトル')).toBeDefined();
     button(root, '視点').fire('click'); expect(button(root, '+X').disabled).toBe(true);
   });

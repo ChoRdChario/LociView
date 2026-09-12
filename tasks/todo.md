@@ -28,6 +28,142 @@ Formal adoption still requires G1-A/C and applicable device evidence. No profile
 
 #### Active connected work — PO-approved limited real-file validation
 
+Latest autosave refinement (2026-09-13): one latest automatic point per Project,
+replaced by the next successful update; no automatic generations. Manual points
+may have user names and are protected from automatic overwrite. PO delegates
+trigger/coalescing decisions against file growth and interactive responsiveness.
+
+- [x] Update 00 §2.2, UI guidance and handoff; distinguish point replacement from
+  causal-history/base deletion and from browser-only recovery data.
+- [x] Read-only safety review and documentation diff check. No runtime change.
+- [x] PO approves the labelled fallback without an available external autosave
+  sink: latest browser resume data plus explicit manual file save, not repeated
+  downloads or false save success. Recorded in 00 §2.2 / UI guidelines / 06.
+
+Current bounded implementation: correct false file-save success in the
+existing Scene development/metadata/validation surface. Read-only inspection
+finds the header mapping in `workspace.ts`, post-ack message in `session.ts` and
+ready-Project catalog in `validationWorkspace.ts`; changing only the header is
+insufficient. Include the same hosts' notice/footer/confirmation copy and
+`metadataWorkspace.ts` state feedback. Preserve the distinct Saved View entity
+labels and internal journal identifiers; do not bulk-replace technical `save`.
+Scope is presentation and matching existing tests, not a file sink.
+
+- [x] Separate browser working-data acknowledgment from file-save presentation;
+  preserve pending/failure/recovery/read-only and unapplied-input indications.
+- [x] Remove internal-ack success claims from header, mutation feedback and
+  resumable-Project catalog without promising unconnected manual/auto output.
+- [x] Verify existing navigation/workspace/metadata/validation tests, final root
+  checks and independent review; rendered/device evidence remains its own lane.
+
+Implementation review: 8 existing source files and 4 existing test files changed;
+internal journal/storage/command behavior is unchanged. The header's working-data
+type cannot represent external-file completion. Failure/checking precedes neutral
+and read-only presentation, including when child controls retain composing input.
+Edit feedback, catalog and retention notices use the same distinction. Existing
+retry/cold-reopen/original-byte assertions remain. Independent read-only review
+found no mandatory issue. No claim that every historical helper string is unified.
+
+Verification: focused 4 files / 109 tests PASS. Final typecheck/build exit 0.
+Final root: 111 files / 2,024 PASS / 21 existing TODO / 0 failures, 311.18 s,
+terminal exit 0 plus JSON success; invocation uses two workers and a 15-second
+default test timeout, as in the prior bounded root runs. The initial root, run
+alongside typecheck/build at default concurrency, failed 28 tests in 6 files,
+including 5/15-second timeouts. Its failures are not counted as a pass. The
+subsequent bounded run used the same executable tree; no assertion, skip or
+per-test source timeout was changed. Mixed-import/large-chunk build warnings remain.
+
+The selected in-app browser runtime was rejected during initialization before
+browser binding. No page was inspected and no new screenshot/native-input evidence
+exists. Do not bypass with another browser or ask the PO to repeat the old repair.
+Recorded DOM is not rendered, physical-iPhone or offline acceptance; these stay in
+the consolidated batch. No server/tunnel/private input, dependency/schema/wire,
+ordinary-home, Service Worker source or release change. No push retry after the
+previous permission rejection; the full practical-team goal remains incomplete.
+
+Completion for that slice is truthful existing-host state, not autosave delivery.
+Named checkpoints, actual file output, resume identity/switch UX and complete
+five-purpose contract remain tracked connections. No new schema, dependency,
+normal-home activation, file export, package-purpose removal or background-write
+guarantee is included. The broader stage-3 wire work remains on the critical path.
+
+Next design connection within delegated sequencing: close manual/auto points'
+relationship to the accepted package purposes and output-completion boundaries
+in 06, without ratifying its new wire or changing 05's gate.
+
+- [x] Specify backup-based manual/auto points versus team-transfer artifacts,
+  content-specific completion, failure-safe latest-point replacement and recovery.
+- [x] Independently review against 00 §2.1–2.2 and 05 §7; record the remaining
+  closed-wire/profile/compatibility inputs once, without re-asking delegation.
+
+This is design work for the real-file stage, not another PoC or autosave delivery.
+Keep new-Project file exchange independent of the later old-format adapter choice.
+
+Design review: 06 §11.4 binds manual/latest-auto to complete backup, explicit team
+transfer to Workspace and selected-base changes to Contribution. It separates
+generated artifacts from verified external file receipts, compares the complete
+captured backup input for no-change output, protects the prior point through
+replacement and keeps restore explicit. Independent read-only review found no
+mandatory issue. This closes that design connection, not a new wire/schema/sink.
+Remaining pre-code work is 06 §11.3's complete field/privacy/inventory/classifier/
+finite-guard contract and its review, then the applicable package gate. 07's
+physical migration-profile compatibility is a separate PO technical decision;
+it need not postpone the first new-Project team-file loop once 06 is ready.
+
+Policy review (before implementation): independent read-only policy check retained manual/auto separation,
+failed-replacement safety and causal/base protection. `git diff --check` passes;
+runtime/tests unchanged. Existing Native output feature-detects the external
+picker and otherwise stages a download; it is not an autosave implementation.
+External picker availability and user-activation requirements were checked against
+[MDN](https://developer.mozilla.org/en-US/docs/Web/API/Window/showSaveFilePicker);
+this is API evidence, not physical-iPhone support or acceptance.
+
+Previous backup direction (2026-09-13): PO proposes game-like coexistence of manual
+and automatic save data. Record this as the product direction under 00 §2.2,
+while retaining §2.1's external-file-only save wording. Browser recovery data is
+not renamed autosave. No runtime, timer, automatic deletion or file-purpose change.
+
+- [x] Record manual/auto coexistence, manual-point protection and failed-output
+  recovery without inventing retention/cadence/platform guarantees.
+- [x] Independently check consistency with file-save/resume rules and run the
+  documentation diff check. Exact sink/retention/restore design remains to close.
+
+Direction review: independent read-only review found no conflict with 00 §2.1;
+00 §2.2 / UI guidelines / 06 / handoff now record the bounded direction.
+`git diff --check` passes. Runtime/tests are unchanged; no autosave or device
+support is claimed implemented and no automatic file deletion is authorized.
+
+Latest PO follow-up (2026-09-13): specification/implementation/verification
+sequencing is delegated within the agreed scope; do not repeatedly ask for the
+same procedural permission. The PO is now discussing product-purpose semantics:
+View-by-URL versus an extracted Scene share, independent copy, transported whole
+Project versus base-relative changes, and backup restoration scope. Explain these
+before freezing the purpose contract. No purpose removal, hosted sharing, new
+wire/profile, migration compatibility or ordinary-route activation follows from
+this delegation. No runtime change is requested by these questions.
+
+Previous PO clarification (2026-09-13): distributor/participant/integrator are
+scenario actions, not different permissions (05 §6.1). The PO accepted that
+explanation, and approved reserving user-visible Project `保存` for reflection
+in a user-controlled local file. Browser-held working data is for recovery;
+successful last-Project resume must identify the Project and offer another
+Project. This does not approve 06 §11's implementation/adoption gate split.
+
+- [x] Record this presentation/recovery requirement in the product contract and
+  UI guidelines, including unchanged internal durability and explicit failures.
+- [x] Align 06's pending output-completion proposal, handoff and lessons without
+  ratifying new wire, migration, capacity, sink implementation or ordinary home.
+- [x] Read-only review and documentation diff check; report the exact policy and
+  remaining implementation mismatch. No runtime change or new test credit.
+
+Clarification review: 00 §2.1 / UI guidelines §9.1 preserve internal durability,
+reserve file-save success for the confirmed output scope, and define truthful
+resume/switch/failure acceptance. Independent read-only review found no policy
+or authority mismatch; `git diff --check` passes. Runtime/tests are unchanged.
+The implementation above supersedes the then-open internal-ack `保存済み` gap
+in `navigationControls.ts`. External output and complete resume/switch messaging
+remain connections in the existing workflow and consolidated device batch.
+
 Current bounded work (2026-09-13): stage-3 technical decision package. Previous
 goal turn is progress: `0b2de6b` commits the GLB hard-chroma connection, with a
 clean worktree and final verification below. Rechecked current source/specs: 06/07
@@ -41,10 +177,13 @@ Do not substitute further isolated material polish for this critical-path decisi
   implementation goldens. Do not manufacture product/device guarantees.
 - [x] Obtain finite independent read-only review and synchronize the decision
   record/handoff with the exact remaining authority request.
-- [ ] PO decision: permit 06 §11's reviewed validation implementation before
-  measured adoption, and treat verified OPFS artifacts as generation-complete
-  without claiming OS download completion. Current 05/06 gates stay in force
-  until this explicit request is approved; migration adapter/adoption stays separate.
+- [x] PO delegates implementation/validation sequencing within the agreed scope.
+  This is procedural delegation, not ratification of concrete wire/sink/budget
+  choices or approval to remove a file purpose.
+- [ ] Resolve the current purpose questions and finish the reviewed closed
+  contract before a reader/writer. External-file-only `保存` is approved; actual
+  output completion, artifact/receipt/base, migration and adoption remain distinct
+  contract/evidence boundaries. Do not request the same sequencing delegation again.
 
 Production scope is documentation only for this decision slice. No package reader,
 writer, new migration source, dependency, profile adoption, ordinary-home or deploy
@@ -64,7 +203,9 @@ adoption distinctions are explicit. Documentation-only; `git diff --check` passe
 No tests rerun or new acceptance credited: executable tree remains `0b2de6b`
 with the verified root/typecheck/build below. No source input, server/tunnel,
 dependency, push or runtime mutation in this decision slice. Next action is the
-bounded PO gate/sink decision, not an unapproved reader or more auxiliary probes.
+purpose clarification and reviewed contract completion under the latest procedural
+delegation, not renewed sequencing/file-save-wording approval, an unapproved
+reader or more auxiliary probes.
 
 Completed bounded connection: hard chroma plus matching triangle-coverage checks
 for the approved validation GLB lane. Previous goal turn was progress (`40da7ef`):
