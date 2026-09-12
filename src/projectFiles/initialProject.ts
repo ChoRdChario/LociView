@@ -14,12 +14,13 @@ export interface PreparedValidationProject {
 }
 export const sealValidationRecord = async (kind: string, record: JsonObject): Promise<JsonObject> =>
   ({ ...record, payloadDigest: await immutableDigest(kind, record) });
-const label = (input: string) => {
+export const validationFileLabel = (input: string) => {
   if (typeof input !== 'string') return fileError('名前を入力してください。');
   const result = input.normalize('NFC').trim();
   if (!result || [...result].length > 256 || /[\u0000-\u001f\u007f]/u.test(result)) return fileError('名前は256文字以内の1行で入力してください。');
   return result;
 };
+const label = validationFileLabel;
 const fresh = (prefix: string) => `${prefix}_${newId()}`;
 export const identityPlacement = () => ({ translation: [0, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 });
 

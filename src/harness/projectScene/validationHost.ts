@@ -16,7 +16,7 @@ import { metadataIntent } from './metadataIntent';
 import type { SyntheticProject } from './fixture';
 import type { SyntheticAuthority } from './historyProjection';
 import type { SavedWorkspaceHost } from './savedHost';
-import type { MediaImage } from './mediaHistory';
+import type { MediaImage, MediaFileAddition } from './mediaHistory';
 
 export const validationArea = 'lociview-development-validation-1';
 export interface ValidationHostOptions {
@@ -62,21 +62,49 @@ export async function openValidationHost(options: ValidationHostOptions) {
       if (read.state !== 'ready' || !project) throw Error('保存が未完了です。元の変更から再試行してください。'); return project; };
     const execute = async <T>(action: () => Promise<T>, inputCommand = false): Promise<T> => {
       if (closed || busy) throw Error('処理の完了をお待ちください。'); busy = true; failure = '';
+      const before = last.source?.token;
       const work = action(); operation = work;
       try { const result = await work; if (closed) throw Error('画面を閉じました。保存結果は再度開いて確認してください。'); return result; }
       catch (error) { last = await session.read();
-        if (inputCommand && last.state === 'ready') throw error;
+        if (inputCommand && last.state === 'ready' && last.source?.token === before) throw error;
         failure = error instanceof Error ? error.message : '保存できません。入力は保持しています。'; throw error; }
       finally { busy = false; if (operation === work) operation = undefined; }
     };
     const resume = async () => {
       const before = await session.read(), entries = await new TransactionJournal(fs, limits).entries();
-      return ready(before.state === 'empty' && options.initial ? await options.initial.persist(fs, options.store, session) :
+      const result = await ready(before.state === 'empty' && options.initial ? await options.initial.persist(fs, options.store, session) :
         before.state === 'empty' || entries.length === 1 && entries[0]!.start.purpose === 'initialize' && before.state !== 'ready'
           ? await resumeValidationCreation(fs, session, `prj_${run}`) : await session.retry());
+      content.releasePreparedImages(); return result;
     };
     if (fresh) { try { await execute(resume); } catch { /* Keep the prepared creation object and the visible failure for explicit retry. */ } }
     const editable = () => { if (closed || fs.mutationAuthority.accessState !== 'editable') throw Error('このタブは閲覧専用です。'); };
+    const addMediaFile = (token: string, input: MediaFileAddition) => {
+      const selected = input.file, target = { sceneId: input.sceneId, captionId: input.captionId, attachmentId: input.attachmentId,
+        orderKey: input.orderKey, eventId: input.eventId };
+      const file = { name: selected.name, size: selected.size, arrayBuffer: selected.arrayBuffer.bind(selected) };
+      return execute(async () => {
+      editable();
+      const before = await session.read();
+      if (before.state !== 'ready' || before.provider?.kind !== 'scene-provider' || before.source?.token !== token)
+        throw Error('対象が更新されています。キャプションを選び直してください。');
+      // Enforce the same total validation budget before allocating the selected body.
+      const bodies = new Map<string, number>();
+      for (const map of [before.provider.details.immutable.representationsById, before.provider.details.immutable.mediaResourcesById])
+        for (const field of Object.values(map)) {
+          if (field.kind !== 'value') throw Error('保存した本体の情報を確認してください。');
+          const blob = field.value.blob as { digest: string; byteLength: number }; bodies.set(blob.digest, blob.byteLength);
+        }
+      if (!Number.isSafeInteger(file.size) || file.size <= 0 || [...bodies.values()].reduce((sum, size) => sum + size, file.size) > options.fileLimits.maxFileBytes)
+        throw Error('画像を含む合計がこの検証の上限を超えています。');
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (bytes.length !== file.size) throw Error('選択した画像の大きさが一致しません。');
+      const media = await content.prepareImage({ label: file.name, bytes });
+      try { const result = await ready(await session.edit(token, { kind: 'createAttachment', ...target, media, altText: '' }));
+        content.releasePreparedImages(); return result;
+      } catch (error) { if ((await session.read()).state === 'ready') content.releasePreparedImages(); throw error; }
+      }, true);
+    };
     const authority: SyntheticAuthority = {
       storage: 'saved-development', writeScope: 'caption-text',
       capabilities: { pins: true, membership: true, color: true, views: true, media: true, sceneAuthoring: true },
@@ -89,11 +117,13 @@ export async function openValidationHost(options: ValidationHostOptions) {
       deleteCaption: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
       assetDeletionImpact: (token, id) => { if (last.provider?.kind !== 'scene-provider' || token !== last.provider.token) throw Error('内容が更新されています。'); return assetDeletionImpact(last.provider, id, limits); },
       deleteAsset: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
+      addMediaFile,
       retry: () => execute(async () => { editable(); return resume(); }),
     };
     const host: SavedWorkspaceHost = { authority, limits, read: () => last, hasPending: () => busy || !!failure || last.state !== 'ready',
       refresh: () => execute(async () => { last = await session.read(); await projectView(last); return last; }),
-      resolve: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true), dispose };
+      resolve: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
+      dispose: async () => { await dispose(); content.releasePreparedImages(); } };
     return { ...host, content };
   } catch (error) { await dispose(); throw error; }
 }

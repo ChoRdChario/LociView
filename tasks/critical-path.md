@@ -364,6 +364,8 @@ language, disposable PoCs and one writer.
 Static-GLB/PNG creation, dedicated Project list/reopen and saved-body display/edit
 now connect in `storage=validation`; exact evidence and pending browser/device
 acceptance are in todo/uiux-handoff. This closes P01/P02 only within that lane.
+PNG after-opening addition now also uses the same media editor and journal;
+I02 retains other image-format and actual-input acceptance gaps.
 Continue the remaining stage-2 file/edit connections, without restoring an
 approval wait, promoting ordinary home or changing 06/07. The following bounded
 progress entries describe earlier checkpoints; their then-next tasks are historical.

@@ -62,7 +62,12 @@ export class SyntheticSession {
   readonly materials = new SyntheticMaterialSession(() => this.project, () => this.sceneId,
     (token, changes, done, failed) => this.applyWorking(() => this.writeMaterials(token, changes), done, failed), () => this.workingBlock, () => this.materialRestriction);
   readonly media = new SyntheticMediaSession(() => this.mediaContext(),
-    (token, changes, done, failed) => this.applyWorking(() => this.writeMedia(token, changes), done, failed), () => this.workingBlock);
+    (token, changes, done, failed) => this.applyWorking(() => this.writeMedia(token, changes), done, failed), () => this.workingBlock,
+    () => !!this.authority?.addMediaFile,
+    (token, command, done, failed) => this.applyWorking(() => {
+      if (this.mediaRestriction || !this.authority?.addMediaFile) throw Error(this.mediaRestriction ?? 'ファイルの追加は未接続です。');
+      return afterWorking(this.authority.addMediaFile(token, command), next => this.publish(next));
+    }, done, failed));
   private project = createSyntheticProject();
   private navigation: NavigationSession;
   private drafts = new Map<string, CaptionDraft>();

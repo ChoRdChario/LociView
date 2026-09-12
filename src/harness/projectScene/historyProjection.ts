@@ -7,7 +7,7 @@ import { decodeSyntheticAnchor } from './modelFixture';
 import { modelHistorySeed, projectModelHistory } from './modelHistory';
 import { projectViewHistory, viewHistorySeed } from './viewHistory';
 import { projectMaterialHistory } from './materialHistory';
-import { mediaSeed, projectMediaHistory } from './mediaHistory';
+import { mediaSeed, projectMediaHistory, type MediaFileAddition } from './mediaHistory';
 import type { SceneAuthoringCommand, CaptionDeletionCommand, CaptionDeletionImpact, AssetDeletionCommand, AssetDeletionImpact } from '../../scene/commands';
 
 export const captionKey = (id: string, field: 'title' | 'body' | 'color' | 'anchor' | 'template' | 'identity') => `caption/${id}/${field}`;
@@ -158,6 +158,7 @@ export interface SyntheticAuthority {
   deleteCaption?(token: string, command: CaptionDeletionCommand): WorkingResult<SyntheticProject>;
   assetDeletionImpact?(token: string, assetId: string): AssetDeletionImpact;
   deleteAsset?(token: string, command: AssetDeletionCommand): WorkingResult<SyntheticProject>;
+  addMediaFile?(token: string, command: MediaFileAddition): WorkingResult<SyntheticProject>;
   status?(): Readonly<{ kind: 'idle' | 'checking' | 'failed'; error?: string }>;
   retry?(): WorkingResult<SyntheticProject>;
 }

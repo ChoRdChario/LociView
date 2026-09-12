@@ -28,6 +28,54 @@ Formal adoption still requires G1-A/C and applicable device evidence. No profile
 
 #### Active connected work — PO-approved limited real-file validation
 
+Completed bounded connection: add one PNG to the selected Caption after opening a
+validation Project. Reuse `createAttachment`, the existing media gallery and the
+save journal; no new page, format, storage schema or ordinary-home activation.
+
+- [x] Connect an intent-labelled file picker to the existing media editor.
+- [x] Validate/own the input, stage exact body bytes through the content service,
+  and publish the new media record plus attachment only after durable save.
+- [x] Verify invalid/stale/read-only refusal, retained-input retry, prepared
+  cold recovery and independent reopen without rereading existing model bodies.
+- [x] Run final-tree checks and read-only independent review; update handoff and
+  the existing inventory without claiming browser/iPhone/offline acceptance.
+
+Stop at an unapproved profile/wire/migration/dependency or device-exposure boundary.
+Real-model transforms/material editing remain separate connections.
+
+PNG connection result: file selection now adds to the selected Caption in the
+same validation editor. Existing registered images remain reusable behind
+`登録済みメディア`. No new storage format/page is introduced. The host captures
+the target and input metadata, refuses invalid/stale/read-only/over-budget input,
+and the content service owns decoded bytes for exact staging retry. A failure
+after durable publication but before gallery preparation also stays failed;
+retry confirms that same attachment, without rereading the selected file or
+republishing history. Independent read-only review found no mandatory issues.
+Final executable tree: typecheck and build exit 0; root 110 files / 2,004 PASS /
+21 existing TODO / zero failures, terminal exit 0 and JSON success verified
+(210.67 s; two workers, 15 s per-test limit, same assertions/skips as before).
+Build retains existing mixed-import/large-chunk warnings. Final focused re-review
+and diff-check have no mandatory findings. Existing 5173 entry and changed
+modules return HTTP 200, not browser-execution evidence. No additional server or
+tunnel was started. Actual browser/OPFS/iPhone/offline remain pending. Inventory
+counts remain 27/7/20/10: I02 still has other still-image formats and actual-input
+acceptance missing. No private source bytes were used by this slice.
+
+Next critical connection: reuse model Move/Rotate/uniform-scale preview and
+confirm/cancel on validation GLB. Create only a fresh manual binding and Asset
+status via existing typed commands; preserve representation/revision/material,
+authored Caption coordinates and saved-body evidence. Read-only investigation
+found no new product decision. Specify this exact seam before implementation;
+exclude model copy/addition, material editing, alpha-aware picking and adoption.
+
+Parallel 06/07 audit: remaining technical ratification is six finite groups,
+not a reopening of accepted purpose/conflict/keep-both policy: 06 §10 full
+five-purpose wire/profile, delta/base/receipt evidence, review/clean exact
+construction; 07 §10 input-specific recipes (including Native pinScale),
+managed-unit/introduction adapter bytes, migration persistence/recovery.
+New-Project team exchange needs 06 ratification, not completion of every 07
+converter. Keep that sequencing while the approved stage-2 connections proceed.
+
 The approved exception and acceptance are consolidated in 05 §13.2 under
 `PO-approved limited real-file validation entry`. Runtime before this work was
 synthetic-only. This implements one limited validation entry, not

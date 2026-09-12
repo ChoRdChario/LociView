@@ -9,6 +9,7 @@
 > 静的GLB／PNGの限定検査・初期Project構築・実保存本体のevidenceが新serviceへ接続。
 > 同じdev hostの限定実file入口で、GLB/PNGからの作成・専用一覧・再開と実保存本体の
 > read/render port、既存pin/text/PNG編集へ接続。memory-port／記録DOMで検証。
+> 開いたCaptionへのPNG後入れも同じjournal／galleryへ接続。他still-image形式は残るためI02の主分類は不変。
 > P01/P02をこの限定経路で接続済みへ。実描画／実入力／実機／正式採用は未受入れ。
 > M07は同じmetadata hostでモデル回転・正の均等拡縮、preview／取消／保存／再開へ接続。
 > 新しい仕様・採用判断ではない。承認済み要件と現行code/testsの距離を記録する。
@@ -112,9 +113,9 @@
 
 | ID | 機能群／利用者の結果 | 状態 | 現在の境界・残り | コード／既存受入れ参照（行番号は監査時点） |
 |---|---|---|---|---|
-| I01 | Project内メディアを添付・再利用し、説明・順序・添付解除を編集する | 接続済み | 既知PNG2枚だけ。確認付き添付削除で元bytesと他Captionを保持。 | [src/harness/projectScene/mediaControls.ts:53](../src/harness/projectScene/mediaControls.ts) / [tests/ui/projectMetadataHost.test.ts:225](../tests/ui/projectMetadataHost.test.ts) |
-| I02 | 実画像ファイルを添付する | 別経路のみ | 新hostはファイル読込未接続。NativeのPNG/JPEG/WebP/GIF still-image範囲を超えない。 | [src/harness/projectScene/mediaControls.ts:55](../src/harness/projectScene/mediaControls.ts) / [docs/ui-product-guidelines.md:107](../docs/ui-product-guidelines.md) |
-| I03 | 添付画像を開いて拡大・失敗時に再試行する | 接続済み | 保存済み合成bytesから表示。欠損をfixture画像で置換しない。 | [src/harness/projectScene/mediaControls.ts:22](../src/harness/projectScene/mediaControls.ts) / [tests/ui/projectSceneMedia.test.ts:32](../tests/ui/projectSceneMedia.test.ts) |
+| I01 | Project内メディアを添付・再利用し、説明・順序・添付解除を編集する | 接続済み | 合成2枚とvalidation保存PNGの登録・再利用。確認付き添付削除で元bytesと他Captionを保持。実入力受入れは別。 | [src/harness/projectScene/mediaControls.ts](../src/harness/projectScene/mediaControls.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
+| I02 | 実画像ファイルを添付する | 別経路のみ | validation hostのPNG後入れは同じcreateAttachment／journalへ限定接続。拒否・元bytes retry・cold復旧を確認。他のNative JPEG/WebP/GIF still-image範囲と実入力は残り、行全体は完了としない。 | [src/harness/projectScene/validationHost.ts](../src/harness/projectScene/validationHost.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
+| I03 | 添付画像を開いて拡大・失敗時に再試行する | 接続済み | 合成bytesとvalidation保存PNGから表示。欠損をfixture画像で置換しない。保存後のgallery準備失敗も隠さず同じ添付を再確認。 | [src/harness/projectScene/mediaControls.ts](../src/harness/projectScene/mediaControls.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
 | I04 | サムネイルで選び、共通viewerで画像を前後確認する | 別経路のみ | 現在の追加はテキストselect、表示はinline拡大。Native側parity R04/R06の便益を未継承。 | [src/harness/projectScene/mediaControls.ts:53](../src/harness/projectScene/mediaControls.ts) / [tasks/uiux-parity-plan.md:38](../tasks/uiux-parity-plan.md) |
 
 ### 視点

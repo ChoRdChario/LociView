@@ -283,7 +283,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           glb: ['three', '../domain/values', './png', './glbMaterials', './validation'],
           glbMaterials: ['../domain/values', './validation'],
           initialProject: ['../domain/projectGraphSupport', '../domain/projectRecords', '../domain/values', '../projectMetadata/persistence', '../projectMetadata/blobStore', './glb', './png', './validation'],
-          content: ['../platform/fs', '../domain/projectContentChecks', '../domain/projectGraphSupport', '../domain/values', '../projectMetadata/contentEvidence', '../projectMetadata/blobInventory', '../projectMetadata/blobStore', '../projectMetadata/session', './glb', './png', './validation', './initialProject'],
+          content: ['../platform/fs', '../domain/projectContentChecks', '../domain/projectGraphSupport', '../domain/values', '../projectMetadata/contentEvidence', '../projectMetadata/blobInventory', '../projectMetadata/blobStore', '../projectMetadata/session', '../projectMetadata/persistence', './glb', './png', './validation', './initialProject'],
           creation: ['../platform/fs', '../projectMetadata/blobStore', '../projectMetadata/source', '../projectMetadata/session', '../projectMetadata/repository', '../projectMetadata/persistence', './content', './initialProject', './png', './validation'],
         };
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);

@@ -52,14 +52,23 @@ export function createMediaControls(document: Document, session: SyntheticMediaS
   const root = make('section'); root.className = 'lv-development-media'; root.setAttribute('aria-label', 'メディア');
   const picker = make('select'); picker.setAttribute('aria-label', 'メディアを選択'); const empty = make('option', 'メディアを選択'); empty.value = ''; picker.append(empty);
   const add = button('メディアを追加'), note = make('p', '開発用の合成画像です。ファイルの読込みは未接続です。'), list = make('div'), status = make('p'); status.setAttribute('role', 'status');
+  const addFile = button('メディアを追加'), file = make('input'), cancelFile = button('選択を取り消す');
+  file.type = 'file'; file.accept = 'image/png,.png'; file.hidden = true; file.setAttribute('aria-label', 'メディアを追加');
+  const stored = make('details'), storedLabel = make('summary', '登録済みメディア'); stored.append(storedLabel);
   const editor = make('section'), input = make('input'), apply = button('説明を適用'), cancel = button('取り消す'), retry = button('再試行');
   input.setAttribute('aria-label', 'メディアの説明'); editor.append(input, apply, cancel);
   const confirm = make('section'), question = make('p'), yes = button('添付を削除'), no = button('戻る'); confirm.append(question, yes, no); confirm.hidden = true;
-  let current: MediaContext, confirming: { ctx: MediaContext; id: string } | null = null, key = '', choiceKey = '', disposed = false;
-  root.append(picker, add, note, list, editor, retry, status, confirm);
+  let current: MediaContext, fileTarget: MediaContext | null = null, confirming: { ctx: MediaContext; id: string } | null = null, key = '', choiceKey = '', disposed = false;
+  if (session.fileAdditionAvailable()) stored.append(picker, add); else root.append(picker, add);
+  root.append(addFile, file, cancelFile, stored, note, list, editor, retry, status, confirm);
   const act = (fn: () => void) => { if (disposed) return; fn(); changed(); };
   add.addEventListener('click', () => act(() => { session.add(current, picker.value); }));
-  picker.addEventListener('change', () => { add.disabled = !picker.value || Boolean(current.block || session.draft); });
+  addFile.addEventListener('click', () => { if (disposed || addFile.disabled) return; fileTarget = current; file.value = ''; file.click(); });
+  file.addEventListener('change', () => act(() => { const selected = file.files?.[0];
+    if (selected && fileTarget) session.addFile(fileTarget, selected); fileTarget = null;
+  }));
+  cancelFile.addEventListener('click', () => act(() => { if (session.cancelFile()) file.value = ''; }));
+  picker.addEventListener('change', () => { add.disabled = !picker.value || Boolean(current.block || session.draft || session.hasFileSelection); });
   input.addEventListener('input', () => act(() => session.input(input.value, session.draft?.composing ?? false)));
   input.addEventListener('compositionstart', () => act(() => session.input(input.value, true)));
   input.addEventListener('compositionend', () => act(() => session.input(input.value, false)));
@@ -75,15 +84,20 @@ export function createMediaControls(document: Document, session: SyntheticMediaS
       choices.forEach(m => { const option = make('option', m.label); option.value = m.id; picker.append(option); });
       picker.value = choices.some(m => m.id === selected) ? selected : '';
     }
-    note.textContent = current.project.validationFiles ? choices.length ? '' : 'このプロジェクトには追加できるメディアがありません。' : '開発用の合成画像です。ファイルの読込みは未接続です。';
+    const filesAvailable = session.fileAdditionAvailable();
+    addFile.hidden = !filesAvailable; stored.hidden = !filesAvailable || !choices.length;
+    addFile.disabled = Boolean(current.block || d || session.hasFileSelection);
+    cancelFile.hidden = !session.hasFileSelection; cancelFile.disabled = Boolean(current.block);
+    add.textContent = filesAvailable ? '選択したメディアを添付' : 'メディアを追加';
+    note.textContent = filesAvailable ? 'この検証版ではPNGを追加できます。' : current.project.validationFiles ? choices.length ? '' : 'このプロジェクトには追加できるメディアがありません。' : '開発用の合成画像です。ファイルの読込みは未接続です。';
     note.hidden = !note.textContent;
-    root.hidden = !current.captionId && !d; picker.disabled = Boolean(current.block || d); add.disabled = picker.disabled || !picker.value;
+    root.hidden = !current.captionId && !d && !session.hasFileSelection; picker.disabled = Boolean(current.block || d || session.hasFileSelection); add.disabled = picker.disabled || !picker.value;
     editor.hidden = !d; if (d && !d.composing && input.value !== d.raw) input.value = d.raw;
     apply.disabled = Boolean(d?.composing || current.block); cancel.disabled = Boolean(d?.composing);
     retry.hidden = !session.failed; retry.disabled = Boolean(current.block || d?.composing);
     status.textContent = session.message || (d ? '説明を編集中です。まだ適用していません。' : current.block ?? (rows.review.length ? '未解決の添付があります。更新候補を確認してください。' : ''));
     if (confirming && (confirming.ctx.project.state.token !== current.project.state.token || confirming.ctx.captionId !== current.captionId || d || current.block)) { confirming = null; confirm.hidden = true; }
-    const next = JSON.stringify([current.project.state.token, current.captionId, Boolean(d), current.block]); if (key === next) return; key = next;
+    const next = JSON.stringify([current.project.state.token, current.captionId, Boolean(d), current.block, session.hasFileSelection]); if (key === next) return; key = next;
     list.replaceChildren(...rows.ready.map((row, i) => {
       const card = make('section'), media = attachmentImage(row, current.project.mediaData)!;
       card.setAttribute('aria-label', `添付 ${i + 1} ${media.record.label}`); card.append(make('p', `${i + 1}. ${media.record.label}`));
@@ -91,6 +105,7 @@ export function createMediaControls(document: Document, session: SyntheticMediaS
       const edit = button('説明を編集'), earlier = button('前へ'), later = button('後へ'), remove = button('添付を削除');
       edit.disabled = Boolean(d || current.block || row.altText.kind !== 'value'); earlier.disabled = Boolean(d || current.block || i === 0 || rows.review.length);
       later.disabled = Boolean(d || current.block || i === rows.ready.length - 1 || rows.review.length); remove.disabled = Boolean(d || current.block);
+      if (session.hasFileSelection) edit.disabled = earlier.disabled = later.disabled = remove.disabled = true;
       const expected = current;
       edit.addEventListener('click', () => act(() => { session.begin(expected, row.id); }));
       earlier.addEventListener('click', () => act(() => { session.reorder(expected, row.id, -1); })); later.addEventListener('click', () => act(() => { session.reorder(expected, row.id, 1); }));

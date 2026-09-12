@@ -1335,8 +1335,22 @@ a pending save and must not enable no-op acknowledgement of unapplied input.
 Creation-name IME and editor draft/save state block creation/switch as appropriate.
 Late open/render results after disposal are drained and released, not mounted.
 The first connected selector introduces all selected models/PNG at creation;
-additional-file introduction and real-model transforms/material editing remain
-explicit later connections, not silent synthetic fallback. Alpha-mask/blended
+the next bounded connection adds one PNG to an opened Caption through the same
+media editor. The file picker captures the exact Scene/Caption/token; a changed
+target or read-only tab must reject before mutation. Strict PNG decoding and
+owned bytes precede the existing `createAttachment` command. The content service
+stages those exact bytes after journal start; media-resource and attachment
+records publish together only after verified durable save. Failed staging keeps
+the same input/identities for in-session retry. After journal preparation, cold
+recovery uses stored original changes and verified bodies, not a new attachment.
+An interruption before preparation retains the existing visible repair state;
+it must not claim success or silently create a replacement. Invalid input creates
+no pending transaction; the user can replace or explicitly cancel that selection.
+The existing combined validation-byte budget also bounds saved referenced input
+plus the new file, without converting it into a capacity guarantee. Existing
+model bodies are not reread for attachment-only edits. Real-model addition,
+transforms and material editing remain explicit later connections, not silent
+synthetic fallback. Alpha-mask/blended
 surface picking is unavailable pending an alpha-aware picker; source appearance
 is preserved and the limitation is visible. Browser execution budgets (64 MiB
 combined input, 4 MiB JSON, 100,000 structural items, 8,000,000 accessor values,

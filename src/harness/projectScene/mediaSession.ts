@@ -1,5 +1,5 @@
 import type { SyntheticProject } from './fixture';
-import { attachmentKey, captionAttachments, fixtureMedia, normalizeAlt, type SyntheticAttachment } from './mediaHistory';
+import { attachmentKey, captionAttachments, fixtureMedia, normalizeAlt, type SyntheticAttachment, type MediaFileAddition, type MediaFileSelection } from './mediaHistory';
 import { canonicalFixture } from './modelClosure';
 import { orderBetween } from './viewHistory';
 import type { WorkingWrite } from './acknowledgment';
@@ -13,9 +13,28 @@ function fail(s: string): never { throw new Error(s); }
 /** Confirmed working state only; no persistence receipt, source-file read or renderer acknowledgement. */
 export class SyntheticMediaSession {
   draft: MediaDraft | null = null; failed: MediaCommand | null = null; message = '';
+  private fileDraft: { token: string; command: MediaFileAddition } | null = null;
   private prepared: MediaCommand | null = null;
-  constructor(readonly context: () => MediaContext, private write: WorkingWrite, private block: () => string | null = () => null) {}
-  get pending() { return this.draft?.composing ? 'composition' as const : this.draft ? 'text' as const : null; }
+  constructor(readonly context: () => MediaContext, private write: WorkingWrite, private block: () => string | null = () => null,
+    readonly fileAdditionAvailable: () => boolean = () => false,
+    private writeFile?: (token: string, command: MediaFileAddition, confirmed: () => void, failed: (error: unknown) => void) => boolean) {}
+  get pending() { return this.draft?.composing ? 'composition' as const : this.draft || this.fileDraft ? 'text' as const : null; }
+  get hasFileSelection() { return !!this.fileDraft; }
+  cancelFile() { if (this.block()) return false; this.fileDraft = null; this.message = ''; return true; }
+  addFile(ctx: MediaContext, file: MediaFileSelection) { return this.attempt(() => {
+    const captionId = this.check(ctx);
+    if (!this.fileAdditionAvailable() || !this.writeFile) fail('ファイルの追加はこの画面では未接続です。');
+    if (this.draft || this.fileDraft) fail('編集中のメディアを確定するか取り消してください。');
+    const rows = captionAttachments(ctx.project.mediaData, captionId); if (rows.review.length) fail('添付の未解決の状態を先に確認してください。');
+    const selection = { token: ctx.project.state.token, command: { sceneId: ctx.sceneId, captionId, attachmentId: fresh('att'), eventId: fresh('evt'), file,
+      orderKey: orderBetween(rows.ready.at(-1)?.orderKey.kind === 'value' ? (rows.ready.at(-1)!.orderKey as { value: string }).value : null, null) } };
+    this.fileDraft = selection;
+    return this.writeFile(selection.token, selection.command, () => {
+      const rows = captionAttachments(this.context().project.mediaData, captionId);
+      if (!rows.ready.some(row => row.id === selection.command.attachmentId)) fail('添付の保存を確認できません。入力を保持しています。');
+      this.fileDraft = null; this.message = '';
+    }, error => { this.message = error instanceof Error ? error.message : '画像を追加できません。入力を保持しています。'; });
+  }); }
   private check(expected: MediaContext) {
     const now = this.context();
     if (now.block) fail(now.block);
@@ -31,7 +50,7 @@ export class SyntheticMediaSession {
     this.message = e instanceof Error ? e.message : 'メディアを変更できません。入力を保持しています。'; return false;
   } }
   begin(ctx: MediaContext, id: string) { return this.attempt(() => {
-    if (this.draft) fail('編集中の説明を適用するか取り消してください。'); const row = this.row(ctx, id);
+    if (this.draft || this.fileDraft) fail('編集中のメディアを適用するか取り消してください。'); const row = this.row(ctx, id);
     if (row.altText.kind !== 'value') fail('説明の競合を先に確認してください。');
     this.draft = { token: ctx.project.state.token, sceneId: ctx.sceneId, captionId: ctx.captionId!, attachmentId: id, raw: row.altText.value, composing: false };
   }); }
@@ -39,6 +58,7 @@ export class SyntheticMediaSession {
   cancel() { if (this.block() || this.draft?.composing) return false; if (this.failed?.draft === this.draft) this.failed = null;
     this.draft = null; this.prepared = null; this.message = ''; return true; }
   private execute(command: MediaCommand) {
+    if (this.fileDraft) fail('選択中のファイルを確定するか取り消してください。');
     const now = this.context(); this.check({ ...now, captionId: command.captionId, sceneId: command.sceneId, project: { ...now.project, state: { ...now.project.state, token: command.token } } });
     if (this.draft?.composing || (this.draft && command.draft !== this.draft) || (command.draft && command.draft !== this.draft)) fail('入力を確定してください。');
     return this.write(command.token, command.changes, () => {

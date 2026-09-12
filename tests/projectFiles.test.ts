@@ -11,7 +11,7 @@ import { inspectValidationGlb, validationGlbParts } from '../src/projectFiles/gl
 import { inspectValidationPng } from '../src/projectFiles/png';
 import { prepareValidationProject } from '../src/projectFiles/initialProject';
 import { prepareValidationCreation, resumeValidationCreation, validationProjectService } from '../src/projectFiles/creation';
-import { fixtureMedia } from '../src/harness/projectScene/mediaHistory';
+import { fixtureMedia, captionAttachments } from '../src/harness/projectScene/mediaHistory';
 import { readProjectScene } from '../src/scene/projectProvider';
 import type { JsonObject } from '../src/domain/values';
 import type { Anchor } from '../src/scene/types';
@@ -30,6 +30,7 @@ import { planModelList } from '../src/ui/projectScene/modelListState';
 import { RecordedDocument } from './ui/domRecorder';
 import { record, type RecordedNode } from './ui/domRecorder';
 import { createValidationWorkspace, type ValidationWorkspacePorts } from '../src/harness/projectScene/validationWorkspace';
+import { createMediaControls } from '../src/harness/projectScene/mediaControls';
 
 const budget: FileValidationLimits = { maxFileBytes: 1_000_000, maxJsonBytes: 100_000, maxItems: 10_000, maxValues: 100_000, maxPixels: 10_000 };
 const png = Uint8Array.from(atob(fixtureMedia[0]!.base64), c => c.charCodeAt(0));
@@ -79,7 +80,115 @@ class TestFS extends MemoryFS {
     return { size: file.size, stream: () => { this.reads++; return file.stream(); } }; }
 }
 
+async function openFileCaption() {
+  const fs = new TestFS(), locks = lockManager(), run = newId(), factory = storageFactory();
+  const coordinator = ProjectMutationCoordinator.browser(locks);
+  const store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
+  const options = { base: fs, coordinator, store, fileLimits: budget, decode, run,
+    openStorage: async () => ({ factory, dispose: async () => {} }) };
+  const initial = prepareValidationCreation(await prepareValidationProject({ run, title: '追加の検証', models: [{ label: '3Dモデル', bytes: glb() }] }, budget, decode));
+  const host = await openValidationHost({ ...options, initial }), workspace = createSavedWorkspace(new RecordedDocument().asDocument(), host);
+  const s = workspace.session!, model = s.snapshot.modelVersions![0]!;
+  s.setViewportState(true, [model.assetId], null); s.acceptPinCreation(s.pinCreationTargets()[0]!, [3, 0.5, 0]);
+  s.acceptPin(planPinMode(s.pinContext(), { kind: 'finish' }));
+  await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+  return { fs, store, options, host, workspace, s, captionId: s.memory.selectedCaptionId! };
+}
+
 describe('limited real-format validation (synthetic GLB bytes, injected PNG decoder, memory storage)', () => {
+  it('adds a selected PNG through the existing media editor, retains invalid input and reopens the exact attachment', async () => {
+    const { host, workspace, s, options, captionId } = await openFileCaption();
+    const modelRead = vi.spyOn(host.content, 'model');
+    const controls = createMediaControls(new RecordedDocument().asDocument(), s.media, () => controls.render()), root = record(controls.root);
+    const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    const button = (label: string) => all(root).find(n => n.tag === 'button' && n.textContent === label)!;
+    const input = all(root).find(n => n.type === 'file')!, dialog = vi.fn(); Object.assign(input, { click: dialog });
+    controls.render(); expect(button('メディアを追加').disabled).toBe(false);
+    const original = host.read().source!.token;
+    button('メディアを追加').fire('click'); expect(dialog).toHaveBeenCalledOnce();
+    Object.assign(input, { files: [{ name: '破損.png', size: 4, arrayBuffer: async () => new Uint8Array(4).buffer }] }); input.fire('change');
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+    expect(host.hasPending()).toBe(false); expect(host.read().source!.token).toBe(original);
+    expect(workspace.hasChanges()).toBe(true); controls.render();
+    expect(button('選択を取り消す').disabled).toBe(false); button('選択を取り消す').fire('click');
+    expect(workspace.hasChanges()).toBe(false);
+    button('メディアを追加').fire('click');
+    const file = { name: '内容で検査.glb', size: png.length, arrayBuffer: vi.fn(async () => png.slice().buffer) };
+    Object.assign(input, { files: [file] }); input.fire('change');
+    expect(workspace.hasChanges()).toBe(true);
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+    expect(s.media.message).toBe(''); expect(workspace.hasChanges()).toBe(false);
+    const rows = captionAttachments(s.snapshot.mediaData, captionId).ready; expect(rows).toHaveLength(1);
+    expect(s.snapshot.mediaChoices).toHaveLength(1); expect(s.snapshot.mediaChoices![0]!.label).toBe(file.name);
+    expect(modelRead).not.toHaveBeenCalled(); expect(file.arrayBuffer).toHaveBeenCalledOnce();
+    const parts = host.read().source!.originalChanges(); controls.dispose(); await workspace.dispose();
+    const cold = await openValidationHost(options);
+    expect(cold.read().source!.originalChanges()).toEqual(parts);
+    expect(captionAttachments(cold.authority.read().mediaData, captionId).ready).toEqual(rows);
+    expect(Object.values(cold.authority.read().mediaData!.images!)[0]!.base64).toBe(fixtureMedia[0]!.base64);
+    await cold.dispose();
+  }, 15_000);
+  it('retries failed PNG staging from owned input and cold-recovers prepared attachment changes without duplication', async () => {
+    const { host, workspace, s, options, captionId, fs, store } = await openFileCaption();
+    const original = host.read().source!.token, bytes = png.slice();
+    const file = { name: '追加PNG', size: bytes.length, arrayBuffer: vi.fn(async () => bytes.buffer) };
+    const put = vi.spyOn(store, 'put').mockRejectedValueOnce(Error('injected body quota'));
+    s.media.addFile(s.mediaContext(), file);
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('failed'));
+    expect(host.read().state).toBe('pending'); expect(host.read().source!.token).toBe(original);
+    expect(captionAttachments(s.snapshot.mediaData, captionId).ready).toHaveLength(0);
+    expect(s.media.cancelFile()).toBe(false); bytes.fill(0);
+    s.retryWorking(); await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+    expect(file.arrayBuffer).toHaveBeenCalledOnce(); expect(put).toHaveBeenCalledTimes(2);
+    expect(captionAttachments(s.snapshot.mediaData, captionId).ready).toHaveLength(1);
+    const media = s.snapshot.mediaChoices![0]!; expect(media.blob.digest).toBe(await digest(png));
+    const published = host.read().publication; await host.authority.retry!(); expect(host.read().publication).toBe(published);
+    fs.reject = p => p.endsWith('/published.json');
+    s.media.addFile(s.mediaContext(), { name: '二つ目PNG', size: png.length, arrayBuffer: async () => png.slice().buffer });
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('failed'));
+    expect(captionAttachments(s.snapshot.mediaData, captionId).ready).toHaveLength(1);
+    const pendingPaths = (await fs.list(`${validationArea}/${options.run}/`)).filter(p => p.endsWith('.amchange'));
+    const originals = await Promise.all(pendingPaths.map(p => fs.readBytes(p)));
+    await workspace.dispose(); fs.reject = () => false;
+    const cold = await openValidationHost(options); expect(cold.read().state).toBe('pending');
+    await cold.authority.retry!();
+    expect(captionAttachments(cold.authority.read().mediaData, captionId).ready).toHaveLength(2);
+    const after = cold.read().source!.originalChanges(), publication = cold.read().publication;
+    for (const bytes of originals) expect(after.some(b => b.length === bytes!.length && b.every((v, i) => v === bytes![i]))).toBe(true);
+    await cold.authority.retry!(); expect(cold.read().publication).toBe(publication);
+    expect(cold.read().source!.originalChanges()).toEqual(after); await cold.dispose();
+  }, 15_000);
+  it('rejects stale targets, read-only tabs and over-budget files before reading or modifying the selected input', async () => {
+    const { host, workspace, s, options, captionId } = await openFileCaption();
+    const file = { name: 'PNG', size: png.length, arrayBuffer: vi.fn(async () => png.slice().buffer) };
+    const command = { file, sceneId: s.sceneId, captionId, attachmentId: `att_${newId()}`, eventId: `evt_${newId()}`, orderKey: 'A' };
+    const token = host.read().source!.token, original = host.read().source!.originalChanges();
+    await expect(host.authority.addMediaFile!('stale', command)).rejects.toThrow('更新');
+    await expect(host.authority.addMediaFile!(token, { ...command, file: { ...file, size: budget.maxFileBytes } })).rejects.toThrow('上限');
+    const readonly = await openValidationHost(options); expect(readonly.authority.readOnly).toBe(true);
+    await expect(readonly.authority.addMediaFile!(token, command)).rejects.toThrow('閲覧専用'); await readonly.dispose();
+    expect(file.arrayBuffer).not.toHaveBeenCalled(); expect(host.hasPending()).toBe(false);
+    expect(host.read().source!.originalChanges()).toEqual(original); await workspace.dispose();
+  }, 15_000);
+  it('keeps a post-publication gallery failure visible and confirms the same attachment on retry', async () => {
+    const { host, workspace, s, captionId } = await openFileCaption();
+    const before = host.read().source!.token, readImage = host.content.image.bind(host.content); let failDisplay = true;
+    vi.spyOn(host.content, 'image').mockImplementation(async record => {
+      if (host.read().source!.token !== before && failDisplay) { failDisplay = false; throw Error('injected gallery read'); }
+      return readImage(record);
+    });
+    const file = { name: '保存後の表示確認', size: png.length, arrayBuffer: vi.fn(async () => png.slice().buffer) };
+    s.media.addFile(s.mediaContext(), file);
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('failed'));
+    expect(host.read().state).toBe('ready'); expect(host.hasPending()).toBe(true);
+    expect(workspace.hasChanges()).toBe(true); expect(s.snapshot.state.token).toBe(before);
+    const publication = host.read().publication, parts = host.read().source!.originalChanges();
+    s.retryWorking(); await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+    expect(host.hasPending()).toBe(false); expect(workspace.hasChanges()).toBe(false);
+    expect(host.read().publication).toBe(publication); expect(host.read().source!.originalChanges()).toEqual(parts);
+    expect(captionAttachments(s.snapshot.mediaData, captionId).ready).toHaveLength(1);
+    expect(file.arrayBuffer).toHaveBeenCalledOnce(); await workspace.dispose();
+  }, 15_000);
   it('connects file selection/create/list/reopen, guards composition/pending save and disposes a late renderer (recorded DOM only)', async () => {
     const fs = new TestFS(), locks = lockManager(), coordinator = ProjectMutationCoordinator.browser(locks);
     const store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);

@@ -67,8 +67,10 @@ Generated-file tests cover actual saved bytes, pin/title edits, independent reop
 and exact incomplete-initialization recovery. The same served development entry
 now has opt-in `storage=validation`: file creation/list/reopen, actual saved-body
 render port and existing pin/text/PNG editor. Recorded-DOM/memory-port evidence
-is not actual browser/device acceptance. Additional-file and real model-editing
-connections remain; no ordinary entry, existing Project or migration has changed.
+is not actual browser/device acceptance. Adding a PNG to an opened Caption now
+uses that same media editor/journal; body/save/display failures retain exact retry.
+Other file and real-model editing connections remain; no ordinary entry, existing
+Project or migration has changed.
 
 ## Classification
 

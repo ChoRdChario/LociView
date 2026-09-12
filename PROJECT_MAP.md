@@ -47,8 +47,9 @@ drafts/windows. Basic Caption/model deletion is now connected. The nonactivated
 streamed body store and actual saved-body inventory now connect to metadata
 creation/reopen in memory-port tests, without fixture fallback or Caption-only
 body rereads. The limited validation host now mounts this store with actual GLB/PNG
-inspection, Project creation/list/reopen and saved-body viewer/gallery. Next is
-remaining additional-file/edit connections and the recorded Desktop batch, not
+inspection, Project creation/list/reopen and saved-body viewer/gallery. PNG can
+also be added to an opened Caption through the same journal/media editor. Next is
+remaining model/file/edit connections and the recorded Desktop batch, not
 further generic storage or a synthetic-run catalog. Limited real-file validation was explicitly
 approved after `023aa59`; formal profiles/device/adoption and ordinary home remain gated.
 Completed before that approval, M07 connects rotation/uniform-scale

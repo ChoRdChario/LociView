@@ -7,10 +7,12 @@ import { PersistentContentVerifier } from '../projectMetadata/contentEvidence';
 import { blobInventory } from '../projectMetadata/blobInventory';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import type { MetadataMediaPort } from '../projectMetadata/session';
+import { digest, newId } from '../projectMetadata/persistence';
+import type { StoredBlobRef } from '../projectMetadata/blobStore';
 import { inspectValidationGlb, type ValidatedGlb } from './glb';
 import { inspectValidationPng, type PngDecoder } from './png';
 import { fileError, fileObject, validationGlbProfile, validationMetadataLimits, type FileValidationLimits } from './validation';
-import { identityPlacement } from './initialProject';
+import { identityPlacement, sealValidationRecord, validationFileLabel, type ValidationFile } from './initialProject';
 
 export async function readValidationBody(file: WorkspaceReadableFile, maxBytes: number): Promise<Uint8Array> {
   if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size > maxBytes) return fileError('保存した本体が検査の上限を超えています。');
@@ -27,8 +29,21 @@ export async function readValidationBody(file: WorkspaceReadableFile, maxBytes: 
 
 /** Actual saved-content executor. A fixture/native profile cannot authorize this path. */
 export class ValidationContent implements MetadataMediaPort {
+  private readonly preparedImages = new Map<string, { record: JsonObject; bytes: Uint8Array; ref: StoredBlobRef }>();
   constructor(private readonly fs: ProjectWorkspaceFS, readonly store: OriginBlobStore,
     readonly limits: FileValidationLimits, private readonly decode?: PngDecoder) {}
+  /** Owned input only; no body or Project write until the existing journal stages it. */
+  async prepareImage(input: ValidationFile): Promise<JsonObject> {
+    this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
+    const label = validationFileLabel(input.label);
+    if (!input.bytes.length || input.bytes.length > this.limits.maxFileBytes) return fileError('画像がこの検証の上限を超えています。');
+    const bytes = input.bytes.slice(); await inspectValidationPng(bytes, this.limits, this.decode);
+    const ref: StoredBlobRef = { algorithm: 'sha256', digest: await digest(bytes), byteLength: bytes.length, mediaType: 'image/png' };
+    const record = await sealValidationRecord('media-resource', { id: `med_${newId()}`, label, mediaKind: 'image', blob: ref as unknown as JsonObject });
+    this.preparedImages.set(record.id as string, { record, bytes, ref });
+    return cloneCanonicalValue(record, validationMetadataLimits) as JsonObject;
+  }
+  releasePreparedImages(): void { this.preparedImages.clear(); }
   async model(record: JsonObject): Promise<ValidatedGlb> {
     if (!same(record.formatProfile, await validationGlbProfile()) || record.contentKind !== 'mesh' || record.role !== 'meshPrimary' ||
       !same(record.representationToAsset, { ...identityPlacement(), reflection: 'none' }) || !same(record.purposes, ['source', 'display']) ||
@@ -45,7 +60,12 @@ export class ValidationContent implements MetadataMediaPort {
   }
   async stage(record: JsonObject, token: string): Promise<void> {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
-    // An explicit file preparation must have staged this exact blob first.
+    const prepared = this.preparedImages.get(record.id as string);
+    if (prepared) {
+      if (!same(record, prepared.record)) return fileError('追加する画像の情報が一致しません。');
+      await this.store.put(new Blob([prepared.bytes.slice().buffer]).stream(), prepared.ref.mediaType, prepared.ref);
+    }
+    // Existing catalog choices are already saved; new selections stage exact owned bytes.
     const result = await this.verifier(true).verify({ token, fact: 'media', records: [record], context: {} }) as { outcome: string };
     if (result.outcome !== 'verified') return fileError('追加する画像の保存を確認できません。');
   }

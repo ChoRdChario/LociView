@@ -1,5 +1,14 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-12 開いたProjectへのPNG追加（`2a8e773`後）:** 同じvalidation編集画面の
+> 「メディアを追加」でPNGを選び、選択Captionへ保存。「登録済みメディア」から再利用も可能。
+> 元bytesを保持したquota retry、prepared後のcold復旧、保存後の画像表示失敗からの
+> no-op確認を既存service/UIテストへ追加。最終110 files／2,004 PASS／21既存TODO、
+> 型・build・独立レビュー済み。既存5173の入口／変更moduleはHTTP200（実行証拠ではない）。
+> 実ブラウザ・実機は未確認。I02の他still-image形式と実モデル追加／変形／材質は残る。
+> 次は既存モデルgizmoと保存commandの実GLBへの接続。通常home／06/07／公開へは進めない。
+> 以下は過去checkpoint。PNG後入れの「未接続」はこの行で更新済み。
+
 > **2026-09-12 実fileの同一host接続（`d7be6c7`後）:** 既存dev入口の「実ファイルで検証」
 > から新規GLB/PNG検証Projectの作成・一覧・再開、保存本体の形状／元材質／PNG表示へ接続。
 > 記録・ピン・添付保存とcold再開、未完了復旧、IME／切替保護、late-disposeを既存testsで確認。
