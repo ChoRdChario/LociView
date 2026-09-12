@@ -337,6 +337,12 @@ C07添付件数、V04背景入口、C04追加色、C09resize、M05一時hide等�
 
 ## 6. 明示deferred／判断未確定（64群へ加算しない）
 
+2026-09-13: 06 §11に実装・採用gateの段階分離を提案（PO未承認）。全五用途の閉じた
+契約と具体的guard値・独立レビューを先に固定し、既存validation内で実装・証明を得る案。
+実測容量保証・正式wire／移行profile・通常homeは後段で別批准する。OPFS生成完了と
+OSダウンロード完了も分離。07 §10.2のpinScale／unplaced／managed adapterは未実装・未批准。
+今回の文書整理で接続数を増やさず、実装のないgoldenや実機PASSを補わない。
+
 | 対象 | 扱い |
 |---|---|
 | Scene複製／削除／並替えUI | 05 §14で最初の限定candidateは明示deferred。core削除guardがあることとUI予定は別 |

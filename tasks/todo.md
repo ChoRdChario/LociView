@@ -28,6 +28,44 @@ Formal adoption still requires G1-A/C and applicable device evidence. No profile
 
 #### Active connected work — PO-approved limited real-file validation
 
+Current bounded work (2026-09-13): stage-3 technical decision package. Previous
+goal turn is progress: `0b2de6b` commits the GLB hard-chroma connection, with a
+clean worktree and final verification below. Rechecked current source/specs: 06/07
+remain explicitly unratified, and 05 §7.5 still gates any S2 reader/writer.
+Do not substitute further isolated material polish for this critical-path decision.
+
+- [x] Read 06/07's current proposal and applicable 05/02 boundaries; separate
+  approved purposes from unresolved wire/profile/retention/migration choices.
+- [x] Pin a concrete recommended technical selection using current source and
+  bounded evidence, with explicit measured-versus-unmeasured limits and remaining
+  implementation goldens. Do not manufacture product/device guarantees.
+- [x] Obtain finite independent read-only review and synchronize the decision
+  record/handoff with the exact remaining authority request.
+- [ ] PO decision: permit 06 §11's reviewed validation implementation before
+  measured adoption, and treat verified OPFS artifacts as generation-complete
+  without claiming OS download completion. Current 05/06 gates stay in force
+  until this explicit request is approved; migration adapter/adoption stays separate.
+
+Production scope is documentation only for this decision slice. No package reader,
+writer, new migration source, dependency, profile adoption, ordinary-home or deploy
+change. Reuse current causal/journal/ZIP and legacy evidence; no new PoC or repeated
+human experiment. Completion means a concrete reviewed choice/permission request,
+not wire ratification, executed acceptance or practical-team completion. Stop before
+changing an accepted gate or implementing an unratified format.
+
+Decision-slice review: 06 §11 fixes the recommended format/adapter/ZIP32 STORE/
+canonical/source/sink direction and enumerates the missing closed tables and exact
+validation guard descriptor as pre-code conditions. It requests a gate split,
+not approval of incomplete byte goldens or numeric guarantees. 07 §10.2 proposes
+lossless pinScale/unplaced mapping and identifies the incompatible managed-subtree
+encoding before claiming the current adapter supports it. Independent read-only
+reviews confirm the present gate is unchanged and the OPFS/download and execution/
+adoption distinctions are explicit. Documentation-only; `git diff --check` passes.
+No tests rerun or new acceptance credited: executable tree remains `0b2de6b`
+with the verified root/typecheck/build below. No source input, server/tunnel,
+dependency, push or runtime mutation in this decision slice. Next action is the
+bounded PO gate/sink decision, not an unapproved reader or more auxiliary probes.
+
 Completed bounded connection: hard chroma plus matching triangle-coverage checks
 for the approved validation GLB lane. Previous goal turn was progress (`40da7ef`):
 scoped actual-material editing closed with root checks; worktree rechecked clean.

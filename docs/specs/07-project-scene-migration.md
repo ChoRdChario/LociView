@@ -781,3 +781,35 @@ text and its media while unrelated attachment conflicts remain available. The
 capability accepts an exact registered synthetic plan, not a general converter.
 The full portable recipe encoder and artifact/proposal schemas, actual files,
 adopted product profiles and UI/device storage activation are still unimplemented.
+
+### 10.2 Concrete mapping decisions and implementation boundary (proposed, 2026-09-13)
+
+This is a reviewed-decision input, not an adopted recipe or permission to implement
+an unratified migration. See 06 §11 for the separately proposed implementation/
+adoption split. Initial new-file team exchange does not require all three converters
+to be finished first; the practical-team version still requires them before acceptance.
+
+| Item | Recommended exact direction | Still required before activation |
+|---|---|---|
+| Input mapping | Retain §4's direct Native/frozen-v1/LociMyu mappings. Do not route through old Native conversion when it reports/omits source normal or unknown content needed by the new recipe. | Closed inspection/immutable-builder/default/order/omission tables for each admitted profile, whole-output goldens; no private-source fixture |
+| Native pin size | Add optional atomic `Asset.pinScale`, finite in `[0.001,1000]`; absence displays as `1`. Preserve explicit source value versus absence. Applies to that Asset's pins across Scenes, separate from selection emphasis. Never multiply coordinates, model transform or camera. | Known schema/provider/command/renderer and copy/history-free handling. Clean retains it; review's three owner branches must explicitly include the optional field if that draft is adopted. Existing 01/02 records do not yet admit it as this known capability. |
+| Unplaced Caption | Use 05 §9.4.1's proposed `{kind:'unplaced', ownerAssetId?}` exactly, retaining known owner, text/media/tags/Scene; no invented position/frame/class. | Anchor union, known-owner retention, first explicit placement, copy/review/clean and appropriate schema compatibility. Current validator admits only asset/project; unresolved Asset `pendingAssetToProject` already exists and need not be reinvented. |
+| Independent IDs | Initial conversion uses §3's registered deterministic resource IDs, fresh Project/epoch/root; `両方残す` uses fresh independent copies and dependent IDs. | Exact builder and whole-output ID/class/digest vectors; the existing membership copy alone does not implement guarded-birth copying or every model profile |
+| Late Native | Keep fixed-baseline, unit-granular original changes, endpoint-fixed memberships, managed whole-selection guards and shared birth/introduction artifacts from §§6–7.1. | Portable control schema/provider/commands and deterministic original-byte encoder; equal/different births and repeat-after-v2-edit proofs. No promotion of PoC code or label/generation-based causality. |
+| Recovery | Dedicated `preparedMigration` source from §7.2 binds old input, registered ancestor, original artifacts and receiver heads. Retry retained exact bytes; do not regenerate acknowledged loss. | Closed control blob/media types, source/receipt retention, original-source staging budget and durable interruption checks. Frozen-v1 later-copy remains a separate required plan variant, not Native evidence relabelled. |
+
+The physical migration adapter is an actual unresolved compatibility decision.
+Current `src/projectMetadata/format.ts` fixes permanent root collections and cannot
+express independent managed-subtree conflicts by merely storing one extra JSON
+scalar. Reuse the current canonical values/history primitives, but specify a
+versioned control encoding with original-byte and old-reader refusal behavior.
+Do not alter `lociview-automerge-atomic-map-1` silently or infer a profile upgrade
+from permission to continue. The recipe/source amendment still needs independent
+review and explicit PO technical approval; 06 §11 is not that approval.
+
+Before implementation, fix the input-profile and typed field tables plus expected
+golden outcomes. Obtain actual encoder/retention/recovery evidence in the existing
+service tests after authority is granted, then freeze descriptor/specification/
+golden hashes from their exact bytes. Hash placeholders, profile IDs alone, and
+raw ZIP hashes cannot prove the complete recipe. No full migration acceptance is
+claimed by this finite mapping recommendation.

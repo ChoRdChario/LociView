@@ -6,6 +6,13 @@ observed implementation.
 
 ## Purpose-specific authority
 
+2026-09-13 decision pending: [06 §11](specs/06-project-package-wire.md#11-proposed-implementationadoption-split--po-decision-pending-2026-09-13)
+proposes separating reviewed five-purpose validation implementation from measured
+wire/profile adoption, including truthful OPFS-generation/download completion.
+[07 §10.2](specs/07-project-scene-migration.md#102-concrete-mapping-decisions-and-implementation-boundary-proposed-2026-09-13)
+records concrete migration gaps. These are not approvals; 05's existing gates
+remain unchanged and no package/migration runtime was added.
+
 | Purpose | Authority |
 |---|---|
 | Working and collaboration rules | `AGENTS.md` |

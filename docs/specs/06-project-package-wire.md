@@ -636,3 +636,114 @@ retention/recovery evidence remain ratification inputs, not an
 implicit permission to feed converted Native metadata into a remote source slot.
 No production reader/writer, current UI connection, dependency adoption, release,
 Pages, Service Worker, media expansion or performance guarantee is authorized.
+
+## 11. Proposed implementation/adoption split — PO decision pending (2026-09-13)
+
+This section is a concrete recommendation, NOT ratification and NOT an amendment
+already in effect. 05 §7.5 and §10 above still apply. The current implementation
+checkpoint is `0b2de6b`; no ProjectScene package reader/writer exists there.
+
+The present gate requires completed golden/runtime and measured Desktop/iOS
+budget evidence before the first S2 reader/writer. Those observations depend on
+the new implementation, not just the old Native path. Do not resolve that dependency
+by inventing measurements or quietly adopting a smaller format. Request this split:
+
+1. **Reviewed five-purpose implementation contract.** Freeze all five shapes,
+   nested copy/omit and inventory/classifier tables, exact adapter/control encoding,
+   finite execution guards and the expected §9 outcomes. After explicit PO approval
+   of this split, implement and execute the contract in the existing isolated
+   validation/service path. No new PoC page; no ordinary-home or old-data activation.
+2. **Measured adoption and activation.** Exact-byte goldens, hostile-input/recovery,
+   complete team rounds and applicable Desktop/iPhone/storage evidence must pass
+   before ratifying product budgets/profiles and activating the ordinary route.
+   A failing case blocks the affected capability; it does not change the expected
+   output. Any wire/schema amendment returns to reviewed contract control, and a
+   new product policy, compatibility change or guarantee needs PO approval.
+
+This moves executable proof to the stage where it can be obtained; it does not
+remove any acceptance, reduce the five purposes, postpone all migration indefinitely,
+claim G1 adoption or authorize public distribution. The final practical-team target
+remains 05 `TEAM-FLOW-01` and the approved 62 groups. Test package bytes are not a
+published compatibility promise. No existing Native or v1 file is rewritten.
+
+### 11.1 Recommended technical selections
+
+| Decision | Concrete recommendation | Current evidence / missing implementation |
+|---|---|---|
+| Package discriminator | Reserve `format: 'lociview-project-package'`, `wireVersion: '1'`; exact five-purpose union in §3, not the superseded 02 manifest. This is the wire identifier, not an app version bump. | New literal; unratified and not accepted by any current reader |
+| Metadata | `adapter: 'automerge'`, `adapterFormatVersion: 'lociview-automerge-atomic-map-1'`, `automerge-root-change-v1` proof; preserve full-source/original-change bytes. | `src/projectMetadata/format.ts` and `source.ts`; no alternate physical encoding |
+| Control bytes | Existing `LociCanonicalJsonV1`, exact UTF-8/no newline, duplicate-aware input parser, exact manifest checksum and derived paths from §3. | Current canonical/JSON primitives are reusable; all new shapes still need bounded validators/goldens |
+| Container | Single-volume ZIP32, STORE for every entry, serial streaming, data descriptors, fixed ZIP epoch; reject ZIP64, compression, encryption, special/undeclared/out-of-order entries. | Native writer uses `zip64:false`/STORE; the new reader must explicitly check ZIP64 and the stricter new layout. Do not claim those checks already exist. |
+| Exchange | Full Workspace metadata and exact base-relative original Contribution changes; separate original wire, derived target and receiver apply records from §8. | Existing full-source/journal tests are reusable, not implementation of delta/base completion |
+| Output completion | Direct-file sink: successful close plus streamed read-back hash. Fallback: successful OPFS close plus streamed read-back hash is **generation completion**, followed by a durable local receipt/base handoff. | Native `app.ts` has both read-back paths; new receipt/base atomicity remains to implement |
+| History-free | The one explicitly selected Scene review and whole-active-Project clean policy in §§5–6, complete typed re-key, no history/migration/exchange state; preserve unplaced/nonvisual ownership. | New builders are missing; no winner projection, JSON recursive copy or silent omission can substitute |
+
+The adapter recommendation applies to the current new-Project source. It does NOT
+claim 07's managed migration subtree is supported by `atomic-map-1`: its physical
+reader fixes the 14 root record maps and treats optional root content as atomic
+scalars, not independently concurrent nested managed units. Before migration,
+review the exact control encoding and adapter/envelope compatibility separately.
+Never pack all guards into one conflicting scalar or silently relax old profile
+validation. A new physical profile or compatibility amendment needs explicit PO
+approval and original-history proofs; it is not ratified by the package literal.
+
+The fallback decision is user-visible: say `ファイルを作成しました` when a verified
+in-app artifact is ready, and `ダウンロードを開始しました。保存先で完了を確認してください。`
+after handing it to the browser. Neither event says the OS saved a file, a recipient
+received it or another person accepted it. The generated base describes the exact
+completed package, not delivery. Generation failure/cancellation records no completion.
+An unknown crash window remains unknown; file existence alone is not a receipt.
+
+Keep package/job roots until the verified artifact and durable receipt/base handoff
+complete. Never delete the retained base's proof/inventory merely because the
+download link was used or its temporary ZIP was explicitly removed. On iPhone,
+the consolidated acceptance must also save to Files, reselect that file, and verify
+its hash/reopen plus cancelled/quota/interrupted receipt behavior on the exact build.
+
+### 11.2 Execution guards are not product capacity
+
+Do not choose an iPhone or product guarantee from the old limits. The available
+code gives these reusable guard inputs, with their units retained exactly:
+
+| Existing boundary | Enforced value | Not proven by that value |
+|---|---|---|
+| Validation source files | Combined 64 MiB; GLB JSON 4 MiB; 100,000 items; 8,000,000 accessor values; 16,777,216 image pixels | All-model/all-media support, new package size or iPhone capacity |
+| Validation metadata | 8,000,000 bytes total; 1,000 changes; 1,000,000 bytes/change; 20,000 operations; depth 32; 100,000 nodes; 1,000,000 work; 65,536 string scalars | Product history capacity or throughput |
+| Old ZIP guard | 20,000 entries; 1 GiB/entry; 2 GiB uncompressed total | New manifest/archive/backup/base overhead, ZIP64 rejection or iPhone guarantees |
+| Existing storage acceptance target | 500 MiB unchanged body, zero Caption-only payload reads; at most 64 MiB app-managed simultaneous I/O buffers | Total browser/GPU memory, actual new-wire/device PASS |
+
+Before any validation reader/writer under the proposed split, its reviewed execution
+descriptor must set every archive/control/entry/ratio/count/depth/head/base/evidence/
+working-space bound. Missing bounds reject execution; do not use `Infinity`, zip
+header claims or library defaults. Keep current lower metadata/source guards and
+the strict ZIP32 representable ceiling. New conservative stop limits must be labelled
+development-only and have finite boundary tests; they are not silently promoted to
+product limits. Numeric guarantees and broader admission still await measurements
+and PO adoption. This section does not supply fake measurements or mark §10 complete.
+
+### 11.3 Finite next delivery if the split is approved
+
+Finish the closed contract tables and validation execution descriptor in this
+companion, with one independent review before reader/writer code. Then implement
+Workspace/full-history + Contribution/base completion on existing source/journal/
+WorkspaceFS, including one five-purpose manifest/summary validator from the start.
+Use the existing tests for original-byte retry, two-person two-rounds, no-op,
+backup continuity and noncausal target heads; do not open another synthetic UI.
+Backup/review/clean builders follow the same complete contract, not a later purpose
+redesign. Migration uses the separately reviewed 07 mapping/source contract and
+can follow the new-file team loop. No missing legacy branch is counted complete.
+
+The genuinely missing tables to close first are: (a) every nested history-free
+field's retain/omit/re-key/re-digest/unknown-refusal action, (b) protected inventory
+covering strong, all-conflict, opaque, migration, retained-base and unfinished-job
+roots, (c) exact summary algorithm/class dictionary and original-write attribution
+for history/delta/snapshot, including edit-then-revert and unknown accounting, and
+(d) every concrete execution limit from §11.2. `blobInventory.ts` verifies known
+representation/media bodies only; candidate projection is not export/GC authority.
+Expected golden outcomes must be set independently before producing implementation
+bytes. Golden generation alone, or updating expected bytes to match a bug, is not
+acceptance. No validator uses whatever table happens to be installed in a future
+library version; pin the reviewed table and rerun its compatibility vectors.
+
+Until PO answers this explicit gate-change request, only design work is authorized.
+Implementation progress elsewhere and permission to push do not approve this split.

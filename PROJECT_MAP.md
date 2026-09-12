@@ -10,6 +10,12 @@
 
 ## Start here
 
+2026-09-13 next decision: specification 06 §11 proposes a reviewed five-purpose
+validation-implementation stage before measured adoption, not removal of either
+gate or activation of an unratified format. Specification 07 §10.2 records pin-scale,
+unplaced and physical-migration-adapter gaps. PO approval of the gate split is
+pending; see current todo. No package reader/writer or ordinary route changed.
+
 2026-09-12 whole-scope inventory: [tasks/implementation-inventory.md](tasks/implementation-inventory.md)
 maps all 41 UI tasks plus accepted Scene/team extensions to 64 work groups:
 27 connected in bounded metadata/validation hosts; 7 component-level gaps, 20 other-path

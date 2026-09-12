@@ -1,5 +1,13 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-13 次の判断（docs-only）:** 06 §11に「五用途の閉じた仕様・具体的実行上限・
+> 独立レビュー→限定検証実装→実測／golden→正式採用」の段階分離を提案。現05 gateは未変更。
+> OPFS読戻し確認後は「生成完了」、ブラウザdownload開始をOS保存完了とはしない。
+> 07 §10.2はpinScale／未配置／移行control adapterの実不足を整理。atomic-map-1のまま
+> portable managed subtree対応済みとはしない。いずれも未批准、新runtime／新PoCなし。
+> POへ求めるのはgate分離と完了sinkの扱い。移行adapter／正式容量保証／通常home／公開は別承認。
+> 実行系checkpointは`0b2de6b`、2,021 PASS／21 TODO・型/build合格を不変のまま再利用。
+
 > **2026-09-12 実GLBのhard色抜き接続（`40da7ef`後）:** 同じ限定validation材質欄に
 > 「指定した色を透過」を接続。元factor／texture／頂点色の照明前binary判定を共有し、
 > CPU候補の三角形だけGPUで可視確認。抜けた面のみ通過し、判定失敗ではpinを置かない。
