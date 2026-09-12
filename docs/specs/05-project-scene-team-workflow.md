@@ -1976,6 +1976,29 @@ failure/cold retry and continued edit; actual rendering remains the batched lane
 Independent Caption/model copies and non-text conflicts remain the next finite
 commands, not implied by this text-resolution implementation.
 
+**Scene-name conflict connection under §8 (2026-09-13):**
+The existing metadata host adds `resolveSceneName` with Scene ID and either a
+selected candidate operation ID or manually entered name. Require the exact
+source token, unambiguous active Scene identity/lifecycle without delete/edit,
+and all valid known required name candidates. Validate manual input with the
+existing Scene-name normalization/length rules; preserve a selected candidate's
+exact value. A single existing journaled command removes/writes the name atomically,
+including equal-valued candidates. Normal rename still refuses unresolved names.
+No Scene selection, order, default, membership, model or Caption field is changed.
+
+Use the existing comparison form, showing all candidate names and no selected
+winner. Allow explicit choice or a new valid name, not scalar keep-both. Keep
+the explicit development import boundary: that form may use `sceneAuthoring`'s
+checked candidate reader and the existing pure `normalizeSceneName` helper, not
+new storage/network access. Preserve stale/failed/IME input and block
+readonly/in-flight application. After acknowledged
+resolution keep current Scene/camera/windows/drafts and allow ordinary rename.
+Existing metadata-host tests cover both choices/equal values, manual validation,
+return/no-op/later conflict, exact cold retry and invalid/stale/lifecycle refusal.
+This is implementation detail of the accepted scalar contract, not a new schema,
+file format or lifecycle-resolution policy. Actual rendering/device checks remain
+in the consolidated batch; no new PoC or ordinary-home activation.
+
 **Startup Scene conflict recovery implementation contract (2026-09-12):**
 Under §§4.1/8, `resolveDefaultScene` selects one explicit candidate operation ID
 of Project.defaultSceneId at the exact source token. Inspect every candidate;

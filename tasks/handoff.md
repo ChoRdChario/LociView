@@ -1,5 +1,14 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-13 Scene名競合の接続（`50f0872`後）:** 二人が同じScene名を変更した後、
+> 全候補から選ぶ／名前を入力する操作を既存metadata画面とjournalへ接続。
+> 通常renameの競合拒否を維持し、確定後に再編集可能。元履歴・手元入力・Sceneを保持。
+> 等値候補、返送／再受信、IME／stale／readonly、失敗後のexact cold retryを検証。
+> 初回の型／fixture／全体2件の不整合を修正。最終型・build exit 0、111 files／2,047 PASS／
+> 21既存TODO／失敗0。独立レビュー必須残件なし、詳細はtodo。棚卸し30/4/20/10は不変。
+> T03の全競合・実画面／iPhone／offlineは未完了。新wire／schema／通常homeは不変更。
+> 06の2判断は未回答のまま。承認済みの実際の行き止まりは進められるが、範囲を広げない。
+
 > **2026-09-13 出力job／完了記録の仕様案（docs-only、実行codeは`2f07ea1`）:**
 > 06 §12.7に固定入力・生成／外部file／交換base／auto置換の別記録と中断復旧を具体化。
 > zero-change受信へ後のheadを流用せず、stale未観測jobはjournal作成前だけ明示取消可能。

@@ -28,7 +28,52 @@ Formal adoption still requires G1-A/C and applicable device evidence. No profile
 
 #### Active connected work — PO-approved limited real-file validation
 
-Latest completed design slice (2026-09-13, after `2f07ea1`): draft the missing
+Latest implementation slice (2026-09-13, after `50f0872`): close T03's Scene-name conflict dead
+end under 05 §8. Short audit: clean `g0-baseline`, previous turn made concrete
+job/receipt design progress; 06 decisions remain unanswered. Independent read-only
+inspection confirms ordinary rename refuses an unresolved name while no current
+control can resolve it. This is an approved team-operation gap, not wire work or
+another cosmetic connection.
+
+- [x] Add a closed Scene-name choose/manual command using complete checked
+  candidates, existing source token and original-change journal; normal rename
+  must still refuse conflicts.
+- [x] Connect the existing conflict form without a default choice; retain
+  Scene/camera/drafts, composing/stale/readonly and failure/retry protection.
+- [x] Reuse metadata-host tests for equal/distinct candidates, manual validation,
+  return/replay, exact cold recovery and stale/invalid refusal; run final checks
+  and independent read-only review, then update inventory/handoff.
+
+Acceptance: an acknowledged name choice removes only the observed name conflict,
+keeps every original change and unrelated field, and permits ordinary rename.
+No lifecycle/order/View conflict policy, new schema/wire/sink/dependency/media,
+normal-home or release change. Actual rendered/device acceptance stays in the
+existing batch; do not retry the unchanged broken browser or denied push.
+Stop at a real contract/authority conflict, not routine implementation details.
+
+Result/review: Scene-name choose/manual resolution now uses one original causal
+change and the existing saved host. Normal rename remains guarded. Scene-switch
+labels update without replacing form nodes; invalid manual names explain the
+refusal. Source/IME/stale/readonly and failed-choice retention are checked.
+Independent read-only review reports no mandatory remainder. Initial typecheck's
+narrowing error and two new fixture/assertion errors were corrected; focused
+cases then passed. First whole-root run was 2,045 PASS / 2 failed: exact development
+import allowlist and old Caption copy expectation. Added only the two required
+read/validation imports, preserving isolation checks, and synchronized the exact
+unapplied copy assertion. Corrected focused checks: 9 PASS. Final executable tree:
+typecheck/build exit 0; root JSON success and terminal exit 0, 111 files,
+2,047 PASS / 21 existing TODO / 0 failed, 188.47 s result span, two workers and
+unchanged timeout budgets. Build retains the usual mixed-import/chunk warnings;
+ordinary build is not rendering evidence for the development route. No executable
+change followed those final checks. Inventory remains 30/4/20/10: T03 is partial,
+not completed. No new actual-browser/iPhone/offline or full-file team acceptance.
+
+Next: F01/F02 still depend on the two already-presented 06 decisions. Further
+approved T03 connections may proceed only when they close a concrete team-work
+gap, not as an excuse for more generic storage/design or repeated browser/push
+attempts. The whole practical-team goal remains active and unfulfilled.
+
+Previous completed design slice (2026-09-13, after `2f07ea1`): draft the missing
 package job/receipt contract from 06 §11.4 in §12.7. M05 was committed with final
 checks and the starting HEAD/worktree were clean. No PO reply has approved §12.6
 or the implementation/adoption split.

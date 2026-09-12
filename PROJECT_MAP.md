@@ -10,6 +10,13 @@
 
 ## Start here
 
+2026-09-13 T03 connection: the same metadata conflict form resolves Scene-name
+candidates or a valid manually entered name through the existing journal.
+Normal rename still refuses a conflict; only the chosen name changes. Original
+history, local drafts/Scene selection and exact retry remain protected. This closes
+the name-edit dead end, not all scalar/lifecycle conflicts or the file-team gate.
+Exact checks are in todo; rendered/device acceptance remains pending.
+
 2026-09-13 M05 connection: the same Model tab offers temporary hide/show,
 this-model-only and show-all, with local Caption-owner recovery also in readonly
 views. Scene membership/history/Saved Views do not change. Loaded residents,

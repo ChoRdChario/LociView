@@ -47,6 +47,7 @@ import { assetDeletionImpact } from '../../src/projectMetadata/assetDeletion';
 import { modelListView } from '../../src/ui/projectScene/modelListState';
 import { defaultSceneCandidates } from '../../src/projectMetadata/startupScene';
 import { createMetadataWorkspace } from '../../src/harness/projectScene/metadataWorkspace';
+import { sceneNameCandidates } from '../../src/projectMetadata/sceneAuthoring';
 
 class FaultFS extends MemoryFS {
   rejectPublication = false; rejectImage = false; writes = 0;
@@ -127,6 +128,134 @@ async function acknowledge(s: SyntheticSession, action: () => void) {
 
 const fullSource = (source: ProjectMetadataSource, n: number) => ({ packageId: `pkg_${n.toString(16).padStart(32, '0')}`,
   metadataBytes: source.encodeFullSource(), proof: source.proof, remoteHeads: source.heads });
+
+describe('Scene name conflict resolution; saved memory ports and recorded DOM only', () => {
+  const raw = (source: ProjectMetadataSource, change: (doc: any) => void) => {
+    const [doc] = A.applyChanges(A.init<any>(), source.originalChanges());
+    return source.appendOriginal(A.getChanges(doc, A.change(A.clone(doc), change)));
+  };
+  const branch = (source: ProjectMetadataSource, name: string) => raw(source, doc => {
+    delete doc.scenesById[f.overview].name; doc.scenesById[f.overview].name = new A.ImmutableString(JSON.stringify(name));
+  });
+  const setup = async (equal = false) => {
+    const h = fixture(), host = await h.open(true), seed = host.read().source!;
+    const one = branch(seed, '現場の記録'), two = branch(seed, equal ? '現場の記録' : '設備の調査');
+    await host.receive(seed.token, fullSource(one, 1400)); await host.receive(host.read().source!.token, fullSource(two, 1401));
+    const mount = createMetadataWorkspace(new RecordedDocument().asDocument(), host), root = record(mount.root), s = mount.session!;
+    const choice = () => picker(root, '現在のシーン：名前の解消方法');
+    const form = () => descendants(root).find(n => n.tag === 'li' && descendants(n).includes(choice()))!;
+    const p = host.read().provider!; if (p.kind !== 'scene-provider') throw Error('provider');
+    return { h, host, seed, one, two, mount, root, s, choice, form, names: sceneNameCandidates(p, f.overview, metadataFixtureLimits) };
+  };
+
+  it.each(['first', 'second', 'equal', 'manual'] as const)('resolves %s without changing other work, returns and replays original history', async mode => {
+    const u = await setup(mode === 'equal'), { h, host, mount, s } = u;
+    const before = host.read().source!, state = s.snapshot.state, captions = s.snapshot.resources.captions;
+    select(s); const detail = s.detailContext();
+    s.acceptDetail({ kind: 'draft', baseDraft: detail.draft!, draft: editCaptionDraft(detail.draft!, detail.source, 'body', '未適用の手元メモ') });
+    const windows = s.windowMemory, memory = s.memory;
+    expect(u.choice().value).toBe(''); expect(button(u.form(), '競合を解消').disabled).toBe(true);
+    const selected = mode === 'second' ? u.names.find(c => c.name === '設備の調査')! : u.names.find(c => c.name === '現場の記録')!;
+    setInput(u.choice(), mode === 'manual' ? 'manual' : selected.operationId);
+    if (mode === 'manual') setInput(named(u.form(), '現在のシーン：名前の入力'), '  Cafe\u0301 調査  ');
+    const expected = mode === 'manual' ? '  Café 調査  ' : selected.name;
+    await acknowledge(s, () => button(u.form(), '競合を解消').fire('click')); mount.render();
+    expect(s.acknowledgment.state).toBe('idle'); expect(s.snapshot.state.scenes[f.overview]!.name).toEqual({ kind: 'value', value: expected });
+    expect(s.sceneId).toBe(f.overview); expect(s.windowMemory).toBe(windows); expect(s.memory).toBe(memory);
+    expect(s.detailContext().draft?.edits.body).toBe('未適用の手元メモ');
+    expect(s.snapshot.state.assetMemberships).toEqual(state.assetMemberships); expect(s.snapshot.state.captionMemberships).toEqual(state.captionMemberships);
+    expect(s.snapshot.state.defaultSceneId).toEqual(state.defaultSceneId); expect(s.snapshot.state.scenes[f.detail]).toEqual(state.scenes[f.detail]);
+    expect(s.snapshot.resources.captions).toEqual(captions);
+    const saved = host.read().source!; expect(saved.originalChanges()).toHaveLength(before.originalChanges().length + 1);
+    for (const bytes of before.originalChanges()) expect(saved.originalChanges().some(b => Buffer.from(b).equals(Buffer.from(bytes)))).toBe(true);
+    // An existing participant receives the resolved history, then ordinary rename works again.
+    const participant = u.one.appendOriginal(saved.originalChanges());
+    const p = await readProjectScene(participant.read(), metadataFixtureLimits, host.content.verifier(false));
+    const returned = participant.prepareEdit(participant.token, { kind: 'renameScene', sceneId: f.overview, name: '二巡目の確認' }, p, 'c'.repeat(32));
+    await host.receive(saved.token, fullSource(returned, 1402)); s.refreshHistory();
+    expect(s.snapshot.state.scenes[f.overview]!.name).toEqual({ kind: 'value', value: '二巡目の確認' });
+    const heads = host.read().source!.heads, writes = h.base.writes;
+    await host.receive(host.read().source!.token, fullSource(returned, 1402)); expect(h.base.writes).toBe(writes);
+    await mount.dispose(); const cold = await h.open(); expect(cold.read().source!.heads).toEqual(heads);
+    expect(cold.authority.read().state.scenes[f.overview]!.name).toEqual({ kind: 'value', value: '二巡目の確認' });
+    // An unseen concurrent name still reopens the conflict; no preferred winner survives.
+    await cold.receive(cold.read().source!.token, fullSource(branch(before, '後着の名前'), 1403));
+    expect(cold.authority.read().state.scenes[f.overview]!.name.kind).toBe('unresolved'); await cold.dispose();
+  });
+
+  it('preserves IME and stale manual input, rejects readonly and invalid names before writing', async () => {
+    const u = await setup(), { h, host, mount, s } = u, before = host.read().source!;
+    const originalForm = u.form();
+    expect(s.acceptNavigation(planNavigation(s.snapshot.state, s.session, s.pending, { kind: 'scene', sceneId: f.detail }))).toBe(true); mount.render();
+    expect(picker(u.root, '現在のシーン：名前の解消方法')).toBeUndefined();
+    expect(descendants(u.root)).toContain(originalForm);
+    expect(s.acceptNavigation(planNavigation(s.snapshot.state, s.session, s.pending, { kind: 'scene', sceneId: f.overview }))).toBe(true); mount.render();
+    expect(u.form()).toBe(originalForm);
+    setInput(u.choice(), 'manual'); const input = named(u.form(), '現在のシーン：名前の入力');
+    for (const name of ['', '  ', '改\n行', 'a'.repeat(257)]) {
+      setInput(input, name); expect(button(u.form(), '競合を解消').disabled).toBe(true);
+      expect(descendants(u.form()).some(n => n.textContent.includes('空白だけの名前は使えません'))).toBe(true);
+      const writes = h.base.writes; button(u.form(), '競合を解消').fire('click'); expect(h.base.writes).toBe(writes);
+    }
+    setInput(input, '残す入力'); input.fire('compositionstart'); mount.render();
+    const writes = h.base.writes; button(u.form(), '競合を解消').fire('click'); expect(h.base.writes).toBe(writes);
+    expect(button(u.form(), '競合を解消').disabled).toBe(true); input.fire('compositionend'); mount.render();
+    const remote = await before.prepareCaptionText(before.token, f.shared, 'body', '別の編集');
+    await host.receive(before.token, fullSource(remote, 1404)); s.refreshHistory(); mount.render();
+    expect(named(u.form(), '現在のシーン：名前の入力')).toBe(input); expect(input.value).toBe('残す入力');
+    expect(button(u.form(), '競合を解消').disabled).toBe(true);
+    const afterReceiveWrites = h.base.writes;
+    await expect(host.resolve(before.token, { kind: 'resolveSceneName', sceneId: f.overview,
+      choice: { kind: 'candidate', operationId: u.names[0]!.operationId } })).rejects.toThrow(/command-not-ready/);
+    expect(h.base.writes).toBe(afterReceiveWrites);
+    button(u.form(), '取り消す').fire('click'); mount.render(); expect(u.choice().value).toBe('');
+    const reader = await h.open(), readonly = createMetadataWorkspace(new RecordedDocument().asDocument(), reader), r = record(readonly.root);
+    expect(picker(r, '現在のシーン：名前の解消方法').disabled).toBe(true);
+    await expect(reader.resolve(reader.read().source!.token, { kind: 'resolveSceneName', sceneId: f.overview,
+      choice: { kind: 'candidate', operationId: u.names[0]!.operationId } })).rejects.toThrow(/閲覧専用/);
+    await readonly.dispose(); await mount.dispose();
+  });
+
+  it('retains failed choice and recovers the exact journal after cold reopen without regenerating resolution', async () => {
+    const u = await setup(), { h, host, mount, s } = u;
+    const before = host.read().source!, chosen = u.names[0]!; setInput(u.choice(), chosen.operationId);
+    h.base.rejectPublication = true; await acknowledge(s, () => button(u.form(), '競合を解消').fire('click')); mount.render();
+    expect(s.acknowledgment.state).toBe('failed'); expect(u.choice().value).toBe(chosen.operationId);
+    expect(s.snapshot.state.scenes[f.overview]!.name.kind).toBe('unresolved');
+    const paths = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.endsWith('.amchange'));
+    const bytes = await Promise.all(paths.map(p => h.base.readBytes(p)));
+    await mount.dispose(); h.base.rejectPublication = false;
+    const cold = await h.open(); expect(cold.read().state).toBe('pending'); await cold.authority.retry!();
+    expect(cold.authority.read().state.scenes[f.overview]!.name).toEqual({ kind: 'value', value: chosen.name });
+    expect(cold.read().source!.originalChanges()).toHaveLength(before.originalChanges().length + 1);
+    expect(await Promise.all(paths.map(p => h.base.readBytes(p)))).toEqual(bytes);
+    const heads = cold.read().source!.heads; await cold.authority.retry!(); expect(cold.read().source!.heads).toEqual(heads); await cold.dispose();
+  });
+
+  it('refuses incomplete/unknown/deleted/lifecycle-ambiguous sources and invalid commands without writes', async () => {
+    const u = await setup(), { h, host, mount } = u, source = host.read().source!, provider = host.read().provider!;
+    const command = { kind: 'resolveSceneName' as const, sceneId: f.overview,
+      choice: { kind: 'candidate' as const, operationId: u.names[0]!.operationId } }, tx = 'c'.repeat(32), writes = h.base.writes;
+    for (const invalid of [{ ...command, choice: { kind: 'candidate', operationId: 'unknown' } },
+      { ...command, extra: true }, { ...command, sceneId: f.detail }, { ...command, choice: { ...command.choice, extra: true } },
+      ...['', '  ', 'bad\nname', 'a'.repeat(257)].map(text => ({ ...command, choice: { kind: 'manual', text } }))])
+      expect(() => source.prepareEdit(source.token, invalid as MetadataEdit, provider, tx)).toThrow();
+    expect(() => source.prepareEdit(source.token, { kind: 'renameScene', sceneId: f.overview, name: '勝手に上書き' }, provider, tx)).toThrow();
+    const changed = [
+      raw(source, d => { d.scenesById[f.overview].name = new A.ImmutableString('42'); }),
+      raw(source, d => { delete d.scenesById[f.overview].name; }),
+      raw(source, d => { d.scenesById[f.overview].lifecycle = new A.ImmutableString(canonicalFixture({ state: 'deleted', eventId: `evt_${tx}`, reason: 'userDelete' })); }),
+      raw(source, d => { d.scenesById[f.overview].lifecycle = new A.ImmutableString(canonicalFixture({ state: 'active', eventId: `evt_${tx}`, reason: 'initial', future: true })); }),
+      raw(source, d => { d.scenesById[f.overview].lifecycle = new A.ImmutableString(canonicalFixture({ state: 'active', eventId: `evt_${tx}`, reason: 'initial' })); })
+        .appendOriginal(raw(source, d => { d.scenesById[f.overview].lifecycle = new A.ImmutableString(canonicalFixture({ state: 'active', eventId: `evt_${'d'.repeat(32)}`, reason: 'initial' })); }).originalChanges()),
+    ];
+    for (const altered of changed) {
+      const p = await readProjectScene(altered.read(), metadataFixtureLimits, host.content.verifier(false));
+      expect(() => altered.prepareEdit(altered.token, command, p, tx)).toThrow();
+    }
+    expect(h.base.writes).toBe(writes); expect(host.read().source!.token).toBe(source.token); await mount.dispose();
+  });
+});
 
 describe('saved startup Scene conflict recovery; memory ports and recorded DOM only', { timeout: 15000 }, () => {
   const raw = (source: ProjectMetadataSource, change: (doc: any) => void) => {
@@ -1643,7 +1772,7 @@ describe('new synthetic saved host (memory ports and recorded DOM, not real brow
     const text = descendants(list).find(n => n.tag === 'textarea')!, confirm = button(list, '競合を解消');
     expect(choice.value).toBe(''); expect(confirm.disabled).toBe(true); expect(ui.hasChanges()).toBe(false);
     setInput(choice, 'manual'); setInput(text, '統合した文言'); expect(ui.hasChanges()).toBe(true);
-    expect(descendants(list).some(n => n.textContent === 'この選択・入力はまだ保存されていません。')).toBe(true);
+    expect(descendants(list).some(n => n.textContent === 'この選択・入力はまだ適用されていません。')).toBe(true);
     const token = host.read().source!.token;
     text.fire('compositionstart'); expect(confirm.disabled).toBe(true);
     expect(button(root, '開発用の更新を受け取る').disabled).toBe(true); confirm.fire('click');

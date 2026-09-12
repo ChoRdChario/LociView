@@ -1,12 +1,53 @@
 import { planSceneCommand, type SceneAuthoringCommand } from '../scene/commands';
 import type { ProjectProviderRead } from '../scene/projectProvider';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
-import { checkMutableRecord } from '../domain/projectMutableFields';
+import { checkMutableField, checkMutableRecord } from '../domain/projectMutableFields';
 import { checkProjectHeader } from '../domain/projectRecords';
-import type { JsonObject } from '../domain/values';
+import { normalizeSceneName, type JsonObject } from '../domain/values';
 import { candidateReader } from './membership';
 import type { MetadataRecordEdit, MetadataWrite } from './commands';
 import { fail, type MetadataLimits } from './format';
+
+export interface SceneNameResolution {
+  kind: 'resolveSceneName'; sceneId: string;
+  choice: { kind: 'candidate'; operationId: string } | { kind: 'manual'; text: string };
+}
+
+/** All original names, including equal values; a diagnostic placeholder is not a choice. */
+export function sceneNameCandidates(provider: Extract<ProjectProviderRead, { kind: 'scene-provider' }>,
+  sceneId: string, limits: MetadataLimits) {
+  const guard = new ProjectRecordFields(); guard.id(sceneId, 'scn', []);
+  const r = candidateReader(provider, limits); r.active('scenesById', sceneId);
+  const field = r.records.get('scenesById')?.get(sceneId)?.get('name');
+  if (!field?.valid || field.hasUnknownFields || field.candidates.length < 2) return fail('scene-name-candidates');
+  r.charge(field.validOperationIds.length); const valid = new Set(field.validOperationIds);
+  return field.candidates.map(candidate => {
+    r.charge();
+    if (!valid.has(candidate.operationId) || candidate.value.kind !== 'value' || typeof candidate.value.value !== 'string')
+      return fail('scene-name-candidates');
+    checkMutableField(guard, 'scenesById', 'name', candidate.value.value);
+    if (guard.unknown) fail('scene-name-unknown');
+    return { operationId: candidate.operationId, name: candidate.value.value };
+  });
+}
+
+export function planSceneNameResolution(provider: Extract<ProjectProviderRead, { kind: 'scene-provider' }>,
+  command: SceneNameResolution, limits: MetadataLimits): MetadataWrite[] {
+  if (Object.keys(command).sort().join(',') !== 'choice,kind,sceneId') fail('scene-name-shape');
+  const choices = sceneNameCandidates(provider, command.sceneId, limits);
+  let name: string;
+  if (command.choice.kind === 'candidate') {
+    if (Object.keys(command.choice).sort().join(',') !== 'kind,operationId') fail('scene-name-shape');
+    const operationId = command.choice.operationId, selected = choices.find(c => c.operationId === operationId);
+    if (!selected) return fail('scene-name-choice'); name = selected.name;
+  } else if (command.choice.kind === 'manual') {
+    if (Object.keys(command.choice).sort().join(',') !== 'kind,text' || typeof command.choice.text !== 'string') fail('scene-name-shape');
+    name = normalizeSceneName(command.choice.text);
+  } else return fail('scene-name-choice');
+  const guard = new ProjectRecordFields(); checkMutableField(guard, 'scenesById', 'name', name);
+  if (guard.unknown) fail('scene-name-unknown');
+  return [{ map: 'scenesById', id: command.sceneId, create: false, fields: { name } }];
+}
 
 /** No partial projection-based copy or generic header patch. */
 export function planSceneAuthoring(provider: Extract<ProjectProviderRead, { kind: 'scene-provider' }>,

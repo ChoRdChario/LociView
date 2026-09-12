@@ -16,7 +16,7 @@ import { metadataImmutableReader } from './records';
 import { assetStatusCandidates } from './assetStatus';
 import { planAssetMembershipCopies } from './modelMembership';
 import { captionFieldCandidates, type CaptionChoiceField } from './captionCandidates';
-import { planSceneAuthoring } from './sceneAuthoring';
+import { planSceneAuthoring, planSceneNameResolution, type SceneNameResolution } from './sceneAuthoring';
 import { planCaptionDeletion } from './captionDeletion';
 import type { CaptionDeletionCommand, AssetDeletionCommand } from '../scene/commands';
 import { planAssetDeletion } from './assetDeletion';
@@ -28,6 +28,7 @@ export type MetadataEdit =
   | CaptionDeletionCommand
   | AssetDeletionCommand
   | SceneAuthoringCommand
+  | SceneNameResolution
   | CaptionMembershipResolution
   | AssetMembershipResolution
   | { kind: 'resolveAssetStatus'; assetId: string; operationId: string }
@@ -65,6 +66,8 @@ const shape = (v: JsonObject, keys: string[]) => {
 export function canonicalMetadataEdit(input: MetadataEdit, limits: MetadataLimits): MetadataEdit {
   if ((input?.kind === 'createScene' || input?.kind === 'renameScene') && typeof input.name === 'string')
     input = { ...input, name: normalizeSceneName(input.name) };
+  if (input?.kind === 'resolveSceneName' && input.choice?.kind === 'manual' && typeof input.choice.text === 'string')
+    input = { ...input, choice: { ...input.choice, text: normalizeSceneName(input.choice.text) } };
   if (input?.kind === 'resolveCaptionText' && input.choice?.kind === 'manual' && typeof input.choice.text === 'string')
     input = { ...input, choice: { ...input.choice, text: normalizeCaptionText(input.field, input.choice.text) } };
   return cloneCanonicalValue(input, limits) as unknown as MetadataEdit;
@@ -74,6 +77,7 @@ export function canonicalMetadataEdit(input: MetadataEdit, limits: MetadataLimit
 export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits: MetadataLimits): readonly MetadataWrite[] {
   const command = canonicalMetadataEdit(input, limits), raw = command as unknown as JsonObject;
   if (command.kind === 'addAsset') return planAssetAddition(provider, command, limits);
+  if (command.kind === 'resolveSceneName') return planSceneNameResolution(provider, command, limits);
   if (command.kind === 'resolveDefaultScene') {
     shape(raw, ['kind', 'operationId']);
     const choice = defaultSceneCandidates(provider, limits).find(c => c.operationId === command.operationId);

@@ -345,7 +345,9 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
             '../../projectMetadata/persistence', '../../projectMetadata/journal', './metadataFixture', './metadataStorage', './historyProjection', './metadataIntent', '../../projectMetadata/remote', './fixture', '../../projectMetadata/commands', '../../scene/projectProvider', './modelClosure', '../../domain/values', './metadataModelFacts', '../../projectMetadata/captionDeletion', '../../projectMetadata/assetDeletion'],
           metadataReceiveControls: ['./metadataHost', './session', './metadataConflictControls', './metadataMembershipControls', './metadataAssetStatusControls'],
           metadataAssetStatusControls: ['three', './metadataHost', './session', '../../projectMetadata/assetStatus', './metadataFixture', './modelFixture'],
-          metadataConflictControls: ['./metadataHost', './session', '../../projectMetadata/captionCandidates', './metadataFixture', '../../scene/types'],
+          // Same approved conflict form: complete Scene-name candidates and pure input validation only.
+          metadataConflictControls: ['./metadataHost', './session', '../../projectMetadata/captionCandidates', './metadataFixture', '../../scene/types',
+            '../../projectMetadata/sceneAuthoring', '../../domain/values'],
           metadataMembershipControls: ['./metadataHost', './session', '../../projectMetadata/membership', '../../projectMetadata/persistence', './metadataFixture',
             '../../projectMetadata/modelMembership', './metadataModelRecords', './modelClosure', '../../domain/values'],
           metadataIntent: ['../../core/json', '../../domain/values', '../../domain/captionText', '../../scene/types', '../../projectMetadata/commands', './fixture', './metadataFixture', './mediaHistory', './modelClosure', './modelHistory'],
