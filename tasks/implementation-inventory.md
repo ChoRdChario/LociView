@@ -1,6 +1,8 @@
 # 実装・接続の全体棚卸し
 
 > CURRENT INVENTORY / 2026-09-13。全体監査基点: `b73315b851f627ca61029cfb73caf23f6e4829bd`。
+> V04は同じ視点タブへ背景入力・適用・取消を接続。表示だけの変更とViewへの記録を分離。
+> exact読戻しまでrollback可能とし、カメラ／軸／gizmo・入力を保持。実描画／実機は未受入れ。
 > C07は添付情報から一覧件数へ接続済み。metadata／限定GLB/PNGで追加・削除・retry・再開を確認。
 > 不明な添付を0件にせず、同じ画像の複数添付は各1件。実画面・実機・offline受入れは別。
 > その後の実装差分: 新metadataの完全履歴受信・Caption文言の明示解消・重複Captionの独立コピー、
@@ -32,14 +34,14 @@
 ## 1. 結論と数え方
 
 ユーザーが行う作業を **64機能群** に整理すると、新metadata保存画面へ限定接続済みが
-**28群**、残りが **36群**。その36群は下記の内訳になる。
-「28/64完成」といった完成率・工数には換算しない。小さい部品接続と
+**29群**、残りが **35群**。その35群は下記の内訳になる。
+「29/64完成」といった完成率・工数には換算しない。小さい部品接続と
 移行／チーム受信では仕事量が大きく違い、接続済みも下記の限定経路だからである。
 
 | 排他的な主分類 | 群数 | 意味 |
 |---|---:|---|
-| 接続済み | 28 | 新metadata hostで操作・必要な保存まで接続。従来25群は既知三角形／2 PNG起点、P01/P02は限定validation、C07は両hostへ接続。実機受入れは別 |
-| 部品未接続 | 6 | 新系統のUI部品・pure planner等はあるが、対象群全体の画面・実データ・typed command／保存のいずれかが未接続。T01〜T04は限定接続まで進んだ |
+| 接続済み | 29 | 新metadata hostで操作・必要な記録まで接続。従来25群は既知三角形／2 PNG起点、P01/P02は限定validation、C07/V04は両hostへ接続。実機受入れは別 |
+| 部品未接続 | 5 | 新系統のUI部品・pure planner等はあるが、対象群全体の画面・実データ・typed command／保存のいずれかが未接続。T01〜T04は限定接続まで進んだ |
 | 別経路のみ | 20 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
 | 新規実装 | 10 | 新契約の利用者向け経路がまだない。schema・検証・設計案があっても実装済みとは数えない |
 
@@ -62,7 +64,7 @@
 |---|---|---|
 | 通常home → Native | 実モデル／画像、DisplaySet、限定backup／collaboration／review／clean、旧Desktop・iPhone合格 | 新ProjectScene／継続因果履歴／新保存サービスの完成 |
 | project-scene memory／旧 `storage=saved` | 合成の2人チーム、更新・競合・独立copy・保存の限定ループ | 新metadata serviceまたは実ファイル製品wireの接続済み |
-| project-scene `storage=metadata` | 新source/repository/session/journalと従来25群＋C07の合成UI接続、限定履歴受信・明示解消 | 任意モデル／任意画像／実ファイルのチーム受信／通常home／offlineの合格 |
+| project-scene `storage=metadata` | 新source/repository/session/journalと従来25群＋C07/V04の合成UI接続、限定履歴受信・明示解消 | 任意モデル／任意画像／実ファイルのチーム受信／通常home／offlineの合格 |
 | project-scene `storage=validation` | 新規静的GLB/PNG Projectの作成・専用一覧・再開、実本体read/render、pin/text/PNG編集、GLB/PNG後入れ・配置・材質照明／表裏／hard chroma／解除 | 実描画／実入力／実機／正式profile採用、他形式・残る材質効果・実チームwireの完成 |
 
 ## 2. 全機能群
@@ -134,7 +136,7 @@
 | V01 | カメラを操作し、全体表示・六方向・透視／平行投影へ戻る | 接続済み | Blender基本mouse。完全keymapではない。touchの実機受入れは別。 | [src/ui/projectScene/viewControls.ts:13](../src/ui/projectScene/viewControls.ts) / [tests/ui/projectSceneViewport.test.ts:307](../tests/ui/projectSceneViewport.test.ts) |
 | V02 | Saved Viewを作成・呼出し・更新・名称／順序編集・削除する | 接続済み | current camera＋背景をcapture。entry参照中の削除は拒否。 | [src/harness/projectScene/viewSession.ts:117](../src/harness/projectScene/viewSession.ts) / [tests/ui/projectMetadataHost.test.ts:628](../tests/ui/projectMetadataHost.test.ts) |
 | V03 | Sceneの開始視点を設定・解除する | 接続済み | 現在のカメラ、Saved View編集、Project default Sceneを混同しない。 | [src/harness/projectScene/viewSession.ts:74](../src/harness/projectScene/viewSession.ts) / [tests/ui/projectMetadataHost.test.ts:628](../tests/ui/projectMetadataHost.test.ts) |
-| V04 | 3D背景色をpicker／HEXで選び、標準色へ戻す | 部品未接続 | createViewBackgroundControlsとテストはあるがworkspaceへmountなし。Saved Viewの背景保存だけでは代替不可。 | [src/ui/projectScene/viewAuthoringControls.ts:125](../src/ui/projectScene/viewAuthoringControls.ts) / [src/harness/projectScene/viewportHost.ts:57](../src/harness/projectScene/viewportHost.ts) |
+| V04 | 3D背景色をpicker／HEXで選び、標準色へ戻す | 接続済み | 同じ視点タブに入力／標準色／適用／取消。local表示はreadonly可、共有Viewの記録は既存command。exact読戻し失敗も旧色・draftを保持し再試行。metadata／限定GLBでView記録・cold再開を確認、実描画／実機は未受入れ。 | [src/ui/projectScene/viewAuthoringControls.ts](../src/ui/projectScene/viewAuthoringControls.ts) / [src/harness/projectScene/viewportHost.ts](../src/harness/projectScene/viewportHost.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
 
 ### マテリアル
 
@@ -332,7 +334,7 @@ PNG／GLB後入れ・配置・材質照明／表裏／hard chroma／解除も同
 | 7 | 他の実形式・閲覧補助と残るalignment／補修を継承・実装する | Point＋表示径＋pick、GS＋明示Proxy、複数material、rotation/scale、残るalignmentを形式／契約ごとに閉じる。M14はGS/repair-local transform/原子的revisionの前提が揃ってから。hard-maskと一般smooth透過を一括deferredにしない。従来UIをコピーして新Sceneの意味を変えない |
 | 8 | 通常homeからの全体受入れ | 新sourceでTEAM-FLOW-01をDesktopとphysical iPhone、保存／restart／offlineまで確認。a11y・短画面・IME等も安定treeでまとめる。Pages/SW/main/releaseへは現在の権限で進まない |
 
-残るV04背景入口、C04追加色、C09resize、M05一時hide等は
+V04背景入口は接続済み。残るC04追加色、C09resize、M05一時hide等は
 小さな独立UI接続として、依存が揃い次第本筋の間に挟んでよい。
 全てのチーム・形式作業が終わるまで放置する意味ではない。
 ただし小改修を積み続けて受信・更新の本筋が進まない状態にはしない。

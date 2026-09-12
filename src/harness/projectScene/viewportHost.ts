@@ -1,5 +1,5 @@
 import { createViewControls } from '../../ui/projectScene/viewControls';
-import { createViewAuthorControls } from '../../ui/projectScene/viewAuthoringControls';
+import { createViewAuthorControls, createViewBackgroundControls } from '../../ui/projectScene/viewAuthoringControls';
 import { type ViewContext, type ViewCameraIntent, type ViewAxis } from '../../ui/projectScene/viewState';
 import { planCaptionList } from '../../ui/projectScene/captionListState';
 import { createCaptionWindowControls } from '../../ui/projectScene/captionWindowControls';
@@ -12,6 +12,7 @@ import type { ModelPlacementTarget } from './pinGizmo';
 import type { ModelManipulation } from './modelTransform';
 import type { SyntheticSession } from './session';
 import type { DisplayCapture } from './viewSession';
+import { PROJECT_SCENE_STANDARD_BACKGROUND_HEX, readSolidBackground, type SolidBackground } from './viewHistory';
 import { createMediaGallery } from './mediaControls';
 
 export interface ViewportObservation {
@@ -30,6 +31,8 @@ export interface SyntheticViewport {
   setPinPointerActive?(active: boolean): void;
   read(): ViewportObservation; camera(intent: ViewCameraIntent): void; retry(): void; dispose(): void;
   capture?(): DisplayCapture; recall?(payload: DisplayCapture): void;
+  /** Includes exact readback verification; thrown verification must roll back before publication. */
+  setBackground?(background: SolidBackground, verify?: () => void): void;
   pick?(target: PinSurfaceTarget, xCss: number, yCss: number): V3 | null;
   pickCreation?(targets: readonly PinSurfaceTarget[], xCss: number, yCss: number): { target: PinSurfaceTarget; position: V3 } | null;
 }
@@ -81,9 +84,19 @@ export function createViewportHost(document: Document, session: SyntheticSession
     changed();
   });
   const cameraHelp = document.createElement('details'), cameraHelpTitle = document.createElement('summary'), cameraHelpText = document.createElement('p');
+  const background = createViewBackgroundControls(document, event => {
+    if (disposed) return;
+    session.views.acceptBackground(event, backgroundContext(), (color, verify) => {
+      if (!runtime?.setBackground) throw new Error('背景色の変更は未接続です。');
+      runtime.setBackground(color, verify);
+    }, () => {
+      if (!runtime?.capture) throw new Error('背景の適用結果を確認できません。');
+      return { context: backgroundContext(), background: readSolidBackground(runtime.capture().background) };
+    }); changed();
+  }, PROJECT_SCENE_STANDARD_BACKGROUND_HEX);
   cameraHelpTitle.textContent = 'カメラ操作';
   cameraHelpText.textContent = '回転：中央ボタンドラッグ。平行移動：Shift＋中央ボタンドラッグ。ズーム：ホイール／Ctrl＋中央ボタンドラッグ。';
-  cameraHelp.append(cameraHelpTitle, cameraHelpText); view.root.append(cameraHelp, author.root);
+  cameraHelp.append(cameraHelpTitle, cameraHelpText); view.root.append(cameraHelp, author.root, background.root);
   const windows = createCaptionWindowControls(document, plan => {
     const accepted = session.acceptWindow(plan); changed(); return accepted;
   }, active => { session.setWindowDragging(active); changed(); }, captionId => createMediaGallery(document, () => session.snapshot, captionId));
@@ -92,14 +105,19 @@ export function createViewportHost(document: Document, session: SyntheticSession
   // Keep failure/retry outside the floating-window stack so comparison cannot cover recovery.
   root.append(windows.root); view.stageTools.append(renderStatus);
   function text(e: unknown) { return e instanceof Error ? e.message : '3D表示を確認してください。'; }
-  function currentContext(): ViewContext {
+  function currentContext(forBackground = false): ViewContext {
     const observation = runtime?.read(), scope = { sceneId: session.sceneId, projectFrameId: session.snapshot.resources.projectFrameId };
     return session.views.context({ ...scope, token: observation?.token ?? 'unconnected',
         ...(observation?.ready && !error ? { kind: 'ready' as const, projection: observation.projection, axis: observation.axis,
           bounds: value(display?.bounds ? 'available' as const : 'empty' as const) } :
           { kind: 'unavailable' as const, reason: error ?? observation?.issue ?? '3D表示は未接続です。' }) },
       observation?.dragging ? 'カメラ操作を終えてください。' : session.pending && !['text', 'composition'].includes(session.pending) ? sceneSwitchReason(session.pending) :
-        session.pending === 'composition' && session.views.pending !== 'composition' ? sceneSwitchReason('composition') : null);
+        session.pending === 'composition' && session.views.pending !== 'composition' ? sceneSwitchReason('composition') :
+        !forBackground && session.views.backgroundPending ? '背景の編集を適用するか、取り消してください。' :
+        forBackground && (session.views.authorPending || session.pending && !session.views.backgroundPending) ? '入力中の操作を適用するか、取り消してください。' : null);
+  }
+  function backgroundContext() {
+    return session.views.backgroundContext(currentContext(true), runtime?.capture && runtime.setBackground ? () => runtime!.capture!() : undefined);
   }
   function paint() {
     if (disposed) return;
@@ -110,6 +128,7 @@ export function createViewportHost(document: Document, session: SyntheticSession
     }
     author.render(authorContext);
     author.root.hidden = !!session.viewRestriction;
+    background.render(backgroundContext());
     const observed = runtime?.read();
     if (!observed?.ready || observed.manipulating || error) { gesture = null; gestureGeneration++; }
     const rect = canvas.getBoundingClientRect?.();
@@ -250,7 +269,7 @@ export function createViewportHost(document: Document, session: SyntheticSession
   return { root, view: view.root, stageTools: view.stageTools, windowTools: windows.tools, render,
     get connected() { return Boolean(runtime?.read().ready && !error); },
     get pickingConnected() { return Boolean(active && runtime?.read().ready && runtime.pick && !error); },
-    dispose() { disposed = true; gesture = null; pressed.clear(); gestureGeneration++; windows.dispose(); runtime?.dispose(); author.dispose(); view.dispose();
+    dispose() { disposed = true; gesture = null; pressed.clear(); gestureGeneration++; windows.dispose(); runtime?.dispose(); background.dispose(); author.dispose(); view.dispose();
       canvas.removeEventListener('pointerdown', down, true); canvas.removeEventListener('pointermove', move, true); canvas.removeEventListener('pointerup', up, true);
       canvas.removeEventListener('pointercancel', cancel, true); canvas.removeEventListener('lostpointercapture', lost, true);
       retry.removeEventListener('click', tryAgain); root.remove(); } };

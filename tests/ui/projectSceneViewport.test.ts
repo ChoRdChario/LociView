@@ -535,6 +535,35 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     expect(v.read().ready).toBe(true); expect(v.capture!()).toEqual(pose); v.dispose();
   });
 
+  it('applies only background with exact Scene memory, preserving camera/axis/Orbit/gizmo and rolling back renderer failures', () => {
+    const canvas = fakeCanvas(), v = createSyntheticViewport(canvas.canvas as unknown as HTMLCanvasElement, () => {});
+    const p = createSyntheticProject(), a = syntheticDisplay(p, f.overview, null, null), b = syntheticDisplay(p, f.detail, null, null);
+    v.update(a); v.setActive(true); canvas.show(); v.camera({ kind: 'axis', axis: '+x' });
+    const renderer = tracker.renderers.at(-1), controls = tracker.controls.at(-1), gizmo = tracker.gizmos.at(-1), camera = v.capture!().camera;
+    const models = renderer.scene.children[0], before = v.read(), color = { kind: 'solid' as const, colorSrgb: [0.123456789, 0.42, 0.8] as const };
+    v.setBackground!(color); expect(v.capture!()).toEqual({ camera, background: color });
+    expect(v.read()).toMatchObject({ axis: '+x', pickToken: before.pickToken }); expect(v.read().token).not.toBe(before.token);
+    expect(tracker.controls.at(-1)).toBe(controls); expect(tracker.gizmos.at(-1)).toBe(gizmo); expect(renderer.scene.children[0]).toBe(models);
+    expect(renderer.scene.background.r).toBeCloseTo(((color.colorSrgb[0] + 0.055) / 1.055) ** 2.4, 10);
+    const oldColor = renderer.scene.background, render = vi.spyOn(renderer, 'render');
+    const receiptColor = { kind: 'solid' as const, colorSrgb: [0, 0, 0] as const }, originalToken = v.read().token;
+    expect(() => v.setBackground!(receiptColor, () => {
+      expect(v.capture!().background).toEqual(receiptColor); throw Error('exact receipt failure');
+    })).toThrow('exact receipt failure');
+    expect(v.read().token).toBe(originalToken); expect(v.capture!().background).toEqual(color);
+    expect(renderer.scene.background).toBe(oldColor);
+    render.mockImplementationOnce(() => { throw Error('background render failure'); });
+    expect(() => v.setBackground!({ kind: 'solid', colorSrgb: [1, 0, 0] })).toThrow('background render failure');
+    expect(v.capture!()).toEqual({ camera, background: color }); expect(renderer.scene.background).toBe(oldColor);
+    expect(v.read().ready).toBe(true); expect(tracker.controls.at(-1)).toBe(controls);
+    expect(() => v.setBackground!({ kind: 'solid', colorSrgb: [2, 0, 0] })).toThrow(); expect(renderer.scene.background).toBe(oldColor);
+    v.update(b); v.update(a); expect(v.capture!().background).toEqual(color);
+    render.mockImplementationOnce(() => { throw Error('apply failure'); }).mockImplementationOnce(() => { throw Error('rollback failure'); });
+    expect(() => v.setBackground!({ kind: 'solid', colorSrgb: [0, 0, 0] })).toThrow('apply failure');
+    expect(v.read()).toMatchObject({ ready: false }); expect(v.read().issue).toContain('rollback failure');
+    v.retry(); expect(v.capture!().background).toEqual(color); v.dispose();
+  });
+
   it('shows context/init failure with recoverable metadata and no automatic retry', () => {
     const canvas = fakeCanvas(), viewport = createSyntheticViewport(canvas.canvas as unknown as HTMLCanvasElement, () => {});
     viewport.update(syntheticDisplay(createSyntheticProject(), f.overview, null, null)); viewport.setActive(true); tracker.fail = true;

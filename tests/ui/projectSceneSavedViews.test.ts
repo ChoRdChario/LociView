@@ -15,6 +15,59 @@ const payload = () => ({ camera: { position: [1, 2, 8] as const, target: [0, 0, 
   projection: { kind: 'perspective' as const, verticalFovRadians: 0.7 } }, background: { kind: 'solid' as const, colorSrgb: [0.1234567, 0.42, 0.8] as const } });
 
 describe('Saved Views in the connected synthetic workspace, not browser/device evidence', () => {
+  it('mounts local background drafts with exact readback, retry, pending guards, standard color and explicit View capture', () => {
+    let token = 0, display: DisplayCapture = payload(), failed = false, applications = 0, rejectReceipt = false, applying = false;
+    const s = new SyntheticSession(), initial = s.snapshot, w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s, { viewportFactory: () => ({
+      update() {}, setActive() {}, read: () => ({ token: String(token), ready: true, issue: null, dragging: false, projection: 'perspective', axis: null, pins: [] }),
+      capture: () => { if (applying && rejectReceipt) { rejectReceipt = false; throw Error('readback refusal'); } return display; },
+      setBackground: (background, verify) => {
+        applications++; if (failed) throw Error('background refusal'); const previous = display;
+        display = { ...display, background }; applying = true;
+        try { verify?.(); token++; } catch (e) { display = previous; throw e; } finally { applying = false; }
+      },
+      camera() {}, retry() {}, dispose() {} }) });
+    const r = record(w.root); button(r, '視点').fire('click');
+    const bg = area(r, '3D背景'), author = area(r, '視点の作成と管理'), hex = descendants(bg).find(n => n.attributes.get('aria-label') === '背景色')!;
+    expect(display.background).toEqual(payload().background); expect(button(bg, '背景に適用').disabled).toBe(true);
+    const input = (text: string) => { hex.value = text; hex.fire('input'); };
+    input('#2468ac'); expect(s.pending).toBe('text'); expect(display.background).toEqual(payload().background);
+    expect(button(r, '設備の確認').disabled).toBe(true); expect(button(author, '視点を作る').disabled).toBe(true);
+    // An external camera movement is not a change to the background source token.
+    display = { ...display, camera: { ...display.camera, position: [3, 4, 9] } }; token++; w.render();
+    expect(button(bg, '背景に適用').disabled).toBe(false);
+    failed = true; button(bg, '背景に適用').fire('click'); expect(s.pending).toBe('text');
+    expect(display.background).toEqual(payload().background); expect(hex.value).toBe('#2468ac'); expect(descendants(bg).map(n => n.textContent).join(' ')).toContain('background refusal');
+    failed = false; rejectReceipt = true; button(bg, '背景に適用').fire('click');
+    expect(s.pending).toBe('text'); expect(display.background).toEqual(payload().background); expect(button(bg, '背景に適用').disabled).toBe(false);
+    button(bg, '背景に適用').fire('click'); expect(s.pending).toBeNull(); expect(applications).toBe(3);
+    const applied = display; expect(applied.background.colorSrgb).toEqual([36 / 255, 104 / 255, 172 / 255]);
+    expect(s.snapshot).toBe(initial); // Local display, zero shared metadata writes.
+    button(bg, '標準色').fire('click'); expect(hex.value).toBe('#e8e6e2'); expect(display).toBe(applied);
+    button(bg, '取り消す').fire('click'); button(bg, '変更を取り消す').fire('click'); expect(s.pending).toBeNull();
+    button(author, '視点を作る').fire('click'); expect(hex.readOnly).toBe(true);
+    const name = descendants(author).find(n => n.tag === 'input')!; name.value = '背景と角度'; name.fire('input');
+    button(author, '視点を追加').fire('click');
+    const id = select(r, '保存した視点').value; expect(s.snapshot.viewData!.records[id]!.background).toEqual({ kind: 'value', value: applied.background });
+    expect(s.snapshot.viewData!.records[id]!.camera).toEqual({ kind: 'value', value: applied.camera });
+    change(select(area(r, '開始時の設定'), 'シーンを開いたときの視点'), id); expect(hex.readOnly).toBe(true);
+    button(area(r, '開始時の設定'), '設定を適用').fire('click'); expect(hex.readOnly).toBe(false); w.dispose();
+  });
+  it('keeps IME/drafts through unavailable rendering and refuses an exact background change even when its HEX is unchanged', () => {
+    let ready = true, token = 0, display: DisplayCapture = payload(), applications = 0;
+    const s = new SyntheticSession(), w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s, { viewportFactory: () => ({
+      update() {}, setActive() {}, read: () => ({ token: String(token), ready, issue: null, dragging: false, projection: 'perspective', axis: null, pins: [] }),
+      capture: () => { if (!ready) throw Error('renderer unavailable'); return display; },
+      setBackground: (background, verify) => { applications++; display = { ...display, background }; verify?.(); token++; }, camera() {}, retry() {}, dispose() {} }) });
+    const r = record(w.root); button(r, '視点').fire('click'); const bg = area(r, '3D背景');
+    const hex = descendants(bg).find(n => n.attributes.get('aria-label') === '背景色')!;
+    hex.fire('compositionstart'); hex.value = '#abcdef'; hex.fire('input'); expect(s.pending).toBe('composition');
+    ready = false; w.render(); expect(button(bg, '背景に適用').disabled).toBe(true); hex.fire('compositionend'); expect(s.pending).toBe('text');
+    expect(hex.value).toBe('#abcdef'); button(bg, '取り消す').fire('click'); button(bg, '変更を取り消す').fire('click'); expect(s.pending).toBeNull();
+    ready = true; w.render(); hex.value = '#abcdef'; hex.fire('input');
+    display = { ...display, background: { kind: 'solid', colorSrgb: [0.1234568, 0.42, 0.8] } }; token++; w.render();
+    expect(button(bg, '背景に適用').disabled).toBe(true); expect(descendants(bg).map(n => n.textContent).join(' ')).toContain('背景が更新'); expect(hex.value).toBe('#abcdef');
+    expect(applications).toBe(0); w.dispose();
+  });
   it('creates, recalls, renames, reorders, sets entry and confirms deletion in the same host, retaining frozen capture and IME input', () => {
     let cameraToken = 0, display: DisplayCapture = payload(); const recalled: unknown[] = [];
     const doc = new RecordedDocument(), s = new SyntheticSession(), w = createDevelopmentWorkspace(doc.asDocument(), s, { viewportFactory: () => ({

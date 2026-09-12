@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { fixtureModelBytes } from './modelClosure';
 import { defaultPose, fittedPose, placementMatrix, projectBounds, switchProjection, type CameraPose, type SyntheticDisplay } from './viewportModel';
 import type { ViewportFactory, ViewportObservation } from './viewportHost';
-import { readProjectCamera, readSolidBackground, type SolidBackground } from './viewHistory';
+import { PROJECT_SCENE_STANDARD_BACKGROUND_HEX, readProjectCamera, readSolidBackground, type SolidBackground } from './viewHistory';
 import type { DisplayCapture } from './viewSession';
 import { pickResidentCreation, pickResidentSurface, type PinSurfaceTarget, type ResidentSurface } from './viewportPicking';
 import { createPinGizmo, type ModelPlacementTarget } from './pinGizmo';
@@ -16,7 +16,7 @@ import { createValidationCoverage, coveragePixel } from './validationCoverage';
 export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFactory => (canvas, changed, proposePin, proposeModel) => {
   let renderer: THREE.WebGLRenderer | null = null, controls: OrbitControls | null = null;
   let camera: THREE.PerspectiveCamera | THREE.OrthographicCamera | null = null;
-  const scene = new THREE.Scene(), models = new THREE.Group(); scene.add(models); scene.background = new THREE.Color('#e8e6e2');
+  const scene = new THREE.Scene(), models = new THREE.Group(); scene.add(models); scene.background = new THREE.Color(PROJECT_SCENE_STANDARD_BACKGROUND_HEX);
   const resident = new Map<string, ResidentSurface>();
   scene.add(new THREE.HemisphereLight(0xffffff, 0x77736e, 2));
   const light = new THREE.DirectionalLight(0xffffff, 2); light.position.set(3, 5, 4); scene.add(light);
@@ -293,6 +293,23 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
       if (!active || !renderer || issue || !display || dragging || gizmo?.dragging) throw new Error('3D表示を確認してください。');
       return { camera: readProjectCamera({ position: pose.position, target: pose.target, up: pose.up,
         projection: pose.projection.kind === 'perspective' ? { kind: 'perspective', verticalFovRadians: pose.projection.verticalFov } : pose.projection }), background: readSolidBackground(background) };
+    },
+    setBackground(input, verify) {
+      if (!active || disposed || !renderer || !camera || issue || contextLost || !display || dragging || gizmo?.dragging) throw new Error('3D表示を確認してください。');
+      const next = readSolidBackground(input), previous = scene.background, previousValue = background;
+      // No camera/Orbit/gizmo replacement, fitting, model I/O or rounded readback.
+      scene.background = new THREE.Color().setRGB(...next.colorSrgb, THREE.SRGBColorSpace);
+      try {
+        renderer.render(scene, camera);
+        background = next; // Readable for verification, not yet published to Scene memory/listeners.
+        verify?.();
+      }
+      catch (e) {
+        background = previousValue; scene.background = previous;
+        try { renderer.render(scene, camera); } catch (rollbackError) { fail(rollbackError); }
+        throw e;
+      }
+      backgrounds.set(display.sceneId, next); serial++; changed();
     },
     recall(payload) {
       if (!active || !renderer || issue || !display || dragging || gizmo?.dragging) throw new Error('3D表示を確認してください。');

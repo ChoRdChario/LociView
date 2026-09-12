@@ -9,6 +9,7 @@ export interface ProjectCamera {
   readonly projection: { readonly kind: 'perspective'; readonly verticalFovRadians: number } | { readonly kind: 'orthographic'; readonly verticalSpan: number };
 }
 export interface SolidBackground { readonly kind: 'solid'; readonly colorSrgb: readonly [number, number, number] }
+export const PROJECT_SCENE_STANDARD_BACKGROUND_HEX = '#e8e6e2';
 export interface SyntheticSavedView {
   readonly id: string; readonly sceneId: string; readonly projectFrameId: string;
   readonly name: Field<string>; readonly orderKey: Field<string>; readonly lifecycle: Field<Lifecycle>;

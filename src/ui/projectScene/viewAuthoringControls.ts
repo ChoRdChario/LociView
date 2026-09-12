@@ -122,13 +122,13 @@ export function createViewAuthorControls(document: Document, onEvent: (event: Vi
 
 export type ViewBackgroundEvent = ViewBackgroundPlan | Readonly<{ kind: 'draft'; baseDraft: ViewBackgroundDraft | null; draft: ViewBackgroundDraft }> |
   Readonly<{ kind: 'cancel'; draft: ViewBackgroundDraft }>;
-export function createViewBackgroundControls(document: Document, onEvent: (event: ViewBackgroundEvent) => void) {
+export function createViewBackgroundControls(document: Document, onEvent: (event: ViewBackgroundEvent) => void, standardHex: string = standardViewBackground) {
   const { make, button, status: live, listen, cleanup } = nodes(document);
   const root = make('section'); root.className = 'lv-view-controls lv-view-background'; root.setAttribute('aria-label', '3D背景');
   const label = make('label', '背景色'), hex = make('input'); hex.type = 'text'; hex.placeholder = '#rrggbb'; hex.setAttribute('aria-label', '背景色'); label.append(hex);
   const picker = make('input'); picker.type = 'color'; picker.setAttribute('aria-label', '背景色を選択');
   const standard = button('標準色'), apply = button('背景に適用'), cancel = button('取り消す'); apply.className = 'lv-view-primary';
-  const note = make('p', '背景は視点の作成・更新で保存します。'), status = live();
+  const note = make('p', '背景を視点にも残すには、視点を作成・更新してください。'), status = live();
   for (const node of [hex, picker, standard, apply]) node.setAttribute('aria-describedby', status.id);
   root.append(label, picker, standard, apply, cancel, note, status);
   const confirmation = make('section'), confirm = button('変更を取り消す'), keep = button('編集を続ける'); confirmation.hidden = true;
@@ -143,7 +143,7 @@ export function createViewBackgroundControls(document: Document, onEvent: (event
   listen(hex, 'compositionstart', () => { if (!hex.readOnly) change(hex.value, true); });
   listen(hex, 'compositionend', () => { if (context?.draft?.composing) change(hex.value, false); });
   listen(picker, 'input', () => { if (!picker.disabled) change(picker.value); });
-  listen(standard, 'click', () => { if (!standard.disabled) change(standardViewBackground); });
+  listen(standard, 'click', () => { if (!standard.disabled) change(standardHex); });
   listen(apply, 'click', () => {
     if (!context || apply.disabled) return; const plan = planViewBackground(context);
     if (plan.kind === 'blocked') { status.textContent = plan.reason; status.hidden = false; } else onEvent(plan);
@@ -158,7 +158,7 @@ export function createViewBackgroundControls(document: Document, onEvent: (event
     if (context && (context.draft || context.feedback.kind === 'applying') && (context.source.sceneId !== next.source.sceneId || context.source.projectFrameId !== next.source.projectFrameId)) {
       status.textContent = '背景の編集を適用・取り消しするか、処理の完了を待ってください。'; status.hidden = false; return false;
     }
-    context = next; const draft = next.draft, busy = next.feedback.kind === 'applying', sourceIssue = backgroundSourceIssue(next);
+    context = next; const draft = next.draft, busy = next.feedback.kind === 'applying', sourceIssue = next.view.cameraBlock ?? backgroundSourceIssue(next);
     const text = draft?.hex ?? (next.source.kind === 'solid' && !sourceIssue ? next.source.hex : '');
     if (!draft?.composing && hex.value !== text) hex.value = text;
     hex.readOnly = busy || Boolean(sourceIssue); const color = normalizeNativeBackgroundHex(text);

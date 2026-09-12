@@ -1,10 +1,15 @@
-import { NATIVE_STANDARD_BACKGROUND_HEX, normalizeNativeBackgroundHex, nativeBackgroundFromHex } from '../../nativeGs/backgroundColor';
+import { NATIVE_STANDARD_BACKGROUND_HEX, normalizeNativeBackgroundHex, nativeBackgroundFromHex, nativeBackgroundHex } from '../../nativeGs/backgroundColor';
 import { viewRuntimeMatches, type ViewContext, type ViewFeedback } from './viewState';
 
 export const standardViewBackground = NATIVE_STANDARD_BACKGROUND_HEX;
 /** token covers the exact, unrounded background only. hex is a display value, not its stored replacement. */
 export type ViewBackgroundSource = Readonly<{ sceneId: string; projectFrameId: string; token: string }> & (
   Readonly<{ kind: 'solid'; hex: string }> | Readonly<{ kind: 'unavailable'; reason: string }>);
+/** The existing UI presentation helper rounds only the label, never its identity. */
+export function solidViewBackgroundSource(scope: Pick<ViewBackgroundSource, 'sceneId' | 'projectFrameId'>,
+  background: ReturnType<typeof nativeBackgroundFromHex>): ViewBackgroundSource {
+  return { ...scope, kind: 'solid', token: JSON.stringify(background), hex: nativeBackgroundHex(background) };
+}
 export interface ViewBackgroundDraft {
   readonly sceneId: string; readonly projectFrameId: string; readonly baseToken: string;
   readonly baseHex: string; readonly hex: string; readonly composing: boolean;

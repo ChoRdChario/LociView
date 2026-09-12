@@ -10,6 +10,13 @@
 
 ## Start here
 
+2026-09-13 V04 connection: the same View tab now mounts solid-background
+picker/HEX/standard/apply/cancel. Display-only edits preserve camera/axis/controls;
+exact read-back is inside rollback, so failed confirmation remains retryable.
+Explicit View capture uses the existing journal; readonly local display still
+works. Metadata and limited GLB/PNG cold recall are tested through existing ports.
+Final checks are in todo; rendered/device acceptance remains in the existing batch.
+
 2026-09-13 C07 connection: existing metadata/limited GLB-PNG lists now show
 attachment-derived counts, with unresolved relations shown for review rather than
 as zero. Same-image attachments count separately; confirmed deletion, failed
@@ -44,9 +51,9 @@ Do not repeat the delegation question. No package reader/writer or ordinary rout
 
 2026-09-12 whole-scope inventory: [tasks/implementation-inventory.md](tasks/implementation-inventory.md)
 maps all 41 UI tasks plus accepted Scene/team extensions to 64 work groups:
-28 connected in bounded metadata/validation hosts; 6 component-level gaps, 20 other-path
+29 connected in bounded metadata/validation hosts; 5 component-level gaps, 20 other-path
 connections and 10 new-path implementations remain. P01/P02 are static-GLB/PNG
-validation-only; C07 now connects both hosts and the other 25 originate in the synthetic host. These are not completion or
+validation-only; C07/V04 now connect both hosts and the other 25 originate in the synthetic host. These are not completion or
 effort percentages. Approved full-source receive (02 §8) and explicit Caption
 text resolution and independent Caption membership copies now have bounded
 new-service/host paths. Prepared model activation, explicit pin correction and

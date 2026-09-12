@@ -1772,6 +1772,37 @@ activation, arbitrary pivot, M13 alignment/Undo or M14 repair is included.
 
 **S1 Saved View extension — implementation contract (2026-09-11):**
 
+**V04 connection detail (2026-09-13, within the existing stage-2 scope):** mount
+the existing solid-background controls in the View tab of the same host. Draft
+HEX/picker/standard choices do not change the renderer until explicit apply.
+Current background is UI-only and available with read-only Project access; only
+View capture/create/update uses the existing metadata commands and journal.
+Background and View-author/entry drafts cannot overlap. Draft/composition joins
+the existing pending guard for Scene/Project switching and survives failed apply,
+runtime loss and stale source. Cancel changes neither current display nor history.
+
+Add a background-only viewport operation, not a camera recall. Validate the exact
+solid sRGB value and render plus verify exact read-back inside one rollback
+boundary before acknowledgement or Scene-memory/listener publication; retain the previous logical
+and rendered background on failure (or report renderer loss if rollback cannot
+render). Camera pose/projection/axis, Orbit/gizmo instances, geometry/material and
+pin coordinates stay unchanged. The draft source token covers exact background,
+not rounded HEX or unrelated camera motion. Clear the draft only after exact
+read-back matches the requested background. Use ProjectScene's current initial
+`#e8e6e2` as this host's standard; do not change the old Native standard or UI theme.
+Unedited high-precision color remains untouched. Unsupported/transparent input
+does not become a guessed solid color. Background apply is not a file-save claim.
+The host connects the existing pure `ui/projectScene/viewBackgroundState` planner.
+HEX presentation stays inside that UI boundary; the viewport adds no direct
+Native-controller, Native-storage or background-helper dependency.
+
+Reuse existing background component, recorded renderer, mounted View and saved-
+host tests: apply versus draft/cancel, invalid HEX/IME/stale/lost runtime, readonly
+local use, camera/control preservation and rollback, View capture after apply,
+original bytes on failed View recording/retry, and cold reopen/recall. Recorded
+renderer/DOM evidence does not provide native input/GPU/iPhone/offline acceptance;
+those remain in the consolidated batch. No new package/schema/adoption follows.
+
 Extend that same synthetic saved host to the already specified View authoring and
 entry operations. Typed commands create a fresh Scene-owned View; edit name,
 order, or a captured camera/background pair; tombstone an explicitly confirmed

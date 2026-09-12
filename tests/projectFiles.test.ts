@@ -27,6 +27,8 @@ import { fixtureModelIds } from '../src/harness/projectScene/modelClosure';
 import { openValidationHost, validationArea } from '../src/harness/projectScene/validationHost';
 import { listValidationProjects } from '../src/harness/projectScene/validationCatalog';
 import { createSavedWorkspace } from '../src/harness/projectScene/metadataWorkspace';
+import type { DisplayCapture } from '../src/harness/projectScene/viewSession';
+import type { ViewportFactory } from '../src/harness/projectScene/viewportHost';
 import { planPinMode } from '../src/ui/projectScene/pinModeState';
 import { planModelList } from '../src/ui/projectScene/modelListState';
 import { RecordedDocument } from './ui/domRecorder';
@@ -591,7 +593,16 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       models: [{ label: '実形状', bytes: glb() }], media: [{ label: '確認用PNG', bytes: png }] }, budget, decode));
     const host = await openValidationHost({ ...options, run, initial, openStorage });
     expect(host.hasPending()).toBe(false); expect(host.authority.read().validationFiles).toBe(true);
-    const mounted = createSavedWorkspace(new RecordedDocument().asDocument(), host), s = mounted.session!;
+    let display: DisplayCapture = { camera: { position: [1, 2, 8], target: [0, 0, 0], up: [0, 1, 0],
+      projection: { kind: 'perspective', verticalFovRadians: 0.7 } }, background: { kind: 'solid', colorSrgb: [1, 1, 1] } }, token = 0;
+    const viewport: ViewportFactory = () => ({ update() {}, setActive() {},
+      read: () => ({ token: String(token), ready: true, issue: null, dragging: false, projection: 'perspective', axis: null, pins: [] }),
+      capture: () => display, setBackground: (background, verify) => { display = { ...display, background }; verify?.(); token++; },
+      recall: payload => { display = payload; token++; }, camera() {}, retry() {}, dispose() {} });
+    const mounted = createSavedWorkspace(new RecordedDocument().asDocument(), host, viewport), s = mounted.session!;
+    const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)], root = record(mounted.root);
+    const button = (r: RecordedNode, text: string) => all(r).find(n => n.tag === 'button' && n.textContent === text)!;
+    const named = (r: RecordedNode, name: string) => all(r).find(n => n.attributes.get('aria-label') === name)!;
     const model = s.snapshot.modelVersions![0]!;
     expect(s.acceptModel(planModelList(s.modelContext(), { kind: 'select', assetId: model.assetId }))).toBe(true);
     expect(s.snapshot.projectId).toBe(`prj_${run}`); expect(s.snapshot.mediaChoices).toHaveLength(1);
@@ -609,6 +620,18 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
     expect(Object.values(s.snapshot.mediaData!.records)).toHaveLength(1);
     expect(s.snapshot.mediaData!.images![image.id]!.base64).toBe(fixtureMedia[0]!.base64);
+    const beforeBackground = host.read().source!.token, originalCamera = display.camera;
+    mounted.render(); button(root, '視点').fire('click');
+    const bg = named(root, '3D背景'), hex = named(bg, '背景色'); hex.value = '#2468ac'; hex.fire('input');
+    expect(mounted.hasChanges()).toBe(true); button(bg, '背景に適用').fire('click');
+    expect(mounted.hasChanges()).toBe(false); expect(display.camera).toBe(originalCamera);
+    expect(host.read().source!.token).toBe(beforeBackground);
+    const captured = display; expect(captured.background.colorSrgb).toEqual([36 / 255, 104 / 255, 172 / 255]);
+    const author = named(root, '視点の作成と管理'); button(author, '視点を作る').fire('click');
+    const name = named(author, '視点の名称'); name.value = '現地の表示'; name.fire('input'); button(author, '視点を追加').fire('click');
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+    const viewId = Object.keys(s.snapshot.viewData!.records)[0]!;
+    expect(s.snapshot.viewData!.records[viewId]!.background).toEqual({ kind: 'value', value: captured.background });
     const reads = fs.reads;
     await host.authority.write(host.read().source!.token, { [`caption/${captionId}/title`]: '現地の確認' });
     expect(fs.reads).toBe(reads); const parts = host.read().source!.originalChanges(); await mounted.dispose();
@@ -617,7 +640,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const cold = await openValidationHost({ ...options, run, openStorage });
     expect(cold.authority.read().resources.captions[captionId]!.title).toEqual({ kind: 'value', value: '現地の確認' });
     expect(cold.authority.read().mediaData!.images![image.id]!.base64).toBe(fixtureMedia[0]!.base64);
-    expect(cold.read().source!.originalChanges()).toEqual(parts); await cold.dispose();
+    expect(cold.read().source!.originalChanges()).toEqual(parts);
+    display = { ...display, background: { kind: 'solid', colorSrgb: [0, 0, 0] } }; token++;
+    const reopened = createSavedWorkspace(new RecordedDocument().asDocument(), cold, viewport), reopenedRoot = record(reopened.root);
+    button(reopenedRoot, '視点').fire('click');
+    const choices = all(reopenedRoot).find(n => n.tag === 'select' && n.attributes.get('aria-label') === '保存した視点')!;
+    choices.value = viewId; choices.fire('change'); button(named(reopenedRoot, '保存した視点'), '表示').fire('click');
+    expect(display).toEqual(captured); await reopened.dispose();
     expect(await fs.readText('projects/unchanged/record.txt')).toBe('old project');
     await expect(openValidationHost({ ...options, run, initial, openStorage })).rejects.toThrow('既存データ');
   });

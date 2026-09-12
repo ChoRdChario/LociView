@@ -386,6 +386,9 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         if (path.replaceAll('\\', '/').endsWith('/viewport.ts')) permitted.push('three/addons/controls/OrbitControls.js', '../../viewer/hardChroma');
         if (/[\\/](viewportHost|viewSession)\.ts$/.test(path)) permitted.push('../../ui/projectScene/viewControls', '../../ui/projectScene/viewState',
           '../../ui/projectScene/viewAuthoringState', '../../ui/projectScene/viewAuthoringControls');
+        // V04 mounts the existing pure background planner in this host only.
+        // Native presentation stays behind the UI boundary; no controller/storage import.
+        if (path.replaceAll('\\', '/').endsWith('/viewSession.ts')) permitted.push('../../ui/projectScene/viewBackgroundState');
         if (path.replaceAll('\\', '/').endsWith('/viewHistory.ts')) permitted.push('../../domain/values');
         if (path.replaceAll('\\', '/').endsWith('/mediaHistory.ts')) permitted.push('../../domain/values');
         if (path.replaceAll('\\', '/').endsWith('/historyPort.ts')) {

@@ -28,7 +28,65 @@ Formal adoption still requires G1-A/C and applicable device evidence. No profile
 
 #### Active connected work — PO-approved limited real-file validation
 
-Current slice (2026-09-13, after `517f4da`): connect C07's real attachment counts
+Current slice (2026-09-13, after `c6c166f`): connect V04's existing background
+controls to the same view/runtime and saved View workflow. Previous turn made
+production progress by closing C07; the five-purpose decision remains unapproved.
+
+- [x] Mount existing HEX/picker/standard/apply/cancel controls in the View tab.
+  Keep UI-only draft/IME in the existing session and prevent competing view drafts
+  or Scene/Project switches; readonly may change local display, not shared Views.
+- [x] Add only a background setter to the existing renderer port. Preserve exact
+  camera/axis/controls/model state, use exact background stale/receipt checks,
+  and retain old background/draft on failure. No recall-based camera replacement.
+- [x] Reuse component/runtime/saved-host tests for local apply, failure/retry,
+  capture/record/reopen/recall, then final-tree checks and independent review.
+
+Scope/acceptance are the V04 implementation detail beside 05's S1 View contract.
+Use the current ProjectScene initial color as its standard; leave the Native
+constant and panel styling unchanged. No new schema/storage/wire/media profile,
+PoC, normal-home route, autosave sink or deployment. Browser runtime is unchanged
+from the verified pre-binding failure in C07; do not retry the same bootstrap or
+substitute another browser. Actual rendering/native input/iPhone/offline remain
+in the consolidated batch, not claims made from recorded renderer/DOM tests.
+Stop only for a genuine accepted-contract conflict or required new authority.
+
+V04 review: the same View tab now mounts the existing controls. Applying a color
+does not write Project history; explicit View capture/create/update records it
+through the existing journal. Renderer apply and exact read-back share rollback;
+failure keeps the old color/Scene memory/token and the same retryable input.
+Camera/axis/Orbit/gizmo/model state stays intact. Independent review identified
+the initially missing read-back rollback; corrected and confirmed. Initial
+typecheck found literal-default/union narrowing and recorded-node test-helper
+typing errors; fixed, no assertions or timeouts weakened. First scoped run was
+100 PASS, connection/renderer/real-file scoped run 48 PASS. The first root run
+was 2,034 PASS / 1 isolation-import failure / 21 TODO, not a passing checkpoint.
+Removed new direct Native-helper imports from viewport/session; HEX presentation
+stays in the existing UI background module. Only that approved pure planner path
+is added to the viewSession-specific isolation list; no broad exception or removed
+assertion. Independent review confirmed this bounded correction. The corrected
+47-test isolation/control/renderer run passed. Final exact executable tree:
+typecheck/build exit 0; root JSON success and terminal exit 0, 111 files,
+2,035 PASS / 21 existing TODO / 0 failures, 255.95 s reported result span, two
+workers and unchanged 15-second default timeout. Existing injected-decoder and
+normal mixed-import/chunk build warnings remain. Normal build is not evidence
+that the nondefault development entry was rendered or adopted. No executable
+change followed these checks.
+No new real-browser evidence: the unchanged pre-binding failure was not retried.
+The existing Desktop batch includes background/apply/cancel/capture/reopen.
+The inventory is now 29 connected / 5 component / 20 other-path / 10 new-path;
+this is not completion credit for the whole 62-group team flow. The pending
+06 §12.6 decision still blocks its affected wire work, not approved local UI work.
+
+Next bounded candidate, not implemented by this slice: M05 temporary hide/isolate
+in the same host, as already defined in 05 §3.2. Keep local Scene display state,
+membership/history and Saved Views separate. Preserve camera, Caption lists and
+windows; suppress hidden Asset pins/hit targets and restore visibility locally
+from the Caption action. Reuse model-list/runtime/limited-GLB tests, including
+readonly, stale/pending input and zero metadata writes. This supports inspecting
+multiple models and correcting pins; it does not replace file-based TEAM-FLOW.
+After M05, reassess the wire dependency before chaining unrelated small polish.
+
+Previous C07 slice (2026-09-13, after `517f4da`): connect C07's real attachment counts
 to the existing Caption lists. Previous turn made progress by committing the wire
 design and identifying a new review-to-edit contract decision. That decision is
 still unapproved; this independent, already-approved stage-2 connection does not

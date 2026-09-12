@@ -101,12 +101,13 @@ function viewHost(s: SyntheticSession) {
   const w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s, { viewportFactory: () => ({
     update() {}, setActive() {}, read: () => ({ token: String(cameraToken), ready: true, issue: null, dragging: false,
       projection: 'perspective', axis: null, pins: [] }), capture: () => capture,
-    recall: p => { recalls.push(p); }, camera() {}, retry() {}, dispose() {},
+    recall: p => { recalls.push(p); }, setBackground: (background, verify) => { capture = { ...capture, background }; verify?.(); cameraToken++; }, camera() {}, retry() {}, dispose() {},
   }) });
   const r = record(w.root); button(r, '視点').fire('click'); const author = area(r, '視点の作成と管理');
   const name = descendants(author).find(n => n.tag === 'input')!;
   return { w, r, author, recalls, picker: picker(r, '保存した視点'),
     capture(next: DisplayCapture) { capture = next; cameraToken++; w.render(); },
+    background(hex: string) { const panel = area(r, '3D背景'), input = named(panel, '背景色'); input.value = hex; input.fire('input'); button(panel, '背景に適用').fire('click'); },
     name(text: string) { name.value = text; name.fire('input'); },
     async add(text: string) { button(author, '視点を作る').fire('click'); this.name(text);
       await acknowledge(s, () => button(author, '視点を追加').fire('click')); w.render(); return this.picker.value; },
@@ -2089,8 +2090,11 @@ describe('new synthetic saved host (memory ports and recorded DOM, not real brow
     expect(s.snapshot.viewData!.records[first]!.background).toEqual({ kind: 'value', value: displayCapture().background });
     expect(ui.recalls).toHaveLength(0); button(area(ui.r, '保存した視点'), '表示').fire('click');
     expect(ui.recalls).toEqual([displayCapture()]);
-    const next = { ...displayCapture(), camera: { ...displayCapture().camera, position: [3, 4, 9] as const } };
-    ui.capture(next); button(ui.author, '編集').fire('click'); ui.name('入口');
+    const next = { ...displayCapture(), camera: { ...displayCapture().camera, position: [3, 4, 9] as const },
+      background: { kind: 'solid' as const, colorSrgb: [36 / 255, 104 / 255, 172 / 255] as const } };
+    ui.capture({ ...next, background: displayCapture().background }); ui.background('#2468ac');
+    expect(host.read().source!.originalChanges()).toHaveLength(initialChanges + 1);
+    button(ui.author, '編集').fire('click'); ui.name('入口');
     button(ui.author, '現在の表示を使用').fire('click');
     await acknowledge(s, () => button(ui.author, '変更を適用').fire('click')); ui.w.render();
     expect(s.snapshot.viewData!.records[first]!.camera).toEqual({ kind: 'value', value: next.camera });
@@ -2117,6 +2121,9 @@ describe('new synthetic saved host (memory ports and recorded DOM, not real brow
     expect(s.snapshot.viewData!.records[first]!.lifecycle).toMatchObject({ value: { state: 'deleted' } });
     const reader = await h.open(), readSession = new SyntheticSession(reader.authority), readUI = viewHost(readSession);
     expect(readUI.author.hidden).toBe(true);
+    const readToken = reader.read().source!.token; readUI.background('#abcdef');
+    expect(readSession.pending).toBeNull(); expect(named(area(readUI.r, '3D背景'), '背景色').value).toBe('#abcdef');
+    expect(reader.read().source!.token).toBe(readToken);
     readUI.picker.value = second; readUI.picker.fire('change'); button(area(readUI.r, '保存した視点'), '表示').fire('click');
     expect(readUI.recalls).toHaveLength(1); expect(picker(area(readUI.r, '開始時の設定'), 'シーンを開いたときの視点').disabled).toBe(true);
     readUI.w.dispose(); await reader.dispose(); ui.w.dispose(); await host.dispose();
@@ -2130,6 +2137,7 @@ describe('new synthetic saved host (memory ports and recorded DOM, not real brow
 
   it('retains a failed View capture and original ID/bytes until exact retry confirms the same draft', async () => {
     const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority), ui = viewHost(s);
+    ui.background('#2468ac'); const appliedBackground = { kind: 'solid', colorSrgb: [36 / 255, 104 / 255, 172 / 255] };
     h.base.rejectPublication = true; await ui.add('復旧する視点');
     expect(s.acknowledgment.state).toBe('failed'); expect(Object.keys(s.snapshot.viewData!.records)).toHaveLength(0);
     expect(s.views.pending).toBe('text');
@@ -2138,7 +2146,7 @@ describe('new synthetic saved host (memory ports and recorded DOM, not real brow
     ui.capture({ ...displayCapture(), background: { kind: 'solid', colorSrgb: [1, 1, 1] } });
     h.base.rejectPublication = false; await acknowledge(s, () => { s.retryWorking(); }); ui.w.render();
     expect(s.acknowledgment.state).toBe('idle'); expect(s.views.pending).toBeNull();
-    const id = ui.picker.value; expect(s.snapshot.viewData!.records[id]!.background).toEqual({ kind: 'value', value: displayCapture().background });
+    const id = ui.picker.value; expect(s.snapshot.viewData!.records[id]!.background).toEqual({ kind: 'value', value: appliedBackground });
     expect(await Promise.all(paths.map(p => h.base.readBytes(p)))).toEqual(bytes);
     await host.authority.retry!(); expect(Object.keys(host.authority.read().viewData!.records)).toEqual([id]);
     ui.w.dispose(); await host.dispose(); const cold = await h.open();

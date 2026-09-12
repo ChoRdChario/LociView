@@ -1,6 +1,7 @@
 import { acceptEntryView, newViewMemory, savedViewChoices, viewPlanIsCurrent, type ViewContext, type ViewMemory, type ViewPlan, type ViewRuntime } from '../../ui/projectScene/viewState';
 import { acceptViewAuthor, viewAuthorPlanIsCurrent, type ViewAuthorContext, type ViewAuthorDraft, type ViewCapture } from '../../ui/projectScene/viewAuthoringState';
-import type { ViewAuthorEvent } from '../../ui/projectScene/viewAuthoringControls';
+import type { ViewAuthorEvent, ViewBackgroundEvent } from '../../ui/projectScene/viewAuthoringControls';
+import { acceptViewBackground, solidViewBackgroundSource, viewBackgroundPlanIsCurrent, type ViewBackgroundContext, type ViewBackgroundDraft } from '../../ui/projectScene/viewBackgroundState';
 import { freezeSynthetic, type SyntheticProject } from './fixture';
 import { canonicalFixture } from './modelClosure';
 import { entryKey, orderBetween, readProjectCamera, readSolidBackground, viewKey, type ProjectCamera, type SolidBackground } from './viewHistory';
@@ -21,12 +22,63 @@ export class SyntheticViewSession {
   private authorFeedback: ViewAuthorContext['feedback'] = { kind: 'idle' };
   private entryFeedback: ViewContext['entryFeedback'] = { kind: 'idle' };
   private cameraFeedback: ViewContext['cameraFeedback'] = { kind: 'idle' };
+  private backgroundDraft: ViewBackgroundDraft | null = null;
+  private backgroundFeedback: ViewBackgroundContext['feedback'] = { kind: 'idle' };
   constructor(private readonly read: () => SyntheticProject, private readonly scene: () => string,
     private readonly write: WorkingWrite, private readonly block: () => string | null = () => null,
     private readonly mutationBlock: () => string | null = () => null) {}
   get pending(): 'composition' | 'text' | null {
+    return this.backgroundDraft?.composing || this.authorPending === 'composition' ? 'composition' :
+      this.backgroundPending ? 'text' : this.authorPending;
+  }
+  get backgroundPending() { return this.backgroundDraft !== null || this.backgroundFeedback.kind === 'applying'; }
+  get authorPending(): 'composition' | 'text' | null {
     return [...this.drafts.values()].some(d => d.composing) ? 'composition' :
       this.drafts.size || [...this.memories.values()].some(m => m.entryDraft) ? 'text' : null;
+  }
+  backgroundContext(view: ViewContext, take: (() => DisplayCapture) | undefined): ViewBackgroundContext {
+    const scope = { sceneId: view.source.sceneId, projectFrameId: view.source.projectFrameId };
+    let source: ViewBackgroundContext['source'] = { ...scope, kind: 'unavailable', token: '', reason: '背景色の変更は未接続です。' };
+    if (view.runtime.kind === 'ready' && take) {
+      try {
+        const background = readSolidBackground(take().background);
+        source = solidViewBackgroundSource(scope, background);
+      } catch (e) { source = { ...scope, kind: 'unavailable', token: '', reason: message(e) }; }
+    }
+    return { view, source, draft: this.backgroundDraft, feedback: this.backgroundFeedback };
+  }
+  acceptBackground(event: ViewBackgroundEvent, context: ViewBackgroundContext,
+    apply: (background: SolidBackground, verify: () => void) => void,
+    observe: () => { context: ViewBackgroundContext; background: SolidBackground }): boolean {
+    try {
+      if (this.backgroundFeedback.kind === 'applying') throw new Error('背景の変更が完了するまで待ってください。');
+      const draft = this.backgroundDraft;
+      if (event.kind === 'cancel') {
+        if (event.draft !== draft || draft?.composing) throw new Error('取り消す入力を確認してください。');
+        this.backgroundDraft = null;
+      } else if (event.kind === 'draft') {
+        // Composition must be able to finish after renderer/storage loss. It is
+        // still only an unacknowledged UI draft, never a Project write.
+        if (event.baseDraft !== draft || event.draft.sceneId !== this.scene() ||
+          event.draft.projectFrameId !== this.read().resources.projectFrameId) throw new Error('編集中の背景を確認してください。');
+        if (!draft?.composing && (this.block() || context.view.cameraBlock)) throw new Error(this.block() ?? context.view.cameraBlock!);
+        this.backgroundDraft = event.draft;
+      } else {
+        if (this.block()) throw new Error(this.block()!);
+        if (this.authorPending || !viewBackgroundPlanIsCurrent(event, context)) throw new Error('背景の状態が変わっています。入力を保持しています。');
+        this.backgroundFeedback = { kind: 'applying' };
+        let verified = false;
+        apply(event.background, () => {
+          const receipt = observe();
+          const remaining = acceptViewBackground(event, this.backgroundDraft, { plan: event, source: receipt.context.source, background: receipt.background });
+          if (receipt.context.view.runtime.kind !== 'ready' || remaining) throw new Error('適用結果を確認できません。入力を保持しています。');
+          verified = true;
+        });
+        if (!verified) throw new Error('適用結果の確認が未接続です。入力を保持しています。');
+        this.backgroundDraft = null;
+      }
+      this.backgroundFeedback = { kind: 'idle' }; return true;
+    } catch (e) { this.backgroundFeedback = { kind: 'failed', message: message(e) }; return false; }
   }
   private get memory() { const id = this.scene(); if (!this.memories.has(id)) this.memories.set(id, newViewMemory(id)); return this.memories.get(id)!; }
   context(runtime: ViewRuntime, block: string | null): ViewContext {
