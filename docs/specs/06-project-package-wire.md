@@ -840,8 +840,8 @@ optional memo or shared Project title. Label/filename validation never proves pu
 The same published heads alone do not identify a backup result: protected inventory
 and local exchange records can change without a Project edit. No-change suppression
 must compare the full captured input, excluding incidental package ID/timestamps.
-The exact persistent job/receipt shape belongs to the closed implementation contract;
-this subsection does not introduce an unversioned local schema.
+The candidate persistent job/receipt shape is specified in §12.7. It remains a
+versioned design proposal, not an adopted local schema or implemented sink.
 
 #### One logical auto point, failure-safe physical replacement
 
@@ -1243,3 +1243,142 @@ the current validation host's cumulative 64 MiB guard; §12.4 now states the act
 code boundary. No other mandatory issue was reported in the field/summary/root/
 execution tables. This is design review, not approval of the §12.6 amendment,
 completion of reconstruction/golden bytes, or executable package acceptance.
+
+### 12.7 Closed local package-job and receipt proposal (2026-09-13)
+
+This fills §11.4's explicit job/receipt design gap under the existing design
+authorization. It does not approve §12.6, change §10/§11's gate, implement a sink
+or add wire entries. All records below are local-only: no job, sink handle,
+external observation or UI checkpoint label enters ProjectDoc or a shared ZIP.
+The current metadata `Publication` records transaction/digest/heads, not package
+output or file completion; `persistence.ts` is a reusable primitive, not a validator
+or atomicity proof for these new records.
+
+#### Frozen fields and fingerprint
+
+Use §3's canonical control encoding and existing exact nominal ID, `Heads`,
+`Identity`, `MetadataEnvelope`, `Entry` and `EvidenceRef` grammars. `JobId` and
+local `SinkId` use the existing collision-checked 128-bit technical-ID grammar;
+neither is a filename, package ID or Project identity. `Proof` below is the closed
+object `{identity,metadataEnvelope,heads}`. Arrays of references are sorted/unique
+by digest with consistent lengths. Bytes required by an active operation or
+retained proof cannot be missing; historical descriptors after completed handoff
+have the explicitly narrower lifetime defined below.
+Each row lists the complete allowed field set; unlisted fields reject.
+
+| Closed record | Fields / exact binding |
+|---|---|
+| `FrozenCapture` | `{schema:'lociview-package-capture-1', source:Proof, sourceMetadata:EvidenceRef, purpose, scope, protectedInventory:EvidenceRef, exchangeBases:EvidenceRef, base?}`. `purpose` is one of §3's five literals. `scope` is `{kind:'wholeProject'}` except review's `{kind:'scene',sceneId}`. `base` is §8.1's exact `ExchangeBaseProofDraft`, required only for Contribution. |
+| Capture inventory/base bytes | `protectedInventory` binds the exact §12.2 canonical whole-Project inventory; `exchangeBases` binds the exact §4.1 canonical local table snapshot, including an explicit empty table. These are local frozen inputs, **not** permission to include them in non-backup outputs. `sourceMetadata` retains original source bytes and proves `source`; a later source/base lookup cannot replace them. |
+| `PreparedOutput` | `{schema:'lociview-package-output-1', capture:EvidenceRef, packageId, manifest:EvidenceRef, payloads:Entry[], roots:{blobs:EvidenceRef[],evidence:EvidenceRef[]}}`. Manifest bytes contain exactly this package ID and the capture's purpose/scope result. Payloads are exactly the purpose's derived entries, in §7's order; do not copy arbitrary paths from a job. Roots are the derived union needed to finish/verify output and base handoff, including frozen source/evidence. They are local protection, not extra ZIP contents. |
+| `JobStart` | `{schema:'lociview-package-job-start-1',jobId,operation,prepared:EvidenceRef,label?,receiver?:Proof}`. Export operation is `send | manualCheckpoint | automaticCheckpoint | reviewCopy | cleanCopy`, mapped respectively to Workspace/Contribution, backup, backup, review, clean. Import uses `receiveWorkspace`, with a prepared verified Workspace descriptor and exact receiver `Proof` in `receiver` (required only for that operation). `label` uses §3's optional label grammar, allowed only for manual checkpoint, never identity or a manifest memo. |
+| Import prepared descriptor | For `receiveWorkspace`, `prepared` instead binds `{schema:'lociview-workspace-receive-1',packageId,manifest:EvidenceRef,metadata:EvidenceRef,roots:{blobs:EvidenceRef[],evidence:EvidenceRef[]}}`. Verified original Workspace bytes fix purpose/identity/envelope/declared heads/inventory. Receiver union and original apply parts still use §8's journal; this descriptor does not replace that proof. |
+| Job step envelope | `{schema:'lociview-package-job-step-1',jobId,start:EvidenceRef,previous:EvidenceRef|null,detail}`. `start` binds the exact original `JobStart`; `previous` is null only for the first step. Steps are immutable, digest-addressed, write-once/read-back checked, serialized under the existing authority boundary. More than one child for a predecessor is repair, not timestamp selection. `detail` has only one of the closed rows below. |
+
+PreparedOutput binds a completed builder's exact manifest/payload descriptors.
+For review/clean, this table does not define their still-unapproved reconstruction
+or make a renderer snapshot an admissible builder. Their job cannot start until
+the applicable complete builder contract and validation exist. Source proof and
+output identity are deliberately separate for fresh clean/review results.
+
+Only automatic checkpoints suppress unchanged work. Their fingerprint is SHA-256
+of the exact canonical object `{schema:'lociview-auto-input-1',source:Proof,
+protectedInventory:EvidenceRef,exchangeBases:EvidenceRef}`. Compare it with the
+input covered by the last **confirmed automatic point**, not a failed/prepared
+job or the current heads alone. It excludes package/job IDs, time, UI gestures,
+filename/label, output buffer layout and equivalent metadata serialization.
+Same heads plus a changed protected inventory or base table must produce a new
+fingerprint; a different raw metadata serialization with the same verified source
+does not. Manual save never skips the user's new named checkpoint request merely
+because content is equal. A browser-only fallback tracks internal resume state
+separately and does not manufacture an external-point fingerprint receipt.
+
+#### Distinct completion and handoff evidence
+
+Every step inherits the exact start/prepared/manifest/capture binding through the
+envelope; it cannot attach an observation to the currently selected Project or
+another job. `archive:EvidenceRef` hashes the **entire completed ZIP**, including
+control entries/container bytes, not only `payloadTotals`. Local paths and native
+handles are resolved through separate authorized sink capabilities, never trusted
+from an imported record. The sink profiles below are proposed protocol names,
+not claims that any browser currently implements them.
+
+| `detail.kind` | Remaining closed fields / precondition |
+|---|---|
+| `artifactVerified` | `{archive:EvidenceRef,location:'opfsArtifact',sinkId}` after successful close and full streamed read-back of the staged artifact, with every entry matching PreparedOutput. This is generation only. |
+| `externalWriteStarted` | `{archive:EvidenceRef,sinkId,profile:'directFileV1'}` before attempting a supported direct-file sink. A matching verified staged artifact must already exist. No file success follows from this event. |
+| `externalFileVerified` | `{archive:EvidenceRef,sinkId,profile:'directFileV1'|'reselectedFileV1'}` after supported direct close plus full read-back, or explicit user re-selection plus full streamed verification against the exact staged archive. Reselection is not automatic discovery by filename. This is a historical observation of those bytes, not a promise that the file still exists. |
+| `workspacePublished` | `{receiver:Proof,journal:EvidenceRef,publication:EvidenceRef}` only after the exact Workspace receive journal published and original source/final union were verified. The journal/receipt must bind this package and actual receiver heads. |
+| `workspaceAlreadyPresent` | `{receiver:Proof,publication:EvidenceRef}` only for a verified zero-change Workspace receive. `receiver` must equal the frozen `start.receiver`; its heads must equal the referenced publication and current durable receiver. Under one authority lock, verify source-change inclusion from that exact receiver metadata/history, required inventory from the durable body store, and append/read back this observation. Publication alone is not a body proof. Retain exact Workspace evidence; do not create an empty metadata journal or new publication. |
+| `baseRecorded` | `{completion:EvidenceRef,baseRecord:EvidenceRef}` after the exact §4.1 table entry is durably committed/read back. `completion` references this job's `artifactVerified`, `workspacePublished` or `workspaceAlreadyPresent` step. A generated observation uses Workspace declared heads; an imported observation also records the exact observed receiver heads. Only Workspace generation/receive permits this step. |
+| `autoPromoted` | `{verifiedFile:EvidenceRef,previousPoint:EvidenceRef|null,promotion:EvidenceRef}` only for an automatic backup, after an adopted failure-safe sink confirms replacement of the declared previous point with the exact verified new point. `verifiedFile` references this job's external verification; `promotion` is the sink's durable, independently verifiable compare/replace evidence. Profile/physical encoding and capability proof remain adoption inputs; absent support requires the approved fallback, not this event. |
+| `cancelled` | Export uses `{stage:'beforeArtifact'|'beforeExternal'|'afterExternalAttempt'}` for explicit cancellation, not file deletion or rollback. A stale, unobserved `receiveWorkspace` alone may use `{stage:'beforeWorkspaceJournal'}` after explicit discard and an authority-locked check that neither its journal nor receive observation exists; this is terminal and releases its unfinished-job slot/temporary roots through the rules below. Missing/torn acknowledged evidence is not absence. Once a receive journal exists, only §8.2's cancellation/recovery rules apply. Export cancellation cannot undo verified generation or its required local base handoff. No later output write/generation/promotion may resume automatically. While the exact verified artifact remains retained, explicit file re-selection may append `externalFileVerified` with `reselectedFileV1`; required idempotent base handoff remains allowed, otherwise the cancelled job is terminal. |
+
+Repeated recovery of a completed step validates/reuses the exact record rather
+than appending another completion. A mismatched digest or alternative payload
+under the same record is repair. Error text is user-facing diagnostic state, not
+an arbitrary field whose presence proves failure/success. Download handoff has
+no completion step: the UI says unconfirmed until explicit verification. For a
+direct-file output, staging then external verification is deliberately one common
+path; its temporary overlap is admitted under §12.4, not assumed free storage.
+
+For zero-change receive, a durable `workspaceAlreadyPresent` fixes the imported
+completion's receiver heads even if later local edits advance them. If a crash
+left no such observation, recovery may finish it only while the durable receiver
+still equals `start.receiver`, repeating the same locked inclusion/inventory
+checks. A changed receiver makes this unobserved job stale, not successful and
+not corrupt: retain its evidence until explicit pre-journal cancellation, then
+offer a fresh receive with a new frozen start. Never record the new current heads
+as the old job's observation. Once a
+metadata journal exists, its exact final-publication recovery applies instead;
+it cannot be converted to a zero-change observation of later state.
+
+#### Durable transitions, crash results and root release
+
+| Last durable evidence / interruption | Recovery and permitted next step | Root/result boundary |
+|---|---|---|
+| Complete capture/prepared/start; artifact writing incomplete | Retain the same frozen input. Restart its output from byte zero into a new staging artifact; never splice an old prefix or allocate a new package ID inside this job. Missing acknowledged input is repair. | Keep all job roots; no generated/base/file success. Fresh export with a new ID is a separate explicit action. |
+| Sink may have closed but no `artifactVerified` | Treat generation as unknown. Existence/hash of an arbitrary file is not a receipt; retain evidence and offer the same frozen generation retry. Only an adopted independently verifiable sink receipt may close this gap. | No base completion or file acknowledgment from PreparedOutput alone. |
+| `artifactVerified`; Workspace base handoff absent | Validate archive/Workspace evidence and idempotently finish §4.1's generated record, then append `baseRecorded`. Other purposes never enter this branch. | Root protection transfers only after durable read-back of the complete base/evidence record; no GC gap. UI still cannot call this external file saving. |
+| External write began; verification missing or crashed | Completion is unknown. Ask for explicit file re-selection/verification, or explicit fresh output; never automatically download/write again. | Preserve artifact and previous usable auto point. Close/start callbacks cannot acknowledge file contents. |
+| `externalFileVerified`; source/base changed during output | Report the exact older checkpoint as verified; keep newer work unreflected. | File evidence is not Project publication, base advancement, switching or participant acknowledgment. Manual points remain independent. |
+| Workspace receive published but local observation/base step absent | Revalidate original manifest/source and the journal's exact retained publication, finish its observation and base handoff once. For zero-change receive, reuse the recorded observation, or apply the frozen-receiver rule above if no observation exists. | Old receive roots remain until durable local handoff; retry does not reapply metadata or substitute later heads. Missing acknowledged proof is repair; an unobserved stale start is not. |
+| New auto file verified; promotion missing | Keep old point authoritative until adopted sink compare/replace evidence verifies success. A lost promotion receipt is unknown, never "newest file wins". | Retain both points during uncertainty. Cleanup may remove only proven superseded automatic artifacts, not manual points, bases or source bodies. |
+| Complete handoff/point or explicit cancellation | Release only this job's temporary roots after checking other jobs, retained bases, current/conflict/opaque/migration roots and sink obligations. Cancellation after an external attempt discloses that an external file may exist. | No external deletion is inferred; no recursive ZIP inclusion. This design adds no GC command. Torn/conflicting receipt chains remain repair state and keep roots. |
+
+Root lifetime is field- and state-specific, not recursive retention of every
+digest ever mentioned. While generation, verification, recovery or a required
+handoff is pending, its frozen input and artifact bytes remain required. Before
+releasing them, validate the terminal chain and durably transfer the original
+Workspace manifest/metadata plus required inventory to §4.1's retained-base
+roots, and journal/source evidence to its existing owner, wherever applicable.
+An externally verified file is not replaced by that local evidence. Retained
+manual/current-auto observations keep their exact local control chain, start,
+capture, prepared descriptor, manifest and frozen inventory/base-table controls;
+missing those controls is repair. After all applicable obligations complete,
+archive/payload/source-byte descriptors in that observation no longer demand an
+extra staged ZIP or old body copy merely to display historical completion.
+Separate base/journal/current/conflict/opaque/migration roots still protect their
+required bytes. An auto promotion's `previousPoint` is a historical identity after
+verified replacement, not a recursive root retaining every older auto job/file.
+This permits retiring superseded auto observations without dropping manual or
+base evidence. A retired artifact cannot silently resume generation or file
+reselection; that needs a fresh explicit job. Historical completion never proves
+current file availability or authorizes restore without reading/verifying the
+actual file. Fingerprint equality likewise proves unchanged input, not an intact
+external file or available permission.
+
+Receipt-chain reads are bounded by §12.4's per-control/aggregate/depth/work limits;
+the additional proposed validation-only stop is 64 steps per job, including retry
+observations. Reusing an identical completion consumes no new step. At the limit,
+preserve state and offer recovery, not receipt truncation. This is not a product
+capacity guarantee or permission to accumulate automatic checkpoint generations.
+
+Extend §9's existing vectors, without a new PoC: same-head/different-base fingerprint;
+exact artifact versus altered control bytes; each missing/torn step; zero-change
+Workspace receive with later local edits; failure between base-table commit and
+step append; external close without receipt; verified old capture with newer edits;
+auto promotion uncertainty and manual-point protection. Expected states are the
+table above, not generated golden bytes. One independent design review must check
+these fields/guards against §§4.1/7/8.2/11.4 before treating this gap as drafted;
+§12.6, complete reconstruction, sink adoption and §10's gate remain open.

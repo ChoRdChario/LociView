@@ -28,7 +28,41 @@ Formal adoption still requires G1-A/C and applicable device evidence. No profile
 
 #### Active connected work — PO-approved limited real-file validation
 
-Current slice (2026-09-13, after `7db036c`): connect M05 temporary model visibility
+Latest completed design slice (2026-09-13, after `2f07ea1`): draft the missing
+package job/receipt contract from 06 §11.4 in §12.7. M05 was committed with final
+checks and the starting HEAD/worktree were clean. No PO reply has approved §12.6
+or the implementation/adoption split.
+
+- [x] Specify closed frozen-input/job fields and the exact no-change fingerprint.
+- [x] Specify separate generation, external-file, import/base and auto-promotion
+  receipts with durable transition/crash outcomes, reusing existing invariants.
+- [x] Independent read-only design review and document consistency checks; record
+  this as a design proposal, not schema adoption, runtime or measured acceptance.
+
+This closes an explicit missing implementation-design input, not another approval
+summary. Keep review content behind its frozen descriptor; do not decide its
+unapproved class/family mapping. No code/writer/sink/golden-byte generation, new
+PoC, normal-home, dependency, migration or deploy change. Reuse exact executable
+evidence from `2f07ea1`; no unchanged root/stress/browser/push rerun for docs only.
+Exit after these finite tables and one review. Remaining product/gate decisions
+still require PO input; do not keep expanding design while waiting.
+
+Review/result: the independent reader's frozen-receiver and evidence-lifetime
+findings were corrected, including the pre-journal-only cancellation that ends a
+stale, unobserved receive without leaking an unfinished-job slot. Final design
+review reports no mandatory remainder. Navigation/handoff and `git diff --check`
+are checked; all changes are Markdown. No executable change or new test claim:
+the retained M05 result remains 2,040 PASS / 21 existing TODO / 0 failed, with its
+previously recorded typecheck/build exits. No browser/device/offline evidence,
+new dependency, sink, schema, golden bytes, normal-home or push was added.
+
+Next boundary: obtain the already-presented PO decisions on 06 §12.6's
+snapshot-local class/family mapping and §11's isolated implementation/adoption
+split, then finish the dependent reconstruction/golden contract toward F01/F02.
+Do not implement or ratify the five-purpose format on the basis of this design
+review. The practical-team goal and its actual acceptance remain unfinished.
+
+Previous slice (2026-09-13, after `7db036c`): connect M05 temporary model visibility
 in the existing metadata/limited-GLB host, within 05 §3.2.
 
 - [x] Add local hide/show/this-model-only/show-all intentions and Model-tab controls,

@@ -1,5 +1,14 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-13 出力job／完了記録の仕様案（docs-only、実行codeは`2f07ea1`）:**
+> 06 §12.7に固定入力・生成／外部file／交換base／auto置換の別記録と中断復旧を具体化。
+> zero-change受信へ後のheadを流用せず、stale未観測jobはjournal作成前だけ明示取消可能。
+> 完了後の一時ZIPと保持必須の証拠を区別。独立レビューの必須指摘は解消。
+> 差分はMarkdownのみ、既存M05検証を再利用。新runtime／実機／offline合格ではない。
+> 有限な設計sliceはここで終了。06 §12.6の対応保持と§11の隔離実装／採用gate分離は
+> 既に提示したPO回答待ち。承認後の復元／golden契約へ進む前提であり、wire批准はしない。
+> 同じ承認・browser修復・pushを繰り返さず、実用チーム版全体は未完了とする。
+
 > **2026-09-13 M05一時表示接続（`7db036c`後）:** モデルタブへ「隠す／表示」
 > 「このモデルだけ表示」「すべて表示」を接続。Scene別local stateで、共有所属・履歴・
 > Saved Viewは変更しない。読み込み済みモデル／カメラ／本文・windowを保持し、所有pin・

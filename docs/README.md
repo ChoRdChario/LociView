@@ -10,7 +10,9 @@ observed implementation.
 records field/privacy, inventory, summary and finite execution tables. Independent
 review corrected the description of the current cumulative validation limit.
 Its §12.6 review-to-edit mapping amendment is a new PO decision, not an adopted
-schema. The five-purpose contract/reconstruction/goldens remain incomplete;
+schema. §12.7 supplies closed local job/receipt, recovery and evidence-lifetime
+tables, still proposed; its executable baseline is `2f07ea1`, unchanged by this
+docs-only slice. The five-purpose contract/reconstruction/goldens remain incomplete;
 no package runtime or acceptance is added. See todo for the exact next boundary.
 
 2026-09-13 bounded display correction: the existing Scene hosts distinguish browser

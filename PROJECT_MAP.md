@@ -37,8 +37,11 @@ summary and finite execution tables, independently reviewed but still proposed.
 §12.6 identifies a real review-to-edit gap: flattened review data lack the
 class-to-model-family partition required by the editable domain. The recommended
 snapshot-local mapping amendment needs PO approval; no schema/writer changed.
-Finish its reconstruction/receipt/golden contract afterward, not a new PoC.
-At that docs-only checkpoint runtime was `f51f8af`; the five-purpose gate remains open.
+§12.7 now drafts the closed local package job/completion protocol: frozen inputs,
+separate generation/file/base/auto evidence and bounded recovery/root lifetimes.
+Its docs-only executable baseline is `2f07ea1`; no package code or adoption evidence
+is added. Reconstruction/goldens, the §12.6 amendment and §11's proposed gate split
+remain open. Do not extend this design slice into another PoC.
 
 2026-09-13 bounded state correction: Scene development/metadata/validation hosts
 now label internal acknowledgment as browser resume data, not file-save success.
