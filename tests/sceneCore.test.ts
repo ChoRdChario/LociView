@@ -234,8 +234,8 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
     });
     for (const path of walk('src').filter(p => /\.(ts|tsx|js)$/.test(p))) {
       const source = readFileSync(path, 'utf8');
-      const packageControl = /[\\/]projectPackage[\\/](contract|manifest|historySummary|closure|protectedInventory|workspaceSource|contributionSource|contributionArchive|contributionEvidence|contributionReceiveJob|contributionOutputJob|outputJobs|receiveJobs|zipChecks|zipArchive|workspaceArchive|receiveJob|workspaceBases|outputJob|backupEvidence|backupSource|backupArchive|backupOutputJob)\.ts$/.test(path);
-      const packageMetadata = /[\\/]projectPackage[\\/](historySummary|closure|protectedInventory|workspaceSource|workspaceArchive|contributionSource|contributionArchive|contributionEvidence|contributionReceiveJob|contributionOutputJob|outputJobs|receiveJobs|receiveJob|workspaceBases|outputJob|backupEvidence|backupSource|backupArchive|backupOutputJob)\.ts$/.test(path);
+      const packageControl = /[\\/]projectPackage[\\/](contract|manifest|historySummary|closure|protectedInventory|workspaceSource|contributionSource|contributionArchive|contributionEvidence|contributionReceiveJob|contributionOutputJob|outputJobs|receiveJobs|zipChecks|zipArchive|workspaceArchive|receiveJob|workspaceBases|outputJob|backupEvidence|backupSource|backupArchive|backupOutputJob|backupRestoreJob|restoreControls)\.ts$/.test(path);
+      const packageMetadata = /[\\/]projectPackage[\\/](historySummary|closure|protectedInventory|workspaceSource|workspaceArchive|contributionSource|contributionArchive|contributionEvidence|contributionReceiveJob|contributionOutputJob|outputJobs|receiveJobs|receiveJob|workspaceBases|outputJob|backupEvidence|backupSource|backupArchive|backupOutputJob|backupRestoreJob|restoreControls)\.ts$/.test(path);
       const packageJournal = /[\\/]projectMetadata[\\/](packageRemote|session|journal)\.ts$/.test(path) || /[\\/]projectFiles[\\/](receiveWorkspace|sendWorkspace)\.ts$/.test(path) ||
         /[\\/]harness[\\/]projectScene[\\/](validationHost|validationWorkspace)\.ts$/.test(path);
       // 06 §11/§12.3 permit these exact disconnected primitives, not an app importer.
@@ -251,6 +251,10 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
       if (packageControl) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
         const byFile: Record<string, string[]> = {
+          restoreControls: ['../platform/fs', '../projectMetadata/format', '../projectMetadata/persistence', '../projectMetadata/remote', './contract', './manifest'],
+          backupRestoreJob: ['../platform/fs', '../domain/values', '../projectMetadata/blobStore', '../projectMetadata/format', '../projectMetadata/generationScope',
+            '../projectMetadata/persistence', '../projectMetadata/session', '../projectMetadata/journal', './backupArchive', './contract', './workspaceBases',
+            './receiveJobs', './outputJobs', './zipChecks', './restoreControls'],
           contract: [], manifest: ['../core/json', '../domain/values', '../domain/projectGraphSupport',
             '../domain/projectRecordFields', '../domain/projectRecords', '../nativeGs/sha256', './contract'],
           backupEvidence: ['@automerge/automerge/slim', '../domain/projectGraphSupport', '../domain/projectRecordFields', '../domain/values',

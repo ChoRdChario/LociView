@@ -75,6 +75,12 @@ generation. The internal `projectMetadata/generationScope.ts` now binds a retain
 logical-root lease/queue to separate local metadata/package and database scopes,
 with stale-operation/lazy-stream fencing. It is not activated: authoritative
 selection, backup initialization/restored-base evidence and restore UI remain next.
+The capability now has an internal consumer: `projectPackage/backupRestoreJob.ts`
+owns a same-Project backup ZIP, binds confirmation to current work/base observations,
+retains Start/Index/cancellation and opens fenced staging with a warm-only database
+creation permit. `restoreControls.ts` checks bounded root controls and witnesses.
+There is no Selection writer or selected-destination activation before the dedicated
+initializer/base/body verifier. This remains internal, not a connected restore UI.
 Explicit restore, other purposes and migration remain open. Checks
 are recorded in todo.
 Download alone is not save proof.

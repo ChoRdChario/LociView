@@ -1,6 +1,14 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **Current F03 — `2389114`後の明示復元:** 元作業を残して同じProjectの別local世代へ
+> **Current F03 — root復元job:** 実backup ZIPの保持・再検査、現在の作業と基準への確認束縛、
+> Start／Index、中断・明示取消、初回だけの専用DB作成とDbOpened引継ぎを実装。
+> 所有capabilityは取消／選択で失効。容量は後続receiptを含めて事前確認する。
+> 選択記録の構造検査だけでは復元先を有効にせず、Selectionを書き込むAPIはまだない。
+> 専用backup初期化・復元base／全本体検証・host切替・UI・復元後の往復が次。
+> 型／全体2,249 PASS・既存21 TODO・失敗0／通常・harness buildが成功。独立review通過。
+> 詳細はtodo。表示変更／復元全体／実機／offline合格ではない。
+
+> **Previous namespace checkpoint — `477dd90`:** 元作業を残して同じProjectの別local世代へ
 > 復元し、検証後に一度だけ切り替える。最初のnamespace capabilityを実装・独立review済み。
 > metadata／packageは世代root、IDBは同じlocatorの専用DBに束縛し、元DB／pathは不変更。
 > 同じProject lock／queueを使い、失効後のFS／IDB／遅延stream／無変更操作を拒否する。

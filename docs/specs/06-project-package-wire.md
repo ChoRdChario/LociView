@@ -2421,3 +2421,146 @@ Reuse existing tests for original Repo/FS immutability, same-head stale access,
 database/range isolation, cancellation, missing/torn control records, independent cold
 selection, exact restored source/bases and subsequent Contribution exchange.
 No new PoC, automatic external write, GC, profile or device/offline credit.
+
+#### Root restore job and selection control records
+
+The next implementation consumes the generation capability. Its controller owns
+the unwrapped logical root and the existing Project lease. Under
+`v2/local-restore/`, use only `jobs/<id>/{input.zip,prepared.json,start.json,
+db-opened.json,result.json,abandoned.json}`, `index/<id>.json`, and
+`selections/<sha256>.json`. IDs are 32 lowercase hex; references are the existing
+closed `{sha256,byteLength}` EvidenceRef. All JSON is canonical and write-once.
+Use existing package per-control/aggregate-control/entry/archive/source/heads/
+base-evidence/inspection limits, cumulatively; no new product capacity promise.
+Before the first write, reserve the input plus the complete control lifecycle,
+including DbOpened, Selection and the largest terminal Result. Count existing
+logical-root files plus those future entries consistently against the entry
+limit. Retained files, input ZIP and control headroom share the existing local
+working-space ceiling (2_147_483_648 minus 16_777_216 bytes); inspect file sizes,
+not body contents. Each subsequent control append rechecks admission before write.
+
+Closed records (no implicit optional fields):
+
+```ts
+type RestoreCurrent = {
+  generationId: string | null;
+  publicationId: string;
+  publication: EvidenceRef;
+  source: { proof: MetadataProof; heads: string[]; token: string };
+  bases: EvidenceRef; // canonical WorkspaceBaseStore snapshot, not its ZIP
+};
+type RestorePrepared = {
+  schema: 'lociview-local-restore-prepared-1'; jobId: string;
+  archive: EvidenceRef; manifest: EvidenceRef; metadata: EvidenceRef;
+  protectedInventory: EvidenceRef; exchangeBases: EvidenceRef;
+  baseEvidence: EvidenceRef[]; // sorted/deduplicated original evidence
+};
+type RestoreStart = {
+  schema: 'lociview-local-restore-start-1'; jobId: string;
+  prepared: EvidenceRef; previousSelection: EvidenceRef | null;
+  current: RestoreCurrent;
+};
+type RestoreIndex = {
+  schema: 'lociview-local-restore-index-1'; jobId: string; start: EvidenceRef;
+};
+type RestoreDbOpened = {
+  schema: 'lociview-local-restore-db-opened-1'; jobId: string;
+  start: EvidenceRef; generationId: string; // exactly jobId
+};
+type GenerationSelection = {
+  schema: 'lociview-local-generation-selection-1'; previous: EvidenceRef | null;
+  jobId: string; start: EvidenceRef;
+  destination: { journal: EvidenceRef; publication: EvidenceRef; baseBinding: EvidenceRef };
+};
+type RestoreResult = {
+  schema: 'lociview-local-restore-result-1'; jobId: string; start: EvidenceRef;
+  detail: { kind: 'selected'; selection: EvidenceRef }
+    | { kind: 'cancelled'; stage: 'beforeSelection' }
+    | { kind: 'cancelled'; stage: 'beforeInitializationWithoutIndex' };
+};
+type RestoreAbandoned = {
+  schema: 'lociview-local-restore-abandoned-1'; jobId: string; stage: 'beforeStart';
+};
+```
+
+Preflight owns an immutable slice of the selected Blob and runs BackupArchive
+inspection. Capture current source from an independent ready Session read, exact
+publication receipt and verified base snapshot; validate source identity against
+the backup. Before the first job write, under the logical-root queue, require the
+same selected generation/publication/source/base fingerprint and no unfinished
+input/output/restore operation. A stale confirmation requires fresh confirmation;
+never silently change its replacement target.
+
+Write Prepared, own `input.zip`, close/reinspect its exact bytes, then write/read
+back Start followed by Index. Start is the durable pending-work boundary; only
+after Index readback can destination initialization begin. Partial pre-Start
+input is not a prepared restoration: preserve it and offer explicit abandonment,
+then a new confirmed job. Do not automatically splice a partial ZIP or replace
+acknowledged input from memory. Opening a started job rechecks the complete owned
+archive and descriptor; lost/corrupt acknowledged originals remain repair.
+
+Successful DB opening is recorded in `db-opened.json` before any destination
+Repo identity/journal/facts/base initialization. Only the first warm start has a
+nonpersistent permit for `allowCreate:true`. All cold retries use `false`:
+an existing compatible empty DB may finish the same DbOpened handoff; absence
+cannot distinguish never-created from lost and requires explicit cancellation
+and a fresh job (or repair), not recreation. Destination evidence without its
+acknowledged DbOpened is repair. No empty or older fallback on selected cold open.
+
+After dedicated initialization, base binding, full protected inventory and editor
+preparation verify, recheck the Start current fingerprint and append/read back
+one Selection. This is the sole switch point. Append/read back Result.selected
+before reporting restoration complete. If Result or display fails afterward,
+keep the new generation selected and resume that handoff; never recreate a
+Selection, roll back, or merge into the former generation. The exact destination
+validation contract below must be implemented before issuing a Selection.
+
+Ordinary cancellation is explicit, retains every generation/original, and requires
+no Selection for this job. A Start with missing Index is never silently repaired.
+The one bounded recovery exception is explicit
+`beforeInitializationWithoutIndex` cancellation: valid existing Start, no Index,
+DbOpened, destination FS files/DB, Selection or selected Result. Successful
+noncreating namespace probes must prove absence; probe errors are not absence.
+This cancellation writes only its fixed Result, leaves selection unchanged and
+cannot later resume. Any destination evidence with a missing Index is repair.
+Pre-Start abandonment similarly requires no Start/Index/DB/destination/selection;
+its fixed job-ID record allows discarding an unusable pending input without
+deleting or trusting malformed input bytes.
+
+Lightweight selection/fence inspection validates paths, closed control records,
+references and cumulative control budgets, not every ZIP/model byte or historical
+Repo on every chunk. Scan one complete predecessor chain; reject branches,
+missing predecessors, unreachable selections, duplicate job selection and Result
+references to missing selections. Current selection is the chain tail even if
+its Result handoff is pending. Unfinished Start never changes selection, but
+blocks ordinary writes. Staging is bound to the exact pending Start/job/input
+and expires on cancellation/selection. Start's old source fingerprint is not
+compared on every ordinary operation after restoration; later edits are valid.
+
+Each generation FS subtree must belong to a known started/cancelled/selected job.
+Cold host resolution and new restore start also reconcile generation DB names;
+an unknown DB, failed enumeration or missing selected namespace is not an empty
+Project. Selected destination receipts must remain present and match the fixed
+Selection references. Full source/base/body checks occur on job open, before
+switch and ordinary cold reopen, not on each lazy chunk fence. A consistent
+erasure of every witness in the same storage cannot be universally detected;
+do not claim such a guarantee. No implicit old-generation fallback is authorized.
+
+Required existing-file cases: unchanged current confirmation versus same-head
+base changes; corrupted input; interruption before/after each start/switch
+handoff; missing Index/Start/Result/selected tail; explicit pre-initialization
+cancellation with failed/positive namespace probes; two local generations with
+unchanged Project identity; independent cold selection; exact original recovery
+and Contribution after restoration. No new probe page or production activation.
+
+Current bounded input/control implementation: `backupRestoreJob.ts` owns the
+inspected ZIP and confirmation from an independent ready service/publication/
+base snapshot. It persists Start/Index, supports explicit pre-Start abandonment
+and pre-selection cancellation, and opens the dedicated generation through the
+existing capability with a warm-only creation permit and acknowledged DB handoff.
+`restoreControls.ts` validates closed root controls, chain witnesses, namespace
+ownership and cumulative bounds without full ZIP reads in lazy-operation fences.
+Its selection result is structural only, not destination authority. The job has
+no Selection writer and refuses preparation against a selected generation until
+the dedicated backup initializer/base/body/destination verifier is connected.
+These are internal port-tested prerequisites, not restoration UI or adoption.

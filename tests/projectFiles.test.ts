@@ -60,6 +60,9 @@ import { WorkspaceOutputJob } from '../src/projectPackage/outputJob';
 import { ContributionOutputJob } from '../src/projectPackage/contributionOutputJob';
 import { BackupOutputJob } from '../src/projectPackage/backupOutputJob';
 import { BackupArchive } from '../src/projectPackage/backupArchive';
+import { BackupRestoreJob, type RestoreDatabasePorts } from '../src/projectPackage/backupRestoreJob';
+import { readRestoreControls, reserveRestoreControls, restoreRef, writeRestoreControl } from '../src/projectPackage/restoreControls';
+import { PACKAGE_LIMITS } from '../src/projectPackage/contract';
 import { PackageArchive } from '../src/projectPackage/zipArchive';
 import { WorkspaceBaseStore } from '../src/projectPackage/workspaceBases';
 import { WorkspaceReceiveJob } from '../src/projectPackage/receiveJob';
@@ -215,6 +218,171 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await f.receiver.session.editCaption(before.source!.token, f.captionId, 'title', '変更分の記録');
     return { f, r, sent: await contributionFile(f.receiver.session, f.fs, f.store) };
   }
+  async function restoreFileFixture() {
+    const f = await workspaceFileFixture(); await f.receiverService.receive(f.local.source!.token, f.file);
+    const session = f.reopen().session, current = await session.read(), sender = new WorkspaceSender(f.fs, session, f.store, metadata, f.locks);
+    const backupId = await sender.generateBackup(current.source!.token), file = await sender.download(backupId);
+    const factories = new Map<string, MetadataStorageFactory>();
+    const databases: RestoreDatabasePorts = {
+      listGenerations: vi.fn(async () => [...factories.keys()]),
+      open: vi.fn(async (id, allowCreate) => {
+        if (id === null) return { factory: f.factory, dispose: vi.fn(async () => {}) };
+        if (!factories.has(id) && allowCreate) factories.set(id, storageFactory());
+        const factory = factories.get(id); if (!factory) throw Error('database does not exist');
+        return { factory, dispose: vi.fn(async () => {}) };
+      }),
+    };
+    const ports = { fs: f.fs, session, store: f.store };
+    const prepare = () => BackupRestoreJob.prepare(f.fs, ports, file, metadata, databases);
+    return { ...f, session, current, sender, backupFile: file, databases, factories, ports, prepare };
+  }
+  it('reserves restore terminal controls and counts original files and retained bodies before any write', async () => {
+    const fs = new TestFS(), listed = vi.spyOn(fs, 'list');
+    listed.mockResolvedValue(Array.from({ length: PACKAGE_LIMITS.entryCount - 3 }, (_, i) => `original/${i}`));
+    await expect(reserveRestoreControls(fs, [{ stage: 'later' }], 7)).rejects.toThrow('restore-entry-budget'); listed.mockRestore();
+    await fs.writeText('retained/body', '');
+    const read = fs.readStream.bind(fs), opened = vi.spyOn(fs, 'readStream').mockImplementation(async path => {
+      const file = await read(path); return file && path === 'retained/body' ? { ...file, size: 2_147_483_648 - 16_777_216 - 20 } : file;
+    });
+    await expect(reserveRestoreControls(fs, [{ stage: 'db-opened-and-terminal-result' }], 2)).rejects.toThrow('restore-space-budget');
+    await expect(writeRestoreControl(fs, `v2/local-restore/jobs/${newId()}/abandoned.json`, { retained: 'no room for terminal record' }, metadata)).rejects.toThrow('restore-space-budget');
+    expect(await fs.list('v2/local-restore/')).toEqual([]); opened.mockRestore();
+  });
+  it('rejects lookalike restore control filenames and unknown generation namespaces', async () => {
+    const fs = new TestFS(), id = newId(), path = `v2/local-restore/jobs/${id}/preparedXjson`;
+    await fs.writeText(path, '{}'); await expect(readRestoreControls(fs, metadata)).rejects.toThrow('restore-control-path');
+    await fs.remove(path); await fs.writeText(`v2/generations/${id}/v2/metadata/orphan`, '{}');
+    await expect(readRestoreControls(fs, metadata)).rejects.toThrow('restore-orphan-generation');
+  });
+  it('owns a confirmed restore ZIP and fences its separate staging scope without changing current work', async () => {
+    const f = await restoreFileFixture(), originalFiles = await f.fs.list(''), originalDb = await f.factory().loadRange([]);
+    const bytes = await Promise.all(originalFiles.map(p => f.fs.readBytes(p))), prepared = await f.prepare();
+    expect(await f.fs.list('v2/local-restore/')).toEqual([]);
+    expect(Object.isFrozen(prepared.current.source.heads)).toBe(true);
+    const job = await prepared.persist(f.ports, f.databases), state = await readRestoreControls(f.fs, metadata);
+    expect(state.selection).toBeNull(); expect(state.pending).toMatchObject({ id: job.id, indexed: true, dbOpened: false });
+    expect(job.inspection.source.proof).toEqual(f.current.source!.proof);
+    const scope = await job.openStaging(f.databases);
+    expect(f.databases.open).toHaveBeenLastCalledWith(job.id, true);
+    expect((await readRestoreControls(f.fs, metadata)).pending?.dbOpened).toBe(true);
+    const inspect = vi.spyOn(BackupArchive, 'inspect'), path = `${scope.fs.projectRoot}/v2/metadata/test-content`;
+    await underWriteLease(scope.fs, async () => { await scope.fs.writeText(path, 'retained'); await scope.factory().save(['test'], new Uint8Array([1, 2])); });
+    const stream = (await scope.fs.readStream(path))!.stream();
+    await scope.fs.readText(path); await scope.factory().load(['test']);
+    expect(inspect).not.toHaveBeenCalled(); inspect.mockRestore();
+    await BackupRestoreJob.cancel(f.fs, job.id, metadata, f.databases);
+    await expect(scope.fs.readText(path)).rejects.toThrow('restore-staging-retired');
+    await expect(scope.factory().save(['test'], new Uint8Array([9]))).rejects.toThrow('restore-staging-retired');
+    await expect(stream.getReader().read()).rejects.toThrow('restore-staging-retired');
+    expect(await f.fs.readText(path)).toBe('retained');
+    expect(await f.factory().loadRange([])).toEqual(originalDb);
+    expect(await Promise.all(originalFiles.map(p => f.fs.readBytes(p)))).toEqual(bytes);
+    expect((await f.reopen().session.read()).source!.token).toBe(f.current.source!.token);
+    await scope.dispose();
+  }, 30000);
+  it('rejects restore confirmation after same-head base changes and after local edits before any restore write', async () => {
+    const f = await restoreFileFixture(), prepared = await f.prepare();
+    await f.sender.generate(f.current.source!.token);
+    expect((await f.session.read()).source!.token).toBe(f.current.source!.token);
+    await expect(prepared.persist(f.ports, f.databases)).rejects.toThrow('restore-confirmation-stale');
+    const next = await f.prepare();
+    await f.session.editCaption(f.current.source!.token, f.captionId, 'body', '後の作業');
+    await expect(next.persist(f.ports, f.databases)).rejects.toThrow('restore-confirmation-stale');
+    expect(await f.fs.list('v2/local-restore/')).toEqual([]); expect(f.databases.open).not.toHaveBeenCalled();
+  }, 30000);
+  it('rejects corrupt or wrong-purpose restore input without storage writes', async () => {
+    const f = await restoreFileFixture(), bytes = new Uint8Array(await f.backupFile.arrayBuffer()); bytes[128] = bytes[128]! ^ 1;
+    await expect(BackupRestoreJob.prepare(f.fs, f.ports, new Blob([bytes]), metadata, f.databases)).rejects.toThrow();
+    await expect(BackupRestoreJob.prepare(f.fs, f.ports, f.file, metadata, f.databases)).rejects.toThrow('backup-purpose');
+    expect(await f.fs.list('v2/local-restore/')).toEqual([]);
+  }, 30000);
+  it('refuses restore preparation and confirmation while a completed output has lost its acknowledged artifact', async () => {
+    const f = await restoreFileFixture(), prepared = await f.prepare();
+    const artifact = (await f.fs.list('v2/packages/backup-output/')).find(p => p.includes('/artifacts/') && p.endsWith('.zip'))!;
+    expect(artifact).toBeDefined(); await f.fs.remove(artifact);
+    expect((await f.session.read()).source!.token).toBe(f.current.source!.token);
+    await expect(f.prepare()).rejects.toThrow('output-artifact-missing');
+    await expect(prepared.persist(f.ports, f.databases)).rejects.toThrow('output-artifact-missing');
+    expect(await f.fs.list('v2/local-restore/')).toEqual([]); expect(await f.fs.exists(artifact)).toBe(false);
+    expect(f.databases.open).not.toHaveBeenCalled();
+  }, 30000);
+  it.each(['input.zip', 'start.json'] as const)('preserves a pre-Start restore interruption at %s until explicit abandonment', async stage => {
+    const f = await restoreFileFixture(), prepared = await f.prepare();
+    f.fs.reject = p => p === prepared.path(stage);
+    await expect(prepared.persist(f.ports, f.databases)).rejects.toThrow('injected quota'); f.fs.reject = () => false;
+    expect((await readRestoreControls(f.fs, metadata)).pending).toMatchObject({ id: prepared.id, start: null });
+    await expect(prepared.persist(f.ports, f.databases)).rejects.toThrow('restore-job-exists');
+    await expect(f.prepare()).rejects.toThrow('restore-pending');
+    const paths = await f.fs.list('v2/local-restore/'), saved = await Promise.all(paths.map(p => f.fs.readBytes(p)));
+    await BackupRestoreJob.abandon(f.fs, prepared.id, metadata, f.databases);
+    expect(await Promise.all(paths.map(p => f.fs.readBytes(p)))).toEqual(saved);
+    expect((await f.prepare()).id).not.toBe(prepared.id); expect(f.databases.open).not.toHaveBeenCalled();
+  }, 30000);
+  it('does not recreate a lost restore Index and proves absence before explicit pre-initialization cancellation', async () => {
+    const f = await restoreFileFixture(), prepared = await f.prepare(), index = `v2/local-restore/index/${prepared.id}.json`;
+    f.fs.reject = p => p === index;
+    await expect(prepared.persist(f.ports, f.databases)).rejects.toThrow('injected quota'); f.fs.reject = () => false;
+    const cold = await BackupRestoreJob.open(f.fs, prepared.id, metadata, f.databases);
+    await expect(cold.openStaging(f.databases)).rejects.toThrow('restore-staging-retired');
+    const list = f.databases.listGenerations;
+    f.databases.listGenerations = async () => { throw Error('probe unavailable'); };
+    await expect(BackupRestoreJob.cancel(f.fs, prepared.id, metadata, f.databases)).rejects.toThrow('probe unavailable');
+    expect(await f.fs.exists(prepared.path('result.json'))).toBe(false); f.databases.listGenerations = list;
+    f.factories.set(prepared.id, storageFactory());
+    await expect(BackupRestoreJob.cancel(f.fs, prepared.id, metadata, f.databases)).rejects.toThrow('restore-orphan-database');
+    f.factories.delete(prepared.id);
+    await BackupRestoreJob.cancel(f.fs, prepared.id, metadata, f.databases);
+    expect(JSON.parse((await f.fs.readText(prepared.path('result.json')))!)).toMatchObject({ detail: { kind: 'cancelled', stage: 'beforeInitializationWithoutIndex' } });
+    expect(await f.fs.exists(index)).toBe(false);
+    await expect(cold.openStaging(f.databases)).rejects.toThrow('restore-not-pending');
+    expect((await readRestoreControls(f.fs, metadata)).selection).toBeNull();
+  }, 30000);
+  it('cold-opens only an existing restore DB and finishes an interrupted empty-DB acknowledgment', async () => {
+    const f = await restoreFileFixture(), job = await (await f.prepare()).persist(f.ports, f.databases);
+    f.fs.reject = p => p === job.path('db-opened.json');
+    await expect(job.openStaging(f.databases)).rejects.toThrow('injected quota'); f.fs.reject = () => false;
+    expect(f.factories.has(job.id)).toBe(true);
+    const cold = await BackupRestoreJob.open(f.fs, job.id, metadata, f.databases), scope = await cold.openStaging(f.databases);
+    expect(f.databases.open).toHaveBeenLastCalledWith(job.id, false);
+    expect((await readRestoreControls(f.fs, metadata)).pending?.dbOpened).toBe(true);
+    await scope.dispose(); f.factories.delete(job.id);
+    await expect(BackupRestoreJob.open(f.fs, job.id, metadata, f.databases)).rejects.toThrow('restore-database-missing');
+    await expect(job.openStaging(f.databases)).rejects.toThrow('restore-database-missing');
+    expect(f.factories.has(job.id)).toBe(false);
+  }, 30000);
+  it('does not turn a cold uncreated restore DB into permission to create and retains acknowledged input loss', async () => {
+    const f = await restoreFileFixture(), job = await (await f.prepare()).persist(f.ports, f.databases);
+    const cold = await BackupRestoreJob.open(f.fs, job.id, metadata, f.databases);
+    await expect(cold.openStaging(f.databases)).rejects.toThrow('database does not exist');
+    expect(f.databases.open).toHaveBeenLastCalledWith(job.id, false);
+    await f.fs.remove(job.path('input.zip'));
+    await expect(job.openStaging(f.databases)).rejects.toThrow('restore-input-missing');
+    expect(f.factories.size).toBe(0); expect(await f.fs.exists(job.path('input.zip'))).toBe(false);
+  }, 30000);
+  it('refuses unacknowledged restore destination data instead of fabricating a DB acknowledgment', async () => {
+    const f = await restoreFileFixture(), job = await (await f.prepare()).persist(f.ports, f.databases), factory = storageFactory();
+    f.factories.set(job.id, factory); await factory().save(['unexpected'], new Uint8Array([1]));
+    const cold = await BackupRestoreJob.open(f.fs, job.id, metadata, f.databases);
+    await expect(cold.openStaging(f.databases)).rejects.toThrow('restore-unacknowledged-database');
+    expect(await f.fs.exists(job.path('db-opened.json'))).toBe(false);
+    await f.fs.writeText(`v2/generations/${job.id}/v2/metadata/unacknowledged`, 'retained');
+    await expect(readRestoreControls(f.fs, metadata)).rejects.toThrow('restore-orphan-generation');
+  }, 30000);
+  it('structurally reads a restore selection tail, refuses activation and detects its lost terminal witness (not initialization evidence)', async () => {
+    const f = await restoreFileFixture(), job = await (await f.prepare()).persist(f.ports, f.databases), scope = await job.openStaging(f.databases);
+    const selection = { schema: 'lociview-local-generation-selection-1', previous: null, jobId: job.id, start: restoreRef(job.start),
+      destination: { journal: restoreRef({ fake: 'journal' }), publication: restoreRef({ fake: 'publication' }), baseBinding: restoreRef({ fake: 'base' }) } };
+    const path = `v2/local-restore/selections/${restoreRef(selection).sha256}.json`;
+    // Deliberately write only control fixtures. These refs cannot activate an uninitialized destination.
+    await f.fs.writeText(path, json(selection));
+    expect((await readRestoreControls(f.fs, metadata)).tail?.jobId).toBe(job.id);
+    await expect(f.prepare()).rejects.toThrow('restore-destination-verification-required');
+    await expect(scope.check()).rejects.toThrow('restore-staging-retired');
+    await f.fs.writeText(job.path('result.json'), json({ schema: 'lociview-local-restore-result-1', jobId: job.id, start: restoreRef(job.start), detail: { kind: 'selected', selection: restoreRef(selection) } }));
+    await f.fs.remove(path);
+    await expect(readRestoreControls(f.fs, metadata)).rejects.toThrow('restore-selected-missing');
+    await scope.dispose();
+  }, 30000);
   it('generates separate named backups with exact originals and no base advancement or save claim', async () => {
     const { f, sent } = await contributionTeam(), sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
     const before = await f.receiver.session.read(), token = before.source!.token, label = '現地調査前';

@@ -2,10 +2,11 @@
 
 ## Current boundary — thin connected workflow first (2026-09-09)
 
-Active after `2389114`: the preceding question turn reconfirmed the visible-pin
-behavior without changing the implementation; classify it as no production
-progress, not a blocker. The clean tree is cached 0 behind / 70 ahead. Resume F03
-explicit restore, preserving the complete practical-team objective.
+Active after `477dd90`: the preceding question turn reconfirmed the already
+implemented visible-pin rule; it made no new implementation progress. This
+continuation consumes the generation capability in the actual F03 restore input
+job. Cached origin is 0 behind / 71 ahead; no unchanged denied push retry. The
+full practical-team goal remains intact, not a namespace/component milestone.
 
 Current connected outcome — explicit same-Project backup restoration:
 
@@ -17,11 +18,59 @@ Current connected outcome — explicit same-Project backup restoration:
   removal, including the unchanged original database. No Project ID rewrite.
 - [ ] Add dedicated full-original backup initialization and restored-base evidence;
   preserve old seals and verify all protected bodies, including base-only bodies.
+- [x] Own the actual backup ZIP in a root restore job, bind explicit confirmation
+  to current work, and implement recoverable start/cancel plus exact selection
+  control validation. Use the existing generation capability and file tests.
 - [ ] Connect verified input/effect confirmation, preparation, one authoritative
   switch and cold recovery to the existing file area/catalog/host. Keep old work.
 - [ ] Verify restored editing/Contribution exchange, stale and cancelled actions,
   missing evidence and post-switch display recovery with existing tests. Finish
   typecheck/root tests/builds and independent review at meaningful final trees.
+
+Current root-job implementation: independent ready source/publication/base
+confirmation, actual owned ZIP and Start/Index, pre-Start abandonment, bounded
+missing-Index cancellation, warm-only DB creation and DbOpened handoff now exist.
+The dedicated generation's lazy capabilities expire on cancel/selection without
+rehashing the archive on each operation. Closed path/record/chain/DB checks retain
+repair states. This unit does not initialize backup history, restore historical
+bases or issue any Selection; parsing a chain cannot activate a destination.
+Existing Scene UI is unchanged. Dedicated initialization/base/body verification,
+ordinary/cold host selection, restore UI and subsequent Contribution remain next.
+
+Independent prereview approved the closed protocol. Code review caught literal
+filename dots, missing lifecycle receipt headroom, and inconsistent aggregate
+file counts. All corrected: reserve the full seven-entry lifecycle including ZIP,
+count the complete logical-root retained files, reuse the existing working-space
+bound, and re-admit each control before write. No new capacity guarantee.
+Initial typecheck 63554 caught nullable control flow; corrected 11960 exits 0.
+Focused restore run 68178 exits 0: 11 PASS (10 new input/control cases and one
+existing matching display case). Separate isolation 782c4e: 12 PASS. Two existing
+file-suite cases were then added for headroom/size admission and strict paths.
+Typecheck 91491 exits 0 on that source. Exact-index review then found that terminal
+step presence alone did not validate a completed input/output's retained proof.
+Root run 81567 was explicitly stopped (exit 1, not a completed result) before
+fixing it. Both job kinds now reuse validateCompletion, matching existing Session
+guards. An added existing file test removes acknowledged output ZIP evidence and
+requires both prepare/confirm refusal without restoration writes. Corrected final
+typecheck 82892 exits 0. Full root 12538 exits 0: 112 files / 2,249 PASS / 21
+existing TODO / zero failures, 345.05 s. Ordinary build bdffa6 and harness build
+f08e65 exit 0 (existing mixed-import/large-chunk warnings; injected-loader warnings
+in existing tests are not raster/device evidence). Independent source review and
+exact 10-file index re-review have no mandatory remainder; final-check conditions
+are met. Only result documents changed after the final source/test checks.
+No rendered/browser/native-input/iPhone/offline evidence is claimed.
+
+Short meta-audit: this unit consumes the previous generation capability with an
+actual original backup and pending-job fences. It is concrete progress toward
+F03, not completion of restore or the 62-group practical-team target. Next fix the
+dedicated fullBackup proof/seal/initialization capability and restored-base binding
+in 06 §12.8, obtain independent technical review, then implement through the same
+journal/Session. Retain original initialize/importWorkspace seals and admission;
+do not reuse merge as restore or let generic retry invent a missing ownership
+job. All protected bodies (including base-only bodies), existing CAS repair,
+one verified selection/host switch and restored Contribution remain required.
+No new PO policy decision, browser request or additional probe page is needed.
+Commit identity is Git HEAD; unchanged denied push remains unattempted.
 
 Current namespace result: `generationScope.ts` preserves
 one logical-root authority/queue while binding metadata/packages and a separately

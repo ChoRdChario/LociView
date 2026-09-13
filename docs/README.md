@@ -63,6 +63,12 @@ now isolates metadata/package paths and database ownership under one logical
 Project lease/queue, fencing stale/lazy operations. The selector, dedicated backup
 initialization/restored-base evidence and UI switch are not connected; this helper
 does not activate restoration. Contract: 06 §12.8; checks are in todo.
+Its internal root restore job now owns and reinspects the backup ZIP, revalidates
+confirmation against current source/publication/base evidence, and retains explicit
+interruption/cancellation plus warm-only staging DB creation. Closed root controls
+and cumulative limits keep incomplete/missing records visible. The selection
+reader is structural only; no Selection writer or restored destination authority
+exists before the dedicated initializer/base/body connection. No restore UI change.
 This does not complete the practical-team, ordinary-home or device/offline gate.
 
 Contribution durable output now connects in the same file tools under §8.7:
