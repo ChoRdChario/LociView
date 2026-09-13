@@ -1687,6 +1687,103 @@ before editor mount and warm same-editor refresh. Recorded DOM/injected display
 evidence is not native picker, rendered browser, ordinary UI or adoption credit.
 The exact executed matrix is in todo; other job purposes remain proposals.
 
+#### Isolated Workspace output physical connection (2026-09-13)
+
+Implement the existing `send`/Team Workspace rows below in the limited real-file
+host, under §11. This is not a manual/automatic checkpoint or initial import.
+Use `v2/packages/output/<jobId>/` beneath the owning Project. Retain fixed
+`metadata.am`, `manifest.json`, `inventory.json`, `bases.json`, `capture.json`,
+`prepared.json`, `start.json`, and digest-addressed `steps/<sha256>.json`.
+Each generation attempt uses a fresh collision-checked `artifacts/<sinkId>.zip`;
+never replace a prior attempt or splice its prefix. Job and package IDs remain
+fixed across retry. No user filename/path is persisted in these controls.
+
+Prepare exact canonical manifest/checksum/payloads before writes, using the same
+builder as the stream writer. Frozen source is the exact durable original metadata
+and source proof, not a render projection. Persist/read back all frozen controls
+before the start marker. On cold retry, reopen those original bytes, recompute the
+summary/strong closure/prepared bindings and verify required bodies. Never use the
+current Session, current base selection or a new package ID as replacement input.
+An incomplete pre-start set is not acknowledged: explicit abandonment may add a
+closed terminal `abandoned.json` with
+`{schema:'lociview-workspace-output-abandoned-1',jobId,stage:'beforeStart'}` only
+after independently proving start/steps absent under the Project lease. All
+fragments remain and count toward capacity. Missing/torn acknowledged data is
+repair, not permission for this abandonment or a rewrite.
+
+The frozen inventory uses §12.2's exact schema. For known data, derive reason
+attribution from original candidate fields and the complete strong reference graph:
+ordinary active lifecycle roots start `current`; unresolved lifecycle and
+concurrent-delete/edit roots start `conflict`. Traversing a reference governed by
+an unresolved field changes `current` to `conflict`; conflict propagates through
+all strong descendants. Equal immutable registrations are one known value, not
+a winner selection. Weak edges never gain protection through this traversal.
+Apply the lifecycle/delete-edit rule also when entering a mutable node from
+another root, not only at root seeding. A resolved deleted node reached by a live
+strong reference remains retained under the existing graph. Governing fields
+use the edge's first field segment for Project/mutable records and the whole
+record for immutable entities. Mutable multi-candidates stay unresolved even if
+their values are equal. Missing/invalid governing fields refuse classification;
+charge both `(node,current)` and `(node,conflict)` visits to finite work limits.
+Union reasons where independent paths reach one physical digest. A text/color
+conflict alone does not turn a model's unrelated status reference into conflict.
+Add `exchangeBase` for every verified retained base's guaranteed inventory,
+including bodies no longer current. Opaque/migration/retention declarations require
+their exact supported evidence; inability to classify them refuses generation.
+Do not claim this first known-profile path implements those later profiles.
+
+`bases.json` is the canonical `{records:[...]}` table in §4.1, folding all matching
+immutable local observations into sorted unique completions. Preserve existing
+imported observations and their exact journal proof; a generated observation
+instead requires the matching output capture/prepared/start and verified artifact
+step. Both share the existing local base/evidence namespace. Different manifest,
+source or heads for one package ID remain an integrity error. Never create a
+separate generated table, discard imported provenance, or freeze an empty table
+merely because output itself does not transport it. Base-only body presence must
+be verified without rereading unchanged large payloads solely to discover a delta.
+
+The concrete service holds the existing origin package-operation lock and invokes
+a dedicated Session command under the same Project write lease; no generic
+UI-provided write callback. Reject pending journal/receive and stale initial token
+before writes. The capture is immutable after start: later completed Project
+edits do not change a recoverable output's content or acknowledge those newer edits.
+Count receive spools, retained output attempts, controls/evidence and temporary
+overlap against §12.4's existing finite limits. No deletion or extra dependency.
+
+Stream through WorkspaceFS, await actual sink close, then independently inspect
+the stored Blob, whole archive digest/length, exact original manifest/metadata and
+payload table. Only this may append `artifactVerified`. Without that step, even a
+complete-looking ZIP is unknown; explicit retry creates a fresh artifact. Finish
+the exact generated base and append `baseRecorded` idempotently before offering
+handoff. Missing already-acknowledged artifact/evidence/base is repair and is not
+recreated from later data. A failure after base commit but before its step may
+validate/reuse only that same record and original generation observation.
+
+Listing jobs and looking up a completed base validates its exact closed controls,
+base/evidence binding and artifact availability/size, not every historical ZIP's
+payload again. Share one validated base/output-control read within that operation.
+Full streamed artifact verification remains mandatory for initial completion,
+unfinished handoff recovery and actual download/file verification. This avoids
+quadratic whole-archive reads merely to list prior outputs; it does not authorize
+artifact retirement or treating a missing acknowledged base as an empty table.
+
+The same file area offers explicit generation, retry and download, plus optional
+exact file re-selection. Download creates no success receipt and does not occur
+automatically on reload/retry. Exact re-selection checks the complete immutable
+Blob against the retained verified artifact before `externalFileVerified` with
+`reselectedFileV1`; filename and modified time are never identity. This reports
+only that captured file's verified contents, not a current-file guarantee or
+acknowledgment of newer Project edits. Draft/IME/gizmo, View/Edit and Project
+switch guards remain. Cold pending jobs are visible before renderer mounting;
+warm operations preserve the same editor and temporary viewing state.
+
+Acceptance uses existing package/file/host tests: saved actual-format originals;
+both output→receive and receive→output; current/conflict/base-only inventory;
+write/close/read-back and base-handoff interruption; frozen retry after later
+edits; missing/torn acknowledged controls/artifact refusal; exact versus wrong
+file re-selection; download without a saved claim; cold and warm host guards.
+No new PoC, ordinary activation, native-input/device or offline credit follows.
+
 #### Frozen fields and fingerprint
 
 Use §3's canonical control encoding and existing exact nominal ID, `Heads`,

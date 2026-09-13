@@ -26,6 +26,7 @@ import { validationMaterialSlots, validationMaterialIssue } from './validationMa
 import { same } from '../../domain/projectGraphSupport';
 import type { MaterialIntent } from '../../domain/materialIntent';
 import { WorkspaceReceiver, type WorkspaceReceiveState } from '../../projectFiles/receiveWorkspace';
+import { WorkspaceSender, type WorkspaceOutputState } from '../../projectFiles/sendWorkspace';
 
 export const validationArea = 'lociview-development-validation-1';
 export interface ValidationHostOptions {
@@ -58,6 +59,9 @@ export async function openValidationHost(options: ValidationHostOptions) {
     connection = await options.openStorage(fresh && !!options.initial && lease.holdsWriteLock);
     const { content, session } = validationProjectService(fs, connection.factory, options.store, options.fileLimits, options.decode);
     const receiver = new WorkspaceReceiver(options.base, fs, session, limits, options.packageLocks ?? null);
+    const sender = new WorkspaceSender(fs, session, options.store, limits, options.packageLocks ?? null);
+    let outputJobs: WorkspaceOutputState[] = await sender.jobs(), outputFailure = '';
+    const unfinishedOutput = () => outputJobs.some(j => ['unstarted', 'incomplete', 'repair-required'].includes(j.state));
     let receiveJobs: WorkspaceReceiveState[] = await receiver.jobs(), receiveFailure = '', receiveDisplayPending = false;
     const unfinishedReceive = () => receiveJobs.some(j => !['completed', 'cancelled', 'abandoned'].includes(j.state));
     const reloadReceive = async () => { receiveJobs = await receiver.jobs(); };
@@ -129,6 +133,21 @@ export async function openValidationHost(options: ValidationHostOptions) {
       reselectInput: (token: string, id: string, file: Blob) => receiveAction(() => receiver.reselectInput(token, id, file)),
       abandonInput: (id: string) => receiveAction(() => receiver.abandonInput(id)),
       cancelStale: (id: string) => receiveAction(() => receiver.cancelStale(id)),
+    };
+    const outputAction = <T>(action: () => Promise<T>, recovery = false) => execute(async () => {
+      editable(); if (!recovery && (unfinishedOutput() || last.state !== 'ready')) throw Error('中断したファイル生成を確認してください。');
+      outputFailure = '';
+      try { return await action(); }
+      catch (error) { outputFailure = error instanceof Error ? error.message : 'ファイル処理を完了できません。'; throw error; }
+      finally { outputJobs = await sender.jobs(); }
+    }, true);
+    const workspaceOutput = {
+      get jobs() { return outputJobs; }, get error() { return outputFailure; },
+      generate: (token: string) => outputAction(() => sender.generate(token)),
+      retry: (id: string) => outputAction(() => sender.retry(id), true),
+      cancel: (id: string) => outputAction(() => sender.cancel(id), true),
+      verifyFile: (id: string, file: Blob) => outputAction(() => sender.verifyFile(id, file), true),
+      download: (id: string) => execute(() => sender.download(id), true),
     };
     const addMediaFile = (token: string, input: MediaFileAddition) => {
       const selected = input.file, target = { sceneId: input.sceneId, captionId: input.captionId, attachmentId: input.attachmentId,
@@ -238,7 +257,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
       refresh: () => execute(async () => { last = await session.read(); await projectView(last); return last; }),
       resolve: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
       dispose: async () => { await dispose(); content.releasePreparedImages(); content.releasePreparedModels(); prepareDisplay = undefined; } };
-    return { ...host, content, workspaceFiles, get accessDetail() { return options.mode === 'view' ? '閲覧専用です。' : lease.accessDetail; },
+    return { ...host, content, workspaceFiles, workspaceOutput, get accessDetail() { return options.mode === 'view' ? '閲覧専用です。' : lease.accessDetail; },
       setDisplayPreparation(callback: (next: SyntheticProject) => Promise<void>) {
       if (closed || prepareDisplay) throw Error('モデル表示の接続を確認してください。');
       prepareDisplay = callback; return () => { if (prepareDisplay === callback) prepareDisplay = undefined; };

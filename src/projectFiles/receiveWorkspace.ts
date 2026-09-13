@@ -8,17 +8,19 @@ import { json } from '../projectMetadata/persistence';
 
 export interface WorkspaceReceiveState { id: string; state: 'incomplete' | 'completed' | 'cancelled' | 'repair-required' | 'input-required' | 'unbound-input' | 'abandoned' | 'stale' }
 
+export async function workspaceFileOperation<T>(locks: LockManager | null, action: () => Promise<T>): Promise<T> {
+  if (!locks) return fileError('このブラウザではファイル処理を排他的に実行できません。');
+  return locks.request('lociview:package-operation:v1', { mode: 'exclusive', ifAvailable: true }, lock => {
+    if (!lock) return fileError('別のファイル処理が進行中です。完了後に再試行してください。'); return action();
+  });
+}
+
 /** Actual file entry, isolated from ordinary home. No filename-derived purpose or direct storage edits. */
 export class WorkspaceReceiver {
   constructor(private readonly base: WorkspaceFS, private readonly fs: ProjectWorkspaceFS,
     private readonly session: MetadataProjectSession, private readonly limits: MetadataLimits, private readonly locks: LockManager | null) {}
   private async operation<T>(action: () => Promise<T>): Promise<T> {
-    if (!this.locks) return fileError('このブラウザではファイル処理を排他的に実行できません。');
-    // Await the native request itself: its completion also releases the operation slot.
-    return this.locks.request('lociview:package-operation:v1', { mode: 'exclusive', ifAvailable: true }, lock => {
-      if (!lock) return fileError('別のファイル処理が進行中です。完了後に再試行してください。');
-      return action();
-    });
+    return workspaceFileOperation(this.locks, action);
   }
   receive(expectedToken: string, file: Blob) {
     return this.operation(async () => {

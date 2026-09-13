@@ -16,6 +16,7 @@ import { PackageArchive } from '../src/projectPackage/zipArchive';
 import { ZipCrc32 } from '../src/projectPackage/zipChecks';
 import type { JsonObject } from '../src/domain/values';
 import type { OriginBlobStore } from '../src/projectMetadata/blobStore';
+import { protectedWorkspaceInventory } from '../src/projectPackage/protectedInventory';
 
 type Mutable<T> = { -readonly [K in keyof T]: Mutable<T[K]> };
 type Fixture<P extends PackagePurpose> = Mutable<PackageManifest & { purpose: P }>;
@@ -81,6 +82,25 @@ async function unpackFixture(file: Blob) {
 }
 
 describe('connected Workspace ZIP generation and integrity (not admission or external saving)', () => {
+  it('attributes protected current, conflicting and base-only bodies without retaining weak history', async () => {
+    const f = await workspaceFixture(), inspection = await f.source.inspectOriginal({ maxNodes: L.inspectionNodes, maxWork: L.inspectionWork });
+    const candidates = inspection.candidates, base = { path: `blobs/sha256/${hash(99)}`, sha256: hash(99), byteLength: 17 };
+    const ordinary = protectedWorkspaceInventory(candidates, [base, f.capture.blobs[0]!]);
+    expect(ordinary.blobs.find(b => b.sha256 === base.sha256)!.reasons).toEqual(['exchangeBase']);
+    expect(ordinary.blobs.find(b => b.sha256 === f.capture.blobs[0]!.sha256)!.reasons).toEqual(['current', 'exchangeBase']);
+    expect(ordinary.blobs).toHaveLength(f.capture.blobs.length + 1);
+    // Attribution-unit candidate ports: mutable equal candidates remain conflict;
+    // equal whole immutable candidates remain one unambiguous value.
+    const duplicate = (path: string[]) => ({ ...candidates, fields: candidates.fields.map(field => {
+      if (JSON.stringify(field.path) !== JSON.stringify(path)) return field;
+      const candidate = { ...field.candidates[0]!, operationId: 'fixture-second-candidate' };
+      return { ...field, candidates: [...field.candidates, candidate], validOperationIds: [...field.validOperationIds, candidate.operationId] };
+    }) });
+    const rep = fixture().representationsById[id('rep')] as JsonObject, sha = (rep.blob as JsonObject).digest;
+    expect(protectedWorkspaceInventory(duplicate(['assetsById', id('ast'), 'status']), []).blobs.find(b => b.sha256 === sha)!.reasons).toEqual(['conflict']);
+    expect(protectedWorkspaceInventory(duplicate(['assetsById', id('ast'), 'lifecycle']), []).blobs.find(b => b.sha256 === sha)!.reasons).toEqual(['conflict']);
+    expect(protectedWorkspaceInventory(duplicate(['representationsById', id('rep')]), []).blobs.find(b => b.sha256 === sha)!.reasons).toEqual(['current']);
+  });
   it('pulls one 64 KiB view at a time from a bounded raw chunk and counts empty/raw reads', async () => {
     const raw = new Uint8Array(L.chunkBytes); raw[raw.length - 1] = 7;
     let reads = 0, charged = 0;

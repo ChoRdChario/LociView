@@ -22,10 +22,10 @@ exact source reopen, all-live-candidate strong closure and read-only body checks
 Unsupported historical summary values/unknown inventory refuse capture without
 changing source admission. The captured source now generates an exact streamed ZIP;
 an independent raw inspector checks headers/CRC/SHA, causal source, summary and
-strong closure when reopening. It does not confer profile admission, a durable
-output job or file-save receipt, and does not activate a format. Protected job/
-retention, CAS/Project receive and ordinary F01/F02 file services remain open;
-current executed evidence and measured-adoption boundaries are in todo.
+strong closure when reopening. This primitive alone does not confer profile
+admission or external-save proof and does not activate a format. The bounded
+receive/output services below add durable jobs; ordinary F01/F02 file flows,
+broader retention and measured-adoption boundaries remain open in todo.
 The next bounded connection in 06 §§8.3–8.4 adds fullMetadata journal/control
 binding and cold retry, plus received original-record GLB/PNG profile/fact staging.
 Legacy receipts stay unchanged. The existing-Project actual ZIP service now joins
@@ -33,8 +33,12 @@ durable input jobs, Session receive/recovery and exact imported-base completion.
 The existing limited GLB/PNG host now exposes actual update-file receive, cold
 recovery before editor mount, and exact pre-start re-selection/explicit abandonment.
 Warm receipt keeps the same editor and retains repeated display failures until
-confirmed. External output, initial import, other purposes, ordinary activation
-and rendered/device acceptance remain open; executed evidence is recorded in todo.
+confirmed. The same file tools now connect frozen-source generation, streamed
+artifact read-back, generated/imported base folding, deliberate download and exact
+reselected-file verification. Incomplete output is recoverable before renderer
+preparation; neither download nor internal acknowledgment means saved. Initial
+import, other purposes, ordinary activation and rendered/device acceptance remain
+open; executed evidence is recorded in todo.
 F01/F02 are not complete. Current executed evidence and next work are in todo.
 
 Later PO adoption: [05 §4.4](specs/05-project-scene-team-workflow.md#44-explicit-pin-parent-changes-po-approved-2026-09-13)

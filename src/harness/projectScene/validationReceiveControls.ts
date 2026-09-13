@@ -1,5 +1,6 @@
 import type { createValidationModeHost } from './validationModeHost';
 import type { SyntheticSession } from './session';
+import { createValidationOutputControls } from './validationOutputControls';
 
 /** One file/recovery area, available even before a Scene editor can mount. */
 export function createValidationReceiveControls(document: Document, host: ReturnType<typeof createValidationModeHost>,
@@ -14,6 +15,8 @@ export function createValidationReceiveControls(document: Document, host: Return
   const status = document.createElement('p'), jobs = document.createElement('section'); status.setAttribute('role', 'status');
   form.append(label, submit, clear); root.append(heading, help, form, status, jobs);
   let busy = false, disposed = false, feedback = '', selectedJob: string | null = null, cancel: { id: string; stale: boolean } | null = null;
+  const output = createValidationOutputControls(document, host, session, changed, () => busy || !!input.files?.length || !!selectedJob || !!cancel);
+  root.append(output.root);
   const guard = (recovery: boolean) => {
     const s = session();
     if (host.authority.readOnly) throw Error('閲覧中は受信できません。編集を開始してください。');
@@ -21,7 +24,7 @@ export function createValidationReceiveControls(document: Document, host: Return
     if (!recovery && host.hasPending()) throw Error('中断した更新を先に確認してください。');
   };
   const perform = (action: () => Promise<unknown>, recovery: boolean, completed: string) => {
-    if (busy || disposed) return;
+    if (busy || output.hasChanges() || disposed) return;
     try { guard(recovery); } catch (error) { feedback = (error as Error).message; render(); return; }
     busy = true; feedback = '更新を確認しています。'; render(); changed();
     void (async () => {
@@ -34,12 +37,12 @@ export function createValidationReceiveControls(document: Document, host: Return
     })();
   };
   const button = (parent: HTMLElement, text: string, action: () => void) => {
-    const b = document.createElement('button'); b.type = 'button'; b.textContent = text; b.disabled = busy || !!host.authority.readOnly;
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = text; b.disabled = busy || output.hasChanges() || !!host.authority.readOnly;
     b.addEventListener('click', () => { if (!b.disabled) action(); }); parent.append(b);
   };
   const render = () => {
     if (disposed) return;
-    form.inert = busy; submit.disabled = busy || host.authority.readOnly || !input.files?.length;
+    output.render(); form.inert = busy || output.hasChanges(); submit.disabled = busy || output.hasChanges() || host.authority.readOnly || !input.files?.length;
     clear.disabled = busy; clear.hidden = !input.files?.length && !selectedJob;
     labelText.textContent = selectedJob ? '元のファイルを選び直す' : '更新ファイルを選択';
     input.setAttribute('aria-label', selectedJob ? '元のファイルを選び直す' : '更新ファイルを選択');
@@ -79,6 +82,6 @@ export function createValidationReceiveControls(document: Document, host: Return
     perform(() => id ? host.workspaceFiles.reselectInput(token, id, file) : host.workspaceFiles.receive(token, file), !!id, '更新を受け取りました。');
   });
   render();
-  return { root, render, busy: () => busy, hasChanges: () => busy || !!input.files?.length || !!selectedJob || !!cancel,
-    dispose: () => { disposed = true; root.remove(); } };
+  return { root, render, busy: () => busy || output.busy(), hasChanges: () => busy || output.hasChanges() || !!input.files?.length || !!selectedJob || !!cancel,
+    dispose: () => { disposed = true; output.dispose(); root.remove(); } };
 }

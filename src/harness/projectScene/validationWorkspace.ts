@@ -25,7 +25,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const root = document.createElement('section'), navigation = document.createElement('section'), content = document.createElement('section');
   root.className = 'lv-validation-host'; navigation.className = 'lv-validation-home';
   const heading = document.createElement('h1'); heading.textContent = '実ファイルで検証';
-  const help = document.createElement('p'); help.textContent = '静的GLB（内蔵PNG・外部参照なし）とPNGを使います。新しい検証プロジェクトを作成します。再開用データはこのブラウザ内のみで、ファイル保存は未接続です。既存プロジェクトは変更しません。';
+  const help = document.createElement('p'); help.textContent = '静的GLB（内蔵PNG・外部参照なし）とPNGで検証プロジェクトを作ります。作業一式の生成・受け渡しができます。ダウンロードだけではファイルへの保存は確認できません。通常画面のプロジェクトは変更しません。';
   const form = document.createElement('form'), title = document.createElement('input'), files = document.createElement('input');
   title.value = '新しいプロジェクト'; title.maxLength = 256; title.setAttribute('aria-label', 'プロジェクト名');
   files.type = 'file'; files.multiple = true; files.setAttribute('aria-label', '3Dモデルとメディアを選択');
@@ -97,6 +97,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       }
       return;
     }
+    // File recovery must remain available even if renderer preparation fails or stalls.
+    if (receiveTools) { receiveTools.render(); content.append(receiveTools.root); }
     status.textContent = 'モデルを読み込んでいます。';
     const target = host, next = await ports.render(target);
     if (disposed || host !== target) { next.dispose(); return; }

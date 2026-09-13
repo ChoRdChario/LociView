@@ -14,6 +14,12 @@ import { checkRemoteStored, copyFullSource, planRemoteChanges, type FullMetadata
 import { WorkspaceReceiveJob, type ReceiverProof } from '../projectPackage/receiveJob';
 import type { JournalRemoteInput } from './packageRemote';
 import { packageByteHash } from '../projectPackage/manifest';
+import type { OriginBlobStore } from './blobStore';
+import { WorkspaceOutputJob } from '../projectPackage/outputJob';
+import { WorkspaceBaseStore } from '../projectPackage/workspaceBases';
+import { WorkspaceSourceCapture } from '../projectPackage/workspaceSource';
+import { protectedWorkspaceInventory } from '../projectPackage/protectedInventory';
+import { PACKAGE_LIMITS } from '../projectPackage/contract';
 
 /** Owned finite content boundary. Stage may introduce bytes; recovery may only verify saved bytes. */
 export interface MetadataMediaPort {
@@ -197,6 +203,70 @@ export class MetadataProjectSession {
   }
 
   async retry(): Promise<MetadataSessionRead> { return underWriteLease(this.fs, () => this.resume()); }
+
+  private async outputReady() {
+    const read = await this.read(); if (read.state !== 'ready' || !read.source || !read.publication) return fail('output-not-ready');
+    for (const id of await WorkspaceReceiveJob.ids(this.fs)) {
+      const state = await WorkspaceReceiveJob.inputState(this.fs, id, this.limits);
+      if (state === 'abandoned') continue;
+      if (state !== 'started') return fail('output-receive-pending');
+      const job = await WorkspaceReceiveJob.open(this.fs, id, this.limits), steps = await job.steps();
+      if (!steps.some(s => s.detail.kind === 'baseRecorded' || s.detail.kind === 'cancelled')) return fail('output-receive-pending');
+      await job.validateCompletion();
+    }
+    return read;
+  }
+  private async finishWorkspaceOutput(job: WorkspaceOutputJob, store: OriginBlobStore, signal?: AbortSignal) {
+    job.assertOwner(this.fs); const current = await this.outputReady();
+    if (json(current.source!.proof) !== json(job.source.proof)) return fail('output-lineage');
+    const bases = new WorkspaceBaseStore(this.fs, this.limits, job.source.proof), snapshot = await bases.snapshot(), frozen = job.frozenBases();
+    // Current table may have advanced, but every original frozen observation must still be present.
+    for (const r of frozen.records) {
+      const found = snapshot.records.find(b => b.workspacePackageId === r.workspacePackageId);
+      if (!found || json({ ...found, completions: [] }) !== json({ ...r, completions: [] }) ||
+        r.completions.some(c => !found.completions.some(v => json(v) === json(c)))) return fail('output-frozen-base-missing');
+    }
+    const inspection = await job.source.inspectOriginal({ maxWork: PACKAGE_LIMITS.inspectionWork, maxNodes: PACKAGE_LIMITS.inspectionNodes });
+    const inventory = protectedWorkspaceInventory(inspection.candidates, await bases.payloads(frozen.records));
+    if (json(inventory) !== json(job.frozenInventory())) return fail('output-frozen-inventory');
+    for (const b of inventory.blobs) if (await store.inspect({ algorithm: 'sha256', digest: b.sha256, byteLength: b.byteLength, mediaType: 'application/octet-stream' }) !== 'verified-present') return fail('output-protected-body-missing');
+    await bases.preflightGenerated(job.baseRecord()); await job.generate(store, signal);
+    await job.baseRecorded(await bases.recordGenerated(job)); return job.id;
+  }
+  async createWorkspaceOutput(expectedToken: string, store: OriginBlobStore, version: string, signal?: AbortSignal) {
+    return underWriteLease(this.fs, async () => {
+      const read = await this.outputReady(); if (read.source!.token !== expectedToken) return fail('output-stale');
+      for (const id of await WorkspaceOutputJob.ids(this.fs)) {
+        const state = await WorkspaceOutputJob.state(this.fs, id, this.limits);
+        if (state === 'abandoned') continue;
+        if (state !== 'started') return fail('output-pending');
+        const steps = await (await WorkspaceOutputJob.open(this.fs, id, this.limits)).steps();
+        if (!steps.some(s => s.detail.kind === 'baseRecorded' || s.detail.kind === 'cancelled')) return fail('output-pending');
+      }
+      const bases = new WorkspaceBaseStore(this.fs, this.limits, read.source!.proof), snapshot = await bases.snapshot();
+      const capture = await WorkspaceSourceCapture.prepare(this, expectedToken, store, this.limits, signal);
+      const inspection = await read.source!.inspectOriginal({ maxWork: PACKAGE_LIMITS.inspectionWork, maxNodes: PACKAGE_LIMITS.inspectionNodes });
+      const inventory = protectedWorkspaceInventory(inspection.candidates, await bases.payloads(snapshot.records));
+      for (const b of inventory.blobs) if (await store.inspect({ algorithm: 'sha256', digest: b.sha256, byteLength: b.byteLength, mediaType: 'application/octet-stream' }) !== 'verified-present') return fail('output-protected-body-missing');
+      const job = WorkspaceOutputJob.prepare(this.fs, capture, inventory, snapshot, this.limits, version);
+      await bases.preflightGenerated(job.baseRecord()); await job.persist(); return this.finishWorkspaceOutput(job, store, signal);
+    });
+  }
+  async resumeWorkspaceOutput(id: string, store: OriginBlobStore, signal?: AbortSignal) {
+    return underWriteLease(this.fs, async () => this.finishWorkspaceOutput(await WorkspaceOutputJob.open(this.fs, id, this.limits), store, signal));
+  }
+  async verifyWorkspaceOutput(id: string, file: Blob) {
+    return underWriteLease(this.fs, async () => {
+      await this.outputReady(); const job = await WorkspaceOutputJob.open(this.fs, id, this.limits);
+      await new WorkspaceBaseStore(this.fs, this.limits, job.source.proof).read(); await job.verifySelected(file);
+    });
+  }
+  async cancelWorkspaceOutput(id: string) {
+    return underWriteLease(this.fs, async () => {
+      if (await WorkspaceOutputJob.state(this.fs, id, this.limits) === 'started') await (await WorkspaceOutputJob.open(this.fs, id, this.limits)).cancel();
+      else await WorkspaceOutputJob.abandon(this.fs, id, this.limits);
+    });
+  }
 
   /** Isolated actual Workspace receive. Job spool/base remain separate from metadata publication. */
   async receiveWorkspace(expectedToken: string | null, input: WorkspaceReceiveJob): Promise<MetadataSessionRead> {

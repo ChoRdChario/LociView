@@ -2,6 +2,75 @@
 
 ## Current boundary — thin connected workflow first (2026-09-09)
 
+Starting checkpoint `604058c`: the 19-file same-editor Workspace receive/recovery
+unit is committed after final typecheck, 2,149 passing tests, both builds and
+independent review. The preceding clarification turn recovered the terminal
+root-test result from its actual handle; this resumed turn closed build/checkpoint
+work. Neither is new rendered/iPhone acceptance. Cached origin is 0 behind / 63
+ahead; the previously denied push/browser bootstrap is not retried unchanged.
+
+Current connected unit — Workspace output in the same limited GLB/PNG file flow:
+
+- [x] Pin/review exact output physical records and current/conflict/base inventory
+  attribution in 06 §12.7 before implementation. Preserve its complete FrozenCapture,
+  PreparedOutput and receipt boundaries; do not substitute a bare download.
+- [x] Prepare exact manifest bytes before writes; retain original source, complete
+  protected inventory and the actual canonical base-table snapshot. Cold recovery
+  must use these inputs, never substitute the current Session or an empty table.
+- [x] Connect streamed artifact creation, independent read-back, generated-base
+  handoff and explicit retry through a dedicated Session/WorkspaceFS command.
+  Shared base reading must validate generated and imported observations without
+  weakening existing journal/receipt checks or splitting into incompatible tables.
+- [x] Connect the existing host/mode/file tools to generation, deliberate download
+  and exact reselected-file verification. Download alone never says saved. Keep
+  drafts/IME/gizmo, Scene/camera/windows, cold recovery and switching guards.
+- [x] Reuse existing package/file/host acceptance for output→receive and receive→
+  output, frozen retry after edits, interrupted close/read-back/base handoff,
+  missing acknowledged evidence and wrong-file refusal. Final meaningful-tree
+  typecheck/test/build and independent source review; no new PoC/test suite.
+
+Checkpoint boundary: the reviewed 24-file output unit above. Resolve its actual
+commit from Git rather than treating the starting checkpoint as current HEAD.
+Do not retry the unchanged denied push or imply browser/device acceptance.
+
+Read-only design review identified the formerly imported-only base reader and
+missing capture inventories/base snapshots; both are connected in this unit.
+Reason attribution and bounded capacity include existing receive spools, output
+attempts, controls and retained evidence. Original IDs/history/candidates remain.
+Initial arbitrary-history Project import follows as its own connected unit; do
+not relax the existing two-original initialization guard to simulate an importer.
+Ordinary-home adoption, other purposes, dependencies, release and actual-device/
+offline acceptance remain separate. No new PO decision is required for this
+approved sequence; stop only on a genuine contract conflict or new authority.
+
+Output review: the shared imported/generated base reader retains original
+observation checks. Independent review found and corrected missing acknowledged
+base handling, receive capacity excluding output artifacts, historical ZIP body
+reads during listing and cold renderer failures withholding output recovery.
+Listings share control/evidence reads and check artifact availability/size; actual
+handoff/retry verifies the whole artifact. Explicit cancellation is offered only
+before artifact completion. No silent deletion/replenishment or save-success label.
+Focused tests cover generation/receive both orders, frozen retry after edits,
+interrupted artifact/base handoff, missing base/artifact, wrong file, reason
+attribution, combined capacity and same-editor/IME/View/cold-render-failure controls.
+One initial mounted-test failure called a nonexistent test API; corrected to the
+existing mode.change contract. Typecheck exit 0 and final independent source review
+has no mandatory findings. Final root on frozen source/tests: 112 files / 2,157
+PASS / 21 existing TODO / zero failures, 435.55 s, exit 0. Normal and harness builds
+both exit 0; existing mixed-import/large-chunk warnings remain. Existing injected
+Node renderer warnings are not GPU acceptance. Only result documentation changed
+after these checks. Recorded DOM/virtual capacity/
+injected model/image tests are not browser/device proof.
+
+Next implementation: first Workspace import must preserve all original history
+in a dedicated unpublished initialization transaction. Do not relax local creation's
+two-original rule. Route by verified Project identity/root, not filenames; existing
+same-lineage Projects use the current receive service, while mismatched identity,
+incomplete creation and repair states never overwrite or silently re-key a Project.
+Specify/review this bounded internal journal/job extension before implementation.
+
+### Completed checkpoint — same-editor receive and input recovery
+
 Active after clean `f3df569`, cached origin 0 behind / 62 ahead. Previous goal
 turn made production progress: actual Workspace receive/job/base plus final
 2,144 tests, typecheck/build and independent review. This next unit connects the

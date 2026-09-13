@@ -1,5 +1,13 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **Current boundary — `604058c`後のWorkspace出力接続:** 実commitはGit HEAD／logで確認する。
+> 同じ限定hostへ元履歴・保護対象本体・実交換基準表を固定したWorkspace書出しを実装。
+> stream生成→読み戻し検証→generated基準→明示download／選び直したfile確認を接続済み。
+> imported/generated共通表、cold復旧、後の編集保持、欠落ack証拠の拒否を既存testsで検査。
+> 独立source review必須残件なし、型exit 0。最終root：112 files／2,157 PASS／既存21 TODO、
+> 失敗0（435.55秒）。通常・harness build exit 0。local checkpointはtodo先頭を参照。
+> downloadだけを保存確認にしない。初回Project importはその後。新しい人手確認待ちはない。
+
 > **2026-09-13 更新fileと未確定入力復旧（`f3df569`後）:** 限定GLB/PNG hostに受信欄を接続。
 > 元file全体が一致する再選択だけで未確定spoolを再コピー。原本不明時は明示的な取りやめで終端化し、
 > 断片は消さず容量に算入。start／journal／stepsが存在すればこの経路を拒否する。

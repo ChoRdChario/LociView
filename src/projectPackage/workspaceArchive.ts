@@ -17,6 +17,18 @@ const fail = (code: string): never => { throw new PackageControlError(code); };
 const encode = (value: JsonValue) => new TextEncoder().encode(canonical(value));
 const same = (a: unknown, b: unknown) => canonical(a as JsonValue) === canonical(b as JsonValue);
 export interface WorkspaceArchiveOptions { readonly packageId: string; readonly createdByVersion: string; readonly memo?: string; readonly signal?: AbortSignal }
+/** One exact builder for pre-write binding and ZIP generation; no durable completion. */
+export function prepareWorkspaceManifest(capture: WorkspaceSourceCapture, options: WorkspaceArchiveOptions) {
+  const payloads = [capture.metadata, ...capture.blobs];
+  const manifest = encode({ format: PACKAGE_FORMAT, wireVersion: PACKAGE_WIRE_VERSION, purpose: 'teamWorkspace',
+    packageId: options.packageId, createdByVersion: options.createdByVersion, ...(options.memo !== undefined ? { memo: options.memo } : {}),
+    identity: capture.proof.identity, metadataEnvelope: capture.proof.envelope, targetHeads: capture.targetHeads,
+    metadata: capture.metadata, blobs: capture.blobs, summary: capture.summary,
+    payloadTotals: { entryCount: payloads.length, uncompressedBytes: payloads.reduce((n, e) => n + e.byteLength, 0),
+      largestEntryBytes: Math.max(...payloads.map(e => e.byteLength)) } } as unknown as JsonValue);
+  const checksum = new TextEncoder().encode(packageByteHash(manifest)), control = readManifestControl(manifest, checksum);
+  return { manifest, checksum, control };
+}
 const zipOptions = (signal: AbortSignal) => ({ level: 0, bufferedWrite: false, dataDescriptor: true, dataDescriptorSignature: true,
   zip64: false, extendedTimestamp: false, version: 20, versionMadeBy: 20, msDosCompatible: true,
   internalFileAttributes: 0, externalFileAttributes: 0, useUnicodeFileNames: true, keepOrder: true,
@@ -60,14 +72,7 @@ export async function writeWorkspaceArchive(capture: WorkspaceSourceCapture, sto
   let pipeline: Promise<void> | undefined;
   try {
     checkAbort(options.signal); const metadata = capture.metadataBytes();
-    const payloads = [capture.metadata, ...capture.blobs];
-    const manifest = encode({ format: PACKAGE_FORMAT, wireVersion: PACKAGE_WIRE_VERSION, purpose: 'teamWorkspace',
-      packageId: options.packageId, createdByVersion: options.createdByVersion, ...(options.memo !== undefined ? { memo: options.memo } : {}),
-      identity: capture.proof.identity, metadataEnvelope: capture.proof.envelope, targetHeads: capture.targetHeads,
-      metadata: capture.metadata, blobs: capture.blobs, summary: capture.summary,
-      payloadTotals: { entryCount: payloads.length, uncompressedBytes: payloads.reduce((n, e) => n + e.byteLength, 0),
-        largestEntryBytes: Math.max(...payloads.map(e => e.byteLength)) } } as unknown as JsonValue);
-    const checksum = new TextEncoder().encode(packageByteHash(manifest)), control = readManifestControl(manifest, checksum);
+    const { manifest, checksum, control } = prepareWorkspaceManifest(capture, options);
     if (metadata.length !== capture.metadata.byteLength || packageByteHash(metadata) !== capture.metadata.sha256) fail('workspace-source-mismatch');
     const bridge = new TransformStream<Uint8Array, Uint8Array>();
     const hash = new NativeSha256(); let byteLength = 0, chunks = 0, bodyReads = 0, finished = false;

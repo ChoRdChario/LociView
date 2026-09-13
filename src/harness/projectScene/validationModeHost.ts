@@ -66,7 +66,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       try { await work; } finally { switching = false; if (operation === work) operation = undefined; }
     },
   };
-  const host: SavedWorkspaceHost & ValidationDisplayHost & Pick<Host, 'workspaceFiles'> = {
+  const host: SavedWorkspaceHost & ValidationDisplayHost & Pick<Host, 'workspaceFiles' | 'workspaceOutput'> = {
     authority, mode, limits: initial.limits, read: () => current.read(),
     hasPending: () => switching || current.hasPending(),
     refresh: () => run(() => current.refresh()), resolve: (...a) => run(() => current.resolve(...a)),
@@ -78,6 +78,14 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       reselectInput: (...a) => run(() => current.workspaceFiles.reselectInput(...a)),
       abandonInput: (...a) => run(() => current.workspaceFiles.abandonInput(...a)),
       cancelStale: (...a) => run(() => current.workspaceFiles.cancelStale(...a)),
+    },
+    workspaceOutput: {
+      get jobs() { return current.workspaceOutput.jobs; }, get error() { return current.workspaceOutput.error; },
+      generate: (...a) => run(() => current.workspaceOutput.generate(...a)),
+      retry: (...a) => run(() => current.workspaceOutput.retry(...a)),
+      cancel: (...a) => run(() => current.workspaceOutput.cancel(...a)),
+      verifyFile: (...a) => run(() => current.workspaceOutput.verifyFile(...a)),
+      download: (...a) => run(() => current.workspaceOutput.download(...a)),
     },
     // The resident cache never retains a closed host's content service.
     content: { model: record => current.content.model(record) },

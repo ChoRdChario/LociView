@@ -9,6 +9,7 @@ import { packageByteHash, readManifestControl } from './manifest';
 import { planWorkspaceClosure } from './closure';
 import { ProjectMetadataSource } from '../projectMetadata/source';
 import { summarizeFullHistory } from './historySummary';
+import { WorkspaceBaseStore, receiveJobIds } from './workspaceBases';
 
 export interface ReceiverProof { identity: MetadataProof['identity']; metadataEnvelope: MetadataProof['envelope']; heads: readonly string[] }
 interface Start { schema: 'lociview-package-job-start-1'; jobId: string; operation: 'receiveWorkspace'; prepared: EvidenceRef; receiver: ReceiverProof }
@@ -53,18 +54,7 @@ export class WorkspaceReceiveJob {
     const input = file.slice(0, file.size), inspection = await WorkspaceArchive.inspect(input, limits);
     return new WorkspaceReceiveJob(fs, newId(), limits, inspection, input, null);
   }
-  static async ids(fs: ProjectWorkspaceFS): Promise<string[]> {
-    const prefix = `${root(fs)}receive/`, paths = await fs.list(prefix);
-    if (paths.length > L.entryCount) fail('receive-job-count');
-    let controls = 0;
-    for (const path of paths) {
-      if (!/^[0-9a-f]{32}\/(input\.zip|input\.json|prepared\.json|start\.json|abandoned\.json|steps\/[0-9a-f]{64}\.json)$/.test(path.slice(prefix.length))) fail('receive-job-path');
-      if (path.endsWith('/input.zip')) continue;
-      const file = await fs.readStream(path);
-      if (!file || file.size > L.controlBytes || (controls += file.size) > L.controlsBytes) return fail('receive-control-budget');
-    }
-    return [...new Set(paths.map(p => p.slice(prefix.length).split('/')[0]!))];
-  }
+  static ids(fs: ProjectWorkspaceFS) { return receiveJobIds(fs); }
   /** Absence is checked separately from parsing: torn acknowledged starts are never unstarted. */
   static async inputState(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits): Promise<InputState> {
     technicalId(id); if (!(await this.ids(fs)).includes(id)) return fail('receive-job-missing');
@@ -144,9 +134,16 @@ export class WorkspaceReceiveJob {
     else if ((await this.fs.list(this.path(''))).length) return fail('receive-job-exists');
     const ids = await WorkspaceReceiveJob.ids(this.fs);
     let existing = 0;
+    const retainedPaths = await this.fs.list(root(this.fs));
+    if (retainedPaths.length > L.entryCount) fail('receive-space-budget');
+    for (const path of retainedPaths) {
+      const file = await this.fs.readStream(path);
+      if (!file || !Number.isSafeInteger(file.size) || file.size < 0) return fail('receive-space-read');
+      existing += file.size;
+      if (existing > 2_147_483_648 - 16_777_216) fail('receive-space-budget');
+    }
     for (const id of ids) {
       const state = await WorkspaceReceiveJob.inputState(this.fs, id, this.limits);
-      existing += (await this.fs.readStream(`${root(this.fs)}receive/${id}/input.zip`))?.size ?? 0;
       if (this.reselected && id === this.id || state === 'abandoned') continue;
       if (state !== 'started') return fail('receive-job-unfinished');
       const prior = await WorkspaceReceiveJob.open(this.fs, id, this.limits);
@@ -275,91 +272,8 @@ export class WorkspaceReceiveJob {
     }
     await writeReceipt(this.fs, path, record, this.limits); return record;
   }
-  private async readBases(): Promise<ImportedBase[]> {
-    const prefix = `${root(this.fs)}bases/`, paths = await this.fs.list(prefix), rows: ImportedBase[] = [], keys = new Map<string, string>();
-    const evidence = new Map<string, number>(); let controlBytes = 0, sourceWork = 0, sourceNodes = 0;
-    if (paths.length > L.entryCount) fail('receive-base-budget');
-    for (const path of paths) {
-      const file = await this.fs.readStream(path); if (!file || file.size > L.controlBytes || (controlBytes += file.size) > L.controlsBytes) return fail('receive-base-budget');
-      const r = await readReceipt<ImportedBase>(this.fs, path, this.limits);
-      if (!r || Object.keys(r).sort().join(',') !== 'completions,declaredHeads,evidence,identity,metadataEnvelope,workspaceManifestSha256,workspacePackageId' ||
-        typeof r.workspacePackageId !== 'string' || !/^pkg_[0-9a-f]{32}$/.test(r.workspacePackageId) ||
-        path !== `${prefix}${r.workspacePackageId}/${reference(r).sha256}.json` ||
-        json(r.identity) !== json(this.inspection.source.proof.identity) || json(r.metadataEnvelope) !== json(this.inspection.source.proof.envelope) ||
-        !r.evidence || Object.keys(r.evidence).sort().join(',') !== 'manifest,metadata' ||
-        !Array.isArray(r.completions) || r.completions.length !== 1 || Object.keys(r.completions[0]!).sort().join(',') !== 'observation,publishedReceiverHeads' ||
-        r.completions[0]!.observation !== 'imported') return fail('receive-base-record');
-      checkRemoteHeads(r.declaredHeads); checkRemoteHeads(r.completions[0]!.publishedReceiverHeads);
-      for (const e of [r.evidence.manifest, r.evidence.metadata]) {
-        if (evidence.has(e.sha256) && evidence.get(e.sha256) !== e.byteLength) fail('receive-base-evidence');
-        evidence.set(e.sha256, e.byteLength);
-      }
-      if (evidence.size > L.baseEvidenceCount || [...evidence.values()].reduce((a, b) => a + b, 0) > L.baseEvidenceBytes) fail('receive-base-budget');
-      const manifestBytes = await this.readEvidence(r.evidence.manifest), metadataBytes = await this.readEvidence(r.evidence.metadata);
-      const m = readManifestControl(manifestBytes, new TextEncoder().encode(r.workspaceManifestSha256)).manifest;
-      if (m.purpose !== 'teamWorkspace' || m.packageId !== r.workspacePackageId || json(m.identity) !== json(r.identity) || json(m.metadataEnvelope) !== json(r.metadataEnvelope) ||
-        json(m.targetHeads) !== json(r.declaredHeads) || json({ sha256: m.metadata.sha256, byteLength: m.metadata.byteLength }) !== json(r.evidence.metadata)) fail('receive-base-manifest');
-      const source = ProjectMetadataSource.fromFullSource(metadataBytes, { identity: r.identity, envelope: r.metadataEnvelope }, this.limits);
-      if (json(source.heads) !== json(r.declaredHeads)) fail('receive-base-heads');
-      const inspection = await source.inspectOriginal({ maxNodes: L.inspectionNodes - sourceNodes, maxWork: L.inspectionWork - sourceWork });
-      sourceWork += inspection.workUsed; sourceNodes += inspection.scalars.length;
-      const summary = summarizeFullHistory(inspection), closure = planWorkspaceClosure(inspection.candidates);
-      sourceWork += summary.workUsed + closure.workUsed;
-      if (sourceWork > L.inspectionWork || sourceNodes > L.inspectionNodes || summary.hasOpaque || json(closure.entries) !== json(m.blobs) ||
-        json(summary.entityClasses) !== json(m.summary.entityClasses) || json(summary.fieldClasses) !== json(m.summary.fieldClasses)) fail('receive-base-source');
-      const value = json({ ...r, completions: [] }), prior = keys.get(r.workspacePackageId);
-      if (prior && prior !== value) fail('receive-base-conflict'); keys.set(r.workspacePackageId, value);
-      await this.verifyBaseObservation(r);
-      if (keys.size > 16) fail('receive-base-budget'); rows.push(r);
-    }
-    return rows;
-  }
-  /** A local imported base requires an actual prior observation, not plausible-looking heads. */
-  private async verifyBaseObservation(record: ImportedBase): Promise<void> {
-    const entries = await new TransactionJournal(this.fs, this.limits).entries(), heads = record.completions[0]!.publishedReceiverHeads;
-    const publication = entries.find(e => e.publication && json(e.publication.heads) === json(heads));
-    if (!publication?.publication || json(publication.start.proof) !== json({ identity: record.identity, envelope: record.metadataEnvelope })) return fail('receive-base-observation');
-    for (const id of await WorkspaceReceiveJob.ids(this.fs)) {
-      const prefix = `${root(this.fs)}receive/${id}/`, start = await readReceipt<Start>(this.fs, `${prefix}start.json`, this.limits);
-      if (!start) continue;
-      const prepared = await readReceipt<Prepared>(this.fs, `${prefix}prepared.json`, this.limits);
-      if (!prepared || prepared.packageId !== record.workspacePackageId) continue;
-      if (Object.keys(start).sort().join(',') !== 'jobId,operation,prepared,receiver,schema' || start.schema !== 'lociview-package-job-start-1' ||
-        start.jobId !== id || start.operation !== 'receiveWorkspace' || json(start.prepared) !== json(reference(prepared)) ||
-        json(prepared.manifest) !== json(record.evidence.manifest) || json(prepared.metadata) !== json(record.evidence.metadata)) fail('receive-base-observation');
-      const paths = await this.fs.list(`${prefix}steps/`); if (paths.length > 2) fail('receive-step-count');
-      let found = false, roots = 0;
-      for (const path of paths) {
-        const step = await readReceipt<Step>(this.fs, path, this.limits);
-        if (!step || path !== `${prefix}steps/${reference(step).sha256}.json` || step.schema !== 'lociview-package-job-step-1' ||
-          step.jobId !== id || json(step.start) !== json(reference(start))) return fail('receive-base-observation');
-        if (step.previous !== null) continue; roots++;
-        const receiver: ReceiverProof = { identity: record.identity, metadataEnvelope: record.metadataEnvelope, heads };
-        const detail: Completion = publication.start.transactionId === id ? { kind: 'workspacePublished', receiver,
-          journal: reference(publication.prepared), publication: reference(publication.publication) } :
-          { kind: 'workspaceAlreadyPresent', receiver, publication: reference(publication.publication) };
-        if (json(step) !== json({ schema: 'lociview-package-job-step-1', jobId: id, start: reference(start), previous: null, detail })) continue;
-        if (detail.kind === 'workspaceAlreadyPresent' && json(start.receiver) !== json(receiver)) fail('receive-base-observation');
-        if (detail.kind === 'workspacePublished') {
-          const checksum = ref(new TextEncoder().encode(record.workspaceManifestSha256));
-          const remote = { version: 'lociview-package-remote-1', source: { kind: 'fullMetadata', packageId: record.workspacePackageId,
-            manifest: record.evidence.manifest, checksum, metadata: record.evidence.metadata, metadataEnvelope: record.metadataEnvelope, remoteHeads: record.declaredHeads }, expectedFinalHeads: heads };
-          if (json(publication.prepared?.remote) !== json(remote)) fail('receive-base-observation');
-        }
-        found = true;
-      }
-      if (roots > 1) fail('receive-step-chain'); if (found) return;
-    }
-    fail('receive-base-observation');
-  }
-  private async readEvidence(e: EvidenceRef): Promise<Uint8Array> {
-    if (!e || Object.keys(e).sort().join(',') !== 'byteLength,sha256' || typeof e.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(e.sha256) ||
-      !Number.isSafeInteger(e.byteLength) || e.byteLength <= 0 || e.byteLength > L.sourceBytes) return fail('receive-base-evidence');
-    const path = `${root(this.fs)}evidence/${e.sha256}`, file = await this.fs.readStream(path);
-    if (!file || file.size !== e.byteLength || file.size > L.sourceBytes) return fail('receive-base-evidence');
-    const bytes = await this.fs.readBytes(path); if (!bytes || bytes.length !== e.byteLength || await digest(bytes) !== e.sha256) return fail('receive-base-evidence');
-    return bytes;
-  }
+  private readBases() { return new WorkspaceBaseStore(this.fs, this.limits, this.inspection.source.proof).read(); }
+  private readEvidence(e: EvidenceRef) { return new WorkspaceBaseStore(this.fs, this.limits, this.inspection.source.proof).readEvidence(e); }
   async journalInput(finalHeads: string[]) {
     const d = this.descriptor(), m = this.manifest(), checksumBytes = await this.original('manifest.sha256');
     return { bytes: await this.original('metadata.am'), manifestBytes: await this.original('manifest.json'), checksumBytes,

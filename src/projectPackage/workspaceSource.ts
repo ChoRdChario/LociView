@@ -18,7 +18,7 @@ export function packageSourceLimits(limits: MetadataLimits): MetadataLimits {
 /** Owned capture only: no ZIP artifact, durable job, exchange base or file receipt. */
 export class WorkspaceSourceCapture {
   readonly kind = 'workspace-source-capture';
-  private constructor(private readonly bytes: Uint8Array, readonly token: string, readonly publication: string,
+  private constructor(private readonly bytes: Uint8Array, readonly token: string, readonly publication: string | null,
     readonly proof: MetadataProof, readonly targetHeads: readonly string[], readonly metadata: Entry,
     readonly blobs: readonly Entry[], readonly summary: AutomaticSummary, readonly bodyRefs: readonly StoredBlobRef[]) { Object.freeze(this); }
   metadataBytes(): Uint8Array { return this.bytes.slice(); }
@@ -26,7 +26,6 @@ export class WorkspaceSourceCapture {
   static async prepare(session: Pick<MetadataProjectSession, 'read'>, expectedToken: string,
     store: Pick<OriginBlobStore, 'openReadOnly'>, limits: MetadataLimits, signal?: AbortSignal): Promise<WorkspaceSourceCapture> {
     const fail = (code: string): never => { throw new PackageControlError(code); };
-    const sourceLimits = packageSourceLimits(limits);
     const abort = () => { if (signal?.aborted) throw signal.reason ?? new DOMException('Operation aborted', 'AbortError'); };
     const checked = (read: MetadataSessionRead) => {
       if (read.state !== 'ready' || !read.source || !read.publication || read.source.token !== expectedToken ||
@@ -35,11 +34,27 @@ export class WorkspaceSourceCapture {
     };
     abort(); const before = checked(await session.read()); abort();
     const bytes = before.source.encodeFullSource();
+    const result = await this.collect(bytes, before.source.proof, expectedToken, before.publication, store, limits, signal, before.source.originalChanges());
+    const after = checked(await session.read()); abort();
+    if (after.publication !== before.publication) fail('workspace-publication-changed');
+    return result;
+  }
+
+  /** Retained job originals only; this does not assert current Session/publication readiness. */
+  static restore(bytes: Uint8Array, proof: MetadataProof, token: string, store: Pick<OriginBlobStore, 'openReadOnly'>,
+    limits: MetadataLimits, signal?: AbortSignal) {
+    return this.collect(bytes.slice(), proof, token, null, store, limits, signal);
+  }
+  private static async collect(bytes: Uint8Array, proof: MetadataProof, expectedToken: string, publication: string | null,
+    store: Pick<OriginBlobStore, 'openReadOnly'>, limits: MetadataLimits, signal?: AbortSignal, originalInput?: readonly Uint8Array[]) {
+    const fail = (code: string): never => { throw new PackageControlError(code); };
+    const abort = () => { if (signal?.aborted) throw signal.reason ?? new DOMException('Operation aborted', 'AbortError'); };
+    abort(); const sourceLimits = packageSourceLimits(limits);
     if (bytes.length > L.sourceBytes) fail('workspace-source-budget');
-    const reopened = ProjectMetadataSource.fromFullSource(bytes, before.source.proof, sourceLimits);
+    const reopened = ProjectMetadataSource.fromFullSource(bytes, proof, sourceLimits);
     if (reopened.token !== expectedToken) fail('workspace-source-mismatch');
     // Verify the exact original changes, independently of the full-source encoding.
-    const originals = before.source.originalChanges(), restored = reopened.originalChanges();
+    const originals = originalInput ?? reopened.originalChanges(), restored = reopened.originalChanges();
     const expected = new Map(originals.map(b => [packageByteHash(b), b]));
     if (originals.length !== restored.length || originals.length > L.changes) fail('workspace-source-mismatch');
     for (const part of restored) {
@@ -72,12 +87,10 @@ export class WorkspaceSourceCapture {
       } catch (error) { try { await reader.cancel(error); } catch { /* Preserve original failure. */ } throw error; }
       finally { reader.releaseLock(); }
     }
-    const after = checked(await session.read()); abort();
-    if (after.publication !== before.publication) fail('workspace-publication-changed');
     const metadata = Object.freeze({ path: 'metadata.am', sha256: packageByteHash(bytes), byteLength: bytes.length });
     const summary: AutomaticSummary = Object.freeze({ algorithm: SUMMARY_ALGORITHM, scope: 'entireHistory',
       entityClasses: counts.entityClasses, fieldClasses: counts.fieldClasses, blobEntryCount: closure.entries.length, blobBytes: measuredBytes });
-    return new WorkspaceSourceCapture(bytes, expectedToken, before.publication, reopened.proof,
+    return new WorkspaceSourceCapture(bytes, expectedToken, publication, reopened.proof,
       Object.freeze(reopened.heads), metadata, closure.entries, summary, closure.semanticRefs);
   }
 }

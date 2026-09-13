@@ -30,9 +30,9 @@ Unknown history without trusted opaque inventory is still a capture limitation,
 not a change to source admission. Captured Workspace sources now generate exact
 STORE ZIP streams and reopen through raw-header/CRC/SHA/source/summary/closure
 inspection. Input corruption/cancel and sink failures cannot return completion.
-This is file integrity, not profile admission or external saving. Durable jobs,
-retention/receipts, CAS/Project receive, ordinary file flows and measured adoption
-remain open. The separate fullMetadata journal now binds all original controls,
+This alone is file integrity, not profile admission or external saving. The bounded
+durable receive/output connections below add jobs and observations; ordinary file
+flows, broader retention and measured adoption remain open. The separate fullMetadata journal now binds all original controls,
 retains legacy seals and cold-recovers through the existing Session. Original-record
 GLB/PNG admission/staging also exists without allocating new IDs or repairing lost
 acknowledged content. Actual Workspace ZIP reception now connects these through a
@@ -41,7 +41,11 @@ and exact imported-base completion. Identical-file replay reuses its job. Cold
 recovery and exact pre-marker re-selection/explicit abandonment are connected to
 the existing limited GLB/PNG editor's update-file controls. Cold recovery is
 available before editor mount; warm updates retain the editor and local view state.
-Workspace output/file verification, initial import and other purposes remain open.
+The same file area now connects frozen Workspace generation, streamed artifact
+read-back, a shared imported/generated base table, deliberate download and exact
+reselected-file verification. Frozen retry keeps later edits; lost acknowledged
+artifacts/bases are not replenished. File controls precede renderer preparation.
+Initial import and other purposes remain open. Download alone is not save proof.
 This is not ordinary-home, rendered/device or whole-team acceptance.
 Exact executed checks are in todo.
 

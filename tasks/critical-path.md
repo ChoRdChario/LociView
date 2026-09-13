@@ -24,8 +24,12 @@
 > and imported base to the limited editor. Pre-start re-selection/explicit abandonment,
 > cold recovery tools and warm same-editor refresh are connected. Exact evidence is
 > in todo; no rendered/device or ordinary-home acceptance is inferred.
-> Next close protected Workspace output/file handoff and initial import in that same
-> flow, then real-file rounds/remaining conflict UI and Contribution. Retention,
+> Protected Workspace output now joins fixed source/inventory/base snapshots,
+> artifact read-back and generated-base completion to that same file area. Deliberate
+> download is not save proof; exact file reselection is separately verified. Frozen
+> retry and pre-render recovery are covered by existing tests; final checks in todo.
+> Next close initial import in that same flow, then real-file rounds/remaining
+> conflict UI and Contribution. Retention,
 > measured admission and other five-purpose consumers remain open.
 > Adjacent UI/PoC work is not a substitute for the practical-team goal.
 >
