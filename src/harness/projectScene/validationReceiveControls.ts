@@ -63,13 +63,13 @@ export function createValidationReceiveControls(document: Document, host: Return
   };
   const render = () => {
     if (disposed) return;
-    heading.textContent = host.workspaceFiles.initialImport ? '作業一式を開く' : '更新ファイル';
+    heading.textContent = host.workspaceFiles.initialImport ? 'ファイルを開く' : '更新ファイル';
     root.setAttribute('aria-label', heading.textContent);
     help.textContent = host.workspaceFiles.initialImport ? '読み込み途中のデータは、元のファイルから再開できます。' :
       '同じプロジェクトの作業一式・変更分を統合します。元ファイルは変更しません。';
     output.render(); form.inert = busy || output.hasChanges() || restoreChanges(); submit.disabled = busy || output.hasChanges() || restoreChanges() || host.authority.readOnly || !input.files?.length;
     clear.disabled = busy; clear.hidden = !input.files?.length && !selectedJob;
-    labelText.textContent = selectedJob ? '元のファイルを選び直す' : host.workspaceFiles.initialImport ? '作業一式を選択' : '更新ファイルを選択';
+    labelText.textContent = selectedJob ? '元のファイルを選び直す' : host.workspaceFiles.initialImport ? 'ファイルを選択' : '更新ファイルを選択';
     input.setAttribute('aria-label', labelText.textContent);
     submit.textContent = selectedJob ? '受信を再開' : host.workspaceFiles.initialImport ? 'ファイルを開く' : '更新を受け取る';
     status.textContent = feedback || host.workspaceFiles.error || (host.authority.readOnly ? '閲覧中。受信するには編集を開始してください。' : '');

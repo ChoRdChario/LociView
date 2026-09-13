@@ -12,7 +12,46 @@ resume and recovery. Desktop, physical iPhone and offline acceptance must cover
 the new route. Scope is 62 of the 64 inventory groups; M13/M14 remain later work.
 Neither component counts nor synthetic-host success is product completion or release approval.
 
-## Completed limited unit — restore → edit → Contribution
+## Active unit — independent copy → edit → reopen
+
+The preceding connected restore unit is committed at `26638b5`; the tree was
+clean on resumption. The next work closes a missing file purpose, not another
+probe page. Existing PO approval and 06 §§5–6/12.1 cover this isolated unit.
+
+- [x] Read the current contract and obtain bounded independent design review: no
+  new policy blocker for whole-Project clean; review/migration remain separate.
+- [x] Build current-value admission, complete typed re-keying and snapshot summary;
+  preserve every active resource and editable strong closure, not just one Scene.
+- [x] Connect frozen clean output/retry and independently admitted clean input to
+  the existing validation file UI, then edit and cold reopen the new Project.
+- [x] Reuse package/file tests for privacy, independence, exact bytes, conflicts,
+  cancellation/retry and failure state; run final checks/review at the connected unit.
+
+Connected evidence: 10 focused package/file/entry checks passed. They cover fresh
+history without deleted values, exact bodies and frozen-ID retry, independent
+editing/cold reopen without a Workspace base, interrupted initialization,
+acknowledged input/output loss, sink-opening failure and the existing selector's
+recorded-DOM flow. The DOM check waits for the enabled Download control, not an
+intermediate generated-job observation. Final typecheck, root tests (112 files:
+2,266 PASS / 21 existing TODO; 570.70s), ordinary build and harness build passed
+serially. The root command was `npm test -- --reporter=dot --maxWorkers=2
+--testTimeout=30000`. Existing mixed-import/large-chunk build warnings and injected
+Node image-loader warnings remain; no dependency or warning threshold changed.
+
+Independent read-only input/output reviews found three bounded recovery defects:
+stale pre-Start reselection, sink-open rejection leaving the stream pending, and
+missing whole output-job discovery. All were fixed and their regression checks
+passed; reviewers confirmed the exact corrections. No new PoC/test framework.
+Browser skill setup still fails before connection with the previously recorded
+runtime import restriction. No live rendering/device/offline PASS is claimed.
+
+Acceptance: source Project untouched, no inherited exchange base, no silent field
+loss/winner, exact retry, honest external-file status. Actual browser/device/offline
+checks stay at the approved grouped boundaries. No ordinary activation, new media,
+dependency, migration or release work. Stop for a genuine contract conflict, not
+for each helper. A snapshot builder alone does not finish this unit.
+
+## Previous evidence — restore → edit → Contribution
 
 Checkpoint entering maintenance: `423990d` (root-owned backup restore input jobs).
 Environment maintenance is complete at `c6222ee`. Product changes connect dedicated
@@ -60,17 +99,14 @@ area. This is limited GLB/PNG development code, not ordinary-home acceptance.
 
 ## Remaining sequence and stop conditions
 
-1. Preserve the checked restore/edit/return checkpoint and proceed to the connected
-   clean-copy unit below. Address data-loss, save-misrepresentation and
-   operation-blocking faults immediately.
-2. Next connected unit: whole-Project clean copy → open as an independent editable
-   Project → edit → cold reopen. Reuse typed re-key/field transforms, graph checks,
-   ZIP machinery and existing file UI; freeze fresh IDs/source for exact retry.
-   Keep current-value privacy admission and clean's whole-active-Project closure
-   separate from review's selected-Scene presentation. Verify source preservation,
-   independent history, exact bodies, rejection/cancel/retry and honest download
-   status in existing package/file tests. A shared builder alone is not completion.
-   Then connect review/edit-copy and migration/late
+1. Preserve the verified independent-copy checkpoint. The connected file/edit/
+   reopen flow, not an increased helper/test count, is the completed unit; normal
+   entry and adoption remain incomplete. Address data-loss, save-misrepresentation
+   and operation-blocking faults immediately.
+2. Next connected unit: selected-Scene review → View →
+   explicit independent editable copy, per 06 §12.6. Reuse the clean reconstruction
+   and existing file/display boundaries without treating a review snapshot as a
+   Workspace or inventing omitted model relations. Then connect migration/late
    Native changes, existing supported formats and missing user controls according
    to their dependencies. Do not polish one subsystem while whole flows stay missing.
 3. Satisfy applicable storage/renderer/profile/device adoption conditions, then
@@ -95,7 +131,7 @@ New policy/compatibility/major architecture decisions retain their explicit appr
 
 PO renewed permission for timely checkpoint Push on 2026-09-14. Use existing
 `g0-baseline`; verify remote, scope, privacy and triggered workflows first.
-Before this product checkpoint, cached origin was 0 behind / 73 ahead; no live fetch
+Before this product checkpoint, cached origin was 0 behind / 74 ahead; no live fetch
 was used for that observation. Previous environment denial is separate from PO permission:
 do not retry a denied action unchanged or bypass it. Local implementation need not wait.
 `main`, Pages, Service Worker, license/version and public release remain separately gated.

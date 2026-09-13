@@ -25,6 +25,9 @@ import { fixtureMedia } from '../src/harness/projectScene/mediaHistory';
 import { BackupSourceCapture } from '../src/projectPackage/backupSource';
 import { BackupArchive, prepareBackupManifest, writeBackupArchive } from '../src/projectPackage/backupArchive';
 import { backupEncode, readBackupBases, type BackupBaseRecord } from '../src/projectPackage/backupEvidence';
+import { CleanSourceCapture, inspectCleanSource } from '../src/projectPackage/cleanSource';
+import { CleanArchive, writeCleanArchive } from '../src/projectPackage/cleanArchive';
+import { selectCleanRecords, rebuildCleanRecords } from '../src/projectPackage/cleanRecords';
 
 type Mutable<T> = { -readonly [K in keyof T]: Mutable<T[K]> };
 type Fixture<P extends PackagePurpose> = Mutable<PackageManifest & { purpose: P }>;
@@ -88,6 +91,106 @@ async function unpackFixture(file: Blob) {
   }
   return entries;
 }
+
+describe('whole-Project clean output (not host activation or external saving)', () => {
+  const change = (source: ProjectMetadataSource, fn: (d: Record<string, any>) => void) =>
+    ProjectMetadataSource.fromFullSource(A.save(A.change(A.load<Record<string, any>>(source.encodeFullSource()), fn)), source.proof, metadataLimits);
+  const value = (v: JsonValue) => new A.ImmutableString(canonical(v));
+  const session = async (source: ProjectMetadataSource) => {
+    const rep = fixture().representationsById[id('rep')];
+    const provider = await readProjectScene(source.read(), metadataLimits, developmentContentVerifier([
+      { variantFamilyId: rep.variantFamilyId, representationId: rep.id, payloadDigest: rep.payloadDigest },
+    ]));
+    return { read: async () => ({ state: 'ready' as const, source, provider, publication: 'clean-test-publication' }) };
+  };
+  it('copies all active resources, preserves needsReview, rekeys references and emits only fresh history/exact bodies', async () => {
+    const f = await workspaceFixture(), originalBytes = f.source.encodeFullSource();
+    const prior = change(f.source, d => {
+      d.captionsById[id('cap')].body = value('PRIVATE_OLD_CAPTION');
+      d.captionsById[id('cap')].futureHint = value('PRIVATE_REMOVED_EXTENSION');
+      d.futureRoot = value('PRIVATE_REMOVED_ROOT');
+    });
+    const current = change(prior, d => {
+      d.captionsById[id('cap')].body = value('Current text');
+      delete d.captionsById[id('cap')].futureHint; delete d.futureRoot;
+      const extra = structuredClone(fixture().captionsById[id('cap')]);
+      extra.id = id('cap', 9); extra.title = 'Outside every Scene'; extra.anchor.authoredAnchorCompatibilityId = id('cmp', 9);
+      delete extra.anchor.authoredAssetRevisionId;
+      d.captionsById[extra.id] = Object.fromEntries(Object.entries(extra).map(([key, v]) => [key, value(v as JsonValue)]));
+    });
+    const capture = await CleanSourceCapture.prepare(await session(current), current.token, f.store, metadataLimits);
+    expect(capture.source.proof).toEqual(current.proof); expect(capture.proof.identity).not.toEqual(current.proof.identity);
+    const records = (await inspectCleanSource(capture.output, metadataLimits)).records as Record<string, any>;
+    expect(Object.keys(records.captionsById)).toHaveLength(2);
+    const captions = Object.values(records.captionsById) as Record<string, any>[];
+    const reviewed = captions.find(c => c.title === 'Outside every Scene')!;
+    expect(reviewed.anchor.authoredAssetRevisionId).toBeUndefined(); expect(reviewed.anchor.positionAsset).toEqual([0, 0, 0]);
+    const asset = Object.values(records.assetsById)[0] as Record<string, any>;
+    const binding = records.assetBindingsById[asset.status.activeBindingId], revision = records.assetRevisionsById[binding.assetRevisionId];
+    expect(captions.find(c => c.body === 'Current text')!.anchor.authoredAssetRevisionId).toBe(revision.id);
+    expect(captions.every(c => c.anchor.assetId === asset.id && c.anchor.assetFrameId === asset.assetFrameId)).toBe(true);
+    const material = Object.values(records.materialOverridesById)[0] as Record<string, any>, rep = records.representationsById[revision.representationIds[0]];
+    expect(material.routing.target).toEqual({ assetId: asset.id, variantFamilyId: rep.variantFamilyId,
+      materialLayoutId: rep.materialCatalog.layoutId, logicalMaterialSlotId: rep.materialCatalog.slots[0].logicalMaterialSlotId });
+    const encodedHistory = JSON.stringify(capture.output.originalChanges().map(b => A.decodeChange(b)));
+    for (const forbidden of ['PRIVATE_OLD_CAPTION', 'PRIVATE_REMOVED_EXTENSION', 'PRIVATE_REMOVED_ROOT', id('prj'), id('cap'), id('ast'), id('fam'), id('cmp')])
+      expect(encodedHistory).not.toContain(forbidden);
+    expect(capture.output.originalChanges()).toHaveLength(2);
+    expect(f.source.encodeFullSource()).toEqual(originalBytes);
+    const parts: BlobPart[] = [], options = { packageId: id('pkg', 9), createdByVersion: '0.0.1' };
+    await writeCleanArchive(capture, f.store, new WritableStream({ write(bytes) { parts.push(bytes.slice() as BlobPart); } }), options);
+    const read = await CleanArchive.inspect(new Blob(parts), metadataLimits);
+    expect(read.source.proof).toEqual(capture.proof); expect(read.source.originalChanges()).toEqual(capture.output.originalChanges());
+    expect(read.archive.control.manifest.summary.scope).toBe('snapshot');
+    expect(read.archive.control.manifest.summary.entityClasses.find(c => c.class === 'captionsById')?.count).toBe(2);
+    for (const entry of capture.blobs) expect(new Uint8Array(await read.archive.entryBlob(entry.path).arrayBuffer())).toEqual(f.bodies.get(entry.sha256));
+    const retry: BlobPart[] = [];
+    await writeCleanArchive(capture, f.store, new WritableStream({ write(bytes) { retry.push(bytes.slice() as BlobPart); } }), options);
+    expect(new Uint8Array(await new Blob(retry).arrayBuffer())).toEqual(new Uint8Array(await new Blob(parts).arrayBuffer()));
+    const oldRep = fixture().representationsById[id('rep')];
+    const restoreInput = { source: capture.sourceBytes(), sourceProof: capture.source.proof, output: capture.metadataBytes(), outputProof: capture.proof,
+      reconstruction: structuredClone(capture.reconstruction) };
+    const verifier = developmentContentVerifier([{ variantFamilyId: oldRep.variantFamilyId, representationId: oldRep.id, payloadDigest: oldRep.payloadDigest }]);
+    const cold = await CleanSourceCapture.restore(restoreInput, f.store, verifier, metadataLimits);
+    expect(cold.metadataBytes()).toEqual(capture.metadataBytes()); expect(cold.reconstruction).toEqual(capture.reconstruction);
+    const badRecipe = { ...restoreInput, reconstruction: { ...restoreInput.reconstruction,
+      idMap: restoreInput.reconstruction.idMap.map((pair, i) => i ? pair : { ...pair, to: pair.from }) } };
+    await expect(CleanSourceCapture.restore(badRecipe, f.store, verifier, metadataLimits)).rejects.toThrow();
+    // Two changes alone are insufficient: conceal an overwritten body in the
+    // population change while retaining the same final visible scalar.
+    const decoded = capture.output.originalChanges().map(b => A.decodeChange(b)), populated = decoded.find(c => c.deps.length)!;
+    const at = populated.ops.findIndex(op => op.action === 'set' && op.key === 'body');
+    const final = populated.ops[at]!; populated.ops[at] = { ...final, value: canonical('PRIVATE_HIDDEN_WRITE') } as typeof final;
+    populated.ops.push({ ...final, pred: [`${populated.startOp + at}@${populated.actor}`] });
+    const hidden = ProjectMetadataSource.reopen(decoded.map(c => A.encodeChange(c)), capture.proof, metadataLimits);
+    await expect(inspectCleanSource(hidden, metadataLimits)).rejects.toThrow('clean-hidden-history');
+  }, 30_000);
+  it('refuses current unknown data and conflicts instead of selecting a winner; excludes resolved deleted resources', async () => {
+    const f = await workspaceFixture();
+    const unknown = change(f.source, d => { d.captionsById[id('cap')].futureHint = value('unknown'); });
+    await expect(selectCleanRecords(unknown, metadataLimits)).rejects.toThrow('clean-unknown-field');
+    const left = change(f.source, d => { d.captionsById[id('cap')].body = value('Left'); });
+    const right = change(f.source, d => { d.captionsById[id('cap')].body = value('Right'); });
+    await expect(selectCleanRecords(left.appendOriginal(right.originalChanges()), metadataLimits)).rejects.toThrow('clean-unresolved-field');
+    const deleted = change(unknown, d => {
+      for (const map of ['captionsById', 'captionAttachmentsById', 'captionTagMembershipsById', 'sceneCaptionMembershipsById'])
+        for (const row of Object.values(d[map]) as Record<string, any>[]) row.lifecycle = value({ state: 'deleted', eventId: id('evt', 7), reason: 'userDelete' });
+    });
+    const selected = await selectCleanRecords(deleted, metadataLimits) as Record<string, any>;
+    expect(selected.captionsById).toEqual({}); expect(selected.mediaResourcesById).toEqual({});
+    expect(Object.keys(selected.captionTagsById)).toHaveLength(1);
+  });
+  it('does not retain unverified nonmanual evidence or mistake old causal history for a clean source', async () => {
+    const f = await workspaceFixture(), records = structuredClone(await selectCleanRecords(f.source, metadataLimits)) as Record<string, any>;
+    const a = records.captionsById[id('cap')].anchor;
+    a.hitEvidence = { method: 'mesh', source: { representationId: id('rep'), surfaceRef: { kind: 'meshTriangle', nodeIndex: 0, primitiveIndex: 0, triangleIndex: 999, barycentric: [1, 0, 0] } } };
+    const rebuilt = await rebuildCleanRecords(records, metadataLimits) as Record<string, any>;
+    const result = Object.values(rebuilt.captionsById)[0] as Record<string, any>;
+    expect(result.anchor.hitEvidence).toEqual({ method: 'mesh' }); expect(result.anchor.authoredAssetRevisionId).toBeUndefined();
+    const edited = change(f.source, d => { d.captionsById[id('cap')].body = value('Edited'); });
+    await expect(inspectCleanSource(edited, metadataLimits)).rejects.toThrow('not-fresh-initialization');
+  });
+});
 
 describe('Contribution originals and actual ZIP (injected base/CAS ports, no durable receive or external save)', () => {
   const session = async (source: ProjectMetadataSource) => {

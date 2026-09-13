@@ -3,21 +3,23 @@ import { fail, type MetadataLimits } from '../projectMetadata/format';
 import { WorkspaceOutputJob } from './outputJob';
 import { ContributionOutputJob } from './contributionOutputJob';
 import { BackupOutputJob } from './backupOutputJob';
+import { CleanOutputJob } from './cleanOutputJob';
+import { cleanProtectedInventory } from './cleanSource';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import { json } from '../projectMetadata/persistence';
 import { WorkspaceBaseStore } from './workspaceBases';
 import { protectedWorkspaceInventory } from './protectedInventory';
 import { PACKAGE_LIMITS as L } from './contract';
 
-export type OutputJobKey = { id: string; kind: 'workspace' | 'contribution' | 'backup' };
-export type OutputJob = WorkspaceOutputJob | ContributionOutputJob | BackupOutputJob;
+export type OutputJobKey = { id: string; kind: 'workspace' | 'contribution' | 'backup' | 'clean' };
+export type OutputJob = WorkspaceOutputJob | ContributionOutputJob | BackupOutputJob | CleanOutputJob;
 export async function outputJobKeys(fs: ProjectWorkspaceFS): Promise<OutputJobKey[]> {
   const workspace = await WorkspaceOutputJob.ids(fs), contribution = await ContributionOutputJob.ids(fs);
-  const backup = await BackupOutputJob.ids(fs), ids = [...workspace, ...contribution, ...backup];
+  const backup = await BackupOutputJob.ids(fs), clean = await CleanOutputJob.ids(fs), ids = [...workspace, ...contribution, ...backup, ...clean];
   if (new Set(ids).size !== ids.length) fail('output-job-kind-collision');
-  return [...workspace.map(id => ({ id, kind: 'workspace' as const })), ...contribution.map(id => ({ id, kind: 'contribution' as const })), ...backup.map(id => ({ id, kind: 'backup' as const }))];
+  return [...workspace.map(id => ({ id, kind: 'workspace' as const })), ...contribution.map(id => ({ id, kind: 'contribution' as const })), ...backup.map(id => ({ id, kind: 'backup' as const })), ...clean.map(id => ({ id, kind: 'clean' as const }))];
 }
-export function outputJobClass(key: OutputJobKey) { return key.kind === 'workspace' ? WorkspaceOutputJob : key.kind === 'backup' ? BackupOutputJob : ContributionOutputJob; }
+export function outputJobClass(key: OutputJobKey) { return key.kind === 'workspace' ? WorkspaceOutputJob : key.kind === 'backup' ? BackupOutputJob : key.kind === 'clean' ? CleanOutputJob : ContributionOutputJob; }
 export function openOutputJob(fs: ProjectWorkspaceFS, key: OutputJobKey, limits: MetadataLimits): Promise<OutputJob> { return outputJobClass(key).open(fs, key.id, limits); }
 export async function outputTerminal(job: OutputJob) {
   const steps = await job.steps(), terminal = job instanceof WorkspaceOutputJob ? 'baseRecorded' : 'artifactVerified';
@@ -32,8 +34,9 @@ export async function validateOutputProtection(fs: ProjectWorkspaceFS, job: Outp
     if (!found || json({ ...found, completions: [] }) !== json({ ...r, completions: [] }) ||
       r.completions.some(c => !found.completions.some(v => json(v) === json(c)))) return fail('output-frozen-base-missing');
   }
-  const inspection = await job.source.inspectOriginal({ maxWork: L.inspectionWork, maxNodes: L.inspectionNodes });
-  const inventory = protectedWorkspaceInventory(inspection.candidates, await bases.payloads(frozen.records));
+  const payloads = await bases.payloads(frozen.records);
+  const inventory = job instanceof CleanOutputJob ? await cleanProtectedInventory(job.source, payloads, limits) :
+    protectedWorkspaceInventory((await job.source.inspectOriginal({ maxWork: L.inspectionWork, maxNodes: L.inspectionNodes })).candidates, payloads);
   if (json(inventory) !== json(job.frozenInventory())) return fail('output-frozen-inventory');
   for (const b of inventory.blobs) if (await store.inspect({ algorithm: 'sha256', digest: b.sha256, byteLength: b.byteLength, mediaType: 'application/octet-stream' }) !== 'verified-present') return fail('output-protected-body-missing');
   return bases;

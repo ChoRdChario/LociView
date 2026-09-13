@@ -3,6 +3,8 @@ import { prepareValidationProject, type ValidationFile } from '../../projectFile
 import { prepareValidationCreation } from '../../projectFiles/creation';
 import { validationMetadataLimits, type FileValidationLimits } from '../../projectFiles/validation';
 import { WorkspaceArchive } from '../../projectPackage/workspaceArchive';
+import { CleanArchive } from '../../projectPackage/cleanArchive';
+import { PackageArchive } from '../../projectPackage/zipArchive';
 import type { PngDecoder } from '../../projectFiles/png';
 import type { openValidationHost } from './validationHost';
 import { createValidationModeHost, type ValidationDisplayHost } from './validationModeHost';
@@ -35,8 +37,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   titleLabel.textContent = 'プロジェクト名'; filesLabel.textContent = '3Dモデルとメディアを選択';
   titleLabel.append(title); filesLabel.append(files); form.append(titleLabel, filesLabel, create);
   const workspaceForm = document.createElement('form'), workspaceLabel = document.createElement('label'), workspaceInput = document.createElement('input'), openFile = document.createElement('button');
-  workspaceLabel.textContent = '作業一式を選択'; workspaceInput.type = 'file'; workspaceInput.setAttribute('aria-label', '作業一式を選択'); workspaceLabel.append(workspaceInput);
-  openFile.type = 'submit'; openFile.textContent = '作業一式を開く'; workspaceForm.append(workspaceLabel, openFile);
+  workspaceLabel.textContent = 'ファイルを選択'; workspaceInput.type = 'file'; workspaceInput.setAttribute('aria-label', 'ファイルを選択'); workspaceLabel.append(workspaceInput);
+  openFile.type = 'submit'; openFile.textContent = 'ファイルを開く'; workspaceForm.append(workspaceLabel, openFile);
   const status = document.createElement('p'); status.setAttribute('role', 'status');
   const list = document.createElement('section'), refresh = document.createElement('button'), back = document.createElement('button');
   refresh.type = back.type = 'button'; refresh.textContent = '一覧を更新'; back.textContent = 'プロジェクトを選ぶ';
@@ -157,9 +159,10 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     selected = run; ports.selected(run, host.mode!.current); navigation.hidden = true; await mount();
   };
   workspaceForm.addEventListener('submit', event => { event.preventDefault(); execute(async () => {
-    ensureMaySwitch(); const file = workspaceInput.files?.[0]; if (!file) throw Error('作業一式を選択してください。');
-    status.textContent = '作業一式を確認しています。';
-    const inspected = await WorkspaceArchive.inspect(file, validationMetadataLimits);
+    ensureMaySwitch(); const file = workspaceInput.files?.[0]; if (!file) throw Error('ファイルを選択してください。');
+    status.textContent = 'ファイルを確認しています。';
+    const purpose = (await PackageArchive.inspect(file)).control.manifest.purpose;
+    const inspected = purpose === 'clean' ? await CleanArchive.inspect(file, validationMetadataLimits) : await WorkspaceArchive.inspect(file, validationMetadataLimits);
     if (disposed) return;
     const run = (inspected.source.proof.identity.projectId as string).slice(4);
     await closeCurrent(); await openProject(run, undefined, 'edit', file);

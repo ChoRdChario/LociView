@@ -19,12 +19,12 @@ export type { MetadataLimits, MetadataProof } from './format';
 export class ProjectMetadataSource {
   private constructor(private readonly doc: PhysicalDoc, readonly proof: MetadataProof, private readonly limits: MetadataLimits) {}
 
-  static bootstrap(schema: JsonObject, identity: JsonObject, requested: MetadataLimits): ProjectMetadataSource {
+  static bootstrap(schema: JsonObject, identity: JsonObject, requested: MetadataLimits, options?: { time: 0 }): ProjectMetadataSource {
     const limits = checkLimits(requested), s = cloneCanonicalValue(schema, limits) as JsonObject,
       i = cloneCanonicalValue(identity, limits) as JsonObject;
     checkProjectHeader(new ProjectRecordFields(), 'schema', s);
     checkProjectHeader(new ProjectRecordFields(), 'identity', i);
-    const doc = A.change(A.init<Record<string, any>>(), draft => {
+    const doc = A.change(A.init<Record<string, any>>(), options ?? {}, draft => {
       draft.schema = scalar(s, limits); draft.identity = scalar(i, limits); draft.project = {};
       for (const map of Object.keys(projectRecordMaps)) draft[map] = {};
     });
@@ -73,14 +73,24 @@ export class ProjectMetadataSource {
   get heads(): string[] { return A.getHeads(this.doc).sort(); }
   originalChanges(): Uint8Array[] { return A.getAllChanges(this.doc).map(b => b.slice()); }
 
+  /** Closed history-free export profile: one empty root and one population change.
+   * Scalar uniqueness/current-value equality are checked by the clean reader. */
+  assertFreshInitialization(expectedRecordContainers?: number): void {
+    const changes = this.originalChanges().map(b => A.decodeChange(b));
+    if (changes.length !== 2 || changes.some(c => c.message || c.time !== 0 || (c as { extraBytes?: Uint8Array }).extraBytes?.length)) fail('not-fresh-initialization');
+    const populated = changes.find(c => c.hash !== this.proof.envelope.lineageProof.rootChangeHash);
+    if (!populated || populated.deps.length !== 1 || populated.deps[0] !== this.proof.envelope.lineageProof.rootChangeHash) fail('not-fresh-initialization');
+    if (expectedRecordContainers !== undefined && populated!.ops.filter(op => op.action === 'makeMap').length !== expectedRecordContainers) fail('not-fresh-initialization');
+  }
+
   /** Bootstrap is withheld from Project readiness. Initialize in one later change. */
-  initialize(records: unknown): ProjectMetadataSource {
+  initialize(records: unknown, options?: { time: 0 }): ProjectMetadataSource {
     if (A.getAllChanges(this.doc).length !== 1) fail('already-initialized');
     const admitted = admitProjectRecords(records, this.limits);
     if (admitted.kind !== 'valid-records') return fail('initial-records');
     const r = admitted.records, source = this.read();
     if (!same(r.identity, this.proof.identity) || !same(r.schema, source.schema)) fail('identity');
-    const doc = A.change(A.clone(this.doc), draft => {
+    const doc = A.change(A.clone(this.doc), options ?? {}, draft => {
       for (const [field, value] of Object.entries(object(r.project))) draft.project[field] = scalar(value, this.limits);
       for (const map of Object.keys(projectRecordMaps)) for (const [id, record] of Object.entries(object(r[map]))) {
         if (Object.hasOwn(immutableKinds, map)) draft[map][id] = scalar(record, this.limits);

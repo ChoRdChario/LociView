@@ -10,6 +10,7 @@ import { PACKAGE_LIMITS as L } from '../projectPackage/contract';
 import { PackageArchive } from '../projectPackage/zipArchive';
 import { PackageControlError } from '../projectPackage/manifest';
 import { ContributionReceiveJob } from '../projectPackage/contributionReceiveJob';
+import { CleanInputJob } from '../projectPackage/cleanInputJob';
 import { receiveJobKeys, receiveInputState, openReceiveJob, receiveTerminal, type ReceiveJob } from '../projectPackage/receiveJobs';
 
 export interface WorkspaceReceiveState { id: string; state: 'incomplete' | 'completed' | 'cancelled' | 'repair-required' | 'input-required' | 'unbound-input' | 'abandoned' | 'stale' }
@@ -33,7 +34,7 @@ export class WorkspaceReceiver {
     if (!found) return fileError('受信データがありません。修復が必要です。'); return found;
   }
   private apply(token: string | null, job: ReceiveJob) {
-    return job instanceof ContributionReceiveJob ? this.session.receiveContribution(token, job) :
+    return job instanceof CleanInputJob ? this.session.initializeClean(job) : job instanceof ContributionReceiveJob ? this.session.receiveContribution(token, job) :
       job.importing ? this.session.importWorkspace(job) : this.session.receiveWorkspace(token, job);
   }
   private async operation<T>(action: () => Promise<T>): Promise<T> {
@@ -41,11 +42,13 @@ export class WorkspaceReceiver {
   }
   /** Initial file entry has no receiver token or synthetic bootstrap. */
   importWorkspace(file: Blob) {
-    return this.operation(async () => this.session.importWorkspace(await WorkspaceReceiveJob.prepare(this.fs, file, this.limits)));
+    return this.operation(async () => (await PackageArchive.inspect(file)).control.manifest.purpose === 'clean' ?
+      this.session.initializeClean(await CleanInputJob.prepare(this.fs, file, this.limits)) : this.session.importWorkspace(await WorkspaceReceiveJob.prepare(this.fs, file, this.limits)));
   }
   receive(expectedToken: string, file: Blob) {
     return this.operation(async () => {
       const purpose = (await PackageArchive.inspect(file)).control.manifest.purpose;
+      if (purpose === 'clean') return fileError('独立コピーはプロジェクト一覧の「ファイルを開く」から開いてください。現在の作業は変更していません。');
       let input: ReceiveJob;
       try { input = purpose === 'contribution' ? await ContributionReceiveJob.prepare(this.fs, file, this.store, this.limits) :
         await WorkspaceReceiveJob.prepare(this.fs, file, this.limits); }
@@ -81,6 +84,7 @@ export class WorkspaceReceiver {
   cancelStale(id: string) {
     return this.operation(async () => {
       const job = await openReceiveJob(this.fs, await this.key(id), this.store, this.limits);
+      if (job instanceof CleanInputJob) return fileError('開始したコピーの読み込みは取り消せません。元の入力から再開してください。');
       return job instanceof ContributionReceiveJob ? this.session.cancelContributionReceive(job) : this.session.cancelWorkspaceReceive(job);
     });
   }
@@ -89,10 +93,12 @@ export class WorkspaceReceiver {
       await ContributionReceiveJob.reselect(this.fs, id, file, this.store, this.limits) : await WorkspaceReceiveJob.reselect(this.fs, id, file, this.limits)));
   }
   reselectImportedInput(id: string, file: Blob) {
-    return this.operation(async () => this.session.importWorkspace(await WorkspaceReceiveJob.reselect(this.fs, id, file, this.limits)));
+    return this.operation(async () => (await this.key(id)).kind === 'clean' ?
+      this.session.initializeClean(await CleanInputJob.reselect(this.fs, id, file, this.limits)) : this.session.importWorkspace(await WorkspaceReceiveJob.reselect(this.fs, id, file, this.limits)));
   }
   abandonInput(id: string) {
-    return this.operation(async () => (await this.key(id)).kind === 'contribution' ? this.session.abandonContributionInput(id) : this.session.abandonWorkspaceInput(id));
+    return this.operation(async () => { const key = await this.key(id); return key.kind === 'clean' ? this.session.abandonCleanInput(id) :
+      key.kind === 'contribution' ? this.session.abandonContributionInput(id) : this.session.abandonWorkspaceInput(id); });
   }
   async jobs() {
     const result: WorkspaceReceiveState[] = [];

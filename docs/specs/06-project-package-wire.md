@@ -1291,6 +1291,79 @@ history-free input; the later accepted field policy must retain pinScale on clea
 and each applicable review owner, and preserve unplaced's optional owner without
 invented coordinates/frame/class. These requirements remain practical-team work.
 
+#### Clean reconstruction evidence in the isolated implementation
+
+The current-value clean builder uses the pinned atomic-map profile with one empty
+bootstrap and one population change. Both newly generated changes use time zero
+and no message/extra data. The clean reader requires exactly those two changes,
+one present scalar per constructed semantic address, and no surplus record
+containers. This is the isolated writer/reader shape, not general wire adoption.
+
+For a durable clean output, retain a closed local `clean-reconstruction.json`:
+`{schema:'lociview-clean-reconstruction-1',identity,idMap,lifecycles}`. `identity`
+is the fresh Project identity. `idMap` is an old-ID-sorted array of exact
+`{from,to}` typed ID pairs; `lifecycles` is a record-ID-sorted array of exact
+`{recordId,eventId}` entries, one fresh event per included mutable record. Require
+the complete used mapping, injectivity, prefix preservation, source-ID disjointness,
+no extra/missing entries, and the existing control/tree budgets. The original
+source, fresh metadata bytes and this recipe are frozen once for the attempt.
+
+Keep FrozenCapture's existing shape. The clean PreparedOutput roots must include
+the recipe's EvidenceRef and both source and output metadata evidence in their
+exact union. The recipe and source proof remain local; neither is a ZIP payload.
+Cold recovery reselects the same authoritative current scope, applies the frozen
+mapping and checks every constructed field/digest against the retained fresh
+source. It never creates another Automerge root. Conditional weak hit evidence
+is rechecked against exact body facts; a changed retain/omit result rejects the
+attempt instead of silently changing the frozen output.
+
+The local `clean-output/<jobId>` record/artifact paths follow the existing bounded
+output job profile. Its independent `clean-output-index/<jobId>.json` uses
+`{schema:'lociview-clean-output-index-1',jobId,prepared:EvidenceRef}` and is written
+after Prepared, before Start. Discovery includes this index, so loss of an entire
+acknowledged job cannot masquerade as no output. No index is a ZIP payload.
+
+Clean-scope admission alone is not a complete local-protection inventory. Derive
+current/exchangeBase roots from the original source only after proving the known,
+conflict-free profile and checking retained bases. A removed unknown field adds
+no current root; present unknown data in omitted records or other unclassified
+protection declarations still require explicit refusal, not a smaller inventory.
+Independent read-only design review confirmed this local recipe and inventory
+boundary before durable clean-job implementation. It is not executed job/UI evidence.
+
+#### Isolated clean input and initialization
+
+The existing validation file selector admits clean by content, without filename
+inference. Use the file's already fresh Project identity/root/IDs; never bootstrap
+or re-key again. A published destination rejects a new file-open request and offers
+the existing Project list. Both OPFS metadata and the repository namespace must be
+empty before first introduction. Retry of the same unfinished job is distinct.
+
+Retain `v2/packages/clean-input/<jobId>/input.zip` and a closed `input.json`:
+`{schema:'lociview-clean-input-1',jobId,archive,manifest,metadata,destination,roots}`.
+The three file descriptors are exact EvidenceRefs; destination is MetadataProof;
+roots contains the sorted physical BlobRefs and manifest/metadata EvidenceRefs.
+An independent `clean-input-index/<jobId>.json` binds the descriptor hash. Write
+`start.json` only after exact ZIP read-back, with
+`{schema:'lociview-clean-input-start-1',jobId,input:EvidenceRef}`. Apply existing
+control/ZIP/package-space budgets. Before Start, exact input may be reselected or
+explicitly abandoned; after Start, lost acknowledged bytes require repair. Do not
+re-encode metadata and call it the original input. No exchange base is created.
+
+Local journal `purpose:'importClean'` has null predecessor, empty baseHeads,
+repositoryId=transactionId=jobId, exactly two original changes, and no remote.
+Its seal uses `lociview:v2:clean-import:jcs-v1` over the existing metadata change-set
+value (including stagedBlobs), with the existing sorted/unique BlobRef validation.
+Old initialize/local/remote seals and wire schemas remain unchanged. Session
+read/recovery requires the exact clean input whenever this purpose appears, even
+if its directory/index is missing. Before Prepared, stage admitted content from
+the same input; after Prepared, verify retained facts/bodies only. Reject unexpected
+repository originals; publish exactly the declared heads once. A single local
+`published.json` binds Start, journal and initial publication EvidenceRefs with
+`{schema:'lociview-clean-input-published-1',jobId,start,journal,publication}`.
+Cold retry validates these bindings and preserves later legitimate edits.
+Independent read-only design review established these guards before implementation.
+
 ### 12.2 Protected inventory: portability is not garbage collection
 
 Compute roots from the complete admitted source and all live candidates at the

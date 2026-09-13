@@ -80,13 +80,24 @@ export async function writeWorkspaceArchive(capture: WorkspaceSourceCapture, sto
 export async function writeCausalArchive(capture: Pick<WorkspaceSourceCapture, 'blobs' | 'bodyRefs'>,
   controls: { manifest: Uint8Array; checksum: Uint8Array }, originals: readonly ({ path: string; bytes: Uint8Array } | (Entry & { read: () => Uint8Array }))[],
   store: Pick<OriginBlobStore, 'openReadOnly'>, destination: WritableStream<Uint8Array>, options: WorkspaceArchiveOptions) {
+  try {
+    const purpose = readManifestControl(controls.manifest, controls.checksum).manifest.purpose;
+    if (!['teamWorkspace', 'contribution', 'backup'].includes(purpose)) throw new PackageControlError('zip-purpose');
+  } catch (error) { await destination.abort(error).catch(() => {}); throw error; }
+  return writePackageArchive(capture, controls, originals, store, destination, options);
+}
+
+/** Bounded container mechanics only. Purpose-specific callers admit all semantics. */
+export async function writePackageArchive(capture: Pick<WorkspaceSourceCapture, 'blobs' | 'bodyRefs'>,
+  controls: { manifest: Uint8Array; checksum: Uint8Array }, originals: readonly ({ path: string; bytes: Uint8Array } | (Entry & { read: () => Uint8Array }))[],
+  store: Pick<OriginBlobStore, 'openReadOnly'>, destination: WritableStream<Uint8Array>, options: WorkspaceArchiveOptions) {
   const cancel = new AbortController(), abort = () => cancel.abort(options.signal?.reason);
   options.signal?.addEventListener('abort', abort, { once: true });
   let pipeline: Promise<void> | undefined;
   try {
     checkAbort(options.signal);
     const manifest = controls.manifest.slice(), checksum = controls.checksum.slice(), control = readManifestControl(manifest, checksum);
-    if (!['teamWorkspace', 'contribution', 'backup'].includes(control.manifest.purpose)) fail('zip-purpose');
+    if (!['teamWorkspace', 'contribution', 'backup', 'clean'].includes(control.manifest.purpose)) fail('zip-purpose');
     const source = originals.map(e => {
       if ('bytes' in e) { const bytes = e.bytes.slice(); return { path: e.path, sha256: packageByteHash(bytes), byteLength: bytes.length, read: () => bytes }; }
       return { path: e.path, sha256: e.sha256, byteLength: e.byteLength, read: e.read };
@@ -134,7 +145,7 @@ export async function writeCausalArchive(capture: Pick<WorkspaceSourceCapture, '
     checkAbort(cancel.signal); await writer.close(undefined, { zip64: false }); await pipeline; checkAbort(cancel.signal);
     if (!finished) fail('zip-output-incomplete');
     return Object.freeze({ kind: control.manifest.purpose === 'teamWorkspace' ? 'generated-workspace-archive' as const :
-      control.manifest.purpose === 'backup' ? 'generated-backup-archive' as const : 'generated-contribution-archive' as const,
+      control.manifest.purpose === 'backup' ? 'generated-backup-archive' as const : control.manifest.purpose === 'clean' ? 'generated-clean-archive' as const : 'generated-contribution-archive' as const,
       byteLength, sha256: hash.digestHex(), manifest: control.manifest });
   } catch (error) {
     cancel.abort(error);

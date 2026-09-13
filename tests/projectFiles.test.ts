@@ -59,6 +59,9 @@ import { WorkspaceSender } from '../src/projectFiles/sendWorkspace';
 import { WorkspaceOutputJob } from '../src/projectPackage/outputJob';
 import { ContributionOutputJob } from '../src/projectPackage/contributionOutputJob';
 import { BackupOutputJob } from '../src/projectPackage/backupOutputJob';
+import { CleanOutputJob } from '../src/projectPackage/cleanOutputJob';
+import { CleanInputJob } from '../src/projectPackage/cleanInputJob';
+import { CleanArchive } from '../src/projectPackage/cleanArchive';
 import { BackupArchive, writeBackupArchive } from '../src/projectPackage/backupArchive';
 import { BackupSourceCapture } from '../src/projectPackage/backupSource';
 import { backupEncode, backupEvidenceRefs } from '../src/projectPackage/backupEvidence';
@@ -539,6 +542,82 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(readRestoreControls(f.fs, metadata)).rejects.toThrow('restore-selected-missing');
     await scope.dispose();
   }, 30000);
+  it('connects clean copy to independent editing and cold reopen without an exchange base', async () => {
+    const f = await workspaceFileFixture(), current = await f.receiverService.receive(f.local.source!.token, f.file);
+    const sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks), sourceBytes = current.source!.encodeFullSource();
+    const beforeBases = await new WorkspaceBaseStore(f.fs, metadata, current.source!.proof).snapshot();
+    const id = await sender.generateClean(current.source!.token), file = await sender.download(id), clean = await CleanArchive.inspect(file, metadata);
+    expect(clean.source.proof.identity).not.toEqual(current.source!.proof.identity);
+    expect(clean.source.originalChanges()).toHaveLength(2);
+    expect((await sender.jobs()).find(j => j.id === id)).toMatchObject({ purpose: 'clean', state: 'generated' });
+    expect((await f.receiver.session.read()).source!.encodeFullSource()).toEqual(sourceBytes);
+    expect(await new WorkspaceBaseStore(f.fs, metadata, current.source!.proof).snapshot()).toEqual(beforeBases);
+    const r = firstWorkspaceRecipient(), imported = await r.receiver.importWorkspace(file);
+    expect(imported.state).toBe('ready'); expect(imported.source!.originalChanges()).toEqual(clean.source.originalChanges());
+    expect(await new WorkspaceBaseStore(r.fs, metadata, imported.source!.proof).read()).toEqual([]);
+    const captionId = Object.keys((clean.description.records.captionsById as Record<string, unknown>))[0]!;
+    expect(captionId).not.toBe(f.captionId);
+    const edited = await r.session.editCaption(imported.source!.token, captionId, 'body', '独立した記録');
+    const cold = r.reopen(), [jobId] = await CleanInputJob.ids(r.fs);
+    expect((await cold.session.read()).source!.originalChanges()).toEqual(edited.source!.originalChanges());
+    expect((await cold.receiver.retry(jobId!)).source!.token).toBe(edited.source!.token);
+    await expect(cold.receiver.receive(edited.source!.token, file)).rejects.toThrow('独立コピー');
+    await expect(cold.receiver.importWorkspace(file)).rejects.toThrow('clean-import-not-empty');
+    expect((await cold.receiver.jobs())[0]).toMatchObject({ state: 'completed' });
+    await sender.verifyFile(id, file); expect((await sender.jobs()).find(j => j.id === id)?.state).toBe('file-verified');
+    await r.fs.remove(`v2/packages/clean-input/${jobId}/input.zip`);
+    expect((await cold.session.read()).state).toBe('repair-required');
+    await expect(cold.receiver.retry(jobId!)).rejects.toThrow();
+    expect((await f.receiver.session.read()).source!.encodeFullSource()).toEqual(sourceBytes);
+  }, 60000);
+  it('cold-retries frozen clean output and interrupted independent initialization without reseeding', async () => {
+    const f = await workspaceFileFixture(), sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
+    const write = f.fs.writeStream.bind(f.fs); let stopped = false;
+    vi.spyOn(f.fs, 'writeStream').mockImplementation(async (path, stream) => {
+      if (!stopped && path.includes('/clean-output/') && path.includes('/artifacts/')) {
+        stopped = true; const reader = stream.getReader(), chunk = await reader.read();
+        await f.fs.writeBytes(path, chunk.value!.slice(0, 24)); await reader.cancel(); throw Error('partial clean output');
+      }
+      return write(path, stream);
+    });
+    await expect(sender.generateClean(f.local.source!.token)).rejects.toThrow();
+    const [id] = await CleanOutputJob.ids(f.fs), job = await CleanOutputJob.open(f.fs, id!, metadata), expected = job.manifest();
+    const later = await f.receiver.session.editCaption(f.local.source!.token, f.captionId, 'body', 'コピー生成後の記録');
+    const coldSender = new WorkspaceSender(f.fs, f.reopen().session, f.store, metadata, f.locks);
+    await coldSender.retry(id!); const file = await coldSender.download(id!);
+    expect((await CleanArchive.inspect(file, metadata)).archive.control.manifest).toEqual(expected);
+    expect((await f.receiver.session.read()).source!.token).toBe(later.source!.token);
+    const r = firstWorkspaceRecipient(); r.fs.reject = p => p.includes('/journal/') && p.endsWith('/published.json');
+    await expect(r.receiver.importWorkspace(file)).rejects.toThrow();
+    const [inputId] = await CleanInputJob.ids(r.fs); expect((await r.session.read()).state).toBe('pending');
+    await expect(r.session.retry()).rejects.toThrow('receive-job-recovery-required');
+    r.fs.reject = () => false; const cold = r.reopen(), ready = await cold.receiver.retry(inputId!);
+    expect(ready.state).toBe('ready'); expect(ready.source!.originalChanges()).toEqual(job.output.originalChanges());
+    expect((await cold.receiver.retry(inputId!)).publication).toBe(ready.publication);
+    expect(await new WorkspaceBaseStore(r.fs, metadata, ready.source!.proof).read()).toEqual([]);
+  }, 60000);
+  it('refuses lost clean output and stale pre-Start input without replenishing acknowledged bytes', async () => {
+    const f = await workspaceFileFixture(), sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
+    // A failure before the sink takes a reader must settle, not leave the bridge hanging.
+    const write = f.fs.writeStream.bind(f.fs); let refused = false;
+    vi.spyOn(f.fs, 'writeStream').mockImplementation(async (path, stream) => {
+      if (!refused && path.includes('/clean-output/') && path.includes('/artifacts/')) { refused = true; throw Error('sink opening failed'); }
+      return write(path, stream);
+    });
+    await expect(sender.generateClean(f.local.source!.token)).rejects.toThrow('sink opening failed');
+    const [id] = await CleanOutputJob.ids(f.fs); await sender.retry(id!); const file = await sender.download(id!);
+    const r = firstWorkspaceRecipient(); r.fs.reject = p => p.includes('/clean-input/') && p.endsWith('/input.zip');
+    await expect(r.receiver.importWorkspace(file)).rejects.toThrow(); r.fs.reject = () => false;
+    const [inputId] = await CleanInputJob.ids(r.fs), stale = await CleanInputJob.reselect(r.fs, inputId!, file, metadata);
+    await underWriteLease(r.fs, () => stale.persist(0)); // Durable Start, no metadata journal yet.
+    const zip = `v2/packages/clean-input/${inputId}/input.zip`; await r.fs.remove(zip);
+    await expect(r.session.initializeClean(stale)).rejects.toThrow('clean-input-reselect-denied');
+    expect(await r.fs.exists(zip)).toBe(false);
+    for (const path of await f.fs.list(`v2/packages/clean-output/${id}/`)) await f.fs.remove(path);
+    const cold = new WorkspaceSender(f.fs, f.reopen().session, f.store, metadata, f.locks);
+    expect(await cold.jobs()).toContainEqual(expect.objectContaining({ id, state: 'repair-required' }));
+    await expect(cold.generateClean(f.local.source!.token)).rejects.toThrow();
+  }, 60000);
   it('generates separate named backups with exact originals and no base advancement or save claim', async () => {
     const { f, sent } = await contributionTeam(), sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
     const before = await f.receiver.session.read(), token = before.source!.token, label = '現地調査前';
@@ -1301,6 +1380,42 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(host.hasPending()).toBe(false); expect(host.workspaceFiles.jobs.find(j => j.id === id)!.state).toBe('completed');
     await u.dispose();
   });
+  it('offers clean preflight and opens the independent copy through the existing selector (recorded DOM)', async () => {
+    const { f, options } = await initialWorkspaceHostFixture(), original = await openValidationHost({ ...options, workspaceFile: f.file });
+    const mode = createValidationModeHost(original, next => openValidationHost({ ...options, mode: next }), () => {});
+    const tools = createValidationReceiveControls(new RecordedDocument().asDocument(), mode, () => undefined, () => {}, async () => {});
+    const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)], root = record(tools.root);
+    const button = (text: string) => all(root).find(n => n.tag === 'button' && n.textContent === text)!;
+    const kind = all(root).find(n => n.attributes.get('aria-label') === '渡す内容')!; kind.value = 'clean'; kind.fire('change');
+    expect(button('ファイルを作成')).toBeUndefined(); button('内容を確認').fire('click');
+    await vi.waitFor(() => expect(button('ファイルを作成')?.disabled).toBe(false));
+    expect(all(root).some(n => n.textContent.includes('シーン 1・モデル 2・キャプション 1・メディア 1'))).toBe(true);
+    expect(all(root).some(n => n.textContent.includes('匿名化はしません'))).toBe(true);
+    button('ファイルを作成').fire('click'); await vi.waitFor(() => {
+      expect(original.workspaceOutput.jobs[0]?.state).toBe('generated'); expect(button('ダウンロード')?.disabled).toBe(false);
+    }, { timeout: 10000 });
+    const file = await original.workspaceOutput.download(original.workspaceOutput.jobs[0]!.id), inspected = await CleanArchive.inspect(file, metadata);
+    tools.dispose(); await mode.dispose();
+    const run = (inspected.source.proof.identity.projectId as string).slice(4), factory = storageFactory();
+    const nextOptions = { ...options, run, openStorage: async () => ({ factory, dispose: async () => {} }) };
+    let host: Awaited<ReturnType<typeof openValidationHost>> | undefined;
+    const render = vi.fn(async () => ({ factory: (() => { throw Error('Recorded DOM has no GPU'); }) as ViewportFactory, dispose() {} }));
+    const u = createValidationWorkspace(new RecordedDocument().asDocument(), { fileLimits: budget, decode, selected() {}, render,
+      list: async () => [], open: async (_run, initial, mode, workspaceFile) => host = await openValidationHost({ ...nextOptions, run: _run, initial, mode, workspaceFile }) });
+    const page = record(u.root), open = () => all(page).find(n => n.tag === 'button' && n.textContent === 'ファイルを開く')!;
+    await vi.waitFor(() => expect(open().disabled).toBe(false));
+    const input = all(page).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!;
+    Object.assign(input, { files: [file] }); input.parent!.parent!.fire('submit', { preventDefault() {} });
+    await vi.waitFor(() => expect(render).toHaveBeenCalledOnce(), { timeout: 10000 });
+    expect(host!.read().source!.originalChanges()).toEqual(inspected.source.originalChanges());
+    expect(host!.authority.read().modelVersions).toHaveLength(2);
+    const sceneId = Object.keys(host!.authority.read().state.scenes)[0]!;
+    await host!.authority.authorScene!(host!.read().source!.token, { kind: 'renameScene', sceneId, name: 'コピーでの作業' });
+    const token = host!.read().source!.token; await u.dispose();
+    await expect(openValidationHost({ ...nextOptions, workspaceFile: file })).rejects.toThrow('プロジェクト一覧から再開');
+    const cold = await openValidationHost(nextOptions); expect(cold.read().source!.token).toBe(token);
+    expect(cold.workspaceOutput.bases).toEqual([]); await cold.dispose();
+  }, 60000);
   it('opens a first Workspace from the existing selector and receives later selection by identity (recorded DOM)', async () => {
     const { f, options, run } = await initialWorkspaceHostFixture();
     let host: Awaited<ReturnType<typeof openValidationHost>> | undefined;
@@ -1311,10 +1426,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const u = createValidationWorkspace(new RecordedDocument().asDocument(), ports), root = record(u.root);
     const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
     const button = (text: string) => all(root).find(n => n.tag === 'button' && n.textContent === text)!;
-    await vi.waitFor(() => expect(button('作業一式を開く').disabled).toBe(false));
-    const input = all(root).find(n => n.attributes.get('aria-label') === '作業一式を選択')!, form = input.parent!.parent!;
+    await vi.waitFor(() => expect(button('ファイルを開く').disabled).toBe(false));
+    const input = all(root).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!, form = input.parent!.parent!;
     Object.assign(input, { files: [new Blob(['broken'])] }); form.fire('submit', { preventDefault() {} });
-    await vi.waitFor(() => expect(button('作業一式を開く').disabled).toBe(false)); expect(host).toBeUndefined();
+    await vi.waitFor(() => expect(button('ファイルを開く').disabled).toBe(false)); expect(host).toBeUndefined();
     Object.assign(input, { files: [f.file] }); form.fire('submit', { preventDefault() {} });
     await vi.waitFor(() => expect(render).toHaveBeenCalledOnce(), { timeout: 10000 });
     await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true));
@@ -1324,7 +1439,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await host!.authority.authorScene!(host!.read().source!.token, { kind: 'renameScene', sceneId, name: '手元のシーン名' });
     const originals = host!.read().source!.originalChanges();
     button('プロジェクトを選ぶ').fire('click'); await vi.waitFor(() => expect(u.selected).toBeNull());
-    await vi.waitFor(() => expect(button('作業一式を開く').disabled).toBe(false));
+    await vi.waitFor(() => expect(button('ファイルを開く').disabled).toBe(false));
     Object.assign(input, { files: [f.file] }); form.fire('submit', { preventDefault() {} });
     await vi.waitFor(() => expect(render).toHaveBeenCalledTimes(2), { timeout: 10000 });
     expect(host!.read().source!.originalChanges()).toEqual(originals); await u.dispose();

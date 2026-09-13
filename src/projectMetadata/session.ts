@@ -22,6 +22,10 @@ import { WorkspaceOutputJob } from '../projectPackage/outputJob';
 import { ContributionOutputJob } from '../projectPackage/contributionOutputJob';
 import { BackupOutputJob, checkedBackupLabel } from '../projectPackage/backupOutputJob';
 import { BackupSourceCapture } from '../projectPackage/backupSource';
+import { CleanOutputJob } from '../projectPackage/cleanOutputJob';
+import { CleanInputJob } from '../projectPackage/cleanInputJob';
+import { CleanSourceCapture, cleanProtectedInventory } from '../projectPackage/cleanSource';
+import { selectCleanRecords } from '../projectPackage/cleanRecords';
 import { ContributionSourceCapture, VerifiedContributionBase, type ContributionBaseSelection } from '../projectPackage/contributionSource';
 import { outputJobKeys, outputJobClass, openOutputJob, outputTerminal, validateOutputProtection } from '../projectPackage/outputJobs';
 import { WorkspaceBaseStore } from '../projectPackage/workspaceBases';
@@ -105,6 +109,7 @@ export class MetadataProjectSession {
           if (!included || !equalBytes(included, bytes)) fail('published-transaction-missing');
         }
         if (entry.start.purpose === 'importWorkspace') await this.journal.validateImport(entry.prepared!);
+        else if (entry.start.purpose === 'importClean') await (await CleanInputJob.open(this.fs, entry.start.transactionId, this.limits)).validateJournal(entry.prepared!);
         else if (entry.start.purpose === 'restoreBackup') { /* Original history and binding checked together above. */ }
         else if (entry.prepared!.remote) {
           const base = await this.repository.read(entry.start.repositoryId, entry.start.proof, entry.start.baseHeads);
@@ -353,6 +358,88 @@ export class MetadataProjectSession {
       if (await BackupOutputJob.state(this.fs, id, this.limits) === 'started') await (await BackupOutputJob.open(this.fs, id, this.limits)).cancel();
       else await BackupOutputJob.abandon(this.fs, id, this.limits);
     });
+  }
+
+  private async finishCleanOutput(job: CleanOutputJob, store: OriginBlobStore, signal?: AbortSignal) {
+    job.assertOwner(this.fs); const current = await this.outputReady();
+    if (json(current.source!.proof) !== json(job.source.proof)) return fail('output-lineage');
+    await this.assertOutputSlot(job.id); await validateOutputProtection(this.fs, job, store, this.limits);
+    await job.generate(store, this.verifier(false), signal); return job.id;
+  }
+  async previewCleanOutput(expectedToken: string) {
+    const read = await this.outputReady(); if (read.source!.token !== expectedToken) return fail('output-stale');
+    const records = await selectCleanRecords(read.source!, this.limits);
+    const count = (name: string) => Object.keys(records[name] as JsonObject).length;
+    return { token: expectedToken, scenes: count('scenesById'), models: count('assetsById'), captions: count('captionsById'), media: count('mediaResourcesById') };
+  }
+  async createCleanOutput(expectedToken: string, store: OriginBlobStore, version: string, signal?: AbortSignal) {
+    return underWriteLease(this.fs, async () => {
+      const read = await this.outputReady(); if (read.source!.token !== expectedToken) return fail('output-stale');
+      await this.assertOutputSlot();
+      const bases = new WorkspaceBaseStore(this.fs, this.limits, read.source!.proof), snapshot = await bases.snapshot();
+      const capture = await CleanSourceCapture.prepare(this, expectedToken, store, this.limits, signal);
+      const inventory = await cleanProtectedInventory(read.source!, await bases.payloads(snapshot.records), this.limits);
+      const job = CleanOutputJob.prepare(this.fs, capture, inventory, snapshot, this.limits, version);
+      await validateOutputProtection(this.fs, job, store, this.limits);
+      const current = await this.outputReady();
+      if (current.source!.token !== expectedToken || current.publication !== capture.publication || json(await bases.snapshot()) !== json(snapshot)) return fail('output-stale');
+      await job.persist(); return this.finishCleanOutput(job, store, signal);
+    });
+  }
+  async resumeCleanOutput(id: string, store: OriginBlobStore, signal?: AbortSignal) {
+    return underWriteLease(this.fs, async () => this.finishCleanOutput(await CleanOutputJob.open(this.fs, id, this.limits), store, signal));
+  }
+  async verifyCleanOutput(id: string, file: Blob, store: OriginBlobStore) {
+    return underWriteLease(this.fs, async () => {
+      const current = await this.outputReady(), job = await CleanOutputJob.open(this.fs, id, this.limits);
+      if (json(current.source!.proof) !== json(job.source.proof)) return fail('output-lineage');
+      await validateOutputProtection(this.fs, job, store, this.limits); await job.verifySelected(file);
+    });
+  }
+  async cancelCleanOutput(id: string) {
+    return underWriteLease(this.fs, async () => {
+      if (await CleanOutputJob.state(this.fs, id, this.limits) === 'started') await (await CleanOutputJob.open(this.fs, id, this.limits)).cancel();
+      else await CleanOutputJob.abandon(this.fs, id, this.limits);
+    });
+  }
+
+  /** Exact history-free input, admitted as a new independent Project only. */
+  async initializeClean(input: CleanInputJob): Promise<MetadataSessionRead> {
+    input.assertOwner(this.fs);
+    return underWriteLease(this.fs, async () => {
+      await this.assertReceiveSlot(input.id);
+      if (!this.modelFacts?.planImported || !this.media?.inventory) return fail('clean-import-unconnected');
+      let job = input.start ? await CleanInputJob.open(this.fs, input.id, this.limits) : input;
+      const entries = await this.journal.entries(), own = entries.find(e => e.start.transactionId === job.id), source = job.inspection.source;
+      if (own && (own.start.purpose !== 'importClean' || json(own.start.proof) !== json(source.proof)) || entries.length && !own ||
+        this.retained && this.retained.start.transactionId !== job.id) return fail('clean-import-not-empty');
+      if (!own && (await this.fs.list(metadataPath(this.fs, ''))).length) return fail('clean-import-not-empty');
+      await this.repository.assertImportNamespace(own?.start.repositoryId);
+      const inventory = await job.inventory();
+      if (own?.publication) {
+        await job.validateJournal(own.prepared!); await this.checked(source, false); await this.media.inventory(inventory);
+        this.retained = null; const current = await this.read();
+        if (current.state !== 'ready') return fail('clean-import-replay-not-ready');
+        await job.complete(); return current;
+      }
+      if (entries.some(e => e !== own)) return fail('clean-import-other-transaction');
+      if (!own?.prepared) {
+        const facts = await this.modelFacts.planImported(source, ref => job.inspection.archive.entryBlob(`blobs/sha256/${ref.digest}`));
+        if (facts.baseToken !== null || facts.finalToken !== source.token) return fail('model-facts-token');
+        const introduced = new Set((facts.stagedBlobs ?? []).map(b => b.digest));
+        await this.media.inventory(inventory.filter(b => !introduced.has(b.digest)));
+        const parts = source.originalChanges();
+        if (!job.start) job = await job.persist((facts.stagedBlobs ?? []).reduce((n, b) => n + (b.byteLength as number), 0) + parts.reduce((n, b) => n + b.length * 4, 0));
+        this.retained = { start: own?.start ?? { transactionId: job.id, repositoryId: job.id, predecessor: null,
+          purpose: 'importClean', proof: source.proof, baseHeads: [] }, parts,
+          ...(facts.stagedBlobs?.length ? { stagedBlobs: [...facts.stagedBlobs] } : {}),
+          modelFacts: { next: source, plan: { ...facts, stage: async () => { await facts.stage(); await this.media!.inventory!(inventory); } } } };
+      } else { this.retained = null; await job.validateJournal(own.prepared); await this.media.inventory(inventory); }
+      await this.resume(job); await job.complete(); return this.read();
+    });
+  }
+  async abandonCleanInput(id: string) {
+    return underWriteLease(this.fs, () => CleanInputJob.abandon(this.fs, id, this.limits));
   }
 
   /** Owned pending restore generation only. Publication is not root selection or restoration completion. */
@@ -638,6 +725,7 @@ export class MetadataProjectSession {
       await restoreJob.assertStaging(this.fs, this.storage);
     }
     if (transactionId && ((pending?.start ?? this.retained?.start)?.purpose === 'importWorkspace' ||
+      (pending?.start ?? this.retained?.start)?.purpose === 'importClean' ||
       !!pending?.prepared?.remote && isContributionRemote(pending.prepared.remote) ||
       !!this.retained?.remote && isContributionRemote(this.retained.remote.proof) ||
       (await ContributionReceiveJob.ids(this.fs)).includes(transactionId) ||
@@ -657,7 +745,7 @@ export class MetadataProjectSession {
         const { plan, next } = this.retained.modelFacts;
         await this.journal.begin(this.retained.start);
         if (pending?.prepared) fail('model-facts-after-prepared');
-        if (this.retained.start.purpose === 'importWorkspace' || this.retained.start.purpose === 'restoreBackup') {
+        if (this.retained.start.purpose === 'importWorkspace' || this.retained.start.purpose === 'restoreBackup' || this.retained.start.purpose === 'importClean') {
           if (plan.baseToken !== null || next.token !== plan.finalToken) fail('model-facts-base');
         } else {
           const base = await this.repository.read(this.retained.start.repositoryId, this.retained.start.proof, this.retained.start.baseHeads);
@@ -679,7 +767,7 @@ export class MetadataProjectSession {
       }
       await this.verifyDelta(this.retained.stagedBlobs);
       if (this.retained.stagedBlobs?.length) {
-        if (this.retained.start.purpose === 'importWorkspace' || this.retained.start.purpose === 'restoreBackup') {
+        if (this.retained.start.purpose === 'importWorkspace' || this.retained.start.purpose === 'restoreBackup' || this.retained.start.purpose === 'importClean') {
           await this.checked(ProjectMetadataSource.reopen(this.retained.parts, this.retained.start.proof, this.limits), false);
         } else {
           const stored = await this.repository.read(this.retained.start.repositoryId, this.retained.start.proof);
@@ -697,7 +785,7 @@ export class MetadataProjectSession {
 
     await this.verifyDelta(prepared.stagedBlobs);
     const parts = await this.journal.validateParts(prepared), start = prepared.start;
-    const initial = start.purpose === 'initialize' || start.purpose === 'importWorkspace' || start.purpose === 'restoreBackup';
+    const initial = start.purpose === 'initialize' || start.purpose === 'importWorkspace' || start.purpose === 'restoreBackup' || start.purpose === 'importClean';
     let stored = await this.repository.read(start.repositoryId, start.proof, undefined, initial);
     if (!initial) {
       if (!stored) fail('journal-base-missing');
@@ -710,8 +798,10 @@ export class MetadataProjectSession {
       if (!stored || !base) return fail('remote-base-missing');
       next = await this.journal.validateRemote(prepared, base);
       checkRemoteStored(stored, base, next, !!pending?.durable);
-    } else if (start.purpose === 'importWorkspace' || start.purpose === 'restoreBackup') {
-      next = start.purpose === 'restoreBackup' ? await this.journal.validateRestore(prepared) : await this.journal.validateImport(prepared);
+    } else if (start.purpose === 'importWorkspace' || start.purpose === 'restoreBackup' || start.purpose === 'importClean') {
+      if (start.purpose === 'importClean' && !(receiveJob instanceof CleanInputJob)) return fail('clean-input-recovery-required');
+      next = start.purpose === 'importClean' ? await (receiveJob as CleanInputJob).validateJournal(prepared) :
+        start.purpose === 'restoreBackup' ? await this.journal.validateRestore(prepared) : await this.journal.validateImport(prepared);
       const allowed = new Map(next.originalChanges().map(b => [A.decodeChange(b).hash, b]));
       for (const bytes of stored?.originalChanges() ?? []) {
         const original = allowed.get(A.decodeChange(bytes).hash);
@@ -732,6 +822,7 @@ export class MetadataProjectSession {
       if (!saved || !equalBytes(saved, bytes)) fail('durable-change-missing');
     }
     await this.checked(stored!, false);
+    if (start.purpose === 'importClean' && stored!.token !== next.token) fail('clean-import-final-heads');
     if (prepared.remote && json(stored!.heads) !== json(prepared.remote.expectedFinalHeads)) fail('remote-final-heads');
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
     await this.journal.publish(prepared, stored!);

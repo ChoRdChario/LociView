@@ -28,6 +28,8 @@ import type { MaterialIntent } from '../../domain/materialIntent';
 import { WorkspaceReceiver, type WorkspaceReceiveState } from '../../projectFiles/receiveWorkspace';
 import { WorkspaceSender, type WorkspaceOutputState, type ContributionBaseChoice } from '../../projectFiles/sendWorkspace';
 import { WorkspaceArchive } from '../../projectPackage/workspaceArchive';
+import { CleanArchive } from '../../projectPackage/cleanArchive';
+import { PackageArchive } from '../../projectPackage/zipArchive';
 import { BackupRestoreJob, type RestoreDatabasePorts } from '../../projectPackage/backupRestoreJob';
 import { readRestoreControls } from '../../projectPackage/restoreControls';
 import { openValidationGeneration, validationGenerationDatabases, validationGenerationService } from './validationGeneration';
@@ -51,7 +53,8 @@ export async function openValidationHost(options: ValidationHostOptions) {
   if (options.mode === 'view' && options.initial) throw Error('閲覧ではプロジェクトを作成できません。');
   if (options.mode === 'view' && options.workspaceFile) throw Error('閲覧では作業一式を取り込めません。');
   if (options.initial && options.workspaceFile) throw Error('作成元を一つ選択してください。');
-  const incoming = options.workspaceFile ? await WorkspaceArchive.inspect(options.workspaceFile, limits) : undefined;
+  const inspectInput = async (file: Blob) => (await PackageArchive.inspect(file)).control.manifest.purpose === 'clean' ? CleanArchive.inspect(file, limits) : WorkspaceArchive.inspect(file, limits);
+  const incoming = options.workspaceFile ? await inspectInput(options.workspaceFile) : undefined;
   if (incoming && incoming.source.proof.identity.projectId !== `prj_${run}`) throw Error('ファイルのプロジェクトと開く場所が一致しません。');
   if (options.initial && options.initial.source.proof.identity.projectId !== `prj_${run}`) throw Error('作成先を確認してください。');
   const lease = options.mode === 'view' ? options.coordinator.openView(options.base, root, `${validationArea}:${run}`) :
@@ -90,6 +93,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
     const unfinishedReceive = () => receiveJobs.some(j => !['completed', 'cancelled', 'abandoned'].includes(j.state));
     const reloadReceive = async () => { receiveJobs = await receiver.jobs(); await reloadOutput(); };
     let last = await session.read(), project: SyntheticProject | undefined;
+    if (incoming instanceof CleanArchive && last.source) throw Error('この独立コピーの再開用データがあります。ファイルを取り込まず、プロジェクト一覧から再開してください。');
     if (last.source && (last.source.proof.identity.projectId !== `prj_${run}` || incoming && json(last.source.proof) !== json(incoming.source.proof)))
       throw Error('ファイルと再開用データのプロジェクトが一致しません。既存データは変更していません。');
     let localInitial = !!options.initial || !!await fs.readStream(metadataPath(fs, 'validation-initial.json')) ||
@@ -167,7 +171,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
         return receiver.receive(token, file);
       }),
       importWorkspace: (file: Blob) => receiveAction(async () => {
-        if ((await WorkspaceArchive.inspect(file, limits)).source.proof.identity.projectId !== `prj_${run}`)
+        if ((await inspectInput(file)).source.proof.identity.projectId !== `prj_${run}`)
           throw Error('別のプロジェクトです。プロジェクト一覧から開いてください。');
         return receiver.importWorkspace(file);
       }),
@@ -193,6 +197,8 @@ export async function openValidationHost(options: ValidationHostOptions) {
       get jobs() { return outputJobs; }, get error() { return outputFailure || outputDiscoveryFailure; },
       get bases() { return outputBases; },
       generate: (token: string) => outputAction(() => sender.generate(token)),
+      generateClean: (token: string) => outputAction(() => sender.generateClean(token)),
+      previewClean: (token: string) => outputAction(() => sender.previewClean(token)),
       generateBackup: (token: string, label?: string) => outputAction(() => sender.generateBackup(token, label)),
       generateContribution: (token: string, selection: ContributionBaseChoice['selection']) => outputAction(() => sender.generateContribution(token, selection)),
       retry: (id: string) => outputAction(() => sender.retry(id), true),
