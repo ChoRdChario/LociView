@@ -1,6 +1,11 @@
 # 実装・接続の全体棚卸し
 
 > CURRENT INVENTORY / 2026-09-13。全体監査基点: `b73315b851f627ca61029cfb73caf23f6e4829bd`。
+> PO追加採用: Asset間の親変更と既存ProjectAnchorへの親設定を05 §4.4へ記録。
+> 操作は「親モデルを変更」に統一し、位置保持／手動配置・全Scene影響を確認。まだ未実装。
+> PO回答（`1edc3f5`後）: 06 §11の隔離実装→実測／採用の順序は承認済み。
+> §12.6の対応保持は「対応モデルなしグループ」案を検討中。旧2判断待ちはこれで更新する。
+> 今回は仕様／記録のみ。実装数・受入れ状態は不変。
 > C04は同じピン操作欄の「追加色」から通常／Shift／数値追加へ接続。作成時の1変更で色も記録。
 > 絞り込み／既存色編集と独立し、Scene別の次回色と実際のピン色を分離。retryは元の色／IDを保持。
 > 新schema／wire／永続preferenceはなし。native picker／実browser／実機受入れは既存一括確認に残る。
@@ -134,7 +139,7 @@
 | C08 | 複数Captionウィンドウを比較する | 接続済み | 順次開く・前面化・個別×・移動／キーボード・並べる・意味のある位置への接続線。 | [src/ui/projectScene/captionWindowControls.ts:26](../src/ui/projectScene/captionWindowControls.ts) / [tests/ui/projectSceneWindowConnection.test.ts:34](../tests/ui/projectSceneWindowConnection.test.ts) |
 | C09 | Captionウィンドウのサイズを変える | 接続済み | 両host共通の右下drag／矢印／非drag選択。Scene別local placementだけ変更し、本文・画像・scroll・他窓・選択・履歴を保持。取消・stale・extent変化／late入力とView操作・Edit切替拒否を既存testsで確認。実描画／実入力／短画面／実機は未受入れ。 | [src/ui/projectScene/captionWindowControls.ts](../src/ui/projectScene/captionWindowControls.ts) / [tests/ui/projectSceneWindowConnection.test.ts](../tests/ui/projectSceneWindowConnection.test.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
 | C10 | Project全体からCaptionを削除する | 接続済み | 影響Scene・添付・tag登録を確認し、Captionと観測済み全edgeを原子的tombstone。本文競合・Media/Tag/モデル本体を保持。保存失敗中は旧UI、exact retry／cold reopen、後着edge/delete-editの保持と警告、未適用入力の明示取消を確認。復元・一般参照修復UIは別。 | [src/projectMetadata/captionDeletion.ts](../src/projectMetadata/captionDeletion.ts) / [src/harness/projectScene/captionDeletionControls.ts](../src/harness/projectScene/captionDeletionControls.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
-| C11 | モデル非依存の既存Captionを読み、明示的にモデルへ置き直す | 新規実装 | domain/list読取の一部あり。実importとProjectAnchor→Assetのcommand/UIなし。移動入口はAsset以外を拒否。新ProjectAnchor作成は別途非対象。 | [src/scene/types.ts:36](../src/scene/types.ts) / [src/harness/projectScene/session.ts:442](../src/harness/projectScene/session.ts) |
+| C11 | 既存ピンの親モデルを設定・変更する | 新規実装 | 05 §4.4でAsset A→Bと既存ProjectAnchor→Assetの統一操作を追加承認。計算可能な3D位置・同じCaption ID／内容／Scene所属を保持し、不能時は明示配置。全Sceneへの影響を確認。command/UIは未実装、同一親の位置調整C02や新ProjectAnchor作成とは別。真正な未配置はC12のschema依存。 | [docs/specs/05-project-scene-team-workflow.md](../docs/specs/05-project-scene-team-workflow.md#44-explicit-pin-parent-changes-po-approved-2026-09-13) / [src/projectMetadata/commands.ts](../src/projectMetadata/commands.ts) / [src/harness/projectScene/session.ts](../src/harness/projectScene/session.ts) |
 | C12 | 未配置の記録を失わず読み込み、後で配置する | 新規実装 | 未配置を保持・後配置する製品要件は承認済み、exact schema/recipeは提案・未実装。現在Anchor unionにもない。破損・競合を未配置扱いにして救済しない。 | [docs/specs/05-project-scene-team-workflow.md:784](../docs/specs/05-project-scene-team-workflow.md) / [src/scene/types.ts:36](../src/scene/types.ts) |
 
 ### メディア

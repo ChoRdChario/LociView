@@ -452,6 +452,60 @@ byte equality, proximity, bounds, transform similarity, array position or load
 order. Exact stable ID or explicit source-authoritative conversion evidence is
 required.
 
+### 4.4 Explicit pin parent changes (PO-approved 2026-09-13)
+
+The PO adopted one `親モデルを変更` operation for an existing Asset-anchored
+Caption to another Asset and for an existing/imported ProjectAnchor to an Asset.
+This extends explicit re-anchoring beyond same-owner movement; it is not model
+replacement, a Scene move, automatic relation matching or new ProjectAnchor creation.
+Current code still implements only same-owner `movePin`; this section is an
+accepted requirement and implementation plan, not an implemented capability.
+
+Select a Caption, choose the new parent explicitly, preview its position, adjust
+with the existing gizmo or verified model-surface input if needed, then confirm
+or cancel. Put the entry next to `位置を調整`, not in Scene management. Parentless
+but placed Captions use the same entry. Do not require numerical coordinates as
+the sole placement method, infer a target from proximity/name or create a new
+Caption as a replacement for changing the existing one.
+
+When the old Project-space position is authoritative, preserve that displayed
+position by converting it into the explicitly selected target's local frame:
+`pTarget = inverse(targetToProject) * pProject`. For an Asset anchor, obtain
+`pProject` from its verified source placement; for a ProjectAnchor use its
+validated Project-frame position. Require a valid invertible target placement
+and exact current target binding/placement eligibility. This coordinate conversion
+does not infer model equivalence, snap to a surface or itself confirm the edit.
+Validate the new anchor's frame, compatibility and manual placement evidence
+against the selected target; never copy these assertions from the old parent.
+If the old position cannot be reconstructed, disclose that fact and require the
+user to choose a new position; never invent an origin or a successful preview.
+Conflicting/invalid anchor authority uses existing conflict/recovery first.
+
+Confirm writes the complete new Asset anchor in one explicit metadata command
+through the existing session/journal. Keep the Caption ID, title/body/color,
+attachments/tags and every SceneCaptionMembership; preserve the old anchor in
+causal history. Do not edit model placement or SceneAssetMembership. Before
+confirmation show the affected Scene count: the same Caption's parent changes
+in every Scene, and where the new parent is absent its existing list-only rules
+apply. Do not automatically show the model in those Scenes.
+
+Preview/draft is local; cancellation changes no shared data. Failed writes keep
+the old published state and retry the original proposed change/IDs exactly.
+Readonly, stale source/target placement, concurrent drafts/IME and in-flight
+writes use existing guards. Concurrent parent/position changes retain complete
+anchor candidates; never merge one parent's ID with another candidate's position.
+
+Implementation/acceptance: first add the explicit command and coordinate planner
+for the current Asset/Project anchor union, then connect the existing pin form,
+gizmo and saved host; reuse current tests for A-to-B and Project-to-Asset, rotated/
+scaled frames, unavailable source position, explicit placement/cancel, multiple
+Scenes, stale/conflict rejection, failure/retry/cold reopen and team re-receive.
+Native input/browser/iPhone evidence stays in the consolidated acceptance batch.
+No new schema, file format, general parent removal, bulk reassignment or new page
+is authorized by this operation. Genuine unplaced records retain §9.4's separate
+schema/migration dependency; the §12.6 review-package mapping in specification 06
+is not ratified by accepting this user-facing operation.
+
 ## 5. Authoritative Scene resolution
 
 The derived renderer-neutral `SceneDocument` is distinct from the persistent
@@ -634,6 +688,17 @@ migration continuity and cannot merge back. Clean copy blocks unresolved include
 semantic conflicts rather than selecting or omitting a winner.
 
 ### 7.5 Mandatory package-wire gate before S2
+
+**PO-approved gate-order amendment (2026-09-13, after `1edc3f5`):** the new
+package reader/writer may be implemented in the existing isolated validation
+path after the complete five-purpose implementation contract and independent
+review are fixed. Executable/golden and measured device evidence are obtained
+there before ordinary-route activation and formal profile/budget adoption.
+This approves the staged order proposed in 06 §11, not its entire proposed
+wire/schema or the separate review-to-edit amendment in 06 §12.6. All acceptance,
+source preservation and separate migration/release decisions remain. The
+pre-first-byte requirements below now govern the complete implementation
+contract; they do not demand new-runtime measurements before that runtime exists.
 
 The semantic purpose discriminator is closed to
 `teamWorkspace | contribution | review | backup | clean`; an implementation may
@@ -866,7 +931,9 @@ retain its Asset and the Asset's ordinary required closure. Rendering an unplace
 Caption does not load that closure's model bytes or require a binding/transform.
 Missing/deleted/conflicted owners remain reportable; do not erase the reference,
 silently cascade-delete the Caption or describe that case as ordinary ownerless.
-This amendment does not add a general unlink/reassign-owner command.
+This unplaced-schema amendment itself adds no general unlink/reassign-owner
+command. The later, separately approved §4.4 adds explicit parent reassignment
+for already placed Asset/Project anchors; it does not activate this unplaced union.
 
 | State | List and editing | 3D / recovery |
 |---|---|---|

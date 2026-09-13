@@ -639,9 +639,13 @@ Pages, Service Worker, media expansion or performance guarantee is authorized.
 
 ## 11. Proposed implementation/adoption split — PO decision pending (2026-09-13)
 
-This section is a concrete recommendation, NOT ratification and NOT an amendment
-already in effect. 05 §7.5 and §10 above still apply. The current implementation
-checkpoint is `0b2de6b`; no ProjectScene package reader/writer exists there.
+**Current status (PO reply after `1edc3f5`): item 1 APPROVED.** PO accepted
+isolated implementation followed by evidence/acceptance and only then ordinary
+activation. 05 §7.5 records this gate-order amendment. The historical heading
+and proposal below retain their existing links; their pending-split wording is
+superseded by this decision. Exact five-purpose wire/schema closure, §12.6's
+separate compatibility amendment, measured adoption and release remain distinct.
+No ProjectScene package reader/writer has been implemented by this docs update.
 
 Later PO clarification: routine design/implementation/verification sequencing is
 delegated. The remaining boundary is approval of the complete concrete technical
@@ -1193,6 +1197,23 @@ not acceptance.
   interruption, hostile-input, privacy, two-round and actual-device vectors remain.
 
 ### 12.6 Actual remaining review-to-edit compatibility decision
+
+Later PO adoption of `親モデルを変更` is recorded in 05 §4.4. It provides an
+accepted future recovery operation for existing placed Caption records, but does
+not itself ratify the snapshot fields/class partition proposed in this section.
+Do not confuse explicit individual reassignment with collapsing a whole group
+into one owner or inferring omitted model relationships during import.
+
+**PO discussion after `1edc3f5` (item 2, NOT yet ratified):** PO suggests grouping
+pins whose target model is not included. A derived Caption-list group can make
+them discoverable without creating a Scene/Asset or rewriting memberships and
+anchors. Retain each item's re-keyed owner/frame/position/class independently;
+grouping is not a replacement for the included-family mapping below. Distinguish
+omitted model payload from an omitted compatible family of a present model.
+Original unplaced items, unresolved/corrupt references and temporarily hidden
+models must not be silently reclassified as ordinary missing-model entries.
+The exact grouping/copy behavior remains a proposal, not permission to change
+the schema or automatically reassign a target.
 
 The current proposal cannot reconstruct an editable visual Asset faithfully from
 its flattened review form. 01 §3.1 and `projectModelGraph.ts` require a complete

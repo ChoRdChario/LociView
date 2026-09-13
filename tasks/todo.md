@@ -2,6 +2,46 @@
 
 ## Current boundary — thin connected workflow first (2026-09-09)
 
+2026-09-13 latest PO adoption: `親モデルを変更` for Asset A→B and an existing
+ProjectAnchor→Asset is accepted in 05 §4.4. Preserve known Project-space position,
+require explicit placement when it is unavailable, retain Caption content/ID and
+Scene memberships, disclose cross-Scene impact. Current code remains same-owner
+move only; the 32/4/18/10 connection count and device acceptance are unchanged.
+
+- [x] Record the adopted operation, safety/acceptance and finite implementation
+  order; distinguish it from the older unplaced schema and package mapping.
+- [ ] Add an explicit parent-change command and coordinate planner using the
+  existing Asset/Project anchor union; retain ordinary move's same-owner guard.
+- [ ] Connect the existing pin controls, gizmo and metadata/validation hosts,
+  then reuse save/retry/cold/team tests and the consolidated browser batch.
+
+This closes the parent-change product decision; do not request it again. File-team
+delivery remains the overall priority. The separate 06 §12.6 exact review mapping
+is not silently approved by this adoption, nor is genuine unplaced runtime/schema.
+This turn records the adopted specification and plan only, preserving the existing
+nine-document approval update; no production code, tests, new page or wire changed.
+Review: independent review of all nine Markdown diffs found no mandatory issue.
+Whitespace and inventory checks passed; runtime/device tests were not rerun for
+these documentation-only changes. The accepted operation remains unimplemented.
+
+2026-09-13 PO decision update (after `1edc3f5`): item 1 is approved: implement
+new package handling in the isolated validation path, obtain executable/device
+evidence, then separately activate the ordinary route. 05 §7.5 / 06 §11 record
+this gate-order amendment. Item 2 is NOT yet ratified: PO asks whether missing
+target pins can be collected into a group. This turn is documentation/explanation
+only; no package/schema/UI implementation or new test campaign.
+
+- [x] Record item 1 without inferring complete wire/profile or release approval.
+- [x] Compare the grouping suggestion with retained per-Caption position/owner,
+  Scene membership and unplaced/corrupt distinctions; explain the recommendation.
+- [ ] Settle item 2's review/edit-copy mapping and grouping scope, then close the
+  complete five-purpose implementation contract for the first Workspace round.
+
+Current next decision is item 2 only. Older two-decision waits below are historical.
+Review: independent read-only review found no approval-scope contradiction in the
+nine Markdown changes; diff whitespace check passed. No executable file changed
+and no runtime tests or new browser/device acceptance were claimed this turn.
+
 PO approved building the whole workflow thinly before subsystem polish. Authority:
 specification 05 §13.4; final completion remains `TEAM-FLOW-01` in §12.6.
 The completed journal Chrome recheck below stays closed; no journal rerun is

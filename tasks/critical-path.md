@@ -2,10 +2,17 @@
 
 > Status: `PROJECTSCENE/TEAM CONTRACT RATIFIED; CONNECTED SYNTHETIC HOST AND LIMITED DESKTOP SAVE ACCEPTANCE; INTEGRATED S1–S3 OPEN`
 >
+> PO decision after `1edc3f5`: 06 §11's isolated-implementation then adoption
+> order is approved (05 §7.5 amended). §12.6 remains under discussion following
+> the missing-model group suggestion; neither its mapping nor the wire is ratified.
+> Explicit placed-pin parent changes are subsequently accepted in 05 §4.4 (C11),
+> still unimplemented: command/planner, existing pin UI/host, then durable team
+> acceptance. Do not turn this operation approval into unplaced/wire adoption.
+>
 > 2026-09-13 current priority: C04/C09 close the approved initial-color/window-size
 > carryovers on the existing hosts; exact executed and pending evidence is in todo.
-> Return to F01/F02 portable file-team delivery. The proposed 06 §11 gate split
-> and §12.6 review/edit-copy relation amendment require an explicit PO decision;
+> Return to F01/F02 portable file-team delivery. The separate §12.6 review/edit-copy
+> relation amendment still requires an explicit PO decision;
 > adjacent UI/PoC work does not close that dependency or the practical-team goal.
 >
 > Updated: 2026-09-12 after the whole-scope source/connection audit at `b73315b`.

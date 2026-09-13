@@ -6,6 +6,17 @@ observed implementation.
 
 ## Purpose-specific authority
 
+2026-09-13 PO decision after `1edc3f5`: isolated package implementation before
+measured adoption/ordinary activation is approved in 05 §7.5 and 06 §11.
+The separate 06 §12.6 review/edit-copy mapping remains under discussion with the
+missing-model group suggestion. Older pending-split notes are historical; no
+complete wire/profile, package implementation or release approval is inferred.
+
+Later PO adoption: [05 §4.4](specs/05-project-scene-team-workflow.md#44-explicit-pin-parent-changes-po-approved-2026-09-13)
+accepts one explicit parent-change operation for existing Asset/Project anchors,
+with position preservation, content/membership retention and cross-Scene impact.
+It is an unimplemented C11 requirement, not the unplaced schema or review wire.
+
 2026-09-13 initial pin color: [05 §11.3](specs/05-project-scene-team-workflow.md#113-bounded-initial-pin-color-connection-2026-09-13)
 records Scene-local next-color selection and capture at placement start. The same
 metadata command creates Caption/membership/color atomically; retry keeps the
