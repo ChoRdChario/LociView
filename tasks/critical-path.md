@@ -1,5 +1,12 @@
 # LociView critical-path execution plan
 
+> **Reference status (2026-09-14):** This file retains earlier milestone, gate and
+> acceptance records. Dated "current priority", "next" and authorization notes
+> below are historical, not today's execution plan. [todo](todo.md) owns current
+> work/approval state; [inventory](implementation-inventory.md) owns coverage;
+> [document authority](../docs/README.md) routes to binding contracts. Do not revive
+> superseded approval waits or waive actual adoption/device/release gates from this record.
+
 > Status: `PROJECTSCENE/TEAM CONTRACT RATIFIED; CONNECTED SYNTHETIC HOST AND LIMITED DESKTOP SAVE ACCEPTANCE; INTEGRATED S1–S3 OPEN`
 >
 > PO decision after `1edc3f5`: 06 §11's isolated-implementation then adoption

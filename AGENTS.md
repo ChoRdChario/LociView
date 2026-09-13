@@ -3,7 +3,9 @@
 ## Canonical scope
 
 - This repository is the only active source of truth for LociView.
-- Read `PROJECT_MAP.md` and `docs/README.md` before non-trivial work. Read only task-relevant entries from `tasks/lessons.md`.
+- On a fresh session or workstream change, read the short `tasks/todo.md` current boundary, `PROJECT_MAP.md` and `docs/README.md`; then open only the relevant contracts and code. For an ongoing bounded fix, start at its target and tests without re-reading every entrypoint.
+- `tasks/todo.md` owns current work, checks and next actions; `tasks/implementation-inventory.md` owns route-specific feature coverage. Map, index and handoff link to these records rather than duplicating progress counts or per-commit logs.
+- Read only relevant entries from `tasks/lessons.md`. `docs/history` is evidence, not an active task queue or a source of renewed approval requirements.
 - Authority is purpose-specific:
   - working rules: `AGENTS.md`;
   - currently observed behavior: code and executable tests;
@@ -22,7 +24,7 @@
 
 ## Architecture rules
 
-- Interactive entity edits in an opened project go through `ProjectStore.dispatch()`.
+- Interactive entity edits use the active route's command boundary: `ProjectStore.dispatch()` for legacy v1, the accepted Native services for Native, and `MetadataProjectSession` commands for the bounded ProjectScene path (specification 05). Never write storage directly from UI or mix route authorities.
 - Project creation and new-package import validate the container path/manifest but preserve v1 operation-log source text according to the frozen v1 contract, including forward-compatible unknown content and reportable malformed lines.
 - Merge into an opened project goes through the project/package merge services, which validate/accept operations and coordinate log and binary writes; do not bypass these boundaries from UI code.
 - Binary I/O goes through `WorkspaceFS` and asset/package helpers.
@@ -40,14 +42,16 @@
 - Independent reviewers are read-only and judge the approved specification, diff, and executed evidence.
 - Chat history is not a specification. Move approved decisions and acceptance criteria into this repository before implementation.
 - A PoC is disposable and isolated. Do not promote PoC code directly into production without a production implementation and review.
+- Record a short outcome-oriented plan before non-trivial implementation. Existing PO approval covers normal sequencing, relevant tests and fixes within that scope; do not request the same approval at each helper or checkpoint.
+- Keep one writer and use bounded read-only parallel work when it helps. Run heavy whole-workspace tests/builds serially. Review the meaningful final diff once; re-review only later substantive changes or unresolved findings, not identical code merely because it was staged.
 
 ## Short meta-audits
 
-- Run a short meta-audit after a meaningful slice, before changing acceptance contract/workstream/subsystem, when scope must expand, when a new P0/P1 or external/specification dependency appears, or when auxiliary tests/fixtures/docs keep growing without closing a production boundary or gate item.
+- Run a short meta-audit at a connected workflow milestone, before changing an acceptance contract/workstream, when scope must expand, when a new P0/P1 or external/specification dependency appears, or when auxiliary work grows without closing a user workflow or gate item. Do not make each helper a separate audit milestone.
 - Recheck branch, HEAD, worktree, active gate and exit criteria, recent production versus auxiliary changes, verification, known failures, blockers and external evidence lanes. Treat the previous priority and next-slice choice as hypotheses, not authority.
 - Prefer closing an accepted boundary, ordinaryizing a known failure or removing a release blocker over increasing test, fixture, review or commit counts. Add auxiliary verification only when the current slice cannot be judged safely with existing acceptance.
 - Keep the audit brief and use existing repository evidence. If the current strategy still follows the critical path, record that conclusion concisely and continue; do not turn meta-audit into a separate workstream.
-- Before the next slice, state its target, purpose, boundary/acceptance, production scope, reused and genuinely missing acceptance, completion criteria, exclusions and stop conditions.
+- Before the next connected unit, record the user outcome, relevant acceptance, exclusions and genuine stop conditions briefly in todo. Reuse existing checks and records; do not create another matrix or PoC unless a concrete evidence gap requires it.
 - Change priority or slice structure autonomously within the approved product/gate scope when evidence supports it. Stop and ask the Product Owner before resolving a specification conflict, ratifying a product policy or numeric guarantee, making a large architecture or compatibility/migration decision, expanding beyond approved scope, or crossing a release/deploy/destructive boundary.
 
 ## Change rules
@@ -92,13 +96,24 @@
 
 ## Verification
 
-Run at minimum:
+During a connected implementation unit, use focused checks for the changed behavior.
+At its final source/test tree, run at minimum (serially):
 
 ```powershell
 npm run typecheck
 npm test
 npm run build
 ```
+
+Also run `npm run build:harness` when the changed path ships in the isolated harness.
+After a check passes, repeat or broaden it only for relevant subsequent changes,
+failures or unresolved concerns. Staging unchanged content, updating result prose,
+or an unpushed commit is not a reason to repeat all runtime checks. Validate that
+the staged source/test content is the reviewed and tested content instead.
+
+For documentation/instruction-only changes, check the diff, local links, retained
+history and instruction/contract consistency; no runtime suite/build is required.
+This exception does not verify pre-existing dirty product code.
 
 For GitHub Pages/PWA path changes, also verify:
 
@@ -107,4 +122,12 @@ $env:BASE_PATH='/LociView/'
 npm run build
 ```
 
-For dependency changes, also run `npm audit`. Rendering changes require recorded browser evidence; mobile-sensitive rendering or storage changes require physical iOS verification.
+For dependency changes, also run `npm audit`. Rendering changes require recorded browser evidence; mobile-sensitive rendering or storage changes require physical iOS verification. Group human checks at the approved adoption/candidate boundaries unless a concrete new risk requires an earlier check. Do not count dev-server checks as offline/PWA evidence or old-route acceptance as new-route acceptance.
+
+## Checkpoints and Push
+
+- PO authorization renewed 2026-09-14: commit and push suitable verified checkpoints to the existing `g0-baseline` branch without asking at every checkpoint. Keep unrelated or unverified work out of the commit.
+- Before pushing, check the actual branch/remote, staged scope, required evidence, outgoing changes for private source material, and whether the push triggers deployment. Never force-push as routine cleanup.
+- Push authorization is not release/deployment authorization. `main`, Pages, Service Worker, license/version, public fixture distribution and release remain separately gated. A pending push does not block local implementation or require repeated tests.
+- User permission and environment approval are separate. A known denied action must not be retried unchanged or bypassed; use a materially safer authorized alternative or report the exact remaining constraint.
+- Update todo with the checkpoint and remaining work; use Git for commit identity instead of copying full logs into every document. A fresh task is useful at a safe handoff, but create it only on user request.

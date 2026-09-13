@@ -1,0 +1,412 @@
+# Documentation authority index
+
+This index prevents current v1/Native behavior, historical plans and the
+accepted-but-not-yet-implemented v2 architecture from being treated as one
+observed implementation.
+
+## Purpose-specific authority
+
+2026-09-13 PO decision after `1edc3f5`: isolated package implementation before
+measured adoption/ordinary activation is approved in 05 §7.5 and 06 §11.
+The separate 06 §12.6 review/edit-copy behavior is now approved with visible
+known-position needsReview pins and a missing-model list group. Exact tables and
+independent review are complete for the next isolated package slice. Older pending notes are historical; no
+complete wire/profile, package implementation or release approval is inferred.
+The bounded ProjectScene viewport now connects visible needsReview pins and their
+windows using current display receipts. Color/status retention and stale-projection
+checks are in the existing tests; rendered/device acceptance remains pending.
+
+The bounded 06 implementation in `src/projectPackage` includes five-purpose
+control preflight and Team Workspace source capture: original-operation summary,
+exact source reopen, all-live-candidate strong closure and read-only body checks.
+Unsupported historical summary values/unknown inventory refuse capture without
+changing source admission. The captured source now generates an exact streamed ZIP;
+an independent raw inspector checks headers/CRC/SHA, causal source, summary and
+strong closure when reopening. This primitive alone does not confer profile
+admission or external-save proof and does not activate a format. The bounded
+receive/output services below add durable jobs; ordinary F01/F02 file flows,
+broader retention and measured-adoption boundaries remain open in todo.
+The next bounded connection in 06 §§8.3–8.4 adds fullMetadata journal/control
+binding and cold retry, plus received original-record GLB/PNG profile/fact staging.
+Legacy receipts stay unchanged. The existing-Project actual ZIP service now joins
+durable input jobs, Session receive/recovery and exact imported-base completion.
+The existing limited GLB/PNG host now exposes actual update-file receive, cold
+recovery before editor mount, and exact pre-start re-selection/explicit abandonment.
+Warm receipt keeps the same editor and retains repeated display failures until
+confirmed. The same file tools now connect frozen-source generation, streamed
+artifact read-back, generated/imported base folding, deliberate download and exact
+reselected-file verification. Incomplete output is recoverable before renderer
+preparation; neither download nor internal acknowledgment means saved. First
+Workspace import now preserves the entire original history in a separate root
+journal. The limited selector routes by verified Project identity, reusing existing
+receive for that lineage. Initial input/recovery, complete base observations,
+separate repository vacancy and startup-Scene guards share existing boundaries.
+Other purposes, ordinary activation and rendered/device acceptance remain open;
+final verification for this connection is recorded in todo.
+Contribution source/archive primitives now freeze one verified retained base,
+generate exact original D and reopen a declared non-ancestor target independently
+of the temporary union. Delta summary and new-body closure are verified; unchanged
+models use existing CAS metadata only. A separate §8.6 frozen input job and
+Contribution journal now connect to the same update-file UI. Exact originals,
+receiver M, one publication, M=0, cold retry and pre-start re-selection use the
+existing services; the live base table is never advanced. Missing acknowledged
+evidence remains repair-required, including lost jobs discovered by index/journal.
+Backup has bounded source/ZIP/reopen primitives under §12.2.1: original causal
+history, protected current/conflict/base-only bodies, the full historical base
+table and deduplicated original evidence. ZIP-only inspection does not grant
+replacement authority or invent local imported/generated observations. Named
+manual backup output now connects through a frozen durable job and the same file
+tools. Partial retry uses the same originals/name; acknowledged loss is repair.
+Generation and optional exact file verification stay separate, with no base
+advancement. Explicit restore remains next. Its internal generation capability
+now isolates metadata/package paths and database ownership under one logical
+Project lease/queue, fencing stale/lazy operations. The selector, dedicated backup
+initialization/restored-base evidence and UI switch are not connected; this helper
+does not activate restoration. Contract: 06 §12.8; checks are in todo.
+Its internal root restore job now owns and reinspects the backup ZIP, revalidates
+confirmation against current source/publication/base evidence, and retains explicit
+interruption/cancellation plus warm-only staging DB creation. Closed root controls
+and cumulative limits keep incomplete/missing records visible. The selection
+reader is structural only; no Selection writer or restored destination authority
+exists before the dedicated initializer/base/body connection. No restore UI change.
+This does not complete the practical-team, ordinary-home or device/offline gate.
+
+Contribution durable output now connects in the same file tools under §8.7:
+explicit available base, frozen source/inventory, original-D retry, indexed missing
+jobs and optional exact reselected-file verification. Generation never advances a
+base; download never proves external save. No other save sink is added.
+Final checks are in todo.
+F01/F02 are not complete. Current executed evidence and next work are in todo.
+
+Later PO adoption: [05 §4.4](../../../specs/05-project-scene-team-workflow.md#44-explicit-pin-parent-changes-po-approved-2026-09-13)
+accepts one explicit parent-change operation for existing Asset/Project anchors,
+with position preservation, content/membership retention and cross-Scene impact.
+It is now bounded C11 code in the metadata/limited GLB validation hosts, using a
+separate command and existing preview/gizmo/retry. It is not unplaced schema or
+review wire adoption. Exact checks and pending native-input/device evidence: todo.
+
+2026-09-13 initial pin color: [05 §11.3](../../../specs/05-project-scene-team-workflow.md#113-bounded-initial-pin-color-connection-2026-09-13)
+records Scene-local next-color selection and capture at placement start. The same
+metadata command creates Caption/membership/color atomically; retry keeps the
+original bytes. This uses the existing color field, not a wire/schema extension
+or persistent preference. Executed checks and pending native-input/device evidence
+are in todo and the consolidated UI handoff.
+
+2026-09-13 local Caption-window sizing: [05 §11.2](../../../specs/05-project-scene-team-workflow.md#112-bounded-caption-window-size-input-2026-09-13)
+records the same-card drag/key/preset connection and cancel/extent boundaries.
+Scene-local window size is not shared Project data, a Saved View field or an
+external save. Current executed checks and pending browser/device evidence are
+in todo and the consolidated UI handoff.
+
+2026-09-13 limited local View/Edit: [05 §11.1](../../../specs/05-project-scene-team-workflow.md#111-bounded-local-viewedit-connection-2026-09-13)
+records the same-editor transition in the existing GLB/PNG validation workspace.
+View is a deliberate lock-free mode, not an account role or an inability to get
+a lock. Edit reloads durable data; failures keep View, input and existing display.
+It does not implement review-package editing, normal-home activation or external
+file saving. Final executed evidence and pending rendered/device checks are in todo.
+
+2026-09-13 concrete package design: [06 §12](../../../specs/06-project-package-wire.md#12-concrete-field-summary-and-execution-tables-proposed-2026-09-13)
+records field/privacy, inventory, summary and finite execution tables. Independent
+review corrected the description of the current cumulative validation limit.
+Its §12.6 review-to-edit behavior now has PO approval with the visible-pin condition;
+the exact schema/reconstruction tables are consolidated/reviewed. §12.7 supplies local job/receipt, recovery and evidence-lifetime
+tables, still proposed; its executable baseline is `2f07ea1`, unchanged by this
+docs-only slice. Executable five-purpose builders/reconstruction/goldens remain incomplete;
+no package runtime or acceptance is added. See todo for the exact next boundary.
+
+2026-09-13 bounded display correction: the existing Scene hosts distinguish browser
+resume data from external file saving, including edit feedback and the validation
+Project catalog. Pending/failure/recovery/readonly states remain visible. This is
+code/recorded-DOM evidence, not file output or rendered/device acceptance; see todo.
+00 §2.2's named manual/one-latest-auto points and browser-resume/manual-file fallback
+are approved. [06 §11.4](../../../specs/06-project-package-wire.md#114-save-point-and-output-completion-protocol-design-closure-2026-09-13)
+drafts their purpose and completion protocol; it does not implement an autosave sink.
+
+2026-09-13 technical design boundary: [06 §11](../../../specs/06-project-package-wire.md#11-proposed-implementationadoption-split--po-decision-pending-2026-09-13)
+proposes separating reviewed five-purpose validation implementation from measured
+wire/profile adoption, including truthful OPFS-generation/download completion.
+[07 §10.2](../../../specs/07-project-scene-migration.md#102-concrete-mapping-decisions-and-implementation-boundary-proposed-2026-09-13)
+records concrete migration gaps. Routine sequencing is delegated, not repeatedly
+pending; complete wire/receipt/limit contracts and compatibility approval remain
+distinct. 05's gates remain unchanged and no package/migration runtime was added.
+
+| Purpose | Authority |
+|---|---|
+| Working and collaboration rules | `AGENTS.md` |
+| Currently observed implementation behavior | Current code and executable tests |
+| v1 package/wire compatibility | Frozen v1 contract plus G0 golden fixtures |
+| Accepted architecture/product invariants | Accepted ADR; constrains PoCs and specifications immediately |
+| Candidate technology and performance guarantees | Adopted specification only after the relevant gate passes |
+| Navigation and known current risks | `PROJECT_MAP.md` |
+| Fresh-session checkpoint and stop boundary | `tasks/handoff.md`; navigation only, never a product specification |
+| Active work sequencing | `tasks/todo.md`; never a product specification |
+| Current implementation/connection coverage | [Whole-scope inventory](../tasks/implementation-inventory.md): 64 work groups and all 41 UI tasks; route-specific gaps, gates and recommended dependencies, not a new specification |
+| Recurrent failure patterns | Task-relevant entries in `tasks/lessons.md`; advisory until promoted to a rule/ADR |
+| Accepted UI/UX presentation principles | Blocks marked `Accepted requirement` in `ui-product-guidelines.md`; behavior and safety still come from the applicable product specification |
+
+If observed code conflicts with the applicable compatibility or accepted future contract, stop and resolve the discrepancy explicitly. Neither side silently overwrites the other.
+
+Latest bounded connection: metadata model-status candidates can be compared and
+explicitly resolved without changing Caption data. The synthetic host also receives
+model updates; ordinary-file, rendered/device and aggregate team acceptance remain
+pending. Todo and the inventory retain profile and adoption boundaries.
+Model membership keep-one and known-Mesh independent keep-both now share the
+saved host: complete nominal-ID remap, retained original Caption ownership,
+scoped new-record facts and independent placement/material. Final evidence is
+in todo; no general model-copy, wire or real-file acceptance is implied.
+The same host also resolves complete Caption anchor/color candidates, preserving
+optional absence and the authored anchor. Read-only position preview does not
+publish a winner. Normal editing/return resumes after saved resolution; evidence
+and remaining conflict/UI-device boundaries are recorded in todo and the inventory.
+Basic Scene authoring is also connected: model-membership-only creation,
+explicit name/default commands, saved reopen and received Scene local-state
+initialization. Existing UI memory and source Scenes are preserved. The inventory
+counts P04/P05 only in the synthetic metadata path, not real-file/device acceptance.
+Confirmed whole-Project Caption deletion (C10) also connects through this host.
+Complete observed child tombstones are atomic; binary content and late conflicts
+are retained, as is unapplied input after a remote deletion. Source/endpoint guards,
+exact retry and cold reopen are covered by existing host tests; real-browser and
+device acceptance remain in the consolidated batch.
+The same review area also resolves Caption delete/edit and delete/restore
+conflicts with an explicit parent-only event. Child tombstones and ambiguous
+references are not repaired or resurrected; original contents remain. The
+existing Scene-inclusion flow can reuse a restored unplaced Caption. This is a
+bounded T03 connection, not general restoration or complete team acceptance;
+final verification is recorded in todo.
+Confirmed whole-Project model deletion (M09) now checks all Scene, Caption-anchor
+and material-routing candidates before changing Asset.lifecycle only. No cascade
+or binary erasure. Exact saved retry, independent reopen and late-reference
+retention are covered in the same host tests. A nonactivated bounded body store
+now supplies actual durable inventory/saved handles to metadata creation/reopen
+tests (02 §7.1); no runtime fixture fallback or existing-host change. Next is actual
+Mesh/image inspection and initial Project construction. Limited real-file entry,
+profile/device/adoption and normal-home activation remain separate decisions.
+The approved M07 model rotation/uniform-scale connection now joins translation
+in the existing metadata host, through a separate typed transformAsset command.
+Full-transform preview and exact cancel/save/retry are covered by host/viewport
+tests. M13 alignment and real-browser/device acceptance remain separate.
+The same host now handles startup-Scene conflicts before constructing its editor.
+One explicit candidate choice is saved before cold startup; warm local Scene and
+camera remain unchanged. Exact retry/readonly/late-disposal checks reuse existing
+host tests. This does not implement other scalar/lifecycle repair or real-file entry.
+
+After explicit PO approval, `projectFiles` adds static GLB/PNG validation and
+fresh Project creation through the same saved metadata service. Its transient
+`development-validation` evidence is not a ratified format/adoption claim.
+Generated-file tests cover actual saved bytes, pin/title edits, independent reopen
+and exact incomplete-initialization recovery. The same served development entry
+now has opt-in `storage=validation`: file creation/list/reopen, actual saved-body
+render port and existing pin/text/PNG editor. Recorded-DOM/memory-port evidence
+is not actual browser/device acceptance. Adding a PNG to an opened Caption now
+uses that same media editor/journal; body/save/display failures retain exact retry.
+Actual GLB placement also uses existing gizmos and typed binding-only persistence.
+Opened-Project GLB addition now goes through one atomic addAsset command and the
+existing journal delta-body field. New facts are limited to the exact owned input;
+old evidence cannot be regenerated. Missing renderer residents are staged before
+UI acknowledgment, without reopening the editor or changing the camera.
+All exact static-GLB material slots now connect Project/Scene lighting/side/reset
+to isolated renderer clones. Original textures/PBR survive reset and unsupported
+source/effects are diagnosed. Hard chroma now uses the same binary pre-lighting
+predicate for display and exact CPU-candidate coverage checks. Unknown GPU coverage
+blocks placement; owned query resources are released and renderer state restored.
+Shader/protocol/injected-pick tests are not real GPU/device acceptance or completion
+of all real-material effects. Other source semantics and fractional alpha stay outside this lane.
+Other file and real-model editing connections remain; no ordinary entry, existing
+Project or migration has changed.
+
+## Classification
+
+| Document | Status | Use |
+|---|---|---|
+| `00-design-philosophy.md` | `CURRENT PRINCIPLES / V1 EXAMPLES` | Long-lived principles; operation-log examples are v1-specific |
+| `01-vision-requirements.md` | `V1 BASELINE / PARTLY SUPERSEDED` | Original goals and v1 requirements; not the new v2 scope |
+| `02-data-format.md` | `FROZEN V1 FORMAT` | Compatibility and migration reference only; do not extend for v2 writes |
+| `03-architecture.md` | `HISTORICAL DESIGN` | Contains implementation drift; use code and `PROJECT_MAP.md` for current behavior |
+| `04-formats-rendering.md` | `V1 RENDERING BASELINE` | Default-v1 GLB/OBJ/STL/ordinary PLY; the bounded native GS path is outside this legacy contract |
+| `05-ui-ux.md` | `V1 PRODUCT + SUPERSEDED DRAFTS` | Current UI intent mixed with earlier proposals; code wins on conflict |
+| `06-device-offline.md` | `V1 PRODUCT + UNVERIFIED TARGETS` | OPFS/PWA intent; size, streaming, sharing, and single-file claims are not guarantees |
+| `07-roadmap.md` | `SUPERSEDED 2026-07 ROADMAP` | Historical only; never use as the active plan |
+| `08-ios-test-guide.md` | `V1 QA RUNBOOK` | Current manual v1 check, not a v2 GS performance specification |
+| `09-locimyu-migration.md` | `V1 LEGACY RUNBOOK` | Existing legacy import guidance; ambiguous filename cases remain possible |
+| `ui-product-guidelines.md` | `PRODUCT-OWNER APPROVED UI/UX PRINCIPLES / IMPLEMENTATION AND ACCEPTANCE STATUS ARE SECTION-SPECIFIC` | Accepted-labelled interaction, information architecture, writing and visual principles; `Current implementation`, `Evidence pending` and `Proposed` blocks are informative and gain no authority from this index |
+| `licensing-and-ownership.md` | `PRODUCT-OWNER APPROVED DIRECTION / PROPOSED ADOPTION / NO LICENSE GRANT` | Ownership/relicensing record, freedom-first MPL-2.0 candidate, material scopes and formal adoption gate |
+| `sponsorship-policy.md` | `PRODUCT-OWNER APPROVED DIRECTION / PROPOSED OPERATIONAL POLICY` | Sponsor acknowledgement, individual consultation, privacy, influence and release boundaries; no sponsor is accepted by the document |
+| `g0/device-performance-runbook.md` | `G0 EVIDENCE CONTRACT / NO MEASUREMENTS RECORDED` | Repeatable device/performance procedure and provisional, unapproved observations |
+| `g0/g0-coverage-map.md` | `G0 ACTIVE COVERAGE MAP / NO GATE CLAIM` | One-to-one status and blocker map for every G0 section 2.1–2.4 requirement |
+| `g0/gs-source-profile-candidate.md` | `G0 PREFLIGHT CANDIDATE / NOT RATIFIED / NO RENDERER GUARANTEE` | Exact Gaussian PLY source-envelope preflight and ratification inputs; companion tiny artifacts remain characterization, not a FormatProfile, renderer or support claim |
+| `g0/fixture-acquisition-contract.md` | `PRODUCT-OWNER RATIFIED / MODE B IMPLEMENTED OFFLINE / MODE A NOT IMPLEMENTED` | Exact Mode-B CLI/core/schemas exist and are offline-verified; real network, Release, publication and adoption actions remain unexecuted and retain separate stops |
+| `v2/00-approved-direction.md` | `ACCEPTED DIRECTION SUMMARY / NON-NORMATIVE / NOT IMPLEMENTED` | Navigation summary; ADR and approved specifications are authoritative |
+| `adr/0001-v2-foundation.md` | `ACCEPTED DIRECTION / CONDITIONAL TECHNOLOGY` | Rationale, rejected alternatives, and reconsideration triggers |
+| `adr/0002-project-scenes-and-continuing-team-history.md` | `ACCEPTED DIRECTION / CONDITIONAL TECHNOLOGY` | Project-as-workspace, Scene composition, Project-wide model revisions and continuing causal file collaboration |
+| `history/legacy-locimyu-alpha.md` | `PROVENANCE` | Location and hashes of archived legacy evidence |
+| `history/task-ledger-through-d32a6a0.md` | `HISTORICAL TASK LEDGER` | Completed development records through the pre-consolidation native checkpoint; not an active plan or product specification |
+| `specs/README.md` | `PRODUCT-OWNER APPROVED CONTRACT / NOT IMPLEMENTED` | Index and authority for the gated v2 implementation contract |
+| `specs/00-product-contract.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | Product guarantees, MVP boundary, privacy and mobile behavior |
+| `specs/01-domain-rendering.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | Frames, revisions, SceneDocument, modes, picking and renderer gates |
+| `specs/02-storage-package-migration.md` | `PRODUCT-OWNER APPROVED / BOUNDED NATIVE SECTIONS 13–31 IMPLEMENTED WHERE MARKED / §29.1 DIRECT HEIC DEFERRED / GENERAL V2 NOT IMPLEMENTED` | General metadata/CAS candidate boundaries plus implemented Native snapshot/package, multi-Asset, DisplaySet/media receiver, package exchange, Native-only write authority and §29.3 device-side HEIC compatibility boundary |
+| `specs/03-gates-and-delivery.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | G0/G0-S/G1 evidence, thresholds, feature flags, rollback and schedule |
+| `specs/04-locimyu-conversion.md` | `PRODUCT-OWNER APPROVED / BOUNDED DIRECT ADAPTER IMPLEMENTED / PRODUCT ACCEPTANCE PASS` | Exact LociMyu identity/source authority and report boundary; six representative rows with an empty trimmed ID are reported as empty input, while 103 Captions publish and survive portable restore without changing the source; Desktop and physical-iPhone acceptance passed |
+| `specs/05-project-scene-team-workflow.md` | `PRODUCT-OWNER APPROVED / BOUNDED CORE, PROVIDER, SYNTHETIC UI AND METADATA SERVICE` | Reusable core/provider and separate memory/old-saved/new-metadata paths exist. New service saves bounded synthetic edits, full-source receive, Caption resolution/copies and prepared-model/pin team rounds through storage ports. No ordinary-app/real-file adoption, general renderer or rendered/device acceptance. Product wire/migration remains unimplemented; current Native bytes unchanged. Current coverage is in the implementation inventory |
+| `specs/06-project-package-wire.md` | `PROPOSED WIRE / APPROVED ISOLATED IMPLEMENTATION / NO ORDINARY ADOPTION` | Five-purpose companion with bounded Workspace/Contribution file connections and backup source/ZIP inspection where marked. Snapshot/migration, general adoption and gates remain open; exact executed scope is in todo |
+| `specs/07-project-scene-migration.md` | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED` | New migration identity/portable Native bridge draft, source-managed guards, shared unit/birth artifacts and prepared-migration source; calculated identity and scoped candidate feasibility are not converter/adoption proof. §10.1 owns the finite service-level next slice |
+
+## Known implementation drift
+
+2026-09-11 decision package: `tasks/todo.md` distinguishes reused G1-A/C evidence,
+actual remaining platform/scale/security inputs and the separate S2 wire gates.
+The PO-approved amendment in 05 §13.2 allows earlier S1 implementation and the
+three pinned root dependencies, limited to new synthetic development workspaces
+until product adoption. It does not waive the empty-root contract or gate status.
+The approved Repo-only uuid 11.1.1 override closes the dependency preflight hold:
+runtime audit is clear and actual Repo API compatibility passes. The five unchanged
+toolchain findings remain separate; this is not product service/adoption credit.
+The reusable `src/projectMetadata` foundation now creates empty-root lineage,
+preserves original atomic histories and prepares Caption text without a winner
+shortcut. The new Repository/Session/journal now connects that source to fenced
+Repo storage, independent stored readback and marker-last publication, with exact
+retained retry. Persistent immutable content facts exclude the metadata token and
+require current inventory/presence. Synthetic memory-port tests cover this service;
+the new `storage=metadata` development mode now wires OPFS/IndexedDB/Web Locks,
+exact synthetic-body inventory and the existing editor to that service. Typed
+Caption text/color, manual pin add/move and Scene Caption/model include/exclude
+now share its journal and exact retry; one added pin is one original change.
+Saved View create/recapture/name/order/delete and Scene entry set/clear also use
+that path; exact original field versions protect retained captures and entry drafts.
+Optional entry clear preserves domain absence rather than adding a nullable schema.
+Exact Project/Scene material create/appearance-edit/confirmed reset now shares
+the same retained save/retry. Complete original routing reservations guard the
+existing lighting/sidedness/hard-chroma UI; no base-color input was added.
+Explicit known-PNG introduction/attachment and description/order/confirmed deletion
+now use that same service. Existing run seeds stay unchanged and the gallery
+uses verified saved image bytes. The blob delta is sealed with retained originals;
+unattached media inspection does not change strong roots. Project-wide model
+translation now uses a fresh binding/status change, same-provider model projection
+and the shared translation gizmo for preview/cancel/confirm. Original Caption
+coordinates, memberships and saved model payloads remain unchanged. Geometry
+replacement, real-file input and exchange stay
+unconnected in this new mode, not removed from old modes or product requirements.
+Old saved runs and ordinary home remain unchanged. Actual browser/input and
+physical iOS evidence remain pending; source-only `reopen` itself is still not a
+saved-workspace receipt. Current todo and uiux-handoff now lead to the consolidated
+new-host Desktop check, not repeated old probe acceptance.
+
+Current readiness review (2026-09-10): `tasks/todo.md` top separates approved
+outcomes, exact wire/migration design gaps and remaining storage/device evidence.
+05 §9.4 records PO-approved unplaced-Caption preservation and the proposed atomic
+schema/bridge mapping. 06 §§4.1/5.1/8–9 define retained base evidence, nonvisual
+owners and full/delta recovery with structural vectors. Runtime still lacks the
+unplaced branch; no adopted wire/recipe or executed byte goldens are claimed.
+The next recipe portion is now drafted in 07: source identity/ID keys, portable
+baseline/registrations, source-managed Scene/attachment guards and shared original
+artifacts. Four identity examples were computed, not a whole converter proven.
+Sections 5–7.2 now draft that managed-unit/introduction/prepared-migration interface.
+Four added existing-candidate tests pass (10 harness tests total), limited to
+shared bytes/objects and explicit guards, not admitted domain or durable conversion.
+The isolated journal now has a dedicated preparedMigration seam with exact retained
+source and recovery, exercised by eight added synthetic cases. The complete
+existing development source now also reaches same-head managed/birth inspection,
+actual temporary-CAS content verification and the journal under an explicit
+candidate-only flat profile. Seven service cases cover local work, scoped review,
+retained original bytes and reopen/replay. No new browser page or durable UI
+activation; exact wire/profile/whole-converter and adoption inputs remain open.
+05 §13.4's finite intermediate step was PO-approved on 2026-09-11: explicit opt-in
+synthetic-only save/reopen in the same development host. The journal-backed pair,
+separate retained bases, acknowledged-head UI and exact retry now connect to
+dedicated development OPFS/IDB ports. Node/mounted checks are distinct from the
+subsequent PO-reported four-group Desktop PASS at served `f341833`: text exchange,
+both-participant reload, explicit title choice and replay/final reload. This
+closes that saved-host batch, not faults, devices, offline or a technology gate.
+No ordinary-runtime change or renewed unplaced-preservation question.
+
+2026-09-10: PO reports the five prescribed camera/pin/window groups PASS at
+`7540478`; their earlier pending status below is historical. Broader rendered,
+IME/iPhone/storage acceptance remains open. PO-approved Scene-first UX and the
+later-adjustment entry now exist in the same synthetic development host under
+spec 05 §13.4 / UI guidelines §4.3. Internal model-relative anchors remain; this
+new arrangement has executable checks, not new rendered acceptance.
+
+Latest C implementation: the isolated candidate has canonical original-field
+source correspondence and an async verified driver. Its two-actor/equivalent
+model/independent Caption copy/retry service loop reaches the full scoped pair.
+The served development entry now mounts that verified pair and shares async draft
+acknowledgment/retry across editors and team commands. Mounted tests cover two
+rounds, independent Caption/model copies, exact retry and source-based material
+review while rendering stays withheld. This connects C in development scope;
+it does not activate the ordinary UI, real storage, files or adoption.
+New Caption/pin creation now also connects explicit model/coordinates/surface to
+the same verified acknowledgment. Created records support subsequent edits/media,
+independent keep-both copies and continuing exchange; anchors on verified model
+copies remain owned by that model. Direct viewport picking/preview now connects
+the exact selected resident surface to confirmation/cancellation and retry.
+CPU/mounted checks cover transforms, clipping, material/occlusion and rejected
+gestures; they do not prove native input or raster output. A PO correction now
+connects transient translate handles and Shift+click addition, moves pin actions
+beside the viewport, and exposes detail/comparison actions in the right task area.
+Numeric input is supplemental. The old UI test request is withdrawn; corrected
+native interaction/layout remains unverified, not a new provider campaign.
+Current execution counts and remaining gates
+are recorded at the top of todo; no new browser/device/storage credit.
+
+Current scheduling amendment (2026-09-09): specification 05 §13.4 is PO approved
+for a thin connected synthetic development host using the existing core/UI parts.
+The first in-memory workspace loop is implemented in `src/harness/projectScene`:
+Scene/task navigation, shared Caption editing/list and model membership. It is not
+integrated production v2. `tasks/todo.md` top owns exact checks and remaining
+connections; rendered/device acceptance, production storage, wire/migration and
+ordinary-app activation remain pending. The components above are no longer all
+test-only. The served development host also connects the isolated candidate to
+two independent memory histories and explicit scalar choices/replay. This is not
+product file exchange. Known synthetic model-binding updates and manual pin
+correction now participate in the same two-round loop, preserving local work and
+Scene references. Explicit membership keep-one and independent Caption copies now
+connect in the known synthetic fixture. Exact synthetic model copies
+also connect, with fresh closed IDs, fixture-byte/immutable-digest checks and
+independent placement edits through a second exchange. General model-copy
+admission, migration and the full provider remain unimplemented; current todo
+owns exact scope/checks and the still-pending rendered UI lane. Exact fixture
+triangle/pin display now connects fit, six axes and projection with retained
+temporary cameras. Multiple retained Caption windows now connect confirmed text,
+pin lines, close/reopen, front order and UI-only positioning. Object/DOM tests
+do not prove raster or native input behavior.
+The same host also connects Scene-owned Saved View authoring/recall and entry
+settings: exact camera/solid-background captures, field-version-aware conflict
+handling and two-round memory exchange. Real storage and rendered/device
+acceptance remain pending.
+Exact fixture material catalogs now connect scoped editing, explicit conflict
+choices/reset and independent model-copy material re-keying to lit/unlit,
+sidedness and hard chroma. This is fixed opaque triangle evidence only, not
+blend/dither adoption. Fixed PNG media now connects add/description/order/removal,
+window images, causal delete/edit choices and independent attachment copies in
+the same host. Tags remain empty-fixture-only; real media files/storage and
+gated durable-file services remain pending. The following records the successive
+provider stages, not new next tasks; C's current connection is summarized above.
+Its stage A now has one decoded whole-root record admission entry, covering the
+amended 14 maps and canonical known values while preserving unknown data. A
+`valid-records` result is not a valid Project/provider. Stage B now additionally
+inspects whole-record references and actual immutable metadata digests/prior
+identity, with scoped diagnoses and known strong/weak edges. This still returns
+no authoritative projection: complete candidate/causal/exact blob-profile evidence
+(B) and same-host authority (C) remain required; see 05 §13.4. Neutral original
+change inspection now retains absent and concurrent candidates and reviews
+immutable/lifecycle history. The existing served candidate supplies exact raw
+flat-string evidence; candidate composition now checks all current values and
+known reference reservations without a winner, retaining diagnostic partial
+records. The actual flat-map candidate tests a full synthetic Project through
+two rounds/save/reload. Executable external-content checks now bind the exact
+snapshot/records and keep individual missing/unsupported/failed/stale results.
+Known triangle/PNG bytes are checked in development scope; weak-only source bytes
+are not fetched. A pure scope-labelled provider now maps affected closures/fields
+into same-token SceneState/resources and detail fields, preserving source and all
+diagnoses. The actual two-round candidate test reaches that pair and resolver.
+C's same-host source-adapter/authority switch now has code/mounted evidence as
+recorded above; no ordinary-app, ratified profile, general source-adapter or
+rendered/device credit.
+
+- Legacy-v1 ZIP/package code is not bounded-memory streaming despite older architecture text. The bounded Native portable and exchange packages use their separate streamed path.
+- Current XLSX reading is the local minimal reader in `src/io/xlsx.ts`, not SheetJS.
+- Strict CSP and single-file distribution are goals, not current implemented controls.
+- Current export is download-based; File System Access/Web Share flows described in older documents are incomplete.
+- Default-v1 viewer holds one model and its PLY support is not Gaussian Splatting; the isolated `?mode=native-gs` production path has separate exact ASCII ordinary-point and SH2/SH3 GS admission and remains bounded.
+- Current material identity and loader behavior differ from parts of `04-formats-rendering.md`.
+
+Do not repair these documents opportunistically during unrelated code changes. Update the relevant current contract or v2 specification in a dedicated documentation change with code evidence.

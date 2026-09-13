@@ -1,0 +1,954 @@
+{
+  "status": "HISTORICAL; not an active plan",
+  "date": "2026-09-14",
+  "transformation": "Content and line endings retained; relative Markdown links rebased. Occurrence-indexed inverse reproduces original SHA-256, including different spellings of the same link.",
+  "records": [
+    {
+      "original": "PROJECT_MAP.md",
+      "snapshot": "docs/history/development-through-2026-09-14/PROJECT_MAP.md",
+      "originalSha256": "4b5c444a53bdf2e103ce5bb9c318c67e52a7b6f8ff71099cef7f891b456604ae",
+      "snapshotSha256": "4b5c444a53bdf2e103ce5bb9c318c67e52a7b6f8ff71099cef7f891b456604ae",
+      "linkRewrites": [
+        {
+          "index": 0,
+          "from": "tasks/implementation-inventory.md",
+          "to": "tasks/implementation-inventory.md"
+        }
+      ]
+    },
+    {
+      "original": "docs/README.md",
+      "snapshot": "docs/history/development-through-2026-09-14/docs/README.md",
+      "originalSha256": "4414b38fe08e69c0738f0fb8be04fb988c6b518f92b6f16e4f53b8826430e28e",
+      "snapshotSha256": "1a6d5efc5a2ca8f4fe2fadb18bd9a88daa01231c378dcc7005ccee0c867f761e",
+      "linkRewrites": [
+        {
+          "index": 0,
+          "from": "specs/05-project-scene-team-workflow.md#44-explicit-pin-parent-changes-po-approved-2026-09-13",
+          "to": "../../../specs/05-project-scene-team-workflow.md#44-explicit-pin-parent-changes-po-approved-2026-09-13"
+        },
+        {
+          "index": 1,
+          "from": "specs/05-project-scene-team-workflow.md#113-bounded-initial-pin-color-connection-2026-09-13",
+          "to": "../../../specs/05-project-scene-team-workflow.md#113-bounded-initial-pin-color-connection-2026-09-13"
+        },
+        {
+          "index": 2,
+          "from": "specs/05-project-scene-team-workflow.md#112-bounded-caption-window-size-input-2026-09-13",
+          "to": "../../../specs/05-project-scene-team-workflow.md#112-bounded-caption-window-size-input-2026-09-13"
+        },
+        {
+          "index": 3,
+          "from": "specs/05-project-scene-team-workflow.md#111-bounded-local-viewedit-connection-2026-09-13",
+          "to": "../../../specs/05-project-scene-team-workflow.md#111-bounded-local-viewedit-connection-2026-09-13"
+        },
+        {
+          "index": 4,
+          "from": "specs/06-project-package-wire.md#12-concrete-field-summary-and-execution-tables-proposed-2026-09-13",
+          "to": "../../../specs/06-project-package-wire.md#12-concrete-field-summary-and-execution-tables-proposed-2026-09-13"
+        },
+        {
+          "index": 5,
+          "from": "specs/06-project-package-wire.md#114-save-point-and-output-completion-protocol-design-closure-2026-09-13",
+          "to": "../../../specs/06-project-package-wire.md#114-save-point-and-output-completion-protocol-design-closure-2026-09-13"
+        },
+        {
+          "index": 6,
+          "from": "specs/06-project-package-wire.md#11-proposed-implementationadoption-split--po-decision-pending-2026-09-13",
+          "to": "../../../specs/06-project-package-wire.md#11-proposed-implementationadoption-split--po-decision-pending-2026-09-13"
+        },
+        {
+          "index": 7,
+          "from": "specs/07-project-scene-migration.md#102-concrete-mapping-decisions-and-implementation-boundary-proposed-2026-09-13",
+          "to": "../../../specs/07-project-scene-migration.md#102-concrete-mapping-decisions-and-implementation-boundary-proposed-2026-09-13"
+        },
+        {
+          "index": 8,
+          "from": "../tasks/implementation-inventory.md",
+          "to": "../tasks/implementation-inventory.md"
+        }
+      ]
+    },
+    {
+      "original": "tasks/todo.md",
+      "snapshot": "docs/history/development-through-2026-09-14/tasks/todo.md",
+      "originalSha256": "38471a4a281010335c782d4c2eb78f9d06cb067d539c941291a2eaa31f9090d8",
+      "snapshotSha256": "38471a4a281010335c782d4c2eb78f9d06cb067d539c941291a2eaa31f9090d8",
+      "linkRewrites": [
+        {
+          "index": 0,
+          "from": "https://developer.mozilla.org/en-US/docs/Web/API/Window/showSaveFilePicker",
+          "to": "https://developer.mozilla.org/en-US/docs/Web/API/Window/showSaveFilePicker"
+        },
+        {
+          "index": 1,
+          "from": "implementation-inventory.md",
+          "to": "implementation-inventory.md"
+        },
+        {
+          "index": 2,
+          "from": "https://github.com/uuidjs/uuid/security/advisories/GHSA-w5hq-g745-h8pq",
+          "to": "https://github.com/uuidjs/uuid/security/advisories/GHSA-w5hq-g745-h8pq"
+        }
+      ]
+    },
+    {
+      "original": "tasks/handoff.md",
+      "snapshot": "docs/history/development-through-2026-09-14/tasks/handoff.md",
+      "originalSha256": "fdd6b70ffbe5bdc1f408d58cc93520154becb6f8ebab17d2c39645dbc6346582",
+      "snapshotSha256": "fdd6b70ffbe5bdc1f408d58cc93520154becb6f8ebab17d2c39645dbc6346582",
+      "linkRewrites": [
+        {
+          "index": 0,
+          "from": "implementation-inventory.md",
+          "to": "implementation-inventory.md"
+        }
+      ]
+    },
+    {
+      "original": "tasks/implementation-inventory.md",
+      "snapshot": "docs/history/development-through-2026-09-14/tasks/implementation-inventory.md",
+      "originalSha256": "5ad62d85f7231e101cae6dbf102c2b4a47ad8359e0a946728b95177b14a2efc1",
+      "snapshotSha256": "6166a384918d57f2d4ade199658a569160c4bc410ae1b1819b6ed479545f3ea0",
+      "linkRewrites": [
+        {
+          "index": 0,
+          "from": "../src/harness/projectScene/validationWorkspace.ts",
+          "to": "../../../../src/harness/projectScene/validationWorkspace.ts"
+        },
+        {
+          "index": 1,
+          "from": "../src/projectFiles/creation.ts",
+          "to": "../../../../src/projectFiles/creation.ts"
+        },
+        {
+          "index": 2,
+          "from": "../tests/projectFiles.test.ts",
+          "to": "../../../../tests/projectFiles.test.ts"
+        },
+        {
+          "index": 3,
+          "from": "../src/harness/projectScene/validationCatalog.ts",
+          "to": "../../../../src/harness/projectScene/validationCatalog.ts"
+        },
+        {
+          "index": 4,
+          "from": "../src/harness/projectScene/validationHost.ts",
+          "to": "../../../../src/harness/projectScene/validationHost.ts"
+        },
+        {
+          "index": 5,
+          "from": "../tests/projectFiles.test.ts",
+          "to": "../../../../tests/projectFiles.test.ts"
+        },
+        {
+          "index": 6,
+          "from": "../src/ui/projectScene/navigationControls.ts",
+          "to": "../../../../src/ui/projectScene/navigationControls.ts"
+        },
+        {
+          "index": 7,
+          "from": "../tests/ui/projectSceneNavigation.test.ts",
+          "to": "../../../../tests/ui/projectSceneNavigation.test.ts"
+        },
+        {
+          "index": 8,
+          "from": "../src/harness/projectScene/sceneAuthoringControls.ts",
+          "to": "../../../../src/harness/projectScene/sceneAuthoringControls.ts"
+        },
+        {
+          "index": 9,
+          "from": "../src/projectMetadata/sceneAuthoring.ts",
+          "to": "../../../../src/projectMetadata/sceneAuthoring.ts"
+        },
+        {
+          "index": 10,
+          "from": "../src/projectMetadata/sceneAuthoring.ts",
+          "to": "../../../../src/projectMetadata/sceneAuthoring.ts"
+        },
+        {
+          "index": 11,
+          "from": "../tests/ui/projectMetadataHost.test.ts",
+          "to": "../../../../tests/ui/projectMetadataHost.test.ts"
+        },
+        {
+          "index": 12,
+          "from": "../src/ui/projectScene/captionIncludeControls.ts",
+          "to": "../../../../src/ui/projectScene/captionIncludeControls.ts"
+        },
+        {
+          "index": 13,
+          "from": "../tests/ui/projectMetadataHost.test.ts",
+          "to": "../../../../tests/ui/projectMetadataHost.test.ts"
+        },
+        {
+          "index": 14,
+          "from": "../src/harness/projectScene/validationModeHost.ts",
+          "to": "../../../../src/harness/projectScene/validationModeHost.ts"
+        },
+        {
+          "index": 15,
+          "from": "../tests/projectFiles.test.ts",
+          "to": "../../../../tests/projectFiles.test.ts"
+        },
+        {
+          "index": 16,
+          "from": "../docs/specs/05-project-scene-team-workflow.md",
+          "to": "../../../specs/05-project-scene-team-workflow.md"
+        },
+        {
+          "index": 17,
+          "from": "../src/harness/projectScene/validationHost.ts",
+          "to": "../../../../src/harness/projectScene/validationHost.ts"
+        },
+        {
+          "index": 18,
+          "from": "../src/harness/projectScene/validationRender.ts",
+          "to": "../../../../src/harness/projectScene/validationRender.ts"
+        },
+        {
+          "index": 19,
+          "from": "../tests/projectFiles.test.ts",
+          "to": "../../../../tests/projectFiles.test.ts"
+        },
+        {
+          "index": 20,
+          "from": "../src/nativeGs/plyProfile.ts",
+          "to": "../../../../src/nativeGs/plyProfile.ts"
+        },
+        {
+          "index": 21,
+          "from": "../tests/nativeGs/pointPresentation.test.ts",
+          "to": "../../../../tests/nativeGs/pointPresentation.test.ts"
+        },
+        {
+          "index": 22,
+          "from": "../src/nativeGs/plyProfile.ts",
+          "to": "../../../../src/nativeGs/plyProfile.ts"
+        },
+        {
+          "index": 23,
+          "from": "../src/harness/projectScene/viewport.ts",
+          "to": "../../../../src/harness/projectScene/viewport.ts"
+        },
+        {
+          "index": 24,
+          "from": "../src/ui/projectScene/modelListState.ts",
+          "to": "../../../../src/ui/projectScene/modelListState.ts"
+        },
+        {
+          "index": 25,
+          "from": "../tests/ui/projectMetadataHost.test.ts",
+          "to": "../../../../tests/ui/projectMetadataHost.test.ts"
+        },
+        {
+          "index": 26,
+          "from": "../src/ui/projectScene/modelListState.ts",
+          "to": "../../../../src/ui/projectScene/modelListState.ts"
+        },
+        {
+          "index": 27,
+          "from": "../src/harness/projectScene/viewportHost.ts",
+          "to": "../../../../src/harness/projectScene/viewportHost.ts"
+        },
+        {
+          "index": 28,
+          "from": "../tests/projectFiles.test.ts",
+          "to": "../../../../tests/projectFiles.test.ts"
+        },
+        {
+          "index": 29,
+          "from": "../src/harness/projectScene/session.ts",
+          "to": "../../../../src/harness/projectScene/session.ts"
+        },
+        {
+          "index": 30,
+          "from": "../tests/projectFiles.test.ts",
+          "to": "../../../../tests/projectFiles.test.ts"
+        },
+        {
+          "index": 31,
+          "from": "../src/projectMetadata/commands.ts",
+          "to": "../../../../src/projectMetadata/commands.ts"
+        },
+        {
+          "index": 32,
+          "from": "../src/harness/projectScene/pinGizmo.ts",
+          "to": "../../../../src/harness/projectScene/pinGizmo.ts"
+        },
+        {
+          "index": 33,
+          "from": "../tests/projectFiles.test.ts",
+          "to": "../../../../tests/projectFiles.test.ts"
+        },
+        {
+          "index": 34,
+          "from": "../src/projectMetadata/commands.ts",
+          "to": "../../../../src/projectMetadata/commands.ts"
+        },
+        {
+          "index": 35,
+          "from": "../tests/ui/projectMetadataHost.test.ts",
+          "to": "../../../../tests/ui/projectMetadataHost.test.ts"
+        },
+        {
+          "index": 36,
+          "from": "../src/projectMetadata/assetDeletion.ts",
+          "to": "../../../../src/projectMetadata/assetDeletion.ts"
+        },
+        {
+          "index": 37,
+          "from": "../src/harness/projectScene/assetDeletionControls.ts",
+          "to": "../../../../src/harness/projectScene/assetDeletionControls.ts"
+        },
+        {
+          "index": 38,
+          "from": "../tests/ui/projectMetadataHost.test.ts",
+          "to": "../../../../tests/ui/projectMetadataHost.test.ts"
+        },
+        {
+          "index": 39,
+          "from": "../src/nativeGs/app.ts",
+          "to": "../../../../src/nativeGs/app.ts"
+        },
+        {
+          "index": 40,
+          "from": "../tests/nativeGs/schemaResolver.test.ts",
+          "to": "../../../../tests/nativeGs/schemaResolver.test.ts"
+        },
+        {
+          "index": 41,
+          "from": "../src/harness/projectScene/workspace.css",
+          "to": "../../../../src/harness/projectScene/workspace.css"
+        },
+        {
+          "index": 42,
+          "from": "../src/nativeGs/app.ts",
+          "to": "../../../../src/nativeGs/app.ts"
+        },
+        {
+          "index": 43,
+          "from": "../src/nativeGs/viewer.ts",
+          "to": "../../../../src/nativeGs/viewer.ts"
+        },
+        {
+          "index": 44,
+          "from": "../src/nativeGs/app.ts",
+          "to": "../../../../src/nativeGs/app.ts"
+        },
+        {
+          "index": 45,
+          "from": "../docs/specs/01-domain-rendering.md",
+          "to": "../../../specs/01-domain-rendering.md"
+        },
+        {
+          "index": 46,
+          "from": "../docs/specs/01-domain-rendering.md",
+          "to": "../../../specs/01-domain-rendering.md"
+        },
+        {
+          "index": 47,
+          "from": "../docs/specs/00-product-contract.md",
+          "to": "../../../specs/00-product-contract.md"
+        },
+        {
+          "index": 48,
+          "from": "../docs/specs/00-product-contract.md",
+          "to": "../../../specs/00-product-contract.md"
+        },
+        {
+          "index": 49,
+          "from": "../src/harness/projectScene/session.ts",
+          "to": "../../../../src/harness/projectScene/session.ts"
+        },
+        {
+          "index": 50,
+          "from": "../tests/ui/projectSceneViewport.test.ts",
+          "to": "../../../../tests/ui/projectSceneViewport.test.ts"
+        },
+        {
+          "index": 51,
+          "from": "../src/harness/projectScene/session.ts",
+          "to": "../../../../src/harness/projectScene/session.ts"
+        },
+        {
+          "index": 52,
+          "from": "../tests/ui/projectMetadataHost.test.ts",
+          "to": "../../../../tests/ui/projectMetadataHost.test.ts"
+        },
+        {
+          "index": 53,
+          "from": "../src/ui/projectScene/captionDetailControls.ts",
+          "to": "../../../../src/ui/projectScene/captionDetailControls.ts"
+        },
+        {
+          "index": 54,
+          "from": "../tests/ui/projectMetadataHost.test.ts",
+          "to": "../../../../tests/ui/projectMetadataHost.test.ts"
+        },
+        {
+          "index": 55,
+          "from": "../src/ui/projectScene/pinModeControls.ts",
+          "to": "../../../../src/ui/projectScene/pinModeControls.ts"
+        },
+        {
+          "index": 56,
+          "from": "../src/harness/projectScene/session.ts",
+          "to": "../../../../src/harness/projectScene/session.ts"
+        },
+        {
+          "index": 57,
+          "from": "../src/projectMetadata/commands.ts",
+          "to": "../../../../src/projectMetadata/commands.ts"
+        },
+        {
+          "index": 58,
+          "from": "../tests/projectFiles.test.ts",
+          "to": "../../../../tests/projectFiles.test.ts"
+        },
+        {
+          "index": 59,
+          "from": "../src/ui/projectScene/captionListControls.ts",
+          "to": "../../../../src/ui/projectScene/captionListControls.ts"
+        },
+        {
+          "index": 60,
+          "from": "../tests/ui/projectSceneCaptionList.test.ts",
+          "to": "../../../../tests/ui/projectSceneCaptionList.test.ts"
+        },
+        {
+          "index": 61,
+          "from": "../src/ui/projectScene/captionListControls.ts",
+          "to": "../../../../src/ui/projectScene/captionListControls.ts"
+        },
+        {
+          "index": 62,
+          "from": "../tests/ui/projectSceneCaptionList.test.ts",
+          "to": "../../../../tests/ui/projectSceneCaptionList.test.ts"
+        },
+        {
+          "index": 63,
+          "from": "../src/harness/projectScene/mediaHistory.ts",
+          "to": "../../../../src/harness/projectScene/mediaHistory.ts"
+        },
+        {
+          "index": 64,
+          "from": "../tests/projectFiles.test.ts",
+          "to": "../../../../tests/projectFiles.test.ts"
+        },
+        {
+          "index": 65,
+          "from": "../tests/ui/projectSceneMedia.test.ts",
+          "to": "../../../../tests/ui/projectSceneMedia.test.ts"
+        },
+        {
+          "index": 66,
+          "from": "../src/ui/projectScene/captionWindowControls.ts",
+          "to": "../../../../src/ui/projectScene/captionWindowControls.ts"
+        },
+        {
+          "index": 67,
+          "from": "../tests/ui/projectSceneWindowConnection.test.ts",
+          "to": "../../../../tests/ui/projectSceneWindowConnection.test.ts"
+        },
+        {
+          "index": 68,
+          "from": "../src/ui/projectScene/captionWindowControls.ts",
+          "to": "../../../../src/ui/projectScene/captionWindowControls.ts"
+        },
+        {
+          "index": 69,
+          "from": "../tests/ui/projectSceneWindowConnection.test.ts",
+          "to": "../../../../tests/ui/projectSceneWindowConnection.test.ts"
+        },
+        {
+          "index": 70,
+          "from": "../tests/projectFiles.test.ts",
+          "to": "../../../../tests/projectFiles.test.ts"
+        },
+        {
+          "index": 71,
+          "from": "../src/projectMetadata/captionDeletion.ts",
+          "to": "../../../../src/projectMetadata/captionDeletion.ts"
+        },
+        {
+          "index": 72,
+          "from": "../src/harness/projectScene/captionDeletionControls.ts",
+          "to": "../../../../src/harness/projectScene/captionDeletionControls.ts"
+        },
+        {
+          "index": 73,
+          "from": "../tests/ui/projectMetadataHost.test.ts",
+          "to": "../../../../tests/ui/projectMetadataHost.test.ts"
+        },
+        {
+          "index": 74,
+          "from": "../docs/specs/05-project-scene-team-workflow.md#44-explicit-pin-parent-changes-po-approved-2026-09-13",
+          "to": "../../../specs/05-project-scene-team-workflow.md#44-explicit-pin-parent-changes-po-approved-2026-09-13"
+        },
+        {
+          "index": 75,
+          "from": "../src/projectMetadata/commands.ts",
+          "to": "../../../../src/projectMetadata/commands.ts"
+        },
+        {
+          "index": 76,
+          "from": "../src/harness/projectScene/session.ts",
+          "to": "../../../../src/harness/projectScene/session.ts"
+        },
+        {
+          "index": 77,
+          "from": "../docs/specs/05-project-scene-team-workflow.md",
+          "to": "../../../specs/05-project-scene-team-workflow.md"
+        },
+        {
+          "index": 78,
+          "from": "../src/scene/types.ts",
+          "to": "../../../../src/scene/types.ts"
+        },
+        {
+          "index": 79,
+          "from": "../src/harness/projectScene/mediaControls.ts",
+          "to": "../../../../src/harness/projectScene/mediaControls.ts"
+        },
+        {
+          "index": 80,
+          "from": "../tests/ui/projectMetadataHost.test.ts",
+          "to": "../../../../tests/ui/projectMetadataHost.test.ts"
+        },
+        {
+          "index": 81,
+          "from": "../src/harness/projectScene/validationHost.ts",
+          "to": "../../../../src/harness/projectScene/validationHost.ts"
+        },
+        {
+          "index": 82,
+          "from": "../tests/projectFiles.test.ts",
+          "to": "../../../../tests/projectFiles.test.ts"
+        },
+        {
+          "index": 83,
+          "from": "../src/harness/projectScene/mediaControls.ts",
+          "to": "../../../../src/harness/projectScene/mediaControls.ts"
+        },
+        {
+          "index": 84,
+          "from": "../tests/projectFiles.test.ts",
+          "to": "../../../../tests/projectFiles.test.ts"
+        },
+        {
+          "index": 85,
+          "from": "../src/harness/projectScene/mediaControls.ts",
+          "to": "../../../../src/harness/projectScene/mediaControls.ts"
+        },
+        {
+          "index": 86,
+          "from": "../tasks/uiux-parity-plan.md",
+          "to": "../../../../tasks/uiux-parity-plan.md"
+        },
+        {
+          "index": 87,
+          "from": "../src/ui/projectScene/viewControls.ts",
+          "to": "../../../../src/ui/projectScene/viewControls.ts"
+        },
+        {
+          "index": 88,
+          "from": "../tests/ui/projectSceneViewport.test.ts",
+          "to": "../../../../tests/ui/projectSceneViewport.test.ts"
+        },
+        {
+          "index": 89,
+          "from": "../src/harness/projectScene/viewSession.ts",
+          "to": "../../../../src/harness/projectScene/viewSession.ts"
+        },
+        {
+          "index": 90,
+          "from": "../tests/ui/projectMetadataHost.test.ts",
+          "to": "../../../../tests/ui/projectMetadataHost.test.ts"
+        },
+        {
+          "index": 91,
+          "from": "../src/harness/projectScene/viewSession.ts",
+          "to": "../../../../src/harness/projectScene/viewSession.ts"
+        },
+        {
+          "index": 92,
+          "from": "../tests/ui/projectMetadataHost.test.ts",
+          "to": "../../../../tests/ui/projectMetadataHost.test.ts"
+        },
+        {
+          "index": 93,
+          "from": "../src/ui/projectScene/viewAuthoringControls.ts",
+          "to": "../../../../src/ui/projectScene/viewAuthoringControls.ts"
+        },
+        {
+          "index": 94,
+          "from": "../src/harness/projectScene/viewportHost.ts",
+          "to": "../../../../src/harness/projectScene/viewportHost.ts"
+        },
+        {
+          "index": 95,
+          "from": "../tests/projectFiles.test.ts",
+          "to": "../../../../tests/projectFiles.test.ts"
+        },
+        {
+          "index": 96,
+          "from": "../src/harness/projectScene/materialSession.ts",
+          "to": "../../../../src/harness/projectScene/materialSession.ts"
+        },
+        {
+          "index": 97,
+          "from": "../tests/projectFiles.test.ts",
+          "to": "../../../../tests/projectFiles.test.ts"
+        },
+        {
+          "index": 98,
+          "from": "../src/harness/projectScene/validationRender.ts",
+          "to": "../../../../src/harness/projectScene/validationRender.ts"
+        },
+        {
+          "index": 99,
+          "from": "../src/harness/projectScene/validationMaterials.ts",
+          "to": "../../../../src/harness/projectScene/validationMaterials.ts"
+        },
+        {
+          "index": 100,
+          "from": "../tests/projectFiles.test.ts",
+          "to": "../../../../tests/projectFiles.test.ts"
+        },
+        {
+          "index": 101,
+          "from": "../src/harness/projectScene/materialSession.ts",
+          "to": "../../../../src/harness/projectScene/materialSession.ts"
+        },
+        {
+          "index": 102,
+          "from": "../docs/specs/01-domain-rendering.md",
+          "to": "../../../specs/01-domain-rendering.md"
+        },
+        {
+          "index": 103,
+          "from": "../src/projectMetadata/session.ts",
+          "to": "../../../../src/projectMetadata/session.ts"
+        },
+        {
+          "index": 104,
+          "from": "../src/ui/projectScene/navigationControls.ts",
+          "to": "../../../../src/ui/projectScene/navigationControls.ts"
+        },
+        {
+          "index": 105,
+          "from": "../tests/ui/projectMetadataHost.test.ts",
+          "to": "../../../../tests/ui/projectMetadataHost.test.ts"
+        },
+        {
+          "index": 106,
+          "from": "../src/projectMetadata/session.ts",
+          "to": "../../../../src/projectMetadata/session.ts"
+        },
+        {
+          "index": 107,
+          "from": "../src/projectMetadata/journal.ts",
+          "to": "../../../../src/projectMetadata/journal.ts"
+        },
+        {
+          "index": 108,
+          "from": "../src/harness/projectScene/metadataHost.ts",
+          "to": "../../../../src/harness/projectScene/metadataHost.ts"
+        },
+        {
+          "index": 109,
+          "from": "../src/projectMetadata/persistence.ts",
+          "to": "../../../../src/projectMetadata/persistence.ts"
+        },
+        {
+          "index": 110,
+          "from": "../tasks/uiux-handoff.md",
+          "to": "../../../../tasks/uiux-handoff.md"
+        },
+        {
+          "index": 111,
+          "from": "../docs/specs/05-project-scene-team-workflow.md",
+          "to": "../../../specs/05-project-scene-team-workflow.md"
+        },
+        {
+          "index": 112,
+          "from": "../src/projectMetadata/session.ts",
+          "to": "../../../../src/projectMetadata/session.ts"
+        },
+        {
+          "index": 113,
+          "from": "../src/harness/projectScene/validationReceiveControls.ts",
+          "to": "../../../../src/harness/projectScene/validationReceiveControls.ts"
+        },
+        {
+          "index": 114,
+          "from": "../tests/projectFiles.test.ts",
+          "to": "../../../../tests/projectFiles.test.ts"
+        },
+        {
+          "index": 115,
+          "from": "../src/projectMetadata/session.ts",
+          "to": "../../../../src/projectMetadata/session.ts"
+        },
+        {
+          "index": 116,
+          "from": "../src/projectFiles/sendWorkspace.ts",
+          "to": "../../../../src/projectFiles/sendWorkspace.ts"
+        },
+        {
+          "index": 117,
+          "from": "../tests/projectFiles.test.ts",
+          "to": "../../../../tests/projectFiles.test.ts"
+        },
+        {
+          "index": 118,
+          "from": "../docs/specs/06-project-package-wire.md",
+          "to": "../../../specs/06-project-package-wire.md"
+        },
+        {
+          "index": 119,
+          "from": "../src/harness/projectScene/metadataConflictControls.ts",
+          "to": "../../../../src/harness/projectScene/metadataConflictControls.ts"
+        },
+        {
+          "index": 120,
+          "from": "../src/harness/projectScene/metadataCaptionLifecycleControls.ts",
+          "to": "../../../../src/harness/projectScene/metadataCaptionLifecycleControls.ts"
+        },
+        {
+          "index": 121,
+          "from": "../src/harness/projectScene/metadataStartupControls.ts",
+          "to": "../../../../src/harness/projectScene/metadataStartupControls.ts"
+        },
+        {
+          "index": 122,
+          "from": "../src/projectMetadata/viewResolution.ts",
+          "to": "../../../../src/projectMetadata/viewResolution.ts"
+        },
+        {
+          "index": 123,
+          "from": "../src/projectMetadata/commands.ts",
+          "to": "../../../../src/projectMetadata/commands.ts"
+        },
+        {
+          "index": 124,
+          "from": "../src/projectMetadata/membership.ts",
+          "to": "../../../../src/projectMetadata/membership.ts"
+        },
+        {
+          "index": 125,
+          "from": "../src/projectMetadata/modelMembership.ts",
+          "to": "../../../../src/projectMetadata/modelMembership.ts"
+        },
+        {
+          "index": 126,
+          "from": "../src/harness/projectScene/metadataMembershipControls.ts",
+          "to": "../../../../src/harness/projectScene/metadataMembershipControls.ts"
+        },
+        {
+          "index": 127,
+          "from": "../tests/ui/projectMetadataHost.test.ts",
+          "to": "../../../../tests/ui/projectMetadataHost.test.ts"
+        },
+        {
+          "index": 128,
+          "from": "../src/projectPackage/workspaceArchive.ts",
+          "to": "../../../../src/projectPackage/workspaceArchive.ts"
+        },
+        {
+          "index": 129,
+          "from": "../src/projectFiles/sendWorkspace.ts",
+          "to": "../../../../src/projectFiles/sendWorkspace.ts"
+        },
+        {
+          "index": 130,
+          "from": "../src/projectFiles/receiveWorkspace.ts",
+          "to": "../../../../src/projectFiles/receiveWorkspace.ts"
+        },
+        {
+          "index": 131,
+          "from": "../tests/projectFiles.test.ts",
+          "to": "../../../../tests/projectFiles.test.ts"
+        },
+        {
+          "index": 132,
+          "from": "../docs/specs/06-project-package-wire.md",
+          "to": "../../../specs/06-project-package-wire.md"
+        },
+        {
+          "index": 133,
+          "from": "../src/projectPackage/contributionSource.ts",
+          "to": "../../../../src/projectPackage/contributionSource.ts"
+        },
+        {
+          "index": 134,
+          "from": "../src/projectPackage/contributionOutputJob.ts",
+          "to": "../../../../src/projectPackage/contributionOutputJob.ts"
+        },
+        {
+          "index": 135,
+          "from": "../src/projectFiles/sendWorkspace.ts",
+          "to": "../../../../src/projectFiles/sendWorkspace.ts"
+        },
+        {
+          "index": 136,
+          "from": "../src/projectFiles/receiveWorkspace.ts",
+          "to": "../../../../src/projectFiles/receiveWorkspace.ts"
+        },
+        {
+          "index": 137,
+          "from": "../docs/specs/06-project-package-wire.md",
+          "to": "../../../specs/06-project-package-wire.md"
+        },
+        {
+          "index": 138,
+          "from": "../src/projectPackage/backupSource.ts",
+          "to": "../../../../src/projectPackage/backupSource.ts"
+        },
+        {
+          "index": 139,
+          "from": "../src/projectPackage/backupArchive.ts",
+          "to": "../../../../src/projectPackage/backupArchive.ts"
+        },
+        {
+          "index": 140,
+          "from": "../src/projectPackage/backupOutputJob.ts",
+          "to": "../../../../src/projectPackage/backupOutputJob.ts"
+        },
+        {
+          "index": 141,
+          "from": "../docs/specs/06-project-package-wire.md",
+          "to": "../../../specs/06-project-package-wire.md"
+        },
+        {
+          "index": 142,
+          "from": "../src/nativeGs/packageSnapshots.ts",
+          "to": "../../../../src/nativeGs/packageSnapshots.ts"
+        },
+        {
+          "index": 143,
+          "from": "../docs/specs/06-project-package-wire.md",
+          "to": "../../../specs/06-project-package-wire.md"
+        },
+        {
+          "index": 144,
+          "from": "../src/nativeGs/packageSnapshots.ts",
+          "to": "../../../../src/nativeGs/packageSnapshots.ts"
+        },
+        {
+          "index": 145,
+          "from": "../docs/specs/06-project-package-wire.md",
+          "to": "../../../specs/06-project-package-wire.md"
+        },
+        {
+          "index": 146,
+          "from": "../docs/specs/07-project-scene-migration.md",
+          "to": "../../../specs/07-project-scene-migration.md"
+        },
+        {
+          "index": 147,
+          "from": "../docs/specs/07-project-scene-migration.md",
+          "to": "../../../specs/07-project-scene-migration.md"
+        },
+        {
+          "index": 148,
+          "from": "../docs/specs/04-locimyu-conversion.md",
+          "to": "../../../specs/04-locimyu-conversion.md"
+        },
+        {
+          "index": 149,
+          "from": "../docs/specs/07-project-scene-migration.md",
+          "to": "../../../specs/07-project-scene-migration.md"
+        },
+        {
+          "index": 150,
+          "from": "../docs/specs/07-project-scene-migration.md",
+          "to": "../../../specs/07-project-scene-migration.md"
+        },
+        {
+          "index": 151,
+          "from": "../tests/nativeGs/homeUi.test.ts",
+          "to": "../../../../tests/nativeGs/homeUi.test.ts"
+        },
+        {
+          "index": 152,
+          "from": "../docs/specs/06-project-package-wire.md",
+          "to": "../../../specs/06-project-package-wire.md"
+        },
+        {
+          "index": 153,
+          "from": "../src/nativeGs/app.ts",
+          "to": "../../../../src/nativeGs/app.ts"
+        },
+        {
+          "index": 154,
+          "from": "../src/harness/projectScene/workspace.ts",
+          "to": "../../../../src/harness/projectScene/workspace.ts"
+        },
+        {
+          "index": 155,
+          "from": "../docs/ui-product-guidelines.md",
+          "to": "../../../ui-product-guidelines.md"
+        },
+        {
+          "index": 156,
+          "from": "../docs/specs/03-gates-and-delivery.md",
+          "to": "../../../specs/03-gates-and-delivery.md"
+        },
+        {
+          "index": 157,
+          "from": "uiux-handoff.md",
+          "to": "../../../../tasks/uiux-handoff.md"
+        },
+        {
+          "index": 158,
+          "from": "../docs/specs/03-gates-and-delivery.md",
+          "to": "../../../specs/03-gates-and-delivery.md"
+        },
+        {
+          "index": 159,
+          "from": "../docs/specs/02-storage-package-migration.md",
+          "to": "../../../specs/02-storage-package-migration.md"
+        },
+        {
+          "index": 160,
+          "from": "../docs/specs/05-project-scene-team-workflow.md",
+          "to": "../../../specs/05-project-scene-team-workflow.md"
+        },
+        {
+          "index": 161,
+          "from": "../docs/specs/06-project-package-wire.md",
+          "to": "../../../specs/06-project-package-wire.md"
+        },
+        {
+          "index": 162,
+          "from": "../docs/specs/07-project-scene-migration.md",
+          "to": "../../../specs/07-project-scene-migration.md"
+        },
+        {
+          "index": 163,
+          "from": "../poc/cas-io/README.md",
+          "to": "../../../../poc/cas-io/README.md"
+        },
+        {
+          "index": 164,
+          "from": "../docs/ui-product-guidelines.md",
+          "to": "../../../ui-product-guidelines.md"
+        },
+        {
+          "index": 165,
+          "from": "../docs/specs/05-project-scene-team-workflow.md",
+          "to": "../../../specs/05-project-scene-team-workflow.md"
+        }
+      ]
+    },
+    {
+      "original": "tasks/lessons.md",
+      "snapshot": "docs/history/development-through-2026-09-14/tasks/lessons.md",
+      "originalSha256": "df817e0b79ec1c56a4548f0c8c0fdd1bf1d57735c4ec9f3bff87235c7306a3f2",
+      "snapshotSha256": "df817e0b79ec1c56a4548f0c8c0fdd1bf1d57735c4ec9f3bff87235c7306a3f2",
+      "linkRewrites": []
+    }
+  ]
+}
