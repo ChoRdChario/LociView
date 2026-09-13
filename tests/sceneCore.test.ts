@@ -234,8 +234,9 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
     });
     for (const path of walk('src').filter(p => /\.(ts|tsx|js)$/.test(p))) {
       const source = readFileSync(path, 'utf8');
-      const packageControl = /[\\/]projectPackage[\\/](contract|manifest)\.ts$/.test(path);
-      // 06 §11 permits these exact disconnected control primitives, not an app importer.
+      const packageControl = /[\\/]projectPackage[\\/](contract|manifest|historySummary|closure|workspaceSource)\.ts$/.test(path);
+      const packageMetadata = /[\\/]projectPackage[\\/](historySummary|closure|workspaceSource)\.ts$/.test(path);
+      // 06 §11/§12.3 permit these exact disconnected primitives, not an app importer.
       if (!packageControl) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectPackage\//);
       const metadataFoundation = /[\\/]projectMetadata[\\/](format|source)\.ts$/.test(path);
       const metadataService = /[\\/]projectMetadata[\\/](persistence|repository|journal|contentEvidence|blobStream|blobStore|blobInventory|session|commands|remote|membership|records|assetStatus|modelMembership|modelAddition|captionCandidates|sceneAuthoring|viewResolution|captionDeletion|assetDeletion|startupScene)\.ts$/.test(path);
@@ -244,12 +245,21 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
       const validationFiles = /[\\/]projectFiles[\\/](validation|png|glb|glbMaterials|initialProject|content|creation|modelFacts)\.ts$/.test(path);
       const validationDisplay = /[\\/]harness[\\/]projectScene[\\/](modelTypes|validationProjection|validationRender|validationMaterials|validationCoverage)\.ts$/.test(path);
       const validationHost = /[\\/]harness[\\/]projectScene[\\/](savedHost|validationHost|validationModeHost|validationCatalog|validationWorkspace|validationBrowser|browserMetadataStorage)\.ts$/.test(path);
-      if (!metadataFoundation && !metadataService && !metadataHost && !validationFiles && !validationDisplay && !validationHost) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectMetadata\//);
+      if (!metadataFoundation && !metadataService && !metadataHost && !validationFiles && !validationDisplay && !validationHost && !packageMetadata) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectMetadata\//);
       if (packageControl) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
-        const permitted = path.endsWith('manifest.ts') ? ['../core/json', '../domain/values', '../domain/projectGraphSupport',
-          '../domain/projectRecordFields', '../domain/projectRecords', '../nativeGs/sha256', './contract'] : [];
-        expect(imports.every(p => permitted.includes(p!)), path).toBe(true);
+        const byFile: Record<string, string[]> = {
+          contract: [], manifest: ['../core/json', '../domain/values', '../domain/projectGraphSupport',
+            '../domain/projectRecordFields', '../domain/projectRecords', '../nativeGs/sha256', './contract'],
+          historySummary: ['../projectMetadata/source', '../domain/projectRecordFields', '../domain/projectRecords',
+            '../domain/projectMutableFields', '../domain/projectGraphSupport', '../domain/values', './contract', './manifest'],
+          closure: ['../domain/projectCandidates', '../domain/projectRecordFields', '../domain/projectGraphSupport', '../domain/values',
+            '../projectMetadata/blobStore', './contract', './manifest'],
+          workspaceSource: ['../projectMetadata/session', '../projectMetadata/source', '../projectMetadata/blobStore', '../projectMetadata/blobStream',
+            './contract', './manifest', './historySummary', './closure'],
+        };
+        const name = path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '');
+        expect(imports.every(p => byFile[name]!.includes(p!)), path).toBe(true);
         expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
       } else if (/[\\/](scene|domain)[\\/]/.test(path)) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);

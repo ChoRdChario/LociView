@@ -1122,10 +1122,55 @@ before final value decoding; existing unbudgeted compatibility callers are uncha
 The manifest table alone cannot classify retained evidence as manifest versus
 metadata. The later evidence reader must also charge retained manifests to the
 shared control-JSON budget; the existing descriptor check is not that proof.
-The existing isolation guard permits only these exact `contract.ts`/`manifest.ts`
-files to reuse the pure canonical/value/record checks and SHA-256 helper. It still
-forbids other source files importing this package module; no application or storage
-activation is authorized by adding this bounded control component.
+For control preflight, the isolation guard enumerates exact `contract.ts`/
+`manifest.ts` imports of pure canonical/value/record checks and SHA-256. The
+source-capture helpers below have a separate exact import list. Unlisted source
+callers still cannot import this package module; no application or storage
+activation is authorized by these bounded components.
+
+Bounded source-capture implementation (2026-09-13): the existing physical
+scanner may collect original scalar operations into a source-owned buffer before
+same-change projection collapse. Return this buffer only after complete physical
+and current-candidate validation, never via a streaming caller callback. Include
+schema, source change/op IDs, exact path and decoded present/absent value. Charge
+the additional node/work traversal cumulatively against finite package inspection
+limits; ordinary source reads do not allocate this optional buffer.
+
+The complete-history summary uses this inspected output and the dictionary above.
+Present known fields reuse domain validators to detect nested unknown fields;
+absence counts by address, including a required field deleted then set in one
+original change. If a superseded present known value cannot be classified, this
+first generator refuses with an explicit unsupported-summary result. This is a
+generator limitation, not a change to existing Project/history/receive admission.
+Unknown history without trustworthy opaque inventory also blocks generation;
+never omit unknown data or infer its references from strings to proceed.
+
+A Team Workspace source capture requires a durable ready Session, publication,
+matching source/provider/requested token, exact full-source reopen/heads/original
+bytes and all-current-candidate strong closure. Validate each semantic BlobRef,
+deduplicate physical digest/length, then stream/verify each required body using
+existing WorkspaceFS/CAS read boundaries and shared package read/byte limits.
+This capture uses a dedicated read-only CAS open: the same receipt/size and
+stream digest checks, but no suspect-marker write or writer-lease acquisition,
+even on corruption. Existing diagnostic `open`/`verify` behavior is unchanged.
+The read-only stream applies the stricter of CAS and supplied package limits to
+raw backend chunks before copying; it does not partition an oversized input to
+evade the chunk bound. Whole-file buffering is not an export fallback.
+It does not publish Project data, mutate CAS metadata or turn verification into
+a repair. Missing/corrupt input is reported to the caller and must be resolved
+before a later capture can complete.
+Recheck ready/token/publication after asynchronous verification; missing, corrupt,
+pending, stale or cancelled work produces no completed capture. The returned owned
+bytes/descriptors are not a durable job, output receipt, exchange base, file-save
+claim or permission to reclaim any body. Output-job retention and exact ZIP/receive
+remain mandatory later connections. The exact isolated source/summary/closure
+helpers may be enumerated in the existing import guard; ordinary callers remain
+forbidden. No storage schema, renderer, dependency or activation change is implied.
+`historySummary.ts`, `closure.ts` and `workspaceSource.ts` implement this isolated
+component. Existing metadata/persistence tests cover original-byte preservation,
+all-live binding closure, distinct weak-body exclusion, deduplication and capture
+failure/recovery. Exact executed evidence and remaining ZIP/job/receive work are
+in `tasks/todo.md`; these checks are not measured wire/profile adoption.
 
 ### 12.4 Finite validation execution descriptor
 

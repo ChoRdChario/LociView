@@ -16,9 +16,10 @@
 > Return to F01/F02 portable file-team delivery. The separate §12.6 review/edit-copy
 > product decision is closed by the visible-pin condition after `c2a00f3`.
 > The display filter is corrected and the file contract tables consolidated/reviewed;
-> The first `src/projectPackage` component now checks canonical five-purpose controls
-> and derived entry descriptors. ZIP/source/summary-content/closure admission and
-> F01/F02's real Workspace/Contribution path remain next; tests are in todo.
+> `src/projectPackage` now checks canonical controls and captures an exact Workspace
+> source with original-operation summary, all-current strong closure and read-only
+> body verification. F01/F02's ZIP generation/verified receive, durable output jobs
+> and real Workspace/Contribution path remain next; exact scope/tests are in todo.
 > Adjacent UI/PoC work is not a substitute for the practical-team goal.
 >
 > Updated: 2026-09-12 after the whole-scope source/connection audit at `b73315b`.

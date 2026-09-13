@@ -1,5 +1,13 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-13 F01 source capture（`6483318`後）:** 元scalar履歴からsummaryを生成し、
+> 全live候補の強参照本体を重複排除・stream検証した出力元を確定する部品を実装。
+> 独立reviewで診断用CAS readのwriteを発見し、専用read-only検証へ修正。
+> 関連93件、最終型・build PASS。root 112 files／2,116 PASS／21既存TODO／失敗0（426.06秒）。
+> 独立source／受入れreviewの必須残件なし。最終検査後のsource/testsは不変更。
+> 未知履歴のinventory未証明・分類不能旧値はgenerator制限。元source受入れは不変更。
+> ZIP／durable job・receipt／ファイル生成・受信／通常homeは未完了。次はF01を接続する。
+
 > **2026-09-13 F01/F02初回部品（`f4388fc`後）:** `src/projectPackage`に
 > 5用途のcanonical manifest／summary構文／導出entryと予算の純粋検査を追加。
 > raw JSONの深さ・件数はopt-inで検査、旧v1 callerの文法は不変更。全17 focused PASS。

@@ -8,6 +8,10 @@ export const PACKAGE_LIMITS = Object.freeze({
   snapshotBytes: 8_000_000, sourceBytes: 8_000_000, changes: 1000, changeBytes: 1_000_000,
   heads: 1000, dependencyReferences: 100_000, baseEvidenceCount: 32, baseEvidenceBytes: 16_777_216,
   maxDepth: 32, maxNodes: 100_000, maxStringScalars: 65_536,
+  inspectionNodes: 1_000_000, inspectionWork: 5_000_000,
+  sourceOperations: 20_000, sourceWork: 1_000_000,
+  closureRecords: 100_000, closureEdges: 200_000, closureWork: 1_000_000,
+  chunkBytes: 16_777_216, streamChunks: 100_000, packageChunks: 1_000_000,
 });
 export const SUMMARY_FIELDS = Object.freeze({
   project: ['schema', 'identity', 'title', 'frame', 'defaultSceneId'],

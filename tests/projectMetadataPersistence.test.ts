@@ -16,6 +16,9 @@ import { planMetadataEdit, type MetadataEdit } from '../src/projectMetadata/comm
 import { captionMembershipGroups, type CaptionMembershipResolution } from '../src/projectMetadata/membership';
 import { OriginBlobStore, type StoredBlobRef } from '../src/projectMetadata/blobStore';
 import { blobInventory } from '../src/projectMetadata/blobInventory';
+import { WorkspaceSourceCapture } from '../src/projectPackage/workspaceSource';
+import { immutableDigest } from '../src/domain/projectGraphSupport';
+import { createFixtureModel } from '../src/harness/projectScene/modelClosure';
 
 const limits: MetadataLimits = { ...valueLimits, maxWork: 1_000_000, maxChanges: 100,
   maxChangeBytes: 1_000_000, maxTotalBytes: 4_000_000, maxOperations: 10_000 };
@@ -118,6 +121,123 @@ describe('streamed bodies connected to metadata creation (memory FS/fake origin 
     finally { reader.releaseLock(); }
     const bytes = new Uint8Array(count); let at = 0; for (const p of parts) { bytes.set(p, at); at += p.length; } return bytes;
   };
+  const captureSetup = async (records = fixture()) => {
+    const fs = new Bodies(), h = setup(fs), lock = locks(); Object.assign(h.records, records);
+    const store = () => new OriginBlobStore(fs, budget, lock.manager);
+    // Deliberately do not seed inactive/weak representations.
+    const bodies = [records.representationsById[id('rep')], ...Object.values(records.mediaResourcesById)] as JsonObject[];
+    for (const record of bodies) {
+      const blob = record.blob as JsonObject;
+      await store().put(chunks((await developmentContentBytes(record))!), blob.mediaType as string, blob);
+    }
+    const executor = developmentContentVerifier(Object.values(records.representationsById).map((r: any) =>
+      ({ variantFamilyId: r.variantFamilyId, representationId: r.id, payloadDigest: r.payloadDigest })), r => readAll(store(), r.blob as JsonObject));
+    const session = () => new MetadataProjectSession(fs, h.storage, limits, write => new PersistentContentVerifier(fs, limits,
+      executor, 'workspace-source-fixture-1', blobInventory(store(), limits), write));
+    const writer = session(), initial = await writer.create(h.records); expect(initial.state).toBe('ready');
+    return { ...h, fs, store, session, writer, initial, lock };
+  };
+
+  it('verifies read-only bodies without writer locks or diagnostics, and refuses oversized raw chunks', async () => {
+    const fs = new Bodies(), lock = locks(), store = new OriginBlobStore(fs, budget, lock.manager);
+    const bytes = new Uint8Array([1, 2, 3]), ref = await store.put(chunks(bytes), 'application/octet-stream');
+    const readerStore = new OriginBlobStore(fs, budget, null), writes = fs.writes, leases = lock.names.length;
+    const consume = async (chunkLimit = 3) => {
+      const file = await readerStore.openReadOnly(ref, { ...budget, maxChunkBytes: chunkLimit });
+      const reader = file.stream().getReader();
+      try { while (!(await reader.read()).done) {} } finally { reader.releaseLock(); }
+    };
+    await consume(); await expect(consume(2)).rejects.toMatchObject({ code: 'limit' });
+    await expect(readerStore.openReadOnly(ref, { ...budget, maxChunks: NaN })).rejects.toMatchObject({ code: 'invalid' });
+    const path = (await fs.list('v2/cas/objects/'))[0]!;
+    await fs.writeBytes(path, new Uint8Array([1, 2, 4])); const afterCorruption = fs.writes;
+    await expect(consume()).rejects.toMatchObject({ code: 'mismatch' });
+    expect(fs.writes).toBe(afterCorruption); expect(afterCorruption).toBe(writes + 1);
+    expect(lock.names).toHaveLength(leases); expect(await fs.list('v2/cas/suspect/')).toEqual([]);
+    expect(await readerStore.inspect(ref)).toBe('verified-present'); // No diagnostic marker; not a digest claim.
+  });
+
+  it('captures exact history plus deduplicated strong bodies, excluding a distinct weak historical model', async () => {
+    const records = fixture(), old = createFixtureModel({ asset: id('ast'), assetFrame: id('frm', 2), representationFrame: id('frm', 4),
+      representation: id('rep', 2), revision: id('rev', 2), binding: id('bnd', 2), family: id('fam', 2), compatibility: id('cmp', 2),
+      layout: id('lay', 2), slot: id('slot', 2) }, 'updated', { translation: [0, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 });
+    records.representationsById[old.representation.id] = old.representation; records.assetRevisionsById[old.revision.id] = old.revision;
+    records.captionsById[id('cap')].anchor.authoredAssetRevisionId = old.revision.id;
+    records.captionsById[id('cap')].anchor.authoredAnchorCompatibilityId = id('cmp', 2);
+    const image = Object.values(records.mediaResourcesById)[0] as any;
+    const copy = { ...image, id: id('med', 2) }; copy.payloadDigest = await immutableDigest('media-resource', copy);
+    records.mediaResourcesById[copy.id] = copy;
+    records.captionAttachmentsById[id('att', 2)] = { ...records.captionAttachmentsById[id('att')], id: id('att', 2), mediaResourceId: copy.id, orderKey: 'B' };
+    const h = await captureSetup(records);
+    const edited = await h.writer.editCaption(h.initial.source!.token, id('cap'), 'body', '参加者の追記');
+    const writes = h.fs.writes, rowWrites = h.fault.writes, reads = h.fs.bodyReads, leases = h.lock.names.length;
+    const capture = await WorkspaceSourceCapture.prepare(h.session(), edited.source!.token, h.store(), limits);
+    expect(capture.blobs.map(e => e.sha256).sort()).toEqual([records.representationsById[id('rep')].blob.digest, image.blob.digest].sort());
+    expect(capture.blobs.some(e => e.sha256 === old.representation.blob.digest)).toBe(false);
+    expect(capture.summary.blobEntryCount).toBe(2);
+    expect(capture.summary.blobBytes).toBe(records.representationsById[id('rep')].blob.byteLength + image.blob.byteLength);
+    expect(capture.summary.entityClasses).toContainEqual({ class: 'mediaResourcesById', count: 2 });
+    expect(capture.summary.entityClasses).toContainEqual({ class: 'representationsById', count: 2 });
+    const reopened = ProjectMetadataSource.fromFullSource(capture.metadataBytes(), capture.proof, limits);
+    expect(reopened.originalChanges()).toEqual(edited.source!.originalChanges());
+    expect(reopened.heads).toEqual(capture.targetHeads); expect(capture.publication).toBe(edited.publication);
+    capture.metadataBytes().fill(0); expect(await digest(capture.metadataBytes())).toBe(capture.metadata.sha256);
+    expect(h.fs.bodyReads - reads).toBe(2); expect(h.fs.writes).toBe(writes); expect(h.fault.writes).toBe(rowWrites);
+    expect(h.lock.names).toHaveLength(leases);
+    expect((await h.session().read()).source!.token).toBe(edited.source!.token);
+  });
+
+  it('refuses pending/stale captures, retaining edits and requiring one unchanged publication', async () => {
+    const h = await captureSetup(), initial = h.initial;
+    const files = h.fs.writes, rows = h.fault.writes;
+    await expect(WorkspaceSourceCapture.prepare(h.session(), 'stale', h.store(), limits)).rejects.toThrow(/workspace-not-ready/);
+    expect(h.fs.writes).toBe(files); expect(h.fault.writes).toBe(rows);
+    let changed = false;
+    await expect(WorkspaceSourceCapture.prepare(h.session(), initial.source!.token, { openReadOnly: async (ref, ceilings) => {
+      if (!changed) { changed = true; await h.writer.editCaption(initial.source!.token, id('cap'), 'body', '検証中の追記'); }
+      return h.store().openReadOnly(ref, ceilings);
+    } }, limits)).rejects.toThrow(/workspace-not-ready/);
+    const edited = await h.session().read(); expect(textCandidates(edited.source!, 'body')).toEqual([{ kind: 'value', value: '検証中の追記' }]);
+    let calls = 0;
+    await expect(WorkspaceSourceCapture.prepare({ read: async () => ({ ...(await h.session().read()),
+      publication: ++calls === 1 ? edited.publication : 'different-publication' }) }, edited.source!.token, h.store(), limits)).rejects.toThrow(/workspace-publication-changed/);
+    h.fs.reject = path => path.endsWith('/published.json');
+    await expect(h.writer.editCaption(edited.source!.token, id('cap'), 'title', '中断した編集')).rejects.toThrow();
+    const pendingWrites = h.fs.writes, pendingRows = h.fault.writes, pendingReads = h.fs.bodyReads;
+    await expect(WorkspaceSourceCapture.prepare(h.session(), edited.source!.token, h.store(), limits)).rejects.toThrow(/workspace-not-ready/);
+    expect(h.fs.writes).toBe(pendingWrites); expect(h.fault.writes).toBe(pendingRows); expect(h.fs.bodyReads).toBe(pendingReads);
+    h.fs.reject = () => false;
+    const resumed = await h.session().retry();
+    const capture = await WorkspaceSourceCapture.prepare(h.session(), resumed.source!.token, h.store(), limits);
+    expect(capture.targetHeads).toEqual(resumed.source!.heads);
+  });
+
+  it.each(['missing', 'same-size-corrupt'] as const)('rejects %s bodies with no writes or completed capture', async damage => {
+    const h = await captureSetup(), token = h.initial.source!.token;
+    const path = (await h.fs.list('v2/cas/objects/'))[0]!;
+    if (damage === 'missing') await h.fs.remove(path);
+    else {
+      const bytes = (await MemoryFS.prototype.readBytes.call(h.fs, path))!; bytes[0] = bytes[0]! ^ 1;
+      await h.fs.writeBytes(path, bytes);
+    }
+    const writes = h.fs.writes, rows = h.fault.writes, leases = h.lock.names.length;
+    await expect(WorkspaceSourceCapture.prepare(h.session(), token, h.store(), limits)).rejects.toThrow();
+    expect(h.fs.writes).toBe(writes); expect(h.fault.writes).toBe(rows); expect(h.lock.names).toHaveLength(leases);
+    expect(await h.fs.list('v2/cas/suspect/')).toEqual([]);
+    expect((await h.session().read()).source!.originalChanges()).toEqual(h.initial.source!.originalChanges());
+  });
+
+  it('cancels a blocked body stream without completing or acknowledging a capture', async () => {
+    const h = await captureSetup(), abort = new AbortController(); let entered!: () => void, cancelled = false;
+    const reading = new Promise<void>(resolve => { entered = resolve; });
+    const writes = h.fs.writes, rows = h.fault.writes;
+    const capture = WorkspaceSourceCapture.prepare(h.session(), h.initial.source!.token, { openReadOnly: async ref => ({ size: ref.byteLength as number,
+      stream: () => new ReadableStream<Uint8Array>({ pull() { entered(); return new Promise<void>(() => {}); }, cancel() { cancelled = true; } }, { highWaterMark: 0 }) }) }, limits, abort.signal);
+    const rejected = expect(capture).rejects.toMatchObject({ name: 'AbortError' });
+    await reading; abort.abort(); await rejected;
+    expect(cancelled).toBe(true); expect(h.fs.writes).toBe(writes); expect(h.fault.writes).toBe(rows);
+    expect((await h.session().read()).publication).toBe(h.initial.publication);
+  });
   it('stages arbitrary chunks, reads saved bytes back, deduplicates across stores and refuses missing/busy origin locks', async () => {
     const fs = new Bodies(), lock = locks(), a = new OriginBlobStore(fs, budget, lock.manager), b = new OriginBlobStore(fs, budget, lock.manager);
     const bytes = Uint8Array.from({ length: 97 }, (_, i) => i), ref = await a.put(chunks(bytes), 'application/octet-stream');

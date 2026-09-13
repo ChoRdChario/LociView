@@ -5,7 +5,7 @@ import { canonical, immutableKinds, same } from '../domain/projectGraphSupport';
 import { projectRecordMaps, checkProjectHeader } from '../domain/projectRecords';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
-import type { ProjectCandidateInput } from '../domain/projectCandidates';
+import { inspectProjectCandidates, type ProjectCandidateInput } from '../domain/projectCandidates';
 
 export const adapterFormatVersion = 'lociview-automerge-atomic-map-1';
 export interface MetadataLimits extends HistoryReadLimits {
@@ -63,8 +63,25 @@ export function checkedProof(input: MetadataProof, limits: MetadataLimits): Meta
   return p;
 }
 
+export interface OriginalScalar extends AtomicWrite { readonly changeHash: string }
+export interface OriginalInspectionBudget { readonly maxNodes: number; readonly maxWork: number }
+
+/** Optional owned inspection; never expose partial operations through a caller callback. */
+export async function inspectOriginalSource(doc: PhysicalDoc, proof: MetadataProof, limits: MetadataLimits, budget: OriginalInspectionBudget) {
+  if (![budget.maxNodes, budget.maxWork].every(n => Number.isSafeInteger(n) && n > 0)) fail('original-budget');
+  const detail = inspectPhysicalDetail(doc, proof, limits, budget);
+  const candidates = await inspectProjectCandidates(detail.input, limits);
+  if (candidates.kind !== 'project-candidate-inspection' || candidates.issues.some(i => i.kind === 'invalid')) return fail('original-candidates');
+  const workUsed = detail.workUsed + candidates.workUsed;
+  if (workUsed > budget.maxWork) fail('original-work-budget');
+  return Object.freeze({ input: detail.input, candidates, scalars: detail.scalars, nodesUsed: detail.nodesUsed, workUsed });
+}
+
 /** All raw structure before projection. No traversal of a materialized winner to recover paths. */
 export function inspectPhysical(doc: PhysicalDoc, inputProof: MetadataProof, limits: MetadataLimits): ProjectCandidateInput {
+  return inspectPhysicalDetail(doc, inputProof, limits).input;
+}
+function inspectPhysicalDetail(doc: PhysicalDoc, inputProof: MetadataProof, limits: MetadataLimits, originalBudget?: OriginalInspectionBudget) {
   const proof = checkedProof(inputProof, limits), rootHash = proof.envelope.lineageProof.rootChangeHash;
   const bytes = checkedChanges(A.getAllChanges(doc), limits);
   if (!bytes.length) fail('empty-history');
@@ -77,6 +94,24 @@ export function inspectPhysical(doc: PhysicalDoc, inputProof: MetadataProof, lim
   const occupied = new Set<string>(), ancestors = new Map<string, Set<string>>();
   const changes: AtomicChange[] = [], scalars = new Map<string, { objectId: string; key: string }>();
   let work = 0, operations = 0, schema: JsonObject | undefined, identity: JsonValue | undefined;
+  const originals: OriginalScalar[] = []; let nodesUsed = 0;
+  const collect = (changeHash: string, operationId: string, path: string[], value: AtomicWrite['value']) => {
+    if (!originalBudget) return;
+    // Count additional owned record/path/value nodes across ALL original writes.
+    nodesUsed += 3 + path.length;
+    const pending: JsonValue[] = value.kind === 'value' ? [value.value] : [];
+    while (pending.length) {
+      if (++nodesUsed > originalBudget.maxNodes) fail('original-node-budget');
+      const v = pending.pop();
+      if (v !== null && typeof v === 'object') {
+        const children = Object.values(v);
+        if (nodesUsed + pending.length + children.length > originalBudget.maxNodes) fail('original-node-budget');
+        for (const child of children) pending.push(child);
+      }
+    }
+    if (nodesUsed > originalBudget.maxNodes || work + nodesUsed > originalBudget.maxWork) fail('original-node-budget');
+    originals.push(Object.freeze({ changeHash, operationId, path: Object.freeze([...path]), value: Object.freeze(value) }));
+  };
   const charge = (n = 1) => { work += n; if (work > limits.maxWork) fail('work-limit'); };
   // Order the read projection only. Encoded source bytes are never rewritten.
   const pending = new Map(byHash);
@@ -121,6 +156,7 @@ export function inspectPhysical(doc: PhysicalDoc, inputProof: MetadataProof, lim
           if (op.key === 'identity' && value.kind === 'value') identity = value.value;
         }
         scalars.set(address, { objectId: op.obj, key: op.key });
+        collect(hash, operationId, path, value);
         writes.set(address, { operationId, path, value });
       }
       // Schema is the separately checked source header, not an entity field.
@@ -157,5 +193,6 @@ export function inspectPhysical(doc: PhysicalDoc, inputProof: MetadataProof, lim
       if (!(value instanceof A.ImmutableString) || c.value.kind !== 'value' || value.toString() !== canonical(c.value.value)) fail('value-mismatch');
     }
   }
-  return Object.freeze({ schema: schema!, recordMaps: Object.freeze(Object.keys(projectRecordMaps)), history: read.history });
+  const input = Object.freeze({ schema: schema!, recordMaps: Object.freeze(Object.keys(projectRecordMaps)), history: read.history });
+  return { input, scalars: Object.freeze(originals), nodesUsed, workUsed: work + nodesUsed + read.workUsed };
 }

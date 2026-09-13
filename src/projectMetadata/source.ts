@@ -7,8 +7,8 @@ import { immutableKinds, object, same } from '../domain/projectGraphSupport';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import type { ProjectProviderRead } from '../scene/projectProvider';
 import { planMetadataEdit, type MetadataEdit } from './commands';
-import { adapterFormatVersion, checkedChanges, checkedProof, checkLimits, fail, inspectPhysical, scalar, MetadataSourceError,
-  type MetadataLimits, type MetadataProof, type PhysicalDoc } from './format';
+import { adapterFormatVersion, checkedChanges, checkedProof, checkLimits, fail, inspectPhysical, inspectOriginalSource, scalar, MetadataSourceError,
+  type MetadataLimits, type MetadataProof, type PhysicalDoc, type OriginalInspectionBudget } from './format';
 
 export type { MetadataLimits, MetadataProof } from './format';
 
@@ -67,6 +67,8 @@ export class ProjectMetadataSource {
   }
 
   read() { return inspectPhysical(this.doc, this.proof, this.limits); }
+  /** Complete original scalar evidence, not a package or a storage acknowledgment. */
+  inspectOriginal(budget: OriginalInspectionBudget) { return inspectOriginalSource(this.doc, this.proof, this.limits, budget); }
   get token(): string { return this.read().history.token; }
   get heads(): string[] { return A.getHeads(this.doc).sort(); }
   originalChanges(): Uint8Array[] { return A.getAllChanges(this.doc).map(b => b.slice()); }

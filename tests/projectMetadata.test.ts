@@ -7,6 +7,11 @@ import { fixture, id, limits as valueLimits } from './helpers/projectRecordsFixt
 import { canonical } from '../src/domain/projectGraphSupport';
 import { readProjectScene } from '../src/scene/projectProvider';
 import { developmentContentVerifier } from '../poc/scene-history/content-verifier';
+import { summarizeFullHistory } from '../src/projectPackage/historySummary';
+import { PACKAGE_LIMITS } from '../src/projectPackage/contract';
+import { planWorkspaceClosure } from '../src/projectPackage/closure';
+import { immutableDigest } from '../src/domain/projectGraphSupport';
+import { createFixtureModel } from '../src/harness/projectScene/modelClosure';
 
 const limits: MetadataLimits = { ...valueLimits, maxWork: 1_000_000, maxChanges: 100,
   maxChangeBytes: 1_000_000, maxTotalBytes: 4_000_000, maxOperations: 10_000 };
@@ -24,6 +29,105 @@ function field(source: ProjectMetadataSource, name: string) {
   if (read.kind !== 'atomic-history-inspection') throw Error('test read failed');
   return read.fields.find(f => canonical(f.path) === canonical(['captionsById', id('cap'), name]))!;
 }
+
+const originalBudget = { maxNodes: PACKAGE_LIMITS.inspectionNodes, maxWork: PACKAGE_LIMITS.inspectionWork };
+describe('complete original scalar inspection for package summaries', () => {
+  it('includes both live model-binding candidates without choosing a winner', async () => {
+    const records = fixture(), updated = createFixtureModel({ asset: id('ast'), assetFrame: id('frm', 2), representationFrame: id('frm', 4),
+      representation: id('rep', 2), revision: id('rev', 2), binding: id('bnd', 2), family: id('fam', 2), compatibility: id('cmp', 2),
+      layout: id('lay', 2), slot: id('slot', 2) }, 'updated', { translation: [0, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 });
+    records.representationsById[updated.representation.id] = updated.representation;
+    records.assetRevisionsById[updated.revision.id] = updated.revision; records.assetBindingsById[updated.binding.id] = updated.binding;
+    const other = { ...records.assetBindingsById[id('bnd')], id: id('bnd', 3) };
+    other.payloadDigest = await immutableDigest('asset-binding-revision', other); records.assetBindingsById[other.id] = other;
+    const { source } = create(records);
+    const setBinding = (binding: string) => changed(source, d => {
+      d.assetsById[id('ast')].status = new A.ImmutableString(canonical({ kind: 'ready', activeBindingId: binding }));
+    });
+    const left = ProjectMetadataSource.reopen(setBinding(updated.binding.id), source.proof, limits), merged = left.appendOriginal(setBinding(other.id));
+    const inspection = await merged.inspectOriginal(originalBudget), before = merged.originalChanges();
+    const closure = planWorkspaceClosure(inspection.candidates);
+    const image = Object.values(records.mediaResourcesById)[0] as any;
+    expect(closure.entries.map(entry => entry.sha256).sort()).toEqual([
+      records.representationsById[id('rep')].blob.digest, updated.representation.blob.digest, image.blob.digest,
+    ].sort());
+    const status = inspection.candidates.fields.find(f => f.path.join('/') === `assetsById/${id('ast')}/status`)!;
+    expect(status.candidates).toHaveLength(2);
+    expect(summarizeFullHistory(inspection).fieldClasses).toContainEqual({ class: 'assetsById.status', count: 1 });
+    expect(merged.originalChanges()).toEqual(before);
+  });
+
+  it('counts addressed entities after edits, reverts and conflicts, including the original schema', async () => {
+    const { source, records } = create(), before = source.originalChanges();
+    const edited = await source.prepareCaptionText(source.token, id('cap'), 'body', '追記');
+    const reverted = await edited.prepareCaptionText(edited.token, id('cap'), 'body', records.captionsById[id('cap')].body);
+    const other = await source.prepareCaptionText(source.token, id('cap'), 'body', '別の追記');
+    const merged = reverted.appendOriginal(other.originalChanges());
+    const inspection = await merged.inspectOriginal(originalBudget), summary = summarizeFullHistory(inspection);
+    expect(inspection.scalars.filter(op => op.path[0] === 'schema')).toHaveLength(1);
+    expect(inspection.scalars.filter(op => op.path.join('/') === `captionsById/${id('cap')}/body`)).toHaveLength(4);
+    expect(summary.entityClasses).toContainEqual({ class: 'captionsById', count: 1 });
+    expect(summary.entityClasses).toContainEqual({ class: 'project', count: 1 });
+    expect(summary.fieldClasses).toContainEqual({ class: 'captionsById.body', count: 1 });
+    expect(summary.fieldClasses).toContainEqual({ class: 'project.schema', count: 1 });
+    expect(summary.fieldClasses).toContainEqual({ class: 'project.identity', count: 1 });
+    expect(summary.hasOpaque).toBe(false);
+    expect(field(merged, 'body').candidates).toHaveLength(2);
+    expect(source.originalChanges()).toEqual(before);
+    expect(inspection.scalars.every(op => Object.isFrozen(op) && Object.isFrozen(op.path) && Object.isFrozen(op.value))).toBe(true);
+  });
+
+  it('retains overwritten nested unknown values within one change, without leaking keys into summaries', async () => {
+    const { source, records } = create(), anchor = records.captionsById[id('cap')].anchor;
+    const parts = changed(source, d => {
+      d.captionsById[id('cap')].anchor = new A.ImmutableString(canonical({ ...anchor, futureDiagnostic: { hidden: ['retained'] } }));
+      d.captionsById[id('cap')].anchor = new A.ImmutableString(canonical(anchor));
+    });
+    const reopened = ProjectMetadataSource.reopen(parts, source.proof, limits);
+    const inspection = await reopened.inspectOriginal(originalBudget), summary = summarizeFullHistory(inspection);
+    expect(inspection.candidates.hasUnknownFields).toBe(false);
+    expect(inspection.scalars.filter(op => op.changeHash === reopened.heads[0] && op.path[2] === 'anchor')).toHaveLength(2);
+    expect(summary.hasOpaque).toBe(true);
+    expect(summary.fieldClasses).toContainEqual({ class: 'opaque.field', count: 1 });
+    expect(summary.fieldClasses).toContainEqual({ class: 'captionsById.anchor', count: 1 });
+    expect(JSON.stringify(summary)).not.toMatch(/futureDiagnostic|retained|cap_/);
+    expect(reopened.originalChanges()).toEqual(parts);
+  });
+
+  it('counts unknown deletions and required-field delete/set without rejecting an otherwise valid source', async () => {
+    const records = fixture(); records.futureRoot = { unknown: true };
+    records.captionsById[id('cap')].futureField = 'unknown';
+    const { source } = create(records);
+    const parts = changed(source, d => {
+      delete d.futureRoot; delete d.captionsById[id('cap')].futureField;
+      delete d.captionsById[id('cap')].title;
+      d.captionsById[id('cap')].title = new A.ImmutableString('"戻したタイトル"');
+    });
+    const reopened = ProjectMetadataSource.reopen(parts, source.proof, limits);
+    const inspection = await reopened.inspectOriginal(originalBudget), summary = summarizeFullHistory(inspection);
+    expect(inspection.scalars.filter(op => op.value.kind === 'absent')).toHaveLength(3);
+    expect(summary.entityClasses).toContainEqual({ class: 'opaque', count: 2 });
+    expect(summary.fieldClasses).toContainEqual({ class: 'captionsById.title', count: 1 });
+    expect(reopened.originalChanges()).toEqual(parts);
+  });
+
+  it('bounds cumulative original-node/work inspection and refuses unclassifiable history only in the generator', async () => {
+    const { source } = create(), baseline = await source.inspectOriginal(originalBudget);
+    await expect(source.inspectOriginal({ maxNodes: baseline.nodesUsed, maxWork: baseline.workUsed })).resolves.toMatchObject({ nodesUsed: baseline.nodesUsed });
+    await expect(source.inspectOriginal({ ...originalBudget, maxNodes: baseline.nodesUsed - 1 })).rejects.toThrow(/budget/);
+    await expect(source.inspectOriginal({ ...originalBudget, maxWork: baseline.workUsed - 1 })).rejects.toThrow(/budget/);
+    await expect(source.inspectOriginal({ ...originalBudget, maxNodes: NaN })).rejects.toThrow(/original-budget/);
+    const parts = changed(source, d => {
+      d.captionsById[id('cap')].title = new A.ImmutableString('42');
+      d.captionsById[id('cap')].title = new A.ImmutableString('"有効なタイトル"');
+    });
+    const reopened = ProjectMetadataSource.reopen(parts, source.proof, limits);
+    const inspection = await reopened.inspectOriginal(originalBudget);
+    expect(() => summarizeFullHistory(inspection)).toThrow(/summary-historical-value-unsupported/);
+    expect(field(reopened, 'title').candidates[0]!.value).toEqual({ kind: 'value', value: '有効なタイトル' });
+    expect(reopened.originalChanges()).toEqual(parts);
+  });
+});
 
 describe('production metadata source foundation (no persistence/activation claim)', () => {
   it('creates an empty root and external proof, then all-map contents in a later original change', async () => {

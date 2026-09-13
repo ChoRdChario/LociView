@@ -108,11 +108,27 @@ export class OriginBlobStore {
       return !file ? 'missing' : file.size !== ref.byteLength ? 'suspect' : 'verified-present';
     } catch { return 'suspect'; }
   }
-  async open(input: JsonObject | StoredBlobRef): Promise<WorkspaceReadableFile> {
+  private async readStored(input: JsonObject | StoredBlobRef) {
     const ref = this.ref(input);
     if (await this.inspect(ref) !== 'verified-present') throw new BlobStoreError('unverified');
-    const r = (await this.receipt(this.readFS, ref))!, file = await this.readFS.readStream(objectPath(r.objectId));
+    const r = await this.receipt(this.readFS, ref);
+    if (!r) throw new BlobStoreError('unverified');
+    const file = await this.readFS.readStream(objectPath(r.objectId));
     if (!file || file.size !== ref.byteLength) throw new BlobStoreError('corrupt');
+    return { ref, file };
+  }
+  /** Verified stream without diagnostic writes or lock acquisition, including on corruption. */
+  async openReadOnly(input: JsonObject | StoredBlobRef, ceiling: BlobStreamLimits = this.limits): Promise<WorkspaceReadableFile> {
+    for (const n of [ceiling.maxBlobBytes, ceiling.maxChunkBytes, ceiling.maxChunks])
+      if (!Number.isSafeInteger(n) || n <= 0) throw new BlobStoreError('invalid');
+    const limits = { maxBlobBytes: Math.min(ceiling.maxBlobBytes, this.limits.maxBlobBytes),
+      maxChunkBytes: Math.min(ceiling.maxChunkBytes, this.limits.maxChunkBytes), maxChunks: Math.min(ceiling.maxChunks, this.limits.maxChunks) };
+    const { ref, file } = await this.readStored(input);
+    if (file.size > limits.maxBlobBytes) throw new BlobStoreError('limit');
+    return { size: file.size, stream: () => checkedBlobStream(file.stream(), limits, () => {}, ref) };
+  }
+  async open(input: JsonObject | StoredBlobRef): Promise<WorkspaceReadableFile> {
+    const { ref, file } = await this.readStored(input);
     return { size: file.size, stream: () => storedBlobStream(file.stream(), this.limits, ref, () => {}, undefined, async error => {
       if (error instanceof BlobStoreError && error.code === 'mismatch') {
         this.suspect.add(ref.digest);

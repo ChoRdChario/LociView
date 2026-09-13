@@ -2,6 +2,55 @@
 
 ## Current boundary — thin connected workflow first (2026-09-09)
 
+Current slice after clean `6483318`: verified Team Workspace source capture for F01.
+One writer; independent read-only source/acceptance reviews have no mandatory
+issue. No current PO wait; the full practical-team scope remains open.
+
+Resumption meta-audit: the last turn answered the PO pin-visibility question and
+rechecked 25 existing display tests; it made no new F01 implementation progress.
+Revalidated the unfinished capture tree and resumed implementation. Fixed the
+union-narrowing error and independent-review finding that the old diagnostic CAS
+read writes suspect markers. Dedicated `openReadOnly` now checks raw chunks under
+the stricter store/package limits without locks/writes; old diagnostics stay intact.
+
+- [x] Add source-owned original scalar inspection, including schema and same-change
+  overwrites, returned only after physical/current-candidate validation and bounded
+  cumulative collection. Existing read/reopen/receive admission stays unchanged.
+- [x] Build the complete-history summary and strong/all-live-candidate physical
+  inventory; capture exact full source with token/publication checks before/after
+  streamed body verification. Keep original bytes and existing Project untouched.
+- [x] Reuse source, persistence/blob and isolation tests; verify edit/revert,
+  overwritten opaque data, conflicts, weak history, dedup, corrupt/missing bodies,
+  pending/stale/cancel and final typecheck/test/build plus independent review.
+
+This capture is not ZIP generation, a durable job/receipt/exchange base or file-save
+success. It refuses unclassifiable historical values or unproved opaque inventory
+without changing existing history admission. No new PoC, ordinary UI activation,
+schema/dependency/migration/release or device claim. Next connect the frozen output
+to bounded ZIP generation and verified file receive; stop on a contract conflict.
+
+Review: 4 existing test files / 93 focused PASS and typecheck exit 0.
+Assertions cover original schema/edit-revert/same-change unknown/absence and
+cumulative budgets, two live binding candidates (closure-level), distinct unsaved
+weak-old-body exclusion, independent Media physical dedup, exact source bytes,
+no-write/no-lock capture, raw-chunk N/N+1, pending/recovery, stale/publication change,
+missing/corrupt body and blocked-stream cancellation. No new PoC or browser claim.
+Final typecheck/build exit 0; root 112 files / 2,116 PASS / 21 existing TODO /
+zero failures, 426.06 s. Executable source/tests are unchanged after that run.
+Known injected-raster, UUID and build warnings remain, not browser/iPhone/offline
+evidence. Independent source/acceptance reviews have no mandatory issue.
+F01/F02 remain unconnected; inventory classifications stay 33/4/18/9, not a
+completion percentage. Branch remains g0-baseline; cached-origin delta at the
+base is 0 behind / 58 ahead. No push/browser retry or release change was made.
+
+Next F01 connection uses existing `@zip.js/zip.js` stream writer APIs, not a new
+dependency. Read-only API review found the exact §12.4 writer fields configurable:
+explicit DOS/version/attributes/UTF-8/signed-descriptor/local 1980 epoch are needed;
+old Native defaults are not that proof. Reuse bounded stream I/O, then independently
+check exact raw headers/descriptors/offsets/EOCD plus measured CRC/hash. Library
+strict-reader mode alone does not enforce the wire contract. Connect source/body
+retention and verified receive before treating a generated stream as file completion.
+
 Completed F01/F02 control slice after clean `f4388fc`: five-purpose canonical manifest and
 derived-entry preflight in `src/projectPackage`, using production JSON/domain/hash
 primitives. Previous goal turn made production progress (visible review pins) and
