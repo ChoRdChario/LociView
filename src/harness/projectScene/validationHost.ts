@@ -26,7 +26,7 @@ import { validationMaterialSlots, validationMaterialIssue } from './validationMa
 import { same } from '../../domain/projectGraphSupport';
 import type { MaterialIntent } from '../../domain/materialIntent';
 import { WorkspaceReceiver, type WorkspaceReceiveState } from '../../projectFiles/receiveWorkspace';
-import { WorkspaceSender, type WorkspaceOutputState } from '../../projectFiles/sendWorkspace';
+import { WorkspaceSender, type WorkspaceOutputState, type ContributionBaseChoice } from '../../projectFiles/sendWorkspace';
 import { WorkspaceArchive } from '../../projectPackage/workspaceArchive';
 
 export const validationArea = 'lociview-development-validation-1';
@@ -66,11 +66,17 @@ export async function openValidationHost(options: ValidationHostOptions) {
     const { content, session } = validationProjectService(fs, connection.factory, options.store, options.fileLimits, options.decode);
     const receiver = new WorkspaceReceiver(options.base, fs, session, limits, options.packageLocks ?? null);
     const sender = new WorkspaceSender(fs, session, options.store, limits, options.packageLocks ?? null);
-    let outputJobs: WorkspaceOutputState[] = await sender.jobs(), outputFailure = '';
+    let outputJobs: WorkspaceOutputState[] = [], outputFailure = '';
+    let outputBases: ContributionBaseChoice[] = [], outputDiscoveryFailure = '';
+    const reloadOutput = async () => {
+      try { outputJobs = await sender.jobs(); outputBases = await sender.availableBases(); outputDiscoveryFailure = ''; }
+      catch (error) { outputBases = []; outputDiscoveryFailure = error instanceof Error ? error.message : '受け渡しの記録を確認できません。'; }
+    };
+    await reloadOutput();
     const unfinishedOutput = () => outputJobs.some(j => ['unstarted', 'incomplete', 'repair-required'].includes(j.state));
     let receiveJobs: WorkspaceReceiveState[] = await receiver.jobs(), receiveFailure = '', receiveDisplayPending = false;
     const unfinishedReceive = () => receiveJobs.some(j => !['completed', 'cancelled', 'abandoned'].includes(j.state));
-    const reloadReceive = async () => { receiveJobs = await receiver.jobs(); };
+    const reloadReceive = async () => { receiveJobs = await receiver.jobs(); await reloadOutput(); };
     let last = await session.read(), project: SyntheticProject | undefined;
     if (last.source && (last.source.proof.identity.projectId !== `prj_${run}` || incoming && json(last.source.proof) !== json(incoming.source.proof)))
       throw Error('ファイルと再開用データのプロジェクトが一致しません。既存データは変更していません。');
@@ -160,15 +166,17 @@ export async function openValidationHost(options: ValidationHostOptions) {
       catch { /* File and incomplete originals stay available through the same recovery controls. */ }
     }
     const outputAction = <T>(action: () => Promise<T>, recovery = false) => execute(async () => {
-      editable(); if (!recovery && (unfinishedOutput() || last.state !== 'ready')) throw Error('中断したファイル生成を確認してください。');
+      editable(); if (!recovery && (outputDiscoveryFailure || unfinishedOutput() || last.state !== 'ready')) throw Error('中断したファイル生成を確認してください。');
       outputFailure = '';
       try { return await action(); }
       catch (error) { outputFailure = error instanceof Error ? error.message : 'ファイル処理を完了できません。'; throw error; }
-      finally { outputJobs = await sender.jobs(); }
+      finally { await reloadOutput(); }
     }, true);
     const workspaceOutput = {
-      get jobs() { return outputJobs; }, get error() { return outputFailure; },
+      get jobs() { return outputJobs; }, get error() { return outputFailure || outputDiscoveryFailure; },
+      get bases() { return outputBases; },
       generate: (token: string) => outputAction(() => sender.generate(token)),
+      generateContribution: (token: string, selection: ContributionBaseChoice['selection']) => outputAction(() => sender.generateContribution(token, selection)),
       retry: (id: string) => outputAction(() => sender.retry(id), true),
       cancel: (id: string) => outputAction(() => sender.cancel(id), true),
       verifyFile: (id: string, file: Blob) => outputAction(() => sender.verifyFile(id, file), true),
@@ -278,7 +286,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
       },
       retry: () => execute(async () => { editable(true); return resume(); }),
     };
-    const emptyImport = () => !localInitial && last.state === 'empty' && !unfinishedReceive() && !unfinishedOutput();
+    const emptyImport = () => !localInitial && last.state === 'empty' && !outputDiscoveryFailure && !unfinishedReceive() && !unfinishedOutput();
     const host: SavedWorkspaceHost = { authority, limits, read: () => last, hasPending: () => busy || receiveDisplayPending || unfinishedReceive() ||
       !emptyImport() && (!!failure || last.state !== 'ready'),
       refresh: () => execute(async () => { await reloadReceive(); last = await session.read(); await projectView(last); return last; }),

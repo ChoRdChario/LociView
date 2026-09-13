@@ -51,7 +51,10 @@ Contribution journal now connect to the same update-file UI. Exact originals,
 receiver M, one publication, M=0, cold retry and pre-start re-selection use the
 existing services; the live base table is never advanced. Missing acknowledged
 evidence remains repair-required, including lost jobs discovered by index/journal.
-Contribution durable output/UI and external save receipts remain open.
+Contribution durable output now connects in the same file tools under §8.7:
+explicit available base, frozen source/inventory, original-D retry, indexed missing
+jobs and optional exact reselected-file verification. Generation never advances a
+base; download never proves external save. No other save sink is added.
 Final checks are in todo.
 F01/F02 are not complete. Current executed evidence and next work are in todo.
 

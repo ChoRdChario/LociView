@@ -4,7 +4,7 @@ import type { JsonValue } from '../domain/values';
 import type { OriginBlobStore, StoredBlobRef } from '../projectMetadata/blobStore';
 import { checkedBlobStream } from '../projectMetadata/blobStream';
 import type { MetadataProjectSession, MetadataSessionRead } from '../projectMetadata/session';
-import { ProjectMetadataSource, type MetadataLimits } from '../projectMetadata/source';
+import { ProjectMetadataSource, type MetadataLimits, type MetadataProof } from '../projectMetadata/source';
 import { PACKAGE_LIMITS as L, SUMMARY_ALGORITHM, type AutomaticSummary, type ChangeEntry, type Entry, type PackageManifest } from './contract';
 import { packageByteHash, PackageControlError, readManifestControl } from './manifest';
 import { summarizeFullHistory } from './historySummary';
@@ -88,10 +88,11 @@ export class VerifiedContributionBase {
 /** Exact original delta capture; no storage mutation, retained-base update or save receipt. */
 export class ContributionSourceCapture {
   readonly kind = 'contribution-source-capture';
-  private constructor(readonly base: VerifiedContributionBase, readonly target: ProjectMetadataSource, readonly token: string, readonly publication: string,
+  private constructor(private readonly bytes: Uint8Array, readonly base: VerifiedContributionBase, readonly target: ProjectMetadataSource, readonly token: string, readonly publication: string | null,
     private readonly originals: readonly Uint8Array[], readonly changes: readonly ChangeEntry[], readonly blobs: readonly Entry[],
     readonly bodyRefs: readonly StoredBlobRef[], readonly summary: AutomaticSummary) { Object.freeze(this); }
   changeBytes(ordinal: number) { const b = this.originals[ordinal]; if (!b) return fail('contribution-ordinal'); return b.slice(); }
+  metadataBytes() { return this.bytes.slice(); }
   static async prepare(session: Pick<MetadataProjectSession, 'read'>, expectedToken: string, base: VerifiedContributionBase,
     store: BodyStore, limits: MetadataLimits, signal?: AbortSignal) {
     const ready = (read: MetadataSessionRead) => {
@@ -100,9 +101,22 @@ export class ContributionSourceCapture {
       return { source: read.source, publication: read.publication };
     };
     checkAbort(signal); const before = ready(await session.read()); checkAbort(signal);
-    await base.verifyInventory(store, signal);
-    const bounded = packageSourceLimits(limits), target = ProjectMetadataSource.fromFullSource(before.source.encodeFullSource(), before.source.proof, bounded);
+    const result = await this.collect(before.source.encodeFullSource(), before.source.proof, expectedToken, before.publication, base, store, limits, signal);
+    const after = ready(await session.read()); checkAbort(signal);
+    if (after.publication !== before.publication) fail('contribution-publication-changed');
+    return result;
+  }
+  /** Frozen job originals only; never a live Session readiness assertion. */
+  static restore(bytes: Uint8Array, proof: MetadataProof, token: string, base: VerifiedContributionBase,
+    store: BodyStore, limits: MetadataLimits, signal?: AbortSignal) {
+    return this.collect(bytes.slice(), proof, token, null, base, store, limits, signal);
+  }
+  private static async collect(bytes: Uint8Array, proof: MetadataProof, expectedToken: string, publication: string | null,
+    base: VerifiedContributionBase, store: BodyStore, limits: MetadataLimits, signal?: AbortSignal) {
+    checkAbort(signal);
+    const bounded = packageSourceLimits(limits), target = ProjectMetadataSource.fromFullSource(bytes, proof, bounded);
     if (target.token !== expectedToken) return fail('contribution-source-mismatch');
+    await base.verifyInventory(store, signal);
     const d = delta(base.source, target, bounded), description = await describeTarget(base, target, d.changes, signal);
     const refs = new Map(description.bodyRefs.map(r => [r.digest, r]));
     let reads = 0, measured = 0; const streamLimits = { maxBlobBytes: L.blobBytes, maxChunkBytes: L.chunkBytes, maxChunks: L.streamChunks };
@@ -121,9 +135,8 @@ export class ContributionSourceCapture {
       } catch (error) { try { await reader.cancel(error); } catch { /* Preserve original error. */ } throw error; }
       finally { reader.releaseLock(); }
     }
-    await base.verifyInventory(store, signal); const after = ready(await session.read()); checkAbort(signal);
-    if (after.publication !== before.publication) fail('contribution-publication-changed');
-    return new ContributionSourceCapture(base, target, expectedToken, before.publication, d.parts, d.changes,
+    await base.verifyInventory(store, signal); checkAbort(signal);
+    return new ContributionSourceCapture(bytes, base, target, expectedToken, publication, d.parts, d.changes,
       description.blobs, description.bodyRefs, description.summary);
   }
 }

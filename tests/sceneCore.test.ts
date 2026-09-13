@@ -234,8 +234,8 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
     });
     for (const path of walk('src').filter(p => /\.(ts|tsx|js)$/.test(p))) {
       const source = readFileSync(path, 'utf8');
-      const packageControl = /[\\/]projectPackage[\\/](contract|manifest|historySummary|closure|protectedInventory|workspaceSource|contributionSource|contributionArchive|contributionEvidence|contributionReceiveJob|receiveJobs|zipChecks|zipArchive|workspaceArchive|receiveJob|workspaceBases|outputJob)\.ts$/.test(path);
-      const packageMetadata = /[\\/]projectPackage[\\/](historySummary|closure|protectedInventory|workspaceSource|workspaceArchive|contributionSource|contributionArchive|contributionEvidence|contributionReceiveJob|receiveJobs|receiveJob|workspaceBases|outputJob)\.ts$/.test(path);
+      const packageControl = /[\\/]projectPackage[\\/](contract|manifest|historySummary|closure|protectedInventory|workspaceSource|contributionSource|contributionArchive|contributionEvidence|contributionReceiveJob|contributionOutputJob|outputJobs|receiveJobs|zipChecks|zipArchive|workspaceArchive|receiveJob|workspaceBases|outputJob)\.ts$/.test(path);
+      const packageMetadata = /[\\/]projectPackage[\\/](historySummary|closure|protectedInventory|workspaceSource|workspaceArchive|contributionSource|contributionArchive|contributionEvidence|contributionReceiveJob|contributionOutputJob|outputJobs|receiveJobs|receiveJob|workspaceBases|outputJob)\.ts$/.test(path);
       const packageJournal = /[\\/]projectMetadata[\\/](packageRemote|session|journal)\.ts$/.test(path) || /[\\/]projectFiles[\\/](receiveWorkspace|sendWorkspace)\.ts$/.test(path) ||
         /[\\/]harness[\\/]projectScene[\\/](validationHost|validationWorkspace)\.ts$/.test(path);
       // 06 §11/§12.3 permit these exact disconnected primitives, not an app importer.
@@ -262,6 +262,10 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
             '../projectMetadata/source', './contract', './manifest', './closure', './historySummary', './outputJob'],
           outputJob: ['../platform/fs', '../projectMetadata/blobStore', '../projectMetadata/format', '../projectMetadata/persistence', '../projectMetadata/source',
             './contract', './manifest', './workspaceSource', './workspaceArchive', './workspaceBases', './protectedInventory'],
+          contributionOutputJob: ['../platform/fs', '../projectMetadata/blobStore', '../projectMetadata/format', '../projectMetadata/persistence', '../projectMetadata/source',
+            './contract', './manifest', './contributionSource', './contributionEvidence', './contributionArchive', './workspaceBases', './protectedInventory'],
+          outputJobs: ['../platform/fs', '../projectMetadata/format', './outputJob', './contributionOutputJob', '../projectMetadata/blobStore',
+            '../projectMetadata/persistence', './workspaceBases', './protectedInventory', './contract'],
           workspaceSource: ['../projectMetadata/session', '../projectMetadata/source', '../projectMetadata/blobStore', '../projectMetadata/blobStream',
             './contract', './manifest', './historySummary', './closure', './contributionEvidence'],
           // 06 §8.5/8.6: exact file/source/receive boundaries, not ordinary activation.
@@ -303,7 +307,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
             '../../projectMetadata/assetDeletion', '../../projectFiles/creation', '../../projectFiles/validation', '../../projectFiles/png',
             './metadataFixture', './validationProjection', './metadataIntent', './fixture', './historyProjection', './savedHost', './mediaHistory',
             '../../projectFiles/initialProject', '../../domain/values', './modelTypes', './viewHistory', '../../scene/resolve', './validationMaterials', '../../domain/projectGraphSupport', '../../domain/materialIntent', '../../projectFiles/receiveWorkspace', '../../projectFiles/sendWorkspace', '../../projectPackage/workspaceArchive'],
-          validationCatalog: ['./validationHost', '../../projectFiles/creation', '../../projectFiles/receiveWorkspace', '../../projectFiles/validation'],
+          validationCatalog: ['./validationHost', '../../projectFiles/creation', '../../projectFiles/receiveWorkspace', '../../projectFiles/sendWorkspace', '../../projectFiles/validation'],
           validationWorkspace: ['../../projectMetadata/persistence', '../../projectFiles/initialProject', '../../projectFiles/creation',
             '../../projectFiles/validation', '../../projectPackage/workspaceArchive', '../../projectFiles/png', './validationHost', './validationModeHost', './savedHost', './validationCatalog', './metadataWorkspace', './viewportHost', './validationReceiveControls'],
           validationReceiveControls: ['./validationModeHost', './session', './validationOutputControls'],
@@ -339,7 +343,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           modelFacts: ['../scene/projectProvider', '../projectMetadata/session', '../projectMetadata/source', '../projectMetadata/persistence', '../domain/projectContentChecks', '../domain/projectRecordFields', '../domain/values', './validation', './content'],
           receiveWorkspace: ['../platform/fs', '../platform/projectLock', '../projectMetadata/session', '../projectMetadata/format', '../projectPackage/receiveJob', './validation', '../projectMetadata/journal', '../projectMetadata/persistence', '../projectMetadata/blobStore', '../projectPackage/contract', '../projectPackage/zipArchive', '../projectPackage/contributionReceiveJob', '../projectPackage/receiveJobs', '../projectPackage/manifest'],
           sendWorkspace: ['../platform/fs', '../projectMetadata/session', '../projectMetadata/blobStore', '../projectMetadata/format', '../projectMetadata/persistence',
-            '../projectPackage/outputJob', '../projectPackage/workspaceBases', './receiveWorkspace', './validation'],
+            '../projectPackage/outputJob', '../projectPackage/contributionOutputJob', '../projectPackage/outputJobs', '../projectPackage/contributionSource', '../projectPackage/workspaceBases', './receiveWorkspace', './validation'],
         };
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
         expect(imports.every(p => byFile[path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '')]!.includes(p!)), path).toBe(true);
@@ -381,7 +385,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           blobInventory: ['../domain/projectContentChecks', '../domain/values', './contentEvidence', './format', './blobStore'],
           session: ['@automerge/automerge/slim', '../platform/fs', '../domain/values', '../domain/projectContentChecks', '../domain/captionText', '../scene/projectProvider',
             './format', './source', './repository', './journal', './persistence', './commands', './remote', './packageRemote', '../projectPackage/receiveJob', '../projectPackage/manifest',
-            './blobStore', '../projectPackage/outputJob', '../projectPackage/workspaceBases', '../projectPackage/workspaceSource', '../projectPackage/protectedInventory', '../projectPackage/contract', '../projectPackage/contributionReceiveJob', '../projectPackage/contributionEvidence', '../projectPackage/receiveJobs'],
+            './blobStore', '../projectPackage/outputJob', '../projectPackage/contributionOutputJob', '../projectPackage/contributionSource', '../projectPackage/outputJobs', '../projectPackage/workspaceBases', '../projectPackage/workspaceSource', '../projectPackage/protectedInventory', '../projectPackage/contract', '../projectPackage/contributionReceiveJob', '../projectPackage/contributionEvidence', '../projectPackage/receiveJobs'],
           startupScene: ['../scene/projectProvider', '../domain/projectRecords', '../domain/projectRecordFields', './membership', './format'],
           commands: ['../domain/values', '../domain/projectMutableFields', '../domain/projectRecordFields', '../domain/projectRecords', '../domain/projectGraphSupport',
             '../domain/materialIntent', '../domain/captionText', '../scene/projectMaterialRoutes', '../scene/commands', '../scene/resolve', '../scene/types', '../scene/projectProvider', './format', './membership', './records', './assetStatus', './modelMembership', './captionCandidates', './sceneAuthoring', './viewResolution', './captionDeletion', './assetDeletion', './startupScene', './modelAddition'],

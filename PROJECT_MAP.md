@@ -59,7 +59,10 @@ same update-file controls. Original wire/base/derived evidence and receiver M st
 separate; pre-start re-selection and cold recovery never recreate acknowledged
 evidence. M=0 has no metadata publication or base advancement. A separate job index
 keeps lost jobs visible to shared recovery/output guards. Exact checks are tracked
-in todo; Contribution durable output/UI and other purposes remain open.
+in todo. Contribution durable output now joins the same file area: explicit base
+selection, frozen source/base/inventory, original-D artifact retry and optional
+exact external-file verification, without a generated base. Shared discovery
+includes both output kinds and indexed missing jobs. Other purposes remain open.
 Download alone is not save proof.
 This is not ordinary-home, rendered/device or whole-team acceptance.
 Exact executed checks are in todo.

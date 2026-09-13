@@ -772,6 +772,75 @@ for D≠M, two rounds/local conflicts, M0, cold prefix interruption, completion 
 lost source/base/derived/M/index/job data and mutual guards. Node/recorded DOM is
 not rendered picker, physical iPhone, offline or normal-home acceptance.
 
+### 8.7 Isolated durable Contribution output (2026-09-13)
+
+Implementation detail of §§8.5/11/12.7, not another wire purpose or save sink.
+Retain original Workspace output records/receipts unchanged. Use a sibling local
+job at `v2/packages/contribution-output/<jobId>/` with fixed `metadata.am`,
+`manifest.json`, `base-manifest.json`, `base-metadata.am`, `inventory.json`,
+`bases.json`, `capture.json`, `prepared.json`, `start.json`, `abandoned.json`,
+`steps/<sha256>.json` and `artifacts/<sinkId>.zip`. All paths derive from checked
+technical IDs, not imported filenames. Existing finite control/source/archive,
+entry and total retained-package space budgets apply, including failed artifacts.
+
+Use §12.7's exact FrozenCapture/PreparedOutput/JobStart/step shapes. Capture purpose
+is `contribution`, scope is wholeProject, and required `base` is §8.1's complete
+proof binding the explicitly selected available Workspace and the two retained base
+originals. `sourceMetadata` binds the first frozen full source, not a file placed
+inside the Contribution ZIP. Payloads are precisely D's original amchange entries
+in incremental lexical-ready order followed by the new strong blobs. Each change
+derives an `Entry` with fixed `changes/<eight-digit ordinal>.amchange` path,
+`sha256:bytesSha256` and the original `byteLength`; do not put a `ChangeEntry`
+object into `PreparedOutput.payloads`. Protected
+inventory and the full available-base table snapshot remain local. Prepared roots
+include frozen source, manifest, capture, inventory, table, selected base originals,
+every snapshot base evidence and protected blob digest/length. No live source/base
+lookup may replace these inputs after Start.
+
+Before first persistence, revalidate Session token/publication, available base,
+source structure and exact summary/closure under the Project lease and the existing
+origin file-operation slot. Retain/read back originals and controls, then write and
+read back an outside-job index at `v2/packages/contribution-output-index/<jobId>.json`
+with closed `{schema:'lociview-contribution-output-index-1',jobId,prepared:EvidenceRef}`;
+Start is last. Union directory/index discovery rejects a started job without a
+matching index, or an indexed job whose bound prepared data is absent/mismatched.
+No index/source/artifact is recreated to conceal acknowledged loss. A crash between
+index and Start is unstarted: no generation/resume; explicitly abandon it using
+`{schema:'lociview-contribution-output-abandoned-1',jobId,stage:'beforeStart'}` and
+retain its fragments. Steps without Start are repair, not unstarted.
+
+Cold generation derives the same original D from frozen source/base bytes using
+the pinned adapter and compares the complete manifest to the retained original.
+It streams only payloads not guaranteed by that base. Recheck frozen observations
+are still present in the current table and the full protected inventory is intact;
+later observations/edits may exist but do not alter this job. Verify all required
+base/body evidence; missing acknowledged data is repair, not a smaller output.
+Retry incomplete artifacts from byte zero into a fresh sink ID under the same
+package/job ID. Never splice a prefix. Await both writer and generator termination
+on error/abort before releasing the operation slot. Existing original D/source
+validation, CRC/SHA and full artifact read-back precede `artifactVerified`.
+
+The allowed closed step chain is `artifactVerified` then optional
+`externalFileVerified(profile:'reselectedFileV1')`, or `cancelled(stage:'beforeArtifact')`
+alone. There is no `baseRecorded`, generated Workspace observation or base-table
+write. Generation is complete after artifact read-back/receipt, not external save.
+Download makes no receipt. A selected external file must exactly match the frozen
+whole ZIP; repeat verification reuses the first observation without another write.
+Known loss/corruption of acknowledged input or artifact remains repair on retry,
+download and verification; no regeneration from the current Project. No cleanup or
+historical root release is introduced in this unit.
+
+Enumerate both output job kinds for creation/retry mutual exclusion, host recovery
+and catalog discovery; a lost Contribution folder cannot disappear behind an empty
+list. Keep the existing receiver guards and Project edit semantics: a frozen output
+does not freeze ordinary editing, but a newer edit never enters an older artifact.
+The existing file UI offers Workspace or Contribution, revealing explicit available
+Workspace-base selection only for Contribution. Choice changes are pending UI input
+until generation/cancellation; no role/filename/source relation is inferred. Mode,
+IME, draft and file input guards remain. Refresh discovers both output kinds, and
+recovery before renderer preparation stays available. Reuse existing package/file/
+recorded-DOM tests; browser/iPhone/offline and ordinary-route adoption remain open.
+
 ## 9. Acceptance vectors required before S2
 
 These are vector requirements, not tests executed by this document. Reuse the
@@ -2001,6 +2070,8 @@ by digest with consistent lengths. Bytes required by an active operation or
 retained proof cannot be missing; historical descriptors after completed handoff
 have the explicitly narrower lifetime defined below.
 Each row lists the complete allowed field set; unlisted fields reject.
+The isolated Contribution output index and before-Start abandonment records use
+the closed local variants in §8.7; they do not add a wire or job-step variant.
 
 | Closed record | Fields / exact binding |
 |---|---|

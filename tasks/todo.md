@@ -2,6 +2,66 @@
 
 ## Current boundary — thin connected workflow first (2026-09-09)
 
+Active after clean `b483640`. Previous goal turn made production progress: actual
+Contribution receive/recovery committed in 25 files after typecheck, 2,199 PASS,
+both builds and independent review. No active process or repeated blocker remains.
+The full practical-team goal is unchanged; this unit connects durable Contribution
+output to the same file area, using approved 06 §12.7 rather than another PoC.
+
+- [x] Specify/review exact frozen output records, outside-job discovery, separate
+  completion and shared guards before implementation.
+- [x] Connect retained source/base/inventory to original-D output, same-ID artifact
+  retry, read-back and optional exact reselected-file verification. No base advance.
+- [x] Add explicit available-base selection and output purpose to the existing host,
+  recovery list, download/confirmation and input guards. Keep later edits intact.
+- [x] Reuse file/package/host tests for two file rounds, cold recovery, corruption,
+  acknowledged loss, no-op verification and old-model zero reads. Final meaningful
+  tree typecheck/test/build, independent review and checkpoint.
+
+No new wire/Project schema, dependency/profile expansion, automatic save sink,
+backup/review/migration, ordinary-home activation, release or device/offline claim.
+Stop only for an actual accepted-contract or authority conflict. Technical record
+details below remain within the already approved implementation delegation.
+
+Review/result (2026-09-14): §8.7 prereview fixed exact Entry derivation
+and the closed local index/abandonment reference. Source review found no mandatory
+job/index/Session issue; UI review found an unrelated download clearing pending
+purpose/base input. Choice now clears only on new generation or explicit choice
+cancellation, covered by the existing recorded-DOM case. The first focused core
+run passed 9 checks in 27.11 s. The subsequent DOM/lost-data run had 19 PASS and
+one failing assertion (40.30 s): the test selected the receive area's identically
+named cancel button instead of the output area's button. Its locator now scopes
+to the labelled output section. A test-only RecordedNode.inert type assertion was
+also corrected. Both explicit-choice/warm-output cases then passed in 9.59 s.
+Typecheck exits 0. The first full root run (52498) passed 112 files / 2,209 tests /
+21 existing TODO / zero failures in 305.19 s. A late UI review additionally found
+old success feedback hiding discovery failures and initial discovery bypassing its
+recovery catch. These are fixed with the same two DOM cases extended; final tree
+typecheck exits 0 and the two cases pass again (10.14 s). Independent UI re-review
+has no mandatory findings. With source/tests frozen, final root run 57330 exits 0:
+112 files / 2,209 PASS / 21 existing TODO / zero failures in 300.83 s. Ordinary
+and harness builds both exit 0; existing mixed-import/large-chunk warnings remain.
+No source/test edits follow these checks. Independent exact-index review of the
+18-file unit has no mandatory findings; unstaged/untracked files are absent and
+both diff checks exit 0. Resolve the local checkpoint from Git HEAD/log.
+No browser/iPhone/offline or ordinary-route acceptance is claimed.
+
+Short meta-audit: `g0-baseline`, start `b483640`, cached origin 0 behind / 67 ahead.
+This unit closes a real Contribution output/receive loop in the existing limited
+host, not another PoC. Full 62-group practical-team/ordinary/device acceptance is
+still open. No unchanged denied push/browser retry or new profile/dependency.
+Next accepted boundary is F03: complete backup and explicit manual checkpoint/
+restore. Begin with exact backup capture/ZIP/reopen under 06 §§4.1/5/12.2/12.7:
+original metadata, all protected blobs including base-only data, full exchange
+table and deduplicated original base evidence. Reuse existing summary/closure/
+ZIP primitives and package/file tests. Then specify the finite durable output and
+explicit same-Project restore protocol before connecting it to the same file area.
+Historical observations must not become newly invented local import/generated
+receipts. No automatic external sink/rotation/GC, review/clean/migration profile,
+ordinary-home activation or device/offline credit is included in that first unit.
+
+### Completed Contribution receive checkpoint (`b483640`)
+
 Completed receive/recovery unit, based on clean `fe5f490` (Contribution originals / ZIP). The previous goal turn
 made production progress: the 13-file unit below is committed after 2,182 passing
 tests, typecheck, both builds and independent exact-index review. Cached origin is

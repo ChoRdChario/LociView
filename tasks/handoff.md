@@ -1,13 +1,22 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **Current unit — `fe5f490`後のContribution受信接続:** 同じ更新file欄から差分を受信。
+> **Current unit — `b483640`後のContribution出力接続:** 同じ「ファイルで渡す」で
+> 作業一式／変更分を選択。変更分は元の作業一式を明示選択し、source／base／inventoryを固定。
+> 中断後も同job／packageと元Dから再生成し、後の編集は混ぜない。base表は更新しない。
+> 独立indexで欠落jobを検出し、cold／warmの一覧と復旧へ接続。downloadは保存証拠ではない。
+> 生成時と別の選択入力を消さないこと、実ZIP二巡／未変更本体0read／欠落拒否を既存testsで確認。
+> 型・通常／harness build exit 0。最終root 2,209 PASS／既存21 TODO／失敗0（300.83秒）。
+> 独立review指摘は解消。exact-index／checkpointはtodo。通常home／他purpose／移行／実機／offlineは未完了。
+> 次はF03の完全backup capture／ZIP／reopen、その後に明示手動checkpoint／復元を接続する。
+
+> **Previous checkpoint — `b483640` Contribution受信接続:** 同じ更新file欄から差分を受信。
 > 元base／wire変更／derived targetを凍結した新job／journalで、receiver Mを一度だけ反映する。
 > M=0はmetadata journal／公開／base更新なし。独立indexとjournalで欠落jobも検出。
 > cold prefix／公開後の復旧・同じfile再選択・取りやめと、warm Viewの復旧用Editへ接続。
 > 位置既知の要確認ピンは元色で表示し、別印・選択・窓を維持する既存方針は変更なし。
 > 型・通常／harness buildはexit 0、全root 2,199 PASS／既存21 TODO／失敗0（282.53秒）。
-> source/test独立reviewの必須残件なし。最終index・checkpointはtodo。Contribution出力UIと他purpose、通常home、
-> 実browser／実機／offlineは未完了。次は同じfile欄へ差分出力を接続し、通し作業を閉じる。
+> source/test独立reviewの必須残件なし。この時点の未完了出力は上記current unitで接続。
+> 他purpose／通常home／実browser／実機／offlineは引き続き未完了。
 
 > **Previous checkpoint — `fe5f490` Contribution原本／ZIP:** 共通交換基準を明示選択し、
 > 元変更D・必要本体差分・delta summaryから実ZIPを生成／再検査する部品を追加。

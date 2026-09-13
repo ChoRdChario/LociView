@@ -19,6 +19,9 @@ import { receiveJobKeys, receiveInputState, openReceiveJob, receiveTerminal, typ
 import { packageByteHash } from '../projectPackage/manifest';
 import type { OriginBlobStore } from './blobStore';
 import { WorkspaceOutputJob } from '../projectPackage/outputJob';
+import { ContributionOutputJob } from '../projectPackage/contributionOutputJob';
+import { ContributionSourceCapture, VerifiedContributionBase, type ContributionBaseSelection } from '../projectPackage/contributionSource';
+import { outputJobKeys, outputJobClass, openOutputJob, outputTerminal, validateOutputProtection } from '../projectPackage/outputJobs';
 import { WorkspaceBaseStore } from '../projectPackage/workspaceBases';
 import { WorkspaceSourceCapture } from '../projectPackage/workspaceSource';
 import { protectedWorkspaceInventory } from '../projectPackage/protectedInventory';
@@ -224,30 +227,15 @@ export class MetadataProjectSession {
   private async finishWorkspaceOutput(job: WorkspaceOutputJob, store: OriginBlobStore, signal?: AbortSignal) {
     job.assertOwner(this.fs); const current = await this.outputReady();
     if (json(current.source!.proof) !== json(job.source.proof)) return fail('output-lineage');
-    const bases = new WorkspaceBaseStore(this.fs, this.limits, job.source.proof), snapshot = await bases.snapshot(), frozen = job.frozenBases();
-    // Current table may have advanced, but every original frozen observation must still be present.
-    for (const r of frozen.records) {
-      const found = snapshot.records.find(b => b.workspacePackageId === r.workspacePackageId);
-      if (!found || json({ ...found, completions: [] }) !== json({ ...r, completions: [] }) ||
-        r.completions.some(c => !found.completions.some(v => json(v) === json(c)))) return fail('output-frozen-base-missing');
-    }
-    const inspection = await job.source.inspectOriginal({ maxWork: PACKAGE_LIMITS.inspectionWork, maxNodes: PACKAGE_LIMITS.inspectionNodes });
-    const inventory = protectedWorkspaceInventory(inspection.candidates, await bases.payloads(frozen.records));
-    if (json(inventory) !== json(job.frozenInventory())) return fail('output-frozen-inventory');
-    for (const b of inventory.blobs) if (await store.inspect({ algorithm: 'sha256', digest: b.sha256, byteLength: b.byteLength, mediaType: 'application/octet-stream' }) !== 'verified-present') return fail('output-protected-body-missing');
+    await this.assertOutputSlot(job.id);
+    const bases = await validateOutputProtection(this.fs, job, store, this.limits);
     await bases.preflightGenerated(job.baseRecord()); await job.generate(store, signal);
     await job.baseRecorded(await bases.recordGenerated(job)); return job.id;
   }
   async createWorkspaceOutput(expectedToken: string, store: OriginBlobStore, version: string, signal?: AbortSignal) {
     return underWriteLease(this.fs, async () => {
       const read = await this.outputReady(); if (read.source!.token !== expectedToken) return fail('output-stale');
-      for (const id of await WorkspaceOutputJob.ids(this.fs)) {
-        const state = await WorkspaceOutputJob.state(this.fs, id, this.limits);
-        if (state === 'abandoned') continue;
-        if (state !== 'started') return fail('output-pending');
-        const steps = await (await WorkspaceOutputJob.open(this.fs, id, this.limits)).steps();
-        if (!steps.some(s => s.detail.kind === 'baseRecorded' || s.detail.kind === 'cancelled')) return fail('output-pending');
-      }
+      await this.assertOutputSlot();
       const bases = new WorkspaceBaseStore(this.fs, this.limits, read.source!.proof), snapshot = await bases.snapshot();
       const capture = await WorkspaceSourceCapture.prepare(this, expectedToken, store, this.limits, signal);
       const inspection = await read.source!.inspectOriginal({ maxWork: PACKAGE_LIMITS.inspectionWork, maxNodes: PACKAGE_LIMITS.inspectionNodes });
@@ -270,6 +258,57 @@ export class MetadataProjectSession {
     return underWriteLease(this.fs, async () => {
       if (await WorkspaceOutputJob.state(this.fs, id, this.limits) === 'started') await (await WorkspaceOutputJob.open(this.fs, id, this.limits)).cancel();
       else await WorkspaceOutputJob.abandon(this.fs, id, this.limits);
+    });
+  }
+  private async assertOutputSlot(ownId?: string) {
+    for (const key of await outputJobKeys(this.fs)) {
+      if (key.id === ownId) continue;
+      const state = await outputJobClass(key).state(this.fs, key.id, this.limits);
+      if (state === 'abandoned') continue;
+      if (state !== 'started') return fail('output-pending');
+      const job = await openOutputJob(this.fs, key, this.limits);
+      if (!await outputTerminal(job)) return fail('output-pending');
+      await job.validateCompletion();
+    }
+  }
+  private async finishContributionOutput(job: ContributionOutputJob, store: OriginBlobStore, signal?: AbortSignal) {
+    job.assertOwner(this.fs); const current = await this.outputReady();
+    if (json(current.source!.proof) !== json(job.source.proof)) return fail('output-lineage');
+    await this.assertOutputSlot(job.id);
+    await validateOutputProtection(this.fs, job, store, this.limits);
+    await job.generate(store, signal); return job.id;
+  }
+  async createContributionOutput(expectedToken: string, selection: ContributionBaseSelection, store: OriginBlobStore, version: string, signal?: AbortSignal) {
+    selection = structuredClone(selection);
+    return underWriteLease(this.fs, async () => {
+      const read = await this.outputReady(); if (read.source!.token !== expectedToken) return fail('output-stale');
+      await this.assertOutputSlot();
+      const bases = new WorkspaceBaseStore(this.fs, this.limits, read.source!.proof), snapshot = await bases.snapshot();
+      const base = await VerifiedContributionBase.select(bases, selection, store, this.limits, signal);
+      const capture = await ContributionSourceCapture.prepare(this, expectedToken, base, store, this.limits, signal);
+      const inspection = await read.source!.inspectOriginal({ maxWork: PACKAGE_LIMITS.inspectionWork, maxNodes: PACKAGE_LIMITS.inspectionNodes });
+      const inventory = protectedWorkspaceInventory(inspection.candidates, await bases.payloads(snapshot.records));
+      const job = ContributionOutputJob.prepare(this.fs, capture, inventory, snapshot, this.limits, version);
+      await validateOutputProtection(this.fs, job, store, this.limits);
+      const current = await this.outputReady();
+      if (current.source!.token !== expectedToken || current.publication !== capture.publication) return fail('output-stale');
+      await job.persist(); return this.finishContributionOutput(job, store, signal);
+    });
+  }
+  async resumeContributionOutput(id: string, store: OriginBlobStore, signal?: AbortSignal) {
+    return underWriteLease(this.fs, async () => this.finishContributionOutput(await ContributionOutputJob.open(this.fs, id, this.limits), store, signal));
+  }
+  async verifyContributionOutput(id: string, file: Blob, store: OriginBlobStore) {
+    return underWriteLease(this.fs, async () => {
+      const current = await this.outputReady(), job = await ContributionOutputJob.open(this.fs, id, this.limits);
+      if (json(current.source!.proof) !== json(job.source.proof)) return fail('output-lineage');
+      await validateOutputProtection(this.fs, job, store, this.limits); await job.verifySelected(file, store);
+    });
+  }
+  async cancelContributionOutput(id: string) {
+    return underWriteLease(this.fs, async () => {
+      if (await ContributionOutputJob.state(this.fs, id, this.limits) === 'started') await (await ContributionOutputJob.open(this.fs, id, this.limits)).cancel();
+      else await ContributionOutputJob.abandon(this.fs, id, this.limits);
     });
   }
 
