@@ -13,9 +13,9 @@ export function createMetadataWorkspace(document: Document, host: Awaited<Return
 }
 /** Same editor/recovery controls, with optional host-owned tools; no synthetic demo in real-file mode. */
 export function createSavedWorkspace(document: Document, host: SavedWorkspaceHost, viewportFactory?: ViewportFactory,
-  extraTools?: (session: SyntheticSession, changed: () => void) => SavedWorkspaceTools) {
+  extraTools?: (session: SyntheticSession, changed: () => void) => SavedWorkspaceTools, initialTools?: SavedWorkspaceTools) {
   let disposed = false, refreshing = false, feedback = '', workspace: ReturnType<typeof createDevelopmentWorkspace> | undefined;
-  let receiveControls: SavedWorkspaceTools | undefined;
+  let receiveControls: SavedWorkspaceTools | undefined = initialTools;
   const root = document.createElement('section'), tools = document.createElement('section');
   const check = document.createElement('button'), restore = document.createElement('button'), status = document.createElement('p');
   check.type = restore.type = 'button'; check.textContent = '再開用データを確認'; restore.textContent = '更新を再試行';
@@ -26,6 +26,7 @@ export function createSavedWorkspace(document: Document, host: SavedWorkspaceHos
   const startup = createMetadataStartupControls(document, host, () => workspace?.session, () => { feedback = ''; render(); },
     () => refreshing || !!receiveControls?.hasChanges());
   tools.append(startup.root);
+  if (receiveControls) tools.append(receiveControls.root);
   const render = () => {
     if (disposed) return;
     const provider = host.read().provider;
@@ -33,7 +34,7 @@ export function createSavedWorkspace(document: Document, host: SavedWorkspaceHos
       workspace = createDevelopmentWorkspace(document, new SyntheticSession(host.authority,
         () => !!receiveControls?.hasChanges() || startup.hasChanges()), {
         viewportFactory, onAction: () => { receiveControls?.render(); startup.render(); } });
-      receiveControls = extraTools?.(workspace.session, () => render());
+      receiveControls ??= extraTools?.(workspace.session, () => render());
       if (receiveControls) tools.append(receiveControls.root); root.append(workspace.root);
     }
     check.disabled = restore.disabled = refreshing || startup.busy() || workspace?.session.acknowledgment.state === 'checking';
@@ -52,7 +53,7 @@ export function createSavedWorkspace(document: Document, host: SavedWorkspaceHos
   };
   const refresh = async (retry: boolean) => {
     if (disposed || refreshing || startup.busy()) return;
-    if (!retry && startup.hasChanges() || workspace && !workspace.session.readOnly &&
+    if (receiveControls?.hasChanges() || !retry && startup.hasChanges() || workspace && !workspace.session.readOnly &&
       (workspace.session.pending || workspace.session.workingBlock && !retry)) {
       feedback = '入力・更新を確定するか、取り消してから確認してください。'; render(); return;
     }
@@ -94,5 +95,6 @@ export function createSavedWorkspace(document: Document, host: SavedWorkspaceHos
   };
   render();
   return { root, render, get session() { return workspace?.session; },
+    inputPending: () => refreshing || startup.hasChanges() || !!workspace?.session.interactionPending,
     hasChanges: () => host.hasPending() || !!workspace?.session.pending || !!receiveControls?.hasChanges() || startup.hasChanges(), dispose };
 }

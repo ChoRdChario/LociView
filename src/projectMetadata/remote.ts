@@ -61,6 +61,21 @@ export function planRemoteChanges(base: ProjectMetadataSource, remote: ProjectMe
   return { parts, final: base.appendOriginal(parts) };
 }
 
+/** First import has no receiver base: retain every original, in dependency-ready batches. */
+export function initialWorkspaceChanges(source: ProjectMetadataSource, limits: MetadataLimits): Uint8Array[] {
+  const pending = new Map(source.originalChanges().map(bytes => {
+    const c = A.decodeChange(bytes); return [c.hash, { bytes, deps: c.deps }] as const;
+  }));
+  const known = new Set<string>(), parts: Uint8Array[] = []; let work = 0;
+  while (pending.size) {
+    work += pending.size; if (work > limits.maxWork) fail('import-work-budget');
+    const ready = [...pending.keys()].filter(hash => pending.get(hash)!.deps.every(dep => known.has(dep))).sort();
+    if (!ready.length) fail('import-dependencies');
+    for (const hash of ready) { parts.push(pending.get(hash)!.bytes); known.add(hash); pending.delete(hash); }
+  }
+  return parts;
+}
+
 /** Do not fill a missing acknowledged base/change or absorb an unexpected writer. */
 export function checkRemoteStored(stored: ProjectMetadataSource, base: ProjectMetadataSource,
   final: ProjectMetadataSource, acknowledged: boolean): void {

@@ -25,6 +25,17 @@ export class MetadataRepository {
   constructor(private readonly fs: ProjectWorkspaceFS, private readonly factory: MetadataStorageFactory, limits: MetadataLimits) {
     this.limits = checkLimits(limits);
   }
+  /** OPFS absence is not proof that the separate metadata namespace is vacant. */
+  async assertImportNamespace(repositoryId?: string): Promise<void> {
+    const rows = await this.factory().loadRange([]);
+    if (rows.length > this.limits.maxChanges) fail('stored-chunks');
+    let bytes = 0;
+    for (const row of rows) {
+      if (!row.data || (bytes += row.data.length) > this.limits.maxTotalBytes) fail('stored-chunk-budget');
+      if (json(row.key) !== json(['storage-adapter-id']) &&
+        (!repositoryId || row.key[0] !== this.documentId(repositoryId))) fail('import-existing-repository');
+    }
+  }
 
   private async use<T>(write: boolean, action: (storage: PinnedStorage) => Promise<T>): Promise<T> {
     const base = this.factory(), authority = this.fs.mutationAuthority;

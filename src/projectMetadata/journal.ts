@@ -5,7 +5,7 @@ import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { checkedProof, fail, type MetadataLimits, type MetadataProof } from './format';
 import { ProjectMetadataSource } from './source';
 import { digest, equalBytes, json, metadataPath, readReceipt, technicalId, writeReceipt } from './persistence';
-import { planRemoteChanges } from './remote';
+import { initialWorkspaceChanges, planRemoteChanges } from './remote';
 import { captureJournalRemote, checkJournalRemote, isPackageRemote, remoteMetadata, validateJournalRemote,
   type JournalRemoteProof, type JournalRemoteInput } from './packageRemote';
 
@@ -13,7 +13,7 @@ export interface JournalStart {
   transactionId: string;
   predecessor: string | null;
   repositoryId: string;
-  purpose: 'initialize' | 'localCommand' | 'remotePackageMerge';
+  purpose: 'initialize' | 'localCommand' | 'remotePackageMerge' | 'importWorkspace';
   proof: MetadataProof;
   baseHeads: string[];
 }
@@ -40,7 +40,7 @@ function validateStart(s: JournalStart, limits: MetadataLimits): void {
   if (!s || Object.keys(s).sort().join(',') !== 'baseHeads,predecessor,proof,purpose,repositoryId,transactionId') fail('journal-start');
   technicalId(s.transactionId); technicalId(s.repositoryId); if (s.predecessor !== null) technicalId(s.predecessor);
   checkedProof(s.proof, limits); heads(s.baseHeads);
-  if (s.purpose === 'initialize') {
+  if (s.purpose === 'initialize' || s.purpose === 'importWorkspace') {
     if (s.predecessor !== null || s.baseHeads.length || s.repositoryId !== s.transactionId) fail('journal-initialize');
   } else if (!['localCommand', 'remotePackageMerge'].includes(s.purpose) || s.predecessor === null || !s.baseHeads.length) fail('journal-purpose');
 }
@@ -112,7 +112,8 @@ export class TransactionJournal {
     if (acknowledged) {
       if (json(acknowledged) !== json(prepared)) fail('journal-prepared-exists');
       await this.validateParts(acknowledged);
-      if (acknowledged.remote) await this.readRemoteSource(acknowledged);
+      if (acknowledged.start.purpose === 'importWorkspace') await this.validateImport(acknowledged);
+      else if (acknowledged.remote) await this.readRemoteSource(acknowledged);
       return acknowledged; // Never refill a missing acknowledged original, even through direct staging.
     }
     await writeReceipt(this.fs, this.path(start.transactionId, 'staging.json'), start, this.limits);
@@ -137,18 +138,20 @@ export class TransactionJournal {
       const read = await this.fs.readBytes(path); if (!read || !equalBytes(read, bytes)) fail('journal-part-write');
     }
     await this.validateParts(prepared);
+    if (start.purpose === 'importWorkspace') await this.validateImport(prepared);
     await writeReceipt(this.fs, this.path(start.transactionId, 'blobsVerified.json'), prepared, this.limits);
     return prepared;
   }
 
   private async validatePrepared(start: JournalStart, p: PreparedJournal): Promise<void> {
-    const remote = start.purpose === 'remotePackageMerge';
+    const imported = start.purpose === 'importWorkspace', remote = start.purpose === 'remotePackageMerge' || imported;
     const packageSource = !!p?.remote && isPackageRemote(p.remote);
     const keys = remote ? ['changes,exactChangeSetDigest,remote,start', ...(packageSource ? ['changes,exactChangeSetDigest,remote,stagedBlobs,start'] : [])]
       : ['changes,exactChangeSetDigest,start', 'changes,exactChangeSetDigest,stagedBlobs,start'];
     if (!p || !keys.includes(Object.keys(p).sort().join(',')) || json(start) !== json(p.start) ||
       !Array.isArray(p.changes) || (remote ? !p.changes.length || p.changes.length > this.limits.maxChanges : p.changes.length !== (start.purpose === 'initialize' ? 2 : 1))) fail('journal-descriptors');
     if (remote) checkJournalRemote(p.remote!, start.proof, this.limits);
+    if (imported && (!packageSource || json(p.remote!.source.remoteHeads) !== json(p.remote!.expectedFinalHeads))) fail('import-source');
     if (p.exactChangeSetDigest !== await seal(start, p.changes, p.stagedBlobs, p.remote)) fail('journal-descriptors');
     if (p.stagedBlobs !== undefined) {
       if (!Array.isArray(p.stagedBlobs) || (packageSource ? !p.stagedBlobs.length || p.stagedBlobs.length > this.limits.maxNodes :
@@ -228,6 +231,15 @@ export class TransactionJournal {
     if (parts.length !== expected.parts.length || parts.some((b, i) => !equalBytes(b, expected.parts[i]!)) ||
       json(expected.final.heads) !== json(p.remote!.expectedFinalHeads)) fail('remote-complete-set');
     return expected.final;
+  }
+
+  /** Initial import proves the entire original history without fabricating a receiver base. */
+  async validateImport(p: PreparedJournal): Promise<ProjectMetadataSource> {
+    if (p.start.purpose !== 'importWorkspace' || !p.remote || !isPackageRemote(p.remote)) return fail('import-journal');
+    const parts = await this.validateParts(p), source = await this.readRemoteSource(p), expected = initialWorkspaceChanges(source, this.limits);
+    if (parts.length !== expected.length || parts.some((b, i) => !equalBytes(b, expected[i]!)) ||
+      json(source.heads) !== json(p.remote.expectedFinalHeads)) fail('import-complete-set');
+    return source;
   }
 
   async publish(p: PreparedJournal, source: ProjectMetadataSource): Promise<void> {

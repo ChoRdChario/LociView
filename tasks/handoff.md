@@ -1,6 +1,17 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **Current boundary — `604058c`後のWorkspace出力接続:** 実commitはGit HEAD／logで確認する。
+> **Current unit — `bf1c0e0`後の初回Workspace読込:** 元履歴を再作成せず、独立した
+> 初回import journalでGLB/PNGと一緒に導入。同じ一覧の「作業一式を開く」へ接続し、
+> identityが既存なら更新受信、別系統／作成途中／欠落証拠は上書きしない。
+> sourceなしのcold再選択、開始Scene確認との相互guard、取りやめ後の一覧復帰を接続。
+> 独立24-file reviewの必須残件なし。関連182件PASS、型・通常／harness build exit 0。
+> default rootは7件失敗。条件を変えずworker数のみ2にした全件再検査は112 files／
+> 2,172 PASS／既存21 TODO／失敗0（263.08秒）。初回失敗の記録はtodoに保持。
+> 最終source/testsは不変更。local checkpointの実commitはGit HEAD／logで確認する。
+> 全62群、通常home、他purpose／移行、実browser・iPhone・offline受入れは未完了。
+> 次は同じ元履歴／交換基準を使うContribution。新しい確認待ち／別PoCは不要。
+
+> **Previous checkpoint — `604058c`後のWorkspace出力接続:** 実commitはGit HEAD／logで確認する。
 > 同じ限定hostへ元履歴・保護対象本体・実交換基準表を固定したWorkspace書出しを実装。
 > stream生成→読み戻し検証→generated基準→明示download／選び直したfile確認を接続済み。
 > imported/generated共通表、cold復旧、後の編集保持、欠落ack証拠の拒否を既存testsで検査。

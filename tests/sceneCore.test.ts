@@ -236,7 +236,8 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
       const source = readFileSync(path, 'utf8');
       const packageControl = /[\\/]projectPackage[\\/](contract|manifest|historySummary|closure|protectedInventory|workspaceSource|zipChecks|zipArchive|workspaceArchive|receiveJob|workspaceBases|outputJob)\.ts$/.test(path);
       const packageMetadata = /[\\/]projectPackage[\\/](historySummary|closure|protectedInventory|workspaceSource|workspaceArchive|receiveJob|workspaceBases|outputJob)\.ts$/.test(path);
-      const packageJournal = /[\\/]projectMetadata[\\/](packageRemote|session)\.ts$/.test(path) || /[\\/]projectFiles[\\/](receiveWorkspace|sendWorkspace)\.ts$/.test(path);
+      const packageJournal = /[\\/]projectMetadata[\\/](packageRemote|session)\.ts$/.test(path) || /[\\/]projectFiles[\\/](receiveWorkspace|sendWorkspace)\.ts$/.test(path) ||
+        /[\\/]harness[\\/]projectScene[\\/](validationHost|validationWorkspace)\.ts$/.test(path);
       // 06 §11/§12.3 permit these exact disconnected primitives, not an app importer.
       if (!packageControl && !packageJournal) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectPackage\//);
       const metadataFoundation = /[\\/]projectMetadata[\\/](format|source)\.ts$/.test(path);
@@ -288,10 +289,10 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
             '../../projectMetadata/repository', '../../projectMetadata/blobStore', '../../projectMetadata/session', '../../projectMetadata/captionDeletion',
             '../../projectMetadata/assetDeletion', '../../projectFiles/creation', '../../projectFiles/validation', '../../projectFiles/png',
             './metadataFixture', './validationProjection', './metadataIntent', './fixture', './historyProjection', './savedHost', './mediaHistory',
-            '../../projectFiles/initialProject', '../../domain/values', './modelTypes', './viewHistory', '../../scene/resolve', './validationMaterials', '../../domain/projectGraphSupport', '../../domain/materialIntent', '../../projectFiles/receiveWorkspace', '../../projectFiles/sendWorkspace'],
-          validationCatalog: ['./validationHost', '../../projectFiles/creation'],
+            '../../projectFiles/initialProject', '../../domain/values', './modelTypes', './viewHistory', '../../scene/resolve', './validationMaterials', '../../domain/projectGraphSupport', '../../domain/materialIntent', '../../projectFiles/receiveWorkspace', '../../projectFiles/sendWorkspace', '../../projectPackage/workspaceArchive'],
+          validationCatalog: ['./validationHost', '../../projectFiles/creation', '../../projectFiles/receiveWorkspace', '../../projectFiles/validation'],
           validationWorkspace: ['../../projectMetadata/persistence', '../../projectFiles/initialProject', '../../projectFiles/creation',
-            '../../projectFiles/validation', '../../projectFiles/png', './validationHost', './validationModeHost', './savedHost', './validationCatalog', './metadataWorkspace', './viewportHost', './validationReceiveControls'],
+            '../../projectFiles/validation', '../../projectPackage/workspaceArchive', '../../projectFiles/png', './validationHost', './validationModeHost', './savedHost', './validationCatalog', './metadataWorkspace', './viewportHost', './validationReceiveControls'],
           validationReceiveControls: ['./validationModeHost', './session', './validationOutputControls'],
           validationOutputControls: ['./validationModeHost', './session'],
           validationBrowser: ['../../platform/opfs', '../../platform/projectLock', '../../projectMetadata/blobStore', '../../projectFiles/validation',

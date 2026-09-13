@@ -1,7 +1,8 @@
 import { newId } from '../../projectMetadata/persistence';
 import { prepareValidationProject, type ValidationFile } from '../../projectFiles/initialProject';
 import { prepareValidationCreation } from '../../projectFiles/creation';
-import type { FileValidationLimits } from '../../projectFiles/validation';
+import { validationMetadataLimits, type FileValidationLimits } from '../../projectFiles/validation';
+import { WorkspaceArchive } from '../../projectPackage/workspaceArchive';
 import type { PngDecoder } from '../../projectFiles/png';
 import type { openValidationHost } from './validationHost';
 import { createValidationModeHost, type ValidationDisplayHost } from './validationModeHost';
@@ -15,7 +16,7 @@ type Host = ReturnType<typeof createValidationModeHost>;
 export interface ValidationWorkspacePorts {
   fileLimits: FileValidationLimits; decode?: PngDecoder;
   list(): Promise<ValidationProjectEntry[]>;
-  open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode): Promise<Awaited<ReturnType<typeof openValidationHost>>>;
+  open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob): Promise<Awaited<ReturnType<typeof openValidationHost>>>;
   render(host: ValidationDisplayHost): Promise<{ factory: ViewportFactory; dispose(): void }>;
   selected(run: string | null, mode?: LocalOpenMode): void;
 }
@@ -33,17 +34,20 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const titleLabel = document.createElement('label'), filesLabel = document.createElement('label');
   titleLabel.textContent = 'プロジェクト名'; filesLabel.textContent = '3Dモデルとメディアを選択';
   titleLabel.append(title); filesLabel.append(files); form.append(titleLabel, filesLabel, create);
+  const workspaceForm = document.createElement('form'), workspaceLabel = document.createElement('label'), workspaceInput = document.createElement('input'), openFile = document.createElement('button');
+  workspaceLabel.textContent = '作業一式を選択'; workspaceInput.type = 'file'; workspaceInput.setAttribute('aria-label', '作業一式を選択'); workspaceLabel.append(workspaceInput);
+  openFile.type = 'submit'; openFile.textContent = '作業一式を開く'; workspaceForm.append(workspaceLabel, openFile);
   const status = document.createElement('p'); status.setAttribute('role', 'status');
   const list = document.createElement('section'), refresh = document.createElement('button'), back = document.createElement('button');
   refresh.type = back.type = 'button'; refresh.textContent = '一覧を更新'; back.textContent = 'プロジェクトを選ぶ';
   const listHeading = document.createElement('h2'); listHeading.textContent = 'このブラウザの再開用データ';
-  navigation.append(heading, help, form, listHeading, refresh, list); root.append(back, status, navigation, content);
+  navigation.append(heading, help, workspaceForm, form, listHeading, refresh, list); root.append(back, status, navigation, content);
   let host: Host | undefined, workspace: ReturnType<typeof createSavedWorkspace> | undefined;
   let receiveTools: ReturnType<typeof createValidationReceiveControls> | undefined;
   let resident: Awaited<ReturnType<ValidationWorkspacePorts['render']>> | undefined;
   let busy = false, disposed = false, composing = false, selected: string | null = null, operation: Promise<void> | undefined;
   const changed = () => !!workspace?.hasChanges() || !!receiveTools?.hasChanges() || !!host?.hasPending();
-  const controls = () => { navigation.inert = busy; create.disabled = busy || composing; back.disabled = busy; back.hidden = !host; };
+  const controls = () => { navigation.inert = busy; openFile.disabled = create.disabled = busy || composing; back.disabled = busy; back.hidden = !host; };
   title.addEventListener('compositionstart', () => { composing = true; controls(); });
   title.addEventListener('compositionend', () => { composing = false; controls(); });
   const execute = (action: () => Promise<void>) => {
@@ -87,7 +91,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       retry.type = 'button'; retry.textContent = '更新を再試行'; retry.disabled = !!host.authority.readOnly;
       retry.addEventListener('click', () => execute(async () => { await host!.authority.retry!(); await mount(); }));
       content.append(note, retry); if (receiveTools) { receiveTools.render(); content.append(receiveTools.root); }
-      retry.hidden = !!host.workspaceFiles.jobs.some(j => !['completed', 'cancelled', 'abandoned'].includes(j.state));
+      retry.hidden = host.workspaceFiles.initialImport && host.read().state === 'empty' ||
+        !!host.workspaceFiles.jobs.some(j => !['completed', 'cancelled', 'abandoned'].includes(j.state));
       if (host.mode?.current === 'view') {
         const edit = document.createElement('button'); edit.type = 'button'; edit.textContent = '編集を開始する';
         edit.addEventListener('click', () => execute(async () => {
@@ -103,20 +108,29 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const target = host, next = await ports.render(target);
     if (disposed || host !== target) { next.dispose(); return; }
     resident = next;
-    try { workspace = createSavedWorkspace(document, target, next.factory, receiveTools ? () => receiveTools! : undefined);
+    try { workspace = createSavedWorkspace(document, target, next.factory, undefined, receiveTools);
       content.replaceChildren(workspace.root); workspace.render(); }
     catch (error) { next.dispose(); resident = undefined; throw error; }
     status.textContent = '検証用プロジェクト。通常画面・オフライン・実機での受入れは未完了です。';
   };
-  const openProject = async (run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode: LocalOpenMode = 'edit') => {
+  const openProject = async (run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode: LocalOpenMode = 'edit', workspaceFile?: Blob) => {
     status.textContent = initial ? 'プロジェクトを作成しています。' : '再開用データを確認しています。';
-    const opened = await ports.open(run, initial, mode);
+    const opened = await ports.open(run, initial, mode, workspaceFile);
     if (disposed) { await opened.dispose(); return; }
     host = createValidationModeHost(opened, nextMode => ports.open(run, undefined, nextMode), nextMode => ports.selected(run, nextMode));
     receiveTools = createValidationReceiveControls(document, host, () => workspace?.session,
-      () => { workspace?.render(); controls(); }, async () => { if (!workspace && !disposed) await mount(); });
+      () => { workspace?.render(); controls(); }, async () => { if (!workspace && !disposed) await mount(); }, () => workspace?.inputPending() ?? false);
     selected = run; ports.selected(run, host.mode!.current); navigation.hidden = true; await mount();
   };
+  workspaceForm.addEventListener('submit', event => { event.preventDefault(); execute(async () => {
+    ensureMaySwitch(); const file = workspaceInput.files?.[0]; if (!file) throw Error('作業一式を選択してください。');
+    status.textContent = '作業一式を確認しています。';
+    const inspected = await WorkspaceArchive.inspect(file, validationMetadataLimits);
+    if (disposed) return;
+    const run = (inspected.source.proof.identity.projectId as string).slice(4);
+    await closeCurrent(); await openProject(run, undefined, 'edit', file);
+    if (host?.read().state === 'ready' && !host.hasPending()) workspaceInput.value = '';
+  }); });
   form.addEventListener('submit', event => { event.preventDefault(); execute(async () => {
     ensureMaySwitch(); const selection = Array.from(files.files ?? []), name = title.value;
     if (!selection.length) throw Error('3Dモデルを選択してください。');
@@ -141,7 +155,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   }));
   refresh.addEventListener('click', () => execute(updateList));
   execute(initialRun ? () => openProject(initialRun, undefined, initialMode) : updateList);
-  return { root, hasChanges: () => busy || composing || changed() || !navigation.hidden && (!!files.files?.length || title.value !== '新しいプロジェクト'),
+  return { root, hasChanges: () => busy || composing || changed() || !navigation.hidden && (!!workspaceInput.files?.length || !!files.files?.length || title.value !== '新しいプロジェクト'),
     async dispose() { if (disposed) return; disposed = true;
       try { await operation; } catch { /* Original input and saved failure are never acknowledged here. */ }
       await closeCurrent(); root.remove(); }, get selected() { return selected; } };

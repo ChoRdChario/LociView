@@ -22,6 +22,10 @@ export class WorkspaceReceiver {
   private async operation<T>(action: () => Promise<T>): Promise<T> {
     return workspaceFileOperation(this.locks, action);
   }
+  /** Initial file entry has no receiver token or synthetic bootstrap. */
+  importWorkspace(file: Blob) {
+    return this.operation(async () => this.session.importWorkspace(await WorkspaceReceiveJob.prepare(this.fs, file, this.limits)));
+  }
   receive(expectedToken: string, file: Blob) {
     return this.operation(async () => {
       const input = await WorkspaceReceiveJob.prepare(this.fs, file, this.limits);
@@ -35,11 +39,19 @@ export class WorkspaceReceiver {
         if (steps.some(s => s.detail.kind === 'baseRecorded') && job.inspection.archive.sha256 === input.inspection.archive.sha256)
           repeated = job;
       }
+      if (repeated?.importing) {
+        const current = await this.session.read();
+        if (current.state !== 'ready' || current.source?.token !== expectedToken) return fileError('入力・更新を確定してから受信してください。');
+        return this.session.importWorkspace(repeated);
+      }
       return this.session.receiveWorkspace(expectedToken, repeated ?? input);
     });
   }
   retry(id: string) {
-    return this.operation(async () => this.session.receiveWorkspace(null, await WorkspaceReceiveJob.open(this.fs, id, this.limits)));
+    return this.operation(async () => {
+      const job = await WorkspaceReceiveJob.open(this.fs, id, this.limits);
+      return job.importing ? this.session.importWorkspace(job) : this.session.receiveWorkspace(null, job);
+    });
   }
   cancelStale(id: string) {
     return this.operation(async () => this.session.cancelWorkspaceReceive(await WorkspaceReceiveJob.open(this.fs, id, this.limits)));
@@ -47,19 +59,26 @@ export class WorkspaceReceiver {
   reselectInput(expectedToken: string, id: string, file: Blob) {
     return this.operation(async () => this.session.receiveWorkspace(expectedToken, await WorkspaceReceiveJob.reselect(this.fs, id, file, this.limits)));
   }
+  reselectImportedInput(id: string, file: Blob) {
+    return this.operation(async () => this.session.importWorkspace(await WorkspaceReceiveJob.reselect(this.fs, id, file, this.limits)));
+  }
   abandonInput(id: string) {
     return this.operation(() => this.session.abandonWorkspaceInput(id));
   }
   async jobs() {
     const result: WorkspaceReceiveState[] = [];
-    for (const id of await WorkspaceReceiveJob.ids(this.fs)) {
+    const entries = await new TransactionJournal(this.fs, this.limits).entries();
+    // The journal is also an authority: a deleted input directory must not hide its import.
+    const ids = new Set([...(await WorkspaceReceiveJob.ids(this.fs)),
+      ...entries.filter(e => e.start.purpose === 'importWorkspace').map(e => e.start.transactionId)]);
+    for (const id of ids) {
       try {
         const state = await WorkspaceReceiveJob.inputState(this.fs, id, this.limits);
         if (state !== 'started') { result.push({ id, state }); continue; }
         const job = await WorkspaceReceiveJob.open(this.fs, id, this.limits), steps = await job.steps();
         await job.validateCompletion();
-        const stale = !steps.length && !(await new TransactionJournal(this.fs, this.limits).entries()).some(e => e.start.transactionId === id) &&
-          json((await this.session.read()).source?.heads) !== json(job.start!.receiver.heads);
+        const stale = job.start?.operation === 'receiveWorkspace' && !steps.length && !entries.some(e => e.start.transactionId === id) &&
+          json((await this.session.read()).source?.heads) !== json(job.start.receiver.heads);
         result.push({ id, state: steps.some(s => s.detail.kind === 'baseRecorded') ? 'completed' :
           steps.some(s => s.detail.kind === 'cancelled') ? 'cancelled' : stale ? 'stale' : 'incomplete' });
       } catch { result.push({ id, state: 'repair-required' }); }

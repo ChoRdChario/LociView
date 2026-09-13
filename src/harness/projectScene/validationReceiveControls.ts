@@ -4,7 +4,7 @@ import { createValidationOutputControls } from './validationOutputControls';
 
 /** One file/recovery area, available even before a Scene editor can mount. */
 export function createValidationReceiveControls(document: Document, host: ReturnType<typeof createValidationModeHost>,
-  session: () => SyntheticSession | undefined, changed: () => void, recovered: () => Promise<void>) {
+  session: () => SyntheticSession | undefined, changed: () => void, recovered: () => Promise<void>, otherInput: () => boolean = () => false) {
   const root = document.createElement('section'), heading = document.createElement('h2'), form = document.createElement('form');
   heading.textContent = '更新ファイル'; root.setAttribute('aria-label', '更新ファイル');
   const label = document.createElement('label'), labelText = document.createElement('span'), input = document.createElement('input'), submit = document.createElement('button');
@@ -15,12 +15,12 @@ export function createValidationReceiveControls(document: Document, host: Return
   const status = document.createElement('p'), jobs = document.createElement('section'); status.setAttribute('role', 'status');
   form.append(label, submit, clear); root.append(heading, help, form, status, jobs);
   let busy = false, disposed = false, feedback = '', selectedJob: string | null = null, cancel: { id: string; stale: boolean } | null = null;
-  const output = createValidationOutputControls(document, host, session, changed, () => busy || !!input.files?.length || !!selectedJob || !!cancel);
+  const output = createValidationOutputControls(document, host, session, changed, () => otherInput() || busy || !!input.files?.length || !!selectedJob || !!cancel);
   root.append(output.root);
   const guard = (recovery: boolean) => {
     const s = session();
     if (host.authority.readOnly) throw Error('閲覧中は受信できません。編集を開始してください。');
-    if (s?.interactionPending || s && s.acknowledgment.state !== 'idle') throw Error('入力・操作を確定するか、取り消してから受信してください。');
+    if (otherInput() || s?.interactionPending || s && s.acknowledgment.state !== 'idle') throw Error('入力・操作を確定するか、取り消してから受信してください。');
     if (!recovery && host.hasPending()) throw Error('中断した更新を先に確認してください。');
   };
   const perform = (action: () => Promise<unknown>, recovery: boolean, completed: string) => {
@@ -42,11 +42,15 @@ export function createValidationReceiveControls(document: Document, host: Return
   };
   const render = () => {
     if (disposed) return;
+    heading.textContent = host.workspaceFiles.initialImport ? '作業一式を開く' : '更新ファイル';
+    root.setAttribute('aria-label', heading.textContent);
+    help.textContent = host.workspaceFiles.initialImport ? '読み込み途中のデータは、元のファイルから再開できます。' :
+      '同じプロジェクトの作業一式を統合します。元ファイルは変更しません。';
     output.render(); form.inert = busy || output.hasChanges(); submit.disabled = busy || output.hasChanges() || host.authority.readOnly || !input.files?.length;
     clear.disabled = busy; clear.hidden = !input.files?.length && !selectedJob;
-    labelText.textContent = selectedJob ? '元のファイルを選び直す' : '更新ファイルを選択';
-    input.setAttribute('aria-label', selectedJob ? '元のファイルを選び直す' : '更新ファイルを選択');
-    submit.textContent = selectedJob ? '受信を再開' : '更新を受け取る';
+    labelText.textContent = selectedJob ? '元のファイルを選び直す' : host.workspaceFiles.initialImport ? '作業一式を選択' : '更新ファイルを選択';
+    input.setAttribute('aria-label', labelText.textContent);
+    submit.textContent = selectedJob ? '受信を再開' : host.workspaceFiles.initialImport ? 'ファイルを開く' : '更新を受け取る';
     status.textContent = feedback || host.workspaceFiles.error || (host.authority.readOnly ? '閲覧中。受信するには編集を開始してください。' : '');
     jobs.replaceChildren();
     for (const job of host.workspaceFiles.jobs) {
@@ -78,8 +82,11 @@ export function createValidationReceiveControls(document: Document, host: Return
   clear.addEventListener('click', () => { if (busy) return; input.value = ''; selectedJob = null; feedback = ''; render(); changed(); });
   form.addEventListener('submit', event => {
     event.preventDefault(); const file = input.files?.[0], token = host.read().source?.token, id = selectedJob;
-    if (!file || !token) { feedback = '更新ファイルを選択してください。'; render(); return; }
-    perform(() => id ? host.workspaceFiles.reselectInput(token, id, file) : host.workspaceFiles.receive(token, file), !!id, '更新を受け取りました。');
+    if (!file) { feedback = 'ファイルを選択してください。'; render(); return; }
+    if (host.workspaceFiles.initialImport) {
+      perform(() => id ? host.workspaceFiles.reselectImportedInput(id, file) : host.workspaceFiles.importWorkspace(file), true, '作業一式を読み込みました。');
+    } else if (token) perform(() => id ? host.workspaceFiles.reselectInput(token, id, file) : host.workspaceFiles.receive(token, file), !!id, '更新を受け取りました。');
+    else { feedback = '再開用データを確認してから受信してください。'; render(); }
   });
   render();
   return { root, render, busy: () => busy || output.busy(), hasChanges: () => busy || output.hasChanges() || !!input.files?.length || !!selectedJob || !!cancel,

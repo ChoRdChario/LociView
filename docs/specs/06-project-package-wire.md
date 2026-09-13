@@ -1784,6 +1784,80 @@ edits; missing/torn acknowledged controls/artifact refusal; exact versus wrong
 file re-selection; download without a saved claim; cold and warm host guards.
 No new PoC, ordinary activation, native-input/device or offline credit follows.
 
+#### Isolated first Workspace import (implementation contract, 2026-09-13)
+
+This connects §2's already-approved start-from-Workspace behavior to the same
+limited GLB/PNG file lane. It is not ordinary activation, a new wire purpose,
+profile adoption or a relaxation of local `initialize` (exactly two originals).
+
+1. The inspected manifest's Project identity selects the isolated Project area.
+   Identity/epoch/envelope/root proof, not filename/title, govern routing. A vacant
+   area may import. A published exact-lineage Project receives through the existing
+   service, retaining local edits. Same Project ID with another proof, incomplete
+   local creation or repair data must not be overwritten or silently re-keyed.
+   An unstarted import fragment permits only exact file re-selection or explicit
+   abandonment; existing creation originals and unrelated metadata block import.
+   Vacancy also checks the separate metadata repository namespace, not just OPFS
+   receipt absence. Recovery admits only the owned original repository ID; surviving
+   unrelated metadata after receipt loss is repair state, not a new import target.
+2. Reuse `receive/<jobId>/` input/descriptor/spool/steps and its capacity/ownership/
+   exact-reselection boundaries. Add one closed Start variant with `operation:
+   importWorkspace`, `destination:{identity,metadataEnvelope}` and no `receiver`.
+   Other fields are unchanged. Destination must exactly equal the original
+   manifest; absence of a receiver is never an empty/fabricated receiver history.
+   Start is written only after complete input read-back. Existing receive starts
+   remain byte-compatible and require a nonempty published receiver.
+3. Add journal purpose `importWorkspace`: `predecessor:null`, `baseHeads:[]`,
+   `repositoryId:transactionId:jobId` (the three IDs are equal). It requires the
+   existing fullMetadata package source proof/original manifest/checksum/metadata,
+   with expected final heads equal to the declared source heads. The exact change
+   set contains **all** original changes, dependency-ready batches with native-hash
+   lexicographic order within each batch, beginning with the original root. Validate
+   completeness against the retained full source, byte identity, DAG and exact
+   final heads. No bootstrap/reseed/materialized reconstruction/prefix publication.
+   The existing `lociview:v2:metadata-change-set:jcs-v2` seal includes the distinct
+   purpose, empty base, descriptors, complete source proof and sorted staged blobs.
+   Existing initialize/local/remote seals and recovery admission are unchanged.
+4. Before writes, check complete historical GLB/PNG metadata and cumulative size,
+   then inspect every currently strong-required original record/body. Initial
+   admission has no old-Project record set; it does not weaken received admission's
+   old-record checks. Existing origin CAS bodies may be reused only after verified
+   presence/content; an acknowledged missing/corrupt body is never replenished.
+   Stage original bodies/facts under the Project lease after retaining input/start,
+   followed by exact journal originals and one final metadata publication. Preserve
+   semantic conflict candidates; no source relation or conflict winner is guessed.
+5. Cold recovery before journal preparation may finish from the exact owned input;
+   after preparation it verifies retained originals/facts/bodies, never regenerates
+   or refills acknowledged evidence. Partial repository state must be an exact
+   original subset; after metadataDurable it must already include all originals.
+   Generic retry/local initialization cannot bypass the input-job verification.
+   Import journal IDs remain discoverable when the entire input directory is lost;
+   catalog and output readiness must not treat that missing evidence as completion.
+6. Reuse `workspacePublished` with actual receiver heads equal to declared heads,
+   binding the first-import journal and publication to the original Start. Initial
+   import never emits `workspaceAlreadyPresent`. Record the same imported base in
+   the shared table, then `baseRecorded`; the reader verifies the distinct initial
+   Start/journal purpose and exact proof/heads. Replay only validates completion,
+   preserves later local edits and never creates a second initial transaction.
+   Replay revalidates the imported snapshot's original strong facts, including
+   records made weak/inactive by later local edits, without overwriting those edits.
+7. Catalog/editor readiness includes unfinished import jobs even if metadata has
+   been published. Cold recovery controls do not require a Scene/editor/source token
+   and appear before renderer preparation. An unknown or conflicting starting Scene
+   must not be guessed. Failed input, mode switch, renderer preparation or file
+   import keeps recoverable data visible; source files are not modified.
+   Before a starting Scene is chosen, the same file tools and Scene controls retain
+   mutual input guards. Explicitly abandoned empty imports may return to the catalog;
+   this neither publishes a Project nor marks missing/incomplete data ready.
+
+Acceptance reuses existing file/journal fixtures: >2-original and branching source
+import with original identity/bytes, retained semantic candidates, edit/output/
+receive round-trip, interrupted spool/facts/metadata/publication/base and cold
+retry, no duplicate replay after later edits, exact pre-start re-selection,
+missing acknowledged evidence refusal, and same-ID/different-proof collision
+without writes. Recorded DOM is not native picker, rendering, iPhone or offline
+acceptance. No new page/fixture framework is required.
+
 #### Frozen fields and fingerprint
 
 Use §3's canonical control encoding and existing exact nominal ID, `Heads`,

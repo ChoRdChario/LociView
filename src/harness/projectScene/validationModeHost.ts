@@ -48,8 +48,8 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
           if (closed) throw Error('画面を閉じました。');
           if (target === 'edit' && candidate.authority.readOnly) throw Error(candidate.accessDetail || '編集を開始できません。閲覧を続けられます。');
           if (candidate.read().state === 'repair-required') throw Error('再開用データの確認が必要です。元の表示を保持しています。');
-          const next = candidate.read().provider ? candidate.authority.read() : undefined;
-          if (!next && previous.read().provider) throw Error('再開用データを確認できません。元の表示を保持しています。');
+          const next = candidate.display();
+          if (!next && previous.display()) throw Error('再開用データを確認できません。元の表示を保持しています。');
           if (next) await prepare?.(next);
           if (closed) throw Error('画面を閉じました。');
           if (prepare) candidateDetach = candidate.setDisplayPreparation(prepare);
@@ -72,10 +72,13 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
     refresh: () => run(() => current.refresh()), resolve: (...a) => run(() => current.resolve(...a)),
     workspaceFiles: {
       get jobs() { return current.workspaceFiles.jobs; }, get error() { return current.workspaceFiles.error; },
+      get initialImport() { return current.workspaceFiles.initialImport; },
       refresh: () => run(() => current.workspaceFiles.refresh()),
       receive: (...a) => run(() => current.workspaceFiles.receive(...a)),
+      importWorkspace: (...a) => run(() => current.workspaceFiles.importWorkspace(...a)),
       retry: (...a) => run(() => current.workspaceFiles.retry(...a)),
       reselectInput: (...a) => run(() => current.workspaceFiles.reselectInput(...a)),
+      reselectImportedInput: (...a) => run(() => current.workspaceFiles.reselectImportedInput(...a)),
       abandonInput: (...a) => run(() => current.workspaceFiles.abandonInput(...a)),
       cancelStale: (...a) => run(() => current.workspaceFiles.cancelStale(...a)),
     },

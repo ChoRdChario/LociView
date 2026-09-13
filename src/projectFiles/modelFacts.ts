@@ -11,7 +11,8 @@ import { fileObject } from './validation';
 
 /** Only a locally selected, owned GLB may introduce new facts. Old evidence is never repaired. */
 export function validationModelFacts(content: ValidationContent): MetadataModelFactPort {
-  return { planReceived: (base, next, bodyFor) => validationReceivedFacts(content, base, next, bodyFor), async plan(base, next) {
+  return { planReceived: (base, next, bodyFor) => validationReceivedFacts(content, base, next, bodyFor),
+    planImported: (next, bodyFor) => receivedFacts(content, null, next, bodyFor), async plan(base, next) {
     const used = new Set<string>(), introduced = new Set<string>(); let work = 0;
     const charge = () => { if (++work > limits.maxWork) fileError('モデルの検証範囲を超えています。'); };
     for (const change of base.read().history.changes) for (const w of change.writes) {
@@ -53,12 +54,16 @@ export function validationModelFacts(content: ValidationContent): MetadataModelF
 export async function validationReceivedFacts(content: ValidationContent, base: ProjectMetadataSource, next: ProjectMetadataSource,
   bodyFor: (ref: JsonObject) => Blob): Promise<MetadataModelFactPlan> {
   if (json(base.proof) !== json(next.proof)) return fileError('受信先のプロジェクトが一致しません。');
+  return receivedFacts(content, base, next, bodyFor);
+}
+async function receivedFacts(content: ValidationContent, base: ProjectMetadataSource | null, next: ProjectMetadataSource,
+  bodyFor: (ref: JsonObject) => Blob): Promise<MetadataModelFactPlan> {
   const oldIds = new Set<string>(), oldDigests = new Map<string, number>(), sizes = new Map<string, number>();
   const inspectionBudget = { maxNodes: limits.maxNodes, maxWork: limits.maxWork };
-  const before = await base.inspectOriginal(inspectionBudget), after = await next.inspectOriginal(inspectionBudget);
-  if (before.workUsed + after.workUsed > limits.maxWork) return fileError('受信内容が検証の上限を超えています。');
-  let work = before.workUsed + after.workUsed, total = 0;
-  for (const [inspection, old] of [[before, true], [after, false]] as const) for (const scalar of inspection.scalars) {
+  const before = base ? await base.inspectOriginal(inspectionBudget) : null, after = await next.inspectOriginal(inspectionBudget);
+  if ((before?.workUsed ?? 0) + after.workUsed > limits.maxWork) return fileError('受信内容が検証の上限を超えています。');
+  let work = (before?.workUsed ?? 0) + after.workUsed, total = 0;
+  for (const [inspection, old] of [[before, true], [after, false]] as const) for (const scalar of inspection?.scalars ?? []) {
     if (++work > limits.maxWork) return fileError('受信内容が検証の上限を超えています。');
     if (!['representationsById', 'mediaResourcesById'].includes(scalar.path[0]!)) continue;
     if (old) oldIds.add(scalar.path[1]!);
@@ -102,7 +107,7 @@ export async function validationReceivedFacts(content: ValidationContent, base: 
     else if (presence === 'verified-present') completedBodies.add(key);
     else return fileError('既存の本体に修復が必要です。');
   }
-  return { baseToken: base.token, finalToken: next.token, stagedBlobs: staged.map(b => b.ref), async stage() {
+  return { baseToken: base?.token ?? null, finalToken: next.token, stagedBlobs: staged.map(b => b.ref), async stage() {
     for (const [key, body] of bodies) {
       if (!completedBodies.has(key)) { await content.stageReceived(body.file, body.ref); completedBodies.add(key); }
       else if (await content.store.inspect(body.ref) !== 'verified-present') return fileError('記録済みの本体を確認できません。');

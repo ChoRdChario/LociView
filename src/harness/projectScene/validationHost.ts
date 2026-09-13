@@ -1,6 +1,6 @@
 import type { WorkspaceFS } from '../../platform/fs';
 import { ProjectMutationCoordinator } from '../../platform/projectLock';
-import { technicalId, newId } from '../../projectMetadata/persistence';
+import { technicalId, newId, metadataPath, json } from '../../projectMetadata/persistence';
 import { TransactionJournal } from '../../projectMetadata/journal';
 import type { MetadataStorageFactory } from '../../projectMetadata/repository';
 import type { OriginBlobStore } from '../../projectMetadata/blobStore';
@@ -27,12 +27,14 @@ import { same } from '../../domain/projectGraphSupport';
 import type { MaterialIntent } from '../../domain/materialIntent';
 import { WorkspaceReceiver, type WorkspaceReceiveState } from '../../projectFiles/receiveWorkspace';
 import { WorkspaceSender, type WorkspaceOutputState } from '../../projectFiles/sendWorkspace';
+import { WorkspaceArchive } from '../../projectPackage/workspaceArchive';
 
 export const validationArea = 'lociview-development-validation-1';
 export interface ValidationHostOptions {
   mode?: LocalOpenMode;
   run: string; base: WorkspaceFS; coordinator: ProjectMutationCoordinator; store: OriginBlobStore;
   fileLimits: FileValidationLimits; decode?: PngDecoder; initial?: ReturnType<typeof prepareValidationCreation>;
+  workspaceFile?: Blob;
   packageLocks?: LockManager | null;
   openStorage(allowCreate: boolean): Promise<{ factory: MetadataStorageFactory; dispose(): Promise<void> }>;
 }
@@ -43,6 +45,10 @@ const base64 = (bytes: Uint8Array) => { let text = ''; for (let n = 0; n < bytes
 export async function openValidationHost(options: ValidationHostOptions) {
   const run = technicalId(options.run), root = `${validationArea}/${run}`;
   if (options.mode === 'view' && options.initial) throw Error('閲覧ではプロジェクトを作成できません。');
+  if (options.mode === 'view' && options.workspaceFile) throw Error('閲覧では作業一式を取り込めません。');
+  if (options.initial && options.workspaceFile) throw Error('作成元を一つ選択してください。');
+  const incoming = options.workspaceFile ? await WorkspaceArchive.inspect(options.workspaceFile, limits) : undefined;
+  if (incoming && incoming.source.proof.identity.projectId !== `prj_${run}`) throw Error('ファイルのプロジェクトと開く場所が一致しません。');
   if (options.initial && options.initial.source.proof.identity.projectId !== `prj_${run}`) throw Error('作成先を確認してください。');
   const lease = options.mode === 'view' ? options.coordinator.openView(options.base, root, `${validationArea}:${run}`) :
     await options.coordinator.tryAcquire(options.base, root, `${validationArea}:${run}`), fs = lease.workspace;
@@ -53,10 +59,10 @@ export async function openValidationHost(options: ValidationHostOptions) {
     await lease.waitForWorkspaceIdle(); lease.sealWorkspaceWritesForRelease(); lease.release(); await connection?.dispose(); };
   try {
     const fresh = !(await options.base.list(`${root}/`)).length;
-    if (fresh && (!options.initial || !lease.holdsWriteLock)) throw Error('保存データがありません。プロジェクトを選び直してください。');
+    if (fresh && (!(options.initial || incoming) || !lease.holdsWriteLock)) throw Error('保存データがありません。プロジェクトを選び直してください。');
     if (!fresh && options.initial) throw Error('作成先に保存データがあります。既存データは変更していません。');
     if (fresh) lease.activateNewProject();
-    connection = await options.openStorage(fresh && !!options.initial && lease.holdsWriteLock);
+    connection = await options.openStorage(fresh && !!(options.initial || incoming) && lease.holdsWriteLock);
     const { content, session } = validationProjectService(fs, connection.factory, options.store, options.fileLimits, options.decode);
     const receiver = new WorkspaceReceiver(options.base, fs, session, limits, options.packageLocks ?? null);
     const sender = new WorkspaceSender(fs, session, options.store, limits, options.packageLocks ?? null);
@@ -66,6 +72,10 @@ export async function openValidationHost(options: ValidationHostOptions) {
     const unfinishedReceive = () => receiveJobs.some(j => !['completed', 'cancelled', 'abandoned'].includes(j.state));
     const reloadReceive = async () => { receiveJobs = await receiver.jobs(); };
     let last = await session.read(), project: SyntheticProject | undefined;
+    if (last.source && (last.source.proof.identity.projectId !== `prj_${run}` || incoming && json(last.source.proof) !== json(incoming.source.proof)))
+      throw Error('ファイルと再開用データのプロジェクトが一致しません。既存データは変更していません。');
+    const localInitial = !!options.initial || !!await fs.readStream(metadataPath(fs, 'validation-initial.json')) ||
+      (await new TransactionJournal(fs, limits).entries()).some(e => e.start.purpose === 'initialize');
     let prepareDisplay: ((next: SyntheticProject) => Promise<void>) | undefined;
     const images: Record<string, MediaImage> = {};
     const projectView = async (read: MetadataSessionRead) => {
@@ -81,7 +91,8 @@ export async function openValidationHost(options: ValidationHostOptions) {
       if (closed) throw Error('画面を閉じました。保存内容は再度開いて確認してください。');
       project = next;
     };
-    await projectView(last);
+    try { await projectView(last); }
+    catch (error) { receiveDisplayPending = true; receiveFailure = error instanceof Error ? error.message : '表示を準備できません。再開用データは保持しています。'; }
     if (!fresh && lease.holdsWriteLock && last.state !== 'repair-required') lease.activateAfterDurableReload();
     const ready = async (read: MetadataSessionRead) => { last = read; await projectView(read);
       if (read.state !== 'ready' || !project) throw Error('保存が未完了です。元の変更から再試行してください。'); return project; };
@@ -101,12 +112,13 @@ export async function openValidationHost(options: ValidationHostOptions) {
         const result = await ready(await session.read()); receiveFailure = ''; receiveDisplayPending = false; return result;
       }
       const before = await session.read(), entries = await new TransactionJournal(fs, limits).entries();
+      if (before.state === 'empty' && !localInitial) throw Error('作業一式を選択するか、プロジェクト一覧へ戻ってください。');
       const result = await ready(before.state === 'empty' && options.initial ? await options.initial.persist(fs, options.store, session) :
         before.state === 'empty' || entries.length === 1 && entries[0]!.start.purpose === 'initialize' && before.state !== 'ready'
           ? await resumeValidationCreation(fs, session, `prj_${run}`) : await session.retry());
       content.releasePreparedImages(); content.releasePreparedModels(); return result;
     };
-    if (fresh) { try { await execute(resume); } catch { /* Keep the prepared creation object and the visible failure for explicit retry. */ } }
+    if (fresh && options.initial) { try { await execute(resume); } catch { /* Keep exact creation input for retry. */ } }
     const editable = (recovery = false) => {
       if (closed || fs.mutationAuthority.accessState !== 'editable') throw Error('このタブは閲覧専用です。');
       if (!recovery && unfinishedReceive()) throw Error('中断した受信を確認してから編集してください。');
@@ -115,6 +127,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
       editable(true); receiveFailure = '';
       try {
         const result = await action(); await reloadReceive();
+        if (!result && !last.source) { last = await session.read(); receiveDisplayPending = false; return; }
         receiveDisplayPending = true;
         const project = await ready(result ?? await session.read()); receiveDisplayPending = false; return project;
       } catch (error) {
@@ -124,16 +137,28 @@ export async function openValidationHost(options: ValidationHostOptions) {
     }, true);
     const workspaceFiles = {
       get jobs() { return receiveJobs; }, get error() { return receiveFailure; },
+      get initialImport() { return !last.source && !localInitial; },
       refresh: () => execute(reloadReceive, true),
       receive: (token: string, file: Blob) => receiveAction(async () => {
         if (last.state !== 'ready' || token !== last.source?.token) throw Error('入力・更新を確定してから受信してください。');
         return receiver.receive(token, file);
       }),
+      importWorkspace: (file: Blob) => receiveAction(async () => {
+        if ((await WorkspaceArchive.inspect(file, limits)).source.proof.identity.projectId !== `prj_${run}`)
+          throw Error('別のプロジェクトです。プロジェクト一覧から開いてください。');
+        return receiver.importWorkspace(file);
+      }),
       retry: (id: string) => receiveAction(() => receiver.retry(id)),
       reselectInput: (token: string, id: string, file: Blob) => receiveAction(() => receiver.reselectInput(token, id, file)),
+      reselectImportedInput: (id: string, file: Blob) => receiveAction(() => receiver.reselectImportedInput(id, file)),
       abandonInput: (id: string) => receiveAction(() => receiver.abandonInput(id)),
       cancelStale: (id: string) => receiveAction(() => receiver.cancelStale(id)),
     };
+    if (options.workspaceFile) {
+      try { await (last.state === 'ready' && last.source ? workspaceFiles.receive(last.source.token, options.workspaceFile) :
+        workspaceFiles.importWorkspace(options.workspaceFile)); }
+      catch { /* File and incomplete originals stay available through the same recovery controls. */ }
+    }
     const outputAction = <T>(action: () => Promise<T>, recovery = false) => execute(async () => {
       editable(); if (!recovery && (unfinishedOutput() || last.state !== 'ready')) throw Error('中断したファイル生成を確認してください。');
       outputFailure = '';
@@ -253,11 +278,14 @@ export async function openValidationHost(options: ValidationHostOptions) {
       },
       retry: () => execute(async () => { editable(true); return resume(); }),
     };
-    const host: SavedWorkspaceHost = { authority, limits, read: () => last, hasPending: () => busy || !!failure || receiveDisplayPending || unfinishedReceive() || last.state !== 'ready',
+    const emptyImport = () => !localInitial && last.state === 'empty' && !unfinishedReceive() && !unfinishedOutput();
+    const host: SavedWorkspaceHost = { authority, limits, read: () => last, hasPending: () => busy || receiveDisplayPending || unfinishedReceive() ||
+      !emptyImport() && (!!failure || last.state !== 'ready'),
       refresh: () => execute(async () => { last = await session.read(); await projectView(last); return last; }),
       resolve: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
       dispose: async () => { await dispose(); content.releasePreparedImages(); content.releasePreparedModels(); prepareDisplay = undefined; } };
-    return { ...host, content, workspaceFiles, workspaceOutput, get accessDetail() { return options.mode === 'view' ? '閲覧専用です。' : lease.accessDetail; },
+    return { ...host, content, workspaceFiles, workspaceOutput, display: () => project,
+      get accessDetail() { return options.mode === 'view' ? '閲覧専用です。' : lease.accessDetail; },
       setDisplayPreparation(callback: (next: SyntheticProject) => Promise<void>) {
       if (closed || prepareDisplay) throw Error('モデル表示の接続を確認してください。');
       prepareDisplay = callback; return () => { if (prepareDisplay === callback) prepareDisplay = undefined; };

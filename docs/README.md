@@ -36,9 +36,13 @@ Warm receipt keeps the same editor and retains repeated display failures until
 confirmed. The same file tools now connect frozen-source generation, streamed
 artifact read-back, generated/imported base folding, deliberate download and exact
 reselected-file verification. Incomplete output is recoverable before renderer
-preparation; neither download nor internal acknowledgment means saved. Initial
-import, other purposes, ordinary activation and rendered/device acceptance remain
-open; executed evidence is recorded in todo.
+preparation; neither download nor internal acknowledgment means saved. First
+Workspace import now preserves the entire original history in a separate root
+journal. The limited selector routes by verified Project identity, reusing existing
+receive for that lineage. Initial input/recovery, complete base observations,
+separate repository vacancy and startup-Scene guards share existing boundaries.
+Other purposes, ordinary activation and rendered/device acceptance remain open;
+final verification for this connection is recorded in todo.
 F01/F02 are not complete. Current executed evidence and next work are in todo.
 
 Later PO adoption: [05 §4.4](specs/05-project-scene-team-workflow.md#44-explicit-pin-parent-changes-po-approved-2026-09-13)

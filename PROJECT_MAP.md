@@ -45,7 +45,12 @@ The same file area now connects frozen Workspace generation, streamed artifact
 read-back, a shared imported/generated base table, deliberate download and exact
 reselected-file verification. Frozen retry keeps later edits; lost acknowledged
 artifacts/bases are not replenished. File controls precede renderer preparation.
-Initial import and other purposes remain open. Download alone is not save proof.
+First Workspace import now uses a separate unpublished root transaction with all
+original history and verified GLB/PNG bodies. The same selector opens by Project
+identity or receives into its existing lineage. Source-less/cold recovery, shared
+base completion and startup-Scene input guards stay in the same editor; missing
+receipts/repository collisions are not replaced. Final checks are tracked in todo.
+Other purposes remain open. Download alone is not save proof.
 This is not ordinary-home, rendered/device or whole-team acceptance.
 Exact executed checks are in todo.
 

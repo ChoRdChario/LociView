@@ -12,7 +12,9 @@ import { summarizeFullHistory } from './historySummary';
 import { WorkspaceBaseStore, receiveJobIds } from './workspaceBases';
 
 export interface ReceiverProof { identity: MetadataProof['identity']; metadataEnvelope: MetadataProof['envelope']; heads: readonly string[] }
-interface Start { schema: 'lociview-package-job-start-1'; jobId: string; operation: 'receiveWorkspace'; prepared: EvidenceRef; receiver: ReceiverProof }
+type Start = { schema: 'lociview-package-job-start-1'; jobId: string; prepared: EvidenceRef } &
+  ({ operation: 'receiveWorkspace'; receiver: ReceiverProof } |
+   { operation: 'importWorkspace'; destination: Omit<ReceiverProof, 'heads'> });
 interface Prepared { schema: 'lociview-workspace-receive-1'; packageId: string; manifest: EvidenceRef; metadata: EvidenceRef;
   roots: { blobs: EvidenceRef[]; evidence: EvidenceRef[] } }
 interface Binding { schema: 'lociview-workspace-input-1'; jobId: string; prepared: EvidenceRef; archive: EvidenceRef }
@@ -39,6 +41,8 @@ export class WorkspaceReceiveJob {
   private constructor(private readonly fs: ProjectWorkspaceFS, readonly id: string, private readonly limits: MetadataLimits,
     readonly inspection: WorkspaceArchive, private readonly input: Blob, readonly start: Start | null, private readonly reselected = false) {}
   assertOwner(fs: ProjectWorkspaceFS) { if (fs !== this.fs) fail('receive-job-owner'); }
+  get importing() { return this.start?.operation === 'importWorkspace'; }
+  private destination() { return this.start?.operation === 'importWorkspace' ? this.start.destination : this.start?.receiver; }
   path(name: string) { return `${root(this.fs)}receive/${this.id}/${name}`; }
   manifest() { const m = this.inspection.archive.control.manifest; if (m.purpose !== 'teamWorkspace') return fail('receive-purpose'); return m; }
   private descriptor(): Prepared {
@@ -120,14 +124,16 @@ export class WorkspaceReceiveJob {
     const inspection = await WorkspaceArchive.inspect(blob, limits), job = new WorkspaceReceiveJob(fs, id, limits, inspection, blob, start);
     if (json(binding) !== json({ schema: 'lociview-workspace-input-1', jobId: id, prepared: reference(prepared), archive: { sha256: inspection.archive.sha256, byteLength: inspection.archive.byteLength } }) ||
       json(prepared) !== json(job.descriptor())) fail('receive-input-binding');
-    if (Object.keys(start).sort().join(',') !== 'jobId,operation,prepared,receiver,schema' || start.schema !== 'lociview-package-job-start-1' ||
-      start.operation !== 'receiveWorkspace' || start.jobId !== id || json(start.prepared) !== json(reference(prepared)) || !start.receiver ||
-      Object.keys(start.receiver).sort().join(',') !== 'heads,identity,metadataEnvelope') fail('receive-start');
-    checkedProof({ identity: start.receiver.identity, envelope: start.receiver.metadataEnvelope }, limits); checkRemoteHeads(start.receiver.heads);
-    if (json(start.receiver.identity) !== json(inspection.source.proof.identity) || json(start.receiver.metadataEnvelope) !== json(inspection.source.proof.envelope)) fail('receive-lineage');
+    const importing = start.operation === 'importWorkspace', destination = importing ? start.destination : start.operation === 'receiveWorkspace' ? start.receiver : null;
+    if (Object.keys(start).sort().join(',') !== (importing ? 'destination,jobId,operation,prepared,schema' : 'jobId,operation,prepared,receiver,schema') ||
+      start.schema !== 'lociview-package-job-start-1' || start.jobId !== id || json(start.prepared) !== json(reference(prepared)) || !destination ||
+      Object.keys(destination).sort().join(',') !== (importing ? 'identity,metadataEnvelope' : 'heads,identity,metadataEnvelope')) return fail('receive-start');
+    checkedProof({ identity: destination.identity, envelope: destination.metadataEnvelope }, limits);
+    if (start.operation === 'receiveWorkspace') checkRemoteHeads(start.receiver.heads);
+    if (json(destination.identity) !== json(inspection.source.proof.identity) || json(destination.metadataEnvelope) !== json(inspection.source.proof.envelope)) fail('receive-lineage');
     await job.steps(); return job;
   }
-  async persist(receiver: ReceiverProof, additionalBytes: number): Promise<WorkspaceReceiveJob> {
+  async persist(receiver: ReceiverProof | null, additionalBytes: number): Promise<WorkspaceReceiveJob> {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
     if (this.start) return fail('receive-job-exists');
     if (this.reselected) await this.checkReselected();
@@ -150,8 +156,9 @@ export class WorkspaceReceiveJob {
       if (!(await prior.steps()).some(s => s.detail.kind === 'baseRecorded' || s.detail.kind === 'cancelled')) fail('receive-job-unfinished');
     }
     if (!Number.isSafeInteger(additionalBytes) || additionalBytes < 0 || existing + this.input.size + additionalBytes > 2_147_483_648 - 16_777_216) fail('receive-space-budget');
-    const prepared = this.descriptor(), start: Start = { schema: 'lociview-package-job-start-1', jobId: this.id, operation: 'receiveWorkspace',
-      prepared: reference(prepared), receiver };
+    const prepared = this.descriptor(), start: Start = { schema: 'lociview-package-job-start-1', jobId: this.id,
+      prepared: reference(prepared), ...(receiver ? { operation: 'receiveWorkspace' as const, receiver } :
+        { operation: 'importWorkspace' as const, destination: { identity: this.inspection.source.proof.identity, metadataEnvelope: this.inspection.source.proof.envelope } }) };
     await this.write('prepared.json', prepared);
     await this.write('input.json', { schema: 'lociview-workspace-input-1', jobId: this.id, prepared: reference(prepared),
       archive: { sha256: this.inspection.archive.sha256, byteLength: this.input.size } });
@@ -182,7 +189,8 @@ export class WorkspaceReceiveJob {
       const d = first.detail;
       if (d.kind === 'baseRecorded' || Object.keys(d).sort().join(',') !== (d.kind === 'workspacePublished' ? 'journal,kind,publication,receiver' : 'kind,publication,receiver') ||
         !d.receiver || Object.keys(d.receiver).sort().join(',') !== 'heads,identity,metadataEnvelope' ||
-        json(d.receiver.identity) !== json(this.start.receiver.identity) || json(d.receiver.metadataEnvelope) !== json(this.start.receiver.metadataEnvelope)) return fail('receive-step-detail');
+        json(d.receiver.identity) !== json(this.destination()!.identity) || json(d.receiver.metadataEnvelope) !== json(this.destination()!.metadataEnvelope) ||
+        this.importing && (d.kind !== 'workspacePublished' || json(d.receiver.heads) !== json(this.inspection.source.heads))) return fail('receive-step-detail');
       checkRemoteHeads(d.receiver.heads); checkRef(d.publication); if (d.kind === 'workspacePublished') checkRef(d.journal);
     }
     if (second?.detail.kind === 'baseRecorded') {
@@ -209,7 +217,8 @@ export class WorkspaceReceiveJob {
     if (!entry?.publication || json(entry.publication.heads) !== json(d.receiver.heads)) return fail('receive-observation-missing');
     if (d.kind === 'workspacePublished' && (entry.start.transactionId !== this.id || json(reference(entry.prepared)) !== json(d.journal) ||
       json(entry.prepared?.remote) !== json((await this.journalInput([...d.receiver.heads])).proof))) fail('receive-journal-originals');
-    if (d.kind === 'workspaceAlreadyPresent' && json(d.receiver) !== json(this.start!.receiver)) fail('receive-stale');
+    if (d.kind === 'workspacePublished' && entry.start.purpose !== (this.importing ? 'importWorkspace' : 'remotePackageMerge')) fail('receive-publication-purpose');
+    if (d.kind === 'workspaceAlreadyPresent' && (this.start?.operation !== 'receiveWorkspace' || json(d.receiver) !== json(this.start.receiver))) fail('receive-stale');
     const bases = await this.readBases(), expected = this.baseRecord(d.receiver);
     if (json(reference(expected)) !== json(last.detail.baseRecord) || !bases.some(b => json(b) === json(expected))) fail('receive-base-missing');
   }
@@ -238,7 +247,8 @@ export class WorkspaceReceiveJob {
     const m = this.manifest();
     if (json(receiver.heads) !== json(entry.publication.heads) || json(receiver.identity) !== json(m.identity) || json(receiver.metadataEnvelope) !== json(m.metadataEnvelope)) fail('receive-publication-proof');
     if (!zero && (entry.start.transactionId !== this.id || entry.prepared.remote?.source.packageId !== m.packageId)) fail('receive-publication-job');
-    if (zero && json(receiver) !== json(this.start.receiver)) fail('receive-stale');
+    if (this.importing && (zero || entry.start.purpose !== 'importWorkspace' || json(receiver.heads) !== json(m.targetHeads))) fail('import-publication');
+    if (zero && (this.start.operation !== 'receiveWorkspace' || json(receiver) !== json(this.start.receiver))) fail('receive-stale');
     const detail: Completion = zero ? { kind: 'workspaceAlreadyPresent', receiver, publication: reference(entry.publication) } :
       { kind: 'workspacePublished', receiver, journal: reference(entry.prepared), publication: reference(entry.publication) };
     const observed = await this.append(detail), record = await this.recordBase(receiver);

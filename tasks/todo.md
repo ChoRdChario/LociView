@@ -2,6 +2,65 @@
 
 ## Current boundary — thin connected workflow first (2026-09-09)
 
+Active after clean `bf1c0e0` (Workspace output connection). The previous goal turn
+made production progress and closed its 24-file checkpoint: typecheck, 2,157 tests,
+both builds and independent review. No changed blocker or repeated denied action.
+The full practical-team target remains 62 groups plus Desktop/iPhone/offline
+acceptance, not merely the isolated GLB/PNG file loop.
+
+Current unit — first Workspace file import and identity-based routing:
+
+- [x] Specify/review the dedicated unpublished initial-import journal/start and
+  exact imported-base completion. Preserve the local two-original initialization.
+- [x] Connect original full history plus admitted GLB/PNG bodies to the new empty
+  Project service, same input spool, exact recovery and shared base table.
+- [x] Connect selected Workspace files to the existing validation catalog/editor:
+  vacant identity imports, same-lineage existing identity receives; collisions and
+  pending/repair data are retained with an explicit recovery path, never replaced.
+- [x] Reuse file/journal/host tests for original-history import→edit→return,
+  interrupted/cold recovery, exact reselect and identity collision refusal. Final
+  meaningful-tree checks, independent review and local checkpoint.
+
+Scope: same limited file profiles, existing Project lease/origin operation slot,
+typed Session commands/WorkspaceFS. No ordinary-home activation, format expansion,
+dependency, independent-copy behavior, schema migration, release or new PoC.
+Only genuine contract/authority conflicts require a new PO decision. Browser/
+device evidence remains in the consolidated lane. Source generation is not save
+confirmation and initial import is not a new lineage.
+
+Implementation/review: the dedicated `importWorkspace` root transaction retains
+every original in dependency-ready order and validates its complete source before
+publication. Initial admission uses no fabricated base; original GLB/PNG records,
+bodies and imported/generated base observations share the existing services.
+The selector routes by content identity, while same-lineage existing runs receive
+updates. Local initialization's exact two-original contract is unchanged.
+Independent reviews corrected separate-IDB vacancy detection, missing input-job
+discovery in output/catalog, replay validation of formerly strong facts, startup
+Scene/file mutual input guards and the empty-import abandonment exit. Both focused
+backend and UI re-reviews have no remaining mandatory findings. Added tests cover
+these paths, original branching candidates, two file rounds, cold interruption and
+source-less recovery. Existing projectFiles: 73 PASS; isolation: 12 PASS. The
+combined metadata-host run completed: 182 PASS / exit 0, 218.28 s. Final typecheck
+also exits 0. The default full-root run ended with 7 failures (including 5 s/15 s
+execution limits), 2,165 PASS / 21 existing TODO, 258.98 s. This is not a passing
+root result. With source/tests still frozen, the same full suite completed with
+`npm test -- --maxWorkers=2`: 112 files / 2,172 PASS / 21 existing TODO, no failures,
+263.08 s. Assertions and timeout limits were unchanged. This reduced-concurrency
+result does not erase the initial failing run or prove its exact cause. Both
+`npm run build` and `npm run build:harness` exit 0; existing mixed-import/large-chunk
+warnings remain. The independent frozen 24-file review has no mandatory findings;
+only result documentation changed after these checks. Local checkpoint follows.
+One earlier focused failure was an existing error-text expectation; creation's
+specific message is retained, with a separate refusal for readonly file input.
+No rendered/browser/iPhone or offline acceptance is claimed.
+
+After this checkpoint: continue F02 Contribution against the same verified common
+base table and original-history journal, then the remaining approved file purposes
+and migration/activation boundaries. Do not introduce another PoC or count the
+limited Workspace loop as the 62-group practical-team completion.
+
+### Completed output checkpoint (`bf1c0e0`)
+
 Starting checkpoint `604058c`: the 19-file same-editor Workspace receive/recovery
 unit is committed after final typecheck, 2,149 passing tests, both builds and
 independent review. The preceding clarification turn recovered the terminal

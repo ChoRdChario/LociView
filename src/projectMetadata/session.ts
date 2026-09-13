@@ -8,9 +8,9 @@ import { checkLimits, fail, type MetadataLimits } from './format';
 import { ProjectMetadataSource } from './source';
 import { MetadataRepository, type MetadataStorageFactory } from './repository';
 import { TransactionJournal, type JournalStart, type PreparedJournal } from './journal';
-import { digest, equalBytes, json, newId, underWriteLease } from './persistence';
+import { digest, equalBytes, json, newId, underWriteLease, metadataPath } from './persistence';
 import { canonicalMetadataEdit, planMetadataEdit, type MetadataEdit } from './commands';
-import { checkRemoteStored, copyFullSource, planRemoteChanges, type FullMetadataSource, type RemoteBatchProof } from './remote';
+import { checkRemoteStored, copyFullSource, initialWorkspaceChanges, planRemoteChanges, type FullMetadataSource, type RemoteBatchProof } from './remote';
 import { WorkspaceReceiveJob, type ReceiverProof } from '../projectPackage/receiveJob';
 import type { JournalRemoteInput } from './packageRemote';
 import { packageByteHash } from '../projectPackage/manifest';
@@ -27,8 +27,9 @@ export interface MetadataMediaPort {
   verify(blobs: readonly JsonObject[]): Promise<void>;
   inventory?(blobs: readonly JsonObject[]): Promise<void>;
 }
-export interface MetadataModelFactPlan { readonly baseToken: string; readonly finalToken: string; readonly stagedBlobs?: readonly JsonObject[]; stage(): Promise<void> }
+export interface MetadataModelFactPlan { readonly baseToken: string | null; readonly finalToken: string; readonly stagedBlobs?: readonly JsonObject[]; stage(): Promise<void> }
 export interface MetadataModelFactPort { plan(base: ProjectMetadataSource, next: ProjectMetadataSource): Promise<MetadataModelFactPlan | null>;
+  planImported?(next: ProjectMetadataSource, bodyFor: (ref: JsonObject) => Blob): Promise<MetadataModelFactPlan>;
   planReceived?(base: ProjectMetadataSource, next: ProjectMetadataSource, bodyFor: (ref: JsonObject) => Blob): Promise<MetadataModelFactPlan> }
 
 export type MetadataSessionRead = Readonly<{
@@ -92,7 +93,8 @@ export class MetadataProjectSession {
           const included = originals.get(A.decodeChange(bytes).hash);
           if (!included || !equalBytes(included, bytes)) fail('published-transaction-missing');
         }
-        if (entry.prepared!.remote) {
+        if (entry.start.purpose === 'importWorkspace') await this.journal.validateImport(entry.prepared!);
+        else if (entry.prepared!.remote) {
           const base = await this.repository.read(entry.start.repositoryId, entry.start.proof, entry.start.baseHeads);
           if (!base) fail('remote-base-missing');
           await this.journal.validateRemote(entry.prepared!, base!);
@@ -206,7 +208,9 @@ export class MetadataProjectSession {
 
   private async outputReady() {
     const read = await this.read(); if (read.state !== 'ready' || !read.source || !read.publication) return fail('output-not-ready');
-    for (const id of await WorkspaceReceiveJob.ids(this.fs)) {
+    const ids = new Set([...(await WorkspaceReceiveJob.ids(this.fs)), ...(await this.journal.entries())
+      .filter(e => e.start.purpose === 'importWorkspace').map(e => e.start.transactionId)]);
+    for (const id of ids) {
       const state = await WorkspaceReceiveJob.inputState(this.fs, id, this.limits);
       if (state === 'abandoned') continue;
       if (state !== 'started') return fail('output-receive-pending');
@@ -268,11 +272,56 @@ export class MetadataProjectSession {
     });
   }
 
+  /** First Workspace introduction: original history, never a reconstructed local initialization. */
+  async importWorkspace(input: WorkspaceReceiveJob): Promise<MetadataSessionRead> {
+    input.assertOwner(this.fs);
+    return underWriteLease(this.fs, async () => {
+      if (!this.modelFacts?.planImported || !this.media?.inventory || input.start && !input.importing) return fail('workspace-import-unconnected');
+      let job = input;
+      const entries = await this.journal.entries(), own = entries.find(e => e.start.transactionId === job.id);
+      if (own && (own.start.purpose !== 'importWorkspace' || json(own.start.proof) !== json(job.inspection.source.proof)) ||
+        entries.length && !own || this.retained && this.retained.start.transactionId !== job.id) return fail('import-not-empty');
+      if (!own && (await this.fs.list(metadataPath(this.fs, ''))).length) return fail('import-not-empty');
+      await this.repository.assertImportNamespace(own?.start.repositoryId);
+      await job.preflightBase();
+      const source = job.inspection.source, inventory = await job.inventory(), remote = await job.journalInput(source.heads);
+      if (own?.prepared && json(own.prepared.remote) !== json(remote.proof)) return fail('receive-journal-originals');
+      if (own?.publication) {
+        await this.journal.validateImport(own.prepared!);
+        const current = await this.read();
+        if (current.state !== 'ready' || !current.source) return fail('import-replay-not-ready');
+        await this.checked(source, false);
+        await this.media.inventory(inventory);
+        await job.finish(own, { identity: source.proof.identity, metadataEnvelope: source.proof.envelope, heads: source.heads }, false);
+        return current; // Later local originals/heads are never replaced by the imported snapshot.
+      }
+      if (entries.some(e => e !== own)) return fail('import-other-transaction');
+      if (!own?.prepared) {
+        const parts = initialWorkspaceChanges(source, this.limits);
+        const facts = await this.modelFacts.planImported(source, ref => job.inspection.archive.entryBlob(`blobs/sha256/${ref.digest}`));
+        if (facts.baseToken !== null || facts.finalToken !== source.token) return fail('model-facts-token');
+        const introduced = new Set((facts.stagedBlobs ?? []).map(b => b.digest));
+        await this.media.inventory(inventory.filter(b => !introduced.has(b.digest)));
+        if (!job.start) job = await job.persist(null, (facts.stagedBlobs ?? []).reduce((n, b) => n + (b.byteLength as number), 0) +
+          parts.reduce((n, b) => n + b.length * 2, 0) + source.encodeFullSource().length * 3 + 4_194_304);
+        this.retained = { start: own?.start ?? { transactionId: job.id, repositoryId: job.id, predecessor: null,
+          purpose: 'importWorkspace', proof: source.proof, baseHeads: [] }, parts, remote,
+          ...(facts.stagedBlobs?.length ? { stagedBlobs: [...facts.stagedBlobs] } : {}),
+          modelFacts: { next: source, plan: { ...facts, stage: async () => { await facts.stage(); await this.media!.inventory!(inventory); } } } };
+      } else { this.retained = null; await this.media.inventory(inventory); }
+      await this.resume(job);
+      const receipt = (await this.journal.entries()).find(e => e.start.transactionId === job.id);
+      if (!receipt?.publication || json(receipt.publication.heads) !== json(source.heads)) return fail('import-final-publication');
+      await job.finish(receipt, { identity: source.proof.identity, metadataEnvelope: source.proof.envelope, heads: source.heads }, false);
+      return this.read();
+    });
+  }
+
   /** Isolated actual Workspace receive. Job spool/base remain separate from metadata publication. */
   async receiveWorkspace(expectedToken: string | null, input: WorkspaceReceiveJob): Promise<MetadataSessionRead> {
     input.assertOwner(this.fs);
     return underWriteLease(this.fs, async () => {
-      if (!this.modelFacts?.planReceived || !this.media?.inventory) return fail('workspace-receive-unconnected');
+      if (!this.modelFacts?.planReceived || !this.media?.inventory || input.importing) return fail('workspace-receive-unconnected');
       let job = input;
       await job.preflightBase(); // Reject an incompatible/corrupt retained base before any Project write.
       const entries = await this.journal.entries(), prior = entries.filter(e => e.publication).at(-1);
@@ -292,7 +341,8 @@ export class MetadataProjectSession {
         await job.finish(receipt, observed.receiver, observed.kind === 'workspaceAlreadyPresent');
         return this.read();
       }
-      const receiver = job.start?.receiver ?? { identity: current.source.proof.identity, metadataEnvelope: current.source.proof.envelope, heads: current.source.heads };
+      const receiver = job.start?.operation === 'receiveWorkspace' ? job.start.receiver :
+        { identity: current.source.proof.identity, metadataEnvelope: current.source.proof.envelope, heads: current.source.heads };
       const base = await this.repository.read(prior.start.repositoryId, { identity: receiver.identity, envelope: receiver.metadataEnvelope }, receiver.heads);
       if (!base) return fail('receive-base-missing');
       if (!own && base.token !== current.source.token) return fail('receive-stale');
@@ -331,7 +381,7 @@ export class MetadataProjectSession {
   async cancelWorkspaceReceive(job: WorkspaceReceiveJob): Promise<void> {
     job.assertOwner(this.fs);
     return underWriteLease(this.fs, async () => {
-      if (!job.start || (await this.journal.entries()).some(e => e.start.transactionId === job.id) || (await job.steps()).length) return fail('receive-cancel-denied');
+      if (job.start?.operation !== 'receiveWorkspace' || (await this.journal.entries()).some(e => e.start.transactionId === job.id) || (await job.steps()).length) return fail('receive-cancel-denied');
       const current = await this.read();
       if (current.state !== 'ready' || !current.source || json(current.source.heads) === json(job.start.receiver.heads)) fail('receive-not-stale');
       await job.cancelStale();
@@ -339,7 +389,8 @@ export class MetadataProjectSession {
   }
   async abandonWorkspaceInput(id: string): Promise<void> {
     return underWriteLease(this.fs, async () => {
-      if (this.retained || (await this.read()).state !== 'ready') return fail('receive-abandon-not-ready');
+      const read = await this.read();
+      if (this.retained || read.state !== 'ready' && (read.state !== 'empty' || (await this.fs.list(metadataPath(this.fs, ''))).length)) return fail('receive-abandon-not-ready');
       await WorkspaceReceiveJob.abandon(this.fs, id, this.limits);
     });
   }
@@ -372,7 +423,8 @@ export class MetadataProjectSession {
   private async resume(receiveJob?: WorkspaceReceiveJob): Promise<MetadataSessionRead> {
     const entries = await this.journal.entries(), pending = entries.find(e => !e.publication);
     const transactionId = pending?.start.transactionId ?? this.retained?.start.transactionId;
-    if (transactionId && (await WorkspaceReceiveJob.ids(this.fs)).includes(transactionId)) {
+    if (transactionId && ((pending?.start ?? this.retained?.start)?.purpose === 'importWorkspace' ||
+      (await WorkspaceReceiveJob.ids(this.fs)).includes(transactionId))) {
       if (!receiveJob || receiveJob.id !== transactionId || !this.media?.inventory) return fail('receive-job-recovery-required');
       receiveJob.assertOwner(this.fs);
     }
@@ -388,8 +440,12 @@ export class MetadataProjectSession {
         const { plan, next } = this.retained.modelFacts;
         await this.journal.begin(this.retained.start);
         if (pending?.prepared) fail('model-facts-after-prepared');
-        const base = await this.repository.read(this.retained.start.repositoryId, this.retained.start.proof, this.retained.start.baseHeads);
-        if (!base || base.token !== plan.baseToken || next.token !== plan.finalToken) fail('model-facts-base');
+        if (this.retained.start.purpose === 'importWorkspace') {
+          if (plan.baseToken !== null || next.token !== plan.finalToken) fail('model-facts-base');
+        } else {
+          const base = await this.repository.read(this.retained.start.repositoryId, this.retained.start.proof, this.retained.start.baseHeads);
+          if (!base || base.token !== plan.baseToken || next.token !== plan.finalToken) fail('model-facts-base');
+        }
         await plan.stage(); await this.checked(next, false);
         delete this.retained.modelFacts; // Prepared/cold recovery can only verify already stored facts.
       }
@@ -406,9 +462,13 @@ export class MetadataProjectSession {
       }
       await this.verifyDelta(this.retained.stagedBlobs);
       if (this.retained.stagedBlobs?.length) {
-        const stored = await this.repository.read(this.retained.start.repositoryId, this.retained.start.proof);
-        if (!stored) return fail('journal-base-missing');
-        await this.checked(stored.appendOriginal(this.retained.parts), false);
+        if (this.retained.start.purpose === 'importWorkspace') {
+          await this.checked(ProjectMetadataSource.reopen(this.retained.parts, this.retained.start.proof, this.limits), false);
+        } else {
+          const stored = await this.repository.read(this.retained.start.repositoryId, this.retained.start.proof);
+          if (!stored) return fail('journal-base-missing');
+          await this.checked(stored.appendOriginal(this.retained.parts), false);
+        }
       }
       // Once prepared, disk is the recovery source. Never conceal loss of an
       // acknowledged source/part by recreating it from this writer's memory.
@@ -420,8 +480,9 @@ export class MetadataProjectSession {
 
     await this.verifyDelta(prepared.stagedBlobs);
     const parts = await this.journal.validateParts(prepared), start = prepared.start;
-    let stored = await this.repository.read(start.repositoryId, start.proof, undefined, start.purpose === 'initialize');
-    if (start.purpose !== 'initialize') {
+    const initial = start.purpose === 'initialize' || start.purpose === 'importWorkspace';
+    let stored = await this.repository.read(start.repositoryId, start.proof, undefined, initial);
+    if (!initial) {
       if (!stored) fail('journal-base-missing');
       const base = await this.repository.read(start.repositoryId, start.proof, start.baseHeads);
       if (!base) fail('journal-base-missing');
@@ -432,6 +493,14 @@ export class MetadataProjectSession {
       if (!stored || !base) return fail('remote-base-missing');
       next = await this.journal.validateRemote(prepared, base);
       checkRemoteStored(stored, base, next, !!pending?.durable);
+    } else if (start.purpose === 'importWorkspace') {
+      next = await this.journal.validateImport(prepared);
+      const allowed = new Map(next.originalChanges().map(b => [A.decodeChange(b).hash, b]));
+      for (const bytes of stored?.originalChanges() ?? []) {
+        const original = allowed.get(A.decodeChange(bytes).hash);
+        if (!original || !equalBytes(original, bytes)) fail('import-unexpected-writer');
+      }
+      if (pending?.durable && (!stored || stored.token !== next.token)) fail('import-acknowledged-change-missing');
     } else next = stored ? stored.appendOriginal(parts) : ProjectMetadataSource.reopen(parts, start.proof, this.limits);
     // Exact pending changes can coexist with legitimate extra local heads; never rebase or choose a winner.
     await this.checked(next, start.purpose === 'initialize');

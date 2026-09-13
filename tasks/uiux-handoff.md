@@ -1,5 +1,13 @@
 # Public candidate UI/UX監査 handoff
 
+> **2026-09-13 更新:** 限定GLB/PNG一覧に「作業一式を開く」を接続。初回読込は
+> 元履歴・モデル・画像を維持し、既存の同系統Projectなら更新を統合する。cold読込途中でも
+> 元fileの再選択／復旧を案内し、開始Scene競合時もfile操作との入力guardを保つ。
+> 同じfile欄の生成・download・選び直したfileとの一致確認も接続済み。
+> downloadだけでは保存確認にしない。以下の旧「外部ファイル保存は未接続」は履歴。
+> 下記一括Desktop確認に、別ブラウザ領域への初回読込→編集→返送→再受信を含める。
+> 今回は記録DOM／生成GLB/PNG／memory storageの検査。実browser・iPhone・offlineは未受入れ。
+
 > **2026-09-12 限定実file有効化:** 同じdev画面の「実ファイルで検証」から
 > 新規の静的GLB（内蔵PNGのみ・外部参照なし）＋添付PNGを選択できます。既存Projectは
 > 変更せず、このブラウザ内に検証Projectの再開用データを作ります。外部ファイル保存は未接続です。
