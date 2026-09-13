@@ -6,7 +6,7 @@ import { initializeBrowserMetadata, openBrowserMetadataStorage, browserMetadataD
 import { openValidationHost, validationArea } from './validationHost';
 import { listValidationProjects } from './validationCatalog';
 import { createValidationWorkspace } from './validationWorkspace';
-import { prepareValidationResidents } from './validationRender';
+import { prepareValidationResidents, prepareReadonlyResidents } from './validationRender';
 import { sceneViewportFactory } from './viewport';
 import { syntheticDisplay } from './viewportModel';
 import type { SyntheticProject } from './fixture';
@@ -30,6 +30,14 @@ export async function createValidationBrowserWorkspace(document: Document, run?:
   const workspace = createValidationWorkspace(document, { ...options,
     list: () => listValidationProjects(options, storage),
     open: (id, initial, mode, workspaceFile) => openValidationHost({ ...options, run: id, initial, mode, workspaceFile, openStorage: create => storage(id, create) }),
+    renderReview: async view => {
+      const resident = await prepareReadonlyResidents(view.models, view.content);
+      try {
+        const display = view.display(null, null);
+        for (const model of view.models) resident.validate(model, display.savedMaterials?.[model.assetId]);
+        return { factory: sceneViewportFactory(resident), dispose: () => resident.dispose() };
+      } catch (error) { resident.dispose(); throw error; }
+    },
     render: async host => {
       const resident = await prepareValidationResidents(host.authority.read().modelVersions!, host.content);
       try {

@@ -97,7 +97,7 @@ export async function writePackageArchive(capture: Pick<WorkspaceSourceCapture, 
   try {
     checkAbort(options.signal);
     const manifest = controls.manifest.slice(), checksum = controls.checksum.slice(), control = readManifestControl(manifest, checksum);
-    if (!['teamWorkspace', 'contribution', 'backup', 'clean'].includes(control.manifest.purpose)) fail('zip-purpose');
+    if (!['teamWorkspace', 'contribution', 'backup', 'clean', 'review'].includes(control.manifest.purpose)) fail('zip-purpose');
     const source = originals.map(e => {
       if ('bytes' in e) { const bytes = e.bytes.slice(); return { path: e.path, sha256: packageByteHash(bytes), byteLength: bytes.length, read: () => bytes }; }
       return { path: e.path, sha256: e.sha256, byteLength: e.byteLength, read: e.read };
@@ -145,7 +145,8 @@ export async function writePackageArchive(capture: Pick<WorkspaceSourceCapture, 
     checkAbort(cancel.signal); await writer.close(undefined, { zip64: false }); await pipeline; checkAbort(cancel.signal);
     if (!finished) fail('zip-output-incomplete');
     return Object.freeze({ kind: control.manifest.purpose === 'teamWorkspace' ? 'generated-workspace-archive' as const :
-      control.manifest.purpose === 'backup' ? 'generated-backup-archive' as const : control.manifest.purpose === 'clean' ? 'generated-clean-archive' as const : 'generated-contribution-archive' as const,
+      control.manifest.purpose === 'backup' ? 'generated-backup-archive' as const : control.manifest.purpose === 'clean' ? 'generated-clean-archive' as const :
+      control.manifest.purpose === 'review' ? 'generated-review-archive' as const : 'generated-contribution-archive' as const,
       byteLength, sha256: hash.digestHex(), manifest: control.manifest });
   } catch (error) {
     cancel.abort(error);

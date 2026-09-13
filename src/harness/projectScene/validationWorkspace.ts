@@ -13,6 +13,8 @@ import type { ValidationProjectEntry } from './validationCatalog';
 import { createSavedWorkspace } from './metadataWorkspace';
 import type { ViewportFactory } from './viewportHost';
 import { createValidationReceiveControls } from './validationReceiveControls';
+import { prepareReviewView, type ReviewView } from './reviewView';
+import { createReviewWorkspace } from './reviewWorkspace';
 
 type Host = ReturnType<typeof createValidationModeHost>;
 export interface ValidationWorkspacePorts {
@@ -20,6 +22,7 @@ export interface ValidationWorkspacePorts {
   list(): Promise<ValidationProjectEntry[]>;
   open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob): Promise<Awaited<ReturnType<typeof openValidationHost>>>;
   render(host: ValidationDisplayHost): Promise<{ factory: ViewportFactory; dispose(): void }>;
+  renderReview?(view: ReviewView): Promise<{ factory: ViewportFactory; dispose(): void }>;
   selected(run: string | null, mode?: LocalOpenMode): void;
 }
 
@@ -45,11 +48,12 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const listHeading = document.createElement('h2'); listHeading.textContent = 'このブラウザの再開用データ';
   navigation.append(heading, help, workspaceForm, form, listHeading, refresh, list); root.append(back, status, navigation, content);
   let host: Host | undefined, workspace: ReturnType<typeof createSavedWorkspace> | undefined;
+  let reviewWorkspace: ReturnType<typeof createReviewWorkspace> | undefined;
   let receiveTools: ReturnType<typeof createValidationReceiveControls> | undefined;
   let resident: Awaited<ReturnType<ValidationWorkspacePorts['render']>> | undefined;
   let busy = false, disposed = false, composing = false, selected: string | null = null, operation: Promise<void> | undefined;
-  const changed = () => !!workspace?.hasChanges() || !!receiveTools?.hasChanges() || !!host?.hasPending();
-  const controls = () => { navigation.inert = busy; openFile.disabled = create.disabled = busy || composing; back.disabled = busy; back.hidden = !host; };
+  const changed = () => !!workspace?.hasChanges() || !!reviewWorkspace?.hasChanges() || !!receiveTools?.hasChanges() || !!host?.hasPending();
+  const controls = () => { navigation.inert = busy; openFile.disabled = create.disabled = busy || composing; back.disabled = busy; back.hidden = !host && !reviewWorkspace; };
   title.addEventListener('compositionstart', () => { composing = true; controls(); });
   title.addEventListener('compositionend', () => { composing = false; controls(); });
   const execute = (action: () => Promise<void>) => {
@@ -61,6 +65,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const closeCurrent = async () => {
     const oldWorkspace = workspace, oldHost = host, oldResident = resident;
     workspace = undefined; host = undefined; resident = undefined;
+    reviewWorkspace?.dispose(); reviewWorkspace = undefined;
     if (oldWorkspace) await oldWorkspace.dispose(); else await oldHost?.dispose(); oldResident?.dispose(); content.replaceChildren();
     receiveTools?.dispose(); receiveTools = undefined;
   };
@@ -162,6 +167,20 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     ensureMaySwitch(); const file = workspaceInput.files?.[0]; if (!file) throw Error('ファイルを選択してください。');
     status.textContent = 'ファイルを確認しています。';
     const purpose = (await PackageArchive.inspect(file)).control.manifest.purpose;
+    if (purpose === 'review') {
+      const view = await prepareReviewView(file, ports.fileLimits, ports.decode);
+      if (!ports.renderReview) throw Error('閲覧用シーンの表示が未接続です。');
+      const prepared = await ports.renderReview(view);
+      try {
+        if (disposed) return;
+        await closeCurrent(); resident = prepared;
+        reviewWorkspace = createReviewWorkspace(document, view, prepared.factory); content.append(reviewWorkspace.root); reviewWorkspace.render();
+        selected = null; ports.selected(null); navigation.hidden = true; workspaceInput.value = '';
+        status.textContent = '閲覧用シーンを開きました。編集プロジェクトは作成していません。';
+      } catch (error) { if (resident === prepared) resident = undefined; throw error; }
+      finally { if (resident !== prepared) prepared.dispose(); }
+      return;
+    }
     const inspected = purpose === 'clean' ? await CleanArchive.inspect(file, validationMetadataLimits) : await WorkspaceArchive.inspect(file, validationMetadataLimits);
     if (disposed) return;
     const run = (inspected.source.proof.identity.projectId as string).slice(4);

@@ -91,6 +91,8 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       generate: (...a) => run(() => current.workspaceOutput.generate(...a)),
       generateClean: (...a) => run(() => current.workspaceOutput.generateClean(...a)),
       previewClean: (...a) => run(() => current.workspaceOutput.previewClean(...a)),
+      previewReview: (...a) => run(() => current.workspaceOutput.previewReview(...a)),
+      generateReview: (...a) => run(() => current.workspaceOutput.generateReview(...a)),
       generateBackup: (...a) => run(() => current.workspaceOutput.generateBackup(...a)),
       generateContribution: (...a) => run(() => current.workspaceOutput.generateContribution(...a)),
       retry: (...a) => run(() => current.workspaceOutput.retry(...a)),

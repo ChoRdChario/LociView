@@ -169,7 +169,7 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
       if (card.body.textContent !== body) card.body.textContent = body;
       card.content?.render();
       card.note.textContent = [item.needsReview || item.pin === 'needsReview' ? '要確認：ピン位置を確認してください。' : '',
-        item.pin === 'ownerHidden' ? 'モデルは非表示です。' : item.pin === 'unavailable' ? 'ピンを表示できません。' : ''].filter(Boolean).join(' ');
+        item.pin === 'ownerMissing' ? '対応モデルなし。記録は保持しています。' : item.pin === 'ownerHidden' ? 'モデルは非表示です。' : item.pin === 'unavailable' ? 'ピンを表示できません。' : ''].filter(Boolean).join(' ');
       card.note.hidden = !card.note.textContent;
       card.close.disabled = Boolean(drag);
       card.resize.disabled = Boolean(drag ? drag.id !== id : next.moveBlock);

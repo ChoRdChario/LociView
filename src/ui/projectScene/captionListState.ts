@@ -11,7 +11,7 @@ export interface CaptionListItem {
   readonly owner: Field<Readonly<{ kind: 'project' }> |
     Readonly<{ kind: 'asset'; assetId: string; name: Field<string> }>>;
   readonly mediaCount: Field<number>;
-  readonly pin: 'visible' | 'ownerHidden' | 'needsReview' | 'unavailable';
+  readonly pin: 'visible' | 'ownerHidden' | 'ownerMissing' | 'needsReview' | 'unavailable';
   /** Independent of temporary visibility; this does not acknowledge compatibility. */
   readonly needsReview?: boolean;
 }

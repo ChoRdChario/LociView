@@ -71,7 +71,8 @@ export class ValidationContent implements MetadataMediaPort {
   }
   private async modelDeclaration(record: JsonObject): Promise<JsonObject> {
     if (!same(record.formatProfile, await validationGlbProfile()) || record.contentKind !== 'mesh' || record.role !== 'meshPrimary' ||
-      !same(record.representationToAsset, { ...identityPlacement(), reflection: 'none' }) || !same(record.purposes, ['source', 'display']) ||
+      !same(record.representationToAsset, { ...identityPlacement(), reflection: 'none' }) ||
+      !same(record.purposes, ['source', 'display']) && !same(record.purposes, ['display']) ||
       !same(record.derivedFrom, [])) return fileError('保存したモデルの形式を確認できません。');
     const blob = fileObject(record.blob) as JsonObject;
     if (blob.mediaType !== 'model/gltf-binary') return fileError('保存したモデルの本体形式が一致しません。');
@@ -163,7 +164,7 @@ export class ValidationContent implements MetadataMediaPort {
       if (actual.size) return response('failed');
       facts = request.fact === 'representation' ? { contentKind: 'mesh', staticPose: true, contentBoundsAsset: decoded.bounds,
         materials: [...decoded.materials], surfaceRanges: [...decoded.surfaceRanges] } : request.fact === 'family-envelope' ?
-        { logicalBoundsAsset: decoded.bounds, authority: { kind: 'source', representationId: record.id!, payloadDigest: record.payloadDigest! } } :
+        { logicalBoundsAsset: decoded.bounds, authority: { kind: same(record.purposes, ['display']) ? 'first-verified-output' : 'source', representationId: record.id!, payloadDigest: record.payloadDigest! } } :
         { verifiedMembers: [{ id: record.id!, payloadDigest: record.payloadDigest! }] };
     } else return response('unsupported');
     checkContentFacts(request, facts); return response('verified', facts);

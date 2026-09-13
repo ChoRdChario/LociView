@@ -26,6 +26,9 @@ import { CleanOutputJob } from '../projectPackage/cleanOutputJob';
 import { CleanInputJob } from '../projectPackage/cleanInputJob';
 import { CleanSourceCapture, cleanProtectedInventory } from '../projectPackage/cleanSource';
 import { selectCleanRecords } from '../projectPackage/cleanRecords';
+import { ReviewOutputJob } from '../projectPackage/reviewOutputJob';
+import { ReviewSourceCapture } from '../projectPackage/reviewSource';
+import { prepareReviewSnapshot, type ReviewSelectionOptions } from '../projectPackage/reviewSelection';
 import { ContributionSourceCapture, VerifiedContributionBase, type ContributionBaseSelection } from '../projectPackage/contributionSource';
 import { outputJobKeys, outputJobClass, openOutputJob, outputTerminal, validateOutputProtection } from '../projectPackage/outputJobs';
 import { WorkspaceBaseStore } from '../projectPackage/workspaceBases';
@@ -400,6 +403,52 @@ export class MetadataProjectSession {
     return underWriteLease(this.fs, async () => {
       if (await CleanOutputJob.state(this.fs, id, this.limits) === 'started') await (await CleanOutputJob.open(this.fs, id, this.limits)).cancel();
       else await CleanOutputJob.abandon(this.fs, id, this.limits);
+    });
+  }
+
+  private async finishReviewOutput(job: ReviewOutputJob, store: OriginBlobStore, signal?: AbortSignal) {
+    job.assertOwner(this.fs); const current = await this.outputReady();
+    if (json(current.source!.proof) !== json(job.source.proof)) return fail('output-lineage');
+    await this.assertOutputSlot(job.id); await validateOutputProtection(this.fs, job, store, this.limits);
+    await job.generate(store, this.verifier(false), signal); return job.id;
+  }
+  async previewReviewOutput(expectedToken: string, selection: ReviewSelectionOptions) {
+    const read = await this.outputReady(); if (read.source!.token !== expectedToken) return fail('output-stale');
+    const { review, omittedEntryView } = await prepareReviewSnapshot(read.source!, this.limits, selection);
+    const count = (name: string) => Object.keys(review.snapshot[name] as JsonObject).length;
+    return { token: expectedToken, sceneId: selection.sceneId, name: (review.snapshot.scene as JsonObject).name as string,
+      models: Object.values(review.snapshot.assetsById as JsonObject).filter(a => (a as JsonObject).kind === 'visual').length,
+      captions: count('captionsById'), media: count('mediaResourcesById'), ...review.editEffect, omittedEntryView };
+  }
+  async createReviewOutput(expectedToken: string, selection: ReviewSelectionOptions, store: OriginBlobStore, version: string, signal?: AbortSignal) {
+    const owned = structuredClone(selection);
+    return underWriteLease(this.fs, async () => {
+      const read = await this.outputReady(); if (read.source!.token !== expectedToken) return fail('output-stale');
+      await this.assertOutputSlot();
+      const bases = new WorkspaceBaseStore(this.fs, this.limits, read.source!.proof), snapshot = await bases.snapshot();
+      const capture = await ReviewSourceCapture.prepare(this, expectedToken, owned, store, this.limits, signal);
+      const inventory = await cleanProtectedInventory(read.source!, await bases.payloads(snapshot.records), this.limits);
+      const job = ReviewOutputJob.prepare(this.fs, capture, inventory, snapshot, this.limits, version);
+      await validateOutputProtection(this.fs, job, store, this.limits);
+      const current = await this.outputReady();
+      if (current.source!.token !== expectedToken || current.publication !== capture.publication || json(await bases.snapshot()) !== json(snapshot)) return fail('output-stale');
+      await job.persist(); return this.finishReviewOutput(job, store, signal);
+    });
+  }
+  async resumeReviewOutput(id: string, store: OriginBlobStore, signal?: AbortSignal) {
+    return underWriteLease(this.fs, async () => this.finishReviewOutput(await ReviewOutputJob.open(this.fs, id, this.limits), store, signal));
+  }
+  async verifyReviewOutput(id: string, file: Blob, store: OriginBlobStore) {
+    return underWriteLease(this.fs, async () => {
+      const current = await this.outputReady(), job = await ReviewOutputJob.open(this.fs, id, this.limits);
+      if (json(current.source!.proof) !== json(job.source.proof)) return fail('output-lineage');
+      await validateOutputProtection(this.fs, job, store, this.limits); await job.verifySelected(file);
+    });
+  }
+  async cancelReviewOutput(id: string) {
+    return underWriteLease(this.fs, async () => {
+      if (await ReviewOutputJob.state(this.fs, id, this.limits) === 'started') await (await ReviewOutputJob.open(this.fs, id, this.limits)).cancel();
+      else await ReviewOutputJob.abandon(this.fs, id, this.limits);
     });
   }
 

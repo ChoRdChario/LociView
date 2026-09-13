@@ -199,6 +199,8 @@ export async function openValidationHost(options: ValidationHostOptions) {
       generate: (token: string) => outputAction(() => sender.generate(token)),
       generateClean: (token: string) => outputAction(() => sender.generateClean(token)),
       previewClean: (token: string) => outputAction(() => sender.previewClean(token)),
+      previewReview: (token: string, selection: Parameters<typeof sender.previewReview>[1]) => outputAction(() => sender.previewReview(token, selection)),
+      generateReview: (token: string, selection: Parameters<typeof sender.generateReview>[1]) => outputAction(() => sender.generateReview(token, selection)),
       generateBackup: (token: string, label?: string) => outputAction(() => sender.generateBackup(token, label)),
       generateContribution: (token: string, selection: ContributionBaseChoice['selection']) => outputAction(() => sender.generateContribution(token, selection)),
       retry: (id: string) => outputAction(() => sender.retry(id), true),

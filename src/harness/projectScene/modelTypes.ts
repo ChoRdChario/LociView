@@ -21,6 +21,18 @@ export interface ValidationModelClosure {
       readonly sourceLocator: JsonObject; readonly sourceSemantics: JsonObject }[] } };
 }
 export type DisplayModelClosure = FixtureModelClosure | ValidationModelClosure;
+/** Read-only rendering facts, not a Binding, Revision or metadata source. */
+export interface ReadonlyRenderModel {
+  readonly shape: 'render-glb'; readonly key: string; readonly assetId: string; readonly assetToProject: FixturePlacement;
+  readonly representation: JsonObject & { readonly id: string; readonly assetId: string; readonly variantFamilyId: string;
+    readonly representationToAsset: FixturePlacement;
+    readonly logicalBoundsAsset: ValidationModelClosure['representation']['logicalBoundsAsset'];
+    readonly materialCatalog: ValidationModelClosure['representation']['materialCatalog'] };
+}
+export const renderModel = (model: ValidationModelClosure | ReadonlyRenderModel): ReadonlyRenderModel => model.shape === 'render-glb' ? model :
+  ({ shape: 'render-glb', key: model.binding.id, assetId: model.binding.assetId, assetToProject: model.binding.assetToProject, representation: model.representation });
+export const renderOwner = (model: DisplayModelClosure | ReadonlyRenderModel) => model.shape === 'render-glb' ? model.assetId : model.binding.assetId;
+export const renderPlacement = (model: DisplayModelClosure | ReadonlyRenderModel) => model.shape === 'render-glb' ? model.assetToProject : model.binding.assetToProject;
 /** Explicit placement edit; no model-content introduction or fixture reconstruction. */
 export interface ModelPlacementCommand {
   readonly sceneId: string; readonly assetId: string; readonly expectedBindingId: string;

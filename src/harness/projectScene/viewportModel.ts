@@ -4,7 +4,7 @@ import { captionColorKey } from '../../ui/projectScene/captionListState';
 import { freezeSynthetic, type SyntheticProject } from './fixture';
 import { modelVersion, syntheticVersions } from './modelFixture';
 import { readFixtureModel, canonicalFixture, type FixturePlacement } from './modelClosure';
-import type { DisplayModelClosure } from './modelTypes';
+import type { DisplayModelClosure, ReadonlyRenderModel } from './modelTypes';
 import { readProjectCamera, readSolidBackground } from './viewHistory';
 import type { DisplayCapture } from './viewSession';
 import { materialTarget, targetKey, resolveFixtureMaterial } from './materialHistory';
@@ -20,6 +20,7 @@ export interface DisplayPin {
   readonly status: 'normal' | 'needsReview';
 }
 export interface SyntheticDisplay {
+  readonly readOnly?: false;
   readonly token: string; readonly sceneId: string; readonly projectFrameId: string;
   readonly models: readonly DisplayModelClosure[]; readonly pins: readonly DisplayPin[];
   /** Residents remain loaded. This local filter controls rendering, bounds and picking only. */
@@ -34,6 +35,11 @@ export interface SyntheticDisplay {
   readonly materialNotices?: readonly string[];
   readonly entry?: { readonly kind: 'none' } | { readonly kind: 'blocked'; readonly reason: string } | { readonly kind: 'ready'; readonly payload: DisplayCapture };
 }
+export interface ReadonlyDisplay extends Omit<SyntheticDisplay, 'models' | 'readOnly' | 'pinEdit' | 'modelEdit' | 'preview'> {
+  readonly readOnly: true; readonly models: readonly ReadonlyRenderModel[];
+  readonly pinEdit?: never; readonly modelEdit?: never; readonly preview?: never;
+}
+export type RenderDisplay = SyntheticDisplay | ReadonlyDisplay;
 export interface CameraPose {
   readonly position: V3; readonly target: V3; readonly up: V3;
   readonly projection: { readonly kind: 'perspective'; readonly verticalFov: number } |

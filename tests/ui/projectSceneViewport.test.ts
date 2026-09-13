@@ -14,7 +14,7 @@ import { planPinMode } from '../../src/ui/projectScene/pinModeState';
 import { pickResidentSurface } from '../../src/harness/projectScene/viewportPicking';
 import { degreesRotation, proposedPlacement } from '../../src/harness/projectScene/modelTransform';
 import type { GizmoProposal, ModelPlacementTarget } from '../../src/harness/projectScene/pinGizmo';
-import type { ValidationModelClosure } from '../../src/harness/projectScene/modelTypes';
+import type { ReadonlyRenderModel, ValidationModelClosure } from '../../src/harness/projectScene/modelTypes';
 import { patchHardChroma } from '../../src/viewer/hardChroma';
 
 const tracker = vi.hoisted(() => ({ renderers: [] as any[], controls: [] as any[], resize: [] as (() => void)[],
@@ -98,6 +98,21 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance', () => {
+  it('renders a read-only DTO with camera controls but no edit gizmo or placement picking', () => {
+    const base = syntheticDisplay(createSyntheticProject(), f.overview, null, null), canvas = fakeCanvas(), propose = vi.fn();
+    const models: ReadonlyRenderModel[] = base.models.map(m => ({ shape: 'render-glb', key: m.binding.id,
+      assetId: m.binding.assetId, assetToProject: m.binding.assetToProject, representation: m.representation as ReadonlyRenderModel['representation'] }));
+    const create = vi.fn((m: ReadonlyRenderModel) => { const asset = new THREE.Group(), mesh = new THREE.Mesh(new THREE.PlaneGeometry(), new THREE.MeshStandardMaterial());
+      asset.add(mesh); asset.matrixAutoUpdate = false; asset.matrix.copy(placementMatrix(m.assetToProject)); return { asset, mesh, dispose() {} }; });
+    const v = sceneViewportFactory({ create, dispose() {} })(canvas.canvas as unknown as HTMLCanvasElement, () => {}, propose, propose);
+    const display = { ...base, models, readOnly: true as const, pinEdit: undefined, modelEdit: undefined, preview: undefined };
+    v.update(display); v.setActive(true); canvas.show(); expect(v.read().ready).toBe(true); expect(v.read().display).toBe(display);
+    v.camera({ kind: 'axis', axis: '+z' }); expect(v.read().axis).toBe('+z');
+    v.camera({ kind: 'projection', projection: 'orthographic' });
+    expect(v.read().projection).toBe('orthographic'); expect(v.read().pins).toHaveLength(base.pins.length);
+    const targets = new SyntheticSession().pinCreationTargets(); expect(v.pick!(targets[0]!, 400, 300)).toBeNull(); expect(v.pickCreation!(targets, 400, 300)).toBeNull();
+    expect(tracker.gizmos).toHaveLength(0); expect(propose).not.toHaveBeenCalled(); expect(create).toHaveBeenCalledTimes(models.length); v.dispose();
+  });
   it('hides residents without reloading, preserves pose/axis, fits only visible models and leaves ProjectAnchor independent', () => {
     const base = createSyntheticProject(), project = { ...base, resources: { ...base.resources,
       captions: { ...base.resources.captions, [f.second]: { ...base.resources.captions[f.second]!,

@@ -1885,6 +1885,62 @@ and standalone `P ⊆ C ⊆ P ∪ R` validation, with no mandatory remaining fin
 This closes the previously identified design gap for the next isolated package
 slice, not builder/golden execution, sink adoption or §10's measured acceptance.
 
+Isolated validation implementation note (2026-09-14): a closed snapshot reader
+may reuse the existing domain graph checks through a private, deterministic
+validation-only expansion of the exact partition and references. Artificial
+lifecycle/binding/revision/header values in that expansion are not source facts,
+metadata history, a provider, render identity or a durable Project. Do not expose
+or persist that expansion as a View session. A View reads the validated snapshot's
+own fields and compatible-ID declaration. Only explicit edit-copy passes the
+checked expansion through the complete fresh typed reconstruction and creates
+metadata history; retain that attempt's fresh map/source bytes for retry. Unknown
+snapshot fields and forbidden provenance must reject before expansion, not vanish
+through it. This is validator reuse, not a new wire field or inferred relation.
+
+#### Isolated review capture and output job
+
+The isolated View reuses the existing viewport/camera and Caption window controls
+through a read-only render DTO: runtime key, Asset ID, exact assetToProject and
+the snapshot Representation. It does not manufacture Binding/Revision/history
+records or a Project provider. Placement picking and edit commands are unavailable.
+Nonvisual-owner records remain list/window-only, not hidden models with a reveal
+action. Current admission stays one static GLB per visual Asset and static PNG;
+unsupported multiple representations fail without choosing a winner.
+
+An explicit review edit-copy retains `purposes:['display']`; do not add `source`.
+The existing validation GLB executor may admit that exact alternative alongside
+`['source','display']`, with unchanged profile/body/bounds/material checks and
+`derivedFrom:[]`. Its family-envelope evidence uses the existing
+`first-verified-output` authority for display-only, bound to the newly checked
+Representation ID/digest and measured bounds. Existing source-purpose evidence
+is not reused. This is accepted review reconstruction, not a new GLB profile.
+
+The local reconstruction object is closed to
+`{schema:'lociview-review-reconstruction-1',snapshotId,selection,rekey}`.
+`selection` is exactly `{sceneId,omitConflictedEntryView?}` with a boolean optional
+confirmation for the conflicted entry pointer only. `rekey` is the frozen typed
+§12.1 clean reconstruction used for the admitted scoped record subset; its fresh
+Project scaffolding is private and absent from the flattened review. The source
+bytes, reconstruction and source proof stay separate from `review.json` and the
+manifest. Restoring an attempt reselects the same source/Scene, reuses the same
+mapping, and requires exact snapshot bytes. It cannot recapture current work.
+
+The existing §12.7 frozen output protocol is used under `review-output/<jobId>/`
+with `source.am`, `review.json`, `manifest.json`, `review-reconstruction.json`,
+`inventory.json`, `bases.json`, `capture.json`, `prepared.json`, `start.json`,
+`abandoned.json`, content-addressed `steps/`, and fresh-ID `artifacts/` ZIPs.
+Capture purpose is review, scope is the selected **source** Scene, and Start's
+operation is `reviewCopy`. Prepared roots protect all local source/base bodies,
+not just the output snapshot closure. `review-output-index/<jobId>.json` is
+`{schema:'lociview-review-output-index-1',jobId,prepared:EvidenceRef}`, written
+after Prepared and before Start. Its presence makes whole-job loss discoverable.
+Unstarted abandonment is `{schema:'lociview-review-output-abandoned-1',jobId,
+stage:'beforeStart'}`. Artifact/external-file/cancellation steps use the existing
+closed chain. No Workspace base is created or advanced. Generate/retry validates
+the original source, frozen mapping, profile/content checks, exact streamed bodies
+and readback before acknowledging the artifact; external file confirmation remains
+separate. These are bounded local controls, not a new public wire or capacity promise.
+
 Design review: independent read-only review found one incorrect description of
 the current validation host's cumulative 64 MiB guard; §12.4 now states the actual
 code boundary. No other mandatory issue was reported in the field/summary/root/

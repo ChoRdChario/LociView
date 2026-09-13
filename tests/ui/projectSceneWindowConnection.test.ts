@@ -47,7 +47,7 @@ describe('same-host comparison windows; authored DOM only, not raster or native 
     let latest: SyntheticDisplay | undefined, receipt: SyntheticDisplay | undefined, hold = false, notified = () => {};
     const workspace = createDevelopmentWorkspace(doc.asDocument(), s, { viewportFactory: (_canvas, changed) => {
       notified = changed;
-      return { update(d) { latest = d; if (!hold) receipt = d; }, setActive() {}, camera() {}, retry() {}, dispose() {},
+      return { update(d) { if (d.readOnly) throw Error('expected editor display'); latest = d; if (!hold) receipt = d; }, setActive() {}, camera() {}, retry() {}, dispose() {},
         read: () => ({ token: 'camera', display: receipt, ready: true, issue: null, dragging: false, projection: 'perspective', axis: null,
           pins: receipt?.pins.map(p => ({ id: p.id, x: 800, y: 500, visible: true })) ?? [] }) };
     } });

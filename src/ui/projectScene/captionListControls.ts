@@ -92,6 +92,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     if (!row.color) notes.push('色を確認');
     if (row.uncertainMatch) notes.push('絞り込み条件を確認');
     if (item.pin === 'ownerHidden') notes.push('モデル非表示');
+    else if (item.pin === 'ownerMissing') notes.push('一覧のみ');
     else if (item.pin === 'unavailable') notes.push('ピンを表示できません');
     if (item.needsReview || item.pin === 'needsReview') notes.push('要確認');
     if (row.colorHidden) notes.push('ピン非表示（色）');

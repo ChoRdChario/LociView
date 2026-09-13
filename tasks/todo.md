@@ -12,7 +12,62 @@ resume and recovery. Desktop, physical iPhone and offline acceptance must cover
 the new route. Scope is 62 of the 64 inventory groups; M13/M14 remain later work.
 Neither component counts nor synthetic-host success is product completion or release approval.
 
-## Active unit — independent copy → edit → reopen
+## Verified checkpoint — selected Scene review output → standalone View
+
+Independent-copy output/input, editing and cold reopen are committed at `cc99bcd`.
+This checkpoint connects the accepted one-Scene review output and
+read-only opening. It is a user-visible checkpoint, not completion of review's
+explicit editable-copy handoff. That connected handoff follows immediately.
+
+- [x] Build and inspect the closed selected-Scene snapshot, exact presentation/
+  Caption/media/material closure, privacy summary and frozen typed reconstruction.
+- [x] Connect output/preflight and genuinely read-only input to the existing file
+  area and 3D/Caption controls; preserve omitted-model records as list-only.
+- [x] Reuse existing package/file tests for scope, privacy, output retry, file input,
+  materials, multiple windows, unknown nested input and read-only rendering.
+  Independent review fixes cover material projection, optional color and startup retry.
+- [x] Finish serial final unit checks and preserve the reviewed checkpoint. Record live
+  browser/device/offline evidence separately at the grouped adoption boundaries.
+
+Final checks passed serially: typecheck, root tests (112 files, 2,273 PASS / 21
+existing TODO; 476.45s), ordinary build and harness build. The root command was
+`npm test -- --reporter=dot --maxWorkers=2 --testTimeout=30000`. Existing
+mixed-import/large-chunk, Repo UUID and injected Node image-loader warnings remain.
+No dependency, runtime budget or warning threshold was changed. Focused failures
+were corrected before the final tree; the full run is green. The three independent
+UI findings were fixed and re-reviewed; exact snapshot/output/source privacy and
+isolation were also reviewed. No additional PoC or test framework was introduced.
+Recorded DOM and mocked GPU checks are not live browser, physical iPhone or
+offline acceptance. Those remain at the grouped boundaries.
+
+## Next unit — explicit review edit-copy → independent Project → edit/cold reopen
+
+The pure typed reconstruction and display-only model admission exist,
+but no persistent review edit job, retry receipts or edit-copy UI is implemented.
+Freeze the reconstruction/destination before initialization; retain the original
+review bytes, exact new history, missing-model records and known-position review
+pins. Reuse the clean initialization path, with the local handoff protocol specified
+and independently reviewed before implementation. Do not count direct component
+initialization as a completed file-to-edit workflow.
+
+- [ ] Specify the bounded local parent/clean-child handoff and confirm independent
+  design review. Freeze actual metadata bytes/proof, not only IDs or timestamps.
+- [ ] Connect explicit confirmation, persistent retry and missing-evidence status
+  to the existing file area/Project selector; reuse clean initialization.
+- [ ] Verify file → independent edits → cold reopen and interrupted retry with
+  existing tests; preserve source review bytes and later edits, then checkpoint.
+
+Acceptance: exactly the chosen durable Scene, no filter-driven omissions, no
+source history/identity, no inferred model relation or compatibility winner.
+View must not create editable metadata or expose mutation commands. Edit-copy
+keeps original bytes, known positions and missing-model records, and discloses
+pins whose omitted family requires review. Existing 06 §§5.1/12.1/12.6 govern;
+no new PO policy is needed. New local retry records receive design review before
+implementation. Genuine unplaced/pinScale, migration, normal activation, other
+profiles/media/dependencies and release remain separate. Stop only for a real
+contract conflict or new authority boundary.
+
+## Previous evidence — independent copy → edit → reopen
 
 The preceding connected restore unit is committed at `26638b5`; the tree was
 clean on resumption. The next work closes a missing file purpose, not another
@@ -99,11 +154,11 @@ area. This is limited GLB/PNG development code, not ordinary-home acceptance.
 
 ## Remaining sequence and stop conditions
 
-1. Preserve the verified independent-copy checkpoint. The connected file/edit/
-   reopen flow, not an increased helper/test count, is the completed unit; normal
-   entry and adoption remain incomplete. Address data-loss, save-misrepresentation
+1. The independent-copy checkpoint is preserved. The connected file/edit/reopen
+   flow, not an increased helper/test count, is the completed unit; normal entry
+   and adoption remain incomplete. Address data-loss, save-misrepresentation
    and operation-blocking faults immediately.
-2. Next connected unit: selected-Scene review → View →
+2. Finish the selected-Scene review output → View checkpoint, then connect
    explicit independent editable copy, per 06 §12.6. Reuse the clean reconstruction
    and existing file/display boundaries without treating a review snapshot as a
    Workspace or inventing omitted model relations. Then connect migration/late
@@ -131,7 +186,7 @@ New policy/compatibility/major architecture decisions retain their explicit appr
 
 PO renewed permission for timely checkpoint Push on 2026-09-14. Use existing
 `g0-baseline`; verify remote, scope, privacy and triggered workflows first.
-Before this product checkpoint, cached origin was 0 behind / 74 ahead; no live fetch
+At the start of this unit, cached origin was 0 behind / 75 ahead; no live fetch
 was used for that observation. Previous environment denial is separate from PO permission:
 do not retry a denied action unchanged or bypass it. Local implementation need not wait.
 `main`, Pages, Service Worker, license/version and public release remain separately gated.

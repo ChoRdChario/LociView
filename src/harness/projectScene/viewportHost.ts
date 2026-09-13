@@ -6,7 +6,7 @@ import { createCaptionWindowControls } from '../../ui/projectScene/captionWindow
 import { sceneSwitchReason } from '../../ui/projectScene/navigationState';
 import type { PinModeMemory } from '../../ui/projectScene/pinModeState';
 import { value } from '../../scene/types';
-import { pointInProject, syntheticDisplay, type SyntheticDisplay, type V3 } from './viewportModel';
+import { pointInProject, syntheticDisplay, type SyntheticDisplay, type RenderDisplay, type V3 } from './viewportModel';
 import type { PinSurfaceTarget } from './viewportPicking';
 import type { ModelPlacementTarget } from './pinGizmo';
 import type { ModelManipulation } from './modelTransform';
@@ -18,7 +18,7 @@ import { createMediaGallery } from './mediaControls';
 export interface ViewportObservation {
   readonly token: string; readonly ready: boolean; readonly issue: string | null; readonly dragging: boolean;
   /** Exact immutable input used for this projection; absent receipts cannot place pins/lines. */
-  readonly display?: SyntheticDisplay;
+  readonly display?: RenderDisplay;
   /** Changes for geometry/camera lifetime, but not an Orbit start/end without movement. */
   readonly pickToken?: string;
   readonly manipulating?: boolean;
@@ -28,7 +28,7 @@ export interface ViewportObservation {
   readonly preview?: { readonly x: number; readonly y: number; readonly visible: boolean };
 }
 export interface SyntheticViewport {
-  update(display: SyntheticDisplay): void; setActive(active: boolean): void;
+  update(display: RenderDisplay): void; setActive(active: boolean): void;
   /** Reserve placement input before Orbit receives pointerdown; independent of gizmo activity. */
   setPinPointerActive?(active: boolean): void;
   read(): ViewportObservation; camera(intent: ViewCameraIntent): void; retry(): void; dispose(): void;

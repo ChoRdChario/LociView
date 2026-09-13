@@ -32,7 +32,7 @@ See inventory for individual connections and todo for the unverified worktree.
 | `src/domain`, `src/scene` | New typed records, source/candidate evidence, pure Scene commands/composition |
 | `src/projectMetadata` | New metadata Session, original history, commands, retained journal/recovery and storage generations |
 | `src/projectFiles` | Limited real-file admission, Project creation, content and team send/receive services |
-| `src/projectPackage` | Five-purpose wire/control inspection and bounded Workspace/Contribution/backup jobs; implementation is section-specific |
+| `src/projectPackage` | Five-purpose wire/control inspection and bounded file jobs; inventory records which user flows are connected |
 | `src/platform` | `WorkspaceFS`, OPFS, browser locks and platform integration |
 | `src/assets`, `src/io` | Legacy asset/package I/O, local XLSX/CSV and LociMyu conversion |
 | `src/viewer` | Three.js loaders, material patches and legacy `ViewerCore` |

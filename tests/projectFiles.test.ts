@@ -62,6 +62,10 @@ import { BackupOutputJob } from '../src/projectPackage/backupOutputJob';
 import { CleanOutputJob } from '../src/projectPackage/cleanOutputJob';
 import { CleanInputJob } from '../src/projectPackage/cleanInputJob';
 import { CleanArchive } from '../src/projectPackage/cleanArchive';
+import { ReviewArchive } from '../src/projectPackage/reviewArchive';
+import { ReviewOutputJob } from '../src/projectPackage/reviewOutputJob';
+import { prepareReviewView } from '../src/harness/projectScene/reviewView';
+import { inspectReviewSnapshot, prepareReviewEdit } from '../src/projectPackage/reviewSnapshot';
 import { BackupArchive, writeBackupArchive } from '../src/projectPackage/backupArchive';
 import { BackupSourceCapture } from '../src/projectPackage/backupSource';
 import { backupEncode, backupEvidenceRefs } from '../src/projectPackage/backupEvidence';
@@ -135,7 +139,7 @@ async function openFileCaption(modelBytes = glb()) {
   const fs = new TestFS(), locks = lockManager(), run = newId(), factory = storageFactory();
   const coordinator = ProjectMutationCoordinator.browser(locks);
   const store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
-  const options = { base: fs, coordinator, store, fileLimits: budget, decode, run,
+  const options = { base: fs, coordinator, store, fileLimits: budget, decode, run, packageLocks: locks,
     openStorage: async () => ({ factory, dispose: async () => {} }) };
   const initial = prepareValidationCreation(await prepareValidationProject({ run, title: '追加の検証', models: [{ label: '3Dモデル', bytes: modelBytes }] }, budget, decode));
   const host = await openValidationHost({ ...options, initial }), workspace = createSavedWorkspace(new RecordedDocument().asDocument(), host);
@@ -542,6 +546,32 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(readRestoreControls(f.fs, metadata)).rejects.toThrow('restore-selected-missing');
     await scope.dispose();
   }, 30000);
+  it('freezes selected-Scene review output and cold retries without source edits, bases or a false file-save acknowledgment', async () => {
+    const f = await workspaceFileFixture(), sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
+    const selected = await f.local.source!.inspectOriginal({ maxNodes: 100000, maxWork: 1000000 });
+    const sceneId = selected.candidates.fields.find(field => field.path[0] === 'scenesById')!.path[1]!;
+    const beforeBases = await new WorkspaceBaseStore(f.fs, metadata, f.local.source!.proof).snapshot();
+    const preview = await sender.previewReview(f.local.source!.token, { sceneId }); expect(preview.models).toBeGreaterThan(0);
+    const write = f.fs.writeStream.bind(f.fs); let stopped = false;
+    vi.spyOn(f.fs, 'writeStream').mockImplementation(async (path, stream) => {
+      if (!stopped && path.includes('/review-output/') && path.includes('/artifacts/')) { stopped = true; throw Error('review sink opening failed'); }
+      return write(path, stream);
+    });
+    await expect(sender.generateReview(f.local.source!.token, { sceneId })).rejects.toThrow('review sink opening failed');
+    const [id] = await ReviewOutputJob.ids(f.fs), job = await ReviewOutputJob.open(f.fs, id!, metadata), manifest = job.manifest();
+    const later = await f.receiver.session.editCaption(f.local.source!.token, f.captionId, 'body', '共有用生成の後に追記');
+    const cold = new WorkspaceSender(f.fs, f.reopen().session, f.store, metadata, f.locks);
+    await cold.retry(id!); const file = await cold.download(id!), review = await ReviewArchive.inspect(file, metadata);
+    expect(review.archive.control.manifest).toEqual(manifest); expect(review).not.toHaveProperty('source');
+    expect((await cold.jobs()).find(j => j.id === id)).toMatchObject({ purpose: 'review', state: 'generated' });
+    expect(JSON.stringify(review.review.snapshot)).not.toContain('共有用生成の後に追記');
+    expect((await f.receiver.session.read()).source!.token).toBe(later.source!.token);
+    expect(await new WorkspaceBaseStore(f.fs, metadata, f.local.source!.proof).snapshot()).toEqual(beforeBases);
+    await cold.verifyFile(id!, file); expect((await cold.jobs()).find(j => j.id === id)?.state).toBe('file-verified');
+    for (const path of await f.fs.list(`v2/packages/review-output/${id}/`)) await f.fs.remove(path);
+    expect(await cold.jobs()).toContainEqual(expect.objectContaining({ id, purpose: 'review', state: 'repair-required' }));
+    await expect(cold.generateReview(later.source!.token, { sceneId })).rejects.toThrow();
+  }, 60000);
   it('connects clean copy to independent editing and cold reopen without an exchange base', async () => {
     const f = await workspaceFileFixture(), current = await f.receiverService.receive(f.local.source!.token, f.file);
     const sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks), sourceBytes = current.source!.encodeFullSource();
@@ -1380,6 +1410,79 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(host.hasPending()).toBe(false); expect(host.workspaceFiles.jobs.find(j => j.id === id)!.state).toBe('completed');
     await u.dispose();
   });
+  it('opens a review from the existing file selector with multiple windows and no editable Project (recorded DOM)', async () => {
+    const { host, workspace, s } = await openFileCaption();
+    s.media.addFile(s.mediaContext(), { name: '添付PNG', size: png.length, arrayBuffer: async () => png.slice().buffer });
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+    expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'color', color: '#123456' }))).toBe(true);
+    s.setViewportState(true, s.snapshot.modelVersions!.map(m => m.assetId), null);
+    expect(s.acceptPinCreation(s.pinCreationTargets()[0]!, [1, 0, 0])).toBe(true);
+    s.acceptPin(planPinMode(s.pinContext(), { kind: 'finish' }));
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+    const model = s.snapshot.modelVersions![0]!.closure; if (model.shape !== 'saved-glb') throw Error('saved model');
+    const slot = validationMaterialSlots(model)[0]!, overrideId = `ovr_${newId()}`;
+    const intent: MaterialIntent = { appearance: { lighting: 'unlit' }, compositing: { coverage: { policy: 'inherit' }, optics: 'inherit' } };
+    await host.authority.write(host.read().source!.token, Object.fromEntries(Object.entries({ routing: { scope: { kind: 'project' }, target: slot.target },
+      ...intent, lifecycle: { state: 'active', eventId: `evt_${newId()}`, reason: 'initial' } }).map(([k, v]) => [materialKey(overrideId, k), canonicalFixture(v)])), { sceneId: s.sceneId });
+    const token = host.read().source!.token, mode = createValidationModeHost(host, async () => { throw Error('unexpected mode switch'); }, () => {});
+    const tools = createValidationReceiveControls(new RecordedDocument().asDocument(), mode, () => s, () => {}, async () => {});
+    const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)], root = record(tools.root);
+    const button = (label: string) => all(root).find(n => n.tag === 'button' && n.textContent === label)!;
+    const kind = all(root).find(n => n.attributes.get('aria-label') === '渡す内容')!; kind.value = 'review'; kind.fire('change');
+    const scenes = all(root).find(n => n.attributes.get('aria-label') === '渡すシーン')!; scenes.value = s.sceneId; scenes.fire('change');
+    button('内容を確認').fire('click'); await vi.waitFor(() => expect(button('ファイルを作成')?.disabled).toBe(false));
+    expect(all(root).some(n => n.textContent.includes('キャプション 2・メディア 1'))).toBe(true);
+    button('ファイルを作成').fire('click'); await vi.waitFor(() => {
+      expect(host.workspaceOutput.error).toBeFalsy(); expect(button('ダウンロード')?.disabled).toBe(false);
+    }, { timeout: 10000 });
+    const file = await host.workspaceOutput.download(host.workspaceOutput.jobs[0]!.id), prepared = await prepareReviewView(file, budget, decode);
+    expect(prepared.models[0]).not.toHaveProperty('binding'); expect(prepared.models[0]).not.toHaveProperty('revision');
+    expect(prepared.models[0]!.representation).not.toHaveProperty('payloadDigest'); expect(prepared.display(null, null).pins).toHaveLength(2);
+    expect(prepared.images.size).toBe(1); expect(host.read().source!.token).toBe(token);
+    expect(Object.values(prepared.display(null, null).savedMaterials![prepared.models[0]!.assetId]!)).toEqual([intent]);
+    // Inject an independently admitted optional-field omission at the pure View projection boundary.
+    const noColor = structuredClone(prepared.inspection.review.snapshot), firstCaption = Object.values(noColor.captionsById as JsonObject)[0] as Record<string, JsonObject[string]>;
+    delete firstCaption.colorSrgb;
+    const omitted = await inspectReviewSnapshot(noColor, metadata), inspect = vi.spyOn(ReviewArchive, 'inspect').mockResolvedValueOnce({ ...prepared.inspection, review: omitted });
+    try { const noColorView = await prepareReviewView(file, budget, decode);
+      expect(noColorView.source.captions.find(c => c.id === firstCaption.id)!.color).toEqual({ kind: 'value', value: '#a08045' });
+      expect(noColorView.inspection.review.snapshot.captionsById).toEqual(noColor.captionsById);
+    } finally { inspect.mockRestore(); }
+    const open = vi.fn(async () => { throw Error('review must not open editable storage'); }), render = vi.fn(async () => { throw Error('review must not fabricate a Project'); });
+    let display: Parameters<ReturnType<ViewportFactory>['update']>[0];
+    let starts = 0;
+    const renderReview = vi.fn(async () => ({ dispose() {}, factory: ((_canvas, _changed, pin, model) => {
+      expect(pin).toBeUndefined(); expect(model).toBeUndefined();
+      if (++starts === 1) throw Error('injected renderer startup refusal');
+      return { update(next) { display = next; }, setActive() {}, camera() {}, retry() {}, dispose() {},
+        read: () => ({ display, token: 'recorded-review-camera', ready: true, issue: null, dragging: false, projection: 'perspective', axis: null,
+          pins: display?.pins.map(p => ({ id: p.id, x: 40, y: 60, visible: true })) ?? [] }) };
+    }) as ViewportFactory }));
+    const u = createValidationWorkspace(new RecordedDocument().asDocument(), { fileLimits: budget, decode, selected() {}, list: async () => [], open, render, renderReview });
+    const page = record(u.root), openButton = () => all(page).find(n => n.tag === 'button' && n.textContent === 'ファイルを開く')!;
+    await vi.waitFor(() => expect(openButton().disabled).toBe(false));
+    const input = all(page).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!;
+    Object.assign(input, { files: [file] }); input.parent!.parent!.fire('submit', { preventDefault() {} });
+    await vi.waitFor(() => expect(all(page).some(n => n.textContent.includes('編集プロジェクトは作成していません'))).toBe(true));
+    expect(open).not.toHaveBeenCalled(); expect(render).not.toHaveBeenCalled(); expect(renderReview).toHaveBeenCalledOnce();
+    const rows = all(page).filter(n => n.className === 'lv-caption-select'); expect(rows).toHaveLength(2);
+    rows[0]!.fire('click'); rows[1]!.fire('click'); expect(all(page).filter(n => n.className === 'lv-caption-window')).toHaveLength(2);
+    const retry = all(page).find(n => n.tag === 'button' && n.textContent === '3D表示を再試行')!;
+    expect(retry.hidden).toBe(false); expect(all(page).some(n => n.textContent === 'injected renderer startup refusal')).toBe(true);
+    retry.fire('click'); expect(starts).toBe(2); expect(retry.hidden).toBe(true);
+    expect(all(page).filter(n => n.className === 'lv-caption-window')).toHaveLength(2);
+    expect(all(page).some(n => n.tag === 'button' && n.textContent === 'ピンを追加')).toBe(false);
+    expect(display!.readOnly).toBe(true); expect(u.selected).toBeNull();
+    const copy = await prepareReviewEdit(prepared.inspection.review, metadata), target = firstWorkspaceRecipient();
+    const bodies = [];
+    for (const ref of prepared.inspection.review.closure.semanticRefs)
+      bodies.push({ ref, bytes: await prepared.inspection.archive.entryBytes(`blobs/sha256/${ref.digest}`, budget.maxFileBytes) });
+    const initialized = await prepareValidationCreation({ records: copy.records as Parameters<typeof prepareValidationCreation>[0]['records'], blobs: bodies }).persist(target.fs, target.store, target.session);
+    expect(initialized.state).toBe('ready');
+    expect(initialized.provider!.kind).toBe('scene-provider'); // Existing first-verified-output evidence, not an invented source purpose.
+    expect(JSON.stringify(copy.records.representationsById)).not.toContain('"source"');
+    await u.dispose(); tools.dispose(); await workspace.dispose();
+  }, 60000);
   it('offers clean preflight and opens the independent copy through the existing selector (recorded DOM)', async () => {
     const { f, options } = await initialWorkspaceHostFixture(), original = await openValidationHost({ ...options, workspaceFile: f.file });
     const mode = createValidationModeHost(original, next => openValidationHost({ ...options, mode: next }), () => {});
@@ -2287,7 +2390,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const { host, workspace, options, captionId } = await openFileCaption();
     const readOnly = await openValidationHost(options); expect(readOnly.authority.readOnly).toBe(true);
     let display: ReturnType<typeof syntheticDisplay>, ready = true;
-    const viewport: ViewportFactory = () => ({ update(d) { display = d; }, setActive() {},
+    const viewport: ViewportFactory = () => ({ update(d) { if (d.readOnly) throw Error('expected editor display'); display = d; }, setActive() {},
       read: () => ({ token: 'display', ready, issue: ready ? null : 'injected display failure', dragging: false, projection: 'perspective', axis: null,
         pins: display?.pins.map(p => ({ id: p.id, x: 30, y: 30, visible: true })) ?? [] }), camera() {}, retry() {}, dispose() {} });
     const mounted = createSavedWorkspace(new RecordedDocument().asDocument(), readOnly, viewport), s = mounted.session!, root = record(mounted.root);

@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { fixtureModelBytes } from './modelClosure';
-import { defaultPose, fittedPose, placementMatrix, projectBounds, switchProjection, type CameraPose, type SyntheticDisplay } from './viewportModel';
+import { defaultPose, fittedPose, placementMatrix, projectBounds, switchProjection, type CameraPose, type RenderDisplay } from './viewportModel';
+import { renderOwner, renderPlacement } from './modelTypes';
 import type { ViewportFactory, ViewportObservation } from './viewportHost';
 import { PROJECT_SCENE_STANDARD_BACKGROUND_HEX, readProjectCamera, readSolidBackground, type SolidBackground } from './viewHistory';
 import type { DisplayCapture } from './viewSession';
@@ -24,7 +25,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
   const backgrounds = new Map<string, SolidBackground>();
   let background: SolidBackground = { kind: 'solid', colorSrgb: [232 / 255, 230 / 255, 226 / 255] };
   let entryPending = false, notice: string | null = null;
-  let pose = defaultPose(), display: SyntheticDisplay | null = null, modelKey = '', active = false, disposed = false, applying = false;
+  let pose = defaultPose(), display: RenderDisplay | null = null, modelKey = '', active = false, disposed = false, applying = false;
   let issue: string | null = null, contextLost = false, dragging = false, axis: ViewportObservation['axis'] = null, serial = 0, raf = 0, lastObservation = '';
   let width = 1, height = 1;
   let pickEpoch = 0;
@@ -88,16 +89,16 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
   function fail(e: unknown) { issue = `3D表示を停止しました。${errorText(e)} 編集内容は保持しています。`; release(); serial++; changed(); }
   function buildModels() {
     if (!display || !renderer) return;
-    const key = JSON.stringify([display.models.map(m => m.binding.id), display.materials, display.savedMaterials]); if (key === modelKey) return;
+    const key = JSON.stringify([display.models.map(m => m.shape === 'render-glb' ? m.key : m.binding.id), display.materials, display.savedMaterials]); if (key === modelKey) return;
     pickEpoch++;
     clearModels();
     try {
       for (const model of display.models) {
-        const appearance = display.materials?.[model.binding.assetId];
+        const assetId = renderOwner(model), appearance = display.materials?.[assetId];
         if (appearance && 'issue' in appearance) continue; // Diagnosed unsupported effect; no source-looking replacement.
-        if (model.shape === 'saved-glb') {
+        if (model.shape === 'saved-glb' || model.shape === 'render-glb') {
           if (!saved) throw Error('実モデルの表示本体が未接続です。');
-          const surface = saved.create(model, display.savedMaterials?.[model.binding.assetId]); models.add(surface.asset); resident.set(model.binding.assetId, surface); continue;
+          const surface = saved.create(model, display.savedMaterials?.[assetId]); models.add(surface.asset); resident.set(assetId, surface); continue;
         }
         const raw = JSON.parse(new TextDecoder().decode(fixtureModelBytes(model.shape))) as { positions: number[]; indices: number[] };
         const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(raw.positions, 3));
@@ -117,11 +118,11 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
   function previewModels() {
     if (!display) return;
     for (const model of display.models) {
-      const surface = resident.get(model.binding.assetId); if (!surface) continue;
-      surface.asset.visible = !display.hiddenAssetIds?.includes(model.binding.assetId);
+      const assetId = renderOwner(model), surface = resident.get(assetId); if (!surface) continue;
+      surface.asset.visible = !display.hiddenAssetIds?.includes(assetId);
       const edit = display.modelEdit;
-      const placement = edit?.target.assetId === model.binding.assetId
-        ? proposedPlacement(model.binding.assetToProject, edit) : model.binding.assetToProject;
+      const placement = edit?.target.assetId === assetId
+        ? proposedPlacement(renderPlacement(model), edit) : renderPlacement(model);
       surface.asset.matrix.copy(placementMatrix(placement)); surface.asset.updateMatrixWorld(true);
     }
     updateClipping();
@@ -143,7 +144,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
       if (![...camera.projectionMatrix.elements, ...camera.matrixWorld.elements].every(Number.isFinite)) throw new Error('表示範囲を確認してください。');
       // Register TransformControls before OrbitControls: handle-down disables orbit
       // before its listener sees that same event (including touch).
-      gizmo = proposePin || proposeModel ? createPinGizmo<PinSurfaceTarget | ModelPlacementTarget>(canvas, scene, camera, (target, world, manipulation) => {
+      gizmo = !display?.readOnly && (proposePin || proposeModel) ? createPinGizmo<PinSurfaceTarget | ModelPlacementTarget>(canvas, scene, camera, (target, world, manipulation) => {
         if ('kind' in target) return !!proposeModel && !!display?.modelEdit?.enabled &&
           JSON.stringify(target) === JSON.stringify(display.modelEdit.target) && proposeModel(target, world, manipulation);
         const surface = resident.get(target.assetId);
@@ -176,9 +177,9 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
   function updateClipping() {
     if (!camera || !display?.bounds) return;
     const min = new THREE.Vector3(...display.bounds.min), max = new THREE.Vector3(...display.bounds.max);
-    const edit = display.modelEdit, model = edit && display.models.find(m => m.binding.assetId === edit.target.assetId);
+    const edit = display.modelEdit, model = edit && display.models.find(m => renderOwner(m) === edit.target.assetId);
     if (edit && model) {
-      const bounds = projectBounds(model.representation.logicalBoundsAsset, proposedPlacement(model.binding.assetToProject, edit));
+      const bounds = projectBounds(model.representation.logicalBoundsAsset, proposedPlacement(renderPlacement(model), edit));
       min.min(new THREE.Vector3(...bounds.min)); max.max(new THREE.Vector3(...bounds.max));
     }
     const radius = max.clone().sub(min).length() / 2, distance = camera.position.distanceTo(min.add(max).multiplyScalar(0.5));
@@ -252,13 +253,13 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
     setActive(next) { if (!next && active) release(); active = next; ensure(); },
     setPinPointerActive(next) { pinPointerActive = next; syncOrbit(); },
     pick(target, x, y) {
-      if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || gizmo?.dragging || !display) return null;
+      if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || gizmo?.dragging || !display || display.readOnly) return null;
       try { const sample = pickSample(x, y); if (!sample) return null;
         const result = pickResidentSurface(display, target, resident, camera, sample.ndc, sample.coverage); reportPickIssue(); return coverageIssue ? null : result;
       } catch (error) { coverageIssue = errorText(error); reportPickIssue(); return null; }
     },
     pickCreation(targets, x, y) {
-      if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || gizmo?.dragging || !display) return null;
+      if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || gizmo?.dragging || !display || display.readOnly) return null;
       try { const sample = pickSample(x, y); if (!sample) return null;
         const result = pickResidentCreation(display, targets, resident, camera, sample.ndc, sample.coverage); reportPickIssue(); return coverageIssue ? null : result;
       } catch (error) { coverageIssue = errorText(error); reportPickIssue(); return null; }
@@ -279,7 +280,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
         display: display ?? undefined,
         pickToken: String(pickEpoch),
         ready: Boolean(active && renderer && camera && !issue), issue,
-        notice: [notice, coverageIssue, alphaPicking ? '半透明・切り抜きの面へのピン配置は未接続です。原本の見た目は保持しています。' : null,
+        notice: [notice, coverageIssue, alphaPicking && !display?.readOnly ? '半透明・切り抜きの面へのピン配置は未接続です。原本の見た目は保持しています。' : null,
           ...(display?.materialNotices ?? []), ...Object.values(display?.materials ?? {}).flatMap(m => 'issue' in m ? [m.issue] : []),
           ...Object.values(display?.savedMaterials ?? {}).flatMap(rows => Object.values(rows).flatMap(m => 'issue' in m ? [m.issue] : []))].filter(Boolean).join(' ') || null,
         dragging: dragging || !!gizmo?.dragging, manipulating: !!gizmo?.dragging,

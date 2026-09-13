@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { disposeModelResources } from '../../viewer/loaders';
 import type { ValidatedGlb } from '../../projectFiles/glb';
 import type { ValidationContent } from '../../projectFiles/content';
-import type { ValidationModelClosure, DisplayModelVersion } from './modelTypes';
+import { renderModel, type ValidationModelClosure, type DisplayModelVersion, type ReadonlyRenderModel } from './modelTypes';
 import type { ResidentSurface } from './viewportPicking';
 import { placementMatrix } from './viewportModel';
 import { canonical, same } from '../../domain/projectGraphSupport';
@@ -11,7 +11,7 @@ import type { JsonObject } from '../../domain/values';
 import { validationMaterialSlots, validationMaterialIssue, type ValidationMaterialEffects } from './validationMaterials';
 import { patchHardChroma } from '../../viewer/hardChroma';
 
-export interface SavedModelResidentPort { create(model: ValidationModelClosure, effects?: ValidationMaterialEffects): ResidentSurface; dispose(): void }
+export interface SavedModelResidentPort { create(model: ValidationModelClosure | ReadonlyRenderModel, effects?: ValidationMaterialEffects): ResidentSurface; dispose(): void }
 export interface ValidationResidentCache extends SavedModelResidentPort { prepare(versions: readonly DisplayModelVersion[]): Promise<void>;
   validate(c: ValidationModelClosure, effects?: ValidationMaterialEffects): void }
 export interface DecodedValidationModel { root: THREE.Object3D; materialLocators: ReadonlyMap<THREE.Material, JsonObject>; dispose(): void }
@@ -86,15 +86,22 @@ export async function decodeValidationModel(source: ValidatedGlb): Promise<Decod
 /** Reusable resident cache, scoped to one opened validation Project; never shared metadata. */
 export async function prepareValidationResidents(versions: readonly DisplayModelVersion[], content: Pick<ValidationContent, 'model'>,
   decode: (source: ValidatedGlb) => Promise<DecodedValidationModel> = decodeValidationModel): Promise<ValidationResidentCache> {
+  const models = (rows: readonly DisplayModelVersion[]) => rows.map(v => {
+    if (v.closure.shape !== 'saved-glb') throw Error('実モデルの保存本体を選択してください。'); return renderModel(v.closure);
+  });
+  const core = await prepareReadonlyResidents(models(versions), content, decode);
+  return { ...core, prepare: next => core.prepare(models(next)) };
+}
+export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderModel[], content: Pick<ValidationContent, 'model'>,
+  decode: (source: ValidatedGlb) => Promise<DecodedValidationModel> = decodeValidationModel) {
   const templates = new Map<string, { record: string; model: DecodedValidationModel }>();
   const live = new Set<() => void>(); let closed = false, preparing = false;
   const dispose = () => { if (closed) return; closed = true; for (const release of [...live]) release();
     for (const item of templates.values()) item.model.dispose(); templates.clear(); };
-  const prepare = async (next: readonly DisplayModelVersion[]) => {
+  const prepare = async (next: readonly ReadonlyRenderModel[]) => {
     if (closed || preparing) throw Error('モデルの表示準備を完了してください。');
     preparing = true; const staged = new Map<string, { record: string; model: DecodedValidationModel }>();
-    try { for (const version of next) {
-      const c = version.closure; if (c.shape !== 'saved-glb') throw Error('実モデルの保存本体を選択してください。');
+    try { for (const c of next) {
       const key = c.representation.id, record = canonical(c.representation);
       const previous = templates.get(key) ?? staged.get(key);
       if (previous) { if (previous.record !== record) throw Error('モデルの本体が一致しません。'); continue; }
@@ -107,7 +114,7 @@ export async function prepareValidationResidents(versions: readonly DisplayModel
     } catch (error) { for (const item of staged.values()) item.model.dispose(); throw error; }
     finally { preparing = false; }
   };
-  const validate = (c: ValidationModelClosure, effects: ValidationMaterialEffects = {}) => {
+  const validate = (c: ValidationModelClosure | ReadonlyRenderModel, effects: ValidationMaterialEffects = {}) => {
     const item = templates.get(c.representation.id), slots = validationMaterialSlots(c);
     if (closed || !item || item.record !== canonical(c.representation)) throw Error('保存したモデルの表示本体を再確認してください。');
     if (Object.keys(effects).some(id => !slots.some(s => s.target.logicalMaterialSlotId === id))) throw Error('材質の適用先がありません。');
@@ -121,8 +128,9 @@ export async function prepareValidationResidents(versions: readonly DisplayModel
     }
   };
   try {
-    await prepare(versions);
-    return { dispose, prepare, validate, create(c, effects = {}) {
+    await prepare(initial);
+    return { dispose, prepare, validate, create(input: ValidationModelClosure | ReadonlyRenderModel, effects: ValidationMaterialEffects = {}) {
+      const c = renderModel(input);
       validate(c, effects);
       const item = templates.get(c.representation.id);
       if (closed || !item || item.record !== canonical(c.representation)) throw Error('保存したモデルの表示本体を再確認してください。');
@@ -163,7 +171,7 @@ export async function prepareValidationResidents(versions: readonly DisplayModel
         } });
         const representation = new THREE.Group(); representation.matrix.copy(placementMatrix(c.representation.representationToAsset)); representation.matrixAutoUpdate = false;
         representation.add(root); asset.add(representation);
-        asset.matrix.copy(placementMatrix(c.binding.assetToProject)); asset.matrixAutoUpdate = false; asset.updateMatrixWorld(true);
+        asset.matrix.copy(placementMatrix(c.assetToProject)); asset.matrixAutoUpdate = false; asset.updateMatrixWorld(true);
         live.add(release); return { mesh: root, asset, dispose: release };
       } catch (error) { release(); throw error; }
     } };

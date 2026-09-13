@@ -2,13 +2,13 @@ import { same } from '../../domain/projectGraphSupport';
 import { validateMaterialIntent, type MaterialIntent } from '../../domain/materialIntent';
 import type { JsonObject } from '../../domain/values';
 import type { MaterialTarget } from '../../scene/types';
-import type { ValidationModelClosure } from './modelTypes';
+import { renderOwner, type ValidationModelClosure, type ReadonlyRenderModel } from './modelTypes';
 
 export interface ValidationMaterialSlot { readonly target: MaterialTarget; readonly name: string;
   readonly locator: JsonObject; readonly semantics: JsonObject }
 export type ValidationMaterialEffects = Readonly<Record<string, MaterialIntent | { readonly issue: string }>>;
-export function validationMaterialSlots(c: ValidationModelClosure): readonly ValidationMaterialSlot[] {
-  return c.representation.materialCatalog.slots.map(slot => ({ target: { assetId: c.binding.assetId,
+export function validationMaterialSlots(c: ValidationModelClosure | ReadonlyRenderModel): readonly ValidationMaterialSlot[] {
+  return c.representation.materialCatalog.slots.map(slot => ({ target: { assetId: renderOwner(c),
     variantFamilyId: c.representation.variantFamilyId, materialLayoutId: c.representation.materialCatalog.layoutId,
     logicalMaterialSlotId: slot.logicalMaterialSlotId }, locator: slot.sourceLocator, semantics: slot.sourceSemantics,
     name: slot.sourceLocator.kind === 'gltfMaterial' ? `材質 ${Number(slot.sourceLocator.materialIndex) + 1}` : '既定の材質' }));

@@ -12,9 +12,10 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   nameField.textContent = '名前（任意）'; nameInput.type = 'text'; nameInput.setAttribute('aria-label', '名前（任意）'); nameField.append(nameInput);
   root.append(heading, actions, nameField, commands, status, list, select);
   let busy = false, disposed = false, feedback = '', selected: string | null = null, cancellation: string | null = null;
-  let purpose: 'teamWorkspace' | 'contribution' | 'backup' | 'clean' = 'teamWorkspace', baseId = '', choicePending = false, checkpointName = '', composing = false;
+  let purpose: 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review' = 'teamWorkspace', baseId = '', choicePending = false, checkpointName = '', composing = false;
   let cleanPreview: Awaited<ReturnType<typeof host.workspaceOutput.previewClean>> | null = null;
-  const resetChoice = () => { purpose = 'teamWorkspace'; baseId = ''; checkpointName = ''; choicePending = false; cleanPreview = null; };
+  let reviewPreview: Awaited<ReturnType<typeof host.workspaceOutput.previewReview>> | null = null, sceneId = '', omitEntry = false;
+  const resetChoice = () => { purpose = 'teamWorkspace'; baseId = ''; checkpointName = ''; choicePending = false; cleanPreview = null; reviewPreview = null; sceneId = ''; omitEntry = false; };
   const urls: string[] = [];
   const perform = (action: () => Promise<unknown>, message: string, writes = true, consumeChoice = false, completed?: () => void) => {
     if (disposed || busy || composing || otherBusy()) return;
@@ -39,18 +40,42 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     if (disposed) return; actions.replaceChildren(); commands.replaceChildren(); list.replaceChildren();
     const label = document.createElement('label'), kind = document.createElement('select'); label.textContent = '渡す内容';
     kind.setAttribute('aria-label', '渡す内容');
-    for (const [value, text] of [['teamWorkspace', '作業一式'], ['contribution', '変更分'], ['backup', 'バックアップ'], ['clean', '独立コピー']]) {
+    for (const [value, text] of [['teamWorkspace', '作業一式'], ['contribution', '変更分'], ['backup', 'バックアップ'], ['clean', '独立コピー'], ['review', '閲覧用のシーン']]) {
       const option = document.createElement('option'); option.value = value!; option.textContent = text!; kind.append(option);
     }
     kind.value = purpose; kind.disabled = busy || composing || otherBusy() || !!host.authority.readOnly; label.append(kind); actions.append(label);
     nameField.hidden = purpose !== 'backup'; nameInput.disabled = busy || otherBusy() || !!host.authority.readOnly;
     if (!composing && nameInput.value !== checkpointName) nameInput.value = checkpointName;
     kind.addEventListener('change', () => {
-      if (kind.disabled || !['teamWorkspace', 'contribution', 'backup', 'clean'].includes(kind.value)) return;
-      purpose = kind.value as typeof purpose; baseId = ''; cleanPreview = null; choicePending = true; render(); changed();
+      if (kind.disabled || !['teamWorkspace', 'contribution', 'backup', 'clean', 'review'].includes(kind.value)) return;
+      purpose = kind.value as typeof purpose; baseId = ''; cleanPreview = null; reviewPreview = null; sceneId = ''; omitEntry = false; choicePending = true; render(); changed();
     });
     const chosen = host.workspaceOutput.bases.find(b => b.selection.workspacePackageId === baseId);
     const cleanConfirmed = !!cleanPreview && cleanPreview.token === host.read().source?.token;
+    const reviewConfirmed = !!reviewPreview && reviewPreview.token === host.read().source?.token && reviewPreview.sceneId === sceneId && reviewPreview.omittedEntryView === omitEntry;
+    if (purpose === 'review') {
+      const label = document.createElement('label'), scenes = document.createElement('select'), empty = document.createElement('option');
+      label.textContent = 'シーン'; scenes.setAttribute('aria-label', '渡すシーン'); empty.value = ''; empty.textContent = '選択してください'; scenes.append(empty);
+      for (const scene of Object.values(session()?.snapshot.state.scenes ?? {})) {
+        if (scene.lifecycle.kind !== 'value' || scene.lifecycle.value.state !== 'active' || scene.name.kind !== 'value') continue;
+        const option = document.createElement('option'); option.value = scene.id; option.textContent = scene.name.value; scenes.append(option);
+      }
+      scenes.value = sceneId; scenes.disabled = kind.disabled; label.append(scenes); actions.append(label);
+      scenes.addEventListener('change', () => { if (!scenes.disabled) { sceneId = scenes.value; omitEntry = false; reviewPreview = null; choicePending = true; render(); changed(); } });
+      const scene = session()?.snapshot.state.scenes[sceneId];
+      if (scene?.defaultViewId.kind === 'unresolved' && scene.defaultViewId.reason === 'conflict') {
+        const label = document.createElement('label'), omit = document.createElement('input'); omit.type = 'checkbox'; omit.checked = omitEntry;
+        omit.disabled = kind.disabled; label.append(omit, '開始視点なしで渡す'); actions.append(label);
+        omit.addEventListener('change', () => { if (!omit.disabled) { omitEntry = omit.checked; reviewPreview = null; choicePending = true; render(); changed(); } });
+      }
+      const help = document.createElement('p'); help.textContent = '選んだシーンのモデル・記録だけを渡します。検索や色の絞り込みは反映しません。'; actions.append(help);
+      if (reviewPreview) {
+        const counts = document.createElement('p'); counts.textContent = reviewConfirmed ? `${reviewPreview.name} — モデル ${reviewPreview.models}・キャプション ${reviewPreview.captions}・メディア ${reviewPreview.media}` : '内容が変わりました。もう一度確認してください。'; actions.append(counts);
+        if (reviewPreview.missingModelCaptions) { const note = document.createElement('p'); note.textContent = `モデルを含まない記録 ${reviewPreview.missingModelCaptions} 件は一覧だけに表示されます。`; actions.append(note); }
+        if (reviewPreview.newlyNeedsReviewCaptions) { const note = document.createElement('p'); note.textContent = `受け手が編集コピーを作ると、${reviewPreview.newlyNeedsReviewCaptions} 件のピンが要確認になります。`; actions.append(note); }
+      }
+      const privacy = document.createElement('p'); privacy.textContent = '過去の変更履歴は含みません。文章・名前・素材に埋め込まれた情報は残ります。'; actions.append(privacy);
+    }
     if (purpose === 'clean') {
       const help = document.createElement('p');
       help.textContent = 'すべてのシーンと現在の素材・記録を別プロジェクトにコピーします。過去の変更履歴は含みません。元のプロジェクトへ変更分を返すことはできません。';
@@ -74,26 +99,30 @@ export function createValidationOutputControls(document: Document, host: ReturnT
       const help = document.createElement('p'); help.textContent = host.workspaceOutput.bases.length ?
         '相手と共有した作業一式を選択してください。' : '先に作業一式を受け取るか、作成してください。'; actions.append(help);
     }
-    const create = button(commands, purpose === 'clean' && !cleanConfirmed ? '内容を確認' : 'ファイルを作成', () => {
+    const create = button(commands, purpose === 'clean' && !cleanConfirmed || purpose === 'review' && !reviewConfirmed ? '内容を確認' : 'ファイルを作成', () => {
       const token = host.read().source?.token; if (!token) return;
       if (purpose === 'contribution') {
         if (chosen) perform(() => host.workspaceOutput.generateContribution(token, chosen.selection), '変更分を生成しました。ファイルへの保存は未確認です。', true, true);
       } else if (purpose === 'clean') {
         if (!cleanConfirmed) perform(async () => { cleanPreview = await host.workspaceOutput.previewClean(token); }, 'コピーに含める内容を確認してください。');
         else perform(() => host.workspaceOutput.generateClean(token), '独立コピーを生成しました。ファイルへの保存は未確認です。', true, true);
+      } else if (purpose === 'review') {
+        const selection = { sceneId, ...(omitEntry ? { omitConflictedEntryView: true } : {}) };
+        if (!reviewConfirmed) perform(async () => { reviewPreview = await host.workspaceOutput.previewReview(token, selection); }, '渡す内容を確認してください。');
+        else perform(() => host.workspaceOutput.generateReview(token, selection), '閲覧用のシーンを生成しました。ファイルへの保存は未確認です。', true, true);
       } else if (purpose === 'backup') {
         const name = checkpointName.trim().normalize('NFC') || undefined;
         perform(() => host.workspaceOutput.generateBackup(token, name), 'バックアップを生成しました。ファイルへの保存は未確認です。', true, true);
       } else perform(() => host.workspaceOutput.generate(token), '作業一式を生成しました。ファイルへの保存は未確認です。', true, true);
     });
-    create.disabled ||= purpose === 'contribution' && !chosen || !!selected || !!cancellation;
+    create.disabled ||= purpose === 'contribution' && !chosen || purpose === 'review' && !sceneId || !!selected || !!cancellation;
     if (choicePending) button(commands, '選択を取り消す', () => { resetChoice(); render(); changed(); });
     status.textContent = host.workspaceOutput.error || feedback;
     for (const [i, job] of host.workspaceOutput.jobs.entries()) {
       if (['cancelled', 'abandoned'].includes(job.state)) continue;
       const row = document.createElement('section'), text = document.createElement('p');
       const complete = job.state === 'generated' || job.state === 'file-verified';
-      const name = job.purpose === 'contribution' ? '変更分' : job.purpose === 'backup' ? 'バックアップ' : job.purpose === 'clean' ? '独立コピー' : '作業一式';
+      const name = job.purpose === 'contribution' ? '変更分' : job.purpose === 'backup' ? 'バックアップ' : job.purpose === 'clean' ? '独立コピー' : job.purpose === 'review' ? '閲覧用のシーン' : '作業一式';
       text.textContent = `${name} ${job.label || i + 1} — ${job.state === 'file-verified' ? '選択したファイルの内容を確認済み' : complete ? '生成済み・ファイルへの保存は未確認' :
         job.state === 'repair-required' ? '生成データを確認できません。元データは保持しています。' : 'ファイル生成が未完了です。'}`;
       row.append(text); list.append(row);
@@ -104,7 +133,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
         button(row, 'ダウンロード', () => perform(async () => {
           const blob = await host.workspaceOutput.download(job.id); if (disposed) return;
           const url = URL.createObjectURL(blob), a = document.createElement('a'); urls.push(url);
-          a.href = url; a.download = job.purpose === 'contribution' ? 'LociView-contribution.zip' : job.purpose === 'backup' ? 'LociView-backup.zip' : job.purpose === 'clean' ? 'LociView-copy.zip' : 'LociView-workspace.zip'; a.hidden = true; root.append(a);
+          a.href = url; a.download = job.purpose === 'contribution' ? 'LociView-contribution.zip' : job.purpose === 'backup' ? 'LociView-backup.zip' : job.purpose === 'clean' ? 'LociView-copy.zip' : job.purpose === 'review' ? 'LociView-review.zip' : 'LociView-workspace.zip'; a.hidden = true; root.append(a);
           try { a.click(); } finally { a.remove(); }
         }, 'ダウンロードを開始しました。保存先のファイルは未確認です。', false), false);
         const details = document.createElement('details'), summary = document.createElement('summary'); summary.textContent = '保存先のファイルを確認';

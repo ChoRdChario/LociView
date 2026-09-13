@@ -7,6 +7,8 @@ import { WorkspaceOutputJob } from '../projectPackage/outputJob';
 import { ContributionOutputJob } from '../projectPackage/contributionOutputJob';
 import { BackupOutputJob } from '../projectPackage/backupOutputJob';
 import { CleanOutputJob } from '../projectPackage/cleanOutputJob';
+import { ReviewOutputJob } from '../projectPackage/reviewOutputJob';
+import type { ReviewSelectionOptions } from '../projectPackage/reviewSelection';
 import { protectedWorkspaceInventory } from '../projectPackage/protectedInventory';
 import { PACKAGE_LIMITS as L } from '../projectPackage/contract';
 import { outputJobKeys, outputJobClass, openOutputJob, validateOutputProtection } from '../projectPackage/outputJobs';
@@ -15,7 +17,7 @@ import { WorkspaceBaseStore } from '../projectPackage/workspaceBases';
 import { workspaceFileOperation } from './receiveWorkspace';
 import { fileError } from './validation';
 
-export interface WorkspaceOutputState { id: string; purpose: 'teamWorkspace' | 'contribution' | 'backup' | 'clean'; label?: string; stale?: boolean; token?: string; cancellable?: boolean; state: 'unstarted' | 'incomplete' | 'generated' | 'file-verified' | 'abandoned' | 'cancelled' | 'repair-required' }
+export interface WorkspaceOutputState { id: string; purpose: 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review'; label?: string; stale?: boolean; token?: string; cancellable?: boolean; state: 'unstarted' | 'incomplete' | 'generated' | 'file-verified' | 'abandoned' | 'cancelled' | 'repair-required' }
 export interface ContributionBaseChoice { selection: ContributionBaseSelection; label: string }
 /** Explicit same-Project output commands. Download handoff has no completion receipt. */
 export class WorkspaceSender {
@@ -24,6 +26,8 @@ export class WorkspaceSender {
   generate(token: string, signal?: AbortSignal) { return workspaceFileOperation(this.locks, () => this.session.createWorkspaceOutput(token, this.store, '0.0.1', signal)); }
   generateClean(token: string, signal?: AbortSignal) { return workspaceFileOperation(this.locks, () => this.session.createCleanOutput(token, this.store, '0.0.1', signal)); }
   previewClean(token: string) { return this.session.previewCleanOutput(token); }
+  generateReview(token: string, selection: ReviewSelectionOptions, signal?: AbortSignal) { return workspaceFileOperation(this.locks, () => this.session.createReviewOutput(token, selection, this.store, '0.0.1', signal)); }
+  previewReview(token: string, selection: ReviewSelectionOptions) { return this.session.previewReviewOutput(token, selection); }
   generateBackup(token: string, label?: string, signal?: AbortSignal) {
     return workspaceFileOperation(this.locks, () => this.session.createManualCheckpoint(token, label, this.store, '0.0.1', signal));
   }
@@ -38,16 +42,19 @@ export class WorkspaceSender {
   retry(id: string, signal?: AbortSignal) { return workspaceFileOperation(this.locks, async () => {
     const key = await this.key(id); return key.kind === 'workspace' ? this.session.resumeWorkspaceOutput(id, this.store, signal) :
       key.kind === 'clean' ? this.session.resumeCleanOutput(id, this.store, signal) :
+      key.kind === 'review' ? this.session.resumeReviewOutput(id, this.store, signal) :
       key.kind === 'backup' ? this.session.resumeBackupOutput(id, this.store, signal) : this.session.resumeContributionOutput(id, this.store, signal);
   }); }
   cancel(id: string) { return workspaceFileOperation(this.locks, async () => {
     const key = await this.key(id); return key.kind === 'workspace' ? this.session.cancelWorkspaceOutput(id) :
       key.kind === 'clean' ? this.session.cancelCleanOutput(id) :
+      key.kind === 'review' ? this.session.cancelReviewOutput(id) :
       key.kind === 'backup' ? this.session.cancelBackupOutput(id) : this.session.cancelContributionOutput(id);
   }); }
   verifyFile(id: string, file: Blob) { return workspaceFileOperation(this.locks, async () => {
     const key = await this.key(id); return key.kind === 'workspace' ? this.session.verifyWorkspaceOutput(id, file) :
       key.kind === 'clean' ? this.session.verifyCleanOutput(id, file, this.store) :
+      key.kind === 'review' ? this.session.verifyReviewOutput(id, file, this.store) :
       key.kind === 'backup' ? this.session.verifyBackupOutput(id, file, this.store) : this.session.verifyContributionOutput(id, file, this.store);
   }); }
   async availableBases(): Promise<ContributionBaseChoice[]> {
@@ -64,7 +71,7 @@ export class WorkspaceSender {
   download(id: string) {
     return workspaceFileOperation(this.locks, async () => {
       const job = await openOutputJob(this.fs, await this.key(id), this.limits);
-      if (job instanceof BackupOutputJob || job instanceof CleanOutputJob) {
+      if (job instanceof BackupOutputJob || job instanceof CleanOutputJob || job instanceof ReviewOutputJob) {
         await validateOutputProtection(this.fs, job, this.store, this.limits); return (await job.artifact()).blob;
       }
       if (job instanceof ContributionOutputJob) {

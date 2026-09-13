@@ -1333,7 +1333,7 @@ describe('saved Caption position/color conflict resolution; synthetic ports and 
     const ah = await a.open(), bh = await b.open(), sa = new SyntheticSession(ah.authority), sb = new SyntheticSession(bh.authority);
     let display: SyntheticDisplay | undefined;
     const doc = new RecordedDocument().asDocument(), wa = createDevelopmentWorkspace(doc, sa, { viewportFactory: () => ({
-      update(next) { display = next; }, setActive() {}, read: () => ({ token: 'comparison', ready: true, issue: null, dragging: false,
+      update(next) { if (next.readOnly) throw Error('expected editor display'); display = next; }, setActive() {}, read: () => ({ token: 'comparison', ready: true, issue: null, dragging: false,
         projection: 'perspective', axis: null, pins: [], preview: { x: 20, y: 30, visible: true } }), camera() {}, retry() {}, dispose() {},
     }) });
     const wb = createDevelopmentWorkspace(new RecordedDocument().asDocument(), sb);
@@ -1726,7 +1726,7 @@ describe('saved model translation; synthetic storage/DOM evidence only', () => {
     let display: ReturnType<typeof syntheticDisplay> | undefined;
     let propose: Parameters<import('../../src/harness/projectScene/viewportHost').ViewportFactory>[3];
     const w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s, { viewportFactory: (_canvas, _changed, _pin, model) => {
-      propose = model; return { update: d => { display = d; }, setActive() {}, camera() {}, retry() {}, dispose() {},
+      propose = model; return { update: d => { if (d.readOnly) throw Error('expected editor display'); display = d; }, setActive() {}, camera() {}, retry() {}, dispose() {},
         read: () => ({ token: 'viewport', ready: true, issue: null, dragging: false, projection: 'perspective', axis: null, pins: [] }) };
     } });
     const root = record(w.root); button(root, 'モデル').fire('click'); selectModel(s); w.render();

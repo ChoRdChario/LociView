@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { parseJsonWithoutDuplicateMembers } from '../src/core/json';
-import { canonical } from '../src/domain/projectGraphSupport';
+import { canonical, immutableDigest } from '../src/domain/projectGraphSupport';
 import type { JsonValue } from '../src/domain/values';
 import { PACKAGE_LIMITS as L, SUMMARY_FIELDS, type Entry, type PackageManifest, type PackagePurpose } from '../src/projectPackage/contract';
 import { checkPackageEntryTable, packageByteHash, PackageControlError, readManifestControl } from '../src/projectPackage/manifest';
@@ -28,6 +28,10 @@ import { backupEncode, readBackupBases, type BackupBaseRecord } from '../src/pro
 import { CleanSourceCapture, inspectCleanSource } from '../src/projectPackage/cleanSource';
 import { CleanArchive, writeCleanArchive } from '../src/projectPackage/cleanArchive';
 import { selectCleanRecords, rebuildCleanRecords } from '../src/projectPackage/cleanRecords';
+import { prepareReviewSnapshot } from '../src/projectPackage/reviewSelection';
+import { inspectReviewSnapshot, readReviewSnapshot, prepareReviewEdit } from '../src/projectPackage/reviewSnapshot';
+import { ReviewSourceCapture } from '../src/projectPackage/reviewSource';
+import { ReviewArchive, writeReviewArchive } from '../src/projectPackage/reviewArchive';
 
 type Mutable<T> = { -readonly [K in keyof T]: Mutable<T[K]> };
 type Fixture<P extends PackagePurpose> = Mutable<PackageManifest & { purpose: P }>;
@@ -91,6 +95,125 @@ async function unpackFixture(file: Blob) {
   }
   return entries;
 }
+
+describe('selected-Scene review snapshot (not View activation or external saving)', () => {
+  const make = (records: Record<string, any>) => ProjectMetadataSource.bootstrap(records.schema, records.identity, metadataLimits).initialize(records);
+  const change = (source: ProjectMetadataSource, fn: (d: Record<string, any>) => void) =>
+    ProjectMetadataSource.fromFullSource(A.save(A.change(A.load<Record<string, any>>(source.encodeFullSource()), fn)), source.proof, metadataLimits);
+  const value = (v: JsonValue) => new A.ImmutableString(canonical(v));
+  it('cuts exactly one Scene, omits old/other data, preserves missing-model owners and freezes rekeying', async () => {
+    const records = fixture();
+    records.scenesById[id('scn', 2)] = { ...structuredClone(records.scenesById[id('scn')]), id: id('scn', 2), name: 'PRIVATE_OTHER_SCENE' };
+    delete records.scenesById[id('scn', 2)].defaultViewId;
+    records.captionsById[id('cap', 2)] = { ...structuredClone(records.captionsById[id('cap')]), id: id('cap', 2), title: 'PRIVATE_OTHER_CAPTION' };
+    records.sceneCaptionMembershipsById[id('scm', 2)] = { ...records.sceneCaptionMembershipsById[id('scm')], id: id('scm', 2), sceneId: id('scn', 2), captionId: id('cap', 2) };
+    const first = change(make(records), d => { d.captionsById[id('cap')].body = value('PRIVATE_OLD_BODY'); });
+    const source = change(first, d => { d.captionsById[id('cap')].body = value('Current body'); });
+    const before = source.encodeFullSource(), output = await prepareReviewSnapshot(source, metadataLimits, { sceneId: id('scn') });
+    const snapshot = output.review.snapshot as Record<string, any>, bytes = encode(canonical(snapshot));
+    expect(output.review.closure.entries).toHaveLength(2); expect(Object.keys(snapshot.captionsById)).toHaveLength(1);
+    expect(snapshot.project.defaultSceneId).toBe(snapshot.scene.id); expect(snapshot.scene.id).not.toBe(id('scn'));
+    const raw = new TextDecoder().decode(bytes); for (const privateValue of ['PRIVATE_OTHER_SCENE', 'PRIVATE_OTHER_CAPTION', 'PRIVATE_OLD_BODY', id('prj'), id('cap'), id('ast')]) expect(raw).not.toContain(privateValue);
+    expect(await readReviewSnapshot(bytes, metadataLimits)).toEqual(output.review);
+    expect((await prepareReviewSnapshot(source, metadataLimits, { sceneId: id('scn') }, output.reconstruction)).review).toEqual(output.review);
+    expect(source.encodeFullSource()).toEqual(before);
+    const hiddenRecords = fixture(); hiddenRecords.sceneAssetMembershipsById = {};
+    const hidden = await prepareReviewSnapshot(make(hiddenRecords), metadataLimits, { sceneId: id('scn') });
+    const hiddenSnapshot = hidden.review.snapshot as Record<string, any>, owner = Object.values(hiddenSnapshot.assetsById)[0] as Record<string, any>;
+    expect(owner.kind).toBe('nonvisualOwner'); expect(owner.label).toBeUndefined(); expect(hiddenSnapshot.representationsById).toEqual({});
+    expect(hiddenSnapshot.sceneAssetMembershipsById).toEqual({}); expect(hidden.review.closure.entries).toHaveLength(1);
+    expect(hidden.review.editEffect.missingModelCaptions).toBe(1);
+    const edited = await prepareReviewEdit(hidden.review, metadataLimits), next = edited.records as Record<string, any>, a = Object.values(next.assetsById)[0] as Record<string, any>;
+    expect(a.status).toEqual({ kind: 'unresolved', reason: 'missingSource', pendingAssetToProject: owner.assetToProject });
+    expect(next.sceneAssetMembershipsById).toEqual({}); expect(next.assetRevisionsById).toEqual({});
+    expect((Object.values(next.captionsById)[0] as Record<string, any>).anchor.positionAsset).toEqual([0, 0, 0]);
+    expect((await prepareReviewEdit(hidden.review, metadataLimits, edited.reconstruction)).records).toEqual(edited.records);
+  });
+  it('keeps export compatibility separate from the exact included-family partition on explicit edit', async () => {
+    const records = fixture(), rep = structuredClone(records.representationsById[id('rep')]);
+    rep.id = id('rep', 2); rep.variantFamilyId = id('fam', 2); rep.purposes = ['source'];
+    rep.payloadDigest = await immutableDigest('representation', rep); records.representationsById[rep.id] = rep;
+    const revision = records.assetRevisionsById[id('rev')]; revision.representationIds.push(rep.id);
+    revision.anchorCompatibilityClasses.push({ id: id('cmp', 2), targetVariantFamilyIds: [id('fam', 2)] });
+    revision.payloadDigest = await immutableDigest('asset-revision', revision);
+    records.captionsById[id('cap')].anchor.authoredAnchorCompatibilityId = id('cmp', 2);
+    const result = await prepareReviewSnapshot(make(records), metadataLimits, { sceneId: id('scn') }), snapshot = result.review.snapshot as Record<string, any>;
+    const a = Object.values(snapshot.assetsById)[0] as Record<string, any>, caption = Object.values(snapshot.captionsById)[0] as Record<string, any>;
+    expect(a.compatibleAnchorClassIds).toContain(caption.anchor.authoredAnchorCompatibilityId);
+    expect(a.anchorClassPartition).toHaveLength(1); expect(a.anchorClassPartition[0].id).not.toBe(caption.anchor.authoredAnchorCompatibilityId);
+    expect(result.review.editEffect.newlyNeedsReviewCaptions).toBe(1);
+    const edited = (await prepareReviewEdit(result.review, metadataLimits)).records as Record<string, any>;
+    const editedCaption = Object.values(edited.captionsById)[0] as Record<string, any>, editedRevision = Object.values(edited.assetRevisionsById)[0] as Record<string, any>;
+    expect(editedRevision.anchorCompatibilityClasses.map((k: any) => k.id)).not.toContain(editedCaption.anchor.authoredAnchorCompatibilityId);
+    expect(editedCaption.anchor.authoredAssetRevisionId).toBeUndefined(); expect(editedCaption.colorSrgb).toEqual(caption.colorSrgb);
+    expect(editedCaption.anchor.positionAsset).toEqual(caption.anchor.positionAsset);
+    for (const mutate of [
+      (r: any) => { Object.values<any>(r.assetsById)[0].compatibleAnchorClassIds.push(id('cmp', 99)); Object.values<any>(r.assetsById)[0].compatibleAnchorClassIds.sort(); },
+      (r: any) => { Object.values<any>(r.representationsById)[0].purposes.unshift('source'); },
+      (r: any) => { Object.values<any>(r.captionsById)[0].anchor.authoredAssetRevisionId = id('rev'); },
+      (r: any) => { Object.values<any>(r.assetsById)[0].anchorClassPartition[0].targetVariantFamilyIds = [id('fam', 99)]; },
+    ]) { const bad = structuredClone(snapshot); mutate(bad); await expect(inspectReviewSnapshot(bad, metadataLimits)).rejects.toThrow(); }
+  });
+  it('rejects hidden fields/extra closure and included conflicts without blocking unrelated Scene conflicts', async () => {
+    const records = fixture(); records.scenesById[id('scn', 2)] = { ...structuredClone(records.scenesById[id('scn')]), id: id('scn', 2) }; delete records.scenesById[id('scn', 2)].defaultViewId;
+    const base = make(records), left = change(base, d => { d.scenesById[id('scn', 2)].name = value('L'); }), right = change(base, d => { d.scenesById[id('scn', 2)].name = value('R'); });
+    const result = await prepareReviewSnapshot(left.appendOriginal(right.originalChanges()), metadataLimits, { sceneId: id('scn') });
+    const one = change(base, d => { d.captionsById[id('cap')].body = value('L'); }), two = change(base, d => { d.captionsById[id('cap')].body = value('R'); });
+    await expect(prepareReviewSnapshot(one.appendOriginal(two.originalChanges()), metadataLimits, { sceneId: id('scn') })).rejects.toThrow('review-unresolved-field');
+    for (const [map, row] of [['sceneAssetMembershipsById', id('sam')], ['sceneCaptionMembershipsById', id('scm')], ['viewsById', id('view')]]) {
+      const illegalMove = change(base, d => { d[map!][row!].sceneId = value(id('scn', 2)); });
+      await expect(prepareReviewSnapshot(illegalMove, metadataLimits, { sceneId: id('scn') })).rejects.toThrow();
+    }
+    const outside = structuredClone(records);
+    for (const n of [2, 3]) outside.sceneCaptionMembershipsById[id('scm', n)] = {
+      ...structuredClone(records.sceneCaptionMembershipsById[id('scm')]), id: id('scm', n), sceneId: id('scn', 2) };
+    await expect(prepareReviewSnapshot(make(outside), metadataLimits, { sceneId: id('scn') })).resolves.toHaveProperty('review');
+    for (const options of [{ sceneId: id('scn'), extra: 'hidden' }, { sceneId: id('scn'), omitConflictedEntryView: 'yes' }])
+      await expect(prepareReviewSnapshot(base, metadataLimits, options as any)).rejects.toThrow('review-selection');
+    const unknownProvenance = fixture(), revision = unknownProvenance.assetRevisionsById[id('rev')];
+    revision.provenance.futurePrivateDetail = { value: 'synthetic unknown value' };
+    revision.payloadDigest = await immutableDigest('asset-revision', revision);
+    // Provenance would normally be omitted, but unknown nested source values must not be silently stripped.
+    await expect(prepareReviewSnapshot(make(unknownProvenance), metadataLimits, { sceneId: id('scn') })).rejects.toThrow('review-unknown-field');
+    for (const mutate of [
+      (r: any) => { r.sourceIdentity = records.identity; },
+      (r: any) => { Object.values<any>(r.representationsById)[0].formatProfile.secret = 'not classified'; },
+      (r: any) => { const extra = structuredClone(Object.values<any>(r.captionsById)[0]); extra.id = id('cap', 99); r.captionsById[extra.id] = extra; },
+      (r: any) => { const extra = structuredClone(Object.values<any>(r.captionTagsById)[0]); extra.id = id('tag', 99); r.captionTagsById[extra.id] = extra; },
+    ]) { const bad = structuredClone(result.review.snapshot); mutate(bad); await expect(inspectReviewSnapshot(bad, metadataLimits)).rejects.toThrow(); }
+    await expect(readReviewSnapshot(encode(canonical(result.review.snapshot) + '\n'), metadataLimits)).rejects.toThrow('review-canonical');
+    const bad = structuredClone(result.review.snapshot) as any; Object.values<any>(bad.assetsById)[0].kind = 'nonvisualOwner';
+    await expect(inspectReviewSnapshot(bad, metadataLimits)).rejects.toThrow();
+    const digest = vi.spyOn(crypto.subtle, 'digest');
+    try {
+      for (const budget of [{ maxNodes: 2 }, { maxStringScalars: 1 }, { maxWork: 2 }, { maxTotalBytes: 16 }]) {
+        await expect(readReviewSnapshot(encode(canonical(result.review.snapshot)), { ...metadataLimits, ...budget })).rejects.toThrow();
+        await expect(inspectReviewSnapshot(result.review.snapshot, { ...metadataLimits, ...budget })).rejects.toThrow();
+      }
+      expect(digest).not.toHaveBeenCalled();
+    } finally { digest.mockRestore(); }
+  });
+  it('streams the separate review ZIP and verifies its declared snapshot, summary and exact body closure', async () => {
+    const f = await workspaceFixture(), rep = fixture().representationsById[id('rep')], verifier = developmentContentVerifier([
+      { variantFamilyId: rep.variantFamilyId, representationId: rep.id, payloadDigest: rep.payloadDigest },
+    ]), provider = await readProjectScene(f.source.read(), metadataLimits, verifier);
+    const capture = await ReviewSourceCapture.prepare({ read: async () => ({ state: 'ready', source: f.source, provider, publication: 'review-fixture' }) },
+      f.source.token, { sceneId: id('scn') }, f.store, metadataLimits);
+    const parts: BlobPart[] = [], generated = await writeReviewArchive(capture, f.store, new WritableStream({ write(bytes) { parts.push(bytes.slice() as BlobPart); } }), f.options);
+    expect(generated.kind).toBe('generated-review-archive');
+    const file = new Blob(parts), inspected = await ReviewArchive.inspect(file, metadataLimits);
+    expect(inspected.review).toEqual(capture.review); expect(inspected.archive.control.manifest.purpose).toBe('review');
+    const entries = await unpackFixture(file);
+    expect(entries.map(e => e.path)).toEqual(['manifest.json', 'manifest.sha256', 'review.json', ...capture.blobs.map(b => b.path)]);
+    for (const entry of entries.filter(e => e.path.startsWith('blobs/'))) expect(entry.bytes).toEqual(f.bodies.get(entry.path.split('/').at(-1)!));
+    const restored = await ReviewSourceCapture.restore({ source: capture.sourceBytes(), sourceProof: capture.source.proof,
+      snapshot: capture.snapshotBytes(), reconstruction: capture.reconstruction }, f.store, verifier, metadataLimits);
+    expect(restored.snapshotBytes()).toEqual(capture.snapshotBytes());
+    const manifest = JSON.parse(new TextDecoder().decode(entries[0]!.bytes)); manifest.summary.entityClasses.find((c: any) => c.class === 'captionsById').count++;
+    entries[0]!.bytes = encode(canonical(manifest)); entries[1]!.bytes = encode(packageByteHash(entries[0]!.bytes));
+    await expect(ReviewArchive.inspect(fixedZip(entries), metadataLimits)).rejects.toThrow('review-summary-or-closure');
+  });
+});
 
 describe('whole-Project clean output (not host activation or external saving)', () => {
   const change = (source: ProjectMetadataSource, fn: (d: Record<string, any>) => void) =>

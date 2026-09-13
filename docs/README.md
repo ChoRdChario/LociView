@@ -39,11 +39,10 @@ may be retained intentionally: read their status amendments before inferring a w
 - Specification 05 has bounded core/metadata/UI and real-file validation connections.
   This is not ordinary-app adoption or the complete practical-team result.
 - Specification 06 permits isolated implementation before general adoption (§11).
-  Workspace/Contribution, named backup/restore and whole-Project clean have bounded
-  file connections; exact checks/worktree status are in todo. Selected-Scene
-  review/edit-copy policy is approved in §12.6, but that distinct snapshot path
-  remains unconnected; clean's writer does not supply omitted review relations
-  or approve all profiles.
+  Five-purpose file connections and remaining handoffs are recorded in inventory;
+  exact checks/worktree status are in todo. Selected-Scene review/edit-copy policy
+  is approved in §12.6. A clean writer alone does not supply omitted review
+  relations, connect the explicit edit-copy handoff or approve all profiles.
 - Specification 07 remains section-specific proposed migration work. Do not turn
   earlier portable-identity or synthetic evidence into an implemented converter.
 
