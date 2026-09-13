@@ -161,15 +161,23 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const host = createValidationModeHost(initial, open, changed);
     const display: DisplayCapture = { camera: { position: [5, 2, 9], target: [1, 0, 0], up: [0, 1, 0],
       projection: { kind: 'perspective', verticalFovRadians: 0.7 } }, background: { kind: 'solid', colorSrgb: [0.1, 0.2, 0.3] } };
-    const recall = vi.fn(), camera = vi.fn(), dispose = vi.fn(), viewport: ViewportFactory = vi.fn(() => ({ update() {}, setActive() {},
+    const recall = vi.fn(), camera = vi.fn(), dispose = vi.fn(), viewport: ViewportFactory = vi.fn(canvas => {
+      // Fixed authored extent, not browser layout or native pointer-capture evidence.
+      Object.assign(canvas, { getBoundingClientRect: () => ({ width: 900, height: 600 }) });
+      return { update() {}, setActive() {},
       read: () => ({ token: 'camera', ready: true, issue: null, dragging: false, projection: 'perspective' as const, axis: null, pins: [] }),
-      capture: () => display, recall, camera, retry() {}, dispose }));
+      capture: () => display, recall, camera, retry() {}, dispose }; });
     const mounted = createSavedWorkspace(new RecordedDocument().asDocument(), host, viewport), s = mounted.session!, root = record(mounted.root);
     const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
     const button = (label: string) => all(root).find(n => n.tag === 'button' && n.textContent === label)!;
     expect(s.acceptNavigation(planNavigation(s.snapshot.state, s.session, null, { kind: 'scene', sceneId: secondScene }))).toBe(true);
     s.acceptList(planCaptionList(s.captionContext(), { kind: 'select', captionId }));
     s.acceptList(planCaptionList(s.captionContext(), { kind: 'search', query: '現地' }));
+    mounted.render();
+    const resize = all(root).find(n => n.attributes.get('aria-label') === '大きさを変更')!;
+    const original = s.snapshot;
+    resize.fire('click', { detail: 0 }); // Local window sizing is available in intentional View.
+    expect(s.windowMemory.placements[0]!.rect.width).toBe(360); expect(s.snapshot).toBe(original); expect(s.readOnly).toBe(true);
     const memory = s.memory, windows = s.windowMemory, scene = s.sceneId;
     expect(scene).not.toBe(defaultScene); expect(memory.search).toBe('現地'); expect(windows.retained).toContain(captionId);
     const cameraCalls = camera.mock.calls.length, recallCalls = recall.mock.calls.length;
@@ -181,9 +189,15 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await writer.authority.write(writer.read().source!.token, { [`caption/${captionId}/title`]: '現地の最新記録' });
     await workspace.dispose(); open.mockClear();
     // Local IME/camera/window interactions must not even start lease acquisition.
-    for (const gesture of [(b: boolean) => s.setSearchComposing(b), (b: boolean) => s.setViewportDragging(b), (b: boolean) => s.setWindowDragging(b)]) {
+    for (const gesture of [(b: boolean) => s.setSearchComposing(b), (b: boolean) => s.setViewportDragging(b)]) {
       gesture(true); button('編集を開始する').fire('click'); expect(open).not.toHaveBeenCalled(); gesture(false);
     }
+    mounted.render(); // These direct test setters do not send the host's normal changed notification.
+    const pointer = { button: 0, pointerId: 6, clientX: 360, clientY: 280, preventDefault() {} };
+    resize.fire('pointerdown', pointer); expect(s.interactionPending).toBe('window');
+    resize.fire('pointermove', { ...pointer, clientX: 410 });
+    button('編集を開始する').fire('click'); expect(open).not.toHaveBeenCalled();
+    resize.fire('pointercancel', pointer); expect(s.interactionPending).toBeNull(); expect(s.windowMemory).toBe(windows);
     button('編集を開始する').fire('click');
     await vi.waitFor(() => expect(button('閲覧に切り替える')?.disabled).toBe(false));
     expect(mounted.session).toBe(s); expect(s.sceneId).toBe(scene); expect(s.memory).toBe(memory); expect(s.windowMemory).toBe(windows);

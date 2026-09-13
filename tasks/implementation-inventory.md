@@ -1,6 +1,9 @@
 # 実装・接続の全体棚卸し
 
 > CURRENT INVENTORY / 2026-09-13。全体監査基点: `b73315b851f627ca61029cfb73caf23f6e4829bd`。
+> C09は両host共通の窓に右下ドラッグ・矢印・非ドラッグ選択を接続。Scene別のlocalサイズだけを変更。
+> 本文／画像node・scroll・選択・元履歴を保持。取消・stale・寸法変化、View操作とEdit切替拒否は既存tests。
+> 分類は接続済みへ移すが、native input／短画面／実機受入れは未完了。最終検査状態はtodoを参照。
 > T03のScene名競合も同じmetadata hostへ接続。全候補の明示選択／名前入力を同じjournalへ通し、
 > 通常renameの競合拒否・手元入力・原履歴を保持。等値候補／返送／cold retryは既存tests。
 > View名／順序／camera／background、Scene開始Viewの競合も同じ候補UIへ接続。
@@ -45,15 +48,15 @@
 ## 1. 結論と数え方
 
 ユーザーが行う作業を **64機能群** に整理すると、新metadata保存画面へ限定接続済みが
-**30群**、残りが **34群**。その34群は下記の内訳になる。
-「30/64完成」といった完成率・工数には換算しない。小さい部品接続と
+**31群**、残りが **33群**。その33群は下記の内訳になる。
+「31/64完成」といった完成率・工数には換算しない。小さい部品接続と
 移行／チーム受信では仕事量が大きく違い、接続済みも下記の限定経路だからである。
 
 | 排他的な主分類 | 群数 | 意味 |
 |---|---:|---|
-| 接続済み | 30 | 新metadata hostで操作・必要な記録まで接続。従来25群は既知三角形／2 PNG起点、P01/P02は限定validation、C07/V04/M05は両hostへ接続。実機受入れは別 |
+| 接続済み | 31 | 新metadata hostで操作・必要な記録まで接続。従来25群は既知三角形／2 PNG起点、P01/P02は限定validation、C07/C09/V04/M05は両hostへ接続。実機受入れは別 |
 | 部品未接続 | 4 | 新系統のUI部品・pure planner等はあるが、対象群全体の画面・実データ・typed command／保存のいずれかが未接続。T01〜T04は限定接続まで進んだ |
-| 別経路のみ | 20 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
+| 別経路のみ | 19 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
 | 新規実装 | 10 | 新契約の利用者向け経路がまだない。schema・検証・設計案があっても実装済みとは数えない |
 
 - 一つの行は、共有する前提・保存境界を持つ「利用者の作業群」。同一ViewのCRUD等は一群。
@@ -126,7 +129,7 @@
 | C06 | カラーサークルで一覧とピンを絞り込む | 接続済み | 全色／空集合、選択を失わない再表示経路。 | [src/ui/projectScene/captionListControls.ts:23](../src/ui/projectScene/captionListControls.ts) / [tests/ui/projectSceneCaptionList.test.ts:66](../tests/ui/projectSceneCaptionList.test.ts) |
 | C07 | 一覧で添付の有無・件数を見分ける | 接続済み | metadata／限定GLB/PNG hostの添付recordを一回集計して一覧へ渡す。確定削除除外、曖昧な参照等は要確認、同じblobの複数添付も各1件。追加・削除・失敗後retry・cold reopenは既存tests、実画面／実機は未受入れ。 | [src/harness/projectScene/mediaHistory.ts](../src/harness/projectScene/mediaHistory.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) / [tests/ui/projectSceneMedia.test.ts](../tests/ui/projectSceneMedia.test.ts) |
 | C08 | 複数Captionウィンドウを比較する | 接続済み | 順次開く・前面化・個別×・移動／キーボード・並べる・意味のある位置への接続線。 | [src/ui/projectScene/captionWindowControls.ts:26](../src/ui/projectScene/captionWindowControls.ts) / [tests/ui/projectSceneWindowConnection.test.ts:34](../tests/ui/projectSceneWindowConnection.test.ts) |
-| C09 | Captionウィンドウのサイズを変える | 別経路のみ | 新部品にresize入力なし。WindowRect型にサイズがあるだけでは操作可能としない。 | [src/ui/projectScene/captionWindowControls.ts:79](../src/ui/projectScene/captionWindowControls.ts) / [src/nativeGs/captionWindows.ts:663](../src/nativeGs/captionWindows.ts) |
+| C09 | Captionウィンドウのサイズを変える | 接続済み | 両host共通の右下drag／矢印／非drag選択。Scene別local placementだけ変更し、本文・画像・scroll・他窓・選択・履歴を保持。取消・stale・extent変化／late入力とView操作・Edit切替拒否を既存testsで確認。実描画／実入力／短画面／実機は未受入れ。 | [src/ui/projectScene/captionWindowControls.ts](../src/ui/projectScene/captionWindowControls.ts) / [tests/ui/projectSceneWindowConnection.test.ts](../tests/ui/projectSceneWindowConnection.test.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
 | C10 | Project全体からCaptionを削除する | 接続済み | 影響Scene・添付・tag登録を確認し、Captionと観測済み全edgeを原子的tombstone。本文競合・Media/Tag/モデル本体を保持。保存失敗中は旧UI、exact retry／cold reopen、後着edge/delete-editの保持と警告、未適用入力の明示取消を確認。復元・一般参照修復UIは別。 | [src/projectMetadata/captionDeletion.ts](../src/projectMetadata/captionDeletion.ts) / [src/harness/projectScene/captionDeletionControls.ts](../src/harness/projectScene/captionDeletionControls.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
 | C11 | モデル非依存の既存Captionを読み、明示的にモデルへ置き直す | 新規実装 | domain/list読取の一部あり。実importとProjectAnchor→Assetのcommand/UIなし。移動入口はAsset以外を拒否。新ProjectAnchor作成は別途非対象。 | [src/scene/types.ts:36](../src/scene/types.ts) / [src/harness/projectScene/session.ts:442](../src/harness/projectScene/session.ts) |
 | C12 | 未配置の記録を失わず読み込み、後で配置する | 新規実装 | 未配置を保持・後配置する製品要件は承認済み、exact schema/recipeは提案・未実装。現在Anchor unionにもない。破損・競合を未配置扱いにして救済しない。 | [docs/specs/05-project-scene-team-workflow.md:784](../docs/specs/05-project-scene-team-workflow.md) / [src/scene/types.ts:36](../src/scene/types.ts) |
@@ -345,7 +348,7 @@ PNG／GLB後入れ・配置・材質照明／表裏／hard chroma／解除も同
 | 7 | 他の実形式・閲覧補助と残るalignment／補修を継承・実装する | Point＋表示径＋pick、GS＋明示Proxy、複数material、rotation/scale、残るalignmentを形式／契約ごとに閉じる。M14はGS/repair-local transform/原子的revisionの前提が揃ってから。hard-maskと一般smooth透過を一括deferredにしない。従来UIをコピーして新Sceneの意味を変えない |
 | 8 | 通常homeからの全体受入れ | 新sourceでTEAM-FLOW-01をDesktopとphysical iPhone、保存／restart／offlineまで確認。a11y・短画面・IME等も安定treeでまとめる。Pages/SW/main/releaseへは現在の権限で進まない |
 
-V04背景入口とM05一時hideは接続済み。残るC04追加色、C09resize等は
+V04背景入口、M05一時hide、C09resizeは接続済み。残るC04追加色等は
 小さな独立UI接続として、依存が揃い次第本筋の間に挟んでよい。
 全てのチーム・形式作業が終わるまで放置する意味ではない。
 ただし小改修を積み続けて受信・更新の本筋が進まない状態にはしない。

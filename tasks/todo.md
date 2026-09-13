@@ -28,6 +28,55 @@ Formal adoption still requires G1-A/C and applicable device evidence. No profile
 
 #### Active connected work — PO-approved limited real-file validation
 
+Current slice (2026-09-13, after `b319cab`): C09 window-size adjustment. Short
+audit: clean g0-baseline, preceding turn made executable progress (P07, 111 files /
+2,073 PASS, typecheck/build); no goal completion or external acceptance inferred.
+Existing `WindowRect`/`place` already carry size but the same comparison window
+has no input for it. Close this approved carryover operation without a new page,
+storage command or layout framework. File-team delivery and the two unanswered
+06 decisions remain the main dependency, not replaced by this UI connection.
+
+- [x] Record the bounded interaction/acceptance: corner drag, arrow keys and
+  non-drag size selection; confirmed Scene-local size vs transient display clamp.
+- [x] Connect size adjustment through the existing window placement plan,
+  preserving Caption selection/text/media/scroll/connector and pending guards.
+- [x] Verify success/cancel/stale/late/dispose, short viewport and Scene return,
+  readonly and P07 handoff blocking; run final checks and independent review.
+
+Use existing window, Scene and saved-host tests. No schema, shared layout, media
+formats, generic Undo, dependency, ordinary home, wire/migration or release work.
+Actual handle hit area, native pointer/touch and short-screen/iPhone acceptance
+remain in the existing pending browser batch. Do not retry unchanged tooling or
+push failures. Stop for a contradictory contract or new product-policy boundary.
+
+Implementation review: independent source review found a release-time reentrant
+extent change that could commit the old rectangle. The gesture now checks its
+extent version after releasing the pending guard and cancels the late click too.
+Existing tests add three focused groups plus a real handle in the P07 saved-host
+test; no new page/framework. An initial P07 test failure came from direct test
+gesture setters lacking the host's normal render notification; the test now
+renders before the next interaction. Focused four cases PASS. Independent test
+review added an ordinary no-drag pointer activation and a non-default-size Scene
+round trip, avoiding false proof from restoring default dimensions. Final source
+typecheck and normal build exit 0. Final single-worker root exit 0 / JSON success:
+111 files, 2,076 PASS, 21 existing TODO, no failures (442.18 seconds). No concurrent
+build/typecheck during root; executable source/tests are unchanged since it ran.
+Normal build's existing mixed-import/chunk warnings remain. Independent source
+and test review findings are closed; the manual Scene round trip now follows
+Scene creation. Inventory is 31 connected / 4 components / 19 other-path / 10 new
+(64 total), not a completion percentage. Actual browser, native capture/touch,
+short-screen/iPhone and offline acceptance remain pending. Independent final
+11-file index review passed, including the JSON result and corrected manual order.
+Ready for the local checkpoint; no unchanged browser/push retry or new authority.
+
+Next bounded candidate: C04 chosen initial pin color. Independent dependency
+inspection found fixed color in Session, metadata intent and `addPin`; reuse the
+existing color field and one atomic creation command, not create-then-recolor.
+Keep Scene-local additional color separate from filters/existing Caption edits;
+capture it at placement start and retain exact color/ID during retry. Specify the
+acceptance before changing commands. This approved operation does not substitute
+for F01/F02 or ratify either outstanding 06 decision.
+
 Current slice (2026-09-13, after `801e7af`): P07 deliberate local View/Edit,
 limited to the existing static-GLB/PNG validation workspace. Previous turn was
 progress (Caption lifecycle recovery); whole practical-team acceptance remains

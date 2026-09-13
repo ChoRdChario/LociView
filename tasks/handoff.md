@@ -1,5 +1,16 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-13 C09 windowサイズ（`b319cab`後）:** 両host共通の窓へ右下drag／
+> 矢印／非drag選択を接続。左上・別の窓・選択・本文／画像node・scroll・元履歴を保持。
+> Scene別localサイズで、狭幅時は表示だけclamp。Viewでも使え、gesture中のEdit切替は拒否。
+> Esc／cancel／capture loss／stale／extent変化／disposeは未確定サイズを破棄。
+> 独立reviewで見つけたrelease時の再入extent変化と、通常選択・非初期サイズ帰還の証拠を補完。
+> 最終型・通常build exit 0。root 111 files／2,076 PASS／21既存TODO／失敗0、442.18秒、JSON success。
+> 実行sourceは最終検査後不変更。実browser／native入力／短画面／iPhone／offlineは未受入れ。
+> 手動手順はScene作成後に往復する順へ修正。棚卸し31/4/19/10、完成率ではない。
+> 11-file最終index独立reviewは指摘なし、local checkpoint可能。既知browser／push失敗は再試行していない。
+> 次候補C04は追加色を既存addPinの1変更へ渡す限定接続。実用file-teamと06の既出2判断は未完了。
+
 > **2026-09-13 P07 local View/Edit（`801e7af`後）:** 限定GLB/PNG一覧に
 > 「閲覧で開く／編集で開く」、同じ画面に「編集を開始する／閲覧に切り替える」を接続。
 > Viewはlock不要・全write拒否。Editはlockとdurable再読込を確認後だけ開始する。

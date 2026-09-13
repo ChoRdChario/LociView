@@ -101,6 +101,10 @@
 .lv-caption-window .lv-caption-window-title { flex: 1; min-width: 0; padding: 8px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; cursor: move; touch-action: none; }
 .lv-caption-window-body { overflow: auto; padding: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .lv-caption-window-note { padding: 4px 8px; font-size: 12px; }
+.lv-caption-window > footer { display: flex; align-items: center; min-width: 0; }
+.lv-caption-window > footer .lv-caption-window-note { min-width: 0; overflow-wrap: anywhere; }
+.lv-caption-window .lv-caption-window-resize { flex: 0 0 44px; width: 44px; margin-left: auto; padding: 0; border: 0; background: transparent; font-size: 20px; cursor: nwse-resize; touch-action: none; }
+.lv-caption-window[data-gesture="resize"] { border-color: #413d39; }
 .lv-caption-window-line { position: absolute; height: 1px; background: #635e58; transform-origin: 0 0; pointer-events: none; }
 .lv-caption-window-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .lv-development-window-actions { border-top: 1px solid #d3cec7; padding-top: 8px; font-size: 12px; }

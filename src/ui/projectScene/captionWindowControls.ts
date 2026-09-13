@@ -14,6 +14,13 @@ export function displayedWindowRect(preferred: WindowRect, width: number, height
   const w = Math.min(preferred.width, Math.max(1, width)), h = Math.min(preferred.height, Math.max(1, height));
   return { left: Math.max(0, Math.min(preferred.left, width - w)), top: Math.max(0, Math.min(preferred.top, height - h)), width: w, height: h };
 }
+// Layout defaults, not persisted project fields or device-size guarantees.
+const sizes = [{ width: 220, height: 180 }, { width: 280, height: 200 }, { width: 360, height: 280 }];
+function resizedWindowRect(base: WindowRect, dx: number, dy: number, width: number, height: number): WindowRect {
+  const availableWidth = Math.max(1, width - base.left), availableHeight = Math.max(1, height - base.top);
+  return { ...base, width: Math.min(availableWidth, Math.max(sizes[0]!.width, base.width + dx)),
+    height: Math.min(availableHeight, Math.max(sizes[0]!.height, base.height + dy)) };
+}
 
 /** Read-only comparison layer. Selection/drafts/history remain owned by the host. */
 export function createCaptionWindowControls(document: Document, onPlan: (plan: CaptionWindowPlan) => boolean,
@@ -28,23 +35,31 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
   tools.append(label, arrange, status);
   type Card = { root: HTMLElement; title: HTMLButtonElement; body: HTMLElement; note: HTMLElement;
     content?: ReturnType<NonNullable<typeof content>>;
-    close: HTMLButtonElement; line: HTMLElement; rect: WindowRect; initial: WindowRect; cleanups: (() => void)[] };
+    close: HTMLButtonElement; resize: HTMLButtonElement; skipResizeClick: boolean;
+    line: HTMLElement; rect: WindowRect; initial: WindowRect; cleanups: (() => void)[] };
   const cards = new Map<string, Card>();
   const initialPositions = new Map<string, Map<string, WindowRect>>();
   let context: WindowContext | null = null, projection: WindowProjection = { ready: false, width: 0, height: 0, pins: [] };
-  let disposed = false, scope = '', optionKey = '';
-  let drag: { id: string; pointer: number; startX: number; startY: number; base: WindowRect; rect: WindowRect; context: WindowContext } | null = null;
+  let disposed = false, scope = '', optionKey = '', extentVersion = 0;
+  let drag: { id: string; kind: 'move' | 'resize'; target: HTMLButtonElement; pointer: number;
+    startX: number; startY: number; base: WindowRect; rect: WindowRect; context: WindowContext; extent: number } | null = null;
   function plan(intent: CaptionWindowIntent, base = context) { return base && planCaptionWindow(base.source, base.memory, base.selectedId, intent); }
+  const hasExtent = () => [projection.width, projection.height].every(n => Number.isFinite(n) && n > 0);
   function apply(intent: CaptionWindowIntent) {
     if (disposed || drag) return false;
     const proposed = plan(intent); return proposed ? onPlan(proposed) : false;
   }
   function endDrag(commit: boolean) {
     const old = drag; if (!old) return; drag = null;
-    const title = cards.get(old.id)?.title;
-    if (title?.hasPointerCapture?.(old.pointer)) title.releasePointerCapture(old.pointer);
+    const card = cards.get(old.id); if (card) { delete card.root.dataset.gesture; if (!commit) card.skipResizeClick = true; }
+    if (old.target.hasPointerCapture?.(old.pointer)) old.target.releasePointerCapture(old.pointer);
     onMoving(false);
-    if (commit) { const proposed = plan({ kind: 'place', captionId: old.id, rect: old.rect }, old.context); if (proposed) onPlan(proposed); }
+    // Reentrant host rendering can discover a changed canvas extent only on release.
+    const current = commit && old.extent === extentVersion;
+    if (!current && card) card.skipResizeClick = true;
+    if (current && Object.keys(old.base).some(k => old.base[k as keyof WindowRect] !== old.rect[k as keyof WindowRect])) {
+      const proposed = plan({ kind: 'place', captionId: old.id, rect: old.rect }, old.context); if (proposed) onPlan(proposed);
+    }
     paint();
   }
   function removeCard(card: Card) { for (const cleanup of card.cleanups) cleanup(); card.content?.dispose(); card.root.remove(); card.line.remove(); }
@@ -52,47 +67,66 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
     let positions = initialPositions.get(scope); if (!positions) { positions = new Map(); initialPositions.set(scope, positions); }
     const initial = positions.get(id) ?? { left: 16 + positions.size * 32, top: 16 + positions.size * 28, width: 280, height: 200 };
     positions.set(id, initial);
-    const node = make('section'), header = make('header'), title = button(''), close = button('×');
+    const node = make('section'), header = make('header'), footer = make('footer'), title = button(''), close = button('×'), resize = button('↘');
     node.className = 'lv-caption-window'; close.setAttribute('aria-label', '閉じる');
     title.className = 'lv-caption-window-title'; title.title = 'ドラッグまたは矢印キーで移動。Escで取り消し';
+    resize.className = 'lv-caption-window-resize'; resize.setAttribute('aria-label', '大きさを変更');
+    resize.title = '選択で大きさを切替。ドラッグ・矢印キーで調整。Escで取り消し';
     const body = make('div'), scroll = make('div'), note = make('p'), line = make('div'), extension = content?.(id);
     body.className = 'lv-caption-window-text'; scroll.className = 'lv-caption-window-body'; note.className = 'lv-caption-window-note';
     scroll.append(body); if (extension) scroll.append(extension.root);
     line.className = 'lv-caption-window-line'; line.setAttribute('aria-hidden', 'true');
-    header.append(title, close); node.append(header, scroll, note); root.append(line, node);
-    const card: Card = { root: node, title, body, note, close, line,
+    header.append(title, close); footer.append(note, resize); node.append(header, scroll, footer); root.append(line, node);
+    const card: Card = { root: node, title, body, note, close, resize, skipResizeClick: false, line,
       rect: initial, initial, cleanups: [], content: extension };
     const listen = (element: HTMLElement, type: string, fn: (event: Event) => void) => {
       element.addEventListener(type, fn); card.cleanups.push(() => element.removeEventListener(type, fn));
     };
     listen(close, 'click', () => apply({ kind: 'close', captionId: id }));
     listen(title, 'click', () => apply({ kind: 'front', captionId: id }));
-    listen(title, 'keydown', event => {
+    listen(resize, 'click', event => {
+      if (card.skipResizeClick) { card.skipResizeClick = false; if ((event as MouseEvent).detail !== 0) return; }
+      if (disposed || !context || drag || !hasExtent()) return;
+      if (context.moveBlock) { status.textContent = context.moveBlock; return; }
+      const available = sizes.map(s => resizedWindowRect(card.rect, s.width - card.rect.width, s.height - card.rect.height, projection.width, projection.height));
+      const next = available.find(s => s.width > card.rect.width || s.height > card.rect.height) ?? available[0]!;
+      apply({ kind: 'place', captionId: id, rect: next });
+    });
+    for (const [target, kind] of [[title, 'move'], [resize, 'resize']] as const) {
+    listen(target, 'keydown', event => {
       const e = event as KeyboardEvent;
       if (e.key === 'Escape' && drag?.id === id) { e.preventDefault(); endDrag(false); return; }
       const steps: Record<string, [number, number]> = { ArrowLeft: [-20, 0], ArrowRight: [20, 0], ArrowUp: [0, -20], ArrowDown: [0, 20] };
-      const step = steps[e.key]; if (!step || !context || drag) return;
+      const step = steps[e.key]; if (!step || !context || drag || !hasExtent()) return;
       e.preventDefault(); if (context.moveBlock) { status.textContent = context.moveBlock; return; }
-      apply({ kind: 'place', captionId: id, rect: displayedWindowRect({ ...card.rect,
-        left: card.rect.left + step[0], top: card.rect.top + step[1] }, projection.width, projection.height) });
+      apply({ kind: 'place', captionId: id, rect: kind === 'resize' ? resizedWindowRect(card.rect, ...step, projection.width, projection.height) :
+        displayedWindowRect({ ...card.rect, left: card.rect.left + step[0], top: card.rect.top + step[1] }, projection.width, projection.height) });
     });
-    listen(title, 'pointerdown', event => {
+    listen(target, 'pointerdown', event => {
       const e = event as PointerEvent;
-      if (e.button !== 0 || disposed || !context || drag || !projection.width || !projection.height) return;
+      if (drag) { card.skipResizeClick = true; if (drag.pointer !== e.pointerId) endDrag(false); return; }
+      if (e.button !== 0 || disposed || !context || !hasExtent() || !Number.isFinite(e.clientX) || !Number.isFinite(e.clientY)) return;
       if (context.moveBlock) { status.textContent = context.moveBlock; return; }
       e.preventDefault();
-      if (!apply({ kind: 'front', captionId: id })) return;
-      title.focus({ preventScroll: true }); title.setPointerCapture?.(e.pointerId);
-      drag = { id, pointer: e.pointerId, startX: e.clientX, startY: e.clientY, base: card.rect, rect: card.rect, context };
+      if (kind === 'move' && !apply({ kind: 'front', captionId: id })) return;
+      target.focus({ preventScroll: true }); target.setPointerCapture?.(e.pointerId);
+      card.skipResizeClick = false;
+      drag = { id, kind, target, pointer: e.pointerId, startX: e.clientX, startY: e.clientY, base: card.rect, rect: card.rect, context, extent: extentVersion };
+      node.dataset.gesture = kind;
       onMoving(true);
     });
-    listen(title, 'pointermove', event => {
-      const e = event as PointerEvent; if (drag?.id !== id || drag.pointer !== e.pointerId) return;
-      drag.rect = displayedWindowRect({ ...drag.base, left: drag.base.left + e.clientX - drag.startX,
-        top: drag.base.top + e.clientY - drag.startY }, projection.width, projection.height); paint();
+    listen(target, 'pointermove', event => {
+      const e = event as PointerEvent; if (drag?.id !== id || drag.target !== target || drag.pointer !== e.pointerId || !Number.isFinite(e.clientX) || !Number.isFinite(e.clientY)) return;
+      const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
+      if (dx || dy) card.skipResizeClick = true;
+      drag.rect = kind === 'resize' ? resizedWindowRect(drag.base, dx, dy, projection.width, projection.height) :
+        displayedWindowRect({ ...drag.base, left: drag.base.left + dx, top: drag.base.top + dy }, projection.width, projection.height); paint();
     });
-    listen(title, 'pointerup', event => { if (drag?.id === id && drag.pointer === (event as PointerEvent).pointerId) endDrag(true); });
-    for (const type of ['pointercancel', 'lostpointercapture']) listen(title, type, () => { if (drag?.id === id) endDrag(false); });
+    listen(target, 'pointerup', event => { if (drag?.id === id && drag.target === target && drag.pointer === (event as PointerEvent).pointerId) endDrag(true); });
+    for (const type of ['pointercancel', 'lostpointercapture']) listen(target, type, event => {
+      if (drag?.id === id && drag.target === target && drag.pointer === (event as PointerEvent).pointerId) endDrag(false);
+    });
+    }
     return card;
   }
   function paint() {
@@ -118,7 +152,8 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
   }
   function render(next: WindowContext) {
     if (disposed) return;
-    if (drag && (drag.context.source.token !== next.source.token || drag.context.memory !== next.memory || drag.context.selectedId !== next.selectedId))
+    if (drag && (drag.context.source.token !== next.source.token || drag.context.memory !== next.memory || drag.context.selectedId !== next.selectedId ||
+      !captionWindowView(next.source, next.memory, next.selectedId).visibleIds.includes(drag.id)))
       endDrag(false);
     if (scope !== next.source.sceneId) { for (const card of cards.values()) removeCard(card); cards.clear(); scope = next.source.sceneId; }
     context = next; const view = captionWindowView(next.source, next.memory, next.selectedId);
@@ -135,6 +170,7 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
         item.pin === 'unavailable' ? 'ピンの状態を確認してください。' : '';
       card.note.hidden = !card.note.textContent;
       card.close.disabled = Boolean(drag);
+      card.resize.disabled = Boolean(drag ? drag.id !== id : next.moveBlock);
     }
     const key = JSON.stringify(view.visibleIds.map(id => [id, cards.get(id)?.title.textContent]));
     if (key !== optionKey) {
@@ -154,7 +190,11 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
       rect: displayedWindowRect({ left: (i % columns) * 296, top: Math.floor(i / columns) * 216, width: 280, height: 200 }, projection.width, projection.height) })) });
   };
   front.addEventListener('change', changeFront); arrange.addEventListener('click', arrangeAll);
-  return { root, tools, render, project(next: WindowProjection) { projection = next; paint(); },
+  return { root, tools, render, project(next: WindowProjection) {
+      const extentChanged = projection.width !== next.width || projection.height !== next.height;
+      projection = [next.width, next.height].every(n => Number.isFinite(n) && n >= 0) ? next : { ...next, ready: false, width: 0, height: 0 };
+      if (extentChanged) extentVersion++;
+      if (drag && extentChanged) endDrag(false); paint(); },
     dispose() { if (disposed) return; endDrag(false); disposed = true; for (const card of cards.values()) removeCard(card);
       cards.clear(); front.removeEventListener('change', changeFront); arrange.removeEventListener('click', arrangeAll); root.remove(); tools.remove(); } };
 }

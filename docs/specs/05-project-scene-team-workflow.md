@@ -1019,6 +1019,36 @@ failure fallback, retained Scene/camera/windows/filter, pending-input refusal,
 explicit recovery and disposal of late candidates. Actual browser and physical
 iPhone evidence remains in the consolidated acceptance batch.
 
+### 11.2 Bounded Caption-window size input (2026-09-13)
+
+C09 connects the existing Scene-local `WindowRect`/`place` intent in the same
+comparison windows. A corner handle offers pointer resizing and arrow-key
+adjustment; activating it without dragging cycles preset sizes. This is a local
+viewing operation available in View as well as Edit, not a Project write, Saved
+View layout, Caption selection, pin move or media transformation. Keep the
+existing muted panel treatment, short accessible name and visible focus/press.
+
+During a pointer gesture only the displayed rectangle changes. Pointer release
+commits one current placement; Esc, cancellation, capture loss, stale source/
+Scene/selection, viewport extent change or disposal restores the last accepted
+size. A drag must not also activate the non-drag preset. Reuse the existing
+window-pending guard to block conflicting Scene/model/pin/P07 operations.
+Other pending input blocks starting an adjustment and is never discarded.
+
+Keep each card, body/media nodes and body scroll mounted during adjustment;
+repaint the connector from its new displayed edge. Preserve other windows,
+selected Caption, source token/history and Scene-local size across Scene return.
+Shrinking the viewport clamps display only, without overwriting the preferred
+size; enlarging it restores that preference. Interactive sizing must leave the
+header/close action and scrolling content usable. CSS-pixel minima/presets are
+layout defaults, not ratified device/capacity guarantees.
+
+Reuse the window connection/state and saved-host tests for pointer/key/preset,
+cancel/stale/late/dispose, retained DOM/content/memory and readonly/P07 refusal.
+Recorded DOM does not emulate native capture, text-range selection, raster or
+touch. Their real-browser/physical-iPhone checks stay in the consolidated batch;
+this does not activate ordinary home or imply complete team-flow acceptance.
+
 ## 12. Acceptance
 
 ### 12.1 Scene/domain

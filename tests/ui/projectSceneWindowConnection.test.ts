@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { value } from '../../src/scene/types';
 import { SyntheticSession } from '../../src/harness/projectScene/session';
 import { fixtureIds as f } from '../../src/harness/projectScene/fixture';
@@ -17,17 +17,22 @@ const select = (s: SyntheticSession, id: string) => s.acceptList(planCaptionList
 const go = (s: SyntheticSession, id: string) => s.acceptNavigation(planNavigation(s.snapshot.state, s.session, s.pending, { kind: 'scene', sceneId: id }));
 const visible = (s: SyntheticSession) => captionWindowView(s.captionContext().source, s.windowMemory, s.memory.selectedCaptionId).visibleIds;
 
-function mountedLayer() {
+function mountedLayer(withContent = false, onRelease?: () => void) {
   const document = new RecordedDocument(), session = new SyntheticSession();
+  // Extension identity only; this is not image decoding or a browser-layout fixture.
+  const contentDispose = vi.fn(), content = vi.fn(() => {
+    const root = document.createElement('div'); root.append(document.createElement('img'));
+    return { root: root as unknown as HTMLElement, render() {}, dispose: contentDispose };
+  });
   const render = () => layer.render({ source: session.captionContext().source, memory: session.windowMemory,
     selectedId: session.memory.selectedCaptionId, moveBlock: session.pending ? '操作を完了してください。' : null });
   const layer = createCaptionWindowControls(document.asDocument(), plan => { const accepted = session.acceptWindow(plan); render(); return accepted; },
-    active => { session.setWindowDragging(active); render(); });
+    active => { session.setWindowDragging(active); render(); if (!active) onRelease?.(); }, withContent ? content : undefined);
   const project = (width = 900, height = 600, pins = [{ id: f.shared, x: 800, y: 500, visible: true }, { id: f.second, x: 750, y: 400, visible: true }], ready = true) =>
     layer.project({ ready, width, height, pins });
   const root = record(layer.root), tools = record(layer.tools);
   const pick = (id: string) => { expect(select(session, id)).toBe(true); render(); project(); };
-  return { document, session, layer, render, project, root, tools, pick };
+  return { document, session, layer, render, project, root, tools, pick, content, contentDispose };
 }
 
 describe('same-host comparison windows; authored DOM only, not raster or native input', () => {
@@ -75,6 +80,100 @@ describe('same-host comparison windows; authored DOM only, not raster or native 
     button(h.tools, 'ウィンドウを並べる').fire('click'); expect(h.session.windowMemory.placements).toHaveLength(2);
     expect(h.session.memory.selectedCaptionId).toBe(f.second);
     h.layer.dispose(); expect(button(a, '設備の確認箇所').listeners.get('pointerdown')?.size).toBe(0);
+  });
+
+  it('resizes one window by pointer, arrows or activation without replacing content, Project state or Scene-local preferences', () => {
+    const h = mountedLayer(true), s = h.session; h.pick(f.shared); h.pick(f.second);
+    const a = named(h.root, '設備の確認箇所'), b = named(h.root, '入口の記録'), handle = named(a, '大きさを変更');
+    const body = a.children.find(n => n.className === 'lv-caption-window-body')!, image = descendants(a).find(n => n.tag === 'img')!;
+    const text = descendants(a).find(n => n.className === 'lv-caption-window-text')!, line = h.root.children.find(n => n.className === 'lv-caption-window-line')!;
+    const snapshot = s.snapshot, draft = s.detailContext().draft, memory = s.memory, windows = s.windowMemory;
+    const other = { ...b.style }, connector = line.style.width; body.scrollTop = 90;
+    const event = { button: 0, pointerId: 8, clientX: 300, clientY: 210, preventDefault() {} };
+    handle.fire('pointerdown', event); expect(s.pending).toBe('window'); expect(handle.disabled).toBe(false);
+    expect(go(s, f.detail)).toBe(false); expect(s.pinContext().otherPending).toBe('window');
+    handle.fire('pointermove', { ...event, clientX: 380, clientY: 290 });
+    expect([a.style.left, a.style.top, a.style.width, a.style.height]).toEqual(['16px', '16px', '360px', '280px']);
+    expect(s.windowMemory).toBe(windows); expect(line.style.width).not.toBe(connector);
+    handle.fire('pointerup', event); expect(s.pending).toBeNull(); const resized = s.windowMemory;
+    handle.fire('click', { detail: 1 }); expect(s.windowMemory).toBe(resized); // No preset after drag.
+    expect(resized.placements[0]!.rect).toEqual({ left: 16, top: 16, width: 360, height: 280 });
+    h.project(150, 120); expect([a.style.width, a.style.height]).toEqual(['150px', '120px']); expect(s.windowMemory).toBe(resized);
+    h.project(); expect([a.style.width, a.style.height]).toEqual(['360px', '280px']);
+    handle.fire('keydown', { key: 'ArrowRight', preventDefault() {} }); expect(a.style.width).toBe('380px');
+    handle.fire('click', { detail: 0 }); expect([a.style.width, a.style.height]).toEqual(['220px', '180px']);
+    handle.fire('click', { detail: 0 }); expect([a.style.width, a.style.height]).toEqual(['280px', '200px']);
+    const beforeClick = s.windowMemory;
+    handle.fire('pointerdown', event); handle.fire('pointerup', event); expect(s.windowMemory).toBe(beforeClick);
+    handle.fire('click', { detail: 1 }); expect([a.style.width, a.style.height]).toEqual(['360px', '280px']);
+    expect([a.style.left, a.style.top]).toEqual(['16px', '16px']); expect(b.style).toEqual(other);
+    expect(a.children).toContain(body); expect(descendants(a)).toContain(image); expect(descendants(a)).toContain(text); expect(body.scrollTop).toBe(90);
+    expect(h.content).toHaveBeenCalledTimes(2); expect(h.contentDispose).not.toHaveBeenCalled();
+    expect(s.snapshot).toBe(snapshot); expect(s.memory).toBe(memory); expect(s.detailContext().draft).toBe(draft);
+    expect(visible(s)).toEqual([f.shared, f.second]);
+    const preferred = s.windowMemory;
+    expect(go(s, f.detail)).toBe(true); h.render(); h.pick(f.shared);
+    expect(s.windowMemory.placements).toHaveLength(0);
+    expect(go(s, f.overview)).toBe(true); h.render(); h.project(); expect(s.windowMemory).toBe(preferred);
+    expect([named(h.root, '設備の確認箇所').style.width, named(h.root, '設備の確認箇所').style.height]).toEqual(['360px', '280px']);
+    expect(new SyntheticSession().windowMemory.placements).toHaveLength(0); h.layer.dispose();
+  });
+
+  it('rolls back interrupted/stale resizing, releases pending and rejects late pointer/click completion', () => {
+    for (const cause of ['Escape', 'pointercancel', 'lostpointercapture', 'extent', 'releaseExtent', 'source', 'selection', 'scene', 'membership', 'otherPointer', 'dispose']) {
+      const h = mountedLayer(false, () => { if (cause === 'releaseExtent') h.project(500, 400); }), s = h.session; h.pick(f.shared);
+      const card = named(h.root, '設備の確認箇所'), handle = named(card, '大きさを変更'), memory = s.windowMemory;
+      const context: WindowContext = { source: s.captionContext().source, memory, selectedId: s.memory.selectedCaptionId, moveBlock: null };
+      const event = { button: 0, pointerId: 9, clientX: 300, clientY: 210, preventDefault() {} };
+      handle.fire('pointerdown', event); handle.fire('pointermove', { ...event, clientX: 380, clientY: 290 });
+      handle.fire('pointerup', { ...event, pointerId: 77 }); expect(s.pending).toBe('window'); expect(s.windowMemory).toBe(memory);
+      if (cause === 'Escape') handle.fire('keydown', { key: 'Escape', preventDefault() {} });
+      else if (cause === 'extent') h.project(500, 400);
+      else if (cause === 'releaseExtent') handle.fire('pointerup', event);
+      else if (cause === 'source') h.layer.render({ ...context, source: { ...context.source, token: 'changed' } });
+      else if (cause === 'selection') h.layer.render({ ...context, selectedId: f.second });
+      else if (cause === 'scene') h.layer.render({ ...context, source: { ...context.source, sceneId: f.detail } });
+      else if (cause === 'membership') {
+        if (context.source.kind !== 'ready') throw Error('source');
+        h.layer.render({ ...context, source: { ...context.source, captions: [] } });
+      } else if (cause === 'otherPointer') handle.fire('pointerdown', { ...event, pointerId: 77 });
+      else if (cause === 'dispose') h.layer.dispose();
+      else handle.fire(cause, event);
+      expect(s.pending, cause).toBeNull(); expect(s.windowMemory, cause).toBe(memory);
+      handle.fire('pointerup', event); handle.fire('click', { detail: 1 }); expect(s.windowMemory, cause).toBe(memory);
+      if (cause !== 'dispose') {
+        h.render(); h.project(); const restored = named(h.root, '設備の確認箇所');
+        expect([restored.style.width, restored.style.height], cause).toEqual(['280px', '200px']);
+        // A cancelled gesture must not swallow the next keyboard activation.
+        named(restored, '大きさを変更').fire('click', { detail: 0 }); expect(restored.style.width, cause).toBe('360px');
+      }
+      h.layer.dispose(); expect(s.pending).toBeNull();
+    }
+  });
+
+  it('keeps top-left fixed at size limits and refuses all sizing inputs during drafts or invalid extents', () => {
+    const h = mountedLayer(), s = h.session; h.pick(f.shared);
+    const card = named(h.root, '設備の確認箇所'), handle = named(card, '大きさを変更');
+    expect(s.acceptWindow(planCaptionWindow(s.captionContext().source, s.windowMemory, s.memory.selectedCaptionId,
+      { kind: 'place', captionId: f.shared, rect: { left: 600, top: 390, width: 280, height: 200 } }))).toBe(true);
+    h.render(); const event = { button: 0, pointerId: 10, clientX: 880, clientY: 590, preventDefault() {} };
+    handle.fire('pointerdown', event); handle.fire('pointermove', { ...event, clientX: 1000, clientY: 1000 }); handle.fire('pointerup', event);
+    expect([card.style.left, card.style.top, card.style.width, card.style.height]).toEqual(['600px', '390px', '300px', '210px']);
+    handle.fire('click', { detail: 1 }); handle.fire('click', { detail: 0 });
+    expect([card.style.left, card.style.top, card.style.width, card.style.height]).toEqual(['600px', '390px', '220px', '180px']);
+    const memory = s.windowMemory, snapshot = s.snapshot, detail = s.detailContext();
+    const draft = editCaptionDraft(detail.draft!, detail.source, 'body', '入力途中');
+    expect(s.acceptDetail({ kind: 'draft', baseDraft: detail.draft!, draft })).toBe(true); h.render();
+    expect(handle.disabled).toBe(true);
+    const attempt = () => { handle.fire('pointerdown', event); handle.fire('pointermove', { ...event, clientX: 1000 });
+      handle.fire('pointerup', event); handle.fire('click', { detail: 0 }); handle.fire('keydown', { key: 'ArrowRight', preventDefault() {} }); };
+    attempt(); expect(s.pending).toBe('text'); expect(s.windowMemory).toBe(memory); expect(s.detailContext().draft).toBe(draft);
+    s.acceptDetail({ kind: 'cancel', draft }); h.render();
+    for (const extent of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      h.project(extent, 600); attempt(); expect(s.windowMemory).toBe(memory); expect(s.pending).toBeNull();
+    }
+    h.project(); expect([card.style.width, card.style.height]).toEqual(['220px', '180px']);
+    expect(s.snapshot).toBe(snapshot); h.layer.dispose();
   });
 
   it('retains text under filters/review/unavailable membership and never invents connectors or conflict winners', () => {

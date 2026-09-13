@@ -10,6 +10,14 @@
 
 ## Start here
 
+2026-09-13 C09 local window sizing: the same Caption comparison cards now offer
+corner drag, arrow keys and non-drag preset selection. Only Scene-local placement
+memory changes; content/scroll, selection, source history and other windows stay.
+Cancelled/stale input and extent changes, including release-time reentrant
+rendering, do not commit. View resizing and Edit-handoff refusal use the existing
+Session guard. Final checks are in todo; native input/raster/iPhone acceptance
+and the practical file-team flow remain open.
+
 2026-09-13 P07 local connection: `validationModeHost.ts` keeps one saved editor
 while acquiring/releasing the existing Project lease through a fresh durable
 host. The limited GLB/PNG catalog has deliberate View/Edit entries. Lock-free

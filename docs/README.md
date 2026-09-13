@@ -6,6 +6,12 @@ observed implementation.
 
 ## Purpose-specific authority
 
+2026-09-13 local Caption-window sizing: [05 §11.2](specs/05-project-scene-team-workflow.md#112-bounded-caption-window-size-input-2026-09-13)
+records the same-card drag/key/preset connection and cancel/extent boundaries.
+Scene-local window size is not shared Project data, a Saved View field or an
+external save. Current executed checks and pending browser/device evidence are
+in todo and the consolidated UI handoff.
+
 2026-09-13 limited local View/Edit: [05 §11.1](specs/05-project-scene-team-workflow.md#111-bounded-local-viewedit-connection-2026-09-13)
 records the same-editor transition in the existing GLB/PNG validation workspace.
 View is a deliberate lock-free mode, not an account role or an inability to get
