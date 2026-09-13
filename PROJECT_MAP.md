@@ -21,8 +21,12 @@ device acceptance remain separate. See todo
 for the connected display correction and file-team plan; old decision waits are historical.
 Known-position needsReview pins now retain color/selection/windows with a separate
 badge; exact display receipts reject stale projections. Browser/device evidence
-is pending. The snapshot/reconstruction/golden tables are consolidated and reviewed,
-not yet package code or measured wire adoption.
+is pending. The snapshot/reconstruction/golden tables are consolidated and reviewed.
+`src/projectPackage/{contract,manifest}.ts` now provides the first bounded file-team
+component: canonical five-purpose controls, closed summary grammar, derived entry
+tables and descriptor budgets. It is not ZIP/content/DAG/summary-semantic admission,
+a connected file reader/writer or measured wire adoption. Tests and next Workspace
+source integration are recorded in todo; ordinary routes are unchanged.
 
 2026-09-13 C04 initial pin color: the existing pin actions now select a Scene-local
 additional color, independent of filters and existing Caption edits. Placement

@@ -16,8 +16,10 @@
 > Return to F01/F02 portable file-team delivery. The separate §12.6 review/edit-copy
 > product decision is closed by the visible-pin condition after `c2a00f3`.
 > The display filter is corrected and the file contract tables consolidated/reviewed;
-> next implement the five-purpose validator and F01/F02 Workspace/Contribution path.
-> adjacent UI/PoC work is not a substitute for the practical-team goal.
+> The first `src/projectPackage` component now checks canonical five-purpose controls
+> and derived entry descriptors. ZIP/source/summary-content/closure admission and
+> F01/F02's real Workspace/Contribution path remain next; tests are in todo.
+> Adjacent UI/PoC work is not a substitute for the practical-team goal.
 >
 > Updated: 2026-09-12 after the whole-scope source/connection audit at `b73315b`.
 > [Current inventory](implementation-inventory.md) maps 64 work groups and all

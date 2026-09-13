@@ -17,8 +17,11 @@ type ArrayContext = {
 type JsonContext = RootContext | ObjectContext | ArrayContext;
 
 /** Parse one JSON value while rejecting duplicate decoded keys in each object scope. */
-export function parseJsonWithoutDuplicateMembers(text: string): unknown {
+export function parseJsonWithoutDuplicateMembers(text: string, limits?: Readonly<{ maxDepth: number; maxNodes: number }>): unknown {
+  if (limits && (!Number.isSafeInteger(limits.maxDepth) || limits.maxDepth < 0 ||
+    !Number.isSafeInteger(limits.maxNodes) || limits.maxNodes < 1)) throw new SyntaxError('invalid JSON limits');
   let index = 0;
+  let nodes = 0;
   const stack: JsonContext[] = [{ type: 'root', state: 'value' }];
   const malformed = (): never => {
     throw new SyntaxError('invalid JSON');
@@ -94,6 +97,7 @@ export function parseJsonWithoutDuplicateMembers(text: string): unknown {
     }
   };
   const value = (context: JsonContext): void => {
+    if (limits && (++nodes > limits.maxNodes || stack.length - 1 > limits.maxDepth)) throw new SyntaxError('JSON limit exceeded');
     const token = text[index];
     if (context.type === 'root') context.state = 'done';
     else context.state = 'comma-or-end';

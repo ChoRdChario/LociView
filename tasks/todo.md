@@ -2,6 +2,59 @@
 
 ## Current boundary — thin connected workflow first (2026-09-09)
 
+Completed F01/F02 control slice after clean `f4388fc`: five-purpose canonical manifest and
+derived-entry preflight in `src/projectPackage`, using production JSON/domain/hash
+primitives. Previous goal turn made production progress (visible review pins) and
+closed the reviewed contract tables; no current PO wait. One writer, independent
+read-only security/contract review. This is the first file-team implementation
+boundary, not a claim that export/import or the 62-group team goal is complete.
+
+- [x] Bound raw JSON parsing without changing unbudgeted v1 callers; check exact
+  canonical bytes/checksum and all five closed-purpose envelopes/summary grammar.
+- [x] Derive the exact ordered entry table and enforce declared/measured descriptor
+  budgets. Keep DAG/root/payload/summary-content verification separate, not implied.
+- [x] Verify hostile/canonical/limit/branch cases, final typecheck/test/build and
+  independent review.
+- [ ] Connect Workspace bytes and causal source services as the next slice below.
+
+Acceptance excludes renderer, storage mutation, ZIP header/CRC implementation,
+native file dialogs, real-data activation, migration, new dependency and release.
+Stop on an unresolved contract contradiction. The §12.3 empty-delta fixture is
+clarified to require no body difference: §4 already allows target/base differences
+requiring old-payload restaging even when D is empty; no zero-blob inference.
+
+Review: 17 new focused tests PASS, including opt-in raw JSON limits,
+five-purpose keys/summary grammar, canonical/checksum, derived paths/totals,
+lexicographically-ready original-change ordering, measured-entry equality and
+source/blob/change/evidence N/N+1 guards. Structural-only result has no storage or
+publication authority. Content-derived summary, retained-base control budgets,
+ZIP CRC/headers, source/root/closure and verified Workspace receive remain next.
+Independent source/test and exact-index reviews have no mandatory issue.
+F01/F02 stay unconnected; inventory counts remain 33/4/18/9.
+Initial root: 111 files PASS / 1 failed, 2,104 PASS / 1 failed / 21 existing TODO,
+449.26 s. The failure was the old exact isolation list, not payload behavior.
+Removed the unnecessary metadata type import; enumerated only the two approved
+package controls and their pure helpers, with inverse ordinary-import prohibition.
+Independent review agrees with this bounded update; 29 package/isolation tests
+and final typecheck/build pass. Corrected final root: 112 files / 2,105 PASS /
+21 existing TODO / zero failures, exit 0, 448.46 s. Source/tests are unchanged
+after that run. Existing injected-raster, UUID and build warnings remain visible;
+they are not browser/iPhone/offline evidence. Only final result documentation changed.
+
+Short meta-audit: branch remains g0-baseline, base f4388fc was 0 behind / 57 ahead
+of cached origin. This slice adds production control code toward F01/F02, not
+another UI/PoC lane. No new manual-check request, schema/dependency/ordinary route
+or release change. Known denied browser/push attempts were not repeated.
+
+Next production slice: build a frozen Team Workspace source descriptor through
+the existing physical-source scanner and candidate strong-reference graph. Retain
+every original scalar for summary, including overwritten unknown values; never
+derive counts from the winner/collapsed projection. Reuse original-byte/binary
+tests for edit/revert, all live candidates, weak-old-body exclusion, deduplication,
+missing/corrupt bodies and stale/pending refusal. No new parser/PoC or file-save
+success claim; exact ZIP/receipt/ordinary activation remain separate. Stop only
+on a contract conflict or unsupported preservation requirement, not routine order.
+
 2026-09-13 latest PO clarification (after `c2a00f3`): approve 06 §12.6's
 review-to-edit behavior with **visible needsReview pins**. `要確認` is a status,
 not an instruction to hide a pin with an authoritative position. Keep its color,

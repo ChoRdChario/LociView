@@ -1105,8 +1105,27 @@ Minimum independent expectations: edit-then-revert of one Caption body counts on
 Caption and one captionsById.body; two captions edited repeatedly count two, not
 the number of writes; unknown value overwritten within one change still counts
 opaque; two edits of one status count one atomic status, not nested key counts;
-empty D has empty class arrays and zero blob delta; snapshot excludes all source
+empty D has empty class arrays and, when the verified inventory difference is also
+empty, zero blob delta; snapshot excludes all source
 history counts; backup's extra evidence files do not inflate blob counts.
+Do not infer an empty body difference merely from zero changes: §4 permits a
+target not descending from all base heads, including restaging a required old body.
+
+Bounded implementation in `src/projectPackage` (2026-09-13): canonical manifest/
+checksum, closed five-purpose shapes, dictionary/count grammar and exact derived-
+entry descriptor table. `tests/projectPackage.test.ts` exercises this component,
+not a completed file exchange. This
+preflight cannot prove ZIP headers/CRC, decoded history/root/DAG, inventory closure
+or summary-content equality. Those later verification stages remain mandatory
+before any publication. Raw JSON depth/node limits apply during token inspection,
+before final value decoding; existing unbudgeted compatibility callers are unchanged.
+The manifest table alone cannot classify retained evidence as manifest versus
+metadata. The later evidence reader must also charge retained manifests to the
+shared control-JSON budget; the existing descriptor check is not that proof.
+The existing isolation guard permits only these exact `contract.ts`/`manifest.ts`
+files to reuse the pure canonical/value/record checks and SHA-256 helper. It still
+forbids other source files importing this package module; no application or storage
+activation is authorized by adding this bounded control component.
 
 ### 12.4 Finite validation execution descriptor
 

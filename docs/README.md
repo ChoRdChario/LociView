@@ -16,6 +16,12 @@ The bounded ProjectScene viewport now connects visible needsReview pins and thei
 windows using current display receipts. Color/status retention and stale-projection
 checks are in the existing tests; rendered/device acceptance remains pending.
 
+The first 06 implementation component is now `src/projectPackage`: five-purpose
+canonical-control and derived-entry-table preflight, tested separately from any
+ZIP payload/DAG/summary-content verification. It does not authorize publication or
+activate a format. F01/F02's actual Workspace/Contribution file services and
+measured adoption remain open; current verification and next step are in todo.
+
 Later PO adoption: [05 §4.4](specs/05-project-scene-team-workflow.md#44-explicit-pin-parent-changes-po-approved-2026-09-13)
 accepts one explicit parent-change operation for existing Asset/Project anchors,
 with position preservation, content/membership retention and cross-Scene impact.

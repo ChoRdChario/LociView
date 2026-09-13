@@ -228,12 +228,15 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
     expect(() => run(state, { ...resources, token: 'another' }, { kind: 'setDefault', sceneId: scb })).toThrow('token mismatch');
   });
 
-  it('isolates ordinary entries; only the approved development host and disconnected metadata service may use the new core', () => {
+  it('isolates ordinary entries; only approved hosts, disconnected metadata and pure package controls may use the new core', () => {
     const walk = (path: string): string[] => readdirSync(path, { withFileTypes: true }).flatMap(entry => {
       const name = join(path, entry.name); return entry.isDirectory() ? walk(name) : [name];
     });
     for (const path of walk('src').filter(p => /\.(ts|tsx|js)$/.test(p))) {
       const source = readFileSync(path, 'utf8');
+      const packageControl = /[\\/]projectPackage[\\/](contract|manifest)\.ts$/.test(path);
+      // 06 §11 permits these exact disconnected control primitives, not an app importer.
+      if (!packageControl) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectPackage\//);
       const metadataFoundation = /[\\/]projectMetadata[\\/](format|source)\.ts$/.test(path);
       const metadataService = /[\\/]projectMetadata[\\/](persistence|repository|journal|contentEvidence|blobStream|blobStore|blobInventory|session|commands|remote|membership|records|assetStatus|modelMembership|modelAddition|captionCandidates|sceneAuthoring|viewResolution|captionDeletion|assetDeletion|startupScene)\.ts$/.test(path);
       // 05 §13.2 permits this exact new synthetic host, never ordinary/old saved activation.
@@ -242,7 +245,13 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
       const validationDisplay = /[\\/]harness[\\/]projectScene[\\/](modelTypes|validationProjection|validationRender|validationMaterials|validationCoverage)\.ts$/.test(path);
       const validationHost = /[\\/]harness[\\/]projectScene[\\/](savedHost|validationHost|validationModeHost|validationCatalog|validationWorkspace|validationBrowser|browserMetadataStorage)\.ts$/.test(path);
       if (!metadataFoundation && !metadataService && !metadataHost && !validationFiles && !validationDisplay && !validationHost) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectMetadata\//);
-      if (/[\\/](scene|domain)[\\/]/.test(path)) {
+      if (packageControl) {
+        const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
+        const permitted = path.endsWith('manifest.ts') ? ['../core/json', '../domain/values', '../domain/projectGraphSupport',
+          '../domain/projectRecordFields', '../domain/projectRecords', '../nativeGs/sha256', './contract'] : [];
+        expect(imports.every(p => permitted.includes(p!)), path).toBe(true);
+        expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
+      } else if (/[\\/](scene|domain)[\\/]/.test(path)) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
         const providerImports = path.replaceAll('\\', '/').endsWith('/scene/projectProvider.ts') ? [
           '../domain/projectContent', '../domain/projectGraphSupport', '../domain/projectMutableFields', '../domain/projectCandidates',

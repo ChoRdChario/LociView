@@ -1,5 +1,14 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-13 F01/F02初回部品（`f4388fc`後）:** `src/projectPackage`に
+> 5用途のcanonical manifest／summary構文／導出entryと予算の純粋検査を追加。
+> raw JSONの深さ・件数はopt-inで検査、旧v1 callerの文法は不変更。全17 focused PASS。
+> 初回全体の隔離allowlist失敗を限定修正。関連29件、最終型・build PASS。
+> 最終root 112 files／2,105 PASS／21既存TODO／失敗0、448.46秒、最終index独立review指摘なし。
+> その後source/tests不変更。実ZIP／内容由来summary／source・closure検証、
+> Workspace生成・受信接続はまだない。通常home・保存・schema・dependencyは不変更。
+> 次は実元履歴と必要本体からWorkspaceを構築する境界。部品をfile配布の完成と数えない。
+
 > **2026-09-13 最新PO判断（`c2a00f3`後）:** 06 §12.6の編集copy方針は承認。
 > ただし「要確認」は状態であり、根拠のある位置のピンは表示・選択できること。
 > 元のピン色を維持し別の印で状態を示す。表示だけでは解除しない。位置不明／競合は推測しない。
