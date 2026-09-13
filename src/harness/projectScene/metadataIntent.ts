@@ -138,14 +138,14 @@ export function metadataIntent(changes: Readonly<Record<string, string>>, projec
         return { kind: 'movePin', captionId, sceneId: context.sceneId, anchor };
       }
       keys(fields, ['anchor', 'identity', 'title', 'body', 'color']);
-      if (rows.length !== 6 || fields.title !== '' || fields.body !== '' || fields.color !== '#a08045') return fail();
+      if (rows.length !== 6 || fields.title !== '' || fields.body !== '') return fail();
       const m = rows.find(([k]) => k.startsWith('membership/scm_')); if (!m) return fail();
       const e = membership(...m), identity = parse(fields.identity!); keys(identity, ['assetId', 'assetFrameId', 'eventId']);
       if (anchor.kind !== 'asset' || identity.assetId !== anchor.assetId || identity.assetFrameId !== anchor.assetFrameId ||
         e.sceneId !== context.sceneId || e.resourceId !== captionId || e.orderKey.kind !== 'value' || e.orderKey.value !== 'Z' ||
         e.lifecycle.kind !== 'value' || e.lifecycle.value.state !== 'active' || e.lifecycle.value.reason !== 'initial' ||
         e.lifecycle.value.eventId !== identity.eventId) return fail();
-      return { kind: 'addPin', captionId, sceneId: context.sceneId, membershipId: e.id, eventId: e.lifecycle.value.eventId, anchor };
+      return { kind: 'addPin', captionId, sceneId: context.sceneId, membershipId: e.id, eventId: e.lifecycle.value.eventId, anchor, colorSrgb: color(fields.color!) };
     }
     if (rows.length !== captions.length || Object.keys(fields).some(k => !['title', 'body', 'color'].includes(k))) return fail();
     return { kind: 'editCaption', captionId, edits: {

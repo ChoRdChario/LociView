@@ -73,6 +73,8 @@
 .lv-development-editor, .lv-development-editor .lv-caption-detail { overflow: visible; flex-shrink: 0; }
 .lv-development .lv-pin-actions, .lv-development .lv-pin-mode { flex: 0 0 auto; padding: 8px; border: 1px solid #b7b1aa; }
 .lv-development .lv-pin-actions label { flex: 1 1 160px; }
+.lv-development .lv-pin-actions .lv-pin-add-color { flex: 0 0 auto; }
+.lv-development .lv-pin-add-color input { width: 64px; padding: 4px; }
 .lv-development .lv-pin-actions p { font-size: 12px; }
 .lv-development .lv-pin-actions button { align-self: end; }
 .lv-development .lv-pin-actions > details { flex-basis: 100%; font-size: 12px; }

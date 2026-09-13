@@ -10,6 +10,13 @@
 
 ## Start here
 
+2026-09-13 C04 initial pin color: the existing pin actions now select a Scene-local
+additional color, independent of filters and existing Caption edits. Placement
+captures it once; Caption, membership and initial color use one original change.
+Cancel/retry, Shift gestures and View/Edit keep their existing guards. Reopening
+retains authored pin colors, not the temporary next-color preference. Exact checks
+are in todo; native picker/browser/iPhone and practical file-team acceptance remain open.
+
 2026-09-13 C09 local window sizing: the same Caption comparison cards now offer
 corner drag, arrow keys and non-drag preset selection. Only Scene-local placement
 memory changes; content/scroll, selection, source history and other windows stay.

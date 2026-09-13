@@ -2,6 +2,12 @@
 
 > Status: `PROJECTSCENE/TEAM CONTRACT RATIFIED; CONNECTED SYNTHETIC HOST AND LIMITED DESKTOP SAVE ACCEPTANCE; INTEGRATED S1–S3 OPEN`
 >
+> 2026-09-13 current priority: C04/C09 close the approved initial-color/window-size
+> carryovers on the existing hosts; exact executed and pending evidence is in todo.
+> Return to F01/F02 portable file-team delivery. The proposed 06 §11 gate split
+> and §12.6 review/edit-copy relation amendment require an explicit PO decision;
+> adjacent UI/PoC work does not close that dependency or the practical-team goal.
+>
 > Updated: 2026-09-12 after the whole-scope source/connection audit at `b73315b`.
 > [Current inventory](implementation-inventory.md) maps 64 work groups and all
 > 41 UI tasks. New metadata source/repository/journal and bounded synthetic UI

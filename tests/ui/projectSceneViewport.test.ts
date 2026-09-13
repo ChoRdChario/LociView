@@ -474,12 +474,18 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     expect(s.snapshot).toBe(initial); expect(ghost.hidden).toBe(true);
     rect = { ...rect, width: 800 };
     const shifted = { ...event, shiftKey: true };
+    labeled(root, '追加色').value = '#345678'; labeled(root, '追加色').fire('input');
+    canvas.fire('pointerdown', shifted);
+    labeled(root, '追加色').value = '#57758b'; labeled(root, '追加色').fire('input');
+    canvas.fire('pointerup', shifted); await Promise.resolve(); expect(s.pinCoordinates).toBeNull(); expect(calls).toBe(1);
+    labeled(root, '追加色').value = '#345678'; labeled(root, '追加色').fire('input');
     canvas.fire('pointerdown', { ...shifted, ctrlKey: true }); canvas.fire('pointerup', { ...shifted, ctrlKey: true }); await Promise.resolve();
     expect(s.pinCoordinates).toBeNull();
     canvas.fire('pointerdown', shifted); canvas.fire('pointerup', shifted); await Promise.resolve();
     expect(s.snapshot).toBe(initial); expect(s.pinCoordinateContext().mode?.kind).toBe('add');
     control(root, '位置を確定').fire('click'); expect(Object.keys(s.snapshot.resources.captions)).toHaveLength(3); expect(ghost.hidden).toBe(true);
     expect(s.snapshot.resources.captions[s.memory.selectedCaptionId!]!.anchor).toMatchObject({ kind: 'value', value: { positionAsset: [0.5, 0.25, 0] } });
+    expect(s.snapshot.colors[s.memory.selectedCaptionId!]).toEqual(value('#345678'));
     workspace.dispose();
   });
   it('projects pins only once and fits all eight semantic corners, independent of pins and color filters', () => {

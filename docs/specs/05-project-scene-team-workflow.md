@@ -1049,6 +1049,36 @@ Recorded DOM does not emulate native capture, text-range selection, raster or
 touch. Their real-browser/physical-iPhone checks stay in the consolidated batch;
 this does not activate ordinary home or imply complete team-flow acceptance.
 
+### 11.3 Bounded initial pin-color connection (2026-09-13)
+
+C04 adds `追加色` beside the existing add action, using a native color control
+and the established muted styling. Store its selected hex color in Scene-local
+pin-mode memory, independently of list color filters, selected Caption edits,
+Saved Views and Project history. Scene return and same-Session View/Edit handoff
+retain it; cold Project reopen uses the existing default, not a new user setting.
+
+Capture the operation's initial color at `beginAdd`, or at direct `add` for
+Shift/surface/numeric entry. A later target selection must not recapture it.
+Pending placement/move, other input/IME, readonly and in-flight/failed updates
+block color changes; stale Scene/source input cannot change the new target.
+Cancellation clears only the operation capture, not the next-add preference.
+Existing-pin movement does not recolor it. Do not reset filters when an added
+color is hidden: use the existing explicit filtered-result notice/reveal path.
+
+Pass the captured color through the existing internal `addPin` command as its
+optional `colorSrgb` field. Omission retains the existing default for callers;
+an explicitly supplied value must pass the existing three-component finite
+0..1 color validation. Create Caption, membership and initial color in one
+original change, never a subsequent recolor. Source schema, old wire/receipts
+and existing Caption records do not change. Failure/retry retains the original
+color, IDs and change bytes; no success is shown before the existing acknowledgment.
+
+Acceptance extends the current pin-mode/workspace/viewport and metadata/file
+tests: repeated chosen-color addition, Scene return, ordinary/Shift placement,
+cancel/move/filter independence, stale/busy/readonly/invalid rejection and exact
+retry/cold reopen. Recorded DOM and memory ports are not native color-picker,
+touch, rendered contrast or iPhone evidence; keep those in the existing batch.
+
 ## 12. Acceptance
 
 ### 12.1 Scene/domain

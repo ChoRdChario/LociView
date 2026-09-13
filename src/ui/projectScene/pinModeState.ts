@@ -18,9 +18,9 @@ export interface PinMode {
   readonly sceneId: string; readonly kind: 'add' | 'move'; readonly target: PinModelTarget;
   readonly caption: PinMoveTarget | null;
 }
-export interface PinModeMemory { readonly sceneId: string; readonly addTargetId: string | null; readonly mode: PinMode | null;
+export interface PinModeMemory { readonly sceneId: string; readonly addTargetId: string | null; readonly addColor: string; readonly mode: PinMode | null;
   readonly choosingSurface?: boolean }
-export const newPinModeMemory = (sceneId: string): PinModeMemory => Object.freeze({ sceneId, addTargetId: null, mode: null });
+export const newPinModeMemory = (sceneId: string): PinModeMemory => Object.freeze({ sceneId, addTargetId: null, addColor: '#a08045', mode: null });
 /** Fully validated TRANSIENT candidate held by host; not coordinates, an anchor or a saved acknowledgement. */
 export interface PinProposal { readonly token: string; readonly mode: PinMode }
 export interface PinModeContext {
@@ -31,11 +31,12 @@ export interface PinModeContext {
   readonly feedback: Readonly<{ kind: 'idle' | 'applying' }> | Readonly<{ kind: 'failed'; message: string }>;
 }
 export type PinModeIntent = Readonly<{ kind: 'target'; assetId: string | null }> |
+  Readonly<{ kind: 'color'; color: string }> |
   Readonly<{ kind: 'beginAdd' | 'add' | 'move' | 'finish' }> |
   Readonly<{ kind: 'cancel'; confirmedMode: PinMode | null; confirmedProposal: PinProposal | null }>;
 interface Base { readonly token: string; readonly sceneId: string; readonly baseMemory: PinModeMemory; readonly baseProposal: PinProposal | null }
 export type PinModePlan = Readonly<{ kind: 'blocked'; reason: string }> |
-  (Base & Readonly<{ kind: 'change'; memory: PinModeMemory; intent: 'target' | 'beginAdd' | 'add' | 'move' | 'cancel' }>) |
+  (Base & Readonly<{ kind: 'change'; memory: PinModeMemory; intent: 'target' | 'color' | 'beginAdd' | 'add' | 'move' | 'cancel' }>) |
   (Base & Readonly<{ kind: 'finish'; mode: PinMode; proposal: PinProposal }>);
 export const pinTargetName = (field: Field<string>): string => field.kind === 'value' ? field.value.trim() ? field.value : '名称なし' : '名称を確認';
 export function pinSourceIssue(context: PinModeContext): string | null {
@@ -83,7 +84,7 @@ export function planPinMode(context: PinModeContext, intent: PinModeIntent): Pin
   const base = { token: source.token, sceneId: memory.sceneId, baseMemory: memory, baseProposal: context.proposal };
   const blocked = (reason: string): PinModePlan => ({ kind: 'blocked', reason });
   const change = (patch: Partial<PinModeMemory>): PinModePlan => Object.freeze({ ...base, kind: 'change',
-    intent: intent.kind as 'target' | 'beginAdd' | 'add' | 'move' | 'cancel', memory: Object.freeze({ ...memory, ...patch }) });
+    intent: intent.kind as 'target' | 'color' | 'beginAdd' | 'add' | 'move' | 'cancel', memory: Object.freeze({ ...memory, ...patch }) });
   // Local cancellation stays possible after source/access loss; it cannot abort an in-flight write.
   if (intent.kind === 'cancel') return memory.mode === intent.confirmedMode && context.proposal === intent.confirmedProposal && context.feedback.kind !== 'applying'
     ? change({ mode: null, choosingSurface: false }) : blocked('現在のピン操作を確認してください。');
@@ -92,6 +93,10 @@ export function planPinMode(context: PinModeContext, intent: PinModeIntent): Pin
     if (issue || memory.mode || context.feedback.kind === 'applying') return blocked(issue || 'ピンの操作を確定するか、取り消してください。');
     return intent.assetId === null || (source.kind === 'ready' && source.models.some(item => item.assetId === intent.assetId))
       ? change({ addTargetId: intent.assetId }) : blocked('モデルを選び直してください。');
+  }
+  if (intent.kind === 'color') {
+    const issue = pinActionIssue(context, 'beginAdd'); if (issue) return blocked(issue);
+    return /^#[0-9a-f]{6}$/i.test(intent.color) ? change({ addColor: intent.color.toLowerCase() }) : blocked('色を選び直してください。');
   }
   const issue = pinActionIssue(context, intent.kind); if (issue) return blocked(issue);
   if (intent.kind === 'beginAdd') return change({ choosingSurface: true, addTargetId: null });
@@ -108,6 +113,7 @@ export function pinModePlanIsCurrent(plan: PinModePlan, context: PinModeContext)
   if (plan.token !== context.source.token || plan.sceneId !== context.source.sceneId) return false;
   if (plan.kind === 'finish') return context.memory.mode === plan.mode && context.proposal === plan.proposal &&
     pinActionIssue({ ...context, feedback: { kind: 'idle' } }, 'finish') === null;
+  if (plan.intent === 'color') return /^#[0-9a-f]{6}$/.test(plan.memory.addColor) && pinActionIssue(context, 'beginAdd') === null;
   return plan.intent === 'target' ? !context.memory.mode && context.feedback.kind !== 'applying' && !pinSourceIssue(context)
     : (plan.intent === 'beginAdd' || plan.intent === 'add' || plan.intent === 'move') && pinActionIssue(context, plan.intent) === null;
 }

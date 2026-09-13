@@ -8,9 +8,11 @@ export function createPinModeControls(document: Document, onPlan: (plan: PinMode
   const actions = make('section'); actions.className = 'lv-pin-actions'; actions.setAttribute('aria-label', 'ピンの追加・移動');
   const label = make('label', '追加先モデル'), target = make('select'); target.setAttribute('aria-label', '追加先モデル'); label.append(target);
   const add = button('ピンを追加'), move = button('位置を調整'), addNote = make('p'), moveNote = make('p'), impact = make('p');
+  const colorLabel = make('label', '追加色'), color = make('input'); color.type = 'color'; color.setAttribute('aria-label', '追加色');
+  colorLabel.className = 'lv-pin-add-color'; colorLabel.append(color);
   const alternative = make('details'), alternativeTitle = make('summary', '数値で配置'), namedAdd = button('このモデルに追加');
   alternative.append(alternativeTitle, label, namedAdd);
-  const moveTarget = make('p'); actions.append(add, move, addNote, moveNote, impact, moveTarget, alternative);
+  const moveTarget = make('p'); actions.append(colorLabel, add, move, addNote, moveNote, impact, moveTarget, alternative);
   const modeStrip = make('section'); modeStrip.className = 'lv-pin-mode'; modeStrip.setAttribute('aria-label', 'ピンの操作');
   const heading = make('p'), status = make('p'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   const finish = button('位置を確定'), cancel = button('取り消す');
@@ -18,6 +20,7 @@ export function createPinModeControls(document: Document, onPlan: (plan: PinMode
   confirmation.append(make('p', '指定中の位置を取り消しますか？'), confirm, keep); confirmation.hidden = true;
   modeStrip.append(heading, status, finish, cancel, confirmation);
   let context: PinModeContext | undefined, disposed = false, fingerprint = '';
+  let colorScope: { sceneId: string; token: string } | undefined;
   let cancelFor: { mode: PinMode | null; memory: PinModeMemory; proposal: PinProposal | null } | null = null;
   const cleanups: (() => void)[] = [];
   const listen = (node: HTMLElement, event: string, action: () => void) => { node.addEventListener(event, action); cleanups.push(() => node.removeEventListener(event, action)); };
@@ -27,6 +30,15 @@ export function createPinModeControls(document: Document, onPlan: (plan: PinMode
     if (plan.kind === 'blocked') status.textContent = plan.reason; else onPlan(plan);
   };
   listen(target, 'change', () => request({ kind: 'target', assetId: target.value || null }));
+  const captureColorScope = () => { if (context && !disposed) colorScope = { sceneId: context.source.sceneId, token: context.source.token }; };
+  listen(color, 'focus', captureColorScope); listen(color, 'pointerdown', captureColorScope);
+  listen(color, 'input', () => {
+    if (!context || disposed) return;
+    if (color.disabled || colorScope && (colorScope.sceneId !== context.source.sceneId || colorScope.token !== context.source.token)) {
+      color.value = context.memory.addColor; return;
+    }
+    request({ kind: 'color', color: color.value }); color.value = context.memory.addColor;
+  });
   listen(add, 'click', () => { if (!add.disabled) request({ kind: 'beginAdd' }); });
   listen(namedAdd, 'click', () => { if (!namedAdd.disabled) request({ kind: 'add' }); });
   listen(move, 'click', () => { if (!move.disabled) request({ kind: 'move' }); });
@@ -58,6 +70,7 @@ export function createPinModeControls(document: Document, onPlan: (plan: PinMode
     }
     target.value = next.memory.addTargetId ?? ''; target.disabled = Boolean(mode) || busy || Boolean(pinSourceIssue(next));
     const addIssue = pinActionIssue(next, 'beginAdd'), moveIssue = pinActionIssue(next, 'move');
+    color.value = next.memory.addColor; color.disabled = addIssue !== null;
     namedAdd.disabled = pinActionIssue(next, 'add') !== null;
     add.disabled = addIssue !== null; move.disabled = moveIssue !== null;
     addNote.textContent = mode || choosing ? '' : addIssue ?? ''; addNote.hidden = !addNote.textContent;

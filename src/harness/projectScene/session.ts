@@ -79,6 +79,7 @@ export class SyntheticSession {
   private includeFeedback: CaptionIncludeContext['feedback'] = { kind: 'idle' };
   private pins = new Map<string, PinModeMemory>();
   private pinInput: SyntheticPinInput | null = null;
+  private pinAddColor: string | null = null;
   private pinProposal: PinProposal | null = null;
   private pinInputComposing = false;
   private placement: ModelPlacementDraft | null = null;
@@ -778,11 +779,13 @@ export class SyntheticSession {
       if (!pinModePlanIsCurrent(plan, this.pinContext())) throw new Error('対象が更新されています。指定中の位置は保持しています。');
       if (plan.kind === 'change') {
         this.pins.set(this.sceneId, plan.memory);
-        if (plan.intent === 'cancel') { this.pinInput = null; this.pinProposal = null; this.pinInputComposing = false; }
+        if (plan.intent === 'cancel') { this.pinInput = null; this.pinProposal = null; this.pinInputComposing = false; this.pinAddColor = null; }
         else if (plan.intent === 'add' || plan.intent === 'beginAdd') {
+          if (plan.intent === 'beginAdd' || !plan.baseMemory.choosingSurface) this.pinAddColor = plan.baseMemory.addColor;
           this.pinInput = { coordinates: ['', '', ''], familyId: null }; this.pinProposal = null;
         }
         else if (plan.intent === 'move') {
+          this.pinAddColor = null;
           const caption = this.project.resources.captions[plan.memory.mode!.caption!.captionId]!;
           if (caption.anchor.kind !== 'value' || caption.anchor.value.kind !== 'asset') throw new Error('ピンを確認してください。');
           this.pinInput = { coordinates: caption.anchor.value.positionAsset.map(String) as [string, string, string], familyId: null };
@@ -801,17 +804,18 @@ export class SyntheticSession {
           ...this.project, state: { ...this.project.state, token }, resources: { ...this.project.resources, token,
             captions: { ...this.project.resources.captions, [captionId]: { ...caption, anchor: value(owner) } } } };
         if (adding) {
+          const color = this.pinAddColor; if (!color || !/^#[0-9a-f]{6}$/.test(color)) throw Error('追加色を確認してください。');
           const membershipId = fresh('scm'), edge = { id: membershipId, sceneId: this.sceneId, resourceId: captionId,
             lifecycle: caption.lifecycle, orderKey: value('Z') };
           Object.assign(changes, { [captionKey(captionId, 'identity')]: JSON.stringify({ assetId: owner.assetId, assetFrameId: owner.assetFrameId, eventId }),
-            [captionKey(captionId, 'title')]: '', [captionKey(captionId, 'body')]: '', [captionKey(captionId, 'color')]: '#a08045',
+            [captionKey(captionId, 'title')]: '', [captionKey(captionId, 'body')]: '', [captionKey(captionId, 'color')]: color,
             [membershipKey(membershipId)]: JSON.stringify(edge) });
           local = { ...local, state: { ...local.state, captionMemberships: { ...local.state.captionMemberships, [membershipId]: edge } },
-            colors: { ...local.colors, [captionId]: value('#a08045') }, captionTemplates: { ...local.captionTemplates, [captionId]: captionId },
+            colors: { ...local.colors, [captionId]: value(color) }, captionTemplates: { ...local.captionTemplates, [captionId]: captionId },
             captionOwners: { ...local.captionOwners, [captionId]: { assetId: owner.assetId, assetFrameId: owner.assetFrameId } } };
         }
         return this.applyWorking(() => this.writeProject(plan.token, changes, local), () => {
-          this.pins.set(this.sceneId, { ...this.pins.get(this.sceneId)!, mode: null }); this.pinInput = null; this.pinProposal = null;
+          this.pins.set(this.sceneId, { ...this.pins.get(this.sceneId)!, mode: null }); this.pinInput = null; this.pinProposal = null; this.pinAddColor = null;
           this.pinFeedback = { kind: 'idle' };
           if (adding && !this.acceptList(planCaptionList(this.captionContext(), { kind: 'select', captionId })))
             throw new Error('追加済みです。一覧からキャプションを選択してください。');

@@ -115,6 +115,27 @@ async function openFileCaption(modelBytes = glb()) {
 }
 
 describe('limited real-format validation (synthetic GLB bytes, injected PNG decoder, memory storage)', () => {
+  it('creates a real-GLB pin with its chosen initial color in one change and cold-reopens it without retaining the local preference', async () => {
+    const { options, workspace, host, s, captionId: existingId } = await openFileCaption();
+    const root = record(workspace.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    const button = (label: string) => all(root).find(n => n.tag === 'button' && n.textContent === label)!;
+    const color = all(root).find(n => n.attributes.get('aria-label') === '追加色')!;
+    const original = s.snapshot, before = host.read().source!.originalChanges().length;
+    color.fire('focus'); color.value = '#123456'; color.fire('input');
+    expect(s.snapshot).toBe(original); expect(host.read().source!.originalChanges()).toHaveLength(before);
+    button('ピンを追加').fire('click'); expect(s.acceptPinCreation(s.pinCreationTargets()[0]!, [3, 0.75, 0])).toBe(true); workspace.render();
+    button('位置を確定').fire('click'); await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+    const id = s.memory.selectedCaptionId!, changes = host.read().source!.originalChanges();
+    expect(id).not.toBe(existingId); expect(changes).toHaveLength(before + 1);
+    expect(s.snapshot.colors[id]).toEqual({ kind: 'value', value: '#123456' });
+    expect(s.snapshot.colors[existingId]).toEqual(original.colors[existingId]);
+    await workspace.dispose(); const cold = await openValidationHost(options);
+    expect(cold.authority.read().colors[id]).toEqual({ kind: 'value', value: '#123456' });
+    expect(cold.read().source!.originalChanges()).toEqual(changes);
+    const reopened = createSavedWorkspace(new RecordedDocument().asDocument(), cold);
+    expect(reopened.session!.pinContext().memory.addColor).toBe('#a08045'); await reopened.dispose();
+  });
+
   it('opens deliberate View without a lock and refuses every write path before file reads', async () => {
     const { workspace, options, captionId, fs } = await openFileCaption(); await workspace.dispose();
     const acquire = vi.spyOn(options.coordinator, 'tryAcquire');
@@ -205,6 +226,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(viewport).toHaveBeenCalledOnce(); expect(recall).toHaveBeenCalledTimes(recallCalls);
     expect(camera).toHaveBeenCalledTimes(cameraCalls); expect(dispose).not.toHaveBeenCalled();
     expect(changed).toHaveBeenLastCalledWith('edit'); expect(s.readOnly).toBe(false);
+    expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'color', color: '#345678' }))).toBe(true);
     // A source draft is also blocked at the shared Session guard (no silent input loss).
     const detail = s.detailContext(), draft = editCaptionDraft(detail.draft!, detail.source, 'body', '未適用のメモ');
     expect(s.acceptDetail({ kind: 'draft', baseDraft: detail.draft!, draft })).toBe(true);
@@ -220,6 +242,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(s.snapshot.resources.captions[captionId]!.body).toEqual({ kind: 'value', value: '未適用のメモ' });
     button('閲覧に切り替える').fire('click'); await vi.waitFor(() => expect(button('編集を開始する')?.disabled).toBe(false));
     expect(s.readOnly).toBe(true); expect(s.windowMemory).toBe(windows); expect(s.memory).toBe(memory);
+    expect(s.pinContext().memory.addColor).toBe('#345678');
+    expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'color', color: '#ffffff' }))).toBe(false);
     const other = await openValidationHost(options); expect(other.authority.readOnly).toBe(false); await other.dispose(); await mounted.dispose();
     expect(dispose).toHaveBeenCalledOnce();
   });

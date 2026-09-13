@@ -34,6 +34,39 @@ const label = (root: RecordedNode, name: string) => by(root, n => n.attributes.g
 const button = (root: RecordedNode, text: string) => by(root, n => n.tag === 'button' && n.textContent === text);
 
 describe('connected synthetic development host (not rendered, storage or TEAM-FLOW acceptance)', () => {
+  it('adds repeatedly with a Scene-local color, independent of filters, existing records, movement and cancellation', () => {
+    const w = createDevelopmentWorkspace(new RecordedDocument().asDocument()), root = record(w.root), s = w.session;
+    const original = s.snapshot, color = label(root, '追加色'); color.value = '#2468ac'; color.fire('input');
+    expect(s.snapshot).toBe(original); expect(s.pinContext().memory.addColor).toBe('#2468ac');
+    find(s, { kind: 'color', color: '#a08045' }); const filters = s.memory.pinColors;
+    button(root, 'ピンを追加').fire('click'); expect(color.disabled).toBe(true);
+    color.value = '#ffffff'; color.fire('input'); expect(s.pinContext().memory.addColor).toBe('#2468ac');
+    button(label(root, 'ピンの操作'), '取り消す').fire('click'); button(root, '操作を取り消す').fire('click');
+    expect(s.snapshot).toBe(original); expect(s.pinContext().memory.addColor).toBe('#2468ac');
+    const ids: string[] = [];
+    for (let i = 0; i < 2; i++) {
+      if (!i) {
+        button(root, 'ピンを追加').fire('click');
+        expect(s.acceptPinCreation(s.pinCreationTargets()[0]!, [i, 1, 0])).toBe(true);
+      } else {
+        button(root, 'このモデルに追加').fire('click'); // Explicit numeric alternative uses the same captured color.
+        expect(s.changePinCoordinates({ coordinates: ['1', '1', '0'], familyId: s.pinSurfaceTarget()!.familyId })).toBe(true);
+      }
+      w.render();
+      button(root, '位置を確定').fire('click'); ids.push(s.memory.selectedCaptionId!);
+      expect(s.snapshot.colors[ids[i]!]).toEqual(value('#2468ac'));
+      expect(s.memory.pinColors).toBe(filters); expect(s.message).toContain('絞り込み');
+    }
+    expect(ids[0]).not.toBe(ids[1]); expect(s.snapshot.colors[f.shared]).toEqual(original.colors[f.shared]);
+    const priorColor = s.snapshot.colors[ids[1]!];
+    expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'move' }))).toBe(true);
+    expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'finish' }))).toBe(true); expect(s.snapshot.colors[ids[1]!]).toEqual(priorColor);
+    expect(navigate(s, f.detail)).toBe(true); w.render(); expect(color.value).toBe('#a08045');
+    color.fire('focus'); color.value = '#57758b'; color.fire('input');
+    expect(navigate(s, f.overview)).toBe(true); w.render(); expect(color.value).toBe('#2468ac');
+    expect(s.memory.pinColors).toBe(filters); expect(new SyntheticSession().pinContext().memory.addColor).toBe('#a08045'); w.dispose();
+  });
+
   it('keeps per-Scene local model visibility, Caption windows/drafts and pin recovery separate from shared membership', () => {
     const s = new SyntheticSession(), original = s.snapshot;
     s.setViewportState(true, [f.structure, f.equipment], null);

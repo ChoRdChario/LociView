@@ -1,5 +1,17 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-13 C04追加色（`ca469ff`後）:** 同じピン操作欄で次回色を選び、
+> 通常／Shift／数値追加の開始時に固定。Caption・Scene所属・色を1変更で記録。
+> 絞り込み／既存色編集と独立、Scene別の次回色と確定済みのピン色を分離。
+> 取消・移動・readonly・遅延入力・exact retry／cold GLB再開を既存testsで確認。
+> 独立review指摘の同一Scene・tokenのみ更新も補完。最終型／通常build exit 0。
+> root 111 files／2,079 PASS／21既存TODO／失敗0、380.65秒、JSON success。
+> 最終19-file差分独立reviewは必須残件なし。実行source／testsは検査後不変更。
+> 棚卸し32/4/18/10（64）、実browser／native picker／iPhone／offlineは未受入れ。
+> 次はF01/F02の実file配布・返送へ戻る。06 §11／§12.6の既出2判断は未批准。
+> 承認後の最初の実装は既存経路でWorkspace書出し→読込み→同系統再受信。
+> 小UI・新資料／PoC・同じbrowser／push再試行を、この境界の代替にしない。
+
 > **2026-09-13 C09 windowサイズ（`b319cab`後）:** 両host共通の窓へ右下drag／
 > 矢印／非drag選択を接続。左上・別の窓・選択・本文／画像node・scroll・元履歴を保持。
 > Scene別localサイズで、狭幅時は表示だけclamp。Viewでも使え、gesture中のEdit切替は拒否。

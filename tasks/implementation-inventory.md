@@ -1,6 +1,9 @@
 # 実装・接続の全体棚卸し
 
 > CURRENT INVENTORY / 2026-09-13。全体監査基点: `b73315b851f627ca61029cfb73caf23f6e4829bd`。
+> C04は同じピン操作欄の「追加色」から通常／Shift／数値追加へ接続。作成時の1変更で色も記録。
+> 絞り込み／既存色編集と独立し、Scene別の次回色と実際のピン色を分離。retryは元の色／IDを保持。
+> 新schema／wire／永続preferenceはなし。native picker／実browser／実機受入れは既存一括確認に残る。
 > C09は両host共通の窓に右下ドラッグ・矢印・非ドラッグ選択を接続。Scene別のlocalサイズだけを変更。
 > 本文／画像node・scroll・選択・元履歴を保持。取消・stale・寸法変化、View操作とEdit切替拒否は既存tests。
 > 分類は接続済みへ移すが、native input／短画面／実機受入れは未完了。最終検査状態はtodoを参照。
@@ -48,15 +51,15 @@
 ## 1. 結論と数え方
 
 ユーザーが行う作業を **64機能群** に整理すると、新metadata保存画面へ限定接続済みが
-**31群**、残りが **33群**。その33群は下記の内訳になる。
-「31/64完成」といった完成率・工数には換算しない。小さい部品接続と
+**32群**、残りが **32群**。その32群は下記の内訳になる。
+「32/64完成」といった完成率・工数には換算しない。小さい部品接続と
 移行／チーム受信では仕事量が大きく違い、接続済みも下記の限定経路だからである。
 
 | 排他的な主分類 | 群数 | 意味 |
 |---|---:|---|
-| 接続済み | 31 | 新metadata hostで操作・必要な記録まで接続。従来25群は既知三角形／2 PNG起点、P01/P02は限定validation、C07/C09/V04/M05は両hostへ接続。実機受入れは別 |
+| 接続済み | 32 | 新metadata hostで操作・必要な記録まで接続。従来25群は既知三角形／2 PNG起点、P01/P02は限定validation、C04/C07/C09/V04/M05は両hostへ接続。実機受入れは別 |
 | 部品未接続 | 4 | 新系統のUI部品・pure planner等はあるが、対象群全体の画面・実データ・typed command／保存のいずれかが未接続。T01〜T04は限定接続まで進んだ |
-| 別経路のみ | 19 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
+| 別経路のみ | 18 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
 | 新規実装 | 10 | 新契約の利用者向け経路がまだない。schema・検証・設計案があっても実装済みとは数えない |
 
 - 一つの行は、共有する前提・保存境界を持つ「利用者の作業群」。同一ViewのCRUD等は一群。
@@ -124,7 +127,7 @@
 | C01 | 面選択／Shift＋クリックでピンを追加する | 接続済み | exact hitを仮対象にし、gizmo確認して保存。合成Meshとvalidation静的GLBへ限定接続。hard chromaは候補面だけをGPU判定し、不明なら拒否。実GPU／実入力受入れは別。 | [src/harness/projectScene/session.ts:560](../src/harness/projectScene/session.ts) / [tests/ui/projectSceneViewport.test.ts:165](../tests/ui/projectSceneViewport.test.ts) |
 | C02 | 既存ピンを後から移動する | 接続済み | 同じAsset内のgizmo／数値・取消／確定。別Assetへのre-anchorとは別。 | [src/harness/projectScene/session.ts:511](../src/harness/projectScene/session.ts) / [tests/ui/projectMetadataHost.test.ts:535](../tests/ui/projectMetadataHost.test.ts) |
 | C03 | タイトル・本文・ピン色を編集する | 接続済み | 一つのsource commandで保存・再開。 | [src/ui/projectScene/captionDetailControls.ts:30](../src/ui/projectScene/captionDetailControls.ts) / [tests/ui/projectMetadataHost.test.ts:471](../tests/ui/projectMetadataHost.test.ts) |
-| C04 | 選んだ分類色で続けてピンを追加する | 別経路のみ | 新規色が固定。Nativeの「追加色」状態を未継承。絞り込み色／既存色編集とは別。 | [src/harness/projectScene/session.ts:574](../src/harness/projectScene/session.ts) / [src/nativeGs/app.ts:2584](../src/nativeGs/app.ts) |
+| C04 | 選んだ分類色で続けてピンを追加する | 接続済み | 両host共通の追加色を通常／Shift／数値追加の開始時に固定し、Caption・所属・色を1変更で記録。Scene別local preference、絞り込み・既存色編集と独立。取消・stale／遅延入力・readonly・exact retryを検査。cold再開はピン色を保持し次回色は初期値。実入力／実機は未受入れ。 | [src/ui/projectScene/pinModeControls.ts](../src/ui/projectScene/pinModeControls.ts) / [src/harness/projectScene/session.ts](../src/harness/projectScene/session.ts) / [src/projectMetadata/commands.ts](../src/projectMetadata/commands.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
 | C05 | Scene内のCaptionを検索・選択する | 接続済み | タイトル／本文検索と選択保持。タグ・添付説明の拡張検索は含めない。 | [src/ui/projectScene/captionListControls.ts:14](../src/ui/projectScene/captionListControls.ts) / [tests/ui/projectSceneCaptionList.test.ts:41](../tests/ui/projectSceneCaptionList.test.ts) |
 | C06 | カラーサークルで一覧とピンを絞り込む | 接続済み | 全色／空集合、選択を失わない再表示経路。 | [src/ui/projectScene/captionListControls.ts:23](../src/ui/projectScene/captionListControls.ts) / [tests/ui/projectSceneCaptionList.test.ts:66](../tests/ui/projectSceneCaptionList.test.ts) |
 | C07 | 一覧で添付の有無・件数を見分ける | 接続済み | metadata／限定GLB/PNG hostの添付recordを一回集計して一覧へ渡す。確定削除除外、曖昧な参照等は要確認、同じblobの複数添付も各1件。追加・削除・失敗後retry・cold reopenは既存tests、実画面／実機は未受入れ。 | [src/harness/projectScene/mediaHistory.ts](../src/harness/projectScene/mediaHistory.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) / [tests/ui/projectSceneMedia.test.ts](../tests/ui/projectSceneMedia.test.ts) |
@@ -348,10 +351,10 @@ PNG／GLB後入れ・配置・材質照明／表裏／hard chroma／解除も同
 | 7 | 他の実形式・閲覧補助と残るalignment／補修を継承・実装する | Point＋表示径＋pick、GS＋明示Proxy、複数material、rotation/scale、残るalignmentを形式／契約ごとに閉じる。M14はGS/repair-local transform/原子的revisionの前提が揃ってから。hard-maskと一般smooth透過を一括deferredにしない。従来UIをコピーして新Sceneの意味を変えない |
 | 8 | 通常homeからの全体受入れ | 新sourceでTEAM-FLOW-01をDesktopとphysical iPhone、保存／restart／offlineまで確認。a11y・短画面・IME等も安定treeでまとめる。Pages/SW/main/releaseへは現在の権限で進まない |
 
-V04背景入口、M05一時hide、C09resizeは接続済み。残るC04追加色等は
-小さな独立UI接続として、依存が揃い次第本筋の間に挟んでよい。
-全てのチーム・形式作業が終わるまで放置する意味ではない。
-ただし小改修を積み続けて受信・更新の本筋が進まない状態にはしない。
+V04背景入口、M05一時hide、C09resize、C04追加色は接続済み。
+この独立UI接続のまとまりを閉じ、次はF01/F02の契約・実装前提へ戻る。
+既出の06判断を批准したことにはせず、小改修を積み続けて
+受信・更新の本筋が進まない状態にはしない。
 
 ## 6. 明示deferred／判断未確定（64群へ加算しない）
 

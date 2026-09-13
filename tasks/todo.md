@@ -28,6 +28,50 @@ Formal adoption still requires G1-A/C and applicable device evidence. No profile
 
 #### Active connected work — PO-approved limited real-file validation
 
+Current slice (2026-09-13, after `ca469ff`): C04 chosen initial pin color. Short
+audit: clean g0-baseline; preceding turn made executable progress, with final
+2,076 PASS/typecheck/build and independent review. The full practical-team goal
+remains open. This approved carryover closes one ordinary recording operation;
+F01/F02 and the two outstanding 06 decisions are not replaced or ratified.
+
+- [x] Specify Scene-local additional color, operation capture and atomic initial
+  color; keep filters/existing edits/temporary selection separate.
+- [x] Connect the existing pin actions and metadata add command, guarding busy,
+  readonly, invalid/stale input and exact retry; no create-then-recolor.
+- [x] Extend existing mode/workspace/viewport/saved-host/file checks; final
+  typecheck/root/build and independent review, update current evidence and steps.
+
+No new schema, wire, media format, persistent preference, ordinary-home activation,
+dependency or release change. Reuse existing color validation and record field.
+Actual browser/iPhone remains the consolidated pending batch. Stop only at a
+contradictory contract or new authority boundary; do not retry unchanged external
+browser/push failures or create another verification page.
+
+Implementation review: initial color is captured once for ordinary, Shift and
+numeric addition and reaches the existing add command, not a second edit. Tests
+cover repeated addition, cancel/move/filter independence, Scene-local memory and
+same-editor View/Edit, invalid explicit color rejection, original retry bytes/ID
+and cold GLB reopen. Independent review requested a same-Scene source-token-only
+late dialog case; it is now in the existing mode test. No new test framework/page.
+Focused eight cases passed. Final typecheck and normal build exit 0; final
+one-worker root exit 0 / JSON success: 111 files, 2,079 PASS, 21 existing TODO,
+zero failures (380.65 seconds). Source/tests are unchanged since those final
+checks; build/typecheck did not run concurrently with root. Existing normal-build
+mixed-import/chunk warnings remain. Independent final 19-file diff review found
+no mandatory remainder, including manual order and the recounted inventory
+32/4/18/10 (64). Actual native input and device checks remain unperformed; this
+does not complete the practical-team goal. No browser/push retry was made.
+
+Next boundary: return to F01/F02 file-team delivery, not more adjacent UI.
+Independent short audit confirms the existing full-source service is ready to
+reuse but no portable Team Workspace/Contribution reader/writer is connected.
+The already-proposed 06 §11 implementation/adoption gate split and §12.6
+review-to-edit class/family preservation need the PO's explicit decision before
+the complete five-purpose contract is fixed for implementation. No new proposal,
+PoC or repetition of unchanged browser/push repair is a substitute. After that
+decision, the first implementation result is Workspace export/import/re-receive
+on the existing validation path; normal-home/profile/release gates remain separate.
+
 Current slice (2026-09-13, after `b319cab`): C09 window-size adjustment. Short
 audit: clean g0-baseline, preceding turn made executable progress (P07, 111 files /
 2,073 PASS, typecheck/build); no goal completion or external acceptance inferred.

@@ -32,13 +32,42 @@ function host() {
     }
   });
   controls.render(current); const actions = record(controls.actions), strip = record(controls.modeStrip);
-  return { controls, events, actions, strip, target: actions.children[6]!.children[1]!.children[0]!, add: actions.children[0]!, move: actions.children[1]!,
-    impact: actions.children[4]!, moveTarget: actions.children[5]!, heading: strip.children[0]!, status: strip.children[1]!,
+  return { controls, events, actions, strip, color: actions.children[0]!.children[0]!, target: actions.children[7]!.children[1]!.children[0]!, add: actions.children[1]!, move: actions.children[2]!,
+    impact: actions.children[5]!, moveTarget: actions.children[6]!, heading: strip.children[0]!, status: strip.children[1]!,
     finish: strip.children[2]!, cancel: strip.children[3]!, confirmation: strip.children[4]!,
     get context() { return current; }, render(next: PinModeContext) { if (controls.render(next)) current = next; } };
 }
 
 describe('disconnected pin-mode intentions, not picking or anchor construction', () => {
+  it('selects a local initial color and refuses invalid, stale, busy and late dialog input without replacing its target', () => {
+    const h = host(); h.color.fire('focus'); h.color.value = '#2468AC'; h.color.fire('input');
+    expect(h.context.memory.addColor).toBe('#2468ac'); expect(h.context.memory.mode).toBeNull();
+    expect(h.context.source).toEqual(source());
+    for (const color of ['', '#123', '#gggggg', 'red']) {
+      h.color.value = color; h.color.fire('input'); expect(h.context.memory.addColor).toBe('#2468ac');
+    }
+    const before = h.context, choice = planPinMode(before, { kind: 'color', color: '#abcdef' });
+    for (const patch of [{ mutationBlock: '閲覧のみ' }, { otherPending: 'composition' as const },
+      { otherPending: 'camera' as const }, { feedback: { kind: 'applying' as const } }]) {
+      expect(planPinMode({ ...before, ...patch }, { kind: 'color', color: '#ffffff' }).kind).toBe('blocked');
+      expect(pinModePlanIsCurrent(choice, { ...before, ...patch })).toBe(false);
+    }
+    h.add.fire('click'); expect(h.color.disabled).toBe(true);
+    h.color.value = '#ffffff'; h.color.fire('input'); expect(h.context.memory.addColor).toBe('#2468ac');
+    h.cancel.fire('click'); h.confirmation.children[1]!.fire('click'); expect(h.context.memory.addColor).toBe('#2468ac');
+    const oldMemory = h.context.memory;
+    h.render({ ...h.context, source: { ...h.context.source, token: 'same-scene-new-source' } });
+    h.color.value = '#ffffff'; h.color.fire('input'); expect(h.context.memory).toBe(oldMemory);
+    expect(pinModePlanIsCurrent(choice, h.context)).toBe(false);
+    h.color.fire('focus'); h.color.value = '#345678'; h.color.fire('input');
+    expect(h.context.memory.addColor).toBe('#345678'); expect(h.context.memory.addTargetId).toBe(oldMemory.addTargetId);
+    const next = { ...context(), source: { ...source(), sceneId: 'next', token: 'new' }, memory: newPinModeMemory('next') };
+    h.render(next); h.color.value = '#ffffff'; h.color.fire('input'); expect(h.context.memory.addColor).toBe('#a08045');
+    expect(pinModePlanIsCurrent(choice, h.context)).toBe(false);
+    h.color.fire('focus'); h.color.value = '#57758b'; h.color.fire('input'); expect(h.context.memory.addColor).toBe('#57758b');
+    const count = h.events.length; h.controls.dispose(); h.color.fire('input'); expect(h.events).toHaveLength(count);
+  });
+
   it('requires explicit add model; move uses exact existing owner regardless of add selection', () => {
     expect(planPinMode(context(), { kind: 'add' }).kind).toBe('blocked');
     const add = start('add'), move = start('move');

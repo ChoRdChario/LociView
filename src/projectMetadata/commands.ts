@@ -43,7 +43,7 @@ export type MetadataEdit =
   | { kind: 'editCaption'; captionId: string; edits: { title?: string; body?: string; colorSrgb?: readonly number[] } }
   | { kind: 'resolveCaptionText'; captionId: string; field: 'title' | 'body';
       choice: { kind: 'candidate'; operationId: string } | { kind: 'manual'; text: string } }
-  | { kind: 'addPin'; sceneId: string; captionId: string; membershipId: string; eventId: string; anchor: Anchor }
+  | { kind: 'addPin'; sceneId: string; captionId: string; membershipId: string; eventId: string; anchor: Anchor; colorSrgb?: readonly number[] }
   | { kind: 'movePin'; sceneId: string; captionId: string; anchor: Anchor }
   | { kind: 'include'; sceneId: string; resourceKind: 'asset' | 'caption'; resourceId: string; membershipId: string; orderKey: string; eventId: string }
   | { kind: 'exclude'; resourceKind: 'asset' | 'caption'; membershipId: string; eventId: string }
@@ -343,10 +343,10 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       add('captionsById', command.captionId, { anchor: merged }); break;
     }
     case 'addPin': {
-      shape(raw, ['kind', 'sceneId', 'captionId', 'membershipId', 'eventId', 'anchor']);
+      shape(raw, ['kind', 'sceneId', 'captionId', 'membershipId', 'eventId', 'anchor', ...('colorSrgb' in raw ? ['colorSrgb'] : [])]);
       pin(command.sceneId, command.anchor); c.id(command.eventId, 'evt', []);
       const lifecycle = { state: 'active' as const, eventId: command.eventId, reason: 'initial' as const };
-      add('captionsById', command.captionId, { id: command.captionId, title: '', body: '', colorSrgb: [160 / 255, 128 / 255, 69 / 255],
+      add('captionsById', command.captionId, { id: command.captionId, title: '', body: '', colorSrgb: 'colorSrgb' in raw ? raw.colorSrgb! : [160 / 255, 128 / 255, 69 / 255],
         lifecycle, anchor: json(command.anchor) }, true);
       memberships('caption', command.sceneId, command.captionId);
       const resources = { ...provider.resources, captions: { ...provider.resources.captions,

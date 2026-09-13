@@ -6,6 +6,13 @@ observed implementation.
 
 ## Purpose-specific authority
 
+2026-09-13 initial pin color: [05 §11.3](specs/05-project-scene-team-workflow.md#113-bounded-initial-pin-color-connection-2026-09-13)
+records Scene-local next-color selection and capture at placement start. The same
+metadata command creates Caption/membership/color atomically; retry keeps the
+original bytes. This uses the existing color field, not a wire/schema extension
+or persistent preference. Executed checks and pending native-input/device evidence
+are in todo and the consolidated UI handoff.
+
 2026-09-13 local Caption-window sizing: [05 §11.2](specs/05-project-scene-team-workflow.md#112-bounded-caption-window-size-input-2026-09-13)
 records the same-card drag/key/preset connection and cancel/extent boundaries.
 Scene-local window size is not shared Project data, a Saved View field or an
