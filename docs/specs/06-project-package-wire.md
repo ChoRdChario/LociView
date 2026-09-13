@@ -1255,6 +1255,66 @@ N+1, declaration/observation disagreement, zero-length/read storms and aggregate
 work across all retained bases. Keep the 500 MiB/zero-unchanged-body-read acceptance
 target and physical-iPhone measurements open until actually executed in scope.
 
+#### Bounded archive connection (2026-09-13)
+
+The next isolated component connects `WorkspaceSourceCapture` to a real ZIP
+stream, then inspects an immutable Blob/File view without modifying that input.
+Use the existing ZIP dependency with every writer option fixed to the layout
+above; in particular local DOS epoch construction, version/attributes and signed
+descriptors must not inherit the Native writer's defaults. Entries are sequential,
+each exact expected length/hash must finish before continuing, and any failed
+entry aborts the owned output instead of closing a partially successful ZIP.
+Abort reaches both entry input and output pipeline; verify it again before/after
+close. Await destination close and all owned pipeline settlements before returning
+a generated-stream digest. No user pathname is inferred or overwritten.
+
+Before the second digest-checking clone and ZIP codec, divide checked stored input
+into at most 64 KiB views, one per pull with a zero high-water mark. Retain at most
+one raw chunk, reject raw chunks over 16 MiB, and charge raw reads (including empty
+ones) as well as divided chunks and output to the shared package counter. Do not
+feed a 16 MiB chunk into the codec's eager slice queue. With a streaming destination,
+the live input/raw-check clone pair is at most 32 MiB, owned metadata plus its output
+copy at most 16,000,000 bytes, manifest at most 1 MiB, all container headers below
+4 MiB, and the finite codec/bridge stages carry only 64 KiB chunks. This leaves
+more than 10 MiB below the 64 MiB I/O ceiling for those small stages. A caller that
+accumulates the entire output is not an eligible streaming sink; sink/job admission
+and actual device/scale measurement remain separate. This is not a Wasm/heap bound.
+
+The read-only inspector starts at the exact final 22-byte EOCD. Bound ranges before
+allocation, check every fixed central/local field, signed descriptor, CRC and byte
+extent independently of the writer library. Entries begin at zero, are contiguous,
+and correspond one-to-one in the manifest's order; central ends at EOCD and no
+prefix, gaps, suffix, extra/comment, alias, ZIP64 or alternative descriptor passes.
+Headers share the metadata budget; raw ranges, control copies and body streams
+share finite reads/buffers. Read payloads in at most 64 KiB ranges; do not buffer a
+whole archive. Controls are decoded only after their declared bounds pass.
+Buffered entry reads require a finite safe-integer maximum no greater than the
+source bound and only one may run per archive at a time. Each range observes both
+the archive and the current read's cancellation signal; a rejected/cancelled read
+releases that temporary buffer slot without resetting shared read counters.
+Recognizable ZIP magic in blob payloads is rejected (including empty/split ZIP
+signatures), with no permission inferred from opaque declarations. Other profile
+and nested-container checks remain required at model/media admission.
+
+For Workspace, reopen exact metadata with the existing lower source limits,
+verify heads/proof and independently recompute original-operation summary and
+all-live strong blob closure; grammar/hash checks are insufficient. Unknown opaque
+inventory and unsupported historical classification retain the capture limitation.
+The inspector returns immutable archive access and inspected source, not trusted
+profile evidence or a publication capability. Generated/inspected archives are
+not external-file receipts, protected job roots or permission for GC. Origin job
+coordination, retention, file close/readback receipts, CAS/content admission and
+Project publication remain mandatory later connections before activation.
+
+Bounded implementation: `workspaceArchive.ts`, `zipArchive.ts` and `zipChecks.ts`
+now provide this stream/inspection connection. The existing package test includes
+an independent complete ZIP encoder, library readback, exact-container mutations,
+CRC-only and SHA faults, false source summary/heads/closure, output failures and
+cancellation. Existing persistence tests roundtrip a durable edited source and its
+deduplicated model/image bodies without modifying source storage. These are
+synthetic Node/storage-port checks; final executed totals are in `tasks/todo.md`.
+No ordinary-import, external-file, scale, renderer, browser or iPhone credit follows.
+
 ### 12.5 Expected vector inputs before implementation bytes
 
 Use synthetic IDs/records and fixed test randomness, never private source metadata.

@@ -17,6 +17,7 @@ import { captionMembershipGroups, type CaptionMembershipResolution } from '../sr
 import { OriginBlobStore, type StoredBlobRef } from '../src/projectMetadata/blobStore';
 import { blobInventory } from '../src/projectMetadata/blobInventory';
 import { WorkspaceSourceCapture } from '../src/projectPackage/workspaceSource';
+import { WorkspaceArchive, writeWorkspaceArchive } from '../src/projectPackage/workspaceArchive';
 import { immutableDigest } from '../src/domain/projectGraphSupport';
 import { createFixtureModel } from '../src/harness/projectScene/modelClosure';
 
@@ -185,6 +186,20 @@ describe('streamed bodies connected to metadata creation (memory FS/fake origin 
     expect(h.fs.bodyReads - reads).toBe(2); expect(h.fs.writes).toBe(writes); expect(h.fault.writes).toBe(rowWrites);
     expect(h.lock.names).toHaveLength(leases);
     expect((await h.session().read()).source!.token).toBe(edited.source!.token);
+    const parts: BlobPart[] = [];
+    const generated = await writeWorkspaceArchive(capture, h.store(), new WritableStream({ write(bytes) { parts.push(bytes.slice() as BlobPart); } }),
+      { packageId: id('pkg'), createdByVersion: '0.0.1' });
+    const archive = await WorkspaceArchive.inspect(new Blob(parts), limits);
+    expect(archive.archive.sha256).toBe(generated.sha256);
+    expect(archive.source.originalChanges()).toEqual(edited.source!.originalChanges());
+    expect(archive.blobs).toEqual(capture.blobs);
+    for (const record of [records.representationsById[id('rep')], image]) {
+      const bytes = new Uint8Array(await archive.archive.entryBlob(`blobs/sha256/${record.blob.digest}`).arrayBuffer());
+      expect(bytes).toEqual(await developmentContentBytes(record));
+    }
+    expect(h.fs.writes).toBe(writes); expect(h.fault.writes).toBe(rowWrites); expect(h.lock.names).toHaveLength(leases);
+    const stillReady = await h.session().read();
+    expect(stillReady.publication).toBe(edited.publication); expect(stillReady.source!.token).toBe(edited.source!.token);
   });
 
   it('refuses pending/stale captures, retaining edits and requiring one unchanged publication', async () => {

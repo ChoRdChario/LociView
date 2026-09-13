@@ -2,6 +2,69 @@
 
 ## Current boundary — thin connected workflow first (2026-09-09)
 
+Completed after clean `5211a4a`: Workspace source capture now connects to an actual ZIP
+stream and immutable Blob/File archive inspection. The intervening pin-status
+answer added no implementation; resumed the unfinished file connection. Cached
+origin at the base is 0 behind / 59 ahead. One writer, parallel
+read-only contract/API and final reviews. No PO wait; no repeated denied push/browser.
+
+- [x] Record bounded archive writer/reader acceptance in 06 §12.4, reusing the
+  existing ZIP dependency and source/body fixtures; no new PoC or dependency.
+- [x] Generate exact STORE entries from owned captured metadata and freshly
+  checked body streams; abort incomplete sinks, never close after a failed entry.
+- [x] Inspect raw central/local/descriptor/EOCD correspondence, CRC/hash and
+  complete source/summary/strong closure. Reject nested ZIP and malformed input.
+- [x] Prove exact bytes/roundtrip, hostile headers/payloads and failure/cancel;
+  final typecheck/root/build and independent review, then update this boundary.
+
+This is a connected low-level file generation/integrity path, not an activated
+format, durable job/body retention, decoding-profile admission, CAS import,
+metadata publication, exchange base or external-save receipt. Those remain required
+before ordinary file flows. Stop on contract conflict, not routine implementation.
+
+Review: initial typecheck and package/isolation 35 PASS. The new persisted-source
+roundtrip initially failed because its test used the wrong derived blob path;
+corrected the test to the unchanged `blobs/sha256/` contract. Focused final 3 files /
+81 PASS, 33.65 s. Actual ZIP bytes match an independent fixed-layout encoder and
+the existing library reader. Reopened archive retains original changes and exact
+model/image bytes without source FS/metadata writes or writer leases. Faults cover
+headers/offsets/CRC/SHA, nested ZIP, false summary/heads/closure, output write/close,
+corrupt body and blocked input cancel. Numeric buffer bounds, concurrent buffered
+reads and fresh per-read cancellation are guarded. Independent reviews identified
+the latter signal gap and a CRC-only assertion gap; both are corrected. A later
+independent buffer review found the ZIP codec's eager large-chunk slicing; stopped
+the first full run with Ctrl+C (exit 1, not a test PASS). The writer now feeds one
+64 KiB view per pull before its second checking clone/codec, preserving the 16 MiB
+raw rejection and counting raw/empty/divided/output calls. Added direct N/N+1,
+no-prefetch and no-whole-chunk-copy checks. Corrected focused rerun: typecheck exit 0,
+3 files / 82 PASS, 49.34 s. Independent re-review and exact 14-file index review
+have no mandatory issue. Final typecheck/build exit 0; full root 112 files /
+2,123 PASS / 21 existing TODO / zero failures, 547.07 s. Source/tests are unchanged
+after that run; only final evidence and next-connection documentation changed.
+Existing injected-raster/UUID/build warnings remain. No browser/device/offline,
+ordinary-entry or file-save receipt claim. F01/F02 and inventory counts 33/4/18/9
+remain unchanged. Local checkpoint only; no repeated denied push/browser attempt.
+
+Next connected slice (read-only dependency review complete): receive an actual
+Workspace file into an existing metadata Project, including supported new GLB/PNG
+bodies and retained local Caption edits. Prioritize this user operation over a
+standalone generic output-job framework; protected output jobs remain required.
+
+- [ ] Pin the existing §12.7 receive-job/§4.1 base physical records and crash
+  handoff before implementation; retain original manifest/metadata/body roots.
+- [ ] Connect verified file/CAS/content admission to `remotePackageMerge`, allowing
+  its approved body set while preserving old local-journal shapes. Keep no-op
+  inclusion/body observation and base handoff under one existing authority.
+- [ ] Reuse persistence/limited-host tests for local work plus new model/image,
+  cold reopen, interrupted receive, publication-before-base crash, replay and
+  corrupt/foreign/stale rejection; connect the existing limited file host only.
+
+`createFromSource` and initialize journals still require exactly two originals.
+New-participant first import is the following separate connection, not complete
+by this existing-Project receive. Ordinary home, full Contribution, checkpoints/
+auto/review/clean, schema/dependency/release changes are outside the next slice.
+A generated ZIP alone must not advance exchange bases or announce external saving.
+
 Current slice after clean `6483318`: verified Team Workspace source capture for F01.
 One writer; independent read-only source/acceptance reviews have no mandatory
 issue. No current PO wait; the full practical-team scope remains open.

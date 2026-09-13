@@ -27,8 +27,12 @@ bounded Team Workspace source capture: exact original history, content-derived
 summary, all-live-candidate strong body closure and read-only streamed verification.
 It rejects stale/pending/corrupt or unclassifiable input without storage writes.
 Unknown history without trusted opaque inventory is still a capture limitation,
-not a change to source admission. ZIP generation/receive, durable jobs/receipts,
-ordinary file flows and measured adoption remain open. Exact tests are in todo.
+not a change to source admission. Captured Workspace sources now generate exact
+STORE ZIP streams and reopen through raw-header/CRC/SHA/source/summary/closure
+inspection. Input corruption/cancel and sink failures cannot return completion.
+This is file integrity, not profile admission or external saving. Durable jobs,
+retention/receipts, CAS/Project receive, ordinary file flows and measured adoption
+remain open. Exact executed checks are in todo.
 
 2026-09-13 C04 initial pin color: the existing pin actions now select a Scene-local
 additional color, independent of filters and existing Caption edits. Placement

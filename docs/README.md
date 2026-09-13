@@ -20,9 +20,12 @@ The bounded 06 implementation in `src/projectPackage` includes five-purpose
 control preflight and Team Workspace source capture: original-operation summary,
 exact source reopen, all-live-candidate strong closure and read-only body checks.
 Unsupported historical summary values/unknown inventory refuse capture without
-changing source admission. It is not ZIP verification/generation, a durable output
-job or file-save receipt and does not activate a format. F01/F02's actual file
-services and measured adoption remain open; current evidence is in todo.
+changing source admission. The captured source now generates an exact streamed ZIP;
+an independent raw inspector checks headers/CRC/SHA, causal source, summary and
+strong closure when reopening. It does not confer profile admission, a durable
+output job or file-save receipt, and does not activate a format. Protected job/
+retention, CAS/Project receive and ordinary F01/F02 file services remain open;
+current executed evidence and measured-adoption boundaries are in todo.
 
 Later PO adoption: [05 §4.4](specs/05-project-scene-team-workflow.md#44-explicit-pin-parent-changes-po-approved-2026-09-13)
 accepts one explicit parent-change operation for existing Asset/Project anchors,

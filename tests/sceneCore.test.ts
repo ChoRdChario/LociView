@@ -234,8 +234,8 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
     });
     for (const path of walk('src').filter(p => /\.(ts|tsx|js)$/.test(p))) {
       const source = readFileSync(path, 'utf8');
-      const packageControl = /[\\/]projectPackage[\\/](contract|manifest|historySummary|closure|workspaceSource)\.ts$/.test(path);
-      const packageMetadata = /[\\/]projectPackage[\\/](historySummary|closure|workspaceSource)\.ts$/.test(path);
+      const packageControl = /[\\/]projectPackage[\\/](contract|manifest|historySummary|closure|workspaceSource|zipChecks|zipArchive|workspaceArchive)\.ts$/.test(path);
+      const packageMetadata = /[\\/]projectPackage[\\/](historySummary|closure|workspaceSource|workspaceArchive)\.ts$/.test(path);
       // 06 §11/§12.3 permit these exact disconnected primitives, not an app importer.
       if (!packageControl) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectPackage\//);
       const metadataFoundation = /[\\/]projectMetadata[\\/](format|source)\.ts$/.test(path);
@@ -257,6 +257,10 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
             '../projectMetadata/blobStore', './contract', './manifest'],
           workspaceSource: ['../projectMetadata/session', '../projectMetadata/source', '../projectMetadata/blobStore', '../projectMetadata/blobStream',
             './contract', './manifest', './historySummary', './closure'],
+          zipChecks: ['./manifest'], zipArchive: ['../nativeGs/sha256', './contract', './manifest', './zipChecks'],
+          workspaceArchive: ['@zip.js/zip.js', '../domain/projectGraphSupport', '../domain/values', '../projectMetadata/blobStore',
+            '../projectMetadata/blobStream', '../projectMetadata/source', '../nativeGs/sha256', './contract', './manifest',
+            './workspaceSource', './historySummary', './closure', './zipChecks', './zipArchive'],
         };
         const name = path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '');
         expect(imports.every(p => byFile[name]!.includes(p!)), path).toBe(true);

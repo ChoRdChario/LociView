@@ -1,5 +1,16 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-13 F01実ZIP接続（`5211a4a`後）:** 確定したsourceを
+> 固定STORE ZIPへstream生成し、raw header／CRC／SHA／元履歴・summary・closureを読み戻し検査。
+> 元ProjectのFS／metadata／lease不変更。sink失敗・body破損・中止は完了を返さない。
+> 独立reviewのread取消・CRC-only assertion・大chunkの内部コピー問題を修正。
+> 関連82件PASS、最終型／build exit 0。root 112 files／2,123 PASS／21既存TODO／失敗0、547.07秒。
+> 独立再review／14-file index reviewの必須残件なし。最終run後のsource/testsは不変更。
+> 初期の全体runはレビュー修正のため中止し、合格と数えていない。既知警告はtodo参照。
+> これはprofile／CAS受入れ、通常UI、外部ファイル保存の証拠ではない。
+> 次は既存Projectへの実Workspace受信＋新GLB/PNG、receive job／base handoffを一続きにする。
+> 初回取込は2 originals固定journalの別接続として残る。F01/F02は未完了、詳細はtodo。
+
 > **2026-09-13 F01 source capture（`6483318`後）:** 元scalar履歴からsummaryを生成し、
 > 全live候補の強参照本体を重複排除・stream検証した出力元を確定する部品を実装。
 > 独立reviewで診断用CAS readのwriteを発見し、専用read-only検証へ修正。
