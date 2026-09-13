@@ -162,7 +162,7 @@ describe('disconnected Caption list contracts (not browser/render/storage eviden
       memory: { ...context.memory, selectedCaptionId: a, pinColors: [] } });
     expect(h.reveal.hidden).toBe(false); h.reveal.fire('click');
     const row = h.list.children[0]!, select = row.children[0]!, action = row.children[1]!;
-    expect(select.children[3]!.textContent).toContain('ピン位置を確認');
+    expect(select.children[3]!.textContent).toContain('要確認');
     expect(action.hidden).toBe(false); expect(action.textContent).toBe('状態を確認');
     select.fire('click'); expect(h.context.memory.selectedCaptionId).toBe(a);
     expect(h.context.memory.pinColors).toBeNull(); h.controls.dispose();

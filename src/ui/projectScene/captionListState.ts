@@ -12,6 +12,8 @@ export interface CaptionListItem {
     Readonly<{ kind: 'asset'; assetId: string; name: Field<string> }>>;
   readonly mediaCount: Field<number>;
   readonly pin: 'visible' | 'ownerHidden' | 'needsReview' | 'unavailable';
+  /** Independent of temporary visibility; this does not acknowledge compatibility. */
+  readonly needsReview?: boolean;
 }
 export type CaptionListSource = Readonly<{ token: string; sceneId: string }> & (
   Readonly<{ kind: 'ready'; captions: readonly CaptionListItem[] }> |

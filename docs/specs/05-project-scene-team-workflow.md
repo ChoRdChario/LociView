@@ -84,6 +84,22 @@ the Caption remains preserved and becomes `needsReview`; it is never discarded,
 reraycast, moved or silently attached to another model. A Project-anchored
 Caption has no model revision dependency and keeps its ProjectFrame coordinate.
 
+PO clarification (2026-09-13, after `c2a00f3`): `needsReview` is a pin status,
+not a hide command. When the authored position and current frame transform are
+authoritative, keep the pin visible and selectable at that position. Preserve its
+chosen color; distinguish the review status separately on the pin and Caption
+list. Selection opens its Caption and permits the existing explicit correction.
+Displaying it neither proves compatibility nor clears the status. Ordinary Scene
+membership, explicit visibility and color filters still apply. Missing, invalid
+or conflicting position authority is a separate unavailable-position case:
+preserve the record/list/recovery path without inventing coordinates or a winner.
+Bounded ProjectScene connection now displays these pins with their original color
+and a separate review badge. The viewport returns the exact immutable display input
+used for projection; overlay/lines accept only that current receipt, finite points
+and current pin membership. Window lines also require the current source and Scene.
+Local hiding does not erase the review status. This is display-only code/port-test
+evidence, not rendered/native-input/device or ordinary-app acceptance; see todo.
+
 ## 3. Persistent metadata
 
 ### 3.1 IDs and root maps

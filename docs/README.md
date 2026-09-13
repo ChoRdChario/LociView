@@ -8,9 +8,13 @@ observed implementation.
 
 2026-09-13 PO decision after `1edc3f5`: isolated package implementation before
 measured adoption/ordinary activation is approved in 05 §7.5 and 06 §11.
-The separate 06 §12.6 review/edit-copy mapping remains under discussion with the
-missing-model group suggestion. Older pending-split notes are historical; no
+The separate 06 §12.6 review/edit-copy behavior is now approved with visible
+known-position needsReview pins and a missing-model list group. Exact tables and
+independent review are complete for the next isolated package slice. Older pending notes are historical; no
 complete wire/profile, package implementation or release approval is inferred.
+The bounded ProjectScene viewport now connects visible needsReview pins and their
+windows using current display receipts. Color/status retention and stale-projection
+checks are in the existing tests; rendered/device acceptance remains pending.
 
 Later PO adoption: [05 §4.4](specs/05-project-scene-team-workflow.md#44-explicit-pin-parent-changes-po-approved-2026-09-13)
 accepts one explicit parent-change operation for existing Asset/Project anchors,
@@ -42,10 +46,10 @@ file saving. Final executed evidence and pending rendered/device checks are in t
 2026-09-13 concrete package design: [06 §12](specs/06-project-package-wire.md#12-concrete-field-summary-and-execution-tables-proposed-2026-09-13)
 records field/privacy, inventory, summary and finite execution tables. Independent
 review corrected the description of the current cumulative validation limit.
-Its §12.6 review-to-edit mapping amendment is a new PO decision, not an adopted
-schema. §12.7 supplies closed local job/receipt, recovery and evidence-lifetime
+Its §12.6 review-to-edit behavior now has PO approval with the visible-pin condition;
+the exact schema/reconstruction tables are consolidated/reviewed. §12.7 supplies local job/receipt, recovery and evidence-lifetime
 tables, still proposed; its executable baseline is `2f07ea1`, unchanged by this
-docs-only slice. The five-purpose contract/reconstruction/goldens remain incomplete;
+docs-only slice. Executable five-purpose builders/reconstruction/goldens remain incomplete;
 no package runtime or acceptance is added. See todo for the exact next boundary.
 
 2026-09-13 bounded display correction: the existing Scene hosts distinguish browser

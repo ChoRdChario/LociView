@@ -275,7 +275,7 @@ Candidate root members are exactly `schema`, `snapshotId`, `project`, `scene`,
 |---|---|
 | `project` | `title`, `frame`, `defaultSceneId`; default equals the sole Scene's re-keyed ID |
 | `scene` | `id`, `name`, `orderKey`, optional `defaultViewId`; no lifecycle |
-| visual Asset | `kind: 'visual'`, `id`, `label`, `assetFrameId`, `assetToProject`, sorted unique `compatibleAnchorClassIds`, sorted unique `representationIds` |
+| visual Asset | `kind: 'visual'`, `id`, `label`, `assetFrameId`, `assetToProject`, sorted unique `compatibleAnchorClassIds`, sorted unique `representationIds`, `anchorClassPartition` as below |
 | positioned nonvisual owner | `kind: 'nonvisualOwner'`, `id`, `assetFrameId`, `assetToProject` only; no label, binding/revision, compatibility list or payload |
 | unplaced-only nonvisual owner | `kind: 'unplacedOwner'`, `id`, `assetFrameId` only; exact source identity/frame mapped, no transform, label, binding/revision, compatibility or payload |
 | Representation | `id`, `assetId`, `representationFrameId`, `contentKind`, `purposes`, `role`, `variantFamilyId`, `formatProfile`, `blob`, `representationToAsset`, `logicalBoundsAsset`; optional `materialCatalog`, `compositeGroupId`, `targetGsVariantFamilyIds`, `proxyForGsVariantFamilyId` |
@@ -294,6 +294,31 @@ subject to the explicit omissions here. Representation purposes contain only
 Material catalogs include their validated source semantics only with the owning
 Representation. Optional fields are not permission to include unknown metadata.
 This draft does not expand supported media beyond the current product boundary.
+
+Under the PO-approved §12.6 behavior, `anchorClassPartition` is a required nonempty
+array on visual Assets only. Its closed entries are `{id,targetVariantFamilyIds}`:
+`cmp` IDs strictly sorted/unique; target `fam` IDs nonempty, strictly sorted/unique.
+The partition covers every included visual family exactly once, belongs to that
+Asset, and preserves the domain's visualPatch singleton rule. Interaction proxies
+and splat-exclusion families are not visual partition members. Build each entry
+from the source active class intersected with included visual families; omit an
+empty intersection. A visual Asset without any visual family rejects.
+
+For this new snapshot only, `compatibleAnchorClassIds` is the mapped sorted union
+of (a) active source classes referenced by included Captions and (b) partition
+entry IDs. Thus unreferenced included families still have an explicit class, while
+every Caption's export-time compatibility comparison remains unchanged. Every
+partition ID must be in that Asset's compatible list; inactive Caption classes
+must not enter either list through guessing. This amends the older 02 §9.3
+topology-omission/intersection-only rule for this separate review schema, not an
+existing Native/v1 reader. Both nonvisual branches forbid the partition field.
+
+A standalone reader has no source active-revision history. It verifies
+`P ⊆ C ⊆ P ∪ R`, where P is this Asset's partition IDs, C its compatible IDs and
+R the class IDs used by included Captions owned by it, in addition to the exact
+family/owner/partition checks above. C outside P retains an export-time compatible
+declaration for an omitted family, not permission to invent that family on edit.
+Do not recompute, guess or remove that declaration from missing source history.
 
 Asset anchors retain `kind`, `assetId`, `assetFrameId`, canonical `positionAsset`
 and re-keyed `authoredAnchorCompatibilityId`. Manual anchors contain only
@@ -341,9 +366,9 @@ Only `nonvisualOwner` also sets `status.pendingAssetToProject` to its exact tran
 or compatibility assertion is fabricated. Unplaced anchor known-owner links
 and positioned anchor/frame/compatibility identities are re-keyed with the same
 typed map; the unresolved model's marker stays suppressed, while its Caption
-remains editable. No Scene-model edge is added. Visual Assets use the ordinary
-history-free reconstruction path. This is a technical mapping proposal, not an
-implemented builder or ratification of the remaining nested field policy.
+remains editable. No Scene-model edge is added. Visual Assets use the exact
+history-free reconstruction table in §12.6. This is a candidate implementation
+contract, not an implemented builder or measured wire adoption.
 
 ## 6. Mandatory automatic summary and privacy
 
@@ -896,7 +921,7 @@ separate; current DOM/storage-port tests cannot supply them.
 
 This is the pre-code design for §11.3, not an adopted wire, implementation or
 measured product limit. The current source reference is `f51f8af`. The complete
-five-purpose contract still needs the review-to-edit decision in §12.6 and the
+five-purpose contract needs independent review of the consolidated §12.6 tables and the
 applicable §10–11 gate; do not present these tables alone as S2 permission.
 No current Native/v1 file or `atomic-map-1` source is reinterpreted.
 
@@ -932,7 +957,7 @@ minor content and its conservative inventory. Never use a generic JSON copy/filt
 |---|---|---|
 | schema / identity / project | Rebuild schema, fresh Project/epoch/seed/root. Retain title and frame values, re-key frame ID/defaultSceneId. | Omit source identity/schema/history. Rebuild snapshot schema/ID; retain title/frame values, re-key frame; defaultSceneId is the sole selected Scene. |
 | assetsById | Re-key id/assetFrameId; retain label; transform status as below; fresh lifecycle. | Rebuild visual/nonvisual owner from §5.1, never copy status/lifecycle/binding/revision. Visual label retained. |
-| assetRevisionsById | Re-key id/assetId/representationIds and each anchorCompatibilityClasses id/targetVariantFamilyIds. Omit parentRevisionId and materialCompatibilityMaps. Transform provenance; re-digest. | Omit records. Derive only the compatible-class membership required by §5.1; see §12.6 before defining edit conversion. |
+| assetRevisionsById | Re-key id/assetId/representationIds and each anchorCompatibilityClasses id/targetVariantFamilyIds. Omit parentRevisionId and materialCompatibilityMaps. Transform provenance; re-digest. | Omit records. Derive compatibleAnchorClassIds and the included-family anchorClassPartition by §5.1. Edit-copy reconstruction follows §12.6. |
 | assetBindingsById | Re-key id/assetId/assetRevisionId; retain assetToProject/method/residual; omit parentBindingId; re-digest. | Omit records; flatten the authoritative assetToProject into the appropriate visual/positioned-owner record. |
 | representationsById | Re-key id/assetId/representationFrameId/variantFamilyId/derivedFrom; retain contentKind/purposes/role/formatProfile/blob/representationToAsset/logicalBoundsAsset. Transform catalog/class fields below; omit derivation; re-digest. | Include presentation closure only; re-key the same included identities/classes. Remove source from purposes; omit derivedFrom/derivation/payloadDigest. Retain the other §5.1 presentation fields, not source-only records or payloads. |
 | mediaResourcesById | Re-key id; retain blob/mediaKind/label; re-digest. | Same field actions, limited to included Caption attachment closure. |
@@ -1183,8 +1208,19 @@ not acceptance.
 - History-free input with two family/class pairs, source-only resources, unshown
   active Captions/tags, a nonvisual owner, optional absent color/view, and nested
   provenance sentinels must follow every table row. Unknown nested values block,
-  not disappear. Review-to-edit has the unresolved expected behavior in §12.6;
+  not disappear. Review-to-edit follows §12.6's reconstruction and vectors below;
   do not supply an implementation-selected expected result.
+- Review partition vectors: two families with two classes paired in opposite ways
+  produce distinct snapshot relations and retain those exact pairings on edit-copy;
+  same labels/order/geometry cannot erase the difference. With one family omitted,
+  only anchors whose class has no included family become needsReview on edit-copy;
+  their known positions, colors, content and Scene edges remain. Already-needsReview
+  anchors remain so; nonvisual owners remain structurally list-only; ProjectAnchor
+  retains Project-frame placement. Missing/duplicate/foreign partition classes,
+  uncovered/multiply-covered/foreign families, a nonsingleton visualPatch class,
+  empty visual set or partition on a nonvisual owner rejects before publication.
+  A family without any Caption still needs its recorded class. Repeated/cancelled
+  edit-copy never reuses the source lineage or publishes a partially rebuilt graph.
 - Summary checks include same-change overwritten unknown content, absent writes,
   edit/revert, two records with many edits, immutable atomic writes, empty delta,
   snapshot-only counting and backup evidence versus blob totals.
@@ -1198,13 +1234,25 @@ not acceptance.
 
 ### 12.6 Actual remaining review-to-edit compatibility decision
 
+**Current PO decision (2026-09-13, after `c2a00f3`): approved behavior with a
+visible-pin condition.** Preserve the included model/pin correspondence in an
+independent edit-copy, group omitted-model records as `対応モデルなし`, and retain
+each record's content and position. `needsReview` is only a status: when position
+authority exists, keep the pin visible/selectable and identify the status
+separately, without replacing its chosen color (05 §2.3). Do not invent a position
+for missing/corrupt/conflicting authority. This closes the product question;
+consolidate the exact snapshot/reconstruction/golden tables and obtain independent
+review before package reader/writer code. It is not complete wire/profile, runtime
+implementation, ordinary-route activation or release acceptance. Earlier pending
+decision notes in this document are superseded for this behavior only.
+
 Later PO adoption of `親モデルを変更` is recorded in 05 §4.4. It provides an
-accepted future recovery operation for existing placed Caption records, but does
+accepted, now connected recovery operation for existing placed Caption records, but does
 not itself ratify the snapshot fields/class partition proposed in this section.
 Do not confuse explicit individual reassignment with collapsing a whole group
 into one owner or inferring omitted model relationships during import.
 
-**PO discussion after `1edc3f5` (item 2, NOT yet ratified):** PO suggests grouping
+**Earlier PO discussion after `1edc3f5` (superseded by the decision above):** PO suggests grouping
 pins whose target model is not included. A derived Caption-list group can make
 them discoverable without creating a Scene/Asset or rewriting memberships and
 anchors. Retain each item's re-keyed owner/frame/position/class independently;
@@ -1212,8 +1260,8 @@ grouping is not a replacement for the included-family mapping below. Distinguish
 omitted model payload from an omitted compatible family of a present model.
 Original unplaced items, unresolved/corrupt references and temporarily hidden
 models must not be silently reclassified as ordinary missing-model entries.
-The exact grouping/copy behavior remains a proposal, not permission to change
-the schema or automatically reassign a target.
+The adopted grouping/copy behavior does not authorize automatic reassignment or
+invented positions; exact schema tables still require the review above.
 
 The current proposal cannot reconstruct an editable visual Asset faithfully from
 its flattened review form. 01 §3.1 and `projectModelGraph.ts` require a complete
@@ -1225,7 +1273,7 @@ editing to create a fresh clean Project. The phrase "ordinary history-free
 reconstruction" does not supply the missing relation; order/name/geometry inference
 or one invented all-family class would violate the accepted rules.
 
-Recommended amendment for PO decision, NOT yet applied to the schema:
+Technical mapping to consolidate under the adopted behavior, NOT yet applied to the schema:
 
 1. Add snapshot-local `anchorClassPartition` to visual review Assets, entries
    `{id,targetVariantFamilyIds}` covering every included visual family exactly
@@ -1240,24 +1288,61 @@ Recommended amendment for PO decision, NOT yet applied to the schema:
    target family retain owner/position and their separate class ID but become
    needsReview in the editable copy; explain this count/effect before confirmation.
    Do not guess a replacement model/family or move the pin. Existing needsReview
-   remains needsReview. Nonvisual owners retain §5.1's unresolved/list-only mapping.
+   remains needsReview. Known-position needsReview pins remain visible/selectable;
+   displaying them does not clear that status. Nonvisual owners retain §5.1's
+   structural list-only/Scene-membership boundary even when a transform is known;
+   this is distinct from compatibility-only needsReview on a visible Scene model.
 3. Keep ordinary local View mode and Workspace/Contribution unchanged. The amendment
    affects only the explicit conversion of a separately cut-out review file into
    an independent editable Project; it is not an extra restriction on participants.
 
+#### Exact fresh edit-copy reconstruction (candidate implementation contract)
+
+Validate the closed snapshot first. Allocate one typed ID map plus fresh Project,
+epoch, seed and causal root; retain it for the same logical attempt/retry. Re-key
+all references/equality classes once, never by record name or array position. Do
+not emit the inverse source-ID map. Source Project and snapshot bytes stay intact.
+Build the whole candidate and validate its domain graph before publication.
+
+| Target | Generated fields and preserved values |
+|---|---|
+| Project / mutable records | Rebuild metadata schema `{major:2,minor:0}` under the pinned atomic-map-1 profile and fresh identity/root; re-key frame/Scene/default pointers using §12.1. Every mutable lifecycle is `{state:'active',eventId:fresh evt,reason:'initial'}`. Retain current user values and optional absence; not old lifecycle/history/actors. |
+| Visual Asset | Fresh Asset with mapped frame/label and active status naming one new binding. Keep exact snapshot assetToProject; no inferred model alignment. |
+| AssetRevision | Fresh revision, mapped Asset and included representationIds, mapped anchorClassPartition as anchorCompatibilityClasses. Generate `provenance:{origin:'import',inputBlobDigests:sorted unique included model blob digests}` as the fact of this new import. Omit parentRevisionId/materialCompatibilityMaps/tool/sourceMediaType; recompute payloadDigest. |
+| AssetBindingRevision | Fresh binding naming new Asset/revision, exact assetToProject, `method:'import'`. Omit parentBindingId/residual; recompute payloadDigest. |
+| Representation | Re-key §5.1 presentation fields/catalog/classes, preserve exact blob bytes and transforms. Set required `derivedFrom:[]`; omit derivation. Recompute payloadDigest. Do not invent source-purpose or recover omitted source bodies. |
+| Asset-anchor Caption | Re-key owner/frame/class with the same map; retain position, permitted normal/hitEvidence, text/color and memberships. A partition class maps to its fresh active class; a class absent from partition gets a distinct fresh ID, not an active class. Only manual anchors in an active class receive the new authoredAssetRevisionId. Other anchors omit that weak revision and source as in §12.1; no invented hit method or surface evidence. |
+| Nonvisual owners / ProjectAnchor | Apply §5.1 missingSource/list-only mapping and its pending transform rule; no new Scene Asset edge. ProjectAnchor keeps its exact Project position under the mapped frame. |
+| Media / Scene / edges / View / material / tags | Apply the corresponding §12.1 re-key/retain/fresh-lifecycle rules to the included snapshot closure. Media blobs remain exact; changed immutable payload digests are recomputed. |
+
+No extra compatibility class is fabricated for a missing family. Preserve
+needsReview as a state; known-position display follows 05 §2.3, independently of
+compatibility acknowledgment. The proposed genuine-unplaced branch remains outside
+the current `atomic-map-1` implementation profile until its separate schema gate;
+do not introduce it implicitly in this reconstruction. Exact byte goldens and
+reader/writer tests follow these tables; neither generation nor this document is
+runtime/adoption evidence.
+
 This changes the review's topology-omission policy, closed snapshot fields and the
-stated edit-copy effect. It needs explicit contract approval, not an implementation
-shortcut under sequencing delegation. The smaller alternative—mark every review
+stated edit-copy effect. The product behavior is now approved; it is not a shortcut
+around exact contract consolidation and review. The smaller alternative—mark every review
 pin needsReview on edit—unnecessarily degrades even fully represented models and
 is not recommended. Requiring a different file instead would remove the accepted
 direct edit-copy capability. No new schema or fallback has been implemented.
 
 Read-only analysis independently confirmed the missing partition. Finish the
-decision and resulting exact snapshot/reconstruction/golden contract before
+resulting exact snapshot/reconstruction/golden contract before
 claiming §11.3's complete five-purpose gate closed. Native/v1/LociMyu migration's
 different physical-profile decision remains in 07 §10.2, not hidden inside this
 review change. Neither issue invalidates the approved full-source service already
 implemented; package reader/writer authority still follows 05 §7.5.
+
+2026-09-13 implementation-contract review: §§5.1/12.1/12.5 and the exact fresh
+reconstruction table above are now consolidated. Independent review/re-review
+confirmed the partition, required generated fields, `{major:2,minor:0}` profile
+and standalone `P ⊆ C ⊆ P ∪ R` validation, with no mandatory remaining finding.
+This closes the previously identified design gap for the next isolated package
+slice, not builder/golden execution, sink adoption or §10's measured acceptance.
 
 Design review: independent read-only review found one incorrect description of
 the current validation host's cumulative 64 MiB guard; §12.4 now states the actual
@@ -1297,8 +1382,8 @@ Each row lists the complete allowed field set; unlisted fields reject.
 | Job step envelope | `{schema:'lociview-package-job-step-1',jobId,start:EvidenceRef,previous:EvidenceRef|null,detail}`. `start` binds the exact original `JobStart`; `previous` is null only for the first step. Steps are immutable, digest-addressed, write-once/read-back checked, serialized under the existing authority boundary. More than one child for a predecessor is repair, not timestamp selection. `detail` has only one of the closed rows below. |
 
 PreparedOutput binds a completed builder's exact manifest/payload descriptors.
-For review/clean, this table does not define their still-unapproved reconstruction
-or make a renderer snapshot an admissible builder. Their job cannot start until
+For review/clean, reconstruction follows §§5.1/12.1/12.6; this job table does not
+make a renderer snapshot an admissible builder. Their job cannot start until
 the applicable complete builder contract and validation exist. Source proof and
 output identity are deliberately separate for fresh clean/review results.
 
@@ -1402,4 +1487,5 @@ step append; external close without receipt; verified old capture with newer edi
 auto promotion uncertainty and manual-point protection. Expected states are the
 table above, not generated golden bytes. One independent design review must check
 these fields/guards against §§4.1/7/8.2/11.4 before treating this gap as drafted;
-§12.6, complete reconstruction, sink adoption and §10's gate remain open.
+The §12.6 product behavior is approved and its reconstruction tables consolidated;
+builder execution/goldens, sink adoption and §10's measured gate remain open.

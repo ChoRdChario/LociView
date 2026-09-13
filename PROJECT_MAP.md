@@ -12,12 +12,17 @@
 
 PO decision after `1edc3f5`: isolated package implementation followed by evidence
 and ordinary-route activation is approved (05 §7.5 / 06 §11). The separate
-review/edit-copy mapping in 06 §12.6 is being discussed as a missing-target pin
-group. Later PO adoption adds explicit Asset/Project-anchor parent changes in
+review/edit-copy behavior in 06 §12.6 is now approved with visible known-position
+needsReview pins and a missing-target list group. Exact tables/review still precede
+package code. Later PO adoption adds explicit Asset/Project-anchor parent changes in
 05 §4.4, now connected through a dedicated command and the existing metadata/
 limited GLB pin editor; no shared-owner collapse or schema amendment. Browser and
 device acceptance remain separate. See todo
-for the single remaining decision; old two-decision waits are historical.
+for the connected display correction and file-team plan; old decision waits are historical.
+Known-position needsReview pins now retain color/selection/windows with a separate
+badge; exact display receipts reject stale projections. Browser/device evidence
+is pending. The snapshot/reconstruction/golden tables are consolidated and reviewed,
+not yet package code or measured wire adoption.
 
 2026-09-13 C04 initial pin color: the existing pin actions now select a Scene-local
 additional color, independent of filters and existing Caption edits. Placement
@@ -91,12 +96,14 @@ rendered/device acceptance remains in the existing Desktop batch.
 summary and finite execution tables, independently reviewed but still proposed.
 §12.6 identifies a real review-to-edit gap: flattened review data lack the
 class-to-model-family partition required by the editable domain. The recommended
-snapshot-local mapping amendment needs PO approval; no schema/writer changed.
+snapshot-local mapping implements the now-approved behavior only after exact
+table consolidation/review; no schema/writer changed.
 §12.7 now drafts the closed local package job/completion protocol: frozen inputs,
 separate generation/file/base/auto evidence and bounded recovery/root lifetimes.
 Its docs-only executable baseline is `2f07ea1`; no package code or adoption evidence
-is added. Reconstruction/goldens, the §12.6 amendment and §11's proposed gate split
-remain open. Do not extend this design slice into another PoC.
+is added. Builder execution/goldens and measured adoption remain open. §11's
+gate order and §12.6's product behavior are now approved as recorded above.
+Do not extend this design slice into another PoC.
 
 2026-09-13 bounded state correction: Scene development/metadata/validation hosts
 now label internal acknowledgment as browser resume data, not file-save success.

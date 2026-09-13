@@ -516,14 +516,29 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     expect(fittedPose(display.bounds!, defaultPose(), 1, '-y').up).toEqual([0, 0, 1]);
   });
 
-  it('omits hidden, incompatible and conflicting owners without changing Caption data', () => {
+  it('keeps compatibility-only review pins at their authored position/color, but omits hidden or conflicting owners', () => {
     const p = createSyntheticProject(), changed = { ...p, resources: { ...p.resources, assets: { ...p.resources.assets,
       [f.equipment]: { ...p.resources.assets[f.equipment]!, projection: value(syntheticVersions.filter(v => v.assetId === f.equipment)[1]!.projection) } } } };
-    expect(syntheticDisplay(changed, f.overview, null, null).pins.map(p => p.id)).toEqual([f.second]);
+    const pins = syntheticDisplay(changed, f.overview, null, null).pins;
+    expect(pins.map(p => p.id)).toContain(f.shared);
+    const original = syntheticDisplay(p, f.overview, null, null).pins.find(pin => pin.id === f.shared)!;
+    expect(pins.find(pin => pin.id === f.shared)).toMatchObject({ color: original.color, position: original.position, status: 'needsReview' });
+    expect(syntheticDisplay(changed, f.overview, [], null).pins).toEqual([]);
+    expect(syntheticDisplay(changed, f.overview, null, null, undefined, [f.equipment]).pins.map(pin => pin.id)).not.toContain(f.shared);
     const conflict = { ...changed, resources: { ...changed.resources, assets: { ...changed.resources.assets,
       [f.equipment]: { ...changed.resources.assets[f.equipment]!, projection: { kind: 'unresolved' as const, reason: 'conflict' as const } } } } };
     expect(syntheticDisplay(conflict, f.detail, null, null).models).toHaveLength(0);
     expect(syntheticDisplay(conflict, f.detail, null, null).pins).toHaveLength(0);
+    const anchor = changed.resources.captions[f.shared]!.anchor;
+    if (anchor.kind !== 'value' || anchor.value.kind !== 'asset') throw Error('fixture anchor');
+    for (const unavailable of [
+      { kind: 'unresolved' as const, reason: 'conflict' as const },
+      value({ ...anchor.value, assetFrameId: 'wrong-frame' }),
+    ]) {
+      const invalid = { ...changed, resources: { ...changed.resources, captions: { ...changed.resources.captions,
+        [f.shared]: { ...changed.resources.captions[f.shared]!, anchor: unavailable } } } };
+      expect(syntheticDisplay(invalid, f.detail, null, null).pins).toHaveLength(0);
+    }
     expect(changed.resources.captions).toBe(p.resources.captions);
   });
 
@@ -648,7 +663,7 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
   it('connects pin selection and view controls, while camera dragging blocks Scene changes without cancelling drafts', () => {
     const doc = new RecordedDocument(); let display: any, dragging = false, ready = false, notified = () => {}; const actions: any[] = [];
     const workspace = createDevelopmentWorkspace(doc.asDocument(), new SyntheticSession(), { viewportFactory: (_canvas, changed) => {
-      notified = changed; return { update: d => { display = d; }, setActive() {}, read: () => ({ token: 'camera', ready, issue: null,
+      notified = changed; return { update: d => { display = d; }, setActive() {}, read: () => ({ token: 'camera', display, ready, issue: null,
         dragging, projection: 'perspective', axis: null, pins: display.pins.map((p: any) => ({ id: p.id, x: 10, y: 10, visible: true })) }),
       camera: intent => actions.push(intent), retry() {}, dispose() {} };
     } });

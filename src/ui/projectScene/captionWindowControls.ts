@@ -8,6 +8,7 @@ export interface WindowContext {
 }
 export interface WindowProjection {
   readonly ready: boolean; readonly width: number; readonly height: number;
+  readonly sourceToken: string; readonly sceneId: string;
   readonly pins: readonly { id: string; x: number; y: number; visible: boolean }[];
 }
 export function displayedWindowRect(preferred: WindowRect, width: number, height: number): WindowRect {
@@ -39,7 +40,7 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
     line: HTMLElement; rect: WindowRect; initial: WindowRect; cleanups: (() => void)[] };
   const cards = new Map<string, Card>();
   const initialPositions = new Map<string, Map<string, WindowRect>>();
-  let context: WindowContext | null = null, projection: WindowProjection = { ready: false, width: 0, height: 0, pins: [] };
+  let context: WindowContext | null = null, projection: WindowProjection = { ready: false, sourceToken: '', sceneId: '', width: 0, height: 0, pins: [] };
   let disposed = false, scope = '', optionKey = '', extentVersion = 0;
   let drag: { id: string; kind: 'move' | 'resize'; target: HTMLButtonElement; pointer: number;
     startX: number; startY: number; base: WindowRect; rect: WindowRect; context: WindowContext; extent: number } | null = null;
@@ -140,7 +141,8 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
       Object.assign(card.root.style, { left: `${card.rect.left}px`, top: `${card.rect.top}px`,
         width: `${card.rect.width}px`, height: `${card.rect.height}px`, zIndex: String(index + 2) });
       const item = context.source.kind === 'ready' ? context.source.captions.find(c => c.id === id) : null;
-      const pin = projection.ready && item?.pin === 'visible'
+      const pin = projection.ready && projection.sourceToken === context.source.token && projection.sceneId === context.source.sceneId &&
+        (item?.pin === 'visible' || item?.pin === 'needsReview')
         ? projection.pins.find(p => p.id === id && p.visible && Number.isFinite(p.x) && Number.isFinite(p.y)) : undefined;
       const r = card.rect, x = pin ? Math.max(r.left, Math.min(pin.x, r.left + r.width)) : 0,
         y = pin ? Math.max(r.top, Math.min(pin.y, r.top + r.height)) : 0;
@@ -166,8 +168,8 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
       const body = item.body.kind === 'value' ? item.body.value : '本文の更新候補を確認してください。';
       if (card.body.textContent !== body) card.body.textContent = body;
       card.content?.render();
-      card.note.textContent = item.pin === 'needsReview' ? 'ピン位置の確認が必要です。' : item.pin === 'ownerHidden' ? 'モデルは非表示です。' :
-        item.pin === 'unavailable' ? 'ピンの状態を確認してください。' : '';
+      card.note.textContent = [item.needsReview || item.pin === 'needsReview' ? '要確認：ピン位置を確認してください。' : '',
+        item.pin === 'ownerHidden' ? 'モデルは非表示です。' : item.pin === 'unavailable' ? 'ピンを表示できません。' : ''].filter(Boolean).join(' ');
       card.note.hidden = !card.note.textContent;
       card.close.disabled = Boolean(drag);
       card.resize.disabled = Boolean(drag ? drag.id !== id : next.moveBlock);

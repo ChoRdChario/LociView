@@ -15,7 +15,10 @@ import { validationMaterialSlots, validationMaterialIssue, type ValidationMateri
 
 export type V3 = readonly [number, number, number];
 export interface Bounds { readonly min: V3; readonly max: V3 }
-export interface DisplayPin { readonly id: string; readonly title: string; readonly color: string; readonly position: V3 }
+export interface DisplayPin {
+  readonly id: string; readonly title: string; readonly color: string; readonly position: V3;
+  readonly status: 'normal' | 'needsReview';
+}
 export interface SyntheticDisplay {
   readonly token: string; readonly sceneId: string; readonly projectFrameId: string;
   readonly models: readonly DisplayModelClosure[]; readonly pins: readonly DisplayPin[];
@@ -92,7 +95,7 @@ export function syntheticDisplay(project: SyntheticProject, sceneId: string, pin
   }
   const pins: DisplayPin[] = [];
   for (const caption of resolved.composition.captions) {
-    if (caption.marker !== 'visible' || caption.anchor.kind !== 'value') continue;
+    if (caption.marker === 'suppressed' || caption.anchor.kind !== 'value') continue;
     const color = captionColorKey(project.colors[caption.captionId] ?? { kind: 'unresolved', reason: 'invalid' });
     if (!color || (pinColors !== null && !pinColors.includes(color))) continue;
     const anchor = caption.anchor.value;
@@ -101,7 +104,7 @@ export function syntheticDisplay(project: SyntheticProject, sceneId: string, pin
     const placement = model && modelEdit?.target.assetId === model.binding.assetId
       ? proposedPlacement(model.binding.assetToProject, modelEdit) : model?.binding.assetToProject;
     const position = anchor.kind === 'project' ? anchor.positionProject : placement ? pointInProject(anchor.positionAsset, placement) : null;
-    if (position) pins.push({ id: caption.captionId, color, position,
+    if (position) pins.push({ id: caption.captionId, color, position, status: caption.marker === 'needsReview' ? 'needsReview' : 'normal',
       title: caption.title.kind === 'value' && caption.title.value.trim() ? caption.title.value : 'キャプション' });
   }
   const pointer = project.state.scenes[sceneId]!.defaultViewId;

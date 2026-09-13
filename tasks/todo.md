@@ -2,6 +2,57 @@
 
 ## Current boundary — thin connected workflow first (2026-09-09)
 
+2026-09-13 latest PO clarification (after `c2a00f3`): approve 06 §12.6's
+review-to-edit behavior with **visible needsReview pins**. `要確認` is a status,
+not an instruction to hide a pin with an authoritative position. Keep its color,
+selection/window connection and explicit position/parent correction. Ordinary
+Scene/visibility/color filters remain; unknown/conflicting positions are not guessed.
+This supersedes the pending review-mapping product question below, not the exact
+wire/profile review, implementation or activation gates.
+
+- [x] Record the approved condition in 05 §2.3 / 06 §12.6 and inspect current code.
+- [x] Correct the current ProjectScene viewport's `visible`-only filter; carry a
+  separate display status and connect the window line only to a current valid
+  projection. Reuse existing viewport/window/filter/stale tests and review.
+- [x] Consolidate the five-purpose snapshot/reconstruction/golden tables under
+  this decision and obtain independent review. No additional PO confirmation for
+  this same product decision.
+- [ ] F01/F02: implement the five-purpose manifest/summary boundary, then Workspace
+  generation/verified receive and Contribution/base completion on the existing
+  source/journal/WorkspaceFS path. Reuse original-byte/retry/two-round tests;
+  no new synthetic UI, migration profile, ordinary activation or release change.
+
+Review: the existing resolver already separated needsReview from unavailable
+position. The viewport now displays the former with its original position/color,
+separate badge and existing selection/windows. Exact display receipts, current
+pin membership and finite/source/Scene guards reject stale overlay/line positions,
+including same-source local hide/filter changes. Hidden records keep review status.
+Focused viewport/window/list: 39 PASS. Typecheck, normal and harness build exit 0.
+Full root: 111 files / 2,088 PASS / 21 existing TODO / zero failures, exit 0,
+452.07 s. Independent code review found no mandatory correction. No source/test
+edits after that final run. Expected injected-loader and existing build warnings
+are not suppressed or treated as real-device evidence.
+Counts remain 33/4/18/9; this closes behavior within an existing connection group.
+Stop on a new contract conflict; do not auto-clear review, reassign or guess a
+location. Rendered/native-input/device acceptance remains in the existing batch.
+Independent documentation review preserved the review snapshot's existing
+nonvisual-owner/list-only Scene-membership rule; it is not compatibility-only
+needsReview. Diff-check passed. The earlier decision-only note is superseded by
+this bounded implementation; rendered/native-input/iPhone remains unverified.
+
+Short meta-audit: cached origin is 0 behind / 56 ahead at `c2a00f3`; the preceding
+checkpoints contain C11/color/window production connections, not only documents.
+This correction follows the approved status behavior and does not reopen model
+identity. Next return to file-team delivery, not another UI/PoC slice. The remaining
+review-copy fields/reconstruction/golden expectations are consolidated in 06 §5.1 /
+§12.1 / §12.5 / §12.6; independent contract review and re-review completed with no
+mandatory remainder. Exact profile schema, standalone snapshot validation and old
+pending references were clarified before closure. No schema/writer code
+or formal wire adoption is claimed. Existing denied push/browser bootstrap retries
+were not repeated; device evidence remains a separate consolidated lane.
+
+### Previous completed slice — C11
+
 2026-09-13 latest PO adoption: `親モデルを変更` for Asset A→B and an existing
 ProjectAnchor→Asset is accepted in 05 §4.4. Preserve known Project-space position,
 require explicit placement when it is unavailable, retain Caption content/ID and
@@ -52,9 +103,9 @@ Independent re-review confirms both findings closed and no remaining mandatory
 code issue; inventory rows match 33/4/18/9. No unchanged browser bootstrap or
 denied push retry was attempted. Public release boundaries unchanged.
 
-Next: return to F01/F02 file-team delivery under the approved isolated-implementation
-order. 06 §12.6's review/edit-copy mapping is still the outstanding product decision;
-C11 does not settle it. Native-input, physical iPhone and real-file retention checks
+Next at that checkpoint: return to F01/F02 under the isolated-implementation order.
+The then-outstanding 06 §12.6 product decision is superseded by the clarification
+above, not settled by C11 itself. Native-input, physical iPhone and real-file retention checks
 remain in the consolidated batch, not a new per-slice human gate.
 
 Completion is this bounded connection, not aggregate team/adoption acceptance.

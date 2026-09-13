@@ -92,12 +92,12 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     if (!row.color) notes.push('色を確認');
     if (row.uncertainMatch) notes.push('絞り込み条件を確認');
     if (item.pin === 'ownerHidden') notes.push('モデル非表示');
-    else if (item.pin === 'needsReview') notes.push('ピン位置を確認');
     else if (item.pin === 'unavailable') notes.push('ピンを表示できません');
+    if (item.needsReview || item.pin === 'needsReview') notes.push('要確認');
     if (row.colorHidden) notes.push('ピン非表示（色）');
     const needsReview = item.title.kind !== 'value' || item.body.kind !== 'value' || item.owner.kind !== 'value' ||
       (item.owner.kind === 'value' && item.owner.value.kind === 'asset' && item.owner.value.name.kind !== 'value') ||
-      item.mediaCount.kind !== 'value' || !row.color || row.uncertainMatch || item.pin === 'needsReview' || item.pin === 'unavailable';
+      item.mediaCount.kind !== 'value' || !row.color || row.uncertainMatch || item.needsReview || item.pin === 'needsReview' || item.pin === 'unavailable';
     const showModel = item.pin === 'ownerHidden' && item.owner.kind === 'value' && item.owner.value.kind === 'asset';
     entry.effect = showModel ? 'showModel' : 'review'; entry.action.textContent = showModel ? 'モデルを表示' : '状態を確認';
     entry.action.hidden = !showModel && !needsReview;

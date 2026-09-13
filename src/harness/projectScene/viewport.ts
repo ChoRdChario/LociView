@@ -276,6 +276,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
           .some(m => m.transparent || m.alphaTest > 0 || m.opacity < 1)) alphaPicking = true;
       });
       return { token: JSON.stringify([serial, display?.sceneId, display?.projectFrameId, display?.bounds, width, height, pose, background]),
+        display: display ?? undefined,
         pickToken: String(pickEpoch),
         ready: Boolean(active && renderer && camera && !issue), issue,
         notice: [notice, coverageIssue, alphaPicking ? '半透明・切り抜きの面へのピン配置は未接続です。原本の見た目は保持しています。' : null,

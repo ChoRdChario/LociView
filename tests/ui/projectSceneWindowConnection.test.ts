@@ -6,6 +6,8 @@ import { createDevelopmentWorkspace } from '../../src/harness/projectScene/works
 import { createCaptionWindowControls, type WindowContext } from '../../src/ui/projectScene/captionWindowControls';
 import { captionWindowView, planCaptionWindow } from '../../src/ui/projectScene/captionWindowState';
 import { planCaptionList } from '../../src/ui/projectScene/captionListState';
+import { planModelList } from '../../src/ui/projectScene/modelListState';
+import type { SyntheticDisplay } from '../../src/harness/projectScene/viewportModel';
 import { planNavigation } from '../../src/ui/projectScene/navigationState';
 import { editCaptionDraft } from '../../src/ui/projectScene/captionDetailState';
 import { RecordedDocument, record, type RecordedNode } from './domRecorder';
@@ -29,13 +31,55 @@ function mountedLayer(withContent = false, onRelease?: () => void) {
   const layer = createCaptionWindowControls(document.asDocument(), plan => { const accepted = session.acceptWindow(plan); render(); return accepted; },
     active => { session.setWindowDragging(active); render(); if (!active) onRelease?.(); }, withContent ? content : undefined);
   const project = (width = 900, height = 600, pins = [{ id: f.shared, x: 800, y: 500, visible: true }, { id: f.second, x: 750, y: 400, visible: true }], ready = true) =>
-    layer.project({ ready, width, height, pins });
+    layer.project({ ready, width, height, pins, sourceToken: session.snapshot.state.token, sceneId: session.sceneId });
   const root = record(layer.root), tools = record(layer.tools);
   const pick = (id: string) => { expect(select(session, id)).toBe(true); render(); project(); };
   return { document, session, layer, render, project, root, tools, pick, content, contentDispose };
 }
 
 describe('same-host comparison windows; authored DOM only, not raster or native input', () => {
+  it('opens review pins in comparison windows and rejects stale projection receipts through same-source filters/hide', () => {
+    const doc = new RecordedDocument(), s = new SyntheticSession();
+    expect(s.acceptModel(planModelList(s.modelContext(), { kind: 'select', assetId: f.equipment }))).toBe(true);
+    const update = s.modelUpdateContext(), version = update.choices.find(v => v.closure.shape === 'updated')!;
+    expect(s.acceptModelUpdate({ token: update.token, sceneId: update.sceneId, assetId: f.equipment, bindingId: version.projection.bindingId })).toBe(true);
+    const original = s.snapshot;
+    let latest: SyntheticDisplay | undefined, receipt: SyntheticDisplay | undefined, hold = false, notified = () => {};
+    const workspace = createDevelopmentWorkspace(doc.asDocument(), s, { viewportFactory: (_canvas, changed) => {
+      notified = changed;
+      return { update(d) { latest = d; if (!hold) receipt = d; }, setActive() {}, camera() {}, retry() {}, dispose() {},
+        read: () => ({ token: 'camera', display: receipt, ready: true, issue: null, dragging: false, projection: 'perspective', axis: null,
+          pins: receipt?.pins.map(p => ({ id: p.id, x: 800, y: 500, visible: true })) ?? [] }) };
+    } });
+    const root = record(workspace.root), stage = named(root, '3D表示');
+    Object.assign(descendants(stage).find(n => n.tag === 'canvas')!, { getBoundingClientRect: () => ({ width: 900, height: 600 }) });
+    workspace.render();
+    const pin = (title: string) => descendants(stage).find(n => n.className === 'lv-development-pin' && n.textContent === title)!;
+    const current = pin('設備の確認箇所'), color = current.style.backgroundColor;
+    expect(current.hidden).toBe(false); expect(current.attributes.get('data-review')).toBe('true');
+    expect(current.attributes.get('aria-description')).toBe('要確認'); current.fire('click');
+    const windows = named(stage, 'キャプションのウィンドウ');
+    const lines = () => descendants(windows).filter(n => n.className === 'lv-caption-window-line');
+    expect(s.memory.selectedCaptionId).toBe(f.shared); expect(lines()[0]!.hidden).toBe(false);
+    expect(descendants(named(windows, '設備の確認箇所')).some(n => n.textContent.startsWith('要確認'))).toBe(true);
+    pin('入口の記録').fire('click'); expect(s.windowMemory.retained).toEqual([f.shared, f.second]);
+
+    hold = true;
+    expect(s.acceptModel(planModelList(s.modelContext(), { kind: 'visibility', action: 'hide', assetId: f.equipment }))).toBe(true);
+    workspace.render(); expect(lines().every(n => n.hidden)).toBe(true); // Old receipt, same Project token.
+    const source = s.captionContext().source;
+    expect(source.kind === 'ready' && source.captions.find(c => c.id === f.shared)).toMatchObject({ pin: 'ownerHidden', needsReview: true });
+    expect(s.acceptModel(planModelList(s.modelContext(), { kind: 'visibility', action: 'show', assetId: f.equipment }))).toBe(true);
+    workspace.render(); expect(pin('設備の確認箇所').hidden).toBe(true);
+    receipt = latest; notified(); expect(pin('設備の確認箇所').hidden).toBe(false); expect(lines()[0]!.hidden).toBe(false);
+    expect(pin('設備の確認箇所').style.backgroundColor).toBe(color);
+    for (const color of new Set(latest!.pins.map(p => p.color)))
+      expect(s.acceptList(planCaptionList(s.captionContext(), { kind: 'color', color }))).toBe(true);
+    workspace.render(); expect(lines().every(n => n.hidden)).toBe(true);
+    receipt = latest; notified(); expect(lines().every(n => n.hidden)).toBe(true);
+    expect(s.snapshot).toBe(original); workspace.dispose();
+  });
+
   it('accumulates consecutive selections without a retain action, closes independently and explicitly reopens', () => {
     const doc = new RecordedDocument(), workspace = createDevelopmentWorkspace(doc.asDocument()), root = record(workspace.root), s = workspace.session;
     const original = s.snapshot; select(s, f.shared); workspace.render();
@@ -184,10 +228,15 @@ describe('same-host comparison windows; authored DOM only, not raster or native 
     h.render(); h.project(900, 600, []); expect(line.hidden).toBe(true); expect(h.root.children).toContain(card);
     expect(h.session.windowMemory).toBe(memory);
     const source = h.session.captionContext().source; if (source.kind !== 'ready') throw Error('source unavailable');
-    const context: WindowContext = { source: { ...source, captions: source.captions.map(c => c.id === f.shared ? { ...c,
+    const context: WindowContext = { source: { ...source, token: 'review-update', captions: source.captions.map(c => c.id === f.shared ? { ...c,
       pin: 'needsReview', title: { kind: 'unresolved', reason: 'conflict' }, body: value('<img src=x onerror=bad()>\r\n記録') } : c) }, memory, selectedId: f.shared, moveBlock: null };
     h.layer.render(context); expect(card.attributes.get('aria-label')).toBe('タイトルを確認');
-    h.project(); expect(line.hidden).toBe(true); // A stale visible-pin observation cannot bypass current review state.
+    h.project(); expect(line.hidden).toBe(true); // Old source coordinates cannot connect the new review state.
+    const projection = { ready: true, width: 900, height: 600, sourceToken: context.source.token, sceneId: context.source.sceneId,
+      pins: [{ id: f.shared, x: 800, y: 500, visible: true }] };
+    h.layer.project({ ...projection, sceneId: 'old-scene' }); expect(line.hidden).toBe(true);
+    h.layer.project(projection); expect(line.hidden).toBe(false);
+    h.layer.project({ ...projection, pins: [] }); expect(line.hidden).toBe(true);
     expect(descendants(card).find(n => n.className === 'lv-caption-window-text')!.textContent).toBe('<img src=x onerror=bad()>\r\n記録');
     expect(descendants(card).some(n => n.tag === 'img')).toBe(false);
     h.layer.render({ ...context, source: { ...source, captions: [] } }); expect(h.root.children.filter(n => n.className === 'lv-caption-window')).toHaveLength(0);

@@ -398,8 +398,9 @@ export class SyntheticSession {
             ? value({ kind: 'project' }) : value({ kind: 'asset', assetId: anchor.value.assetId,
               name: modelNames[anchor.value.assetId] === undefined ? unknown() : value(modelNames[anchor.value.assetId]!) });
           const hidden = result.issues.some(i => i.entityId === caption.captionId && i.code === 'hidden-owner') ||
-            (caption.marker === 'visible' && anchor.kind === 'value' && anchor.value.kind === 'asset' && locallyHidden.has(anchor.value.assetId));
+            (caption.marker !== 'suppressed' && anchor.kind === 'value' && anchor.value.kind === 'asset' && locallyHidden.has(anchor.value.assetId));
           return { id: caption.captionId, title: caption.title, body: caption.body, owner,
+            needsReview: result.issues.some(i => i.entityId === caption.captionId && i.code === 'needs-review'),
             color: colors[caption.captionId] ?? unknown(), mediaCount: mediaCounts.get(caption.captionId) ?? noMedia,
             pin: hidden ? 'ownerHidden' : caption.marker === 'needsReview' ? 'needsReview' :
               caption.marker === 'visible' ? 'visible' : 'unavailable' };

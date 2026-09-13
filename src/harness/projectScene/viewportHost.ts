@@ -17,6 +17,8 @@ import { createMediaGallery } from './mediaControls';
 
 export interface ViewportObservation {
   readonly token: string; readonly ready: boolean; readonly issue: string | null; readonly dragging: boolean;
+  /** Exact immutable input used for this projection; absent receipts cannot place pins/lines. */
+  readonly display?: SyntheticDisplay;
   /** Changes for geometry/camera lifetime, but not an Orbit start/end without movement. */
   readonly pickToken?: string;
   readonly manipulating?: boolean;
@@ -132,7 +134,10 @@ export function createViewportHost(document: Document, session: SyntheticSession
     const observed = runtime?.read();
     if (!observed?.ready || observed.manipulating || error) { gesture = null; gestureGeneration++; }
     const rect = canvas.getBoundingClientRect?.();
-    windows.project({ ready: Boolean(observed?.ready && !error), width: rect?.width ?? 0, height: rect?.height ?? 0, pins: observed?.pins ?? [] });
+    const currentProjection = Boolean(display && observed?.display === display && observed.ready && !error);
+    const projectedPins = currentProjection ? observed!.pins.filter(p => display!.pins.some(pin => pin.id === p.id) && Number.isFinite(p.x) && Number.isFinite(p.y)) : [];
+    windows.project({ ready: currentProjection, sourceToken: display?.token ?? '', sceneId: display?.sceneId ?? '',
+      width: rect?.width ?? 0, height: rect?.height ?? 0, pins: projectedPins });
     const dragChanged = session.setViewportDragging(observed?.dragging ?? false);
     const stateChanged = session.setViewportState(Boolean(observed?.ready && !error), display?.models.filter(m => !('issue' in (display?.materials?.[m.binding.assetId] ?? {}))).map(m => m.binding.assetId) ?? [], error ?? observed?.issue ?? observed?.notice ?? null);
     status.textContent = error ?? observed?.issue ?? observed?.notice ?? (observed?.ready ? '' : '3D表示は未接続です。'); status.hidden = !status.textContent;
@@ -140,7 +145,7 @@ export function createViewportHost(document: Document, session: SyntheticSession
     // Preserve measurable layout while initialization waits for attachment/resize.
     canvas.style.visibility = error || !observed?.ready ? 'hidden' : 'visible';
     for (const [id, pin] of pins) {
-      const p = observed?.pins.find(p => p.id === id); pin.hidden = Boolean(error || !observed?.ready || !p?.visible);
+      const p = projectedPins.find(p => p.id === id); pin.hidden = !p?.visible;
       if (p) { pin.style.left = `${p.x}px`; pin.style.top = `${p.y}px`; }
     }
     const ghost = observed?.preview;
@@ -255,6 +260,10 @@ export function createViewportHost(document: Document, session: SyntheticSession
           const button = document.createElement('button'); button.type = 'button'; button.textContent = source.title;
           button.className = 'lv-development-pin'; button.style.backgroundColor = source.color;
           button.setAttribute('aria-pressed', String(source.id === display.selectedId)); button.title = source.title;
+          button.setAttribute('data-review', String(source.status === 'needsReview'));
+          if (source.status === 'needsReview') {
+            button.setAttribute('aria-description', '要確認'); button.title = `${source.title}（要確認）`;
+          }
           const expected = display;
           button.addEventListener('click', () => {
             if (disposed || button.hidden || display?.token !== expected.token || display.sceneId !== expected.sceneId ||

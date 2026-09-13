@@ -6,7 +6,9 @@
 > 同一Caption・内容・Scene所属を保持し、全Scene影響を提示。exact retry／cold／競合候補は既存tests。
 > 実browser／iPhone受入れは別。旧固定owner host・新規ProjectAnchor作成・未配置schemaは対象外。
 > PO回答（`1edc3f5`後）: 06 §11の隔離実装→実測／採用の順序は承認済み。
-> §12.6の対応保持は「対応モデルなしグループ」案を検討中。旧2判断待ちはこれで更新する。
+> §12.6の編集copy方針は、位置既知の要確認ピンを表示する条件で承認（`c2a00f3`後）。
+> 対応モデルなしは一覧上の分類。要確認pinの表示／選択／窓の線を接続、exact display鮮度も検査。
+> 元色・要確認状態を保持。実browser／iPhoneは未受入れ。exact wire表の統合・契約review済み。
 > 上記package判断の文書更新自体は実装数を変えない。最新C11接続の分類数は§1。
 > C04は同じピン操作欄の「追加色」から通常／Shift／数値追加へ接続。作成時の1変更で色も記録。
 > 絞り込み／既存色編集と独立し、Scene別の次回色と実際のピン色を分離。retryは元の色／IDを保持。
@@ -195,7 +197,7 @@
 | F01 | 自己完結したTeam Workspaceファイルを配布・開く | 新規実装 | 5-purposeの合成semantic proofのみ。実manifest／writer／reader／preflightは06未批准。T01は内部受信、こちらはportableファイル。 | [docs/specs/06-project-package-wire.md:3](../docs/specs/06-project-package-wire.md) / [poc/scene-history/purposes.ts](../poc/scene-history/purposes.ts) |
 | F02 | Contributionファイルを書き出し・取り込む | 新規実装 | base依存delta＋必要blobsのportable実装なし。旧Native collaborationとは契約が違う。 | [docs/specs/06-project-package-wire.md:24](../docs/specs/06-project-package-wire.md) / [docs/specs/06-project-package-wire.md:531](../docs/specs/06-project-package-wire.md) |
 | F03 | 完全backupを書き出し・明示確認して復元する | 別経路のみ | 旧Nativeで実装あり。新history／保護inventory／exchange-base付きwhole Projectのwire接続は別実装。 | [src/nativeGs/packageExchange.ts](../src/nativeGs/packageExchange.ts) / [docs/specs/06-project-package-wire.md:24](../docs/specs/06-project-package-wire.md) |
-| F04 | 一つのSceneを閲覧用に共有する | 別経路のみ | 旧Nativeのreview相当あり。新history-free closure／privacy検査／View入口は未接続。編集copyに必要なfamily対応不足とsnapshot改訂案は06 §12.6（未批准）。 | [src/nativeGs/packageSnapshots.ts](../src/nativeGs/packageSnapshots.ts) / [docs/specs/06-project-package-wire.md:24](../docs/specs/06-project-package-wire.md) |
+| F04 | 一つのSceneを閲覧用に共有する | 別経路のみ | 旧Nativeのreview相当あり。新history-free closure／privacy検査／View入口は未接続。編集copyの対応保持は06 §12.6で要確認ピン表示を条件に承認。exact snapshot／再構築表review済み、builder／golden実行は残る。 | [src/nativeGs/packageSnapshots.ts](../src/nativeGs/packageSnapshots.ts) / [docs/specs/06-project-package-wire.md:24](../docs/specs/06-project-package-wire.md) |
 | F05 | 全Sceneを独立Projectとして複製して渡す | 別経路のみ | 旧Native clean相当あり。新全Projectのre-key／fresh history／元へContribution不可は未接続。 | [src/nativeGs/packageSnapshots.ts](../src/nativeGs/packageSnapshots.ts) / [docs/specs/06-project-package-wire.md:24](../docs/specs/06-project-package-wire.md) |
 | F06 | 現Native Projectを新Project/Sceneへ変換する | 新規実装 | 新recipe・共有導入artifact・変換writer未実装。旧sourceを変更しない。 | [docs/specs/07-project-scene-migration.md:3](../docs/specs/07-project-scene-migration.md) |
 | F07 | frozen v1を新Project/Sceneへ変換する | 新規実装 | 旧readerの互換性維持と新writerを接続する移行は未実装。 | [docs/specs/07-project-scene-migration.md:3](../docs/specs/07-project-scene-migration.md) |

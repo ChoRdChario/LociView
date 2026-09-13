@@ -93,6 +93,7 @@
 .lv-development-pin-preview { position: absolute; pointer-events: none; transform: translate(-50%, -50%); border: 2px dashed #413d39; outline: 2px solid #faf9f8; background: #f2f0ee; color: #312f2d; padding: 3px 7px; font-size: 12px; }
 .lv-development .lv-development-pin { position: absolute; pointer-events: auto; transform: translate(-50%, -50%); width: 32px; height: 32px; min-height: 32px; border-radius: 50%; border: 3px solid #faf9f8; box-shadow: 0 0 0 1px #413d39; font-size: 0; }
 .lv-development .lv-development-pin[aria-pressed="true"] { box-shadow: 0 0 0 3px #413d39; }
+.lv-development .lv-development-pin[data-review="true"]::after { content: "!"; position: absolute; right: -7px; top: -7px; width: 16px; height: 16px; border: 1px solid #413d39; border-radius: 50%; background: #faf9f8; color: #413d39; font-size: 12px; font-weight: 700; line-height: 14px; }
 .lv-development-stage { overflow-y: auto; }
 .lv-development-sidebar > .lv-development-pending-panel { overflow-y: auto; min-height: 0; }
 .lv-caption-windows { position: absolute; inset: 0; pointer-events: none; }
