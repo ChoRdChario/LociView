@@ -234,9 +234,9 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
     });
     for (const path of walk('src').filter(p => /\.(ts|tsx|js)$/.test(p))) {
       const source = readFileSync(path, 'utf8');
-      const packageControl = /[\\/]projectPackage[\\/](contract|manifest|historySummary|closure|protectedInventory|workspaceSource|contributionSource|contributionArchive|zipChecks|zipArchive|workspaceArchive|receiveJob|workspaceBases|outputJob)\.ts$/.test(path);
-      const packageMetadata = /[\\/]projectPackage[\\/](historySummary|closure|protectedInventory|workspaceSource|workspaceArchive|contributionSource|contributionArchive|receiveJob|workspaceBases|outputJob)\.ts$/.test(path);
-      const packageJournal = /[\\/]projectMetadata[\\/](packageRemote|session)\.ts$/.test(path) || /[\\/]projectFiles[\\/](receiveWorkspace|sendWorkspace)\.ts$/.test(path) ||
+      const packageControl = /[\\/]projectPackage[\\/](contract|manifest|historySummary|closure|protectedInventory|workspaceSource|contributionSource|contributionArchive|contributionEvidence|contributionReceiveJob|receiveJobs|zipChecks|zipArchive|workspaceArchive|receiveJob|workspaceBases|outputJob)\.ts$/.test(path);
+      const packageMetadata = /[\\/]projectPackage[\\/](historySummary|closure|protectedInventory|workspaceSource|workspaceArchive|contributionSource|contributionArchive|contributionEvidence|contributionReceiveJob|receiveJobs|receiveJob|workspaceBases|outputJob)\.ts$/.test(path);
+      const packageJournal = /[\\/]projectMetadata[\\/](packageRemote|session|journal)\.ts$/.test(path) || /[\\/]projectFiles[\\/](receiveWorkspace|sendWorkspace)\.ts$/.test(path) ||
         /[\\/]harness[\\/]projectScene[\\/](validationHost|validationWorkspace)\.ts$/.test(path);
       // 06 §11/§12.3 permit these exact disconnected primitives, not an app importer.
       if (!packageControl && !packageJournal) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectPackage\//);
@@ -263,11 +263,18 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           outputJob: ['../platform/fs', '../projectMetadata/blobStore', '../projectMetadata/format', '../projectMetadata/persistence', '../projectMetadata/source',
             './contract', './manifest', './workspaceSource', './workspaceArchive', './workspaceBases', './protectedInventory'],
           workspaceSource: ['../projectMetadata/session', '../projectMetadata/source', '../projectMetadata/blobStore', '../projectMetadata/blobStream',
-            './contract', './manifest', './historySummary', './closure'],
-          // 06 §8.5 only: original delta/file primitives, not Session/job/UI activation.
+            './contract', './manifest', './historySummary', './closure', './contributionEvidence'],
+          // 06 §8.5/8.6: exact file/source/receive boundaries, not ordinary activation.
           contributionSource: ['@automerge/automerge/slim', '../domain/projectGraphSupport', '../domain/values', '../projectMetadata/blobStore',
             '../projectMetadata/blobStream', '../projectMetadata/session', '../projectMetadata/source', './contract', './manifest',
-            './historySummary', './closure', './workspaceSource', './workspaceBases', './zipChecks', './zipArchive'],
+            './historySummary', './closure', './workspaceSource', './workspaceBases', './zipChecks', './zipArchive', './contributionEvidence'],
+          contributionEvidence: ['@automerge/automerge/slim', '../domain/projectGraphSupport', '../domain/values', '../projectMetadata/source',
+            './contract', './manifest', './historySummary', './closure'],
+          contributionReceiveJob: ['../platform/fs', '../projectMetadata/blobStore', '../projectMetadata/format', '../projectMetadata/persistence',
+            '../projectMetadata/remote', '../projectMetadata/journal', '../projectMetadata/packageRemote', './contract', './workspaceBases',
+            './contributionSource', './contributionEvidence', './zipArchive', './closure'],
+          receiveJobs: ['../platform/fs', '../projectMetadata/blobStore', '../projectMetadata/format', '../projectMetadata/journal',
+            '../projectMetadata/packageRemote', './receiveJob', './contributionReceiveJob'],
           contributionArchive: ['../projectMetadata/blobStore', '../domain/projectGraphSupport', '../domain/values', './contract', './manifest',
             './contributionSource', './workspaceArchive', './zipChecks'],
           zipChecks: ['./manifest'], zipArchive: ['../nativeGs/sha256', './contract', './manifest', './zipChecks'],
@@ -330,7 +337,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           content: ['../platform/fs', '../domain/projectContentChecks', '../domain/projectGraphSupport', '../domain/values', '../domain/projectRecordFields', '../projectMetadata/contentEvidence', '../projectMetadata/blobInventory', '../projectMetadata/blobStore', '../projectMetadata/session', '../projectMetadata/persistence', './glb', './png', './validation', './initialProject'],
           creation: ['../platform/fs', '../projectMetadata/blobStore', '../projectMetadata/source', '../projectMetadata/session', '../projectMetadata/repository', '../projectMetadata/persistence', './content', './initialProject', './png', './validation', './modelFacts'],
           modelFacts: ['../scene/projectProvider', '../projectMetadata/session', '../projectMetadata/source', '../projectMetadata/persistence', '../domain/projectContentChecks', '../domain/projectRecordFields', '../domain/values', './validation', './content'],
-          receiveWorkspace: ['../platform/fs', '../platform/projectLock', '../projectMetadata/session', '../projectMetadata/format', '../projectPackage/receiveJob', './validation', '../projectMetadata/journal', '../projectMetadata/persistence'],
+          receiveWorkspace: ['../platform/fs', '../platform/projectLock', '../projectMetadata/session', '../projectMetadata/format', '../projectPackage/receiveJob', './validation', '../projectMetadata/journal', '../projectMetadata/persistence', '../projectMetadata/blobStore', '../projectPackage/contract', '../projectPackage/zipArchive', '../projectPackage/contributionReceiveJob', '../projectPackage/receiveJobs', '../projectPackage/manifest'],
           sendWorkspace: ['../platform/fs', '../projectMetadata/session', '../projectMetadata/blobStore', '../projectMetadata/format', '../projectMetadata/persistence',
             '../projectPackage/outputJob', '../projectPackage/workspaceBases', './receiveWorkspace', './validation'],
         };
@@ -349,9 +356,9 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         const byFile: Record<string, string[]> = {
           persistence: ['../core/json', '../domain/projectGraphSupport', '../domain/values', '../platform/fs', './format'],
           repository: ['@automerge/automerge/slim', '@automerge/automerge-repo/slim', '../platform/fs', './format', './persistence', './source'],
-          journal: ['@automerge/automerge/slim', '../platform/fs', '../domain/values', '../domain/projectRecordFields', './format', './source', './persistence', './remote', './packageRemote'],
+          journal: ['@automerge/automerge/slim', '../platform/fs', '../domain/values', '../domain/projectRecordFields', './format', './source', './persistence', './remote', './packageRemote', '../projectPackage/contributionEvidence'],
           remote: ['@automerge/automerge/slim', '../domain/values', './format', './source', './persistence'],
-          packageRemote: ['../domain/values', '../projectPackage/manifest', '../projectPackage/contract', './format', './source', './remote', './persistence'],
+          packageRemote: ['../domain/values', '../projectPackage/manifest', '../projectPackage/contract', './format', './source', './remote', './persistence', '../projectPackage/contributionEvidence'],
           records: ['../domain/projectRecords', '../domain/projectRecordFields', '../domain/projectGraphSupport', '../scene/projectProvider', './format'],
           assetStatus: ['../domain/projectMutableFields', '../domain/projectRecords', '../domain/projectRecordFields', '../domain/projectGraphSupport',
             '../domain/values', '../scene/types', '../scene/projectProvider', './format'],
@@ -374,7 +381,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           blobInventory: ['../domain/projectContentChecks', '../domain/values', './contentEvidence', './format', './blobStore'],
           session: ['@automerge/automerge/slim', '../platform/fs', '../domain/values', '../domain/projectContentChecks', '../domain/captionText', '../scene/projectProvider',
             './format', './source', './repository', './journal', './persistence', './commands', './remote', './packageRemote', '../projectPackage/receiveJob', '../projectPackage/manifest',
-            './blobStore', '../projectPackage/outputJob', '../projectPackage/workspaceBases', '../projectPackage/workspaceSource', '../projectPackage/protectedInventory', '../projectPackage/contract'],
+            './blobStore', '../projectPackage/outputJob', '../projectPackage/workspaceBases', '../projectPackage/workspaceSource', '../projectPackage/protectedInventory', '../projectPackage/contract', '../projectPackage/contributionReceiveJob', '../projectPackage/contributionEvidence', '../projectPackage/receiveJobs'],
           startupScene: ['../scene/projectProvider', '../domain/projectRecords', '../domain/projectRecordFields', './membership', './format'],
           commands: ['../domain/values', '../domain/projectMutableFields', '../domain/projectRecordFields', '../domain/projectRecords', '../domain/projectGraphSupport',
             '../domain/materialIntent', '../domain/captionText', '../scene/projectMaterialRoutes', '../scene/commands', '../scene/resolve', '../scene/types', '../scene/projectProvider', './format', './membership', './records', './assetStatus', './modelMembership', './captionCandidates', './sceneAuthoring', './viewResolution', './captionDeletion', './assetDeletion', './startupScene', './modelAddition'],

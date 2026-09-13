@@ -1,5 +1,11 @@
 # Public candidate UI/UX監査 handoff
 
+> **Contribution受信接続:** 同じ「更新ファイル」欄が作業一式／変更分を内容から扱う。
+> 元の作業一式が未記録なら、先に開く必要があることを案内。中断時は同じfileの再選択／
+> 受信再開／明示取りやめを使い、原本欠落は修復必要のまま保持。閲覧中に見つけた中断も
+> 同じeditorから復旧用の編集へ移れるが、別の修復必要jobは無視しない。
+> 二巡／cold／recorded DOMはtodoの検査。Contribution出力UI、実browser／実機／offlineは未完了。
+
 > **2026-09-13 更新:** 限定GLB/PNG一覧に「作業一式を開く」を接続。初回読込は
 > 元履歴・モデル・画像を維持し、既存の同系統Projectなら更新を統合する。cold読込途中でも
 > 元fileの再選択／復旧を案内し、開始Scene競合時もfile操作との入力guardを保つ。

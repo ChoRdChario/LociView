@@ -1,6 +1,15 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **Current unit — `f41ba40`後のContribution原本／ZIP:** 共通交換基準を明示選択し、
+> **Current unit — `fe5f490`後のContribution受信接続:** 同じ更新file欄から差分を受信。
+> 元base／wire変更／derived targetを凍結した新job／journalで、receiver Mを一度だけ反映する。
+> M=0はmetadata journal／公開／base更新なし。独立indexとjournalで欠落jobも検出。
+> cold prefix／公開後の復旧・同じfile再選択・取りやめと、warm Viewの復旧用Editへ接続。
+> 位置既知の要確認ピンは元色で表示し、別印・選択・窓を維持する既存方針は変更なし。
+> 型・通常／harness buildはexit 0、全root 2,199 PASS／既存21 TODO／失敗0（282.53秒）。
+> source/test独立reviewの必須残件なし。最終index・checkpointはtodo。Contribution出力UIと他purpose、通常home、
+> 実browser／実機／offlineは未完了。次は同じfile欄へ差分出力を接続し、通し作業を閉じる。
+
+> **Previous checkpoint — `fe5f490` Contribution原本／ZIP:** 共通交換基準を明示選択し、
 > 元変更D・必要本体差分・delta summaryから実ZIPを生成／再検査する部品を追加。
 > 位置づけはfile primitiveであり、ContributionのSession/journal/UI接続は次。
 > 原本保持・incremental wire順・非祖先target再構成・変更なし本体0readを検査。

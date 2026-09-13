@@ -12,7 +12,10 @@ import { digest, equalBytes, json, newId, underWriteLease, metadataPath } from '
 import { canonicalMetadataEdit, planMetadataEdit, type MetadataEdit } from './commands';
 import { checkRemoteStored, copyFullSource, initialWorkspaceChanges, planRemoteChanges, type FullMetadataSource, type RemoteBatchProof } from './remote';
 import { WorkspaceReceiveJob, type ReceiverProof } from '../projectPackage/receiveJob';
-import type { JournalRemoteInput } from './packageRemote';
+import { isContributionRemote, type JournalRemoteInput } from './packageRemote';
+import { ContributionReceiveJob } from '../projectPackage/contributionReceiveJob';
+import { assertContributionBaseInReceiver } from '../projectPackage/contributionEvidence';
+import { receiveJobKeys, receiveInputState, openReceiveJob, receiveTerminal, type ReceiveJob } from '../projectPackage/receiveJobs';
 import { packageByteHash } from '../projectPackage/manifest';
 import type { OriginBlobStore } from './blobStore';
 import { WorkspaceOutputJob } from '../projectPackage/outputJob';
@@ -208,14 +211,12 @@ export class MetadataProjectSession {
 
   private async outputReady() {
     const read = await this.read(); if (read.state !== 'ready' || !read.source || !read.publication) return fail('output-not-ready');
-    const ids = new Set([...(await WorkspaceReceiveJob.ids(this.fs)), ...(await this.journal.entries())
-      .filter(e => e.start.purpose === 'importWorkspace').map(e => e.start.transactionId)]);
-    for (const id of ids) {
-      const state = await WorkspaceReceiveJob.inputState(this.fs, id, this.limits);
+    for (const key of await receiveJobKeys(this.fs, this.limits)) {
+      const state = await receiveInputState(this.fs, key, this.limits);
       if (state === 'abandoned') continue;
       if (state !== 'started') return fail('output-receive-pending');
-      const job = await WorkspaceReceiveJob.open(this.fs, id, this.limits), steps = await job.steps();
-      if (!steps.some(s => s.detail.kind === 'baseRecorded' || s.detail.kind === 'cancelled')) return fail('output-receive-pending');
+      const job = await openReceiveJob(this.fs, key, this.receiveStore(), this.limits);
+      if (!await receiveTerminal(job)) return fail('output-receive-pending');
       await job.validateCompletion();
     }
     return read;
@@ -276,6 +277,7 @@ export class MetadataProjectSession {
   async importWorkspace(input: WorkspaceReceiveJob): Promise<MetadataSessionRead> {
     input.assertOwner(this.fs);
     return underWriteLease(this.fs, async () => {
+      await this.assertReceiveSlot(input.id);
       if (!this.modelFacts?.planImported || !this.media?.inventory || input.start && !input.importing) return fail('workspace-import-unconnected');
       let job = input;
       const entries = await this.journal.entries(), own = entries.find(e => e.start.transactionId === job.id);
@@ -321,6 +323,7 @@ export class MetadataProjectSession {
   async receiveWorkspace(expectedToken: string | null, input: WorkspaceReceiveJob): Promise<MetadataSessionRead> {
     input.assertOwner(this.fs);
     return underWriteLease(this.fs, async () => {
+      await this.assertReceiveSlot(input.id);
       if (!this.modelFacts?.planReceived || !this.media?.inventory || input.importing) return fail('workspace-receive-unconnected');
       let job = input;
       await job.preflightBase(); // Reject an incompatible/corrupt retained base before any Project write.
@@ -395,6 +398,94 @@ export class MetadataProjectSession {
     });
   }
 
+  private receiveStore() {
+    return { inspect: async (ref: import('./blobStore').StoredBlobRef) => {
+      if (!this.media?.inventory) return fail('media-unconnected'); await this.media.inventory([{ ...ref }]); return 'verified-present' as const;
+    } };
+  }
+  private async assertReceiveSlot(ownId: string) {
+    for (const key of await receiveJobKeys(this.fs, this.limits)) {
+      if (key.id === ownId) continue;
+      const state = await receiveInputState(this.fs, key, this.limits);
+      if (state === 'abandoned') continue;
+      if (state !== 'started') return fail('receive-job-unfinished');
+      const job = await openReceiveJob(this.fs, key, this.receiveStore(), this.limits);
+      if (!await receiveTerminal(job)) fail('receive-job-unfinished'); await job.validateCompletion();
+    }
+  }
+  /** Actual delta input; wire D is retained separately from receiver M. No base advancement. */
+  async receiveContribution(expectedToken: string | null, input: ContributionReceiveJob): Promise<MetadataSessionRead> {
+    input.assertOwner(this.fs);
+    return underWriteLease(this.fs, async () => {
+      await this.assertReceiveSlot(input.id);
+      if (!this.modelFacts?.planReceived || !this.media?.inventory) return fail('contribution-receive-unconnected');
+      let job = input; await job.preflightBase();
+      const entries = await this.journal.entries(), prior = entries.filter(e => e.publication).at(-1), own = entries.find(e => e.start.transactionId === job.id);
+      if (!prior?.publication || this.retained && this.retained.start.transactionId !== job.id) return fail('receive-not-ready');
+      const current = await this.read();
+      if (!current.source || current.state === 'repair-required' || expectedToken !== null && current.source.token !== expectedToken ||
+        !job.start && current.state !== 'ready') return fail('receive-not-ready');
+      if (own?.prepared && json(own.prepared.remote) !== json((await job.journalInput(own.prepared.remote?.expectedFinalHeads ?? [])).proof)) fail('receive-journal-originals');
+      const observed = await job.publicationReference();
+      if (observed) {
+        await job.validateCompletion();
+        const receipt = entries.find(e => e.publication && packageByteHash(new TextEncoder().encode(json(e.publication))) === observed.publication.sha256);
+        if (!receipt?.publication || observed.kind === 'contributionPublished' && receipt.start.transactionId !== job.id ||
+          observed.kind === 'contributionAlreadyPresent' && own) return fail('receive-observation-missing');
+        const frozen = await this.repository.read(receipt.start.repositoryId, receipt.start.proof, observed.receiver.heads);
+        if (!frozen) return fail('receive-base-missing');
+        assertContributionBaseInReceiver(job.inspection.base.source, frozen);
+        if (planRemoteChanges(frozen, job.inspection.target, this.limits).parts.length) fail('receive-inclusion');
+        await this.checked(frozen, false); await this.media.inventory(await job.inventory()); return this.read();
+      }
+      const receiver = job.start?.receiver ?? { identity: current.source.proof.identity, metadataEnvelope: current.source.proof.envelope, heads: current.source.heads };
+      const base = await this.repository.read(prior.start.repositoryId, { identity: receiver.identity, envelope: receiver.metadataEnvelope }, receiver.heads);
+      if (!base) return fail('receive-base-missing');
+      if (!own && base.token !== current.source.token) fail('receive-stale');
+      if (entries.some(e => !e.publication && e !== own)) fail('receive-other-transaction');
+      assertContributionBaseInReceiver(job.inspection.base.source, base);
+      const { parts, final } = planRemoteChanges(base, job.inspection.target, this.limits), inventory = await job.inventory();
+      if (own && (json(own.start.proof) !== json(base.proof) || json(own.start.baseHeads) !== json(base.heads))) fail('receive-job-journal');
+      if (!own?.prepared) {
+        const facts = parts.length ? await this.modelFacts.planReceived(base, final, r => job.inspection.archive.entryBlob(`blobs/sha256/${r.digest}`)) : null;
+        const introduced = new Set((facts?.stagedBlobs ?? []).map(b => b.digest));
+        await this.media.inventory(inventory.filter(b => !introduced.has(b.digest)));
+        if (!job.start) {
+          const proof = await job.journalInput(final.heads);
+          const evidenceBytes = proof.manifestBytes.length + proof.checksumBytes.length + proof.baseManifestBytes.length + proof.baseMetadataBytes.length +
+            proof.derivedTargetBytes.length + proof.wireParts.reduce((n, b) => n + b.length, 0);
+          job = await job.persist(receiver, evidenceBytes + parts.reduce((n, b) => n + b.length * 2, 0) +
+            final.encodeFullSource().length * 2 + (facts?.stagedBlobs ?? []).reduce((n, b) => n + (b.byteLength as number), 0) + 4_194_304);
+        }
+        if (parts.length && facts) this.retained = { start: own?.start ?? { transactionId: job.id, repositoryId: prior.start.repositoryId,
+          predecessor: prior.start.transactionId, purpose: 'remotePackageMerge', proof: base.proof, baseHeads: base.heads }, parts,
+          remote: await job.journalInput(final.heads), ...(facts.stagedBlobs?.length ? { stagedBlobs: [...facts.stagedBlobs] } : {}),
+          modelFacts: { next: final, plan: { ...facts, stage: async () => { await facts.stage(); await this.media!.inventory!(inventory); } } } };
+      } else { this.retained = null; await this.media.inventory(inventory); }
+      if (parts.length && !own?.publication) await this.resume(job);
+      const receipt = parts.length ? (await this.journal.entries()).find(e => e.start.transactionId === job.id) : prior;
+      if (!receipt?.publication || json(receipt.publication.heads) !== json(final.heads)) return fail('receive-final-publication');
+      await this.checked(final, false); await this.media.inventory(await job.inventory());
+      await job.finish(receipt, { identity: final.proof.identity, metadataEnvelope: final.proof.envelope, heads: final.heads }, !parts.length);
+      return this.read();
+    });
+  }
+  async cancelContributionReceive(job: ContributionReceiveJob) {
+    job.assertOwner(this.fs);
+    return underWriteLease(this.fs, async () => {
+      if (!job.start || (await this.journal.entries()).some(e => e.start.transactionId === job.id) || (await job.steps()).length) fail('receive-cancel-denied');
+      const read = await this.read();
+      if (read.state !== 'ready' || !read.source || json(read.source.heads) === json(job.start!.receiver.heads)) fail('receive-not-stale');
+      await job.cancelStale();
+    });
+  }
+  async abandonContributionInput(id: string) {
+    return underWriteLease(this.fs, async () => {
+      if (this.retained || (await this.read()).state !== 'ready') fail('receive-abandon-not-ready');
+      await ContributionReceiveJob.abandon(this.fs, id, this.limits);
+    });
+  }
+
   /** Owned initial-source receipt only. Complete an unprepared first initialization, never a merge. */
   async recoverInitialization(source: ProjectMetadataSource): Promise<MetadataSessionRead> {
     return underWriteLease(this.fs, async () => {
@@ -420,10 +511,13 @@ export class MetadataProjectSession {
     });
   }
 
-  private async resume(receiveJob?: WorkspaceReceiveJob): Promise<MetadataSessionRead> {
+  private async resume(receiveJob?: ReceiveJob): Promise<MetadataSessionRead> {
     const entries = await this.journal.entries(), pending = entries.find(e => !e.publication);
     const transactionId = pending?.start.transactionId ?? this.retained?.start.transactionId;
     if (transactionId && ((pending?.start ?? this.retained?.start)?.purpose === 'importWorkspace' ||
+      !!pending?.prepared?.remote && isContributionRemote(pending.prepared.remote) ||
+      !!this.retained?.remote && isContributionRemote(this.retained.remote.proof) ||
+      (await ContributionReceiveJob.ids(this.fs)).includes(transactionId) ||
       (await WorkspaceReceiveJob.ids(this.fs)).includes(transactionId))) {
       if (!receiveJob || receiveJob.id !== transactionId || !this.media?.inventory) return fail('receive-job-recovery-required');
       receiveJob.assertOwner(this.fs);

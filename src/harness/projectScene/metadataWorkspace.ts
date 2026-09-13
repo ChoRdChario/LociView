@@ -72,7 +72,7 @@ export function createSavedWorkspace(document: Document, host: SavedWorkspaceHos
   restore.addEventListener('click', () => { if (!restore.disabled && !restore.hidden) void refresh(true); });
   modeButton.addEventListener('click', () => { void (async () => {
     if (disposed || refreshing || !host.mode || host.mode.busy || startup.busy()) return;
-    const viewRecovery = host.mode.current === 'view' && host.read().state === 'pending';
+    const viewRecovery = host.mode.current === 'view' && (host.read().state === 'pending' || host.mode.recoveryAvailable === true);
     if (startup.hasChanges() || receiveControls?.hasChanges() || workspace?.session.interactionPending ||
       workspace && workspace.session.acknowledgment.state !== 'idle' || host.hasPending() && !viewRecovery) {
       feedback = '入力・更新を確定するか、取り消してから切り替えてください。'; render(); return;

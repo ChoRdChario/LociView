@@ -10,6 +10,10 @@
 > 後の編集を保持したcold retryと、renderer失敗時の生成復旧を既存testsで確認。実測結果はtodo。
 > 初回Workspace importも限定一覧に接続。元履歴／GLB/PNG／交換基準を維持し、既存同系統は受信へ。
 > sourceなしcold復旧／開始Sceneの相互guard／明示取りやめ後の一覧復帰は既存testsで検査。
+> Contribution受信も同じ更新file欄へ接続。元base／wire変更／最初のderivedを凍結し、
+> receiver差分Mだけを一度反映。cold復旧・同一file再選択・再受信no-opを同じserviceで扱う。
+> M=0でも独立indexで欠落jobを検出し、原本不足を再選択で補充しない。base表は更新しない。
+> Contribution生成部品はあるが、durable出力job／出力UIは次。F02全体の接続完了とは数えない。
 > 他purpose／通常home／実browser・picker／実機は残り、機能群数は不変更。
 > PO追加採用: Asset間の親変更と既存ProjectAnchorへの親設定を05 §4.4へ記録。
 > C11を新metadata／限定GLB validationへ接続。親を選択→仮位置→確定／取消、位置不明時は面指定。
@@ -205,7 +209,7 @@
 | ID | 機能群／利用者の結果 | 状態 | 現在の境界・残り | コード／既存受入れ参照（行番号は監査時点） |
 |---|---|---|---|---|
 | F01 | 自己完結したTeam Workspaceファイルを配布・開く | 新規実装 | 元履歴summary・全live強参照closureから実ZIPをstream生成し、header／CRC／SHA／source／summary／closureを検査。限定GLB/PNG一覧・editorに初回import／既存同系統への受信／cold復旧と固定source出力job／generated base／明示download／選び直したfileの一致確認を接続。共通base表・元履歴・手元編集を保持し、欠落したack証拠を補充しない。生成した実形式fileの二巡は既存tests。未知inventory制限、retention全体・通常UI／他形式／実browser・実機が残る。portable操作全体の完成ではない。 | [src/projectPackage/workspaceArchive.ts](../src/projectPackage/workspaceArchive.ts) / [src/projectFiles/sendWorkspace.ts](../src/projectFiles/sendWorkspace.ts) / [src/projectFiles/receiveWorkspace.ts](../src/projectFiles/receiveWorkspace.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) / [docs/specs/06-project-package-wire.md](../docs/specs/06-project-package-wire.md) |
-| F02 | Contributionファイルを書き出し・取り込む | 新規実装 | 検証済み交換基準を明示選択し、元Dの完全性・incremental lex-ready順・delta summary・必要本体差分から実ZIPを生成／再検査する部品を実装。非祖先targetも元reachable bytesから再構成し、base保証は本体非読込で確認。base更新・Session/journal／UIの受信接続・通常経路／実機受入れは未完了。実行結果はtodo。旧Native collaborationとは契約が違う。 | [src/projectPackage/contributionSource.ts](../src/projectPackage/contributionSource.ts) / [src/projectPackage/contributionArchive.ts](../src/projectPackage/contributionArchive.ts) / [docs/specs/06-project-package-wire.md](../docs/specs/06-project-package-wire.md) |
+| F02 | Contributionファイルを書き出し・取り込む | 新規実装 | 検証済み交換基準を明示選択し、元Dの完全性・incremental lex-ready順・delta summary・必要本体差分から実ZIPを生成／再検査する部品を実装。非祖先targetも元reachable bytesから再構成し、base保証は本体非読込で確認。凍結base／wire／derivedとreceiver Mを別保持するSession／journal受信を、限定GLB/PNGの同じ更新file欄へ接続。二巡・元bytesからのcold復旧・M=0・再選択・欠落拒否を検査。Contributionはbaseを更新しない。durable出力job／出力UI・通常経路／実機受入れは未完了。実行結果はtodo。旧Native collaborationとは契約が違う。 | [src/projectPackage/contributionSource.ts](../src/projectPackage/contributionSource.ts) / [src/projectPackage/contributionArchive.ts](../src/projectPackage/contributionArchive.ts) / [src/projectPackage/contributionReceiveJob.ts](../src/projectPackage/contributionReceiveJob.ts) / [src/projectFiles/receiveWorkspace.ts](../src/projectFiles/receiveWorkspace.ts) / [docs/specs/06-project-package-wire.md](../docs/specs/06-project-package-wire.md) |
 | F03 | 完全backupを書き出し・明示確認して復元する | 別経路のみ | 旧Nativeで実装あり。新history／保護inventory／exchange-base付きwhole Projectのwire接続は別実装。 | [src/nativeGs/packageExchange.ts](../src/nativeGs/packageExchange.ts) / [docs/specs/06-project-package-wire.md:24](../docs/specs/06-project-package-wire.md) |
 | F04 | 一つのSceneを閲覧用に共有する | 別経路のみ | 旧Nativeのreview相当あり。新history-free closure／privacy検査／View入口は未接続。編集copyの対応保持は06 §12.6で要確認ピン表示を条件に承認。exact snapshot／再構築表review済み、builder／golden実行は残る。 | [src/nativeGs/packageSnapshots.ts](../src/nativeGs/packageSnapshots.ts) / [docs/specs/06-project-package-wire.md:24](../docs/specs/06-project-package-wire.md) |
 | F05 | 全Sceneを独立Projectとして複製して渡す | 別経路のみ | 旧Native clean相当あり。新全Projectのre-key／fresh history／元へContribution不可は未接続。 | [src/nativeGs/packageSnapshots.ts](../src/nativeGs/packageSnapshots.ts) / [docs/specs/06-project-package-wire.md:24](../docs/specs/06-project-package-wire.md) |

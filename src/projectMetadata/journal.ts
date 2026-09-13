@@ -6,8 +6,10 @@ import { checkedProof, fail, type MetadataLimits, type MetadataProof } from './f
 import { ProjectMetadataSource } from './source';
 import { digest, equalBytes, json, metadataPath, readReceipt, technicalId, writeReceipt } from './persistence';
 import { initialWorkspaceChanges, planRemoteChanges } from './remote';
-import { captureJournalRemote, checkJournalRemote, isPackageRemote, remoteMetadata, validateJournalRemote,
+import { captureJournalRemote, checkJournalRemote, isPackageRemote, isContributionRemote, validateJournalRemote,
+  remoteEvidenceBytes, remoteEvidenceDescriptors, remoteInputFromEvidence,
   type JournalRemoteProof, type JournalRemoteInput } from './packageRemote';
+import { assertContributionBaseInReceiver, frozenBaseSource } from '../projectPackage/contributionEvidence';
 
 export interface JournalStart {
   transactionId: string;
@@ -53,7 +55,7 @@ export class TransactionJournal {
     const prefix = metadataPath(this.fs, 'journal/'), paths = await this.fs.list(prefix);
     const ids = [...new Set(paths.map(path => {
       const tail = path.slice(prefix.length);
-      if (!/^[0-9a-f]{32}\/(staging\.json|blobsVerified\.json|metadataDurable\.json|published\.json|source-metadata\.am|source-manifest\.(json|sha256)|changes\/[0-9]{8}\.amchange)$/.test(tail)) fail('journal-path');
+      if (!/^[0-9a-f]{32}\/(staging\.json|blobsVerified\.json|metadataDurable\.json|published\.json|source-metadata\.am|source-manifest\.(json|sha256)|changes\/[0-9]{8}\.amchange|wire-changes\/[0-9]{8}\.amchange|derived-target-metadata\.am|base-evidence\/[0-9a-f]{64})$/.test(tail)) fail('journal-path');
       return tail.split('/')[0]!;
     }))];
     if (ids.length > this.limits.maxChanges) fail('journal-count');
@@ -66,6 +68,11 @@ export class TransactionJournal {
       if (prepared) await this.validatePrepared(start!, prepared);
       if (prepared && (!prepared.remote || !isPackageRemote(prepared.remote)) &&
         paths.some(path => path.startsWith(this.path(id, 'source-manifest.')))) fail('journal-source-kind');
+      if (prepared) {
+        const allowed = new Set(prepared.remote ? remoteEvidenceDescriptors(prepared.remote).map(([name]) => this.path(id, name)) : []);
+        for (const path of paths.filter(path => path.startsWith(this.path(id, '')) && /\/(source-|wire-changes\/|base-evidence\/|derived-target-)/.test(path)))
+          if (!allowed.has(path)) fail('journal-source-kind');
+      }
       const durable = await readReceipt<Durable>(this.fs, this.path(id, 'metadataDurable.json'), this.limits);
       const publication = await readReceipt<Publication>(this.fs, this.path(id, 'published.json'), this.limits);
       for (const receipt of [durable, publication]) if (receipt) {
@@ -98,7 +105,7 @@ export class TransactionJournal {
   async stage(start: JournalStart, parts: readonly Uint8Array[], stagedBlobs: readonly JsonObject[] = [],
     remote?: JournalRemoteInput): Promise<PreparedJournal> {
     validateStart(start, this.limits);
-    if (remote) remote = captureJournalRemote(remote, start.proof, this.limits);
+    if (remote) { remote = captureJournalRemote(remote, start.proof, this.limits); await validateJournalRemote(remote, start.proof, this.limits); }
     const changes: Part[] = [];
     for (const [ordinal, bytes] of parts.entries()) {
       const c = A.decodeChange(bytes);
@@ -118,8 +125,7 @@ export class TransactionJournal {
     }
     await writeReceipt(this.fs, this.path(start.transactionId, 'staging.json'), start, this.limits);
     if (remote) {
-      const originals: [string, Uint8Array][] = [['source-metadata.am', remote.bytes]];
-      if (isPackageRemote(remote.proof)) originals.unshift(['source-manifest.json', remote.manifestBytes!], ['source-manifest.sha256', remote.checksumBytes!]);
+      const originals = remoteEvidenceBytes(remote);
       for (const [name, original] of originals) {
         const path = this.path(start.transactionId, name), prior = await this.fs.readStream(path);
         if (prior) {
@@ -151,7 +157,7 @@ export class TransactionJournal {
     if (!p || !keys.includes(Object.keys(p).sort().join(',')) || json(start) !== json(p.start) ||
       !Array.isArray(p.changes) || (remote ? !p.changes.length || p.changes.length > this.limits.maxChanges : p.changes.length !== (start.purpose === 'initialize' ? 2 : 1))) fail('journal-descriptors');
     if (remote) checkJournalRemote(p.remote!, start.proof, this.limits);
-    if (imported && (!packageSource || json(p.remote!.source.remoteHeads) !== json(p.remote!.expectedFinalHeads))) fail('import-source');
+    if (imported && (!packageSource || isContributionRemote(p.remote!) || json(p.remote!.source.remoteHeads) !== json(p.remote!.expectedFinalHeads))) fail('import-source');
     if (p.exactChangeSetDigest !== await seal(start, p.changes, p.stagedBlobs, p.remote)) fail('journal-descriptors');
     if (p.stagedBlobs !== undefined) {
       if (!Array.isArray(p.stagedBlobs) || (packageSource ? !p.stagedBlobs.length || p.stagedBlobs.length > this.limits.maxNodes :
@@ -198,36 +204,30 @@ export class TransactionJournal {
     return parts;
   }
 
-  private async readRemoteSource(p: PreparedJournal): Promise<ProjectMetadataSource> {
+  private async readRemoteInput(p: PreparedJournal): Promise<JournalRemoteInput> {
     if (!p.remote) return fail('remote-descriptor');
-    const s = p.remote.source, descriptor = remoteMetadata(p.remote), path = this.path(p.start.transactionId, 'source-metadata.am');
-    const file = await this.fs.readStream(path);
-    if (!file || file.size !== descriptor.byteLength) fail('remote-source-size');
-    const bytes = await this.fs.readBytes(path);
-    if (!bytes || bytes.length !== descriptor.byteLength || await digest(bytes) !== descriptor.sha256) fail('remote-source-digest');
-    if (isPackageRemote(p.remote)) {
-      const readControl = async (name: string, length: number) => {
-        const path = this.path(p.start.transactionId, name), input = await this.fs.readStream(path);
-        if (!input || input.size !== length) return fail('package-remote-original');
-        const result = await this.fs.readBytes(path);
-        if (!result || result.length !== length) return fail('package-remote-original');
-        return result;
-      };
-      return validateJournalRemote({ proof: p.remote, bytes: bytes!,
-        manifestBytes: await readControl('source-manifest.json', p.remote.source.manifest.byteLength),
-        checksumBytes: await readControl('source-manifest.sha256', p.remote.source.checksum.byteLength),
-      }, p.start.proof, this.limits);
+    const originals = new Map<string, Uint8Array>();
+    for (const [name, ref] of remoteEvidenceDescriptors(p.remote)) {
+      const path = this.path(p.start.transactionId, name), file = await this.fs.readStream(path);
+      if (!file || file.size !== ref.byteLength) fail('remote-source-size');
+      const bytes = await this.fs.readBytes(path);
+      if (!bytes || bytes.length !== ref.byteLength || await digest(bytes) !== ref.sha256) return fail('remote-source-digest');
+      originals.set(name, bytes);
     }
-    const source = ProjectMetadataSource.fromFullSource(bytes!, p.start.proof, this.limits);
-    if (json(source.heads) !== json(s.remoteHeads)) fail('remote-source-heads');
-    return source;
+    return remoteInputFromEvidence(p.remote, originals);
+  }
+  private async readRemoteSource(p: PreparedJournal): Promise<ProjectMetadataSource> {
+    return validateJournalRemote(await this.readRemoteInput(p), p.start.proof, this.limits);
   }
 
   /** Recovery re-derives completeness from the retained full source and exact durable base. */
   async validateRemote(p: PreparedJournal, base: ProjectMetadataSource): Promise<ProjectMetadataSource> {
     const parts = await this.validateParts(p);
     if (p.start.purpose !== 'remotePackageMerge' || !p.remote || json(base.heads) !== json(p.start.baseHeads)) fail('remote-base-heads');
-    const expected = planRemoteChanges(base, await this.readRemoteSource(p), this.limits);
+    const input = await this.readRemoteInput(p), target = await validateJournalRemote(input, p.start.proof, this.limits);
+    if ('wireParts' in input) assertContributionBaseInReceiver(frozenBaseSource(input.proof.source.base,
+      input.baseManifestBytes, input.baseMetadataBytes, this.limits).source, base);
+    const expected = planRemoteChanges(base, target, this.limits);
     if (parts.length !== expected.parts.length || parts.some((b, i) => !equalBytes(b, expected.parts[i]!)) ||
       json(expected.final.heads) !== json(p.remote!.expectedFinalHeads)) fail('remote-complete-set');
     return expected.final;
@@ -235,7 +235,7 @@ export class TransactionJournal {
 
   /** Initial import proves the entire original history without fabricating a receiver base. */
   async validateImport(p: PreparedJournal): Promise<ProjectMetadataSource> {
-    if (p.start.purpose !== 'importWorkspace' || !p.remote || !isPackageRemote(p.remote)) return fail('import-journal');
+    if (p.start.purpose !== 'importWorkspace' || !p.remote || !isPackageRemote(p.remote) || isContributionRemote(p.remote)) return fail('import-journal');
     const parts = await this.validateParts(p), source = await this.readRemoteSource(p), expected = initialWorkspaceChanges(source, this.limits);
     if (parts.length !== expected.length || parts.some((b, i) => !equalBytes(b, expected[i]!)) ||
       json(source.heads) !== json(p.remote.expectedFinalHeads)) fail('import-complete-set');

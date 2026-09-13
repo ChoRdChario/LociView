@@ -281,7 +281,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
     const emptyImport = () => !localInitial && last.state === 'empty' && !unfinishedReceive() && !unfinishedOutput();
     const host: SavedWorkspaceHost = { authority, limits, read: () => last, hasPending: () => busy || receiveDisplayPending || unfinishedReceive() ||
       !emptyImport() && (!!failure || last.state !== 'ready'),
-      refresh: () => execute(async () => { last = await session.read(); await projectView(last); return last; }),
+      refresh: () => execute(async () => { await reloadReceive(); last = await session.read(); await projectView(last); return last; }),
       resolve: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
       dispose: async () => { await dispose(); content.releasePreparedImages(); content.releasePreparedModels(); prepareDisplay = undefined; } };
     return { ...host, content, workspaceFiles, workspaceOutput, display: () => project,

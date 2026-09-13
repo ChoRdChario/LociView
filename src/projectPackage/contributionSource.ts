@@ -7,7 +7,7 @@ import type { MetadataProjectSession, MetadataSessionRead } from '../projectMeta
 import { ProjectMetadataSource, type MetadataLimits } from '../projectMetadata/source';
 import { PACKAGE_LIMITS as L, SUMMARY_ALGORITHM, type AutomaticSummary, type ChangeEntry, type Entry, type PackageManifest } from './contract';
 import { packageByteHash, PackageControlError, readManifestControl } from './manifest';
-import { summarizeDeltaHistory, summarizeFullHistory } from './historySummary';
+import { summarizeFullHistory } from './historySummary';
 import { planWorkspaceClosure } from './closure';
 import { packageSourceLimits } from './workspaceSource';
 import type { WorkspaceBaseStore } from './workspaceBases';
@@ -16,7 +16,10 @@ import { PackageArchive } from './zipArchive';
 
 export type ContributionManifest = Extract<PackageManifest, { purpose: 'contribution' }>;
 export type ContributionBaseSelection = ContributionManifest['base'];
-export const CONTRIBUTION_RECONSTRUCTION = 'lociview-automerge-3.4.1-reachable-originals-1';
+export { CONTRIBUTION_RECONSTRUCTION } from './contributionEvidence';
+import { CONTRIBUTION_RECONSTRUCTION, contributionDelta as delta, contributionTargetView as targetView,
+  describeContributionTarget as describeTarget, verifyFrozenBase, verifyContributionEvidence,
+  type ContributionBaseProof, type ContributionReconstruction } from './contributionEvidence';
 const fail = (code: string): never => { throw new PackageControlError(code); };
 const same = (a: unknown, b: unknown) => canonical(a as JsonValue) === canonical(b as JsonValue);
 const equal = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((v, i) => v === b[i]);
@@ -64,6 +67,15 @@ export class VerifiedContributionBase {
       Object.freeze({ workspacePackageId: m.packageId, workspaceManifestSha256: packageByteHash(manifestBytes), heads: m.targetHeads }), m.blobs, closure.semanticRefs);
     await base.verifyInventory(store, signal); return base;
   }
+  /** Frozen journal/job evidence only; fresh admission still uses select(). */
+  static async fromFrozenEvidence(proof: ContributionBaseProof, manifest: Uint8Array, metadata: Uint8Array, limits: MetadataLimits) {
+    const manifestBytes = manifest.slice(), metadataBytes = metadata.slice();
+    const ownedProof = JSON.parse(canonical(proof as unknown as JsonValue)) as ContributionBaseProof;
+    const verified = await verifyFrozenBase(ownedProof, manifestBytes, metadataBytes, limits);
+    return new VerifiedContributionBase(manifestBytes, metadataBytes, verified.source,
+      Object.freeze({ workspacePackageId: verified.manifest.packageId, workspaceManifestSha256: packageByteHash(manifestBytes), heads: verified.manifest.targetHeads }),
+      verified.blobs, verified.bodyRefs);
+  }
   async verifyInventory(store: Pick<OriginBlobStore, 'inspect'>, signal?: AbortSignal) {
     checkAbort(signal);
     for (const ref of this.bodyRefs) {
@@ -71,67 +83,6 @@ export class VerifiedContributionBase {
     }
     checkAbort(signal);
   }
-}
-
-function originalIndex(source: ProjectMetadataSource) {
-  return new Map(source.originalChanges().map(bytes => { const c = A.decodeChange(bytes); return [c.hash, { bytes, deps: c.deps }] as const; }));
-}
-/** Wire D uses incremental lexical readiness, not the receiver journal's ready batches. */
-function delta(base: ProjectMetadataSource, target: ProjectMetadataSource, limits: MetadataLimits) {
-  if (!same(base.proof, target.proof)) return fail('contribution-lineage');
-  const known = originalIndex(base), pending = originalIndex(target); let work = 0, dependencies = 0;
-  for (const [hash, part] of pending) {
-    dependencies += part.deps.length; if (dependencies > L.dependencyReferences) fail('contribution-dependency-budget');
-    const prior = known.get(hash); if (!prior) continue;
-    if (!equal(prior.bytes, part.bytes)) fail('contribution-original-identity'); pending.delete(hash);
-  }
-  const parts: Uint8Array[] = [], changes: ChangeEntry[] = [];
-  while (pending.size) {
-    const ready: string[] = [];
-    for (const [hash, part] of pending) {
-      work += 1 + part.deps.length; if (work > limits.maxWork) fail('contribution-work-budget');
-      if (part.deps.every(dep => known.has(dep))) ready.push(hash);
-    }
-    const hash = ready.sort()[0]; if (!hash) return fail('contribution-dependencies');
-    const part = pending.get(hash)!;
-    changes.push(Object.freeze({ ordinal: parts.length, expectedChangeHash: hash, dependencies: Object.freeze([...part.deps].sort()),
-      byteLength: part.bytes.length, bytesSha256: packageByteHash(part.bytes) }));
-    parts.push(part.bytes); known.set(hash, part); pending.delete(hash);
-  }
-  return { parts, changes: Object.freeze(changes), workUsed: work };
-}
-function targetView(base: ProjectMetadataSource, parts: readonly Uint8Array[], heads: readonly string[], limits: MetadataLimits) {
-  // The temporary native union may contain container collisions from unrelated
-  // branches. Validate the selected sender target, not that temporary domain view.
-  const index = originalIndex(base), selected = new Set<string>(), queue = [...heads]; let work = 0;
-  for (const bytes of parts) {
-    const c = A.decodeChange(bytes), prior = index.get(c.hash);
-    work += 1 + c.deps.length; if (work > limits.maxWork) fail('contribution-work-budget');
-    if (prior && !equal(prior.bytes, bytes)) fail('contribution-original-identity');
-    if (c.deps.some(dep => !index.has(dep))) fail('contribution-dependencies');
-    index.set(c.hash, { bytes, deps: c.deps });
-  }
-  while (queue.length) {
-    if (++work > limits.maxWork) fail('contribution-work-budget');
-    const hash = queue.pop()!; if (selected.has(hash)) continue;
-    const found = index.get(hash); if (!found) return fail('contribution-target-missing');
-    selected.add(hash); queue.push(...found.deps);
-  }
-  const target = ProjectMetadataSource.reopen([...index].filter(([hash]) => selected.has(hash)).map(([, p]) => p.bytes), base.proof, limits);
-  if (!same(target.heads, heads)) return fail('contribution-target-heads'); return target;
-}
-async function describeTarget(base: VerifiedContributionBase, target: ProjectMetadataSource, changes: readonly ChangeEntry[], signal?: AbortSignal) {
-  const inspection = await target.inspectOriginal({ maxNodes: L.inspectionNodes, maxWork: L.inspectionWork }); checkAbort(signal);
-  const counts = summarizeDeltaHistory(inspection, new Set(changes.map(c => c.expectedChangeHash))), closure = planWorkspaceClosure(inspection.candidates);
-  if (counts.hasOpaque || counts.workUsed + closure.workUsed > L.inspectionWork) return fail('contribution-inspection-budget');
-  const guaranteed = new Map(base.blobs.map(e => [e.sha256, e.byteLength]));
-  const blobs = Object.freeze(closure.entries.filter(e => {
-    const prior = guaranteed.get(e.sha256);
-    if (prior !== undefined && prior !== e.byteLength) fail('contribution-digest-length'); return prior === undefined;
-  }));
-  const summary: AutomaticSummary = Object.freeze({ algorithm: SUMMARY_ALGORITHM, scope: 'baseDelta',
-    entityClasses: counts.entityClasses, fieldClasses: counts.fieldClasses, blobEntryCount: blobs.length, blobBytes: blobs.reduce((n, e) => n + e.byteLength, 0) });
-  return { blobs, bodyRefs: Object.freeze(closure.semanticRefs.filter(r => !guaranteed.has(r.digest))), summary };
 }
 
 /** Exact original delta capture; no storage mutation, retained-base update or save receipt. */
@@ -184,7 +135,20 @@ export class ContributionArchive {
     private readonly originals: readonly Uint8Array[], readonly bodyRefs: readonly StoredBlobRef[], private readonly derived: Uint8Array) { Object.freeze(this); }
   changeBytes(ordinal: number) { const b = this.originals[ordinal]; if (!b) return fail('contribution-ordinal'); return b.slice(); }
   derivedTargetBytes() { return this.derived.slice(); }
-  reconstruction() { return Object.freeze({ kind: 'derivedTargetView', adapterId: CONTRIBUTION_RECONSTRUCTION, targetMetadata: reference(this.derived) }); }
+  reconstruction(): Readonly<ContributionReconstruction> { return Object.freeze({ kind: 'derivedTargetView', adapterId: CONTRIBUTION_RECONSTRUCTION, targetMetadata: reference(this.derived) }); }
+  static async restore(file: Blob, base: VerifiedContributionBase, derived: Uint8Array,
+    reconstruction: ContributionReconstruction, store: Pick<OriginBlobStore, 'inspect'>, limits: MetadataLimits) {
+    derived = derived.slice(); reconstruction = JSON.parse(canonical(reconstruction as unknown as JsonValue)) as ContributionReconstruction;
+    const archive = await PackageArchive.inspect(file), m = archive.control.manifest;
+    if (m.purpose !== 'contribution') return fail('contribution-purpose');
+    const parts: Uint8Array[] = [];
+    for (const entry of m.changes) parts.push(await archive.entryBytes(`changes/${String(entry.ordinal).padStart(8, '0')}.amchange`, limits.maxChangeBytes));
+    const verified = await verifyContributionEvidence({ manifestBytes: await archive.entryBytes('manifest.json', L.controlBytes),
+      checksumBytes: await archive.entryBytes('manifest.sha256', 64), base: base.proof(), baseManifestBytes: base.manifestBytes(),
+      baseMetadataBytes: base.metadataBytes(), wireParts: parts, derivedTargetBytes: derived, reconstruction }, limits);
+    await base.verifyInventory(store);
+    return new ContributionArchive(archive, base, verified.target, parts, verified.bodyRefs, derived.slice());
+  }
   static async inspect(file: Blob, base: VerifiedContributionBase, store: Pick<OriginBlobStore, 'inspect'>, limits: MetadataLimits, signal?: AbortSignal) {
     const archive = await PackageArchive.inspect(file, signal), m = archive.control.manifest;
     if (m.purpose !== 'contribution') return fail('contribution-purpose');

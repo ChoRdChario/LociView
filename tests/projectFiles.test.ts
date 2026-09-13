@@ -5,6 +5,7 @@ import { MemoryFS } from '../src/platform/fs';
 import { ProjectMutationCoordinator } from '../src/platform/projectLock';
 import { OriginBlobStore } from '../src/projectMetadata/blobStore';
 import type { MetadataStorageFactory } from '../src/projectMetadata/repository';
+import { MetadataRepository } from '../src/projectMetadata/repository';
 import { digest, newId, json, underWriteLease } from '../src/projectMetadata/persistence';
 import { validationMetadataLimits as metadata, type FileValidationLimits } from '../src/projectFiles/validation';
 import { inspectValidationGlb, validationGlbParts } from '../src/projectFiles/glb';
@@ -64,6 +65,8 @@ import { VerifiedContributionBase, ContributionSourceCapture, ContributionArchiv
 import { writeContributionArchive } from '../src/projectPackage/contributionArchive';
 import { TransactionJournal } from '../src/projectMetadata/journal';
 import { createValidationReceiveControls } from '../src/harness/projectScene/validationReceiveControls';
+import { ContributionReceiveJob } from '../src/projectPackage/contributionReceiveJob';
+import { remoteEvidenceBytes } from '../src/projectMetadata/packageRemote';
 
 const budget: FileValidationLimits = { maxFileBytes: 1_000_000, maxJsonBytes: 100_000, maxItems: 10_000, maxValues: 100_000, maxPixels: 10_000 };
 const png = Uint8Array.from(atob(fixtureMedia[0]!.base64), c => c.charCodeAt(0));
@@ -109,6 +112,9 @@ class TestFS extends MemoryFS {
   reject = (_: string) => false; reads = 0;
   override async writeText(path: string, text: string) { if (this.reject(path)) throw Error('injected quota'); return super.writeText(path, text); }
   override async writeBytes(path: string, bytes: Uint8Array) { if (this.reject(path)) throw Error('injected quota'); return super.writeBytes(path, bytes); }
+  override async writeStream(path: string, stream: ReadableStream<Uint8Array>) {
+    if (this.reject(path)) { await stream.cancel(); throw Error('injected quota'); } return super.writeStream(path, stream);
+  }
   override async readStream(path: string) { const file = await super.readStream(path); if (!file || !path.startsWith('v2/cas/objects/')) return file;
     return { size: file.size, stream: () => { this.reads++; return file.stream(); } }; }
 }
@@ -189,6 +195,169 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     };
     return { fs, factory, store, locks, reopen, ...reopen() };
   }
+  async function contributionFile(session: ReturnType<typeof validationProjectService>['session'], fs: TestFS, store: OriginBlobStore) {
+    const current = await session.read(), bases = new WorkspaceBaseStore(fs, metadata, current.source!.proof), snapshot = await bases.snapshot(), row = snapshot.records[0]!;
+    const base = await VerifiedContributionBase.select(bases, { workspacePackageId: row.workspacePackageId,
+      workspaceManifestSha256: row.workspaceManifestSha256, heads: row.declaredHeads }, store, metadata);
+    const capture = await ContributionSourceCapture.prepare(session, current.source!.token, base, store, metadata), chunks: BlobPart[] = [];
+    await writeContributionArchive(capture, store, new WritableStream({ write(b) { chunks.push(b.slice() as BlobPart); } }),
+      { packageId: `pkg_${newId()}`, createdByVersion: 'validation' });
+    return { file: new Blob(chunks), capture, snapshot, current };
+  }
+  async function contributionTeam() {
+    const f = await workspaceFileFixture(), r = firstWorkspaceRecipient();
+    await f.receiverService.receive(f.local.source!.token, f.file); await r.receiver.importWorkspace(f.file);
+    const before = await f.receiver.session.read();
+    await f.receiver.session.editCaption(before.source!.token, f.captionId, 'title', '変更分の記録');
+    return { f, r, sent: await contributionFile(f.receiver.session, f.fs, f.store) };
+  }
+  it('receives Contribution through the same file service for two rounds, retaining originals/conflicts and exact bases', async () => {
+    const { f, r, sent } = await contributionTeam(), initial = await r.session.read();
+    const rBases = await new WorkspaceBaseStore(r.fs, metadata, initial.source!.proof).snapshot();
+    const local = await r.session.editCaption(initial.source!.token, f.captionId, 'body', '受け手の記録'), reads = r.fs.reads;
+    const result = await r.receiver.receive(local.source!.token, sent.file); expect(result.state).toBe('ready');
+    const originalSet = (s: ProjectMetadataSource) => s.originalChanges().map(b => [A.decodeChange(b).hash, [...b]]).sort();
+    expect(originalSet(result.source!)).toEqual(originalSet(planRemoteChanges(local.source!, sent.current.source!, metadata).final));
+    if (result.provider?.kind !== 'scene-provider') throw Error('provider');
+    expect(result.provider.resources.captions[f.captionId]!.body.kind).toBe('unresolved');
+    expect(r.fs.reads).toBe(reads); // Existing model/image bodies are not streamed for delta discovery/receive.
+    const reply = await contributionFile(r.session, r.fs, r.store), back = await f.receiverService.receive(sent.current.source!.token, reply.file);
+    expect(back.source!.token).toBe(result.source!.token);
+    const tx = (await new TransactionJournal(f.fs, metadata).entries()).at(-1)!;
+    expect(tx.prepared!.changes.length).toBeLessThan(reply.capture.changes.length); // receiver M differs from wire D.
+    expect(await new WorkspaceBaseStore(f.fs, metadata, back.source!.proof).snapshot()).toEqual(sent.snapshot);
+    expect(await new WorkspaceBaseStore(r.fs, metadata, result.source!.proof).snapshot()).toEqual(rBases);
+    const cold = r.reopen(), writes = vi.spyOn(r.fs, 'writeText');
+    expect((await cold.receiver.receive(result.source!.token, sent.file)).source!.token).toBe(result.source!.token);
+    expect(writes).not.toHaveBeenCalled(); writes.mockRestore();
+  }, 15000); // Several complete file rounds; not a product latency guarantee.
+  it.each(['prepared', 'completion'] as const)('cold-recovers Contribution %s interruption without changing source/base or publishing twice', async point => {
+    const { f, r, sent } = await contributionTeam(), before = await r.session.read();
+    r.fs.reject = p => point === 'prepared' ? p.endsWith('/metadataDurable.json') : p.includes('/contribution-receive/') && p.includes('/steps/');
+    await expect(r.receiver.receive(before.source!.token, sent.file)).rejects.toThrow('injected quota'); r.fs.reject = () => false;
+    const [id] = await ContributionReceiveJob.ids(r.fs), job = await ContributionReceiveJob.open(r.fs, id!, r.store, metadata);
+    const journal = new TransactionJournal(r.fs, metadata), entry = (await journal.entries()).find(e => e.start.transactionId === id)!;
+    const input = await job.journalInput(entry.prepared!.remote!.expectedFinalHeads);
+    for (const [name, bytes] of remoteEvidenceBytes(input)) expect(await r.fs.readBytes(journal.path(id!, name))).toEqual(bytes);
+    expect(await r.fs.readBytes(journal.path(id!, 'source-metadata.am'))).toBeNull();
+    if (point === 'prepared') {
+      expect((await r.session.read()).source!.token).toBe(before.source!.token);
+      await expect(r.reopen().session.retry()).rejects.toThrow('receive-job-recovery-required');
+    } else {
+      const read = await r.session.read(); await r.session.editCaption(read.source!.token, f.captionId, 'title', '受信後の編集');
+    }
+    const cold = r.reopen(), done = await cold.receiver.retry(id!); expect(done.state).toBe('ready');
+    const writes = vi.spyOn(r.fs, 'writeText'); expect((await cold.receiver.retry(id!)).source!.token).toBe(done.source!.token);
+    expect(writes).not.toHaveBeenCalled(); writes.mockRestore();
+    expect((await journal.entries()).filter(e => e.start.transactionId === id)).toHaveLength(1);
+    expect((await cold.receiver.jobs()).find(j => j.id === id)!.state).toBe('completed');
+  });
+  it('keeps M=0 job/index completion separate from metadata and blocks lost-job output', async () => {
+    const { f, sent } = await contributionTeam(), journal = new TransactionJournal(f.fs, metadata), before = await journal.entries();
+    f.fs.reject = p => p.includes('/contribution-receive/') && p.includes('/steps/');
+    await expect(f.receiverService.receive(sent.current.source!.token, sent.file)).rejects.toThrow('injected quota'); f.fs.reject = () => false;
+    const [id] = await ContributionReceiveJob.ids(f.fs); expect(await journal.entries()).toEqual(before);
+    expect((await f.receiverService.jobs()).find(j => j.id === id)!.state).toBe('incomplete');
+    const sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
+    await expect(sender.generate(sent.current.source!.token)).rejects.toThrow();
+    const cold = new WorkspaceReceiver(f.fs, f.fs, f.reopen().session, metadata, f.locks);
+    await cold.retry(id!); expect(await journal.entries()).toEqual(before);
+    const later = await f.receiver.session.editCaption(sent.current.source!.token, f.captionId, 'title', '後の記録');
+    expect((await cold.retry(id!)).source!.token).toBe(later.source!.token);
+    for (const path of await f.fs.list(`v2/packages/contribution-receive/${id}/`)) await f.fs.remove(path);
+    expect((await cold.jobs()).find(j => j.id === id)!.state).toBe('repair-required');
+    await expect(sender.generate(later.source!.token)).rejects.toThrow();
+    expect(await f.fs.exists(`v2/packages/contribution-index/${id}.json`)).toBe(true);
+  });
+  it.each(['input.zip', 'start.json'])('reselects the exact Contribution after %s interruption from frozen evidence', async stop => {
+    const { r, sent } = await contributionTeam(), before = await r.session.read(), pathsBefore = await r.fs.list('');
+    r.fs.reject = p => p.includes('/contribution-receive/') && p.endsWith(`/${stop}`);
+    await expect(r.receiver.receive(before.source!.token, sent.file)).rejects.toThrow('injected quota'); r.fs.reject = () => false;
+    const [id] = await ContributionReceiveJob.ids(r.fs), prefix = `v2/packages/contribution-receive/${id}/`;
+    expect(await ContributionReceiveJob.inputState(r.fs, id!, metadata)).toBe('input-required');
+    expect(await r.fs.exists(`v2/packages/contribution-index/${id}.json`)).toBe(stop === 'start.json');
+    const evidencePaths = ['base-manifest.json', 'base-metadata.am', 'derived-target-metadata.am'].map(p => prefix + p);
+    const originals = await Promise.all(evidencePaths.map(p => r.fs.readBytes(p)));
+    const cold = r.reopen(), write = vi.spyOn(r.fs, 'writeBytes');
+    await expect(cold.receiver.reselectInput(before.source!.token, id!, new Blob(['wrong file']))).rejects.toThrow();
+    expect(write).not.toHaveBeenCalled(); write.mockRestore();
+    // Frozen recovery must not re-select the live table; fresh admission still does.
+    const select = vi.spyOn(VerifiedContributionBase, 'select').mockRejectedValue(Error('live base unavailable'));
+    try { expect((await cold.receiver.reselectInput(before.source!.token, id!, sent.file)).state).toBe('ready'); }
+    finally { select.mockRestore(); }
+    expect(await Promise.all(evidencePaths.map(p => r.fs.readBytes(p)))).toEqual(originals);
+    expect((await r.fs.list('')).length).toBeGreaterThan(pathsBefore.length);
+    expect((await cold.receiver.jobs()).find(j => j.id === id)!.state).toBe('completed');
+  });
+  it('recovers an exact Contribution prefix without exposing it or reserializing its originals', async () => {
+    const { r, sent } = await contributionTeam(), before = await r.session.read();
+    const planned = planRemoteChanges(before.source!, sent.current.source!, metadata); expect(planned.parts.length).toBeGreaterThan(1);
+    const prefix = before.source!.appendOriginal(planned.parts.slice(0, 1)), persist = MetadataRepository.prototype.persist;
+    let partial = false;
+    const fault = vi.spyOn(MetadataRepository.prototype, 'persist').mockImplementation(async function (this: MetadataRepository, id, expected) {
+      if (!partial && expected.token === planned.final.token) { partial = true; await persist.call(this, id, prefix); throw Error('prefix interrupted'); }
+      return persist.call(this, id, expected);
+    });
+    try { await expect(r.receiver.receive(before.source!.token, sent.file)).rejects.toThrow('prefix interrupted'); }
+    finally { fault.mockRestore(); }
+    expect(partial).toBe(true); const [id] = await ContributionReceiveJob.ids(r.fs), journal = new TransactionJournal(r.fs, metadata);
+    const entry = (await journal.entries()).find(e => e.start.transactionId === id)!;
+    const raw = await new MetadataRepository(r.fs, r.factory, metadata).read(entry.start.repositoryId, before.source!.proof);
+    expect(raw!.token).toBe(prefix.token); expect(entry.publication).toBeNull();
+    const cold = r.reopen(); expect((await cold.session.read()).source!.token).toBe(before.source!.token);
+    const recovered = await cold.receiver.retry(id!);
+    expect(recovered.source!.originalChanges()).toEqual(planned.final.originalChanges());
+    expect((await journal.entries()).filter(e => e.start.transactionId === id && e.publication)).toHaveLength(1);
+  });
+  it.each(['wire', 'base', 'derived', 'index', 'job'] as const)('refuses lost acknowledged Contribution %s and never replenishes from reselected input', async part => {
+    const { r, sent } = await contributionTeam(), before = await r.session.read();
+    await r.receiver.receive(before.source!.token, sent.file);
+    const [id] = await ContributionReceiveJob.ids(r.fs), journal = new TransactionJournal(r.fs, metadata);
+    const sourcePaths = await r.fs.list(journal.path(id!, ''));
+    const path = part === 'wire' ? sourcePaths.find(p => p.includes('/wire-changes/'))! : part === 'base' ? sourcePaths.find(p => p.includes('/base-evidence/'))! :
+      part === 'derived' ? journal.path(id!, 'derived-target-metadata.am') : part === 'index' ? `v2/packages/contribution-index/${id}.json` :
+      `v2/packages/contribution-receive/${id}/start.json`;
+    await r.fs.remove(path); const writes = vi.spyOn(r.fs, 'writeBytes'), controls = vi.spyOn(r.fs, 'writeText');
+    const cold = r.reopen(); await expect(cold.receiver.retry(id!)).rejects.toThrow();
+    await expect(cold.receiver.reselectInput(before.source!.token, id!, sent.file)).rejects.toThrow();
+    expect(await r.fs.exists(path)).toBe(false); expect(writes).not.toHaveBeenCalled(); expect(controls).not.toHaveBeenCalled();
+    writes.mockRestore(); controls.mockRestore();
+  });
+  it('explains a missing Contribution base without mutating the existing Project', async () => {
+    const { f, sent } = await contributionTeam(), separate = firstWorkspaceRecipient();
+    // A local Project with no retained Workspace observation cannot use the delta.
+    await prepareValidationCreation(f.prepared).persist(separate.fs, separate.store, separate.session);
+    const read = await separate.session.read(), before = await separate.fs.list('');
+    await expect(separate.receiver.receive(read.source!.token, sent.file)).rejects.toThrow('元になった作業一式');
+    expect(await separate.fs.list('')).toEqual(before); expect((await separate.session.read()).source!.token).toBe(read.source!.token);
+  });
+  it.each(['body', 'facts'])('receives a new Contribution PNG, cold-recovers, and refuses acknowledged %s loss', async missing => {
+    const { f, r } = await contributionTeam(), sender = f.receiver, current = await sender.session.read();
+    if (current.provider?.kind !== 'scene-provider') throw Error('provider');
+    const sceneId = Object.keys(current.provider.state.scenes)[0]!;
+    const included = await sender.session.edit(current.source!.token, { kind: 'include', sceneId, resourceKind: 'caption', resourceId: f.captionId,
+      membershipId: `scm_${newId()}`, orderKey: 'C', eventId: `evt_${newId()}` });
+    const bytes = Uint8Array.from(atob(fixtureMedia[1]!.base64), c => c.charCodeAt(0));
+    const media = await underWriteLease(f.fs, () => sender.content.prepareImage({ label: '追加画像', bytes }));
+    const attachmentId = `att_${newId()}`;
+    await sender.session.edit(included.source!.token, { kind: 'createAttachment', sceneId, captionId: f.captionId, attachmentId, media,
+      orderKey: 'C', altText: '', eventId: `evt_${newId()}` });
+    const sent = await contributionFile(sender.session, f.fs, f.store); expect(sent.capture.blobs).toHaveLength(1);
+    expect(sent.capture.blobs[0]!.sha256).toBe(await digest(bytes));
+    const before = new Set(await r.fs.list('')), read = await r.session.read();
+    r.fs.reject = p => p.endsWith('/metadataDurable.json');
+    await expect(r.receiver.receive(read.source!.token, sent.file)).rejects.toThrow('injected quota'); r.fs.reject = () => false;
+    const [id] = await ContributionReceiveJob.ids(r.fs), cold = r.reopen(), recovered = await cold.receiver.retry(id!);
+    expect(recovered.state).toBe('ready');
+    if (recovered.provider?.kind !== 'scene-provider') throw Error('provider');
+    expect(recovered.provider.details.attachments[attachmentId]?.kind).toBe('value');
+    const path = (await r.fs.list('')).find(p => !before.has(p) && (missing === 'body' ? p.startsWith('v2/cas/objects/') : p.startsWith('v2/metadata/evidence/')))!;
+    expect(path).toBeDefined(); await r.fs.remove(path);
+    const writes = vi.spyOn(r.fs, 'writeBytes'), controls = vi.spyOn(r.fs, 'writeText');
+    await expect(r.reopen().receiver.retry(id!)).rejects.toThrow();
+    expect(await r.fs.exists(path)).toBe(false); expect(writes).not.toHaveBeenCalled(); expect(controls).not.toHaveBeenCalled();
+    writes.mockRestore(); controls.mockRestore();
+  }, 15000);
   it('captures a Contribution from a real imported-base record without reading unchanged GLB/PNG or advancing that base', async () => {
     const f = await workspaceFileFixture(), imported = await f.receiverService.receive(f.local.source!.token, f.file);
     const bases = new WorkspaceBaseStore(f.fs, metadata, imported.source!.proof), before = await bases.snapshot(), row = before.records[0]!;
@@ -274,7 +443,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const cold = r.reopen();
     expect(await cold.receiver.jobs()).toEqual([{ id, state: 'repair-required' }]);
     await expect(cold.session.retry()).rejects.toThrow('receive-job-recovery-required');
-    await expect(cold.receiver.importWorkspace(f.file)).rejects.toThrow('import-not-empty');
+    await expect(cold.receiver.importWorkspace(f.file)).rejects.toThrow('receive-job-missing');
     expect((await cold.session.read()).source).toBeNull();
   });
   it('rejects surviving metadata after filesystem receipts are lost, and lost import jobs cannot enable output', async () => {
@@ -448,6 +617,37 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       fileLimits: budget, decode, packageLocks: r.locks, openStorage: async () => ({ factory: r.factory, dispose: async () => {} }) };
     return { ...r, f, run, options };
   }
+  it('enters Contribution recovery from a warm mounted View and refuses a separate repair job (recorded DOM)', async () => {
+    const { f, fs, options } = await initialWorkspaceHostFixture();
+    const first = await openValidationHost({ ...options, workspaceFile: f.file }); await first.dispose();
+    await f.receiverService.receive(f.local.source!.token, f.file);
+    const senderRead = await f.receiver.session.read();
+    await f.receiver.session.editCaption(senderRead.source!.token, f.captionId, 'title', '変更分の記録');
+    const sent = await contributionFile(f.receiver.session, f.fs, f.store);
+    const view = await openValidationHost({ ...options, mode: 'view' });
+    const host = createValidationModeHost(view, mode => openValidationHost({ ...options, mode }), () => {});
+    const u = createSavedWorkspace(new RecordedDocument().asDocument(), host,
+      undefined, (s, changed) => createValidationReceiveControls(new RecordedDocument().asDocument(), host, () => s, changed, async () => {}));
+    const originalSession = u.session, root = record(u.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    const button = (text: string) => all(root).find(n => n.tag === 'button' && n.textContent === text)!;
+    const writer = await openValidationHost(options);
+    fs.reject = p => p.includes('/contribution-receive/') && p.endsWith('/input.zip');
+    await expect(writer.workspaceFiles.receive(writer.read().source!.token, sent.file)).rejects.toThrow('injected quota');
+    fs.reject = () => false; await writer.dispose();
+    button('再開用データを確認').fire('click');
+    await vi.waitFor(() => { expect(host.mode!.recoveryAvailable).toBe(true); expect(button('編集を開始する').disabled).toBe(false); });
+    expect(host.read().state).toBe('ready'); expect(host.hasPending()).toBe(true);
+    // A distinct damaged job must not be mistaken for this recoverable pre-start input.
+    const jobs = host.workspaceFiles.jobs; jobs.push({ id: newId(), state: 'repair-required' });
+    expect(host.mode!.recoveryAvailable).toBe(false);
+    button('編集を開始する').fire('click'); expect(host.mode!.current).toBe('view'); jobs.pop();
+    button('編集を開始する').fire('click'); await vi.waitFor(() => { expect(host.mode!.current).toBe('edit'); expect(host.mode!.busy).toBe(false); });
+    expect(u.session).toBe(originalSession);
+    const id = host.workspaceFiles.jobs.find(j => j.state === 'input-required')!.id;
+    await host.workspaceFiles.reselectInput(host.read().source!.token, id, sent.file); u.render();
+    expect(host.hasPending()).toBe(false); expect(host.workspaceFiles.jobs.find(j => j.id === id)!.state).toBe('completed');
+    await u.dispose();
+  });
   it('opens a first Workspace from the existing selector and receives later selection by identity (recorded DOM)', async () => {
     const { f, options, run } = await initialWorkspaceHostFixture();
     let host: Awaited<ReturnType<typeof openValidationHost>> | undefined;

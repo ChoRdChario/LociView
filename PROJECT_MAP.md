@@ -54,8 +54,13 @@ Contribution now has bounded source/ZIP primitives: exact selected retained base
 original target-minus-base changes, incremental wire order, delta-only summary and
 new-body closure. Reopen reconstructs exact target ancestors, not the temporary
 union; base guarantees use durable CAS metadata without old-model streams. This
-does not yet connect Contribution to Session jobs/UI or advance any base. Exact
-checks are tracked in todo. Other purposes remain open. Download alone is not save proof.
+now connects to a distinct frozen Contribution input job and journal through the
+same update-file controls. Original wire/base/derived evidence and receiver M stay
+separate; pre-start re-selection and cold recovery never recreate acknowledged
+evidence. M=0 has no metadata publication or base advancement. A separate job index
+keeps lost jobs visible to shared recovery/output guards. Exact checks are tracked
+in todo; Contribution durable output/UI and other purposes remain open.
+Download alone is not save proof.
 This is not ordinary-home, rendered/device or whole-team acceptance.
 Exact executed checks are in todo.
 

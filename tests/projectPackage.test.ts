@@ -139,6 +139,18 @@ describe('Contribution originals and actual ZIP (injected base/CAS ports, no dur
     const owned = inspected.changeBytes(0); owned.fill(0); expect(inspected.changeBytes(0)).toEqual(capture.changeBytes(0));
     expect(b.bodies.openReadOnly).not.toHaveBeenCalled(); expect(b.bodies.inspect).toHaveBeenCalled();
   });
+  it('restores the first derived target and owns its bytes and descriptor before asynchronous inspection', async () => {
+    const f = await workspaceFixture(), b = await baseFor(f.source, f.store), target = title(f.source, 'Received');
+    const capture = await ContributionSourceCapture.prepare(await session(target), target.token, b.base, b.bodies, metadataLimits);
+    const built = await output(capture, b.bodies), inspected = await ContributionArchive.inspect(built.file, b.base, b.bodies, metadataLimits);
+    const bytes = inspected.derivedTargetBytes(), reconstruction = { ...inspected.reconstruction(), targetMetadata: { ...inspected.reconstruction().targetMetadata } };
+    const restoring = ContributionArchive.restore(built.file, b.base, bytes, reconstruction, b.bodies, metadataLimits);
+    bytes.fill(0); reconstruction.targetMetadata.sha256 = hash(9);
+    const restored = await restoring;
+    expect(restored.derivedTargetBytes()).toEqual(inspected.derivedTargetBytes());
+    expect(restored.target.originalChanges()).toEqual(target.originalChanges());
+    await expect(ContributionArchive.restore(built.file, b.base, bytes, reconstruction, b.bodies, metadataLimits)).rejects.toThrow();
+  });
   it('selects a non-ancestor target from base plus delta, not their union heads; M differs from D', async () => {
     const f = await workspaceFixture(), left = title(f.source, 'Left'), right = body(f.source, 'Right'), b = await baseFor(left, f.store);
     const capture = await ContributionSourceCapture.prepare(await session(right), right.token, b.base, b.bodies, metadataLimits), built = await output(capture, b.bodies);

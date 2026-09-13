@@ -5,6 +5,9 @@ import { checkedProof, fail, type MetadataLimits, type MetadataProof } from './f
 import { ProjectMetadataSource } from './source';
 import { checkRemoteBatch, checkRemoteHeads, type RemoteBatchProof } from './remote';
 import { json } from './persistence';
+import { CONTRIBUTION_RECONSTRUCTION, contributionOriginals, verifyContributionEvidence,
+  type ContributionBaseProof, type ContributionReconstruction, type ContributionEvidenceInput } from '../projectPackage/contributionEvidence';
+import type { ChangeEntry } from '../projectPackage/contract';
 
 /** Separate isolated package journal. Never reinterpret a legacy 02 source. */
 export interface PackageRemoteBatchProof {
@@ -13,14 +16,30 @@ export interface PackageRemoteBatchProof {
     metadata: EvidenceRef; metadataEnvelope: MetadataProof['envelope']; remoteHeads: string[] };
   expectedFinalHeads: string[];
 }
-export type JournalRemoteProof = RemoteBatchProof | PackageRemoteBatchProof;
-export interface JournalRemoteInput {
-  proof: JournalRemoteProof; bytes: Uint8Array;
+export interface ContributionRemoteBatchProof {
+  version: 'lociview-package-contribution-1';
+  source: { kind: 'contributionDelta'; packageId: string; manifest: EvidenceRef; checksum: EvidenceRef;
+    metadataEnvelope: MetadataProof['envelope']; remoteHeads: string[]; base: ContributionBaseProof;
+    wireChanges: readonly ChangeEntry[]; reconstruction: ContributionReconstruction };
+  expectedFinalHeads: string[];
+}
+export type JournalRemoteProof = RemoteBatchProof | PackageRemoteBatchProof | ContributionRemoteBatchProof;
+export interface FullJournalRemoteInput {
+  proof: RemoteBatchProof | PackageRemoteBatchProof; bytes: Uint8Array;
   manifestBytes?: Uint8Array; checksumBytes?: Uint8Array;
 }
-export function isPackageRemote(proof: JournalRemoteProof): proof is PackageRemoteBatchProof {
+export interface ContributionRemoteInput {
+  proof: ContributionRemoteBatchProof; manifestBytes: Uint8Array; checksumBytes: Uint8Array;
+  baseManifestBytes: Uint8Array; baseMetadataBytes: Uint8Array; wireParts: readonly Uint8Array[]; derivedTargetBytes: Uint8Array;
+}
+export type JournalRemoteInput = FullJournalRemoteInput | ContributionRemoteInput;
+export function isPackageRemote(proof: JournalRemoteProof): proof is PackageRemoteBatchProof | ContributionRemoteBatchProof {
   return !!proof && Object.hasOwn(proof, 'version');
 }
+export function isContributionRemote(proof: JournalRemoteProof): proof is ContributionRemoteBatchProof {
+  return isPackageRemote(proof) && proof.version === 'lociview-package-contribution-1';
+}
+export function isContributionInput(input: JournalRemoteInput): input is ContributionRemoteInput { return isContributionRemote(input.proof); }
 function evidence(value: EvidenceRef, max: number): void {
   if (!value || Object.keys(value).sort().join(',') !== 'byteLength,sha256' ||
     typeof value.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(value.sha256) ||
@@ -28,6 +47,38 @@ function evidence(value: EvidenceRef, max: number): void {
 }
 export function checkJournalRemote(remote: JournalRemoteProof, target: MetadataProof, limits: MetadataLimits): void {
   if (!isPackageRemote(remote)) return checkRemoteBatch(remote, target, limits);
+  if (isContributionRemote(remote)) {
+    if (Object.keys(remote).sort().join(',') !== 'expectedFinalHeads,source,version' || !remote.source ||
+      Object.keys(remote.source).sort().join(',') !== 'base,checksum,kind,manifest,metadataEnvelope,packageId,reconstruction,remoteHeads,wireChanges') fail('contribution-remote-descriptor');
+    const s = remote.source, b = s.base, r = s.reconstruction;
+    if (s.kind !== 'contributionDelta' || !/^pkg_[0-9a-f]{32}$/.test(s.packageId) || json(s.metadataEnvelope) !== json(target.envelope) ||
+      !b || Object.keys(b).sort().join(',') !== 'declaredHeads,evidence,identity,metadataEnvelope,workspaceManifestSha256,workspacePackageId' ||
+      json(b.identity) !== json(target.identity) || json(b.metadataEnvelope) !== json(target.envelope) ||
+      !/^pkg_[0-9a-f]{32}$/.test(b.workspacePackageId) || !/^[0-9a-f]{64}$/.test(b.workspaceManifestSha256) ||
+      !b.evidence || Object.keys(b.evidence).sort().join(',') !== 'manifest,metadata' ||
+      !r || Object.keys(r).sort().join(',') !== 'adapterId,kind,targetMetadata' || r.kind !== 'derivedTargetView' ||
+      r.adapterId !== CONTRIBUTION_RECONSTRUCTION) fail('contribution-remote-descriptor');
+    evidence(s.manifest, Math.min(PACKAGE_LIMITS.controlBytes, limits.maxTotalBytes)); evidence(s.checksum, 64);
+    evidence(b.evidence.manifest, Math.min(PACKAGE_LIMITS.controlBytes, limits.maxTotalBytes));
+    evidence(b.evidence.metadata, Math.min(PACKAGE_LIMITS.sourceBytes, limits.maxTotalBytes));
+    evidence(r.targetMetadata, Math.min(PACKAGE_LIMITS.sourceBytes, limits.maxTotalBytes));
+    if (s.checksum.byteLength !== 64 || b.evidence.manifest.sha256 !== b.workspaceManifestSha256) fail('contribution-remote-descriptor');
+    for (const heads of [s.remoteHeads, b.declaredHeads, remote.expectedFinalHeads]) {
+      checkRemoteHeads(heads); if (heads.length > Math.min(PACKAGE_LIMITS.heads, limits.maxChanges)) fail('package-remote-head-count');
+    }
+    if (!Array.isArray(s.wireChanges) || s.wireChanges.length > Math.min(PACKAGE_LIMITS.changes, limits.maxChanges)) fail('contribution-remote-changes');
+    let bytes = 0, deps = 0;
+    for (const [ordinal, c] of s.wireChanges.entries()) {
+      if (!c || Object.keys(c).sort().join(',') !== 'byteLength,bytesSha256,dependencies,expectedChangeHash,ordinal' || c.ordinal !== ordinal ||
+        !/^[0-9a-f]{64}$/.test(c.expectedChangeHash)) fail('contribution-remote-changes');
+      evidence({ sha256: c.bytesSha256, byteLength: c.byteLength }, Math.min(PACKAGE_LIMITS.changeBytes, limits.maxChangeBytes));
+      // Every delta original depends on the retained lineage, never a new root.
+      checkRemoteHeads(c.dependencies);
+      bytes += c.byteLength; deps += c.dependencies.length;
+      if (bytes > Math.min(PACKAGE_LIMITS.sourceBytes, limits.maxTotalBytes) || deps > PACKAGE_LIMITS.dependencyReferences) fail('contribution-remote-budget');
+    }
+    return;
+  }
   if (Object.keys(remote).sort().join(',') !== 'expectedFinalHeads,source,version' || remote.version !== 'lociview-package-remote-1' ||
     !remote.source || Object.keys(remote.source).sort().join(',') !== 'checksum,kind,manifest,metadata,metadataEnvelope,packageId,remoteHeads')
     fail('package-remote-descriptor');
@@ -41,7 +92,7 @@ export function checkJournalRemote(remote: JournalRemoteProof, target: MetadataP
   if (s.remoteHeads.length > Math.min(PACKAGE_LIMITS.heads, limits.maxChanges) ||
     remote.expectedFinalHeads.length > limits.maxChanges) fail('package-remote-head-count');
 }
-export function remoteMetadata(proof: JournalRemoteProof): EvidenceRef {
+export function remoteMetadata(proof: RemoteBatchProof | PackageRemoteBatchProof): EvidenceRef {
   return isPackageRemote(proof) ? proof.source.metadata :
     { sha256: proof.source.metadataSha256, byteLength: proof.source.metadataByteLength };
 }
@@ -52,7 +103,7 @@ function exactBytes(bytes: Uint8Array | undefined, ref: EvidenceRef): Uint8Array
 }
 
 /** Pure source/manifest binding. Does not authorize archive, body, profile or imported-base completion. */
-export function validateJournalRemote(input: JournalRemoteInput, target: MetadataProof, limits: MetadataLimits): ProjectMetadataSource {
+function validateFullJournalRemote(input: FullJournalRemoteInput, target: MetadataProof, limits: MetadataLimits): ProjectMetadataSource {
   checkJournalRemote(input.proof, target, limits);
   const proof = input.proof, source = proof.source;
   const bytes = exactBytes(input.bytes, remoteMetadata(proof));
@@ -69,20 +120,82 @@ export function validateJournalRemote(input: JournalRemoteInput, target: Metadat
   return result;
 }
 
+function contributionEvidence(input: ContributionRemoteInput, target: MetadataProof, limits: MetadataLimits): ContributionEvidenceInput {
+  checkJournalRemote(input.proof, target, limits);
+  if (Object.keys(input).sort().join(',') !== 'baseManifestBytes,baseMetadataBytes,checksumBytes,derivedTargetBytes,manifestBytes,proof,wireParts') fail('contribution-remote-input');
+  const s = input.proof.source;
+  const manifest = readManifestControl(exactBytes(input.manifestBytes, s.manifest), exactBytes(input.checksumBytes, s.checksum)).manifest;
+  if (manifest.purpose !== 'contribution' || manifest.packageId !== s.packageId || json(manifest.identity) !== json(target.identity) ||
+    json(manifest.metadataEnvelope) !== json(target.envelope) || json(manifest.targetHeads) !== json(s.remoteHeads) ||
+    json(manifest.changes) !== json(s.wireChanges)) fail('contribution-remote-manifest');
+  return { manifestBytes: input.manifestBytes, checksumBytes: input.checksumBytes, base: s.base,
+    baseManifestBytes: exactBytes(input.baseManifestBytes, s.base.evidence.manifest),
+    baseMetadataBytes: exactBytes(input.baseMetadataBytes, s.base.evidence.metadata), wireParts: input.wireParts,
+    derivedTargetBytes: exactBytes(input.derivedTargetBytes, s.reconstruction.targetMetadata), reconstruction: s.reconstruction };
+}
+export async function validateJournalRemote(input: JournalRemoteInput, target: MetadataProof, limits: MetadataLimits): Promise<ProjectMetadataSource> {
+  if (!isContributionInput(input)) return validateFullJournalRemote(input, target, limits);
+  return (await verifyContributionEvidence(contributionEvidence(input, target, limits), limits)).target;
+}
+
 /** Capture all originals before any await/write so caller mutation cannot alter a staged transaction. */
-export function captureJournalRemote(input: JournalRemoteInput, target: MetadataProof, limits: MetadataLimits): JournalRemoteInput {
+export function captureJournalRemote<T extends JournalRemoteInput>(input: T, target: MetadataProof, limits: MetadataLimits): T {
   checkedProof(target, limits);
   if (!input || typeof input !== 'object') return fail('remote-input');
   const proof = cloneCanonicalValue(input.proof, limits) as unknown as JournalRemoteProof;
   checkJournalRemote(proof, target, limits);
+  if (isContributionInput(input) && isContributionRemote(proof)) {
+    const evidence = contributionEvidence(input, target, limits);
+    contributionOriginals(evidence, limits);
+    const result: ContributionRemoteInput = { proof, manifestBytes: evidence.manifestBytes.slice(), checksumBytes: evidence.checksumBytes.slice(),
+      baseManifestBytes: evidence.baseManifestBytes.slice(), baseMetadataBytes: evidence.baseMetadataBytes.slice(),
+      wireParts: evidence.wireParts.map(b => b.slice()), derivedTargetBytes: evidence.derivedTargetBytes.slice() };
+    contributionOriginals(contributionEvidence(result, target, limits), limits); return result as T;
+  }
+  if (isContributionInput(input) || isContributionRemote(proof)) return fail('contribution-remote-input');
   const expected = isPackageRemote(proof) ? 'bytes,checksumBytes,manifestBytes,proof' : 'bytes,proof';
   if (Object.keys(input).sort().join(',') !== expected) fail('remote-input');
   const copy = (bytes: Uint8Array | undefined, ref: EvidenceRef) => {
     if (!(bytes instanceof Uint8Array) || bytes.length !== ref.byteLength) return fail('package-remote-original');
     return bytes.slice();
   };
-  const result: JournalRemoteInput = { proof, bytes: copy(input.bytes, remoteMetadata(proof)), ...(isPackageRemote(proof) ? {
+  const result: FullJournalRemoteInput = { proof, bytes: copy(input.bytes, remoteMetadata(proof)), ...(isPackageRemote(proof) ? {
     manifestBytes: copy(input.manifestBytes, proof.source.manifest), checksumBytes: copy(input.checksumBytes, proof.source.checksum),
   } : {}) };
-  validateJournalRemote(result, target, limits); return result;
+  validateFullJournalRemote(result, target, limits); return result as T;
+}
+
+/** All locations are derived from closed descriptors, never imported paths. */
+export function remoteEvidenceDescriptors(proof: JournalRemoteProof): [string, EvidenceRef][] {
+  if (isContributionRemote(proof)) {
+    const s = proof.source;
+    return [['source-manifest.json', s.manifest], ['source-manifest.sha256', s.checksum],
+      [`base-evidence/${s.base.evidence.manifest.sha256}`, s.base.evidence.manifest],
+      [`base-evidence/${s.base.evidence.metadata.sha256}`, s.base.evidence.metadata],
+      ['derived-target-metadata.am', s.reconstruction.targetMetadata],
+      ...s.wireChanges.map(c => [`wire-changes/${String(c.ordinal).padStart(8, '0')}.amchange`, { sha256: c.bytesSha256, byteLength: c.byteLength }] as [string, EvidenceRef])];
+  }
+  return [...(isPackageRemote(proof) ? [['source-manifest.json', proof.source.manifest], ['source-manifest.sha256', proof.source.checksum]] as [string, EvidenceRef][] : []),
+    ['source-metadata.am', remoteMetadata(proof)]];
+}
+export function remoteEvidenceBytes(input: JournalRemoteInput): [string, Uint8Array][] {
+  if (isContributionInput(input)) {
+    const s = input.proof.source;
+    return [['source-manifest.json', input.manifestBytes], ['source-manifest.sha256', input.checksumBytes],
+      [`base-evidence/${s.base.evidence.manifest.sha256}`, input.baseManifestBytes],
+      [`base-evidence/${s.base.evidence.metadata.sha256}`, input.baseMetadataBytes],
+      ['derived-target-metadata.am', input.derivedTargetBytes],
+      ...input.wireParts.map((b, i) => [`wire-changes/${String(i).padStart(8, '0')}.amchange`, b] as [string, Uint8Array])];
+  }
+  return [...(isPackageRemote(input.proof) ? [['source-manifest.json', input.manifestBytes!], ['source-manifest.sha256', input.checksumBytes!]] as [string, Uint8Array][] : []),
+    ['source-metadata.am', input.bytes]];
+}
+export function remoteInputFromEvidence(proof: JournalRemoteProof, bytes: ReadonlyMap<string, Uint8Array>): JournalRemoteInput {
+  if (isContributionRemote(proof)) return { proof, manifestBytes: bytes.get('source-manifest.json')!, checksumBytes: bytes.get('source-manifest.sha256')!,
+    baseManifestBytes: bytes.get(`base-evidence/${proof.source.base.evidence.manifest.sha256}`)!,
+    baseMetadataBytes: bytes.get(`base-evidence/${proof.source.base.evidence.metadata.sha256}`)!, derivedTargetBytes: bytes.get('derived-target-metadata.am')!,
+    wireParts: proof.source.wireChanges.map(c => bytes.get(`wire-changes/${String(c.ordinal).padStart(8, '0')}.amchange`)! ) };
+  return { proof, bytes: bytes.get('source-metadata.am')!, ...(isPackageRemote(proof) ? {
+    manifestBytes: bytes.get('source-manifest.json')!, checksumBytes: bytes.get('source-manifest.sha256')!,
+  } : {}) };
 }

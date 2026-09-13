@@ -46,8 +46,13 @@ final verification for this connection is recorded in todo.
 Contribution source/archive primitives now freeze one verified retained base,
 generate exact original D and reopen a declared non-ancestor target independently
 of the temporary union. Delta summary and new-body closure are verified; unchanged
-models use existing CAS metadata only. No Contribution receive journal, UI, base
-advancement or external save receipt is implied. Final checks are in todo.
+models use existing CAS metadata only. A separate §8.6 frozen input job and
+Contribution journal now connect to the same update-file UI. Exact originals,
+receiver M, one publication, M=0, cold retry and pre-start re-selection use the
+existing services; the live base table is never advanced. Missing acknowledged
+evidence remains repair-required, including lost jobs discovered by index/journal.
+Contribution durable output/UI and external save receipts remain open.
+Final checks are in todo.
 F01/F02 are not complete. Current executed evidence and next work are in todo.
 
 Later PO adoption: [05 §4.4](specs/05-project-scene-team-workflow.md#44-explicit-pin-parent-changes-po-approved-2026-09-13)

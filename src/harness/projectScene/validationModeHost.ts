@@ -33,6 +33,9 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
   const mode: SavedWorkspaceMode = {
     get current() { return current.authority.readOnly ? 'view' : 'edit'; },
     get busy() { return switching; }, get detail() { return current.accessDetail ?? ''; },
+    get recoveryAvailable() { return current.authority.readOnly && !current.workspaceFiles.error && current.read().state !== 'repair-required' &&
+      !current.workspaceFiles.jobs.some(j => j.state === 'repair-required') &&
+      current.workspaceFiles.jobs.some(j => ['incomplete', 'input-required', 'unbound-input', 'stale'].includes(j.state)); },
     async change(target, token, publish) {
       admit();
       if (token !== current.read().source?.token) throw Error('内容が更新されています。再開用データを確認してください。');

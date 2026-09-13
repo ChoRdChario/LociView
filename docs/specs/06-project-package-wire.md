@@ -589,7 +589,8 @@ root/frontier, then rederives the exact missing originals and union heads.
 After prepared acknowledgment, missing originals remain repair state; retry
 must not fill them from a retained input buffer or ZIP.
 
-Only this version admits a multi-body remote `stagedBlobs` delta. Its finite
+This version and the distinct §8.6 Contribution version admit a multi-body remote
+`stagedBlobs` delta under the same exact rules. Its finite
 closed BlobRefs sort by canonical BlobRef JSON bytes, are unique, and cannot
 associate one digest with different lengths. It contains only new/explicitly
 restaged refs, never the full already-verified inventory. The existing local
@@ -689,6 +690,87 @@ Reuse existing package/file fixtures: non-ancestor target, newly-ready lexical
 order, exact raw originals, empty D, missing/extra/corrupt/foreign input, lost base
 guarantees, changed token/publication, cancellation/sink failure and Caption-only
 zero old-model reads. No new PoC, runtime dependency or assertion relaxation.
+
+### 8.6 Isolated Contribution receive and frozen recovery (2026-09-13)
+
+Implementation contract under §11, using §8.1/8.2/8.5 unchanged wire semantics.
+The distinct local proof has `version:'lociview-package-contribution-1'` and the
+closed `contributionDelta` source in §8.1. Its exact reconstruction adapter is
+`lociview-automerge-3.4.1-reachable-originals-1`. Keep the existing fullMetadata and
+legacy proof shapes, original locations and seals unchanged. The new proof uses
+the existing §8.2 jcs-v2 domain with all its base/wire/derived descriptors included.
+It cannot be used for initial Workspace import.
+
+Capture owned controls, frozen base manifest/metadata, all original D and the first
+derived target before writes. Journal `wire-changes/` holds D; `changes/` holds M.
+Base bytes use fixed `base-evidence/<sha256>` paths within the same journal; derived
+bytes use `derived-target-metadata.am`, never `source-metadata.am`. A separately
+retained reconstruction descriptor must match the saved derived bytes and their
+exact reachable originals. Recovery may recompute proofs, not replace those bytes.
+Pure structural capture remains synchronous; complete history/summary/closure
+verification precedes durable preparation and is repeated on recovery. Prove every
+base original belongs byte-identically to receiver R before computing M=T−R.
+
+The local sibling job uses `v2/packages/contribution-receive/<jobId>/` with fixed
+`input.zip`, `input.json`, `prepared.json`, `start.json`, optional `abandoned.json`,
+`base-manifest.json`, `base-metadata.am`, `derived-target-metadata.am`, and
+digest-addressed `steps/<sha256>.json`. Original D is retained in the immutable
+input archive and separately in the metadata journal when M is nonempty.
+Prepared is closed `{schema:'lociview-contribution-receive-1',packageId,manifest,
+base,wireChanges,reconstruction,roots:{blobs,evidence}}`; base and reconstruction
+are exactly the §8.1 proof projections. Input is closed
+`{schema:'lociview-contribution-input-1',jobId,prepared:EvidenceRef,archive:EvidenceRef}`.
+Start is closed `{schema:'lociview-package-job-start-1',operation:'receiveContribution',
+jobId,prepared:EvidenceRef,receiver:{identity,metadataEnvelope,heads}}`.
+
+Before first writes, use a validated available common base and verify its durable
+guaranteed inventory without reading unchanged bodies. Preflight same lineage,
+receiver, final closure and existing GLB/PNG admission. Retain/read back controls,
+frozen originals and streamed input before Start. Cold recovery validates these
+frozen bytes, not current base selection or a new serialization. Exact pre-start
+reselection may replace the unacknowledged spool only; its frozen base/derived
+evidence must remain exact. Explicit abandonment requires absence of start,
+journal and steps, using `{schema:'lociview-contribution-input-abandoned-1',jobId,
+stage:'beforeStart'}`. All fragments remain; no delete or inferred replacement.
+
+A write-once external job index at `v2/packages/contribution-index/<jobId>.json`
+contains `{schema:'lociview-contribution-job-index-1',jobId,prepared:EvidenceRef}`.
+Write/read back it before Start, after the full input evidence. Discovery unions
+job directories, this index and contributionDelta journals. An index/journal with
+missing job bytes is repair, not empty/completed state. This is required even for
+M=0, which has neither a metadata journal nor a base observation. Enumeration and
+all retained controls/spools/journals/CAS overlap use existing finite budgets.
+Index-before-Start interruption is a valid unstarted recovery state, not a prepared
+journal. A started job requires the original index too; never recreate it after
+loss. An explicit pre-start abandonment retains and verifies any existing index.
+Start, journal or step presence also requires a matching original index; its
+prepared reference must equal the same job's prepared/Start. Index-before-Start
+recovery uses the exact retained input, never later Project state as source.
+
+Use the existing origin operation lock and dedicated Session Project lease.
+M nonempty shares remotePackageMerge, exact prepared recovery and one publication.
+M=0 verifies durable inventory and records only a job completion: no metadata
+journal/change/publication and no blob-repair shortcut. Contribution never writes
+a base observation. The sole terminal completion is `contributionPublished`
+with receiver/journal/publication evidence, or `contributionAlreadyPresent` with
+receiver/publication evidence. Both use the existing closed Step envelope, null
+previous and at most one step. Stale pre-journal cancellation instead records
+`{kind:'cancelled',stage:'beforeContributionJournal'}`; no journal or completion may
+exist. Observed receiver heads remain frozen during later replay/local edits.
+The initial M=0 completion compares Start.receiver, the current durable receiver
+and the referenced publication under that same lease. A stale Start cannot bind
+later heads; only replay of an existing observation may preserve its earlier heads.
+
+Package journal validation imports only the pure original/base/D/target/summary
+helpers in `contributionEvidence.ts`, not archive/CAS/Session/job code. The existing
+source/ZIP classes reuse those helpers; original source limits remain unchanged.
+
+Route by inspected purpose inside the same file service; no new format picker or
+role. Empty Projects cannot start from Contribution. All input, mode, output,
+catalog, draft/IME and recovery guards cover both job kinds. Reuse existing tests
+for D≠M, two rounds/local conflicts, M0, cold prefix interruption, completion retry,
+lost source/base/derived/M/index/job data and mutual guards. Node/recorded DOM is
+not rendered picker, physical iPhone, offline or normal-home acceptance.
 
 ## 9. Acceptance vectors required before S2
 
@@ -1606,6 +1688,10 @@ execution tables. This is design review, not approval of the §12.6 amendment,
 completion of reconstruction/golden bytes, or executable package acceptance.
 
 ### 12.7 Closed local package-job and receipt proposal (2026-09-13)
+
+The isolated §8.6 receiveContribution Start, input/index/prepared and its two
+completion alternatives/cancel stage are additional closed local rows. They do
+not change existing Workspace records or permit another JobStep detail.
 
 This fills §11.4's explicit job/receipt design gap under the existing design
 authorization. It does not approve §12.6, change §10/§11's gate, implement a sink

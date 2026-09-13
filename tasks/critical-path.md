@@ -28,8 +28,12 @@
 > artifact read-back and generated-base completion to that same file area. Deliberate
 > download is not save proof; exact file reselection is separately verified. Frozen
 > retry and pre-render recovery are covered by existing tests; final checks in todo.
-> Next close initial import in that same flow, then real-file rounds/remaining
-> conflict UI and Contribution. Retention,
+> First import now opens the original Workspace from the limited catalog. Contribution
+> receive also joins frozen base/D/derived evidence, one-publication recovery and the
+> same update-file UI; it never advances a base. M=0 jobs remain discoverable without
+> a metadata journal. Exact checks and outstanding rendered/device evidence are in todo.
+> Next connect durable Contribution output in that same flow, then remaining file
+> purposes and ordinary-route acceptance. Retention,
 > measured admission and other five-purpose consumers remain open.
 > Adjacent UI/PoC work is not a substitute for the practical-team goal.
 >

@@ -7,13 +7,8 @@ import { packageByteHash, PackageControlError } from './manifest';
 import { summarizeFullHistory } from './historySummary';
 import { planWorkspaceClosure } from './closure';
 
-export function packageSourceLimits(limits: MetadataLimits): MetadataLimits {
-  return { ...limits, maxChanges: Math.min(limits.maxChanges, L.changes),
-    maxChangeBytes: Math.min(limits.maxChangeBytes, L.changeBytes), maxTotalBytes: Math.min(limits.maxTotalBytes, L.sourceBytes),
-    maxOperations: Math.min(limits.maxOperations, L.sourceOperations), maxWork: Math.min(limits.maxWork, L.sourceWork),
-    maxNodes: Math.min(limits.maxNodes, L.maxNodes), maxDepth: Math.min(limits.maxDepth, L.maxDepth),
-    maxStringScalars: Math.min(limits.maxStringScalars, L.maxStringScalars) };
-}
+export { packageSourceLimits } from './contributionEvidence';
+import { packageSourceLimits } from './contributionEvidence';
 
 /** Owned capture only: no ZIP artifact, durable job, exchange base or file receipt. */
 export class WorkspaceSourceCapture {

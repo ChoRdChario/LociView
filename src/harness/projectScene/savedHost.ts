@@ -6,6 +6,8 @@ export interface SavedWorkspaceMode {
   readonly current: LocalOpenMode;
   readonly busy: boolean;
   readonly detail: string;
+  /** Host-owned pending input, not an editor draft or a repair bypass. */
+  readonly recoveryAvailable?: boolean;
   change(target: LocalOpenMode, token: string | undefined, publish: (next: SyntheticProject) => void): Promise<void>;
 }
 

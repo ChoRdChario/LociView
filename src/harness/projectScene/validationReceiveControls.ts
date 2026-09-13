@@ -11,7 +11,7 @@ export function createValidationReceiveControls(document: Document, host: Return
   labelText.textContent = '更新ファイルを選択'; input.type = 'file'; input.setAttribute('aria-label', '更新ファイルを選択'); label.append(labelText, input);
   submit.type = 'submit'; submit.textContent = '更新を受け取る';
   const clear = document.createElement('button'); clear.type = 'button'; clear.textContent = '選択を取り消す';
-  const help = document.createElement('p'); help.textContent = '同じプロジェクトの作業一式を統合します。元ファイルは変更しません。';
+  const help = document.createElement('p'); help.textContent = '同じプロジェクトの作業一式・変更分を統合します。元ファイルは変更しません。';
   const status = document.createElement('p'), jobs = document.createElement('section'); status.setAttribute('role', 'status');
   form.append(label, submit, clear); root.append(heading, help, form, status, jobs);
   let busy = false, disposed = false, feedback = '', selectedJob: string | null = null, cancel: { id: string; stale: boolean } | null = null;
@@ -45,7 +45,7 @@ export function createValidationReceiveControls(document: Document, host: Return
     heading.textContent = host.workspaceFiles.initialImport ? '作業一式を開く' : '更新ファイル';
     root.setAttribute('aria-label', heading.textContent);
     help.textContent = host.workspaceFiles.initialImport ? '読み込み途中のデータは、元のファイルから再開できます。' :
-      '同じプロジェクトの作業一式を統合します。元ファイルは変更しません。';
+      '同じプロジェクトの作業一式・変更分を統合します。元ファイルは変更しません。';
     output.render(); form.inert = busy || output.hasChanges(); submit.disabled = busy || output.hasChanges() || host.authority.readOnly || !input.files?.length;
     clear.disabled = busy; clear.hidden = !input.files?.length && !selectedJob;
     labelText.textContent = selectedJob ? '元のファイルを選び直す' : host.workspaceFiles.initialImport ? '作業一式を選択' : '更新ファイルを選択';

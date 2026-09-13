@@ -5,6 +5,12 @@ import { WorkspaceReceiveJob } from '../projectPackage/receiveJob';
 import { fileError } from './validation';
 import { TransactionJournal } from '../projectMetadata/journal';
 import { json } from '../projectMetadata/persistence';
+import { OriginBlobStore } from '../projectMetadata/blobStore';
+import { PACKAGE_LIMITS as L } from '../projectPackage/contract';
+import { PackageArchive } from '../projectPackage/zipArchive';
+import { PackageControlError } from '../projectPackage/manifest';
+import { ContributionReceiveJob } from '../projectPackage/contributionReceiveJob';
+import { receiveJobKeys, receiveInputState, openReceiveJob, receiveTerminal, type ReceiveJob } from '../projectPackage/receiveJobs';
 
 export interface WorkspaceReceiveState { id: string; state: 'incomplete' | 'completed' | 'cancelled' | 'repair-required' | 'input-required' | 'unbound-input' | 'abandoned' | 'stale' }
 
@@ -17,8 +23,19 @@ export async function workspaceFileOperation<T>(locks: LockManager | null, actio
 
 /** Actual file entry, isolated from ordinary home. No filename-derived purpose or direct storage edits. */
 export class WorkspaceReceiver {
+  private readonly store: OriginBlobStore;
   constructor(private readonly base: WorkspaceFS, private readonly fs: ProjectWorkspaceFS,
-    private readonly session: MetadataProjectSession, private readonly limits: MetadataLimits, private readonly locks: LockManager | null) {}
+    private readonly session: MetadataProjectSession, private readonly limits: MetadataLimits, private readonly locks: LockManager | null) {
+    this.store = new OriginBlobStore(base, { metadata: limits, maxBlobBytes: L.blobBytes, maxChunkBytes: L.chunkBytes, maxChunks: L.streamChunks }, locks);
+  }
+  private async key(id: string) {
+    const found = (await receiveJobKeys(this.fs, this.limits)).find(k => k.id === id);
+    if (!found) return fileError('受信データがありません。修復が必要です。'); return found;
+  }
+  private apply(token: string | null, job: ReceiveJob) {
+    return job instanceof ContributionReceiveJob ? this.session.receiveContribution(token, job) :
+      job.importing ? this.session.importWorkspace(job) : this.session.receiveWorkspace(token, job);
+  }
   private async operation<T>(action: () => Promise<T>): Promise<T> {
     return workspaceFileOperation(this.locks, action);
   }
@@ -28,59 +45,71 @@ export class WorkspaceReceiver {
   }
   receive(expectedToken: string, file: Blob) {
     return this.operation(async () => {
-      const input = await WorkspaceReceiveJob.prepare(this.fs, file, this.limits);
-      let repeated: WorkspaceReceiveJob | undefined;
-      for (const id of await WorkspaceReceiveJob.ids(this.fs)) {
-        const state = await WorkspaceReceiveJob.inputState(this.fs, id, this.limits);
+      const purpose = (await PackageArchive.inspect(file)).control.manifest.purpose;
+      let input: ReceiveJob;
+      try { input = purpose === 'contribution' ? await ContributionReceiveJob.prepare(this.fs, file, this.store, this.limits) :
+        await WorkspaceReceiveJob.prepare(this.fs, file, this.limits); }
+      catch (error) {
+        if (error instanceof PackageControlError && error.code === 'contribution-base-unavailable')
+          return fileError('先に、この変更分の元になった作業一式を開いてください。元のデータは変更していません。');
+        throw error;
+      }
+      let repeated: ReceiveJob | undefined;
+      for (const key of await receiveJobKeys(this.fs, this.limits)) {
+        const state = await receiveInputState(this.fs, key, this.limits);
         if (state === 'abandoned') continue;
         if (state !== 'started') return fileError('中断した受信を確認してください。');
-        const job = await WorkspaceReceiveJob.open(this.fs, id, this.limits), steps = await job.steps();
-        if (!steps.some(s => s.detail.kind === 'baseRecorded' || s.detail.kind === 'cancelled')) return fileError('未完了の受信を再開してください。');
-        if (steps.some(s => s.detail.kind === 'baseRecorded') && job.inspection.archive.sha256 === input.inspection.archive.sha256)
+        const job = await openReceiveJob(this.fs, key, this.store, this.limits), steps = await job.steps();
+        if (!await receiveTerminal(job)) return fileError('未完了の受信を再開してください。');
+        await job.validateCompletion();
+        if (!steps.some(s => s.detail.kind === 'cancelled') && job.inspection.archive.sha256 === input.inspection.archive.sha256)
           repeated = job;
       }
-      if (repeated?.importing) {
+      if (repeated instanceof WorkspaceReceiveJob && repeated.importing) {
         const current = await this.session.read();
         if (current.state !== 'ready' || current.source?.token !== expectedToken) return fileError('入力・更新を確定してから受信してください。');
         return this.session.importWorkspace(repeated);
       }
-      return this.session.receiveWorkspace(expectedToken, repeated ?? input);
+      return this.apply(expectedToken, repeated ?? input);
     });
   }
   retry(id: string) {
     return this.operation(async () => {
-      const job = await WorkspaceReceiveJob.open(this.fs, id, this.limits);
-      return job.importing ? this.session.importWorkspace(job) : this.session.receiveWorkspace(null, job);
+      return this.apply(null, await openReceiveJob(this.fs, await this.key(id), this.store, this.limits));
     });
   }
   cancelStale(id: string) {
-    return this.operation(async () => this.session.cancelWorkspaceReceive(await WorkspaceReceiveJob.open(this.fs, id, this.limits)));
+    return this.operation(async () => {
+      const job = await openReceiveJob(this.fs, await this.key(id), this.store, this.limits);
+      return job instanceof ContributionReceiveJob ? this.session.cancelContributionReceive(job) : this.session.cancelWorkspaceReceive(job);
+    });
   }
   reselectInput(expectedToken: string, id: string, file: Blob) {
-    return this.operation(async () => this.session.receiveWorkspace(expectedToken, await WorkspaceReceiveJob.reselect(this.fs, id, file, this.limits)));
+    return this.operation(async () => this.apply(expectedToken, (await this.key(id)).kind === 'contribution' ?
+      await ContributionReceiveJob.reselect(this.fs, id, file, this.store, this.limits) : await WorkspaceReceiveJob.reselect(this.fs, id, file, this.limits)));
   }
   reselectImportedInput(id: string, file: Blob) {
     return this.operation(async () => this.session.importWorkspace(await WorkspaceReceiveJob.reselect(this.fs, id, file, this.limits)));
   }
   abandonInput(id: string) {
-    return this.operation(() => this.session.abandonWorkspaceInput(id));
+    return this.operation(async () => (await this.key(id)).kind === 'contribution' ? this.session.abandonContributionInput(id) : this.session.abandonWorkspaceInput(id));
   }
   async jobs() {
     const result: WorkspaceReceiveState[] = [];
     const entries = await new TransactionJournal(this.fs, this.limits).entries();
     // The journal is also an authority: a deleted input directory must not hide its import.
-    const ids = new Set([...(await WorkspaceReceiveJob.ids(this.fs)),
-      ...entries.filter(e => e.start.purpose === 'importWorkspace').map(e => e.start.transactionId)]);
-    for (const id of ids) {
+    for (const key of await receiveJobKeys(this.fs, this.limits)) {
+      const { id } = key;
       try {
-        const state = await WorkspaceReceiveJob.inputState(this.fs, id, this.limits);
+        const state = await receiveInputState(this.fs, key, this.limits);
         if (state !== 'started') { result.push({ id, state }); continue; }
-        const job = await WorkspaceReceiveJob.open(this.fs, id, this.limits), steps = await job.steps();
+        const job = await openReceiveJob(this.fs, key, this.store, this.limits), steps = await job.steps();
         await job.validateCompletion();
-        const stale = job.start?.operation === 'receiveWorkspace' && !steps.length && !entries.some(e => e.start.transactionId === id) &&
+        const stale = job.start && 'receiver' in job.start && !steps.length && !entries.some(e => e.start.transactionId === id) &&
           json((await this.session.read()).source?.heads) !== json(job.start.receiver.heads);
-        result.push({ id, state: steps.some(s => s.detail.kind === 'baseRecorded') ? 'completed' :
-          steps.some(s => s.detail.kind === 'cancelled') ? 'cancelled' : stale ? 'stale' : 'incomplete' });
+        const cancelled = steps.some(s => s.detail.kind === 'cancelled');
+        if (cancelled && entries.some(e => e.start.transactionId === id)) throw Error('取りやめた受信の履歴を確認してください。');
+        result.push({ id, state: cancelled ? 'cancelled' : await receiveTerminal(job) ? 'completed' : stale ? 'stale' : 'incomplete' });
       } catch { result.push({ id, state: 'repair-required' }); }
     }
     return result;

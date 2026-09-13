@@ -2,7 +2,68 @@
 
 ## Current boundary — thin connected workflow first (2026-09-09)
 
-Active after clean `f41ba40` (first Workspace import). The previous goal turn made
+Completed receive/recovery unit, based on clean `fe5f490` (Contribution originals / ZIP). The previous goal turn
+made production progress: the 13-file unit below is committed after 2,182 passing
+tests, typecheck, both builds and independent exact-index review. Cached origin is
+0 behind / 66 ahead at this unit's start. The next connected boundary is durable
+Contribution output in the same file tools, not additional standalone validation pages.
+
+- [x] Specify/review frozen Contribution evidence and a distinct journal/job variant.
+- [x] Retain and validate base/wire/derived originals, exact receiver M and interrupted
+  recovery without base advancement or acknowledged-evidence replenishment.
+- [x] Connect receive/reselect/retry/cancel to the existing file tools, shared guards,
+  capacity accounting and lost-job discovery (including M=0).
+- [x] Reuse package/file/persistence/host tests for local work, two rounds, no-op,
+  cold prefix recovery and lost originals. Final tree checks/review/checkpoint.
+
+No Project/wire schema migration, dependency/profile expansion, ordinary-home activation, release or
+device/offline claim. New true authority/contract conflicts still stop; routine
+implementation and scoped corrections continue under the approved plan.
+
+Review/result: frozen base/D/derived input, receiver M journal and a
+distinct outside-directory index now connect to the same update-file service/UI.
+Independent review corrected the async restore snapshot, fresh-only live-base
+selection, cancelled-job/journal coexistence and warm View recovery with a separate
+repair job. Existing failure/input/IME/ack guards remain. No winner or source
+relation is inferred and no base is advanced. New PNG admission uses the same CAS/
+facts staging; Contribution output job/UI remains the next connected work.
+
+The first combined package/file/isolation run had 5 failures / 130 PASS (99.79 s):
+one new two-round case reached Vitest's 5 s default; two stream fault fixtures did
+not inject at MemoryFS.writeStream; one publication assertion expected undefined
+instead of the contract's null; and an older import-refusal text expected the later
+guard rather than the new shared lost-job guard. The fixtures now inject the actual
+stream boundary, retain exact denial assertions and use a 15 s execution budget for
+the multi-round case (not a product latency guarantee). The warm test also uses the
+actual callback signature and waits for completed refresh/mode handoff. A test-only
+readonly mutation type error was corrected with an explicitly mutable caller copy.
+After corrections, the 16 focused Contribution/M=0/lost-import cases pass (42.28 s).
+Both new-PNG body/fact cases pass (9.94 s), including cold recovery and denial after
+acknowledged body/evidence loss. Independent source/test review has no mandatory
+findings. Final typecheck exits 0. With source/tests frozen, the full root run
+(`npm test -- --maxWorkers=2`) completes with 112 files / 2,199 PASS / 21 existing
+TODO / zero failures, exit 0 in 282.53 s. Ordinary and harness builds exit 0;
+existing mixed-import/large-chunk warnings remain. Independent exact-index review
+of the 25-file unit found only an outdated inventory F02 row; it now distinguishes
+connected receive from pending output and the no-base-advance contract. No source/
+test changes follow the final checks. Local checkpoint is resolved from Git HEAD/
+log; no push is claimed. Initial failures above are retained.
+
+Short meta-audit: `g0-baseline`, unchanged starting HEAD `fe5f490`, cached origin
+0 behind / 66 ahead. This unit connects actual Contribution input/recovery, not a
+new PoC or evidence-only workstream. No private inputs, dependency/profile expansion,
+ordinary activation or release change. No unchanged denied push/browser retry.
+Continue next with frozen Contribution output in the same file area: explicit
+available Workspace-base selection, original source/D/payload, durable artifact
+read-back, cold retry and optional external-file verification. Do not reuse
+Workspace baseRecorded completion or advance any base. Specify/review the distinct
+local output records first; no new PO decision is known within this approved scope.
+The full practical-team target remains 62 groups and consolidated device/ordinary/
+offline acceptance. F02 is not complete at this receive checkpoint.
+
+### Completed Contribution source checkpoint (`fe5f490`)
+
+Starting after clean `f41ba40` (first Workspace import). The previous goal turn made
 production progress: 24 files committed after focused 182 PASS, typecheck, final
 root 2,172 PASS with two workers, both builds and independent exact-index review.
 The initial default-root 7 failures remain recorded below. Cached origin is
