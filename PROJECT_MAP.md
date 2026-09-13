@@ -50,7 +50,12 @@ original history and verified GLB/PNG bodies. The same selector opens by Project
 identity or receives into its existing lineage. Source-less/cold recovery, shared
 base completion and startup-Scene input guards stay in the same editor; missing
 receipts/repository collisions are not replaced. Final checks are tracked in todo.
-Other purposes remain open. Download alone is not save proof.
+Contribution now has bounded source/ZIP primitives: exact selected retained base,
+original target-minus-base changes, incremental wire order, delta-only summary and
+new-body closure. Reopen reconstructs exact target ancestors, not the temporary
+union; base guarantees use durable CAS metadata without old-model streams. This
+does not yet connect Contribution to Session jobs/UI or advance any base. Exact
+checks are tracked in todo. Other purposes remain open. Download alone is not save proof.
 This is not ordinary-home, rendered/device or whole-team acceptance.
 Exact executed checks are in todo.
 

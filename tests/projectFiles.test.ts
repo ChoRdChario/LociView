@@ -60,6 +60,8 @@ import { WorkspaceBaseStore } from '../src/projectPackage/workspaceBases';
 import { WorkspaceReceiveJob } from '../src/projectPackage/receiveJob';
 import { WorkspaceSourceCapture } from '../src/projectPackage/workspaceSource';
 import { WorkspaceArchive, writeWorkspaceArchive } from '../src/projectPackage/workspaceArchive';
+import { VerifiedContributionBase, ContributionSourceCapture, ContributionArchive } from '../src/projectPackage/contributionSource';
+import { writeContributionArchive } from '../src/projectPackage/contributionArchive';
 import { TransactionJournal } from '../src/projectMetadata/journal';
 import { createValidationReceiveControls } from '../src/harness/projectScene/validationReceiveControls';
 
@@ -187,6 +189,26 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     };
     return { fs, factory, store, locks, reopen, ...reopen() };
   }
+  it('captures a Contribution from a real imported-base record without reading unchanged GLB/PNG or advancing that base', async () => {
+    const f = await workspaceFileFixture(), imported = await f.receiverService.receive(f.local.source!.token, f.file);
+    const bases = new WorkspaceBaseStore(f.fs, metadata, imported.source!.proof), before = await bases.snapshot(), row = before.records[0]!;
+    const edited = await f.receiver.session.editCaption(imported.source!.token, f.captionId, 'title', '差分で返す記録');
+    const originals = (s: ProjectMetadataSource) => s.originalChanges().sort((a, b) => A.decodeChange(a).hash.localeCompare(A.decodeChange(b).hash));
+    const read = vi.spyOn(f.store, 'openReadOnly'), sourceBefore = originals(edited.source!);
+    const base = await VerifiedContributionBase.select(bases, { workspacePackageId: row.workspacePackageId,
+      workspaceManifestSha256: row.workspaceManifestSha256, heads: row.declaredHeads }, f.store, metadata);
+    const capture = await ContributionSourceCapture.prepare(f.receiver.session, edited.source!.token, base, f.store, metadata);
+    expect(capture.changes.length).toBeGreaterThan(0); expect(capture.blobs).toHaveLength(0);
+    const chunks: BlobPart[] = [];
+    await writeContributionArchive(capture, f.store, new WritableStream({ write(bytes) { chunks.push(bytes.slice() as BlobPart); } }),
+      { packageId: `pkg_${newId()}`, createdByVersion: 'validation' });
+    const inspected = await ContributionArchive.inspect(new Blob(chunks), base, f.store, metadata);
+    expect(inspected.target.heads).toEqual(edited.source!.heads);
+    expect(originals(inspected.target)).toEqual(sourceBefore); expect(read).not.toHaveBeenCalled();
+    expect(await bases.snapshot()).toEqual(before);
+    expect(originals((await f.reopen().session.read()).source!)).toEqual(sourceBefore);
+    read.mockRestore();
+  });
   it('imports the complete Workspace originals, edits and returns files through two team rounds without a new lineage', async () => {
     const f = await workspaceFileFixture(), r = firstWorkspaceRecipient();
     expect(f.source.originalChanges().length).toBeGreaterThan(2);

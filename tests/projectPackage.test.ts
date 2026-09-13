@@ -1,22 +1,27 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { parseJsonWithoutDuplicateMembers } from '../src/core/json';
 import { canonical } from '../src/domain/projectGraphSupport';
 import type { JsonValue } from '../src/domain/values';
 import { PACKAGE_LIMITS as L, SUMMARY_FIELDS, type Entry, type PackageManifest, type PackagePurpose } from '../src/projectPackage/contract';
 import { checkPackageEntryTable, packageByteHash, PackageControlError, readManifestControl } from '../src/projectPackage/manifest';
 import '@automerge/automerge'; // Node-only Wasm initialization.
+import * as A from '@automerge/automerge/slim';
 import { ZipReader, BlobReader, Uint8ArrayWriter } from '@zip.js/zip.js';
 import { fixture, limits as valueLimits } from './helpers/projectRecordsFixture';
 import { ProjectMetadataSource, type MetadataLimits } from '../src/projectMetadata/source';
 import { readProjectScene } from '../src/scene/projectProvider';
 import { developmentContentVerifier, developmentContentBytes } from '../poc/scene-history/content-verifier';
 import { WorkspaceSourceCapture } from '../src/projectPackage/workspaceSource';
-import { WorkspaceArchive, writeWorkspaceArchive, workspaceInputChunks } from '../src/projectPackage/workspaceArchive';
+import { WorkspaceArchive, writeWorkspaceArchive, workspaceInputChunks, prepareWorkspaceManifest } from '../src/projectPackage/workspaceArchive';
+import { VerifiedContributionBase, ContributionSourceCapture, ContributionArchive } from '../src/projectPackage/contributionSource';
+import { prepareContributionManifest, writeContributionArchive } from '../src/projectPackage/contributionArchive';
+import { planRemoteChanges } from '../src/projectMetadata/remote';
 import { PackageArchive } from '../src/projectPackage/zipArchive';
 import { ZipCrc32 } from '../src/projectPackage/zipChecks';
 import type { JsonObject } from '../src/domain/values';
 import type { OriginBlobStore } from '../src/projectMetadata/blobStore';
 import { protectedWorkspaceInventory } from '../src/projectPackage/protectedInventory';
+import { fixtureMedia } from '../src/harness/projectScene/mediaHistory';
 
 type Mutable<T> = { -readonly [K in keyof T]: Mutable<T[K]> };
 type Fixture<P extends PackagePurpose> = Mutable<PackageManifest & { purpose: P }>;
@@ -80,6 +85,189 @@ async function unpackFixture(file: Blob) {
   }
   return entries;
 }
+
+describe('Contribution originals and actual ZIP (injected base/CAS ports, no durable receive or external save)', () => {
+  const session = async (source: ProjectMetadataSource) => {
+    const rep = fixture().representationsById[id('rep')];
+    const provider = await readProjectScene(source.read(), metadataLimits, developmentContentVerifier([
+      { variantFamilyId: rep.variantFamilyId, representationId: rep.id, payloadDigest: rep.payloadDigest },
+    ]));
+    return { read: async () => ({ state: 'ready' as const, source, provider, publication: 'fixture-publication' }) };
+  };
+  async function baseFor(source: ProjectMetadataSource, store: Pick<OriginBlobStore, 'openReadOnly'>) {
+    const capture = await WorkspaceSourceCapture.prepare(await session(source), source.token, store, metadataLimits);
+    const controls = prepareWorkspaceManifest(capture, { packageId: id('pkg'), createdByVersion: '0.0.1' });
+    const ref = (b: Uint8Array) => ({ sha256: packageByteHash(b), byteLength: b.length });
+    const metadata = capture.metadataBytes(), evidence = { manifest: ref(controls.manifest), metadata: ref(metadata) };
+    const row = { identity: source.proof.identity, metadataEnvelope: source.proof.envelope, workspacePackageId: id('pkg'),
+      workspaceManifestSha256: evidence.manifest.sha256, declaredHeads: source.heads, evidence, completions: [{ observation: 'generated' as const }] };
+    const selection = { workspacePackageId: row.workspacePackageId, workspaceManifestSha256: row.workspaceManifestSha256, heads: row.declaredHeads };
+    const ports = { read: async () => [row], readEvidence: async (e: { sha256: string }) => e.sha256 === evidence.manifest.sha256 ? controls.manifest : metadata };
+    const bodies = { ...store, inspect: vi.fn(async () => 'verified-present' as const), openReadOnly: vi.fn(store.openReadOnly) };
+    const base = await VerifiedContributionBase.select(ports, selection, bodies, metadataLimits);
+    return { base, ports, selection, bodies, controls };
+  }
+  async function output(capture: ContributionSourceCapture, store: Pick<OriginBlobStore, 'inspect' | 'openReadOnly'>) {
+    const chunks: BlobPart[] = [];
+    const result = await writeContributionArchive(capture, store, new WritableStream({ write(b) { chunks.push(b.slice() as BlobPart); } }),
+      { packageId: id('pkg', 2), createdByVersion: '0.0.1' });
+    return { file: new Blob(chunks), result };
+  }
+  const change = (source: ProjectMetadataSource, fn: (draft: Record<string, any>) => void) =>
+    ProjectMetadataSource.fromFullSource(A.save(A.change(A.load<Record<string, any>>(source.encodeFullSource()), fn)), source.proof, metadataLimits);
+  const title = (source: ProjectMetadataSource, value: string) => change(source, d => { d.captionsById[id('cap')].title = new A.ImmutableString(JSON.stringify(value)); });
+  const body = (source: ProjectMetadataSource, value: string) => change(source, d => { d.captionsById[id('cap')].body = new A.ImmutableString(JSON.stringify(value)); });
+  async function rewrite(file: Blob, edit: (manifest: any, entries: { path: string; bytes: Uint8Array }[]) => void) {
+    const entries = await unpackFixture(file), manifest = JSON.parse(new TextDecoder().decode(entries[0]!.bytes));
+    edit(manifest, entries); entries[0]!.bytes = encode(canonical(manifest)); entries[1]!.bytes = encode(packageByteHash(entries[0]!.bytes));
+    return fixedZip(entries);
+  }
+
+  it('retains exact edit/revert originals and delta-only counts, with zero unchanged body reads', async () => {
+    const f = await workspaceFixture(), b = await baseFor(f.source, f.store), target = body(body(f.source, 'Temporary'), fixture().captionsById[id('cap')].body);
+    const capture = await ContributionSourceCapture.prepare(await session(target), target.token, b.base, b.bodies, metadataLimits);
+    expect(capture.changes).toHaveLength(2); expect(capture.blobs).toHaveLength(0);
+    expect(capture.summary.entityClasses).toEqual([{ class: 'captionsById', count: 1 }]);
+    expect(capture.summary.fieldClasses).toEqual([{ class: 'captionsById.body', count: 1 }]);
+    const built = await output(capture, b.bodies), inspected = await ContributionArchive.inspect(built.file, b.base, b.bodies, metadataLimits);
+    expect(built.result.kind).toBe('generated-contribution-archive');
+    expect(new Uint8Array(await fixedZip(await unpackFixture(built.file)).arrayBuffer())).toEqual(new Uint8Array(await built.file.arrayBuffer()));
+    expect((await unpackFixture(built.file)).map(e => e.path)).toEqual(['manifest.json', 'manifest.sha256', 'changes/00000000.amchange', 'changes/00000001.amchange']);
+    expect(inspected.target.originalChanges()).toEqual(target.originalChanges());
+    expect(inspected.reconstruction().targetMetadata.sha256).toBe(packageByteHash(inspected.derivedTargetBytes()));
+    expect(inspected.reconstruction().adapterId).toBe('lociview-automerge-3.4.1-reachable-originals-1');
+    const owned = inspected.changeBytes(0); owned.fill(0); expect(inspected.changeBytes(0)).toEqual(capture.changeBytes(0));
+    expect(b.bodies.openReadOnly).not.toHaveBeenCalled(); expect(b.bodies.inspect).toHaveBeenCalled();
+  });
+  it('selects a non-ancestor target from base plus delta, not their union heads; M differs from D', async () => {
+    const f = await workspaceFixture(), left = title(f.source, 'Left'), right = body(f.source, 'Right'), b = await baseFor(left, f.store);
+    const capture = await ContributionSourceCapture.prepare(await session(right), right.token, b.base, b.bodies, metadataLimits), built = await output(capture, b.bodies);
+    const inspected = await ContributionArchive.inspect(built.file, b.base, b.bodies, metadataLimits);
+    expect(inspected.target.heads).toEqual(right.heads); expect(inspected.target.originalChanges()).toEqual(right.originalChanges());
+    const merged = planRemoteChanges(left, inspected.target, metadataLimits).final;
+    expect(merged.heads).toHaveLength(2); expect(merged.heads).not.toEqual(right.heads);
+    expect(planRemoteChanges(merged, inspected.target, metadataLimits).parts).toHaveLength(0);
+    expect(capture.changes).toHaveLength(1); expect(b.base.source.heads).toEqual(left.heads);
+  });
+  it('uses incremental lex-ready wire ordering and retains all concurrent candidates', async () => {
+    const f = await workspaceFixture(), b = await baseFor(f.source, f.store);
+    const find = (create: (i: number) => ProjectMetadataSource, accept: (hash: string) => boolean) => {
+      for (let i = 0; i < 4096; i++) { const s = create(i); if (accept(s.heads[0]!)) return s; }
+      throw new Error('could not construct lexical fixture');
+    };
+    const a = find(i => title(f.source, `A ${i}`), h => h < '2'), c = find(i => body(a, `Child ${i}`), h => h < '2');
+    const childHash = c.heads[0]!, ancestorHash = a.heads[0]!;
+    // Choose a sibling with a larger native hash so that newly-ready child outranks it.
+    const sibling = find(i => body(f.source, `Sibling ${i}`), h => h > '8');
+    const target = c.appendOriginal(sibling.originalChanges());
+    const capture = await ContributionSourceCapture.prepare(await session(target), target.token, b.base, b.bodies, metadataLimits);
+    expect(capture.changes.map(c => c.expectedChangeHash)).toEqual([ancestorHash, childHash, sibling.heads[0]!]);
+    const built = await output(capture, b.bodies), inspected = await ContributionArchive.inspect(built.file, b.base, b.bodies, metadataLimits);
+    expect(inspected.target.originalChanges()).toEqual(target.originalChanges()); expect(inspected.target.heads).toHaveLength(2);
+  });
+  it('validates only the selected target when unrelated base containers collide in a temporary union', async () => {
+    const f = await workspaceFixture();
+    const add = (text: string) => change(f.source, d => {
+      d.captionsById[id('cap', 2)] = Object.fromEntries(Object.entries({ ...fixture().captionsById[id('cap')], id: id('cap', 2), title: text })
+        .map(([key, value]) => [key, new A.ImmutableString(canonical(value as JsonValue))]));
+    });
+    const left = add('Left record'), right = add('Right record'), b = await baseFor(left, f.store);
+    expect(() => left.appendOriginal(right.originalChanges())).toThrow(/container-replacement/);
+    const capture = await ContributionSourceCapture.prepare(await session(right), right.token, b.base, b.bodies, metadataLimits);
+    const built = await output(capture, b.bodies), inspected = await ContributionArchive.inspect(built.file, b.base, b.bodies, metadataLimits);
+    expect(inspected.target.originalChanges()).toEqual(right.originalChanges());
+  });
+  it('accepts empty D and independently restages a former payload absent from the base guarantee', async () => {
+    const f = await workspaceFixture();
+    const removed = change(f.source, d => {
+      for (const a of Object.values(d.captionAttachmentsById) as Record<string, any>[])
+        a.lifecycle = new A.ImmutableString(canonical({ state: 'deleted', reason: 'userDelete', eventId: id('evt', 99) }));
+    });
+    const b = await baseFor(removed, f.store), capture = await ContributionSourceCapture.prepare(await session(f.source), f.source.token, b.base, b.bodies, metadataLimits);
+    expect(capture.changes).toHaveLength(0); expect(capture.blobs.length).toBeGreaterThan(0);
+    expect(capture.summary.entityClasses).toEqual([]);
+    const built = await output(capture, b.bodies), restored = await ContributionArchive.inspect(built.file, b.base, b.bodies, metadataLimits);
+    expect(restored.target.originalChanges()).toEqual(f.source.originalChanges());
+    const current = await ContributionSourceCapture.prepare(await session(removed), removed.token, b.base, b.bodies, metadataLimits);
+    expect(current.changes).toHaveLength(0); expect(current.blobs).toHaveLength(0);
+    const empty = await output(current, b.bodies); expect((await unpackFixture(empty.file))).toHaveLength(2);
+    expect((await ContributionArchive.inspect(empty.file, b.base, b.bodies, metadataLimits)).target.heads).toEqual(removed.heads);
+  });
+  it('rejects forged base/target/summary, extra or missing original changes, without base updates', async () => {
+    const f = await workspaceFixture(), b = await baseFor(f.source, f.store), target = body(title(f.source, 'One'), 'Two');
+    const capture = await ContributionSourceCapture.prepare(await session(target), target.token, b.base, b.bodies, metadataLimits), built = await output(capture, b.bodies);
+    for (const edit of [
+      (m: any) => { m.base.workspaceManifestSha256 = hash(9); },
+      (m: any) => { m.targetHeads = [hash(9)]; },
+      (m: any) => { m.targetHeads = f.source.heads; },
+      (m: any) => { m.summary.entityClasses = []; m.summary.fieldClasses = []; },
+      (m: any) => { m.changes[0].expectedChangeHash = hash(9); },
+    ]) await expect(ContributionArchive.inspect(await rewrite(built.file, edit), b.base, b.bodies, metadataLimits)).rejects.toThrow();
+    const missing = await rewrite(built.file, (m, entries) => {
+      const last = m.changes.pop(); entries.pop(); m.payloadTotals.entryCount--; m.payloadTotals.uncompressedBytes -= last.byteLength;
+      m.payloadTotals.largestEntryBytes = Math.max(0, ...m.changes.map((c: any) => c.byteLength));
+    });
+    await expect(PackageArchive.inspect(missing)).resolves.toMatchObject({ kind: 'package-archive-integrity' });
+    await expect(ContributionArchive.inspect(missing, b.base, b.bodies, metadataLimits)).rejects.toThrow();
+    expect(b.base.source.token).toBe(f.source.token); expect((await b.ports.read())).toHaveLength(1);
+    await expect(VerifiedContributionBase.select(b.ports, { ...b.selection, heads: target.heads }, b.bodies, metadataLimits)).rejects.toThrow(/base-unavailable/);
+  });
+  it('refuses lost base inventory, stale/pending source, foreign lineage, abort and sink failure', async () => {
+    const f = await workspaceFixture(), b = await baseFor(f.source, f.store), target = title(f.source, 'Edit'), validSession = await session(target);
+    const badStore = { ...b.bodies, inspect: async () => 'missing' as const };
+    await expect(VerifiedContributionBase.select(b.ports, b.selection, badStore, metadataLimits)).rejects.toThrow(/payload-unavailable/);
+    await expect(ContributionSourceCapture.prepare(validSession, target.token, b.base, badStore, metadataLimits)).rejects.toThrow(/payload-unavailable/);
+    await expect(ContributionSourceCapture.prepare(validSession, f.source.token, b.base, b.bodies, metadataLimits)).rejects.toThrow(/not-ready/);
+    const read = await validSession.read(); let reads = 0;
+    await expect(ContributionSourceCapture.prepare({ read: async () => ({ ...read, publication: String(++reads) }) }, target.token, b.base, b.bodies, metadataLimits)).rejects.toThrow(/publication-changed/);
+    await expect(ContributionSourceCapture.prepare({ read: async () => ({ ...read, state: 'pending' as const }) }, target.token, b.base, b.bodies, metadataLimits)).rejects.toThrow(/not-ready/);
+    const foreign = await workspaceFixture();
+    await expect(ContributionSourceCapture.prepare(await session(foreign.source), foreign.source.token, b.base, b.bodies, metadataLimits)).rejects.toThrow(/lineage/);
+    const abort = new AbortController(); abort.abort();
+    await expect(ContributionSourceCapture.prepare(validSession, target.token, b.base, b.bodies, metadataLimits, abort.signal)).rejects.toThrow();
+    const capture = await ContributionSourceCapture.prepare(validSession, target.token, b.base, b.bodies, metadataLimits);
+    await expect(writeContributionArchive(capture, b.bodies, new WritableStream({ write() { throw new Error('injected sink failure'); } }),
+      { packageId: id('pkg', 2), createdByVersion: '0.0.1' })).rejects.toThrow(/injected sink failure/);
+    const built = await output(capture, b.bodies);
+    await expect(ContributionArchive.inspect(built.file, b.base, badStore, metadataLimits)).rejects.toThrow(/payload-unavailable/);
+  });
+  it('freezes output identity and cancellation signal before awaited base checks', async () => {
+    const f = await workspaceFixture(), b = await baseFor(f.source, f.store), target = title(f.source, 'Edit');
+    const capture = await ContributionSourceCapture.prepare(await session(target), target.token, b.base, b.bodies, metadataLimits);
+    let release!: () => void;
+    const wait = new Promise<void>(resolve => { release = resolve; }), store = { ...b.bodies, inspect: async () => { await wait; return 'verified-present' as const; } };
+    const abort = new AbortController(), swapped = new AbortController(), options = { packageId: id('pkg', 2), createdByVersion: '0.0.1', memo: 'Original', signal: abort.signal };
+    const chunks: BlobPart[] = [], pending = writeContributionArchive(capture, store, new WritableStream({ write(b) { chunks.push(b.slice() as BlobPart); } }), options);
+    options.packageId = id('pkg', 3); options.createdByVersion = 'changed'; options.memo = 'Changed'; options.signal = swapped.signal; swapped.abort(); release();
+    const result = await pending; expect(result.manifest).toMatchObject({ packageId: id('pkg', 2), createdByVersion: '0.0.1', memo: 'Original' });
+    const emptyStore = { ...b.bodies, inspect: async () => { abort.abort(); return 'verified-present' as const; } };
+    await expect(writeContributionArchive(capture, emptyStore, new WritableStream(), { ...options, signal: abort.signal })).rejects.toThrow();
+    await expect(ContributionSourceCapture.prepare(await session(target), target.token, b.base, b.bodies, { ...metadataLimits, maxWork: 1 })).rejects.toThrow();
+  });
+  it('includes only the added image body and refuses corruption or cancellation while streaming it', async () => {
+    const f = await workspaceFixture(), b = await baseFor(f.source, f.store), bytes = Uint8Array.from(atob(fixtureMedia[1]!.base64), c => c.charCodeAt(0));
+    const digest = packageByteHash(bytes), media = fixtureMedia[1]!.record;
+    const target = change(f.source, d => {
+      d.mediaResourcesById[id('med', 2)] = new A.ImmutableString(canonical(media));
+      d.captionAttachmentsById[id('att', 2)] = Object.fromEntries(Object.entries({ ...fixture().captionAttachmentsById[id('att')], id: id('att', 2), mediaResourceId: id('med', 2) })
+        .map(([key, value]) => [key, new A.ImmutableString(canonical(value as JsonValue))]));
+    });
+    f.bodies.set(digest, bytes); b.bodies.openReadOnly.mockClear();
+    const capture = await ContributionSourceCapture.prepare(await session(target), target.token, b.base, b.bodies, metadataLimits);
+    expect(capture.blobs.map(b => b.sha256)).toEqual([digest]); expect(b.bodies.openReadOnly.mock.calls.map(c => c[0].digest)).toEqual([digest]);
+    const built = await output(capture, b.bodies); expect((await ContributionArchive.inspect(built.file, b.base, b.bodies, metadataLimits)).target.token).toBe(target.token);
+    expect(b.bodies.openReadOnly.mock.calls.every(c => c[0].digest === digest)).toBe(true);
+    const bad = { ...b.bodies, openReadOnly: async () => ({ size: bytes.length, stream: () => new Blob([new Uint8Array(bytes.length)]).stream() }) };
+    await expect(output(capture, bad)).rejects.toThrow();
+    const controller = new AbortController(); let enter!: () => void, cancelled = false;
+    const started = new Promise<void>(resolve => { enter = resolve; });
+    const blocked = { ...b.bodies, openReadOnly: async () => ({ size: bytes.length, stream: () => new ReadableStream<Uint8Array>({
+      pull() { enter(); }, cancel() { cancelled = true; },
+    }) }) };
+    const pending = writeContributionArchive(capture, blocked, new WritableStream(), { packageId: id('pkg', 2), createdByVersion: '0.0.1', signal: controller.signal });
+    await started; controller.abort(); await expect(pending).rejects.toThrow(); expect(cancelled).toBe(true);
+  });
+});
 
 describe('connected Workspace ZIP generation and integrity (not admission or external saving)', () => {
   it('attributes protected current, conflicting and base-only bodies without retaining weak history', async () => {

@@ -67,13 +67,28 @@ export function workspaceInputChunks(input: ReadableStream<Uint8Array>, signal: 
 /** Actual ZIP generation into an owned sink, not a job, retained base or external-file receipt. */
 export async function writeWorkspaceArchive(capture: WorkspaceSourceCapture, store: Pick<OriginBlobStore, 'openReadOnly'>,
   destination: WritableStream<Uint8Array>, options: WorkspaceArchiveOptions) {
+  let started = false;
+  try {
+    const metadata = capture.metadataBytes();
+    if (metadata.length !== capture.metadata.byteLength || packageByteHash(metadata) !== capture.metadata.sha256) fail('workspace-source-mismatch');
+    const controls = prepareWorkspaceManifest(capture, options); started = true;
+    return await writeCausalArchive(capture, controls, [{ path: 'metadata.am', bytes: metadata }], store, destination, options);
+  } catch (error) { if (!started) await destination.abort(error).catch(() => {}); throw error; }
+}
+
+/** Shared bounded container writer only; source/base authority belongs to purpose-specific captures. */
+export async function writeCausalArchive(capture: Pick<WorkspaceSourceCapture, 'blobs' | 'bodyRefs'>,
+  controls: { manifest: Uint8Array; checksum: Uint8Array }, originals: readonly { path: string; bytes: Uint8Array }[],
+  store: Pick<OriginBlobStore, 'openReadOnly'>, destination: WritableStream<Uint8Array>, options: WorkspaceArchiveOptions) {
   const cancel = new AbortController(), abort = () => cancel.abort(options.signal?.reason);
   options.signal?.addEventListener('abort', abort, { once: true });
   let pipeline: Promise<void> | undefined;
   try {
-    checkAbort(options.signal); const metadata = capture.metadataBytes();
-    const { manifest, checksum, control } = prepareWorkspaceManifest(capture, options);
-    if (metadata.length !== capture.metadata.byteLength || packageByteHash(metadata) !== capture.metadata.sha256) fail('workspace-source-mismatch');
+    checkAbort(options.signal);
+    const manifest = controls.manifest.slice(), checksum = controls.checksum.slice(), control = readManifestControl(manifest, checksum);
+    if (!['teamWorkspace', 'contribution'].includes(control.manifest.purpose)) fail('zip-purpose');
+    const source = originals.map(e => ({ path: e.path, bytes: e.bytes.slice() }));
+    if (!same(control.entries.slice(2), [...source.map(e => ({ path: e.path, sha256: packageByteHash(e.bytes), byteLength: e.bytes.length })), ...capture.blobs])) fail('zip-source-table');
     const bridge = new TransformStream<Uint8Array, Uint8Array>();
     const hash = new NativeSha256(); let byteLength = 0, chunks = 0, bodyReads = 0, finished = false;
     const output = new TransformStream<Uint8Array, Uint8Array>({ transform(bytes, controller) {
@@ -84,7 +99,7 @@ export async function writeWorkspaceArchive(capture: WorkspaceSourceCapture, sto
     pipeline = bridge.readable.pipeThrough(output).pipeTo(destination, { signal: cancel.signal });
     void pipeline.catch(error => { cancel.abort(error); });
     const writer = new ZipWriter(bridge.writable, zipOptions(cancel.signal));
-    for (const [path, bytes] of [['manifest.json', manifest], ['manifest.sha256', checksum], ['metadata.am', metadata]] as const) {
+    for (const { path, bytes } of [{ path: 'manifest.json', bytes: manifest }, { path: 'manifest.sha256', bytes: checksum }, ...source]) {
       checkAbort(cancel.signal); await writer.add(path, new Uint8ArrayReader(bytes), zipOptions(cancel.signal)); checkAbort(cancel.signal);
     }
     const refs = new Map(capture.bodyRefs.map(ref => [ref.digest, ref]));
@@ -109,7 +124,8 @@ export async function writeWorkspaceArchive(capture: WorkspaceSourceCapture, sto
     }
     checkAbort(cancel.signal); await writer.close(undefined, { zip64: false }); await pipeline; checkAbort(cancel.signal);
     if (!finished) fail('zip-output-incomplete');
-    return Object.freeze({ kind: 'generated-workspace-archive' as const, byteLength, sha256: hash.digestHex(), manifest: control.manifest });
+    return Object.freeze({ kind: control.manifest.purpose === 'teamWorkspace' ? 'generated-workspace-archive' as const : 'generated-contribution-archive' as const,
+      byteLength, sha256: hash.digestHex(), manifest: control.manifest });
   } catch (error) {
     cancel.abort(error);
     if (pipeline) await pipeline.catch(() => {});

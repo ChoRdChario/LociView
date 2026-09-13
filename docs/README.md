@@ -43,6 +43,11 @@ receive for that lineage. Initial input/recovery, complete base observations,
 separate repository vacancy and startup-Scene guards share existing boundaries.
 Other purposes, ordinary activation and rendered/device acceptance remain open;
 final verification for this connection is recorded in todo.
+Contribution source/archive primitives now freeze one verified retained base,
+generate exact original D and reopen a declared non-ancestor target independently
+of the temporary union. Delta summary and new-body closure are verified; unchanged
+models use existing CAS metadata only. No Contribution receive journal, UI, base
+advancement or external save receipt is implied. Final checks are in todo.
 F01/F02 are not complete. Current executed evidence and next work are in todo.
 
 Later PO adoption: [05 §4.4](specs/05-project-scene-team-workflow.md#44-explicit-pin-parent-changes-po-approved-2026-09-13)

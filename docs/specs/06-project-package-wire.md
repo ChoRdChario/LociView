@@ -644,6 +644,52 @@ before body reads, preservation of old verification receipts and retry failure
 after acknowledged body/fact loss. Keep job/service/adoption work open until its
 separate connection is executed.
 
+### 8.5 Isolated Contribution source and archive (2026-09-13)
+
+Under §11, implement §4's original delta and file-integrity boundary before the
+dedicated durable Contribution job. This does not extend the existing fullMetadata
+journal, activate ordinary import, advance a base or confirm an external save.
+
+- Freeze one exact `base` selection from the validated `WorkspaceBaseStore`, with
+  owned original manifest/metadata bytes and §8.1's proof projection. Completion
+  observations/labels are not wire proof. Recheck every guaranteed base payload's
+  durable CAS presence/size/suspect metadata without streaming its body. A missing,
+  suspect or unverified guarantee makes the selected base unavailable, not smaller.
+- Both original sources use the current finite package/metadata budgets and the
+  same identity/epoch/root. Derive `D = reachable(target) - reachable(base)` by
+  native change hash, preserving byte equality for shared changes. Order D by
+  incrementally selecting the smallest ready native hash, exactly as the existing
+  manifest reader does. Do not reuse receiver M's ready-batch order as wire order.
+- Inspect all target original scalars under the existing bounded classifier, but
+  count only scalars whose change hash belongs to D for `scope:baseDelta`. Existing
+  unsupported-history/opaque-inventory refusal remains; excluding base counts
+  must not bypass structural source validation or its work/node budgets.
+- Compute all-live-candidate target strong closure and subtract only matching
+  digest/length entries in the verified base inventory. Read/hash only remaining
+  bodies. An empty D does not imply an empty payload set. Freeze the Session token
+  and publication before/after capture; stale/pending/aborted input cannot complete.
+- Reuse exact STORE ZIP/control/CRC/SHA limits, entry ordering and bounded sink
+  completion. Contribution carries original `changes/<ordinal>.amchange`, not
+  `metadata.am`. No base receipt or durable output completion follows this primitive.
+- Input verifies the same explicit base, all wire descriptors and original bytes,
+  then applies base+D in a detached source. Traverse native dependencies from
+  declared target heads and reopen only reachable originals. This avoids the pinned
+  adapter's full-history `getAllChanges(view)` behavior. Require exact target heads
+  and exact D set/bytes/incremental order, not the temporary union's heads.
+- Derived target bytes have their own digest/length and adapter contract literal
+  `lociview-automerge-3.4.1-reachable-originals-1`; they are local reconstruction
+  evidence, never original package metadata. A future journal must retain wire,
+  frozen base and derived evidence separately under §8.1 before acknowledgment.
+- Input recomputes baseDelta summary and target-minus-guaranteed payload closure.
+  Source/control/body integrity is not receiver readiness or profile admission.
+  `M = T - R`, original retention/recovery and explicit no-base-advance completion
+  remain the next Session/job connection, not simulated via Workspace receipts.
+
+Reuse existing package/file fixtures: non-ancestor target, newly-ready lexical
+order, exact raw originals, empty D, missing/extra/corrupt/foreign input, lost base
+guarantees, changed token/publication, cancellation/sink failure and Caption-only
+zero old-model reads. No new PoC, runtime dependency or assertion relaxation.
+
 ## 9. Acceptance vectors required before S2
 
 These are vector requirements, not tests executed by this document. Reuse the

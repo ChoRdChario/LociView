@@ -2,7 +2,76 @@
 
 ## Current boundary — thin connected workflow first (2026-09-09)
 
-Active after clean `bf1c0e0` (Workspace output connection). The previous goal turn
+Active after clean `f41ba40` (first Workspace import). The previous goal turn made
+production progress: 24 files committed after focused 182 PASS, typecheck, final
+root 2,172 PASS with two workers, both builds and independent exact-index review.
+The initial default-root 7 failures remain recorded below. Cached origin is
+0 behind / 65 ahead. No unchanged denied push/browser bootstrap is retried.
+
+Current F02 unit — verified base → original Contribution delta → exact ZIP/reopen:
+
+- [x] Specify/review the isolated original-D capture and target reconstruction;
+  preserve Workspace wire/receipts and receiver M journal ordering.
+- [x] Freeze an explicitly selected available base, derive exact target-minus-base
+  original changes and missing guaranteed-body closure. Check base inventory using
+  durable CAS metadata, not unchanged body reads. Preserve branching target heads.
+- [x] Generate/reopen a Contribution ZIP through the existing bounded ZIP path;
+  compare original hashes/bytes/deps/order, base proof, summary and payload closure.
+- [x] Reuse package/file tests for real original histories, non-ancestor targets,
+  empty deltas, bad input and Caption-only zero model reads. Final meaningful-tree
+  checks, independent review and checkpoint before Session/job/UI connection.
+
+Acceptance: usable production file primitives, not fake full metadata. No storage
+writes/base advancement, new journal yet, normal-home activation, dependency,
+profile expansion, migration, browser/device/offline claim or new PoC. The next
+connected unit uses these exact originals in the approved contributionDelta journal
+and existing file tools; no new PO decision unless a genuine contract conflict.
+The full goal remains all 62 groups and consolidated Desktop/iPhone/offline
+acceptance. F02 is not complete at this primitive boundary.
+
+Implementation/review: private-constructor base selection retains original
+manifest/metadata and checks exact local observations through the existing store.
+Only new required bodies are streamed. Original delta counts preserve edit/revert;
+incremental wire order is separate from receiver M. Independent source review
+corrected Workspace pre-start sink cleanup, mutable Contribution output options,
+and a temporary-union container collision rejecting a valid non-ancestor target.
+The latter now checks a bounded original/dependency index before selecting and
+validating the target alone. Dedicated regression cases are in the existing suite.
+The combined package/file run completed: 108 PASS / exit 0, 60.75 s. Final
+typecheck exits 0 after correcting a pending-read test stub to retain its required
+source/provider/publication fields. The guard and assertion are unchanged. The
+first full-root run with two workers ended with 1 failure / 2,181 PASS / 21
+existing TODO (270.86 s): the isolation allowlist omitted the two new §8.5 modules.
+Only those exact filenames/direct imports are now allowed; ordinary-app/host
+activation and direct browser-storage/network imports stay denied. Isolation's
+12 cases pass after this correction. Final typecheck exits 0. With source/tests
+frozen, `npm test -- --maxWorkers=2` completes with 112 files / 2,182 PASS /
+21 existing TODO / zero failures, exit 0 in 265.56 s. Both `npm run build` and
+`npm run build:harness` exit 0; existing mixed-import/large-chunk warnings remain.
+Independent source and exact-index review of the 13-file scope, including the exact
+isolation allowlist, have no mandatory findings. Only result documentation changes
+after these checks; resolve the local checkpoint from Git HEAD/log. Early fixture
+failures were invalid lifecycle/
+immutable-media digest values and an overly strict getAllChanges enumeration-order
+assertion; the new file test instead checks exact raw bytes by native hash and heads.
+No source operation, winner, hash or acceptance condition was rewritten to pass.
+
+Next connected receive unit (after this checkpoint): specify/review a separate
+Contribution source/job variant before implementation. Reuse the original-D file
+primitives above, but recover from retained base manifest/metadata, original wire
+parts and the first sealed derived target, not a current base-table selection or a
+new serialization. Verify all base originals belong byte-identically to receiver R
+before deriving M. Nonempty M uses the existing one-publication journal boundary;
+M=0 creates no metadata journal/change/publication and never a base observation.
+Both variants share existing file-tool input/mode/output guards and capacity/root
+accounting. Missing acknowledged job/base/derived evidence must remain repair,
+including when only the journal reveals the job after directory loss. Existing
+package/file/persistence tests cover two rounds, local edits/conflicts, cold prefix
+recovery, original evidence loss and repeat no-op; do not add another PoC.
+
+### Completed first-import checkpoint (`f41ba40`)
+
+Starting at clean `bf1c0e0` (Workspace output connection). The preceding goal turn
 made production progress and closed its 24-file checkpoint: typecheck, 2,157 tests,
 both builds and independent review. No changed blocker or repeated denied action.
 The full practical-team target remains 62 groups plus Desktop/iPhone/offline
@@ -49,7 +118,7 @@ root result. With source/tests still frozen, the same full suite completed with
 result does not erase the initial failing run or prove its exact cause. Both
 `npm run build` and `npm run build:harness` exit 0; existing mixed-import/large-chunk
 warnings remain. The independent frozen 24-file review has no mandatory findings;
-only result documentation changed after these checks. Local checkpoint follows.
+only result documentation changed after these checks. Committed as `f41ba40`.
 One earlier focused failure was an existing error-text expectation; creation's
 specific message is retained, with a separate refusal for readonly file input.
 No rendered/browser/iPhone or offline acceptance is claimed.

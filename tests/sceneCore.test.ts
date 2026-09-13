@@ -234,8 +234,8 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
     });
     for (const path of walk('src').filter(p => /\.(ts|tsx|js)$/.test(p))) {
       const source = readFileSync(path, 'utf8');
-      const packageControl = /[\\/]projectPackage[\\/](contract|manifest|historySummary|closure|protectedInventory|workspaceSource|zipChecks|zipArchive|workspaceArchive|receiveJob|workspaceBases|outputJob)\.ts$/.test(path);
-      const packageMetadata = /[\\/]projectPackage[\\/](historySummary|closure|protectedInventory|workspaceSource|workspaceArchive|receiveJob|workspaceBases|outputJob)\.ts$/.test(path);
+      const packageControl = /[\\/]projectPackage[\\/](contract|manifest|historySummary|closure|protectedInventory|workspaceSource|contributionSource|contributionArchive|zipChecks|zipArchive|workspaceArchive|receiveJob|workspaceBases|outputJob)\.ts$/.test(path);
+      const packageMetadata = /[\\/]projectPackage[\\/](historySummary|closure|protectedInventory|workspaceSource|workspaceArchive|contributionSource|contributionArchive|receiveJob|workspaceBases|outputJob)\.ts$/.test(path);
       const packageJournal = /[\\/]projectMetadata[\\/](packageRemote|session)\.ts$/.test(path) || /[\\/]projectFiles[\\/](receiveWorkspace|sendWorkspace)\.ts$/.test(path) ||
         /[\\/]harness[\\/]projectScene[\\/](validationHost|validationWorkspace)\.ts$/.test(path);
       // 06 §11/§12.3 permit these exact disconnected primitives, not an app importer.
@@ -264,6 +264,12 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
             './contract', './manifest', './workspaceSource', './workspaceArchive', './workspaceBases', './protectedInventory'],
           workspaceSource: ['../projectMetadata/session', '../projectMetadata/source', '../projectMetadata/blobStore', '../projectMetadata/blobStream',
             './contract', './manifest', './historySummary', './closure'],
+          // 06 §8.5 only: original delta/file primitives, not Session/job/UI activation.
+          contributionSource: ['@automerge/automerge/slim', '../domain/projectGraphSupport', '../domain/values', '../projectMetadata/blobStore',
+            '../projectMetadata/blobStream', '../projectMetadata/session', '../projectMetadata/source', './contract', './manifest',
+            './historySummary', './closure', './workspaceSource', './workspaceBases', './zipChecks', './zipArchive'],
+          contributionArchive: ['../projectMetadata/blobStore', '../domain/projectGraphSupport', '../domain/values', './contract', './manifest',
+            './contributionSource', './workspaceArchive', './zipChecks'],
           zipChecks: ['./manifest'], zipArchive: ['../nativeGs/sha256', './contract', './manifest', './zipChecks'],
           workspaceArchive: ['@zip.js/zip.js', '../domain/projectGraphSupport', '../domain/values', '../projectMetadata/blobStore',
             '../projectMetadata/blobStream', '../projectMetadata/source', '../nativeGs/sha256', './contract', './manifest',

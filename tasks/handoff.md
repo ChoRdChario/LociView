@@ -1,6 +1,16 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **Current unit — `bf1c0e0`後の初回Workspace読込:** 元履歴を再作成せず、独立した
+> **Current unit — `f41ba40`後のContribution原本／ZIP:** 共通交換基準を明示選択し、
+> 元変更D・必要本体差分・delta summaryから実ZIPを生成／再検査する部品を追加。
+> 位置づけはfile primitiveであり、ContributionのSession/journal/UI接続は次。
+> 原本保持・incremental wire順・非祖先target再構成・変更なし本体0readを検査。
+> 旧Workspace出力の失敗cleanupも保持。途中のunion構造をtargetと混同しない。
+> 独立13-file reviewの必須残件なし。関連108件PASS、型・通常／harness build exit 0。
+> 最終root：112 files／2,182 PASS／既存21 TODO／失敗0（265.56秒、worker数2）。
+> 初回rootの隔離allowlist漏れ1件は限定修正し、失敗記録もtodoに保持。
+> 最終source/testsは不変更。base更新・通常home・実browser／実機／offlineの受入れではない。
+
+> **Previous checkpoint — `f41ba40` 初回Workspace読込:** 元履歴を再作成せず、独立した
 > 初回import journalでGLB/PNGと一緒に導入。同じ一覧の「作業一式を開く」へ接続し、
 > identityが既存なら更新受信、別系統／作成途中／欠落証拠は上書きしない。
 > sourceなしのcold再選択、開始Scene確認との相互guard、取りやめ後の一覧復帰を接続。

@@ -11,16 +11,25 @@ export type OriginalInspection = Awaited<ReturnType<ProjectMetadataSource['inspe
 
 /** Exact addressed-entity counts. Original addresses/values never enter the summary. */
 export function summarizeFullHistory(inspection: OriginalInspection) {
+  return summarizeHistory(inspection);
+}
+/** Validate the whole history, but count only addressed entities in the original delta. */
+export function summarizeDeltaHistory(inspection: OriginalInspection, changes: ReadonlySet<string>) {
+  return summarizeHistory(inspection, changes);
+}
+function summarizeHistory(inspection: OriginalInspection, changes?: ReadonlySet<string>) {
   const entities = new Map<string, Set<string>>(), fields = new Map<string, Set<string>>();
-  let workUsed = inspection.workUsed;
+  let workUsed = inspection.workUsed, selected = true, hasOpaque = false;
   const add = (map: Map<string, Set<string>>, key: string, entity: string) => {
+    if (!selected) return;
     const set = map.get(key) ?? new Set<string>(); set.add(entity); map.set(key, set);
   };
-  const opaque = (entity: string) => { add(entities, 'opaque', entity); add(fields, 'opaque.field', entity); };
+  const opaque = (entity: string) => { hasOpaque = true; add(entities, 'opaque', entity); add(fields, 'opaque.field', entity); };
   // Each node can be revisited by the existing semantic validator; charge this
   // whole finite traversal before invoking it, not a fresh budget per scalar.
   workUsed += inspection.nodesUsed;
   for (const op of inspection.scalars) {
+    selected = !changes || changes.has(op.changeHash);
     if (++workUsed > L.inspectionWork) throw new PackageControlError('summary-work-budget');
     const [map, id, field] = op.path;
     let entity = canonical(op.path.slice(0, 2)), group = map!, name: string | undefined;
@@ -46,5 +55,5 @@ export function summarizeFullHistory(inspection: OriginalInspection) {
     if (c.unknown) opaque(entity);
   }
   const counts = (map: Map<string, Set<string>>) => Object.freeze([...map.keys()].sort().map(key => Object.freeze({ class: key, count: map.get(key)!.size })));
-  return Object.freeze({ entityClasses: counts(entities), fieldClasses: counts(fields), hasOpaque: entities.has('opaque'), workUsed });
+  return Object.freeze({ entityClasses: counts(entities), fieldClasses: counts(fields), hasOpaque, workUsed });
 }
