@@ -2320,3 +2320,104 @@ table above, not generated golden bytes. One independent design review must chec
 these fields/guards against §§4.1/7/8.2/11.4 before treating this gap as drafted;
 The §12.6 product behavior is approved and its reconstruction tables consolidated;
 builder execution/goldens, sink adoption and §10's measured gate remain open.
+
+### 12.8 Same-Project restore and local storage generations
+
+Status: technical implementation contract under the already-approved explicit
+backup restoration policy; independently review each closed protocol before its
+code. This is not wire/profile adoption or an implemented restore claim. The
+existing practical-team F03 outcome still requires the complete UI/recovery and
+continued Contribution loop, not merely a namespace helper.
+
+Restoration is not causal merge. Retain the current working history and prepare
+the backup's exact original history in a separate **local generation** of the
+same Project. Project identity/proof, the logical run, and its exclusive lease
+remain unchanged. Metadata, immutable facts, base evidence and package jobs use
+one selected generation; old output jobs are never interpreted against the
+restored base table. No old generation or checkpoint is deleted by this operation.
+
+#### Namespace capability and mutation fencing
+
+`openWorkspaceGeneration` binds one logical-root ProjectWorkspaceFS and an
+owned storage opener to either the original namespace (`generationId: null`)
+or one 32-lowercase-hex local generation. The ID is an internal restore-job ID,
+not a new Project identity or proof inferred from a filename/time/hash.
+
+- The original OPFS namespace retains its existing paths. New generations use
+  `<logical-root>/v2/generations/<id>/`; metadata and package helpers derive paths
+  from this scoped root without individually selecting different generations.
+  `<logical-root>/v2/local-restore/` is reserved for the root controller. Original
+  generation lists exclude both reserved trees; direct access to them is denied.
+  Every scoped path is validated; parent segments, duplicate separators and
+  cross-generation paths are not allowed.
+- The original IndexedDB database and keys stay unchanged. Each new generation
+  uses `<original-database-name>-generation-<id>`, including its own Repo identity.
+  The same locator is passed to the storage opener and used for the FS root;
+  neither browser nor catalog independently reselects a generation. The opener
+  returns an already isolated database port. Repo keys are not rewritten.
+  `removeRange([])` therefore affects only that one namespace, never siblings.
+  A shared-database prefix/filter wrapper is deliberately not used: the current
+  adapter's original `loadRange([])` would materialize sibling generations before
+  filtering, and provides no bounded key-only API. Do not add such an adapter API
+  or silently migrate the existing database merely to implement restoration.
+- The capability retains the **same root mutation authority object**, hence the
+  existing `underWriteLease` queue, rather than one queue or lock per generation.
+  A scope-owned asynchronous fence runs at lease entry and before return, and
+  before/after every FS and IDB operation. Thus even zero-change operations or
+  identity-seeding writes cannot acknowledge a stale generation. The scope never
+  invents its own selected pointer. Its internal controller-provided fence must
+  validate the exact bound selection, or the exact pending staging job and input.
+  A failed/missing selection rejects access; same metadata heads do not excuse a
+  different generation. No permissive fallback is installed in ordinary routes.
+- The fence reads the unwrapped logical root, never its own fenced filesystem.
+  The opener receives explicit creation authority only for a verified staging
+  job/new Project; selected cold opens always forbid creation. If selection
+  changes during opening, close that connection and return no capability.
+- Captured keys, bytes and arrays are owned across asynchronous checks. Lazy file
+  streams/blob acquisition also recheck the fence, including before delivery and
+  after reading. A retired handle cannot silently keep feeding a new editor.
+  Source streams are cancelled/released on refusal. Already supplied UI drafts
+  remain available to explain/recover the interruption, not editable new state.
+- The namespace helper neither selects a generation nor grants restore authority.
+  Until the root selector and restore job are connected, it remains internal and
+  is not used to activate a new ordinary Project. A missing selected namespace is
+  never initialized automatically. Existing repository exact-history and journal
+  append-only checks remain unchanged.
+
+#### Complete restore connection (required next protocol)
+
+The root controller uses one append-only, predecessor-bound selection chain.
+It binds the exact backup ZIP, confirmation's current generation/publication/
+source/base snapshot, restore job and verified destination. Preparation is not
+selection. Pending work retains the old display and refuses ordinary writes;
+explicit cancellation preserves the old selection and all original data. An
+inconsistent/missing acknowledged job or selected destination is repair state,
+never fallback to an older generation, an empty Project or a demo.
+
+The new generation starts with a dedicated `restoreBackup` journal purpose and
+fullBackup proof, not a fake Workspace input. Its initial predecessor is null,
+baseHeads empty and repositoryId equals the restore transaction. Exact full
+original changes and original manifest/checksum/metadata/inventory/base table/
+base evidence are validated. Only this new branch receives a new seal domain;
+all earlier seals remain byte-identical. Recovery reuses acknowledged originals.
+
+A restore-specific base binding ties the original historical table/evidence to
+that verified initialization and publication. Do not fabricate current local
+generated/imported observations. Later actual Workspace observations fold into
+the restored table without losing labels/provenance, under cumulative existing
+limits. All current/conflict/base-only inventory bodies must be present and
+verified before selection. Existing acknowledged CAS loss requires an explicit
+repair path, not an implicit `put` from the chosen backup.
+
+The same resolver is used after the logical lease in validationHost and by the
+read-only catalog; FS and IDB receive the **same** resolved locator. Warm services
+stay fenced. Prepare fresh editor/residents and use the restored startup Scene,
+not the former Scene's UI memory. Switch once after all verification; only then
+replace the visible editor. A display failure after the committed switch offers
+resume of the selected generation, not a hidden rollback. The current-file
+selection and restoration impact are explicit in the existing file area.
+
+Reuse existing tests for original Repo/FS immutability, same-head stale access,
+database/range isolation, cancellation, missing/torn control records, independent cold
+selection, exact restored source/bases and subsequent Contribution exchange.
+No new PoC, automatic external write, GC, profile or device/offline credit.

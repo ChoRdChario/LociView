@@ -71,7 +71,11 @@ with frozen original retention, sequential readback, cold partial retry and exac
 optional file verification. Names belong only to the output job; later edits and
 base observations make its older content visible, without advancing any base.
 Acknowledged input/artifact loss refuses regeneration, including initial warm
-generation. Explicit restore, other purposes and migration remain open. Checks
+generation. The internal `projectMetadata/generationScope.ts` now binds a retained
+logical-root lease/queue to separate local metadata/package and database scopes,
+with stale-operation/lazy-stream fencing. It is not activated: authoritative
+selection, backup initialization/restored-base evidence and restore UI remain next.
+Explicit restore, other purposes and migration remain open. Checks
 are recorded in todo.
 Download alone is not save proof.
 This is not ordinary-home, rendered/device or whole-team acceptance.

@@ -2,6 +2,66 @@
 
 ## Current boundary — thin connected workflow first (2026-09-09)
 
+Active after `2389114`: the preceding question turn reconfirmed the visible-pin
+behavior without changing the implementation; classify it as no production
+progress, not a blocker. The clean tree is cached 0 behind / 70 ahead. Resume F03
+explicit restore, preserving the complete practical-team objective.
+
+Current connected outcome — explicit same-Project backup restoration:
+
+- [x] Fix and independently review the namespace-capability contract before code.
+  Restore initialization, historical-base authority and switch/recovery still
+  require their exact closed records and independent review before their code.
+- [x] Bind OPFS metadata/packages and IndexedDB to one local generation under the
+  same logical Project lease/queue. Fence stale readers/writers and isolate range
+  removal, including the unchanged original database. No Project ID rewrite.
+- [ ] Add dedicated full-original backup initialization and restored-base evidence;
+  preserve old seals and verify all protected bodies, including base-only bodies.
+- [ ] Connect verified input/effect confirmation, preparation, one authoritative
+  switch and cold recovery to the existing file area/catalog/host. Keep old work.
+- [ ] Verify restored editing/Contribution exchange, stale and cancelled actions,
+  missing evidence and post-switch display recovery with existing tests. Finish
+  typecheck/root tests/builds and independent review at meaningful final trees.
+
+Current namespace result: `generationScope.ts` preserves
+one logical-root authority/queue while binding metadata/packages and a separately
+opened database. Original paths/DB are unchanged. Guarded operations and lazy
+streams reject retired scopes, and disposal invalidates captured handles. The
+initial shared-DB prefix proposal was rejected before implementation because
+legacy loadRange would materialize sibling histories; no adapter API was added.
+Prereview and source re-review passed after fixing stream chunk ownership before
+an asynchronous fence. Related persistence/isolation run 33689: 72 PASS. Two more
+cases then added actual local-lease streaming and chunk mutation during a fence.
+Typecheck 42293 caught a contextual overload in the new test assertion; separated
+Blob acquisition fixes that typing without changing production behavior. Root
+67078 was mistakenly started before that failed typecheck was handled and was
+explicitly stopped (exit 1); it is not a completed test result. Corrected final
+typecheck 67026 exits 0. Full root 49137 exits 0: 112 files / 2,236 PASS / 21
+existing TODO / zero failures, 324.15 s. Ordinary build f4c1bf and harness build
+18263d both exit 0 (existing mixed-import/large-chunk warnings only). Independent
+source re-review and exact 10-file index review have no mandatory remainder;
+their final-check conditions are met. No source/test edits followed these checks.
+No new browser/device or restore-completion claim; checkpoint identity is Git.
+
+Short meta-audit: the helper is a necessary restore boundary, not another UI/PoC
+or completion counter. The next work must consume it: fix the root restore
+job/selection records, then connect dedicated backup initialization, restored-base
+authority and the existing file/editor switch. The read-only design review found
+that scanning selection files alone cannot detect a lost last switch: use the
+job/index and terminal selection-reference witness, keep incomplete work visible,
+and forbid fallback. Exact closed protocol review precedes that code. Do not
+start a separate generic storage campaign. No new PO policy question or blocker;
+ordinary adoption, missing acknowledged CAS repair and consolidated Desktop/iOS/
+offline acceptance remain explicit boundaries. No unchanged denied push retry.
+
+The generation capability is an internal prerequisite, not a completed restore
+or another validation UI. Its first checks cover actual Repo namespace separation
+and the shared lease/fence. The selector and complete restore connection remain
+required. Explicit acknowledged-CAS repair remains F03 work. No ordinary adoption,
+new profile/dependency, automatic sink, cleanup, device/offline or release claim.
+
+### Completed named manual backup output (`2389114`)
+
 Active after `3c8ed08`: the preceding question turn confirmed the visible-pin
 contract by reading code/tests; it made no implementation progress. This resumed
 turn connects named backup output. Cached origin is 0 behind / 69 ahead; the

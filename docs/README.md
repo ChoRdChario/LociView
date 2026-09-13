@@ -58,7 +58,11 @@ replacement authority or invent local imported/generated observations. Named
 manual backup output now connects through a frozen durable job and the same file
 tools. Partial retry uses the same originals/name; acknowledged loss is repair.
 Generation and optional exact file verification stay separate, with no base
-advancement. Explicit restore remains next; checks are in todo.
+advancement. Explicit restore remains next. Its internal generation capability
+now isolates metadata/package paths and database ownership under one logical
+Project lease/queue, fencing stale/lazy operations. The selector, dedicated backup
+initialization/restored-base evidence and UI switch are not connected; this helper
+does not activate restoration. Contract: 06 §12.8; checks are in todo.
 This does not complete the practical-team, ordinary-home or device/offline gate.
 
 Contribution durable output now connects in the same file tools under §8.7:

@@ -25,6 +25,8 @@ import { PACKAGE_FORMAT, PACKAGE_WIRE_VERSION } from '../src/projectPackage/cont
 import { readManifestControl } from '../src/projectPackage/manifest';
 import { summarizeFullHistory } from '../src/projectPackage/historySummary';
 import { planWorkspaceClosure } from '../src/projectPackage/closure';
+import { generationDatabaseName, openWorkspaceGeneration, type WorkspaceGenerationId } from '../src/projectMetadata/generationScope';
+import { ProjectMutationCoordinator } from '../src/platform/projectLock';
 
 const limits: MetadataLimits = { ...valueLimits, maxWork: 1_000_000, maxChanges: 100,
   maxChangeBytes: 1_000_000, maxTotalBytes: 4_000_000, maxOperations: 10_000 };
@@ -74,6 +76,180 @@ function textCandidates(source: NonNullable<Awaited<ReturnType<MetadataProjectSe
 }
 const fullSource = (source: ProjectMetadataSource): FullMetadataSource => ({
   packageId: id('pkg'), metadataBytes: source.encodeFullSource(), proof: source.proof, remoteHeads: source.heads,
+});
+
+describe('local generation capabilities (ports only, not backup restore/selection acceptance)', () => {
+  const nextId = 'd'.repeat(32);
+  function local() {
+    const fs = new FaultFS(), original = setup(fs);
+    const databases = new Map<WorkspaceGenerationId, ReturnType<typeof setup>>([[null, original]]);
+    const allowed = new Set<WorkspaceGenerationId>([null]);
+    const opened: { id: WorkspaceGenerationId; create: boolean }[] = [];
+    let closed = 0;
+    const bind = (generationId: WorkspaceGenerationId, allowCreate = false, onCheck = async () => {}) =>
+      openWorkspaceGeneration(fs, { generationId, allowCreate, assertSelected: async () => {
+        await onCheck(); if (!allowed.has(generationId)) throw Error('Retired generation');
+      } }, async (id, create) => {
+        opened.push({ id, create });
+        if (!databases.has(id)) { if (!create) throw Error('Missing database'); databases.set(id, setup(fs)); }
+        return { factory: databases.get(id)!.storage, dispose: async () => { closed++; } };
+      });
+    return { fs, original, databases, allowed, opened, bind, closed: () => closed };
+  }
+  const deferred = () => { let release!: () => void;
+    const promise = new Promise<void>(resolve => { release = resolve; }); return { promise, release }; };
+
+  it('retains the original name/Repo history and isolates restored storage and package paths', async () => {
+    const f = local(), old = await f.bind(null), source = ProjectMetadataSource.bootstrap(f.original.records.schema,
+      f.original.records.identity, limits).initialize(f.original.records);
+    const later = await source.prepareCaptionText(source.token, id('cap'), 'body', '手元の新しい記録');
+    const repositoryId = 'b'.repeat(32), oldRepo = new MetadataRepository(old.fs, old.factory, limits);
+    await underWriteLease(old.fs, () => oldRepo.persist(repositoryId, later));
+    await old.fs.writeText('v2/packages/evidence/old', 'old base evidence');
+    const originalRows = [...f.original.rows].map(([key, bytes]) => [key, [...bytes]]);
+    f.allowed.add(nextId); const next = await f.bind(nextId, true);
+    expect(next.fs.mutationAuthority).toBe(old.fs.mutationAuthority);
+    const nextRepo = new MetadataRepository(next.fs, next.factory, limits);
+    await nextRepo.assertImportNamespace();
+    await underWriteLease(next.fs, () => nextRepo.persist(repositoryId, source));
+    await next.fs.writeText(`${next.fs.projectRoot}/v2/packages/evidence/restored`, 'restored base evidence');
+    await f.fs.writeText('v2/local-restore/job', 'root-only');
+    expect(await old.fs.list('')).toEqual(['v2/packages/evidence/old']);
+    expect((await oldRepo.read(repositoryId, source.proof))?.originalChanges()).toEqual(later.originalChanges());
+    const cold = await f.bind(nextId);
+    expect((await new MetadataRepository(cold.fs, cold.factory, limits).read(repositoryId, source.proof))?.originalChanges())
+      .toEqual(source.originalChanges());
+    await next.factory().removeRange([]);
+    expect(await next.factory().loadRange([])).toEqual([]);
+    expect([...f.original.rows].map(([key, bytes]) => [key, [...bytes]])).toEqual(originalRows);
+    expect(generationDatabaseName('existing-database', null)).toBe('existing-database');
+    expect(generationDatabaseName('existing-database', nextId)).toBe(`existing-database-generation-${nextId}`);
+  });
+
+  it('does not initialize a missing selected database or bypass a failed pre-open fence', async () => {
+    const f = local(); f.allowed.add(nextId);
+    await expect(f.bind(nextId)).rejects.toThrow('Missing database');
+    expect(f.databases.has(nextId)).toBe(false);
+    f.allowed.delete(nextId);
+    await expect(f.bind(nextId, true)).rejects.toThrow('Retired');
+    expect(f.opened).toEqual([{ id: nextId, create: false }]);
+    const entered = deferred(), release = deferred(); let disposals = 0;
+    const opening = openWorkspaceGeneration(f.fs, { generationId: null, allowCreate: false,
+      assertSelected: async () => { if (!f.allowed.has(null)) throw Error('Retired'); } }, async () => {
+        entered.release(); await release.promise;
+        return { factory: f.original.storage, dispose: async () => { disposals++; } };
+      });
+    await entered.promise; f.allowed.delete(null); release.release();
+    await expect(opening).rejects.toThrow('Retired'); expect(disposals).toBe(1);
+  });
+
+  it('rejects path escape/reserved access without changing sibling data', async () => {
+    const f = local(), old = await f.bind(null); f.allowed.add(nextId); const next = await f.bind(nextId, true);
+    for (const path of ['../x', '/x', 'v2//x', 'v2/../x', 'v2\\x', 'v2/generations/x', 'v2/local-restore/job']) {
+      expect(() => old.fs.writeText(path, 'bad')).toThrow();
+    }
+    expect(() => next.fs.remove('v2/packages/evidence/old')).toThrow();
+    expect(() => next.fs.list('')).toThrow();
+    expect(await f.fs.list('')).toEqual([]);
+    await expect(f.bind('../bad', true)).rejects.toThrow();
+  });
+
+  it('rejects every stale FS/IDB operation and even a no-I/O lease action', async () => {
+    const f = local(), old = await f.bind(null), port = old.factory();
+    await old.fs.writeBytes('body', new Uint8Array([1])); await port.save(['doc'], new Uint8Array([2]));
+    const handle = await old.fs.readStream('body');
+    f.allowed.delete(null);
+    const actions = [() => old.fs.readText('body'), () => old.fs.readBytes('body'), () => old.fs.readBytesFrom('body', 0),
+      () => old.fs.readStream('body'), () => old.fs.list(''), () => old.fs.exists('body'), () => old.fs.remove('body'),
+      () => old.fs.writeText('body', 'bad'), () => old.fs.appendText('body', 'bad'),
+      () => old.fs.writeBytes('body', new Uint8Array([3])), () => old.fs.appendBytes('body', new Uint8Array([3])),
+      () => port.load(['doc']), () => port.save(['doc'], new Uint8Array([3])), () => port.remove(['doc']),
+      () => port.loadRange([]), () => port.removeRange([]), () => underWriteLease(old.fs, async () => 'false success'),
+      () => handle!.blob!(), () => handle!.stream().getReader().read()];
+    for (const action of actions) await expect(action()).rejects.toThrow('Retired');
+    let cancelled = false;
+    await expect(old.fs.writeStream('body', new ReadableStream<Uint8Array>({ cancel() { cancelled = true; } })))
+      .rejects.toThrow('Retired');
+    expect(cancelled).toBe(true); expect(await f.fs.readBytes('body')).toEqual(new Uint8Array([1]));
+    expect(await f.original.storage().load(['doc'])).toEqual(new Uint8Array([2]));
+  });
+
+  it('serializes both generation service calls with the original root queue and rechecks queued work', async () => {
+    const f = local(), old = await f.bind(null); f.allowed.add(nextId); const next = await f.bind(nextId, true);
+    const entered = deferred(), release = deferred(), order: string[] = [];
+    const first = underWriteLease(old.fs, async () => { order.push('old'); entered.release(); await release.promise; });
+    await entered.promise;
+    const second = underWriteLease(next.fs, async () => { order.push('next'); });
+    await Promise.resolve(); expect(order).toEqual(['old']);
+    release.release(); await Promise.all([first, second]); expect(order).toEqual(['old', 'next']);
+    const held = deferred(), proceed = deferred();
+    const rootAction = underWriteLease(f.fs, async () => { held.release(); await proceed.promise; f.allowed.delete(null); });
+    await held.promise;
+    const stale = underWriteLease(old.fs, async () => { throw Error('must never execute'); });
+    proceed.release(); await rootAction; await expect(stale).rejects.toThrow('Retired');
+  });
+
+  it('owns storage keys/bytes across asynchronous checks and disposes captured ports once', async () => {
+    const f = local(), entered = deferred(), release = deferred(); let pause = false;
+    const old = await f.bind(null, false, async () => { if (pause) { entered.release(); await release.promise; } });
+    const port = old.factory(), key = ['doc'], bytes = new Uint8Array([1]); pause = true;
+    const pending = port.save(key, bytes); await entered.promise; key[0] = 'other'; bytes[0] = 9; release.release(); await pending;
+    pause = false;
+    expect(await port.load(['doc'])).toEqual(new Uint8Array([1])); expect(await port.load(['other'])).toBeUndefined();
+    await old.dispose(); await old.dispose(); expect(f.closed()).toBe(1);
+    await expect(port.load(['doc'])).rejects.toThrow('generation-closed');
+    expect(() => old.factory()).toThrow('generation-closed');
+  });
+
+  it('refuses late completion and cancels a stream after the bound generation changes', async () => {
+    const f = local(), entered = deferred(), release = deferred();
+    let cancelled = false, selected = true;
+    const base = f.fs.readStream.bind(f.fs);
+    f.fs.readStream = async path => path === 'slow' ? { size: 1,
+      stream: () => new ReadableStream<Uint8Array>({ async pull(controller) {
+        entered.release(); await release.promise; controller.enqueue(new Uint8Array([1]));
+      }, cancel() { cancelled = true; } }, { highWaterMark: 0 }) } : base(path);
+    const scope = await f.bind(null, false, async () => { if (!selected) throw Error('Retired'); });
+    const handle = await scope.fs.readStream('slow'), reader = handle!.stream().getReader(), pending = reader.read();
+    await entered.promise; selected = false; release.release();
+    await expect(pending).rejects.toThrow('Retired'); expect(cancelled).toBe(true); reader.releaseLock();
+    selected = true;
+    await expect(underWriteLease(scope.fs, async () => { selected = false; return 'false completion'; })).rejects.toThrow('Retired');
+  });
+
+  it('streams/reopens the scoped root under the actual local lease and denies writes after release', async () => {
+    const f = local(), coordinator = ProjectMutationCoordinator.local(), root = `validation-test/${nextId}`;
+    const lease = await coordinator.tryAcquire(f.fs, root, nextId); lease.activateNewProject();
+    const scope = await openWorkspaceGeneration(lease.workspace, { generationId: nextId, allowCreate: true,
+      assertSelected: async () => {} }, async () => ({ factory: f.original.storage, dispose: async () => {} }));
+    const path = `${scope.fs.projectRoot}/v2/packages/original`, bytes = new Uint8Array([1, 2, 3]);
+    await underWriteLease(scope.fs, () => scope.fs.writeStream(path, new Blob([bytes]).stream()));
+    expect(await scope.fs.list(`${scope.fs.projectRoot}/`)).toEqual([path]);
+    const file = await scope.fs.readStream(path);
+    const blob = await file!.blob!();
+    expect(new Uint8Array(await blob.arrayBuffer())).toEqual(bytes);
+    for (let i = 0; i < 2; i++) expect(new Uint8Array(await new Response(file!.stream()).arrayBuffer())).toEqual(bytes);
+    expect(await scope.fs.readBytesFrom(path, 1)).toEqual({ size: 3, data: new Uint8Array([2, 3]) });
+    const competitor = await coordinator.tryAcquire(f.fs, root, nextId);
+    expect(competitor.accessState).not.toBe('editable'); competitor.release();
+    lease.release();
+    await expect(scope.fs.remove(path)).rejects.toThrow();
+    await expect(scope.factory().save(['doc'], bytes)).rejects.toThrow();
+    expect(await f.fs.readBytes(path)).toEqual(bytes);
+    await scope.dispose();
+  });
+
+  it('owns a streamed chunk before the asynchronous post-read fence', async () => {
+    const f = local(), entered = deferred(), release = deferred(), bytes = new Uint8Array([1]);
+    let delivered = false;
+    f.fs.readStream = async () => ({ size: 1, stream: () => new ReadableStream<Uint8Array>({ pull(controller) {
+      delivered = true; controller.enqueue(bytes); controller.close();
+    } }, { highWaterMark: 0 }) });
+    const scope = await f.bind(null, false, async () => { if (delivered) { entered.release(); await release.promise; } });
+    const file = await scope.fs.readStream('body'), result = new Response(file!.stream()).arrayBuffer();
+    await entered.promise; bytes[0] = 9; release.release();
+    expect(new Uint8Array(await result)).toEqual(new Uint8Array([1]));
+  });
 });
 function checked(read: MetadataSessionRead) {
   if (read.provider?.kind !== 'scene-provider') throw Error('Expected a verified provider');

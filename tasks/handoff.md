@@ -1,6 +1,14 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **Current unit — `3c8ed08`後の名前付きbackup出力:** 同じ「ファイルで渡す」に
+> **Current F03 — `2389114`後の明示復元:** 元作業を残して同じProjectの別local世代へ
+> 復元し、検証後に一度だけ切り替える。最初のnamespace capabilityを実装・独立review済み。
+> metadata／packageは世代root、IDBは同じlocatorの専用DBに束縛し、元DB／pathは不変更。
+> 同じProject lock／queueを使い、失効後のFS／IDB／遅延stream／無変更操作を拒否する。
+> 型／通常・harness build exit 0、全体2,236 PASS／既存21 TODO／失敗0。独立review通過。
+> 実行詳細はtodo。selector・専用backup初期化・復元base証拠・切替UI・復元後の往復は次。
+> 部品は未活性化であり、復元UI／F03完成／通常home／実機／offlineの証拠ではない。
+
+> **Previous checkpoint — `2389114` 名前付きbackup出力:** 同じ「ファイルで渡す」に
 > バックアップと任意名を接続。元履歴／全基準／原証拠を固定したjobから逐次ZIP生成、
 > 中断再開・明示download・選んだfileの一致確認を行う。名前はjobだけに保持。
 > 元データ消失をメモリで補わず、初回生成でも再検査する。最終再検査中の中止も未完了。

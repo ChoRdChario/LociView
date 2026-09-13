@@ -43,12 +43,24 @@ export async function writeReceipt(fs: ProjectWorkspaceFS, path: string, value: 
 
 // Serialize all service instances sharing the same project lease, not just one UI instance.
 const queues = new WeakMap<ProjectMutationAuthority, Promise<unknown>>();
+const writeFences = new WeakMap<ProjectWorkspaceFS, () => Promise<void>>();
+/** Internal scoped-capability hook; does not grant or replace the root lease. */
+export function registerWriteFence(fs: ProjectWorkspaceFS, fence: () => Promise<void>): void {
+  if (writeFences.has(fs)) fail('write-fence-already-bound');
+  writeFences.set(fs, fence);
+}
 export async function underWriteLease<T>(fs: ProjectWorkspaceFS, action: () => Promise<T>): Promise<T> {
   const authority = fs.mutationAuthority;
   const prior = queues.get(authority) ?? Promise.resolve();
   const run = prior.catch(() => undefined).then(async () => {
     authority.assertEditable(); const finish = authority.beginWorkspaceWrite();
-    try { const result = await action(); authority.assertWorkspaceWriteAuthorized(); return result; }
+    const fence = writeFences.get(fs);
+    try {
+      if (fence) await fence();
+      const result = await action();
+      if (fence) await fence();
+      authority.assertWorkspaceWriteAuthorized(); return result;
+    }
     finally { finish(); }
   });
   queues.set(authority, run);
