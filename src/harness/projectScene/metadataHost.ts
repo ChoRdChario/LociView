@@ -106,6 +106,11 @@ export async function openMetadataHost(options: MetadataHostOptions) {
         if (!['createScene', 'renameScene', 'setDefaultScene'].includes(command.kind)) throw Error('シーンの操作を確認してください。');
         return ready(await service.edit(token, command));
       }, 'シーンを変更できません。'),
+      reparentPin: (token, command) => execute(async () => {
+        if (authority.readOnly) throw Error('このタブは閲覧専用です。');
+        if (command.kind !== 'reparentPin') throw Error('親モデルの変更を確認してください。');
+        return ready(await service.edit(token, command));
+      }, '親モデルを変更できません。'),
       captionDeletionImpact: (token, captionId) => {
         if (last.provider?.kind !== 'scene-provider' || token !== last.provider.state.token) throw Error('内容が更新されています。選び直してください。');
         return captionDeletionImpact(last.provider, captionId, limits);

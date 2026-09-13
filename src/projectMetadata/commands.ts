@@ -18,7 +18,7 @@ import { planAssetMembershipCopies } from './modelMembership';
 import { captionFieldCandidates, type CaptionChoiceField } from './captionCandidates';
 import { planSceneAuthoring, planSceneNameResolution, type SceneNameResolution } from './sceneAuthoring';
 import { planCaptionDeletion, planCaptionLifecycleResolution, type CaptionLifecycleResolution } from './captionDeletion';
-import type { CaptionDeletionCommand, AssetDeletionCommand } from '../scene/commands';
+import type { CaptionDeletionCommand, AssetDeletionCommand, PinParentCommand } from '../scene/commands';
 import { planAssetDeletion } from './assetDeletion';
 import { defaultSceneCandidates } from './startupScene';
 import { planAssetAddition, type AddAssetCommand } from './modelAddition';
@@ -45,6 +45,7 @@ export type MetadataEdit =
       choice: { kind: 'candidate'; operationId: string } | { kind: 'manual'; text: string } }
   | { kind: 'addPin'; sceneId: string; captionId: string; membershipId: string; eventId: string; anchor: Anchor; colorSrgb?: readonly number[] }
   | { kind: 'movePin'; sceneId: string; captionId: string; anchor: Anchor }
+  | PinParentCommand
   | { kind: 'include'; sceneId: string; resourceKind: 'asset' | 'caption'; resourceId: string; membershipId: string; orderKey: string; eventId: string }
   | { kind: 'exclude'; resourceKind: 'asset' | 'caption'; membershipId: string; eventId: string }
   | { kind: 'createView'; sceneId: string; viewId: string; projectFrameId: string; name: string; orderKey: string;
@@ -324,6 +325,16 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       // Explicit resolution alone may replace a conflicted field. The source
       // token and this complete candidate set bind the user's chosen context.
       result.push({ map: 'captionsById', id: command.captionId, create: false, fields: { [command.field]: text } }); break;
+    }
+    case 'reparentPin': {
+      shape(raw, ['kind', 'sceneId', 'captionId', 'anchor']);
+      const before = exact(provider.resources.captions[command.captionId]?.anchor), after = command.anchor;
+      if (after.kind !== 'asset' || before.kind === 'asset' && before.assetId === after.assetId) fail('pin-parent-unchanged');
+      memberships('caption', command.sceneId, command.captionId);
+      if (!pin(command.sceneId, after).captions.some(caption => caption.captionId === command.captionId)) fail('pin-not-in-scene');
+      // Replace the whole anchor, not a spread of old-parent evidence/coordinates.
+      // add() also refuses unresolved or unknown old fields instead of losing them.
+      add('captionsById', command.captionId, { anchor: json(after) }); break;
     }
     case 'movePin': {
       shape(raw, ['kind', 'sceneId', 'captionId', 'anchor']);

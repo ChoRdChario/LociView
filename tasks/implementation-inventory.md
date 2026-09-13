@@ -2,10 +2,12 @@
 
 > CURRENT INVENTORY / 2026-09-13。全体監査基点: `b73315b851f627ca61029cfb73caf23f6e4829bd`。
 > PO追加採用: Asset間の親変更と既存ProjectAnchorへの親設定を05 §4.4へ記録。
-> 操作は「親モデルを変更」に統一し、位置保持／手動配置・全Scene影響を確認。まだ未実装。
+> C11を新metadata／限定GLB validationへ接続。親を選択→仮位置→確定／取消、位置不明時は面指定。
+> 同一Caption・内容・Scene所属を保持し、全Scene影響を提示。exact retry／cold／競合候補は既存tests。
+> 実browser／iPhone受入れは別。旧固定owner host・新規ProjectAnchor作成・未配置schemaは対象外。
 > PO回答（`1edc3f5`後）: 06 §11の隔離実装→実測／採用の順序は承認済み。
 > §12.6の対応保持は「対応モデルなしグループ」案を検討中。旧2判断待ちはこれで更新する。
-> 今回は仕様／記録のみ。実装数・受入れ状態は不変。
+> 上記package判断の文書更新自体は実装数を変えない。最新C11接続の分類数は§1。
 > C04は同じピン操作欄の「追加色」から通常／Shift／数値追加へ接続。作成時の1変更で色も記録。
 > 絞り込み／既存色編集と独立し、Scene別の次回色と実際のピン色を分離。retryは元の色／IDを保持。
 > 新schema／wire／永続preferenceはなし。native picker／実browser／実機受入れは既存一括確認に残る。
@@ -56,16 +58,16 @@
 ## 1. 結論と数え方
 
 ユーザーが行う作業を **64機能群** に整理すると、新metadata保存画面へ限定接続済みが
-**32群**、残りが **32群**。その32群は下記の内訳になる。
-「32/64完成」といった完成率・工数には換算しない。小さい部品接続と
+**33群**、残りが **31群**。その31群は下記の内訳になる。
+「33/64完成」といった完成率・工数には換算しない。小さい部品接続と
 移行／チーム受信では仕事量が大きく違い、接続済みも下記の限定経路だからである。
 
 | 排他的な主分類 | 群数 | 意味 |
 |---|---:|---|
-| 接続済み | 32 | 新metadata hostで操作・必要な記録まで接続。従来25群は既知三角形／2 PNG起点、P01/P02は限定validation、C04/C07/C09/V04/M05は両hostへ接続。実機受入れは別 |
+| 接続済み | 33 | 新metadata hostで操作・必要な記録まで接続。従来25群は既知三角形／2 PNG起点、P01/P02は限定validation、C04/C07/C09/C11/V04/M05は両hostへ接続。実機受入れは別 |
 | 部品未接続 | 4 | 新系統のUI部品・pure planner等はあるが、対象群全体の画面・実データ・typed command／保存のいずれかが未接続。T01〜T04は限定接続まで進んだ |
 | 別経路のみ | 18 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
-| 新規実装 | 10 | 新契約の利用者向け経路がまだない。schema・検証・設計案があっても実装済みとは数えない |
+| 新規実装 | 9 | 新契約の利用者向け経路がまだない。schema・検証・設計案があっても実装済みとは数えない |
 
 - 一つの行は、共有する前提・保存境界を持つ「利用者の作業群」。同一ViewのCRUD等は一群。
   三つのモデル形式・五つのpackage目的・三つの移行元は異なる契約があるため別群。
@@ -139,7 +141,7 @@
 | C08 | 複数Captionウィンドウを比較する | 接続済み | 順次開く・前面化・個別×・移動／キーボード・並べる・意味のある位置への接続線。 | [src/ui/projectScene/captionWindowControls.ts:26](../src/ui/projectScene/captionWindowControls.ts) / [tests/ui/projectSceneWindowConnection.test.ts:34](../tests/ui/projectSceneWindowConnection.test.ts) |
 | C09 | Captionウィンドウのサイズを変える | 接続済み | 両host共通の右下drag／矢印／非drag選択。Scene別local placementだけ変更し、本文・画像・scroll・他窓・選択・履歴を保持。取消・stale・extent変化／late入力とView操作・Edit切替拒否を既存testsで確認。実描画／実入力／短画面／実機は未受入れ。 | [src/ui/projectScene/captionWindowControls.ts](../src/ui/projectScene/captionWindowControls.ts) / [tests/ui/projectSceneWindowConnection.test.ts](../tests/ui/projectSceneWindowConnection.test.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
 | C10 | Project全体からCaptionを削除する | 接続済み | 影響Scene・添付・tag登録を確認し、Captionと観測済み全edgeを原子的tombstone。本文競合・Media/Tag/モデル本体を保持。保存失敗中は旧UI、exact retry／cold reopen、後着edge/delete-editの保持と警告、未適用入力の明示取消を確認。復元・一般参照修復UIは別。 | [src/projectMetadata/captionDeletion.ts](../src/projectMetadata/captionDeletion.ts) / [src/harness/projectScene/captionDeletionControls.ts](../src/harness/projectScene/captionDeletionControls.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
-| C11 | 既存ピンの親モデルを設定・変更する | 新規実装 | 05 §4.4でAsset A→Bと既存ProjectAnchor→Assetの統一操作を追加承認。計算可能な3D位置・同じCaption ID／内容／Scene所属を保持し、不能時は明示配置。全Sceneへの影響を確認。command/UIは未実装、同一親の位置調整C02や新ProjectAnchor作成とは別。真正な未配置はC12のschema依存。 | [docs/specs/05-project-scene-team-workflow.md](../docs/specs/05-project-scene-team-workflow.md#44-explicit-pin-parent-changes-po-approved-2026-09-13) / [src/projectMetadata/commands.ts](../src/projectMetadata/commands.ts) / [src/harness/projectScene/session.ts](../src/harness/projectScene/session.ts) |
+| C11 | 既存ピンの親モデルを設定・変更する | 接続済み | 05 §4.4のAsset A→B／既存ProjectAnchor→Assetを専用command、親選択・仮位置・gizmo・確定／取消へ接続。計算可能な3D位置、同じCaption ID／内容／Scene所属を保持し、不能時は面指定。全Scene影響・一覧のみの条件を提示。新metadata／限定GLB hostでretry／cold／全anchor競合を検査。実描画・実機・移行入口は未受入れ。新ProjectAnchor作成・真正な未配置C12とは別。 | [docs/specs/05-project-scene-team-workflow.md](../docs/specs/05-project-scene-team-workflow.md#44-explicit-pin-parent-changes-po-approved-2026-09-13) / [src/projectMetadata/commands.ts](../src/projectMetadata/commands.ts) / [src/harness/projectScene/session.ts](../src/harness/projectScene/session.ts) |
 | C12 | 未配置の記録を失わず読み込み、後で配置する | 新規実装 | 未配置を保持・後配置する製品要件は承認済み、exact schema/recipeは提案・未実装。現在Anchor unionにもない。破損・競合を未配置扱いにして救済しない。 | [docs/specs/05-project-scene-team-workflow.md:784](../docs/specs/05-project-scene-team-workflow.md) / [src/scene/types.ts:36](../src/scene/types.ts) |
 
 ### メディア

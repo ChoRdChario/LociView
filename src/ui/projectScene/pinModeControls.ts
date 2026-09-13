@@ -12,7 +12,11 @@ export function createPinModeControls(document: Document, onPlan: (plan: PinMode
   colorLabel.className = 'lv-pin-add-color'; colorLabel.append(color);
   const alternative = make('details'), alternativeTitle = make('summary', '数値で配置'), namedAdd = button('このモデルに追加');
   alternative.append(alternativeTitle, label, namedAdd);
-  const moveTarget = make('p'); actions.append(colorLabel, add, move, addNote, moveNote, impact, moveTarget, alternative);
+  const parent = make('details'), parentTitle = make('summary', '親モデルを変更');
+  const parentLabel = make('label', '変更先モデル'), parentTarget = make('select'), parentStart = button('位置を確認'), parentNote = make('p');
+  parentTarget.setAttribute('aria-label', '変更先モデル'); parentLabel.append(parentTarget);
+  parent.append(parentTitle, parentLabel, parentStart, parentNote);
+  const moveTarget = make('p'); actions.append(colorLabel, add, move, parent, addNote, moveNote, impact, moveTarget, alternative);
   const modeStrip = make('section'); modeStrip.className = 'lv-pin-mode'; modeStrip.setAttribute('aria-label', 'ピンの操作');
   const heading = make('p'), status = make('p'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   const finish = button('位置を確定'), cancel = button('取り消す');
@@ -21,6 +25,7 @@ export function createPinModeControls(document: Document, onPlan: (plan: PinMode
   modeStrip.append(heading, status, finish, cancel, confirmation);
   let context: PinModeContext | undefined, disposed = false, fingerprint = '';
   let colorScope: { sceneId: string; token: string } | undefined;
+  let parentKey = '', parentScope = '';
   let cancelFor: { mode: PinMode | null; memory: PinModeMemory; proposal: PinProposal | null } | null = null;
   const cleanups: (() => void)[] = [];
   const listen = (node: HTMLElement, event: string, action: () => void) => { node.addEventListener(event, action); cleanups.push(() => node.removeEventListener(event, action)); };
@@ -42,6 +47,20 @@ export function createPinModeControls(document: Document, onPlan: (plan: PinMode
   listen(add, 'click', () => { if (!add.disabled) request({ kind: 'beginAdd' }); });
   listen(namedAdd, 'click', () => { if (!namedAdd.disabled) request({ kind: 'add' }); });
   listen(move, 'click', () => { if (!move.disabled) request({ kind: 'move' }); });
+  const parentStatus = () => {
+    if (!context) return;
+    const issue = pinActionIssue(context, 'reparent', parentTarget.value);
+    parentStart.disabled = issue !== null; parentNote.textContent = issue ?? ''; parentNote.hidden = !issue;
+  };
+  const captureParentScope = () => { parentScope = parentKey; };
+  listen(parentTarget, 'focus', captureParentScope); listen(parentTarget, 'pointerdown', captureParentScope);
+  listen(parentTarget, 'change', () => {
+    if (parentScope !== parentKey || parentTarget.disabled) parentTarget.value = '';
+    parentStatus();
+  });
+  listen(parentStart, 'click', () => {
+    if (!parentStart.disabled && parentScope === parentKey) request({ kind: 'reparent', assetId: parentTarget.value });
+  });
   listen(finish, 'click', () => { if (!finish.disabled) request({ kind: 'finish' }); });
   listen(cancel, 'click', () => {
     if (!context || (!context.memory.mode && !context.memory.choosingSurface) || cancel.disabled) return;
@@ -56,6 +75,20 @@ export function createPinModeControls(document: Document, onPlan: (plan: PinMode
     }
     context = next;
     const mode = next.memory.mode, choosing = !!next.memory.choosingSurface, busy = next.feedback.kind === 'applying';
+    const selected = next.source.kind === 'ready' ? next.source.selected : null;
+    const nextParentKey = JSON.stringify([next.source.sceneId, next.source.token, selected?.captionId, selected?.token,
+      next.source.kind === 'ready' ? next.source.models.map(m => [m.assetId, m.token, m.addBlock, m.name]) : null]);
+    if (nextParentKey !== parentKey) {
+      const empty = make('option', '変更先モデルを選択'); empty.value = ''; parentTarget.replaceChildren(empty); parentTarget.value = '';
+      if (next.source.kind === 'ready') for (const item of next.source.models) {
+        if (selected?.assetId.kind === 'value' && selected.assetId.value === item.assetId) continue;
+        const option = make('option', pinTargetName(item.name)); option.value = item.assetId;
+        option.disabled = item.addBlock !== null; parentTarget.append(option);
+      }
+      parentKey = nextParentKey;
+    }
+    parentTarget.disabled = Boolean(mode) || choosing || busy || !!next.mutationBlock || !!next.otherPending;
+    parentStatus();
     if (cancelFor?.memory !== next.memory || cancelFor?.proposal !== next.proposal || busy) { cancelFor = null; confirmation.hidden = true; }
     const options = next.source.kind === 'ready' && !pinSourceIssue(next)
       ? next.source.models.map(item => ({ id: item.assetId, label: pinTargetName(item.name) })) : [];
@@ -78,12 +111,15 @@ export function createPinModeControls(document: Document, onPlan: (plan: PinMode
     const caption = mode?.caption ?? (next.source.kind === 'ready' ? next.source.selected : null);
     moveTarget.textContent = caption ? `選択：${pinTargetName(caption.title)}` : '';
     moveTarget.hidden = !moveTarget.textContent || Boolean(mode);
-    impact.textContent = caption?.sceneCount.kind === 'value' && caption.sceneCount.value > 1
-      ? `${caption.sceneCount.value}シーンで共有されています。ピンの移動はすべてに反映されます。` : '';
+    impact.textContent = mode?.kind === 'reparent' && caption?.sceneCount.kind === 'value'
+      ? `${caption.sceneCount.value}シーンに反映されます。変更先モデルがないシーンでは一覧のみになります。`
+      : caption?.sceneCount.kind === 'value' && caption.sceneCount.value > 1
+        ? `${caption.sceneCount.value}シーンで共有されています。ピンの移動はすべてに反映されます。` : '';
     impact.hidden = !impact.textContent;
     modeStrip.hidden = !mode && !choosing;
-    heading.textContent = !mode ? choosing ? 'モデルの面を選択してください。' : '' : `${mode.kind === 'add' ? 'ピンを追加中' : '位置を調整中'}：` +
+    heading.textContent = !mode ? choosing ? 'モデルの面を選択してください。' : '' : `${mode.kind === 'add' ? 'ピンを追加中' : mode.kind === 'reparent' ? '親モデルを変更中' : '位置を調整中'}：` +
       (mode.caption ? `${pinTargetName(mode.caption.title)} — ` : '') + pinTargetName(mode.target.name);
+    finish.textContent = mode?.kind === 'reparent' ? '親モデルと位置を確定' : '位置を確定';
     const finishIssue = pinActionIssue(next, 'finish'); finish.disabled = finishIssue !== null;
     status.textContent = [next.feedback.kind === 'failed' && `適用できませんでした。${next.feedback.message} 指定中の位置は保持しています。`,
       mode && finishIssue].filter(Boolean).join(' ');

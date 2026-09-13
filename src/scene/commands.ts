@@ -1,9 +1,11 @@
-import type { Entity, Field, Lifecycle, Membership, Scene, SceneResources, SceneState, Table } from './types';
+import type { Anchor, Entity, Field, Lifecycle, Membership, Scene, SceneResources, SceneState, Table } from './types';
 import { value } from './types';
 import { active, memberships, sameSnapshot } from './resolve';
 import { DomainValidationError, normalizeSceneName } from '../domain/values';
 
 type EdgeKind = 'asset' | 'caption';
+/** Explicit parent intent shared by the pin editor and metadata service. */
+export interface PinParentCommand { kind: 'reparentPin'; sceneId: string; captionId: string; anchor: Anchor }
 export interface AssetDeletionCommand { kind: 'deleteAsset'; assetId: string; eventId: string }
 export interface AssetDeletionImpact {
   assetId: string;

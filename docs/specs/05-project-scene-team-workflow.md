@@ -458,8 +458,11 @@ The PO adopted one `親モデルを変更` operation for an existing Asset-ancho
 Caption to another Asset and for an existing/imported ProjectAnchor to an Asset.
 This extends explicit re-anchoring beyond same-owner movement; it is not model
 replacement, a Scene move, automatic relation matching or new ProjectAnchor creation.
-Current code still implements only same-owner `movePin`; this section is an
-accepted requirement and implementation plan, not an implemented capability.
+Bounded connection (2026-09-13): the metadata/limited GLB validation hosts expose
+the separate `reparentPin` command; ordinary `movePin` remains same-owner only.
+The memory preview host also connects it; old fixed-owner history hosts do not.
+Current executed evidence is in todo. Browser/native-input/iPhone and ordinary
+route adoption are not implied by this connection.
 
 Select a Caption, choose the new parent explicitly, preview its position, adjust
 with the existing gizmo or verified model-surface input if needed, then confirm
@@ -505,6 +508,14 @@ No new schema, file format, general parent removal, bulk reassignment or new pag
 is authorized by this operation. Genuine unplaced records retain §9.4's separate
 schema/migration dependency; the §12.6 review-package mapping in specification 06
 is not ratified by accepting this user-facing operation.
+
+The existing pin controls disclose a destination selector under `親モデルを変更`,
+beside `位置を調整`. `位置を確認` starts the local proposal; the existing surface/
+gizmo path and `親モデルと位置を確定` finish it. Destination selection starts empty,
+and source changes invalidate both late selector input and prepared coordinates.
+The dedicated authority never infers this intent from ordinary anchor edits.
+Only `captionsById[id].anchor` changes; metadata read derives its current owner.
+No copy identity, Scene edge or model binding is rewritten.
 
 ## 5. Authoritative Scene resolution
 

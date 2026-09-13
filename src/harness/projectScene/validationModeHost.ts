@@ -20,6 +20,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
     status: () => switching ? { kind: 'checking' } : current.authority.status!(),
     write: (...a) => run(() => current.authority.write(...a)),
     authorScene: (...a) => run(() => current.authority.authorScene!(...a)),
+    reparentPin: (...a) => run(() => current.authority.reparentPin!(...a)),
     captionDeletionImpact: (...a) => { admit(); return current.authority.captionDeletionImpact!(...a); },
     deleteCaption: (...a) => run(() => current.authority.deleteCaption!(...a)),
     assetDeletionImpact: (...a) => { admit(); return current.authority.assetDeletionImpact!(...a); },

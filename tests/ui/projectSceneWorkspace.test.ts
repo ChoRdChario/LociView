@@ -9,6 +9,11 @@ import { editCaptionDraft, hasCaptionDraft, planCaptionApply } from '../../src/u
 import { planModelList } from '../../src/ui/projectScene/modelListState';
 import { planPinMode } from '../../src/ui/projectScene/pinModeState';
 import { RecordedDocument, RecordedNode, record } from './domRecorder';
+import { pinPositionInParent } from '../../src/harness/projectScene/pinParent';
+import { pointInProject } from '../../src/harness/projectScene/viewportModel';
+import { syntheticVersions, versionFromClosure } from '../../src/harness/projectScene/modelFixture';
+import { createFixtureModel, fixtureModelIds } from '../../src/harness/projectScene/modelClosure';
+import { degreesRotation } from '../../src/harness/projectScene/modelTransform';
 
 const find = (session: SyntheticSession, intent: CaptionListIntent) => session.acceptList(planCaptionList(session.captionContext(), intent));
 const navigate = (session: SyntheticSession, sceneId: string) => session.acceptNavigation(
@@ -34,6 +39,70 @@ const label = (root: RecordedNode, name: string) => by(root, n => n.attributes.g
 const button = (root: RecordedNode, text: string) => by(root, n => n.tag === 'button' && n.textContent === text);
 
 describe('connected synthetic development host (not rendered, storage or TEAM-FLOW acceptance)', () => {
+  it('changes an existing parent without replacing the Caption, its contents/windows or its Scene memberships', () => {
+    const w = createDevelopmentWorkspace(new RecordedDocument().asDocument()), root = record(w.root), s = w.session;
+    find(s, { kind: 'select', captionId: f.shared }); w.render(); const before = s.snapshot, windows = s.windowMemory;
+    const target = label(root, '変更先モデル'); target.fire('focus'); target.value = f.structure; target.fire('change');
+    button(root, '位置を確認').fire('click');
+    expect(s.pinContext().memory.mode?.kind).toBe('reparent'); expect(s.snapshot).toBe(before);
+    const expected = pinPositionInParent(before, f.shared, f.structure)!;
+    expect(s.pinPreviewAnchor).toMatchObject({ assetId: f.structure, positionAsset: expected });
+    expect(navigate(s, f.detail)).toBe(false);
+    button(root, '親モデルと位置を確定').fire('click');
+    const after = s.snapshot;
+    expect(after.resources.captions[f.shared]).toEqual({ ...before.resources.captions[f.shared], anchor: after.resources.captions[f.shared]!.anchor });
+    expect(after.state.captionMemberships).toEqual(before.state.captionMemberships); expect(after.state.assetMemberships).toEqual(before.state.assetMemberships);
+    expect(after.colors).toEqual(before.colors); expect(after.mediaData).toEqual(before.mediaData); expect(s.windowMemory).toEqual(windows);
+    expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'move' }))).toBe(true);
+    expect(s.pinSurfaceTarget()?.assetId).toBe(f.structure);
+    const c = s.pinContext(); s.acceptPin(planPinMode(c, { kind: 'cancel', confirmedMode: c.memory.mode, confirmedProposal: c.proposal }));
+    expect(navigate(s, f.detail)).toBe(true);
+    expect(s.composition.captions.find(caption => caption.captionId === f.shared)?.marker).toBe('suppressed'); w.dispose();
+  });
+
+  it('converts Asset/Project positions through rotated/scaled frames and never invents an unavailable position', () => {
+    const base = new SyntheticSession().snapshot;
+    const versions = syntheticVersions.map((v, i) => versionFromClosure(createFixtureModel(fixtureModelIds(v.closure), 'original', {
+      translation: [i + 2, 3, -4], rotationXYZW: degreesRotation(['0', '30', '90']), uniformScale: i + 2,
+    })));
+    const project = { ...base, modelVersions: versions };
+    const old = base.resources.captions[f.shared]!.anchor;
+    if (old.kind !== 'value' || old.value.kind !== 'asset') throw Error('anchor');
+    const oldAnchor = old.value;
+    const source = versions.find(v => v.assetId === oldAnchor.assetId && v.projection.bindingId ===
+      (base.resources.assets[oldAnchor.assetId]!.projection as { value: { bindingId: string } }).value.bindingId)!;
+    const destination = versions.find(v => v.assetId === f.structure)!;
+    const world = pointInProject(old.value.positionAsset, source.closure.binding.assetToProject);
+    const projectAnchor = { ...project, resources: { ...project.resources, captions: { ...project.resources.captions,
+      [f.shared]: { ...project.resources.captions[f.shared]!, anchor: value({ kind: 'project' as const, projectFrameId: project.resources.projectFrameId, positionProject: world }) } } } };
+    for (const p of [project, projectAnchor]) {
+      const converted = pinPositionInParent(p, f.shared, f.structure)!;
+      const roundTrip = pointInProject(converted, destination.closure.binding.assetToProject);
+      world.forEach((n, i) => expect(roundTrip[i]).toBeCloseTo(n, 10));
+    }
+    expect(pinPositionInParent({ ...project, modelVersions: versions.filter(v => v.assetId !== oldAnchor.assetId) }, f.shared, f.structure)).toBeNull();
+  });
+
+  it('requires manual placement for a missing source, but refuses anchor conflicts; cancellation survives readonly loss', () => {
+    const base = new SyntheticSession().snapshot;
+    let project = { ...base, resources: { ...base.resources, assets: { ...base.resources.assets,
+      [f.equipment]: { ...base.resources.assets[f.equipment]!, projection: { kind: 'unresolved' as const, reason: 'missing' as const } } } } };
+    let readOnly = false;
+    const s = new SyntheticSession({ get readOnly() { return readOnly; }, read: () => project,
+      write: () => { throw Error('not an ordinary move'); }, reparentPin: () => { throw Error('preview only'); } });
+    find(s, { kind: 'select', captionId: f.shared });
+    expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'reparent', assetId: f.structure }))).toBe(true);
+    expect(s.pinPreviewAnchor).toBeNull(); expect(planPinMode(s.pinContext(), { kind: 'finish' }).kind).toBe('blocked');
+    expect(s.message).toContain('元の位置を確認できません');
+    expect(s.acceptPinSurface(s.pinSurfaceTarget()!, [1, 2, 3])).toBe(true);
+    expect(s.pinPreviewAnchor).toMatchObject({ assetId: f.structure, positionAsset: [1, 2, 3] });
+    readOnly = true; expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'finish' }))).toBe(false);
+    const c = s.pinContext(); expect(s.acceptPin(planPinMode(c, { kind: 'cancel', confirmedMode: c.memory.mode, confirmedProposal: c.proposal }))).toBe(true);
+    expect(s.snapshot).toEqual(project); readOnly = false;
+    project = { ...project, state: { ...project.state, token: 'conflicted' }, resources: { ...project.resources, token: 'conflicted',
+      captions: { ...project.resources.captions, [f.shared]: { ...project.resources.captions[f.shared]!, anchor: { kind: 'unresolved', reason: 'conflict' } } } } };
+    s.refreshHistory(); expect(planPinMode(s.pinContext(), { kind: 'reparent', assetId: f.structure }).kind).toBe('blocked');
+  });
   it('adds repeatedly with a Scene-local color, independent of filters, existing records, movement and cancellation', () => {
     const w = createDevelopmentWorkspace(new RecordedDocument().asDocument()), root = record(w.root), s = w.session;
     const original = s.snapshot, color = label(root, '追加色'); color.value = '#2468ac'; color.fire('input');

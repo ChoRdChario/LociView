@@ -115,6 +115,24 @@ async function openFileCaption(modelBytes = glb()) {
 }
 
 describe('limited real-format validation (synthetic GLB bytes, injected PNG decoder, memory storage)', () => {
+  it('connects explicit pin parent changes to the GLB validation authority and reopens the same Caption', async () => {
+    const { options, workspace, host, s, captionId } = await openFileCaption();
+    const bytes = glb(); s.addModelFile({ token: s.snapshot.state.token, sceneId: s.sceneId }, {
+      name: '変更先モデル', size: bytes.length, arrayBuffer: async () => bytes.buffer as ArrayBuffer });
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+    const target = s.snapshot.modelVersions!.find(v => v.assetId !== s.snapshot.captionOwners[captionId]!.assetId)!;
+    s.acceptList(planCaptionList(s.captionContext(), { kind: 'select', captionId }));
+    const before = host.read().source!.originalChanges().length, old = s.snapshot.resources.captions[captionId]!;
+    expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'reparent', assetId: target.assetId }))).toBe(true);
+    const preview = s.pinPreviewAnchor!; expect(preview).toMatchObject({ assetId: target.assetId, assetFrameId: target.projection.assetFrameId });
+    s.acceptPin(planPinMode(s.pinContext(), { kind: 'finish' }));
+    expect(s.acknowledgment.state).toBe('checking');
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+    expect(host.read().source!.originalChanges()).toHaveLength(before + 1);
+    expect(s.snapshot.resources.captions[captionId]).toEqual({ ...old, anchor: { kind: 'value', value: preview } });
+    await workspace.dispose(); const cold = await openValidationHost(options);
+    expect(cold.authority.read().resources.captions[captionId]).toEqual({ ...old, anchor: { kind: 'value', value: preview } }); await cold.dispose();
+  });
   it('creates a real-GLB pin with its chosen initial color in one change and cold-reopens it without retaining the local preference', async () => {
     const { options, workspace, host, s, captionId: existingId } = await openFileCaption();
     const root = record(workspace.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];

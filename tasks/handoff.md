@@ -1,10 +1,15 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **2026-09-13 親変更の追加採用:** POは「親モデルを変更」を承認。
+> **2026-09-13 C11親変更の接続（`5f390a7`後）:** PO承認済みの「親モデルを変更」を実装。
 > Asset A→B／既存ProjectAnchor→Asset、計算できる3D位置は保持、不能時だけ明示配置。
 > 同じCaption ID・本文／media／Scene所属を残し、共有Scene影響を確定前に提示。
-> 05 §4.4とC11・todoへ反映。実装は既存command/planner→pin UI/host→保存/再受信の順。
-> まだ未実装。真正な未配置union・06 review mapping・通常home・releaseの批准ではない。
+> 既存位置調整の隣で変更先を選択→仮位置→確定／取消。専用reparentPinから同じjournalへ。
+> 新metadata／限定GLB hostで接続、旧固定owner hostは非対応。通常movePinの親変更拒否は維持。
+> 元bytes retry／cold／全anchor競合、実GLB接続は既存検査を使用。
+> 最終typecheck／通常build exit 0、root 111 files／2,087 PASS／21 TODO／失敗0（469.27秒）。
+> 独立review指摘の候補表示更新・型依存を修正、再reviewの必須残件なし。詳細はtodo。
+> 棚卸し33/4/18/9（64）。実描画・native input・iPhone・offlineは未受入れ。
+> 真正な未配置union・06 review mapping・通常home・releaseの批准ではない。
 
 > **2026-09-13 PO回答（`1edc3f5`後）:** ①隔離検証で実装→証拠／受入れ後に
 > 通常入口を有効化する順序は承認済み。05 §7.5／06 §11へ反映。再承認を求めない。

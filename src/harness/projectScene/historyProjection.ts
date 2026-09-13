@@ -8,7 +8,7 @@ import { modelHistorySeed, projectModelHistory } from './modelHistory';
 import { projectViewHistory, viewHistorySeed } from './viewHistory';
 import { projectMaterialHistory } from './materialHistory';
 import { mediaSeed, projectMediaHistory, type MediaFileAddition } from './mediaHistory';
-import type { SceneAuthoringCommand, CaptionDeletionCommand, CaptionDeletionImpact, AssetDeletionCommand, AssetDeletionImpact } from '../../scene/commands';
+import type { SceneAuthoringCommand, CaptionDeletionCommand, CaptionDeletionImpact, AssetDeletionCommand, AssetDeletionImpact, PinParentCommand } from '../../scene/commands';
 import type { ModelPlacementCommand, ModelFileAddition } from './modelTypes';
 
 export const captionKey = (id: string, field: 'title' | 'body' | 'color' | 'anchor' | 'template' | 'identity') => `caption/${id}/${field}`;
@@ -155,6 +155,7 @@ export interface SyntheticAuthority {
   read(): SyntheticProject;
   write(token: string, changes: Readonly<Record<string, string>>, context?: { sceneId: string }): WorkingResult<SyntheticProject>;
   authorScene?(token: string, command: SceneAuthoringCommand): WorkingResult<SyntheticProject>;
+  reparentPin?(token: string, command: PinParentCommand): WorkingResult<SyntheticProject>;
   captionDeletionImpact?(token: string, captionId: string): CaptionDeletionImpact;
   deleteCaption?(token: string, command: CaptionDeletionCommand): WorkingResult<SyntheticProject>;
   assetDeletionImpact?(token: string, assetId: string): AssetDeletionImpact;

@@ -141,6 +141,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
         return ready(await session.edit(token, command));
       }, true),
       authorScene: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
+      reparentPin: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
       captionDeletionImpact: (token, id) => { if (last.provider?.kind !== 'scene-provider' || token !== last.provider.token) throw Error('内容が更新されています。'); return captionDeletionImpact(last.provider, id, limits); },
       deleteCaption: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
       assetDeletionImpact: (token, id) => { if (last.provider?.kind !== 'scene-provider' || token !== last.provider.token) throw Error('内容が更新されています。'); return assetDeletionImpact(last.provider, id, limits); },

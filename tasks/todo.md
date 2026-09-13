@@ -5,24 +5,63 @@
 2026-09-13 latest PO adoption: `親モデルを変更` for Asset A→B and an existing
 ProjectAnchor→Asset is accepted in 05 §4.4. Preserve known Project-space position,
 require explicit placement when it is unavailable, retain Caption content/ID and
-Scene memberships, disclose cross-Scene impact. Current code remains same-owner
-move only; the 32/4/18/10 connection count and device acceptance are unchanged.
+Scene memberships, disclose cross-Scene impact. C11 now connects this separate
+command to metadata/limited GLB hosts; ordinary move remains same-owner only.
+Inventory: 33 connected / 4 components / 18 other-path / 9 new = 64; this is not a
+completion percentage. Browser/native-input/iPhone acceptance remains pending.
 
 - [x] Record the adopted operation, safety/acceptance and finite implementation
   order; distinguish it from the older unplaced schema and package mapping.
-- [ ] Add an explicit parent-change command and coordinate planner using the
+- [x] Add an explicit parent-change command and coordinate planner using the
   existing Asset/Project anchor union; retain ordinary move's same-owner guard.
-- [ ] Connect the existing pin controls, gizmo and metadata/validation hosts,
-  then reuse save/retry/cold/team tests and the consolidated browser batch.
+- [x] Connect the existing pin controls, gizmo and metadata/validation hosts;
+  reuse save/retry/cold/team tests. Add native-input checks to the existing batch.
 
 This closes the parent-change product decision; do not request it again. File-team
 delivery remains the overall priority. The separate 06 §12.6 exact review mapping
 is not silently approved by this adoption, nor is genuine unplaced runtime/schema.
-This turn records the adopted specification and plan only, preserving the existing
-nine-document approval update; no production code, tests, new page or wire changed.
-Review: independent review of all nine Markdown diffs found no mandatory issue.
-Whitespace and inventory checks passed; runtime/device tests were not rerun for
-these documentation-only changes. The accepted operation remains unimplemented.
+Active implementation slice (after clean `5f390a7`, g0-baseline): implement C11
+under 05 §4.4. One writer; independent command/test-boundary inspection is read-only.
+The previous nine-document adoption checkpoint passed independent review.
+
+- [x] Add separate `reparentPin` authority to metadata/validation hosts; old history
+  hosts and ordinary same-owner `movePin` retain their existing boundaries.
+- [x] Select destination beside position adjustment, preview verified frame
+  conversion, then confirm/cancel using existing surface/gizmo controls. Keep
+  unknown position empty, disclose shared-Scene/list-only impact, reject stale input.
+- [x] Reuse mode/workspace/metadata/file tests for position, original-byte retry,
+  cold reopen and whole-anchor concurrency; run final typecheck/test/build and
+  independent review. Record rendered/native-input/iPhone evidence separately.
+
+Review/executed evidence: eight new focused cases pass, including rotated/
+scaled Asset and Project positions, unavailable-source manual placement, cancellation,
+readonly/stale/IME guards, retained Caption/Scene data, metadata original-byte
+retry/cold reopen, complete concurrent anchor candidates and real-format GLB host
+connection (synthetic GLB bytes, recorded DOM/memory ports, not browser evidence).
+Independent review found and closed a stale disabled destination option after
+local hide/show, and a type import crossing the existing isolation boundary.
+The shared command type now lives in scene/commands; isolation was not relaxed to
+allow a history host to depend on metadata storage. Focused isolation/UI: 22 PASS.
+The pre-fix root run was stopped; final post-fix typecheck passed. Full root:
+`npm test -- --maxWorkers=1 --reporter=dot`, 111 files / 2,087 PASS / 21 existing
+TODO / zero failed, exit 0 (469.27 s). Normal build passed (exit 0); existing chunk/
+mixed-import warnings remain, not a PWA/offline acceptance claim.
+The existing `build:harness` bundle also passed (exit 0), without source changes
+after the final runtime checks; this is bundle evidence, not rendered acceptance.
+Independent re-review confirms both findings closed and no remaining mandatory
+code issue; inventory rows match 33/4/18/9. No unchanged browser bootstrap or
+denied push retry was attempted. Public release boundaries unchanged.
+
+Next: return to F01/F02 file-team delivery under the approved isolated-implementation
+order. 06 §12.6's review/edit-copy mapping is still the outstanding product decision;
+C11 does not settle it. Native-input, physical iPhone and real-file retention checks
+remain in the consolidated batch, not a new per-slice human gate.
+
+Completion is this bounded connection, not aggregate team/adoption acceptance.
+No new schema/wire, parent removal, batch edit, format, page, dependency, ordinary
+activation or release change. Stop on a specification conflict; do not silently
+approve the outstanding review mapping. Browser infrastructure remains a distinct
+pending evidence lane, not a reason to duplicate synthetic probes.
 
 2026-09-13 PO decision update (after `1edc3f5`): item 1 is approved: implement
 new package handling in the isolated validation path, obtain executable/device

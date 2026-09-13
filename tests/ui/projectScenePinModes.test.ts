@@ -32,13 +32,42 @@ function host() {
     }
   });
   controls.render(current); const actions = record(controls.actions), strip = record(controls.modeStrip);
-  return { controls, events, actions, strip, color: actions.children[0]!.children[0]!, target: actions.children[7]!.children[1]!.children[0]!, add: actions.children[1]!, move: actions.children[2]!,
-    impact: actions.children[5]!, moveTarget: actions.children[6]!, heading: strip.children[0]!, status: strip.children[1]!,
+  return { controls, events, actions, strip, color: actions.children[0]!.children[0]!, target: actions.children[8]!.children[1]!.children[0]!, add: actions.children[1]!, move: actions.children[2]!,
+    parent: actions.children[3]!, impact: actions.children[6]!, moveTarget: actions.children[7]!, heading: strip.children[0]!, status: strip.children[1]!,
     finish: strip.children[2]!, cancel: strip.children[3]!, confirmation: strip.children[4]!,
     get context() { return current; }, render(next: PinModeContext) { if (controls.render(next)) current = next; } };
 }
 
 describe('disconnected pin-mode intentions, not picking or anchor construction', () => {
+  it('requires an explicit parent, guards the whole source snapshot and retains cancellation after access loss', () => {
+    const h = host(), initial = source();
+    h.render({ ...h.context, source: { ...initial, selected: { ...initial.selected!, reparentBlock: null } } });
+    const target = h.parent.children[1]!.children[0]!, begin = h.parent.children[2]!;
+    expect(target.value).toBe(''); expect(begin.disabled).toBe(true);
+    const current = h.context.source as PinModeSource & { kind: 'ready' };
+    h.render({ ...h.context, source: { ...current, models: current.models.map(m => m.assetId === assetA ? { ...m, addBlock: '非表示' } : m) } });
+    expect(target.children.find(n => n.value === assetA)!.disabled).toBe(true);
+    h.render({ ...h.context, source: current });
+    expect(target.children.find(n => n.value === assetA)!.disabled).toBe(false);
+    target.fire('focus'); target.value = assetA; target.fire('change'); begin.fire('click');
+    const ctx = proposal(h.context); h.render(ctx);
+    expect(ctx.memory.mode).toMatchObject({ kind: 'reparent', target: { assetId: assetA }, caption: { captionId: cap }, sourceToken: 'one' });
+    expect(h.impact.textContent).toContain('2シーン'); expect(h.impact.textContent).toContain('一覧のみ');
+    expect(h.finish.disabled).toBe(false); expect(h.finish.textContent).toBe('親モデルと位置を確定');
+    for (const patch of [{ otherPending: 'composition' as const }, { mutationBlock: '閲覧のみ' },
+      { source: { ...ctx.source, token: 'changed-source-placement' } }]) {
+      expect(planPinMode({ ...ctx, ...patch }, { kind: 'finish' }).kind).toBe('blocked');
+    }
+    h.render({ ...ctx, mutationBlock: '閲覧のみ' }); h.cancel.fire('click'); h.confirmation.children[1]!.fire('click');
+    expect(h.context.memory.mode).toBeNull();
+    target.value = assetA; target.fire('focus'); target.fire('change');
+    h.render({ ...h.context, mutationBlock: null, source: { ...ctx.source, token: 'new' } });
+    target.value = assetA; target.fire('change'); expect(target.value).toBe(''); expect(begin.disabled).toBe(true);
+    const project = { ...initial.selected!, assetId: { kind: 'unresolved', reason: 'missing' } as Field<string>, block: 'same-owner only', reparentBlock: null };
+    expect(planPinMode({ ...context(), source: { ...initial, selected: project } }, { kind: 'reparent', assetId: assetA }).kind).toBe('change');
+    expect(planPinMode({ ...context(), source: { ...initial, selected: project } }, { kind: 'move' }).kind).toBe('blocked');
+    h.controls.dispose();
+  });
   it('selects a local initial color and refuses invalid, stale, busy and late dialog input without replacing its target', () => {
     const h = host(); h.color.fire('focus'); h.color.value = '#2468AC'; h.color.fire('input');
     expect(h.context.memory.addColor).toBe('#2468ac'); expect(h.context.memory.mode).toBeNull();

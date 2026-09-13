@@ -14,7 +14,9 @@ PO decision after `1edc3f5`: isolated package implementation followed by evidenc
 and ordinary-route activation is approved (05 §7.5 / 06 §11). The separate
 review/edit-copy mapping in 06 §12.6 is being discussed as a missing-target pin
 group. Later PO adoption adds explicit Asset/Project-anchor parent changes in
-05 §4.4, still unimplemented; no shared-owner collapse or schema amendment. See todo
+05 §4.4, now connected through a dedicated command and the existing metadata/
+limited GLB pin editor; no shared-owner collapse or schema amendment. Browser and
+device acceptance remain separate. See todo
 for the single remaining decision; old two-decision waits are historical.
 
 2026-09-13 C04 initial pin color: the existing pin actions now select a Scene-local

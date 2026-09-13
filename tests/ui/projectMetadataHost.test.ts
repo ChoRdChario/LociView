@@ -2640,6 +2640,75 @@ describe('new synthetic saved host (memory ports and recorded DOM, not real brow
     expect(cold.read().source!.originalChanges()).toHaveLength(before + 8); await cold.dispose();
   });
 
+  it.each(['asset', 'project'] as const)('reparents a %s anchor with one retained change, exact retry and cold reopen', async kind => {
+    const h = fixture(), host = await h.open(true);
+    if (kind === 'project') {
+      const seed = host.read().source!, [doc] = A.applyChanges(A.init<any>(), seed.originalChanges());
+      const changed = A.change(A.clone(doc), d => { d.captionsById[f.shared].anchor = new A.ImmutableString(canonicalFixture({
+        kind: 'project', projectFrameId: host.authority.read().resources.projectFrameId, positionProject: [7, 8, 9] })); });
+      await host.receive(seed.token, fullSource(seed.appendOriginal(A.getChanges(doc, changed)), 1201));
+    }
+    const s = new SyntheticSession(host.authority); select(s);
+    const source = host.read().source!, provider = host.read().provider!, before = s.snapshot;
+    if (provider.kind !== 'scene-provider') throw Error('provider');
+    const count = source.originalChanges().length;
+    expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'reparent', assetId: f.structure }))).toBe(true);
+    const anchor = s.pinPreviewAnchor!; expect(anchor).toMatchObject({ assetId: f.structure });
+    expect(host.read().source!.originalChanges()).toHaveLength(count);
+    h.base.rejectPublication = true;
+    await acknowledge(s, () => { s.acceptPin(planPinMode(s.pinContext(), { kind: 'finish' })); });
+    expect(s.acknowledgment.state).toBe('failed'); expect(s.snapshot).toBe(before);
+    const paths = (await h.base.list(`${metadataArea}/${h.run}/`)).filter(p => p.endsWith('.amchange'));
+    const bytes = await Promise.all(paths.map(p => h.base.readBytes(p)));
+    h.base.rejectPublication = false; await acknowledge(s, () => { s.retryWorking(); });
+    expect(s.acknowledgment.state).toBe('idle'); expect(s.snapshot.resources.captions[f.shared]!.anchor).toEqual({ kind: 'value', value: anchor });
+    expect(await Promise.all(paths.map(p => h.base.readBytes(p)))).toEqual(bytes);
+    expect(host.read().source!.originalChanges()).toHaveLength(count + 1);
+    const next = host.read().provider!; if (next.kind !== 'scene-provider') throw Error('provider');
+    const { anchor: _old, ...oldRecord } = provider.details.mutable.captionsById[f.shared]!;
+    const { anchor: _new, ...newRecord } = next.details.mutable.captionsById[f.shared]!;
+    expect(newRecord).toEqual(oldRecord);
+    for (const map of ['sceneCaptionMembershipsById', 'sceneAssetMembershipsById', 'captionAttachmentsById', 'captionTagMembershipsById', 'assetsById'] as const)
+      expect(next.details.mutable[map]).toEqual(provider.details.mutable[map]);
+    expect(s.snapshot.captionOwners[f.shared]!.assetId).toBe(f.structure);
+    const complete = host.read().source!;
+    await host.receive(complete.token, fullSource(complete, 1202)); expect(host.read().source!.token).toBe(complete.token);
+    await host.dispose(); const cold = await h.open();
+    expect(cold.authority.read().resources.captions[f.shared]!.anchor).toEqual({ kind: 'value', value: anchor });
+    expect(cold.content.counts.bodyBytes).toBe(0); await cold.dispose();
+  });
+
+  it('retains whole parent/position conflict candidates, resolves explicitly and refuses unknown old anchors', async () => {
+    const h = fixture(), host = await h.open(true), seed = host.read().source!, provider = host.read().provider!;
+    const s = new SyntheticSession(host.authority); select(s);
+    s.acceptPin(planPinMode(s.pinContext(), { kind: 'move' })); const old = s.pinPreviewAnchor!;
+    const c = s.pinContext(); s.acceptPin(planPinMode(c, { kind: 'cancel', confirmedMode: c.memory.mode, confirmedProposal: c.proposal }));
+    s.acceptPin(planPinMode(s.pinContext(), { kind: 'reparent', assetId: f.structure })); const next = s.pinPreviewAnchor!;
+    const command: MetadataEdit = { kind: 'reparentPin', sceneId: f.overview, captionId: f.shared, anchor: next };
+    const local = seed.prepareEdit(seed.token, command, provider, '1'.repeat(32));
+    const remote = seed.prepareEdit(seed.token, { kind: 'movePin', sceneId: f.overview, captionId: f.shared,
+      anchor: { ...old, positionAsset: [10, 11, 12] } } as MetadataEdit, provider, '2'.repeat(32));
+    const merged = local.appendOriginal(remote.originalChanges());
+    await host.receive(seed.token, fullSource(merged, 1203));
+    const conflicted = host.read().provider!; if (conflicted.kind !== 'scene-provider') throw Error('provider');
+    const field = captionFieldCandidates(conflicted, f.shared, 'anchor', metadataFixtureLimits);
+    expect(field).toHaveLength(2);
+    expect(field.map(c => c.value)).toEqual(expect.arrayContaining([{ kind: 'value', value: next },
+      { kind: 'value', value: { ...old, positionAsset: [10, 11, 12] } }]));
+    expect(() => merged.prepareEdit(merged.token, command, conflicted, '3'.repeat(32))).toThrow(/unresolved/);
+    const chosen = field.find(c => c.value.kind === 'value' && canonicalFixture(c.value.value) === canonicalFixture(next))!;
+    await host.resolve(host.read().source!.token, { kind: 'resolveCaptionField', captionId: f.shared, field: 'anchor', operationId: chosen.operationId });
+    const complete = host.read().source!; await host.receive(complete.token, fullSource(remote, 1204));
+    expect(host.read().source!.token).toBe(complete.token);
+    const [doc] = A.applyChanges(A.init<any>(), seed.originalChanges());
+    const unknown = seed.appendOriginal(A.getChanges(doc, A.change(A.clone(doc), d => {
+      d.captionsById[f.shared].anchor = new A.ImmutableString(canonicalFixture({ ...old, future: { preserve: true } }));
+    })));
+    const unknownView = await readProjectScene(unknown.read(), metadataFixtureLimits, host.content.verifier(false));
+    expect(() => unknown.prepareEdit(unknown.token, command, unknownView, '4'.repeat(32))).toThrow();
+    await host.dispose();
+  });
+
   it('retries a failed pin creation with the same ID and original bytes, not a second Caption', async () => {
     const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority);
     expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'color', color: '#123456' }))).toBe(true);

@@ -6,8 +6,9 @@
 > order is approved (05 §7.5 amended). §12.6 remains under discussion following
 > the missing-model group suggestion; neither its mapping nor the wire is ratified.
 > Explicit placed-pin parent changes are subsequently accepted in 05 §4.4 (C11),
-> still unimplemented: command/planner, existing pin UI/host, then durable team
-> acceptance. Do not turn this operation approval into unplaced/wire adoption.
+> now connected: separate command/planner, existing pin UI/metadata/GLB host and
+> saved-history tests. Native-input/device acceptance remains open. This does not
+> approve unplaced/wire adoption; return to F01/F02 after this bounded C11 slice.
 >
 > 2026-09-13 current priority: C04/C09 close the approved initial-color/window-size
 > carryovers on the existing hosts; exact executed and pending evidence is in todo.
