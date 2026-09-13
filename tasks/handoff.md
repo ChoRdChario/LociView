@@ -1,5 +1,16 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-13 P07 local View/Edit（`801e7af`後）:** 限定GLB/PNG一覧に
+> 「閲覧で開く／編集で開く」、同じ画面に「編集を開始する／閲覧に切り替える」を接続。
+> Viewはlock不要・全write拒否。Editはlockとdurable再読込を確認後だけ開始する。
+> 同じSession／viewportを保持し、非開始Scene・カメラ・窓・検索・draftを移し替えない。
+> 別writer／読込／表示失敗なら旧Viewを残し、候補leaseを解放。中断を後から観測した
+> Viewも復旧専用Editへ進めるが、未完了Editからの切替は不可。独立指摘は修正済み。
+> 最終型・build exit 0。root 111 files／2,073 PASS／21既存TODO／失敗0、exit 0／JSON success。
+> 最終index独立レビュー後の手動準備不足も補完。実browser／iPhone／offlineは未受入れ。
+> P07のmetadata host・review編集copyは残るため分類数は30/4/20/10のまま。
+> 次候補は承認済みC09のwindow resize。file-teamの本筋と既出06の2判断を置換しない。
+
 > **2026-09-13 Caption削除競合の復旧（`06e2eda`後）:** 同じmetadata要確認欄で
 > 「削除状態を維持／キャプションを復元」を明示選択。単一deleted候補＋同時編集も対象。
 > 親だけにfresh eventを追加し、元本文／位置候補、子tombstone、後着／曖昧edgeを保持。

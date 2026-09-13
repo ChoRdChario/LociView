@@ -28,6 +28,48 @@ Formal adoption still requires G1-A/C and applicable device evidence. No profile
 
 #### Active connected work — PO-approved limited real-file validation
 
+Current slice (2026-09-13, after `801e7af`): P07 deliberate local View/Edit,
+limited to the existing static-GLB/PNG validation workspace. Previous turn was
+progress (Caption lifecycle recovery); whole practical-team acceptance remains
+open. Read-only independent design review supports stable host delegation and
+the same Session/viewport rather than remounting user state.
+
+- [x] Specify deliberate lock-free View and fresh durable Edit handoff; preserve
+  current Scene/camera/windows/input, old View on failure, and pending recovery.
+- [x] Connect catalog View/Edit choices and same-workspace switch controls;
+  guard service writes, pending/draft/IME/drag, late completion and lock refusal.
+- [x] Extend existing file/DOM tests, reuse platform lock tests; execute final
+  typecheck/test/build and independent review, update evidence for the checkpoint.
+
+No metadata-demo mode conversion, review-package editing, schema/wire/profile,
+ordinary home, shared-data URL, external save, dependency or release change.
+Recorded DOM/service results are not browser/iPhone/offline acceptance. The two
+06 decisions and unchanged browser/push blockers remain separate.
+
+Implementation review: stable authority/content delegation keeps the same editor
+and resident cache. Independent review found and closed one warm-View recovery
+dead end: local draft/IME/drag is now distinguished from an observed pending
+journal, so only explicit recovery may acquire Edit. Four additions in the
+existing limited-file suite plus the catalog case cover lock-free reads, all
+write paths, fresh read, a non-startup Scene, open windows/search/camera, actual
+Caption draft/failed update, lock/read/display/publication failure and late close.
+No new page/fixture or test timeout. Final typecheck and normal build exit 0;
+final single-worker root exit 0 / JSON success: 111 files, 2,073 PASS, 21 existing
+TODO, no failures (443.93 seconds). No concurrent build or typecheck during root;
+executable source/tests are unchanged since these final checks. Normal build's
+existing mixed-import/chunk warnings remain. Independent source/test/index review
+closed the warm recovery, actual-draft/failed-Edit and observability findings;
+manual steps now prepare a separate Scene and explicitly include its Caption.
+The 17-file local checkpoint is ready to commit. Inventory stays 30/4/20/10:
+P07 is partially connected, not whole-group, browser/device, file-team or release
+acceptance. No unchanged browser bootstrap or policy-denied push retry was made.
+
+Next bounded candidate is the remaining C09 Caption-window resize operation,
+subject to a short dependency/acceptance check. It is already in the approved
+stage-2-related carryover scope, not new media, generic Undo or storage design.
+F01/F02/file-team flow remain the main dependency once the two 06 decisions and
+their applicable gates are resolved; do not substitute UI carryover for that exit.
+
 Current slice (2026-09-13, after `06e2eda`): Caption delete/edit and delete/restore
 recovery under 05 §3.4/§8. Short audit: clean g0-baseline; preceding turn closed
 the Saved View dead end with exact final evidence (progress, not a wait). The

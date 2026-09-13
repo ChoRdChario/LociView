@@ -141,7 +141,8 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     placement.actions.hidden = task !== 'models';
     materialPanel.hidden = task !== 'materials'; viewPanel.hidden = task !== 'views';
     if (session.captionTextOnly) {
-      notice.textContent = (session.readOnly ? '閲覧専用のタブです。編集する場合は、編集用タブを閉じてから再読み込みしてください。' :
+      notice.textContent = (session.readOnly ? session.snapshot.validationFiles ? '閲覧専用のタブです。' :
+        '閲覧専用のタブです。編集する場合は、編集用タブを閉じてから再読み込みしてください。' :
         session.snapshot.validationFiles ? '実ファイルの限定検証。' : '開発用・合成データのみ。') + retentionNotice;
       if (session.pinRestriction) pin.actions.hidden = pin.modeStrip.hidden = pinHelp.hidden = numeric.hidden = true;
       if (session.membershipRestriction) include.root.hidden = true;

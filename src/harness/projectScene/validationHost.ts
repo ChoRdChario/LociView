@@ -17,7 +17,7 @@ import { validationModelVersions } from './validationProjection';
 import { metadataIntent } from './metadataIntent';
 import type { SyntheticProject } from './fixture';
 import type { SyntheticAuthority } from './historyProjection';
-import type { SavedWorkspaceHost } from './savedHost';
+import type { SavedWorkspaceHost, LocalOpenMode } from './savedHost';
 import type { MediaImage, MediaFileAddition } from './mediaHistory';
 import type { ModelPlacementCommand, ModelFileAddition } from './modelTypes';
 import { orderBetween } from './viewHistory';
@@ -28,6 +28,7 @@ import type { MaterialIntent } from '../../domain/materialIntent';
 
 export const validationArea = 'lociview-development-validation-1';
 export interface ValidationHostOptions {
+  mode?: LocalOpenMode;
   run: string; base: WorkspaceFS; coordinator: ProjectMutationCoordinator; store: OriginBlobStore;
   fileLimits: FileValidationLimits; decode?: PngDecoder; initial?: ReturnType<typeof prepareValidationCreation>;
   openStorage(allowCreate: boolean): Promise<{ factory: MetadataStorageFactory; dispose(): Promise<void> }>;
@@ -38,8 +39,10 @@ const base64 = (bytes: Uint8Array) => { let text = ''; for (let n = 0; n < bytes
 /** New validation namespace only; no synthetic seed, guessed Project or old-store fallback. */
 export async function openValidationHost(options: ValidationHostOptions) {
   const run = technicalId(options.run), root = `${validationArea}/${run}`;
+  if (options.mode === 'view' && options.initial) throw Error('閲覧ではプロジェクトを作成できません。');
   if (options.initial && options.initial.source.proof.identity.projectId !== `prj_${run}`) throw Error('作成先を確認してください。');
-  const lease = await options.coordinator.tryAcquire(options.base, root, `${validationArea}:${run}`), fs = lease.workspace;
+  const lease = options.mode === 'view' ? options.coordinator.openView(options.base, root, `${validationArea}:${run}`) :
+    await options.coordinator.tryAcquire(options.base, root, `${validationArea}:${run}`), fs = lease.workspace;
   let connection: Awaited<ReturnType<ValidationHostOptions['openStorage']>> | undefined, operation: Promise<unknown> | undefined;
   let closed = false, busy = false, failure = '';
   const dispose = async () => { if (closed) return; closed = true; lease.beginClose();
@@ -197,7 +200,8 @@ export async function openValidationHost(options: ValidationHostOptions) {
       refresh: () => execute(async () => { last = await session.read(); await projectView(last); return last; }),
       resolve: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
       dispose: async () => { await dispose(); content.releasePreparedImages(); content.releasePreparedModels(); prepareDisplay = undefined; } };
-    return { ...host, content, setDisplayPreparation(callback: (next: SyntheticProject) => Promise<void>) {
+    return { ...host, content, get accessDetail() { return options.mode === 'view' ? '閲覧専用です。' : lease.accessDetail; },
+      setDisplayPreparation(callback: (next: SyntheticProject) => Promise<void>) {
       if (closed || prepareDisplay) throw Error('モデル表示の接続を確認してください。');
       prepareDisplay = callback; return () => { if (prepareDisplay === callback) prepareDisplay = undefined; };
     } };

@@ -279,8 +279,12 @@ export class SyntheticSession {
   }
   get memory() { return this.navigation.sceneMemory[this.sceneId]!; }
   get pending(): PendingInteraction | null {
+    return this.workingBlock ? 'update' : this.interactionPending;
+  }
+  /** Local input/gestures, separate from a host-owned journal awaiting explicit recovery. */
+  get interactionPending(): PendingInteraction | null {
     const text = this.textPending;
-    return this.workingBlock ? 'update' : text === 'composition' ? text : this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : text;
+    return text === 'composition' ? text : this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.pinInput ? 'pinMove' : text;
   }
   private get textPending(): PendingInteraction | null {
     if (this.sceneDraft?.composing) return 'composition';

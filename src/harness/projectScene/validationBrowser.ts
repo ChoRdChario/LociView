@@ -24,7 +24,7 @@ export async function createValidationBrowserWorkspace(document: Document, run?:
   const storage = (id: string, create: boolean) => openBrowserMetadataStorage(`${validationArea}-${id}`, create);
   const workspace = createValidationWorkspace(document, { ...options,
     list: () => listValidationProjects(options, storage),
-    open: (id, initial) => openValidationHost({ ...options, run: id, initial, openStorage: create => storage(id, create) }),
+    open: (id, initial, mode) => openValidationHost({ ...options, run: id, initial, mode, openStorage: create => storage(id, create) }),
     render: async host => {
       const resident = await prepareValidationResidents(host.authority.read().modelVersions!, host.content);
       try {
@@ -41,11 +41,13 @@ export async function createValidationBrowserWorkspace(document: Document, run?:
         return { factory: sceneViewportFactory(resident), dispose: () => { detach(); resident.dispose(); } };
       } catch (error) { resident.dispose(); throw error; }
     },
-    selected: id => {
+    selected: (id, mode) => {
       const url = new URL(location.href); url.searchParams.delete('create');
-      if (id) url.searchParams.set('run', id); else url.searchParams.delete('run'); history.replaceState(null, '', url);
+      if (id) url.searchParams.set('run', id); else url.searchParams.delete('run');
+      if (id && mode === 'view') url.searchParams.set('access', 'view'); else url.searchParams.delete('access');
+      history.replaceState(null, '', url);
     },
-  }, run);
+  }, run, new URL(location.href).searchParams.get('access') === 'view' ? 'view' : 'edit');
   const dispose = () => { window.removeEventListener('pagehide', dispose); void workspace.dispose(); };
   window.addEventListener('pagehide', dispose);
   return { root: workspace.root, hasChanges: workspace.hasChanges, dispose };

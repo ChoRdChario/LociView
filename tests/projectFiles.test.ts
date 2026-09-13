@@ -25,6 +25,7 @@ import { prepareValidationResidents, decodeValidationModel } from '../src/harnes
 import { pickResidentSurface } from '../src/harness/projectScene/viewportPicking';
 import { fixtureModelIds } from '../src/harness/projectScene/modelClosure';
 import { openValidationHost, validationArea } from '../src/harness/projectScene/validationHost';
+import { createValidationModeHost } from '../src/harness/projectScene/validationModeHost';
 import { listValidationProjects } from '../src/harness/projectScene/validationCatalog';
 import { createSavedWorkspace } from '../src/harness/projectScene/metadataWorkspace';
 import type { DisplayCapture } from '../src/harness/projectScene/viewSession';
@@ -32,6 +33,8 @@ import type { ViewportFactory } from '../src/harness/projectScene/viewportHost';
 import { planPinMode } from '../src/ui/projectScene/pinModeState';
 import { planModelList } from '../src/ui/projectScene/modelListState';
 import { planCaptionList } from '../src/ui/projectScene/captionListState';
+import { planCaptionInclude } from '../src/ui/projectScene/captionIncludeState';
+import { editCaptionDraft, planCaptionApply } from '../src/ui/projectScene/captionDetailState';
 import { RecordedDocument } from './ui/domRecorder';
 import { record, type RecordedNode } from './ui/domRecorder';
 import { createValidationWorkspace, type ValidationWorkspacePorts } from '../src/harness/projectScene/validationWorkspace';
@@ -112,6 +115,151 @@ async function openFileCaption(modelBytes = glb()) {
 }
 
 describe('limited real-format validation (synthetic GLB bytes, injected PNG decoder, memory storage)', () => {
+  it('opens deliberate View without a lock and refuses every write path before file reads', async () => {
+    const { workspace, options, captionId, fs } = await openFileCaption(); await workspace.dispose();
+    const acquire = vi.spyOn(options.coordinator, 'tryAcquire');
+    const bytes = vi.spyOn(fs, 'writeBytes'), text = vi.spyOn(fs, 'writeText'), metadataWrite = vi.fn();
+    const connection = await options.openStorage();
+    const tracked: MetadataStorageFactory = () => { const port = connection.factory(); return { ...port,
+      save: (key, data) => { metadataWrite(); return port.save(key, data); },
+      remove: key => { metadataWrite(); return port.remove(key); },
+      removeRange: key => { metadataWrite(); return port.removeRange(key); } }; };
+    const view = await openValidationHost({ ...options, mode: 'view', openStorage: async () => ({ factory: tracked, dispose: connection.dispose }) });
+    expect(acquire).not.toHaveBeenCalled(); expect(view.authority.readOnly).toBe(true);
+    expect(metadataWrite).not.toHaveBeenCalled(); expect(bytes).not.toHaveBeenCalled(); expect(text).not.toHaveBeenCalled();
+    const editor = await openValidationHost(options); expect(editor.authority.readOnly).toBe(false);
+    const token = view.read().source!.token, original = view.read().source!.originalChanges(), paths = await fs.list('');
+    const file = { name: '選択ファイル', size: 12, arrayBuffer: vi.fn(async () => new ArrayBuffer(12)) };
+    for (const command of [
+      () => view.authority.write(token, { [`caption/${captionId}/title`]: '拒否' }),
+      () => view.authority.authorScene!(token, { kind: 'renameScene', sceneId: 'scn_missing', name: '拒否' }),
+      () => view.authority.deleteCaption!(token, {} as never), () => view.authority.deleteAsset!(token, {} as never),
+      () => view.authority.addMediaFile!(token, { file } as never), () => view.authority.addModelFile!(token, { file } as never),
+      () => view.authority.transformModel!(token, {} as never), () => view.resolve(token, {} as never), () => view.authority.retry!(),
+    ]) await expect(command()).rejects.toThrow('閲覧専用');
+    expect(file.arrayBuffer).not.toHaveBeenCalled(); expect(bytes).not.toHaveBeenCalled(); expect(text).not.toHaveBeenCalled();
+    expect(metadataWrite).not.toHaveBeenCalled();
+    expect(await fs.list('')).toEqual(paths); expect(view.read().source!.originalChanges()).toEqual(original);
+    await view.dispose(); await editor.dispose();
+    const initial = prepareValidationCreation(await prepareValidationProject({ run: options.run, title: '作成不可', models: [{ label: '3D', bytes: glb() }] }, budget, decode));
+    acquire.mockClear(); await expect(openValidationHost({ ...options, initial, mode: 'view' })).rejects.toThrow('作成できません');
+    expect(acquire).not.toHaveBeenCalled();
+  });
+  it('hands View to fresh durable Edit without remounting Scene, camera, windows or filters; guards input and releases Edit', async () => {
+    const { options, workspace, host: writer, captionId, fs } = await openFileCaption();
+    const defaultScene = workspace.session!.sceneId, secondScene = `scn_${newId()}`;
+    await writer.authority.authorScene!(writer.read().source!.token, { kind: 'createScene', sceneId: secondScene,
+      sourceSceneId: defaultScene, activeSceneId: defaultScene, name: '個別の確認', orderKey: 'z',
+      membershipIds: [`sam_${newId()}`], eventId: `evt_${newId()}` });
+    const writerSession = workspace.session!; writerSession.refreshHistory();
+    expect(writerSession.acceptNavigation(planNavigation(writerSession.snapshot.state, writerSession.session, null, { kind: 'scene', sceneId: secondScene }))).toBe(true);
+    writerSession.acceptInclude(planCaptionInclude(writerSession.includeContext(), { kind: 'select', captionId }));
+    writerSession.acceptInclude(planCaptionInclude(writerSession.includeContext(), { kind: 'include' }));
+    await vi.waitFor(() => expect(writerSession.acknowledgment.state).toBe('idle'));
+    const initial = await openValidationHost({ ...options, mode: 'view' });
+    const changed = vi.fn(), open = vi.fn(mode => openValidationHost({ ...options, mode }));
+    const host = createValidationModeHost(initial, open, changed);
+    const display: DisplayCapture = { camera: { position: [5, 2, 9], target: [1, 0, 0], up: [0, 1, 0],
+      projection: { kind: 'perspective', verticalFovRadians: 0.7 } }, background: { kind: 'solid', colorSrgb: [0.1, 0.2, 0.3] } };
+    const recall = vi.fn(), camera = vi.fn(), dispose = vi.fn(), viewport: ViewportFactory = vi.fn(() => ({ update() {}, setActive() {},
+      read: () => ({ token: 'camera', ready: true, issue: null, dragging: false, projection: 'perspective' as const, axis: null, pins: [] }),
+      capture: () => display, recall, camera, retry() {}, dispose }));
+    const mounted = createSavedWorkspace(new RecordedDocument().asDocument(), host, viewport), s = mounted.session!, root = record(mounted.root);
+    const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    const button = (label: string) => all(root).find(n => n.tag === 'button' && n.textContent === label)!;
+    expect(s.acceptNavigation(planNavigation(s.snapshot.state, s.session, null, { kind: 'scene', sceneId: secondScene }))).toBe(true);
+    s.acceptList(planCaptionList(s.captionContext(), { kind: 'select', captionId }));
+    s.acceptList(planCaptionList(s.captionContext(), { kind: 'search', query: '現地' }));
+    const memory = s.memory, windows = s.windowMemory, scene = s.sceneId;
+    expect(scene).not.toBe(defaultScene); expect(memory.search).toBe('現地'); expect(windows.retained).toContain(captionId);
+    const cameraCalls = camera.mock.calls.length, recallCalls = recall.mock.calls.length;
+    // Another writer blocks Edit but never closes the existing viewer or acquires on its behalf.
+    button('編集を開始する').fire('click'); await vi.waitFor(() => expect(open).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(host.mode!.busy).toBe(false)); mounted.render();
+    expect(s.readOnly).toBe(true); expect(s.memory).toBe(memory); expect(dispose).not.toHaveBeenCalled();
+    expect(all(root).some(n => n.textContent.includes('ロック'))).toBe(true);
+    await writer.authority.write(writer.read().source!.token, { [`caption/${captionId}/title`]: '現地の最新記録' });
+    await workspace.dispose(); open.mockClear();
+    // Local IME/camera/window interactions must not even start lease acquisition.
+    for (const gesture of [(b: boolean) => s.setSearchComposing(b), (b: boolean) => s.setViewportDragging(b), (b: boolean) => s.setWindowDragging(b)]) {
+      gesture(true); button('編集を開始する').fire('click'); expect(open).not.toHaveBeenCalled(); gesture(false);
+    }
+    button('編集を開始する').fire('click');
+    await vi.waitFor(() => expect(button('閲覧に切り替える')?.disabled).toBe(false));
+    expect(mounted.session).toBe(s); expect(s.sceneId).toBe(scene); expect(s.memory).toBe(memory); expect(s.windowMemory).toBe(windows);
+    expect(s.snapshot.resources.captions[captionId]!.title).toEqual({ kind: 'value', value: '現地の最新記録' });
+    expect(viewport).toHaveBeenCalledOnce(); expect(recall).toHaveBeenCalledTimes(recallCalls);
+    expect(camera).toHaveBeenCalledTimes(cameraCalls); expect(dispose).not.toHaveBeenCalled();
+    expect(changed).toHaveBeenLastCalledWith('edit'); expect(s.readOnly).toBe(false);
+    // A source draft is also blocked at the shared Session guard (no silent input loss).
+    const detail = s.detailContext(), draft = editCaptionDraft(detail.draft!, detail.source, 'body', '未適用のメモ');
+    expect(s.acceptDetail({ kind: 'draft', baseDraft: detail.draft!, draft })).toBe(true);
+    const count = open.mock.calls.length;
+    button('閲覧に切り替える').fire('click'); expect(open).toHaveBeenCalledTimes(count); expect(s.detailContext().draft).toBe(draft);
+    fs.reject = p => p.endsWith('/published.json');
+    const apply = planCaptionApply(s.detailContext()); if (apply.kind !== 'apply') throw Error(apply.reason);
+    expect(s.acceptDetail(apply)).toBe(false);
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('failed'));
+    button('閲覧に切り替える').fire('click'); expect(open).toHaveBeenCalledTimes(count);
+    expect(s.detailContext().draft).toBe(draft); expect(host.mode!.current).toBe('edit');
+    fs.reject = () => false; s.retryWorking(); await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+    expect(s.snapshot.resources.captions[captionId]!.body).toEqual({ kind: 'value', value: '未適用のメモ' });
+    button('閲覧に切り替える').fire('click'); await vi.waitFor(() => expect(button('編集を開始する')?.disabled).toBe(false));
+    expect(s.readOnly).toBe(true); expect(s.windowMemory).toBe(windows); expect(s.memory).toBe(memory);
+    const other = await openValidationHost(options); expect(other.authority.readOnly).toBe(false); await other.dispose(); await mounted.dispose();
+    expect(dispose).toHaveBeenCalledOnce();
+  });
+  it('keeps old View and releases failed, corrupt or late Edit candidates, blocking facade commands throughout handoff', async () => {
+    const { options, workspace } = await openFileCaption(); await workspace.dispose();
+    const initial = await openValidationHost({ ...options, mode: 'view' });
+    let fail: 'lock' | 'read' | 'decode' | 'publish' | 'late' = 'lock', candidate: Awaited<ReturnType<typeof openValidationHost>> | undefined;
+    let finish!: () => void; const released = vi.fn();
+    const host = createValidationModeHost(initial, async mode => {
+      if (fail === 'lock') return openValidationHost({ ...options, coordinator: ProjectMutationCoordinator.browser(null), mode });
+      if (fail === 'read') return openValidationHost({ ...options, mode, openStorage: async () => { throw Error('injected read failure'); } });
+      candidate = await openValidationHost({ ...options, mode });
+      const dispose = candidate.dispose; candidate.dispose = async () => { released(); await dispose(); };
+      if (fail === 'late') await new Promise<void>(resolve => { finish = resolve; }); return candidate;
+    }, () => {});
+    host.setDisplayPreparation(async () => { if (fail === 'decode') throw Error('injected decode failure'); });
+    const token = host.read().source!.token, project = host.authority.read();
+    for (const kind of ['lock', 'read', 'decode', 'publish'] as const) {
+      fail = kind;
+      await expect(host.mode!.change('edit', token, () => { if (fail === 'publish') throw Error('injected publication failure'); })).rejects.toThrow();
+      expect(host.mode!.current).toBe('view'); expect(host.authority.read()).toBe(project); expect(host.read().source!.token).toBe(token);
+      const probe = await openValidationHost(options); expect(probe.authority.readOnly).toBe(false); await probe.dispose();
+    }
+    expect(released).toHaveBeenCalledTimes(2);
+    fail = 'late'; const pending = host.mode!.change('edit', token, () => { throw Error('must never publish'); });
+    const rejected = expect(pending).rejects.toThrow('閉じました');
+    await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
+    await expect(host.authority.write(token, {})).rejects.toThrow('切替');
+    await expect(host.refresh()).rejects.toThrow('切替'); await expect(host.resolve(token, {} as never)).rejects.toThrow('切替');
+    const closing = host.dispose(); finish(); await rejected; await closing; expect(released).toHaveBeenCalledTimes(3);
+    const probe = await openValidationHost(options); expect(probe.authority.readOnly).toBe(false); await probe.dispose();
+  });
+  it('lets an already-mounted View acquire recovery-only Edit after observing an interrupted external update', async () => {
+    const { options, workspace, host: writer, captionId, fs } = await openFileCaption();
+    const view = await openValidationHost({ ...options, mode: 'view' });
+    const host = createValidationModeHost(view, mode => openValidationHost({ ...options, mode }), () => {});
+    const mounted = createSavedWorkspace(new RecordedDocument().asDocument(), host), s = mounted.session!, root = record(mounted.root);
+    const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    const button = (label: string) => all(root).find(n => n.tag === 'button' && n.textContent === label)!;
+    const token = s.snapshot.state.token;
+    fs.reject = p => p.endsWith('/published.json');
+    await expect(writer.authority.write(writer.read().source!.token, { [`caption/${captionId}/title`]: '中断した記録' })).rejects.toThrow();
+    await workspace.dispose(); fs.reject = () => false;
+    button('再開用データを確認').fire('click'); await vi.waitFor(() => expect(host.read().state).toBe('pending'));
+    await vi.waitFor(() => expect(button('編集を開始する').disabled).toBe(false));
+    expect(s.snapshot.state.token).toBe(token); expect(s.pending).toBe('update');
+    button('編集を開始する').fire('click'); await vi.waitFor(() => expect(button('閲覧に切り替える')?.disabled).toBe(false));
+    expect(host.read().state).toBe('pending'); expect(s.pending).toBe('update'); expect(s.snapshot.state.token).toBe(token);
+    expect(all(root).some(n => n.textContent === '更新の復旧が必要です。')).toBe(true);
+    button('閲覧に切り替える').fire('click'); expect(host.mode!.current).toBe('edit');
+    expect(s.retryWorking()).toBe(false); await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle')); mounted.render();
+    expect(host.read().state).toBe('ready'); expect(s.snapshot.resources.captions[captionId]!.title).toEqual({ kind: 'value', value: '中断した記録' });
+    expect(mounted.session).toBe(s); await mounted.dispose();
+  });
   it('maps all GLB slots by explicit primitive association and edits instance clones without changing PNG/PBR originals', async () => {
     vi.stubGlobal('self', globalThis);
     const bitmap = { width: 64, height: 48, close: vi.fn() };
@@ -573,7 +721,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       factory: () => { throw Error('Recorded DOM has no GPU'); }, dispose: released });
     const ports: ValidationWorkspacePorts = { fileLimits: budget, decode, selected: vi.fn(),
       list: () => listValidationProjects(options, openStorage), render: draw,
-      open: vi.fn(async (run, initial) => host = await openValidationHost({ ...options, run, initial, openStorage: create => openStorage(run, create) })) };
+      open: vi.fn(async (run, initial, mode) => host = await openValidationHost({ ...options, run, initial, mode, openStorage: create => openStorage(run, create) })) };
     const u = createValidationWorkspace(new RecordedDocument().asDocument(), ports), root = record(u.root);
     const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
     const button = (text: string) => all(root).find(n => n.tag === 'button' && n.textContent === text)!;
@@ -599,8 +747,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await vi.waitFor(() => expect(u.selected).toBeNull());
     expect(released).toHaveBeenCalledOnce();
     await vi.waitFor(() => expect(all(root).some(n => n.textContent === '選択から作成 — 再開用データ ')).toBe(true));
-    button('開く').fire('click'); await vi.waitFor(() => expect(u.selected).toBe(id));
+    button('閲覧で開く').fire('click'); await vi.waitFor(() => expect(u.selected).toBe(id));
     await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true));
+    expect(host!.authority.readOnly).toBe(true); expect(ports.selected).toHaveBeenLastCalledWith(id, 'view');
+    button('編集を開始する').fire('click');
+    await vi.waitFor(() => expect(button('閲覧に切り替える')?.disabled).toBe(false));
+    expect(host!.authority.readOnly).toBe(false); expect(ports.selected).toHaveBeenLastCalledWith(id, 'edit');
     await u.dispose(); expect(released).toHaveBeenCalledTimes(2);
     let finish!: (r: Awaited<ReturnType<ValidationWorkspacePorts['render']>>) => void;
     const lateRelease = vi.fn(), lateRender = vi.fn(() => new Promise<Awaited<ReturnType<ValidationWorkspacePorts['render']>>>(r => { finish = r; }));

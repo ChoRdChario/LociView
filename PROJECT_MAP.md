@@ -10,6 +10,14 @@
 
 ## Start here
 
+2026-09-13 P07 local connection: `validationModeHost.ts` keeps one saved editor
+while acquiring/releasing the existing Project lease through a fresh durable
+host. The limited GLB/PNG catalog has deliberate View/Edit entries. Lock-free
+View denies writes; failed acquisition/preparation retains the old display.
+Pending input blocks switching; observed journal interruption permits explicit
+recovery-only Edit. Exact checks are in todo. Metadata-demo mode selection,
+review-to-edit, ordinary-home/file flow and rendered/device acceptance remain open.
+
 2026-09-13 T03 Caption recovery: the existing metadata review area now connects
 explicit keep-deleted/restore-parent decisions, including a single deleted
 lifecycle candidate with concurrent edits. Other candidates, child tombstones,

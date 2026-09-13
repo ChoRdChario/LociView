@@ -990,6 +990,35 @@ class and newly required byte total. A generated-Workspace base is labelled as
 valid only for a recipient of that exact Workspace; the UI never claims receipt
 or advances it merely because export completed.
 
+### 11.1 Bounded local View/Edit connection (2026-09-13)
+
+P07's first new-path connection is the opt-in static-GLB/PNG validation workspace,
+not ordinary home, the synthetic metadata host or review-package conversion.
+An existing Project can be opened deliberately with `閲覧で開く` without asking
+for or holding a write lock. `編集で開く` / `編集を開始する` must obtain the
+existing Project lock and reload durable state before enabling commands. Lock
+unavailability leaves View usable, with a reason and explicit retry action;
+there is no automatic lock promotion, role/ACL or shared-data URL.
+
+Switching retains the same Session, viewport and Scene-local camera/window/filter
+memory. Draft, IME, drag, in-flight or failed Edit work blocks a switch. During
+asynchronous handoff, UI input and facade mutations are blocked. The candidate
+host must finish its durable read, display preparation and current-Scene
+validation before replacing the old host; publication failure rolls back to the
+old read host. Do not silently select another Scene. Release the old host only
+after successful publication; failed/late candidates release their own lease.
+
+View may request Edit for a pending journal so explicit recovery remains
+reachable. Such a host is recovery-only, not ready for ordinary editing. View
+never writes creation, metadata, binary or recovery state; controls alone are
+not the guard. No file has been saved by changing mode or retaining browser data.
+
+Acceptance reuses existing limited-file/recorded-DOM and multi-tab-lock tests:
+deliberate View plus a separate editor, durable Edit handoff, lock/read/display
+failure fallback, retained Scene/camera/windows/filter, pending-input refusal,
+explicit recovery and disposal of late candidates. Actual browser and physical
+iPhone evidence remains in the consolidated acceptance batch.
+
 ## 12. Acceptance
 
 ### 12.1 Scene/domain

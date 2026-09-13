@@ -93,7 +93,7 @@
 | P04 | Sceneを作る | 接続済み | CaptionタブのScene管理から作成し、新metadataへ保存。元Sceneの確定モデル所属だけを順序保持・fresh IDで複写。Caption/material/View/defaultはコピーせず、不完全sourceは拒否。 | [src/harness/projectScene/sceneAuthoringControls.ts](../src/harness/projectScene/sceneAuthoringControls.ts) / [src/projectMetadata/sceneAuthoring.ts](../src/projectMetadata/sceneAuthoring.ts) |
 | P05 | Scene名・Project開始Sceneを設定する | 接続済み | 同じScene管理UIから明示確定して新metadata保存。名前／default競合は通常操作で上書きしない。開始Sceneは次回起動に使い、現在Scene選択やentry Saved Viewとは別。 | [src/projectMetadata/sceneAuthoring.ts](../src/projectMetadata/sceneAuthoring.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
 | P06 | 既存CaptionをSceneへ追加／外す | 接続済み | 同じCaptionを参照。本文・他Scene・添付を保持。Project全体削除ではない。 | [src/ui/projectScene/captionIncludeControls.ts:38](../src/ui/projectScene/captionIncludeControls.ts) / [tests/ui/projectMetadataHost.test.ts:535](../tests/ui/projectMetadataHost.test.ts) |
-| P07 | 閲覧と編集を選んで開く | 別経路のみ | 新hostのロックによるread-onlyは利用者の閲覧モードではない。reviewを編集する場合の独立Project化も未接続。 | [src/harness/projectScene/workspace.ts:51](../src/harness/projectScene/workspace.ts) / [docs/specs/06-project-package-wire.md:24](../docs/specs/06-project-package-wire.md) |
+| P07 | 閲覧と編集を選んで開く | 別経路のみ | 限定validationに意図的なlock-free View／fresh durable Editと同一画面切替を接続。Scene・カメラ・窓・検索を保持し、入力／未完了Editの切替を拒否。metadata hostの選択入口・review編集の独立Project化は未接続。実画面受入れも残るため行全体を完了としない。 | [src/harness/projectScene/validationModeHost.ts](../src/harness/projectScene/validationModeHost.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) / [docs/specs/05-project-scene-team-workflow.md](../docs/specs/05-project-scene-team-workflow.md) |
 
 ### モデル
 

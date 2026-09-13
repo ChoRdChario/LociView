@@ -6,6 +6,13 @@ observed implementation.
 
 ## Purpose-specific authority
 
+2026-09-13 limited local View/Edit: [05 §11.1](specs/05-project-scene-team-workflow.md#111-bounded-local-viewedit-connection-2026-09-13)
+records the same-editor transition in the existing GLB/PNG validation workspace.
+View is a deliberate lock-free mode, not an account role or an inability to get
+a lock. Edit reloads durable data; failures keep View, input and existing display.
+It does not implement review-package editing, normal-home activation or external
+file saving. Final executed evidence and pending rendered/device checks are in todo.
+
 2026-09-13 concrete package design: [06 §12](specs/06-project-package-wire.md#12-concrete-field-summary-and-execution-tables-proposed-2026-09-13)
 records field/privacy, inventory, summary and finite execution tables. Independent
 review corrected the description of the current cumulative validation limit.
