@@ -38,9 +38,11 @@ GLB/PNG admission/staging also exists without allocating new IDs or repairing lo
 acknowledged content. Actual Workspace ZIP reception now connects these through a
 durable input job and the Session to one publication (or a zero-change observation)
 and exact imported-base completion. Identical-file replay reuses its job. Cold
-recovery is tested after the input's start marker; interrupted pre-marker input
-recovery and the host file action remain next, alongside initial import and other
-purposes. This is not ordinary-home, rendered/device or whole-team acceptance.
+recovery and exact pre-marker re-selection/explicit abandonment are connected to
+the existing limited GLB/PNG editor's update-file controls. Cold recovery is
+available before editor mount; warm updates retain the editor and local view state.
+Workspace output/file verification, initial import and other purposes remain open.
+This is not ordinary-home, rendered/device or whole-team acceptance.
 Exact executed checks are in todo.
 
 2026-09-13 C04 initial pin color: the existing pin actions now select a Scene-local

@@ -20,8 +20,13 @@
 > source with original-operation summary, all-current strong closure and read-only
 > body verification. Exact ZIP streaming and immutable archive/source inspection
 > are now connected; they are not profile admission or external-save receipts.
-> Protected output jobs/retention, CAS/Project receive and real Workspace/Contribution
-> flows remain next; exact executed scope/tests are in todo.
+> Actual Workspace receive now joins original GLB/PNG admission, durable job/journal
+> and imported base to the limited editor. Pre-start re-selection/explicit abandonment,
+> cold recovery tools and warm same-editor refresh are connected. Exact evidence is
+> in todo; no rendered/device or ordinary-home acceptance is inferred.
+> Next close protected Workspace output/file handoff and initial import in that same
+> flow, then real-file rounds/remaining conflict UI and Contribution. Retention,
+> measured admission and other five-purpose consumers remain open.
 > Adjacent UI/PoC work is not a substitute for the practical-team goal.
 >
 > Updated: 2026-09-12 after the whole-scope source/connection audit at `b73315b`.

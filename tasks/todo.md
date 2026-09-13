@@ -2,6 +2,57 @@
 
 ## Current boundary — thin connected workflow first (2026-09-09)
 
+Active after clean `f3df569`, cached origin 0 behind / 62 ahead. Previous goal
+turn made production progress: actual Workspace receive/job/base plus final
+2,144 tests, typecheck/build and independent review. This next unit connects the
+same operation to the limited real-file editor and closes pre-start input recovery.
+
+- [x] Specify/review bound-input re-selection and explicit unstarted-job abandonment;
+  never overwrite acknowledged start/journal/body evidence.
+- [x] Implement those dedicated commands and connect receive/recovery to the existing
+  GLB/PNG host with the same input, IME, busy, View/Edit and display-refresh guards.
+- [x] Reuse projectFiles/host/isolation tests for interrupted copying, exact re-selection,
+  old unbound fragments and same-editor receive; final typecheck/test/build and
+  independent diff review, then update docs and checkpoint.
+
+Accept actual Workspace file selection in an opened same-lineage Project, retained
+local Caption edits, refreshed model/image display, explicit recovery after copying
+interruption, and no implicit conflict winner or source-file modification. No new
+PoC, ordinary-home activation, first Project import, external output or device/offline
+credit. Existing browser-setup/push denial is not retried unchanged. Stop only at a
+specification conflict or new required authority; routine implementation is approved.
+
+Review: controls bind the original archive before copying. Exact re-selection
+rechecks start/journal/steps under the same lease; old unbound fragments require
+explicit terminal abandonment, retaining bytes/capacity. The limited GLB/PNG
+host owns receive jobs and display preparation; cold recovery tools mount before
+the Scene editor, while warm receive refreshes the same Session. Independent
+review corrected repeated display-failure acknowledgment and cold View-to-Edit
+button state. Both have regression coverage; final re-review has no mandatory
+findings in service or host code. Five new cases reuse existing actual ZIP/GLB/PNG
+fixtures and Recorded DOM; no new probe page or native-input simulation.
+One early focused failure was a test fault injection aimed at writeBytes rather
+than MemoryFS.writeStream; corrected to interrupt the actual stream boundary.
+Related final 3 files / 116 PASS, 110.22 s; final typecheck exit 0. Final root on
+the frozen source/tests: 112 files / 2,149 PASS / 21 existing TODO / zero failures,
+688.16 s, exit 0. Normal and harness build exit 0; existing mixed-import/large-chunk
+warnings remain. Independent exact-index review found no mandatory remainder in
+the intended 19 files. Only result documentation changed after these tests.
+Browser/rendered,
+physical iPhone and offline remain in the consolidated acceptance lane.
+Next close Workspace generation/external handoff and initial import in this same
+file flow, then real-file two-round exchange/remaining conflict UI. Do not restart
+input-recovery helpers or claim the 62-group practical-team goal complete.
+Read-only next-slice investigation: output first needs a frozen durable capture,
+exact prepared manifest, artifact verification and generated-base handoff before
+download/reselected-file confirmation. Reuse the existing streamed writer/FS;
+download alone is not file-save confirmation. Initial import is a separate
+arbitrary-original-history bootstrap: the current creation path's two-original
+limit and receive's published-receiver prerequisite must not simply be relaxed.
+Keep original identity/IDs/heads, then use the same catalog/editor; specify and
+independently review that bootstrap before implementing it. No new product-policy
+decision is currently needed for this sequence.
+
 Active after clean `068dd44`, cached origin 0 behind / 61 ahead. Previous goal turn
 made production progress: received originals/content facts and all final checks.
 Now connect actual Workspace input to the existing-Project Session, not another

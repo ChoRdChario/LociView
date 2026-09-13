@@ -3,6 +3,10 @@ import type { MetadataProjectSession } from '../projectMetadata/session';
 import type { MetadataLimits } from '../projectMetadata/format';
 import { WorkspaceReceiveJob } from '../projectPackage/receiveJob';
 import { fileError } from './validation';
+import { TransactionJournal } from '../projectMetadata/journal';
+import { json } from '../projectMetadata/persistence';
+
+export interface WorkspaceReceiveState { id: string; state: 'incomplete' | 'completed' | 'cancelled' | 'repair-required' | 'input-required' | 'unbound-input' | 'abandoned' | 'stale' }
 
 /** Actual file entry, isolated from ordinary home. No filename-derived purpose or direct storage edits. */
 export class WorkspaceReceiver {
@@ -21,6 +25,9 @@ export class WorkspaceReceiver {
       const input = await WorkspaceReceiveJob.prepare(this.fs, file, this.limits);
       let repeated: WorkspaceReceiveJob | undefined;
       for (const id of await WorkspaceReceiveJob.ids(this.fs)) {
+        const state = await WorkspaceReceiveJob.inputState(this.fs, id, this.limits);
+        if (state === 'abandoned') continue;
+        if (state !== 'started') return fileError('中断した受信を確認してください。');
         const job = await WorkspaceReceiveJob.open(this.fs, id, this.limits), steps = await job.steps();
         if (!steps.some(s => s.detail.kind === 'baseRecorded' || s.detail.kind === 'cancelled')) return fileError('未完了の受信を再開してください。');
         if (steps.some(s => s.detail.kind === 'baseRecorded') && job.inspection.archive.sha256 === input.inspection.archive.sha256)
@@ -35,14 +42,24 @@ export class WorkspaceReceiver {
   cancelStale(id: string) {
     return this.operation(async () => this.session.cancelWorkspaceReceive(await WorkspaceReceiveJob.open(this.fs, id, this.limits)));
   }
+  reselectInput(expectedToken: string, id: string, file: Blob) {
+    return this.operation(async () => this.session.receiveWorkspace(expectedToken, await WorkspaceReceiveJob.reselect(this.fs, id, file, this.limits)));
+  }
+  abandonInput(id: string) {
+    return this.operation(() => this.session.abandonWorkspaceInput(id));
+  }
   async jobs() {
-    const result: { id: string; state: 'incomplete' | 'completed' | 'cancelled' | 'repair-required' }[] = [];
+    const result: WorkspaceReceiveState[] = [];
     for (const id of await WorkspaceReceiveJob.ids(this.fs)) {
       try {
+        const state = await WorkspaceReceiveJob.inputState(this.fs, id, this.limits);
+        if (state !== 'started') { result.push({ id, state }); continue; }
         const job = await WorkspaceReceiveJob.open(this.fs, id, this.limits), steps = await job.steps();
         await job.validateCompletion();
+        const stale = !steps.length && !(await new TransactionJournal(this.fs, this.limits).entries()).some(e => e.start.transactionId === id) &&
+          json((await this.session.read()).source?.heads) !== json(job.start!.receiver.heads);
         result.push({ id, state: steps.some(s => s.detail.kind === 'baseRecorded') ? 'completed' :
-          steps.some(s => s.detail.kind === 'cancelled') ? 'cancelled' : 'incomplete' });
+          steps.some(s => s.detail.kind === 'cancelled') ? 'cancelled' : stale ? 'stale' : 'incomplete' });
       } catch { result.push({ id, state: 'repair-required' }); }
     }
     return result;

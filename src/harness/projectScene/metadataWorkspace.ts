@@ -47,8 +47,8 @@ export function createSavedWorkspace(document: Document, host: SavedWorkspaceHos
       modeButton.disabled = refreshing || host.mode.busy || startup.busy();
       modeStatus.textContent = host.mode.busy ? '切替を確認しています。' : host.mode.current === 'view' ?
         `閲覧中。${host.mode.detail}` : host.hasPending() ? '更新の復旧が必要です。' : '編集中';
-      if (workspace) workspace.root.inert = refreshing || host.mode.busy;
     }
+    if (workspace) workspace.root.inert = refreshing || !!host.mode?.busy || !!receiveControls?.busy?.();
   };
   const refresh = async (retry: boolean) => {
     if (disposed || refreshing || startup.busy()) return;

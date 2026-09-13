@@ -1,5 +1,16 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-13 更新fileと未確定入力復旧（`f3df569`後）:** 限定GLB/PNG hostに受信欄を接続。
+> 元file全体が一致する再選択だけで未確定spoolを再コピー。原本不明時は明示的な取りやめで終端化し、
+> 断片は消さず容量に算入。start／journal／stepsが存在すればこの経路を拒否する。
+> cold復旧UIはScene editor作成前にも表示、warmは同じSession／表示状態を保持して更新。
+> 連続表示失敗／cold View→Editの独立review指摘を修正し、関連116件PASS（110.22秒）、型exit 0。
+> 最終root：112 files／2,149 PASS／既存21 TODO／失敗0（688.16秒）。通常・harness build exit 0。
+> 独立19-file exact-index reviewの必須残件なし。最終検査後は結果文書のみ更新。
+> 実browser／picker／iPhone／offlineは未受入れ。機能群数は不変更。
+> 次は同じfile導線のWorkspace生成・外部受渡しと初回import、実file二巡と残る競合UIを閉じる。
+> 追加のPO待ち／別PoCは不要。通常home・未採用wire・releaseへは進まない。
+
 > **2026-09-13 実Workspace受信service（`068dd44`後）:** actual ZIP→元GLB/PNG
 > 受入れ→Sessionの一度だけの公開→imported baseを接続。同じfileはjobを再利用し重複しない。
 > 関連111件PASS／93.18秒。最終rootは112 files／2,144 PASS／既存21 TODO／失敗0（660.42秒）。

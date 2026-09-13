@@ -267,6 +267,12 @@ export class MetadataProjectSession {
       await job.cancelStale();
     });
   }
+  async abandonWorkspaceInput(id: string): Promise<void> {
+    return underWriteLease(this.fs, async () => {
+      if (this.retained || (await this.read()).state !== 'ready') return fail('receive-abandon-not-ready');
+      await WorkspaceReceiveJob.abandon(this.fs, id, this.limits);
+    });
+  }
 
   /** Owned initial-source receipt only. Complete an unprepared first initialization, never a merge. */
   async recoverInitialization(source: ProjectMetadataSource): Promise<MetadataSessionRead> {

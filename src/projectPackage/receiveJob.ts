@@ -1,5 +1,5 @@
 import type { ProjectWorkspaceFS } from '../platform/fs';
-import { checkedProof, fail, type MetadataLimits, type MetadataProof } from '../projectMetadata/format';
+import { checkedProof, fail, MetadataSourceError, type MetadataLimits, type MetadataProof } from '../projectMetadata/format';
 import { digest, json, newId, readReceipt, technicalId, writeReceipt } from '../projectMetadata/persistence';
 import { checkRemoteHeads } from '../projectMetadata/remote';
 import { TransactionJournal, type JournalEntry } from '../projectMetadata/journal';
@@ -15,6 +15,7 @@ interface Start { schema: 'lociview-package-job-start-1'; jobId: string; operati
 interface Prepared { schema: 'lociview-workspace-receive-1'; packageId: string; manifest: EvidenceRef; metadata: EvidenceRef;
   roots: { blobs: EvidenceRef[]; evidence: EvidenceRef[] } }
 interface Binding { schema: 'lociview-workspace-input-1'; jobId: string; prepared: EvidenceRef; archive: EvidenceRef }
+type InputState = 'started' | 'input-required' | 'unbound-input' | 'abandoned';
 type Completion = { kind: 'workspacePublished'; receiver: ReceiverProof; journal: EvidenceRef; publication: EvidenceRef } |
   { kind: 'workspaceAlreadyPresent'; receiver: ReceiverProof; publication: EvidenceRef };
 interface Step { schema: 'lociview-package-job-step-1'; jobId: string; start: EvidenceRef; previous: EvidenceRef | null;
@@ -25,7 +26,7 @@ export interface ImportedBase { identity: ReceiverProof['identity']; metadataEnv
 const encoded = (value: unknown) => new TextEncoder().encode(json(value));
 const ref = (bytes: Uint8Array): EvidenceRef => ({ sha256: packageByteHash(bytes), byteLength: bytes.length });
 const reference = (value: unknown) => ref(encoded(value));
-function checkRef(e: EvidenceRef, max = L.controlBytes) {
+function checkRef(e: EvidenceRef, max: number = L.controlBytes) {
   if (!e || Object.keys(e).sort().join(',') !== 'byteLength,sha256' || typeof e.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(e.sha256) ||
     !Number.isSafeInteger(e.byteLength) || e.byteLength <= 0 || e.byteLength > max) fail('receive-reference');
 }
@@ -35,7 +36,7 @@ const sortedRefs = (refs: EvidenceRef[]) => [...new Map(refs.map(r => [r.sha256,
 /** Concrete existing-Project receive owner. All mutation is inside the Session's Project lease. */
 export class WorkspaceReceiveJob {
   private constructor(private readonly fs: ProjectWorkspaceFS, readonly id: string, private readonly limits: MetadataLimits,
-    readonly inspection: WorkspaceArchive, private readonly input: Blob, readonly start: Start | null) {}
+    readonly inspection: WorkspaceArchive, private readonly input: Blob, readonly start: Start | null, private readonly reselected = false) {}
   assertOwner(fs: ProjectWorkspaceFS) { if (fs !== this.fs) fail('receive-job-owner'); }
   path(name: string) { return `${root(this.fs)}receive/${this.id}/${name}`; }
   manifest() { const m = this.inspection.archive.control.manifest; if (m.purpose !== 'teamWorkspace') return fail('receive-purpose'); return m; }
@@ -57,15 +58,67 @@ export class WorkspaceReceiveJob {
     if (paths.length > L.entryCount) fail('receive-job-count');
     let controls = 0;
     for (const path of paths) {
-      if (!/^[0-9a-f]{32}\/(input\.zip|input\.json|prepared\.json|start\.json|steps\/[0-9a-f]{64}\.json)$/.test(path.slice(prefix.length))) fail('receive-job-path');
+      if (!/^[0-9a-f]{32}\/(input\.zip|input\.json|prepared\.json|start\.json|abandoned\.json|steps\/[0-9a-f]{64}\.json)$/.test(path.slice(prefix.length))) fail('receive-job-path');
       if (path.endsWith('/input.zip')) continue;
       const file = await fs.readStream(path);
       if (!file || file.size > L.controlBytes || (controls += file.size) > L.controlsBytes) return fail('receive-control-budget');
     }
     return [...new Set(paths.map(p => p.slice(prefix.length).split('/')[0]!))];
   }
+  /** Absence is checked separately from parsing: torn acknowledged starts are never unstarted. */
+  static async inputState(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits): Promise<InputState> {
+    technicalId(id); if (!(await this.ids(fs)).includes(id)) return fail('receive-job-missing');
+    const path = `${root(fs)}receive/${id}/`;
+    const started = await fs.readStream(`${path}start.json`), abandoned = await fs.readStream(`${path}abandoned.json`);
+    if (started) { if (abandoned) return fail('receive-input-state'); return 'started'; }
+    if ((await new TransactionJournal(fs, limits).entries()).some(e => e.start.transactionId === id) ||
+      (await fs.list(`${path}steps/`)).length) return fail('receive-input-state');
+    if (abandoned) {
+      if (json(await readReceipt(fs, `${path}abandoned.json`, limits)) !== json(this.abandonment(id))) return fail('receive-input-state');
+      return 'abandoned';
+    }
+    try { await this.inputBinding(fs, id, limits); return 'input-required'; }
+    catch (error) {
+      if (error instanceof MetadataSourceError && ['receipt-invalid', 'receive-input-binding', 'receive-reference'].includes(error.code)) return 'unbound-input';
+      throw error;
+    }
+  }
+  private static abandonment(id: string) { return { schema: 'lociview-workspace-input-abandoned-1', jobId: id, stage: 'beforeStart' }; }
+  private static async inputBinding(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
+    const path = `${root(fs)}receive/${id}/`, binding = await readReceipt<Binding>(fs, `${path}input.json`, limits),
+      prepared = await readReceipt<Prepared>(fs, `${path}prepared.json`, limits);
+    if (!binding || !prepared || Object.keys(binding).sort().join(',') !== 'archive,jobId,prepared,schema' ||
+      binding.schema !== 'lociview-workspace-input-1' || binding.jobId !== id || json(binding.prepared) !== json(reference(prepared))) return fail('receive-input-binding');
+    checkRef(binding.archive, L.archiveBytes);
+    if (Object.keys(prepared).sort().join(',') !== 'manifest,metadata,packageId,roots,schema' || prepared.schema !== 'lociview-workspace-receive-1' ||
+      typeof prepared.packageId !== 'string' || !/^pkg_[0-9a-f]{32}$/.test(prepared.packageId) || !prepared.roots ||
+      Object.keys(prepared.roots).sort().join(',') !== 'blobs,evidence' || !Array.isArray(prepared.roots.blobs) || !Array.isArray(prepared.roots.evidence)) return fail('receive-input-binding');
+    checkRef(prepared.manifest); checkRef(prepared.metadata, L.sourceBytes);
+    for (const r of prepared.roots.blobs) checkRef(r, L.archiveBytes);
+    for (const r of prepared.roots.evidence) checkRef(r, L.sourceBytes);
+    return { binding, prepared };
+  }
+  static async reselect(fs: ProjectWorkspaceFS, id: string, file: Blob, limits: MetadataLimits) {
+    if (await this.inputState(fs, id, limits) !== 'input-required') return fail('receive-reselect-denied');
+    const candidate = await this.prepare(fs, file, limits);
+    const job = new WorkspaceReceiveJob(fs, id, limits, candidate.inspection, candidate.input, null, true);
+    await job.checkReselected(); return job;
+  }
+  private async checkReselected() {
+    if (await WorkspaceReceiveJob.inputState(this.fs, this.id, this.limits) !== 'input-required') return fail('receive-reselect-denied');
+    const { binding, prepared } = await WorkspaceReceiveJob.inputBinding(this.fs, this.id, this.limits);
+    if (json(binding.archive) !== json({ sha256: this.inspection.archive.sha256, byteLength: this.input.size }) ||
+      json(prepared) !== json(this.descriptor())) fail('receive-reselected-file');
+  }
+  static async abandon(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits): Promise<void> {
+    fs.mutationAuthority.assertWorkspaceWriteAuthorized();
+    const state = await this.inputState(fs, id, limits);
+    if (state === 'started') return fail('receive-abandon-denied');
+    await writeReceipt(fs, `${root(fs)}receive/${id}/abandoned.json`, this.abandonment(id), limits);
+    if (await this.inputState(fs, id, limits) !== 'abandoned') fail('receive-input-state');
+  }
   static async open(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits): Promise<WorkspaceReceiveJob> {
-    technicalId(id); if (!(await WorkspaceReceiveJob.ids(fs)).includes(id)) return fail('receive-job-missing');
+    if (await this.inputState(fs, id, limits) !== 'started') return fail('receive-input-incomplete');
     const path = `${root(fs)}receive/${id}/`;
     const readLimits = { ...limits, maxTotalBytes: Math.min(limits.maxTotalBytes, L.controlBytes) };
     const start = await readReceipt<Start>(fs, `${path}start.json`, readLimits);
@@ -86,24 +139,31 @@ export class WorkspaceReceiveJob {
   }
   async persist(receiver: ReceiverProof, additionalBytes: number): Promise<WorkspaceReceiveJob> {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
-    if (this.start || (await this.fs.list(this.path(''))).length) return fail('receive-job-exists');
+    if (this.start) return fail('receive-job-exists');
+    if (this.reselected) await this.checkReselected();
+    else if ((await this.fs.list(this.path(''))).length) return fail('receive-job-exists');
     const ids = await WorkspaceReceiveJob.ids(this.fs);
     let existing = 0;
     for (const id of ids) {
+      const state = await WorkspaceReceiveJob.inputState(this.fs, id, this.limits);
+      existing += (await this.fs.readStream(`${root(this.fs)}receive/${id}/input.zip`))?.size ?? 0;
+      if (this.reselected && id === this.id || state === 'abandoned') continue;
+      if (state !== 'started') return fail('receive-job-unfinished');
       const prior = await WorkspaceReceiveJob.open(this.fs, id, this.limits);
       if (!(await prior.steps()).some(s => s.detail.kind === 'baseRecorded' || s.detail.kind === 'cancelled')) fail('receive-job-unfinished');
-      existing += prior.input.size;
     }
     if (!Number.isSafeInteger(additionalBytes) || additionalBytes < 0 || existing + this.input.size + additionalBytes > 2_147_483_648 - 16_777_216) fail('receive-space-budget');
     const prepared = this.descriptor(), start: Start = { schema: 'lociview-package-job-start-1', jobId: this.id, operation: 'receiveWorkspace',
       prepared: reference(prepared), receiver };
+    await this.write('prepared.json', prepared);
+    await this.write('input.json', { schema: 'lociview-workspace-input-1', jobId: this.id, prepared: reference(prepared),
+      archive: { sha256: this.inspection.archive.sha256, byteLength: this.input.size } });
     await this.fs.writeStream(this.path('input.zip'), this.input.stream());
     const stored = await this.fs.readStream(this.path('input.zip'));
     if (!stored?.blob || stored.size !== this.input.size) return fail('receive-spool-incomplete');
     const saved = await WorkspaceArchive.inspect(await stored.blob(), this.limits);
     if (saved.archive.sha256 !== this.inspection.archive.sha256 || saved.archive.byteLength !== this.input.size) fail('receive-spool-mismatch');
-    await this.write('input.json', { schema: 'lociview-workspace-input-1', jobId: this.id, prepared: reference(prepared), archive: { sha256: saved.archive.sha256, byteLength: saved.archive.byteLength } });
-    await this.write('prepared.json', prepared); await this.write('start.json', start);
+    await this.write('start.json', start);
     return WorkspaceReceiveJob.open(this.fs, this.id, this.limits);
   }
   private write(name: string, value: unknown) { return writeReceipt(this.fs, this.path(name), value, { ...this.limits, maxTotalBytes: Math.min(L.controlBytes, this.limits.maxTotalBytes) }); }
@@ -261,8 +321,9 @@ export class WorkspaceReceiveJob {
     if (!publication?.publication || json(publication.start.proof) !== json({ identity: record.identity, envelope: record.metadataEnvelope })) return fail('receive-base-observation');
     for (const id of await WorkspaceReceiveJob.ids(this.fs)) {
       const prefix = `${root(this.fs)}receive/${id}/`, start = await readReceipt<Start>(this.fs, `${prefix}start.json`, this.limits);
+      if (!start) continue;
       const prepared = await readReceipt<Prepared>(this.fs, `${prefix}prepared.json`, this.limits);
-      if (!start || !prepared || prepared.packageId !== record.workspacePackageId) continue;
+      if (!prepared || prepared.packageId !== record.workspacePackageId) continue;
       if (Object.keys(start).sort().join(',') !== 'jobId,operation,prepared,receiver,schema' || start.schema !== 'lociview-package-job-start-1' ||
         start.jobId !== id || start.operation !== 'receiveWorkspace' || json(start.prepared) !== json(reference(prepared)) ||
         json(prepared.manifest) !== json(record.evidence.manifest) || json(prepared.metadata) !== json(record.evidence.metadata)) fail('receive-base-observation');

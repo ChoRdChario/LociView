@@ -9,6 +9,7 @@ import type { LocalOpenMode } from './savedHost';
 import type { ValidationProjectEntry } from './validationCatalog';
 import { createSavedWorkspace } from './metadataWorkspace';
 import type { ViewportFactory } from './viewportHost';
+import { createValidationReceiveControls } from './validationReceiveControls';
 
 type Host = ReturnType<typeof createValidationModeHost>;
 export interface ValidationWorkspacePorts {
@@ -38,9 +39,10 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const listHeading = document.createElement('h2'); listHeading.textContent = 'このブラウザの再開用データ';
   navigation.append(heading, help, form, listHeading, refresh, list); root.append(back, status, navigation, content);
   let host: Host | undefined, workspace: ReturnType<typeof createSavedWorkspace> | undefined;
+  let receiveTools: ReturnType<typeof createValidationReceiveControls> | undefined;
   let resident: Awaited<ReturnType<ValidationWorkspacePorts['render']>> | undefined;
   let busy = false, disposed = false, composing = false, selected: string | null = null, operation: Promise<void> | undefined;
-  const changed = () => !!workspace?.hasChanges() || !!host?.hasPending();
+  const changed = () => !!workspace?.hasChanges() || !!receiveTools?.hasChanges() || !!host?.hasPending();
   const controls = () => { navigation.inert = busy; create.disabled = busy || composing; back.disabled = busy; back.hidden = !host; };
   title.addEventListener('compositionstart', () => { composing = true; controls(); });
   title.addEventListener('compositionend', () => { composing = false; controls(); });
@@ -54,6 +56,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const oldWorkspace = workspace, oldHost = host, oldResident = resident;
     workspace = undefined; host = undefined; resident = undefined;
     if (oldWorkspace) await oldWorkspace.dispose(); else await oldHost?.dispose(); oldResident?.dispose(); content.replaceChildren();
+    receiveTools?.dispose(); receiveTools = undefined;
   };
   const ensureMaySwitch = () => {
     if (composing || changed()) throw Error('入力・更新を確定するか、取り消してからプロジェクトを切り替えてください。');
@@ -83,7 +86,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       note.textContent = host.authority.status?.().error || '更新が未完了です。元の変更から再試行してください。';
       retry.type = 'button'; retry.textContent = '更新を再試行'; retry.disabled = !!host.authority.readOnly;
       retry.addEventListener('click', () => execute(async () => { await host!.authority.retry!(); await mount(); }));
-      content.append(note, retry);
+      content.append(note, retry); if (receiveTools) { receiveTools.render(); content.append(receiveTools.root); }
+      retry.hidden = !!host.workspaceFiles.jobs.some(j => !['completed', 'cancelled', 'abandoned'].includes(j.state));
       if (host.mode?.current === 'view') {
         const edit = document.createElement('button'); edit.type = 'button'; edit.textContent = '編集を開始する';
         edit.addEventListener('click', () => execute(async () => {
@@ -97,7 +101,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const target = host, next = await ports.render(target);
     if (disposed || host !== target) { next.dispose(); return; }
     resident = next;
-    try { workspace = createSavedWorkspace(document, target, next.factory); content.replaceChildren(workspace.root); }
+    try { workspace = createSavedWorkspace(document, target, next.factory, receiveTools ? () => receiveTools! : undefined);
+      content.replaceChildren(workspace.root); workspace.render(); }
     catch (error) { next.dispose(); resident = undefined; throw error; }
     status.textContent = '検証用プロジェクト。通常画面・オフライン・実機での受入れは未完了です。';
   };
@@ -106,6 +111,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const opened = await ports.open(run, initial, mode);
     if (disposed) { await opened.dispose(); return; }
     host = createValidationModeHost(opened, nextMode => ports.open(run, undefined, nextMode), nextMode => ports.selected(run, nextMode));
+    receiveTools = createValidationReceiveControls(document, host, () => workspace?.session,
+      () => { workspace?.render(); controls(); }, async () => { if (!workspace && !disposed) await mount(); });
     selected = run; ports.selected(run, host.mode!.current); navigation.hidden = true; await mount();
   };
   form.addEventListener('submit', event => { event.preventDefault(); execute(async () => {

@@ -245,7 +245,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
       const metadataHost = /[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Intent|MembershipControls|Models|ModelFacts|AssetStatusControls|ConflictControls|CaptionLifecycleControls|StartupControls)\.ts$/.test(path);
       const validationFiles = /[\\/]projectFiles[\\/](validation|png|glb|glbMaterials|initialProject|content|creation|modelFacts|receiveWorkspace)\.ts$/.test(path);
       const validationDisplay = /[\\/]harness[\\/]projectScene[\\/](modelTypes|validationProjection|validationRender|validationMaterials|validationCoverage)\.ts$/.test(path);
-      const validationHost = /[\\/]harness[\\/]projectScene[\\/](savedHost|validationHost|validationModeHost|validationCatalog|validationWorkspace|validationBrowser|browserMetadataStorage)\.ts$/.test(path);
+      const validationHost = /[\\/]harness[\\/]projectScene[\\/](savedHost|validationHost|validationModeHost|validationCatalog|validationWorkspace|validationReceiveControls|validationBrowser|browserMetadataStorage)\.ts$/.test(path);
       if (!metadataFoundation && !metadataService && !metadataHost && !validationFiles && !validationDisplay && !validationHost && !packageMetadata) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectMetadata\//);
       if (packageControl) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
@@ -283,10 +283,11 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
             '../../projectMetadata/repository', '../../projectMetadata/blobStore', '../../projectMetadata/session', '../../projectMetadata/captionDeletion',
             '../../projectMetadata/assetDeletion', '../../projectFiles/creation', '../../projectFiles/validation', '../../projectFiles/png',
             './metadataFixture', './validationProjection', './metadataIntent', './fixture', './historyProjection', './savedHost', './mediaHistory',
-            '../../projectFiles/initialProject', '../../domain/values', './modelTypes', './viewHistory', '../../scene/resolve', './validationMaterials', '../../domain/projectGraphSupport', '../../domain/materialIntent'],
+            '../../projectFiles/initialProject', '../../domain/values', './modelTypes', './viewHistory', '../../scene/resolve', './validationMaterials', '../../domain/projectGraphSupport', '../../domain/materialIntent', '../../projectFiles/receiveWorkspace'],
           validationCatalog: ['./validationHost', '../../projectFiles/creation'],
           validationWorkspace: ['../../projectMetadata/persistence', '../../projectFiles/initialProject', '../../projectFiles/creation',
-            '../../projectFiles/validation', '../../projectFiles/png', './validationHost', './validationModeHost', './savedHost', './validationCatalog', './metadataWorkspace', './viewportHost'],
+            '../../projectFiles/validation', '../../projectFiles/png', './validationHost', './validationModeHost', './savedHost', './validationCatalog', './metadataWorkspace', './viewportHost', './validationReceiveControls'],
+          validationReceiveControls: ['./validationModeHost', './session'],
           validationBrowser: ['../../platform/opfs', '../../platform/projectLock', '../../projectMetadata/blobStore', '../../projectFiles/validation',
             './browserMetadataStorage', './validationHost', './validationCatalog', './validationWorkspace', './validationRender', './viewport', './viewportModel', './fixture'],
           browserMetadataStorage: ['@automerge/automerge/slim', '@automerge/automerge/automerge.wasm?url', '@automerge/automerge-repo-storage-indexeddb'],
@@ -316,7 +317,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           content: ['../platform/fs', '../domain/projectContentChecks', '../domain/projectGraphSupport', '../domain/values', '../domain/projectRecordFields', '../projectMetadata/contentEvidence', '../projectMetadata/blobInventory', '../projectMetadata/blobStore', '../projectMetadata/session', '../projectMetadata/persistence', './glb', './png', './validation', './initialProject'],
           creation: ['../platform/fs', '../projectMetadata/blobStore', '../projectMetadata/source', '../projectMetadata/session', '../projectMetadata/repository', '../projectMetadata/persistence', './content', './initialProject', './png', './validation', './modelFacts'],
           modelFacts: ['../scene/projectProvider', '../projectMetadata/session', '../projectMetadata/source', '../projectMetadata/persistence', '../domain/projectContentChecks', '../domain/projectRecordFields', '../domain/values', './validation', './content'],
-          receiveWorkspace: ['../platform/fs', '../platform/projectLock', '../projectMetadata/session', '../projectMetadata/format', '../projectPackage/receiveJob', './validation'],
+          receiveWorkspace: ['../platform/fs', '../platform/projectLock', '../projectMetadata/session', '../projectMetadata/format', '../projectPackage/receiveJob', './validation', '../projectMetadata/journal', '../projectMetadata/persistence'],
         };
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
         expect(imports.every(p => byFile[path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '')]!.includes(p!)), path).toBe(true);

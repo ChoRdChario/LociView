@@ -25,12 +25,14 @@ import { resolveScene } from '../../scene/resolve';
 import { validationMaterialSlots, validationMaterialIssue } from './validationMaterials';
 import { same } from '../../domain/projectGraphSupport';
 import type { MaterialIntent } from '../../domain/materialIntent';
+import { WorkspaceReceiver, type WorkspaceReceiveState } from '../../projectFiles/receiveWorkspace';
 
 export const validationArea = 'lociview-development-validation-1';
 export interface ValidationHostOptions {
   mode?: LocalOpenMode;
   run: string; base: WorkspaceFS; coordinator: ProjectMutationCoordinator; store: OriginBlobStore;
   fileLimits: FileValidationLimits; decode?: PngDecoder; initial?: ReturnType<typeof prepareValidationCreation>;
+  packageLocks?: LockManager | null;
   openStorage(allowCreate: boolean): Promise<{ factory: MetadataStorageFactory; dispose(): Promise<void> }>;
 }
 const base64 = (bytes: Uint8Array) => { let text = ''; for (let n = 0; n < bytes.length; n += 8192)
@@ -55,6 +57,10 @@ export async function openValidationHost(options: ValidationHostOptions) {
     if (fresh) lease.activateNewProject();
     connection = await options.openStorage(fresh && !!options.initial && lease.holdsWriteLock);
     const { content, session } = validationProjectService(fs, connection.factory, options.store, options.fileLimits, options.decode);
+    const receiver = new WorkspaceReceiver(options.base, fs, session, limits, options.packageLocks ?? null);
+    let receiveJobs: WorkspaceReceiveState[] = await receiver.jobs(), receiveFailure = '', receiveDisplayPending = false;
+    const unfinishedReceive = () => receiveJobs.some(j => !['completed', 'cancelled', 'abandoned'].includes(j.state));
+    const reloadReceive = async () => { receiveJobs = await receiver.jobs(); };
     let last = await session.read(), project: SyntheticProject | undefined;
     let prepareDisplay: ((next: SyntheticProject) => Promise<void>) | undefined;
     const images: Record<string, MediaImage> = {};
@@ -86,6 +92,10 @@ export async function openValidationHost(options: ValidationHostOptions) {
       finally { busy = false; if (operation === work) operation = undefined; }
     };
     const resume = async () => {
+      if (unfinishedReceive()) throw Error('「更新ファイル」の中断した受信を確認してください。');
+      if (receiveDisplayPending && last.state === 'ready') {
+        const result = await ready(await session.read()); receiveFailure = ''; receiveDisplayPending = false; return result;
+      }
       const before = await session.read(), entries = await new TransactionJournal(fs, limits).entries();
       const result = await ready(before.state === 'empty' && options.initial ? await options.initial.persist(fs, options.store, session) :
         before.state === 'empty' || entries.length === 1 && entries[0]!.start.purpose === 'initialize' && before.state !== 'ready'
@@ -93,7 +103,33 @@ export async function openValidationHost(options: ValidationHostOptions) {
       content.releasePreparedImages(); content.releasePreparedModels(); return result;
     };
     if (fresh) { try { await execute(resume); } catch { /* Keep the prepared creation object and the visible failure for explicit retry. */ } }
-    const editable = () => { if (closed || fs.mutationAuthority.accessState !== 'editable') throw Error('このタブは閲覧専用です。'); };
+    const editable = (recovery = false) => {
+      if (closed || fs.mutationAuthority.accessState !== 'editable') throw Error('このタブは閲覧専用です。');
+      if (!recovery && unfinishedReceive()) throw Error('中断した受信を確認してから編集してください。');
+    };
+    const receiveAction = (action: () => Promise<MetadataSessionRead | void>) => execute(async () => {
+      editable(true); receiveFailure = '';
+      try {
+        const result = await action(); await reloadReceive();
+        receiveDisplayPending = true;
+        const project = await ready(result ?? await session.read()); receiveDisplayPending = false; return project;
+      } catch (error) {
+        receiveFailure = error instanceof Error ? error.message : '受信できません。元のデータは保持しています。';
+        await reloadReceive(); throw error;
+      }
+    }, true);
+    const workspaceFiles = {
+      get jobs() { return receiveJobs; }, get error() { return receiveFailure; },
+      refresh: () => execute(reloadReceive, true),
+      receive: (token: string, file: Blob) => receiveAction(async () => {
+        if (last.state !== 'ready' || token !== last.source?.token) throw Error('入力・更新を確定してから受信してください。');
+        return receiver.receive(token, file);
+      }),
+      retry: (id: string) => receiveAction(() => receiver.retry(id)),
+      reselectInput: (token: string, id: string, file: Blob) => receiveAction(() => receiver.reselectInput(token, id, file)),
+      abandonInput: (id: string) => receiveAction(() => receiver.abandonInput(id)),
+      cancelStale: (id: string) => receiveAction(() => receiver.cancelStale(id)),
+    };
     const addMediaFile = (token: string, input: MediaFileAddition) => {
       const selected = input.file, target = { sceneId: input.sceneId, captionId: input.captionId, attachmentId: input.attachmentId,
         orderKey: input.orderKey, eventId: input.eventId };
@@ -125,7 +161,8 @@ export async function openValidationHost(options: ValidationHostOptions) {
       capabilities: { pins: true, membership: true, color: true, views: true, media: true, materials: true, sceneAuthoring: true, placement: true, transform: true },
       get readOnly() { return closed || fs.mutationAuthority.accessState !== 'editable'; },
       read: () => { if (!project) throw Error('プロジェクトの作成が未完了です。'); return project; },
-      status: () => ({ kind: busy ? 'checking' : failure || last.state !== 'ready' ? 'failed' : 'idle', error: failure || '更新が未完了です。' }),
+      status: () => ({ kind: busy ? 'checking' : failure || receiveDisplayPending || unfinishedReceive() || last.state !== 'ready' ? 'failed' : 'idle',
+        error: failure || (receiveDisplayPending ? receiveFailure : '') || (unfinishedReceive() ? '「更新ファイル」の中断した受信を確認してください。' : '更新が未完了です。') }),
       write: (token, changes, context) => execute(async () => {
         editable(); const command = metadataIntent(changes, authority.read(), context);
         if (command.kind === 'createMaterial' || command.kind === 'editMaterial') {
@@ -195,13 +232,13 @@ export async function openValidationHost(options: ValidationHostOptions) {
             expectedBindingId: captured.expectedBindingId, binding }));
         }, true);
       },
-      retry: () => execute(async () => { editable(); return resume(); }),
+      retry: () => execute(async () => { editable(true); return resume(); }),
     };
-    const host: SavedWorkspaceHost = { authority, limits, read: () => last, hasPending: () => busy || !!failure || last.state !== 'ready',
+    const host: SavedWorkspaceHost = { authority, limits, read: () => last, hasPending: () => busy || !!failure || receiveDisplayPending || unfinishedReceive() || last.state !== 'ready',
       refresh: () => execute(async () => { last = await session.read(); await projectView(last); return last; }),
       resolve: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
       dispose: async () => { await dispose(); content.releasePreparedImages(); content.releasePreparedModels(); prepareDisplay = undefined; } };
-    return { ...host, content, get accessDetail() { return options.mode === 'view' ? '閲覧専用です。' : lease.accessDetail; },
+    return { ...host, content, workspaceFiles, get accessDetail() { return options.mode === 'view' ? '閲覧専用です。' : lease.accessDetail; },
       setDisplayPreparation(callback: (next: SyntheticProject) => Promise<void>) {
       if (closed || prepareDisplay) throw Error('モデル表示の接続を確認してください。');
       prepareDisplay = callback; return () => { if (prepareDisplay === callback) prepareDisplay = undefined; };

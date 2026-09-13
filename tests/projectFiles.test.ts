@@ -58,6 +58,7 @@ import { WorkspaceReceiveJob } from '../src/projectPackage/receiveJob';
 import { WorkspaceSourceCapture } from '../src/projectPackage/workspaceSource';
 import { writeWorkspaceArchive } from '../src/projectPackage/workspaceArchive';
 import { TransactionJournal } from '../src/projectMetadata/journal';
+import { createValidationReceiveControls } from '../src/harness/projectScene/validationReceiveControls';
 
 const budget: FileValidationLimits = { maxFileBytes: 1_000_000, maxJsonBytes: 100_000, maxItems: 10_000, maxValues: 100_000, maxPixels: 10_000 };
 const png = Uint8Array.from(atob(fixtureMedia[0]!.base64), c => c.charCodeAt(0));
@@ -174,6 +175,140 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const receiver = new WorkspaceReceiver(f.fs, f.fs, f.receiver.session, metadata, f.locks);
     return { ...f, source, file, receiverService: receiver, reopen, capture, senderStore };
   }
+  it('reselects only the exact bound Workspace after an interrupted copy, without touching acknowledged data', async () => {
+    const f = await workspaceFileFixture(), originalWrite = f.fs.writeStream.bind(f.fs);
+    let interrupt = true;
+    vi.spyOn(f.fs, 'writeStream').mockImplementation(async (path, stream) => {
+      if (interrupt && path.endsWith('/input.zip')) {
+        const reader = stream.getReader(), chunk = await reader.read(); await reader.cancel();
+        await f.fs.writeBytes(path, chunk.value!.slice(0, 32)); throw Error('interrupted copy');
+      }
+      return originalWrite(path, stream);
+    });
+    await expect(f.receiverService.receive(f.local.source!.token, f.file)).rejects.toThrow('interrupted copy');
+    const job = (await f.receiverService.jobs())[0]!; expect(job.state).toBe('input-required');
+    const path = `v2/packages/receive/${job.id}/input.zip`, prefix = await f.fs.readBytes(path), before = await f.fs.list('');
+    const altered: Uint8Array[] = [];
+    await writeWorkspaceArchive(f.capture, f.senderStore, new WritableStream({ write: b => { altered.push(b.slice()); } }),
+      { packageId: `pkg_${newId()}`, createdByVersion: 'validation' });
+    await expect(f.receiverService.reselectInput(f.local.source!.token, job.id, new Blob(altered.map(b => b.slice().buffer))))
+      .rejects.toThrow('receive-reselected-file');
+    expect(await f.fs.list('')).toEqual(before); expect(await f.fs.readBytes(path)).toEqual(prefix);
+    expect((await f.receiver.session.read()).source!.token).toBe(f.local.source!.token);
+    interrupt = false;
+    const cold = f.reopen(), service = new WorkspaceReceiver(f.fs, f.fs, cold.session, metadata, f.locks);
+    expect((await service.reselectInput(f.local.source!.token, job.id, f.file)).state).toBe('ready');
+    expect(await service.jobs()).toEqual([{ id: job.id, state: 'completed' }]);
+    await expect(service.reselectInput((await cold.session.read()).source!.token, job.id, f.file)).rejects.toThrow('receive-reselect-denied');
+    await expect(service.abandonInput(job.id)).rejects.toThrow('receive-abandon-denied');
+  });
+  it('explicitly abandons old unbound fragments, retains their bytes and never resurrects the job', async () => {
+    const f = await workspaceFileFixture(), id = newId(), path = `v2/packages/receive/${id}/input.zip`;
+    await f.fs.writeBytes(path, new Uint8Array([1, 2, 3]));
+    expect(await f.receiverService.jobs()).toEqual([{ id, state: 'unbound-input' }]);
+    await expect(f.receiverService.receive(f.local.source!.token, f.file)).rejects.toThrow('中断した受信');
+    await f.receiverService.abandonInput(id);
+    const cold = new WorkspaceReceiver(f.fs, f.fs, f.reopen().session, metadata, f.locks);
+    await cold.abandonInput(id); expect(await cold.jobs()).toEqual([{ id, state: 'abandoned' }]);
+    expect(await f.fs.readBytes(path)).toEqual(new Uint8Array([1, 2, 3]));
+    await expect(cold.reselectInput(f.local.source!.token, id, f.file)).rejects.toThrow('receive-reselect-denied');
+    expect((await cold.receive(f.local.source!.token, f.file)).state).toBe('ready');
+    expect((await cold.jobs()).map(j => j.state).sort()).toEqual(['abandoned', 'completed']);
+  });
+  it('never treats a torn start, lost start with journal, or failed absence read as unacknowledged input', async () => {
+    const f = await workspaceFileFixture(), id = newId(), prefix = `v2/packages/receive/${id}/`;
+    await f.fs.writeText(`${prefix}start.json`, '{');
+    await expect(f.receiverService.abandonInput(id)).rejects.toThrow('receive-abandon-denied');
+    expect((await f.receiverService.jobs())[0]!.state).toBe('repair-required');
+    await f.fs.remove(`${prefix}start.json`); // Test fixture only: create a separate simulated interrupted copy.
+    await f.fs.writeBytes(`${prefix}input.zip`, new Uint8Array([1]));
+    const read = f.fs.readStream.bind(f.fs), spy = vi.spyOn(f.fs, 'readStream').mockImplementation(async path => {
+      if (path === `${prefix}start.json`) throw Error('unavailable start'); return read(path);
+    });
+    await expect(f.receiverService.abandonInput(id)).rejects.toThrow('unavailable start');
+    expect(await f.fs.readText(`${prefix}abandoned.json`)).toBeNull(); spy.mockRestore();
+    await f.receiverService.abandonInput(id);
+    await f.receiverService.receive(f.local.source!.token, f.file);
+    const done = (await f.receiverService.jobs()).find(j => j.state === 'completed')!;
+    await f.fs.remove(`v2/packages/receive/${done.id}/start.json`);
+    await expect(f.receiverService.abandonInput(done.id)).rejects.toThrow('receive-input-state');
+    expect((await f.receiverService.jobs()).find(j => j.id === done.id)!.state).toBe('repair-required');
+  });
+  async function receivedHostFixture() {
+    const f = await workspaceFileFixture(), run = (f.initial.source!.proof.identity.projectId as string).slice(4);
+    // Same actual Project history, moved into the host's existing isolated namespace by this fixture only.
+    for (const path of await f.fs.list('v2/')) if (!path.startsWith('v2/cas/'))
+      await f.fs.writeBytes(`${validationArea}/${run}/${path}`, (await f.fs.readBytes(path))!);
+    const options = { run, base: f.fs, coordinator: ProjectMutationCoordinator.browser(f.locks), store: f.store,
+      fileLimits: budget, decode, packageLocks: f.locks, openStorage: async () => ({ factory: f.factory, dispose: async () => {} }) };
+    return { ...f, options, host: await openValidationHost(options) };
+  }
+  it('receives a Workspace through the same editor, preserves local input/windows and retries failed display without republishing (recorded DOM)', async () => {
+    const f = await receivedHostFixture(), host = createValidationModeHost(f.host, mode => openValidationHost({ ...f.options, mode }), () => {});
+    const document = new RecordedDocument().asDocument();
+    let workspace: ReturnType<typeof createSavedWorkspace>, tools: ReturnType<typeof createValidationReceiveControls>;
+    tools = createValidationReceiveControls(document, host, () => workspace?.session, () => workspace?.render(), async () => {});
+    workspace = createSavedWorkspace(document, host, undefined, () => tools);
+    const s = workspace.session!, root = record(tools.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    const form = all(root).find(n => n.tag === 'form')!, input = all(root).find(n => n.type === 'file')!;
+    const before = s.snapshot.state.token, memory = s.memory, windows = s.windowMemory;
+    Object.assign(input, { files: [f.file] }); input.fire('change');
+    s.setSearchComposing(true); form.fire('submit', { preventDefault() {} });
+    expect(host.read().source!.token).toBe(before); expect(all(root).some(n => n.textContent.includes('入力・操作を確定'))).toBe(true);
+    s.setSearchComposing(false); let failDisplay = true;
+    const prepare = vi.fn(async () => { if (failDisplay) throw Error('injected receive display'); });
+    host.setDisplayPreparation(prepare); form.fire('submit', { preventDefault() {} });
+    await vi.waitFor(() => expect(all(root).some(n => n.textContent === 'injected receive display')).toBe(true), { timeout: 10000 });
+    expect(s.snapshot.state.token).toBe(before); expect(host.hasPending()).toBe(true);
+    const publication = host.read().publication; expect(host.read().state).toBe('ready');
+    expect(host.workspaceFiles.jobs).toHaveLength(1); expect(host.workspaceFiles.jobs[0]!.state).toBe('completed');
+    all(root).find(n => n.tag === 'button' && n.textContent === '受信を再開')!.fire('click');
+    await vi.waitFor(() => expect(prepare).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(tools.busy()).toBe(false));
+    expect(host.hasPending()).toBe(true); expect(host.authority.status!().kind).toBe('failed');
+    expect(s.snapshot.state.token).toBe(before);
+    failDisplay = false;
+    all(root).find(n => n.tag === 'button' && n.textContent === '受信を再開')!.fire('click');
+    await vi.waitFor(() => expect(host.hasPending()).toBe(false), { timeout: 10000 });
+    await vi.waitFor(() => expect(s.snapshot.modelVersions).toHaveLength(2));
+    expect(host.read().publication).toBe(publication); expect(workspace.session).toBe(s);
+    expect(s.memory.selectedCaptionId).toBe(memory.selectedCaptionId); expect(s.windowMemory).toEqual(windows);
+    expect(s.snapshot.mediaChoices).toHaveLength(1);
+    const provider = host.read().provider;
+    expect(provider?.kind === 'scene-provider' && provider.resources.captions[f.captionId]!.body)
+      .toEqual({ kind: 'value', value: '手元の追記' });
+    Object.assign(input, { files: [] }); input.fire('change'); await workspace.dispose();
+  });
+  it('shows cold input recovery before mounting the real-file editor and blocks readonly receive', async () => {
+    const f = await receivedHostFixture(), writeStream = f.fs.writeStream.bind(f.fs);
+    const interrupted = vi.spyOn(f.fs, 'writeStream').mockImplementation(async (path, stream) => {
+      if (path.endsWith('/input.zip')) { await stream.cancel(); throw Error('injected quota'); }
+      return writeStream(path, stream);
+    });
+    await expect(f.host.workspaceFiles.receive(f.host.read().source!.token, f.file)).rejects.toThrow('injected quota');
+    expect(f.host.hasPending()).toBe(true); const id = f.host.workspaceFiles.jobs[0]!.id;
+    await expect(f.host.authority.authorScene!(f.host.read().source!.token, { kind: 'renameScene', sceneId: Object.keys(f.host.authority.read().state.scenes)[0]!, name: '拒否' })).rejects.toThrow('中断した受信');
+    await f.host.dispose(); interrupted.mockRestore();
+    const view = await openValidationHost({ ...f.options, mode: 'view' });
+    await expect(view.workspaceFiles.reselectInput(view.read().source!.token, id, f.file)).rejects.toThrow('閲覧専用'); await view.dispose();
+    const render = vi.fn(async () => ({ factory: (() => { throw Error('Recorded DOM has no GPU'); }) as ViewportFactory, dispose() {} }));
+    const workspace = createValidationWorkspace(new RecordedDocument().asDocument(), { fileLimits: budget, decode, list: async () => [], selected() {}, render,
+      open: async (_run, _initial, mode) => openValidationHost({ ...f.options, mode }) }, f.options.run, 'view');
+    const root = record(workspace.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    await vi.waitFor(() => expect(all(root).some(n => n.textContent === '元のファイルを選び直す')).toBe(true));
+    expect(render).not.toHaveBeenCalled();
+    expect(all(root).find(n => n.tag === 'button' && n.textContent === '元のファイルを選び直す')!.disabled).toBe(true);
+    all(root).find(n => n.tag === 'button' && n.textContent === '編集を開始する')!.fire('click');
+    await vi.waitFor(() => expect(all(root).find(n => n.tag === 'button' && n.textContent === '元のファイルを選び直す')!.disabled).toBe(false));
+    for (const n of all(root).filter(n => n.type === 'file')) Object.assign(n, { click: vi.fn() }); // Native picker is not simulated.
+    all(root).find(n => n.tag === 'button' && n.textContent === '元のファイルを選び直す')!.fire('click');
+    const input = all(root).find(n => n.attributes.get('aria-label') === '元のファイルを選び直す')!;
+    Object.assign(input, { files: [f.file] }); input.fire('change');
+    input.parent!.parent!.fire('submit', { preventDefault() {} });
+    await vi.waitFor(() => expect(render).toHaveBeenCalledOnce(), { timeout: 10000 });
+    await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true));
+    await workspace.dispose();
+  });
   it('receives an actual Workspace ZIP with new GLB/PNG, retains local edits, records the declared base and replays without writes', async () => {
     const f = await workspaceFileFixture(), result = await f.receiverService.receive(f.local.source!.token, f.file);
     expect(result.state).toBe('ready'); expect(result.provider?.kind).toBe('scene-provider');

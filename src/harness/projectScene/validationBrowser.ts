@@ -18,7 +18,7 @@ export async function createValidationBrowserWorkspace(document: Document, run?:
   if (!import.meta.env.DEV) throw Error('開発サーバーで開いてください。');
   await initializeBrowserMetadata();
   const base = await OpfsFS.open(), locks = navigator.locks ?? null;
-  const options = { base, coordinator: ProjectMutationCoordinator.browser(locks), fileLimits: validationBrowserLimits,
+  const options = { base, coordinator: ProjectMutationCoordinator.browser(locks), fileLimits: validationBrowserLimits, packageLocks: locks,
     store: new OriginBlobStore(base, { maxBlobBytes: validationBrowserLimits.maxFileBytes,
       maxChunkBytes: 16 * 1024 * 1024, maxChunks: 100_000, metadata: validationMetadataLimits }, locks) };
   const storage = (id: string, create: boolean) => openBrowserMetadataStorage(`${validationArea}-${id}`, create);

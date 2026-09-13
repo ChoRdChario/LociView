@@ -1574,7 +1574,7 @@ or atomicity proof for these new records.
 The following pins the existing-project `receiveWorkspace` subset for isolated
 implementation under §11, not other job purposes or ordinary-route adoption.
 Use `v2/packages/receive/<jobId>/` below the owning Project root. Fixed files are
-`input.zip`, `input.json`, `prepared.json`, `start.json`, and digest-named JSON
+`input.zip`, `input.json`, `prepared.json`, `start.json`, optional `abandoned.json`, and digest-named JSON
 `steps/<sha256>.json`. `input.json` is the closed local binding
 `{schema:'lociview-workspace-input-1',jobId,prepared:EvidenceRef,archive:EvidenceRef}`;
 it is not wire data. Prepared/start/input bindings must all agree.
@@ -1591,9 +1591,10 @@ same Project filesystem capability. A pure type-only Session reference in
 Workspace source capture must not become a runtime cycle.
 
 Before first write, inspect the actual immutable Blob, complete original source,
-final union/profile/facts and cumulative GLB/PNG lane limits. Retain the input by
-streaming into `input.zip`, read it back through the FS Blob capability and verify
-the whole archive again. Write input/prepared controls, then `start.json` last;
+final union/profile/facts and cumulative GLB/PNG lane limits. Write/read back the
+prepared/input controls first, binding the entire original archive before copying.
+Retain the input by streaming into `input.zip`, read it back through the FS Blob
+capability and verify the whole archive again. Write `start.json` last;
 that acknowledged start requires all exact input bytes on cold recovery. A
 partial unacknowledged spool is an interrupted job, not an accepted receipt or
 permission to overwrite arbitrary bytes. It cannot mutate Project metadata.
@@ -1601,6 +1602,36 @@ Use existing finite guards and include the spool, possible new CAS copies,
 metadata/journal parts, base controls and overhead in staging-space admission.
 No whole-archive `arrayBuffer`, memory fallback for a missing Blob capability,
 automatic deletion, or unbounded receipt enumeration is permitted.
+
+An unstarted job is proven by absence of `start.json`, same-ID metadata journal
+and every step, checked under the Session Project lease. Presence of even a torn
+start, journal/step evidence, or a failed absence check forbids this branch.
+With a valid closed input/prepared binding, explicit `reselectInput` verifies the
+whole selected archive against that binding before any write, then may replace
+only this unacknowledged `input.zip` from byte zero. Recheck the current receiver,
+token, lineage, profile/facts and other unfinished jobs before copying; there was
+no frozen receiver before start. No acknowledged input, CAS receipt, fact or
+journal original is replenished by this command. Wrong file selection is rejected
+without changing the fragment or the existing Project.
+
+An old fragment without a usable binding cannot prove its original file. Offer
+explicit `abandonInput`, not filename/prefix matching. The command rechecks the
+same absence conditions and writes/read-backs only the closed local marker
+`{schema:'lociview-workspace-input-abandoned-1',jobId,stage:'beforeStart'}` to
+`abandoned.json`. It is terminal, not a JobStep, publication or imported base.
+Retain all fragments and count their sizes in admission; no deletion is implied.
+Repeated abandonment verifies/reuses the marker. A marker coexisting with a start,
+journal or steps is repair, never permission to hide an acknowledged operation.
+Bound but unstarted input may also be explicitly abandoned. Torn controls may be
+abandoned only when start/journal/step absence is independently established.
+
+The limited GLB/PNG host exposes actual same-Project Workspace receive and these
+state-specific recovery actions in its existing file area. All writes use the
+concrete service and Session commands. Busy, draft/IME, Project switch and View/Edit
+guards apply for the full operation, including display refresh. A failed decode
+after publication retains the old rendered view and a retry path; no remount or
+synthetic fallback acknowledges success. Completed imported-base status is not an
+external file-save message. Ordinary home and device acceptance remain gated.
 
 Cold pre-prepared recovery reopens this same input, freezes the original receiver
 proof and reconstructs the exact missing original changes/fact plan. Reused CAS
@@ -1650,9 +1681,10 @@ does not confer browser, physical iPhone or offline acceptance.
 
 Bounded implementation status: `receiveWorkspace.ts` / `receiveJob.ts` connect
 actual Blob input to the existing-Project Session, including post-start cold
-recovery and imported completion. Pre-start interrupted-spool recovery is still
-required with the next host input flow; today it is retained as repair-required,
-not silently restarted/overwritten. There is no ordinary UI or adoption credit.
+recovery and imported completion. Explicit pre-start re-selection/abandonment now
+connects to the existing limited GLB/PNG host's file area, including cold recovery
+before editor mount and warm same-editor refresh. Recorded DOM/injected display
+evidence is not native picker, rendered browser, ordinary UI or adoption credit.
 The exact executed matrix is in todo; other job purposes remain proposals.
 
 #### Frozen fields and fingerprint
