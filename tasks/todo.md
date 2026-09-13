@@ -2,6 +2,66 @@
 
 ## Current boundary — thin connected workflow first (2026-09-09)
 
+Active after clean `6c2bc79`: previous turn made production progress by connecting
+frozen Contribution output/receive in the existing file area. Cached origin is
+0 behind / 68 ahead. No live process or repeated blocker remains.
+
+Current F03 unit — complete backup originals / ZIP / exact reopen:
+
+- [x] Specify and independently review the bounded backup capture/inspection
+  contract before implementation, using 06 §§4.1/5/12.2 and existing limits.
+- [x] Preserve exact full metadata, canonical base table, deduplicated original
+  evidence and all current/conflict/base-only protected bodies in a backup ZIP.
+- [x] Independently reopen and verify source, summary, reasons, evidence union and
+  body bytes. Never reinterpret backup as a Workspace merge or a new observation.
+- [x] Reuse package/isolation tests for retained-only bodies, conflict/history,
+  corruption, cancellation and stale capture. Final tree checks/review/checkpoint.
+
+No durable output/replace protocol, ordinary-home activation, new profile,
+migration/opaque/retention policy, automatic external sink/GC, or device/offline
+credit in this first unit. Explicit restore and the same file UI follow next;
+this primitive alone does not complete F03 or the 62-group practical-team goal.
+Stop on an actual accepted-contract/authority conflict, not routine implementation.
+
+Review/result: prereview required cumulative base-manifest control accounting
+and sequential original loading to stay within the existing I/O buffer bound.
+Both were specified before code. Source review then required pre-clone input caps,
+final zero-body abort protection and checksum bytes in shared control accounting;
+all are corrected. The first source-only typecheck (5308) passed. Expanded-test
+typecheck (41720) found one test using non-existent Session state `read-only`;
+the refusal fixture now uses the actual `pending` state. Package/isolation run
+40089 exits 0: 54 PASS in 8.76 s. Final tests extend the same cases with oversized
+input/control-budget/pre-abort checks. Final typecheck 15763 exits 0. Full root
+55651 exits 0 with two workers: 112 files / 2,216 PASS / 21 existing TODO /
+zero failures in 315.92 s. Both ordinary and harness builds exit 0 (existing
+mixed-import/large-chunk warnings only). Source/test re-review has no mandatory
+findings; no source/test changes followed final checks. The 15-file exact-index
+review found one inventory classification mismatch: F03 now retains its existing
+whole-user-task category and aggregate counts while describing added primitives.
+All other indexed files had no mandatory findings. After this documentation-only
+correction, the approved checkpoint is recorded in Git HEAD/log. The optional review suggestion to avoid
+original-change enumeration-order assertions is not a source failure; current
+roundtrips also bind exact source bytes and heads.
+No actual browser/device/offline or external save/restore acceptance is claimed.
+
+Short meta-audit: this unit adds the missing backup portability proof rather than
+another validation page. F03 still requires connected output/explicit restore;
+the full goal still requires all 62 groups, ordinary real-file flow and consolidated
+Desktop/iPhone/offline acceptance. No main/Pages/SW source, dependency/profile,
+private input or release change; no unchanged denied push/browser retry.
+
+Next connected unit (read-only boundary review found no new PO policy question):
+manual backup output in the existing file area. Specify the exact backup job/index
+first; use `manualCheckpoint`, optional name only in Start.label, frozen full
+source/inventory/base/evidence and exact retry. Add the third job kind to shared
+discovery/guards; no baseRecorded or base advancement. Download/reselected-file
+verification remain separate from generation. Staleness includes the base table,
+not just Project token: unchanged heads can have new exchange observations.
+Avoid full body reads for list refresh. Explicit same-Project restore follows;
+do not create another PoC or ask for a separate primitive-only manual check.
+
+### Completed Contribution output checkpoint (`6c2bc79`)
+
 Active after clean `b483640`. Previous goal turn made production progress: actual
 Contribution receive/recovery committed in 25 files after typecheck, 2,199 PASS,
 both builds and independent review. No active process or repeated blocker remains.

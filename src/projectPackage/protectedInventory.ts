@@ -8,7 +8,7 @@ import { planWorkspaceClosure } from './closure';
 type Reason = 'current' | 'conflict' | 'exchangeBase';
 type Candidates = Extract<ProjectCandidatesInspection, { kind: 'project-candidate-inspection' }>;
 /** Exact known-profile reason inventory. Base entries must come from verified retained evidence. */
-export function protectedWorkspaceInventory(candidates: Candidates, baseEntries: readonly Entry[]) {
+export function protectedWorkspaceInventory(candidates: Candidates, baseEntries: readonly Entry[], chargeWork?: (work: number) => void) {
   const fail = (): never => { throw new PackageControlError('protected-inventory'); };
   const closure = planWorkspaceClosure(candidates), fields = new Map(candidates.fields.map(f => [JSON.stringify(f.path), f]));
   const maps = new Map<string, string>(), outgoing = new Map<string, GraphEdge[]>();
@@ -71,5 +71,5 @@ export function protectedWorkspaceInventory(candidates: Candidates, baseEntries:
   const value = { schema: 'lociview-protected-inventory-1', blobs: [...blobs.values()].sort((a, b) => a.sha256.localeCompare(b.sha256))
     .map(b => ({ sha256: b.sha256, byteLength: b.byteLength, reasons: [...b.reasons].sort() })) };
   if (new TextEncoder().encode(canonical(value as JsonObject)).length > L.controlBytes) fail();
-  return value;
+  chargeWork?.(work); return value;
 }

@@ -1,8 +1,10 @@
 # ProjectScene package-wire companion — design proposal
 
-> Status: `PROPOSED / UNRATIFIED / NOT IMPLEMENTED`
+> Status: `PROPOSED WIRE / APPROVED ISOLATED IMPLEMENTATION (§11) / NO ORDINARY ADOPTION`
 > Drafted: 2026-09-08, under specification 05 §7.5's design authorization.
-> This document does not adopt a package version, adapter, byte budget or writer.
+> Bounded Workspace/Contribution file connections and backup source/ZIP inspection
+> exist where specifically described; their executed scope is recorded in todo.
+> This document does not generally adopt a package version, adapter, byte budget or writer.
 > It does not amend an accepted contract until separately approved. Section 10
 > lists the remaining ratification inputs; the S2 wire gate is still open.
 
@@ -1325,6 +1327,66 @@ opaque/explicit-retention declarations conservatively preserve their stated byte
 they are not proof of semantic reference or permission to reclaim anything else.
 False missing/current/conflict/migration/base claims reject; local job roots alone
 cannot add entries to a completed backup. Restore must disclose retained-only data.
+
+#### 12.2.1 Bounded backup original capture and ZIP inspection
+
+This is the next isolated implementation under §11, not general adoption or a
+restore/publication protocol. It uses the existing known atomic-map source and
+current/conflict/exchangeBase inventory. Unknown/unsupported migration, opaque or
+explicit-retention inventories are refused, never silently omitted to report a
+complete backup. Their broader portability remains required before adoption.
+
+`BackupSourceCapture.prepare` takes the ready Session/token, its retained base
+store and a read-only body store. It freezes original metadata bytes before any
+later awaited read, copies the canonical `{records}` snapshot and original base
+evidence, and rechecks the Session publication/token and exact base snapshot before
+returning. A frozen-original reconstruction entry makes no live-readiness claim.
+The future Session output boundary must additionally hold the lease and refuse
+unfinished input/output/storage jobs; source capture is not that authority.
+
+For both capture and independent archive inspection:
+
+- Preserve exact full metadata/history/identity/heads, not projected winners.
+- Parse the closed canonical table and each record under §4.1. Preserve optional
+  labels and sorted unique historical completions, without manufacturing a local
+  generated/imported event. All rows have the exact backup lineage; duplicate keys,
+  mixed evidence or incorrect order reject. Labels use the existing finite text
+  limit and never select purpose, identity or a base.
+- Verify each original Workspace manifest/metadata pair and recompute its summary
+  and strong closure. The evidence list is exactly the deduplicated sorted union
+  of table references; missing or extra evidence rejects. Empty tables are valid.
+- Recompute current/conflict/exchangeBase reasons and compare the entire protected
+  inventory, including base-only bodies. All physical bodies are included once per
+  digest/length; semantic aliases keep their own validated references. No local job,
+  previous ZIP, handle, path, profile or transient UI state enters the payload.
+- Stream and hash every required body, including unchanged/base-only models. A
+  metadata-only presence check cannot prove a complete portable backup. Reopening
+  checks the actual ZIP via the existing bounded raw-header/CRC/SHA inspector.
+- Use the existing package limits for control/evidence/source/entry/body budgets.
+  The checksum's 64 bytes and all retained base manifests count toward the shared 4 MiB controls limit as well
+  as each 1 MiB limit. Charge 100,000 physical operations and dependency references
+  and 1,000,000 decoded nodes across the complete package proof.
+  Charge source inspection/summary/closure work cumulatively across current source
+  and all retained bases, rather than resetting the package budget per row.
+- Retain one owned copy of each original. Supply output entries sequentially from
+  that owner, not a second aggregate clone of metadata plus all base evidence.
+  Use 64 KiB pull views before digest/ZIP copies; retain at most one raw 16 MiB
+  body chunk. Originals (8,000,000 + 16,777,216 bytes), controls (4 MiB), one entry
+  copy (at most 8,000,000), and that bounded body/header working set stay below the
+  existing 64 MiB application-owned I/O ceiling. This is an implementation buffer
+  bound, not a measured total JS/Wasm/renderer memory guarantee.
+- Entry order is manifest/checksum, metadata, protected inventory, exchange table,
+  digest-sorted base evidence, then digest-sorted bodies. All enter payload totals;
+  summary blob counts exclude evidence controls. Writer success is only generated
+  archive integrity, not external save, durable checkpoint or successful restore.
+
+Acceptance reuses package tests: exact original/history roundtrip, empty/multiple
+base tables and completion preservation, a base-only model/image after current
+exclusion, no evidence/body duplication, valid conflicts, stale capture rejection,
+missing/corrupt/misbound evidence and reasons, stream cancellation/failure and
+exact-purpose refusal. Durable output, explicit same-Project replacement, restored
+base availability, continuation after restore and UI/device checks are subsequent
+F03 connection work, not satisfied by this primitive.
 
 ### 12.3 Exact automatic summary classification
 

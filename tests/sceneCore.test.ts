@@ -234,8 +234,8 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
     });
     for (const path of walk('src').filter(p => /\.(ts|tsx|js)$/.test(p))) {
       const source = readFileSync(path, 'utf8');
-      const packageControl = /[\\/]projectPackage[\\/](contract|manifest|historySummary|closure|protectedInventory|workspaceSource|contributionSource|contributionArchive|contributionEvidence|contributionReceiveJob|contributionOutputJob|outputJobs|receiveJobs|zipChecks|zipArchive|workspaceArchive|receiveJob|workspaceBases|outputJob)\.ts$/.test(path);
-      const packageMetadata = /[\\/]projectPackage[\\/](historySummary|closure|protectedInventory|workspaceSource|workspaceArchive|contributionSource|contributionArchive|contributionEvidence|contributionReceiveJob|contributionOutputJob|outputJobs|receiveJobs|receiveJob|workspaceBases|outputJob)\.ts$/.test(path);
+      const packageControl = /[\\/]projectPackage[\\/](contract|manifest|historySummary|closure|protectedInventory|workspaceSource|contributionSource|contributionArchive|contributionEvidence|contributionReceiveJob|contributionOutputJob|outputJobs|receiveJobs|zipChecks|zipArchive|workspaceArchive|receiveJob|workspaceBases|outputJob|backupEvidence|backupSource|backupArchive)\.ts$/.test(path);
+      const packageMetadata = /[\\/]projectPackage[\\/](historySummary|closure|protectedInventory|workspaceSource|workspaceArchive|contributionSource|contributionArchive|contributionEvidence|contributionReceiveJob|contributionOutputJob|outputJobs|receiveJobs|receiveJob|workspaceBases|outputJob|backupEvidence|backupSource|backupArchive)\.ts$/.test(path);
       const packageJournal = /[\\/]projectMetadata[\\/](packageRemote|session|journal)\.ts$/.test(path) || /[\\/]projectFiles[\\/](receiveWorkspace|sendWorkspace)\.ts$/.test(path) ||
         /[\\/]harness[\\/]projectScene[\\/](validationHost|validationWorkspace)\.ts$/.test(path);
       // 06 §11/§12.3 permit these exact disconnected primitives, not an app importer.
@@ -253,6 +253,13 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         const byFile: Record<string, string[]> = {
           contract: [], manifest: ['../core/json', '../domain/values', '../domain/projectGraphSupport',
             '../domain/projectRecordFields', '../domain/projectRecords', '../nativeGs/sha256', './contract'],
+          backupEvidence: ['@automerge/automerge/slim', '../domain/projectGraphSupport', '../domain/projectRecordFields', '../domain/values',
+            '../projectMetadata/source', '../projectMetadata/blobStore', './workspaceBases', './contract', './manifest',
+            './contributionEvidence', './historySummary', './closure', './protectedInventory', './zipChecks'],
+          backupSource: ['../projectMetadata/session', '../projectMetadata/source', '../projectMetadata/blobStore', '../projectMetadata/blobStream',
+            './workspaceBases', './contract', './manifest', './contributionEvidence', './backupEvidence', './workspaceArchive', './zipChecks'],
+          backupArchive: ['../projectMetadata/blobStore', '../projectMetadata/source', '../domain/projectGraphSupport', '../domain/values',
+            './contract', './manifest', './backupSource', './backupEvidence', './contributionEvidence', './workspaceArchive', './zipArchive', './zipChecks'],
           historySummary: ['../projectMetadata/source', '../domain/projectRecordFields', '../domain/projectRecords',
             '../domain/projectMutableFields', '../domain/projectGraphSupport', '../domain/values', './contract', './manifest'],
           closure: ['../domain/projectCandidates', '../domain/projectRecordFields', '../domain/projectGraphSupport', '../domain/values',

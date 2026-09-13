@@ -1,6 +1,14 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **Current unit — `b483640`後のContribution出力接続:** 同じ「ファイルで渡す」で
+> **Current unit — `6c2bc79`後のbackup原本／ZIP:** 完全な元履歴、全交換基準表、
+> 重複排除した元証拠、現在／競合／基準だけが必要とする本体を保持。ZIP単独で再検査する。
+> 過去のimported/generated観測は保持するが、新しいlocal receiptや復元許可にはしない。
+> 原本を全件再cloneせず逐次出力。共有control／source検査予算と失敗／中断を保持。
+> 検査結果・独立review・checkpointはtodo。この部品はF03完成ではなく、次はdurable
+> manual checkpoint出力と明示的な同Project復元を既存file欄へ接続する。
+> 通常home／未対応profile／migration／実機／offlineは未完了。
+
+> **Previous checkpoint — `6c2bc79` Contribution出力接続:** 同じ「ファイルで渡す」で
 > 作業一式／変更分を選択。変更分は元の作業一式を明示選択し、source／base／inventoryを固定。
 > 中断後も同job／packageと元Dから再生成し、後の編集は混ぜない。base表は更新しない。
 > 独立indexで欠落jobを検出し、cold／warmの一覧と復旧へ接続。downloadは保存証拠ではない。

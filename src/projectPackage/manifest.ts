@@ -24,7 +24,7 @@ export interface ManifestControl {
   readonly entries: readonly Entry[]; readonly archiveByteLength: number;
 }
 const encoder = new TextEncoder();
-function canonicalControl(input: Uint8Array): JsonValue {
+export function canonicalControl(input: Uint8Array): JsonValue {
   if (!(input instanceof Uint8Array) || !input.length || input.length > L.controlBytes) return fail('manifest-bytes');
   const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(input);
   const root = cloneCanonicalValue(parseJsonWithoutDuplicateMembers(text, L), L);

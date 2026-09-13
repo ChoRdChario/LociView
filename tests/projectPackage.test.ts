@@ -22,6 +22,9 @@ import type { JsonObject } from '../src/domain/values';
 import type { OriginBlobStore } from '../src/projectMetadata/blobStore';
 import { protectedWorkspaceInventory } from '../src/projectPackage/protectedInventory';
 import { fixtureMedia } from '../src/harness/projectScene/mediaHistory';
+import { BackupSourceCapture } from '../src/projectPackage/backupSource';
+import { BackupArchive, prepareBackupManifest, writeBackupArchive } from '../src/projectPackage/backupArchive';
+import { backupEncode, readBackupBases, type BackupBaseRecord } from '../src/projectPackage/backupEvidence';
 
 type Mutable<T> = { -readonly [K in keyof T]: Mutable<T[K]> };
 type Fixture<P extends PackagePurpose> = Mutable<PackageManifest & { purpose: P }>;
@@ -278,6 +281,150 @@ describe('Contribution originals and actual ZIP (injected base/CAS ports, no dur
     }) }) };
     const pending = writeContributionArchive(capture, blocked, new WritableStream(), { packageId: id('pkg', 2), createdByVersion: '0.0.1', signal: controller.signal });
     await started; controller.abort(); await expect(pending).rejects.toThrow(); expect(cancelled).toBe(true);
+  });
+});
+
+describe('complete backup originals and ZIP (not durable checkpoint or restore)', () => {
+  const change = (source: ProjectMetadataSource, fn: (draft: Record<string, any>) => void) =>
+    ProjectMetadataSource.fromFullSource(A.save(A.change(A.load<Record<string, any>>(source.encodeFullSource()), fn)), source.proof, metadataLimits);
+  const session = async (source: ProjectMetadataSource) => {
+    const rep = fixture().representationsById[id('rep')];
+    const provider = await readProjectScene(source.read(), metadataLimits, developmentContentVerifier([
+      { variantFamilyId: rep.variantFamilyId, representationId: rep.id, payloadDigest: rep.payloadDigest },
+    ]));
+    return { read: async () => ({ state: 'ready' as const, source, provider, publication: 'backup-fixture' }) };
+  };
+  async function backupFixture(empty = false) {
+    const f = await workspaceFixture(), evidence = new Map<string, Uint8Array>(), rows: BackupBaseRecord[] = [];
+    for (let n = 1; !empty && n <= 2; n++) {
+      const controls = prepareWorkspaceManifest(f.capture, { ...f.options, packageId: id('pkg', n) });
+      const metadata = f.capture.metadataBytes(), ref = (bytes: Uint8Array) => ({ sha256: packageByteHash(bytes), byteLength: bytes.length });
+      evidence.set(packageByteHash(metadata), metadata); evidence.set(packageByteHash(controls.manifest), controls.manifest);
+      rows.push({ identity: f.source.proof.identity, metadataEnvelope: f.source.proof.envelope, workspacePackageId: id('pkg', n),
+        workspaceManifestSha256: packageByteHash(controls.manifest), declaredHeads: f.source.heads,
+        evidence: { manifest: ref(controls.manifest), metadata: ref(metadata) }, label: `基準 ${n}`,
+        completions: [{ observation: 'generated' }, { observation: 'imported', publishedReceiverHeads: f.source.heads }] });
+    }
+    const bases = { snapshot: vi.fn(async () => ({ records: structuredClone(rows) })), readEvidence: vi.fn(async (ref: { sha256: string }) => evidence.get(ref.sha256)!) };
+    return { ...f, evidence, rows, bases };
+  }
+  async function output(capture: BackupSourceCapture, store: Pick<OriginBlobStore, 'openReadOnly'>) {
+    const chunks: BlobPart[] = [];
+    const result = await writeBackupArchive(capture, store, new WritableStream({ write(b) { chunks.push(b.slice() as BlobPart); } }),
+      { packageId: id('pkg', 10), createdByVersion: '0.0.1' });
+    return { result, file: new Blob(chunks) };
+  }
+  async function rewrite(file: Blob, edit: (manifest: Fixture<'backup'>, values: Map<string, Uint8Array>) => void) {
+    const entries = await unpackFixture(file), m = JSON.parse(new TextDecoder().decode(entries[0]!.bytes)) as Fixture<'backup'>;
+    const values = new Map(entries.slice(2).map(e => [e.path, e.bytes])); edit(m, values);
+    const descriptor = (e: Entry) => ({ path: e.path, sha256: packageByteHash(values.get(e.path)!), byteLength: values.get(e.path)!.length });
+    m.metadata = descriptor(m.metadata); m.exchangeBases = descriptor(m.exchangeBases); m.protectedInventory = descriptor(m.protectedInventory);
+    m.baseEvidence = m.baseEvidence.map(e => { const bytes = values.get(`base-evidence/sha256/${e.sha256}`)!; return { sha256: e.sha256, byteLength: bytes.length }; });
+    recount(m); const manifest = backupEncode(m);
+    return fixedZip([{ path: 'manifest.json', bytes: manifest }, { path: 'manifest.sha256', bytes: encode(packageByteHash(manifest)) },
+      ...payloads(m).map(e => ({ path: e.path, bytes: values.get(e.path)! }))]);
+  }
+  it('keeps full original history, multiple historical observations and deduplicated evidence/bodies', async () => {
+    const f = await backupFixture(), originalRows = JSON.stringify(f.rows), host = await session(f.source);
+    const capture = await BackupSourceCapture.prepare(host, f.source.token, f.bases, f.store, metadataLimits);
+    const built = await output(capture, f.store), reopened = await BackupArchive.inspect(built.file, metadataLimits);
+    expect(built.result.kind).toBe('generated-backup-archive'); expect(reopened.source.originalChanges()).toEqual(f.source.originalChanges());
+    expect(reopened.description.table.records).toEqual(f.rows); expect(reopened.description.baseEvidence).toHaveLength(3);
+    expect(reopened.description.blobs).toEqual(f.capture.blobs); expect(JSON.stringify(f.rows)).toBe(originalRows);
+    expect(await reopened.archive.entryBytes('metadata.am', L.sourceBytes)).toEqual(f.capture.metadataBytes());
+    expect((await unpackFixture(built.file)).map(e => e.path)).toEqual(['manifest.json', 'manifest.sha256', ...capture.originals().map(e => e.path), ...capture.blobs.map(e => e.path)]);
+    expect(new Uint8Array(await fixedZip(await unpackFixture(built.file)).arrayBuffer())).toEqual(new Uint8Array(await built.file.arrayBuffer()));
+    await expect(WorkspaceArchive.inspect(built.file, metadataLimits)).rejects.toThrow('workspace-purpose');
+    await expect(BackupArchive.inspect(f.file, metadataLimits)).rejects.toThrow('backup-purpose');
+  });
+  it('streams and includes base-only model and image after current roots are removed', async () => {
+    const f = await backupFixture(), removed = change(f.source, d => {
+      for (const key of ['assetsById', 'captionsById', 'captionAttachmentsById', 'sceneAssetMembershipsById', 'sceneCaptionMembershipsById', 'materialOverridesById', 'captionTagMembershipsById'])
+        for (const row of Object.values(d[key]) as Record<string, any>[]) row.lifecycle = new A.ImmutableString(canonical({ state: 'deleted', reason: 'userDelete', eventId: id('evt', 99) }));
+    });
+    const store = { openReadOnly: vi.fn(f.store.openReadOnly) }, capture = await BackupSourceCapture.prepare(await session(removed), removed.token, f.bases, store, metadataLimits);
+    expect(capture.description.inventory).toEqual({ schema: 'lociview-protected-inventory-1', blobs: f.capture.blobs.map(e => ({ sha256: e.sha256, byteLength: e.byteLength, reasons: ['exchangeBase'] })) });
+    expect(store.openReadOnly.mock.calls.map(c => c[0].digest)).toEqual(f.capture.blobs.map(e => e.sha256));
+    const built = await output(capture, store), reopened = await BackupArchive.inspect(built.file, metadataLimits);
+    expect(reopened.source.originalChanges()).toEqual(removed.originalChanges());
+    for (const e of f.capture.blobs) expect(await reopened.archive.entryBytes(e.path, L.sourceBytes)).toEqual(f.bodies.get(e.sha256));
+    expect(store.openReadOnly).toHaveBeenCalledTimes(f.capture.blobs.length * 2);
+  });
+  it('supports empty bases and retains concurrent choices and edit/revert originals', async () => {
+    const f = await backupFixture(true);
+    const title = (s: ProjectMetadataSource, value: string) => change(s, d => { d.captionsById[id('cap')].title = new A.ImmutableString(canonical(value)); });
+    const left = title(title(f.source, 'Intermediate'), 'Left'), right = title(f.source, 'Right'), target = left.appendOriginal(right.originalChanges());
+    const capture = await BackupSourceCapture.prepare(await session(target), target.token, f.bases, f.store, metadataLimits);
+    const reopened = await BackupArchive.inspect((await output(capture, f.store)).file, metadataLimits);
+    expect(reopened.description.table.records).toEqual([]); expect(reopened.description.baseEvidence).toEqual([]);
+    expect(reopened.source.originalChanges()).toEqual(target.originalChanges()); expect(reopened.source.heads).toHaveLength(2);
+    expect((await reopened.source.inspectOriginal({ maxNodes: L.inspectionNodes, maxWork: L.inspectionWork })).candidates.fields.find(f => f.path.join('/') === `captionsById/${id('cap')}/title`)!.candidates).toHaveLength(2);
+  });
+  it('refuses stale Session/base capture, unsupported source and missing/corrupt originals or bodies', async () => {
+    const f = await backupFixture(), host = await session(f.source), read = await host.read();
+    const changed = { read: vi.fn().mockResolvedValueOnce(read).mockResolvedValue({ ...read, publication: 'changed' }) };
+    await expect(BackupSourceCapture.prepare(changed, f.source.token, f.bases, f.store, metadataLimits)).rejects.toThrow('publication-changed');
+    const bases = { ...f.bases, snapshot: vi.fn().mockResolvedValueOnce({ records: f.rows }).mockResolvedValue({ records: [] }) };
+    await expect(BackupSourceCapture.prepare(host, f.source.token, bases, f.store, metadataLimits)).rejects.toThrow('bases-changed');
+    await expect(BackupSourceCapture.prepare({ read: async () => ({ ...read, state: 'pending' as const }) }, f.source.token, f.bases, f.store, metadataLimits)).rejects.toThrow('not-ready');
+    await expect(BackupSourceCapture.prepare(host, f.source.token, { ...f.bases, readEvidence: async () => new Uint8Array(1) }, f.store, metadataLimits)).rejects.toThrow('evidence-bytes');
+    const corrupt = { openReadOnly: async (ref: { byteLength: number }) => ({ size: ref.byteLength, stream: () => new Blob([new Uint8Array(ref.byteLength)]).stream() }) };
+    await expect(BackupSourceCapture.prepare(host, f.source.token, f.bases, corrupt, metadataLimits)).rejects.toThrow();
+    const unknown = change(f.source, d => { d.project.future = new A.ImmutableString('true'); });
+    await expect(BackupSourceCapture.restore(unknown.encodeFullSource(), unknown.proof, unknown.token, backupEncode({ records: [] }), [], f.store, metadataLimits)).rejects.toThrow('opaque-inventory-required');
+  });
+  it('owns frozen caller bytes and refuses invalid canonical tables or forged provenance', async () => {
+    const f = await backupFixture(), table = backupEncode({ records: f.rows }), source = f.source.encodeFullSource();
+    const evidence = [...f.evidence].sort(([a], [b]) => a < b ? -1 : 1).map(([sha256, bytes]) => ({ reference: { sha256, byteLength: bytes.length }, bytes: bytes.slice() }));
+    const pending = BackupSourceCapture.restore(source, f.source.proof, f.source.token, table, evidence, f.store, metadataLimits);
+    source.fill(0); table.fill(0); evidence.forEach(e => e.bytes.fill(0));
+    const capture = await pending, built = await output(capture, f.store);
+    expect((await BackupArchive.inspect(built.file, metadataLimits)).source.token).toBe(f.source.token);
+    for (const edit of [ (r: any[]) => r.reverse(), (r: any[]) => r.push(r[0]), (r: any[]) => { r[0].completions.reverse(); },
+      (r: any[]) => { r[0].completions = []; }, (r: any[]) => { r[0].path = 'private'; }, (r: any[]) => { r[0].identity.projectId = id('prj', 99); } ]) {
+      const rows = structuredClone(f.rows); edit(rows); expect(() => readBackupBases(backupEncode({ records: rows }), f.source.proof)).toThrow();
+    }
+    expect(() => readBackupBases(encode('{"records":[],"records":[]}'), f.source.proof)).toThrow();
+    expect(() => BackupSourceCapture.restore(new Uint8Array(L.sourceBytes + 1), f.source.proof, f.source.token, backupEncode({ records: [] }), [], f.store, metadataLimits)).toThrow('original-budget');
+    expect(() => BackupSourceCapture.restore(f.source.encodeFullSource(), f.source.proof, f.source.token, new Uint8Array(L.controlBytes + 1), [], f.store, metadataLimits)).toThrow('original-budget');
+    expect(() => BackupSourceCapture.restore(f.source.encodeFullSource(), f.source.proof, f.source.token, backupEncode({ records: [] }), Array(L.baseEvidenceCount + 1).fill(null), f.store, metadataLimits)).toThrow('original-budget');
+    const largeControls = Array.from({ length: 5 }, (_, i) => ({ ...structuredClone(f.rows[0]!), workspacePackageId: id('pkg', i + 1),
+      evidence: { ...f.rows[0]!.evidence, manifest: { sha256: hash(100 + i), byteLength: L.controlBytes } } }));
+    expect(() => readBackupBases(backupEncode({ records: largeControls }), f.source.proof)).toThrow('control-budget');
+    const misbound = await rewrite(built.file, (m, values) => { const rows = structuredClone(f.rows); rows[0]!.workspaceManifestSha256 = hash(80); values.set(m.exchangeBases.path, backupEncode({ records: rows })); });
+    await expect(BackupArchive.inspect(misbound, metadataLimits)).rejects.toThrow();
+  });
+  it('rejects semantically forged inventory/summary and extra or missing evidence despite valid ZIP hashes', async () => {
+    const f = await backupFixture(), capture = await BackupSourceCapture.prepare(await session(f.source), f.source.token, f.bases, f.store, metadataLimits);
+    const built = await output(capture, f.store);
+    const wrongReasons = await rewrite(built.file, (m, values) => {
+      const inventory = JSON.parse(new TextDecoder().decode(values.get(m.protectedInventory.path)!)); inventory.blobs[0].reasons = ['current']; values.set(m.protectedInventory.path, backupEncode(inventory));
+    });
+    await expect(BackupArchive.inspect(wrongReasons, metadataLimits)).rejects.toThrow('protected-inventory');
+    const wrongSummary = await rewrite(built.file, m => { m.summary.entityClasses[0]!.count++; });
+    await expect(BackupArchive.inspect(wrongSummary, metadataLimits)).rejects.toThrow('backup-summary');
+    const missing = await rewrite(built.file, m => { m.baseEvidence.pop(); });
+    await expect(BackupArchive.inspect(missing, metadataLimits)).rejects.toThrow('evidence-union');
+    const extra = await rewrite(built.file, (m, values) => { const bytes = encode('undeclared proof'), sha256 = packageByteHash(bytes); m.baseEvidence.push({ sha256, byteLength: bytes.length });
+      m.baseEvidence.sort((a, b) => a.sha256 < b.sha256 ? -1 : 1); values.set(`base-evidence/sha256/${sha256}`, bytes); });
+    await expect(BackupArchive.inspect(extra, metadataLimits)).rejects.toThrow('evidence-union');
+    expect(prepareBackupManifest(capture, { packageId: id('pkg', 10), createdByVersion: '0.0.1' }).control.manifest.purpose).toBe('backup');
+  });
+  it('cancels blocked capture/output and refuses sink failure without completion', async () => {
+    const f = await backupFixture(), capture = await BackupSourceCapture.prepare(await session(f.source), f.source.token, f.bases, f.store, metadataLimits);
+    const preAbort = new AbortController(); preAbort.abort();
+    await expect(BackupArchive.inspect((await output(capture, f.store)).file, metadataLimits, preAbort.signal)).rejects.toThrow();
+    await expect(output(capture, { openReadOnly: async () => { throw new Error('missing body'); } })).rejects.toThrow('missing body');
+    await expect(writeBackupArchive(capture, f.store, new WritableStream({ write() { throw new Error('sink failed'); } }),
+      { packageId: id('pkg', 10), createdByVersion: '0.0.1' })).rejects.toThrow('sink failed');
+    for (const phase of ['capture', 'output']) {
+      const abort = new AbortController(); let enter!: () => void, cancelled = false;
+      const started = new Promise<void>(resolve => { enter = resolve; });
+      const store = { openReadOnly: async (ref: { byteLength: number }) => ({ size: ref.byteLength, stream: () => new ReadableStream<Uint8Array>({ pull() { enter(); }, cancel() { cancelled = true; } }) }) };
+      const pending = phase === 'capture' ? BackupSourceCapture.prepare(await session(f.source), f.source.token, f.bases, store, metadataLimits, abort.signal) :
+        writeBackupArchive(capture, store, new WritableStream(), { packageId: id('pkg', 10), createdByVersion: '0.0.1', signal: abort.signal });
+      const rejected = expect(pending).rejects.toThrow(); await started; abort.abort(); await rejected; expect(cancelled).toBe(true);
+    }
   });
 });
 

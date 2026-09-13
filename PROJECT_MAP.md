@@ -62,7 +62,12 @@ keeps lost jobs visible to shared recovery/output guards. Exact checks are track
 in todo. Contribution durable output now joins the same file area: explicit base
 selection, frozen source/base/inventory, original-D artifact retry and optional
 exact external-file verification, without a generated base. Shared discovery
-includes both output kinds and indexed missing jobs. Other purposes remain open.
+includes both output kinds and indexed missing jobs. Backup now has bounded
+original-capture/ZIP/reopen primitives: full original history, historical base
+observations/evidence and every current/conflict/base-only protected body. Exact
+ZIP and semantic inventory verification does not restore a Project or record a
+new observation. Durable backup output/checkpoint/explicit restore and its UI,
+other purposes and migration remain open. Checks are recorded in todo.
 Download alone is not save proof.
 This is not ordinary-home, rendered/device or whole-team acceptance.
 Exact executed checks are in todo.

@@ -78,7 +78,7 @@ export async function writeWorkspaceArchive(capture: WorkspaceSourceCapture, sto
 
 /** Shared bounded container writer only; source/base authority belongs to purpose-specific captures. */
 export async function writeCausalArchive(capture: Pick<WorkspaceSourceCapture, 'blobs' | 'bodyRefs'>,
-  controls: { manifest: Uint8Array; checksum: Uint8Array }, originals: readonly { path: string; bytes: Uint8Array }[],
+  controls: { manifest: Uint8Array; checksum: Uint8Array }, originals: readonly ({ path: string; bytes: Uint8Array } | (Entry & { read: () => Uint8Array }))[],
   store: Pick<OriginBlobStore, 'openReadOnly'>, destination: WritableStream<Uint8Array>, options: WorkspaceArchiveOptions) {
   const cancel = new AbortController(), abort = () => cancel.abort(options.signal?.reason);
   options.signal?.addEventListener('abort', abort, { once: true });
@@ -86,9 +86,12 @@ export async function writeCausalArchive(capture: Pick<WorkspaceSourceCapture, '
   try {
     checkAbort(options.signal);
     const manifest = controls.manifest.slice(), checksum = controls.checksum.slice(), control = readManifestControl(manifest, checksum);
-    if (!['teamWorkspace', 'contribution'].includes(control.manifest.purpose)) fail('zip-purpose');
-    const source = originals.map(e => ({ path: e.path, bytes: e.bytes.slice() }));
-    if (!same(control.entries.slice(2), [...source.map(e => ({ path: e.path, sha256: packageByteHash(e.bytes), byteLength: e.bytes.length })), ...capture.blobs])) fail('zip-source-table');
+    if (!['teamWorkspace', 'contribution', 'backup'].includes(control.manifest.purpose)) fail('zip-purpose');
+    const source = originals.map(e => {
+      if ('bytes' in e) { const bytes = e.bytes.slice(); return { path: e.path, sha256: packageByteHash(bytes), byteLength: bytes.length, read: () => bytes }; }
+      return { path: e.path, sha256: e.sha256, byteLength: e.byteLength, read: e.read };
+    });
+    if (!same(control.entries.slice(2), [...source.map(({ path, sha256, byteLength }) => ({ path, sha256, byteLength })), ...capture.blobs])) fail('zip-source-table');
     const bridge = new TransformStream<Uint8Array, Uint8Array>();
     const hash = new NativeSha256(); let byteLength = 0, chunks = 0, bodyReads = 0, finished = false;
     const output = new TransformStream<Uint8Array, Uint8Array>({ transform(bytes, controller) {
@@ -99,8 +102,14 @@ export async function writeCausalArchive(capture: Pick<WorkspaceSourceCapture, '
     pipeline = bridge.readable.pipeThrough(output).pipeTo(destination, { signal: cancel.signal });
     void pipeline.catch(error => { cancel.abort(error); });
     const writer = new ZipWriter(bridge.writable, zipOptions(cancel.signal));
-    for (const { path, bytes } of [{ path: 'manifest.json', bytes: manifest }, { path: 'manifest.sha256', bytes: checksum }, ...source]) {
+    for (const { path, bytes } of [{ path: 'manifest.json', bytes: manifest }, { path: 'manifest.sha256', bytes: checksum }]) {
       checkAbort(cancel.signal); await writer.add(path, new Uint8ArrayReader(bytes), zipOptions(cancel.signal)); checkAbort(cancel.signal);
+    }
+    // Backup loaders provide one owned entry copy at a time, not another aggregate.
+    for (const entry of source) {
+      checkAbort(cancel.signal); const bytes = entry.read();
+      if (bytes.length !== entry.byteLength || packageByteHash(bytes) !== entry.sha256) fail('zip-source-bytes');
+      await writer.add(entry.path, new Uint8ArrayReader(bytes), zipOptions(cancel.signal)); checkAbort(cancel.signal);
     }
     const refs = new Map(capture.bodyRefs.map(ref => [ref.digest, ref]));
     const limits = { maxBlobBytes: L.blobBytes, maxChunkBytes: L.chunkBytes, maxChunks: L.streamChunks };
@@ -124,7 +133,8 @@ export async function writeCausalArchive(capture: Pick<WorkspaceSourceCapture, '
     }
     checkAbort(cancel.signal); await writer.close(undefined, { zip64: false }); await pipeline; checkAbort(cancel.signal);
     if (!finished) fail('zip-output-incomplete');
-    return Object.freeze({ kind: control.manifest.purpose === 'teamWorkspace' ? 'generated-workspace-archive' as const : 'generated-contribution-archive' as const,
+    return Object.freeze({ kind: control.manifest.purpose === 'teamWorkspace' ? 'generated-workspace-archive' as const :
+      control.manifest.purpose === 'backup' ? 'generated-backup-archive' as const : 'generated-contribution-archive' as const,
       byteLength, sha256: hash.digestHex(), manifest: control.manifest });
   } catch (error) {
     cancel.abort(error);

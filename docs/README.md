@@ -51,6 +51,13 @@ Contribution journal now connect to the same update-file UI. Exact originals,
 receiver M, one publication, M=0, cold retry and pre-start re-selection use the
 existing services; the live base table is never advanced. Missing acknowledged
 evidence remains repair-required, including lost jobs discovered by index/journal.
+Backup has bounded source/ZIP/reopen primitives under §12.2.1: original causal
+history, protected current/conflict/base-only bodies, the full historical base
+table and deduplicated original evidence. ZIP-only inspection does not grant
+replacement authority or invent local imported/generated observations. Durable
+checkpoint output, explicit restore and its UI remain next; checks are in todo.
+This does not complete the practical-team, ordinary-home or device/offline gate.
+
 Contribution durable output now connects in the same file tools under §8.7:
 explicit available base, frozen source/inventory, original-D retry, indexed missing
 jobs and optional exact reselected-file verification. Generation never advances a
@@ -227,7 +234,7 @@ Project or migration has changed.
 | `specs/03-gates-and-delivery.md` | `PRODUCT-OWNER APPROVED / NOT IMPLEMENTED` | G0/G0-S/G1 evidence, thresholds, feature flags, rollback and schedule |
 | `specs/04-locimyu-conversion.md` | `PRODUCT-OWNER APPROVED / BOUNDED DIRECT ADAPTER IMPLEMENTED / PRODUCT ACCEPTANCE PASS` | Exact LociMyu identity/source authority and report boundary; six representative rows with an empty trimmed ID are reported as empty input, while 103 Captions publish and survive portable restore without changing the source; Desktop and physical-iPhone acceptance passed |
 | `specs/05-project-scene-team-workflow.md` | `PRODUCT-OWNER APPROVED / BOUNDED CORE, PROVIDER, SYNTHETIC UI AND METADATA SERVICE` | Reusable core/provider and separate memory/old-saved/new-metadata paths exist. New service saves bounded synthetic edits, full-source receive, Caption resolution/copies and prepared-model/pin team rounds through storage ports. No ordinary-app/real-file adoption, general renderer or rendered/device acceptance. Product wire/migration remains unimplemented; current Native bytes unchanged. Current coverage is in the implementation inventory |
-| `specs/06-project-package-wire.md` | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED` | Five-purpose wire companion draft; explicit delta/journal, base-receipt, budget and snapshot-builder ratification inputs. No adopted format/version, production bytes or gate credit |
+| `specs/06-project-package-wire.md` | `PROPOSED WIRE / APPROVED ISOLATED IMPLEMENTATION / NO ORDINARY ADOPTION` | Five-purpose companion with bounded Workspace/Contribution file connections and backup source/ZIP inspection where marked. Snapshot/migration, general adoption and gates remain open; exact executed scope is in todo |
 | `specs/07-project-scene-migration.md` | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED` | New migration identity/portable Native bridge draft, source-managed guards, shared unit/birth artifacts and prepared-migration source; calculated identity and scoped candidate feasibility are not converter/adoption proof. §10.1 owns the finite service-level next slice |
 
 ## Known implementation drift
