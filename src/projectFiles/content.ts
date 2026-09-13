@@ -3,6 +3,7 @@ import type { ContentRequest, ProjectContentVerifier } from '../domain/projectCo
 import { checkContentFacts } from '../domain/projectContentChecks';
 import { canonical, same } from '../domain/projectGraphSupport';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
+import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { PersistentContentVerifier } from '../projectMetadata/contentEvidence';
 import { blobInventory } from '../projectMetadata/blobInventory';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
@@ -60,26 +61,56 @@ export class ValidationContent implements MetadataMediaPort {
     return p;
   }
   async inspectPreparedModel(request: ContentRequest) {
-    return this.execute(request, await inspectValidationGlb(this.preparedModel(request.records[0]!).body.bytes.slice(), this.limits, this.decode));
+    return this.execute(request, { model: await inspectValidationGlb(this.preparedModel(request.records[0]!).body.bytes.slice(), this.limits, this.decode) });
   }
   async stagePreparedModel(record: JsonObject): Promise<void> {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
     const { body } = this.preparedModel(record);
     await this.store.put(new Blob([body.bytes.slice().buffer]).stream(), body.ref.mediaType, body.ref);
   }
-  async model(record: JsonObject): Promise<ValidatedGlb> {
+  private async modelDeclaration(record: JsonObject): Promise<JsonObject> {
     if (!same(record.formatProfile, await validationGlbProfile()) || record.contentKind !== 'mesh' || record.role !== 'meshPrimary' ||
       !same(record.representationToAsset, { ...identityPlacement(), reflection: 'none' }) || !same(record.purposes, ['source', 'display']) ||
       !same(record.derivedFrom, [])) return fileError('保存したモデルの形式を確認できません。');
     const blob = fileObject(record.blob) as JsonObject;
     if (blob.mediaType !== 'model/gltf-binary') return fileError('保存したモデルの本体形式が一致しません。');
-    return inspectValidationGlb(await readValidationBody(await this.store.open(blob), this.limits.maxFileBytes), this.limits, this.decode);
+    return blob;
   }
-  async image(record: JsonObject): Promise<Uint8Array> {
+  async model(record: JsonObject, readOnly = false): Promise<ValidatedGlb> {
+    const blob = await this.modelDeclaration(record);
+    return inspectValidationGlb(await readValidationBody(await (readOnly ? this.store.openReadOnly(blob) : this.store.open(blob)), this.limits.maxFileBytes), this.limits, this.decode);
+  }
+  private imageDeclaration(record: JsonObject): JsonObject {
     const blob = fileObject(record.blob) as JsonObject;
     if (record.mediaKind !== 'image' || blob.mediaType !== 'image/png') return fileError('この検証版で扱える添付はPNGのみです。');
-    const bytes = await readValidationBody(await this.store.open(blob), this.limits.maxFileBytes);
+    return blob;
+  }
+  async image(record: JsonObject, readOnly = false): Promise<Uint8Array> {
+    const blob = this.imageDeclaration(record);
+    const bytes = await readValidationBody(await (readOnly ? this.store.openReadOnly(blob) : this.store.open(blob)), this.limits.maxFileBytes);
     await inspectValidationPng(bytes, this.limits, this.decode); return bytes;
+  }
+  /** Original incoming record and immutable range, no ID allocation or storage/evidence writes. */
+  async inspectReceived(input: ContentRequest, file: Blob) {
+    const request = cloneCanonicalValue(input, validationMetadataLimits) as unknown as ContentRequest;
+    if (request.records.length !== 1 || !(file instanceof Blob)) return fileError('受信する本体を確認できません。');
+    const record = request.records[0]!, check = new ProjectRecordFields(); check.blob(record.blob!, []);
+    if (check.unknown) return fileError('受信する本体の情報が不正です。');
+    const ref = record.blob as JsonObject;
+    if (file.size !== ref.byteLength || file.size <= 0 || file.size > this.limits.maxFileBytes) return fileError('受信する本体の大きさが不正です。');
+    if (request.fact === 'media') this.imageDeclaration(record); else await this.modelDeclaration(record);
+    const bytes = await readValidationBody({ size: file.size, stream: () => file.stream() }, this.limits.maxFileBytes);
+    if (await digest(bytes) !== ref.digest) return fileError('受信する本体が一致しません。');
+    if (request.fact === 'media') {
+      await inspectValidationPng(bytes, this.limits, this.decode); return this.execute(request, { image: bytes });
+    }
+    return this.execute(request, { model: await inspectValidationGlb(bytes, this.limits, this.decode) });
+  }
+  /** Fresh facts for a new record reusing an already verified body; no receipt creation here. */
+  inspectStored(request: ContentRequest) { return this.execute(request, undefined, true); }
+  async stageReceived(file: Blob, ref: JsonObject): Promise<void> {
+    this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
+    await this.store.put(file.stream(), ref.mediaType as string, ref);
   }
   async stage(record: JsonObject, token: string): Promise<void> {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
@@ -105,16 +136,18 @@ export class ValidationContent implements MetadataMediaPort {
     return new PersistentContentVerifier(this.fs, validationMetadataLimits, executor, 'validation-glb-png-executor-1',
       blobInventory(this.store, validationMetadataLimits), allowNewEvidence);
   }
-  private async execute(input: ContentRequest, prepared?: ValidatedGlb) {
+  private async execute(input: ContentRequest, prepared?: { model?: ValidatedGlb; image?: Uint8Array }, readOnly = false) {
     const request = cloneCanonicalValue(input, validationMetadataLimits) as unknown as ContentRequest;
     const response = (outcome: string, facts?: JsonObject) => ({ request, scope: 'development-validation', outcome, ...(facts ? { facts } : {}) });
     if (request.records.length !== 1) return response('unsupported'); // No inferred equivalence or multi-output proof.
     const record = request.records[0]!;
     let facts: JsonObject;
     if (request.fact === 'media') {
-      await this.image(record); facts = { mediaKind: 'image', mediaType: 'image/png' };
+      this.imageDeclaration(record); if (!prepared?.image) await this.image(record, readOnly);
+      facts = { mediaKind: 'image', mediaType: 'image/png' };
     } else if (request.fact === 'representation' || request.fact === 'family-envelope' || request.fact === 'family-contribution') {
-      const decoded = prepared ?? await this.model(record);
+      await this.modelDeclaration(record); // Prepared decoding never bypasses declared profile/role/transform checks.
+      const decoded = prepared?.model ?? await this.model(record, readOnly);
       if (!same(record.logicalBoundsAsset, decoded.bounds)) return response('failed');
       const rawCatalog = fileObject(record.materialCatalog), slots = rawCatalog.slots;
       if (!Array.isArray(slots) || slots.length !== decoded.materials.length) return response('failed');

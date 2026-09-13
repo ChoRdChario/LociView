@@ -26,6 +26,10 @@ strong closure when reopening. It does not confer profile admission, a durable
 output job or file-save receipt, and does not activate a format. Protected job/
 retention, CAS/Project receive and ordinary F01/F02 file services remain open;
 current executed evidence and measured-adoption boundaries are in todo.
+The next bounded connection in 06 §§8.3–8.4 adds fullMetadata journal/control
+binding and cold retry, plus received original-record GLB/PNG profile/fact staging.
+Legacy receipts stay unchanged. Durable receive jobs/base completion and the host
+file action are still unconnected; these components do not complete F01/F02.
 
 Later PO adoption: [05 §4.4](specs/05-project-scene-team-workflow.md#44-explicit-pin-parent-changes-po-approved-2026-09-13)
 accepts one explicit parent-change operation for existing Asset/Project anchors,

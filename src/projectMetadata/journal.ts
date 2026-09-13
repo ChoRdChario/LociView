@@ -5,7 +5,9 @@ import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { checkedProof, fail, type MetadataLimits, type MetadataProof } from './format';
 import { ProjectMetadataSource } from './source';
 import { digest, equalBytes, json, metadataPath, readReceipt, technicalId, writeReceipt } from './persistence';
-import { checkRemoteBatch, planRemoteChanges, type RemoteBatchProof } from './remote';
+import { planRemoteChanges } from './remote';
+import { captureJournalRemote, checkJournalRemote, isPackageRemote, remoteMetadata, validateJournalRemote,
+  type JournalRemoteProof, type JournalRemoteInput } from './packageRemote';
 
 export interface JournalStart {
   transactionId: string;
@@ -16,18 +18,19 @@ export interface JournalStart {
   baseHeads: string[];
 }
 interface Part { ordinal: number; expectedChangeHash: string; dependencies: string[]; byteLength: number; bytesSha256: string }
-export interface PreparedJournal { start: JournalStart; changes: Part[]; exactChangeSetDigest: string; stagedBlobs?: JsonObject[]; remote?: RemoteBatchProof }
+export interface PreparedJournal { start: JournalStart; changes: Part[]; exactChangeSetDigest: string; stagedBlobs?: JsonObject[]; remote?: JournalRemoteProof }
 interface Durable { transactionId: string; exactChangeSetDigest: string }
 export interface Publication extends Durable { heads: string[] }
 export interface JournalEntry { start: JournalStart; prepared: PreparedJournal | null; durable: Durable | null; publication: Publication | null }
 const sorted = (s: readonly string[]) => [...s].sort();
-async function seal(start: JournalStart, changes: Part[], stagedBlobs: readonly JsonObject[] = [], remote?: RemoteBatchProof): Promise<string> {
+async function seal(start: JournalStart, changes: Part[], stagedBlobs: readonly JsonObject[] = [], remote?: JournalRemoteProof): Promise<string> {
   if (start.purpose === 'initialize') return digest(new TextEncoder().encode(`lociview:private-initialization:jcs-v1\n${json({ start, changes })}`));
   // Exact 02 §8 local-command digest. Old receipts retain the empty-list digest.
   const value = { transactionId: start.transactionId,
     target: { identity: start.proof.identity, metadataEnvelope: start.proof.envelope }, purpose: start.purpose, stagedBlobs,
     metadataBatch: { kind: start.purpose, baseHeads: start.baseHeads, changes, ...(remote ?? {}) } };
-  return digest(new TextEncoder().encode(`lociview:v2:metadata-change-set:jcs-v1\n${json(value)}`));
+  const version = remote && isPackageRemote(remote) ? 'v2' : 'v1';
+  return digest(new TextEncoder().encode(`lociview:v2:metadata-change-set:jcs-${version}\n${json(value)}`));
 }
 function heads(value: unknown): asserts value is string[] {
   if (!Array.isArray(value) || value.some(v => typeof v !== 'string' || !/^[0-9a-f]{64}$/.test(v)) ||
@@ -50,7 +53,7 @@ export class TransactionJournal {
     const prefix = metadataPath(this.fs, 'journal/'), paths = await this.fs.list(prefix);
     const ids = [...new Set(paths.map(path => {
       const tail = path.slice(prefix.length);
-      if (!/^[0-9a-f]{32}\/(staging\.json|blobsVerified\.json|metadataDurable\.json|published\.json|source-metadata\.am|changes\/[0-9]{8}\.amchange)$/.test(tail)) fail('journal-path');
+      if (!/^[0-9a-f]{32}\/(staging\.json|blobsVerified\.json|metadataDurable\.json|published\.json|source-metadata\.am|source-manifest\.(json|sha256)|changes\/[0-9]{8}\.amchange)$/.test(tail)) fail('journal-path');
       return tail.split('/')[0]!;
     }))];
     if (ids.length > this.limits.maxChanges) fail('journal-count');
@@ -61,6 +64,8 @@ export class TransactionJournal {
       validateStart(start!, this.limits);
       const prepared = await readReceipt<PreparedJournal>(this.fs, this.path(id, 'blobsVerified.json'), this.limits);
       if (prepared) await this.validatePrepared(start!, prepared);
+      if (prepared && (!prepared.remote || !isPackageRemote(prepared.remote)) &&
+        paths.some(path => path.startsWith(this.path(id, 'source-manifest.')))) fail('journal-source-kind');
       const durable = await readReceipt<Durable>(this.fs, this.path(id, 'metadataDurable.json'), this.limits);
       const publication = await readReceipt<Publication>(this.fs, this.path(id, 'published.json'), this.limits);
       for (const receipt of [durable, publication]) if (receipt) {
@@ -91,8 +96,9 @@ export class TransactionJournal {
     await writeReceipt(this.fs, this.path(start.transactionId, 'staging.json'), start, this.limits);
   }
   async stage(start: JournalStart, parts: readonly Uint8Array[], stagedBlobs: readonly JsonObject[] = [],
-    remote?: { proof: RemoteBatchProof; bytes: Uint8Array }): Promise<PreparedJournal> {
+    remote?: JournalRemoteInput): Promise<PreparedJournal> {
     validateStart(start, this.limits);
+    if (remote) remote = captureJournalRemote(remote, start.proof, this.limits);
     const changes: Part[] = [];
     for (const [ordinal, bytes] of parts.entries()) {
       const c = A.decodeChange(bytes);
@@ -102,16 +108,25 @@ export class TransactionJournal {
     const prepared = { start, changes, ...(stagedBlobs.length ? { stagedBlobs: [...stagedBlobs] } : {}),
       ...(remote ? { remote: remote.proof } : {}), exactChangeSetDigest: await seal(start, changes, stagedBlobs, remote?.proof) };
     await this.validatePrepared(start, prepared);
+    const acknowledged = await readReceipt<PreparedJournal>(this.fs, this.path(start.transactionId, 'blobsVerified.json'), this.limits);
+    if (acknowledged) {
+      if (json(acknowledged) !== json(prepared)) fail('journal-prepared-exists');
+      await this.validateParts(acknowledged);
+      if (acknowledged.remote) await this.readRemoteSource(acknowledged);
+      return acknowledged; // Never refill a missing acknowledged original, even through direct staging.
+    }
     await writeReceipt(this.fs, this.path(start.transactionId, 'staging.json'), start, this.limits);
     if (remote) {
-      const descriptor = remote.proof.source;
-      if (remote.bytes.length !== descriptor.metadataByteLength || await digest(remote.bytes) !== descriptor.metadataSha256) fail('remote-source-digest');
-      const path = this.path(start.transactionId, 'source-metadata.am'), prior = await this.fs.readStream(path);
-      if (prior) {
-        if (prior.size !== remote.bytes.length) fail('remote-source-size');
-        const bytes = await this.fs.readBytes(path);
-        if (!bytes || !equalBytes(bytes, remote.bytes)) fail('remote-source-exists');
-      } else await this.fs.writeBytes(path, remote.bytes);
+      const originals: [string, Uint8Array][] = [['source-metadata.am', remote.bytes]];
+      if (isPackageRemote(remote.proof)) originals.unshift(['source-manifest.json', remote.manifestBytes!], ['source-manifest.sha256', remote.checksumBytes!]);
+      for (const [name, original] of originals) {
+        const path = this.path(start.transactionId, name), prior = await this.fs.readStream(path);
+        if (prior) {
+          if (prior.size !== original.length) fail('remote-source-size');
+          const bytes = await this.fs.readBytes(path);
+          if (!bytes || !equalBytes(bytes, original)) fail('remote-source-exists');
+        } else await this.fs.writeBytes(path, original);
+      }
       await this.readRemoteSource(prepared);
     }
     for (const [ordinal, bytes] of parts.entries()) {
@@ -128,15 +143,26 @@ export class TransactionJournal {
 
   private async validatePrepared(start: JournalStart, p: PreparedJournal): Promise<void> {
     const remote = start.purpose === 'remotePackageMerge';
-    const keys = remote ? ['changes,exactChangeSetDigest,remote,start'] : ['changes,exactChangeSetDigest,start', 'changes,exactChangeSetDigest,stagedBlobs,start'];
+    const packageSource = !!p?.remote && isPackageRemote(p.remote);
+    const keys = remote ? ['changes,exactChangeSetDigest,remote,start', ...(packageSource ? ['changes,exactChangeSetDigest,remote,stagedBlobs,start'] : [])]
+      : ['changes,exactChangeSetDigest,start', 'changes,exactChangeSetDigest,stagedBlobs,start'];
     if (!p || !keys.includes(Object.keys(p).sort().join(',')) || json(start) !== json(p.start) ||
       !Array.isArray(p.changes) || (remote ? !p.changes.length || p.changes.length > this.limits.maxChanges : p.changes.length !== (start.purpose === 'initialize' ? 2 : 1))) fail('journal-descriptors');
-    if (remote) checkRemoteBatch(p.remote!, start.proof, this.limits);
+    if (remote) checkJournalRemote(p.remote!, start.proof, this.limits);
     if (p.exactChangeSetDigest !== await seal(start, p.changes, p.stagedBlobs, p.remote)) fail('journal-descriptors');
     if (p.stagedBlobs !== undefined) {
-      if (start.purpose !== 'localCommand' || !Array.isArray(p.stagedBlobs) || p.stagedBlobs.length !== 1) fail('journal-blob-delta');
-      const check = new ProjectRecordFields(); check.blob(p.stagedBlobs[0]!, []);
-      if (check.unknown) fail('journal-blob-delta');
+      if (!Array.isArray(p.stagedBlobs) || (packageSource ? !p.stagedBlobs.length || p.stagedBlobs.length > this.limits.maxNodes :
+        start.purpose !== 'localCommand' || p.stagedBlobs.length !== 1)) fail('journal-blob-delta');
+      const lengths = new Map<string, number>(); let previous = '';
+      for (const blob of p.stagedBlobs) {
+        const check = new ProjectRecordFields(); check.blob(blob, []);
+        if (check.unknown) fail('journal-blob-delta');
+        if (packageSource) {
+          const key = json(blob), before = lengths.get(blob.digest as string);
+          if (key <= previous || before !== undefined && before !== blob.byteLength) fail('journal-blob-delta');
+          previous = key; lengths.set(blob.digest as string, blob.byteLength as number);
+        }
+      }
     }
     let total = 0; const seen = new Set<string>();
     for (const [ordinal, part] of p.changes.entries()) {
@@ -171,11 +197,24 @@ export class TransactionJournal {
 
   private async readRemoteSource(p: PreparedJournal): Promise<ProjectMetadataSource> {
     if (!p.remote) return fail('remote-descriptor');
-    const s = p.remote.source, path = this.path(p.start.transactionId, 'source-metadata.am');
+    const s = p.remote.source, descriptor = remoteMetadata(p.remote), path = this.path(p.start.transactionId, 'source-metadata.am');
     const file = await this.fs.readStream(path);
-    if (!file || file.size !== s.metadataByteLength) fail('remote-source-size');
+    if (!file || file.size !== descriptor.byteLength) fail('remote-source-size');
     const bytes = await this.fs.readBytes(path);
-    if (!bytes || bytes.length !== s.metadataByteLength || await digest(bytes) !== s.metadataSha256) fail('remote-source-digest');
+    if (!bytes || bytes.length !== descriptor.byteLength || await digest(bytes) !== descriptor.sha256) fail('remote-source-digest');
+    if (isPackageRemote(p.remote)) {
+      const readControl = async (name: string, length: number) => {
+        const path = this.path(p.start.transactionId, name), input = await this.fs.readStream(path);
+        if (!input || input.size !== length) return fail('package-remote-original');
+        const result = await this.fs.readBytes(path);
+        if (!result || result.length !== length) return fail('package-remote-original');
+        return result;
+      };
+      return validateJournalRemote({ proof: p.remote, bytes: bytes!,
+        manifestBytes: await readControl('source-manifest.json', p.remote.source.manifest.byteLength),
+        checksumBytes: await readControl('source-manifest.sha256', p.remote.source.checksum.byteLength),
+      }, p.start.proof, this.limits);
+    }
     const source = ProjectMetadataSource.fromFullSource(bytes!, p.start.proof, this.limits);
     if (json(source.heads) !== json(s.remoteHeads)) fail('remote-source-heads');
     return source;

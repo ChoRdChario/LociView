@@ -32,7 +32,12 @@ STORE ZIP streams and reopen through raw-header/CRC/SHA/source/summary/closure
 inspection. Input corruption/cancel and sink failures cannot return completion.
 This is file integrity, not profile admission or external saving. Durable jobs,
 retention/receipts, CAS/Project receive, ordinary file flows and measured adoption
-remain open. Exact executed checks are in todo.
+remain open. The separate fullMetadata journal now binds all original controls,
+retains legacy seals and cold-recovers through the existing Session. Original-record
+GLB/PNG admission/staging also exists without allocating new IDs or repairing lost
+acknowledged content. These two boundaries are not yet one file-receive job/action;
+source retention, imported-base completion and host connection remain next.
+Exact executed checks are in todo.
 
 2026-09-13 C04 initial pin color: the existing pin actions now select a Scene-local
 additional color, independent of filters and existing Caption edits. Placement

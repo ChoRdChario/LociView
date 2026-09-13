@@ -143,6 +143,7 @@ export async function openMetadataHost(options: MetadataHostOptions) {
       const previous = (await journal.entries()).find(e => e.prepared?.remote?.source.packageId === packageId);
       let demoInput: FullMetadataSource;
       if (previous?.prepared?.remote) {
+        if ('version' in previous.prepared.remote) throw Error('実ファイルの受信記録は合成データの検証に再利用できません。');
         const descriptor = previous.prepared.remote.source, path = journal.path(previous.start.transactionId, 'source-metadata.am');
         const file = await fs.readStream(path);
         if (!file || file.size !== descriptor.metadataByteLength || file.size > limits.maxTotalBytes)

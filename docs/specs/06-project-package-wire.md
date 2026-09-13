@@ -559,6 +559,91 @@ ratified together. Existing full-source proofs remain reusable within their exac
 scope; S2 Contribution import remains blocked until this interface is implemented
 and proved after the applicable approvals.
 
+### 8.3 Isolated full-Workspace journal connection (2026-09-13)
+
+Under §11's implementation/adoption split, pin the first executable package
+journal to the full Workspace branch only. This is not Contribution, first
+Project import, ordinary-route activation or wire adoption. Legacy 02 journals
+keep their exact keys and `jcs-v1` seal; no existing receipt is reinterpreted.
+
+The new `PreparedJournal.remote` is the closed object
+`{version:'lociview-package-remote-1',source,expectedFinalHeads}`. `source` is
+exactly §8.1's `fullMetadata` branch: `kind,packageId,manifest,checksum,metadata,
+metadataEnvelope,remoteHeads`. Each evidence descriptor is exactly
+`{sha256,byteLength}`. Manifest/metadata sizes are positive and bounded by both
+the current package guards and applicable metadata limits; checksum is exactly
+64 bytes. Original controls must pass the existing pure manifest reader, have
+purpose `teamWorkspace`, and agree with the transaction identity/envelope,
+package ID, metadata descriptor and sender heads. Backup/clean/review/delta are
+not admitted through this branch. Actual archive/body/profile admission remains
+the receiving service's obligation, not a claim made by the journal.
+
+The canonical `jcs-v2` preimage is exactly the existing §8.2 object, with
+`metadataBatch:{kind,baseHeads,changes,version,source,expectedFinalHeads}`. The
+new version literal is inside that preimage. There are no paths supplied by the
+caller: the three originals occupy the fixed files in §8.1. Stage verifies the
+owned original controls and full metadata before its first write, writes/reads
+them unchanged, and writes `blobsVerified` last. Every cold validation reopens
+all three originals, verifies their descriptors/control correspondence and source
+root/frontier, then rederives the exact missing originals and union heads.
+After prepared acknowledgment, missing originals remain repair state; retry
+must not fill them from a retained input buffer or ZIP.
+
+Only this version admits a multi-body remote `stagedBlobs` delta. Its finite
+closed BlobRefs sort by canonical BlobRef JSON bytes, are unique, and cannot
+associate one digest with different lengths. It contains only new/explicitly
+restaged refs, never the full already-verified inventory. The existing local
+one-body and legacy remote no-body receipt shapes remain unchanged. An empty
+delta is omitted on disk but seals as `[]`. Zero missing changes still creates
+no metadata journal. Full required-content/fact checks precede prepared and
+publication; adding a descriptor alone does not prove a body durable.
+
+Use a narrow `projectMetadata/packageRemote.ts` import of the pure
+`projectPackage/manifest` reader and contract constants/types. It must not import
+archive/CAS/service/host/UI code. This avoids a host-supplied recovery callback;
+ordinary entries remain isolated. Readiness/publication still use the existing
+Session and journal; durable receive jobs, imported-base handoff and the actual
+file-accept action must be connected before this is a completed Workspace flow.
+
+Reuse existing persistence/package tests for original manifest/checksum/metadata
+roundtrip, distinct v1/v2 seal preimages, wrong purpose/identity/heads/descriptors,
+incomplete M, multiple sorted body refs, cold partial-apply/publication, loss of
+each acknowledged original, retry/no-op and unchanged legacy receipts. These are
+Node/port checks, not browser, physical iOS, offline or adoption evidence.
+
+### 8.4 Received body admission in the limited GLB/PNG lane (2026-09-13)
+
+The receiving service must distinguish exact bytes/ZIP integrity from executable
+profile admission. Received immutable Representation/MediaResource IDs and all
+original changes stay unchanged: do not call a local authoring preparer that
+allocates replacement IDs. The content executor may inspect an owned Blob range
+and its original record without CAS/Project writes. Check declared size before
+allocating a body buffer and verify its digest. Reuse the same GLB declaration,
+role/content-kind, transform, purposes, derivation, material-catalog and actual
+bounds checks as saved-body reads, including when a body has already been
+decoded. PNG still requires actual image decode; neither filename nor Blob.type
+is authority. This does not expand the development profile or claim browser
+decoder acceptance from an injected Node decoder.
+
+Before reading any introduced body, a finite receiver plan must account for the
+deduplicated immutable model/media bytes in the final original history under the
+existing host's cumulative `maxFileBytes` limit. This is stricter than ZIP guards.
+References already present in the receiver's history use verify-only durable
+evidence, never a fresh content result that hides lost acknowledged evidence.
+Only introduced records may collect freshly inspected facts. Reuse the existing
+provider to reject invalid/unverified closure; semantic conflicts remain intact.
+After preflight, the receiver stages exact new body streams and facts before its
+prepared journal. Acknowledged bodies/facts may only be verified on retry, not
+refilled. Cold unprepared-input retention is the receive job's responsibility;
+cold prepared recovery uses only saved evidence. The bounded admission port
+alone is not file receipt, imported-base completion or UI activation.
+
+Reuse real-format tests for received GLB/PNG records retaining identity, incorrect
+profile/role/transform/material/bounds/MIME/digest refusal, cumulative refusal
+before body reads, preservation of old verification receipts and retry failure
+after acknowledged body/fact loss. Keep job/service/adoption work open until its
+separate connection is executed.
+
 ## 9. Acceptance vectors required before S2
 
 These are vector requirements, not tests executed by this document. Reuse the

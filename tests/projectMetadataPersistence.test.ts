@@ -8,6 +8,7 @@ import { TransactionJournal } from '../src/projectMetadata/journal';
 import { digest, json, underWriteLease, writeReceipt } from '../src/projectMetadata/persistence';
 import { ProjectMetadataSource, type MetadataLimits } from '../src/projectMetadata/source';
 import { planRemoteChanges, type FullMetadataSource } from '../src/projectMetadata/remote';
+import { captureJournalRemote, type JournalRemoteInput, type PackageRemoteBatchProof } from '../src/projectMetadata/packageRemote';
 import type { JsonObject } from '../src/domain/values';
 import { inspectAtomicHistory } from '../src/domain/atomicHistory';
 import { fixture, id, limits as valueLimits } from './helpers/projectRecordsFixture';
@@ -20,6 +21,10 @@ import { WorkspaceSourceCapture } from '../src/projectPackage/workspaceSource';
 import { WorkspaceArchive, writeWorkspaceArchive } from '../src/projectPackage/workspaceArchive';
 import { immutableDigest } from '../src/domain/projectGraphSupport';
 import { createFixtureModel } from '../src/harness/projectScene/modelClosure';
+import { PACKAGE_FORMAT, PACKAGE_WIRE_VERSION } from '../src/projectPackage/contract';
+import { readManifestControl } from '../src/projectPackage/manifest';
+import { summarizeFullHistory } from '../src/projectPackage/historySummary';
+import { planWorkspaceClosure } from '../src/projectPackage/closure';
 
 const limits: MetadataLimits = { ...valueLimits, maxWork: 1_000_000, maxChanges: 100,
   maxChangeBytes: 1_000_000, maxTotalBytes: 4_000_000, maxOperations: 10_000 };
@@ -74,6 +79,111 @@ function checked(read: MetadataSessionRead) {
   if (read.provider?.kind !== 'scene-provider') throw Error('Expected a verified provider');
   return { ...read, provider: read.provider };
 }
+
+/** Real original metadata/controls; this journal fixture does not claim body/profile admission. */
+async function workspaceRemote(source: ProjectMetadataSource, final: ProjectMetadataSource) {
+  const bytes = source.encodeFullSource(), inspection = await source.inspectOriginal({ maxNodes: 100_000, maxWork: 1_000_000 });
+  const summary = summarizeFullHistory(inspection), closure = planWorkspaceClosure(inspection.candidates);
+  const metadata = { path: 'metadata.am', sha256: await digest(bytes), byteLength: bytes.length };
+  const entries = [metadata, ...closure.entries], blobBytes = closure.entries.reduce((n, e) => n + e.byteLength, 0);
+  const manifest = { format: PACKAGE_FORMAT, wireVersion: PACKAGE_WIRE_VERSION, packageId: id('pkg'), createdByVersion: 'test',
+    purpose: 'teamWorkspace', identity: source.proof.identity, metadataEnvelope: source.proof.envelope, targetHeads: source.heads,
+    metadata, blobs: closure.entries, summary: { algorithm: 'lociview-project-summary-1', scope: 'entireHistory',
+      entityClasses: summary.entityClasses, fieldClasses: summary.fieldClasses, blobEntryCount: closure.entries.length, blobBytes },
+    payloadTotals: { entryCount: entries.length, uncompressedBytes: entries.reduce((n, e) => n + e.byteLength, 0), largestEntryBytes: Math.max(...entries.map(e => e.byteLength)) } };
+  const manifestBytes = new TextEncoder().encode(json(manifest)), checksumBytes = new TextEncoder().encode(await digest(manifestBytes));
+  readManifestControl(manifestBytes, checksumBytes);
+  const proof: PackageRemoteBatchProof = { version: 'lociview-package-remote-1', source: { kind: 'fullMetadata',
+    packageId: id('pkg'), manifest: { sha256: await digest(manifestBytes), byteLength: manifestBytes.length },
+    checksum: { sha256: await digest(checksumBytes), byteLength: checksumBytes.length },
+    metadata: { sha256: metadata.sha256, byteLength: metadata.byteLength }, metadataEnvelope: source.proof.envelope, remoteHeads: source.heads },
+    expectedFinalHeads: final.heads };
+  return { proof, bytes, manifestBytes, checksumBytes };
+}
+
+describe('full Workspace journal connection (memory ports, not a completed file receiver)', () => {
+  async function staged() {
+    const h = setup(), writer = h.session(), initial = await writer.create(h.records);
+    const local = await writer.editCaption(initial.source!.token, id('cap'), 'body', '手元の記録');
+    const first = await initial.source!.prepareCaptionText(initial.source!.token, id('cap'), 'title', '一巡目');
+    const remote = await first.prepareCaptionText(first.token, id('cap'), 'title', '二巡目');
+    const plan = planRemoteChanges(local.source!, remote, limits), input = await workspaceRemote(remote, plan.final);
+    const journal = new TransactionJournal(h.fs, limits), prior = (await journal.entries()).at(-1)!;
+    const start = { ...prior.start, transactionId: 'f'.repeat(32), predecessor: prior.start.transactionId,
+      purpose: 'remotePackageMerge' as const, baseHeads: local.source!.heads };
+    return { h, writer, local, remote, plan, input, journal, start };
+  }
+  it('seals exact controls with jcs-v2, retains local work and cold-publishes once from original changes', async () => {
+    const f = await staged(), saved = structuredClone(f.input), reads = f.h.fault.bodies;
+    const promise = underWriteLease(f.h.fs, () => f.journal.stage(f.start, f.plan.parts, [], f.input));
+    // Capture owns independent originals; later caller mutations cannot change them.
+    const owned = captureJournalRemote(saved, f.start.proof, limits);
+    saved.bytes.fill(0); saved.manifestBytes.fill(0); saved.checksumBytes.fill(0);
+    expect(owned.bytes).toEqual(f.input.bytes);
+    const p = await promise;
+    const preimage = { transactionId: f.start.transactionId, target: { identity: f.start.proof.identity, metadataEnvelope: f.start.proof.envelope },
+      purpose: f.start.purpose, stagedBlobs: [], metadataBatch: { kind: f.start.purpose, baseHeads: f.start.baseHeads, changes: p.changes, ...f.input.proof } };
+    expect(p.exactChangeSetDigest).toBe(await digest(new TextEncoder().encode(`lociview:v2:metadata-change-set:jcs-v2\n${json(preimage)}`)));
+    expect(p.exactChangeSetDigest).not.toBe(await digest(new TextEncoder().encode(`lociview:v2:metadata-change-set:jcs-v1\n${json(preimage)}`)));
+    for (const [name, bytes] of [['source-manifest.json', f.input.manifestBytes], ['source-manifest.sha256', f.input.checksumBytes], ['source-metadata.am', f.input.bytes]] as const)
+      expect(await f.h.fs.readBytes(f.journal.path(f.start.transactionId, name))).toEqual(bytes);
+    // Simulate a crash with only the first of two receiver parts durable.
+    await underWriteLease(f.h.fs, () => new MetadataRepository(f.h.fs, f.h.storage, limits)
+      .persist(f.start.repositoryId, f.local.source!.appendOriginal(f.plan.parts.slice(0, 1))));
+    expect((await f.h.session().read()).source!.token).toBe(f.local.source!.token);
+    const done = await f.h.session().retry(); expect(done.state).toBe('ready');
+    expect(done.source!.originalChanges()).toEqual(f.plan.final.originalChanges());
+    expect(textCandidates(done.source!, 'body')).toEqual([{ kind: 'value', value: '手元の記録' }]);
+    const writes = f.h.fs.writes, metadataWrites = f.h.fault.writes;
+    const cold = f.h.session(); expect((await cold.read()).source!.token).toBe(done.source!.token);
+    expect((await cold.retry()).publication).toBe(done.publication);
+    expect(f.h.fs.writes).toBe(writes); expect(f.h.fault.writes).toBe(metadataWrites); expect(f.h.fault.bodies).toBe(reads);
+  });
+  it.each(['source-manifest.json', 'source-manifest.sha256', 'source-metadata.am'])('never replenishes acknowledged %s from a retained input', async name => {
+    const f = await staged(); await underWriteLease(f.h.fs, () => f.journal.stage(f.start, f.plan.parts, [], f.input));
+    const path = f.journal.path(f.start.transactionId, name); await f.h.fs.remove(path);
+    const writes = f.h.fs.writes, metadataWrites = f.h.fault.writes;
+    await expect(f.h.session().retry()).rejects.toThrow();
+    await expect(underWriteLease(f.h.fs, () => f.journal.stage(f.start, f.plan.parts, [], f.input))).rejects.toThrow();
+    expect(await f.h.fs.readBytes(path)).toBeNull(); expect(f.h.fs.writes).toBe(writes); expect(f.h.fault.writes).toBe(metadataWrites);
+    expect((await f.h.session().read()).source!.token).toBe(f.local.source!.token);
+  });
+  it('rejects changed manifest semantics, source descriptors and versions before any write', async () => {
+    const f = await staged(), invalid: JournalRemoteInput[] = [];
+    for (const mutate of [(p: any) => { p.version = 'future'; }, (p: any) => { p.source.kind = 'contributionDelta'; },
+      (p: any) => { p.source.remoteHeads = f.local.source!.heads; }, (p: any) => { p.source.metadata.sha256 = '0'.repeat(64); },
+      (p: any) => { p.source.extra = 1; }]) {
+      const copy = structuredClone(f.input); mutate(copy.proof); invalid.push(copy);
+    }
+    for (const mutate of [(m: any) => { m.purpose = 'clean'; m.summary.scope = 'snapshot'; },
+      (m: any) => { m.identity.projectId = id('prj', 9); }, (m: any) => { m.targetHeads = f.local.source!.heads; }]) {
+      const copy = structuredClone(f.input), manifest = JSON.parse(new TextDecoder().decode(copy.manifestBytes)); mutate(manifest);
+      copy.manifestBytes = new TextEncoder().encode(json(manifest)); copy.checksumBytes = new TextEncoder().encode(await digest(copy.manifestBytes));
+      copy.proof.source.manifest = { sha256: await digest(copy.manifestBytes), byteLength: copy.manifestBytes.length };
+      copy.proof.source.checksum = { sha256: await digest(copy.checksumBytes), byteLength: 64 }; invalid.push(copy);
+    }
+    const writes = f.h.fs.writes;
+    for (const input of invalid) await expect(underWriteLease(f.h.fs, () => f.journal.stage(f.start, f.plan.parts, [], input))).rejects.toThrow();
+    expect(f.h.fs.writes).toBe(writes); expect((await f.h.session().read()).state).toBe('ready');
+  });
+  it('supports only canonical multi-body deltas in the new branch and verifies them again before publication', async () => {
+    const f = await staged(), refs: JsonObject[] = ['a', 'b'].map(c => ({ algorithm: 'sha256', digest: c.repeat(64), byteLength: 7, mediaType: 'image/png' }));
+    for (const delta of [[refs[1]!, refs[0]!], [refs[0]!, refs[0]!], [refs[0]!, { ...refs[0]!, byteLength: 8 }].sort((a, b) => json(a) < json(b) ? -1 : 1)])
+      await expect(underWriteLease(f.h.fs, () => f.journal.stage(f.start, f.plan.parts, delta, f.input))).rejects.toThrow();
+    const p = await underWriteLease(f.h.fs, () => f.journal.stage(f.start, f.plan.parts, refs, f.input)); expect(p.stagedBlobs).toEqual(refs);
+    await expect(f.h.session().retry()).rejects.toThrow('media-unconnected');
+    const verified: (readonly JsonObject[])[] = [];
+    const cold = new MetadataProjectSession(f.h.fs, f.h.storage, limits, f.h.verifier, {
+      stage: async () => { throw Error('recovery must not stage'); }, verify: async refs => { verified.push(refs); },
+    });
+    expect((await cold.retry()).state).toBe('ready'); expect(verified).toEqual([refs]);
+  });
+  it('rechecks complete missing originals and refuses a correctly sealed incomplete set', async () => {
+    const f = await staged(); await underWriteLease(f.h.fs, () => f.journal.stage(f.start, f.plan.parts.slice(0, 1), [], f.input));
+    await expect(f.h.session().retry()).rejects.toThrow('remote-complete-set');
+    expect((await f.h.session().read()).source!.token).toBe(f.local.source!.token);
+  });
+});
 
 describe('streamed bodies connected to metadata creation (memory FS/fake origin locks, not adoption)', () => {
   const budget = { maxBlobBytes: 65536, maxChunkBytes: 65536, maxChunks: 4096, metadata: limits };

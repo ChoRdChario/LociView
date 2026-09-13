@@ -1,5 +1,15 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-13 Workspace受信の原本／本体境界（`bd06a20`後）:**
+> 新fullMetadata journalが元manifest／checksum／metadataを結合し、旧sealは維持。
+> 元変更の途中適用から既存Sessionでcold復旧し、欠落原本は補充しない。
+> GLB/PNG受入れplanは元IDを保ち、元履歴から累積を検査、旧本体・旧factsの欠損を隠さない。
+> 新規本体の判定はCASのunverified（receiptなし）。missingは既存本体消失なので拒否。
+> 最終rootは112 files／2,135 PASS／既存21 TODO／失敗0（458.95秒）、型／build exit 0。
+> 独立code／exact-index reviewとも必須残件なし。14ファイルのlocal checkpointへ進む。
+> 次はこれらをdurable receive job＋原本入力保持＋imported base＋限定hostの実file操作へ
+> 接続する。受信全体・通常home・browser／iPhone／offlineは未完了。新たなPO待ちはない。
+
 > **2026-09-13 F01実ZIP接続（`5211a4a`後）:** 確定したsourceを
 > 固定STORE ZIPへstream生成し、raw header／CRC／SHA／元履歴・summary・closureを読み戻し検査。
 > 元ProjectのFS／metadata／lease不変更。sink失敗・body破損・中止は完了を返さない。

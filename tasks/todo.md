@@ -2,6 +2,78 @@
 
 ## Current boundary — thin connected workflow first (2026-09-09)
 
+Active after clean `bd06a20`: connect verified Workspace files to existing-Project
+receive, new GLB/PNG bodies and exact recovery/base handoff. Previous goal turn
+made production progress (actual ZIP generate/inspect); this unit began on the same
+branch at this base, cached-origin 0 behind / 60 ahead, with only this carried plan
+modified. One writer, two bounded
+read-only reviews. No new PO wait or repeated denied push/browser attempt.
+
+Implementation order inside this connected slice: pin fullMetadata journal and
+receive-job bindings, connect imported-body profile/fact admission without new IDs,
+then service/job/base handoff and limited-host UI. Existing two-original initial
+creation, local journals, Native/v1 and ordinary home stay unchanged. Reuse the
+existing package/persistence/real-format tests; do not create a new PoC page.
+Accept only preservation of local work plus exact file input/body/source, cold
+recovery/replay and no publication/base completion on rejected or incomplete input.
+Stop on an unresolvable specification conflict, not ordinary missing implementation.
+
+- [x] Pin and independently review the isolated fullMetadata source/journal
+  version, original control bindings and legacy compatibility in 06 §8.3.
+- [x] Connect that branch to journal staging/cold validation and the existing
+  metadata retry/publication path; focused persistence/isolation 65 PASS.
+- [x] Connect original-record GLB/PNG admission and exact new-body/fact staging;
+  preserve IDs/history and reject lost acknowledged evidence.
+- [ ] Connect durable receive-job ownership, original input retention, imported
+  base handoff and the limited-host file action; then demonstrate actual files.
+- [x] Final meaningful-unit typecheck/root/build on the journal/content admission
+  boundary: 112 files / 2,135 PASS / 21 TODO / 0 failures, 458.95 s; build exit 0.
+- [x] Independent exact-index review and documentation update: no mandatory
+  findings across the intended 14 files; safe local checkpoint approved by the
+  read-only reviewer. This is not all-team completion.
+
+The intervening pin clarification turn only confirmed existing behavior and made
+no implementation progress. The current resumed turn executes the file-receive
+dependency rather than repeating that confirmation. Cached branch state remains
+0 behind / 60 ahead; earlier denied external operations are not retried.
+
+Interim verification: typecheck exit 0; focused persistence, actual-format and
+isolation 3 files / 101 PASS, 58.59 s. New original-control journal validation
+also handles a durable prefix before cold retry and retains the old published
+view. Body/fact admission is tested with the real OriginBlobStore and injected
+PNG decoder, not browser raster evidence. Independent source/journal and content
+reviews have no remaining mandatory findings after the CAS presence correction:
+`unverified` is a fresh receipt-less object; `missing` is lost acknowledged data.
+An early focused run was explicitly interrupted for this correction and a test
+type error, not counted as PASS. Subsequent focused fixtures needed an owned
+clone and the actual provider projection; corrected without changing the contract.
+Full final root/build and exact-index review follow; no service/job/base or
+ordinary UI completion is inferred from these separate boundaries.
+Final self-review then found the fresh-fact reused-body read still used the CAS
+diagnostic writer. Admission now uses `openReadOnly`; normal saved reads retain
+their existing behavior. The new actual-corruption regression checks zero receipt
+writes/replenishment/file changes. Targeted 5 PASS (32 unrelated tests skipped).
+The first root run was deliberately stopped for this correction, exit 1, not a
+completed matrix. Independent targeted review has no mandatory findings; final
+typecheck/root/build ran on the corrected source: typecheck exit 0, root 112 files /
+2,135 PASS / 21 existing TODO / 0 failures (458.95 s), build exit 0. The stopped
+root run was not reused as evidence. The final run includes the read-only corruption
+regression. No browser, iPhone, offline or service/job/base completion is claimed.
+Exact-index review confirmed the intended file set and the same executed evidence;
+no remaining mandatory findings. The final documentation-only completion update
+does not change the tested source. Local checkpoint follows; no denied external
+operation is retried.
+
+Next connection, independently scoped during the final run: a concrete
+`projectFiles/receiveWorkspace` entry inspects the actual Blob and reserves a
+separate origin package-operation slot (not the CAS writer lock). A dedicated
+Session receive command owns the one Project `underWriteLease`, receives owned
+originals/fact plan, and uses a concrete job store for begin/observation/base.
+Keep job↔transaction identity fixed. Prepared recovery calls private resume;
+never recursively call public retry/receive under the same lease or add a generic
+mutation callback. Pin the receive-job physical records/retention before that
+implementation. This is the next F01/F02 connection, not an additional workstream.
+
 Completed after clean `5211a4a`: Workspace source capture now connects to an actual ZIP
 stream and immutable Blob/File archive inspection. The intervening pin-status
 answer added no implementation; resumed the unfinished file connection. Cached

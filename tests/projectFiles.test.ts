@@ -5,7 +5,7 @@ import { MemoryFS } from '../src/platform/fs';
 import { ProjectMutationCoordinator } from '../src/platform/projectLock';
 import { OriginBlobStore } from '../src/projectMetadata/blobStore';
 import type { MetadataStorageFactory } from '../src/projectMetadata/repository';
-import { digest, newId } from '../src/projectMetadata/persistence';
+import { digest, newId, json, underWriteLease } from '../src/projectMetadata/persistence';
 import { validationMetadataLimits as metadata, type FileValidationLimits } from '../src/projectFiles/validation';
 import { inspectValidationGlb, validationGlbParts } from '../src/projectFiles/glb';
 import { inspectValidationPng } from '../src/projectFiles/png';
@@ -42,7 +42,10 @@ import { createMediaControls } from '../src/harness/projectScene/mediaControls';
 import { createModelAdditionControls } from '../src/harness/projectScene/modelAdditionControls';
 import { planMetadataEdit } from '../src/projectMetadata/commands';
 import { prepareValidationModel, sealValidationRecord } from '../src/projectFiles/initialProject';
-import { validationModelFacts } from '../src/projectFiles/modelFacts';
+import { validationModelFacts, validationReceivedFacts } from '../src/projectFiles/modelFacts';
+import { ValidationContent } from '../src/projectFiles/content';
+import { ProjectMetadataSource } from '../src/projectMetadata/source';
+import { planRemoteChanges } from '../src/projectMetadata/remote';
 import { planNavigation } from '../src/ui/projectScene/navigationState';
 import { planMaterial, materialTargetKey, editMaterialDraft, type MaterialIntentRequest } from '../src/ui/projectScene/materialState';
 import { validationMaterialSlots, validationMaterialIssue } from '../src/harness/projectScene/validationMaterials';
@@ -115,6 +118,84 @@ async function openFileCaption(modelBytes = glb()) {
 }
 
 describe('limited real-format validation (synthetic GLB bytes, injected PNG decoder, memory storage)', () => {
+  async function receivedFixture(reuseModel = false) {
+    const fs = new TestFS(), locks = lockManager(), store = new OriginBlobStore(fs,
+      { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
+    const prepared = structuredClone(await prepareValidationProject({ run: newId(), title: 'チームの作業', models: [{ label: '最初のモデル', bytes: glb() }] }, budget, decode));
+    const captionId = `cap_${newId()}`, project = prepared.records.project as JsonObject;
+    (prepared.records.captionsById as Record<string, JsonObject>)[captionId] = { id: captionId, title: '最初の記録', body: '',
+      lifecycle: { state: 'active', eventId: `evt_${newId()}`, reason: 'initial' }, colorSrgb: [1, 0, 0],
+      anchor: { kind: 'project', projectFrameId: (project.frame as JsonObject).id!, positionProject: [0, 0, 0] } };
+    const receiver = validationProjectService(fs, storageFactory(), store, budget, decode);
+    const initial = await prepareValidationCreation(prepared).persist(fs, store, receiver.session);
+    const local = await receiver.session.editCaption(initial.source!.token, captionId, 'body', '手元の追記');
+    const bytes = reuseModel ? glb() : glb(j => { j.nodes[0].translation = [8, 0, 0]; });
+    const model = await prepareValidationModel({ label: '受信したモデル', bytes }, budget, decode), sceneId = project.defaultSceneId as string;
+    const { body: _body, ...records } = model;
+    const introduced = initial.source!.prepareEdit(initial.source!.token, { kind: 'addAsset', sceneId, ...records,
+      membership: { id: `sam_${newId()}`, sceneId, assetId: model.asset.id!, orderKey: 'B', lifecycle: { state: 'active', reason: 'initial', eventId: `evt_${newId()}` } } }, initial.provider!, newId());
+    const image = await sealValidationRecord('media-resource', { id: `med_${newId()}`, label: '受信画像', mediaKind: 'image',
+      blob: { algorithm: 'sha256', digest: await digest(png), byteLength: png.length, mediaType: 'image/png' } });
+    const doc = A.change(A.load<Record<string, any>>(introduced.encodeFullSource()), draft => {
+      draft.mediaResourcesById[image.id as string] = new A.ImmutableString(json(image));
+    });
+    const remote = ProjectMetadataSource.fromFullSource(A.save(doc), initial.source!.proof, metadata);
+    const final = planRemoteChanges(local.source!, remote, metadata).final;
+    const bodyFor = vi.fn((ref: JsonObject) => new Blob([ref.digest === model.body.ref.digest ? bytes.slice().buffer : png.slice().buffer], { type: 'application/octet-stream' }));
+    return { fs, store, receiver, initial, local, final, model, image, captionId, bodyFor, bytes };
+  }
+  it('admits original received GLB/PNG records without allocating IDs or writes, stages facts and keeps local Caption history', async () => {
+    const f = await receivedFixture(), originals = f.final.originalChanges(), files = await f.fs.list('');
+    const plan = await validationReceivedFacts(f.receiver.content, f.local.source!, f.final, f.bodyFor);
+    expect(await f.fs.list('')).toEqual(files); expect(plan.stagedBlobs).toHaveLength(2);
+    await underWriteLease(f.fs, () => plan.stage());
+    const provider = await readProjectScene(f.final.read(), metadata, f.receiver.content.verifier(false), { verifyRetainedMedia: true });
+    expect(provider.kind).toBe('scene-provider'); if (provider.kind !== 'scene-provider') throw Error('provider');
+    expect(provider.inspection.checks.every(c => c.outcome === 'verified')).toBe(true);
+    expect(f.final.originalChanges()).toEqual(originals);
+    expect(provider.resources.captions[f.captionId]!.body).toEqual({ kind: 'value', value: '手元の追記' });
+    expect(provider.inspection.candidates.unambiguousRecords.representationsById).toHaveProperty(f.model.representation.id as string);
+    expect((await f.receiver.session.read()).source!.token).toBe(f.local.source!.token); // Admission is not publication.
+    const writes = vi.spyOn(f.fs, 'writeText'); await underWriteLease(f.fs, () => plan.stage()); expect(writes).not.toHaveBeenCalled();
+  });
+  it('refuses cumulative size before opening incoming bodies and never repairs a missing old body under a new ID', async () => {
+    const f = await receivedFixture(true), small = new ValidationContent(f.fs, f.store, { ...budget, maxFileBytes: f.bytes.length }, decode);
+    await expect(validationReceivedFacts(small, f.local.source!, f.final, f.bodyFor)).rejects.toThrow('合計'); expect(f.bodyFor).not.toHaveBeenCalled();
+    const object = (await f.fs.list('v2/cas/objects/'))[0]!; await f.fs.remove(object);
+    const put = vi.spyOn(f.store, 'put');
+    await expect(validationReceivedFacts(f.receiver.content, f.local.source!, f.final, f.bodyFor)).rejects.toThrow();
+    expect(put).not.toHaveBeenCalled(); expect(await f.fs.readBytes(object)).toBeNull();
+  });
+  it('leaves storage untouched when readonly admission discovers corrupt reused bytes under a new record ID', async () => {
+    const f = await receivedFixture(true), path = (await f.fs.list('v2/cas/objects/'))[0]!, bytes = (await f.fs.readBytes(path))!;
+    bytes[bytes.length - 1] = bytes[bytes.length - 1]! ^ 1; await f.fs.writeBytes(path, bytes);
+    const originalFiles = await f.fs.list(''), writes = vi.spyOn(f.fs, 'writeText'), puts = vi.spyOn(f.store, 'put');
+    await expect(validationReceivedFacts(f.receiver.content, f.local.source!, f.final, f.bodyFor)).rejects.toThrow();
+    expect(writes).not.toHaveBeenCalled(); expect(puts).not.toHaveBeenCalled(); expect(await f.fs.list('')).toEqual(originalFiles);
+  });
+  it('does not regenerate acknowledged incoming body or fact evidence on retry', async () => {
+    for (const missing of ['body', 'fact'] as const) {
+      const f = await receivedFixture(), before = new Set(await f.fs.list(''));
+      const plan = await validationReceivedFacts(f.receiver.content, f.local.source!, f.final, f.bodyFor); await underWriteLease(f.fs, () => plan.stage());
+      const path = (await f.fs.list('')).find(p => !before.has(p) && (missing === 'body' ? p.startsWith('v2/cas/objects/') : p.startsWith('v2/metadata/evidence/')))!;
+      expect(path).toBeTruthy(); await f.fs.remove(path); const put = vi.spyOn(f.store, 'put');
+      await expect(underWriteLease(f.fs, () => plan.stage())).rejects.toThrow(); expect(put).not.toHaveBeenCalled(); expect(await f.fs.readBytes(path)).toBeNull();
+    }
+  });
+  it('checks original received profile, role, transform, material/bounds and blob digest even after decoding', async () => {
+    const f = await receivedFixture(), record = f.model.representation, original = structuredClone(record), file = new Blob([f.bytes.slice().buffer]);
+    for (const mutate of [(r: any) => { r.formatProfile.id = 'unapproved'; }, (r: any) => { r.role = 'interactionProxy'; },
+      (r: any) => { r.representationToAsset.uniformScale = 2; }, (r: any) => { r.blob.mediaType = 'image/png'; },
+      (r: any) => { r.blob.digest = '0'.repeat(64); }]) {
+      const copy = structuredClone(record); mutate(copy);
+      await expect(f.receiver.content.inspectReceived({ token: f.final.token, fact: 'representation', records: [copy], context: {} }, file)).rejects.toThrow();
+    }
+    for (const mutate of [(r: any) => { r.logicalBoundsAsset.min[0]--; }, (r: any) => { r.materialCatalog.slots = []; }]) {
+      const copy = structuredClone(record); mutate(copy);
+      expect(await f.receiver.content.inspectReceived({ token: f.final.token, fact: 'representation', records: [copy], context: {} }, file)).toMatchObject({ outcome: 'failed' });
+    }
+    expect(record).toEqual(original);
+  });
   it('connects explicit pin parent changes to the GLB validation authority and reopens the same Caption', async () => {
     const { options, workspace, host, s, captionId } = await openFileCaption();
     const bytes = glb(); s.addModelFile({ token: s.snapshot.state.token, sceneId: s.sceneId }, {
