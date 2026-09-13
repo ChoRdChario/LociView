@@ -58,6 +58,8 @@ import { WorkspaceReceiver } from '../src/projectFiles/receiveWorkspace';
 import { WorkspaceSender } from '../src/projectFiles/sendWorkspace';
 import { WorkspaceOutputJob } from '../src/projectPackage/outputJob';
 import { ContributionOutputJob } from '../src/projectPackage/contributionOutputJob';
+import { BackupOutputJob } from '../src/projectPackage/backupOutputJob';
+import { BackupArchive } from '../src/projectPackage/backupArchive';
 import { PackageArchive } from '../src/projectPackage/zipArchive';
 import { WorkspaceBaseStore } from '../src/projectPackage/workspaceBases';
 import { WorkspaceReceiveJob } from '../src/projectPackage/receiveJob';
@@ -213,6 +215,126 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await f.receiver.session.editCaption(before.source!.token, f.captionId, 'title', '変更分の記録');
     return { f, r, sent: await contributionFile(f.receiver.session, f.fs, f.store) };
   }
+  it('generates separate named backups with exact originals and no base advancement or save claim', async () => {
+    const { f, sent } = await contributionTeam(), sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
+    const before = await f.receiver.session.read(), token = before.source!.token, label = '現地調査前';
+    const id = await sender.generateBackup(token, label), file = await sender.download(id), job = await BackupOutputJob.open(f.fs, id, metadata);
+    const inspected = await BackupArchive.inspect(file, metadata);
+    expect(inspected.source.encodeFullSource()).toEqual(before.source!.encodeFullSource());
+    expect(inspected.description.table).toEqual(sent.snapshot);
+    expect(inspected.archive.control.manifest).toMatchObject({ purpose: 'backup', targetHeads: before.source!.heads });
+    expect(inspected.archive.control.manifest).not.toHaveProperty('memo');
+    expect(JSON.parse((await f.fs.readText(job.path('start.json')))!)).toMatchObject({ operation: 'manualCheckpoint', label });
+    expect(await new WorkspaceBaseStore(f.fs, metadata, before.source!.proof).snapshot()).toEqual(sent.snapshot);
+    expect((await f.receiver.session.read()).publication).toBe(before.publication);
+    const reads = f.fs.reads;
+    expect((await sender.jobs()).find(j => j.id === id)).toMatchObject({ purpose: 'backup', state: 'generated', label, stale: false });
+    expect(f.fs.reads).toBe(reads); // Listing checks facts/receipts, not model streams.
+    const second = await sender.generateBackup(token, label), other = await sender.download(second);
+    expect(second).not.toBe(id); expect((await BackupOutputJob.open(f.fs, second, metadata)).manifest().packageId).not.toBe(job.manifest().packageId);
+    await expect(sender.verifyFile(id, other)).rejects.toThrow('output-selected-mismatch');
+    await sender.verifyFile(id, file); const writes = vi.spyOn(f.fs, 'writeText');
+    await sender.verifyFile(id, file); expect(writes).not.toHaveBeenCalled(); writes.mockRestore();
+    expect((await job.steps()).map(s => s.detail.kind)).toEqual(['artifactVerified', 'externalFileVerified']);
+    // A new generated Workspace observation makes the old backup stale even at identical heads.
+    await sender.generate(token); const listReads = f.fs.reads;
+    expect((await sender.jobs()).find(j => j.id === id)).toMatchObject({ state: 'file-verified', stale: true });
+    expect(f.fs.reads).toBe(listReads); expect((await f.receiver.session.read()).source!.token).toBe(token);
+    expect((await BackupArchive.inspect(await sender.download(id), metadata)).description.table).toEqual(sent.snapshot);
+  }, 20000);
+  it('cold-retries partial backup output from frozen originals and keeps later edits outside the named checkpoint', async () => {
+    const { f, sent } = await contributionTeam(), sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
+    const writeStream = f.fs.writeStream.bind(f.fs); let interrupted = false;
+    vi.spyOn(f.fs, 'writeStream').mockImplementation(async (path, stream) => {
+      if (!interrupted && path.includes('/backup-output/') && path.includes('/artifacts/')) {
+        interrupted = true; const reader = stream.getReader(), part = await reader.read();
+        await f.fs.writeBytes(path, part.value!.slice(0, 24)); await reader.cancel(); throw Error('partial backup output');
+      }
+      return writeStream(path, stream);
+    });
+    const token = sent.current.source!.token, selection = (await sender.availableBases())[0]!.selection;
+    await expect(sender.generateBackup(token, '中断前')).rejects.toThrow();
+    const id = (await sender.jobs())[0]!.id, job = await BackupOutputJob.open(f.fs, id, metadata), manifest = job.manifest();
+    await expect(sender.generate(token)).rejects.toThrow('output-pending');
+    await expect(sender.generateContribution(token, selection)).rejects.toThrow('output-pending');
+    await expect(sender.generateBackup(token)).rejects.toThrow('output-pending');
+    const later = await f.receiver.session.editCaption(token, f.captionId, 'body', '作成開始後の記録');
+    const cold = f.reopen(), retry = new WorkspaceSender(f.fs, cold.session, f.store, metadata, f.locks);
+    await retry.retry(id); const result = await BackupArchive.inspect(await retry.download(id), metadata);
+    expect(result.archive.control.manifest).toEqual(manifest); expect(result.source.encodeFullSource()).toEqual(sent.current.source!.encodeFullSource());
+    expect(result.description.table).toEqual(sent.snapshot); expect((await cold.session.read()).source!.token).toBe(later.source!.token);
+    expect((await retry.jobs()).find(j => j.id === id)).toMatchObject({ state: 'generated', label: '中断前', stale: true });
+    expect(await f.fs.list(job.path('artifacts/'))).toHaveLength(2);
+    const paths = await f.fs.list(''), writes = vi.spyOn(f.fs, 'writeText'); await retry.retry(id);
+    expect(await f.fs.list('')).toEqual(paths); expect(writes).not.toHaveBeenCalled();
+  }, 15000);
+  it.each(['metadata.am', 'base-evidence', 'artifact', 'index', 'whole-job'] as const)('does not replenish lost acknowledged backup output %s', async lost => {
+    const { f, sent } = await contributionTeam(), sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
+    const token = sent.current.source!.token, selection = (await sender.availableBases())[0]!.selection;
+    const id = await sender.generateBackup(token, '保護対象'), file = await sender.download(id), prefix = `v2/packages/backup-output/${id}/`;
+    const targets = lost === 'whole-job' ? await f.fs.list(prefix) : lost === 'artifact' ? await f.fs.list(`${prefix}artifacts/`) :
+      lost === 'base-evidence' ? (await f.fs.list(`${prefix}base-evidence/`)).slice(0, 1) :
+      [lost === 'index' ? `v2/packages/backup-output-index/${id}.json` : `${prefix}${lost}`];
+    expect(targets.length).toBeGreaterThan(0); for (const path of targets) await f.fs.remove(path);
+    const before = await f.fs.list(''), writes = vi.spyOn(f.fs, 'writeText'), writeBytes = vi.spyOn(f.fs, 'writeBytes');
+    expect((await sender.jobs()).find(j => j.id === id)!.state).toBe('repair-required');
+    await expect(sender.retry(id)).rejects.toThrow(); await expect(sender.download(id)).rejects.toThrow();
+    await expect(sender.verifyFile(id, file)).rejects.toThrow(); await expect(sender.generate(token)).rejects.toThrow();
+    await expect(sender.generateContribution(token, selection)).rejects.toThrow(); await expect(sender.generateBackup(token)).rejects.toThrow();
+    expect(writes).not.toHaveBeenCalled(); expect(writeBytes).not.toHaveBeenCalled(); expect(await f.fs.list('')).toEqual(before);
+  }, 15000);
+  it('rejects acknowledged backup original loss after Start even on the initial warm generation', async () => {
+    const { f, sent } = await contributionTeam(), sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
+    const write = f.fs.writeText.bind(f.fs);
+    vi.spyOn(f.fs, 'writeText').mockImplementation(async (path, text) => {
+      await write(path, text);
+      if (path.includes('/backup-output/') && path.endsWith('/start.json'))
+        await f.fs.remove(path.replace(/start\.json$/, 'metadata.am'));
+    });
+    await expect(sender.generateBackup(sent.current.source!.token, '原本保持')).rejects.toThrow('output-input-missing');
+    const [id] = await BackupOutputJob.ids(f.fs), prefix = `v2/packages/backup-output/${id}/`;
+    expect(await f.fs.list(`${prefix}steps/`)).toEqual([]); expect(await f.fs.list(`${prefix}artifacts/`)).toEqual([]);
+    expect((await sender.jobs()).find(j => j.id === id)!.state).toBe('repair-required');
+    expect((await f.receiver.session.read()).source!.token).toBe(sent.current.source!.token);
+  });
+  it('keeps backup cancellation during final durable-original validation incomplete and retryable', async () => {
+    const { f, sent } = await contributionTeam(), sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
+    const cancel = new AbortController(), write = f.fs.writeStream.bind(f.fs), read = f.fs.readBytes.bind(f.fs); let artifactClosed = false;
+    vi.spyOn(f.fs, 'writeStream').mockImplementation(async (path, stream) => {
+      await write(path, stream); if (path.includes('/backup-output/') && path.includes('/artifacts/')) artifactClosed = true;
+    });
+    vi.spyOn(f.fs, 'readBytes').mockImplementation(async path => {
+      const bytes = await read(path);
+      if (artifactClosed && path.includes('/backup-output/') && path.endsWith('/metadata.am')) cancel.abort();
+      return bytes;
+    });
+    await expect(sender.generateBackup(sent.current.source!.token, '中止前', cancel.signal)).rejects.toThrow();
+    const [id] = await BackupOutputJob.ids(f.fs), job = await BackupOutputJob.open(f.fs, id!, metadata);
+    expect(await job.steps()).toEqual([]); expect((await sender.jobs()).find(j => j.id === id)!.state).toBe('incomplete');
+    await sender.retry(id!); expect((await sender.jobs()).find(j => j.id === id)).toMatchObject({ state: 'generated', label: '中止前' });
+    expect((await f.receiver.session.read()).source!.token).toBe(sent.current.source!.token);
+  });
+  it('abandons pre-Start backup explicitly, refuses invalid names without writes and obeys other output slots', async () => {
+    const { f, sent } = await contributionTeam(), sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks), token = sent.current.source!.token;
+    const before = await f.fs.list('');
+    for (const label of ['x\ny', 'x'.repeat(257)]) await expect(sender.generateBackup(token, label)).rejects.toThrow();
+    expect(await f.fs.list('')).toEqual(before);
+    f.fs.reject = p => p.includes('/backup-output/') && p.endsWith('/start.json');
+    await expect(sender.generateBackup(token, '開始前')).rejects.toThrow('injected quota'); f.fs.reject = () => false;
+    const job = (await sender.jobs())[0]!; expect(job).toMatchObject({ purpose: 'backup', state: 'unstarted', cancellable: true });
+    await expect(sender.retry(job.id)).rejects.toThrow('output-unstarted'); await expect(sender.generate(token)).rejects.toThrow('output-pending');
+    await sender.cancel(job.id); expect((await sender.jobs())[0]!.state).toBe('abandoned');
+    const selection = (await sender.availableBases())[0]!.selection;
+    f.fs.reject = p => p.includes('/contribution-output/') && p.includes('/artifacts/');
+    await expect(sender.generateContribution(token, selection)).rejects.toThrow(); f.fs.reject = () => false;
+    await expect(sender.generateBackup(token)).rejects.toThrow('output-pending');
+    const pending = (await sender.jobs()).find(j => j.state === 'incomplete')!; await sender.cancel(pending.id);
+    const id = await sender.generateBackup(token); expect((await sender.jobs()).find(j => j.id === id)!.state).toBe('generated');
+    // IDs cannot identify two different output kinds, even before either is opened.
+    await f.fs.writeText(`v2/packages/contribution-output-index/${id}.json`, '{}');
+    await expect(sender.jobs()).rejects.toThrow('output-job-kind-collision');
+    await expect(sender.generateBackup(token)).rejects.toThrow('output-job-kind-collision');
+  }, 15000);
   it('generates durable Contribution files for two actual rounds without advancing either base or reading old model bodies', async () => {
     const { f, r, sent } = await contributionTeam(), sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
     const choices = await sender.availableBases(), beforeReads = f.fs.reads;
@@ -947,6 +1069,55 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     input('渡す内容').value = 'contribution'; input('渡す内容').fire('change');
     const output = all(root).find(n => n.attributes.get('aria-label') === 'ファイルで渡す')!;
     all(output).find(n => n.tag === 'button' && n.textContent === '選択を取り消す')!.fire('click'); expect(tools.hasChanges()).toBe(false);
+    await workspace.dispose();
+  }, 20000);
+  it('keeps backup names and file choices through IME, failures and unrelated download without claiming external save (recorded DOM)', async () => {
+    const { f, options } = await initialWorkspaceHostFixture(), initial = await openValidationHost({ ...options, workspaceFile: f.file });
+    await initial.workspaceOutput.generate(initial.read().source!.token);
+    const host = createValidationModeHost(initial, mode => openValidationHost({ ...options, mode }), () => {});
+    const document = new RecordedDocument().asDocument(), create = document.createElement.bind(document), download = vi.fn();
+    vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      const node = create(tag); if (tag === 'a' || tag === 'input') Object.assign(node, { click: tag === 'a' ? download : () => {} }); return node;
+    });
+    let workspace: ReturnType<typeof createSavedWorkspace>;
+    const tools = createValidationReceiveControls(document, host, () => workspace?.session, () => workspace?.render(), async () => {});
+    workspace = createSavedWorkspace(document, host, undefined, () => tools);
+    const root = record(workspace.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    const input = (name: string) => all(root).find(n => n.attributes.get('aria-label') === name)!;
+    const output = input('ファイルで渡す'), button = (text: string) => all(output).find(n => n.tag === 'button' && n.textContent === text)!;
+    input('渡す内容').value = 'backup'; input('渡す内容').fire('change');
+    const name = input('名前（任意）'); name.fire('compositionstart'); name.value = '調査前'; name.fire('input');
+    expect(button('ファイルを作成').disabled).toBe(true); button('ファイルを作成').fire('click');
+    expect(host.workspaceOutput.jobs.some(j => j.purpose === 'backup')).toBe(false);
+    workspace.render(); expect(input('名前（任意）')).toBe(name); expect(name.value).toBe('調査前');
+    name.fire('compositionend'); expect(tools.hasChanges()).toBe(true);
+    expect((all(root).find(n => n.tag === 'form') as unknown as HTMLElement).inert).toBe(true);
+    all(root).find(n => n.tag === 'button' && n.textContent === '閲覧に切り替える')!.fire('click'); expect(host.mode!.current).toBe('edit');
+    name.value = 'x'.repeat(257); name.fire('input'); button('ファイルを作成').fire('click');
+    await vi.waitFor(() => expect(tools.busy()).toBe(false));
+    expect(name.value).toBe('x'.repeat(257)); expect(tools.hasChanges()).toBe(true);
+    expect(host.workspaceOutput.jobs.some(j => j.purpose === 'backup')).toBe(false);
+    name.value = '調査前'; name.fire('input');
+    button('ファイルを選択').fire('click'); expect(button('ファイルを作成').disabled).toBe(true);
+    const selected = input('保存先のファイルを選択'); Object.assign(selected, { files: [new Blob(['wrong'])] }); selected.fire('change');
+    await vi.waitFor(() => expect(tools.busy()).toBe(false));
+    button('ダウンロード').fire('click'); await vi.waitFor(() => expect(download).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(tools.busy()).toBe(false));
+    expect(button('ファイル確認を取り消す')).toBeDefined(); expect(name.value).toBe('調査前'); expect(input('渡す内容').value).toBe('backup');
+    button('ファイル確認を取り消す').fire('click'); expect(tools.hasChanges()).toBe(true);
+    const session = workspace.session!, before = host.read().source!.token;
+    button('ファイルを作成').fire('click');
+    await vi.waitFor(() => expect(host.workspaceOutput.jobs.some(j => j.purpose === 'backup' && j.state === 'generated')).toBe(true), { timeout: 10000 });
+    await vi.waitFor(() => expect(tools.hasChanges()).toBe(false));
+    const result = host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!;
+    expect(result.label).toBe('調査前'); expect(result.state).toBe('generated');
+    expect(output.children.find(n => n.attributes.get('role') === 'status')!.textContent).toBe('バックアップを生成しました。ファイルへの保存は未確認です。');
+    expect(all(output).some(n => n.textContent.includes('バックアップ 調査前'))).toBe(true);
+    const archive = await BackupArchive.inspect(await host.workspaceOutput.download(result.id), metadata);
+    expect(archive.archive.control.manifest.purpose).toBe('backup'); expect(host.read().source!.token).toBe(before); expect(workspace.session).toBe(session);
+    all(root).find(n => n.tag === 'button' && n.textContent === '閲覧に切り替える')!.fire('click');
+    await vi.waitFor(() => expect(host.mode!.current).toBe('view'));
+    expect(input('渡す内容').disabled).toBe(true); expect(name.disabled).toBe(true); expect(button('ファイルを作成').disabled).toBe(true);
     await workspace.dispose();
   }, 20000);
   it('refreshes warm output recovery and catalog state for both kinds without replacing the saved editor', async () => {

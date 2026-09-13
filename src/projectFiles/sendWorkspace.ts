@@ -5,19 +5,25 @@ import type { MetadataLimits } from '../projectMetadata/format';
 import { json } from '../projectMetadata/persistence';
 import { WorkspaceOutputJob } from '../projectPackage/outputJob';
 import { ContributionOutputJob } from '../projectPackage/contributionOutputJob';
+import { BackupOutputJob } from '../projectPackage/backupOutputJob';
+import { protectedWorkspaceInventory } from '../projectPackage/protectedInventory';
+import { PACKAGE_LIMITS as L } from '../projectPackage/contract';
 import { outputJobKeys, outputJobClass, openOutputJob, validateOutputProtection } from '../projectPackage/outputJobs';
 import { VerifiedContributionBase, type ContributionBaseSelection } from '../projectPackage/contributionSource';
 import { WorkspaceBaseStore } from '../projectPackage/workspaceBases';
 import { workspaceFileOperation } from './receiveWorkspace';
 import { fileError } from './validation';
 
-export interface WorkspaceOutputState { id: string; purpose: 'teamWorkspace' | 'contribution'; token?: string; cancellable?: boolean; state: 'unstarted' | 'incomplete' | 'generated' | 'file-verified' | 'abandoned' | 'cancelled' | 'repair-required' }
+export interface WorkspaceOutputState { id: string; purpose: 'teamWorkspace' | 'contribution' | 'backup'; label?: string; stale?: boolean; token?: string; cancellable?: boolean; state: 'unstarted' | 'incomplete' | 'generated' | 'file-verified' | 'abandoned' | 'cancelled' | 'repair-required' }
 export interface ContributionBaseChoice { selection: ContributionBaseSelection; label: string }
 /** Explicit same-Project output commands. Download handoff has no completion receipt. */
 export class WorkspaceSender {
   constructor(private readonly fs: ProjectWorkspaceFS, private readonly session: MetadataProjectSession,
     private readonly store: OriginBlobStore, private readonly limits: MetadataLimits, private readonly locks: LockManager | null) {}
   generate(token: string, signal?: AbortSignal) { return workspaceFileOperation(this.locks, () => this.session.createWorkspaceOutput(token, this.store, '0.0.1', signal)); }
+  generateBackup(token: string, label?: string, signal?: AbortSignal) {
+    return workspaceFileOperation(this.locks, () => this.session.createManualCheckpoint(token, label, this.store, '0.0.1', signal));
+  }
   generateContribution(token: string, selection: ContributionBaseSelection, signal?: AbortSignal) {
     const owned = structuredClone(selection);
     return workspaceFileOperation(this.locks, () => this.session.createContributionOutput(token, owned, this.store, '0.0.1', signal));
@@ -26,12 +32,18 @@ export class WorkspaceSender {
     const key = (await outputJobKeys(this.fs)).find(k => k.id === id);
     if (!key) return fileError('生成データを確認できません。'); return key;
   }
-  retry(id: string, signal?: AbortSignal) { return workspaceFileOperation(this.locks, async () => (await this.key(id)).kind === 'workspace' ?
-    this.session.resumeWorkspaceOutput(id, this.store, signal) : this.session.resumeContributionOutput(id, this.store, signal)); }
-  cancel(id: string) { return workspaceFileOperation(this.locks, async () => (await this.key(id)).kind === 'workspace' ?
-    this.session.cancelWorkspaceOutput(id) : this.session.cancelContributionOutput(id)); }
-  verifyFile(id: string, file: Blob) { return workspaceFileOperation(this.locks, async () => (await this.key(id)).kind === 'workspace' ?
-    this.session.verifyWorkspaceOutput(id, file) : this.session.verifyContributionOutput(id, file, this.store)); }
+  retry(id: string, signal?: AbortSignal) { return workspaceFileOperation(this.locks, async () => {
+    const key = await this.key(id); return key.kind === 'workspace' ? this.session.resumeWorkspaceOutput(id, this.store, signal) :
+      key.kind === 'backup' ? this.session.resumeBackupOutput(id, this.store, signal) : this.session.resumeContributionOutput(id, this.store, signal);
+  }); }
+  cancel(id: string) { return workspaceFileOperation(this.locks, async () => {
+    const key = await this.key(id); return key.kind === 'workspace' ? this.session.cancelWorkspaceOutput(id) :
+      key.kind === 'backup' ? this.session.cancelBackupOutput(id) : this.session.cancelContributionOutput(id);
+  }); }
+  verifyFile(id: string, file: Blob) { return workspaceFileOperation(this.locks, async () => {
+    const key = await this.key(id); return key.kind === 'workspace' ? this.session.verifyWorkspaceOutput(id, file) :
+      key.kind === 'backup' ? this.session.verifyBackupOutput(id, file, this.store) : this.session.verifyContributionOutput(id, file, this.store);
+  }); }
   async availableBases(): Promise<ContributionBaseChoice[]> {
     const read = await this.session.read(); if (read.state !== 'ready' || !read.source) return [];
     const bases = new WorkspaceBaseStore(this.fs, this.limits, read.source.proof), rows = await bases.read();
@@ -46,6 +58,9 @@ export class WorkspaceSender {
   download(id: string) {
     return workspaceFileOperation(this.locks, async () => {
       const job = await openOutputJob(this.fs, await this.key(id), this.limits);
+      if (job instanceof BackupOutputJob) {
+        await validateOutputProtection(this.fs, job, this.store, this.limits); return (await job.artifact()).blob;
+      }
       if (job instanceof ContributionOutputJob) {
         await validateOutputProtection(this.fs, job, this.store, this.limits); return (await job.artifact(this.store)).blob;
       }
@@ -59,7 +74,7 @@ export class WorkspaceSender {
     const result: WorkspaceOutputState[] = [];
     let bases: ReturnType<WorkspaceBaseStore['read']> | undefined;
     for (const key of await outputJobKeys(this.fs)) {
-      const { id } = key, purpose = key.kind === 'workspace' ? 'teamWorkspace' as const : 'contribution' as const;
+      const { id } = key, purpose = key.kind === 'workspace' ? 'teamWorkspace' as const : key.kind;
       try {
         const state = await outputJobClass(key).state(this.fs, id, this.limits);
         if (state !== 'started') { result.push({ id, purpose, state, cancellable: state === 'unstarted' }); continue; }
@@ -70,7 +85,16 @@ export class WorkspaceSender {
           const rows = await (bases ??= new WorkspaceBaseStore(this.fs, this.limits, job.source.proof).read());
           if (!rows.some(r => json(r) === json(job.baseRecord()))) throw Error('output-base-missing');
         }
-        result.push({ id, purpose, token: job.source.token, cancellable: kinds.length === 0, state: kinds.includes('cancelled') ? 'cancelled' : kinds.includes('externalFileVerified') ? 'file-verified' :
+        let extra: { label?: string; stale?: boolean } = {};
+        if (job instanceof BackupOutputJob) {
+          await validateOutputProtection(this.fs, job, this.store, this.limits);
+          const current = await this.session.read(); if (!current.source) throw Error('output-source-missing');
+          const currentBases = new WorkspaceBaseStore(this.fs, this.limits, current.source.proof), snapshot = await currentBases.snapshot();
+          const inspection = await current.source.inspectOriginal({ maxNodes: L.inspectionNodes, maxWork: L.inspectionWork });
+          const inventory = protectedWorkspaceInventory(inspection.candidates, await currentBases.payloads(snapshot.records));
+          extra = { label: job.label, stale: current.source.token !== job.source.token || json(snapshot) !== json(job.frozenBases()) || json(inventory) !== json(job.frozenInventory()) };
+        }
+        result.push({ id, purpose, ...extra, token: job.source.token, cancellable: kinds.length === 0, state: kinds.includes('cancelled') ? 'cancelled' : kinds.includes('externalFileVerified') ? 'file-verified' :
           kinds.includes(key.kind === 'workspace' ? 'baseRecorded' : 'artifactVerified') ? 'generated' : 'incomplete' });
       } catch { result.push({ id, purpose, state: 'repair-required' }); }
     }

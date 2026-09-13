@@ -1,6 +1,15 @@
 # Fresh-session handoff — public-candidate preparation
 
-> **Current unit — `6c2bc79`後のbackup原本／ZIP:** 完全な元履歴、全交換基準表、
+> **Current unit — `3c8ed08`後の名前付きbackup出力:** 同じ「ファイルで渡す」に
+> バックアップと任意名を接続。元履歴／全基準／原証拠を固定したjobから逐次ZIP生成、
+> 中断再開・明示download・選んだfileの一致確認を行う。名前はjobだけに保持。
+> 元データ消失をメモリで補わず、初回生成でも再検査する。最終再検査中の中止も未完了。
+> 他のdownloadで未確定の名前・file確認を消さず、IME入力中の生成を拒否。
+> baseを進めず、同じheadsでも後から追加された基準は古いbackupとの差として表示。
+> checks／独立review／checkpointはtodo。次は明示的な同Project復元と復元後の往復。
+> 通常home／他purpose／未対応profile／migration／実機／offlineは未完了。
+
+> **Previous checkpoint — `3c8ed08` backup原本／ZIP:** 完全な元履歴、全交換基準表、
 > 重複排除した元証拠、現在／競合／基準だけが必要とする本体を保持。ZIP単独で再検査する。
 > 過去のimported/generated観測は保持するが、新しいlocal receiptや復元許可にはしない。
 > 原本を全件再cloneせず逐次出力。共有control／source検査予算と失敗／中断を保持。

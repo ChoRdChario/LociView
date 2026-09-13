@@ -89,6 +89,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       get jobs() { return current.workspaceOutput.jobs; }, get error() { return current.workspaceOutput.error; },
       get bases() { return current.workspaceOutput.bases; },
       generate: (...a) => run(() => current.workspaceOutput.generate(...a)),
+      generateBackup: (...a) => run(() => current.workspaceOutput.generateBackup(...a)),
       generateContribution: (...a) => run(() => current.workspaceOutput.generateContribution(...a)),
       retry: (...a) => run(() => current.workspaceOutput.retry(...a)),
       cancel: (...a) => run(() => current.workspaceOutput.cancel(...a)),

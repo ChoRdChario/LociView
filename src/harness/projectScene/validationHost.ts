@@ -176,6 +176,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
       get jobs() { return outputJobs; }, get error() { return outputFailure || outputDiscoveryFailure; },
       get bases() { return outputBases; },
       generate: (token: string) => outputAction(() => sender.generate(token)),
+      generateBackup: (token: string, label?: string) => outputAction(() => sender.generateBackup(token, label)),
       generateContribution: (token: string, selection: ContributionBaseChoice['selection']) => outputAction(() => sender.generateContribution(token, selection)),
       retry: (id: string) => outputAction(() => sender.retry(id), true),
       cancel: (id: string) => outputAction(() => sender.cancel(id), true),

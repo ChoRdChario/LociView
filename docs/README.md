@@ -54,8 +54,11 @@ evidence remains repair-required, including lost jobs discovered by index/journa
 Backup has bounded source/ZIP/reopen primitives under §12.2.1: original causal
 history, protected current/conflict/base-only bodies, the full historical base
 table and deduplicated original evidence. ZIP-only inspection does not grant
-replacement authority or invent local imported/generated observations. Durable
-checkpoint output, explicit restore and its UI remain next; checks are in todo.
+replacement authority or invent local imported/generated observations. Named
+manual backup output now connects through a frozen durable job and the same file
+tools. Partial retry uses the same originals/name; acknowledged loss is repair.
+Generation and optional exact file verification stay separate, with no base
+advancement. Explicit restore remains next; checks are in todo.
 This does not complete the practical-team, ordinary-home or device/offline gate.
 
 Contribution durable output now connects in the same file tools under §8.7:

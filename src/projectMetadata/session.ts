@@ -20,6 +20,8 @@ import { packageByteHash } from '../projectPackage/manifest';
 import type { OriginBlobStore } from './blobStore';
 import { WorkspaceOutputJob } from '../projectPackage/outputJob';
 import { ContributionOutputJob } from '../projectPackage/contributionOutputJob';
+import { BackupOutputJob, checkedBackupLabel } from '../projectPackage/backupOutputJob';
+import { BackupSourceCapture } from '../projectPackage/backupSource';
 import { ContributionSourceCapture, VerifiedContributionBase, type ContributionBaseSelection } from '../projectPackage/contributionSource';
 import { outputJobKeys, outputJobClass, openOutputJob, outputTerminal, validateOutputProtection } from '../projectPackage/outputJobs';
 import { WorkspaceBaseStore } from '../projectPackage/workspaceBases';
@@ -309,6 +311,43 @@ export class MetadataProjectSession {
     return underWriteLease(this.fs, async () => {
       if (await ContributionOutputJob.state(this.fs, id, this.limits) === 'started') await (await ContributionOutputJob.open(this.fs, id, this.limits)).cancel();
       else await ContributionOutputJob.abandon(this.fs, id, this.limits);
+    });
+  }
+
+  private async finishBackupOutput(job: BackupOutputJob, store: OriginBlobStore, signal?: AbortSignal) {
+    job.assertOwner(this.fs); const current = await this.outputReady();
+    if (json(current.source!.proof) !== json(job.source.proof)) return fail('output-lineage');
+    await this.assertOutputSlot(job.id); await validateOutputProtection(this.fs, job, store, this.limits);
+    await job.generate(store, signal); return job.id;
+  }
+  async createManualCheckpoint(expectedToken: string, label: string | undefined, store: OriginBlobStore, version: string, signal?: AbortSignal) {
+    checkedBackupLabel(label);
+    return underWriteLease(this.fs, async () => {
+      const read = await this.outputReady(); if (read.source!.token !== expectedToken) return fail('output-stale');
+      await this.assertOutputSlot();
+      const bases = new WorkspaceBaseStore(this.fs, this.limits, read.source!.proof);
+      const capture = await BackupSourceCapture.prepare(this, expectedToken, bases, store, this.limits, signal);
+      const job = BackupOutputJob.prepare(this.fs, capture, this.limits, version, label);
+      await validateOutputProtection(this.fs, job, store, this.limits);
+      const current = await this.outputReady();
+      if (current.source!.token !== expectedToken || current.publication !== capture.publication || json(await bases.snapshot()) !== json(job.frozenBases())) return fail('output-stale');
+      await job.persist(); return this.finishBackupOutput(job, store, signal);
+    });
+  }
+  async resumeBackupOutput(id: string, store: OriginBlobStore, signal?: AbortSignal) {
+    return underWriteLease(this.fs, async () => this.finishBackupOutput(await BackupOutputJob.open(this.fs, id, this.limits), store, signal));
+  }
+  async verifyBackupOutput(id: string, file: Blob, store: OriginBlobStore) {
+    return underWriteLease(this.fs, async () => {
+      const current = await this.outputReady(), job = await BackupOutputJob.open(this.fs, id, this.limits);
+      if (json(current.source!.proof) !== json(job.source.proof)) return fail('output-lineage');
+      await validateOutputProtection(this.fs, job, store, this.limits); await job.verifySelected(file);
+    });
+  }
+  async cancelBackupOutput(id: string) {
+    return underWriteLease(this.fs, async () => {
+      if (await BackupOutputJob.state(this.fs, id, this.limits) === 'started') await (await BackupOutputJob.open(this.fs, id, this.limits)).cancel();
+      else await BackupOutputJob.abandon(this.fs, id, this.limits);
     });
   }
 

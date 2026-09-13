@@ -2,6 +2,69 @@
 
 ## Current boundary — thin connected workflow first (2026-09-09)
 
+Active after `3c8ed08`: the preceding question turn confirmed the visible-pin
+contract by reading code/tests; it made no implementation progress. This resumed
+turn connects named backup output. Cached origin is 0 behind / 69 ahead; the
+working tree owns this implementation. No repeated blocker or new PO decision.
+
+Current F03 connection — named manual backup output in the existing file area:
+
+- [x] Specify/review exact backup job/index, Start-only optional label, frozen
+  protection and separate generation/external-file observations before code.
+- [x] Connect durable original retention, sequential full ZIP output/readback,
+  exact cold retry, three-kind discovery/guards and acknowledged-loss refusal.
+- [x] Connect backup purpose/name to the existing controls with input/IME guards,
+  explicit download/verification, and token-plus-base/inventory staleness.
+- [x] Reuse file/DOM/isolation tests, then final typecheck/full test/both builds,
+  independent exact-index review, result documents and checkpoint.
+
+No new PoC, format/profile, Project/wire schema migration, ordinary activation, automatic sink,
+base advance, destructive restore or device/offline claim. Explicit same-Project
+restore follows; the full practical-team goal and consolidated acceptance remain.
+
+Current verification/review: the first source typecheck (13903) found an implicit
+array type and obsolete artifact argument; both were fixed. Its later observation
+was not retained; no result is claimed for that missing handle. Fresh typecheck
+74335 exits 0. Initial name/output tests 90685: 10 PASS; its name filter skipped
+all sceneCore cases, so it is not isolation credit. Separate sceneCore 395202 exits
+0 with all 12 PASS. Backup-focused 82093 exits 0 with 10 PASS (30.19 s).
+Independent backend review required warm durable-original validation before
+generation/acknowledgment; final validation now also honors cancellation. The
+existing file tests inject original loss at Start and final-read cancellation.
+Independent UI review required action-owned consumption of pending file choices;
+unrelated download now preserves both confirmation and name drafts. A mounted
+regression covers failure, IME, readonly and preserved editor/source. All mandatory
+source/UI findings are corrected and independently rechecked. Final typecheck
+98630 exits 0. Full root 2469 exits 0 with two workers: 112 files / 2,227 PASS /
+21 existing TODO / zero failures in 329.43 s. Ordinary build 79891 and harness
+build c1ceab both exit 0 (existing mixed-import/large-chunk warnings only).
+Independent exact-index review approved all 16 files subject only to these final
+checks and accurate result updates; those conditions are now met. No source/test
+changes followed the final checks. Checkpoint identity is in Git HEAD/log.
+Native browser/picker/IME, physical iOS and offline remain unexecuted; this unit
+does not ask for an isolated human check or pass F03.
+
+Short meta-audit: this connects a user file workflow rather than another probe.
+The complete practical-team goal remains all 62 groups and ordinary real-file,
+two-round Desktop/iPhone/offline acceptance, not the count of passing tests.
+No main/Pages/SW source, dependency/profile, migration or release change. Cached
+origin comparison is read-only; no unchanged denied push/browser retry.
+
+Next F03 boundary: specify and independently review explicit same-Project restore
+in the same file area, then implement preflight/confirmation, a complete new local
+storage generation, verified original/base receipt and one authoritative switch.
+Keep the old generation and later edits; do not weaken append-only persistence or
+reuse merge as restore. Bind confirmation to both the selected ZIP and replaced
+work; cancellation/failure keeps that work. Historical backup observations require
+restore-specific authority, not fabricated local generated/imported completions.
+Reuse current file/recovery/team tests; continued Contribution after restore is
+required. Missing/corrupt acknowledged CAS bodies also need an explicit repair
+contract and remain F03 work, not an omitted recovery requirement. No new PO
+policy question was found for this bounded implementation; actual specification
+conflicts, ordinary adoption or external/destructive activation still stop.
+
+### Completed backup primitives (`3c8ed08`)
+
 Active after clean `6c2bc79`: previous turn made production progress by connecting
 frozen Contribution output/receive in the existing file area. Cached origin is
 0 behind / 68 ahead. No live process or repeated blocker remains.

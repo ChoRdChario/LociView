@@ -2121,6 +2121,74 @@ missing acknowledged evidence refusal, and same-ID/different-proof collision
 without writes. Recorded DOM is not native picker, rendering, iPhone or offline
 acceptance. No new page/fixture framework is required.
 
+#### Isolated manual backup output connection (implementation contract)
+
+The existing file tools add manual backup output using §12.2.1's exact originals,
+not another validation page. A new job lives under
+`v2/packages/backup-output/<jobId>/`. Fixed payload paths are `metadata.am`,
+`protected-inventory.json`, `exchange-bases.json` and declared
+`base-evidence/sha256/<digest>`, plus `manifest.json`, `capture.json`,
+`prepared.json`, `start.json`, `abandoned.json`, `steps/<digest>.json` and
+`artifacts/<sinkId>.zip`. No other path is allowed. Entire missing jobs remain
+discoverable through `v2/packages/backup-output-index/<jobId>.json`, the closed
+`{schema:'lociview-backup-output-index-1',jobId,prepared:EvidenceRef}`.
+
+Use the shared frozen/output records below: purpose backup, wholeProject, no
+selected base; payloads equal the complete manifest payload order; roots include
+all protected bodies and exact originals/controls. Start uses manualCheckpoint
+and optional label only. The label follows the 256-scalar single-line grammar;
+it is not a manifest memo, Project title/identity, purpose or base selection.
+Each explicit request creates new package/job IDs even at unchanged heads.
+
+Persist/read back every original and control, then the external index, then Start.
+The exact closed pre-Start abandonment is
+`{schema:'lociview-backup-output-abandoned-1',jobId,stage:'beforeStart'}`.
+Indexed missing prepared data, Start without index, or acknowledged missing input
+is repair. No current source/reselected file may replenish acknowledged loss.
+An unstarted partial alone permits explicit abandonment, not automatic completion.
+
+Open/list validates the frozen metadata/base/evidence/inventory and receipt/size
+bindings without reading models. Full body verification occurs during sequential
+ZIP generation and exact artifact/file inspection. The job retains one original
+set; generation supplies sequential copies to the bounded writer, not a second
+BackupSourceCapture/full-original clone alongside body buffers. Existing source,
+control/evidence, shared I/O and retained-space limits apply; partial artifacts
+remain counted, never silently deleted. Later edits remain outside the frozen job.
+
+Only artifactVerified then optional externalFileVerified(reselectedFileV1), or
+cancelled(beforeArtifact), are connected here. No baseRecorded/base advancement,
+automatic promotion or restore occurs. Partial generation retries from byte zero
+to a fresh sink under the same package/job/source. Acknowledged artifact loss is
+repair, never regeneration. Successful generation/download is not external save.
+Repeated verification checks the exact same bytes and adds no duplicate step.
+
+The Session uses the existing Project lease, receive/output guards and original
+protection checks. All three output kinds participate in discovery, kind-collision
+checks and incomplete/repair exclusion. Frozen bases may gain observations later
+but may not lose any frozen proof/completion/body. Backup staleness compares the
+source token and whole protected inventory/base snapshot: new base observations
+at unchanged heads still mean the older file does not contain current work.
+List refresh uses metadata/presence inspection, not full model rehashing.
+
+Warm generation revalidates each durable original/control/index/Start before
+streaming and before recording artifactVerified. It does not replenish a lost
+acknowledged input from its retained memory copy. These checks are sequential,
+retain no second aggregate original set and honor cancellation before completion.
+
+The same UI adds backup and an optional name. Pending name, composition, file
+selection and cancellation keep their mutual guards; unrelated download/verification
+cannot erase a new name/selection. Invalid names remain editable. The name labels
+the job; download uses a safe generic backup filename and does not infer purpose.
+Generation, historical selected-file confirmation and older content remain visible.
+
+Acceptance reuses file/DOM/isolation tests: generated backup retains exact original
+history/table/evidence and base-only bodies, repeated named requests are separate,
+cold partial retry preserves source/name and later edits, pre-Start abandonment,
+index/original/artifact loss refuses repair shortcuts, three-kind exclusion,
+same-head base staleness, no model reads from listing, exact/no-op file confirmation,
+and pending/IME/read-only controls. Explicit restore/continued collaboration after
+restore and ordinary/device/offline adoption remain subsequent work.
+
 #### Frozen fields and fingerprint
 
 Use §3's canonical control encoding and existing exact nominal ID, `Heads`,

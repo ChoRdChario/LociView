@@ -2,23 +2,25 @@ import type { ProjectWorkspaceFS } from '../platform/fs';
 import { fail, type MetadataLimits } from '../projectMetadata/format';
 import { WorkspaceOutputJob } from './outputJob';
 import { ContributionOutputJob } from './contributionOutputJob';
+import { BackupOutputJob } from './backupOutputJob';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import { json } from '../projectMetadata/persistence';
 import { WorkspaceBaseStore } from './workspaceBases';
 import { protectedWorkspaceInventory } from './protectedInventory';
 import { PACKAGE_LIMITS as L } from './contract';
 
-export type OutputJobKey = { id: string; kind: 'workspace' | 'contribution' };
-export type OutputJob = WorkspaceOutputJob | ContributionOutputJob;
+export type OutputJobKey = { id: string; kind: 'workspace' | 'contribution' | 'backup' };
+export type OutputJob = WorkspaceOutputJob | ContributionOutputJob | BackupOutputJob;
 export async function outputJobKeys(fs: ProjectWorkspaceFS): Promise<OutputJobKey[]> {
   const workspace = await WorkspaceOutputJob.ids(fs), contribution = await ContributionOutputJob.ids(fs);
-  if (workspace.some(id => contribution.includes(id))) fail('output-job-kind-collision');
-  return [...workspace.map(id => ({ id, kind: 'workspace' as const })), ...contribution.map(id => ({ id, kind: 'contribution' as const }))];
+  const backup = await BackupOutputJob.ids(fs), ids = [...workspace, ...contribution, ...backup];
+  if (new Set(ids).size !== ids.length) fail('output-job-kind-collision');
+  return [...workspace.map(id => ({ id, kind: 'workspace' as const })), ...contribution.map(id => ({ id, kind: 'contribution' as const })), ...backup.map(id => ({ id, kind: 'backup' as const }))];
 }
-export function outputJobClass(key: OutputJobKey) { return key.kind === 'workspace' ? WorkspaceOutputJob : ContributionOutputJob; }
+export function outputJobClass(key: OutputJobKey) { return key.kind === 'workspace' ? WorkspaceOutputJob : key.kind === 'backup' ? BackupOutputJob : ContributionOutputJob; }
 export function openOutputJob(fs: ProjectWorkspaceFS, key: OutputJobKey, limits: MetadataLimits): Promise<OutputJob> { return outputJobClass(key).open(fs, key.id, limits); }
 export async function outputTerminal(job: OutputJob) {
-  const steps = await job.steps(), terminal = job instanceof ContributionOutputJob ? 'artifactVerified' : 'baseRecorded';
+  const steps = await job.steps(), terminal = job instanceof WorkspaceOutputJob ? 'baseRecorded' : 'artifactVerified';
   return steps.some(s => s.detail.kind === terminal || s.detail.kind === 'cancelled');
 }
 /** Later observations may be added; none of the capture's protected evidence may disappear. */
