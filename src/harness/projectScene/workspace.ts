@@ -102,7 +102,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     if (disposed) return;
     working.hidden = !session.workingBlock;
     workingStatus.textContent = session.workingBlock ? `${session.workingBlock}${session.acknowledgment.error ? ` ${session.acknowledgment.error}` : ''}` : '';
-    retryWorking.hidden = session.readOnly || (session.acknowledgment.state !== 'failed' && session.savedStatus?.kind !== 'failed');
+    retryWorking.hidden = !session.canRetryWorking;
     // Keep editors mounted and draft DOM intact, but prevent overlapping native input.
     content.inert = header.inert = !!session.workingBlock;
     content.setAttribute('aria-busy', String(session.acknowledgment.state === 'checking'));

@@ -82,17 +82,18 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       list.append(row);
     }
   };
-  const mount = async () => {
-    if (!host || disposed) return;
+  const mount = async (prepared?: Awaited<ReturnType<ValidationWorkspacePorts['render']>>) => {
+    if (!host || disposed) { prepared?.dispose(); return; }
     content.replaceChildren();
-    if (host.read().state !== 'ready' || host.hasPending()) {
+    if (host.read().state !== 'ready' || host.hasPending() && !(host.backupRestore.needsDisplay && !host.backupRestore.pending)) {
+      prepared?.dispose();
       const note = document.createElement('p'), retry = document.createElement('button');
       note.textContent = host.authority.status?.().error || '更新が未完了です。元の変更から再試行してください。';
       retry.type = 'button'; retry.textContent = '更新を再試行'; retry.disabled = !!host.authority.readOnly;
       retry.addEventListener('click', () => execute(async () => { await host!.authority.retry!(); await mount(); }));
       content.append(note, retry); if (receiveTools) { receiveTools.render(); content.append(receiveTools.root); }
       retry.hidden = host.workspaceFiles.initialImport && host.read().state === 'empty' ||
-        !!host.workspaceFiles.jobs.some(j => !['completed', 'cancelled', 'abandoned'].includes(j.state));
+        host.backupRestore.pending || !!host.workspaceFiles.jobs.some(j => !['completed', 'cancelled', 'abandoned'].includes(j.state));
       if (host.mode?.current === 'view') {
         const edit = document.createElement('button'); edit.type = 'button'; edit.textContent = '編集を開始する';
         edit.addEventListener('click', () => execute(async () => {
@@ -105,13 +106,46 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     // File recovery must remain available even if renderer preparation fails or stalls.
     if (receiveTools) { receiveTools.render(); content.append(receiveTools.root); }
     status.textContent = 'モデルを読み込んでいます。';
-    const target = host, next = await ports.render(target);
+    const target = host, next = prepared ?? await ports.render(target);
     if (disposed || host !== target) { next.dispose(); return; }
     resident = next;
     try { workspace = createSavedWorkspace(document, target, next.factory, undefined, receiveTools);
-      content.replaceChildren(workspace.root); workspace.render(); }
-    catch (error) { next.dispose(); resident = undefined; throw error; }
+      content.replaceChildren(workspace.root); workspace.render();
+      if (target.backupRestore.needsDisplay) { target.backupRestore.displayReady(target.read().source!.token); workspace.render(); } }
+    catch (error) { workspace?.unmount(); workspace = undefined; next.dispose(); resident = undefined; throw error; }
     status.textContent = '検証用プロジェクト。通常画面・オフライン・実機での受入れは未完了です。';
+  };
+  const restoreDisplay = async (retry: boolean) => {
+    const target = host; if (!target || disposed) throw Error('プロジェクトを開いてください。');
+    const epoch = target.backupRestore.epoch;
+    let staged: Awaited<ReturnType<ValidationWorkspacePorts['render']>> | undefined;
+    let stagedPrepare: Parameters<ValidationDisplayHost['setDisplayPreparation']>[0] | undefined;
+    let readContent: ValidationDisplayHost['content'] | undefined;
+    const removeOldDisplay = () => { workspace?.unmount(); workspace = undefined; resident?.dispose(); resident = undefined; };
+    try {
+      await target.backupRestore[retry ? 'retry' : 'confirm'](async (next, sourceContent) => {
+        readContent = sourceContent;
+        staged = await ports.render({ authority: { ...target.authority, read: () => next },
+          content: { model: record => readContent!.model(record) },
+          setDisplayPreparation(callback) { stagedPrepare = callback; return () => { if (stagedPrepare === callback) stagedPrepare = undefined; }; } });
+      });
+      if (disposed || host !== target) throw Error('画面を閉じました。復元先は再度開いて確認してください。');
+      if (!staged) throw Error('復元先の表示を準備できません。');
+      // Only the selected runtime supplies future model reads; staging capabilities have expired.
+      readContent = target.content; const next = staged, prepare = stagedPrepare;
+      removeOldDisplay();
+      const detach = prepare ? target.setDisplayPreparation(prepare) : () => {};
+      staged = undefined; // mount now owns this resident, including failure/closed paths.
+      await mount({ factory: next.factory, dispose: () => { detach(); next.dispose(); } });
+    } catch (error) {
+      staged?.dispose();
+      if (target.backupRestore.epoch !== epoch) {
+        removeOldDisplay(); content.replaceChildren();
+        const note = document.createElement('p'); note.textContent = '復元先に切り替わりました。未完了の確認・表示を再開してください。';
+        content.append(note); if (receiveTools) content.append(receiveTools.root);
+      }
+      throw error;
+    }
   };
   const openProject = async (run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode: LocalOpenMode = 'edit', workspaceFile?: Blob) => {
     status.textContent = initial ? 'プロジェクトを作成しています。' : '再開用データを確認しています。';
@@ -119,7 +153,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (disposed) { await opened.dispose(); return; }
     host = createValidationModeHost(opened, nextMode => ports.open(run, undefined, nextMode), nextMode => ports.selected(run, nextMode));
     receiveTools = createValidationReceiveControls(document, host, () => workspace?.session,
-      () => { workspace?.render(); controls(); }, async () => { if (!workspace && !disposed) await mount(); }, () => workspace?.inputPending() ?? false);
+      () => { workspace?.render(); controls(); }, async () => { if (!workspace && !disposed) await mount(); }, () => workspace?.inputPending() ?? false, restoreDisplay);
     selected = run; ports.selected(run, host.mode!.current); navigation.hidden = true; await mount();
   };
   workspaceForm.addEventListener('submit', event => { event.preventDefault(); execute(async () => {

@@ -247,9 +247,12 @@ export class SyntheticSession {
     } catch (error) { return this.refuse(this.errorText(error)); }
   }
   get savedStatus() { return this.authority?.status?.(); }
+  get canRetryWorking() { return !this.readOnly && this.savedStatus?.retryable !== false &&
+    (this.acknowledgment.state === 'failed' || this.savedStatus?.kind === 'failed'); }
   get workingBlock() { return this.acknowledgment.block ?? (this.savedStatus?.kind === 'failed' ?
     this.savedStatus.error ?? '未完了の更新があります。更新を再試行してください。' : null); }
   retryWorking() {
+    if (!this.canRetryWorking) return false;
     if (this.acknowledgment.state === 'failed') return this.acknowledgment.retry();
     if (this.authority?.retry && this.savedStatus?.kind === 'failed')
       return this.applyWorking(() => this.authority!.retry!(), () => this.refreshHistory());

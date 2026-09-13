@@ -9,10 +9,9 @@ for code locations and [document index](../docs/README.md) for applicable contra
 
 1. Read AGENTS.md and the short current records above. Check actual branch, HEAD,
    worktree and remote state read-only; preserve existing changes.
-2. Follow the active task in todo. Environment maintenance is complete;
-   the product continuation is the connected backup restore/edit/Contribution flow.
-3. Inspect only its relevant source/tests/contracts. The current dirty restore
-   implementation must not be described as absent or as already accepted.
+2. Follow the active task in todo; it owns the next connected implementation unit.
+3. Inspect only its relevant source/tests/contracts. Distinguish tested limited
+   code from ordinary-route/browser/device acceptance, and preserve any dirty work.
 4. Continue approved work without repeated PO confirmation. Report only a real
    new decision/authority boundary or the completed requested result.
 

@@ -8,9 +8,12 @@ export async function initializeBrowserMetadata() {
   if (!response.ok) throw Error('保存エンジンを読み込めません。再読み込みしてください。');
   await A.initializeWasm(new Uint8Array(await response.arrayBuffer()));
 }
-export async function openBrowserMetadataStorage(name: string, allowCreate: boolean) {
+export async function browserMetadataDatabaseNames(): Promise<string[]> {
   if (typeof indexedDB.databases !== 'function') throw Error('このブラウザでは保存領域を安全に確認できません。');
-  if (!(await indexedDB.databases()).some(db => db.name === name) && !allowCreate)
+  return (await indexedDB.databases()).flatMap(db => db.name ? [db.name] : []);
+}
+export async function openBrowserMetadataStorage(name: string, allowCreate: boolean) {
+  if (!(await browserMetadataDatabaseNames()).includes(name) && !allowCreate)
     throw Error('必要な保存領域がありません。既存データは保持しています。');
   // Keep a non-creating connection until the adapter has opened; enumeration is only a snapshot.
   const guard = allowCreate ? undefined : await new Promise<IDBDatabase>((resolve, reject) => {

@@ -163,7 +163,7 @@ export interface SyntheticAuthority {
   addMediaFile?(token: string, command: MediaFileAddition): WorkingResult<SyntheticProject>;
   addModelFile?(token: string, command: ModelFileAddition): WorkingResult<SyntheticProject>;
   transformModel?(token: string, command: ModelPlacementCommand): WorkingResult<SyntheticProject>;
-  status?(): Readonly<{ kind: 'idle' | 'checking' | 'failed'; error?: string }>;
+  status?(): Readonly<{ kind: 'idle' | 'checking' | 'failed'; error?: string; retryable?: boolean }>;
   retry?(): WorkingResult<SyntheticProject>;
 }
 export function historyAuthority(history: WorkingHistory): SyntheticAuthority {

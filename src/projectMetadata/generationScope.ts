@@ -67,10 +67,10 @@ function fencedStream(open: () => ReadableStream<Uint8Array>, check: () => Promi
  * unwrapped root. The opener MUST isolate each generation in its own database.
  */
 export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
-  input: Readonly<{ generationId: WorkspaceGenerationId; allowCreate: boolean; assertSelected: () => Promise<void> }>,
+  input: Readonly<{ generationId: WorkspaceGenerationId; allowCreate: boolean; assertSelected: () => Promise<void>; assertWritable?: () => Promise<void> }>,
   openStorage: GenerationStorageOpener) {
   const generationId = checkedId(input.generationId), allowCreate = input.allowCreate,
-    assertSelected = input.assertSelected;
+    assertSelected = input.assertSelected, assertWritable = input.assertWritable;
   const logicalRoot = root.projectRoot === null ? '' : canonicalPath(root.projectRoot, false);
   const prefix = logicalRoot ? `${logicalRoot}/` : '';
   const projectRoot = generationId === null ? root.projectRoot : `${prefix}v2/generations/${generationId}`;
@@ -81,6 +81,7 @@ export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
     await assertSelected();
     if (disposed) fail('generation-closed');
   };
+  const checkWrite = async () => { await check(); if (assertWritable) await assertWritable(); await check(); };
   const ownPath = (path: string, listing = false) => {
     const canonical = canonicalPath(path, listing);
     if (namespace && !within(canonical, namespace)) fail('generation-path-outside');
@@ -94,7 +95,7 @@ export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
   const write = async (action: () => Promise<void>) => {
     root.mutationAuthority.assertWorkspaceWriteAuthorized();
     const finish = root.mutationAuthority.beginWorkspaceWrite();
-    try { await read(action); root.mutationAuthority.assertWorkspaceWriteAuthorized(); }
+    try { await checkWrite(); await action(); await checkWrite(); root.mutationAuthority.assertWorkspaceWriteAuthorized(); }
     finally { finish(); }
   };
   const fs: ProjectWorkspaceFS = Object.freeze({
@@ -138,13 +139,13 @@ export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
       ownPath(path); const owned = bytes.slice(); return write(() => root.appendBytes(path, owned));
     },
     writeStream: async (path: string, stream: ReadableStream<Uint8Array>) => {
-      const guarded = fencedStream(() => stream, check, reason => stream.cancel(reason));
+      const guarded = fencedStream(() => stream, checkWrite, reason => stream.cancel(reason));
       try { ownPath(path); await write(() => root.writeStream(path, guarded)); }
       finally { if (!guarded.locked) await guarded.cancel().catch(() => undefined); }
     },
     remove: (path: string) => { ownPath(path); return write(() => root.remove(path)); },
   });
-  registerWriteFence(fs, check);
+  registerWriteFence(fs, checkWrite);
   await check();
   const connection = await openStorage(generationId, allowCreate);
   try { await check(); } catch (error) { disposed = true; await connection.dispose().catch(() => undefined); throw error; }

@@ -37,8 +37,8 @@ async function writeInitial(fs: ProjectWorkspaceFS, source: ProjectMetadataSourc
     return fileError('初期記録の保存を確認できません。');
 }
 export function validationProjectService(fs: ProjectWorkspaceFS, storage: MetadataStorageFactory, store: OriginBlobStore,
-  limits: FileValidationLimits, decode?: PngDecoder) {
-  const content = new ValidationContent(fs, store, limits, decode);
+  limits: FileValidationLimits, decode?: PngDecoder, checkContentRead?: () => Promise<void>) {
+  const content = new ValidationContent(fs, store, limits, decode, checkContentRead);
   return { content, session: new MetadataProjectSession(fs, storage, metadataLimits, allow => content.verifier(allow), content, validationModelFacts(content)) };
 }
 /** Capture once; repeated execution uses identical source/IDs/bytes after a failed attempt. */

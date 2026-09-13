@@ -2422,6 +2422,174 @@ database/range isolation, cancellation, missing/torn control records, independen
 selection, exact restored source/bases and subsequent Contribution exchange.
 No new PoC, automatic external write, GC, profile or device/offline credit.
 
+#### Dedicated original-history initialization
+
+The internal `MetadataProjectSession.initializeBackup(job)` consumes only the
+exact staging filesystem and storage-factory pair returned by that
+`BackupRestoreJob.openStaging()`. The job keeps the returned scope's check
+privately (not caller-supplied refs); the filesystem alone cannot authorize an
+unrelated database factory.
+Before initialization/recovery it verifies the live Start/Index/DbOpened binding
+and reinspects its acknowledged ZIP. A cancelled, selected, disposed, different
+or original-generation capability cannot initialize. Generic Session retry cannot
+resume this purpose without the owning job. No UI or ordinary route is added by
+this command alone; historical-base binding and destination selection still follow.
+
+The closed journal input is:
+
+```ts
+interface BackupRestoreBatchProof {
+  version: 'lociview-package-backup-restore-1';
+  source: {
+    kind: 'fullBackup'; packageId: string;
+    manifest: EvidenceRef; checksum: EvidenceRef; metadata: EvidenceRef;
+    protectedInventory: EvidenceRef; exchangeBases: EvidenceRef;
+    baseEvidence: EvidenceRef[]; // ascending unique hash, exact table union
+    metadataEnvelope: MetadataProof['envelope']; remoteHeads: string[];
+  };
+  expectedFinalHeads: string[]; // exactly remoteHeads, not receiver union
+}
+interface BackupRestoreInput {
+  proof: BackupRestoreBatchProof;
+  bytes: Uint8Array; manifestBytes: Uint8Array; checksumBytes: Uint8Array;
+  protectedInventoryBytes: Uint8Array; exchangeBasesBytes: Uint8Array;
+  baseEvidenceBytes: Uint8Array[]; // same order as proof references
+}
+```
+
+Own every original before an await. Validate closed keys, existing per-file and
+cumulative package/source/evidence/control limits, exact manifest identity,
+purpose `backup`, heads and refs. Reuse complete backup semantic inspection to
+derive and compare the historical table/evidence, protected inventory, body list
+and summary. Keep `fullMetadata` restricted to Team Workspace. Merge and Workspace
+initialization explicitly reject fullBackup; a backup is not another merge input.
+
+Use existing journal original paths, plus only `source-protected-inventory.json`
+and `source-exchange-bases.json`. Base evidence uses `base-evidence/<hash>`.
+Before `blobsVerified` and on cold recovery, rederive the full canonical original
+change sequence from the retained source and compare every part byte and final
+head. An internally consistent hash of an incomplete subset is insufficient.
+An acknowledged missing original is an error, never refilled from memory or ZIP.
+
+The `restoreBackup` seal uses UTF-8
+`lociview:v2:backup-restore:jcs-v1\n` followed by canonical JSON of exactly the
+existing change-set preimage: `{transactionId, target:{identity,
+metadataEnvelope}, purpose, stagedBlobs, metadataBatch:{kind, baseHeads,
+changes, version, source, expectedFinalHeads}}`. `kind`/`purpose` are
+`restoreBackup`; `stagedBlobs` is the sorted explicit introduced-body delta or
+empty array. Earlier initialize/local/fullMetadata/Contribution seals are unchanged.
+
+The destination metadata namespace and Repo are initially empty. Repository ID
+equals job ID. Preserve the complete original history without bootstrap, new
+domain IDs or receiver rebase. Partial durable changes must be an exact subset of
+these originals. After the durable acknowledgment, loss is repair state. Once
+published, reentry validates initialization and returns the current history,
+including subsequent legitimate edits, without another publication.
+
+Limited GLB/PNG admission prepares original current-record content facts and all
+protected body refs, including historical-base-only refs. Before the first stage,
+preflight types, sizes and aggregate bounded content. New unacknowledged bodies
+may be introduced; already acknowledged missing/suspect bodies require explicit
+repair and are not filled from backup. Before metadata publication and reentry,
+consume and verify every protected saved body, not only a presence inventory.
+Profile/fact checks for the current Project stay mandatory. This is the existing
+bounded GLB/PNG route, not additional profile adoption.
+
+Reuse existing file/journal tests for actual backup initialization, old FS/DB
+byte preservation, original heads/parts, wrong purpose/scope, cancelled handles,
+partial recovery, generic-retry refusal, acknowledged source/body loss, base-only
+body verification and published reentry preserving later edits. Historical base
+authority, actual Contribution after restore, Selection and UI/cold host handoff
+remain mandatory next connections, not completion claims from these tests.
+
+#### Restored historical-base binding
+
+The generation-local `v2/metadata/restored-bases.json` is a closed canonical
+write-once record (under the same resolved Project prefix as its journal):
+
+```ts
+interface RestoredBasesBinding {
+  schema: 'lociview-workspace-restored-bases-1';
+  transactionId: string;
+  journal: EvidenceRef;       // exact prepared restore journal
+  publication: EvidenceRef;   // exact planned initial publication
+  exchangeBases: EvidenceRef; // original table in the same journal
+}
+```
+
+Even an empty table requires this binding. After verifying the owned restore
+job, all retained journal originals, complete history and all protected saved
+bodies, write/read back the binding before `published.json`. Compute the future
+publication from the same transaction/digest/exact final heads; the publication
+is its acknowledgment, not a second generated/imported observation. Recovery
+before publication may finish an absent binding. Once published, an absent,
+malformed or mismatched binding is repair state and must not be recreated.
+The binding stays fixed when later edits publish. Existing non-restore seals,
+publication records and local base receipts are unchanged.
+
+Journal helpers validate this record from exact entries and originals without
+calling Session.read. Session.read and destination selection consume this check;
+WorkspaceBaseStore reads historical rows/evidence through it without calling
+Session. No binding with no restore entry, or beside a non-restore root, grants
+authority. Unpublished restored rows are never exposed as usable bases.
+
+Read the original table directly; do not fabricate local base receipts. Keep
+local imported/generated observations independently validated. Compare the base
+proof excluding only `completions` and optional `label`, retain the historical
+label, and fold distinct completions in canonical order for snapshot/output.
+Local observation validation still requires its exact original local record.
+If the same evidence is authorized historically and by a local observation,
+verify both stored copies; neither may conceal loss of the other. A retained
+local receipt therefore prevents fallback to the historical copy on local loss.
+
+Apply the existing 16-base, 32-evidence, 16-MiB evidence, aggregate control,
+source-inspection and dependency limits to the combined table, not separately
+to restored and later local rows. Reuse source/manifest validation under shared
+budgets. Receive/generate preflight checks the prospective combined table before
+writing an observation; historical labels alone cannot reject a legitimate replay.
+Reuse actual backup/edit/Contribution tests with preserved original table/labels,
+later observations, missing binding/evidence, and unchanged old-generation bytes.
+Selection and browser acceptance still follow; binding alone is not restore UI.
+
+#### Selected-generation connection
+
+`openWorkspaceGeneration` separates a read fence (`assertSelected`) from an
+optional write fence (`assertWritable`, defaulting to the read fence for existing
+callers). FS/IDB mutations, lazy write-stream pulls and `underWriteLease` check
+both before and after work. A selected old generation remains readable while
+its owned root has a pending restore, but ordinary writes are refused. Staging
+retains the owning-pending-job guard for both reads and writes. Neither fence
+grants the underlying logical Project lease.
+
+The shared selected-generation resolver reads root controls and the actual DB
+list, captures the exact Selection (or original-generation absence), opens only
+an existing matching DB, and verifies the selected initialization's original
+proof, binding, first publication and all protected stored bodies. It uses the
+same scope for FS and Repo. No selected-state loss falls back to the original.
+Catalog and host consume this resolver; a pending restore is visible before
+renderer preparation. Actual destination verification never relies on URL names.
+
+Selection consumes an owned staging FS/factory pair after initialization and
+display preparation. In the unwrapped root queue, recheck current source/base
+fingerprint, prior Selection, active owning job and exact verified destination.
+Write/read back the existing Selection, then Result.selected. If a write's
+acknowledgment fails, inspect the same retained Selection before any retry;
+do not allocate another selection or undo an already committed switch. A missing
+Result after a verified Selection can be completed from its exact job; loss of
+an acknowledged Selection remains repair state. Repeated restore uses the
+verified selected generation as its old current, not a hard-coded original.
+Until Result.selected is verified, ordinary writes and a new restore are refused;
+read-only catalog inspection reports incomplete and never supplies that Result.
+
+The host retains one logical lease while disposing/replacing generation-local
+services. Prepare destination residents first, then commit Selection and mount a
+fresh editor using selected capabilities and the restored startup Scene. Staging
+capabilities expire at Selection. A post-switch display failure retains a
+selected-data resume action, never implicit rollback. Existing file controls
+own confirmation/cancel/retry and IME/draft guards; no new page or ordinary-home
+activation. Reuse file/host tests for two restores, pending read/write separation,
+cancel, pre/post-switch failure, cold restart and continued Contribution.
+
 #### Root restore job and selection control records
 
 The next implementation consumes the generation capability. Its controller owns
@@ -2553,14 +2721,16 @@ cancellation with failed/positive namespace probes; two local generations with
 unchanged Project identity; independent cold selection; exact original recovery
 and Contribution after restoration. No new probe page or production activation.
 
-Current bounded input/control implementation: `backupRestoreJob.ts` owns the
-inspected ZIP and confirmation from an independent ready service/publication/
-base snapshot. It persists Start/Index, supports explicit pre-Start abandonment
-and pre-selection cancellation, and opens the dedicated generation through the
-existing capability with a warm-only creation permit and acknowledged DB handoff.
-`restoreControls.ts` validates closed root controls, chain witnesses, namespace
-ownership and cumulative bounds without full ZIP reads in lazy-operation fences.
-Its selection result is structural only, not destination authority. The job has
-no Selection writer and refuses preparation against a selected generation until
-the dedicated backup initializer/base/body/destination verifier is connected.
-These are internal port-tested prerequisites, not restoration UI or adoption.
+Current bounded implementation: `backupRestoreJob.ts` owns the inspected ZIP and
+confirmation, Start/Index and acknowledged DB handoff; the dedicated Session
+initializer preserves original history and binds historical bases before first
+publication. The job verifies destination source/base/body evidence before its
+single Selection/Result handoff. `restoreControls.ts` remains structural control
+validation, not destination authority; lazy fences do not reread whole ZIPs.
+The opt-in GLB/PNG validation host/catalog resolve the selected generation under
+one logical lease. Explicit restore confirmation/retry/cancel and fresh display
+handoff are connected in the existing file area; retired content reads are
+checked before work and after decode, and host-owned recovery does not expose an
+unusable generic edit retry. Restored edits and Contribution use that same selected
+service. Executed checks and remaining browser/device evidence are recorded only
+in `tasks/todo.md`; this is not ordinary-route activation, adoption or release.

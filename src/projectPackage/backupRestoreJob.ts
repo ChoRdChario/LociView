@@ -1,11 +1,14 @@
 import type { ProjectWorkspaceFS } from '../platform/fs';
-import { cloneCanonicalValue } from '../domain/values';
+import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import { checkLimits, fail, type MetadataLimits } from '../projectMetadata/format';
 import { openWorkspaceGeneration, type GenerationStorageOpener } from '../projectMetadata/generationScope';
 import { newId, underWriteLease } from '../projectMetadata/persistence';
 import type { MetadataProjectSession } from '../projectMetadata/session';
 import { TransactionJournal } from '../projectMetadata/journal';
+import { MetadataRepository, type MetadataStorageFactory } from '../projectMetadata/repository';
+import type { BackupRestoreInput } from '../projectMetadata/packageRemote';
+import { packageByteHash } from './manifest';
 import { BackupArchive } from './backupArchive';
 import { PACKAGE_LIMITS as L, type EvidenceRef } from './contract';
 import { WorkspaceBaseStore } from './workspaceBases';
@@ -13,13 +16,14 @@ import { receiveJobKeys, receiveInputState, openReceiveJob, receiveTerminal } fr
 import { outputJobKeys, outputJobClass, openOutputJob, outputTerminal } from './outputJobs';
 import { checkAbort } from './zipChecks';
 import { checkRestoreCurrent, readRestoreControls, reconcileRestoreDatabases, reserveRestoreControls, writeRestoreControl, restoreEqual, restoreJobPath, restoreRef, restoreRoot,
-  type RestoreCurrent, type RestorePrepared, type RestoreStart, type RestoreControlJob } from './restoreControls';
+  type RestoreCurrent, type RestorePrepared, type RestoreStart, type RestoreControlJob, type GenerationSelection } from './restoreControls';
 
 /** Existing ready service, not UI-supplied heads or a filename-based Project identity. */
 export interface RestoreSourcePorts {
   readonly fs: ProjectWorkspaceFS;
   readonly session: Pick<MetadataProjectSession, 'read'>;
-  readonly store: Pick<OriginBlobStore, 'inspect'>;
+  readonly store: Pick<OriginBlobStore, 'inspect' | 'openReadOnly'>;
+  readonly factory?: MetadataStorageFactory;
 }
 export interface RestoreDatabasePorts {
   /** Enumerate only this logical Project's dedicated generation DB IDs; failure must reject. */
@@ -29,9 +33,10 @@ export interface RestoreDatabasePorts {
 const evidence = ({ sha256, byteLength }: EvidenceRef): EvidenceRef => ({ sha256, byteLength });
 const terminal = (job: RestoreControlJob) => job.abandoned || job.result !== null;
 
-/** Root-owned input and staging only. No selection/publication API before the full destination verifier exists. */
+/** Root-owned restore. All generation changes retain the same Project identity and logical lease. */
 export class BackupRestoreJob {
   private warmCreate = false;
+  private scopes = new WeakMap<ProjectWorkspaceFS, { factory: MetadataStorageFactory; check: () => Promise<void> }>();
   private constructor(private readonly root: ProjectWorkspaceFS, readonly id: string, private readonly limits: MetadataLimits,
     readonly inspection: BackupArchive, private readonly file: Blob, readonly current: RestoreCurrent,
     readonly previousSelection: EvidenceRef | null, readonly start: RestoreStart | null) {
@@ -50,11 +55,16 @@ export class BackupRestoreJob {
       baseEvidence: manifest.baseEvidence.map(evidence) };
   }
   private static async current(root: ProjectWorkspaceFS, ports: RestoreSourcePorts, limits: MetadataLimits,
-    state: Awaited<ReturnType<typeof readRestoreControls>>): Promise<RestoreCurrent> {
-    if (state.pending) return fail('restore-pending');
-    // A parsed chain is not proof of a restored destination. Its initializer/verifier is the next connection.
-    if (state.tail) return fail('restore-destination-verification-required');
-    if (ports.fs.mutationAuthority !== root.mutationAuthority || ports.fs.projectRoot !== root.projectRoot) fail('restore-current-scope');
+    state: Awaited<ReturnType<typeof readRestoreControls>>, ownPending?: string): Promise<RestoreCurrent> {
+    if (state.pending && state.pending.id !== ownPending || state.tail && !state.jobs.find(j => j.id === state.tail!.jobId)?.result)
+      return fail('restore-pending');
+    const generationId = state.tail?.jobId ?? null, expectedRoot = generationId === null ? root.projectRoot : `${restoreRoot(root)}v2/generations/${generationId}`;
+    if (ports.fs.mutationAuthority !== root.mutationAuthority || ports.fs.projectRoot !== expectedRoot) fail('restore-current-scope');
+    if (state.tail) {
+      const job = state.jobs.find(j => j.id === state.tail!.jobId)!;
+      if (!ports.factory) return fail('restore-destination-verification-required');
+      await this.verifyDestination(root, ports, ports.factory, job, limits, state.tail);
+    }
     const before = await ports.session.read();
     if (before.state !== 'ready' || !before.source || !before.publication || before.provider?.kind !== 'scene-provider' ||
       before.provider.token !== before.source.token) return fail('restore-current-not-ready');
@@ -79,7 +89,7 @@ export class BackupRestoreJob {
     const bases = await new WorkspaceBaseStore(ports.fs, limits, before.source.proof).snapshot();
     const after = await ports.session.read();
     if (after.state !== 'ready' || after.publication !== before.publication || after.source?.token !== before.source.token) return fail('restore-current-changed');
-    const current: RestoreCurrent = { generationId: null, publicationId: before.publication, publication: restoreRef(publication),
+    const current: RestoreCurrent = { generationId, publicationId: before.publication, publication: restoreRef(publication),
       source: { proof: before.source.proof, heads: [...before.source.heads], token: before.source.token }, bases: restoreRef(bases) };
     checkRestoreCurrent(current, limits); return current;
   }
@@ -164,8 +174,126 @@ export class BackupRestoreJob {
           checkAbort(signal); await this.write('db-opened.json', { schema: 'lociview-local-restore-db-opened-1', jobId: this.id,
             start: restoreRef(this.start), generationId: this.id });
         }
-        opening = false; checkAbort(signal); await scope.check(); return scope;
+        opening = false; checkAbort(signal); await scope.check();
+        this.scopes.set(scope.fs, { factory: scope.factory, check: scope.check }); return scope;
       } catch (error) { await scope.dispose().catch(() => {}); throw error; }
+    });
+  }
+  async assertStaging(fs: ProjectWorkspaceFS, factory: MetadataStorageFactory) {
+    const scope = this.scopes.get(fs);
+    if (!scope || scope.factory !== factory) return fail('restore-staging-owner'); await scope.check();
+  }
+  /** Reinspect owned disk bytes, not caller fields; binds the exact FS and DB capability pair. */
+  async initialization(fs: ProjectWorkspaceFS, factory: MetadataStorageFactory) {
+    await this.assertStaging(fs, factory);
+    const inspection = await BackupRestoreJob.inspectInput(this.root, this.id, this.descriptor(), this.limits);
+    const archive = inspection.archive, m = archive.control.manifest; if (m.purpose !== 'backup') return fail('restore-purpose');
+    const bytes = await archive.entryBytes('metadata.am', L.sourceBytes), manifestBytes = await archive.entryBytes('manifest.json', L.controlBytes),
+      checksumBytes = await archive.entryBytes('manifest.sha256', 64), protectedInventoryBytes = await archive.entryBytes('protected-inventory.json', L.controlBytes),
+      exchangeBasesBytes = await archive.entryBytes('exchange-bases.json', L.controlBytes), baseEvidenceBytes: Uint8Array[] = [];
+    for (const r of m.baseEvidence) baseEvidenceBytes.push(await archive.entryBytes(`base-evidence/sha256/${r.sha256}`, L.sourceBytes));
+    const input: BackupRestoreInput = { bytes, manifestBytes, checksumBytes, protectedInventoryBytes, exchangeBasesBytes, baseEvidenceBytes,
+      proof: { version: 'lociview-package-backup-restore-1', source: { kind: 'fullBackup', packageId: m.packageId,
+        manifest: { sha256: packageByteHash(manifestBytes), byteLength: manifestBytes.length }, checksum: { sha256: packageByteHash(checksumBytes), byteLength: 64 },
+        metadata: evidence(m.metadata), protectedInventory: evidence(m.protectedInventory), exchangeBases: evidence(m.exchangeBases), baseEvidence: m.baseEvidence.map(evidence),
+        metadataEnvelope: m.metadataEnvelope, remoteHeads: [...m.targetHeads] }, expectedFinalHeads: [...m.targetHeads] } };
+    await this.assertStaging(fs, factory); return { inspection, input };
+  }
+  inventory(): JsonObject[] { return this.inspection.description.bodyRefs.map(r => ({ ...r })); }
+  private static async verifyDestination(root: ProjectWorkspaceFS, ports: RestoreSourcePorts, factory: MetadataStorageFactory, job: RestoreControlJob,
+    limits: MetadataLimits, selected?: GenerationSelection) {
+    if (!job.prepared) return fail('restore-destination-job');
+    // Selection must not acknowledge a destination whose retained recovery archive is already corrupt.
+    await this.inspectInput(root, job.id, job.prepared, limits);
+    const restored = await new TransactionJournal(ports.fs, limits).readRestoredBases();
+    if (!job.prepared || !job.start || !job.dbOpened || !restored || restored.entry.start.transactionId !== job.id ||
+      !restoreEqual(restored.entry.start.proof, job.start.current.source.proof)) return fail('restore-destination-journal');
+    const original = restored.input.proof.source;
+    for (const key of ['manifest', 'metadata', 'protectedInventory', 'exchangeBases', 'baseEvidence'] as const)
+      if (!restoreEqual(original[key], job.prepared[key])) fail('restore-destination-originals');
+    const destination = { journal: restoreRef(restored.entry.prepared), publication: restoreRef(restored.entry.publication), baseBinding: restoreRef(restored.binding) };
+    if (selected && !restoreEqual(destination, selected.destination)) fail('restore-destination-binding');
+    const read = await ports.session.read();
+    if (read.state !== 'ready' || !read.source || !read.publication || read.provider?.kind !== 'scene-provider' ||
+      read.provider.token !== read.source.token) return fail('restore-destination-not-ready');
+    const saved = await new MetadataRepository(ports.fs, factory, limits).read(restored.entry.start.repositoryId, restored.source.proof, read.source.heads);
+    if (saved?.token !== read.source.token) return fail('restore-destination-database');
+    for (const ref of restored.description.bodyRefs) {
+      const file = await ports.store.openReadOnly(ref), reader = file.stream().getReader();
+      try { while (!(await reader.read()).done) { /* verified stream, no body accumulation */ } }
+      finally { try { await reader.cancel(); } finally { reader.releaseLock(); } }
+    }
+    await new WorkspaceBaseStore(ports.fs, limits, restored.source.proof).snapshot();
+    return { destination, read };
+  }
+  /** Resolve existing selected data only. Read permission survives a pending restore; ordinary writes do not. */
+  static async openSelected(root: ProjectWorkspaceFS, limits: MetadataLimits, databases: RestoreDatabasePorts,
+    createPorts: (scope: Awaited<ReturnType<typeof openWorkspaceGeneration>>) => RestoreSourcePorts) {
+    const state = await reconcileRestoreDatabases(root, limits, () => databases.listGenerations()), selected = state.selection,
+      generationId = state.tail?.jobId ?? null;
+    const checkSelected = async () => {
+      const next = await readRestoreControls(root, limits);
+      if (!restoreEqual(next.selection, selected)) fail('restore-generation-retired'); return next;
+    };
+    const scope = await openWorkspaceGeneration(root, { generationId, allowCreate: false,
+      assertSelected: async () => { await checkSelected(); },
+      assertWritable: async () => { const next = await checkSelected();
+        if (next.pending || next.tail && !next.jobs.find(j => j.id === next.tail!.jobId)?.result) fail('restore-pending'); } }, databases.open);
+    try {
+      const ports = createPorts(scope);
+      if (ports.fs !== scope.fs || ports.factory !== scope.factory) fail('restore-selected-scope');
+      if (state.tail) {
+        const job = state.jobs.find(j => j.id === generationId)!;
+        if (!job.prepared) return fail('restore-destination-job');
+        await this.verifyDestination(root, ports, scope.factory, job, limits, state.tail);
+      }
+      await scope.check(); return { ...scope, ports, selection: selected, pending: state.pending };
+    } catch (error) { await scope.dispose().catch(() => {}); throw error; }
+  }
+  /** One authoritative switch. An already retained switch is completed, never rewritten or rolled back. */
+  async select(current: RestoreSourcePorts, destination: RestoreSourcePorts & { factory: MetadataStorageFactory }, databases: RestoreDatabasePorts,
+    createSelectedPorts: (scope: Awaited<ReturnType<typeof openWorkspaceGeneration>>) => RestoreSourcePorts) {
+    return underWriteLease(this.root, async () => {
+      let state: Awaited<ReturnType<typeof readRestoreControls>> = await reconcileRestoreDatabases(this.root, this.limits, () => databases.listGenerations());
+      const selected = state.selections.find(s => s.jobId === this.id), job = state.jobs.find(j => j.id === this.id);
+      if (!this.start || !job?.start || !restoreEqual(job.start, this.start)) return fail('restore-selection-job');
+      if (selected) {
+        if (state.tail !== selected) return fail('restore-generation-retired');
+        const reopened = await BackupRestoreJob.openSelected(this.root, this.limits, databases, createSelectedPorts);
+        await reopened.dispose();
+      } else {
+        await this.assertStaging(destination.fs, destination.factory);
+        if (!restoreEqual(state.selection, this.previousSelection)) return fail('restore-confirmation-stale');
+        const now = await BackupRestoreJob.current(this.root, current, this.limits, state, this.id);
+        if (!restoreEqual(now, this.current)) return fail('restore-confirmation-stale');
+        const verified = await BackupRestoreJob.verifyDestination(this.root, destination, destination.factory, job, this.limits);
+        // Recheck source and selection after streamed destination verification, inside the same root queue.
+        state = await readRestoreControls(this.root, this.limits);
+        if (state.pending?.id !== this.id || !restoreEqual(state.selection, this.previousSelection) ||
+          !restoreEqual(await BackupRestoreJob.current(this.root, current, this.limits, state, this.id), this.current)) fail('restore-confirmation-stale');
+        const selection: GenerationSelection = { schema: 'lociview-local-generation-selection-1', jobId: this.id,
+          previous: this.previousSelection, start: restoreRef(this.start), destination: verified.destination };
+        await writeRestoreControl(this.root, `${restoreRoot(this.root)}v2/local-restore/selections/${restoreRef(selection).sha256}.json`, selection, this.limits);
+      }
+      state = await readRestoreControls(this.root, this.limits);
+      if (state.tail?.jobId !== this.id) return fail('restore-selection-readback');
+      await this.write('result.json', { schema: 'lociview-local-restore-result-1', jobId: this.id, start: restoreRef(this.start),
+        detail: { kind: 'selected', selection: state.selection } });
+      return state.selection!;
+    });
+  }
+  static async resumeSelection(root: ProjectWorkspaceFS, limits: MetadataLimits, databases: RestoreDatabasePorts,
+    createPorts: (scope: Awaited<ReturnType<typeof openWorkspaceGeneration>>) => RestoreSourcePorts) {
+    return underWriteLease(root, async () => {
+      const scope = await this.openSelected(root, limits, databases, createPorts);
+      try {
+        const state = await readRestoreControls(root, limits), job = state.jobs.find(j => j.id === state.tail?.jobId);
+        if (!job?.start || !state.tail || !restoreEqual(scope.selection, state.selection)) return fail('restore-selection-readback');
+        await writeRestoreControl(root, restoreJobPath(root, job.id, 'result.json'), {
+          schema: 'lociview-local-restore-result-1', jobId: job.id, start: restoreRef(job.start),
+          detail: { kind: 'selected', selection: state.selection } }, limits);
+        return state.selection!;
+      } finally { await scope.dispose(); }
     });
   }
   private write(name: string, value: unknown) { return writeRestoreControl(this.root, this.path(name), value, this.limits); }

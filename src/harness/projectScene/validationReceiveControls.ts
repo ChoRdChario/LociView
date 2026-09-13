@@ -4,7 +4,8 @@ import { createValidationOutputControls } from './validationOutputControls';
 
 /** One file/recovery area, available even before a Scene editor can mount. */
 export function createValidationReceiveControls(document: Document, host: ReturnType<typeof createValidationModeHost>,
-  session: () => SyntheticSession | undefined, changed: () => void, recovered: () => Promise<void>, otherInput: () => boolean = () => false) {
+  session: () => SyntheticSession | undefined, changed: () => void, recovered: () => Promise<void>, otherInput: () => boolean = () => false,
+  restoreDisplay?: (retry: boolean) => Promise<void>) {
   const root = document.createElement('section'), heading = document.createElement('h2'), form = document.createElement('form');
   heading.textContent = '更新ファイル'; root.setAttribute('aria-label', '更新ファイル');
   const label = document.createElement('label'), labelText = document.createElement('span'), input = document.createElement('input'), submit = document.createElement('button');
@@ -15,8 +16,15 @@ export function createValidationReceiveControls(document: Document, host: Return
   const status = document.createElement('p'), jobs = document.createElement('section'); status.setAttribute('role', 'status');
   form.append(label, submit, clear); root.append(heading, help, form, status, jobs);
   let busy = false, disposed = false, feedback = '', selectedJob: string | null = null, cancel: { id: string; stale: boolean } | null = null;
-  const output = createValidationOutputControls(document, host, session, changed, () => otherInput() || busy || !!input.files?.length || !!selectedJob || !!cancel);
-  root.append(output.root);
+  const restoreArea = document.createElement('details'), restoreSummary = document.createElement('summary'), restoreLabel = document.createElement('label'),
+    restoreInput = document.createElement('input'), restoreCommands = document.createElement('div'), restoreStatus = document.createElement('p');
+  restoreSummary.textContent = 'バックアップから復元'; restoreLabel.textContent = 'バックアップを選択';
+  restoreInput.type = 'file'; restoreInput.setAttribute('aria-label', 'バックアップを選択'); restoreLabel.append(restoreInput);
+  restoreStatus.setAttribute('role', 'status'); restoreArea.append(restoreSummary, restoreLabel, restoreStatus, restoreCommands);
+  let restorePrepared = false, restoreCancel = false;
+  const restoreChanges = () => !!restoreInput.files?.length || restorePrepared || restoreCancel;
+  const output = createValidationOutputControls(document, host, session, changed, () => otherInput() || busy || !!input.files?.length || !!selectedJob || !!cancel || restoreChanges());
+  root.append(restoreArea, output.root);
   const guard = (recovery: boolean) => {
     const s = session();
     if (host.authority.readOnly) throw Error('閲覧中は受信できません。編集を開始してください。');
@@ -24,7 +32,7 @@ export function createValidationReceiveControls(document: Document, host: Return
     if (!recovery && host.hasPending()) throw Error('中断した更新を先に確認してください。');
   };
   const perform = (action: () => Promise<unknown>, recovery: boolean, completed: string) => {
-    if (busy || output.hasChanges() || disposed) return;
+    if (busy || output.hasChanges() || restoreChanges() || disposed) return;
     try { guard(recovery); } catch (error) { feedback = (error as Error).message; render(); return; }
     busy = true; feedback = '更新を確認しています。'; render(); changed();
     void (async () => {
@@ -40,13 +48,26 @@ export function createValidationReceiveControls(document: Document, host: Return
     const b = document.createElement('button'); b.type = 'button'; b.textContent = text; b.disabled = busy || output.hasChanges() || !!host.authority.readOnly;
     b.addEventListener('click', () => { if (!b.disabled) action(); }); parent.append(b);
   };
+  const performRestore = (action: () => Promise<void>, recovery: boolean, completed: string, consume = true) => {
+    if (busy || disposed || output.hasChanges() || input.files?.length || selectedJob || cancel) return;
+    try { guard(recovery); } catch (error) { feedback = (error as Error).message; render(); return; }
+    busy = true; feedback = '復元を確認しています。'; render(); changed();
+    void (async () => {
+      try {
+        await action(); if (disposed) return;
+        if (consume) { restoreInput.value = ''; restorePrepared = false; restoreCancel = false; }
+        await recovered(); feedback = completed;
+      } catch (error) { if (!disposed) feedback = error instanceof Error ? error.message : '復元を完了できません。元のデータは保持しています。'; }
+      finally { busy = false; if (!disposed) { render(); changed(); } }
+    })();
+  };
   const render = () => {
     if (disposed) return;
     heading.textContent = host.workspaceFiles.initialImport ? '作業一式を開く' : '更新ファイル';
     root.setAttribute('aria-label', heading.textContent);
     help.textContent = host.workspaceFiles.initialImport ? '読み込み途中のデータは、元のファイルから再開できます。' :
       '同じプロジェクトの作業一式・変更分を統合します。元ファイルは変更しません。';
-    output.render(); form.inert = busy || output.hasChanges(); submit.disabled = busy || output.hasChanges() || host.authority.readOnly || !input.files?.length;
+    output.render(); form.inert = busy || output.hasChanges() || restoreChanges(); submit.disabled = busy || output.hasChanges() || restoreChanges() || host.authority.readOnly || !input.files?.length;
     clear.disabled = busy; clear.hidden = !input.files?.length && !selectedJob;
     labelText.textContent = selectedJob ? '元のファイルを選び直す' : host.workspaceFiles.initialImport ? '作業一式を選択' : '更新ファイルを選択';
     input.setAttribute('aria-label', labelText.textContent);
@@ -77,7 +98,38 @@ export function createValidationReceiveControls(document: Document, host: Return
         host.workspaceFiles.abandonInput(target.id), true, '受信を取りやめました。'));
       button(jobs, '戻る', () => { cancel = null; render(); changed(); });
     }
+    restoreArea.hidden = !host.backupRestore.enabled;
+    if (host.backupRestore.pending || host.backupRestore.needsDisplay) restoreArea.open = true;
+    restoreInput.disabled = busy || output.hasChanges() || host.authority.readOnly || host.backupRestore.pending;
+    restoreStatus.textContent = host.backupRestore.error || (host.backupRestore.pending ? '復元が未完了です。' :
+      host.backupRestore.needsDisplay ? '復元先の表示を再開してください。' : '統合ではなく、バックアップの状態に切り替えます。元の作業とファイルは残ります。');
+    restoreCommands.replaceChildren();
+    if (host.backupRestore.retryable) button(restoreCommands, '復元を再開', () => performRestore(async () => {
+      if (!restoreDisplay) throw Error('復元先の表示に接続できません。'); await restoreDisplay(true);
+    }, true, 'バックアップから復元しました。ファイルへの反映はしていません。'));
+    if (host.backupRestore.cancellable) button(restoreCommands, '復元を取りやめる', () => { restoreCancel = true; render(); changed(); });
+    if (restoreCancel) {
+      const note = document.createElement('p'); note.textContent = '復元を取りやめ、現在の作業を続けます。'; restoreCommands.append(note);
+      button(restoreCommands, '取りやめる', () => performRestore(() => host.backupRestore.cancel(), true, '復元を取りやめました。'));
+      button(restoreCommands, '戻る', () => { restoreCancel = false; render(); changed(); });
+    } else if (!host.backupRestore.pending && !host.backupRestore.needsDisplay) {
+      if (restorePrepared) {
+        const note = document.createElement('p'); note.textContent = '現在の作業から、このバックアップの状態へ切り替えますか？'; restoreCommands.append(note);
+        button(restoreCommands, 'このバックアップから復元', () => performRestore(async () => {
+          if (!restoreDisplay) throw Error('復元先の表示に接続できません。'); await restoreDisplay(false);
+        }, false, 'バックアップから復元しました。ファイルへの反映はしていません。'));
+      } else if (restoreInput.files?.length) button(restoreCommands, '内容を確認', () => performRestore(async () => {
+        const file = restoreInput.files?.[0]; if (!file) throw Error('バックアップを選択してください。');
+        await host.backupRestore.prepare(file); restorePrepared = true;
+      }, false, '復元内容を確認してください。', false));
+      if (restoreChanges()) button(restoreCommands, '復元の選択を取り消す', () => {
+        host.backupRestore.clearPreparation(); restoreInput.value = ''; restorePrepared = false; feedback = ''; render(); changed();
+      });
+    }
   };
+  restoreInput.addEventListener('change', () => {
+    if (busy) return; host.backupRestore.clearPreparation(); restorePrepared = false; feedback = ''; render(); changed();
+  });
   input.addEventListener('change', () => { feedback = ''; render(); changed(); });
   clear.addEventListener('click', () => { if (busy) return; input.value = ''; selectedJob = null; feedback = ''; render(); changed(); });
   form.addEventListener('submit', event => {
@@ -89,6 +141,6 @@ export function createValidationReceiveControls(document: Document, host: Return
     else { feedback = '再開用データを確認してから受信してください。'; render(); }
   });
   render();
-  return { root, render, busy: () => busy || output.busy(), hasChanges: () => busy || output.hasChanges() || !!input.files?.length || !!selectedJob || !!cancel,
+  return { root, render, busy: () => busy || output.busy(), hasChanges: () => busy || output.hasChanges() || restoreChanges() || !!input.files?.length || !!selectedJob || !!cancel,
     dispose: () => { disposed = true; output.dispose(); root.remove(); } };
 }

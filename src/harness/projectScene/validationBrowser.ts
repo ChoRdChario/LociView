@@ -2,7 +2,7 @@ import { OpfsFS } from '../../platform/opfs';
 import { ProjectMutationCoordinator } from '../../platform/projectLock';
 import { OriginBlobStore } from '../../projectMetadata/blobStore';
 import { validationMetadataLimits, type FileValidationLimits } from '../../projectFiles/validation';
-import { initializeBrowserMetadata, openBrowserMetadataStorage } from './browserMetadataStorage';
+import { initializeBrowserMetadata, openBrowserMetadataStorage, browserMetadataDatabaseNames } from './browserMetadataStorage';
 import { openValidationHost, validationArea } from './validationHost';
 import { listValidationProjects } from './validationCatalog';
 import { createValidationWorkspace } from './validationWorkspace';
@@ -10,6 +10,7 @@ import { prepareValidationResidents } from './validationRender';
 import { sceneViewportFactory } from './viewport';
 import { syntheticDisplay } from './viewportModel';
 import type { SyntheticProject } from './fixture';
+import { generationDatabaseName } from '../../projectMetadata/generationScope';
 
 // Conservative execution budgets for this development lane, not measured product capacity.
 export const validationBrowserLimits: FileValidationLimits = { maxFileBytes: 64 * 1024 * 1024,
@@ -19,6 +20,10 @@ export async function createValidationBrowserWorkspace(document: Document, run?:
   await initializeBrowserMetadata();
   const base = await OpfsFS.open(), locks = navigator.locks ?? null;
   const options = { base, coordinator: ProjectMutationCoordinator.browser(locks), fileLimits: validationBrowserLimits, packageLocks: locks,
+    generations: (id: string) => { const original = `${validationArea}-${id}`, prefix = `${original}-generation-`;
+      return { listGenerations: async () => (await browserMetadataDatabaseNames()).filter(name => name.startsWith(prefix)).map(name => name.slice(prefix.length)),
+        open: (generation: string | null, create: boolean) => openBrowserMetadataStorage(generationDatabaseName(original, generation), create) };
+    },
     store: new OriginBlobStore(base, { maxBlobBytes: validationBrowserLimits.maxFileBytes,
       maxChunkBytes: 16 * 1024 * 1024, maxChunks: 100_000, metadata: validationMetadataLimits }, locks) };
   const storage = (id: string, create: boolean) => openBrowserMetadataStorage(`${validationArea}-${id}`, create);

@@ -3,7 +3,7 @@ import { metadataProviderReady, type MetadataModelFactPort, type MetadataModelFa
 import type { ProjectMetadataSource } from '../projectMetadata/source';
 import { json } from '../projectMetadata/persistence';
 import type { ContentRequest } from '../domain/projectContentChecks';
-import type { JsonObject } from '../domain/values';
+import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import { validationMetadataLimits as limits, fileError } from './validation';
 import type { ValidationContent } from './content';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
@@ -12,6 +12,7 @@ import { fileObject } from './validation';
 /** Only a locally selected, owned GLB may introduce new facts. Old evidence is never repaired. */
 export function validationModelFacts(content: ValidationContent): MetadataModelFactPort {
   return { planReceived: (base, next, bodyFor) => validationReceivedFacts(content, base, next, bodyFor),
+    planRestored: (next, bodyFor, refs) => restoredFacts(content, next, bodyFor, refs),
     planImported: (next, bodyFor) => receivedFacts(content, null, next, bodyFor), async plan(base, next) {
     const used = new Set<string>(), introduced = new Set<string>(); let work = 0;
     const charge = () => { if (++work > limits.maxWork) fileError('モデルの検証範囲を超えています。'); };
@@ -47,6 +48,41 @@ export function validationModelFacts(content: ValidationContent): MetadataModelF
         completed.add(key);
       }
     } };
+  } };
+}
+
+/** Also retain bodies needed only by historical exchange bases; never repair an acknowledged CAS entry. */
+async function restoredFacts(content: ValidationContent, next: ProjectMetadataSource, bodyFor: (ref: JsonObject) => Blob,
+  input: readonly JsonObject[]): Promise<MetadataModelFactPlan> {
+  const refs = cloneCanonicalValue(input, limits) as JsonObject[];
+  const sizes = new Map<string, number>(), bodies = new Map<string, { ref: JsonObject; file: Blob }>();
+  let total = 0;
+  for (const ref of refs) {
+    const check = new ProjectRecordFields(); check.blob(ref, []);
+    if (check.unknown || !['model/gltf-binary', 'image/png'].includes(ref.mediaType as string)) return fileError('復元する本体形式を確認してください。');
+    const key = json(ref), size = ref.byteLength as number, previous = sizes.get(ref.digest as string);
+    if (previous !== undefined && previous !== size) return fileError('復元する本体の大きさが一致しません。');
+    if (previous === undefined) { total += size; sizes.set(ref.digest as string, size); }
+    if (total > content.limits.maxFileBytes || bodies.has(key)) return fileError('復元する本体が検証の範囲を超えています。');
+    const file = bodyFor(ref); if (!(file instanceof Blob) || file.size !== size) return fileError('復元する本体が不足しています。');
+    bodies.set(key, { ref, file });
+  }
+  const introduced = new Set<string>();
+  for (const [key, body] of bodies) {
+    const state = await content.store.inspect(body.ref);
+    if (state === 'unverified') introduced.add(key);
+    else if (state !== 'verified-present') return fileError('記録済みの本体に修復が必要です。');
+  }
+  const facts = await receivedFacts(content, null, next, bodyFor), handled = new Set((facts.stagedBlobs ?? []).map(json));
+  if ([...handled].some(key => !bodies.has(key))) return fileError('復元する本体の一覧が一致しません。');
+  const completed = new Set<string>();
+  return { baseToken: null, finalToken: next.token, stagedBlobs: [...introduced].sort().map(key => bodies.get(key)!.ref), async stage() {
+    await facts.stage();
+    for (const [key, body] of bodies) {
+      if (introduced.has(key) && !handled.has(key) && !completed.has(key)) { await content.stageReceived(body.file, body.ref); completed.add(key); }
+      else if (await content.store.inspect(body.ref) !== 'verified-present') return fileError('記録済みの本体を確認できません。');
+    }
+    // Session consumes/verifies the complete inventory again immediately before publication.
   } };
 }
 

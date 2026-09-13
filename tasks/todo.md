@@ -12,48 +12,65 @@ resume and recovery. Desktop, physical iPhone and offline acceptance must cover
 the new route. Scope is 62 of the 64 inventory groups; M13/M14 remain later work.
 Neither component counts nor synthetic-host success is product completion or release approval.
 
-## Completed — environment maintenance (PO approved)
-
-- [x] Consolidate global/repository guidance: scoped autonomy, focused checks and checkpoint Push.
-- [x] Separate current navigation from preserved historical records.
-- [x] Reconcile inventory/current lessons and verify retained history, links and instruction consistency.
-- [x] Complete independent read-only review; confirm product source/tests/configuration were not changed by this task.
-
-No product implementation, dependency/schema/profile change, new skill framework,
-permission weakening, release or deployment belongs to this maintenance task.
-
-## Product work to resume — restore → edit → Contribution
+## Completed limited unit — restore → edit → Contribution
 
 Checkpoint entering maintenance: `423990d` (root-owned backup restore input jobs).
-The worktree already contains dedicated original-history initialization, historical
-base binding, retained-ZIP validation, selected-generation routing and restore
-confirmation/retry/cancel controls in the existing file area. It is **not yet a
-verified connected restore milestone**. Preserve all existing dirty changes.
+Environment maintenance is complete at `c6222ee`. Product changes connect dedicated
+original-history initialization, historical bases, retained-ZIP validation, selected
+generation routing and explicit restore controls in the existing validation file
+area. This is limited GLB/PNG development code, not ordinary-home acceptance.
 
 - [x] Independent pre-implementation review of the dedicated initialization contract (06 §12.8).
-- [ ] Finish the connected host/catalog/display lifecycle; retain one logical lease,
+- [x] Finish the connected host/catalog/display lifecycle; retain one logical lease,
   original work, every protected body and exact recovery. Do not fall back silently after selection.
-- [ ] Verify restored editing and Contribution, cold selected-generation reopen,
+- [x] Verify restored editing and Contribution, cold selected-generation reopen,
   failure/retry/cancellation using the existing file/host tests. Update the existing
   isolation allowlist for the new generation module; no new PoC/test framework.
-- [ ] Run final typecheck, root tests, ordinary/harness builds and independent final
-  review at the connected source/test tree, then commit a suitable checkpoint.
+- [x] Run typecheck, root tests, ordinary/harness builds and independent final review.
+  Correct the two test-only failures and rerun those cases; see exact evidence below.
+- [ ] Record actual browser rendering, physical-device and offline acceptance at
+  their approved grouped boundaries; do not replace them with recorded DOM tests.
 
 ### Evidence boundaries
 
-- Prior committed root-job checkpoint: 2,249 PASS, 21 existing TODO, no failures;
-  typecheck, ordinary/harness builds and independent review passed. This does not verify later dirty code.
-- Pre-host-integration focused restore/generation run: 20 PASS (3 files, 184 skipped).
-  This is not a full-suite or latest-host result.
-- After host/UI integration: typecheck passed. Final connected tests/builds/review,
-  browser rendering and physical-device/offline acceptance remain pending.
-- No new product execution evidence is claimed by environment/document maintenance.
+- Final typecheck, ordinary build and harness build passed. Existing large-chunk/
+  mixed-import warnings remain; no warning threshold or dependency was changed.
+- Root run `npm test -- --reporter=dot --maxWorkers=2 --testTimeout=30000`:
+  2,257 PASS, 21 existing TODO, 2 test failures (112 files, 742.76s). Product code
+  did not change afterward. An obsolete pre-implementation refusal expectation
+  was replaced with the current pending guard plus actual forged-destination
+  rejection. A View-switch test now waits for durable reopening to finish (10s
+  test ceiling), then asserts View and disabled editing/output controls. Both
+  cases passed targeted reruns; independent review confirmed no weakened acceptance.
+  Do not describe this as a second all-green full run; unchanged cases were not rerun.
+- Four focused host/content/recorded-DOM cases passed: restored editing and two-way
+  Contribution with cold reopen; failed rendering/cancellation and missing-Result
+  recovery; reachable restore retry/fresh editor/single resident ownership; refusal
+  of an in-flight content result after generation retirement.
+- Existing imported-base Contribution regression plus entry isolation: 2 PASS.
+  Replay budgets the actual observed receiver, not a fictitious source-head receipt.
+  Raw database enumeration remains behind the existing browser-storage adapter.
+- Independent read-only UI/core reviews are complete with no mandatory remainder:
+  generic retry dead end, retired content/read handoff, resident ownership and
+  prospective-base replay/first-import checks were corrected.
+- Browser connection failed during the installed tool's bootstrap with
+  `Importing module "node:process" is not allowed in node_repl`. No browser,
+  iPhone, offline or performance PASS is claimed. Do not make tool repair a new
+  product dependency or ask the PO to repeat internal checks individually.
 
 ## Remaining sequence and stop conditions
 
-1. Finish the current connected restore/edit/return operation. Address data-loss,
-   save-misrepresentation and operation-blocking faults immediately.
-2. Connect remaining file purposes (review/edit-copy, clean copy), migration/late
+1. Preserve the checked restore/edit/return checkpoint and proceed to the connected
+   clean-copy unit below. Address data-loss, save-misrepresentation and
+   operation-blocking faults immediately.
+2. Next connected unit: whole-Project clean copy → open as an independent editable
+   Project → edit → cold reopen. Reuse typed re-key/field transforms, graph checks,
+   ZIP machinery and existing file UI; freeze fresh IDs/source for exact retry.
+   Keep current-value privacy admission and clean's whole-active-Project closure
+   separate from review's selected-Scene presentation. Verify source preservation,
+   independent history, exact bodies, rejection/cancel/retry and honest download
+   status in existing package/file tests. A shared builder alone is not completion.
+   Then connect review/edit-copy and migration/late
    Native changes, existing supported formats and missing user controls according
    to their dependencies. Do not polish one subsystem while whole flows stay missing.
 3. Satisfy applicable storage/renderer/profile/device adoption conditions, then
@@ -78,25 +95,21 @@ New policy/compatibility/major architecture decisions retain their explicit appr
 
 PO renewed permission for timely checkpoint Push on 2026-09-14. Use existing
 `g0-baseline`; verify remote, scope, privacy and triggered workflows first.
-At maintenance entry, cached origin was 0 behind / 72 ahead; no live fetch was used
-for that observation. Previous environment denial is separate from PO permission:
+Before this product checkpoint, cached origin was 0 behind / 73 ahead; no live fetch
+was used for that observation. Previous environment denial is separate from PO permission:
 do not retry a denied action unchanged or bypass it. Local implementation need not wait.
 `main`, Pages, Service Worker, license/version and public release remain separately gated.
 
 ## Review record
 
-Environment maintenance completed 2026-09-14: six historical snapshots reconstruct
-their original hashes; 420 local Markdown links resolve; the 64 unique feature IDs
-and 33/4/18/9 classification are unchanged. All 509 fingerprinted product/test/
-tooling/config files are unchanged by maintenance; diff-check passes. Independent
-read-only review of the guidance/current records and three adjacent reference
-banners has no mandatory remainder. Global guidance was backed up locally and
-consolidated; model/effort, installed skills and sandbox/security settings are unchanged.
-The mechanical verifier was corrected for synonymous link spellings (indexed
-reversal) and H01/H02 counting; these were verifier issues, not product failures.
-No runtime suite/build or browser/device test was run for this documentation-only task.
-No denied Push was retried. Commit only this environment/document scope, preserving
-the unverified product changes for the connected unit above.
+2026-09-14: the connected restore path, not a new probe page, is the unit of work.
+Focused tests reuse existing suites; the initial mixed selection hit 5s/30s test
+timeouts, not acceptance of a performance bound. Long connected host tests have a
+60s test-only deadline. Final root execution uses bounded workers and a 30s default
+deadline without changing runtime budgets, test assertions or project configuration.
+One full run was stopped when independent review found the prospective-base defect;
+it is not completion evidence. No new dependencies/formats/schema policies,
+ordinary activation, release changes or denied Push retries belong to this unit.
 
 The previous plans, failures and executed checkpoint logs are preserved in
 [history](../docs/history/development-through-2026-09-14/README.md). Update this

@@ -33,7 +33,8 @@ export class ValidationContent implements MetadataMediaPort {
   private readonly preparedImages = new Map<string, { record: JsonObject; bytes: Uint8Array; ref: StoredBlobRef }>();
   private readonly preparedModels = new Map<string, Awaited<ReturnType<typeof prepareValidationModel>>>();
   constructor(private readonly fs: ProjectWorkspaceFS, readonly store: OriginBlobStore,
-    readonly limits: FileValidationLimits, private readonly decode?: PngDecoder) {}
+    readonly limits: FileValidationLimits, private readonly decode?: PngDecoder,
+    private readonly checkRead?: () => Promise<void>) {}
   /** Owned input only; no body or Project write until the existing journal stages it. */
   async prepareImage(input: ValidationFile): Promise<JsonObject> {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
@@ -77,8 +78,10 @@ export class ValidationContent implements MetadataMediaPort {
     return blob;
   }
   async model(record: JsonObject, readOnly = false): Promise<ValidatedGlb> {
+    await this.checkRead?.();
     const blob = await this.modelDeclaration(record);
-    return inspectValidationGlb(await readValidationBody(await (readOnly ? this.store.openReadOnly(blob) : this.store.open(blob)), this.limits.maxFileBytes), this.limits, this.decode);
+    const model = await inspectValidationGlb(await readValidationBody(await (readOnly ? this.store.openReadOnly(blob) : this.store.open(blob)), this.limits.maxFileBytes), this.limits, this.decode);
+    await this.checkRead?.(); return model;
   }
   private imageDeclaration(record: JsonObject): JsonObject {
     const blob = fileObject(record.blob) as JsonObject;
@@ -86,9 +89,10 @@ export class ValidationContent implements MetadataMediaPort {
     return blob;
   }
   async image(record: JsonObject, readOnly = false): Promise<Uint8Array> {
+    await this.checkRead?.();
     const blob = this.imageDeclaration(record);
     const bytes = await readValidationBody(await (readOnly ? this.store.openReadOnly(blob) : this.store.open(blob)), this.limits.maxFileBytes);
-    await inspectValidationPng(bytes, this.limits, this.decode); return bytes;
+    await inspectValidationPng(bytes, this.limits, this.decode); await this.checkRead?.(); return bytes;
   }
   /** Original incoming record and immutable range, no ID allocation or storage/evidence writes. */
   async inspectReceived(input: ContentRequest, file: Blob) {

@@ -1,3 +1,4 @@
+import * as A from '@automerge/automerge/slim';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import { fail, type MetadataLimits, type MetadataProof } from '../projectMetadata/format';
 import { digest, json, readReceipt, writeReceipt } from '../projectMetadata/persistence';
@@ -9,6 +10,7 @@ import { packageByteHash, readManifestControl } from './manifest';
 import { planWorkspaceClosure } from './closure';
 import { summarizeFullHistory } from './historySummary';
 import { verifyGeneratedBase, WorkspaceOutputJob } from './outputJob';
+import { readBackupBases, backupEvidenceRefs } from './backupEvidence';
 
 export interface ReceiverProof { identity: MetadataProof['identity']; metadataEnvelope: MetadataProof['envelope']; heads: readonly string[] }
 type Start = { schema: 'lociview-package-job-start-1'; jobId: string; prepared: EvidenceRef } &
@@ -24,7 +26,22 @@ interface Step { schema: 'lociview-package-job-step-1'; jobId: string; start: Ev
   detail: Completion | { kind: 'baseRecorded'; completion: EvidenceRef; baseRecord: EvidenceRef } | { kind: 'cancelled'; stage: 'beforeWorkspaceJournal' } }
 export interface WorkspaceBaseRecord { identity: ReceiverProof['identity']; metadataEnvelope: ReceiverProof['metadataEnvelope']; workspacePackageId: string;
   workspaceManifestSha256: string; declaredHeads: readonly string[]; evidence: { manifest: EvidenceRef; metadata: EvidenceRef };
-  completions: ({ observation: 'imported'; publishedReceiverHeads: readonly string[] } | { observation: 'generated' })[] }
+  completions: ({ observation: 'imported'; publishedReceiverHeads: readonly string[] } | { observation: 'generated' })[]; label?: string }
+
+export function workspaceBaseProof(row: WorkspaceBaseRecord) {
+  const { completions: _observations, label: _label, ...proof } = row; return proof;
+}
+function foldBases(rows: readonly WorkspaceBaseRecord[]) {
+  const groups = new Map<string, WorkspaceBaseRecord>();
+  for (const row of rows) {
+    const previous = groups.get(row.workspacePackageId);
+    if (previous && json(workspaceBaseProof(previous)) !== json(workspaceBaseProof(row))) fail('receive-base-conflict');
+    const completions = [...(previous?.completions ?? []), ...row.completions], label = previous?.label ?? row.label;
+    groups.set(row.workspacePackageId, { ...row, ...(label !== undefined ? { label } : {}), completions:
+      [...new Map(completions.map(c => [json(c), c])).entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, c]) => c) });
+  }
+  return { records: [...groups.values()].sort((a, b) => a.workspacePackageId.localeCompare(b.workspacePackageId)) };
+}
 
 export const encodePackageValue = (value: unknown) => new TextEncoder().encode(json(value));
 export const evidenceReference = (bytes: Uint8Array): EvidenceRef => ({ sha256: packageByteHash(bytes), byteLength: bytes.length });
@@ -57,8 +74,8 @@ export class WorkspaceBaseStore {
     for (const id of await WorkspaceOutputJob.ids(this.fs)) if (await WorkspaceOutputJob.state(this.fs, id, this.limits) === 'started') {
       const job = await WorkspaceOutputJob.open(this.fs, id, this.limits); await job.validateCompletion(); outputs.push(job);
     }
-    const prefix = `${workspacePackageRoot(this.fs)}bases/`, paths = await this.fs.list(prefix), rows: WorkspaceBaseRecord[] = [], keys = new Map<string, string>();
-    const evidence = new Map<string, number>(); let controlBytes = 0, sourceWork = 0, sourceNodes = 0;
+    const prefix = `${workspacePackageRoot(this.fs)}bases/`, paths = await this.fs.list(prefix), rows: WorkspaceBaseRecord[] = [];
+    let controlBytes = 0;
     if (paths.length > L.entryCount) fail('receive-base-budget');
     for (const path of paths) {
       const file = await this.fs.readStream(path); if (!file || file.size > L.controlBytes || (controlBytes += file.size) > L.controlsBytes) return fail('receive-base-budget');
@@ -70,29 +87,59 @@ export class WorkspaceBaseStore {
         !r.evidence || Object.keys(r.evidence).sort().join(',') !== 'manifest,metadata' ||
         !Array.isArray(r.completions) || r.completions.length !== 1 || !validCompletion(r.completions[0])) return fail('receive-base-record');
       checkRemoteHeads(r.declaredHeads); if (r.completions[0]!.observation === 'imported') checkRemoteHeads(r.completions[0]!.publishedReceiverHeads);
-      for (const e of [r.evidence.manifest, r.evidence.metadata]) {
-        if (evidence.has(e.sha256) && evidence.get(e.sha256) !== e.byteLength) fail('receive-base-evidence');
-        evidence.set(e.sha256, e.byteLength);
+      // Local receipts always require their own copies, even when a restore holds identical evidence.
+      await this.readLocalEvidence(r.evidence.manifest); await this.readLocalEvidence(r.evidence.metadata);
+      await this.verifyBaseObservation(r, outputs); rows.push(r);
+    }
+    await this.requireLocalObservations(rows);
+    const restored = await new TransactionJournal(this.fs, this.limits).readRestoredBases();
+    const historical = restored ? readBackupBases(restored.input.exchangeBasesBytes, this.proof).table.records : [];
+    const originals = new Map(restored?.input.proof.source.baseEvidence.map((e, i) => [e.sha256, restored.input.baseEvidenceBytes[i]!]) ?? []);
+    rows.push(...historical);
+    await this.checkSources(rows, async e => originals.get(e.sha256) ?? this.readLocalEvidence(e), controlBytes);
+    return rows;
+  }
+  /** A completed local receive witnesses its own receipt; restored history cannot replace it. */
+  private async requireLocalObservations(rows: readonly WorkspaceBaseRecord[]) {
+    for (const id of await receiveJobIds(this.fs)) {
+      const prefix = `${workspacePackageRoot(this.fs)}receive/${id}/`, paths = await this.fs.list(`${prefix}steps/`);
+      if (paths.length > 2) fail('receive-step-count');
+      for (const path of paths) {
+        const step = await readReceipt<Step>(this.fs, path, this.limits);
+        if (!step || step.detail?.kind !== 'baseRecorded') continue;
+        const prepared = await readReceipt<Prepared>(this.fs, `${prefix}prepared.json`, this.limits),
+          start = await readReceipt<Start>(this.fs, `${prefix}start.json`, this.limits);
+        if (!start || !prepared || step.schema !== 'lociview-package-job-step-1' || step.jobId !== id ||
+          path !== `${prefix}steps/${reference(step).sha256}.json` || json(step.start) !== json(reference(start)) ||
+          json(start.prepared) !== json(reference(prepared)) || !rows.some(r => r.workspacePackageId === prepared.packageId &&
+            json(reference(r)) === json(step.detail.kind === 'baseRecorded' ? step.detail.baseRecord : null))) fail('receive-base-missing');
       }
-      if (evidence.size > L.baseEvidenceCount || [...evidence.values()].reduce((a, b) => a + b, 0) > L.baseEvidenceBytes) fail('receive-base-budget');
-      const manifestBytes = await this.readEvidence(r.evidence.manifest), metadataBytes = await this.readEvidence(r.evidence.metadata);
+    }
+  }
+  /** One combined budget for restored history and later real observations. */
+  private async checkSources(rows: readonly WorkspaceBaseRecord[], read: (e: EvidenceRef) => Promise<Uint8Array>, controlBytes = 0) {
+    const table = foldBases(rows), tableBytes = encodePackageValue(table), parsed = readBackupBases(tableBytes, this.proof);
+    backupEvidenceRefs(table);
+    if (controlBytes + tableBytes.length + parsed.baseControlBytes > L.controlsBytes) fail('receive-base-budget');
+    let sourceWork = 0, sourceNodes = 0, dependencies = parsed.dependencies, operations = 0;
+    for (const r of table.records) {
+      const manifestBytes = await read(r.evidence.manifest), metadataBytes = await read(r.evidence.metadata);
+      for (const [e, bytes] of [[r.evidence.manifest, manifestBytes], [r.evidence.metadata, metadataBytes]] as const)
+        if (bytes.length !== e.byteLength || packageByteHash(bytes) !== e.sha256) fail('receive-base-evidence');
       const m = readManifestControl(manifestBytes, new TextEncoder().encode(r.workspaceManifestSha256)).manifest;
       if (m.purpose !== 'teamWorkspace' || m.packageId !== r.workspacePackageId || json(m.identity) !== json(r.identity) || json(m.metadataEnvelope) !== json(r.metadataEnvelope) ||
         json(m.targetHeads) !== json(r.declaredHeads) || json({ sha256: m.metadata.sha256, byteLength: m.metadata.byteLength }) !== json(r.evidence.metadata)) fail('receive-base-manifest');
       const source = ProjectMetadataSource.fromFullSource(metadataBytes, { identity: r.identity, envelope: r.metadataEnvelope }, this.limits);
       if (json(source.heads) !== json(r.declaredHeads)) fail('receive-base-heads');
+      for (const bytes of source.originalChanges()) { const change = A.decodeChange(bytes); dependencies += change.deps.length; operations += change.ops.length; }
+      if (dependencies > L.dependencyReferences || operations > 100_000) fail('receive-base-budget');
       const inspection = await source.inspectOriginal({ maxNodes: L.inspectionNodes - sourceNodes, maxWork: L.inspectionWork - sourceWork });
-      sourceWork += inspection.workUsed; sourceNodes += inspection.scalars.length;
+      sourceWork += inspection.workUsed; sourceNodes += inspection.nodesUsed;
       const summary = summarizeFullHistory(inspection), closure = planWorkspaceClosure(inspection.candidates);
       sourceWork += summary.workUsed + closure.workUsed;
       if (sourceWork > L.inspectionWork || sourceNodes > L.inspectionNodes || summary.hasOpaque || json(closure.entries) !== json(m.blobs) ||
         json(summary.entityClasses) !== json(m.summary.entityClasses) || json(summary.fieldClasses) !== json(m.summary.fieldClasses)) fail('receive-base-source');
-      const value = json({ ...r, completions: [] }), prior = keys.get(r.workspacePackageId);
-      if (prior && prior !== value) fail('receive-base-conflict'); keys.set(r.workspacePackageId, value);
-      await this.verifyBaseObservation(r, outputs);
-      if (keys.size > 16) fail('receive-base-budget'); rows.push(r);
     }
-    return rows;
   }
   /** A local imported base requires an actual prior observation, not plausible-looking heads. */
   private async verifyBaseObservation(record: WorkspaceBaseRecord, outputs: readonly WorkspaceOutputJob[]): Promise<void> {
@@ -138,7 +185,7 @@ export class WorkspaceBaseStore {
     }
     fail('receive-base-observation');
   }
-  async readEvidence(e: EvidenceRef): Promise<Uint8Array> {
+  private async readLocalEvidence(e: EvidenceRef): Promise<Uint8Array> {
     if (!e || Object.keys(e).sort().join(',') !== 'byteLength,sha256' || typeof e.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(e.sha256) ||
       !Number.isSafeInteger(e.byteLength) || e.byteLength <= 0 || e.byteLength > L.sourceBytes) return fail('receive-base-evidence');
     const path = `${workspacePackageRoot(this.fs)}evidence/${e.sha256}`, file = await this.fs.readStream(path);
@@ -147,15 +194,30 @@ export class WorkspaceBaseStore {
     return bytes;
   }
 
-  async snapshot() {
-    const groups = new Map<string, WorkspaceBaseRecord>();
-    for (const row of await this.read()) {
-      const previous = groups.get(row.workspacePackageId);
-      const completions = [...(previous?.completions ?? []), ...row.completions];
-      groups.set(row.workspacePackageId, { ...row, completions: [...new Map(completions.map(c => [json(c), c])).entries()]
-        .sort(([a], [b]) => a.localeCompare(b)).map(([, c]) => c) });
+  async readEvidence(e: EvidenceRef): Promise<Uint8Array> {
+    const restored = await new TransactionJournal(this.fs, this.limits).readRestoredBases();
+    if (restored && json(restored.entry.start.proof) !== json(this.proof)) return fail('receive-base-lineage');
+    const index = restored?.input.proof.source.baseEvidence.findIndex(r => json(r) === json(e)) ?? -1;
+    if (!restored || index < 0) return this.readLocalEvidence(e);
+    // A local observation must not silently fall back after its acknowledged evidence disappears.
+    const prefix = `${workspacePackageRoot(this.fs)}bases/`, paths = await this.fs.list(prefix);
+    if (paths.length > L.entryCount) fail('receive-base-budget');
+    let controls = 0, local = false; const rows: WorkspaceBaseRecord[] = [];
+    for (const path of paths) {
+      const file = await this.fs.readStream(path);
+      if (!file || file.size > L.controlBytes || (controls += file.size) > L.controlsBytes) fail('receive-base-budget');
+      const row = await readReceipt<WorkspaceBaseRecord>(this.fs, path, this.limits);
+      if (!row?.evidence) return fail('receive-base-record');
+      rows.push(row);
+      if ([row.evidence.manifest, row.evidence.metadata].some(r => r?.sha256 === e.sha256)) local = true;
     }
-    return { records: [...groups.values()].sort((a, b) => a.workspacePackageId.localeCompare(b.workspacePackageId)) };
+    await this.requireLocalObservations(rows);
+    if (local || await this.fs.readStream(`${workspacePackageRoot(this.fs)}evidence/${e.sha256}`)) await this.readLocalEvidence(e);
+    return restored.input.baseEvidenceBytes[index]!.slice();
+  }
+
+  async snapshot() {
+    return foldBases(await this.read());
   }
   async payloads(records: readonly WorkspaceBaseRecord[]) {
     const payloads = [];
@@ -165,19 +227,26 @@ export class WorkspaceBaseStore {
     }
     return payloads;
   }
-  async preflightGenerated(record: WorkspaceBaseRecord) {
+  async preflightRecord(record: WorkspaceBaseRecord, originalEvidence: readonly Uint8Array[]) {
     const rows = await this.read(), keys = new Set(rows.map(r => r.workspacePackageId)), evidence = new Map<string, number>();
     keys.add(record.workspacePackageId);
     for (const r of [...rows, record]) {
-      if (r.workspacePackageId === record.workspacePackageId && json({ ...r, completions: [] }) !== json({ ...record, completions: [] })) fail('output-base-conflict');
+      if (r.workspacePackageId === record.workspacePackageId && json(workspaceBaseProof(r)) !== json(workspaceBaseProof(record))) fail('output-base-conflict');
       for (const e of [r.evidence.manifest, r.evidence.metadata]) {
         if (evidence.has(e.sha256) && evidence.get(e.sha256) !== e.byteLength) fail('output-base-evidence'); evidence.set(e.sha256, e.byteLength);
       }
     }
     if (keys.size > 16 || evidence.size > L.baseEvidenceCount || [...evidence.values()].reduce((a, b) => a + b, 0) > L.baseEvidenceBytes) fail('output-base-budget');
+    {
+      const originals = new Map(originalEvidence.map(bytes => [packageByteHash(bytes), bytes]));
+      const prefix = `${workspacePackageRoot(this.fs)}bases/`, paths = await this.fs.list(prefix);
+      let controls = paths.includes(`${prefix}${record.workspacePackageId}/${reference(record).sha256}.json`) ? 0 : encodePackageValue(record).length;
+      for (const path of paths) { const file = await this.fs.readStream(path); if (!file) return fail('receive-base-record'); controls += file.size; }
+      await this.checkSources([...rows, record], async e => originals.get(e.sha256) ?? this.readEvidence(e), controls);
+    }
   }
   async recordGenerated(job: WorkspaceOutputJob) {
-    job.assertOwner(this.fs); const record = job.baseRecord(); await this.preflightGenerated(record); await job.artifactReceipt();
+    job.assertOwner(this.fs); const record = job.baseRecord(); await this.preflightRecord(record, job.originalEvidence()); await job.artifactReceipt();
     const path = `${workspacePackageRoot(this.fs)}bases/${record.workspacePackageId}/${reference(record).sha256}.json`;
     if ((await job.steps()).some(s => s.detail.kind === 'baseRecorded')) {
       if (json(await readReceipt(this.fs, path, this.limits)) !== json(record)) return fail('output-base-missing'); return record;

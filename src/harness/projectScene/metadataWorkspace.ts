@@ -38,7 +38,7 @@ export function createSavedWorkspace(document: Document, host: SavedWorkspaceHos
       if (receiveControls) tools.append(receiveControls.root); root.append(workspace.root);
     }
     check.disabled = restore.disabled = refreshing || startup.busy() || workspace?.session.acknowledgment.state === 'checking';
-    restore.hidden = !!workspace || host.authority.readOnly || !host.hasPending() && !startup.recoveryPending();
+    restore.hidden = !!workspace || host.authority.readOnly || host.authority.status?.().retryable === false || !host.hasPending() && !startup.recoveryPending();
     status.textContent = feedback || (!workspace ? host.hasPending() ?
       host.authority.readOnly ? '更新が未完了です。編集用タブで復旧してください。' : '更新が未完了です。元の変更から再試行できます。' :
       '開始シーンを確認してください。シーンと記録は保持しています。' : '');
@@ -89,12 +89,13 @@ export function createSavedWorkspace(document: Document, host: SavedWorkspaceHos
     } catch (error) { if (!disposed) feedback = error instanceof Error ? error.message : '切り替えられません。元の表示を保持しています。'; }
     finally { refreshing = false; render(); }
   })(); });
-  const dispose = async () => {
+  const unmount = () => {
     if (disposed) return; disposed = true;
-    startup.dispose(); receiveControls?.dispose(); workspace?.dispose(); root.remove(); await host.dispose();
+    startup.dispose(); if (!initialTools) receiveControls?.dispose(); workspace?.dispose(); root.remove();
   };
+  const dispose = async () => { if (disposed) return; unmount(); initialTools?.dispose(); await host.dispose(); };
   render();
   return { root, render, get session() { return workspace?.session; },
     inputPending: () => refreshing || startup.hasChanges() || !!workspace?.session.interactionPending,
-    hasChanges: () => host.hasPending() || !!workspace?.session.pending || !!receiveControls?.hasChanges() || startup.hasChanges(), dispose };
+    hasChanges: () => host.hasPending() || !!workspace?.session.pending || !!receiveControls?.hasChanges() || startup.hasChanges(), unmount, dispose };
 }

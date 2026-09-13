@@ -9,7 +9,7 @@ import { packageByteHash, readManifestControl } from './manifest';
 import { planWorkspaceClosure } from './closure';
 import { ProjectMetadataSource } from '../projectMetadata/source';
 import { summarizeFullHistory } from './historySummary';
-import { WorkspaceBaseStore, receiveJobIds } from './workspaceBases';
+import { WorkspaceBaseStore, receiveJobIds, workspaceBaseProof } from './workspaceBases';
 
 export interface ReceiverProof { identity: MetadataProof['identity']; metadataEnvelope: MetadataProof['envelope']; heads: readonly string[] }
 type Start = { schema: 'lociview-package-job-start-1'; jobId: string; prepared: EvidenceRef } &
@@ -220,19 +220,25 @@ export class WorkspaceReceiveJob {
     if (d.kind === 'workspacePublished' && entry.start.purpose !== (this.importing ? 'importWorkspace' : 'remotePackageMerge')) fail('receive-publication-purpose');
     if (d.kind === 'workspaceAlreadyPresent' && (this.start?.operation !== 'receiveWorkspace' || json(d.receiver) !== json(this.start.receiver))) fail('receive-stale');
     const bases = await this.readBases(), expected = this.baseRecord(d.receiver);
-    if (json(reference(expected)) !== json(last.detail.baseRecord) || !bases.some(b => json(b) === json(expected))) fail('receive-base-missing');
+    const localPath = `${root(this.fs)}bases/${expected.workspacePackageId}/${reference(expected).sha256}.json`;
+    if (json(await readReceipt(this.fs, localPath, this.limits)) !== json(expected) ||
+      json(reference(expected)) !== json(last.detail.baseRecord) || !bases.some(b => json(b) === json(expected))) fail('receive-base-missing');
   }
-  async preflightBase(): Promise<void> {
-    const rows = await this.readBases(), expected = this.baseRecord({ identity: this.inspection.source.proof.identity,
+  async preflightBase(receiver?: ReceiverProof): Promise<void> {
+    const rows = await this.readBases(), expected = this.baseRecord(receiver ?? { identity: this.inspection.source.proof.identity,
       metadataEnvelope: this.inspection.source.proof.envelope, heads: this.inspection.source.heads });
     const keys = new Set(rows.map(r => r.workspacePackageId)), refs = new Map<string, number>(); keys.add(expected.workspacePackageId);
     for (const r of [...rows, expected]) {
-      if (r.workspacePackageId === expected.workspacePackageId && json({ ...r, completions: [] }) !== json({ ...expected, completions: [] })) fail('receive-base-conflict');
+      if (r.workspacePackageId === expected.workspacePackageId && json(workspaceBaseProof(r)) !== json(workspaceBaseProof(expected))) fail('receive-base-conflict');
       for (const e of [r.evidence.manifest, r.evidence.metadata]) {
         if (refs.has(e.sha256) && refs.get(e.sha256) !== e.byteLength) fail('receive-base-evidence'); refs.set(e.sha256, e.byteLength);
       }
     }
     if (keys.size > 16 || refs.size > L.baseEvidenceCount || [...refs.values()].reduce((a, b) => a + b, 0) > L.baseEvidenceBytes) fail('receive-base-budget');
+    // A merge's source heads are not its receiver observation. Only budget the
+    // actual planned/recorded result (first import has exactly the source heads).
+    if (receiver || this.importing) await new WorkspaceBaseStore(this.fs, this.limits, this.inspection.source.proof).preflightRecord(expected,
+      [await this.original('manifest.json'), await this.original('metadata.am')]);
   }
   private async append(detail: Step['detail']): Promise<Step> {
     if (!this.start) return fail('receive-start-missing');
@@ -249,6 +255,7 @@ export class WorkspaceReceiveJob {
     if (!zero && (entry.start.transactionId !== this.id || entry.prepared.remote?.source.packageId !== m.packageId)) fail('receive-publication-job');
     if (this.importing && (zero || entry.start.purpose !== 'importWorkspace' || json(receiver.heads) !== json(m.targetHeads))) fail('import-publication');
     if (zero && (this.start.operation !== 'receiveWorkspace' || json(receiver) !== json(this.start.receiver))) fail('receive-stale');
+    await this.preflightBase(receiver);
     const detail: Completion = zero ? { kind: 'workspaceAlreadyPresent', receiver, publication: reference(entry.publication) } :
       { kind: 'workspacePublished', receiver, journal: reference(entry.prepared), publication: reference(entry.publication) };
     const observed = await this.append(detail), record = await this.recordBase(receiver);
@@ -266,7 +273,7 @@ export class WorkspaceReceiveJob {
     const prefix = `${root(this.fs)}bases/`, bases = await this.readBases(), packages = new Set<string>();
     for (const r of bases) {
       packages.add(r.workspacePackageId);
-      if (r.workspacePackageId === m.packageId && json({ ...r, completions: [] }) !== json({ ...record, completions: [] })) fail('receive-base-conflict');
+      if (r.workspacePackageId === m.packageId && json(workspaceBaseProof(r)) !== json(workspaceBaseProof(record))) fail('receive-base-conflict');
     }
     packages.add(m.packageId); if (packages.size > 16) fail('receive-base-budget');
     const already = (await this.steps()).find(s => s.detail.kind === 'baseRecorded');

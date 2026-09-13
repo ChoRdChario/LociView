@@ -35,7 +35,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
     get busy() { return switching; }, get detail() { return current.accessDetail ?? ''; },
     get recoveryAvailable() { return current.authority.readOnly && !current.workspaceFiles.error && current.read().state !== 'repair-required' &&
       !current.workspaceFiles.jobs.some(j => j.state === 'repair-required') &&
-      current.workspaceFiles.jobs.some(j => ['incomplete', 'input-required', 'unbound-input', 'stale'].includes(j.state)); },
+      (current.backupRestore.pending || current.workspaceFiles.jobs.some(j => ['incomplete', 'input-required', 'unbound-input', 'stale'].includes(j.state))); },
     async change(target, token, publish) {
       admit();
       if (token !== current.read().source?.token) throw Error('内容が更新されています。再開用データを確認してください。');
@@ -69,7 +69,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       try { await work; } finally { switching = false; if (operation === work) operation = undefined; }
     },
   };
-  const host: SavedWorkspaceHost & ValidationDisplayHost & Pick<Host, 'workspaceFiles' | 'workspaceOutput'> = {
+  const host: SavedWorkspaceHost & ValidationDisplayHost & Pick<Host, 'workspaceFiles' | 'workspaceOutput' | 'backupRestore'> = {
     authority, mode, limits: initial.limits, read: () => current.read(),
     hasPending: () => switching || current.hasPending(),
     refresh: () => run(() => current.refresh()), resolve: (...a) => run(() => current.resolve(...a)),
@@ -95,6 +95,17 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       cancel: (...a) => run(() => current.workspaceOutput.cancel(...a)),
       verifyFile: (...a) => run(() => current.workspaceOutput.verifyFile(...a)),
       download: (...a) => run(() => current.workspaceOutput.download(...a)),
+    },
+    backupRestore: {
+      get enabled() { return current.backupRestore.enabled; }, get error() { return current.backupRestore.error; },
+      get pending() { return current.backupRestore.pending; }, get needsDisplay() { return current.backupRestore.needsDisplay; },
+      get epoch() { return current.backupRestore.epoch; }, get cancellable() { return current.backupRestore.cancellable; },
+      get retryable() { return current.backupRestore.retryable; },
+      prepare: (...a) => run(() => current.backupRestore.prepare(...a)),
+      clearPreparation: () => { admit(); current.backupRestore.clearPreparation(); },
+      confirm: (...a) => run(() => current.backupRestore.confirm(...a)), retry: (...a) => run(() => current.backupRestore.retry(...a)),
+      cancel: () => run(() => current.backupRestore.cancel()),
+      displayReady: (...a) => { admit(); current.backupRestore.displayReady(...a); },
     },
     // The resident cache never retains a closed host's content service.
     content: { model: record => current.content.model(record) },

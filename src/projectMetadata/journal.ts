@@ -2,20 +2,20 @@ import * as A from '@automerge/automerge/slim';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import type { JsonObject } from '../domain/values';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
-import { checkedProof, fail, type MetadataLimits, type MetadataProof } from './format';
+import { checkedChanges, checkedProof, fail, type MetadataLimits, type MetadataProof } from './format';
 import { ProjectMetadataSource } from './source';
 import { digest, equalBytes, json, metadataPath, readReceipt, technicalId, writeReceipt } from './persistence';
 import { initialWorkspaceChanges, planRemoteChanges } from './remote';
-import { captureJournalRemote, checkJournalRemote, isPackageRemote, isContributionRemote, validateJournalRemote,
+import { captureJournalRemote, checkJournalRemote, isPackageRemote, isContributionRemote, isBackupRestore, isBackupRestoreInput, validateJournalRemote, validateBackupRestore,
   remoteEvidenceBytes, remoteEvidenceDescriptors, remoteInputFromEvidence,
-  type JournalRemoteProof, type JournalRemoteInput } from './packageRemote';
+  type JournalRemoteProof, type JournalRemoteInput, type BackupRestoreInput } from './packageRemote';
 import { assertContributionBaseInReceiver, frozenBaseSource } from '../projectPackage/contributionEvidence';
 
 export interface JournalStart {
   transactionId: string;
   predecessor: string | null;
   repositoryId: string;
-  purpose: 'initialize' | 'localCommand' | 'remotePackageMerge' | 'importWorkspace';
+  purpose: 'initialize' | 'localCommand' | 'remotePackageMerge' | 'importWorkspace' | 'restoreBackup';
   proof: MetadataProof;
   baseHeads: string[];
 }
@@ -24,6 +24,11 @@ export interface PreparedJournal { start: JournalStart; changes: Part[]; exactCh
 interface Durable { transactionId: string; exactChangeSetDigest: string }
 export interface Publication extends Durable { heads: string[] }
 export interface JournalEntry { start: JournalStart; prepared: PreparedJournal | null; durable: Durable | null; publication: Publication | null }
+interface RestoredBasesBinding {
+  schema: 'lociview-workspace-restored-bases-1'; transactionId: string;
+  journal: { sha256: string; byteLength: number }; publication: { sha256: string; byteLength: number };
+  exchangeBases: { sha256: string; byteLength: number };
+}
 const sorted = (s: readonly string[]) => [...s].sort();
 async function seal(start: JournalStart, changes: Part[], stagedBlobs: readonly JsonObject[] = [], remote?: JournalRemoteProof): Promise<string> {
   if (start.purpose === 'initialize') return digest(new TextEncoder().encode(`lociview:private-initialization:jcs-v1\n${json({ start, changes })}`));
@@ -32,6 +37,7 @@ async function seal(start: JournalStart, changes: Part[], stagedBlobs: readonly 
     target: { identity: start.proof.identity, metadataEnvelope: start.proof.envelope }, purpose: start.purpose, stagedBlobs,
     metadataBatch: { kind: start.purpose, baseHeads: start.baseHeads, changes, ...(remote ?? {}) } };
   const version = remote && isPackageRemote(remote) ? 'v2' : 'v1';
+  if (start.purpose === 'restoreBackup') return digest(new TextEncoder().encode(`lociview:v2:backup-restore:jcs-v1\n${json(value)}`));
   return digest(new TextEncoder().encode(`lociview:v2:metadata-change-set:jcs-${version}\n${json(value)}`));
 }
 function heads(value: unknown): asserts value is string[] {
@@ -42,7 +48,7 @@ function validateStart(s: JournalStart, limits: MetadataLimits): void {
   if (!s || Object.keys(s).sort().join(',') !== 'baseHeads,predecessor,proof,purpose,repositoryId,transactionId') fail('journal-start');
   technicalId(s.transactionId); technicalId(s.repositoryId); if (s.predecessor !== null) technicalId(s.predecessor);
   checkedProof(s.proof, limits); heads(s.baseHeads);
-  if (s.purpose === 'initialize' || s.purpose === 'importWorkspace') {
+  if (s.purpose === 'initialize' || s.purpose === 'importWorkspace' || s.purpose === 'restoreBackup') {
     if (s.predecessor !== null || s.baseHeads.length || s.repositoryId !== s.transactionId) fail('journal-initialize');
   } else if (!['localCommand', 'remotePackageMerge'].includes(s.purpose) || s.predecessor === null || !s.baseHeads.length) fail('journal-purpose');
 }
@@ -55,7 +61,7 @@ export class TransactionJournal {
     const prefix = metadataPath(this.fs, 'journal/'), paths = await this.fs.list(prefix);
     const ids = [...new Set(paths.map(path => {
       const tail = path.slice(prefix.length);
-      if (!/^[0-9a-f]{32}\/(staging\.json|blobsVerified\.json|metadataDurable\.json|published\.json|source-metadata\.am|source-manifest\.(json|sha256)|changes\/[0-9]{8}\.amchange|wire-changes\/[0-9]{8}\.amchange|derived-target-metadata\.am|base-evidence\/[0-9a-f]{64})$/.test(tail)) fail('journal-path');
+      if (!/^[0-9a-f]{32}\/(staging\.json|blobsVerified\.json|metadataDurable\.json|published\.json|source-metadata\.am|source-manifest\.(json|sha256)|source-protected-inventory\.json|source-exchange-bases\.json|changes\/[0-9]{8}\.amchange|wire-changes\/[0-9]{8}\.amchange|derived-target-metadata\.am|base-evidence\/[0-9a-f]{64})$/.test(tail)) fail('journal-path');
       return tail.split('/')[0]!;
     }))];
     if (ids.length > this.limits.maxChanges) fail('journal-count');
@@ -105,6 +111,7 @@ export class TransactionJournal {
   async stage(start: JournalStart, parts: readonly Uint8Array[], stagedBlobs: readonly JsonObject[] = [],
     remote?: JournalRemoteInput): Promise<PreparedJournal> {
     validateStart(start, this.limits);
+    parts = checkedChanges(parts, this.limits);
     if (remote) { remote = captureJournalRemote(remote, start.proof, this.limits); await validateJournalRemote(remote, start.proof, this.limits); }
     const changes: Part[] = [];
     for (const [ordinal, bytes] of parts.entries()) {
@@ -120,6 +127,7 @@ export class TransactionJournal {
       if (json(acknowledged) !== json(prepared)) fail('journal-prepared-exists');
       await this.validateParts(acknowledged);
       if (acknowledged.start.purpose === 'importWorkspace') await this.validateImport(acknowledged);
+      else if (acknowledged.start.purpose === 'restoreBackup') await this.validateRestore(acknowledged);
       else if (acknowledged.remote) await this.readRemoteSource(acknowledged);
       return acknowledged; // Never refill a missing acknowledged original, even through direct staging.
     }
@@ -145,19 +153,21 @@ export class TransactionJournal {
     }
     await this.validateParts(prepared);
     if (start.purpose === 'importWorkspace') await this.validateImport(prepared);
+    if (start.purpose === 'restoreBackup') await this.validateRestore(prepared);
     await writeReceipt(this.fs, this.path(start.transactionId, 'blobsVerified.json'), prepared, this.limits);
     return prepared;
   }
 
   private async validatePrepared(start: JournalStart, p: PreparedJournal): Promise<void> {
-    const imported = start.purpose === 'importWorkspace', remote = start.purpose === 'remotePackageMerge' || imported;
+    const imported = start.purpose === 'importWorkspace', restored = start.purpose === 'restoreBackup', remote = start.purpose === 'remotePackageMerge' || imported || restored;
     const packageSource = !!p?.remote && isPackageRemote(p.remote);
     const keys = remote ? ['changes,exactChangeSetDigest,remote,start', ...(packageSource ? ['changes,exactChangeSetDigest,remote,stagedBlobs,start'] : [])]
       : ['changes,exactChangeSetDigest,start', 'changes,exactChangeSetDigest,stagedBlobs,start'];
     if (!p || !keys.includes(Object.keys(p).sort().join(',')) || json(start) !== json(p.start) ||
       !Array.isArray(p.changes) || (remote ? !p.changes.length || p.changes.length > this.limits.maxChanges : p.changes.length !== (start.purpose === 'initialize' ? 2 : 1))) fail('journal-descriptors');
     if (remote) checkJournalRemote(p.remote!, start.proof, this.limits);
-    if (imported && (!packageSource || isContributionRemote(p.remote!) || json(p.remote!.source.remoteHeads) !== json(p.remote!.expectedFinalHeads))) fail('import-source');
+    if (imported && (!packageSource || isContributionRemote(p.remote!) || isBackupRestore(p.remote!) || json(p.remote!.source.remoteHeads) !== json(p.remote!.expectedFinalHeads))) fail('import-source');
+    if (restored ? !p.remote || !isBackupRestore(p.remote) : p.remote && isBackupRestore(p.remote)) fail('restore-source-purpose');
     if (p.exactChangeSetDigest !== await seal(start, p.changes, p.stagedBlobs, p.remote)) fail('journal-descriptors');
     if (p.stagedBlobs !== undefined) {
       if (!Array.isArray(p.stagedBlobs) || (packageSource ? !p.stagedBlobs.length || p.stagedBlobs.length > this.limits.maxNodes :
@@ -223,7 +233,7 @@ export class TransactionJournal {
   /** Recovery re-derives completeness from the retained full source and exact durable base. */
   async validateRemote(p: PreparedJournal, base: ProjectMetadataSource): Promise<ProjectMetadataSource> {
     const parts = await this.validateParts(p);
-    if (p.start.purpose !== 'remotePackageMerge' || !p.remote || json(base.heads) !== json(p.start.baseHeads)) fail('remote-base-heads');
+    if (p.start.purpose !== 'remotePackageMerge' || !p.remote || isBackupRestore(p.remote) || json(base.heads) !== json(p.start.baseHeads)) fail('remote-base-heads');
     const input = await this.readRemoteInput(p), target = await validateJournalRemote(input, p.start.proof, this.limits);
     if ('wireParts' in input) assertContributionBaseInReceiver(frozenBaseSource(input.proof.source.base,
       input.baseManifestBytes, input.baseMetadataBytes, this.limits).source, base);
@@ -235,17 +245,58 @@ export class TransactionJournal {
 
   /** Initial import proves the entire original history without fabricating a receiver base. */
   async validateImport(p: PreparedJournal): Promise<ProjectMetadataSource> {
-    if (p.start.purpose !== 'importWorkspace' || !p.remote || !isPackageRemote(p.remote) || isContributionRemote(p.remote)) return fail('import-journal');
+    if (p.start.purpose !== 'importWorkspace' || !p.remote || !isPackageRemote(p.remote) || p.remote.version !== 'lociview-package-remote-1') return fail('import-journal');
     const parts = await this.validateParts(p), source = await this.readRemoteSource(p), expected = initialWorkspaceChanges(source, this.limits);
     if (parts.length !== expected.length || parts.some((b, i) => !equalBytes(b, expected[i]!)) ||
       json(source.heads) !== json(p.remote.expectedFinalHeads)) fail('import-complete-set');
     return source;
   }
 
+  async readRestoreInput(p: PreparedJournal): Promise<BackupRestoreInput> {
+    if (p.start.purpose !== 'restoreBackup' || !p.remote || !isBackupRestore(p.remote)) return fail('restore-journal');
+    await this.validatePrepared(p.start, p);
+    const input = await this.readRemoteInput(p); if (!isBackupRestoreInput(input)) return fail('restore-journal'); return input;
+  }
+  /** Restoration initializes every original; neither a receiver union nor a current-value snapshot. */
+  async validateRestore(p: PreparedJournal): Promise<ProjectMetadataSource> {
+    return (await this.restoreOriginals(p)).source;
+  }
+  private async restoreOriginals(p: PreparedJournal) {
+    const input = await this.readRestoreInput(p), parts = await this.validateParts(p);
+    const result = await validateBackupRestore(input, p.start.proof, this.limits), { source } = result, expected = initialWorkspaceChanges(source, this.limits);
+    if (parts.length !== expected.length || parts.some((b, i) => !equalBytes(b, expected[i]!)) ||
+      json(source.heads) !== json(input.proof.expectedFinalHeads)) fail('restore-complete-set');
+    return { ...result, input };
+  }
+
+  private async restoredBinding(p: PreparedJournal, publication: Publication): Promise<RestoredBasesBinding> {
+    if (!p.remote || !isBackupRestore(p.remote) || p.start.purpose !== 'restoreBackup') return fail('restore-base-journal');
+    const ref = async (value: unknown) => { const bytes = new TextEncoder().encode(json(value)); return { sha256: await digest(bytes), byteLength: bytes.length }; };
+    return { schema: 'lociview-workspace-restored-bases-1', transactionId: p.start.transactionId,
+      journal: await ref(p), publication: await ref(publication), exchangeBases: p.remote.source.exchangeBases };
+  }
+  /** Historical authority comes from this published initialization, never from fabricated local receipts. */
+  async readRestoredBases(entries?: readonly JournalEntry[]) {
+    const chain = entries ?? await this.entries(), entry = chain.find(e => e.start.purpose === 'restoreBackup');
+    const binding = await readReceipt<RestoredBasesBinding>(this.fs, metadataPath(this.fs, 'restored-bases.json'), this.limits);
+    if (!entry) { if (binding) fail('restore-base-orphan'); return null; }
+    if (chain[0] !== entry) return fail('restore-base-root');
+    if (!entry.publication) return null; // A prepared binding is not a completed base observation.
+    if (!entry.prepared || json(binding) !== json(await this.restoredBinding(entry.prepared, entry.publication))) return fail('restore-base-binding');
+    return { binding: binding!, entry, ...await this.restoreOriginals(entry.prepared) };
+  }
+
   async publish(p: PreparedJournal, source: ProjectMetadataSource): Promise<void> {
     const [doc] = A.applyChanges(A.init(), source.originalChanges());
     const receipt: Publication = { transactionId: p.start.transactionId, exactChangeSetDigest: p.exactChangeSetDigest, heads: sorted(A.getHeads(doc)) };
     if (p.remote && json(receipt.heads) !== json(p.remote.expectedFinalHeads)) fail('remote-final-heads');
+    if (p.start.purpose === 'restoreBackup') {
+      await this.validateRestore(p);
+      const path = metadataPath(this.fs, 'restored-bases.json'), binding = await this.restoredBinding(p, receipt);
+      if (await readReceipt(this.fs, this.path(p.start.transactionId, 'published.json'), this.limits)) {
+        if (json(await readReceipt(this.fs, path, this.limits)) !== json(binding)) fail('restore-base-binding');
+      } else await writeReceipt(this.fs, path, binding, this.limits);
+    }
     await writeReceipt(this.fs, this.path(p.start.transactionId, 'metadataDurable.json'),
       { transactionId: receipt.transactionId, exactChangeSetDigest: receipt.exactChangeSetDigest }, this.limits);
     await writeReceipt(this.fs, this.path(p.start.transactionId, 'published.json'), receipt, this.limits);

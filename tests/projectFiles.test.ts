@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as A from '@automerge/automerge';
 import { serializeGlb } from '../src/assets/glbOptimize';
-import { MemoryFS } from '../src/platform/fs';
+import { MemoryFS, type ProjectWorkspaceFS } from '../src/platform/fs';
 import { ProjectMutationCoordinator } from '../src/platform/projectLock';
 import { OriginBlobStore } from '../src/projectMetadata/blobStore';
 import type { MetadataStorageFactory } from '../src/projectMetadata/repository';
@@ -59,7 +59,9 @@ import { WorkspaceSender } from '../src/projectFiles/sendWorkspace';
 import { WorkspaceOutputJob } from '../src/projectPackage/outputJob';
 import { ContributionOutputJob } from '../src/projectPackage/contributionOutputJob';
 import { BackupOutputJob } from '../src/projectPackage/backupOutputJob';
-import { BackupArchive } from '../src/projectPackage/backupArchive';
+import { BackupArchive, writeBackupArchive } from '../src/projectPackage/backupArchive';
+import { BackupSourceCapture } from '../src/projectPackage/backupSource';
+import { backupEncode, backupEvidenceRefs } from '../src/projectPackage/backupEvidence';
 import { BackupRestoreJob, type RestoreDatabasePorts } from '../src/projectPackage/backupRestoreJob';
 import { readRestoreControls, reserveRestoreControls, restoreRef, writeRestoreControl } from '../src/projectPackage/restoreControls';
 import { PACKAGE_LIMITS } from '../src/projectPackage/contract';
@@ -202,7 +204,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     };
     return { fs, factory, store, locks, reopen, ...reopen() };
   }
-  async function contributionFile(session: ReturnType<typeof validationProjectService>['session'], fs: TestFS, store: OriginBlobStore) {
+  async function contributionFile(session: ReturnType<typeof validationProjectService>['session'], fs: ProjectWorkspaceFS, store: OriginBlobStore) {
     const current = await session.read(), bases = new WorkspaceBaseStore(fs, metadata, current.source!.proof), snapshot = await bases.snapshot(), row = snapshot.records[0]!;
     const base = await VerifiedContributionBase.select(bases, { workspacePackageId: row.workspacePackageId,
       workspaceManifestSha256: row.workspaceManifestSha256, heads: row.declaredHeads }, store, metadata);
@@ -236,6 +238,158 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const prepare = () => BackupRestoreJob.prepare(f.fs, ports, file, metadata, databases);
     return { ...f, session, current, sender, backupFile: file, databases, factories, ports, prepare };
   }
+  it('initializes backup originals in the owned generation, preserves old work and keeps edits on reentry', async () => {
+    const f = await restoreFileFixture(), originalFiles = await f.fs.list(''), originalBytes = await Promise.all(originalFiles.map(p => f.fs.readBytes(p))),
+      originalDb = await f.factory().loadRange([]), job = await (await f.prepare()).persist(f.ports, f.databases), scope = await job.openStaging(f.databases);
+    const service = validationProjectService(scope.fs, scope.factory, f.store, budget, decode);
+    await expect(f.session.initializeBackup(job)).rejects.toThrow('restore-staging-owner');
+    await expect(validationProjectService(scope.fs, f.factory, f.store, budget, decode).session.initializeBackup(job)).rejects.toThrow('restore-staging-owner');
+    const done = await service.session.initializeBackup(job);
+    expect(done.state).toBe('ready'); expect(done.source!.originalChanges()).toEqual(job.inspection.source.originalChanges());
+    expect(done.source!.heads).toEqual(job.inspection.source.heads);
+    expect(await f.factory().loadRange([])).toEqual(originalDb);
+    expect(await Promise.all(originalFiles.map(p => f.fs.readBytes(p)))).toEqual(originalBytes);
+    const journal = new TransactionJournal(scope.fs, metadata), first = (await journal.entries())[0]!;
+    expect(first.start.purpose).toBe('restoreBackup');
+    const p = first.prepared!, preimage = { transactionId: job.id, target: { identity: p.start.proof.identity, metadataEnvelope: p.start.proof.envelope },
+      purpose: 'restoreBackup', stagedBlobs: p.stagedBlobs ?? [], metadataBatch: { kind: 'restoreBackup', baseHeads: [], changes: p.changes, ...p.remote } };
+    expect(p.exactChangeSetDigest).toBe(await digest(new TextEncoder().encode(`lociview:v2:backup-restore:jcs-v1\n${json(preimage)}`)));
+    await expect(journal.validateImport(p)).rejects.toThrow('import-journal');
+    const edited = await service.session.editCaption(done.source!.token, f.captionId, 'body', '復元後の追記');
+    const before = await scope.factory().loadRange([]), paths = await scope.fs.list(scope.fs.projectRoot!), bytes = await Promise.all(paths.map(p => scope.fs.readBytes(p)));
+    expect((await service.session.initializeBackup(job)).source!.token).toBe(edited.source!.token);
+    expect(await scope.factory().loadRange([])).toEqual(before); expect(await Promise.all(paths.map(p => scope.fs.readBytes(p)))).toEqual(bytes);
+    expect((await readRestoreControls(f.fs, metadata)).selection).toBeNull(); // Metadata publication is not a selected restore.
+    const bases = new WorkspaceBaseStore(scope.fs, metadata, done.source!.proof), snapshot = await bases.snapshot();
+    expect(snapshot).toEqual(await new WorkspaceBaseStore(f.fs, metadata, done.source!.proof).snapshot());
+    const peer = firstWorkspaceRecipient(); await peer.receiver.importWorkspace(f.file);
+    const sent = await contributionFile(service.session, scope.fs, f.store), peerBefore = await peer.session.read();
+    const received = await peer.receiver.receive(peerBefore.source!.token, sent.file);
+    if (received.provider?.kind !== 'scene-provider') throw Error('provider');
+    expect(received.provider.resources.captions[f.captionId]!.body).toEqual({ kind: 'value', value: '復元後の追記' });
+    const peerEdit = await peer.session.editCaption(received.source!.token, f.captionId, 'title', '復元先へ返送');
+    const reply = await contributionFile(peer.session, peer.fs, peer.store);
+    const receiver = new WorkspaceReceiver(f.fs, scope.fs, service.session, metadata, f.locks);
+    const merged = await receiver.receive(edited.source!.token, reply.file);
+    if (merged.provider?.kind !== 'scene-provider') throw Error('provider');
+    expect(merged.provider.resources.captions[f.captionId]!.title).toEqual({ kind: 'value', value: '復元先へ返送' });
+    expect(merged.provider.resources.captions[f.captionId]!.body).toEqual({ kind: 'value', value: '復元後の追記' });
+    expect((await receiver.receive(merged.source!.token, reply.file)).source!.token).toBe(merged.source!.token);
+    expect(await bases.snapshot()).toEqual(snapshot); expect(peerEdit.state).toBe('ready');
+    const bindingPath = `${scope.fs.projectRoot}/v2/metadata/restored-bases.json`;
+    await f.fs.remove(bindingPath);
+    await expect(service.session.initializeBackup(job)).rejects.toThrow();
+    expect((await service.session.read()).state).toBe('repair-required');
+    await expect(bases.read()).rejects.toThrow('restore-base-binding');
+    expect(await f.fs.exists(bindingPath)).toBe(false);
+    await scope.dispose();
+  }, 60_000);
+  it('cold-recovers backup initialization only with its original job and rejects lost acknowledged source', async () => {
+    const f = await restoreFileFixture(), job = await (await f.prepare()).persist(f.ports, f.databases), scope = await job.openStaging(f.databases);
+    const service = validationProjectService(scope.fs, scope.factory, f.store, budget, decode);
+    f.fs.reject = path => path.endsWith('/blobsVerified.json');
+    await expect(service.session.initializeBackup(job)).rejects.toThrow('injected quota'); f.fs.reject = () => false; await scope.dispose();
+    const coldJob = await BackupRestoreJob.open(f.fs, job.id, metadata, f.databases), cold = await coldJob.openStaging(f.databases),
+      reopened = validationProjectService(cold.fs, cold.factory, f.store, budget, decode);
+    await expect(reopened.session.retry()).rejects.toThrow('restore-job-recovery-required');
+    expect((await reopened.session.initializeBackup(coldJob)).state).toBe('ready');
+    const path = new TransactionJournal(cold.fs, metadata).path(job.id, 'source-exchange-bases.json'); await cold.fs.remove(path);
+    await expect(reopened.session.initializeBackup(coldJob)).rejects.toThrow();
+    expect(await cold.fs.exists(path)).toBe(false); expect((await reopened.session.read()).state).toBe('repair-required');
+    expect((await f.session.read()).source!.token).toBe(f.current.source!.token); await cold.dispose();
+  }, 60_000);
+  it('restores labeled historical bases and verifies base-only saved bodies without repairing their later corruption', async () => {
+    const f = await restoreFileFixture(), bases = new WorkspaceBaseStore(f.fs, metadata, f.current.source!.proof), table = await bases.snapshot();
+    table.records[0]!.label = '配布時点';
+    const doc = A.change(A.load<Record<string, any>>(f.current.source!.encodeFullSource()), draft => {
+      for (const key of ['assetsById', 'captionsById', 'captionAttachmentsById', 'sceneAssetMembershipsById', 'sceneCaptionMembershipsById', 'materialOverridesById', 'captionTagMembershipsById'])
+        for (const row of Object.values(draft[key]) as Record<string, any>[]) row.lifecycle = new A.ImmutableString(json({ state: 'deleted', reason: 'userDelete', eventId: `evt_${newId()}` }));
+    });
+    const source = ProjectMetadataSource.fromFullSource(A.save(doc), f.current.source!.proof, metadata), evidence = [];
+    for (const reference of backupEvidenceRefs(table)) evidence.push({ reference, bytes: await bases.readEvidence(reference) });
+    const capture = await BackupSourceCapture.restore(source.encodeFullSource(), source.proof, source.token, backupEncode(table), evidence, f.store, metadata);
+    expect((capture.description.inventory as JsonObject).blobs).toEqual(capture.blobs.map(e => ({ sha256: e.sha256, byteLength: e.byteLength, reasons: ['exchangeBase'] })));
+    const chunks: BlobPart[] = [];
+    await writeBackupArchive(capture, f.store, new WritableStream({ write(b) { chunks.push(b.slice() as BlobPart); } }), { packageId: `pkg_${newId()}`, createdByVersion: 'validation' });
+    const job = await (await BackupRestoreJob.prepare(f.fs, f.ports, new Blob(chunks), metadata, f.databases)).persist(f.ports, f.databases), scope = await job.openStaging(f.databases);
+    const service = validationProjectService(scope.fs, scope.factory, f.store, budget, decode), bodyRead = vi.spyOn(f.store, 'open'), priorReads = f.fs.reads;
+    const done = await service.session.initializeBackup(job); expect(done.state).toBe('ready');
+    expect(new Set(bodyRead.mock.calls.map(c => c[0].digest))).toEqual(new Set(capture.bodyRefs.map(r => r.digest)));
+    expect(f.fs.reads - priorReads).toBeGreaterThanOrEqual(capture.bodyRefs.length);
+    expect(await new WorkspaceBaseStore(scope.fs, metadata, source.proof).snapshot()).toEqual(table);
+    const body = capture.bodyRefs[0]!, receipt = JSON.parse((await f.fs.readText(`v2/cas/sha256/${body.digest.slice(0, 2)}/${body.digest.slice(2)}.json`))!);
+    const path = `v2/cas/objects/${receipt.objectId}.bin`, corrupt = (await f.fs.readBytes(path))!.slice(); corrupt[0] = corrupt[0]! ^ 255;
+    await f.fs.writeBytes(path, corrupt);
+    await expect(service.session.initializeBackup(job)).rejects.toThrow(); expect(await f.fs.readBytes(path)).toEqual(corrupt);
+    await scope.dispose();
+  }, 60_000);
+  it('does not substitute historical rows for a lost acknowledged post-restore receive receipt', async () => {
+    const f = await restoreFileFixture(), job = await (await f.prepare()).persist(f.ports, f.databases), scope = await job.openStaging(f.databases),
+      service = validationProjectService(scope.fs, scope.factory, f.store, budget, decode), done = await service.session.initializeBackup(job),
+      receiver = new WorkspaceReceiver(f.fs, scope.fs, service.session, metadata, f.locks);
+    const read = await receiver.receive(done.source!.token, f.file); expect(read.source!.token).toBe(done.source!.token);
+    const bases = new WorkspaceBaseStore(scope.fs, metadata, done.source!.proof), rows = await bases.read();
+    expect(rows).toHaveLength(2); expect(rows[0]).toEqual(rows[1]);
+    for (const path of await scope.fs.list(`${scope.fs.projectRoot}/v2/packages/bases/`)) await f.fs.remove(path);
+    for (const path of await scope.fs.list(`${scope.fs.projectRoot}/v2/packages/evidence/`)) await f.fs.remove(path);
+    await expect(bases.read()).rejects.toThrow('receive-base-missing');
+    await expect(bases.readEvidence(rows[0]!.evidence.metadata)).rejects.toThrow('receive-base-missing');
+    await expect(receiver.receive(read.source!.token, f.file)).rejects.toThrow();
+    expect(await scope.fs.list(`${scope.fs.projectRoot}/v2/packages/bases/`)).toEqual([]); await scope.dispose();
+  }, 60_000);
+  it('selects restored data once, cold-recovers its result and permits a second explicit restore with old writers fenced', async () => {
+    const f = await restoreFileFixture();
+    const ports = (scope: { fs: ProjectWorkspaceFS; factory: MetadataStorageFactory }) => ({ fs: scope.fs, factory: scope.factory, store: f.store,
+      session: validationProjectService(scope.fs, scope.factory, f.store, budget, decode).session });
+    const original = await BackupRestoreJob.openSelected(f.fs, metadata, f.databases, ports);
+    const job = await (await BackupRestoreJob.prepare(f.fs, original.ports, f.backupFile, metadata, f.databases)).persist(original.ports, f.databases),
+      staging = await job.openStaging(f.databases), destination = ports(staging);
+    expect((await original.ports.session.read()).source!.token).toBe(f.current.source!.token);
+    await expect((original.ports.session as ReturnType<typeof validationProjectService>['session']).editCaption(f.current.source!.token, f.captionId, 'body', '拒否される編集')).rejects.toThrow('restore-pending');
+    const initialized = await destination.session.initializeBackup(job); expect(initialized.state).toBe('ready');
+    const retainedInput = (await f.fs.readBytes(job.path('input.zip')))!;
+    const corruptInput = retainedInput.slice(); corruptInput[128] = corruptInput[128]! ^ 1;
+    await f.fs.writeBytes(job.path('input.zip'), corruptInput);
+    await expect(job.select(original.ports, destination, f.databases, ports)).rejects.toThrow();
+    expect((await readRestoreControls(f.fs, metadata)).selection).toBeNull();
+    // Remove only the injected fault in the in-memory fixture; production never repairs acknowledged input.
+    await f.fs.writeBytes(job.path('input.zip'), retainedInput);
+    f.fs.reject = path => path.endsWith('/result.json');
+    await expect(job.select(original.ports, destination, f.databases, ports)).rejects.toThrow('injected quota');
+    expect((await readRestoreControls(f.fs, metadata)).tail!.jobId).toBe(job.id);
+    await expect(original.check()).rejects.toThrow('restore-generation-retired');
+    await expect(staging.check()).rejects.toThrow('restore-staging-retired');
+    f.fs.reject = () => false;
+    const selection = await BackupRestoreJob.resumeSelection(f.fs, metadata, f.databases, ports);
+    expect(await BackupRestoreJob.resumeSelection(f.fs, metadata, f.databases, ports)).toEqual(selection);
+    const selected = await BackupRestoreJob.openSelected(f.fs, metadata, f.databases, ports), selectedPorts = ports(selected);
+    const edited = await selectedPorts.session.editCaption(initialized.source!.token, f.captionId, 'body', '切替後の編集');
+    expect((await selectedPorts.session.read()).source!.token).toBe(edited.source!.token);
+    await f.fs.writeBytes(job.path('input.zip'), corruptInput);
+    await expect(BackupRestoreJob.prepare(f.fs, selectedPorts, f.backupFile, metadata, f.databases)).rejects.toThrow();
+    expect((await readRestoreControls(f.fs, metadata)).jobs).toHaveLength(1);
+    await f.fs.writeBytes(job.path('input.zip'), retainedInput);
+    const again = await (await BackupRestoreJob.prepare(f.fs, selectedPorts, f.backupFile, metadata, f.databases)).persist(selectedPorts, f.databases),
+      stagedAgain = await again.openStaging(f.databases), againPorts = ports(stagedAgain);
+    await againPorts.session.initializeBackup(again); await again.select(selectedPorts, againPorts, f.databases, ports);
+    await expect(selected.check()).rejects.toThrow('restore-generation-retired');
+    const final = await BackupRestoreJob.openSelected(f.fs, metadata, f.databases, ports);
+    expect(final.generationId).toBe(again.id); expect((await final.ports.session.read()).source!.token).toBe(initialized.source!.token);
+    expect((await readRestoreControls(f.fs, metadata)).selections).toHaveLength(2);
+    // Original generation retains its exact history; it is not the active resolver fallback.
+    expect((await f.session.read()).source!.token).toBe(f.current.source!.token);
+    await Promise.all([original.dispose(), staging.dispose(), selected.dispose(), stagedAgain.dispose(), final.dispose()]);
+  }, 60_000);
+  it('rejects cancelled backup capabilities and a complete-looking but incomplete original set', async () => {
+    const f = await restoreFileFixture(), job = await (await f.prepare()).persist(f.ports, f.databases), scope = await job.openStaging(f.databases),
+      service = validationProjectService(scope.fs, scope.factory, f.store, budget, decode), { input, inspection } = await job.initialization(scope.fs, scope.factory);
+    const journal = new TransactionJournal(scope.fs, metadata), start = { transactionId: job.id, repositoryId: job.id, predecessor: null,
+      purpose: 'restoreBackup' as const, proof: inspection.source.proof, baseHeads: [] };
+    await expect(underWriteLease(scope.fs, () => journal.stage(start, inspection.source.originalChanges().slice(0, 2), [], input))).rejects.toThrow('restore-complete-set');
+    expect((await journal.entries())[0]?.prepared).toBeNull();
+    await BackupRestoreJob.cancel(f.fs, job.id, metadata, f.databases);
+    await expect(service.session.initializeBackup(job)).rejects.toThrow('restore-staging-retired'); await scope.dispose();
+  }, 60_000);
   it('reserves restore terminal controls and counts original files and retained bodies before any write', async () => {
     const fs = new TestFS(), listed = vi.spyOn(fs, 'list');
     listed.mockResolvedValue(Array.from({ length: PACKAGE_LIMITS.entryCount - 3 }, (_, i) => `original/${i}`));
@@ -376,9 +530,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     // Deliberately write only control fixtures. These refs cannot activate an uninitialized destination.
     await f.fs.writeText(path, json(selection));
     expect((await readRestoreControls(f.fs, metadata)).tail?.jobId).toBe(job.id);
-    await expect(f.prepare()).rejects.toThrow('restore-destination-verification-required');
+    await expect(f.prepare()).rejects.toThrow('restore-pending');
     await expect(scope.check()).rejects.toThrow('restore-staging-retired');
     await f.fs.writeText(job.path('result.json'), json({ schema: 'lociview-local-restore-result-1', jobId: job.id, start: restoreRef(job.start), detail: { kind: 'selected', selection: restoreRef(selection) } }));
+    await expect(BackupRestoreJob.openSelected(f.fs, metadata, f.databases, selected => ({ fs: selected.fs,
+      factory: selected.factory, store: f.store, ...validationProjectService(selected.fs, selected.factory, f.store, budget, decode) }))).rejects.toThrow();
     await f.fs.remove(path);
     await expect(readRestoreControls(f.fs, metadata)).rejects.toThrow('restore-selected-missing');
     await scope.dispose();
@@ -732,6 +888,16 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   it('captures a Contribution from a real imported-base record without reading unchanged GLB/PNG or advancing that base', async () => {
     const f = await workspaceFileFixture(), imported = await f.receiverService.receive(f.local.source!.token, f.file);
     const bases = new WorkspaceBaseStore(f.fs, metadata, imported.source!.proof), before = await bases.snapshot(), row = before.records[0]!;
+    expect(imported.source!.heads).not.toEqual(f.source.heads);
+    const preflight = vi.spyOn(WorkspaceBaseStore.prototype, 'preflightRecord');
+    try {
+      const job = (await f.receiverService.jobs())[0]!;
+      await f.receiverService.retry(job.id);
+      expect(preflight).toHaveBeenCalled();
+      for (const [record] of preflight.mock.calls) expect(record.completions).toEqual([
+        { observation: 'imported', publishedReceiverHeads: imported.source!.heads }]);
+      expect(await bases.snapshot()).toEqual(before); // No phantom observation/receipt reserved on replay.
+    } finally { preflight.mockRestore(); }
     const edited = await f.receiver.session.editCaption(imported.source!.token, f.captionId, 'title', '差分で返す記録');
     const originals = (s: ProjectMetadataSource) => s.originalChanges().sort((a, b) => A.decodeChange(a).hash.localeCompare(A.decodeChange(b).hash));
     const read = vi.spyOn(f.store, 'openReadOnly'), sourceBefore = originals(edited.source!);
@@ -988,6 +1154,122 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       fileLimits: budget, decode, packageLocks: r.locks, openStorage: async () => ({ factory: r.factory, dispose: async () => {} }) };
     return { ...r, f, run, options };
   }
+  async function restoredWorkspaceHostFixture() {
+    const f = await initialWorkspaceHostFixture(), factories = new Map<string, MetadataStorageFactory>();
+    const databases: RestoreDatabasePorts = { listGenerations: async () => [...factories.keys()], open: async (id, create) => {
+      if (id === null) return f.options.openStorage();
+      if (!factories.has(id) && create) factories.set(id, storageFactory());
+      const factory = factories.get(id); if (!factory) throw Error('missing generation database');
+      return { factory, dispose: async () => {} };
+    } };
+    const options = { ...f.options, generations: () => databases };
+    const host = await openValidationHost({ ...options, workspaceFile: f.f.file });
+    const backupId = await host.workspaceOutput.generateBackup(host.read().source!.token, '作業前');
+    return { ...f, options, host, factories, backup: await host.workspaceOutput.download(backupId) };
+  }
+  it('connects backup restoration to editing, two-way Contribution and cold selected-host/catalog reopen', async () => {
+    const f = await restoredWorkspaceHostFixture(), host = f.host, token = host.read().source!.token;
+    await host.authority.write(token, { [`caption/${f.f.captionId}/body`]: '復元前の作業' });
+    const before = host.read().source!.token, originalDb = await f.factory().loadRange([]), oldModel = host.authority.read().modelVersions![0]!, oldContent = host.content;
+    let stagedContent: typeof host.content | undefined;
+    await host.backupRestore.prepare(f.backup);
+    const prepare = vi.fn(async (next: ReturnType<typeof host.authority.read>, content: typeof host.content) => {
+      stagedContent = content;
+      expect(host.read().source!.token).toBe(before); expect(next.state.token).toBe(token);
+      expect(host.backupRestore.pending).toBe(true);
+    });
+    await host.backupRestore.confirm(prepare); expect(prepare).toHaveBeenCalledOnce();
+    await expect(oldContent.model(oldModel.closure.representation)).rejects.toThrow();
+    await expect(stagedContent!.model(oldModel.closure.representation)).rejects.toThrow();
+    expect(host.read().source!.token).toBe(token); expect(host.hasPending()).toBe(true);
+    await expect(host.workspaceOutput.generate(token)).rejects.toThrow();
+    host.backupRestore.displayReady(token);
+    await host.authority.write(token, { [`caption/${f.f.captionId}/body`]: '復元後の追記' });
+    const choice = host.workspaceOutput.bases[0]!.selection;
+    const id = await host.workspaceOutput.generateContribution(host.read().source!.token, choice);
+    const peer = firstWorkspaceRecipient(); await peer.receiver.importWorkspace(f.f.file);
+    const received = await peer.receiver.receive((await peer.session.read()).source!.token, await host.workspaceOutput.download(id));
+    if (received.provider?.kind !== 'scene-provider') throw Error('provider');
+    expect(received.provider.resources.captions[f.f.captionId]!.body).toEqual({ kind: 'value', value: '復元後の追記' });
+    await peer.session.editCaption(received.source!.token, f.f.captionId, 'title', '返送された確認');
+    const reply = await contributionFile(peer.session, peer.fs, peer.store);
+    await host.workspaceFiles.receive(host.read().source!.token, reply.file);
+    const final = host.read().source!.token;
+    await host.workspaceFiles.receive(final, reply.file); expect(host.read().source!.token).toBe(final);
+    expect(await f.factory().loadRange([])).toEqual(originalDb);
+    expect((await listValidationProjects(f.options, f.options.openStorage))[0]!.state).toBe('ready');
+    await host.dispose();
+    const cold = await openValidationHost(f.options);
+    expect(cold.read().source!.token).toBe(final); expect(cold.hasPending()).toBe(false);
+    expect(cold.authority.read().resources.captions[f.f.captionId]!.title).toEqual({ kind: 'value', value: '返送された確認' });
+    expect(cold.authority.read().modelVersions!.some(m => m.assetId === oldModel.assetId)).toBe(true);
+    expect(cold.workspaceOutput.bases.some(b => b.selection.workspacePackageId === choice.workspacePackageId)).toBe(true);
+    await cold.dispose();
+  }, 60000);
+  it('keeps a pre-switch render failure on old data, cancels explicitly, and cold-recovers a missing selection Result', async () => {
+    const f = await restoredWorkspaceHostFixture(), host = f.host, token = host.read().source!.token;
+    await host.backupRestore.prepare(f.backup);
+    await expect(host.backupRestore.confirm(async () => { throw Error('restore renderer unavailable'); })).rejects.toThrow('restore renderer unavailable');
+    expect(host.read().source!.token).toBe(token); expect(host.backupRestore.cancellable).toBe(true);
+    expect((await listValidationProjects(f.options, f.options.openStorage))[0]!.state).toBe('incomplete');
+    await host.backupRestore.cancel(); expect(host.hasPending()).toBe(false);
+    const prefix = `${validationArea}/${f.run}/v2/local-restore/`;
+    expect(await f.fs.list(`${prefix}selections/`)).toEqual([]);
+    await host.backupRestore.prepare(f.backup);
+    f.fs.reject = p => p.startsWith(prefix) && p.endsWith('/result.json');
+    await expect(host.backupRestore.confirm(async () => {})).rejects.toThrow('injected quota'); f.fs.reject = () => false;
+    expect((await f.fs.list(`${prefix}selections/`)).length).toBe(1);
+    expect(host.hasPending()).toBe(true); await host.dispose();
+    const cold = await openValidationHost(f.options);
+    expect(cold.backupRestore.pending).toBe(true);
+    await cold.backupRestore.retry(async () => {}); cold.backupRestore.displayReady(cold.read().source!.token);
+    expect(cold.hasPending()).toBe(false); expect((await f.fs.list(`${prefix}selections/`)).length).toBe(1);
+    expect((await listValidationProjects(f.options, f.options.openStorage))[0]!.state).toBe('ready');
+    await cold.dispose();
+  }, 30000);
+  it('keeps restore recovery reachable and remounts a fresh editor with one resident owner (recorded DOM)', async () => {
+    const f = await restoredWorkspaceHostFixture(), host = f.host, backupToken = host.read().source!.token;
+    await host.authority.write(backupToken, { [`caption/${f.f.captionId}/body`]: '復元前の作業' });
+    const before = host.read().source!.token, disposals: ReturnType<typeof vi.fn>[] = [];
+    let failRender = false;
+    const render: ValidationWorkspacePorts['render'] = vi.fn(async target => {
+      if (failRender) throw Error('restore renderer unavailable');
+      const detach = target.setDisplayPreparation(async () => {}), dispose = vi.fn(detach); disposals.push(dispose);
+      return { factory: (() => { throw Error('Recorded DOM has no GPU'); }) as ViewportFactory, dispose };
+    });
+    const u = createValidationWorkspace(new RecordedDocument().asDocument(), { fileLimits: budget, decode,
+      list: async () => [], selected() {}, render, open: async () => host }, f.run);
+    const root = record(u.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    const button = (text: string) => all(root).find(n => n.tag === 'button' && n.textContent === text)!;
+    await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true), { timeout: 10000 });
+    const oldRetry = all(root).filter(n => n.tag === 'button' && n.textContent === '更新を再試行').at(-1)!;
+    const input = all(root).find(n => n.attributes.get('aria-label') === 'バックアップを選択')!;
+    Object.assign(input, { files: [f.backup] }); input.fire('change'); button('内容を確認').fire('click');
+    await vi.waitFor(() => expect(button('このバックアップから復元')?.disabled).toBe(false), { timeout: 10000 });
+    failRender = true; button('このバックアップから復元').fire('click');
+    await vi.waitFor(() => expect(button('復元を再開')?.disabled).toBe(false), { timeout: 10000 });
+    expect(host.read().source!.token).toBe(before); expect(oldRetry.hidden).toBe(true);
+    oldRetry.fire('click'); // Even a retained handler cannot create a failed editor acknowledgment.
+    failRender = false; button('復元を再開').fire('click');
+    await vi.waitFor(() => expect(host.hasPending()).toBe(false), { timeout: 20000 });
+    expect(host.read().source!.token).toBe(backupToken); expect(host.backupRestore.needsDisplay).toBe(false);
+    expect(all(root)).not.toContain(oldRetry); expect(disposals).toHaveLength(2);
+    expect(disposals[0]).toHaveBeenCalledOnce(); expect(disposals[1]).not.toHaveBeenCalled();
+    await u.dispose(); expect(disposals[1]).toHaveBeenCalledOnce();
+  }, 60000);
+  it('refuses a content read completing after its generation retires', async () => {
+    const fs = new TestFS(), locks = lockManager(), store = new OriginBlobStore(fs,
+      { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
+    const ref = await store.put(new Blob([png.slice().buffer]).stream(), 'image/png');
+    let retired = false, release!: () => void;
+    const waiting = new Promise<void>(resolve => { release = resolve; });
+    const decoder = vi.fn(async () => { await waiting; return { width: 64, height: 48, close() {} }; });
+    const content = new ValidationContent(fs, store, budget, decoder, async () => { if (retired) throw Error('retired generation'); });
+    const record = { mediaKind: 'image', blob: ref as unknown as JsonObject };
+    const read = content.image(record), refused = expect(read).rejects.toThrow('retired generation');
+    await vi.waitFor(() => expect(decoder).toHaveBeenCalledOnce()); retired = true; release(); await refused;
+    await expect(content.image(record)).rejects.toThrow('retired generation'); expect(decoder).toHaveBeenCalledOnce();
+  });
   it('enters Contribution recovery from a warm mounted View and refuses a separate repair job (recorded DOM)', async () => {
     const { f, fs, options } = await initialWorkspaceHostFixture();
     const first = await openValidationHost({ ...options, workspaceFile: f.file }); await first.dispose();
@@ -1284,7 +1566,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const archive = await BackupArchive.inspect(await host.workspaceOutput.download(result.id), metadata);
     expect(archive.archive.control.manifest.purpose).toBe('backup'); expect(host.read().source!.token).toBe(before); expect(workspace.session).toBe(session);
     all(root).find(n => n.tag === 'button' && n.textContent === '閲覧に切り替える')!.fire('click');
-    await vi.waitFor(() => expect(host.mode!.current).toBe('view'));
+    await vi.waitFor(() => expect(host.mode!.busy).toBe(false), { timeout: 10000 });
+    expect(host.mode!.current, all(root).filter(n => n.attributes.get('role') === 'status').map(n => n.textContent).join('\n')).toBe('view');
     expect(input('渡す内容').disabled).toBe(true); expect(name.disabled).toBe(true); expect(button('ファイルを作成').disabled).toBe(true);
     await workspace.dispose();
   }, 20000);

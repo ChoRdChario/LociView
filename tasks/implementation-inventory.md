@@ -1,8 +1,8 @@
 # 実装・接続の全体棚卸し
 
-> 更新: 2026-09-14（環境整理）。本書は機能対応の正本。
+> 更新: 2026-09-14（限定復元経路の接続）。本書は機能対応の正本。
 > 実装順・現在の作業tree・実行結果は [todo](todo.md) を参照し、ここへ重複記載しない。
-> 今回は古い予定／承認待ちと現在の部分接続を整理しただけで、新たな受入れを主張しない。
+> 限定接続と製品受入れを区別し、通常画面・実機の新たな合格は主張しない。
 > [以前の棚卸しと監査記録](../docs/history/development-through-2026-09-14/tasks/implementation-inventory.md) は履歴。
 
 ## 1. 結論と数え方
@@ -40,7 +40,7 @@
 | 通常home → Native | 実モデル／画像、DisplaySet、限定backup／collaboration／review／clean、旧Desktop・iPhone合格 | 新ProjectScene／継続因果履歴／新保存サービスの完成 |
 | project-scene memory／旧 `storage=saved` | 合成の2人チーム、更新・競合・独立copy・保存の限定ループ | 新metadata serviceまたは実ファイル製品wireの接続済み |
 | project-scene `storage=metadata` | 新source/repository/session/journalと従来25群＋C07/V04の合成UI接続、限定履歴受信・明示解消 | 任意モデル／任意画像／実ファイルのチーム受信／通常home／offlineの合格 |
-| project-scene `storage=validation` | 静的GLB/PNG Projectの作成・一覧・再開、実本体read/renderと編集、限定Workspace/Contributionの実file入出力・中断復旧、名前付きbackup出力。復元の作業treeはtodo参照 | 通常home、正式profile／任意形式、実描画／実入力／実機／offlineの受入れ、全purpose／移行の完成 |
+| project-scene `storage=validation` | 静的GLB/PNG Projectの作成・一覧・再開、実本体read/renderと編集、限定Workspace/Contributionの実file入出力・中断復旧、名前付きbackup出力と確認付き復元・復元後の編集／返送。実行結果はtodo参照 | 通常home、正式profile／任意形式、実描画／実入力／実機／offlineの受入れ、全purpose／移行の完成 |
 
 ## 2. 全機能群
 
@@ -145,14 +145,14 @@
 |---|---|---|---|---|
 | F01 | 自己完結したTeam Workspaceファイルを配布・開く | 新規実装 | 元履歴summary・全live強参照closureから実ZIPをstream生成し、header／CRC／SHA／source／summary／closureを検査。限定GLB/PNG一覧・editorに初回import／既存同系統への受信／cold復旧と固定source出力job／generated base／明示download／選び直したfileの一致確認を接続。共通base表・元履歴・手元編集を保持し、欠落したack証拠を補充しない。生成した実形式fileの二巡は既存tests。未知inventory制限、retention全体・通常UI／他形式／実browser・実機が残る。portable操作全体の完成ではない。 | [src/projectPackage/workspaceArchive.ts](../src/projectPackage/workspaceArchive.ts) / [src/projectFiles/sendWorkspace.ts](../src/projectFiles/sendWorkspace.ts) / [src/projectFiles/receiveWorkspace.ts](../src/projectFiles/receiveWorkspace.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) / [docs/specs/06-project-package-wire.md](../docs/specs/06-project-package-wire.md) |
 | F02 | Contributionファイルを書き出し・取り込む | 新規実装 | 元D／delta summary／必要本体差分の実ZIPと、凍結base／wire／derived・receiver MのSession受信を限定GLB/PNGの同じfile欄へ接続。durable出力も明示base／元source／inventoryから生成し、cold retryで後の編集を混ぜない。独立indexで欠落jobを発見し、両出力のguardとwarm一覧を共有。二巡・M=0・再選択・欠落拒否・元モデル0readを検査。Contributionはbaseを更新しない。通常経路／他対応形式／実機受入れは未完了。実行結果はtodo。 | [src/projectPackage/contributionSource.ts](../src/projectPackage/contributionSource.ts) / [src/projectPackage/contributionOutputJob.ts](../src/projectPackage/contributionOutputJob.ts) / [src/projectFiles/sendWorkspace.ts](../src/projectFiles/sendWorkspace.ts) / [src/projectFiles/receiveWorkspace.ts](../src/projectFiles/receiveWorkspace.ts) / [docs/specs/06-project-package-wire.md](../docs/specs/06-project-package-wire.md) |
-| F03 | 完全backupを書き出し・明示確認して復元する | 別経路のみ | 新経路に元history／current・conflict・base-only本体／交換基準・元証拠付きbackupと名前付き出力UIあり。root-owned ZIP jobと世代分離は既存checkpointで検証。作業treeには専用元履歴初期化・復元base束縛・選択／host／UIが追加済みだが、復元→編集→Contributionの最終接続検証・独立reviewは未完了。通常home／実機受入れは別。旧Nativeの合格を流用しない。 | [src/projectPackage/backupSource.ts](../src/projectPackage/backupSource.ts) / [src/projectPackage/backupArchive.ts](../src/projectPackage/backupArchive.ts) / [src/projectPackage/backupOutputJob.ts](../src/projectPackage/backupOutputJob.ts) / [docs/specs/06-project-package-wire.md](../docs/specs/06-project-package-wire.md) |
+| F03 | 完全backupを書き出し・明示確認して復元する | 別経路のみ | 限定validationに名前付き出力・確認付き復元・専用元履歴初期化・復元base束縛・世代選択とcold再開を接続。元作業／current・conflict・base-only本体／交換基準・元証拠を保持し、復元後の編集→Contribution返送／再受信と中断・取消・表示retryを既存testsで確認。独立reviewの指摘は解消。通常home／実描画／実機・offlineと行全体の受入れは残り、主分類は変更しない。 | [src/projectPackage/backupSource.ts](../src/projectPackage/backupSource.ts) / [src/projectPackage/backupArchive.ts](../src/projectPackage/backupArchive.ts) / [src/projectPackage/backupOutputJob.ts](../src/projectPackage/backupOutputJob.ts) / [src/projectPackage/backupRestoreJob.ts](../src/projectPackage/backupRestoreJob.ts) / [docs/specs/06-project-package-wire.md](../docs/specs/06-project-package-wire.md) |
 | F04 | 一つのSceneを閲覧用に共有する | 別経路のみ | 旧Nativeのreview相当あり。新history-free closure／privacy検査／View入口は未接続。編集copyの対応保持は06 §12.6で要確認ピン表示を条件に承認。exact snapshot／再構築表review済み、builder／golden実行は残る。 | [src/nativeGs/packageSnapshots.ts](../src/nativeGs/packageSnapshots.ts) / [docs/specs/06-project-package-wire.md:24](../docs/specs/06-project-package-wire.md) |
 | F05 | 全Sceneを独立Projectとして複製して渡す | 別経路のみ | 旧Native clean相当あり。新全Projectのre-key／fresh history／元へContribution不可は未接続。 | [src/nativeGs/packageSnapshots.ts](../src/nativeGs/packageSnapshots.ts) / [docs/specs/06-project-package-wire.md:24](../docs/specs/06-project-package-wire.md) |
 | F06 | 現Native Projectを新Project/Sceneへ変換する | 新規実装 | 新recipe・共有導入artifact・変換writer未実装。旧sourceを変更しない。 | [docs/specs/07-project-scene-migration.md:3](../docs/specs/07-project-scene-migration.md) |
 | F07 | frozen v1を新Project/Sceneへ変換する | 新規実装 | 旧readerの互換性維持と新writerを接続する移行は未実装。 | [docs/specs/07-project-scene-migration.md:3](../docs/specs/07-project-scene-migration.md) |
 | F08 | LociMyu ZIPを新Project/Sceneへ変換する | 新規実装 | 旧Native converterはあるが新Scene／unplaced保存のrecipeは未実装。Google／曖昧relationは継承しない。 | [docs/specs/04-locimyu-conversion.md](../docs/specs/04-locimyu-conversion.md) / [docs/specs/07-project-scene-migration.md:3](../docs/specs/07-project-scene-migration.md) |
 | F09 | 移行後に届いた旧Nativeの変更を受け入れる | 新規実装 | late Native bridgeは設計案のみ。既知source relation、旧baseline、v2の手元変更の保護が必要。 | [docs/specs/07-project-scene-migration.md:10](../docs/specs/07-project-scene-migration.md) |
-| F10 | ファイル内容・影響を確認し、取消／不正入力から回復する | 別経路のみ | 限定GLB/PNG file欄に内容由来のWorkspace／Contribution検査、形式・目的・影響の確認、失敗・未確定入力の保持、再選択／retry／明示取消を接続済み。backup出力も接続、復元は作業tree検証中。全purpose／移行元／通常homeを一つの利用者導線として完結する部分は残る。filenameからpurposeを推測しない。 | [tests/nativeGs/homeUi.test.ts:476](../tests/nativeGs/homeUi.test.ts) / [docs/specs/06-project-package-wire.md:31](../docs/specs/06-project-package-wire.md) |
+| F10 | ファイル内容・影響を確認し、取消／不正入力から回復する | 別経路のみ | 限定GLB/PNG file欄に内容由来のWorkspace／Contribution検査、形式・目的・影響の確認、失敗・未確定入力の保持、再選択／retry／明示取消を接続済み。backup出力と確認付き復元・専用再開／取消も接続。全purpose／移行元／通常homeを一つの利用者導線として完結する部分は残る。filenameからpurposeを推測しない。 | [tests/nativeGs/homeUi.test.ts:476](../tests/nativeGs/homeUi.test.ts) / [docs/specs/06-project-package-wire.md:31](../docs/specs/06-project-package-wire.md) |
 
 ### 利用支援
 
@@ -264,5 +264,5 @@ LociMyuからのタブ構成、Sceneに相当する記録切替、直接色選�
 ## 7. 更新記録
 
 2026-09-14: 古い三slice予定・重複した経緯を履歴へ移し、実行順をtodoへ集約。
-F03/F10とvalidation経路を実際の限定接続に合わせて記述した。分類件数は変更せず、
-作業treeにある復元UIを「不存在」「検証済み」のどちらにも取り違えない。
+F03/F10とvalidation経路を実際の復元・編集・返送の限定接続へ更新。分類件数は変更せず、
+内部／recorded DOM検証と、未受入れの実ブラウザ・実機・通常homeを区別する。
