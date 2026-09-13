@@ -11,7 +11,7 @@ import { fileObject } from './validation';
 
 /** Only a locally selected, owned GLB may introduce new facts. Old evidence is never repaired. */
 export function validationModelFacts(content: ValidationContent): MetadataModelFactPort {
-  return { async plan(base, next) {
+  return { planReceived: (base, next, bodyFor) => validationReceivedFacts(content, base, next, bodyFor), async plan(base, next) {
     const used = new Set<string>(), introduced = new Set<string>(); let work = 0;
     const charge = () => { if (++work > limits.maxWork) fileError('モデルの検証範囲を超えています。'); };
     for (const change of base.read().history.changes) for (const w of change.writes) {

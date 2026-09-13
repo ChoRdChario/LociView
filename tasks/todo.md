@@ -2,6 +2,63 @@
 
 ## Current boundary — thin connected workflow first (2026-09-09)
 
+Active after clean `068dd44`, cached origin 0 behind / 61 ahead. Previous goal turn
+made production progress: received originals/content facts and all final checks.
+Now connect actual Workspace input to the existing-Project Session, not another
+standalone preflight. One implementation writer and read-only independent review.
+
+- [x] Pin/review concrete receive-job spool, journal identity and local base
+  records under 06 §12.7; preserve previous journal and ordinary Native contracts.
+- [x] Connect actual Blob inspection, a separate origin operation slot, owned
+  input retention and Session receive/recovery with original new-body facts.
+- [x] Bind publication/no-op to immutable imported-base completion; reject lost
+  acknowledged evidence and stale unobserved receivers without hidden repair.
+- [x] Exercise actual generated files, local edits, cold interruption, repeated
+  receive and base handoff using existing tests; final typecheck and root pass.
+- [x] Independent exact-index review: intended 13 files only, no mandatory
+  findings within this bounded service checkpoint; source/tests remain frozen.
+- [x] Final build exit 0; result documentation updated. Reviewed 13-file tree is
+  ready for the scoped local checkpoint below; no external push/deploy claim.
+
+Host UI, ordinary activation, other purposes, initial Project import and device/
+offline acceptance remain dependencies, not implied completion. No new PoC,
+dependency, external release or repeated denied push/browser operation. Stop on
+specification conflict; continue routine implementation under existing approval.
+
+Review: actual generated Workspace ZIP now enters the existing-Project Session,
+stages original-ID GLB/PNG facts, publishes its exact union once, then records the
+original declared heads and independently observed receiver heads as an imported
+base. Re-receiving the identical file reuses its job, without another spool or
+metadata publication. A distinct zero-change Workspace records only its own base.
+Explicit stale pre-journal cancellation is terminal without deleting any bytes.
+The same Project lease owns mutation; a native origin-wide package lock awaits
+completion/release before reporting completion. The original coordinator-based
+slot had an immediate retry race in one focused test; corrected at this separate
+operation boundary, without changing the existing Project or CAS coordinator.
+
+Independent reviews corrected exact job/journal originals, whole guaranteed
+inventory checks before writes/publication/base, base-record/source/observation
+validation, and a public initialization-recovery bypass. Required source fixes
+are closed. Focused final 3 files / 111 PASS, 93.18 s; final typecheck exit 0.
+Final root: 112 files / 2,144 PASS / 21 existing TODO / 0 failures, 660.42 s.
+Exact-index independent review found no mandatory remaining findings in these
+13 files. Final build exit 0, with existing mixed static/dynamic import and large
+chunk warnings. Test warnings are the existing Node image/texture and UUID notices.
+Only result documentation changed after final tests; git diff --check passed.
+Tests reuse generated GLB/PNG, injected PNG decoding, memory metadata and fake
+native lock ports. They include facts/prepared/publication-observation/base
+interruptions, later edits, no-op, missing acknowledged input/evidence, fabricated
+completion heads and explicit stale cancellation. No rendered/device credit.
+
+Important next closure: cold recovery here starts only after `start.json` is
+acknowledged. A spool interrupted before that marker is retained as repair-required
+and blocks new receive; an explicit same-input re-selection or unacknowledged-spool
+abandonment path must be designed/connected with the host file flow next. Do not
+call the whole receiver complete or claim P1 zero. Job/spool/evidence retirement,
+space/real-device qualification and the table's later consumers also remain open.
+Next production work is that input-recovery plus same-host file action, not another
+standalone validator or PoC. The earlier pure-journal checkpoint below is complete.
+
 Active after clean `bd06a20`: connect verified Workspace files to existing-Project
 receive, new GLB/PNG bodies and exact recovery/base handoff. Previous goal turn
 made production progress (actual ZIP generate/inspect); this unit began on the same

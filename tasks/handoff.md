@@ -1,5 +1,13 @@
 # Fresh-session handoff — public-candidate preparation
 
+> **2026-09-13 実Workspace受信service（`068dd44`後）:** actual ZIP→元GLB/PNG
+> 受入れ→Sessionの一度だけの公開→imported baseを接続。同じfileはjobを再利用し重複しない。
+> 関連111件PASS／93.18秒。最終rootは112 files／2,144 PASS／既存21 TODO／失敗0（660.42秒）。
+> 型／build exit 0、独立exact-index reviewも13ファイル内の必須残件なし。最終source/testsは不変更。
+> cold復旧の証拠はstart.json確定後のみ。確定前spoolは保持／repair-requiredで、新受信を拒否する。
+> 次はこの未ack入力の明示復旧と既存hostのfile操作を一緒に閉じる。初回Project import／他purpose／
+> 通常home／実browser・iPhone・offline／採用は未完了。新たなPO待ちや別PoCは不要。
+
 > **2026-09-13 Workspace受信の原本／本体境界（`bd06a20`後）:**
 > 新fullMetadata journalが元manifest／checksum／metadataを結合し、旧sealは維持。
 > 元変更の途中適用から既存Sessionでcold復旧し、欠落原本は補充しない。

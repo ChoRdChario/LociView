@@ -11,14 +11,19 @@ import { TransactionJournal, type JournalStart, type PreparedJournal } from './j
 import { digest, equalBytes, json, newId, underWriteLease } from './persistence';
 import { canonicalMetadataEdit, planMetadataEdit, type MetadataEdit } from './commands';
 import { checkRemoteStored, copyFullSource, planRemoteChanges, type FullMetadataSource, type RemoteBatchProof } from './remote';
+import { WorkspaceReceiveJob, type ReceiverProof } from '../projectPackage/receiveJob';
+import type { JournalRemoteInput } from './packageRemote';
+import { packageByteHash } from '../projectPackage/manifest';
 
 /** Owned finite content boundary. Stage may introduce bytes; recovery may only verify saved bytes. */
 export interface MetadataMediaPort {
   stage(record: JsonObject, token: string): Promise<void>;
   verify(blobs: readonly JsonObject[]): Promise<void>;
+  inventory?(blobs: readonly JsonObject[]): Promise<void>;
 }
 export interface MetadataModelFactPlan { readonly baseToken: string; readonly finalToken: string; readonly stagedBlobs?: readonly JsonObject[]; stage(): Promise<void> }
-export interface MetadataModelFactPort { plan(base: ProjectMetadataSource, next: ProjectMetadataSource): Promise<MetadataModelFactPlan | null> }
+export interface MetadataModelFactPort { plan(base: ProjectMetadataSource, next: ProjectMetadataSource): Promise<MetadataModelFactPlan | null>;
+  planReceived?(base: ProjectMetadataSource, next: ProjectMetadataSource, bodyFor: (ref: JsonObject) => Blob): Promise<MetadataModelFactPlan> }
 
 export type MetadataSessionRead = Readonly<{
   state: 'empty' | 'ready' | 'pending' | 'repair-required';
@@ -56,7 +61,7 @@ export class MetadataProjectSession {
   private readonly journal: TransactionJournal;
   private retained: { start: JournalStart; parts: Uint8Array[]; stagedBlobs?: JsonObject[];
     modelFacts?: { plan: MetadataModelFactPlan; next: ProjectMetadataSource };
-    remote?: { proof: RemoteBatchProof; bytes: Uint8Array };
+    remote?: JournalRemoteInput;
     introduction?: { source: ProjectMetadataSource; command: Extract<MetadataEdit, { kind: 'createAttachment' }> } } | null = null;
   private last: MetadataSessionRead = { state: 'empty', source: null, provider: null, publication: null };
   constructor(private readonly fs: ProjectWorkspaceFS, storage: MetadataStorageFactory, limits: MetadataLimits,
@@ -193,6 +198,76 @@ export class MetadataProjectSession {
 
   async retry(): Promise<MetadataSessionRead> { return underWriteLease(this.fs, () => this.resume()); }
 
+  /** Isolated actual Workspace receive. Job spool/base remain separate from metadata publication. */
+  async receiveWorkspace(expectedToken: string | null, input: WorkspaceReceiveJob): Promise<MetadataSessionRead> {
+    input.assertOwner(this.fs);
+    return underWriteLease(this.fs, async () => {
+      if (!this.modelFacts?.planReceived || !this.media?.inventory) return fail('workspace-receive-unconnected');
+      let job = input;
+      await job.preflightBase(); // Reject an incompatible/corrupt retained base before any Project write.
+      const entries = await this.journal.entries(), prior = entries.filter(e => e.publication).at(-1);
+      if (!prior?.publication) return fail('receive-not-ready');
+      const current = await this.read();
+      if (!current.source || current.state === 'repair-required' || expectedToken !== null && current.source.token !== expectedToken ||
+        !job.start && current.state !== 'ready') return fail('receive-not-ready');
+      const own = entries.find(e => e.start.transactionId === job.id), observed = await job.publicationReference();
+      if (own?.prepared && json(own.prepared.remote) !== json((await job.journalInput(own.prepared.remote?.expectedFinalHeads ?? [])).proof)) return fail('receive-journal-originals');
+      if (observed) {
+        const receipt = entries.find(e => e.publication && packageByteHash(new TextEncoder().encode(json(e.publication))) === observed.publication.sha256);
+        if (!receipt?.publication || observed.kind === 'workspacePublished' && receipt.start.transactionId !== job.id ||
+          observed.kind === 'workspaceAlreadyPresent' && own) return fail('receive-observation-missing');
+        const frozen = await this.repository.read(receipt.start.repositoryId, receipt.start.proof, observed.receiver.heads);
+        if (!frozen || planRemoteChanges(frozen, job.inspection.source, this.limits).parts.length) return fail('receive-inclusion');
+        await this.checked(frozen, false); await this.media.inventory(await job.inventory());
+        await job.finish(receipt, observed.receiver, observed.kind === 'workspaceAlreadyPresent');
+        return this.read();
+      }
+      const receiver = job.start?.receiver ?? { identity: current.source.proof.identity, metadataEnvelope: current.source.proof.envelope, heads: current.source.heads };
+      const base = await this.repository.read(prior.start.repositoryId, { identity: receiver.identity, envelope: receiver.metadataEnvelope }, receiver.heads);
+      if (!base) return fail('receive-base-missing');
+      if (!own && base.token !== current.source.token) return fail('receive-stale');
+      if (entries.some(e => !e.publication && e !== own)) return fail('receive-other-transaction');
+      const { parts, final } = planRemoteChanges(base, job.inspection.source, this.limits);
+      const inventory = await job.inventory();
+      if (!parts.length) await this.media.inventory(inventory);
+      if (own && (json(own.start.proof) !== json(base.proof) || json(own.start.baseHeads) !== json(base.heads))) return fail('receive-job-journal');
+      if (!own?.prepared) {
+        const facts = await this.modelFacts.planReceived(base, final, ref => job.inspection.archive.entryBlob(`blobs/sha256/${ref.digest}`));
+        const introduced = new Set((facts.stagedBlobs ?? []).map(b => b.digest));
+        await this.media.inventory(inventory.filter(b => !introduced.has(b.digest)));
+        if (!job.start) {
+          const additional = (facts.stagedBlobs ?? []).reduce((n, b) => n + (b.byteLength as number), 0) +
+            parts.reduce((n, b) => n + b.length * 2, 0) + job.inspection.source.encodeFullSource().length * 3 + 4_194_304;
+          job = await job.persist(receiver, additional);
+        }
+        if (parts.length) {
+          this.retained = { start: own?.start ?? { transactionId: job.id, repositoryId: prior.start.repositoryId,
+            predecessor: prior.start.transactionId, purpose: 'remotePackageMerge', proof: base.proof, baseHeads: base.heads },
+            parts, ...(facts.stagedBlobs?.length ? { stagedBlobs: [...facts.stagedBlobs] } : {}), modelFacts: { plan: {
+              ...facts, stage: async () => { await facts.stage(); await this.media!.inventory!(inventory); },
+            }, next: final },
+            remote: await job.journalInput(final.heads) };
+        }
+      } else { this.retained = null; await this.media.inventory(inventory); } // Prepared recovery verifies the complete guaranteed inventory too.
+      if (parts.length && !own?.publication) await this.resume(job);
+      const receipt = parts.length ? (await this.journal.entries()).find(e => e.start.transactionId === job.id) : prior;
+      if (!receipt?.publication || json(receipt.publication.heads) !== json(final.heads)) return fail('receive-final-publication');
+      await this.checked(final, false); await this.media.inventory(await job.inventory());
+      const published: ReceiverProof = { identity: final.proof.identity, metadataEnvelope: final.proof.envelope, heads: final.heads };
+      await job.finish(receipt, published, !parts.length);
+      return this.read();
+    });
+  }
+  async cancelWorkspaceReceive(job: WorkspaceReceiveJob): Promise<void> {
+    job.assertOwner(this.fs);
+    return underWriteLease(this.fs, async () => {
+      if (!job.start || (await this.journal.entries()).some(e => e.start.transactionId === job.id) || (await job.steps()).length) return fail('receive-cancel-denied');
+      const current = await this.read();
+      if (current.state !== 'ready' || !current.source || json(current.source.heads) === json(job.start.receiver.heads)) fail('receive-not-stale');
+      await job.cancelStale();
+    });
+  }
+
   /** Owned initial-source receipt only. Complete an unprepared first initialization, never a merge. */
   async recoverInitialization(source: ProjectMetadataSource): Promise<MetadataSessionRead> {
     return underWriteLease(this.fs, async () => {
@@ -218,8 +293,13 @@ export class MetadataProjectSession {
     });
   }
 
-  private async resume(): Promise<MetadataSessionRead> {
+  private async resume(receiveJob?: WorkspaceReceiveJob): Promise<MetadataSessionRead> {
     const entries = await this.journal.entries(), pending = entries.find(e => !e.publication);
+    const transactionId = pending?.start.transactionId ?? this.retained?.start.transactionId;
+    if (transactionId && (await WorkspaceReceiveJob.ids(this.fs)).includes(transactionId)) {
+      if (!receiveJob || receiveJob.id !== transactionId || !this.media?.inventory) return fail('receive-job-recovery-required');
+      receiveJob.assertOwner(this.fs);
+    }
     let prepared: PreparedJournal;
     if (this.retained) {
       if (pending && json(pending.start) !== json(this.retained.start)) fail('retry-other-transaction');
@@ -279,6 +359,7 @@ export class MetadataProjectSession {
     } else next = stored ? stored.appendOriginal(parts) : ProjectMetadataSource.reopen(parts, start.proof, this.limits);
     // Exact pending changes can coexist with legitimate extra local heads; never rebase or choose a winner.
     await this.checked(next, start.purpose === 'initialize');
+    if (receiveJob) await this.media!.inventory!(await receiveJob.inventory());
     await this.repository.persist(start.repositoryId, next);
     stored = await this.repository.read(start.repositoryId, start.proof);
     if (!stored) fail('durable-source-missing');

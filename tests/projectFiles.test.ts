@@ -53,6 +53,11 @@ import { materialKey } from '../src/harness/projectScene/materialHistory';
 import { canonicalFixture } from '../src/harness/projectScene/modelClosure';
 import type { MaterialIntent } from '../src/domain/materialIntent';
 import { hardChroma } from '../src/viewer/hardChroma';
+import { WorkspaceReceiver } from '../src/projectFiles/receiveWorkspace';
+import { WorkspaceReceiveJob } from '../src/projectPackage/receiveJob';
+import { WorkspaceSourceCapture } from '../src/projectPackage/workspaceSource';
+import { writeWorkspaceArchive } from '../src/projectPackage/workspaceArchive';
+import { TransactionJournal } from '../src/projectMetadata/journal';
 
 const budget: FileValidationLimits = { maxFileBytes: 1_000_000, maxJsonBytes: 100_000, maxItems: 10_000, maxValues: 100_000, maxPixels: 10_000 };
 const png = Uint8Array.from(atob(fixtureMedia[0]!.base64), c => c.charCodeAt(0));
@@ -126,7 +131,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     (prepared.records.captionsById as Record<string, JsonObject>)[captionId] = { id: captionId, title: '最初の記録', body: '',
       lifecycle: { state: 'active', eventId: `evt_${newId()}`, reason: 'initial' }, colorSrgb: [1, 0, 0],
       anchor: { kind: 'project', projectFrameId: (project.frame as JsonObject).id!, positionProject: [0, 0, 0] } };
-    const receiver = validationProjectService(fs, storageFactory(), store, budget, decode);
+    const factory = storageFactory(), receiver = validationProjectService(fs, factory, store, budget, decode);
     const initial = await prepareValidationCreation(prepared).persist(fs, store, receiver.session);
     const local = await receiver.session.editCaption(initial.source!.token, captionId, 'body', '手元の追記');
     const bytes = reuseModel ? glb() : glb(j => { j.nodes[0].translation = [8, 0, 0]; });
@@ -142,8 +147,120 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const remote = ProjectMetadataSource.fromFullSource(A.save(doc), initial.source!.proof, metadata);
     const final = planRemoteChanges(local.source!, remote, metadata).final;
     const bodyFor = vi.fn((ref: JsonObject) => new Blob([ref.digest === model.body.ref.digest ? bytes.slice().buffer : png.slice().buffer], { type: 'application/octet-stream' }));
-    return { fs, store, receiver, initial, local, final, model, image, captionId, bodyFor, bytes };
+    return { fs, store, receiver, initial, local, final, model, image, captionId, bodyFor, bytes, locks, factory, remote, prepared };
   }
+  async function workspaceFileFixture() {
+    const f = await receivedFixture(), senderFS = new TestFS();
+    const senderStore = new OriginBlobStore(senderFS, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, lockManager());
+    for (const b of f.prepared.blobs) await senderStore.put(new Blob([b.bytes.slice().buffer]).stream(), b.ref.mediaType, b.ref);
+    await senderStore.put(new Blob([f.bytes.slice().buffer]).stream(), f.model.body.ref.mediaType, f.model.body.ref);
+    await senderStore.put(new Blob([png.slice().buffer]).stream(), 'image/png', f.image.blob as JsonObject);
+    const attachmentId = `att_${newId()}`;
+    const doc = A.change(A.load<Record<string, any>>(f.remote.encodeFullSource()), d => {
+      d.captionAttachmentsById[attachmentId] = Object.fromEntries(Object.entries({ id: attachmentId, captionId: f.captionId,
+        mediaResourceId: f.image.id, altText: '', orderKey: 'A', lifecycle: { state: 'active', reason: 'initial', eventId: `evt_${newId()}` } })
+        .map(([key, value]) => [key, new A.ImmutableString(json(value))]));
+    });
+    const source = ProjectMetadataSource.fromFullSource(A.save(doc), f.remote.proof, metadata);
+    const content = new ValidationContent(senderFS, senderStore, budget, decode);
+    const provider = await underWriteLease(senderFS, () => readProjectScene(source.read(), metadata, content.verifier(true), { verifyRetainedMedia: true }));
+    const publication = newId();
+    const capture = await WorkspaceSourceCapture.prepare({ read: async () => ({ state: 'ready', source, provider, publication }) }, source.token, senderStore, metadata);
+    const chunks: Uint8Array[] = [];
+    await writeWorkspaceArchive(capture, senderStore, new WritableStream<Uint8Array>({ write: bytes => { chunks.push(bytes.slice()); } }),
+      { packageId: `pkg_${newId()}`, createdByVersion: 'validation' });
+    const file = new Blob(chunks.map(b => b.slice().buffer));
+    const reopen = () => validationProjectService(f.fs, f.factory, f.store, budget, decode);
+    const receiver = new WorkspaceReceiver(f.fs, f.fs, f.receiver.session, metadata, f.locks);
+    return { ...f, source, file, receiverService: receiver, reopen, capture, senderStore };
+  }
+  it('receives an actual Workspace ZIP with new GLB/PNG, retains local edits, records the declared base and replays without writes', async () => {
+    const f = await workspaceFileFixture(), result = await f.receiverService.receive(f.local.source!.token, f.file);
+    expect(result.state).toBe('ready'); expect(result.provider?.kind).toBe('scene-provider');
+    if (result.provider?.kind !== 'scene-provider') throw Error('provider');
+    expect(result.provider.resources.captions[f.captionId]!.body).toEqual({ kind: 'value', value: '手元の追記' });
+    expect(result.provider.details.immutable.representationsById[f.model.representation.id as string]).toBeDefined();
+    const jobs = await f.receiverService.jobs(); expect(jobs).toHaveLength(1); expect(jobs[0]!.state).toBe('completed');
+    const paths = await f.fs.list('v2/packages/bases/'); expect(paths).toHaveLength(1);
+    const base = JSON.parse((await f.fs.readText(paths[0]!))!);
+    expect(base.declaredHeads).toEqual(f.source.heads); expect(base.completions[0].publishedReceiverHeads).toEqual(result.source!.heads);
+    expect(result.source!.heads).not.toEqual(f.source.heads);
+    const cold = f.reopen(), service = new WorkspaceReceiver(f.fs, f.fs, cold.session, metadata, f.locks), writes = vi.spyOn(f.fs, 'writeText');
+    expect((await service.receive(result.source!.token, f.file)).source!.token).toBe(result.source!.token);
+    expect((await service.retry(jobs[0]!.id)).source!.token).toBe(result.source!.token); expect(writes).not.toHaveBeenCalled();
+    expect(await f.fs.list('v2/packages/bases/')).toEqual(paths);
+  });
+  it.each(['facts', 'prepared', 'observation', 'base'] as const)('cold-recovers actual Workspace input after %s interruption without duplicate publication', async point => {
+    const f = await workspaceFileFixture();
+    f.fs.reject = p => point === 'facts' ? p.includes('/metadata/evidence/') : point === 'prepared' ? p.endsWith('/metadataDurable.json') : point === 'observation' ? p.includes('/steps/') : p.includes('/packages/bases/');
+    await expect(f.receiverService.receive(f.local.source!.token, f.file)).rejects.toThrow('injected quota');
+    const ids = await WorkspaceReceiveJob.ids(f.fs); expect(ids).toHaveLength(1);
+    f.fs.reject = () => false;
+    if (point === 'observation' || point === 'base') {
+      const published = await f.receiver.session.read();
+      await f.receiver.session.editCaption(published.source!.token, f.captionId, 'title', '受信処理の後の追記');
+    }
+    const cold = f.reopen(), service = new WorkspaceReceiver(f.fs, f.fs, cold.session, metadata, f.locks);
+    const result = await service.retry(ids[0]!); expect(result.state).toBe('ready');
+    expect((await new TransactionJournal(f.fs, metadata).entries()).filter(e => e.start.transactionId === ids[0])).toHaveLength(1);
+    const before = (await new TransactionJournal(f.fs, metadata).entries()).length;
+    expect((await service.retry(ids[0]!)).source!.token).toBe(result.source!.token);
+    expect((await new TransactionJournal(f.fs, metadata).entries())).toHaveLength(before);
+  });
+  it('records zero-change Workspace receipt and keeps its original publication after later local editing', async () => {
+    const f = await workspaceFileFixture(), first = await f.receiverService.receive(f.local.source!.token, f.file);
+    const chunks: Uint8Array[] = [];
+    await writeWorkspaceArchive(f.capture, f.senderStore, new WritableStream<Uint8Array>({ write: b => { chunks.push(b.slice()); } }),
+      { packageId: `pkg_${newId()}`, createdByVersion: 'validation' });
+    const journal = new TransactionJournal(f.fs, metadata), before = (await journal.entries()).length;
+    await f.receiverService.receive(first.source!.token, new Blob(chunks.map(b => b.slice().buffer)));
+    expect((await journal.entries())).toHaveLength(before);
+    const jobs = await f.receiverService.jobs();
+    const zeroId = (await Promise.all(jobs.map(async j => ({ id: j.id, steps: await (await WorkspaceReceiveJob.open(f.fs, j.id, metadata)).steps() })))).find(j => j.steps[0]?.detail.kind === 'workspaceAlreadyPresent')!.id;
+    const edited = await f.receiver.session.editCaption(first.source!.token, f.captionId, 'title', '受信後の追記');
+    expect((await f.receiverService.retry(zeroId)).source!.token).toBe(edited.source!.token);
+    const step = (await (await WorkspaceReceiveJob.open(f.fs, zeroId, metadata)).steps())[0]!;
+    expect(step.detail.kind === 'workspaceAlreadyPresent' && step.detail.receiver.heads).toEqual(first.source!.heads);
+  });
+  it('preserves acknowledged receive failures for missing originals and lost base evidence', async () => {
+    const f = await workspaceFileFixture(); f.fs.reject = p => p.endsWith('/metadataDurable.json');
+    await expect(f.receiverService.receive(f.local.source!.token, f.file)).rejects.toThrow('injected quota');
+    f.fs.reject = () => false;
+    const id = (await WorkspaceReceiveJob.ids(f.fs))[0]!, inputPath = `v2/packages/receive/${id}/input.zip`, original = (await f.fs.readBytes(inputPath))!;
+    await f.fs.remove(inputPath); const writes = vi.spyOn(f.fs, 'writeBytes');
+    await expect(f.receiverService.retry(id)).rejects.toThrow('receive-input-incomplete'); expect(writes).not.toHaveBeenCalled();
+    await expect(f.receiver.session.retry()).rejects.toThrow('receive-job-recovery-required');
+    await expect(f.receiver.session.recoverInitialization(f.initial.source!)).rejects.toThrow('receive-job-recovery-required');
+    await f.fs.writeBytes(inputPath, original); // Test-controlled restoration, never an importer repair.
+    const result = await f.receiverService.retry(id); expect(result.state).toBe('ready');
+    const base = JSON.parse((await f.fs.readText((await f.fs.list('v2/packages/bases/'))[0]!))!);
+    await f.fs.remove(`v2/packages/evidence/${base.evidence.metadata.sha256}`); writes.mockClear();
+    await expect(f.receiverService.retry(id)).rejects.toThrow('receive-base-evidence'); expect(writes).not.toHaveBeenCalled();
+    expect((await f.receiverService.jobs())[0]!.state).toBe('repair-required');
+  });
+  it('rejects fabricated imported completion heads even with intact Workspace evidence and a correct record digest', async () => {
+    const f = await workspaceFileFixture(), saved = await f.receiverService.receive(f.local.source!.token, f.file);
+    const originalPath = (await f.fs.list('v2/packages/bases/'))[0]!, row = JSON.parse((await f.fs.readText(originalPath))!);
+    row.completions[0].publishedReceiverHeads = ['b'.repeat(64)];
+    const encoded = new TextEncoder().encode(json(row));
+    await f.fs.writeText(`v2/packages/bases/${row.workspacePackageId}/${await digest(encoded)}.json`, json(row));
+    const writes = vi.spyOn(f.fs, 'writeText');
+    await expect(f.receiverService.receive(saved.source!.token, f.file)).rejects.toThrow('receive-base-observation');
+    expect(writes).not.toHaveBeenCalled(); expect((await f.receiver.session.read()).source!.token).toBe(saved.source!.token);
+  });
+  it('cancels only an explicitly stale pre-journal receive and rejects corrupted input before any writes', async () => {
+    const f = await workspaceFileFixture(), job = await WorkspaceReceiveJob.prepare(f.fs, f.file, metadata);
+    await underWriteLease(f.fs, () => job.persist({ identity: f.local.source!.proof.identity, metadataEnvelope: f.local.source!.proof.envelope, heads: f.local.source!.heads }, 4_194_304));
+    await expect(f.receiverService.cancelStale(job.id)).rejects.toThrow('receive-not-stale');
+    const changed = await f.receiver.session.editCaption(f.local.source!.token, f.captionId, 'title', '新しい作業');
+    await expect(f.receiverService.retry(job.id)).rejects.toThrow('receive-stale');
+    await f.receiverService.cancelStale(job.id);
+    expect((await f.receiverService.jobs())[0]!.state).toBe('cancelled');
+    const corrupted = new Uint8Array(await f.file.arrayBuffer()); corrupted[0] = 0;
+    const writes = vi.spyOn(f.fs, 'writeText');
+    await expect(f.receiverService.receive(changed.source!.token, new Blob([corrupted.buffer]))).rejects.toThrow(); expect(writes).not.toHaveBeenCalled();
+    expect((await f.receiverService.receive(changed.source!.token, f.file)).state).toBe('ready');
+  });
   it('admits original received GLB/PNG records without allocating IDs or writes, stages facts and keeps local Caption history', async () => {
     const f = await receivedFixture(), originals = f.final.originalChanges(), files = await f.fs.list('');
     const plan = await validationReceivedFacts(f.receiver.content, f.local.source!, f.final, f.bodyFor);

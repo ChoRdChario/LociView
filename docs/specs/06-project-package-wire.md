@@ -1569,6 +1569,92 @@ The current metadata `Publication` records transaction/digest/heads, not package
 output or file completion; `persistence.ts` is a reusable primitive, not a validator
 or atomicity proof for these new records.
 
+#### Isolated Workspace receive physical connection (2026-09-13)
+
+The following pins the existing-project `receiveWorkspace` subset for isolated
+implementation under §11, not other job purposes or ordinary-route adoption.
+Use `v2/packages/receive/<jobId>/` below the owning Project root. Fixed files are
+`input.zip`, `input.json`, `prepared.json`, `start.json`, and digest-named JSON
+`steps/<sha256>.json`. `input.json` is the closed local binding
+`{schema:'lociview-workspace-input-1',jobId,prepared:EvidenceRef,archive:EvidenceRef}`;
+it is not wire data. Prepared/start/input bindings must all agree.
+`prepared.json`, `start.json` and steps use the exact closed rows below. The
+physical job ID equals its metadata transaction ID when M is nonempty. No job is
+associated by newest journal, package filename or a later receiver head set.
+
+The concrete file service holds a distinct origin-wide package-operation lock,
+then calls the Session's dedicated receive command. That command alone owns the
+Project `underWriteLease`; CAS retains its separate existing lock. No public
+receive/retry is called recursively under the Project lease, and no generic
+UI-supplied mutation callback is added. The concrete job object is bound to the
+same Project filesystem capability. A pure type-only Session reference in
+Workspace source capture must not become a runtime cycle.
+
+Before first write, inspect the actual immutable Blob, complete original source,
+final union/profile/facts and cumulative GLB/PNG lane limits. Retain the input by
+streaming into `input.zip`, read it back through the FS Blob capability and verify
+the whole archive again. Write input/prepared controls, then `start.json` last;
+that acknowledged start requires all exact input bytes on cold recovery. A
+partial unacknowledged spool is an interrupted job, not an accepted receipt or
+permission to overwrite arbitrary bytes. It cannot mutate Project metadata.
+Use existing finite guards and include the spool, possible new CAS copies,
+metadata/journal parts, base controls and overhead in staging-space admission.
+No whole-archive `arrayBuffer`, memory fallback for a missing Blob capability,
+automatic deletion, or unbounded receipt enumeration is permitted.
+
+Cold pre-prepared recovery reopens this same input, freezes the original receiver
+proof and reconstructs the exact missing original changes/fact plan. Reused CAS
+receipts and old facts are verify-only; a missing acknowledged body or prepared
+journal original is never filled from the archive. Prepared recovery uses the
+existing Session private resume and its original journal. A published journal
+fixes the observation to its own original final heads, even after later edits.
+Zero-change completion verifies inclusion and required durable bodies under the
+same authority, without creating a journal. Before any receive observation, a
+different receiver makes a pre-journal job stale, not corrupt or complete.
+Before either imported-base completion, verify the original Workspace manifest's
+entire guaranteed inventory in CAS, including bodies no longer active in the
+receiver. Current final closure alone is insufficient; missing bytes reject and
+are not repaired by an empty merge.
+
+For this subset, each job has at most one `workspacePublished` or
+`workspaceAlreadyPresent` step, followed by one `baseRecorded` step. Retry reuses
+the exact step rather than appending a second completion. Extra/branching/torn
+steps reject. The public service exposes incomplete job IDs for explicit recovery
+and an explicit stale-job cancellation command. Under the same Project authority,
+only a changed receiver with no journal or observation may append the existing
+`cancelled/beforeWorkspaceJournal` step. It terminates that job without deleting
+its spool; a new explicit receive may then start. No new receive may bypass an
+unfinished job, and no implicit cancellation is permitted.
+
+The imported base table is materialized from immutable canonical records under
+`v2/packages/bases/<packageId>/<sha256>.json`, each a complete §4.1 record with
+one imported completion. Its filename hashes its exact canonical bytes. The
+table folds matching records by identity/epoch/package ID and unions exact
+completions; different manifest/declared-head/evidence under a key is repair.
+Original manifest/metadata evidence is write-once under
+`v2/packages/evidence/<sha256>` before the base record. That final immutable
+record introduces evidence plus completion at one complete canonical-record
+commit boundary, with read-back; this is not a filesystem rename guarantee and
+torn records fail closed. Missing acknowledged
+evidence rejects, including retry after record commit but before `baseRecorded`.
+No selected exchange base changes automatically. Current implementation retains
+job spools and evidence (no GC command); these copies count in admission and are
+not claimed as an optimized permanent retention policy.
+
+Acceptance reuses the real-format/package/persistence tests: actual generated
+Workspace with new GLB/PNG and a local Caption edit; cold pre-prepared and prepared
+interruption; publication-to-base crash; already-present/repeated receive without
+metadata writes; exact imported declared vs receiver heads; corrupt input and
+lost acknowledged evidence refuse without repair. Node/injected decoder evidence
+does not confer browser, physical iPhone or offline acceptance.
+
+Bounded implementation status: `receiveWorkspace.ts` / `receiveJob.ts` connect
+actual Blob input to the existing-Project Session, including post-start cold
+recovery and imported completion. Pre-start interrupted-spool recovery is still
+required with the next host input flow; today it is retained as repair-required,
+not silently restarted/overwritten. There is no ordinary UI or adoption credit.
+The exact executed matrix is in todo; other job purposes remain proposals.
+
 #### Frozen fields and fingerprint
 
 Use §3's canonical control encoding and existing exact nominal ID, `Heads`,

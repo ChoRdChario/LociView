@@ -131,6 +131,9 @@ export class ValidationContent implements MetadataMediaPort {
       else return fileError('追加する本体形式が不正です。');
     }
   }
+  async inventory(blobs: readonly JsonObject[]): Promise<void> {
+    for (const blob of blobs) if (await this.store.inspect(blob) !== 'verified-present') return fileError('受信ファイルの本体を確認できません。');
+  }
   verifier(allowNewEvidence: boolean): ProjectContentVerifier {
     const executor: ProjectContentVerifier = { scope: 'development-validation', verify: q => this.execute(q) };
     return new PersistentContentVerifier(this.fs, validationMetadataLimits, executor, 'validation-glb-png-executor-1',

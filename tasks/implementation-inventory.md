@@ -1,9 +1,10 @@
 # 実装・接続の全体棚卸し
 
 > CURRENT INVENTORY / 2026-09-13。全体監査基点: `b73315b851f627ca61029cfb73caf23f6e4829bd`。
-> F01/F02: fullMetadata journalの原manifest結合／cold復旧と、元IDを保つGLB/PNG受入れplanを追加。
-> 原本欠損・既存本体／facts消失は補充せず拒否。関連101件PASS、全体結果はtodo。
-> receive job／入力保持／imported base／host file操作は未接続のため、機能群の完成数は変更しない。
+> F01/F02: actual Workspace ZIPを既存Projectの新保存serviceへ接続。元GLB/PNGを受け入れ、
+> 一度だけの公開／ゼロ変更／同じfile再受信と、元declared headsを用いたimported baseを記録。
+> start.json確定後のcold復旧を関連111件で確認。全体結果はtodo。未ack入力復旧／host file操作／
+> 初回import／他purpose／通常home／実機受入れが残るため、機能群の完成数は変更しない。
 > PO追加採用: Asset間の親変更と既存ProjectAnchorへの親設定を05 §4.4へ記録。
 > C11を新metadata／限定GLB validationへ接続。親を選択→仮位置→確定／取消、位置不明時は面指定。
 > 同一Caption・内容・Scene所属を保持し、全Scene影響を提示。exact retry／cold／競合候補は既存tests。

@@ -35,8 +35,12 @@ retention/receipts, CAS/Project receive, ordinary file flows and measured adopti
 remain open. The separate fullMetadata journal now binds all original controls,
 retains legacy seals and cold-recovers through the existing Session. Original-record
 GLB/PNG admission/staging also exists without allocating new IDs or repairing lost
-acknowledged content. These two boundaries are not yet one file-receive job/action;
-source retention, imported-base completion and host connection remain next.
+acknowledged content. Actual Workspace ZIP reception now connects these through a
+durable input job and the Session to one publication (or a zero-change observation)
+and exact imported-base completion. Identical-file replay reuses its job. Cold
+recovery is tested after the input's start marker; interrupted pre-marker input
+recovery and the host file action remain next, alongside initial import and other
+purposes. This is not ordinary-home, rendered/device or whole-team acceptance.
 Exact executed checks are in todo.
 
 2026-09-13 C04 initial pin color: the existing pin actions now select a Scene-local
