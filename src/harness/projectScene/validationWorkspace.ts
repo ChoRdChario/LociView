@@ -11,6 +11,7 @@ import { createValidationModeHost, type ValidationDisplayHost } from './validati
 import type { LocalOpenMode } from './savedHost';
 import type { ValidationProjectEntry } from './validationCatalog';
 import { createSavedWorkspace } from './metadataWorkspace';
+import { createMetadataConflictControls } from './metadataConflictControls';
 import type { ViewportFactory } from './viewportHost';
 import { createValidationReceiveControls } from './validationReceiveControls';
 import { prepareReviewView, type ReviewView } from './reviewView';
@@ -118,7 +119,12 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const target = host, next = prepared ?? await ports.render(target);
     if (disposed || host !== target) { next.dispose(); return; }
     resident = next;
-    try { workspace = createSavedWorkspace(document, target, next.factory, undefined, receiveTools);
+    const fileTools = receiveTools;
+    try { workspace = createSavedWorkspace(document, target, next.factory,
+      (session, changed) => createMetadataConflictControls(document, target, session, changed, {
+        captionTextOnly: true,
+        blockedReason: () => fileTools?.hasChanges() ? 'ファイルの操作を終えるか、取り消してから解消してください。' : null,
+      }), fileTools);
       content.replaceChildren(workspace.root); workspace.render();
       if (target.backupRestore.needsDisplay) { target.backupRestore.displayReady(target.read().source!.token); workspace.render(); } }
     catch (error) { workspace?.unmount(); workspace = undefined; next.dispose(); resident = undefined; throw error; }

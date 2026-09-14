@@ -1,7 +1,6 @@
-import type { openMetadataHost } from './metadataHost';
+import type { SavedWorkspaceHost } from './savedHost';
 import type { SyntheticSession } from './session';
 import { captionFieldCandidates } from '../../projectMetadata/captionCandidates';
-import { metadataFixtureLimits as limits } from './metadataFixture';
 import type { Anchor } from '../../scene/types';
 import { sceneNameCandidates } from '../../projectMetadata/sceneAuthoring';
 import { normalizeSceneName } from '../../domain/values';
@@ -55,25 +54,29 @@ function viewDescription(p: Provider, id: string, field: ChoiceField, value: unk
 }
 
 /** Temporary comparison forms. Only explicit commands reach the saved host. */
-export function createMetadataConflictControls(document: Document, host: Awaited<ReturnType<typeof openMetadataHost>>,
-  session: SyntheticSession, changed: () => void) {
+export function createMetadataConflictControls(document: Document, host: Pick<SavedWorkspaceHost, 'read' | 'resolve' | 'limits'>,
+  session: SyntheticSession, changed: () => void, config: { captionTextOnly?: boolean; blockedReason?: () => string | null } = {}) {
+  const limits = host.limits;
+  let disposed = false;
   const root = document.createElement('ul'); root.setAttribute('aria-label', '未解決の候補');
   type Form = { root: HTMLLIElement; token: string; select: HTMLSelectElement; text: HTMLTextAreaElement;
     apply: HTMLButtonElement; cancel: HTMLButtonElement; message: HTMLParagraphElement; composing: boolean; ready: boolean;
-    isScene: boolean; isName: boolean; recordId: string; fieldName: ChoiceField; heading: HTMLParagraphElement };
+    isScene: boolean; isName: boolean; recordId: string; fieldName: ChoiceField; heading: HTMLParagraphElement; externalMessage?: string };
   const forms = new Map<string, Form>();
   const dirty = (f: Form) => !!f.select.value || !!f.text.value || f.composing;
   const hasChanges = () => [...forms.values()].some(dirty);
   const composing = () => [...forms.values()].some(f => f.composing);
-  const blocked = () => session.readOnly || !!session.pending && session.pending !== 'text' || composing();
+  const blocked = () => disposed || session.readOnly || !!session.pending && session.pending !== 'text' || composing() || !!config.blockedReason?.();
   const validInput = (f: Form) => {
     if (!f.isName || f.select.value !== 'manual') return true;
     try { normalizeSceneName(f.text.value); return true; } catch { return false; }
   };
   const invalidNameMessage = '名前は256文字以内の1行で入力してください。空白だけの名前は使えません。';
   const render = () => {
+    if (disposed) return;
     const provider = host.read().provider, seen = new Set<string>(), nodes: HTMLLIElement[] = [];
     if (provider?.kind === 'scene-provider') for (const field of provider.inspection.candidates.fields) {
+      if (config.captionTextOnly && (field.path[0] !== 'captionsById' || !['title', 'body'].includes(field.path[2] ?? ''))) continue;
       const isScene = field.path[0] === 'scenesById' && ['name', 'defaultViewId'].includes(field.path[2] ?? '');
       const isView = field.path[0] === 'viewsById' && ['name', 'orderKey', 'camera', 'background'].includes(field.path[2] ?? '');
       if (field.path.length !== 3 || !isScene && !isView && (field.path[0] !== 'captionsById' || !['title', 'body', 'anchor', 'colorSrgb'].includes(field.path[2] ?? '')) || field.candidates.length < 2) continue;
@@ -137,6 +140,7 @@ export function createMetadataConflictControls(document: Document, host: Awaited
         const current: Form = { root: item, token: provider.token, select: options, text, apply, cancel, message, composing: false, ready, isScene, isName, recordId, fieldName, heading };
         forms.set(key, current); form = current;
         options.addEventListener('change', () => {
+          if (disposed) return;
           text.hidden = options.value !== 'manual';
           if (fieldName === 'anchor') {
             session.setCaptionComparison(null); previewNote.textContent = '';
@@ -151,11 +155,11 @@ export function createMetadataConflictControls(document: Document, host: Awaited
           }
           render(); changed();
         });
-        text.addEventListener('input', () => { render(); changed(); });
-        text.addEventListener('compositionstart', () => { current.composing = true; render(); changed(); });
-        text.addEventListener('compositionend', () => { current.composing = false; render(); changed(); });
+        text.addEventListener('input', () => { if (!disposed) { render(); changed(); } });
+        text.addEventListener('compositionstart', () => { if (!disposed) { current.composing = true; render(); changed(); } });
+        text.addEventListener('compositionend', () => { if (!disposed) { current.composing = false; render(); changed(); } });
         cancel.addEventListener('click', () => {
-          if (session.workingBlock || current.composing) return;
+          if (disposed || session.workingBlock || current.composing) return;
           if (fieldName === 'anchor') session.setCaptionComparison(null);
           forms.delete(key); render(); changed();
         });
@@ -168,9 +172,10 @@ export function createMetadataConflictControls(document: Document, host: Awaited
             isScene ? { kind: 'resolveSceneName', sceneId: recordId, choice } :
             isText ? { kind: 'resolveCaptionText', captionId: recordId, field: fieldName as 'title' | 'body', choice } :
             { kind: 'resolveCaptionField', captionId: recordId, field: fieldName as 'anchor' | 'colorSrgb', operationId: options.value }), () => {
+            if (disposed) return;
             if (fieldName === 'anchor') session.setCaptionComparison(null);
             forms.delete(key); session.refreshHistory(); render(); changed();
-          }, error => { message.textContent = error instanceof Error ? error.message : '解消できません。入力は保持しています。'; render(); changed(); });
+          }, error => { if (!disposed) { message.textContent = error instanceof Error ? error.message : '解消できません。入力は保持しています。'; render(); changed(); } });
           render(); changed();
         });
       }
@@ -185,10 +190,14 @@ export function createMetadataConflictControls(document: Document, host: Awaited
         form.text.setAttribute('aria-label', `${label}の入力`);
       }
       const stale = form.token !== host.read().source?.token;
-      form.select.disabled = form.text.disabled = session.readOnly || !!session.workingBlock;
+      const externalBlock = config.blockedReason?.();
+      if (form.externalMessage && form.message.textContent === form.externalMessage) form.message.textContent = '';
+      form.externalMessage = externalBlock || undefined;
+      form.select.disabled = form.text.disabled = session.readOnly || !!session.workingBlock || !!externalBlock;
       form.apply.disabled = blocked() || stale || !form.ready || !validInput(form) || !form.select.value;
       form.cancel.disabled = !!session.workingBlock || form.composing;
       if (stale) form.message.textContent = '内容が更新されています。入力は保持しています。取り消して選び直してください。';
+      else if (externalBlock) form.message.textContent = externalBlock;
       else if (form.ready && !validInput(form) && !form.composing) form.message.textContent = invalidNameMessage;
       else if (form.message.textContent === invalidNameMessage) form.message.textContent = 'この選択・入力はまだ適用されていません。';
       else if (dirty(form) && !form.message.textContent) form.message.textContent = 'この選択・入力はまだ適用されていません。';
@@ -197,5 +206,5 @@ export function createMetadataConflictControls(document: Document, host: Awaited
     for (const child of Array.from(root.children)) if (!nodes.includes(child as HTMLLIElement)) child.remove();
     for (const [i, node] of nodes.entries()) if (root.children[i] !== node) root.insertBefore(node, root.children[i] ?? null);
   };
-  render(); return { root, render, hasChanges, composing };
+  render(); return { root, render, hasChanges, composing, dispose: () => { disposed = true; forms.clear(); root.remove(); } };
 }

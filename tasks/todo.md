@@ -12,53 +12,7 @@ resume and recovery. Desktop, physical iPhone and offline acceptance must cover
 the new route. Scope is 62 of the 64 inventory groups; M13/M14 remain later work.
 Neither component counts nor synthetic-host success is product completion or release approval.
 
-## Verified unit — I04 registered media selection and shared image viewing
-
-The Native compatibility amendment below awaits PO authorization. Continue the
-already-approved image workflow without changing a schema, package or profile:
-select an existing verified PNG by thumbnail → explicitly attach → inspect from
-the panel or any retained Caption window in one common viewer. The standalone
-read-only review uses the same viewing controls, not editing commands.
-
-- [x] Connect thumbnail selection and common viewing with existing Session writes.
-- [x] Verify exact Caption/attachment/resource identity, previous/next, close/focus,
-  stale image events, failure/retry and read-only/draft preservation in existing tests.
-- [x] Review the connected final diff, run serial final checks, and record the
-  separate live-browser/device evidence boundary before checkpointing.
-
-Acceptance: selection alone never attaches; existing independent attachments to
-the same resource stay distinct; the viewer follows the bound Caption's attachment
-order without changing Scene/list selection or draft state. Removed/ambiguous
-targets cannot silently become another image. Scene/Project changes dispose the
-old view; load failure and retry retain the exact target. Thumbnail work is lazy
-and bounded by a small UI page, without stored derivatives or new binary I/O.
-
-Exclusions: new media formats, image processing/zoom tools, new persistence/wire,
-Native conversion, ordinary-home activation, new probes/dependencies, device or
-offline acceptance. Browser control previously failed during plugin bootstrap;
-do not call recorded DOM tests live rendering evidence or restart that unrelated
-repair workstream. No repeated full suite merely for documentation or staging.
-
-Focused checks: 14 existing-suite media tests pass (three connected cases added),
-plus three existing saved-PNG/file/review integration cases. They cover explicit
-attachment, retained drafts, exact-target navigation/retry, old event rejection,
-bounded/lazy thumbnails, read-only use and review file → common viewer → edit-copy.
-Independent read-only review found no mandatory issues. Final serial checks passed;
-no live modal/focus, physical-iPhone or offline PASS is implied.
-
-Final typecheck and root tests pass: 112 files, 2,280 PASS / 21 existing TODO,
-355.37s (`npm test -- --reporter=dot --maxWorkers=2 --testTimeout=30000`).
-The first root run found only the existing entry-isolation allowlist rejecting the
-new presentation helper. The exact helper/host imports were added, independently
-reviewed and checked in isolation before the green full rerun; no ordinary-entry,
-storage/network or Native prohibition was relaxed. No product change followed
-that first root run. Ordinary and harness builds passed. Existing mixed-import/
-large-chunk, Repo UUID and injected Node image-loader warnings remain; no limits
-or dependencies changed. Document links, 64-group classification and diff checks
-pass. No server/tunnel was started; Push remains separately constrained by the
-known environment denial, which was not retried.
-
-## Next approved connection, without waiting on the Native amendment
+## Verified unit — T01/T03 real-file Caption text conflict resolution
 
 T01/T03: real Workspace/Contribution receive → compare Caption title/body
 candidates → explicit choice/manual text → ordinary edit → cold reopen.
@@ -69,20 +23,76 @@ not choose a winner, reinterpret absent fields or expand to a new profile/wire.
 Use existing file and conflict tests; this is a connected user flow, not another
 probe. Other field/lifecycle gaps remain explicit, and ordinary adoption stays gated.
 
-- [ ] Adapt the existing read/resolve conflict UI to the real-file host and expose
+Keep the existing host-owned file/recovery tools and add Session-owned comparison
+forms beside them. Dispose only the latter on editor remount. The file guard reads
+comparison input, not its own selected file; comparison apply reads external
+file/output/restore input, not its own choice. Use the actual host limits and the
+existing `resolveCaptionText` command. No new persistence or contract policy.
+
+- [x] Adapt the existing read/resolve conflict UI to the real-file host and expose
   the supported Caption title/body candidates without synthetic receive controls.
-- [ ] Include candidate/manual input and IME in existing navigation/pending guards;
+- [x] Include candidate/manual input and IME in existing navigation/pending guards;
   preserve stale input, failure/retry and explicit winner selection.
-- [ ] Verify receive → resolve → ordinary edit → cold reopen in existing tests,
+- [x] Verify receive → resolve → ordinary edit → cold reopen in existing tests,
   independently review the connected diff, then checkpoint and continue.
+
+Focused evidence: one existing-suite real-file integration case connects Workspace
+receive → manual text resolution → injected publication failure/exact retry →
+ordinary Caption editing → second-round Contribution → explicit candidate choice
+→ re-receive no-op → cold reopen with every original change preserved. It also
+checks actual initial-file-tools plus comparison mounting, IME, Project/mode/file
+guards and disposed controls. Twelve existing draft/conflict/isolation checks pass.
+Independent read-only review found no mandatory issues. Final serial checks pass:
+typecheck, root tests (112 files, 2,281 PASS / 21 existing TODO; 414.73s), ordinary
+build and harness build. The root command remains
+`npm test -- --reporter=dot --maxWorkers=2 --testTimeout=30000`.
+A test-only missing provider-kind guard was corrected
+before the final typecheck; it did not require a product or contract change.
+Existing mixed-import/large-chunk, Repo UUID and injected Node image-loader
+warnings remain. No suite, fixture system or runtime limit was added. Local links,
+64-group classification (34 connected / 30 remaining) and diff checks pass;
+T01/T03 remain partially connected, not whole-group completion or adoption.
+
+No new wire/schema/profile, dependency, public source material, ordinary entry or
+deployment changes. Browser bootstrap remains unavailable; recorded DOM is not
+live rendering, physical-iPhone or offline evidence. Do not repeat the unchanged
+browser repair or denied Push action, or repeat full checks merely for staging.
+
+Previous connected checkpoint `e27a354` added I04 thumbnail selection/attachment and
+one shared image viewer (panel, retained windows and readonly review), with exact
+target/failure/retry/draft preservation. Typecheck, 2,280 tests/21 existing TODO,
+ordinary/harness builds and independent review passed. The detailed prior result
+is retained in Git; inventory owns its current route coverage.
+
+## Next approved unit — recover and independently edit received Captions
+
+Connect the two existing Caption-only controls to the real-file host: lifecycle
+conflict (keep deleted / restore parent only) and duplicate Scene membership
+(keep one / independent keep-both). Combine them with title/body comparison under
+the same Session-owned pending/IME/dispose guards, using host limits and existing
+`resolveCaptionLifecycle` / `resolveCaptionMembership` commands.
+
+- [ ] Connect existing lifecycle and Caption membership controls, without enabling
+  the synthetic model-copy branch or changing command/storage policy.
+- [ ] Reuse existing real-file fixtures: receive → restore/resolve/register as
+  needed → independent Caption/attachment edits → Contribution return → cold reopen.
+  Preserve originals, other Scenes and deleted children; retry the exact changes.
+- [ ] Run focused checks, then one final serial suite/build/review for the connected
+  unit. Update coverage and checkpoint without a new probe or per-helper PO wait.
+
+Copy requires complete, unambiguous source content; preserve/refuse unsupported
+or unresolved values rather than infer winners. Ordinary tombstone browsing,
+automatic child restoration, tags UI, new wire/Native migration and adoption are
+excluded. Real-model update/copy remains a separate connected unit: old UI still
+depends on synthetic model records, so merely exposing it would be misleading.
+Existing real-GLB pin parent reassignment/position correction remains available.
 
 ## Pending decision — Native conversion implementation
 
-Previous goal turn was progress: the connected review edit-copy checkpoint is
-`9e49571`; the worktree is clean. The next user outcome is Native file → confirmed
+The connected review edit-copy checkpoint is `9e49571`. The blocked user outcome is Native file → confirmed
 conversion → independent Project → edit/cold reopen, with a retained common
-baseline for later Native changes. This turn closes its concrete implementation
-decision, not another probe or adoption claim.
+baseline for later Native changes. The reviewed proposal closes its concrete
+implementation decision; it is not an adoption claim or approval to implement it.
 
 - [x] Compare 07/05 §9 with actual Native and metadata readers; identify exact
   mapping/encoding gaps rather than reopening approved product policies.
@@ -312,7 +322,7 @@ New policy/compatibility/major architecture decisions retain their explicit appr
 
 PO renewed permission for timely checkpoint Push on 2026-09-14. Use existing
 `g0-baseline`; verify remote, scope, privacy and triggered workflows first.
-At the start of Native decision preparation, cached origin was 0 behind / 77 ahead; no live fetch
+At the start of this text-conflict unit, cached origin was 0 behind / 79 ahead; no live fetch
 was used for that observation. Previous environment denial is separate from PO permission:
 do not retry a denied action unchanged or bypass it. Local implementation need not wait.
 `main`, Pages, Service Worker, license/version and public release remain separately gated.

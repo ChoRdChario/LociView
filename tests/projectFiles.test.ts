@@ -1251,8 +1251,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(f.receiverService.abandonInput(done.id)).rejects.toThrow('receive-input-state');
     expect((await f.receiverService.jobs()).find(j => j.id === done.id)!.state).toBe('repair-required');
   });
-  async function receivedHostFixture() {
-    const f = await workspaceFileFixture(), run = (f.initial.source!.proof.identity.projectId as string).slice(4);
+  async function receivedHostFixture(transform?: (source: ProjectMetadataSource) => ProjectMetadataSource) {
+    const f = await workspaceFileFixture(transform), run = (f.initial.source!.proof.identity.projectId as string).slice(4);
     // Same actual Project history, moved into the host's existing isolated namespace by this fixture only.
     for (const path of await f.fs.list('v2/')) if (!path.startsWith('v2/cas/'))
       await f.fs.writeBytes(`${validationArea}/${run}/${path}`, (await f.fs.readBytes(path))!);
@@ -1950,6 +1950,89 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       .toEqual({ kind: 'value', value: '手元の追記' });
     Object.assign(input, { files: [] }); input.fire('change'); await workspace.dispose();
   });
+  it('connects real-file text conflicts to explicit resolution, guarded input, retry, ordinary editing and a second Contribution round (recorded DOM)', async () => {
+    const f = await receivedHostFixture(source => {
+      const doc = A.change(A.load<Record<string, any>>(source.encodeFullSource()), d => {
+        const captionId = Object.keys(d.captionsById)[0]!, sceneId = Object.keys(d.scenesById)[0]!, id = `scm_${newId()}`;
+        d.captionsById[captionId].body = new A.ImmutableString(json('受信した本文'));
+        d.sceneCaptionMembershipsById[id] = Object.fromEntries(Object.entries({ id, sceneId, captionId, orderKey: 'A',
+          lifecycle: { state: 'active', reason: 'initial', eventId: `evt_${newId()}` } }).map(([k, v]) => [k, new A.ImmutableString(json(v))]));
+      });
+      return ProjectMetadataSource.fromFullSource(A.save(doc), source.proof, metadata);
+    });
+    const ports: ValidationWorkspacePorts = { fileLimits: budget, decode, list: async () => [], selected: vi.fn(),
+      open: vi.fn(async () => f.host), render: async () => ({ factory: () => { throw Error('Recorded DOM has no GPU'); }, dispose() {} }) };
+    const u = createValidationWorkspace(new RecordedDocument().asDocument(), ports, f.options.run), root = record(u.root);
+    const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    const named = (label: string, parent = root) => all(parent).find(n => n.attributes.get('aria-label') === label)!;
+    const button = (text: string, parent = root) => all(parent).find(n => n.tag === 'button' && n.textContent === text)!;
+    const choose = (node: RecordedNode, value: string) => { node.value = value; node.fire(node.tag === 'select' ? 'change' : 'input'); };
+    const value = () => f.host.authority.read().resources.captions[f.captionId]!.body;
+    await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true));
+    expect(button('開発用の更新を受け取る')).toBeUndefined();
+    const fileInput = named('更新ファイルを選択'), receive = fileInput.parent!.parent!;
+    const setFile = (file: Blob) => { Object.assign(fileInput, { files: [file] }); fileInput.fire('change'); };
+    const submit = () => receive.fire('submit', { preventDefault() {} });
+    const clearFile = () => { Object.assign(fileInput, { files: [] }); button('選択を取り消す', receive).fire('click'); };
+    setFile(f.file); submit();
+    await vi.waitFor(() => expect(value().kind).toBe('unresolved'), { timeout: 10000 });
+    await vi.waitFor(() => expect(button('更新を受け取る').disabled).toBe(false)); clearFile();
+    const list = named('未解決の候補'); expect(list.children).toHaveLength(1);
+    let form = list.children[0]!, choice = all(form).find(n => n.tag === 'select')!, text = all(form).find(n => n.tag === 'textarea')!;
+    expect(choice.value).toBe(''); expect(button('競合を解消', form).disabled).toBe(true);
+    expect(all(form).some(n => n.textContent.includes('手元の追記'))).toBe(true);
+    expect(all(form).some(n => n.textContent.includes('受信した本文'))).toBe(true);
+    choose(choice, 'manual'); choose(text, '合意した本文'); const token = f.host.read().source!.token;
+    text.fire('compositionstart'); button('競合を解消', form).fire('click');
+    expect(button('競合を解消', form).disabled).toBe(true); expect(f.host.read().source!.token).toBe(token);
+    button('プロジェクトを選ぶ').fire('click');
+    await vi.waitFor(() => expect(all(root).some(n => n.textContent.includes('プロジェクトを切り替えて'))).toBe(true));
+    expect(u.selected).toBe(f.options.run); expect(ports.open).toHaveBeenCalledOnce();
+    button('閲覧に切り替える').fire('click'); expect(f.host.authority.readOnly).toBe(false);
+    setFile(f.file); submit(); expect(f.host.read().source!.token).toBe(token);
+    expect(all(root).some(n => n.textContent.includes('入力・操作を確定'))).toBe(true);
+    clearFile(); text.fire('compositionend'); expect(text.value).toBe('合意した本文');
+    expect(button('競合を解消', form).disabled).toBe(false);
+    f.fs.reject = path => path.endsWith('/published.json'); button('競合を解消', form).fire('click');
+    await vi.waitFor(() => expect(f.host.authority.status!().kind).toBe('failed'));
+    expect(text.value).toBe('合意した本文'); expect(u.hasChanges()).toBe(true);
+    const paths = (await f.fs.list(`${validationArea}/${f.options.run}/`)).filter(p => p.endsWith('.amchange'));
+    const bytes = await Promise.all(paths.map(p => f.fs.readBytes(p)));
+    f.fs.reject = () => false; button('更新を再試行', named('更新の確認')).fire('click');
+    await vi.waitFor(() => expect(value()).toEqual({ kind: 'value', value: '合意した本文' }));
+    await vi.waitFor(() => expect(list.children).toHaveLength(0));
+    expect(await Promise.all(paths.map(p => f.fs.readBytes(p)))).toEqual(bytes);
+    all(root).find(n => n.className === 'lv-caption-select')!.fire('click');
+    const detail = named('キャプションの詳細'); choose(named('本文', detail), '解消後の追記');
+    expect(button('変更を適用', detail).disabled).toBe(false); button('変更を適用', detail).fire('click');
+    await vi.waitFor(() => expect(value()).toEqual({ kind: 'value', value: '解消後の追記' }));
+
+    const participant = firstWorkspaceRecipient(), first = await participant.receiver.importWorkspace(f.file);
+    await participant.session.editCaption(first.source!.token, f.captionId, 'body', '二巡目の本文');
+    const reply = await contributionFile(participant.session, participant.fs, participant.store);
+    setFile(reply.file); submit();
+    await vi.waitFor(() => expect(value().kind).toBe('unresolved'), { timeout: 10000 });
+    await vi.waitFor(() => expect(button('更新を受け取る').disabled).toBe(false)); clearFile();
+    form = list.children[0]!; choice = all(form).find(n => n.tag === 'select')!;
+    expect(choice.value).toBe('');
+    const provider = f.host.read().provider; if (provider?.kind !== 'scene-provider') throw Error('provider');
+    const field = provider.inspection.candidates.fields.find(v => v.path.join('/') === `captionsById/${f.captionId}/body`)!;
+    const candidate = field.candidates.find(c => c.value.kind === 'value' && c.value.value === '二巡目の本文')!;
+    choose(choice, candidate.operationId); button('競合を解消', form).fire('click');
+    await vi.waitFor(() => expect(value()).toEqual({ kind: 'value', value: '二巡目の本文' }));
+    await vi.waitFor(() => expect(list.children).toHaveLength(0));
+    const final = f.host.read().source!; setFile(reply.file); submit();
+    await vi.waitFor(() => expect(button('更新を受け取る').disabled).toBe(false)); clearFile();
+    expect(f.host.read().source!.token).toBe(final.token); expect(f.host.read().source!.originalChanges()).toEqual(final.originalChanges());
+    const resolve = vi.spyOn(f.host, 'resolve'); await u.dispose();
+    button('競合を解消', form).fire('click'); expect(resolve).not.toHaveBeenCalled(); resolve.mockRestore();
+    const cold = await openValidationHost(f.options);
+    expect(cold.authority.read().resources.captions[f.captionId]!.body).toEqual({ kind: 'value', value: '二巡目の本文' });
+    expect(cold.read().source!.originalChanges()).toEqual(final.originalChanges());
+    const originals = new Map(final.originalChanges().map(b => [A.decodeChange(b).hash, b]));
+    for (const b of [...f.local.source!.originalChanges(), ...reply.current.source!.originalChanges()]) expect(originals.get(A.decodeChange(b).hash)).toEqual(b);
+    await cold.dispose();
+  }, 30000);
   it('shows cold input recovery before mounting the real-file editor and blocks readonly receive', async () => {
     const f = await receivedHostFixture(), writeStream = f.fs.writeStream.bind(f.fs);
     const interrupted = vi.spyOn(f.fs, 'writeStream').mockImplementation(async (path, stream) => {

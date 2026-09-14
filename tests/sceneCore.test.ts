@@ -341,7 +341,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
             '../../projectPackage/restoreControls', '../../projectFiles/creation', '../../projectFiles/validation', './validationHost'],
           validationCatalog: ['./validationHost', './validationGeneration', '../../projectFiles/receiveWorkspace', '../../projectFiles/sendWorkspace', '../../projectFiles/validation', '../../projectPackage/reviewEditControls'],
           validationWorkspace: ['../../projectMetadata/persistence', '../../projectFiles/initialProject', '../../projectFiles/creation',
-            '../../projectFiles/validation', '../../projectPackage/workspaceArchive', '../../projectPackage/cleanArchive', '../../projectPackage/zipArchive', '../../projectPackage/reviewEdit', '../../projectFiles/png', './validationHost', './validationModeHost', './savedHost', './validationCatalog', './metadataWorkspace', './viewportHost', './validationReceiveControls', './reviewView', './reviewWorkspace'],
+            '../../projectFiles/validation', '../../projectPackage/workspaceArchive', '../../projectPackage/cleanArchive', '../../projectPackage/zipArchive', '../../projectPackage/reviewEdit', '../../projectFiles/png', './validationHost', './validationModeHost', './savedHost', './validationCatalog', './metadataWorkspace', './metadataConflictControls', './viewportHost', './validationReceiveControls', './reviewView', './reviewWorkspace'],
           validationReceiveControls: ['./validationModeHost', './session', './validationOutputControls'],
           validationOutputControls: ['./validationModeHost', './session'],
           validationBrowser: ['../../platform/opfs', '../../platform/projectLock', '../../projectMetadata/blobStore', '../../projectMetadata/generationScope', '../../projectFiles/validation',
@@ -439,7 +439,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           metadataCaptionLifecycleControls: ['./metadataHost', './session', '../../projectMetadata/captionDeletion', './metadataFixture', '../../projectMetadata/persistence', '../../scene/types'],
           metadataAssetStatusControls: ['three', './metadataHost', './session', '../../projectMetadata/assetStatus', './metadataFixture', './modelFixture'],
             // Same approved conflict form: complete Scene/View candidates and pure input validation only.
-          metadataConflictControls: ['./metadataHost', './session', '../../projectMetadata/captionCandidates', './metadataFixture', '../../scene/types',
+          metadataConflictControls: ['./savedHost', './session', '../../projectMetadata/captionCandidates', '../../scene/types',
               '../../projectMetadata/sceneAuthoring', '../../domain/values', '../../projectMetadata/viewResolution'],
           metadataMembershipControls: ['./metadataHost', './session', '../../projectMetadata/membership', '../../projectMetadata/persistence', './metadataFixture',
             '../../projectMetadata/modelMembership', './metadataModelRecords', './modelClosure', '../../domain/values'],

@@ -60,5 +60,6 @@ export function createMetadataReceiveControls(document: Document, host: Awaited<
     render(); changed();
   });
   const unsubscribe = session.acknowledgment.subscribe(render);
-  render(); return { root, render, hasChanges: () => conflicts.hasChanges() || lifecycle.hasChanges() || memberships.hasChanges() || models.hasChanges() || assetMemberships.hasChanges(), dispose: unsubscribe };
+  render(); return { root, render, hasChanges: () => conflicts.hasChanges() || lifecycle.hasChanges() || memberships.hasChanges() || models.hasChanges() || assetMemberships.hasChanges(),
+    dispose: () => { unsubscribe(); conflicts.dispose(); } };
 }

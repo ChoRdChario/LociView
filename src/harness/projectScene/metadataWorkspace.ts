@@ -15,7 +15,9 @@ export function createMetadataWorkspace(document: Document, host: Awaited<Return
 export function createSavedWorkspace(document: Document, host: SavedWorkspaceHost, viewportFactory?: ViewportFactory,
   extraTools?: (session: SyntheticSession, changed: () => void) => SavedWorkspaceTools, initialTools?: SavedWorkspaceTools) {
   let disposed = false, refreshing = false, feedback = '', workspace: ReturnType<typeof createDevelopmentWorkspace> | undefined;
-  let receiveControls: SavedWorkspaceTools | undefined = initialTools;
+  let receiveControls: SavedWorkspaceTools | undefined;
+  const toolsChanged = () => !!initialTools?.hasChanges() || !!receiveControls?.hasChanges();
+  const renderTools = () => { initialTools?.render(); receiveControls?.render(); };
   const root = document.createElement('section'), tools = document.createElement('section');
   const check = document.createElement('button'), restore = document.createElement('button'), status = document.createElement('p');
   check.type = restore.type = 'button'; check.textContent = '再開用データを確認'; restore.textContent = '更新を再試行';
@@ -24,17 +26,17 @@ export function createSavedWorkspace(document: Document, host: SavedWorkspaceHos
   modeButton.type = 'button'; modeStatus.setAttribute('role', 'status');
   if (host.mode) { tools.insertBefore(modeButton, check); tools.insertBefore(modeStatus, check); }
   const startup = createMetadataStartupControls(document, host, () => workspace?.session, () => { feedback = ''; render(); },
-    () => refreshing || !!receiveControls?.hasChanges());
+    () => refreshing || toolsChanged());
   tools.append(startup.root);
-  if (receiveControls) tools.append(receiveControls.root);
+  if (initialTools) tools.append(initialTools.root);
   const render = () => {
     if (disposed) return;
     const provider = host.read().provider;
     if (!workspace && provider?.kind === 'scene-provider' && chooseStartupScene(provider.state).sceneId && !startup.busy()) {
       workspace = createDevelopmentWorkspace(document, new SyntheticSession(host.authority,
-        () => !!receiveControls?.hasChanges() || startup.hasChanges()), {
-        viewportFactory, onAction: () => { receiveControls?.render(); startup.render(); } });
-      receiveControls ??= extraTools?.(workspace.session, () => render());
+        () => toolsChanged() || startup.hasChanges()), {
+        viewportFactory, onAction: () => { renderTools(); startup.render(); } });
+      receiveControls = extraTools?.(workspace.session, () => render());
       if (receiveControls) tools.append(receiveControls.root); root.append(workspace.root);
     }
     check.disabled = restore.disabled = refreshing || startup.busy() || workspace?.session.acknowledgment.state === 'checking';
@@ -42,18 +44,18 @@ export function createSavedWorkspace(document: Document, host: SavedWorkspaceHos
     status.textContent = feedback || (!workspace ? host.hasPending() ?
       host.authority.readOnly ? '更新が未完了です。編集用タブで復旧してください。' : '更新が未完了です。元の変更から再試行できます。' :
       '開始シーンを確認してください。シーンと記録は保持しています。' : '');
-    workspace?.render(); receiveControls?.render(); startup.render();
+    workspace?.render(); renderTools(); startup.render();
     if (host.mode) {
       modeButton.textContent = host.mode.current === 'view' ? '編集を開始する' : '閲覧に切り替える';
       modeButton.disabled = refreshing || host.mode.busy || startup.busy();
       modeStatus.textContent = host.mode.busy ? '切替を確認しています。' : host.mode.current === 'view' ?
         `閲覧中。${host.mode.detail}` : host.hasPending() ? '更新の復旧が必要です。' : '編集中';
     }
-    if (workspace) workspace.root.inert = refreshing || !!host.mode?.busy || !!receiveControls?.busy?.();
+    if (workspace) workspace.root.inert = refreshing || !!host.mode?.busy || !!initialTools?.busy?.() || !!receiveControls?.busy?.();
   };
   const refresh = async (retry: boolean) => {
     if (disposed || refreshing || startup.busy()) return;
-    if (receiveControls?.hasChanges() || !retry && startup.hasChanges() || workspace && !workspace.session.readOnly &&
+    if (toolsChanged() || !retry && startup.hasChanges() || workspace && !workspace.session.readOnly &&
       (workspace.session.pending || workspace.session.workingBlock && !retry)) {
       feedback = '入力・更新を確定するか、取り消してから確認してください。'; render(); return;
     }
@@ -73,7 +75,7 @@ export function createSavedWorkspace(document: Document, host: SavedWorkspaceHos
   modeButton.addEventListener('click', () => { void (async () => {
     if (disposed || refreshing || !host.mode || host.mode.busy || startup.busy()) return;
     const viewRecovery = host.mode.current === 'view' && (host.read().state === 'pending' || host.mode.recoveryAvailable === true);
-    if (startup.hasChanges() || receiveControls?.hasChanges() || workspace?.session.interactionPending ||
+    if (startup.hasChanges() || toolsChanged() || workspace?.session.interactionPending ||
       workspace && workspace.session.acknowledgment.state !== 'idle' || host.hasPending() && !viewRecovery) {
       feedback = '入力・更新を確定するか、取り消してから切り替えてください。'; render(); return;
     }
@@ -91,11 +93,12 @@ export function createSavedWorkspace(document: Document, host: SavedWorkspaceHos
   })(); });
   const unmount = () => {
     if (disposed) return; disposed = true;
-    startup.dispose(); if (!initialTools) receiveControls?.dispose(); workspace?.dispose(); root.remove();
+    startup.dispose(); receiveControls?.dispose(); workspace?.dispose(); root.remove();
   };
   const dispose = async () => { if (disposed) return; unmount(); initialTools?.dispose(); await host.dispose(); };
   render();
   return { root, render, get session() { return workspace?.session; },
-    inputPending: () => refreshing || startup.hasChanges() || !!workspace?.session.interactionPending,
-    hasChanges: () => host.hasPending() || !!workspace?.session.pending || !!receiveControls?.hasChanges() || startup.hasChanges(), unmount, dispose };
+    // Host-owned file tools consult this guard: including their own input would block submission.
+    inputPending: () => refreshing || startup.hasChanges() || !!receiveControls?.hasChanges() || !!workspace?.session.interactionPending,
+    hasChanges: () => host.hasPending() || !!workspace?.session.pending || toolsChanged() || startup.hasChanges(), unmount, dispose };
 }
