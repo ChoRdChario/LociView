@@ -1627,6 +1627,37 @@ save. Use existing service/host/renderer tests, not a new PoC or generic file AP
 Other formats, existing old-namespace Projects, replacement/copy inference,
 material editing, wire/migration, ordinary home and formal adoption stay outside.
 
+The next validation-only connection applies §2.3 to an explicitly selected new
+static GLB for an existing Asset. `replaceAssetModel` carries Scene/Asset IDs,
+expected active binding, and one new Representation/revision/manual binding.
+Require a current active, unambiguous target in that Scene, complete known old
+binding and exact new records. Preserve Asset/AssetFrame, label/lifecycle,
+asset-to-project transform and every Scene edge, Caption and attachment. The new
+binding names the old binding as parent; all new record, family, compatibility,
+material-layout/slot and RepresentationFrame IDs are fresh against retained history.
+Neither equal filenames/bytes nor a similar surface declares compatibility.
+The revision has only the selected Mesh Representation, identity Representation
+placement and inspected source material catalog; old overrides are not remapped.
+
+Plan these immutable records and the active pointer in one local-command change,
+using the existing validation model-fact plan, owned input and `stagedBlobs`.
+Verify before journaling, stage required bytes/facts, publish metadata once and
+prepare the new resident before UI acknowledgment. On failure preserve old display,
+selection and exact prepared changes; retry never generates a second revision.
+The model tab first captures the target/token and selected file, then shows affected
+Scene count and retained-record/pin consequences with explicit confirm/cancel.
+Pending/IME/read-only/stale/disposed guards cover the entire selection. No raw
+file input is translated through the synthetic prepared-version adapter.
+
+Acceptance reuses existing GLB/PNG, journal and file tests: invalid/stale input
+leaves the original Project unchanged; same-Asset replacement affects all Scenes
+without rewriting Caption data; updated Workspace receive preserves local edits
+and known-position needsReview pins; explicit current-surface correction and
+Contribution return/replay/cold reopen retain the complete original history.
+Include publication failure/exact retry and existing resident failure coverage.
+No new wire/schema/profile, implicit material matching, general revision manager,
+Point/GS/Proxy expansion or adoption/ordinary-home/device credit is granted.
+
 Validation-GLB material connection reuses existing scoped MaterialOverride commands,
 the mounted editor and saved source catalog. Enumerate every logical slot with its
 exact family/layout/slot target; do not use only the first slot. Existing command

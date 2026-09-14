@@ -22,10 +22,12 @@ import type { CaptionDeletionCommand, AssetDeletionCommand, PinParentCommand } f
 import { planAssetDeletion } from './assetDeletion';
 import { defaultSceneCandidates } from './startupScene';
 import { planAssetAddition, type AddAssetCommand } from './modelAddition';
+import { planModelReplacement, type ReplaceAssetModelCommand } from './modelReplacement';
 import { planViewResolution, type ViewResolution } from './viewResolution';
 
 export type MetadataEdit =
   | AddAssetCommand
+  | ReplaceAssetModelCommand
   | CaptionDeletionCommand
   | CaptionLifecycleResolution
   | AssetDeletionCommand
@@ -81,6 +83,7 @@ export function canonicalMetadataEdit(input: MetadataEdit, limits: MetadataLimit
 export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits: MetadataLimits): readonly MetadataWrite[] {
   const command = canonicalMetadataEdit(input, limits), raw = command as unknown as JsonObject;
   if (command.kind === 'addAsset') return planAssetAddition(provider, command, limits);
+  if (command.kind === 'replaceAssetModel') return planModelReplacement(provider, command, limits);
   if (command.kind === 'resolveSceneName') return planSceneNameResolution(provider, command, limits);
   if (command.kind === 'resolveViewField' || command.kind === 'resolveEntryView') return planViewResolution(provider, command, limits);
   if (command.kind === 'resolveDefaultScene') {

@@ -1,7 +1,9 @@
 import type { SyntheticSession } from './session';
+import { createModelReplacementControls } from './modelReplacementControls';
 
 /** Small development-only input adapters around the existing mounted model/pin controls. */
 export function createModelUpdateControls(document: Document, session: SyntheticSession, changed: () => void) {
+  if (session.modelFileReplacementAvailable) return createModelReplacementControls(document, session, changed);
   const root = document.createElement('section'); root.className = 'lv-development-model-update';
   const title = document.createElement('h2'); title.textContent = 'モデルを更新';
   const state = document.createElement('p'), impact = document.createElement('p'), issue = document.createElement('p');

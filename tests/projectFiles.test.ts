@@ -42,6 +42,7 @@ import { record, type RecordedNode } from './ui/domRecorder';
 import { createValidationWorkspace, type ValidationWorkspacePorts } from '../src/harness/projectScene/validationWorkspace';
 import { createMediaControls } from '../src/harness/projectScene/mediaControls';
 import { createModelAdditionControls } from '../src/harness/projectScene/modelAdditionControls';
+import { createModelUpdateControls } from '../src/harness/projectScene/developmentControls';
 import { planMetadataEdit } from '../src/projectMetadata/commands';
 import { prepareValidationModel, sealValidationRecord } from '../src/projectFiles/initialProject';
 import { validationModelFacts, validationReceivedFacts } from '../src/projectFiles/modelFacts';
@@ -2341,6 +2342,139 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(await f.receiver.content.inspectReceived({ token: f.final.token, fact: 'representation', records: [copy], context: {} }, file)).toMatchObject({ outcome: 'failed' });
     }
     expect(record).toEqual(original);
+  });
+  it('replaces an explicitly selected GLB, retains team edits and returns corrected same-Asset pins through real files', async () => {
+    const f = await openFileCaption(), { host, workspace, s, captionId } = f, sceneId = s.sceneId;
+    const assetId = s.snapshot.modelVersions![0]!.assetId, secondScene = `scn_${newId()}`;
+    await host.authority.authorScene!(host.read().source!.token, { kind: 'createScene', sceneId: secondScene, sourceSceneId: sceneId,
+      activeSceneId: sceneId, name: '詳細', orderKey: 'B', membershipIds: [`sam_${newId()}`], eventId: `evt_${newId()}` });
+    await host.authority.transformModel!(host.read().source!.token, { sceneId, assetId,
+      expectedBindingId: host.authority.read().modelVersions![0]!.projection.bindingId, bindingId: `bnd_${newId()}`,
+      placement: { translation: [1, 2, 3], rotationXYZW: [0, 0, 0, 1], uniformScale: 2 } });
+    const initialFile = await host.workspaceOutput.download(await host.workspaceOutput.generate(host.read().source!.token));
+    const r = firstWorkspaceRecipient(), peerOptions = { ...f.options, base: r.fs, store: r.store, coordinator: ProjectMutationCoordinator.browser(r.locks),
+      packageLocks: r.locks, openStorage: async () => ({ factory: r.factory, dispose: async () => {} }) };
+    const peer = await openValidationHost({ ...peerOptions, workspaceFile: initialFile });
+    await peer.authority.write(peer.read().source!.token, { [`caption/${captionId}/body`]: '未送信の現場記録' });
+    const attachmentId = `att_${newId()}`;
+    await peer.authority.addMediaFile!(peer.read().source!.token, { sceneId, captionId, attachmentId, eventId: `evt_${newId()}`, orderKey: 'A',
+      file: { name: '現場画像', size: png.length, arrayBuffer: async () => png.slice().buffer } });
+    const pw = createSavedWorkspace(new RecordedDocument().asDocument(), peer), ps = pw.session!;
+    const localCaption = ps.snapshot.resources.captions[captionId]!, localAttachments = captionAttachments(ps.snapshot.mediaData, captionId).ready;
+    s.refreshHistory(); s.acceptModel(planModelList(s.modelContext(), { kind: 'select', assetId }));
+    const old = s.snapshot, oldModel = old.modelVersions![0]!, oldChanges = host.read().source!.originalChanges();
+    if (oldModel.closure.shape !== 'saved-glb') throw Error('model');
+    const residents = await prepareValidationResidents(old.modelVersions!, host.content), oldSurface = residents.create(oldModel.closure);
+    let failDisplay = true;
+    const prepare = vi.fn(async (next: typeof old) => { await residents.prepare(next.modelVersions!); if (failDisplay) throw Error('injected replacement display'); });
+    const detach = host.setDisplayPreparation(prepare);
+    const control = createModelUpdateControls(new RecordedDocument().asDocument(), s, () => control.render()), root = record(control.root);
+    const button = (text: string) => root.children.find(n => n.tag === 'button' && n.textContent === text)!;
+    const input = root.children.find(n => n.type === 'file')!;
+    Object.assign(input, { click: vi.fn() }); // Recorded DOM does not open native file dialogs.
+    const bytes = glb(j => { j.nodes[0].translation = [3, 0, 0.25]; }), exactBytes = bytes.slice();
+    const file = { name: '更新モデル', size: bytes.length, arrayBuffer: vi.fn(async () => bytes.buffer as ArrayBuffer) };
+    const earlierExclude = planModelList(s.modelContext(), { kind: 'membership', assetId, included: false });
+    const choose = () => { control.render(); button('3Dモデルを差し替える').fire('click'); Object.assign(input, { files: [file] }); input.fire('change'); };
+    choose(); expect(host.read().source!.originalChanges()).toEqual(oldChanges); expect(file.arrayBuffer).not.toHaveBeenCalled();
+    expect(planModelList(s.modelContext(), { kind: 'membership', assetId, included: false }).kind).toBe('blocked');
+    expect(s.acceptModel(earlierExclude)).toBe(false); expect(host.read().source!.originalChanges()).toEqual(oldChanges);
+    expect(root.children.some(n => n.textContent.includes('2シーン'))).toBe(true); expect(workspace.hasChanges()).toBe(true);
+    button('選択を取り消す').fire('click'); expect(workspace.hasChanges()).toBe(false); expect(s.snapshot).toBe(old);
+    choose(); s.setSearchComposing(true); control.render(); expect(button('差し替える').disabled).toBe(true);
+    button('差し替える').fire('click'); expect(file.arrayBuffer).not.toHaveBeenCalled(); s.setSearchComposing(false); control.render();
+    f.fs.reject = path => path.endsWith('/published.json'); button('差し替える').fire('click');
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('failed'), { timeout: 10000 });
+    expect(s.snapshot).toBe(old); expect(s.modelReplacementSelection?.command.file.name).toBe('更新モデル');
+    expect(s.cancelModelReplacement()).toBe(false);
+    const paths = (await f.fs.list(`${validationArea}/${f.options.run}/`)).filter(p => p.endsWith('.amchange'));
+    const originalBytes = await Promise.all(paths.map(p => f.fs.readBytes(p)));
+    bytes.fill(0); f.fs.reject = () => false; s.retryWorking();
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('failed'), { timeout: 10000 });
+    expect(host.read().state).toBe('ready'); expect(s.snapshot).toBe(old); expect(s.message).toContain('injected replacement display');
+    const published = host.read().publication, publishedChanges = host.read().source!.originalChanges();
+    failDisplay = false; s.retryWorking();
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'), { timeout: 10000 });
+    expect(host.read().publication).toBe(published); expect(host.read().source!.originalChanges()).toEqual(publishedChanges);
+    expect(prepare).toHaveBeenCalledTimes(2);
+    expect(s.modelReplacementSelection).toBeNull(); expect(file.arrayBuffer).toHaveBeenCalledOnce();
+    expect(await Promise.all(paths.map(p => f.fs.readBytes(p)))).toEqual(originalBytes);
+    const updated = s.snapshot.modelVersions![0]!;
+    expect(updated.projection.revisionId).not.toBe(oldModel.projection.revisionId);
+    expect(updated.projection.assetFrameId).toBe(oldModel.projection.assetFrameId);
+    expect(updated.closure.binding.assetToProject).toEqual(oldModel.closure.binding.assetToProject);
+    expect((updated.closure.representation.blob as JsonObject).digest).toBe(await digest(exactBytes));
+    if (updated.closure.shape !== 'saved-glb') throw Error('model');
+    const updatedSurface = residents.create(updated.closure);
+    expect(new THREE.Box3().setFromObject(oldSurface.asset, true).min.z).toBe(3);
+    expect(new THREE.Box3().setFromObject(updatedSurface.asset, true).min.z).toBe(3.5);
+    oldSurface.dispose?.(); updatedSurface.dispose?.();
+    expect(s.snapshot.resources.captions).toEqual(old.resources.captions);
+    expect(s.snapshot.state.assetMemberships).toEqual(old.state.assetMemberships);
+    for (const id of [sceneId, secondScene]) {
+      const view = resolveScene(s.snapshot.state, s.snapshot.resources, id); if (view.kind === 'blocked') throw Error('scene');
+      expect(view.composition.assets[0]!.projection.revisionId).toBe(updated.projection.revisionId);
+    }
+    const updatedFile = await host.workspaceOutput.download(await host.workspaceOutput.generate(host.read().source!.token));
+    await peer.workspaceFiles.receive(peer.read().source!.token, updatedFile); ps.refreshHistory();
+    expect(ps.snapshot.resources.captions[captionId]).toEqual(localCaption);
+    expect(captionAttachments(ps.snapshot.mediaData, captionId).ready).toEqual(localAttachments);
+    expect(ps.composition.captions.find(c => c.captionId === captionId)!.marker).toBe('needsReview');
+    expect(ps.snapshot.colors[captionId]).toEqual(old.colors[captionId]);
+    const oldPin = syntheticDisplay(old, sceneId, null, captionId).pins.find(p => p.id === captionId)!;
+    expect(syntheticDisplay(ps.snapshot, sceneId, null, captionId).pins.find(p => p.id === captionId))
+      .toMatchObject({ position: oldPin.position, color: oldPin.color, status: 'needsReview' });
+    ps.setViewportState(true, [assetId], null); expect(ps.acceptList(planCaptionList(ps.captionContext(), { kind: 'select', captionId }))).toBe(true);
+    expect(ps.acceptPin(planPinMode(ps.pinContext(), { kind: 'move' }))).toBe(true);
+    expect(ps.acceptPinSurface(ps.pinSurfaceTarget()!, [3, 0.5, 0.25], true)).toBe(true);
+    ps.acceptPin(planPinMode(ps.pinContext(), { kind: 'finish' }));
+    await vi.waitFor(() => expect(ps.acknowledgment.state).toBe('idle'), { timeout: 10000 });
+    expect(ps.composition.captions.find(c => c.captionId === captionId)!.marker).toBe('visible');
+    expect(ps.snapshot.resources.captions[captionId]!.anchor).toMatchObject({ kind: 'value', value: { assetId,
+      authoredAssetRevisionId: updated.projection.revisionId, positionAsset: [3, 0.5, 0.25] } });
+    const reply = await peer.workspaceOutput.download(await peer.workspaceOutput.generateContribution(peer.read().source!.token, peer.workspaceOutput.bases[0]!.selection));
+    await host.workspaceFiles.receive(host.read().source!.token, reply); s.refreshHistory();
+    expect(s.snapshot.resources.captions[captionId]).toEqual(ps.snapshot.resources.captions[captionId]);
+    expect(captionAttachments(s.snapshot.mediaData, captionId).ready).toEqual(localAttachments);
+    const final = host.read().source!; await host.workspaceFiles.receive(final.token, reply);
+    expect(host.read().source!.token).toBe(final.token); expect(host.read().source!.originalChanges()).toEqual(final.originalChanges());
+    control.dispose(); const write = vi.spyOn(host.authority as Required<Pick<typeof host.authority, 'replaceModelFile'>>, 'replaceModelFile');
+    button('差し替える').fire('click'); expect(write).not.toHaveBeenCalled(); write.mockRestore();
+    detach(); residents.dispose(); await workspace.dispose(); await pw.dispose(); const cold = await openValidationHost(f.options);
+    expect(cold.read().source!.token).toBe(final.token); expect(cold.read().source!.originalChanges()).toEqual(final.originalChanges());
+    expect(captionAttachments(cold.authority.read().mediaData, captionId).ready).toEqual(localAttachments);
+    await cold.dispose();
+  }, 60000);
+  it('rejects stale, malformed and inferred replacement closures without modifying the existing Project', async () => {
+    const { host, workspace, s, options } = await openFileCaption(), old = s.snapshot.modelVersions![0]!, assetId = old.assetId, sceneId = s.sceneId;
+    const before = host.read().source!, provider = host.read().provider!; if (provider.kind !== 'scene-provider') throw Error('provider');
+    const model = await prepareValidationModel({ label: '更新', bytes: glb() }, budget, decode, assetId);
+    const binding = await sealValidationRecord('asset-binding-revision', { id: model.binding.id!, assetId,
+      assetRevisionId: model.revision.id!, assetToProject: old.closure.binding.assetToProject as unknown as JsonObject, parentBindingId: old.projection.bindingId, method: 'manual' });
+    const command = { kind: 'replaceAssetModel' as const, sceneId, assetId, expectedBindingId: old.projection.bindingId,
+      revision: model.revision, representation: model.representation, binding };
+    expect(planMetadataEdit(provider, command, metadata)).toHaveLength(4);
+    for (const change of [(c: any) => { c.expectedBindingId = `bnd_${newId()}`; },
+      (c: any) => { c.binding.assetToProject.uniformScale = 3; }, (c: any) => { c.representation.extra = true; },
+      (c: any) => { c.revision.anchorCompatibilityClasses[0].id = old.projection.anchorCompatibilityIds[0]; },
+      (c: any) => { c.representation.materialCatalog.slots[0].logicalMaterialSlotId = old.closure.representation.materialCatalog.slots[0]!.logicalMaterialSlotId; }]) {
+      const copy = structuredClone(command); change(copy); expect(() => planMetadataEdit(provider, copy, metadata)).toThrow();
+    }
+    const file = { name: '不正', size: 3, arrayBuffer: vi.fn(async () => new Uint8Array(3).buffer) };
+    const input = { sceneId, assetId, expectedBindingId: old.projection.bindingId, file };
+    await expect(host.authority.replaceModelFile!('stale', input)).rejects.toThrow('更新'); expect(file.arrayBuffer).not.toHaveBeenCalled();
+    const view = await openValidationHost(options); await expect(view.authority.replaceModelFile!(before.token, input)).rejects.toThrow('閲覧専用'); await view.dispose();
+    await expect(host.authority.replaceModelFile!(before.token, input)).rejects.toThrow();
+    expect(host.hasPending()).toBe(false); expect(host.read().source!.originalChanges()).toEqual(before.originalChanges());
+    expect(host.authority.read().modelVersions![0]).toEqual(old);
+    s.acceptModel(planModelList(s.modelContext(), { kind: 'select', assetId }));
+    expect(s.selectModelReplacement({ token: before.token, ...input }, file)).toBe(true);
+    await host.authority.write(before.token, { [`caption/${s.memory.selectedCaptionId!}/body`]: '別の更新' });
+    s.refreshHistory(); const after = host.read().source!;
+    expect(s.confirmModelReplacement()).toBe(false); expect(s.message).toContain('更新');
+    expect(s.modelReplacementSelection?.target.token).toBe(before.token);
+    expect(host.read().source!.originalChanges()).toEqual(after.originalChanges()); expect(s.cancelModelReplacement()).toBe(true);
+    await workspace.dispose();
   });
   it('connects explicit pin parent changes to the GLB validation authority and reopens the same Caption', async () => {
     const { options, workspace, host, s, captionId } = await openFileCaption();

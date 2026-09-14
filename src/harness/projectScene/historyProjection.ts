@@ -9,7 +9,7 @@ import { projectViewHistory, viewHistorySeed } from './viewHistory';
 import { projectMaterialHistory } from './materialHistory';
 import { mediaSeed, projectMediaHistory, type MediaFileAddition } from './mediaHistory';
 import type { SceneAuthoringCommand, CaptionDeletionCommand, CaptionDeletionImpact, AssetDeletionCommand, AssetDeletionImpact, PinParentCommand } from '../../scene/commands';
-import type { ModelPlacementCommand, ModelFileAddition } from './modelTypes';
+import type { ModelPlacementCommand, ModelFileAddition, ModelFileReplacement } from './modelTypes';
 
 export const captionKey = (id: string, field: 'title' | 'body' | 'color' | 'anchor' | 'template' | 'identity') => `caption/${id}/${field}`;
 export const bindingKey = (id: string) => `asset/${id}/binding`;
@@ -162,6 +162,7 @@ export interface SyntheticAuthority {
   deleteAsset?(token: string, command: AssetDeletionCommand): WorkingResult<SyntheticProject>;
   addMediaFile?(token: string, command: MediaFileAddition): WorkingResult<SyntheticProject>;
   addModelFile?(token: string, command: ModelFileAddition): WorkingResult<SyntheticProject>;
+  replaceModelFile?(token: string, command: ModelFileReplacement): WorkingResult<SyntheticProject>;
   transformModel?(token: string, command: ModelPlacementCommand): WorkingResult<SyntheticProject>;
   status?(): Readonly<{ kind: 'idle' | 'checking' | 'failed'; error?: string; retryable?: boolean }>;
   retry?(): WorkingResult<SyntheticProject>;

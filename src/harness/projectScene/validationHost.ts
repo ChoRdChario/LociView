@@ -19,7 +19,7 @@ import type { SyntheticProject } from './fixture';
 import type { SyntheticAuthority } from './historyProjection';
 import type { SavedWorkspaceHost, LocalOpenMode } from './savedHost';
 import type { MediaImage, MediaFileAddition } from './mediaHistory';
-import type { ModelPlacementCommand, ModelFileAddition } from './modelTypes';
+import type { ModelPlacementCommand, ModelFileAddition, ModelFileReplacement } from './modelTypes';
 import { orderBetween } from './viewHistory';
 import { resolveScene } from '../../scene/resolve';
 import { validationMaterialSlots, validationMaterialIssue } from './validationMaterials';
@@ -420,6 +420,38 @@ export async function openValidationHost(options: ValidationHostOptions) {
             const result = await ready(await session.edit(token, { kind: 'addAsset', sceneId: target.sceneId, ...records,
               membership: { id: `sam_${newId()}`, sceneId: target.sceneId, assetId: target.assetId, orderKey,
                 lifecycle: { state: 'active', reason: 'initial', eventId: `evt_${newId()}` } } }));
+            content.releasePreparedModels(); return result;
+          } catch (error) { if ((await session.read()).state === 'ready') content.releasePreparedModels(); throw error; }
+        }, true);
+      },
+      replaceModelFile: (token, input: ModelFileReplacement) => {
+        const target = { sceneId: input.sceneId, assetId: input.assetId, expectedBindingId: input.expectedBindingId }, selected = input.file;
+        const file = { name: selected.name, size: selected.size, arrayBuffer: selected.arrayBuffer.bind(selected) };
+        return execute(async () => {
+          editable(); const before = await session.read();
+          if (before.state !== 'ready' || before.source?.token !== token || before.provider?.kind !== 'scene-provider')
+            throw Error('対象が更新されています。差し替えるモデルを確認してください。');
+          const versions = await validationModelVersions(before.provider);
+          const source = versions.find(v => v.assetId === target.assetId && v.projection.bindingId === target.expectedBindingId)?.closure;
+          const view = authority.read(), scene = resolveScene(view.state, view.resources, target.sceneId);
+          if (!source || source.shape !== 'saved-glb' || scene.kind !== 'ready' || !scene.composition.assets.some(a => a.assetId === target.assetId))
+            throw Error('差し替えるモデルを確認してください。');
+          const bodies = new Map<string, number>();
+          for (const map of [before.provider.details.immutable.representationsById, before.provider.details.immutable.mediaResourcesById])
+            for (const field of Object.values(map)) {
+              if (field.kind !== 'value') throw Error('保存した本体の情報を確認してください。');
+              const b = field.value.blob as { digest: string; byteLength: number }; bodies.set(b.digest, b.byteLength);
+            }
+          if (!Number.isSafeInteger(file.size) || file.size <= 0 || [...bodies.values()].reduce((sum, size) => sum + size, file.size) > options.fileLimits.maxFileBytes)
+            throw Error('モデルを含む合計がこの検証の上限を超えています。');
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          if (bytes.length !== file.size) throw Error('選択したモデルの大きさが一致しません。');
+          const prepared = await content.prepareModel({ label: file.name, bytes }, target.assetId);
+          try {
+            const binding = await sealValidationRecord('asset-binding-revision', { id: prepared.binding.id!, assetId: target.assetId,
+              assetRevisionId: prepared.revision.id!, parentBindingId: source.binding.id, method: 'manual', assetToProject: source.binding.assetToProject as unknown as JsonObject });
+            const result = await ready(await session.edit(token, { kind: 'replaceAssetModel', ...target,
+              revision: prepared.revision, representation: prepared.representation, binding }));
             content.releasePreparedModels(); return result;
           } catch (error) { if ((await session.read()).state === 'ready') content.releasePreparedModels(); throw error; }
         }, true);

@@ -72,7 +72,7 @@ reopen. Typecheck, 2,281 tests/21 existing TODO, both builds and independent rev
 passed. `e27a354` connected I04 media selection/shared viewing. Detailed prior
 results remain in Git; inventory owns route coverage, not whole-group completion.
 
-## Next connected unit — update a real model and return corrected pins
+## Completed unit — update a real model and return corrected pins
 
 Close the real GLB update → updated Workspace receive → explicit same-Asset pin
 correction → Contribution return flow under accepted 05 §2.3/TEAM-FLOW. Current
@@ -80,22 +80,58 @@ prepared-revision controls still construct synthetic records and must not be
 exposed as real-model support. Independent read-only investigation found no new
 PO policy decision in this bounded connection; Native conversion remains separate.
 
-- [ ] Specify the local typed update command and input ownership before coding:
+- [x] Specify the local typed update command and input ownership before coding:
   verified new Representation/revision plus fresh manual binding and active pointer
   in one existing Session/journal change. Retain logical Asset/AssetFrame, current
   transform, Scene edges, Caption coordinates/content and immutable old records.
-- [ ] Reuse validated GLB preparation/content facts, explicit file/impact confirmation,
+- [x] Reuse validated GLB preparation/content facts, explicit file/impact confirmation,
   pending/cancel/exact retry and resident preparation; no fixture-model adapter.
   New compatibility/family/material IDs do not imply correspondence with the old model.
-- [ ] Reuse existing real-file fixtures for retained local text/PNG, all-Scene update,
+- [x] Reuse existing real-file fixtures for retained local text/PNG, all-Scene update,
   visible needsReview pins, explicit surface correction, return/replay/cold reopen
-  and a representative interrupted publication. Verify/review the connected flow.
+  and a representative interrupted publication.
+- [x] Finish one serial final typecheck/root suite/ordinary + harness build and
+  independent review; update this record and checkpoint the connected flow.
 
 Keep retained-revision metadata separate from active resident decode if later
 selection needs it. No general revision manager, automatic alignment/compatibility
 or material remapping, Point/GS/Proxy expansion, new profile/wire, ordinary-home
 activation or device/adoption credit. Stop only for a concrete contract conflict
 or new authority requirement, not at each helper or because Push is unavailable.
+Starting checkpoint: `46c66bd`, clean `g0-baseline`. The preceding connected
+Caption recovery/copy unit is complete; model-file replacement is still missing,
+so it remains on the practical-team critical path rather than an auxiliary task.
+
+Connected implementation now uses `replaceAssetModel`, a four-write immutable
+closure/status command, and a separate typed real-file authority entry. The model
+tab owns target/file selection and explicit confirm/cancel; no synthetic conversion
+adapter or detached-target decode was enabled. Three focused checks passed: GLB
+update/file return, refusal/stale guards and isolation. They include real GLTF
+resident geometry replacement, both publication and display failure/exact retry,
+old logical Frame/transform/Scene edges/Caption retention, local text/PNG on receipt,
+visible known-position needsReview pins, same-Asset surface correction, Contribution
+return/replay and cold reopen. Recorded DOM/raster injection is not native UI evidence.
+
+Independent review found one pending-state omission: model Scene membership could
+change while a replacement selection remained open. The model planner now blocks
+that edit, including a plan captured before selection; regression and read-only
+re-review passed. No mandatory finding remains. Final serial checks passed:
+typecheck; root suite (112 files, 2,284 PASS / 21 existing TODO, 524.94s); ordinary
+and harness builds. The root command remains `npm test -- --reporter=dot
+--maxWorkers=2 --testTimeout=30000`. Existing build/Node image-loader warnings
+remain. Only two cases were added to the existing file suite; no new test framework,
+PoC, dependency, runtime budget or measured adoption claim.
+
+Next connected unit: both people replace the same Asset → receive conflict →
+explicit read-only model comparison/choice → Contribution return/replay/reopen.
+Reuse `assetStatusCandidates` / `resolveAssetStatus` and existing resident/viewport
+ports; independent read-only investigation found no new schema or PO-policy gate.
+Candidate preview is separate from authoritative Scene rendering, uses the exact
+candidate Representation/binding, and has no pins, gizmos or edit callbacks. Do not
+show IDs/hashes as the primary decision aid or infer a winner from cached geometry.
+The existing Contribution strong closure is unchanged: preserving original history
+does not promise delivery of every losing weak-referenced model body to a recipient
+that never had it. Real-model independent copy remains separate from this choice.
 
 ## Pending decision — Native conversion implementation
 
@@ -303,8 +339,9 @@ area. This is limited GLB/PNG development code, not ordinary-home acceptance.
 2. The connected review → independent edit-copy unit is verified. The concrete Native
    conversion amendment is recorded and independently reviewed in 07 §11, awaiting
    one grouped PO decision; the earlier synthetic bridge GO does not authorize the
-   new schema/recipe. While it is pending, close the already-approved real-model
-   update/correction/return connection above without substituting UI polish for
+   new schema/recipe. While it is pending, follow the verified real-model
+   update/correction/return connection with explicit competing-model resolution,
+   as scoped above, without substituting UI polish for
    migration. The conversion flow after approval is Native file
    → explicit conversion → new Project → edit/cold reopen. Source preservation and
    unplaced-record retention are already approved; do not re-ask those policies.
@@ -333,7 +370,7 @@ New policy/compatibility/major architecture decisions retain their explicit appr
 
 PO renewed permission for timely checkpoint Push on 2026-09-14. Use existing
 `g0-baseline`; verify remote, scope, privacy and triggered workflows first.
-At the start of this Caption recovery/copy unit, cached origin was 0 behind / 80 ahead; no live fetch
+At the start of this real-model update unit, cached origin was 0 behind / 81 ahead; no live fetch
 was used for that observation. Previous environment denial is separate from PO permission:
 do not retry a denied action unchanged or bypass it. Local implementation need not wait.
 `main`, Pages, Service Worker, license/version and public release remain separately gated.

@@ -4,6 +4,8 @@ import type { FixtureModelClosure, FixturePlacement } from './modelClosure';
 import type { MediaFileSelection } from './mediaHistory';
 
 export interface ModelFileAddition { readonly sceneId: string; readonly assetId: string; readonly file: MediaFileSelection }
+export interface ModelFileReplacement extends ModelFileAddition { readonly expectedBindingId: string }
+export interface ModelReplacementTarget { readonly token: string; readonly sceneId: string; readonly assetId: string; readonly expectedBindingId: string }
 
 /** Saved read projection only. Complete immutable records remain attached, not reconstructed as fixtures. */
 export interface ValidationModelClosure {

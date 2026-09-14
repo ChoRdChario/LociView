@@ -27,6 +27,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
     deleteAsset: (...a) => run(() => current.authority.deleteAsset!(...a)),
     addMediaFile: (...a) => run(() => current.authority.addMediaFile!(...a)),
     addModelFile: (...a) => run(() => current.authority.addModelFile!(...a)),
+    replaceModelFile: (...a) => run(() => current.authority.replaceModelFile!(...a)),
     transformModel: (...a) => run(() => current.authority.transformModel!(...a)),
     retry: () => run(() => current.authority.retry!()),
   };

@@ -17,7 +17,7 @@ import { bindingKey, captionKey, membershipKey, type SyntheticAuthority } from '
 import { pinPositionInParent } from './pinParent';
 import { decodeSyntheticAnchor, modelVersion, syntheticVersions, versionFromClosure } from './modelFixture';
 import { canonicalFixture, createFixtureModel, fixtureModelIds, moveFixtureModel, readFixtureModel, type FixtureModelClosure } from './modelClosure';
-import type { DisplayModelVersion, DisplayModelClosure, ModelFileAddition } from './modelTypes';
+import type { DisplayModelVersion, DisplayModelClosure, ModelFileAddition, ModelFileReplacement, ModelReplacementTarget } from './modelTypes';
 import { modelClosureKey } from './modelHistory';
 import { newPinModeMemory, pinActionIssue, pinModePlanIsCurrent, planPinMode, type PinModeContext,
   type PinModeMemory, type PinModePlan, type PinProposal } from '../../ui/projectScene/pinModeState';
@@ -89,6 +89,42 @@ export class SyntheticSession {
   private deletion: { token: string; sceneId: string; title: string; impact: CaptionDeletionImpact } | null = null;
   private assetDeletion: { token: string; sceneId: string; name: string; impact: AssetDeletionImpact } | null = null;
   private modelFile: { token: string; command: ModelFileAddition } | null = null;
+  private replacement: { target: ModelReplacementTarget; command: ModelFileReplacement; name: string; sceneCount: number } | null = null;
+  get modelFileReplacementAvailable() { return !!this.authority?.replaceModelFile; }
+  get modelReplacementSelection() { return this.replacement; }
+  selectModelReplacement(target: ModelReplacementTarget, file: MediaFileSelection): boolean {
+    const context = this.modelUpdateContext();
+    if (!this.modelFileReplacementAvailable || this.readOnly || this.pending || this.externalChanges() || context.issue ||
+      target.token !== context.token || target.sceneId !== context.sceneId || target.assetId !== context.assetId ||
+      target.expectedBindingId !== context.current?.projection.bindingId)
+      return this.refuse('入力を確定し、差し替えるモデルを確認してください。');
+    this.replacement = { target: { ...target }, name: context.name, sceneCount: context.sceneCount,
+      command: { sceneId: target.sceneId, assetId: target.assetId, expectedBindingId: target.expectedBindingId,
+        file: { name: file.name, size: file.size, arrayBuffer: file.arrayBuffer.bind(file) } } };
+    this.message = ''; return true;
+  }
+  get modelReplacementIssue(): string | null {
+    const d = this.replacement, context = this.modelUpdateContext();
+    if (this.readOnly) return 'このタブは閲覧専用です。';
+    if (context.issue) return context.issue;
+    if (this.externalChanges()) return '他の入力を確定するか、取り消してください。';
+    if (this.modelFile || this.sceneDraft || this.deletion || this.views.pending || this.materials.pending || this.media.pending ||
+      [...this.drafts.values()].some(hasCaptionDraft)) return '他の入力を確定するか、取り消してください。';
+    if (d && (d.target.token !== context.token || d.target.sceneId !== context.sceneId || d.target.assetId !== context.assetId ||
+      d.target.expectedBindingId !== context.current?.projection.bindingId)) return '対象が更新されています。選択を取り消して、選び直してください。';
+    return null;
+  }
+  cancelModelReplacement(): boolean { if (this.workingBlock) return false; this.replacement = null; this.message = ''; return true; }
+  confirmModelReplacement(): boolean {
+    const d = this.replacement, issue = this.modelReplacementIssue;
+    if (!d || !this.authority?.replaceModelFile || issue) return this.refuse(issue ?? '差し替える3Dモデルを選択してください。');
+    return this.applyWorking(() => afterWorking(this.authority!.replaceModelFile!(d.target.token, d.command), next => this.publish(next)), () => {
+      const projection = this.project.resources.assets[d.command.assetId]?.projection;
+      if (projection?.kind !== 'value' || projection.value.bindingId === d.command.expectedBindingId)
+        throw Error('モデルの差し替えを確認できません。選択を保持しています。');
+      this.replacement = null; this.message = 'モデルを差し替えました。要確認のピンは、位置を確認して調整できます。';
+    });
+  }
   get modelFileAdditionAvailable() { return !!this.authority?.addModelFile; }
   get hasModelFileSelection() { return !!this.modelFile; }
   cancelModelFile() { if (this.workingBlock) return false; this.modelFile = null; this.message = ''; return true; }
@@ -136,7 +172,7 @@ export class SyntheticSession {
   get materialRestriction() { return this.readOnly || !this.authority?.capabilities?.materials ? this.editingRestriction : null; }
   get mediaRestriction() { return this.readOnly || !this.authority?.capabilities?.media ? this.editingRestriction : null; }
   get placementRestriction() { return this.readOnly || !this.authority?.capabilities?.placement ? this.editingRestriction : null; }
-  get modelUpdateRestriction() { return this.readOnly || !this.authority?.capabilities?.preparedRevision ? this.editingRestriction : null; }
+  get modelUpdateRestriction() { return this.readOnly || !this.authority?.capabilities?.preparedRevision && !this.modelFileReplacementAvailable ? this.editingRestriction : null; }
   get sceneAuthoringAvailable() { return !!this.authority?.capabilities?.sceneAuthoring && !!this.authority.authorScene; }
   get sceneAuthoringDraft() { return this.sceneDraft; }
   get captionDeletionAvailable() { return !!this.authority?.captionDeletionImpact && !!this.authority.deleteCaption; }
@@ -296,7 +332,7 @@ export class SyntheticSession {
     if (this.views.pending === 'composition' || this.materials.pending === 'composition' || this.media.pending === 'composition') return 'composition';
     if (this.placement?.composing || this.pinInputComposing || this.searchComposing || [...this.includes.values()].some(m => m.composing) || [...this.models.values()].some(m => m.composing) ||
       [...this.drafts.values()].some(d => d.composing !== null)) return 'composition';
-    return this.views.pending ?? this.materials.pending ?? this.media.pending ?? (this.modelFile || this.assetDeletion || this.deletion || this.sceneDraft || [...this.drafts.values()].some(hasCaptionDraft) ? 'text' : null);
+    return this.views.pending ?? this.materials.pending ?? this.media.pending ?? (this.modelFile || this.replacement || this.assetDeletion || this.deletion || this.sceneDraft || [...this.drafts.values()].some(hasCaptionDraft) ? 'text' : null);
   }
   setSearchComposing(active: boolean) { this.searchComposing = active; }
   setViewportDragging(active: boolean): boolean { const changed = this.viewportDragging !== active; this.viewportDragging = active; return changed; }
@@ -505,7 +541,7 @@ export class SyntheticSession {
             asset.projection.kind !== 'value' || edges.length > 1 ? 'モデルの更新・所属の候補を確認してください。' :
               this.viewportState.issue ?? 'シーンに含まれています。3D表示を確認してください。' };
       }) }, memory: this.models.get(this.sceneId)!, pending: this.workingBlock ? 'update' : this.textPending === 'composition' ? 'composition' :
-        this.assetDeletion ? 'text' : this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' :
+        this.assetDeletion || this.replacement ? 'text' : this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' :
           this.pinInput ? 'pinMove' : this.views.pending, mutationBlock: this.workingBlock ?? this.membershipRestriction, feedback: this.modelFeedback };
   }
   get hiddenAssetIds() { return this.models.get(this.sceneId)!.hiddenAssetIds; }

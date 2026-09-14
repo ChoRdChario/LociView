@@ -242,7 +242,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
       // 06 §11/§12.3 permit these exact disconnected primitives, not an app importer.
       if (!packageControl && !packageJournal) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectPackage\//);
       const metadataFoundation = /[\\/]projectMetadata[\\/](format|source)\.ts$/.test(path);
-      const metadataService = /[\\/]projectMetadata[\\/](persistence|generationScope|repository|journal|contentEvidence|blobStream|blobStore|blobInventory|session|commands|remote|packageRemote|membership|records|assetStatus|modelMembership|modelAddition|captionCandidates|sceneAuthoring|viewResolution|captionDeletion|assetDeletion|startupScene)\.ts$/.test(path);
+      const metadataService = /[\\/]projectMetadata[\\/](persistence|generationScope|repository|journal|contentEvidence|blobStream|blobStore|blobInventory|session|commands|remote|packageRemote|membership|records|assetStatus|modelMembership|modelAddition|modelReplacement|captionCandidates|sceneAuthoring|viewResolution|captionDeletion|assetDeletion|startupScene)\.ts$/.test(path);
       // 05 §13.2 permits this exact new synthetic host, never ordinary/old saved activation.
       const metadataHost = /[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Intent|MembershipControls|Models|ModelFacts|AssetStatusControls|ConflictControls|CaptionLifecycleControls|StartupControls)\.ts$/.test(path);
       const validationFiles = /[\\/]projectFiles[\\/](validation|png|glb|glbMaterials|initialProject|content|creation|modelFacts|receiveWorkspace|sendWorkspace)\.ts$/.test(path);
@@ -405,6 +405,8 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
             '../domain/values', '../scene/projectProvider', './membership', './commands', './format', './records'],
           modelAddition: ['../domain/projectRecords', '../domain/projectRecordFields', '../domain/projectMutableFields', '../domain/projectGraphSupport',
             '../domain/values', '../scene/projectProvider', './membership', './commands', './format'],
+          modelReplacement: ['../domain/projectRecords', '../domain/projectRecordFields', '../domain/projectGraphSupport',
+            '../domain/values', '../scene/projectProvider', '../scene/resolve', './membership', './records', './commands', './format'],
           captionCandidates: ['../scene/projectProvider', '../domain/projectMutableFields', '../domain/projectRecordFields', './membership', './format'],
           captionDeletion: ['../scene/commands', '../scene/projectProvider', '../domain/projectRecordFields', './membership', './format', './commands', '../domain/projectMutableFields', '../domain/values'],
           assetDeletion: ['../scene/commands', '../scene/projectProvider', '../domain/projectCandidates', '../domain/projectRecordFields', '../domain/projectGraphSupport', './membership', './format', './commands'],
@@ -421,7 +423,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
             './blobStore', '../projectPackage/outputJob', '../projectPackage/contributionOutputJob', '../projectPackage/backupOutputJob', '../projectPackage/backupSource', '../projectPackage/cleanOutputJob', '../projectPackage/reviewOutputJob', '../projectPackage/reviewSource', '../projectPackage/reviewSelection', '../projectPackage/cleanInputJob', '../projectPackage/cleanSource', '../projectPackage/cleanRecords', '../projectPackage/contributionSource', '../projectPackage/outputJobs', '../projectPackage/workspaceBases', '../projectPackage/workspaceSource', '../projectPackage/protectedInventory', '../projectPackage/contract', '../projectPackage/contributionReceiveJob', '../projectPackage/contributionEvidence', '../projectPackage/receiveJobs', '../projectPackage/backupRestoreJob'],
           startupScene: ['../scene/projectProvider', '../domain/projectRecords', '../domain/projectRecordFields', './membership', './format'],
           commands: ['../domain/values', '../domain/projectMutableFields', '../domain/projectRecordFields', '../domain/projectRecords', '../domain/projectGraphSupport',
-            '../domain/materialIntent', '../domain/captionText', '../scene/projectMaterialRoutes', '../scene/commands', '../scene/resolve', '../scene/types', '../scene/projectProvider', './format', './membership', './records', './assetStatus', './modelMembership', './captionCandidates', './sceneAuthoring', './viewResolution', './captionDeletion', './assetDeletion', './startupScene', './modelAddition'],
+            '../domain/materialIntent', '../domain/captionText', '../scene/projectMaterialRoutes', '../scene/commands', '../scene/resolve', '../scene/types', '../scene/projectProvider', './format', './membership', './records', './assetStatus', './modelMembership', './captionCandidates', './sceneAuthoring', './viewResolution', './captionDeletion', './assetDeletion', './startupScene', './modelAddition', './modelReplacement'],
         };
         const name = path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '');
         expect(imports.every(p => byFile[name]!.includes(p!)), path).toBe(true);
