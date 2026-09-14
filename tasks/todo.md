@@ -12,14 +12,34 @@ resume and recovery. Desktop, physical iPhone and offline acceptance must cover
 the new route. Scope is 62 of the 64 inventory groups; M13/M14 remain later work.
 Neither component counts nor synthetic-host success is product completion or release approval.
 
-Feature development is paused at the PO's request. Current work is the bounded
-test-flow improvement and unnecessary-complexity audit below. The PO reports one
+Feature development is paused at the PO's request. Current work is documenting
+the PO-approved user-facing simplification in the existing UI guidelines. The PO reports one
 overnight goal run consumed 90% of the allowance; estimates must respect that
 observed constraint rather than assume unlimited daily agent time. No per-action
 quota attribution has been measured. Real-file material resolution is verified
 at `e6fc15b`; Native 07 §11 still requires its separate compatibility decision.
 
-## Current unit — economical verification and complexity audit
+## Current unit — user-facing simplicity guidance (documentation only)
+
+Outcome: make ordinary work understandable without learning storage/package or
+reference-management internals. The PO approved the review's presentation direction;
+this request updates guidance, not product code or compatibility semantics.
+
+- [x] Update the existing UI guidelines: core flow, save/send, meaningful choices,
+  temporary visibility versus Scene inclusion, cleanup and progressive settings.
+- [x] Correct stale guidance that conflicts with this direction; retain established
+  safety, useful viewing features, route-specific evidence and visual tone.
+- [x] Check links/diff and obtain one bounded read-only review; checkpoint only
+  documentation, preserve the paused product changes and stop.
+
+The [UI guidelines](../docs/ui-product-guidelines.md) own the detailed rules in
+§§2.1/4.4–4.5/6.1/9.2 and the existing acceptance section. Local links and diff checks
+passed; one read-only review found no mandatory findings. Documentation only:
+no runtime tests or browser/device acceptance were claimed. Product work is still paused.
+No new matrix, PoC, runtime suite,
+dependency, schema, release or feature-deletion decision belongs to this unit.
+
+## Previous checkpoint — economical verification and complexity audit
 
 - [x] Make focused/related checks and the serial final checkpoint easy to invoke
   with existing Vitest; keep all acceptance, failure exits and final checks intact.

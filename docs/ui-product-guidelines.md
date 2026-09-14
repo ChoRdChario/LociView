@@ -7,6 +7,8 @@
 > information-architecture, writing and visual direction approved during the
 > public-candidate UI/UX closure. They do not by themselves claim that the
 > current worktree has passed rendered Desktop or physical-iPhone acceptance.
+> Presentation amendment approved 2026-09-14: ordinary-workflow simplicity
+> (§§2.1, 4.4–4.5, 6.1, 9.2). This approval is not implementation evidence.
 
 ## 1. Authority and scope
 
@@ -58,6 +60,25 @@ an instrument whose target and state are always clear**.
 - UI color and 3D-stage background are independent systems. Changing the scene
   background must not recolor the application chrome.
 
+### 2.1 日常操作を中心にする（PO承認 2026-09-14）
+
+**設計の軸：開く → シーンを選ぶ → ピンと記録を扱う → ファイルに保存／相手に渡す。**
+
+ユーザーが覚えるのは作業に必要な概念であり、内部のデータ構造や処理段階ではない。
+初回の記録や通常の保存に、ファイル目的の一覧、履歴の仕組み、参照管理の理解を要求しない。
+機能を削るのではなく、日常操作・必要時の判断・詳細設定を分ける（§6）。
+
+- 判断材料がない選択を増やさない。画面上の内容と結果から選べるようにする。
+- 正常時に内部状態の点検を求めない。処理はアプリが担い、進捗と結果を伝える。
+- 複数キャプションウィンドウ、色フィルター、カメラプリセットは閲覧に直接役立つ。
+  簡素化を理由に削除したり、日常の操作を詳細欄へ追いやったりしない。
+- 現在の低彩度ウォームグレー、控えめな枠・ブランド、3Dと記録を優先するトーンを維持する。
+  過密さを小さい文字、アイコンだけの表示、装飾や説明文の追加で解決しない。
+- 短くしても、未反映の変更、失敗、破壊・共有の影響、回復の入口は隠さない。
+
+この方針は表示と導線の改善であり、自動的な競合解消、対応関係の推測、参照の一括削除、
+保存・ファイル形式の保証変更を承認するものではない。
+
 ## 3. User-visible mental model and terminology
 
 > Classification: **Accepted requirement**.
@@ -73,7 +94,8 @@ or contextual details unless the user must decide something about it.
 | キャプション | One Project record normally tied to an explicitly chosen model location and reusable in multiple Scenes | A copied per-Scene note, generic image caption or inferred model relation |
 | メディア | Images and other content attached to a Caption | A separate model, surface material or an automatically inferred source relation |
 | シーン | A named Project presentation selecting models and Captions, Scene appearance and an optional entry view | A model revision, renderer scene object or temporary filter |
-| モデルの表示 | Whether a model belongs to the current Scene | Replacing the model or selecting a model revision |
+| このシーンに含める／このシーンから外す | Shared Scene membership of a Project model or Caption | Temporary hiding, Project-wide deletion or copying the resource |
+| 一時的に隠す | Local viewing aid that leaves Scene membership unchanged | Removing an item from the Scene or changing what another user receives |
 | マテリアル | How a supported model surface is drawn | Model visibility or Caption color |
 | 保存した視点 | A reusable camera and 3D-background state owned by one Scene | Project save, Scene membership or model placement |
 | 完全バックアップ | A complete restore of the same Project | A merge contribution or independent copy |
@@ -85,6 +107,8 @@ or contextual details unless the user must decide something about it.
 `Team Workspace` and `Contribution` are contract names in this document; their
 final short Japanese control labels require rendered copy review and are not
 ratified by translating them mechanically.
+The table is a vocabulary reference, not a menu to display at startup or on every
+save. File-purpose distinctions belong under the user's intent (§4.4).
 
 ### 3.1 Asset and Representation language
 
@@ -160,9 +184,9 @@ model-management responsibility required by LociView:
 | Tab | User questions it answers | Contents |
 |---|---|---|
 | キャプション | What is recorded in this Scene? What should I add or correct? | Scene list, current-Scene search, pin-color filters, list, existing-Project Caption inclusion, add/place/move, title/body/color, attached media and secondary window tools |
-| モデル | What Project models exist, and which belong to this Scene? | Project model list, Scene membership, Project-wide placement/alignment and replacement, pin scale, format-specific applicable controls, add and delete |
-| マテリアル | How should this surface look in this Scene? | Explicit target model/surface, Scene or Project scope, opacity, sidedness, unlit and applicable chroma controls |
-| 視点 | From where and against what background should I inspect this Scene? | Six directions, projection, Scene-owned Saved View recall/manage, entry view and 3D background |
+| モデル | What Project models exist, and which belong to this Scene? | Model list/add and clearly separate Scene inclusion/local visibility; contextual placement, replacement, pin scale and supported format controls; Project deletion in secondary management |
+| マテリアル | How should this surface look in this Scene? | Current target and common adjustments first; surface targeting, cross-Scene scope, sidedness, unlit and applicable chroma controls progressively disclosed (§4.5) |
+| 視点 | From where and against what background should I inspect this Scene? | Fit, six directions, projection and Saved View recall first; view creation/management, entry view and background settings remain reachable but secondary (§4.5) |
 
 Scene switching lives atop Caption; other tabs show the current Scene as context.
 Project save state and file exchange stay outside the tabs. Frequent `全体表示` and
@@ -214,6 +238,48 @@ second move system. Preserve current owner/frame, Caption identity and other
 Scene references. Only model-update incompatibility requires renewed surface
 review. Failure retains the proposal; cancel restores the confirmed position.
 
+### 4.4 保存・受け渡しは目的から始める
+
+**Accepted presentation requirement (2026-09-14); implementation pending.**
+Keep the five package purposes and their contracts; do not make them five equal
+choices on every save. This organizes the existing intents in specification 06
+§11.4 without ratifying a new wire format, sink or migration.
+
+| ユーザーの目的 | 入口と必要時の選択 | 維持する内容・影響 |
+|---|---|---|
+| 自分の作業をファイルに残す | `ファイルに保存`。名前は任意 | 手動checkpointは同じProjectの完全backup。自動再開用データとは別。既存の手動ファイルを無断で上書きしない |
+| 相手に作業を渡す | `相手に渡す`の中で、作業一式を渡すか変更を返すかを選ぶ | Workspaceは単独で開始できる。Contributionは検証済みの基準が必要。送信相手の受領は推測しない |
+| 一つのシーンだけを渡す | シーンの共有操作から内容と共有範囲を確認 | reviewの範囲・プライバシー・統合不可を明示。単なる閲覧モード切替ではデータを転送しない |
+| 別のProjectとして使う | Project管理のコピー操作から影響を確認 | cleanは独立した編集用コピー。元Projectへの変更返送はできない |
+
+変更を返す際は、`元にする作業一式`だけではなく、どの共有ファイルへの変更を返すのかを
+説明する。候補には識別可能な名前・日時など利用可能な文脈を表示し、選択後も対象を見せる。
+名前・日時は識別の補助であり、系統や基準の証明ではない。最新らしいファイル、同名ファイル、
+相手の推定状態から基準を選ばない。基準が失われた場合の回復は§7.2に従う。
+
+生成は通常操作の内部工程とし、独立したジョブ管理を覚えさせない。ブラウザが許す範囲で
+一つの保存／受け渡し操作から処理を進める。追加の明示操作が必要な環境では、現在の状態と
+次の一手を示す。共有範囲の確認や保存先の許可は省かない。出力の完了表現は§9.1–9.2に従う。
+
+### 4.5 設定・片付けは日常操作と分ける
+
+**Accepted presentation requirement (2026-09-14); implementation pending.**
+
+- モデルのシーン所属は`このシーンに含める`、一時表示は`一時的に隠す`と区別する。
+  チェックや目のアイコンに同じ「表示」という意味を持たせない。共有する変更か一時操作かを示す。
+- 通常の片付けは`このシーンから外す`。Project全体からの削除は詳細操作に置く。
+  削除が参照によって止まる場合は、残っているシーン・記録・設定と、その確認先への導線を示す。
+  ユーザーに参照先を探し回らせない。参照ゼロ条件の撤廃、連鎖削除、ピンの自動付け替えは別判断。
+- マテリアルは現在の対象とよく使う調整を先に表示する。対象が既存の明示選択から一意なら
+  名前を示し、同じ対象の再選択を要求しない。複数候補がある場合は選択を残す。
+  全シーン共通設定や専門的な項目は段階表示とし、適用範囲と他シーンへの影響は隠さない。
+  設定を開いただけでは編集・保存せず、確定／取消と下書き保護を維持する。
+- 視点タブは全体表示・六方向・投影方式・保存した視点の呼び出しを中心にする。
+  開始視点は視点管理、背景編集は詳細へ分ける。現在のカメラ操作、保存視点の更新、
+  シーン開始設定は同じ操作にまとめず、背景をどこまで残すかも対象の操作で伝える。
+- 詳細は対象の近くから戻れるようにする。折りたたむことを機能の削除や、
+  iPhoneでの操作不可に置き換えない。
+
 ## 5. Caption-first interaction
 
 > Classification: **Accepted requirement**.
@@ -243,7 +309,7 @@ hit, empty Scene or missing model ever creates one or fabricates an owner model.
 The Caption list stays in the right task area on Desktop. It must not live below
 the page or behind a collapsed section that forces page travel to identify the
 selected pin. Direct pin-color circles sit immediately above the list, below
-search/owner controls; filtering should take one action per color and must not
+Scene/search controls; filtering should take one action per color and must not
 be hidden behind a generic menu.
 
 Floating Caption windows are view aids on the 3D stage, connected to their pins
@@ -300,6 +366,23 @@ and which becomes a copy, disclose other-Scene effects and leave existing Captio
 model ownership unchanged. Preview the actual result; do not automatically merge
 equal-looking choices or choose an original candidate for the user. Other typed
 conflicts expose only their implemented resolution actions.
+
+### 6.1 人が判断できる比較を提示する
+
+**Accepted presentation requirement (2026-09-14); implementation pending.**
+
+`登録1／登録2`や`候補1を残す`だけでは、何が違い、結果がどう変わるかを判断できない。
+対象の記録名、比較する内容、利用可能な出所の文脈、他シーンへの影響と適用結果を示す。
+番号は補助には使えるが、判断材料の代わりにはならない。出所を証明できなければ推測しない。
+
+ピン位置・色・カメラ・マテリアルは、見た目の比較を先に置く。座標、ラジアン、sRGB値、
+内部IDは詳細情報とし、数値を読めることを解消の前提にしない。比較表示は一時的なものとし、
+選んで確定するまで共有データや競合の勝者を変更しない。表示できない候補はその理由を示し、
+表示できた候補だけが正しいように誘導しない。文章・名前など視覚以外の識別手段も併用する。
+
+「元として残す登録」の選択自体を省けるかは、意味と他の参照への影響を確認する再検討事項。
+今回の承認は説明・比較・導線の改善であり、既存の明示選択や独立した`両方残す`の意味を
+変更してよいという承認ではない。通常の表示改善を、この別判断のために止めない。
 
 ## 7. Writing and labels
 
@@ -447,7 +530,9 @@ sufficient.
 > hosts no longer map internal acknowledgment to `保存済み`. Their header, mutation
 > feedback, catalog and retention notice distinguish browser resume data from
 > file output. Code/recorded-DOM checks are not rendered/device acceptance;
-> external file output and complete resume/switch UX remain unconnected.
+> bounded validation-file generation/download/optional verification now exists;
+> this does not establish ordinary-home or device acceptance. Current connection
+> coverage belongs in [the inventory](../tasks/implementation-inventory.md).
 
 - Internal working-data retention is not announced as Project save success. Where
   necessary, say `ファイルに未反映の変更があります`; contextual help explains
@@ -481,6 +566,23 @@ labelled file-saved. The PO-approved fallback without an available external sink
 is latest browser resume data plus explicit manual file saving, with a concise
 capability/permission explanation and no invented download completion. Concrete
 timing is delegated, not a new user decision at every edit.
+
+### 9.2 正常な作業に内部点検を要求しない
+
+**Accepted presentation requirement (2026-09-14); implementation pending.**
+
+- 正常時の`状態を確認`や生成ジョブ一覧を、通常作業の必須手順にしない。
+  通常は進捗・結果・現在使えるファイルを示し、処理履歴や技術情報は詳細へ置く。
+- 中断や失敗では、対象、保持されている内容、次にできる操作をその場で示す。
+  状況に応じた`再試行`、`元のファイルを選び直す`などを入口にし、
+  ユーザーにjournalやreceiptの状態から復旧手順を組み立てさせない。
+- 元の変更・既存の保存時点を保持し、取りやめる際は残る内容と影響を伝える。
+  内部の安全確認は省略せず、途中状態を完了として表示しない。
+- 同じ未確認メッセージを各所へ重ねず、ファイル操作の近くと共通状態欄に要点を集約する。
+  現在の操作に必要な警告を詳細へ隠さず、生成後の新しい変更も区別する。
+- ダウンロードしたファイルの再選択確認は、利用者が必要時に選べる詳細操作。
+  日常の必須儀式にはしないが、未確認のまま`保存しました`とも表示しない。
+  通常homeを含む旧経路の端末内データも、この保存表現の点検対象とする。
 
 ## 10. Responsive behavior
 
@@ -530,6 +632,14 @@ Acceptance checks include:
 - Project-wide model replacement showing all affected Scenes and `要確認` state;
 - temporary camera versus shared Saved View and separate entry-view assignment;
 - all five file purposes with exact whole/base-dependent/one-Scene consequences;
+- ordinary record/save work without choosing from five package purposes or doing
+  healthy-state diagnostics; one understandable next action during output/recovery;
+- meaningful conflict comparisons without requiring raw-coordinate or registration-ID
+  interpretation, while retaining explicit choices and complete candidates;
+- clearly different Scene-inclusion and temporary-visibility actions, with reachable
+  references when Project deletion is blocked;
+- daily material/view operations ahead of advanced settings, with scope, shared
+  effects and narrow-screen access preserved;
 - affected-only semantic conflict blocking and an explicit resolution/recovery path;
 - feature-parity reachability on physical iPhone, not a contributor-only layout;
 - Desktop rendered walkthrough and physical-iPhone checks where the change is
@@ -537,20 +647,29 @@ Acceptance checks include:
 
 DOM structure or CSS inspection proves neither visual quality nor physical
 device acceptance. A development server is not offline/PWA evidence.
+For the simplicity amendment, reuse the existing task walkthrough and record the
+choices, repeated input and navigation needed for the affected workflow. Add no
+separate audit matrix or test framework. A shorter flow is not a pass if it hides
+an effect, removes a useful function or makes a recovery action unreachable.
 
 ## 12. Implementation snapshot and change control
 
-> Classification: **Current implementation snapshot / no rendered acceptance**.
+> Classification: **Historical implementation snapshot / no new rendered acceptance**.
 
 As inspected on 2026-09-07, branch `g0-baseline` at checkpoint
 `21786771bdb39800a29f835fa4f25535cd01d5bc` contains the one-home composition,
 four-tab workspace, Caption list/detail, pin-color controls, multiple
-Caption-window comparison and the warm-greige visual system. The current Native
-implementation still persists DisplaySets and uses fixed-baseline package
-exchange. ProjectScene, continuing causal Contribution and the five-purpose v2
-package contract are accepted but not implemented. The relevant current code is
-under `src/ui` and `src/nativeGs`; task-specific evidence remains in
+Caption-window comparison and the warm-greige visual system. The Native
+implementation at that checkpoint persisted DisplaySets and used fixed-baseline
+package exchange. ProjectScene, continuing causal Contribution and the five-purpose
+v2 package contract were not implemented at that checkpoint. The inspected code was
+under `src/ui` and `src/nativeGs`; task-specific historical evidence remains in
 `tasks/uiux-implementation.md` and `tasks/uiux-parity-plan.md`.
+
+Do not treat that 2026-09-07 snapshot as today's connection status. Read
+[current work](../tasks/todo.md), [feature coverage](../tasks/implementation-inventory.md)
+and the applicable route's code. The 2026-09-14 simplicity amendment is approved
+guidance; it does not claim the current Native/home or ProjectScene UI satisfies it.
 
 Automated checks can establish structure and state contracts; rendered Desktop
 and any newly required physical-iPhone acceptance remain separately recorded

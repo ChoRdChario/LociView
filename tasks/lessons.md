@@ -36,6 +36,10 @@ Read only the relevant topic, not every historical incident.
 
 - Use a complete product description with LociView as subject and short intent-based
   action labels. Remove redundant help, but retain failure, effects and recovery.
+  Daily work must not require package-purpose, receipt or reference-management
+  knowledge. Follow UI guidelines §§2.1/4.4–4.5/6.1/9.2: meaningful choices,
+  contextual detail and no routine internal inspection, without deleting useful
+  viewing functions or weakening explicit decisions and recovery guarantees.
 - Internal resume/autosave is not a confirmed external file save. A latest resume
   slot is not permission to discard continuing causal history or protected bodies.
 - Team-workflow labels describe actions, not fixed distributor/participant roles.
