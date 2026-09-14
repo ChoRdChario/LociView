@@ -13,7 +13,7 @@ import type { PngDecoder } from '../../projectFiles/png';
 import { sealValidationRecord } from '../../projectFiles/initialProject';
 import { cloneCanonicalValue, type JsonObject } from '../../domain/values';
 import { metadataProjectView } from './metadataFixture';
-import { validationModelVersions } from './validationProjection';
+import { validationModelVersions, validationDeclaredBodyBytes } from './validationProjection';
 import { metadataIntent } from './metadataIntent';
 import type { SyntheticProject } from './fixture';
 import type { SyntheticAuthority } from './historyProjection';
@@ -347,13 +347,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
       if (before.state !== 'ready' || before.provider?.kind !== 'scene-provider' || before.source?.token !== token)
         throw Error('対象が更新されています。キャプションを選び直してください。');
       // Enforce the same total validation budget before allocating the selected body.
-      const bodies = new Map<string, number>();
-      for (const map of [before.provider.details.immutable.representationsById, before.provider.details.immutable.mediaResourcesById])
-        for (const field of Object.values(map)) {
-          if (field.kind !== 'value') throw Error('保存した本体の情報を確認してください。');
-          const blob = field.value.blob as { digest: string; byteLength: number }; bodies.set(blob.digest, blob.byteLength);
-        }
-      if (!Number.isSafeInteger(file.size) || file.size <= 0 || [...bodies.values()].reduce((sum, size) => sum + size, file.size) > options.fileLimits.maxFileBytes)
+      if (!Number.isSafeInteger(file.size) || file.size <= 0 || validationDeclaredBodyBytes(before.provider, limits) + file.size > options.fileLimits.maxFileBytes)
         throw Error('画像を含む合計がこの検証の上限を超えています。');
       const bytes = new Uint8Array(await file.arrayBuffer());
       if (bytes.length !== file.size) throw Error('選択した画像の大きさが一致しません。');
@@ -405,13 +399,8 @@ export async function openValidationHost(options: ValidationHostOptions) {
           if (edges.some(e => e.lifecycle.kind !== 'value' || e.orderKey.kind !== 'value')) throw Error('モデル一覧の未解決の状態を確認してください。');
           const orders = edges.filter(e => e.lifecycle.kind === 'value' && e.lifecycle.value.state === 'active')
             .map(e => (e.orderKey as { value: string }).value).sort();
-          const orderKey = orderBetween(orders.at(-1) ?? null, null), bodies = new Map<string, number>();
-          for (const map of [before.provider.details.immutable.representationsById, before.provider.details.immutable.mediaResourcesById])
-            for (const field of Object.values(map)) {
-              if (field.kind !== 'value') throw Error('保存した本体の情報を確認してください。');
-              const b = field.value.blob as { digest: string; byteLength: number }; bodies.set(b.digest, b.byteLength);
-            }
-          if (!Number.isSafeInteger(file.size) || file.size <= 0 || [...bodies.values()].reduce((sum, size) => sum + size, file.size) > options.fileLimits.maxFileBytes)
+          const orderKey = orderBetween(orders.at(-1) ?? null, null);
+          if (!Number.isSafeInteger(file.size) || file.size <= 0 || validationDeclaredBodyBytes(before.provider, limits) + file.size > options.fileLimits.maxFileBytes)
             throw Error('モデルを含む合計がこの検証の上限を超えています。');
           const bytes = new Uint8Array(await file.arrayBuffer());
           if (bytes.length !== file.size) throw Error('選択したモデルの大きさが一致しません。');
@@ -436,13 +425,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
           const view = authority.read(), scene = resolveScene(view.state, view.resources, target.sceneId);
           if (!source || source.shape !== 'saved-glb' || scene.kind !== 'ready' || !scene.composition.assets.some(a => a.assetId === target.assetId))
             throw Error('差し替えるモデルを確認してください。');
-          const bodies = new Map<string, number>();
-          for (const map of [before.provider.details.immutable.representationsById, before.provider.details.immutable.mediaResourcesById])
-            for (const field of Object.values(map)) {
-              if (field.kind !== 'value') throw Error('保存した本体の情報を確認してください。');
-              const b = field.value.blob as { digest: string; byteLength: number }; bodies.set(b.digest, b.byteLength);
-            }
-          if (!Number.isSafeInteger(file.size) || file.size <= 0 || [...bodies.values()].reduce((sum, size) => sum + size, file.size) > options.fileLimits.maxFileBytes)
+          if (!Number.isSafeInteger(file.size) || file.size <= 0 || validationDeclaredBodyBytes(before.provider, limits) + file.size > options.fileLimits.maxFileBytes)
             throw Error('モデルを含む合計がこの検証の上限を超えています。');
           const bytes = new Uint8Array(await file.arrayBuffer());
           if (bytes.length !== file.size) throw Error('選択したモデルの大きさが一致しません。');

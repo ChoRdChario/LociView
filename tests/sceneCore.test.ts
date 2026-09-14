@@ -246,7 +246,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
       // 05 §13.2 permits this exact new synthetic host, never ordinary/old saved activation.
       const metadataHost = /[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Intent|MembershipControls|Models|ModelFacts|AssetStatusControls|ConflictControls|CaptionLifecycleControls|StartupControls)\.ts$/.test(path);
       const validationFiles = /[\\/]projectFiles[\\/](validation|png|glb|glbMaterials|initialProject|content|creation|modelFacts|receiveWorkspace|sendWorkspace)\.ts$/.test(path);
-      const validationDisplay = /[\\/]harness[\\/]projectScene[\\/](modelTypes|validationProjection|validationRender|validationMaterials|validationCoverage)\.ts$/.test(path);
+      const validationDisplay = /[\\/]harness[\\/]projectScene[\\/](modelTypes|modelCandidatePreview|validationProjection|validationRender|validationMaterials|validationCoverage)\.ts$/.test(path);
       const validationHost = /[\\/]harness[\\/]projectScene[\\/](reviewView|reviewWorkspace|savedHost|validationHost|validationModeHost|validationCatalog|validationGeneration|validationWorkspace|validationReceiveControls|validationOutputControls|validationBrowser|browserMetadataStorage)\.ts$/.test(path);
       if (!metadataFoundation && !metadataService && !metadataHost && !validationFiles && !validationDisplay && !validationHost && !packageMetadata) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectMetadata\//);
       if (packageControl) {
@@ -341,7 +341,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
             '../../projectPackage/restoreControls', '../../projectFiles/creation', '../../projectFiles/validation', './validationHost'],
           validationCatalog: ['./validationHost', './validationGeneration', '../../projectFiles/receiveWorkspace', '../../projectFiles/sendWorkspace', '../../projectFiles/validation', '../../projectPackage/reviewEditControls'],
           validationWorkspace: ['../../projectMetadata/persistence', '../../projectFiles/initialProject', '../../projectFiles/creation',
-            '../../projectFiles/validation', '../../projectPackage/workspaceArchive', '../../projectPackage/cleanArchive', '../../projectPackage/zipArchive', '../../projectPackage/reviewEdit', '../../projectFiles/png', './validationHost', './validationModeHost', './savedHost', './validationCatalog', './metadataWorkspace', './metadataConflictControls', './metadataCaptionLifecycleControls', './metadataMembershipControls', './viewportHost', './validationReceiveControls', './reviewView', './reviewWorkspace'],
+            '../../projectFiles/validation', '../../projectPackage/workspaceArchive', '../../projectPackage/cleanArchive', '../../projectPackage/zipArchive', '../../projectPackage/reviewEdit', '../../projectFiles/png', './validationHost', './validationModeHost', './savedHost', './validationCatalog', './metadataWorkspace', './metadataConflictControls', './metadataCaptionLifecycleControls', './metadataMembershipControls', './metadataAssetStatusControls', './modelCandidatePreview', './viewportHost', './validationReceiveControls', './reviewView', './reviewWorkspace'],
           validationReceiveControls: ['./validationModeHost', './session', './validationOutputControls'],
           validationOutputControls: ['./validationModeHost', './session'],
           validationBrowser: ['../../platform/opfs', '../../platform/projectLock', '../../projectMetadata/blobStore', '../../projectMetadata/generationScope', '../../projectFiles/validation',
@@ -355,7 +355,8 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
       } else if (validationDisplay) {
         const byFile: Record<string, string[]> = {
           modelTypes: ['../../domain/values', '../../scene/types', './modelClosure', './mediaHistory'],
-          validationProjection: ['../../scene/projectProvider', '../../projectMetadata/records', '../../domain/projectGraphSupport', '../../projectFiles/validation', './fixture', './modelTypes'],
+          modelCandidatePreview: ['../../scene/projectProvider', '../../projectMetadata/assetStatus', '../../projectMetadata/records', '../../projectMetadata/format', './modelTypes', './viewportModel', './viewportHost'],
+          validationProjection: ['../../scene/projectProvider', '../../projectMetadata/records', '../../projectMetadata/format', '../../domain/projectGraphSupport', '../../projectFiles/validation', './fixture', './modelTypes'],
           validationRender: ['three', 'three/addons/loaders/GLTFLoader.js', '../../viewer/loaders', '../../viewer/hardChroma', '../../projectFiles/glb', '../../projectFiles/content', './modelTypes', './viewportPicking', './viewportModel', '../../domain/projectGraphSupport', '../../domain/values', './validationMaterials'],
           validationMaterials: ['../../domain/projectGraphSupport', '../../domain/materialIntent', '../../domain/values', '../../scene/types', './modelTypes'],
           validationCoverage: ['three', '../../viewer/hardChroma', './viewportPicking'],
@@ -439,7 +440,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
             '../../projectMetadata/persistence', '../../projectMetadata/journal', './metadataFixture', './metadataStorage', './historyProjection', './metadataIntent', '../../projectMetadata/remote', './fixture', '../../projectMetadata/commands', '../../scene/projectProvider', './modelClosure', '../../domain/values', './metadataModelFacts', '../../projectMetadata/captionDeletion', '../../projectMetadata/assetDeletion'],
           metadataReceiveControls: ['./metadataHost', './session', './metadataConflictControls', './metadataMembershipControls', './metadataAssetStatusControls', './metadataCaptionLifecycleControls'],
           metadataCaptionLifecycleControls: ['./savedHost', './session', '../../projectMetadata/captionDeletion', '../../projectMetadata/persistence', '../../scene/types'],
-          metadataAssetStatusControls: ['three', './metadataHost', './session', '../../projectMetadata/assetStatus', './metadataFixture', './modelFixture'],
+          metadataAssetStatusControls: ['three', './savedHost', './session', '../../projectMetadata/assetStatus', './modelFixture', './modelCandidatePreview'],
             // Same approved conflict form: complete Scene/View candidates and pure input validation only.
           metadataConflictControls: ['./savedHost', './session', '../../projectMetadata/captionCandidates', '../../scene/types',
               '../../projectMetadata/sceneAuthoring', '../../domain/values', '../../projectMetadata/viewResolution'],

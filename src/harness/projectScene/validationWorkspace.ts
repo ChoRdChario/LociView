@@ -14,6 +14,8 @@ import { createSavedWorkspace } from './metadataWorkspace';
 import { createMetadataConflictControls } from './metadataConflictControls';
 import { createMetadataCaptionLifecycleControls } from './metadataCaptionLifecycleControls';
 import { createMetadataMembershipControls } from './metadataMembershipControls';
+import { createMetadataAssetStatusControls } from './metadataAssetStatusControls';
+import type { ModelCandidateRenderer } from './modelCandidatePreview';
 import type { ViewportFactory } from './viewportHost';
 import { createValidationReceiveControls } from './validationReceiveControls';
 import { prepareReviewView, type ReviewView } from './reviewView';
@@ -27,6 +29,7 @@ export interface ValidationWorkspacePorts {
   open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob, reviewEdit?: PreparedReviewEdit): Promise<Awaited<ReturnType<typeof openValidationHost>>>;
   render(host: ValidationDisplayHost): Promise<{ factory: ViewportFactory; dispose(): void }>;
   renderReview?(view: ReviewView): Promise<{ factory: ViewportFactory; dispose(): void }>;
+  renderModelCandidate?(host: ValidationDisplayHost, display: Parameters<ModelCandidateRenderer>[0]): ReturnType<ModelCandidateRenderer>;
   selected(run: string | null, mode?: LocalOpenMode): void;
 }
 
@@ -129,8 +132,10 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
         const text = createMetadataConflictControls(document, target, session, changed, { captionTextOnly: true, blockedReason });
         const lifecycle = createMetadataCaptionLifecycleControls(document, target, session, text.composing, changed, blockedReason);
         const memberships = createMetadataMembershipControls(document, target, session, text.composing, changed, 'caption', blockedReason);
-        // Only accepted Caption commands: the synthetic Asset-copy path is not activated.
-        const groups = [lifecycle, text, memberships]; root.append(...groups.map(g => g.root));
+        const models = createMetadataAssetStatusControls(document, target, session, text.composing, changed, { blockedReason,
+          preview: ports.renderModelCandidate ? display => ports.renderModelCandidate!(target, display) : undefined });
+        // Accepted typed choices only: the synthetic Asset-copy path is not activated.
+        const groups = [lifecycle, text, memberships, models]; root.append(...groups.map(g => g.root));
         return { root, render: () => { for (const group of groups) group.render(); },
           hasChanges: () => groups.some(g => g.hasChanges()), dispose: () => { for (const group of groups) group.dispose(); root.remove(); } };
       }, fileTools);

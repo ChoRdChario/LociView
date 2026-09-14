@@ -61,5 +61,5 @@ export function createMetadataReceiveControls(document: Document, host: Awaited<
   });
   const unsubscribe = session.acknowledgment.subscribe(render);
   render(); return { root, render, hasChanges: () => conflicts.hasChanges() || lifecycle.hasChanges() || memberships.hasChanges() || models.hasChanges() || assetMemberships.hasChanges(),
-    dispose: () => { unsubscribe(); conflicts.dispose(); lifecycle.dispose(); memberships.dispose(); assetMemberships.dispose(); } };
+    dispose: () => { unsubscribe(); conflicts.dispose(); lifecycle.dispose(); memberships.dispose(); models.dispose(); assetMemberships.dispose(); } };
 }

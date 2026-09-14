@@ -122,7 +122,7 @@ and harness builds. The root command remains `npm test -- --reporter=dot
 remain. Only two cases were added to the existing file suite; no new test framework,
 PoC, dependency, runtime budget or measured adoption claim.
 
-Next connected unit: both people replace the same Asset → receive conflict →
+Completed unit: both people replace the same Asset → receive conflict →
 explicit read-only model comparison/choice → Contribution return/replay/reopen.
 Reuse `assetStatusCandidates` / `resolveAssetStatus` and existing resident/viewport
 ports; independent read-only investigation found no new schema or PO-policy gate.
@@ -132,6 +132,61 @@ show IDs/hashes as the primary decision aid or infer a winner from cached geomet
 The existing Contribution strong closure is unchanged: preserving original history
 does not promise delivery of every losing weak-referenced model body to a recipient
 that never had it. Real-model independent copy remains separate from this choice.
+
+- [x] Specify and connect the existing status choice to the validation file host,
+  with labelled read-only GLB comparison, no default winner and all-Scene impact.
+- [x] Verify real-file conflicting replacements, retained local records, guarded
+  comparison/choice, exact failure retry, Contribution return/replay/cold reopen.
+  Reuse existing viewport/service/file tests rather than add a probe.
+- [x] Run final serial checks and one independent diff review; update coverage
+  and checkpoint. Live browser/device/offline evidence remains a separate lane.
+
+Starting checkpoint: `819e8f5`, clean `g0-baseline`. The previous goal turn was
+progress: a real-file model update/correction/return flow was connected and checked.
+This unit closes concurrent update resolution, not a new renderer or revision UI.
+The first connected test exposed a real blocker: post-replacement media addition
+used active display eligibility to count retained model bytes. Capacity accounting
+now reads known immutable source declarations only; no weak body is reloaded or
+promoted to display authority. Existing caps and unknown/inconsistent-input refusal
+remain. This repair belongs to continued editing, not an additional feature.
+Focused evidence now passes: the real-file comparison/choice/return flow and
+preview lifetime case, three existing synthetic status cases, and entry/import
+isolation. Exact GLTF geometry/body checks use an injected viewport, not GPU/live
+browser evidence. Both sides' GLB bodies, local text/PNG, other models, all-Scene
+resolution, file-input guards, original-byte retry/replay/cold reopen are covered.
+The two new cases reuse the existing file suite; generic conflict combinations
+remain in existing service/host tests. Independent review found one preview issue:
+the old framebuffer could remain under the next candidate's label while loading
+or after failure. The canvas now stays hidden until the exact current candidate
+is ready; its failure/retry regression and read-only re-review passed. No mandatory
+finding remains. Final serial checks passed: typecheck; root suite (112 files,
+2,286 PASS / 21 existing TODO, 675.78s); ordinary build and harness build. The root
+command remains `npm test -- --reporter=dot --maxWorkers=2 --testTimeout=30000`.
+Existing build/Node image-loader warnings remain; no runtime thresholds, dependency
+or test framework changed. Only documentation changed after the tested tree.
+
+## Next unit — independently edit copied real models
+
+Duplicate real-model Scene registration → explicit keep-one
+or independent keep-both → copy-only placement/material/model edits → Contribution
+return/replay/cold reopen. Independent read-only investigation confirms that 05 §8
+already authorizes this connection; no new product policy is required.
+
+- [ ] Specify complete remapping of every admitted GLB material slot and its
+  confirmed effective Scene-then-Project override, then remove fixture reconstruction
+  from the membership control. Preserve original Assets, other Scenes and Captions.
+- [ ] Prepare facts only for fresh copy Representation IDs using verified existing
+  bodies; do not re-spool large bodies, repair acknowledged loss or reuse old facts
+  under a new ID. Connect the existing Asset membership controls to the file host.
+- [ ] Reuse existing copy/facts/file tests for independent edits, multi-material
+  preservation, exact retry/return/reopen and rejection of incomplete dependencies;
+  finish one connected-unit review and serial final checks.
+
+Keep the current command's explicit original choice and complete fresh-ID map.
+Single-slot-only support is not completion of the real GLB connection. General
+copy, unknown closure, Point/GS/Proxy expansion, Native 07, normal entry and measured
+adoption remain outside this unit. Stop for a concrete contract/authority conflict,
+not a new probe or repeated PO checkpoint approval.
 
 ## Pending decision — Native conversion implementation
 
@@ -340,8 +395,8 @@ area. This is limited GLB/PNG development code, not ordinary-home acceptance.
    conversion amendment is recorded and independently reviewed in 07 §11, awaiting
    one grouped PO decision; the earlier synthetic bridge GO does not authorize the
    new schema/recipe. While it is pending, follow the verified real-model
-   update/correction/return connection with explicit competing-model resolution,
-   as scoped above, without substituting UI polish for
+   update/correction/return connection with explicit competing-model resolution
+   and independent model-copy editing, as scoped above, without substituting UI polish for
    migration. The conversion flow after approval is Native file
    → explicit conversion → new Project → edit/cold reopen. Source preservation and
    unplaced-record retention are already approved; do not re-ask those policies.
@@ -370,7 +425,7 @@ New policy/compatibility/major architecture decisions retain their explicit appr
 
 PO renewed permission for timely checkpoint Push on 2026-09-14. Use existing
 `g0-baseline`; verify remote, scope, privacy and triggered workflows first.
-At the start of this real-model update unit, cached origin was 0 behind / 81 ahead; no live fetch
+At the start of this competing-model unit, cached origin was 0 behind / 82 ahead; no live fetch
 was used for that observation. Previous environment denial is separate from PO permission:
 do not retry a denied action unchanged or bypass it. Local implementation need not wait.
 `main`, Pages, Service Worker, license/version and public release remain separately gated.

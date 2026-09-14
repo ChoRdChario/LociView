@@ -4,6 +4,20 @@ import { same } from '../../domain/projectGraphSupport';
 import { validationGlbProfile, validationMetadataLimits } from '../../projectFiles/validation';
 import { freezeSynthetic } from './fixture';
 import type { DisplayModelVersion, ValidationModelClosure } from './modelTypes';
+import type { MetadataLimits } from '../../projectMetadata/format';
+
+/** Capacity accounting uses known declarations, not display eligibility of old weak models. */
+export function validationDeclaredBodyBytes(provider: Extract<ProjectProviderRead, { kind: 'scene-provider' }>, limits: MetadataLimits): number {
+  const read = metadataImmutableReader(provider, limits), bodies = new Map<string, number>();
+  for (const map of ['representationsById', 'mediaResourcesById'] as const) for (const id of Object.keys(provider.details.immutable[map])) {
+    const blob = read(map, id).blob as { digest: string; byteLength: number };
+    if (bodies.has(blob.digest) && bodies.get(blob.digest) !== blob.byteLength) throw Error('保存した本体の大きさが一致しません。');
+    bodies.set(blob.digest, blob.byteLength);
+  }
+  const bytes = [...bodies.values()].reduce((sum, size) => sum + size, 0);
+  if (!Number.isSafeInteger(bytes)) throw Error('保存した本体の合計が扱える範囲を超えています。');
+  return bytes;
+}
 
 /** Only content-admitted saved records; body reads happen separately, never a fixture fallback. */
 export async function validationModelVersions(provider: ProjectProviderRead): Promise<readonly DisplayModelVersion[]> {

@@ -30,6 +30,10 @@ export async function createValidationBrowserWorkspace(document: Document, run?:
   const workspace = createValidationWorkspace(document, { ...options,
     list: () => listValidationProjects(options, storage),
     open: (id, initial, mode, workspaceFile, reviewEdit) => openValidationHost({ ...options, run: id, initial, mode, workspaceFile, reviewEdit, openStorage: create => storage(id, create) }),
+    renderModelCandidate: async (host, display) => {
+      const resident = await prepareReadonlyResidents(display.models, { model: record => host.content.model(record, true) });
+      return { factory: sceneViewportFactory(resident), dispose: () => resident.dispose() };
+    },
     renderReview: async view => {
       const resident = await prepareReadonlyResidents(view.models, view.content);
       try {

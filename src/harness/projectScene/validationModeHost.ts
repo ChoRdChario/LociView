@@ -118,7 +118,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       displayReady: (...a) => { admit(); current.backupRestore.displayReady(...a); },
     },
     // The resident cache never retains a closed host's content service.
-    content: { model: record => current.content.model(record) },
+    content: { model: (record, readOnly) => current.content.model(record, readOnly) },
     setDisplayPreparation(callback) {
       admit(); if (prepare) throw Error('モデル表示の接続を確認してください。');
       prepare = callback; detach = current.setDisplayPreparation(callback);

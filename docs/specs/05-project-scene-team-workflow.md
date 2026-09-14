@@ -2527,6 +2527,35 @@ from the authoritative viewport; show model/placement and all-Scene impact, sele
 no candidate by default, and retain stale/failed/IME-protected choices. No preview
 is to become the current Asset before the saved causal choice is confirmed.
 
+The validation-file connection extends this same command to received static GLB
+candidates admitted by the existing content/profile checks. Reuse the conflict
+controls with the opened host's limits and Session-owned input guards. An explicit
+`候補 N を表示` action prepares one exact candidate Representation and binding
+placement in a separate read-only viewport; it selects no resolution by itself.
+The preview uses source materials and says so; it does not apply Scene overrides,
+show pins, create gizmos, or attach edit/pick callbacks. The current Scene and Asset
+projection remain unresolved until the explicit causal choice is acknowledged.
+
+Use existing readonly render DTO/resident/viewport ports and verified read-only
+body access, never synthetic model reconstruction or an alternate mutable Project.
+No model is decoded merely by listing candidates. Release a superseded, cancelled,
+stale or disposed preview, including late asynchronous completion. Show missing
+body/renderer failures with retry; do not substitute old cached geometry. Capture
+the exact token and operation before apply, retain selection on failure and reject
+stale/IME/file-input/read-only mutation. Existing publication/display retry owns the
+original changes. No new history, wire/profile, general revision browser or model
+copy policy is added. Contribution retains its existing strong closure: original
+history retention is not a promise to send every losing weak body to a new recipient.
+Acceptance reuses real-file conflicting GLB updates, all-Scene suppression/choice,
+local Caption/media preservation, isolated preview/disposal/failure, exact retry,
+Contribution return/replay and cold reopen. This is not live/device/adoption evidence.
+
+The continued-edit flow must not reject adding media/models merely because an old
+weak model is outside the active display projection. Capacity accounting reads
+complete known immutable source blob declarations, counts each digest once and
+rejects inconsistent sizes/unknown records. It does not read or restore old bodies,
+make them display-authoritative, or change the existing validation capacity ceiling.
+
 ### 13.3 Approved scheduling exception — validators and UI components (2026-09-08)
 
 The PO explicitly approved advancing storage-neutral data validation and reusable
