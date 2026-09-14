@@ -15,6 +15,9 @@
     "fixtures:release:restore": "node scripts/fixtures/restore-release-fixture.mjs",
     "fixtures:receipt:verify": "node scripts/fixtures/verify-acquisition-receipt.mjs",
     "test": "vitest run",
+    "test:focus": "vitest run --reporter=dot --silent=passed-only --maxWorkers=2 --testTimeout=30000",
+    "test:related": "vitest related --run --reporter=dot --silent=passed-only --maxWorkers=2 --testTimeout=30000",
+    "check:checkpoint": "npm run typecheck && npm run test:focus && npm run build && npm run build:harness",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },

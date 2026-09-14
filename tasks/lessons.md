@@ -10,6 +10,12 @@ Read only the relevant topic, not every historical incident.
 - 2026-09-14: Finish connected user operations before polishing helpers. Internal
   checks stay focused; final tests/build/review belong to the connected milestone.
   Do not make audit, fixture or commit counts substitutes for missing user flows.
+  A field/control is not automatically a milestone: group adjacent changes under
+  the same user workflow and reuse invariant tests instead of multiplying full
+  roundtrips. Keep the required final suite/review and data-loss safeguards.
+  The PO observed 90% allowance consumption in one overnight goal run; calendar
+  estimates must include available usage, not assume 6–8 agent hours every day.
+  Distinguish measured test wall time from unmeasured model/quota attribution.
 - Current work belongs in todo, coverage in inventory, contracts in specifications.
   Map/handoff/index should link rather than repeat changing counts and next steps.
 - An approved plan authorizes its ordinary implementation/fixes. Stop only at an

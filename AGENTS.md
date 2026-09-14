@@ -97,6 +97,31 @@
 ## Verification
 
 During a connected implementation unit, use focused checks for the changed behavior.
+A unit is a named user workflow, not each field/control/helper or each commit.
+Group adjacent changes using the same authority and acceptance boundary before its
+final verification/review; do not combine unrelated features or postpone a known
+data-loss/security failure. A local WIP commit is not a verified completion checkpoint.
+
+Use the installed Vitest rather than create a parallel test harness:
+
+```powershell
+npm run test:focus -- tests/ui/projectSceneCaptionList.test.ts
+npm run test:related -- src/ui/projectScene/captionListControls.ts
+```
+
+For a large existing suite, use its exact file plus `-t` during editing. Related
+selection follows static imports; it may be broad and does not replace explicit
+storage/package/entry isolation tests when those boundaries change. No file filter
+means the complete root suite, including for `test:focus`.
+For new module/import boundaries, run `npm run test:focus -- tests/sceneCore.test.ts`
+early; do not discover a missing exact allowlist only after the full suite.
+These aliases suppress console output of passing tests only; failed-test logs,
+unhandled errors, test counts and exit status remain visible. No automatic retry,
+test exclusion, assertion relaxation or new runtime limits are introduced.
+Reuse service tests for invariant/fault combinations and a representative connected
+file flow for each changed integration boundary; do not clone the entire file
+roundtrip for every independent UI field without a distinct failure risk.
+
 At its final source/test tree, run at minimum (serially):
 
 ```powershell
@@ -106,6 +131,9 @@ npm run build
 ```
 
 Also run `npm run build:harness` when the changed path ships in the isolated harness.
+`npm run check:checkpoint` runs this full sequence, including the harness build,
+serially and stops on the first failure. Run it once at the connected workflow
+boundary, not after each component or just to create a commit.
 After a check passes, repeat or broaden it only for relevant subsequent changes,
 failures or unresolved concerns. Staging unchanged content, updating result prose,
 or an unpushed commit is not a reason to repeat all runtime checks. Validate that

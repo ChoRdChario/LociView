@@ -12,322 +12,88 @@ resume and recovery. Desktop, physical iPhone and offline acceptance must cover
 the new route. Scope is 62 of the 64 inventory groups; M13/M14 remain later work.
 Neither component counts nor synthetic-host success is product completion or release approval.
 
-Next work is [the ordinary-entry adoption boundary](#next-connected-unit).
-Real-file material resolution is implemented and verified below; Native 07 §11 still
-requires its separate concrete compatibility decision.
+Feature development is paused at the PO's request. Current work is the bounded
+test-flow improvement and unnecessary-complexity audit below. The PO reports one
+overnight goal run consumed 90% of the allowance; estimates must respect that
+observed constraint rather than assume unlimited daily agent time. No per-action
+quota attribution has been measured. Real-file material resolution is verified
+at `e6fc15b`; Native 07 §11 still requires its separate compatibility decision.
 
-## Completed unit — recover and independently edit received Captions
+## Current unit — economical verification and complexity audit
 
-Connect the two existing Caption-only controls to the real-file host: lifecycle
-conflict (keep deleted / restore parent only) and duplicate Scene membership
-(keep one / independent keep-both). Combine them with title/body comparison under
-the same Session-owned pending/IME/dispose guards, using host limits and existing
-`resolveCaptionLifecycle` / `resolveCaptionMembership` commands.
+- [x] Make focused/related checks and the serial final checkpoint easy to invoke
+  with existing Vitest; keep all acceptance, failure exits and final checks intact.
+- [x] Group related implementation under one connected-workflow final verification
+  and independent review; remove completed logs from the startup status record.
+- [x] Read-only audit of reuse, file/recovery workflows and migration complexity:
+  separate necessary safety from duplication and unapproved simplification.
+- [x] Validate the tooling/document diff proportionately, record findings and stop.
 
-- [x] Connect existing lifecycle and Caption membership controls, without enabling
-  the synthetic model-copy branch or changing command/storage policy.
-- [x] Reuse existing real-file fixtures: receive → restore/resolve/register as
-  needed → independent Caption/attachment edits → Contribution return → cold reopen.
-  Preserve originals, other Scenes and deleted children; retry the exact changes.
-- [x] Run focused checks, then one final serial suite/build/review for the connected
-  unit. Update coverage and checkpoint without a new probe or per-helper PO wait.
+No feature work, dependency, test deletion, relaxed assertion, automatic winner,
+schema/compatibility change, deployment or another PoC. Preserve the paused dirty
+Caption-list work below; do not include it in a tooling checkpoint or claim it passes.
 
-Copy requires complete, unambiguous source content; preserve/refuse unsupported
-or unresolved values rather than infer winners. Ordinary tombstone browsing,
-automatic child restoration, tags UI, new wire/Native migration and adoption are
-excluded. Real-model update/copy remains a separate connected unit: old UI still
-depends on synthetic model records, so merely exposing it would be misleading.
-Existing real-GLB pin parent reassignment/position correction remains available.
+Findings (read-only; no product simplification implemented):
 
-Starting checkpoint: `82c05cd`, clean `g0-baseline`; previous goal turn was progress
-(real-file text-conflict workflow connected and verified). This unit reuses the
-same file/Session ownership split and existing commands. Its two added control
-groups expose no model-copy capability. All comparisons contribute pending state;
-external file/output/restore input blocks apply without blocking its own retry.
+- [Conflict-control assembly](../src/harness/projectScene/validationWorkspace.ts)
+  and [metadata receive assembly](../src/harness/projectScene/metadataReceiveControls.ts)
+  repeat registration/pending/disposal. Share that assembly when next touched, not
+  whole hosts: the real-file route already reuses the saved/development workspace.
+- [Review output](../src/projectPackage/reviewOutputJob.ts) and
+  [clean output](../src/projectPackage/cleanOutputJob.ts) duplicate receipt-chain
+  validation/append. A narrow pure helper may reduce maintenance; preserve purpose
+  closures, byte formats and Workspace bases. No new general job framework.
+- [Output controls](../src/harness/projectScene/validationOutputControls.ts) put
+  save/send/copy in one five-purpose selector. During ordinary-entry connection,
+  apply the existing 06 §11.4 intent split, with review/clean as secondary actions.
+  These are existing functions to organize, not a request for five new features.
+- Native loaders/rendering are not all rewritten; existing reuse is present.
+  Original-byte recovery and external-save confirmation remain necessary. Manual
+  output reselection is already optional. Proposed 07 §11 encoding/migration work
+  is not an implemented redundancy; compatibility simplification needs PO decision.
 
-Focused checks pass: the existing real-file suite now covers UI deletion → received
-concurrent edit → parent-only restoration → fresh Scene registration/PNG attachment
-→ concurrent duplicate registration → explicit keep-both with publication failure
-and exact retry → independent copied Caption/attachment editing → Contribution
-return/no-op/cold reopen. Prior text-conflict file flow also passes; 11 existing
-lifecycle/copy/isolation checks pass. A cross-Repo test assertion was corrected:
-concurrent original changes may have different valid topological orders, so compare
-the exact change-hash/bytes map and heads, not array order. Same-Repo no-op retains
-the exact array. No product persistence or contract policy was changed for this.
-Final typecheck, ordinary build and harness build passed. The root suite ran once
-(112 files, 403.63s): 2,281 PASS / 21 existing TODO / one failure in the prior text
-flow's one-second receive-completion wait. Product code was unchanged afterward.
-That test now waits for the actual success message and enabled control, with the
-existing file-test ten-second ceiling; exact no-op/history assertions remain.
-The corrected text flow and new lifecycle/copy flow both passed (25.65s test time).
-This is full-run evidence plus targeted correction, not a second all-green root
-run. Independent read-only product review found no mandatory fixes; the test-only
-completion correction was also reviewed without weakening acceptance. No new PoC,
-test framework, runtime budget or dependency was introduced.
-
-Evidence boundaries are unchanged: no new wire/schema/profile/dependency, source
-mutation, ordinary entry or deployment. Recorded DOM is not live rendering,
-physical-iPhone or offline evidence. The known browser bootstrap and Push denials
-are not retried unchanged; do not repeat full checks merely for staging.
-
-Previous checkpoint `82c05cd` connected real-file title/body resolution, guarded
-input, exact failure retry, continued editing and second-round Contribution/cold
-reopen. Typecheck, 2,281 tests/21 existing TODO, both builds and independent review
-passed. `e27a354` connected I04 media selection/shared viewing. Detailed prior
-results remain in Git; inventory owns route coverage, not whole-group completion.
-
-## Completed unit — update a real model and return corrected pins
-
-Close the real GLB update → updated Workspace receive → explicit same-Asset pin
-correction → Contribution return flow under accepted 05 §2.3/TEAM-FLOW. Current
-prepared-revision controls still construct synthetic records and must not be
-exposed as real-model support. Independent read-only investigation found no new
-PO policy decision in this bounded connection; Native conversion remains separate.
-
-- [x] Specify the local typed update command and input ownership before coding:
-  verified new Representation/revision plus fresh manual binding and active pointer
-  in one existing Session/journal change. Retain logical Asset/AssetFrame, current
-  transform, Scene edges, Caption coordinates/content and immutable old records.
-- [x] Reuse validated GLB preparation/content facts, explicit file/impact confirmation,
-  pending/cancel/exact retry and resident preparation; no fixture-model adapter.
-  New compatibility/family/material IDs do not imply correspondence with the old model.
-- [x] Reuse existing real-file fixtures for retained local text/PNG, all-Scene update,
-  visible needsReview pins, explicit surface correction, return/replay/cold reopen
-  and a representative interrupted publication.
-- [x] Finish one serial final typecheck/root suite/ordinary + harness build and
-  independent review; update this record and checkpoint the connected flow.
-
-Keep retained-revision metadata separate from active resident decode if later
-selection needs it. No general revision manager, automatic alignment/compatibility
-or material remapping, Point/GS/Proxy expansion, new profile/wire, ordinary-home
-activation or device/adoption credit. Stop only for a concrete contract conflict
-or new authority requirement, not at each helper or because Push is unavailable.
-Starting checkpoint: `46c66bd`, clean `g0-baseline`. The preceding connected
-Caption recovery/copy unit is complete; model-file replacement is still missing,
-so it remains on the practical-team critical path rather than an auxiliary task.
-
-Connected implementation now uses `replaceAssetModel`, a four-write immutable
-closure/status command, and a separate typed real-file authority entry. The model
-tab owns target/file selection and explicit confirm/cancel; no synthetic conversion
-adapter or detached-target decode was enabled. Three focused checks passed: GLB
-update/file return, refusal/stale guards and isolation. They include real GLTF
-resident geometry replacement, both publication and display failure/exact retry,
-old logical Frame/transform/Scene edges/Caption retention, local text/PNG on receipt,
-visible known-position needsReview pins, same-Asset surface correction, Contribution
-return/replay and cold reopen. Recorded DOM/raster injection is not native UI evidence.
-
-Independent review found one pending-state omission: model Scene membership could
-change while a replacement selection remained open. The model planner now blocks
-that edit, including a plan captured before selection; regression and read-only
-re-review passed. No mandatory finding remains. Final serial checks passed:
-typecheck; root suite (112 files, 2,284 PASS / 21 existing TODO, 524.94s); ordinary
-and harness builds. The root command remains `npm test -- --reporter=dot
---maxWorkers=2 --testTimeout=30000`. Existing build/Node image-loader warnings
-remain. Only two cases were added to the existing file suite; no new test framework,
-PoC, dependency, runtime budget or measured adoption claim.
-
-Completed unit: both people replace the same Asset → receive conflict →
-explicit read-only model comparison/choice → Contribution return/replay/reopen.
-Reuse `assetStatusCandidates` / `resolveAssetStatus` and existing resident/viewport
-ports; independent read-only investigation found no new schema or PO-policy gate.
-Candidate preview is separate from authoritative Scene rendering, uses the exact
-candidate Representation/binding, and has no pins, gizmos or edit callbacks. Do not
-show IDs/hashes as the primary decision aid or infer a winner from cached geometry.
-The existing Contribution strong closure is unchanged: preserving original history
-does not promise delivery of every losing weak-referenced model body to a recipient
-that never had it. Real-model independent copy remains separate from this choice.
-
-- [x] Specify and connect the existing status choice to the validation file host,
-  with labelled read-only GLB comparison, no default winner and all-Scene impact.
-- [x] Verify real-file conflicting replacements, retained local records, guarded
-  comparison/choice, exact failure retry, Contribution return/replay/cold reopen.
-  Reuse existing viewport/service/file tests rather than add a probe.
-- [x] Run final serial checks and one independent diff review; update coverage
-  and checkpoint. Live browser/device/offline evidence remains a separate lane.
-
-Starting checkpoint: `819e8f5`, clean `g0-baseline`. The previous goal turn was
-progress: a real-file model update/correction/return flow was connected and checked.
-This unit closes concurrent update resolution, not a new renderer or revision UI.
-The first connected test exposed a real blocker: post-replacement media addition
-used active display eligibility to count retained model bytes. Capacity accounting
-now reads known immutable source declarations only; no weak body is reloaded or
-promoted to display authority. Existing caps and unknown/inconsistent-input refusal
-remain. This repair belongs to continued editing, not an additional feature.
-Focused evidence now passes: the real-file comparison/choice/return flow and
-preview lifetime case, three existing synthetic status cases, and entry/import
-isolation. Exact GLTF geometry/body checks use an injected viewport, not GPU/live
-browser evidence. Both sides' GLB bodies, local text/PNG, other models, all-Scene
-resolution, file-input guards, original-byte retry/replay/cold reopen are covered.
-The two new cases reuse the existing file suite; generic conflict combinations
-remain in existing service/host tests. Independent review found one preview issue:
-the old framebuffer could remain under the next candidate's label while loading
-or after failure. The canvas now stays hidden until the exact current candidate
-is ready; its failure/retry regression and read-only re-review passed. No mandatory
-finding remains. Final serial checks passed: typecheck; root suite (112 files,
-2,286 PASS / 21 existing TODO, 675.78s); ordinary build and harness build. The root
-command remains `npm test -- --reporter=dot --maxWorkers=2 --testTimeout=30000`.
-Existing build/Node image-loader warnings remain; no runtime thresholds, dependency
-or test framework changed. Only documentation changed after the tested tree.
-
-## Completed unit — independently edit copied real models
-
-Duplicate real-model Scene registration → explicit keep-one
-or independent keep-both → copy-only placement/material/model edits → Contribution
-return/replay/cold reopen. Independent read-only investigation confirms that 05 §8
-already authorizes this connection; no new product policy is required.
-Starting checkpoint: `24ef8de`, clean `g0-baseline`. The previous goal turn was
-progress: competing real GLB updates can be compared, explicitly selected and
-returned. This unit closes real independent model editing rather than another probe.
-
-- [x] Specify complete remapping of every admitted GLB material slot and its
-  confirmed effective Scene-then-Project override, then remove fixture reconstruction
-  from the membership control. Preserve original Assets, other Scenes and Captions.
-- [x] Prepare facts only for fresh copy Representation IDs using verified existing
-  bodies; do not re-spool large bodies, repair acknowledged loss or reuse old facts
-  under a new ID. Connect the existing Asset membership controls to the file host.
-- [x] Reuse existing copy/facts/file tests for independent edits, multi-material
-  preservation, exact retry/return/reopen and rejection of incomplete dependencies;
-  finish one connected-unit review and serial final checks.
-
-Keep the current command's explicit original choice and complete fresh-ID map.
-Single-slot-only support is not completion of the real GLB connection. General
-copy, unknown closure, Point/GS/Proxy expansion, Native 07, normal entry and measured
-adoption remain outside this unit. Stop for a concrete contract/authority conflict,
-not a new probe or repeated PO checkpoint approval.
-
-The connected file flow now passes: three received registrations → explicit
-original plus two independent GLB copies → per-slot Scene/Project/source material
-preservation → copy-only placement/material/model update → Contribution return,
-no-op and cold reopen. Copying does not put/spool the original body. Existing
-synthetic copy/isolation and real-model reused-body recovery checks also pass.
-The first file test used an invalid material-control enum and then selected an
-unshared exchange base by array position; both test setup errors were corrected
-without changing runtime policy. Independent product review found no mandatory
-fixes. Its test review required direct material-independence assertions, since
-model versions do not contain saved material overrides. The first root run was
-explicitly stopped for that addition; it is not completion evidence. Fixed baseline
-snapshots now prove original/other-copy/other-Scene materials unchanged both after
-material editing and after replacement, and re-review passed. Both final focused
-cases pass (23.29s test time), including multiple-copy partial fact staging and
-acknowledged fact/body loss refusal. Final serial checks passed: typecheck; root
-suite (112 files, 2,288 PASS / 21 existing TODO, 425.07s); ordinary build and harness
-build. Existing build/Node loader warnings remain. The final root command was
-`npm test -- --reporter=dot --maxWorkers=2 --testTimeout=30000`. Documentation links
-(186) and diff whitespace passed. No new probe, test framework, dependency, runtime
-budget, wire/schema, public fixture or release change. Only result prose changed
-after the reviewed/tested source and test tree. This remains recorded DOM/GLTF
-evidence, not live browser/device acceptance.
-
-## Completed unit — resolve received pin, Scene and View fields
-
-Real-file update → explicit Caption position/color and
-Scene/View field resolution → continued editing → Contribution return/replay/cold
-reopen. Read-only investigation found the typed readers/commands and actual GLB
-comparison viewport already exist; the validation host currently hides those
-forms. Project startup-default recovery is already mounted separately, not a
-missing UI to rebuild.
-
-Starting checkpoint: `b669e3c`, clean `g0-baseline`. The preceding real-model
-copy/edit/return unit is committed; no runtime checks are repeated for that commit.
-This unit closes existing field-resolution forms in the same real-file host.
-
-The connected return check exposed a contract discrepancy: `resolveEntryView`
-wrote a temporary `null` before deleting an optional View reference. The full
-original-history summary correctly rejects that scalar even though the final
-projection is absent. Repair the writer under existing 05/06, not the summary or
-schema: reuse a valid exact same-address original View ID solely as a same-change
-set/delete witness. Read all original scalars, including overwritten values; no
-invented reference or semantic winner. Refuse before mutation if no witness exists.
-Old invalid source remains retained/rejected, not silently rewritten. Independent
-read-only diagnosis confirms this bounded repair and the collapsed-history pitfall.
-
-- [x] Specify and enable those forms with existing typed commands. Preserve complete
-  and absent candidate values, and capture the exact command before asynchronous apply.
-- [x] Match hidden-owner preview messaging to actual visible-model behavior without
-  auto-revealing the model. Check warm camera retention and cold explicit startup
-  choice separately, with input/pending/stale/IME/readonly/dispose protection.
-- [x] Reuse existing field and real-file tests for continued edits, exact retry,
-  Contribution return/replay/cold reopen; finish one review and serial final checks.
-
-No new schema/PO policy, PoC, additional lifecycle repair, Native conversion,
-Point/GS/Proxy, normal-entry or adoption credit belongs to that connection.
-
-The connected file flow passes all eight field forms, absence for color and Scene
-entry View, no automatic winner or warm viewport remount/recall, original-byte
-publication retry, normal Caption editing without color backfill, cold startup
-choice, normal Scene/View editing and exact Contribution return/replay/reopen.
-The initial test setup used the conflict port for ordinary edits and mixed View
-order with recapture; it now uses the existing write/authorScene ports and legal
-separate order command. A fixture publication token was also made stable. No
-runtime policy was relaxed. Independent review of the forms and later witness
-repair found no remaining mandatory finding. Final focused checks passed (12 cases,
-51.09s combined test time). Final serial typecheck, root suite (112 files,
-2,289 passed / 21 existing TODO, 483.31s), normal build and harness build passed on
-the reviewed source/test tree. Existing Node image-decoder/UUID and build chunk
-warnings remain; they are not physical-device evidence. Documentation links (186)
-and diff checks pass. Only result/next-work prose changed after runtime checks.
-This is synthetic GLB/PNG content with actual file formats, recorded DOM and an
-injected viewport/storage runtime, not live browser, iPhone, offline or ordinary-home
-acceptance. No new PoC, dependency, public fixture or release change. The approved
-critical path still closes continued editing after received changes; material
-conflicts are the next concrete interruption to that workflow.
-
-## Completed unit — received material conflicts
-
-Receive competing material settings → explicit
-whole-field choice / duplicate same-target keep-one → normal edit/reset → Contribution
-return/replay/cold reopen. Read-only investigation and source check confirm current
-`MaterialSession` review is only guidance, typed commands refuse conflicts, and the
-old duplicate resolver writes through `WorkingHistory`, not this metadata Session.
-Specify the finite commands and complete candidate/target validation before coding,
-then connect the existing file/editor guards. Reuse existing material/file tests;
-no new probe, soft transparency/profile expansion, general relation repair, Native
-conversion or ordinary-entry/device adoption. A concrete contract ambiguity is a
-stop condition; routine sequencing and focused repair do not require another PO wait.
-
-- [x] Specify finite material resolution commands and whole-candidate validation.
-- [x] Connect the real-file host through the Metadata Session; retain retry,
-  pending/input guards and warm Scene/camera state.
-- [x] Verify receive → resolve → normal edit/reset → exact return/replay/reopen
-  with existing tests, then one final serial verification/review/checkpoint.
-
-Starting checkpoint: `1688492`, clean `g0-baseline`; previous goal turn was
-progress (pin/Scene/View real-file resolution, verified and committed). Paired
-appearance/compositing selection avoids invalid intermediate combinations; duplicate
-keep-one is separate and preserves the survivor. The real-file resolution port
-must enforce existing exact-slot capability admission before journaling, just as
-ordinary material writes do. Independent read-only investigation identified that
-port difference; no wider material rendering profile is approved.
-
-Implemented paired exact-atom choices (only conflicted fields are rewritten),
-same-routing complete duplicate keep-one and pre-journal real-slot admission in
-the host resolution port. Pure UI preflight leaves incompatible pairs editable,
-not trapped in a journal retry. Duplicate projection DTOs withhold routing and
-appearance: review labels/scope/choices now read exact original candidates, not
-that non-authoritative DTO. The selected pair still cannot render until duplicate
-cleanup, and whole Project fallback remains intact. No guessed source relation.
-
-Focused material checks pass (4 cases; 13.48s combined test time); the real-file
-case with added file-input/IME/readonly/stale/dispose guards passes (12.54s test
-time). Final typecheck passed. Independent product review and the focused follow-up
-found no mandatory findings. Initial failures were one withheld-DTO UI seam and
-test fixture/type assumptions (fresh lifecycle event, diagnostic/raw distinction,
-original-inspection input); none required a relaxed contract. The root suite ran
-once (112 files, 539.50s): 2,289 PASS / 21 existing TODO / one static import-isolation
-failure. Its exact allowlist lacked the two newly approved material files and
-their actual imports. Only that assertion was corrected afterward; ordinary-entry,
-DEV and storage/network restrictions remain unchanged and cover the new files.
-The complete isolation file then passed (12 cases, 454ms). Independent review of
-that correction found no mandatory finding. Unchanged runtime evidence was reused
-rather than repeat the nine-minute suite: this is a full run plus targeted
-correction, not a second all-green root run. Final typecheck, ordinary build and
-harness build passed; existing chunk/image-loader/UUID warnings remain. An earlier
-terminal result was unavailable after context recovery, so only typecheck/build
-were rerun to obtain attributable completion; runtime tests were not repeated.
-No new probe or test framework. Recorded DOM and injected storage/viewport remain
-distinct from live browser, physical iPhone, offline and ordinary-entry acceptance.
+Executed tooling probes: installed Vitest 3.2.7 supports the aliases. `test:focus`
+preserved the paused list failure and exit 1 (10 PASS / 1 FAIL, 561ms); a nonexistent
+test filter also exited 1. `test:related` selected 9 dependent files and passed the
+single requested existing case (328 skipped, 5.76s); this is selector evidence, not
+nine-suite coverage. The full checkpoint alias preserves the serial required
+typecheck/root suite/ordinary build/harness build with stop-on-failure. It was not
+run against the known-unverified paused product tree. No test source, config,
+assertion, dependency or runtime budget was changed. No quota saving is measured
+yet; compare the next connected workflow's usage rather than promise a percentage.
+Independent read-only review of these four tooling/instruction/status files found
+no mandatory findings. Diff checks passed. The active todo was reduced from about
+42,000 to 13,000 characters; removed completed records remain verbatim in the Git
+checkpoint linked below. Product implementation remains paused, not reverified.
 
 ## Next connected unit
+
+Paused/uncommitted: Caption list controls/CSS, new `captionRowLayout.ts` and the
+05 §13.2 list-scale note. Typecheck passed before the pause; the existing reveal
+case still fails (250 vs expected 194). Pin-origin offscreen reveal is not yet
+connected, and 10k/variable-height/keyboard coverage and final review are pending.
+Preserve these changes and resume them only after the PO resumes feature work.
+
+Make a long Scene Caption list usable: scroll/find a distant record → select or
+reveal its pin → keep text/recovery details and keyboard access → continue editing.
+Source inspection found that the existing list mounts every row; 03 §6 explicitly
+requires virtualization for the 10,000-Caption UI. This is an implementation gap,
+not a failed device measurement or a reason to raise the metadata limits.
+
+- [ ] Window the existing list's DOM with measured variable row heights, keeping
+  complete search/color/count/selection semantics, stable keyed rows and inner-list reveal.
+- [ ] Preserve focus, keyboard reachability, IME, narrow/zoomed wrapping, scroll
+  memory and visible recovery messages. Reuse the existing list/host tests, not a PoC.
+- [ ] Finish focused and final serial checks plus independent review; record
+  live browser/iPhone/scale-budget evidence separately, then checkpoint.
+
+No dependency, schema/profile/budget, ordinary entry, new data or private fixture.
+A future 10k recorded-DOM check proves a bounded mount and behavior only: it cannot
+prove whole-Project cold open/edit latency, storage capacity or native layout.
+The current validation metadata cap is 1,000 changes; the approved 50,000-change
+workload and two-tab workload remain a separate implementation/adoption boundary.
+
+## Following boundary — ordinary-entry adoption
 
 Prioritize ordinary entry → real Project work and file exchange → exit/reopen,
 not another small conflict-form expansion. Source recheck confirms `src/main.ts`
@@ -388,180 +154,16 @@ release or device route changes. Stop at the actual schema/recipe authority
 boundary; recipe hashes and adoption evidence are outputs to freeze after an
 authorized implementation, never invented evidence in an advance proposal.
 
-## Previous evidence — selected Scene review output → standalone View
-
-Independent-copy output/input, editing and cold reopen are committed at `cc99bcd`.
-This checkpoint connects the accepted one-Scene review output and
-read-only opening. It was a user-visible checkpoint, not completion of review's
-explicit editable-copy handoff. The connected handoff is recorded below.
-
-- [x] Build and inspect the closed selected-Scene snapshot, exact presentation/
-  Caption/media/material closure, privacy summary and frozen typed reconstruction.
-- [x] Connect output/preflight and genuinely read-only input to the existing file
-  area and 3D/Caption controls; preserve omitted-model records as list-only.
-- [x] Reuse existing package/file tests for scope, privacy, output retry, file input,
-  materials, multiple windows, unknown nested input and read-only rendering.
-  Independent review fixes cover material projection, optional color and startup retry.
-- [x] Finish serial final unit checks and preserve the reviewed checkpoint. Record live
-  browser/device/offline evidence separately at the grouped adoption boundaries.
-
-Final checks passed serially: typecheck, root tests (112 files, 2,273 PASS / 21
-existing TODO; 476.45s), ordinary build and harness build. The root command was
-`npm test -- --reporter=dot --maxWorkers=2 --testTimeout=30000`. Existing
-mixed-import/large-chunk, Repo UUID and injected Node image-loader warnings remain.
-No dependency, runtime budget or warning threshold was changed. Focused failures
-were corrected before the final tree; the full run is green. The three independent
-UI findings were fixed and re-reviewed; exact snapshot/output/source privacy and
-isolation were also reviewed. No additional PoC or test framework was introduced.
-Recorded DOM and mocked GPU checks are not live browser, physical iPhone or
-offline acceptance. Those remain at the grouped boundaries.
-
-## Verified unit — explicit review edit-copy → independent Project → edit/cold reopen
-
-Previous goal turn: progress, verified at `90441d3`; branch/worktree were clean on
-resumption. The next missing user flow is review-file editing, not another probe.
-The current tree connects persistent review edit jobs, exact retry receipts and
-the explicit edit-copy UI through the existing clean initialization path. The
-reconstruction/destination and actual metadata bytes are fixed before initialization;
-original review bytes, missing-model records and known-position review pins remain.
-The local handoff contract was specified and independently reviewed before code.
-This is a connected file-to-edit unit, not only direct component initialization.
-
-- [x] Specify the bounded local parent/clean-child handoff and confirm independent
-  design review. Freeze actual metadata bytes/proof, not only IDs or timestamps.
-- [x] Connect explicit confirmation, persistent retry and missing-evidence status
-  to the existing file area/Project selector; reuse clean initialization.
-- [x] Verify file → independent edits → cold reopen and interrupted retry with
-  existing tests; preserve source review bytes and later edits, then checkpoint.
-
-Focused evidence: six package/file/entry checks passed. They exercise standalone
-View → explicit edit-copy → independent edits → cold reopen; original/child/parent
-completion interruptions; host package-lock refusal before parent creation; and
-acknowledged parent/child evidence loss. Parent-only recovery never exposes the
-private clean ZIP. Exact later edits survive retry; source review bytes and the
-source Project stay unchanged. Independent input/UI reviews found three mandatory
-failure-path corrections (parent loss classification, child Start loss with journal,
-and first-open rejection without a recovery parent); all were fixed and re-reviewed.
-No new probe page, dependency or test framework.
-
-Final serial checks passed: typecheck; root tests (112 files, 2,277 PASS / 21
-existing TODO; 414.30s); ordinary build; harness build. The root command remains
-`npm test -- --reporter=dot --maxWorkers=2 --testTimeout=30000`. The first whole
-run found one startup regression: a duplicate output-list read cleared its initial
-discovery failure. Removing the redundant read preserves the failure and blocks
-new output; five focused checks and the second whole run passed. Independent
-re-review confirmed startup still initializes the list. Existing build/Node loader
-warnings remain; no thresholds or dependencies changed. Documentation links and
-diff whitespace passed. Live browser/device/offline evidence is still outstanding.
-
-Acceptance: exactly the chosen durable Scene, no filter-driven omissions, no
-source history/identity, no inferred model relation or compatibility winner.
-View must not create editable metadata or expose mutation commands. Edit-copy
-keeps original bytes, known positions and missing-model records, and discloses
-pins whose omitted family requires review. Existing 06 §§5.1/12.1/12.6 govern;
-no new PO policy is needed. New local retry records receive design review before
-implementation. Genuine unplaced/pinScale, migration, normal activation, other
-profiles/media/dependencies and release remain separate. Stop only for a real
-contract conflict or new authority boundary.
-
-## Previous evidence — independent copy → edit → reopen
-
-The preceding connected restore unit is committed at `26638b5`; the tree was
-clean on resumption. The next work closes a missing file purpose, not another
-probe page. Existing PO approval and 06 §§5–6/12.1 cover this isolated unit.
-
-- [x] Read the current contract and obtain bounded independent design review: no
-  new policy blocker for whole-Project clean; review/migration remain separate.
-- [x] Build current-value admission, complete typed re-keying and snapshot summary;
-  preserve every active resource and editable strong closure, not just one Scene.
-- [x] Connect frozen clean output/retry and independently admitted clean input to
-  the existing validation file UI, then edit and cold reopen the new Project.
-- [x] Reuse package/file tests for privacy, independence, exact bytes, conflicts,
-  cancellation/retry and failure state; run final checks/review at the connected unit.
-
-Connected evidence: 10 focused package/file/entry checks passed. They cover fresh
-history without deleted values, exact bodies and frozen-ID retry, independent
-editing/cold reopen without a Workspace base, interrupted initialization,
-acknowledged input/output loss, sink-opening failure and the existing selector's
-recorded-DOM flow. The DOM check waits for the enabled Download control, not an
-intermediate generated-job observation. Final typecheck, root tests (112 files:
-2,266 PASS / 21 existing TODO; 570.70s), ordinary build and harness build passed
-serially. The root command was `npm test -- --reporter=dot --maxWorkers=2
---testTimeout=30000`. Existing mixed-import/large-chunk build warnings and injected
-Node image-loader warnings remain; no dependency or warning threshold changed.
-
-Independent read-only input/output reviews found three bounded recovery defects:
-stale pre-Start reselection, sink-open rejection leaving the stream pending, and
-missing whole output-job discovery. All were fixed and their regression checks
-passed; reviewers confirmed the exact corrections. No new PoC/test framework.
-Browser skill setup still fails before connection with the previously recorded
-runtime import restriction. No live rendering/device/offline PASS is claimed.
-
-Acceptance: source Project untouched, no inherited exchange base, no silent field
-loss/winner, exact retry, honest external-file status. Actual browser/device/offline
-checks stay at the approved grouped boundaries. No ordinary activation, new media,
-dependency, migration or release work. Stop for a genuine contract conflict, not
-for each helper. A snapshot builder alone does not finish this unit.
-
-## Previous evidence — restore → edit → Contribution
-
-Checkpoint entering maintenance: `423990d` (root-owned backup restore input jobs).
-Environment maintenance is complete at `c6222ee`. Product changes connect dedicated
-original-history initialization, historical bases, retained-ZIP validation, selected
-generation routing and explicit restore controls in the existing validation file
-area. This is limited GLB/PNG development code, not ordinary-home acceptance.
-
-- [x] Independent pre-implementation review of the dedicated initialization contract (06 §12.8).
-- [x] Finish the connected host/catalog/display lifecycle; retain one logical lease,
-  original work, every protected body and exact recovery. Do not fall back silently after selection.
-- [x] Verify restored editing and Contribution, cold selected-generation reopen,
-  failure/retry/cancellation using the existing file/host tests. Update the existing
-  isolation allowlist for the new generation module; no new PoC/test framework.
-- [x] Run typecheck, root tests, ordinary/harness builds and independent final review.
-  Correct the two test-only failures and rerun those cases; see exact evidence below.
-- [ ] Record actual browser rendering, physical-device and offline acceptance at
-  their approved grouped boundaries; do not replace them with recorded DOM tests.
-
-### Evidence boundaries
-
-- Final typecheck, ordinary build and harness build passed. Existing large-chunk/
-  mixed-import warnings remain; no warning threshold or dependency was changed.
-- Root run `npm test -- --reporter=dot --maxWorkers=2 --testTimeout=30000`:
-  2,257 PASS, 21 existing TODO, 2 test failures (112 files, 742.76s). Product code
-  did not change afterward. An obsolete pre-implementation refusal expectation
-  was replaced with the current pending guard plus actual forged-destination
-  rejection. A View-switch test now waits for durable reopening to finish (10s
-  test ceiling), then asserts View and disabled editing/output controls. Both
-  cases passed targeted reruns; independent review confirmed no weakened acceptance.
-  Do not describe this as a second all-green full run; unchanged cases were not rerun.
-- Four focused host/content/recorded-DOM cases passed: restored editing and two-way
-  Contribution with cold reopen; failed rendering/cancellation and missing-Result
-  recovery; reachable restore retry/fresh editor/single resident ownership; refusal
-  of an in-flight content result after generation retirement.
-- Existing imported-base Contribution regression plus entry isolation: 2 PASS.
-  Replay budgets the actual observed receiver, not a fictitious source-head receipt.
-  Raw database enumeration remains behind the existing browser-storage adapter.
-- Independent read-only UI/core reviews are complete with no mandatory remainder:
-  generic retry dead end, retired content/read handoff, resident ownership and
-  prospective-base replay/first-import checks were corrected.
-- Browser connection failed during the installed tool's bootstrap with
-  `Importing module "node:process" is not allowed in node_repl`. No browser,
-  iPhone, offline or performance PASS is claimed. Do not make tool repair a new
-  product dependency or ask the PO to repeat internal checks individually.
-
 ## Remaining sequence and stop conditions
 
 1. The independent-copy checkpoint is preserved. The connected file/edit/reopen
    flow, not an increased helper/test count, is the completed unit; normal entry
    and adoption remain incomplete. Address data-loss, save-misrepresentation
    and operation-blocking faults immediately.
-2. The connected review → independent edit-copy unit is verified. The concrete Native
-   conversion amendment is recorded and independently reviewed in 07 §11, awaiting
-   one grouped PO decision; the earlier synthetic bridge GO does not authorize the
-   new schema/recipe. While it is pending, follow the verified real-model
-   update/correction/return connection with explicit competing-model resolution
-   and independent model-copy editing, as scoped above, without substituting UI polish for
-   migration. The conversion flow after approval is Native file
+2. The concrete Native conversion amendment in 07 §11 awaits one grouped PO
+   decision; the earlier synthetic bridge GO does not authorize the new schema/recipe.
+   Real-model update/correction/return and independent copy are now verified in the
+   limited route. The conversion flow after approval is Native file
    → explicit conversion → new Project → edit/cold reopen. Source preservation and
    unplaced-record retention are already approved; do not re-ask those policies.
    Later Native input UI, frozen-v1/LociMyu conversion and other profiles remain
@@ -589,22 +191,10 @@ New policy/compatibility/major architecture decisions retain their explicit appr
 
 PO renewed permission for timely checkpoint Push on 2026-09-14. Use existing
 `g0-baseline`; verify remote, scope, privacy and triggered workflows first.
-At the start of this independent-model-copy unit, cached origin was 0 behind / 83 ahead; no live fetch
-was used for that observation. Previous environment denial is separate from PO permission:
+At `e6fc15b`, cached origin was 0 behind / 86 ahead; no live fetch was used for that
+observation. Previous environment denial is separate from PO permission:
 do not retry a denied action unchanged or bypass it. Local implementation need not wait.
 `main`, Pages, Service Worker, license/version and public release remain separately gated.
-
-## Review record
-
-2026-09-14: the connected restore path, not a new probe page, is the unit of work.
-Focused tests reuse existing suites; the initial mixed selection hit 5s/30s test
-timeouts, not acceptance of a performance bound. Long connected host tests have a
-60s test-only deadline. Final root execution uses bounded workers and a 30s default
-deadline without changing runtime budgets, test assertions or project configuration.
-One full run was stopped when independent review found the prospective-base defect;
-it is not completion evidence. No new dependencies/formats/schema policies,
-ordinary activation, release changes or denied Push retries belong to this unit.
-
-The previous plans, failures and executed checkpoint logs are preserved in
-[history](../docs/history/development-through-2026-09-14/README.md). Update this
-record in place; do not prepend another full implementation diary.
+Completed checkpoint details remain unchanged in Git at `e6fc15b:tasks/todo.md`
+(`git show e6fc15b:tasks/todo.md`). Read them only for a concrete evidence question;
+[current inventory](implementation-inventory.md) remains the feature-coverage record.
