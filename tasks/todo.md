@@ -12,12 +12,12 @@ resume and recovery. Desktop, physical iPhone and offline acceptance must cover
 the new route. Scope is 62 of the 64 inventory groups; M13/M14 remain later work.
 Neither component counts nor synthetic-host success is product completion or release approval.
 
-## Verified checkpoint — selected Scene review output → standalone View
+## Previous evidence — selected Scene review output → standalone View
 
 Independent-copy output/input, editing and cold reopen are committed at `cc99bcd`.
 This checkpoint connects the accepted one-Scene review output and
-read-only opening. It is a user-visible checkpoint, not completion of review's
-explicit editable-copy handoff. That connected handoff follows immediately.
+read-only opening. It was a user-visible checkpoint, not completion of review's
+explicit editable-copy handoff. The connected handoff is recorded below.
 
 - [x] Build and inspect the closed selected-Scene snapshot, exact presentation/
   Caption/media/material closure, privacy summary and frozen typed reconstruction.
@@ -40,22 +40,43 @@ isolation were also reviewed. No additional PoC or test framework was introduced
 Recorded DOM and mocked GPU checks are not live browser, physical iPhone or
 offline acceptance. Those remain at the grouped boundaries.
 
-## Next unit — explicit review edit-copy → independent Project → edit/cold reopen
+## Verified unit — explicit review edit-copy → independent Project → edit/cold reopen
 
-The pure typed reconstruction and display-only model admission exist,
-but no persistent review edit job, retry receipts or edit-copy UI is implemented.
-Freeze the reconstruction/destination before initialization; retain the original
-review bytes, exact new history, missing-model records and known-position review
-pins. Reuse the clean initialization path, with the local handoff protocol specified
-and independently reviewed before implementation. Do not count direct component
-initialization as a completed file-to-edit workflow.
+Previous goal turn: progress, verified at `90441d3`; branch/worktree were clean on
+resumption. The next missing user flow is review-file editing, not another probe.
+The current tree connects persistent review edit jobs, exact retry receipts and
+the explicit edit-copy UI through the existing clean initialization path. The
+reconstruction/destination and actual metadata bytes are fixed before initialization;
+original review bytes, missing-model records and known-position review pins remain.
+The local handoff contract was specified and independently reviewed before code.
+This is a connected file-to-edit unit, not only direct component initialization.
 
-- [ ] Specify the bounded local parent/clean-child handoff and confirm independent
+- [x] Specify the bounded local parent/clean-child handoff and confirm independent
   design review. Freeze actual metadata bytes/proof, not only IDs or timestamps.
-- [ ] Connect explicit confirmation, persistent retry and missing-evidence status
+- [x] Connect explicit confirmation, persistent retry and missing-evidence status
   to the existing file area/Project selector; reuse clean initialization.
-- [ ] Verify file → independent edits → cold reopen and interrupted retry with
+- [x] Verify file → independent edits → cold reopen and interrupted retry with
   existing tests; preserve source review bytes and later edits, then checkpoint.
+
+Focused evidence: six package/file/entry checks passed. They exercise standalone
+View → explicit edit-copy → independent edits → cold reopen; original/child/parent
+completion interruptions; host package-lock refusal before parent creation; and
+acknowledged parent/child evidence loss. Parent-only recovery never exposes the
+private clean ZIP. Exact later edits survive retry; source review bytes and the
+source Project stay unchanged. Independent input/UI reviews found three mandatory
+failure-path corrections (parent loss classification, child Start loss with journal,
+and first-open rejection without a recovery parent); all were fixed and re-reviewed.
+No new probe page, dependency or test framework.
+
+Final serial checks passed: typecheck; root tests (112 files, 2,277 PASS / 21
+existing TODO; 414.30s); ordinary build; harness build. The root command remains
+`npm test -- --reporter=dot --maxWorkers=2 --testTimeout=30000`. The first whole
+run found one startup regression: a duplicate output-list read cleared its initial
+discovery failure. Removing the redundant read preserves the failure and blocks
+new output; five focused checks and the second whole run passed. Independent
+re-review confirmed startup still initializes the list. Existing build/Node loader
+warnings remain; no thresholds or dependencies changed. Documentation links and
+diff whitespace passed. Live browser/device/offline evidence is still outstanding.
 
 Acceptance: exactly the chosen durable Scene, no filter-driven omissions, no
 source history/identity, no inferred model relation or compatibility winner.
@@ -158,12 +179,18 @@ area. This is limited GLB/PNG development code, not ordinary-home acceptance.
    flow, not an increased helper/test count, is the completed unit; normal entry
    and adoption remain incomplete. Address data-loss, save-misrepresentation
    and operation-blocking faults immediately.
-2. Finish the selected-Scene review output → View checkpoint, then connect
-   explicit independent editable copy, per 06 §12.6. Reuse the clean reconstruction
-   and existing file/display boundaries without treating a review snapshot as a
-   Workspace or inventing omitted model relations. Then connect migration/late
-   Native changes, existing supported formats and missing user controls according
-   to their dependencies. Do not polish one subsystem while whole flows stay missing.
+2. The connected review → independent edit-copy unit is verified. Next, consolidate
+   the concrete Native conversion contract in existing 07/05 §9: closed input/field/
+   default/order mapping, unplaced anchors and pin scale, versioned portable control
+   encoding, and retained baseline/recipe evidence. Read-only investigation confirms
+   that these technical schema/recipe amendments are not yet ratified; the earlier
+   synthetic bridge GO does not authorize them. Obtain one grouped technical decision
+   and independent review before conversion code. The next user flow is Native file
+   → explicit conversion → new Project → edit/cold reopen. Source preservation and
+   unplaced-record retention are already approved; do not re-ask those policies.
+   Later Native input UI, frozen-v1/LociMyu conversion and other profiles remain
+   required follow-on work, not claims of this first flow. Do not create another probe
+   instead of connecting it or silently alter `lociview-automerge-atomic-map-1`.
 3. Satisfy applicable storage/renderer/profile/device adoption conditions, then
    connect the ordinary entry. Unratified migration/wire differences need a concrete,
    grouped decision; they do not stop already-approved isolated implementation.
@@ -186,7 +213,7 @@ New policy/compatibility/major architecture decisions retain their explicit appr
 
 PO renewed permission for timely checkpoint Push on 2026-09-14. Use existing
 `g0-baseline`; verify remote, scope, privacy and triggered workflows first.
-At the start of this unit, cached origin was 0 behind / 75 ahead; no live fetch
+At the start of this unit, cached origin was 0 behind / 76 ahead; no live fetch
 was used for that observation. Previous environment denial is separate from PO permission:
 do not retry a denied action unchanged or bypass it. Local implementation need not wait.
 `main`, Pages, Service Worker, license/version and public release remain separately gated.

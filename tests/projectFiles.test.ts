@@ -64,6 +64,9 @@ import { CleanInputJob } from '../src/projectPackage/cleanInputJob';
 import { CleanArchive } from '../src/projectPackage/cleanArchive';
 import { ReviewArchive } from '../src/projectPackage/reviewArchive';
 import { ReviewOutputJob } from '../src/projectPackage/reviewOutputJob';
+import { PreparedReviewEdit } from '../src/projectPackage/reviewEdit';
+import { ReviewEditJob } from '../src/projectPackage/reviewEditJob';
+import { reviewEditRoot } from '../src/projectPackage/reviewEditControls';
 import { prepareReviewView } from '../src/harness/projectScene/reviewView';
 import { inspectReviewSnapshot, prepareReviewEdit } from '../src/projectPackage/reviewSnapshot';
 import { BackupArchive, writeBackupArchive } from '../src/projectPackage/backupArchive';
@@ -1410,8 +1413,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(host.hasPending()).toBe(false); expect(host.workspaceFiles.jobs.find(j => j.id === id)!.state).toBe('completed');
     await u.dispose();
   });
-  it('opens a review from the existing file selector with multiple windows and no editable Project (recorded DOM)', async () => {
-    const { host, workspace, s } = await openFileCaption();
+  it('opens a review read-only, then explicitly creates an editable independent copy and cold reopens it (recorded DOM)', async () => {
+    const { host, workspace, s, options } = await openFileCaption();
     s.media.addFile(s.mediaContext(), { name: '添付PNG', size: png.length, arrayBuffer: async () => png.slice().buffer });
     await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
     expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'color', color: '#123456' }))).toBe(true);
@@ -1448,7 +1451,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(noColorView.source.captions.find(c => c.id === firstCaption.id)!.color).toEqual({ kind: 'value', value: '#a08045' });
       expect(noColorView.inspection.review.snapshot.captionsById).toEqual(noColor.captionsById);
     } finally { inspect.mockRestore(); }
-    const open = vi.fn(async () => { throw Error('review must not open editable storage'); }), render = vi.fn(async () => { throw Error('review must not fabricate a Project'); });
+    const open = vi.fn<ValidationWorkspacePorts['open']>(async () => { throw Error('injected copy host opening failure'); });
+    const render = vi.fn<ValidationWorkspacePorts['render']>(async () => { throw Error('review must not fabricate a Project'); });
     let display: Parameters<ReturnType<ViewportFactory>['update']>[0];
     let starts = 0;
     const renderReview = vi.fn(async () => ({ dispose() {}, factory: ((_canvas, _changed, pin, model) => {
@@ -1473,15 +1477,97 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(all(page).filter(n => n.className === 'lv-caption-window')).toHaveLength(2);
     expect(all(page).some(n => n.tag === 'button' && n.textContent === 'ピンを追加')).toBe(false);
     expect(display!.readOnly).toBe(true); expect(u.selected).toBeNull();
-    const copy = await prepareReviewEdit(prepared.inspection.review, metadata), target = firstWorkspaceRecipient();
-    const bodies = [];
-    for (const ref of prepared.inspection.review.closure.semanticRefs)
-      bodies.push({ ref, bytes: await prepared.inspection.archive.entryBytes(`blobs/sha256/${ref.digest}`, budget.maxFileBytes) });
-    const initialized = await prepareValidationCreation({ records: copy.records as Parameters<typeof prepareValidationCreation>[0]['records'], blobs: bodies }).persist(target.fs, target.store, target.session);
-    expect(initialized.state).toBe('ready');
-    expect(initialized.provider!.kind).toBe('scene-provider'); // Existing first-verified-output evidence, not an invented source purpose.
-    expect(JSON.stringify(copy.records.representationsById)).not.toContain('"source"');
-    await u.dispose(); tools.dispose(); await workspace.dispose();
+    const pageButton = (text: string) => all(page).find(n => n.tag === 'button' && n.textContent === text)!;
+    pageButton('編集コピーを作る').fire('click'); expect(open).not.toHaveBeenCalled();
+    expect(all(page).find(n => n.attributes.get('aria-label') === '編集コピーの確認')!.hidden).toBe(false);
+    pageButton('コピーを作成').fire('click');
+    await vi.waitFor(() => expect(all(page).some(n => n.textContent === 'injected copy host opening failure')).toBe(true));
+    expect(all(page).filter(n => n.className === 'lv-caption-window')).toHaveLength(2); expect(u.selected).toBeNull();
+    const attempt = open.mock.calls[0]![4]!, factory = storageFactory(); let copied: Awaited<ReturnType<typeof openValidationHost>> | undefined;
+    const nextOptions = { ...options, run: attempt.run, openStorage: async () => ({ factory, dispose: async () => {} }) };
+    open.mockImplementation(async (run, initial, mode, workspaceFile, reviewEdit) => copied = await openValidationHost({ ...nextOptions, run, initial, mode, workspaceFile, reviewEdit }));
+    render.mockResolvedValue({ factory: (() => { throw Error('Recorded DOM has no GPU'); }) as ViewportFactory, dispose() {} });
+    pageButton('コピーを作成').fire('click');
+    await vi.waitFor(() => { expect(render).toHaveBeenCalledOnce(); expect(copied!.hasPending()).toBe(false); }, { timeout: 10000 });
+    expect(open.mock.calls[1]![4]).toBe(attempt); expect(u.selected).toBe(attempt.run);
+    expect(copied!.workspaceFiles.reviewCopies[0]!.state).toBe('completed'); expect(copied!.workspaceFiles.jobs).toEqual([]);
+    expect(copied!.read().source!.proof).not.toEqual(host.read().source!.proof); expect(copied!.workspaceOutput.bases).toEqual([]);
+    const sceneId = Object.keys(copied!.authority.read().state.scenes)[0]!;
+    await copied!.authority.authorScene!(copied!.read().source!.token, { kind: 'renameScene', sceneId, name: '閲覧コピーでの作業' });
+    const updated = copied!.read().source!.token;
+    await copied!.workspaceFiles.retryReviewCopy(attempt.id); expect(copied!.read().source!.token).toBe(updated);
+    await u.dispose(); const cold = await openValidationHost(nextOptions);
+    expect(cold.read().source!.token).toBe(updated); expect(cold.hasPending()).toBe(false);
+    expect(cold.authority.read().modelVersions).toHaveLength(1); expect(cold.workspaceOutput.bases).toEqual([]);
+    expect(host.read().source!.token).toBe(token); expect(await digest(new Uint8Array(await file.arrayBuffer()))).toBe(attempt.descriptor().original.sha256);
+    await cold.dispose(); tools.dispose(); await workspace.dispose();
+  }, 60000);
+  it.each(['original', 'child', 'completion'] as const)('cold resumes a review edit-copy stopped at %s through one parent recovery row', async stage => {
+    const source = await openFileCaption(), id = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+    const file = await source.host.workspaceOutput.download(id), prepared = await PreparedReviewEdit.prepare(file, metadata);
+    const fs = new TestFS(), locks = lockManager(), factory = storageFactory();
+    const store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
+    const creates: boolean[] = [], options = { base: fs, coordinator: ProjectMutationCoordinator.browser(locks), store,
+      fileLimits: budget, decode, run: prepared.run, packageLocks: locks, openStorage: async (create: boolean) => { creates.push(create); return { factory, dispose: async () => {} }; } };
+    await expect(openValidationHost({ ...options, reviewEdit: prepared, packageLocks: null })).rejects.toThrow('排他的');
+    expect(await fs.list(`${validationArea}/${prepared.run}/v2/packages/review-edit/`)).toEqual([]);
+    fs.reject = path => stage === 'original' ? path.includes('/review-edit/') && path.endsWith('/original.zip') :
+      stage === 'child' ? path.includes('/clean-input/') && path.endsWith('/input.zip') : path.includes('/review-edit/') && path.endsWith('/published.json');
+    const first = await openValidationHost({ ...options, reviewEdit: prepared });
+    expect(first.hasPending()).toBe(true); expect(first.workspaceFiles.jobs).toEqual([]);
+    expect(first.workspaceFiles.reviewCopies).toEqual([{ id: prepared.id, childId: prepared.childId, state: stage === 'original' ? 'input-required' : 'incomplete' }]);
+    if (first.read().source) {
+      await expect(first.authority.authorScene!(first.read().source!.token, { kind: 'renameScene', sceneId: Object.keys(prepared.clean.description.records.scenesById!)[0]!, name: '禁止' })).rejects.toThrow('編集コピー');
+      await expect(first.workspaceOutput.generate(first.read().source!.token)).rejects.toThrow('編集コピー');
+    }
+    await first.dispose(); fs.reject = () => false;
+    const listed = await listValidationProjects(options, (_run, create) => options.openStorage(create));
+    expect(listed).toEqual([expect.objectContaining({ run: prepared.run, state: 'incomplete' })]);
+    const cold = await openValidationHost(options), mode = createValidationModeHost(cold, next => openValidationHost({ ...options, mode: next }), () => {});
+    const tools = createValidationReceiveControls(new RecordedDocument().asDocument(), mode, () => undefined, () => {}, async () => {});
+    const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)], nodes = all(record(tools.root));
+    expect(nodes.some(n => n.textContent === '元のファイルを選び直す')).toBe(false); // Private clean ZIP never appears.
+    if (stage === 'original') {
+      await expect(cold.workspaceFiles.reselectReviewCopy(prepared.id, new Blob(['not a review']))).rejects.toThrow();
+      await cold.workspaceFiles.reselectReviewCopy(prepared.id, file);
+    } else await cold.workspaceFiles.retryReviewCopy(prepared.id);
+    expect(cold.hasPending()).toBe(false); expect(cold.read().source!.originalChanges()).toEqual(prepared.clean.source.originalChanges());
+    const sceneId = Object.keys(cold.authority.read().state.scenes)[0]!;
+    await cold.authority.authorScene!(cold.read().source!.token, { kind: 'renameScene', sceneId, name: 'コピーの後続編集' });
+    const token = cold.read().source!.token; await cold.workspaceFiles.retryReviewCopy(prepared.id); expect(cold.read().source!.token).toBe(token);
+    expect(cold.workspaceOutput.bases).toEqual([]); tools.dispose(); await mode.dispose();
+    const reopened = await openValidationHost(options); expect(reopened.read().source!.token).toBe(token); expect(reopened.hasPending()).toBe(false);
+    expect(creates.slice(2).every(create => !create)).toBe(true); await reopened.dispose(); await source.workspace.dispose();
+  }, 60000);
+  it('refuses acknowledged review parent/child evidence loss and preserves independent edits', async () => {
+    const source = await openFileCaption(), id = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+    const file = await source.host.workspaceOutput.download(id), prepared = await PreparedReviewEdit.prepare(file, metadata);
+    // Three different losses share the same exact fixture; none can be repaired by regenerating bytes.
+    for (const loss of ['parent', 'parent-start', 'child'] as const) {
+      const r = firstWorkspaceRecipient(), job = new ReviewEditJob(r.fs, r.session, metadata);
+      r.fs.reject = p => p.includes('/journal/') && p.endsWith('/blobsVerified.json');
+      await expect(job.start(prepared).then(() => 'unexpected success')).rejects.toThrow(); r.fs.reject = () => false;
+      expect((await new TransactionJournal(r.fs, metadata).entries())).toHaveLength(1);
+      const parentRoot = reviewEditRoot(r.fs, prepared.id), childRoot = `v2/packages/clean-input/${prepared.childId}/`;
+      if (loss === 'parent') {
+        for (const path of await r.fs.list(parentRoot)) await r.fs.remove(path);
+        await r.fs.remove(`v2/packages/review-edit-index/${prepared.id}.json`);
+      } else if (loss === 'parent-start') {
+        await r.fs.remove(`${parentRoot}start.json`); await r.fs.remove(`${parentRoot}original.zip`);
+      } else {
+        for (const path of await r.fs.list(childRoot)) await r.fs.remove(path);
+        await r.fs.remove(`v2/packages/clean-input-index/${prepared.childId}.json`);
+      }
+      const before = await r.fs.list(''), writer = vi.spyOn(r.fs, 'writeStream');
+      const cold = r.reopen(), retry = new ReviewEditJob(r.fs, cold.session, metadata);
+      await expect(retry.retry(prepared.id)).rejects.toThrow();
+      await expect(retry.reselect(prepared.id, file)).rejects.toThrow();
+      await expect(retry.abandon(prepared.id)).rejects.toThrow();
+      await expect(cold.session.retry()).rejects.toThrow();
+      expect((await retry.states())[0]).toMatchObject({ childId: prepared.childId, state: 'repair-required' });
+      expect(writer).not.toHaveBeenCalled(); expect(await r.fs.list('')).toEqual(before);
+    }
+    await source.workspace.dispose();
   }, 60000);
   it('offers clean preflight and opens the independent copy through the existing selector (recorded DOM)', async () => {
     const { f, options } = await initialWorkspaceHostFixture(), original = await openValidationHost({ ...options, workspaceFile: f.file });

@@ -1,6 +1,6 @@
 # 実装・接続の全体棚卸し
 
-> 更新: 2026-09-14（限定独立コピーと閲覧出力／Viewの接続）。本書は機能対応の正本。
+> 更新: 2026-09-14（閲覧ファイルからの明示編集コピー／再開を限定接続）。本書は機能対応の正本。
 > 実装順・現在の作業tree・実行結果は [todo](todo.md) を参照し、ここへ重複記載しない。
 > 限定接続と製品受入れを区別し、通常画面・実機の新たな合格は主張しない。
 > [以前の棚卸しと監査記録](../docs/history/development-through-2026-09-14/tasks/implementation-inventory.md) は履歴。
@@ -40,7 +40,7 @@
 | 通常home → Native | 実モデル／画像、DisplaySet、限定backup／collaboration／review／clean、旧Desktop・iPhone合格 | 新ProjectScene／継続因果履歴／新保存サービスの完成 |
 | project-scene memory／旧 `storage=saved` | 合成の2人チーム、更新・競合・独立copy・保存の限定ループ | 新metadata serviceまたは実ファイル製品wireの接続済み |
 | project-scene `storage=metadata` | 新source/repository/session/journalと従来25群＋C07/V04の合成UI接続、限定履歴受信・明示解消 | 任意モデル／任意画像／実ファイルのチーム受信／通常home／offlineの合格 |
-| project-scene `storage=validation` | 静的GLB/PNG Projectの作成・一覧・再開、実本体read/renderと編集、限定Workspace/Contributionの実file入出力・中断復旧、名前付きbackup出力と確認付き復元・復元後の編集／返送、独立コピー出力・入力・編集／再開、選択Sceneの閲覧用出力・内容由来のstandalone View。実行結果はtodo参照 | 通常home、正式profile／任意形式、実描画／実入力／実機／offlineの受入れ、全purpose／移行の完成 |
+| project-scene `storage=validation` | 静的GLB/PNG Projectの作成・一覧・再開、実本体read/renderと編集、限定Workspace/Contributionの実file入出力・中断復旧、名前付きbackup出力と確認付き復元・復元後の編集／返送、独立コピー出力・入力・編集／再開、選択Sceneの閲覧用出力・内容由来のstandalone View、明示確認した編集コピー・中断復旧・編集／再開。実行結果はtodo参照 | 通常home、正式profile／任意形式、実描画／実入力／実機／offlineの受入れ、全purpose／移行の完成 |
 
 ## 2. 全機能群
 
@@ -57,7 +57,7 @@
 | P04 | Sceneを作る | 接続済み | CaptionタブのScene管理から作成し、新metadataへ保存。元Sceneの確定モデル所属だけを順序保持・fresh IDで複写。Caption/material/View/defaultはコピーせず、不完全sourceは拒否。 | [src/harness/projectScene/sceneAuthoringControls.ts](../src/harness/projectScene/sceneAuthoringControls.ts) / [src/projectMetadata/sceneAuthoring.ts](../src/projectMetadata/sceneAuthoring.ts) |
 | P05 | Scene名・Project開始Sceneを設定する | 接続済み | 同じScene管理UIから明示確定して新metadata保存。名前／default競合は通常操作で上書きしない。開始Sceneは次回起動に使い、現在Scene選択やentry Saved Viewとは別。 | [src/projectMetadata/sceneAuthoring.ts](../src/projectMetadata/sceneAuthoring.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
 | P06 | 既存CaptionをSceneへ追加／外す | 接続済み | 同じCaptionを参照。本文・他Scene・添付を保持。Project全体削除ではない。 | [src/ui/projectScene/captionIncludeControls.ts:38](../src/ui/projectScene/captionIncludeControls.ts) / [tests/ui/projectMetadataHost.test.ts:535](../tests/ui/projectMetadataHost.test.ts) |
-| P07 | 閲覧と編集を選んで開く | 別経路のみ | 限定validationに意図的なlock-free View／fresh durable Editと同一画面切替を接続。Scene・カメラ・窓・検索を保持し、入力／未完了Editの切替を拒否。reviewファイルは編集metadata／Projectを作らないstandalone Viewへ接続。metadata hostの選択入口・review編集の独立Project化は未接続。実画面受入れも残るため行全体を完了としない。 | [src/harness/projectScene/validationModeHost.ts](../src/harness/projectScene/validationModeHost.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) / [docs/specs/05-project-scene-team-workflow.md](../docs/specs/05-project-scene-team-workflow.md) |
+| P07 | 閲覧と編集を選んで開く | 別経路のみ | 限定validationに意図的なlock-free View／fresh durable Editと同一画面切替を接続。Scene・カメラ・窓・検索を保持し、入力／未完了Editの切替を拒否。reviewはstandalone Viewで開き、明示確認で独立Projectの編集へ移る。開始前の失敗は元Viewと同じ作成準備を保持し、中断後は同じファイル欄から復旧。metadata hostの選択入口・通常home／実画面受入れが残るため行全体を完了としない。 | [src/harness/projectScene/validationModeHost.ts](../src/harness/projectScene/validationModeHost.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) / [docs/specs/05-project-scene-team-workflow.md](../docs/specs/05-project-scene-team-workflow.md) |
 
 ### モデル
 
@@ -146,7 +146,7 @@
 | F01 | 自己完結したTeam Workspaceファイルを配布・開く | 新規実装 | 元履歴summary・全live強参照closureから実ZIPをstream生成し、header／CRC／SHA／source／summary／closureを検査。限定GLB/PNG一覧・editorに初回import／既存同系統への受信／cold復旧と固定source出力job／generated base／明示download／選び直したfileの一致確認を接続。共通base表・元履歴・手元編集を保持し、欠落したack証拠を補充しない。生成した実形式fileの二巡は既存tests。未知inventory制限、retention全体・通常UI／他形式／実browser・実機が残る。portable操作全体の完成ではない。 | [src/projectPackage/workspaceArchive.ts](../src/projectPackage/workspaceArchive.ts) / [src/projectFiles/sendWorkspace.ts](../src/projectFiles/sendWorkspace.ts) / [src/projectFiles/receiveWorkspace.ts](../src/projectFiles/receiveWorkspace.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) / [docs/specs/06-project-package-wire.md](../docs/specs/06-project-package-wire.md) |
 | F02 | Contributionファイルを書き出し・取り込む | 新規実装 | 元D／delta summary／必要本体差分の実ZIPと、凍結base／wire／derived・receiver MのSession受信を限定GLB/PNGの同じfile欄へ接続。durable出力も明示base／元source／inventoryから生成し、cold retryで後の編集を混ぜない。独立indexで欠落jobを発見し、両出力のguardとwarm一覧を共有。二巡・M=0・再選択・欠落拒否・元モデル0readを検査。Contributionはbaseを更新しない。通常経路／他対応形式／実機受入れは未完了。実行結果はtodo。 | [src/projectPackage/contributionSource.ts](../src/projectPackage/contributionSource.ts) / [src/projectPackage/contributionOutputJob.ts](../src/projectPackage/contributionOutputJob.ts) / [src/projectFiles/sendWorkspace.ts](../src/projectFiles/sendWorkspace.ts) / [src/projectFiles/receiveWorkspace.ts](../src/projectFiles/receiveWorkspace.ts) / [docs/specs/06-project-package-wire.md](../docs/specs/06-project-package-wire.md) |
 | F03 | 完全backupを書き出し・明示確認して復元する | 別経路のみ | 限定validationに名前付き出力・確認付き復元・専用元履歴初期化・復元base束縛・世代選択とcold再開を接続。元作業／current・conflict・base-only本体／交換基準・元証拠を保持し、復元後の編集→Contribution返送／再受信と中断・取消・表示retryを既存testsで確認。独立reviewの指摘は解消。通常home／実描画／実機・offlineと行全体の受入れは残り、主分類は変更しない。 | [src/projectPackage/backupSource.ts](../src/projectPackage/backupSource.ts) / [src/projectPackage/backupArchive.ts](../src/projectPackage/backupArchive.ts) / [src/projectPackage/backupOutputJob.ts](../src/projectPackage/backupOutputJob.ts) / [src/projectPackage/backupRestoreJob.ts](../src/projectPackage/backupRestoreJob.ts) / [docs/specs/06-project-package-wire.md](../docs/specs/06-project-package-wire.md) |
-| F04 | 一つのSceneを閲覧用に共有する | 別経路のみ | 限定validationで明示選択Sceneのhistory-free closure・typed re-key・実ZIP出力と事前確認、元履歴と交換基準を変更しない凍結retry、既存ファイル入口からのstandalone Viewを接続。Viewは編集metadataを作らず、非visual ownerは一覧／窓のみ。明示独立編集コピーの永続job・UI・再開、通常home／他profile／実ブラウザ・実機・offline受入れは残る。実行結果はtodo参照。 | [src/projectPackage/reviewSelection.ts](../src/projectPackage/reviewSelection.ts) / [src/projectPackage/reviewOutputJob.ts](../src/projectPackage/reviewOutputJob.ts) / [src/harness/projectScene/reviewWorkspace.ts](../src/harness/projectScene/reviewWorkspace.ts) / [docs/specs/06-project-package-wire.md](../docs/specs/06-project-package-wire.md) |
+| F04 | 一つのSceneを閲覧用に共有する | 別経路のみ | 限定validationで選択Sceneのhistory-free closure・typed re-key・実ZIP出力／確認・凍結retry、既存ファイル入口からのstandalone View、明示独立編集コピー・永続job・既存欄での復旧・編集／cold再開を接続。View単独では編集metadataを作らず、非visual ownerは一覧／窓のみ。編集コピーは元bytes・新しい実metadata bytesを固定し、欠落した承認済み証拠を再生成せず、後続編集を保持する。通常home／他profile／実ブラウザ・実機・offline受入れは残る。実行結果はtodo参照。 | [src/projectPackage/reviewSelection.ts](../src/projectPackage/reviewSelection.ts) / [src/projectPackage/reviewOutputJob.ts](../src/projectPackage/reviewOutputJob.ts) / [src/projectPackage/reviewEditJob.ts](../src/projectPackage/reviewEditJob.ts) / [src/harness/projectScene/reviewWorkspace.ts](../src/harness/projectScene/reviewWorkspace.ts) / [docs/specs/06-project-package-wire.md](../docs/specs/06-project-package-wire.md) |
 | F05 | 全Sceneを独立Projectとして複製して渡す | 別経路のみ | 限定validationで現在の全Scene／素材／記録のtyped re-key・fresh history・実ZIP出力、件数と匿名化しない境界の事前確認、独立Projectへの入力・編集・cold再開を接続。元履歴／削除値／交換基準を出力せず、元Projectは保持。中断時は同じID・原本から再開し、既存コピーへの再入力は上書きせず一覧再開を案内。通常home／他profile／実描画・実機・offlineの受入れは残る。最終チェックはtodo参照。 | [src/projectPackage/cleanSource.ts](../src/projectPackage/cleanSource.ts) / [src/projectPackage/cleanOutputJob.ts](../src/projectPackage/cleanOutputJob.ts) / [src/projectPackage/cleanInputJob.ts](../src/projectPackage/cleanInputJob.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) / [docs/specs/06-project-package-wire.md](../docs/specs/06-project-package-wire.md) |
 | F06 | 現Native Projectを新Project/Sceneへ変換する | 新規実装 | 新recipe・共有導入artifact・変換writer未実装。旧sourceを変更しない。 | [docs/specs/07-project-scene-migration.md:3](../docs/specs/07-project-scene-migration.md) |
 | F07 | frozen v1を新Project/Sceneへ変換する | 新規実装 | 旧readerの互換性維持と新writerを接続する移行は未実装。 | [docs/specs/07-project-scene-migration.md:3](../docs/specs/07-project-scene-migration.md) |
@@ -223,7 +223,7 @@ LociMyuからのタブ構成、Sceneに相当する記録切替、直接色選�
 |---|---|---|---|
 | E01 | 保存／CAS／GC／大容量I/O | 新original-byte journal、metadata-only cold evidence、非活性OriginBlobStoreのbounded stream／保存後検証／不変receipt／実inventory→metadata作成・再開、隔離CAS・retentionと500 MiB保存本体のPO readback | **実装＋証拠**。新storeの実OPFS・Web Locks・iOS証拠とhost接続、全Project/conflict/opaque/未完了journal等のroot producer、origin-wide GC、bounded browser/iOS出力、実中断。MemoryFSの一般bytes試験をプラットフォーム採用証拠にせず、過去の500 MiB最初の完了ログ不明をFAIL扱いして同じreadbackを繰り返さない |
 | E02 | 実モデル・Representation／renderer | 旧Nativeの限定Mesh/Point/GS/Proxy、各loader、known triangle content verifier | **実装＋採用**。実body admission、Frame/catalog/texture/family証拠、Representation選択と対応外の局所的fallback、資源解放。shared-view合成・hard mask・dither等の各gateを確認。M01–M03/A02と補修操作M14の技術前提で、同じ作業をここで重複加算しない |
-| E03 | 新wire・移行recipe | 5-purposeの意味的closure PoC、原履歴／prepared migrationの隔離証拠 | **孤立実装＋採用／移行の残件**。06 §11の実装先行と§12.6のreview/edit-copy方針は承認済み。限定Workspace/Contribution/backup/cleanとreview出力・Viewの実装は各F行・todoを参照。一般profile／容量保証／採用、永続review edit-copyと07の実source recipe／golden／late bridgeは残る。古い未承認記述を再確認待ちにしない。 |
+| E03 | 新wire・移行recipe | 5-purposeの意味的closure PoC、原履歴／prepared migrationの隔離証拠 | **孤立実装＋採用／移行の残件**。06 §11の実装先行と§12.6のreview/edit-copy方針は承認済み。限定Workspace/Contribution/backup/cleanとreview出力・View・永続編集コピーの実装は各F行・todoを参照。一般profile／容量保証／採用、07の実source recipe／golden／late bridgeは残る。古い未承認記述を再確認待ちにしない。 |
 | E04 | 規模・安全性・アクセシビリティ | 最終rootテスト、限定hostのfocus／失敗／古いtoken防御、既存runtime audit | **実装確認＋証拠**。10k Caption/50k changes、規定多tab workload、10k UI virtualizationとopen/edit budget達成、メモリ・CSP・不正入力、200%/狭幅/IME/keyboard/contrast/44pxの総合確認。未測定を性能FAILにしない。5件の既存toolchain audit findingsは未解消、runtimeの狭いhold解消とは別 |
 | E05 | Desktop／physical iPhone／offline | 旧Native受入れ、旧saved限定4群、修正後journalのPO再確認 | **新経路の証拠待ち**。新metadata hostの8群は一般的好評のみで全件PASSではない。新保存・描画に必要な実機は該当境界で実施し、全てを無条件に最終日へ先送りしない。最後は通常UIでTEAM-FLOW-01。dev serverはoffline/PWA証拠ではない |
 
@@ -245,7 +245,7 @@ LociMyuからのタブ構成、Sceneに相当する記録切替、直接色選�
 ## 6. 明示deferred／判断未確定（64群へ加算しない）
 
 06 §11の孤立実装／一般採用の分離、§12.6のreview/edit-copyと既知位置の要確認pin表示は承認済み。
-限定snapshot writerは実装されているが、永続review edit-copy／07の移行profile、通常home／実機／公開の受入れ・批准を意味しない。
+限定snapshot writerと永続review edit-copyは接続されているが、07の移行profile、通常home／実機／公開の受入れ・批准を意味しない。
 以下の非対象・後続要件は維持する。
 
 | 対象 | 扱い |

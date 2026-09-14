@@ -7,8 +7,8 @@ import type { ViewCameraIntent } from '../../ui/projectScene/viewState';
 import type { ReviewView } from './reviewView';
 import type { ViewportFactory, SyntheticViewport } from './viewportHost';
 
-/** Standalone snapshot viewing; every handler below changes local UI state only. */
-export function createReviewWorkspace(document: Document, view: ReviewView, factory: ViewportFactory) {
+/** Standalone snapshot viewing. Only an explicitly confirmed handoff may create an editing Project. */
+export function createReviewWorkspace(document: Document, view: ReviewView, factory: ViewportFactory, editCopy?: () => void | Promise<void>) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const node = document.createElement(tag); node.textContent = text; return node; };
   const root = make('main'); root.className = 'lv-development'; root.setAttribute('aria-label', '閲覧用のシーン');
   const header = make('header'); header.className = 'lv-development-header'; header.append(make('span', 'LociView'), make('h1', view.title), make('span', '閲覧中'));
@@ -23,6 +23,22 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   let memory: SceneUiMemory = { selectedCaptionId: null, search: '', pinColors: null, listScrollTop: 0, ownerFilter: { kind: 'all' } };
   let windowsMemory = newCaptionWindowMemory(view.source.sceneId), composing = false, moving = false, disposed = false, rendering = false;
   let runtime: SyntheticViewport | undefined, display = view.display(null, null), failure = '', rendererFailure = '';
+  const copy = make('button', '編集コピーを作る'), confirmation = make('section'); copy.type = 'button'; copy.hidden = !editCopy;
+  confirmation.hidden = true; confirmation.setAttribute('aria-label', '編集コピーの確認');
+  confirmation.append(make('p', '独立したプロジェクトを作成します。元ファイルは変更しません。元のプロジェクトへの変更分の返送には使えません。'));
+  const effects = view.inspection.review.editEffect;
+  if (effects.missingModelCaptions || effects.newlyNeedsReviewCaptions) confirmation.append(make('p',
+    `対応モデルなし：${effects.missingModelCaptions}件。要確認になるピン：${effects.newlyNeedsReviewCaptions}件。位置が分かるピンは残します。`));
+  const confirmCopy = make('button', 'コピーを作成'), cancelCopy = make('button', '戻る'); confirmCopy.type = cancelCopy.type = 'button';
+  confirmation.append(confirmCopy, cancelCopy); header.append(copy); root.append(confirmation);
+  copy.addEventListener('click', () => { if (!disposed && !composing && !moving) confirmation.hidden = false; });
+  cancelCopy.addEventListener('click', () => { confirmation.hidden = true; });
+  confirmCopy.addEventListener('click', () => {
+    if (disposed || composing || moving || confirmation.hidden || confirmCopy.disabled) return;
+    confirmCopy.disabled = cancelCopy.disabled = copy.disabled = true;
+    void Promise.resolve().then(() => editCopy?.()).catch(error => { if (!disposed) { failure = (error as Error).message; paint(); } })
+      .finally(() => { if (!disposed) confirmCopy.disabled = cancelCopy.disabled = copy.disabled = false; });
+  });
   const pins = new Map<string, HTMLButtonElement>();
   const context = (): CaptionListContext => ({ source: view.source, memory, pending: composing ? 'composition' : null, mutationBlock: '閲覧用ファイルです。' });
   function windowPlan(plan: CaptionWindowPlan) {

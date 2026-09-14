@@ -14,7 +14,8 @@ const fail = (code: string): never => { throw new PackageControlError(`clean-${c
 const encode = (v: unknown) => new TextEncoder().encode(canonical(v as JsonValue));
 const same = (a: unknown, b: unknown) => canonical(a as JsonValue) === canonical(b as JsonValue);
 
-export function prepareCleanManifest(capture: CleanSourceCapture, options: WorkspaceArchiveOptions) {
+export type CleanArchivePayload = Pick<CleanSourceCapture, 'metadataBytes' | 'metadata' | 'blobs' | 'bodyRefs' | 'summary' | 'proof' | 'targetHeads'>;
+export function prepareCleanManifest(capture: CleanArchivePayload, options: WorkspaceArchiveOptions) {
   const payloads = [capture.metadata, ...capture.blobs];
   const manifest = encode({ format: PACKAGE_FORMAT, wireVersion: PACKAGE_WIRE_VERSION, purpose: 'clean',
     packageId: options.packageId, createdByVersion: options.createdByVersion, ...(options.memo !== undefined ? { memo: options.memo } : {}),
@@ -24,7 +25,7 @@ export function prepareCleanManifest(capture: CleanSourceCapture, options: Works
   const checksum = new TextEncoder().encode(packageByteHash(manifest));
   return { manifest, checksum, control: readManifestControl(manifest, checksum) };
 }
-export async function writeCleanArchive(capture: CleanSourceCapture, store: Pick<OriginBlobStore, 'openReadOnly'>,
+export async function writeCleanArchive(capture: CleanArchivePayload, store: Pick<OriginBlobStore, 'openReadOnly'>,
   destination: WritableStream<Uint8Array>, options: WorkspaceArchiveOptions) {
   let started = false;
   try {

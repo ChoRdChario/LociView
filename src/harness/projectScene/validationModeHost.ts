@@ -35,7 +35,8 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
     get busy() { return switching; }, get detail() { return current.accessDetail ?? ''; },
     get recoveryAvailable() { return current.authority.readOnly && !current.workspaceFiles.error && current.read().state !== 'repair-required' &&
       !current.workspaceFiles.jobs.some(j => j.state === 'repair-required') &&
-      (current.backupRestore.pending || current.workspaceFiles.jobs.some(j => ['incomplete', 'input-required', 'unbound-input', 'stale'].includes(j.state))); },
+      (current.backupRestore.pending || current.workspaceFiles.reviewCopies.some(j => ['incomplete', 'input-required', 'unbound-input'].includes(j.state)) ||
+        current.workspaceFiles.jobs.some(j => ['incomplete', 'input-required', 'unbound-input', 'stale'].includes(j.state))); },
     async change(target, token, publish) {
       admit();
       if (token !== current.read().source?.token) throw Error('内容が更新されています。再開用データを確認してください。');
@@ -76,6 +77,10 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
     workspaceFiles: {
       get jobs() { return current.workspaceFiles.jobs; }, get error() { return current.workspaceFiles.error; },
       get initialImport() { return current.workspaceFiles.initialImport; },
+      get reviewCopies() { return current.workspaceFiles.reviewCopies; }, get reviewCopyError() { return current.workspaceFiles.reviewCopyError; },
+      retryReviewCopy: (...a) => run(() => current.workspaceFiles.retryReviewCopy(...a)),
+      reselectReviewCopy: (...a) => run(() => current.workspaceFiles.reselectReviewCopy(...a)),
+      abandonReviewCopy: (...a) => run(() => current.workspaceFiles.abandonReviewCopy(...a)),
       refresh: () => run(() => current.workspaceFiles.refresh()),
       receive: (...a) => run(() => current.workspaceFiles.receive(...a)),
       importWorkspace: (...a) => run(() => current.workspaceFiles.importWorkspace(...a)),

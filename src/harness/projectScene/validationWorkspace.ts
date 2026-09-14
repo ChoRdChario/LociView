@@ -15,12 +15,13 @@ import type { ViewportFactory } from './viewportHost';
 import { createValidationReceiveControls } from './validationReceiveControls';
 import { prepareReviewView, type ReviewView } from './reviewView';
 import { createReviewWorkspace } from './reviewWorkspace';
+import { PreparedReviewEdit } from '../../projectPackage/reviewEdit';
 
 type Host = ReturnType<typeof createValidationModeHost>;
 export interface ValidationWorkspacePorts {
   fileLimits: FileValidationLimits; decode?: PngDecoder;
   list(): Promise<ValidationProjectEntry[]>;
-  open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob): Promise<Awaited<ReturnType<typeof openValidationHost>>>;
+  open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob, reviewEdit?: PreparedReviewEdit): Promise<Awaited<ReturnType<typeof openValidationHost>>>;
   render(host: ValidationDisplayHost): Promise<{ factory: ViewportFactory; dispose(): void }>;
   renderReview?(view: ReviewView): Promise<{ factory: ViewportFactory; dispose(): void }>;
   selected(run: string | null, mode?: LocalOpenMode): void;
@@ -59,7 +60,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const execute = (action: () => Promise<void>) => {
     if (busy || disposed) return; busy = true; controls();
     const work = action(); operation = work;
-    void work.catch(error => { if (!disposed) status.textContent = error instanceof Error ? error.message : '処理できません。入力と再開用データは保持しています。'; })
+    return work.catch(error => { if (!disposed) status.textContent = error instanceof Error ? error.message : '処理できません。入力と再開用データは保持しています。'; })
       .finally(() => { busy = false; if (operation === work) operation = undefined; if (!disposed) controls(); });
   };
   const closeCurrent = async () => {
@@ -100,6 +101,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       retry.addEventListener('click', () => execute(async () => { await host!.authority.retry!(); await mount(); }));
       content.append(note, retry); if (receiveTools) { receiveTools.render(); content.append(receiveTools.root); }
       retry.hidden = host.workspaceFiles.initialImport && host.read().state === 'empty' ||
+        !!host.workspaceFiles.reviewCopyError || host.workspaceFiles.reviewCopies.some(j => !['completed', 'abandoned'].includes(j.state)) ||
         host.backupRestore.pending || !!host.workspaceFiles.jobs.some(j => !['completed', 'cancelled', 'abandoned'].includes(j.state));
       if (host.mode?.current === 'view') {
         const edit = document.createElement('button'); edit.type = 'button'; edit.textContent = '編集を開始する';
@@ -154,14 +156,16 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       throw error;
     }
   };
-  const openProject = async (run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode: LocalOpenMode = 'edit', workspaceFile?: Blob) => {
-    status.textContent = initial ? 'プロジェクトを作成しています。' : '再開用データを確認しています。';
-    const opened = await ports.open(run, initial, mode, workspaceFile);
+  const adoptProject = async (run: string, opened: Awaited<ReturnType<typeof openValidationHost>>) => {
     if (disposed) { await opened.dispose(); return; }
     host = createValidationModeHost(opened, nextMode => ports.open(run, undefined, nextMode), nextMode => ports.selected(run, nextMode));
     receiveTools = createValidationReceiveControls(document, host, () => workspace?.session,
       () => { workspace?.render(); controls(); }, async () => { if (!workspace && !disposed) await mount(); }, () => workspace?.inputPending() ?? false, restoreDisplay);
     selected = run; ports.selected(run, host.mode!.current); navigation.hidden = true; await mount();
+  };
+  const openProject = async (run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode: LocalOpenMode = 'edit', workspaceFile?: Blob) => {
+    status.textContent = initial ? 'プロジェクトを作成しています。' : '再開用データを確認しています。';
+    await adoptProject(run, await ports.open(run, initial, mode, workspaceFile));
   };
   workspaceForm.addEventListener('submit', event => { event.preventDefault(); execute(async () => {
     ensureMaySwitch(); const file = workspaceInput.files?.[0]; if (!file) throw Error('ファイルを選択してください。');
@@ -174,7 +178,15 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       try {
         if (disposed) return;
         await closeCurrent(); resident = prepared;
-        reviewWorkspace = createReviewWorkspace(document, view, prepared.factory); content.append(reviewWorkspace.root); reviewWorkspace.render();
+        let editAttempt: PreparedReviewEdit | undefined;
+        reviewWorkspace = createReviewWorkspace(document, view, prepared.factory, () => execute(async () => {
+          status.textContent = '編集コピーを作成しています。';
+          editAttempt ??= await PreparedReviewEdit.prepare(file, validationMetadataLimits);
+          const opened = await ports.open(editAttempt.run, undefined, 'edit', undefined, editAttempt);
+          if (disposed) { await opened.dispose(); return; }
+          // Preserve the View, its windows and the exact attempt until an actual recovery-capable Host exists.
+          await closeCurrent(); await adoptProject(editAttempt.run, opened);
+        })); content.append(reviewWorkspace.root); reviewWorkspace.render();
         selected = null; ports.selected(null); navigation.hidden = true; workspaceInput.value = '';
         status.textContent = '閲覧用シーンを開きました。編集プロジェクトは作成していません。';
       } catch (error) { if (resident === prepared) resident = undefined; throw error; }

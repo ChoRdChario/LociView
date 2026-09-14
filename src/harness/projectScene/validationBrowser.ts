@@ -29,7 +29,7 @@ export async function createValidationBrowserWorkspace(document: Document, run?:
   const storage = (id: string, create: boolean) => openBrowserMetadataStorage(`${validationArea}-${id}`, create);
   const workspace = createValidationWorkspace(document, { ...options,
     list: () => listValidationProjects(options, storage),
-    open: (id, initial, mode, workspaceFile) => openValidationHost({ ...options, run: id, initial, mode, workspaceFile, openStorage: create => storage(id, create) }),
+    open: (id, initial, mode, workspaceFile, reviewEdit) => openValidationHost({ ...options, run: id, initial, mode, workspaceFile, reviewEdit, openStorage: create => storage(id, create) }),
     renderReview: async view => {
       const resident = await prepareReadonlyResidents(view.models, view.content);
       try {

@@ -24,6 +24,7 @@ import { BackupOutputJob, checkedBackupLabel } from '../projectPackage/backupOut
 import { BackupSourceCapture } from '../projectPackage/backupSource';
 import { CleanOutputJob } from '../projectPackage/cleanOutputJob';
 import { CleanInputJob } from '../projectPackage/cleanInputJob';
+import { assertReviewEditSlot } from '../projectPackage/reviewEditControls';
 import { CleanSourceCapture, cleanProtectedInventory } from '../projectPackage/cleanSource';
 import { selectCleanRecords } from '../projectPackage/cleanRecords';
 import { ReviewOutputJob } from '../projectPackage/reviewOutputJob';
@@ -142,6 +143,7 @@ export class MetadataProjectSession {
   /** Host-retained initialization originals; never a package importer. */
   async createFromSource(source: ProjectMetadataSource): Promise<MetadataSessionRead> {
     return underWriteLease(this.fs, async () => {
+      await assertReviewEditSlot(this.fs, this.limits);
       if ((await this.read()).state !== 'empty') fail('workspace-not-empty');
       if (source.originalChanges().length !== 2) fail('initialization-source');
       const transactionId = newId();
@@ -167,6 +169,7 @@ export class MetadataProjectSession {
   async edit(expectedToken: string, command: MetadataEdit): Promise<MetadataSessionRead> {
     command = canonicalMetadataEdit(command, this.limits);
     return underWriteLease(this.fs, async () => {
+      await assertReviewEditSlot(this.fs, this.limits);
       const read = await this.read();
       if (read.state !== 'ready' || !read.source || read.source.token !== expectedToken) return fail('command-not-ready');
       const entries = await this.journal.entries(), prior = entries.at(-1)!;
@@ -204,6 +207,7 @@ export class MetadataProjectSession {
     if (json(remote.heads) !== json(captured.remoteHeads)) fail('remote-source-heads');
     const metadataSha256 = await digest(captured.metadataBytes);
     return underWriteLease(this.fs, async () => {
+      await assertReviewEditSlot(this.fs, this.limits);
       const read = await this.read();
       if (read.state !== 'ready' || !read.source || read.source.token !== expectedToken) return fail('receive-not-ready');
       const prior = (await this.journal.entries()).at(-1)!;
@@ -224,9 +228,10 @@ export class MetadataProjectSession {
     });
   }
 
-  async retry(): Promise<MetadataSessionRead> { return underWriteLease(this.fs, () => this.resume()); }
+  async retry(): Promise<MetadataSessionRead> { return underWriteLease(this.fs, async () => { await assertReviewEditSlot(this.fs, this.limits); return this.resume(); }); }
 
   private async outputReady() {
+    await assertReviewEditSlot(this.fs, this.limits);
     const read = await this.read(); if (read.state !== 'ready' || !read.source || !read.publication) return fail('output-not-ready');
     for (const key of await receiveJobKeys(this.fs, this.limits)) {
       const state = await receiveInputState(this.fs, key, this.limits);
@@ -659,6 +664,7 @@ export class MetadataProjectSession {
     } };
   }
   private async assertReceiveSlot(ownId: string) {
+    await assertReviewEditSlot(this.fs, this.limits, ownId);
     for (const key of await receiveJobKeys(this.fs, this.limits)) {
       if (key.id === ownId) continue;
       const state = await receiveInputState(this.fs, key, this.limits);

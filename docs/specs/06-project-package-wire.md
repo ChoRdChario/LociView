@@ -1941,6 +1941,73 @@ the original source, frozen mapping, profile/content checks, exact streamed bodi
 and readback before acknowledging the artifact; external file confirmation remains
 separate. These are bounded local controls, not a new public wire or capacity promise.
 
+#### Isolated review-to-edit handoff (implementation contract)
+
+Explicit confirmation creates a fresh independent Project from the admitted review;
+opening View alone never creates metadata or a copy job. Reuse the existing clean
+container mechanics and `CleanInputJob` / `initializeClean` for initialization. A
+private generated clean ZIP is an internal bridge, not a second user-selected
+file, new public purpose or new journal transaction type. The writer may accept
+the exact structural clean payload fields instead of a `CleanSourceCapture` class.
+
+Prepare once in memory: original review ZIP and snapshot, complete fresh typed
+recipe, new metadata bytes/proof, fixed parent/child IDs and fixed clean manifest
+options. Reinspect the generated clean ZIP. `time:0` and frozen typed IDs do not
+fix Automerge's actor/root: cold retry loads the stored actual metadata bytes,
+rebuilds records with the frozen recipe and compares them, never bootstraps again.
+The display-only model and missing-model/compatibility rules above still apply.
+
+Parent records live in the new run's existing `v2/packages/review-edit/<jobId>/`:
+`prepared.json`, `recipe.json`, `metadata.am`, `copy.zip`, `original.zip`,
+`start.json`, `published.json`, `abandoned.json`. The independent
+`review-edit-index/<jobId>.json` binds Prepared by EvidenceRef. Prepared is closed
+to schema `lociview-review-edit-1`, `jobId`, `childId`, `original`, `snapshot`,
+`recipe`, `metadata`, `copy`, `destination`, `childInput`, `roots`. Byte-valued
+members are EvidenceRefs; snapshot binds the canonical review; destination is
+the new metadata proof; childInput binds the normal clean input descriptor at the
+fixed child ID. Roots retain the review/copy/metadata/recipe evidence and every
+included body. No source Project identity or exchange base is invented.
+
+Write/read back Prepared and index before the payloads; retain recipe, metadata
+and private copy before original ZIP, then validate all inputs before parent Start.
+Parent index/start/published/abandoned use distinct `lociview-review-edit-*-1`
+schemas. Index/Start bind `{jobId,prepared:EvidenceRef}`; published additionally
+binds `childId` and the child's validated published receipt; abandoned is
+`{jobId,stage:'beforeStart'}`. A missing original before Start can be reselected
+only against Prepared and intact remaining inputs. Other incomplete pre-Start
+data may be explicitly abandoned without deletion; missing acknowledged evidence
+after Start is repair-required. Never refill it from a newly generated copy.
+
+The child keeps its existing clean input descriptor unchanged. Its review-specific
+index/Start schemas (`lociview-clean-review-input-index-1` and
+`lociview-clean-review-input-start-1`) retain the normal fields and add
+`reviewEdit:{jobId,prepared:EvidenceRef}`. Child open/binding/journal validation
+also validates the exact parent inputs/Start. Parent validation does not open
+the child recursively. Parent discovery includes directory, independent index
+and child backlinks, so losing an entire parent cannot hide the interruption.
+Only that fixed child may initialize while the parent is unfinished. The child
+may be prepared from the exact private ZIP before its own Start; after child Start,
+its missing input/receipts remain repair-required and are not replenished.
+
+First-open ordering is part of the contract: pass the explicit prepared review
+copy as a new-Project creation trigger, then use the existing empty-run guard,
+Project lease and first database creation **before** writing parent records.
+Do not prewrite into a run and weaken the empty check. Cold open uses the existing
+database with create=false; missing storage is not silently recreated. List/host
+discovery exposes parent-only interruptions, disables unrelated edits/imports/
+outputs, and offers the same copy retry/original selection in the existing file
+area. Generic child recovery still checks its parent; no second retry screen.
+Release the parent write operation before `initializeClean` takes its write lease;
+one outer package-operation lock covers the sequence, without nested reacquisition.
+
+Parent completion requires the child's exact initial journal/publication receipt.
+Rechecking or finishing that receipt after later user edits does not roll back
+those edits or publish again. Keep original review bytes and all attempt evidence.
+Space preflight counts actual original ZIP + parent copy ZIP + child copy ZIP +
+CAS bodies + metadata/journal/control overhead under the existing local bound;
+this is not a new general capacity/performance guarantee. Current profile admission
+and grouped real-browser/device/offline evidence remain unchanged.
+
 Design review: independent read-only review found one incorrect description of
 the current validation host's cumulative 64 MiB guard; §12.4 now states the actual
 code boundary. No other mandatory issue was reported in the field/summary/root/

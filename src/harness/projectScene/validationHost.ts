@@ -25,7 +25,10 @@ import { resolveScene } from '../../scene/resolve';
 import { validationMaterialSlots, validationMaterialIssue } from './validationMaterials';
 import { same } from '../../domain/projectGraphSupport';
 import type { MaterialIntent } from '../../domain/materialIntent';
-import { WorkspaceReceiver, type WorkspaceReceiveState } from '../../projectFiles/receiveWorkspace';
+import { WorkspaceReceiver, workspaceFileOperation, type WorkspaceReceiveState } from '../../projectFiles/receiveWorkspace';
+import type { PreparedReviewEdit } from '../../projectPackage/reviewEdit';
+import { ReviewEditJob } from '../../projectPackage/reviewEditJob';
+import { reviewEditChildBinding, type ReviewEditState } from '../../projectPackage/reviewEditControls';
 import { WorkspaceSender, type WorkspaceOutputState, type ContributionBaseChoice } from '../../projectFiles/sendWorkspace';
 import { WorkspaceArchive } from '../../projectPackage/workspaceArchive';
 import { CleanArchive } from '../../projectPackage/cleanArchive';
@@ -40,6 +43,7 @@ export interface ValidationHostOptions {
   run: string; base: WorkspaceFS; coordinator: ProjectMutationCoordinator; store: OriginBlobStore;
   fileLimits: FileValidationLimits; decode?: PngDecoder; initial?: ReturnType<typeof prepareValidationCreation>;
   workspaceFile?: Blob;
+  reviewEdit?: PreparedReviewEdit;
   packageLocks?: LockManager | null;
   generations?: (run: string) => RestoreDatabasePorts;
   openStorage(allowCreate: boolean): Promise<{ factory: MetadataStorageFactory; dispose(): Promise<void> }>;
@@ -52,7 +56,9 @@ export async function openValidationHost(options: ValidationHostOptions) {
   const run = technicalId(options.run), root = `${validationArea}/${run}`;
   if (options.mode === 'view' && options.initial) throw Error('閲覧ではプロジェクトを作成できません。');
   if (options.mode === 'view' && options.workspaceFile) throw Error('閲覧では作業一式を取り込めません。');
-  if (options.initial && options.workspaceFile) throw Error('作成元を一つ選択してください。');
+  if (options.mode === 'view' && options.reviewEdit) throw Error('閲覧中は編集コピーを作成できません。');
+  if ([options.initial, options.workspaceFile, options.reviewEdit].filter(Boolean).length > 1) throw Error('作成元を一つ選択してください。');
+  if (options.reviewEdit && options.reviewEdit.run !== run) throw Error('編集コピーの作成先を確認してください。');
   const inspectInput = async (file: Blob) => (await PackageArchive.inspect(file)).control.manifest.purpose === 'clean' ? CleanArchive.inspect(file, limits) : WorkspaceArchive.inspect(file, limits);
   const incoming = options.workspaceFile ? await inspectInput(options.workspaceFile) : undefined;
   if (incoming && incoming.source.proof.identity.projectId !== `prj_${run}`) throw Error('ファイルのプロジェクトと開く場所が一致しません。');
@@ -66,10 +72,10 @@ export async function openValidationHost(options: ValidationHostOptions) {
     await lease.waitForWorkspaceIdle(); lease.sealWorkspaceWritesForRelease(); lease.release(); await connection?.dispose(); };
   try {
     const fresh = !(await options.base.list(`${root}/`)).length;
-    if (fresh && (!(options.initial || incoming) || !lease.holdsWriteLock)) throw Error('保存データがありません。プロジェクトを選び直してください。');
+    if (fresh && (!(options.initial || incoming || options.reviewEdit) || !lease.holdsWriteLock)) throw Error('保存データがありません。プロジェクトを選び直してください。');
     if (!fresh && options.initial) throw Error('作成先に保存データがあります。既存データは変更していません。');
     if (fresh) lease.activateNewProject();
-    connection = await openValidationGeneration(lease.workspace, options, fresh && !!(options.initial || incoming) && lease.holdsWriteLock);
+    connection = await openValidationGeneration(lease.workspace, options, fresh && !!(options.initial || incoming || options.reviewEdit) && lease.holdsWriteLock);
     let { fs, content, session } = connection.service;
     let receiver = new WorkspaceReceiver(options.base, fs, session, limits, options.packageLocks ?? null);
     let sender = new WorkspaceSender(fs, session, options.store, limits, options.packageLocks ?? null);
@@ -87,11 +93,23 @@ export async function openValidationHost(options: ValidationHostOptions) {
       try { outputJobs = await sender.jobs(); outputBases = await sender.availableBases(); outputDiscoveryFailure = ''; }
       catch (error) { outputBases = []; outputDiscoveryFailure = error instanceof Error ? error.message : '受け渡しの記録を確認できません。'; }
     };
-    await reloadOutput();
     const unfinishedOutput = () => outputJobs.some(j => ['unstarted', 'incomplete', 'repair-required'].includes(j.state));
-    let receiveJobs: WorkspaceReceiveState[] = await receiver.jobs(), receiveFailure = '', receiveDisplayPending = false;
-    const unfinishedReceive = () => receiveJobs.some(j => !['completed', 'cancelled', 'abandoned'].includes(j.state));
-    const reloadReceive = async () => { receiveJobs = await receiver.jobs(); await reloadOutput(); };
+    let receiveJobs: WorkspaceReceiveState[] = [], receiveFailure = '', receiveDisplayPending = false;
+    let reviewCopies: ReviewEditState[] = [], reviewCopyError = '';
+    const reviewPending = () => !!reviewCopyError || reviewCopies.some(j => !['completed', 'abandoned'].includes(j.state));
+    const unfinishedReceive = () => reviewPending() || receiveJobs.some(j => !['completed', 'cancelled', 'abandoned'].includes(j.state));
+    const reloadReceive = async () => {
+      try { reviewCopies = await new ReviewEditJob(fs, session, limits).states(); reviewCopyError = ''; }
+      catch { reviewCopyError = '編集コピーの元データを確認できません。修復が必要です。'; }
+      const jobs = await receiver.jobs(); receiveJobs = [];
+      const children = new Set(reviewCopies.flatMap(j => j.childId ? [j.childId] : []));
+      for (const job of jobs) {
+        if (children.has(job.id) || await reviewEditChildBinding(fs, job.id, limits).catch(() => true)) continue;
+        receiveJobs.push(job);
+      }
+      await reloadOutput();
+    };
+    await reloadReceive();
     let last = await session.read(), project: SyntheticProject | undefined;
     if (incoming instanceof CleanArchive && last.source) throw Error('この独立コピーの再開用データがあります。ファイルを取り込まず、プロジェクト一覧から再開してください。');
     if (last.source && (last.source.proof.identity.projectId !== `prj_${run}` || incoming && json(last.source.proof) !== json(incoming.source.proof)))
@@ -148,6 +166,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
     const editable = (recovery = false) => {
       if (closed || fs.mutationAuthority.accessState !== 'editable') throw Error('このタブは閲覧専用です。');
       if (connection?.restorePending || restoreRetired || restoreDisplayPending) throw Error('バックアップの復元が未完了です。復元を再開するか、取りやめてください。');
+      if (reviewPending()) throw Error('編集コピーの作成を再開するか、開始前の作成を取りやめてください。');
       if (!recovery && unfinishedReceive()) throw Error('中断した受信を確認してから編集してください。');
     };
     const receiveAction = (action: () => Promise<MetadataSessionRead | void>) => execute(async () => {
@@ -162,9 +181,22 @@ export async function openValidationHost(options: ValidationHostOptions) {
         await reloadReceive(); throw error;
       }
     }, true);
+    const reviewAction = (action: (job: ReviewEditJob) => Promise<MetadataSessionRead | void>) => execute(async () => {
+      if (closed || fs.mutationAuthority.accessState !== 'editable' || connection?.restorePending || restoreRetired || restoreDisplayPending)
+        throw Error('編集を開始してからコピー作成を再開してください。');
+      try {
+        const result = await workspaceFileOperation(options.packageLocks ?? null, () => action(new ReviewEditJob(fs, session, limits)));
+        await reloadReceive(); last = result ?? await session.read();
+        if (last.state === 'ready' && !reviewPending()) { receiveDisplayPending = true; await ready(last); receiveDisplayPending = false; }
+      } catch (error) { await reloadReceive(); throw error; }
+    }, true);
     const workspaceFiles = {
       get jobs() { return receiveJobs; }, get error() { return receiveFailure; },
-      get initialImport() { return !last.source && !localInitial; },
+      get initialImport() { return !last.source && !localInitial && !reviewPending(); },
+      get reviewCopies() { return reviewCopies; }, get reviewCopyError() { return reviewCopyError; },
+      retryReviewCopy: (id: string) => reviewAction(job => job.retry(id)),
+      reselectReviewCopy: (id: string, file: Blob) => reviewAction(job => job.reselect(id, file)),
+      abandonReviewCopy: (id: string) => reviewAction(job => job.abandon(id)),
       refresh: () => execute(reloadReceive, true),
       receive: (token: string, file: Blob) => receiveAction(async () => {
         if (last.state !== 'ready' || token !== last.source?.token) throw Error('入力・更新を確定してから受信してください。');
@@ -181,6 +213,16 @@ export async function openValidationHost(options: ValidationHostOptions) {
       abandonInput: (id: string) => receiveAction(() => receiver.abandonInput(id)),
       cancelStale: (id: string) => receiveAction(() => receiver.cancelStale(id)),
     };
+    if (options.reviewEdit) {
+      try {
+        const existing = reviewCopies.find(j => j.id === options.reviewEdit!.id);
+        await reviewAction(job => existing ? job.retry(existing.id) : job.start(options.reviewEdit!));
+      } catch (error) {
+        // Before any parent evidence exists, only the caller still owns the exact attempt and View.
+        if (!reviewCopies.some(j => j.id === options.reviewEdit!.id) && !reviewCopyError) throw error;
+        // Otherwise retain the dedicated recovery Host, never silently return to a fresh destination.
+      }
+    }
     if (options.workspaceFile) {
       try { await (last.state === 'ready' && last.source ? workspaceFiles.receive(last.source.token, options.workspaceFile) :
         workspaceFiles.importWorkspace(options.workspaceFile)); }
@@ -207,6 +249,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
       cancel: (id: string) => outputAction(() => sender.cancel(id), true),
       verifyFile: (id: string, file: Blob) => outputAction(() => sender.verifyFile(id, file), true),
       download: (id: string) => execute(() => {
+        if (reviewPending()) throw Error('編集コピーの作成を完了してください。');
         if (connection?.restorePending || restoreRetired || restoreDisplayPending) throw Error('復元を完了してからファイルを渡してください。');
         return sender.download(id);
       }, true),
@@ -230,6 +273,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
       }
     };
     const restoreAction = <T>(action: () => Promise<T>) => execute(async () => {
+      if (reviewPending()) throw Error('編集コピーの作成を完了してください。');
       if (!options.generations) throw Error('この画面では復元用の保存領域に接続できません。');
       if (closed || !lease.holdsWriteLock) throw Error('復元するには編集を開始してください。');
       restoreFailure = '';

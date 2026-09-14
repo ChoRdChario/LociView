@@ -42,7 +42,8 @@ may be retained intentionally: read their status amendments before inferring a w
   Five-purpose file connections and remaining handoffs are recorded in inventory;
   exact checks/worktree status are in todo. Selected-Scene review/edit-copy policy
   is approved in §12.6. A clean writer alone does not supply omitted review
-  relations, connect the explicit edit-copy handoff or approve all profiles.
+  relations or approve all profiles; inventory distinguishes explicit handoff
+  connection from ordinary-home/device adoption.
 - Specification 07 remains section-specific proposed migration work. Do not turn
   earlier portable-identity or synthetic evidence into an implemented converter.
 

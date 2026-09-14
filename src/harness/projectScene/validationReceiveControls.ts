@@ -15,7 +15,8 @@ export function createValidationReceiveControls(document: Document, host: Return
   const help = document.createElement('p'); help.textContent = '同じプロジェクトの作業一式・変更分を統合します。元ファイルは変更しません。';
   const status = document.createElement('p'), jobs = document.createElement('section'); status.setAttribute('role', 'status');
   form.append(label, submit, clear); root.append(heading, help, form, status, jobs);
-  let busy = false, disposed = false, feedback = '', selectedJob: string | null = null, cancel: { id: string; stale: boolean } | null = null;
+  let busy = false, disposed = false, feedback = '', selectedJob: string | null = null, selectedCopy: string | null = null,
+    cancel: { id: string; stale: boolean; review?: boolean } | null = null;
   const restoreArea = document.createElement('details'), restoreSummary = document.createElement('summary'), restoreLabel = document.createElement('label'),
     restoreInput = document.createElement('input'), restoreCommands = document.createElement('div'), restoreStatus = document.createElement('p');
   restoreSummary.textContent = 'バックアップから復元'; restoreLabel.textContent = 'バックアップを選択';
@@ -39,7 +40,7 @@ export function createValidationReceiveControls(document: Document, host: Return
       try {
         await action(); if (disposed) return;
         session()?.refreshHistory(); await recovered();
-        input.value = ''; selectedJob = null; cancel = null; feedback = completed;
+        input.value = ''; selectedJob = null; selectedCopy = null; cancel = null; feedback = completed;
       } catch (error) { if (!disposed) feedback = error instanceof Error ? error.message : '受信できません。元のデータは保持しています。'; }
       finally { busy = false; if (!disposed) { render(); changed(); } }
     })();
@@ -63,17 +64,32 @@ export function createValidationReceiveControls(document: Document, host: Return
   };
   const render = () => {
     if (disposed) return;
-    heading.textContent = host.workspaceFiles.initialImport ? 'ファイルを開く' : '更新ファイル';
+    const copies = host.workspaceFiles.reviewCopies, copyPending = !!host.workspaceFiles.reviewCopyError || copies.some(j => !['completed', 'abandoned'].includes(j.state));
+    heading.textContent = copyPending ? '編集コピー' : host.workspaceFiles.initialImport ? 'ファイルを開く' : '更新ファイル';
     root.setAttribute('aria-label', heading.textContent);
-    help.textContent = host.workspaceFiles.initialImport ? '読み込み途中のデータは、元のファイルから再開できます。' :
+    help.textContent = copyPending ? '中断したコピー作成を確認してください。元の閲覧用ファイルは変更していません。' : host.workspaceFiles.initialImport ? '読み込み途中のデータは、元のファイルから再開できます。' :
       '同じプロジェクトの作業一式・変更分を統合します。元ファイルは変更しません。';
     output.render(); form.inert = busy || output.hasChanges() || restoreChanges(); submit.disabled = busy || output.hasChanges() || restoreChanges() || host.authority.readOnly || !input.files?.length;
     clear.disabled = busy; clear.hidden = !input.files?.length && !selectedJob;
-    labelText.textContent = selectedJob ? '元のファイルを選び直す' : host.workspaceFiles.initialImport ? 'ファイルを選択' : '更新ファイルを選択';
+    form.hidden = copyPending && !selectedCopy;
+    labelText.textContent = selectedCopy ? '元の閲覧用ファイルを選び直す' : selectedJob ? '元のファイルを選び直す' : host.workspaceFiles.initialImport ? 'ファイルを選択' : '更新ファイルを選択';
     input.setAttribute('aria-label', labelText.textContent);
-    submit.textContent = selectedJob ? '受信を再開' : host.workspaceFiles.initialImport ? 'ファイルを開く' : '更新を受け取る';
-    status.textContent = feedback || host.workspaceFiles.error || (host.authority.readOnly ? '閲覧中。受信するには編集を開始してください。' : '');
+    submit.textContent = selectedCopy ? 'コピー作成を再開' : selectedJob ? '受信を再開' : host.workspaceFiles.initialImport ? 'ファイルを開く' : '更新を受け取る';
+    status.textContent = feedback || host.workspaceFiles.reviewCopyError || host.workspaceFiles.error || (host.authority.readOnly ? '閲覧中。受信するには編集を開始してください。' : '');
     jobs.replaceChildren();
+    for (const copy of copies) {
+      if (['completed', 'abandoned'].includes(copy.state)) continue;
+      const row = document.createElement('section'), note = document.createElement('p');
+      note.textContent = copy.state === 'incomplete' ? '編集コピーの作成が未完了です。' : copy.state === 'input-required' ? '元の閲覧用ファイルを選び直してください。' :
+        copy.state === 'unbound-input' ? 'コピー作成を開始できませんでした。取りやめてから、元の閲覧用ファイルを開き直してください。' :
+          'コピー作成の記録を確認できません。データは消さず、修復が必要な状態で保持しています。';
+      row.append(note); jobs.append(row);
+      if (copy.state === 'incomplete') button(row, 'コピー作成を再開', () => perform(() => host.workspaceFiles.retryReviewCopy(copy.id), true, '編集コピーを作成しました。ファイルへの保存はしていません。'));
+      if (copy.state === 'input-required') button(row, '元の閲覧用ファイルを選び直す', () => {
+        selectedCopy = copy.id; selectedJob = null; input.value = ''; feedback = ''; render(); changed(); input.click();
+      });
+      if (['input-required', 'unbound-input'].includes(copy.state)) button(row, 'コピー作成を取りやめる', () => { cancel = { id: copy.id, stale: false, review: true }; render(); changed(); });
+    }
     for (const job of host.workspaceFiles.jobs) {
       if (['abandoned', 'cancelled'].includes(job.state) || job.state === 'completed' && !host.workspaceFiles.error) continue;
       const row = document.createElement('section'), note = document.createElement('p');
@@ -93,8 +109,8 @@ export function createValidationReceiveControls(document: Document, host: Return
       });
     }
     if (cancel) {
-      const target = cancel, note = document.createElement('p'); note.textContent = 'この受信を取りやめます。手元の記録と元ファイルは変更しません。'; jobs.append(note);
-      button(jobs, '取りやめる', () => perform(() => target.stale ? host.workspaceFiles.cancelStale(target.id) :
+      const target = cancel, note = document.createElement('p'); note.textContent = target.review ? 'コピー作成を取りやめます。元ファイルは変更しません。' : 'この受信を取りやめます。手元の記録と元ファイルは変更しません。'; jobs.append(note);
+      button(jobs, '取りやめる', () => perform(() => target.review ? host.workspaceFiles.abandonReviewCopy(target.id) : target.stale ? host.workspaceFiles.cancelStale(target.id) :
         host.workspaceFiles.abandonInput(target.id), true, '受信を取りやめました。'));
       button(jobs, '戻る', () => { cancel = null; render(); changed(); });
     }
@@ -131,16 +147,18 @@ export function createValidationReceiveControls(document: Document, host: Return
     if (busy) return; host.backupRestore.clearPreparation(); restorePrepared = false; feedback = ''; render(); changed();
   });
   input.addEventListener('change', () => { feedback = ''; render(); changed(); });
-  clear.addEventListener('click', () => { if (busy) return; input.value = ''; selectedJob = null; feedback = ''; render(); changed(); });
+  clear.addEventListener('click', () => { if (busy) return; input.value = ''; selectedJob = null; selectedCopy = null; feedback = ''; render(); changed(); });
   form.addEventListener('submit', event => {
     event.preventDefault(); const file = input.files?.[0], token = host.read().source?.token, id = selectedJob;
     if (!file) { feedback = 'ファイルを選択してください。'; render(); return; }
-    if (host.workspaceFiles.initialImport) {
+    if (selectedCopy) {
+      const copyId = selectedCopy; perform(() => host.workspaceFiles.reselectReviewCopy(copyId, file), true, '編集コピーを作成しました。ファイルへの保存はしていません。');
+    } else if (host.workspaceFiles.initialImport) {
       perform(() => id ? host.workspaceFiles.reselectImportedInput(id, file) : host.workspaceFiles.importWorkspace(file), true, '作業一式を読み込みました。');
     } else if (token) perform(() => id ? host.workspaceFiles.reselectInput(token, id, file) : host.workspaceFiles.receive(token, file), !!id, '更新を受け取りました。');
     else { feedback = '再開用データを確認してから受信してください。'; render(); }
   });
   render();
-  return { root, render, busy: () => busy || output.busy(), hasChanges: () => busy || output.hasChanges() || restoreChanges() || !!input.files?.length || !!selectedJob || !!cancel,
+  return { root, render, busy: () => busy || output.busy(), hasChanges: () => busy || output.hasChanges() || restoreChanges() || !!input.files?.length || !!selectedJob || !!selectedCopy || !!cancel,
     dispose: () => { disposed = true; output.dispose(); root.remove(); } };
 }
