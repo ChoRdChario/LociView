@@ -44,6 +44,16 @@ identity inference, a single-model assumption or a hidden external version syste
 
 ## Decision
 
+PO-approved migration scope amendment (2026-09-14): migration is a one-time
+cutover. The team uses the converted Project and its new-format Workspace /
+Contribution files thereafter. Continued Native/frozen-v1/LociMyu updates into
+the migrated Project, and bridges solely for that purpose, are not required.
+This supersedes the later-old-input requirements in specifications 02/03/05/06/07;
+it does not remove initial legacy readers, source preservation, existing old-route
+behavior, or continuing team history within the new Project. Existing new-format
+files and interrupted jobs must not be broken. One converted Workspace supplies
+the team; independently converting old copies does not create a shared lineage.
+
 1. A LociView Project is the durable working source of truth. It retains typed
    project resources: logical visual Assets, immutable Asset revisions and
    Representations, Captions, MediaResources, Saved Views and material intent.
@@ -93,7 +103,8 @@ identity inference, a single-model assumption or a hidden external version syste
     staging publishes no new head. Semantic conflict and invalid input are not
     represented by the same zero-write outcome.
 11. Migration is dual-read and v2-only-write. Frozen v1, Native snapshot/package
-    versions and LociMyu inputs remain readable and unchanged. A relation may be
+    versions and LociMyu inputs remain readable and unchanged for initial conversion,
+    not continued cross-format collaboration after cutover. A relation may be
     converted only from exact source authority or an explicit user decision;
     filenames, byte equality, hashes, ordering, proximity and visual similarity
     do not prove logical model or Scene relationships.

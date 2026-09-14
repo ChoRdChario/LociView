@@ -20,6 +20,7 @@ passed. The authoritative requirements remain in that approved specification.
 | `specification-blocked` | A Product Owner decision, numeric guarantee or ratified semantic contract is still required. |
 | `implementation-blocked` | A harness, schema, verifier or production capability needed to collect/accept the evidence is absent. |
 | `deferred` | The specification explicitly makes the item optional or outside the current supported class. |
+| `withdrawn` | The PO removed the requirement. Not PASS, covered or deferred; retain its ID and history without a delivery blocker. |
 
 `available`, `discovered`, `restorable`, `measured`, `ratified` and
 `gate-passing` are different states. A source URL, successful local diagnostic,
@@ -59,8 +60,10 @@ requirements are conjunctive even though their status is atomized here:
 material/override matrix; `08A`–`08D` form one anisotropic-GS/mesh-axis family;
 `14A`–`14J` form one relationship family;
 `17A`–`17D` form one multi-asset alignment scene; `18A`–`18B` form one stress
-scenario; and `21A`–`21E` form one later-copy media family. A subset cannot pass
-its parent requirement independently.
+scenario. `21A` remains the initial equal-byte/distinct-identity requirement;
+`21B`–`21E` were withdrawn by PO 2026-09-14 with continued old-input migration.
+A subset of a still-required family cannot pass its parent independently; retiring
+those four rows is a scope change, not execution or gate credit.
 
 | ID | Atomic requirement | State | Present evidence or exact gap | Owner / next action |
 |---|---|---|---|---|
@@ -134,10 +137,10 @@ its parent requirement independently.
 | `G0-FX-20A` | Parent-delete versus concurrent-child input | `candidate` | Operation/domain cases exist but are not bound to one restorable fixture/oracle. | `Writer` binds the shared corpus after merge semantics are approved. |
 | `G0-FX-20B` | Unknown-minor-only-blob input | `candidate` | Package characterizations exist; exact retained/rejected blob oracle is not registered. | `Writer` binds the smallest current case. |
 | `G0-FX-21A` | Equal media bytes under distinct v1 asset IDs | `candidate` | Synthetic migration coverage is partial. | `Writer` freezes distinct identity plus equal digest behavior. |
-| `G0-FX-21B` | Later-copy attachment prepend | `candidate` | No complete canonical migration oracle. | `Writer` adds exact ordering expectation after recipe approval. |
-| `G0-FX-21C` | Later-copy attachment reorder | `candidate` | No complete canonical migration oracle. | `Writer` adds exact ordering expectation after recipe approval. |
-| `G0-FX-21D` | Reviewed duplicate-count change | `candidate` | No complete canonical migration oracle. | `Writer` adds exact duplicate-count expectation after recipe approval. |
-| `G0-FX-21E` | Attachment content-revision change | `candidate` | No complete canonical migration oracle. | `Writer` adds exact revision/content expectation after recipe approval. |
+| `G0-FX-21B` | Later-copy attachment prepend | `withdrawn` | PO one-time cutover, 2026-09-14; no continued old-input migration. | No new fixture/bridge work. Preserve initial count/order coverage elsewhere. |
+| `G0-FX-21C` | Later-copy attachment reorder | `withdrawn` | PO one-time cutover, 2026-09-14. | Not PASS; normal new-format ordering/exchange remains required. |
+| `G0-FX-21D` | Reviewed duplicate-count change | `withdrawn` | PO one-time cutover, 2026-09-14. | Preserve 21A and initial distinct/duplicate identity checks. |
+| `G0-FX-21E` | Attachment content-revision change | `withdrawn` | PO one-time cutover, 2026-09-14. | Retires later-old-copy case only, not new-format media/model updates. |
 | `G0-FX-22A` | Malicious package corpus | `candidate` | Extensive deterministic test-local ZIP/JSON/operation/domain cases exist, but no registered test-to-input/result manifest covers traversal/structure, parser budgets, operation policy, graph/reference and privacy/export classes. | `Writer` maps the existing corpus by threat/result and registers only missing restorable boundaries. |
 | `G0-FX-22B` | Malicious model/media corpus | `candidate` | Model URI/MIME/polyglot/decode cases exist only as dispersed tests; no registered source/oracle envelope. | `Writer` maps current model/media threats and adds only an uncovered accepted threat. |
 | `G0-CHAR-01` | G0 owns a failing characterization for every known G0-S defect, or the one explicitly approved historical-unavailable disposition | `covered` | The [pre-fix reproduction ledger](../../evidence/g0/pre-fix-reproduction-ledger.md) maps every known family to an exact owner row, code/test revision, focused procedure, raw rerun or explicit missing disposition and current fix/open state. Caption attachments have no compatible pre-fix characterization; the Product Owner approved `historical reproduction unavailable` without calling it a pre-fix failure or PASS and prohibited retroactive test/fixture/evidence work. Counts alone earn no credit. | `Writer` keeps the ledger aligned; `Independent reviewer` rejects unmapped scope or any claim that the unavailable row is failure evidence. |

@@ -7,8 +7,9 @@
 
 ## 1. 結論と数え方
 
-ユーザーが行う作業を **64機能群** に整理すると、新metadata保存画面へ限定接続済みが
-**34群**、残りが **30群**。今回の実用チーム版はM13/M14を後続へ分けた62群が対象。
+元の棚卸しは **64機能群**。2026-09-14のPO判断でF09（移行後の旧形式更新受信）を撤回し、
+現在の要件は63群。限定接続済みの分類は **34群**、他分類は **29群**。
+今回の実用チーム版はM13/M14を後続へ分けた **61群** が対象。F09の除外は完成ではない。
 以下は最後に確認した接続分類であり、環境整理だけで件数を増やさない。
 「34/64完成」といった完成率・工数には換算しない。小さい部品接続と
 移行／チーム受信では仕事量が大きく違い、接続済みも下記の限定経路だからである。
@@ -18,14 +19,15 @@
 | 接続済み | 34 | 新metadata hostで操作・必要な記録まで接続。従来25群は既知三角形／2 PNG起点、P01/P02は限定validation、C04/C07/C09/C11/V04/M05/I04は両hostへ接続。実機受入れは別 |
 | 部品未接続 | 4 | 新系統のUI部品・pure planner等はあるが、対象群全体の画面・実データ・typed command／保存のいずれかが未接続。T01〜T04は限定接続まで進んだ |
 | 別経路のみ | 17 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
-| 新規実装 | 9 | 新契約の機能群全体が未完了。限定的な実装・UI接続を含む行もあり、コード不在を意味しない |
+| 新規実装 | 8 | 新契約の機能群全体が未完了。限定的な実装・UI接続を含む行もあり、コード不在を意味しない |
+| 要件撤回 | 1 | F09。移行した後は新形式で続ける運用に確定。完了・deferred・PASSには数えない |
 
 - 一つの行は、共有する前提・保存境界を持つ「利用者の作業群」。同一ViewのCRUD等は一群。
   三つのモデル形式・五つのpackage目的・三つの移行元は異なる契約があるため別群。
 - 同一行を複数分類へ加算しない。UI部品と保存commandの両方がない場合も一群のまま。
 - Desktop／iPhone、単体／統合テスト、retryの各faultを機能数へ重複加算しない。
 - §4の基盤・検証残件、§6の明示deferred／未決事項は、この64群とは別に管理する。
-- 承認済み製品全体の棚卸しであり、64群すべてを現在の合成接続sliceや最初の
+- 元の64群の識別子を保持した棚卸しであり、要件撤回と後続機能を区別する。全行を現在の合成接続sliceや最初の
   candidate必須gateへ追加しない。完全alignmentやM14等の別gate能力は、その前提が
   揃った段階で扱う。閉じた旧Native受入れをこの件数で再オープンしない。
 - 「新規実装」はコードが全くないという意味ではない。F08は旧Native変換とは別の
@@ -148,10 +150,10 @@
 | F03 | 完全backupを書き出し・明示確認して復元する | 別経路のみ | 限定validationに名前付き出力・確認付き復元・専用元履歴初期化・復元base束縛・世代選択とcold再開を接続。元作業／current・conflict・base-only本体／交換基準・元証拠を保持し、復元後の編集→Contribution返送／再受信と中断・取消・表示retryを既存testsで確認。独立reviewの指摘は解消。通常home／実描画／実機・offlineと行全体の受入れは残り、主分類は変更しない。 | [src/projectPackage/backupSource.ts](../src/projectPackage/backupSource.ts) / [src/projectPackage/backupArchive.ts](../src/projectPackage/backupArchive.ts) / [src/projectPackage/backupOutputJob.ts](../src/projectPackage/backupOutputJob.ts) / [src/projectPackage/backupRestoreJob.ts](../src/projectPackage/backupRestoreJob.ts) / [docs/specs/06-project-package-wire.md](../docs/specs/06-project-package-wire.md) |
 | F04 | 一つのSceneを閲覧用に共有する | 別経路のみ | 限定validationで選択Sceneのhistory-free closure・typed re-key・実ZIP出力／確認・凍結retry、既存ファイル入口からのstandalone View、明示独立編集コピー・永続job・既存欄での復旧・編集／cold再開を接続。View単独では編集metadataを作らず、非visual ownerは一覧／窓のみ。編集コピーは元bytes・新しい実metadata bytesを固定し、欠落した承認済み証拠を再生成せず、後続編集を保持する。通常home／他profile／実ブラウザ・実機・offline受入れは残る。実行結果はtodo参照。 | [src/projectPackage/reviewSelection.ts](../src/projectPackage/reviewSelection.ts) / [src/projectPackage/reviewOutputJob.ts](../src/projectPackage/reviewOutputJob.ts) / [src/projectPackage/reviewEditJob.ts](../src/projectPackage/reviewEditJob.ts) / [src/harness/projectScene/reviewWorkspace.ts](../src/harness/projectScene/reviewWorkspace.ts) / [docs/specs/06-project-package-wire.md](../docs/specs/06-project-package-wire.md) |
 | F05 | 全Sceneを独立Projectとして複製して渡す | 別経路のみ | 限定validationで現在の全Scene／素材／記録のtyped re-key・fresh history・実ZIP出力、件数と匿名化しない境界の事前確認、独立Projectへの入力・編集・cold再開を接続。元履歴／削除値／交換基準を出力せず、元Projectは保持。中断時は同じID・原本から再開し、既存コピーへの再入力は上書きせず一覧再開を案内。通常home／他profile／実描画・実機・offlineの受入れは残る。最終チェックはtodo参照。 | [src/projectPackage/cleanSource.ts](../src/projectPackage/cleanSource.ts) / [src/projectPackage/cleanOutputJob.ts](../src/projectPackage/cleanOutputJob.ts) / [src/projectPackage/cleanInputJob.ts](../src/projectPackage/cleanInputJob.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) / [docs/specs/06-project-package-wire.md](../docs/specs/06-project-package-wire.md) |
-| F06 | 現Native Projectを新Project/Sceneへ変換する | 新規実装 | 新recipe・共有導入artifact・変換writer未実装。旧sourceを変更しない。仕様07 §11に新旧形式分離、未配置／pin倍率／無効な材質設定の保持、source実順序・slot対応、初回共通基準の技術決定案を集約。まだ批准・実装・profile採用ではない。 | [docs/specs/07-project-scene-migration.md:3](../docs/specs/07-project-scene-migration.md) |
+| F06 | 現Native Projectを新Project/Sceneへ一度移行する | 新規実装 | 初回の値／本体／未配置／pin倍率／材質／順序の保持、公開・再開を接続する。旧sourceは変更しない。旧形式の継続更新用基準・共有導入artifactは不要。07の旧§11一式は承認待ちではなく廃案で、必要最小限のtarget差分を再計画する。 | [docs/specs/07-project-scene-migration.md](../docs/specs/07-project-scene-migration.md) |
 | F07 | frozen v1を新Project/Sceneへ変換する | 新規実装 | 旧readerの互換性維持と新writerを接続する移行は未実装。 | [docs/specs/07-project-scene-migration.md:3](../docs/specs/07-project-scene-migration.md) |
 | F08 | LociMyu ZIPを新Project/Sceneへ変換する | 新規実装 | 旧Native converterはあるが新Scene／unplaced保存のrecipeは未実装。Google／曖昧relationは継承しない。 | [docs/specs/04-locimyu-conversion.md](../docs/specs/04-locimyu-conversion.md) / [docs/specs/07-project-scene-migration.md:3](../docs/specs/07-project-scene-migration.md) |
-| F09 | 移行後に届いた旧Nativeの変更を受け入れる | 新規実装 | late Native bridgeは設計案のみ。既知source relation、旧baseline、v2の手元変更の保護が必要。 | [docs/specs/07-project-scene-migration.md:10](../docs/specs/07-project-scene-migration.md) |
+| F09 | 移行後に届いた旧Nativeの変更を受け入れる | 要件撤回 | PO判断 2026-09-14。移行後は新形式のファイルだけで編集・受け渡しを続ける。bridgeは実装対象外。初回変換・新形式同士の統合は維持。 | [docs/specs/07-project-scene-migration.md](../docs/specs/07-project-scene-migration.md) |
 | F10 | ファイル内容・影響を確認し、取消／不正入力から回復する | 別経路のみ | 限定GLB/PNG file欄に内容由来のWorkspace／Contribution検査、形式・目的・影響の確認、失敗・未確定入力の保持、再選択／retry／明示取消を接続済み。backup出力と確認付き復元・専用再開／取消、独立コピーの件数・匿名化しない境界の確認／入力／中断復旧も接続。reviewのScene・件数・埋込情報保持の確認、readonly入力、凍結出力再開・保存先の別確認も接続。View自体の永続再開ではない。全purpose／移行元／通常homeを一つの利用者導線として完結する部分は残る。filenameからpurposeを推測しない。 | [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) / [tests/nativeGs/homeUi.test.ts:476](../tests/nativeGs/homeUi.test.ts) / [docs/specs/06-project-package-wire.md:31](../docs/specs/06-project-package-wire.md) |
 
 ### 利用支援
@@ -211,7 +213,7 @@
 | 41 | iPhone保存・offline | S01–S04 / E05 |
 
 41に収まらない承認済みのScene作成・開始Scene、繰り返しチーム編集、独立keep-both、
-移行後bridge、追加色、ウィンドウresize等も§2へ含めた。
+追加色、ウィンドウresize等も§2へ含めた。移行後bridgeのF09は要件撤回として保持する。
 LociMyuからのタブ構成、Sceneに相当する記録切替、直接色選択、連続追加、複数window、
 画像確認、視点補助を照合。Google依存・内部sheet構造・単一モデル前提・無確認削除は継承しない。
 
@@ -223,7 +225,7 @@ LociMyuからのタブ構成、Sceneに相当する記録切替、直接色選�
 |---|---|---|---|
 | E01 | 保存／CAS／GC／大容量I/O | 新original-byte journal、metadata-only cold evidence、非活性OriginBlobStoreのbounded stream／保存後検証／不変receipt／実inventory→metadata作成・再開、隔離CAS・retentionと500 MiB保存本体のPO readback | **実装＋証拠**。新storeの実OPFS・Web Locks・iOS証拠とhost接続、全Project/conflict/opaque/未完了journal等のroot producer、origin-wide GC、bounded browser/iOS出力、実中断。MemoryFSの一般bytes試験をプラットフォーム採用証拠にせず、過去の500 MiB最初の完了ログ不明をFAIL扱いして同じreadbackを繰り返さない |
 | E02 | 実モデル・Representation／renderer | 旧Nativeの限定Mesh/Point/GS/Proxy、各loader、known triangle content verifier | **実装＋採用**。実body admission、Frame/catalog/texture/family証拠、Representation選択と対応外の局所的fallback、資源解放。shared-view合成・hard mask・dither等の各gateを確認。M01–M03/A02と補修操作M14の技術前提で、同じ作業をここで重複加算しない |
-| E03 | 新wire・移行recipe | 5-purposeの意味的closure PoC、原履歴／prepared migrationの隔離証拠 | **孤立実装＋採用／移行の残件**。06 §11の実装先行と§12.6のreview/edit-copy方針は承認済み。限定Workspace/Contribution/backup/cleanとreview出力・View・永続編集コピーの実装は各F行・todoを参照。一般profile／容量保証／採用、07の実source recipe／golden／late bridgeは残る。古い未承認記述を再確認待ちにしない。 |
+| E03 | 新wire・移行recipe | 5-purposeの意味的closure PoC、原履歴／prepared migrationの隔離証拠 | **孤立実装＋採用／初回移行の残件**。06 §11の実装先行と§12.6のreview/edit-copy方針は承認済み。実装は各F行・todoを参照。一般profile／容量保証／採用、07の初回source mappingと必要target差分は残る。late bridgeは撤回済みで、そのPoCを再実行・採用条件化しない。 |
 | E04 | 規模・安全性・アクセシビリティ | 最終rootテスト、限定hostのfocus／失敗／古いtoken防御、既存runtime audit | **実装確認＋証拠**。10k Caption/50k changes、規定多tab workload、10k UI virtualizationとopen/edit budget達成、メモリ・CSP・不正入力、200%/狭幅/IME/keyboard/contrast/44pxの総合確認。未測定を性能FAILにしない。5件の既存toolchain audit findingsは未解消、runtimeの狭いhold解消とは別 |
 | E05 | Desktop／physical iPhone／offline | 旧Native受入れ、旧saved限定4群、修正後journalのPO再確認 | **新経路の証拠待ち**。新metadata hostの8群は一般的好評のみで全件PASSではない。新保存・描画に必要な実機は該当境界で実施し、全てを無条件に最終日へ先送りしない。最後は通常UIでTEAM-FLOW-01。dev serverはoffline/PWA証拠ではない |
 
@@ -240,7 +242,7 @@ LociMyuからのタブ構成、Sceneに相当する記録切替、直接色選�
 
 実行順は [todoの現在境界](todo.md) に一本化する。承認済みの実用チーム版を
 全体先行でつなぎ、各行の実装・UI接続・実機受入れを混同しない。
-内部部品の完了を新しい利用者操作の完成として数えず、M13/M14は今回の62群に含めない。
+内部部品の完了を新しい利用者操作の完成として数えず、M13/M14と撤回F09は今回の61群に含めない。
 
 ## 6. 明示deferred／判断未確定（64群へ加算しない）
 
@@ -254,7 +256,7 @@ LociMyuからのタブ構成、Sceneに相当する記録切替、直接色選�
 | 新規Project-space Caption、Sceneごとのrevision／alignment、Scene media layer、汎用Unity階層 | 明示非対象。既存ProjectAnchor読取・置き直しC11とは別 |
 | Captionの一般Undo/Redo・一般複製・前後巡回 | 現状なし。旧parityでも要追加判断／確認待ち。承認済み必須欠落として数えない。モデルalignment固有の復帰M13とは別 |
 | 任意baseColor入力 | 元materialの色保持・描画解釈はあるが入力UIなし。現在のaccepted editable fieldsとは別なので、勝手に新機能化しない |
-| タグ編集UI | 新規作成・編集・管理UIは旧parity §7で追加判断。既存タグの保持・copy・削除依存・package closureは必須で、C10/T04/F06–F09側へ含める。schemaの存在だけで管理画面を必須にしない |
+| タグ編集UI | 新規作成・編集・管理UIは旧parity §7で追加判断。既存タグの保持・copy・削除依存・package closureは必須で、C10/T04/F06–F08側へ含める。schemaの存在だけで管理画面を必須にしない |
 | ローカルprofile／表示名設定 | 旧homeにはあるが新hostは合成identity。新Projectの利用者向けidentity／来歴表示要件と接続範囲をチーム導入時に確認。クラウドaccountやrolesは作らない |
 | HEIC／video／audio | 現candidate非対象。PROD-16のpost-candidate要件を削除した意味ではない |
 | 自動同一モデル判定／relation推測／位置remap／conflict winner | 禁止。判断量削減で越えてはいけない境界 |

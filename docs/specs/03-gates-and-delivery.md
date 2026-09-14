@@ -6,7 +6,7 @@
 > ADR-0002 and `05-project-scene-team-workflow.md` supersede the production
 > sequence below where it would write the closed DisplaySet migration target or
 > old three-purpose package wire. The ProjectScene writer requires its separately
-> ratified migration companion, portable Native-bridge support record and
+> ratified one-time migration companion and
 > five-purpose package-wire companion before S2. The 2026-09-08 correction maps
 > G1-C inputs to this new contract below. Existing durability, privacy and device
 > thresholds remain in force; no aggregate G0/G0-S or renderer work is restarted.
@@ -65,7 +65,7 @@ Required fixtures:
 - 10,000 captions and 50,000 metadata changes;
 - deleted/private sentinel values for package privacy tests;
 - parent-delete/concurrent-child and unknown-minor-only-blob fixtures;
-- v1 media fixtures with equal bytes under distinct asset IDs plus later-copy attachment prepend/reorder/reviewed duplicate-count/content-revision changes;
+- v1 media fixtures with equal bytes under distinct asset IDs and preserved initial occurrence count/order; later-copy prepend/reorder/duplicate-count/content-revision gates are withdrawn for ProjectScene by PO 2026-09-14 (G0-FX-21B–E), not PASS;
 - malicious package and model corpus.
 
 Later feature fixtures are retained but do not block G0 exit, base G1-B adoption
@@ -484,7 +484,7 @@ this acceptance ownership:
 | Causal history and explicit conflicts | `TEAM-HIST-01`–`06`, including user-selected resolution; original changes, sibling branches and replay | Same semantics through real package import, with no rewritten dependencies |
 | Contribution base and delta | `TEAM-PKG-08`: exact current-minus-base changes and durable local base records via a test port | Manifest/base validation, reopen/backup, blob delta and real package replay |
 | Five purposes and privacy | Derive each semantic closure from the same synthetic Project; verify history/identity and exchange-record inclusion/omission | Section 7.5 companion: exact discriminated wire, golden vectors, streamed transport and read-back |
-| Migration continuity | Synthetic registered ancestor plus later changes proves causal preservation; no old recipe output is reinterpreted | `SCN-MIG-01`–`06`, new recipe and portable bridge with real accepted source paths |
+| One-time migration | Historical bridge PoC is not current conversion evidence; no old recipe output is reinterpreted | `SCN-MIG-01`–`04`/`06`/`07`, faithful initial conversion and current-format exchange; `SCN-MIG-05` withdrawn |
 | Mobile durability and performance | Applicable iOS adapter/storage evidence before adoption or production storage acceptance | Changed package/storage recovery paths on device; S3 later adds the integrated product workflow |
 
 These rows map evidence to existing requirements rather than create a second
@@ -544,9 +544,9 @@ Hard privacy pass:
 - all five semantic closures obey their purpose-specific identity/history rules.
   Review has no source identity and clean creates a new lineage; exact manifest
   rejection/golden vectors belong to S2;
-- same-lineage closures protect registered migration ancestors and required
-  baseline blobs; review/clean omit registry/baseline sentinels and disclose
-  continuity loss. Exact portable Native-bridge support and converters are S2;
+- same-lineage closures protect required existing history and initial-conversion
+  data; review/clean preserve their source/privacy exclusions. One-time converters
+  remain S2; the portable late-Native bridge is withdrawn (PO 2026-09-14);
 - durable workspace-local exchange-base records survive reopen and are included
   only in backup, with disclosure; importing a Contribution never advances them.
 
@@ -650,8 +650,8 @@ below.
    behind its versioned wire gate.
 8. preserve the immutable `v1-migration-recipe-1` companion/golden manifest as
    closed evidence. For the ProjectScene writer, ratify
-   `v1-project-scene-migration-recipe-1`, its portable Native-bridge support type
-   and the five-purpose manifest/review companion before implementing conversion
+   the applicable one-time ProjectScene recipe and the five-purpose manifest/review
+   companion before implementing conversion
    or package S2; no durable ProjectScene conversion or package wire exists before
    those sub-gates pass.
 9. Proxy-backed vertical slice with one independent Mesh Asset and one GS Asset

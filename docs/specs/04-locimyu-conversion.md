@@ -13,6 +13,10 @@
 > Native receiver. When a converter writes the future v2 schema, section 9.2 of
 > `05-project-scene-team-workflow.md` maps each admitted sheet to a ProjectScene.
 > That mapping does not rewrite or reinterpret current Native DisplaySet bytes.
+> **PO cutover clarification (2026-09-14):** new ProjectScene conversion is one-time;
+> later old-format updates are not required. Any later-copy continuity discussion
+> below does not add that workflow to the new candidate. Initial source identity,
+> duplicate preservation, exact relations and the frozen Native recipe remain.
 
 ## 1. Scope and authority
 

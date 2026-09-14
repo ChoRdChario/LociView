@@ -1,7 +1,7 @@
 # LociView v2 approved direction
 
 > Status: `ACCEPTED DIRECTION SUMMARY / NON-NORMATIVE / NOT IMPLEMENTED`
-> Updated: 2026-09-09
+> Updated: 2026-09-14
 > Technology choices marked as candidates remain subject to the listed PoC gates.
 
 This is a navigation summary, not an independent requirements source. Rationale,
@@ -184,9 +184,10 @@ choose a winner. Invalid or incomplete input activates nothing.
   writable-v1 G0S-S2/S3 work is deferred and becomes a required gate again
   before any future candidate re-enables legacy writes.
 - Convert known copies to one canonical genesis/history epoch.
-- Keep deterministic v1 ID/decision/mapping continuity in Team Workspaces and
-  complete backups so a reviewed later v1 copy can migrate on another device;
-  review/share and clean copies intentionally omit that lineage.
+- Migration is a one-time cutover (ADR-0002 amendment, 2026-09-14). Preserve
+  initial mapping and source bytes, then distribute the converted Workspace.
+  Continued updates from old Native/v1 files into that Project are withdrawn;
+  ordinary new-format team exchange and existing-file recovery remain required.
 - Represent imported v1 assets as synthetic legacy revisions.
 - Preserve caption tags and map each admitted LociMyu sheet/Native DisplaySet to
   one ProjectScene with exact membership, Scene-scoped material appearance and

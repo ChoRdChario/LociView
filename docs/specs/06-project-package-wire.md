@@ -10,6 +10,12 @@
 
 ## 1. Authority and design boundary
 
+PO scope amendment (2026-09-14): new ProjectScene migration is one-time under
+ADR-0002 and specification 07. Continued legacy-input bridges and their dedicated
+control/ancestor/baseline requirements below are superseded. Initial conversion,
+existing-file/job retention, normal new-format history and five-purpose closure /
+privacy remain required; do not drop existing protected bytes or opaque records.
+
 The accepted outcomes are in [specification 05 §§6–7](05-project-scene-team-workflow.md).
 The five purposes, original causal history, explicit conflict choices, one-Scene
 review and whole-Project clean copy are not new decisions here. Canonical domain
@@ -913,10 +919,10 @@ wire/schema, budgets, privacy/recovery and golden contract before S2 reads or
 writes its first byte. Workspace/Contribution may be implemented before backup,
 review and clean only AFTER that complete ratification; a smaller implementation
 slice is not permission to ratify only two purposes. Raw-model new-Project work
-does not require every legacy converter first. Native/v1/LociMyu entry and late
-old-format receive require the exact applicable 07 recipe/artifact evidence;
-their implementation can follow the first new-Project team round without being
-removed from the practical candidate. Storage/device/adoption gates stay separate.
+does not require every legacy converter first. One-time Native/v1/LociMyu entry
+requires the applicable 07 initial-conversion evidence. The PO withdrew continued
+old-format receive on 2026-09-14; it is not a practical-candidate dependency.
+Storage/device/adoption gates stay separate.
 
 1. **Exact wire/profile:** choose the format/version and adapter identifier,
    ZIP/ZIP64/compression/sink profile, summary classifier, complete backup
@@ -936,13 +942,11 @@ removed from the practical candidate. Storage/device/adoption gates stay separat
 
 Independent review may correct this draft but cannot approve it for the Product
 Owner. After these inputs and explicit ratification, S2 still depends on the
-metadata/CAS gates and separately ratified migration/Native-bridge companion.
-The proposed [07 companion](07-project-scene-migration.md) §7.2 now drafts a
-prepared-migration journal source distinct from this document's full-metadata/
-Contribution union, plus portable managed-unit/introduction evidence in §§5–7.
-Its interface is specified as a draft; executable exact artifact/profile and
-retention/recovery evidence remain ratification inputs, not an
-implicit permission to feed converted Native metadata into a remote source slot.
+metadata/CAS gates and the applicable one-time conversion contract.
+The [07 companion](07-project-scene-migration.md) now supersedes its former
+bridge-only journal/managed-unit proposal. Initial conversion still needs an
+explicit durable publication/retry path; do not feed converted Native metadata
+into a remote-source slot or drop existing protected data to simplify it.
 No production reader/writer, current UI connection, dependency adoption, release,
 Pages, Service Worker, media expansion or performance guarantee is authorized.
 
@@ -1285,7 +1289,7 @@ cannot be treated as resolved deletion. Review uses only 05 §7.3's closure.
 | Technical/private state | Omit source history/actors/times, deleted values, recognized migration/report/source evidence, exchange bases, participant/device profiles, UI state, local handles/paths/object URLs. Original embedded blob metadata and current user text remain disclosed content, not promised anonymous. |
 
 `Asset.pinScale` and `anchor.kind:'unplaced'` are not current known domain
-capabilities: 07 §10.2 / 05 §9.4's amendments remain distinct. Do not silently omit
+capabilities: reduced 07 §5 / 05 §9.4's amendments remain distinct. Do not silently omit
 them to make a current-profile export succeed. The current profile refuses affected
 history-free input; the later accepted field policy must retain pinScale on clean
 and each applicable review owner, and preserve unplaced's optional owner without
@@ -1874,7 +1878,7 @@ direct edit-copy capability. No new schema or fallback has been implemented.
 Read-only analysis independently confirmed the missing partition. Finish the
 resulting exact snapshot/reconstruction/golden contract before
 claiming §11.3's complete five-purpose gate closed. Native/v1/LociMyu migration's
-different physical-profile decision remains in 07 §10.2, not hidden inside this
+necessary physical-profile decision remains in reduced 07 §5, not hidden inside this
 review change. Neither issue invalidates the approved full-source service already
 implemented; package reader/writer authority still follows 05 §7.5.
 

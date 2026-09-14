@@ -154,6 +154,10 @@ There is one normal home at `/`.
   content will go, and any choice or warning that changes the decision. Browser
   retention does not mean the selected file has been updated (§9.1).
 - A model selected through the same entry proceeds to new-Project creation.
+- Legacy conversion is a one-time cutover (PO 2026-09-14; specification 07).
+  Explain that the source stays unchanged and subsequent team work uses the
+  converted Project's files. An old-format update cannot update that Project;
+  do not expose a legacy-bridge mode or silently start a separate conversion.
 - Existing on-device Projects remain a separate, scannable list with explicit
   View, Edit and file-operation results. Identify these as resumable work, not
   independently backed-up files.

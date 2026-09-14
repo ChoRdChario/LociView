@@ -2,7 +2,7 @@
 
 > Status: `PRODUCT-OWNER APPROVED IMPLEMENTATION CONTRACT / NOT IMPLEMENTED`
 > Baseline implementation: normalized v1 commit `fc7054f`; this specification revision is identified by its own Git commit
-> Approved: 2026-08-19; Product Owner amendments recorded through 2026-09-09
+> Approved: 2026-08-19; Product Owner amendments recorded through 2026-09-14
 
 These documents turn accepted ADRs 0001 and 0002 and the approved v2 direction
 into testable implementation contracts. They intentionally separate fixed
@@ -40,14 +40,14 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metri
 | [`02-storage-package-migration.md`](02-storage-package-migration.md) | Metadata, CAS, transaction recovery, package classes, merge semantics, v1 conversion |
 | [`03-gates-and-delivery.md`](03-gates-and-delivery.md) | G0, blocking G0-S, PoC gates, evidence, feature flags, rollback and development sequence |
 | [`04-locimyu-conversion.md`](04-locimyu-conversion.md) | Canonical LociMyu Caption identity, source-authority rules and the direct-adapter conversion-report boundary |
-| [`05-project-scene-team-workflow.md`](05-project-scene-team-workflow.md) | ProjectScene composition, continuing causal team history, Workspace/Contribution purposes, migration bridge and acceptance; supersedes the identified general-v2 DisplaySet/fixed-campaign clauses without changing Native bytes |
+| [`05-project-scene-team-workflow.md`](05-project-scene-team-workflow.md) | ProjectScene composition, continuing new-format team history, Workspace/Contribution purposes, one-time migration and acceptance; supersedes identified general-v2 clauses without changing Native bytes |
+| [`07-project-scene-migration.md`](07-project-scene-migration.md) | PO-approved one-time cutover (2026-09-14); initial conversion is not complete. The former old-update bridge and §11 approval request are superseded; reduced source/target mapping still precedes implementation |
 
 ### Proposed companions — not covered by the approval above
 
 | Document | Status / purpose |
 |---|---|
 | [`06-project-package-wire.md`](06-project-package-wire.md) | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED`; five-purpose wire design under 05 §7.5, with explicit unresolved journal/base, budget and history-free-builder inputs; no format/version or production authorization |
-| [`07-project-scene-migration.md`](07-project-scene-migration.md) | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED`; source-domain/ID recipe, portable Native baseline and atomic relation mapping, original-artifact/replay requirements and calculated identity examples. Inspector, introduction/adapter/journal bytes and whole-output goldens remain gates |
 
 ## Fixed versus conditional decisions
 
@@ -62,6 +62,8 @@ ADR-0002:
 - exact smooth-alpha mesh/GS intersection is not an MVP dependency;
 - large package and GS paths cannot require whole-file memory materialization;
 - v1 sources are preserved and conversion is explicit.
+- Legacy conversion is a one-time cutover; the team continues with the converted
+  Project's new-format files. No later-old-input bridge is a completion gate.
 - LociMyu conversion uses the versioned preserve-all identity; guessed
   sheet/media relationships are never activated. For the first direct adapter
   the user retains the original ZIP and an exportable report accounts for

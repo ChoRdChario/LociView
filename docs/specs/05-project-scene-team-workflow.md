@@ -822,6 +822,13 @@ reopens the conflict; no automatic winner or automatic duplicate is introduced.
 
 ## 9. Migration
 
+**PO-approved one-time cutover (2026-09-14; supersedes later-old-input clauses):**
+convert the selected old source into a new Project, then use and distribute that
+Project's files for all subsequent work. Initial Native/frozen-v1/LociMyu reading,
+faithful value/payload mapping and source preservation remain required. Continued
+old-format updates into the converted Project and their dedicated bridges are
+withdrawn, not deferred. New-format team history/recovery remains unchanged.
+
 ProjectScene migration uses a new immutable companion recipe,
 `v1-project-scene-migration-recipe-1`. It does not reinterpret, amend or emit
 new output under `v1-migration-recipe-1`, whose `display-set`/`set_` output and
@@ -830,10 +837,11 @@ ratify every canonical source key, domain-separated preimage, full digest,
 collision check, output kind and golden byte/hash vector. Until that companion
 passes its gate, durable ProjectScene conversion remains disabled.
 
-The [07 migration/Native-bridge companion](07-project-scene-migration.md) now
-drafts those source domains/ID mappings and portable evidence, including source-
-atomic relation guards and parallel-introduction requirements. It is unratified;
-its §10 lists remaining exact inspector/adapter/journal/whole-output inputs.
+The [07 one-time migration companion](07-project-scene-migration.md) owns the
+reduced initial-conversion boundary. Its previous late-update control maps,
+common legacy ancestors and parallel-introduction protocol are superseded, not
+mandatory prerequisites for initial conversion. Concrete source mapping and any
+necessary target-format changes still precede implementation.
 
 Every admitted Native/frozen-v1/LociMyu model and media payload is retained
 byte-for-byte under a verified digest and byte length, either by safely reusing
@@ -890,7 +898,7 @@ single-model global state and ambiguous relation inference are not migrated.
 Inactive/unlinked source relationships remain accounted for in the unchanged
 source ZIP plus exportable report.
 
-### 9.3 Frozen v1 and late Native collaboration files
+### 9.3 Frozen v1 and the post-migration cutover
 
 Frozen v1 conversion creates deterministic Scene/membership records through the
 new `v1-project-scene-migration-recipe-1` companion and remains distinct from
@@ -898,26 +906,13 @@ LociMyu conversion. The companion consumes the frozen source evidence directly;
 it does not treat closed `v1-migration-recipe-1` DisplaySet output as if it were
 a ProjectScene.
 
-A Native copy without an accepted fixed collaboration baseline can be converted
-as one canonical source only; separately converted copies never auto-merge.
-When a Native Project and late Native collaboration package share the exact
-verified Project ID, baseline ID and unsupported-state digest, a dedicated bridge
-may map that baseline to one common v2 ancestor and convert only the current
-Native Caption/media three-way domain into exact descendant changes. It never
-treats the old package as a general v2 Contribution.
-
-The bridge records the source package digest/conversion registration for
-idempotence. A conflict with later v2 work follows section 8 and preserves
-candidates. Missing/unequal baseline evidence, model/presentation differences
-outside the old merge contract or ambiguous identity fails without writes.
-
-The bridge registration is portable Project migration truth, not a device-local
-cache. Before S2, the ProjectScene recipe companion must define its exact typed
-support record in the v2 root, ID/key grammar, source Project/baseline/
-unsupported-state evidence, mapped v2 ancestor heads, accepted mapping-baseline
-blob, processed-package registration, retention/privacy roots and package
-closure. No implementation may improvise this data inside `MigrationSupportV1`,
-whose schema is closed, or keep it only in an unexported local index.
+The converted Project supplies the team through one Workspace. Later Native or
+frozen-v1 changes are not a supported update to that Project, even if old IDs,
+names or baselines match. Explain that subsequent work uses the converted file;
+do not silently import, overwrite, merge or create a second Project on rejection.
+A separate explicit conversion is independent, not a way to bypass that boundary.
+No fixed-baseline bridge registration, mapped legacy ancestor or managed old-input
+control graph is required solely for continuing cross-format updates.
 
 ### 9.4 Unplaced Caption preservation (2026-09-10)
 
@@ -982,10 +977,10 @@ edits still integrate normally. `両方残す` allocates independent Caption and
 attachment/membership IDs under §8, copies the chosen anchor unchanged and follows
 existing tag/media sharing rules; later placement of either copy is independent.
 
-#### 9.4.2 Proposed conversion and late-bridge mapping
+#### 9.4.2 Proposed one-time conversion mapping
 
 The new recipe companion in §9.1 must record exact source Caption/owner mappings,
-the canonical baseline placement value and immutable source evidence separately
+the exact source placement value and immutable source evidence separately
 from the editable target anchor. Do not extend or reinterpret the closed old
 recipe or `MigrationSupportV1`.
 
@@ -997,23 +992,19 @@ recipe or `MigrationSupportV1`.
 | Positioned source | Existing exact positioned-anchor mapping; never downgrade because model is hidden |
 | Conflicting/invalid source authority outside the admitted conversion rule | Preserve/report; do not select a winner or convert corruption to normal unplaced |
 
-Native owner and anchor are separate atomic source fields. The bridge compares
-their complete canonical placement tuple against the registered old baseline.
-If unchanged, emit no anchor change: a later v2 placement must survive an old
-unplaced input and text-only edits. If changed, map the authoritative tuple as one
-whole-anchor descendant of the registered common v2 ancestor, not of current
-heads. An unresolved source tuple blocks that affected bridge mapping with its
-source intact; do not synthesize cross-product candidates or serialize a winner.
-Concurrent valid v2 placement then follows ordinary whole-anchor conflict choice.
-Same-input replay reuses registered mappings and original generated change bytes,
-never refreshes its baseline from current v2 state.
+Native owner and anchor form one validated source placement tuple during initial
+conversion. Preserve its exact meaning; do not synthesize cross-product candidates
+or serialize a winner for an unresolved source tuple. Interrupted conversion
+reuses its frozen destination and original generated bytes. A completed retry
+must not reset edits made later in the new Project. Further old-format updates
+are unsupported rather than mapped to new anchor changes.
 
 Team Workspace and backup preserve unplaced values, candidates and their required
-portable migration/bridge evidence. Contribution sends exact base-relative changes
+initial-conversion evidence. Contribution sends exact base-relative changes
 and newly required evidence/payloads; placement-only edits do not reread unchanged
 model bodies. Review includes every active Caption of the selected Scene even if
 unplaced; clean includes all active Project resources. Both history-free purposes
-re-key known owners, preserve absent owners, and omit source/history/bridge
+re-key known owners, preserve absent owners, and omit source/history
 evidence. Neither adds Scene-model memberships. Minimal nonvisual owners and
 review-to-clean mapping are specified in companion 06 §5.1.
 
@@ -1022,7 +1013,7 @@ review-to-clean mapping are specified in companion 06 §5.1.
 Reuse source conversion, conflict, keep-both and export/reopen fixtures; add only
 the cases needed to distinguish known-owner/ownerless unplaced, malformed versus
 normal state, first placement confirm/cancel/failure, unrelated text integration,
-concurrent placement candidates, identical late-source replay after v2 placement,
+concurrent new-format placement candidates, completed-conversion retry after new edits,
 independent copy placement and five-purpose closure/privacy. Include an unplaced
 Caption whose owner is unresolved and one with no Scene membership. Expected
 results are exact preserved IDs/content/membership within a lineage and typed
@@ -1272,11 +1263,14 @@ touch, rendered contrast or iPhone evidence; keep those in the existing batch.
   repeated conversion through the separately ratified ProjectScene recipe is
   deterministic and every converted Project is v2-only-write. The closed
   `v1-migration-recipe-1` output is never reinterpreted.
-- `SCN-MIG-05`: the fixed-baseline Native bridge accepts only exact verified old
-  Caption/media domain changes, is idempotent and fails closed outside that scope.
+- `SCN-MIG-05`: **withdrawn by PO 2026-09-14**, not PASS or deferred. The
+  fixed-baseline late-Native bridge is no longer a delivery/acceptance requirement.
 - `SCN-MIG-06`: every admitted model/media payload preserves exact digest, byte
   length and bytes in v2; unsupported, missing and unlinked inputs are fully
   accounted for, and success/failure/cancel leaves every source byte unchanged.
+- `SCN-MIG-07`: after one-time conversion, new-format Workspace/Contribution
+  exchange continues; an old-format update does not mutate the converted Project
+  and explains the cutover. Conversion retry does not duplicate/reset that Project.
 
 ### 12.5 UI and devices
 
@@ -1384,7 +1378,7 @@ only the still-missing G1-A/C criteria before production storage adoption.
    ProjectSession/MetadataRepository, journal, Scene records/commands/resolver under
    a nondefault feature boundary. No converter, package or production UI.
 2. **S2 — migration and team exchange:** implement Native/frozen-v1/LociMyu
-   converters, the fixed-baseline bridge and all five package purposes, but only
+   one-time converters and all five package purposes, but only
    after the new migration companion and package-wire companion in sections 7.5
    and 9 pass independent review and their gates. No UI polish, renderer
    expansion or release work.
@@ -2167,8 +2161,10 @@ the first completion target is a usable team candidate under TEAM-FLOW-01, with
 real files, ordinary Project/Scene/editing flows, five-purpose exchange and
 Desktop/physical-iPhone/offline acceptance. Inventory M13 full alignment and M14
 visual repair stay required later capabilities, not first-candidate blockers.
-The other 62 inventory groups remain connection/acceptance work. This changes
-scheduling only; real-data, wire/migration, dependency and release gates remain.
+The original target was the other 62 inventory groups. The PO's 2026-09-14
+one-time cutover withdraws F09, leaving 61 in the practical-team target; this is
+a scope reduction, not a completion claim. Initial conversion, real-data,
+wire/migration, dependency and release gates remain where still applicable.
 
 First implement `MetadataProjectSession.receiveFullSource(expectedToken, input)`
 using accepted 02 §8, not proposed 06 delta/base-completion. Its internal input is
