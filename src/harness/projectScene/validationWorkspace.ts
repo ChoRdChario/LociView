@@ -129,7 +129,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       (session, changed) => {
         const root = document.createElement('section');
         const blockedReason = () => fileTools?.hasChanges() ? 'ファイルの操作を終えるか、取り消してから解消してください。' : null;
-        const text = createMetadataConflictControls(document, target, session, changed, { captionTextOnly: true, blockedReason });
+        const text = createMetadataConflictControls(document, target, session, changed, { blockedReason });
         const lifecycle = createMetadataCaptionLifecycleControls(document, target, session, text.composing, changed, blockedReason);
         const memberships = createMetadataMembershipControls(document, target, session, text.composing, changed, 'caption', blockedReason);
         const models = createMetadataAssetStatusControls(document, target, session, text.composing, changed, { blockedReason,

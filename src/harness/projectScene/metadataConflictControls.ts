@@ -147,9 +147,10 @@ export function createMetadataConflictControls(document: Document, host: Pick<Sa
             const index = checked?.findIndex(c => c.operationId === options.value) ?? -1, candidate = checked?.[index];
             if (candidate?.value.kind === 'value' && current.token === session.snapshot.state.token) {
               const anchor = candidate.value.value as unknown as Anchor;
-              const model = anchor.kind === 'asset' ? session.composition.assets.find(m => m.assetId === anchor.assetId) : undefined;
+              const model = anchor.kind === 'asset' && !session.hiddenAssetIds.includes(anchor.assetId)
+                ? session.composition.assets.find(m => m.assetId === anchor.assetId) : undefined;
               const available = anchor.kind === 'project' ? anchor.projectFrameId === session.snapshot.resources.projectFrameId : model?.projection.assetFrameId === anchor.assetFrameId;
-              previewNote.textContent = available ? '位置の比較表示です。確定するまで保存されません。' : 'モデル・座標の基準が現在のシーンにないため、位置を表示できません。';
+              previewNote.textContent = available ? '比較用の位置です。まだ適用していません。' : 'モデルが非表示、または座標の基準を確認できないため、位置を表示できません。';
               if (available) session.setCaptionComparison({ token: current.token, captionId: recordId, anchor, label: `候補 ${index + 1}（未確定）` });
             }
           }
@@ -167,11 +168,12 @@ export function createMetadataConflictControls(document: Document, host: Pick<Sa
           if (blocked() || !current.ready || !validInput(current) || current.token !== host.read().source?.token || !options.value) return;
           const choice = options.value === 'manual' ? { kind: 'manual' as const, text: text.value } :
             { kind: 'candidate' as const, operationId: options.value };
-          session.applyWorking(() => host.resolve(current.token, isEntry ? { kind: 'resolveEntryView', sceneId: recordId, operationId: options.value } :
+          const token = current.token, command: Parameters<typeof host.resolve>[1] = isEntry ? { kind: 'resolveEntryView', sceneId: recordId, operationId: options.value } :
             isView ? { kind: 'resolveViewField', sceneId: checkedView!.sceneId, viewId: recordId, field: fieldName as ViewChoiceField, choice } :
             isScene ? { kind: 'resolveSceneName', sceneId: recordId, choice } :
             isText ? { kind: 'resolveCaptionText', captionId: recordId, field: fieldName as 'title' | 'body', choice } :
-            { kind: 'resolveCaptionField', captionId: recordId, field: fieldName as 'anchor' | 'colorSrgb', operationId: options.value }), () => {
+            { kind: 'resolveCaptionField', captionId: recordId, field: fieldName as 'anchor' | 'colorSrgb', operationId: options.value };
+          session.applyWorking(() => host.resolve(token, command), () => {
             if (disposed) return;
             if (fieldName === 'anchor') session.setCaptionComparison(null);
             forms.delete(key); session.refreshHistory(); render(); changed();

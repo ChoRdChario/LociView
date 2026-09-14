@@ -18,6 +18,7 @@ import { metadataFixtureLimits, metadataProjectView, createMetadataFixture, meta
 import { inspectProjectCandidates } from '../../src/domain/projectCandidates';
 import { writeMetadataSeed } from '../../src/harness/projectScene/metadataStorage';
 import { underWriteLease } from '../../src/projectMetadata/persistence';
+import { summarizeFullHistory } from '../../src/projectPackage/historySummary';
 import type { MetadataEdit } from '../../src/projectMetadata/commands';
 import { ProjectMetadataSource } from '../../src/projectMetadata/source';
 import { planViewAuthor } from '../../src/ui/projectScene/viewAuthoringState';
@@ -142,7 +143,7 @@ describe('Saved View conflict resolution; saved memory ports and recorded DOM on
   const branch = (source: ProjectMetadataSource, field: TestedField, value: unknown) => raw(source, d => {
     const record = field === 'defaultViewId' ? d.scenesById[f.overview] : d.viewsById[id];
     delete record[field];
-    record[field] = new A.ImmutableString(canonicalFixture(value === undefined ? null : value));
+    record[field] = new A.ImmutableString(canonicalFixture(value === undefined ? id : value));
     if (value === undefined) delete record[field]; // Explicit absence even when it was already absent.
   });
   const setup = async (field: TestedField, first: unknown, second: unknown) => {
@@ -258,6 +259,12 @@ describe('Saved View conflict resolution; saved memory ports and recorded DOM on
     const p = u.host.read().provider!; if (p.kind !== 'scene-provider') throw Error('provider');
     expect(p.details.mutable.scenesById[f.overview]!.defaultViewId).toEqual({ kind: 'value', value: second });
     const saved = u.host.read().source!; expect(saved.originalChanges()).toHaveLength(before.originalChanges().length + 1);
+    const original = await saved.inspectOriginal({ maxNodes: metadataFixtureLimits.maxNodes, maxWork: metadataFixtureLimits.maxWork });
+    expect(() => summarizeFullHistory(original)).not.toThrow();
+    const entryWrites = original.scalars.filter(op => op.path.join('/') === `scenesById/${f.overview}/defaultViewId`);
+    expect(entryWrites.every(op => op.value.kind === 'absent' || typeof op.value.value === 'string')).toBe(true);
+    if (mode === 'bothAbsent') expect(before.read().history.changes.flatMap(c => c.writes)
+      .filter(op => op.path.join('/') === `scenesById/${f.overview}/defaultViewId`).every(op => op.value.kind === 'absent')).toBe(true);
     expect(u.recalls).toHaveLength(0); expect(u.background).not.toHaveBeenCalled();
     // Ordinary entry setting is available again from the same mounted workspace.
     button(u.root, '視点').fire('click'); const entry = area(u.root, '開始時の設定');
@@ -375,6 +382,18 @@ describe('Saved View conflict resolution; saved memory ports and recorded DOM on
       const p = await u.read(e); if (p.kind !== 'scene-provider') throw Error('provider');
       expect(() => entryViewCandidates(p, f.overview, metadataFixtureLimits)).toThrow();
     }
+    // Old malformed null witnesses remain unexportable; do not invent an ID to hide that history.
+    const invalidAbsence = () => raw(u.seed, d => {
+      d.scenesById[f.overview].defaultViewId = new A.ImmutableString('null'); delete d.scenesById[f.overview].defaultViewId;
+    });
+    const noWitness = invalidAbsence().appendOriginal(invalidAbsence().originalChanges()), untouched = noWitness.originalChanges();
+    const np = await u.read(noWitness); if (np.kind !== 'scene-provider') throw Error('provider');
+    const absent = entryViewCandidates(np, f.overview, metadataFixtureLimits).candidates[0]!;
+    expect(() => noWitness.prepareEdit(noWitness.token, { kind: 'resolveEntryView', sceneId: f.overview, operationId: absent.operationId }, np, tx))
+      .toThrow('entry-absence-witness');
+    const invalidOriginal = await noWitness.inspectOriginal({ maxNodes: metadataFixtureLimits.maxNodes, maxWork: metadataFixtureLimits.maxWork });
+    expect(() => summarizeFullHistory(invalidOriginal)).toThrow('summary-historical-value-unsupported');
+    expect(noWitness.originalChanges()).toEqual(untouched);
     expect(u.h.base.writes).toBe(writes); expect(u.host.read().source!.token).toBe(source.token); await u.mount.dispose();
   });
 });
@@ -1363,7 +1382,14 @@ describe('saved Caption position/color conflict resolution; synthetic ports and 
       expect(marker.textContent).toBe('候補 2（未確定）'); expect(display!.pins.some(p => p.id === f.shared)).toBe(false);
       button(form, '取り消す').fire('click'); wa.render(); expect(display!.preview).toBeUndefined();
       const again = named(root, '未解決の候補').children[0]!;
-      setInput(descendants(again).find(n => n.tag === 'select')!, chosen.operationId);
+      expect(sa.acceptModel(planModelList(sa.modelContext(), { kind: 'visibility', action: 'hide', assetId: f.equipment }))).toBe(true);
+      setInput(descendants(again).find(n => n.tag === 'select')!, chosen.operationId); wa.render();
+      expect(sa.captionComparisonPreview).toBeNull(); expect(display!.preview).toBeUndefined();
+      expect(descendants(again).some(n => n.textContent.includes('モデルが非表示'))).toBe(true);
+      expect(sa.hiddenAssetIds).toContain(f.equipment); expect(a.base.writes).toBe(writes);
+      button(again, '取り消す').fire('click');
+      expect(sa.acceptModel(planModelList(sa.modelContext(), { kind: 'visibility', action: 'show', assetId: f.equipment }))).toBe(true);
+      setInput(descendants(named(root, '未解決の候補').children[0]!).find(n => n.tag === 'select')!, chosen.operationId);
     }
     const freshForm = named(root, '未解決の候補').children[0]!;
     a.base.rejectPublication = true; await acknowledge(sa, () => button(freshForm, '競合を解消').fire('click'));

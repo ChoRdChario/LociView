@@ -44,11 +44,11 @@ export function createMetadataStartupControls(document: Document, host: SavedWor
     const stale = !!select.value && token !== host.read().source?.token;
     select.disabled = blocked(); apply.disabled = blocked() || !ready || stale || !select.value;
     cancel.disabled = disposed || host.hasPending() || ack.state !== 'idle' || !!session()?.workingBlock;
-    message.textContent = feedback || (ack.block ?? (host.hasPending() ? '保存が未完了です。元の変更から再試行してください。' :
+    message.textContent = feedback || (ack.block ?? (host.hasPending() ? '更新が未完了です。元の変更から再試行してください。' :
       stale ? '内容が更新されています。選択は保持しています。取り消して選び直してください。' :
-      !ready && conflict ? '候補の状態を確認できないため解消できません。保存内容は保持しています。' :
-      host.authority.readOnly ? 'このタブは閲覧専用です。編集用タブで確定し、保存状態を確認してください。' :
-      select.value ? 'この選択はまだ保存されていません。' : '開始シーンが競合しています。自動では選びません。'));
+      !ready && conflict ? '候補の状態を確認できないため解消できません。元の変更は保持しています。' :
+      host.authority.readOnly ? 'このタブは閲覧専用です。編集用タブで確定し、再開用データを確認してください。' :
+      select.value ? 'この選択はまだ適用されていません。' : '開始シーンが競合しています。自動では選びません。'));
   };
   select.addEventListener('change', () => { feedback = ''; render(); changed(); });
   cancel.addEventListener('click', () => {
@@ -62,7 +62,7 @@ export function createMetadataStartupControls(document: Document, host: SavedWor
       if (disposed) return;
       select.value = ''; token = ''; feedback = ''; session()?.refreshHistory(); render(); changed();
     };
-    const failed = (error: unknown) => { if (!disposed) { feedback = error instanceof Error ? error.message : '保存できません。選択は保持しています。'; render(); changed(); } };
+    const failed = (error: unknown) => { if (!disposed) { feedback = error instanceof Error ? error.message : '適用できません。選択は保持しています。'; render(); changed(); } };
     const current = session();
     if (current) current.applyWorking(() => host.resolve(before, command), confirmed, failed);
     else ack.run(() => host.resolve(before, command), confirmed, failed, () =>

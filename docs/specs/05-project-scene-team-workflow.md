@@ -2408,6 +2408,34 @@ save retry/cold reopen, normal editing after resolution and two-person return/
 replay. No new ProjectAnchor/unplaced authoring, general re-anchor or schema,
 new wire/body input, separate PoC or intermediate human gate is included.
 
+**Real-file field-resolution connection under §8 (2026-09-14):**
+The limited GLB/PNG validation workspace uses the same full field forms above,
+not only Caption text: anchor/color, Scene name/entry View, and View
+name/order/camera/solid background. No new command, source schema or file profile.
+Capture the complete typed command and token when confirmation is pressed;
+failed work must not reread mutable controls on retry. All forms contribute to
+the existing Session/file/Project/mode/IME/readonly/stale/dispose guards.
+Anchor comparison checks the current visible owner, without revealing hidden
+models or claiming internal resume data is a saved external file. Warm receipt
+and resolution retain Scene/camera; Project startup-default recovery remains
+the existing separate cold-entry control, not a guessed fallback.
+Reuse field and real-file tests for complete/absent values, no preselected
+winner, read-only preview, exact retry, subsequent edits and Contribution
+return/replay/cold reopen. Recorded DOM and injected viewport evidence does not
+close browser, physical-device, offline or normal-entry adoption.
+
+The real-file return check found an existing encoding defect: entry-absence
+resolution wrote a temporary `null`, which 06's original-history summary correctly
+rejects. Optional View references remain absent, never nullable. For the causal
+set/delete needed by absent/absent resolution, reuse an exact valid View ID already
+written at that same Scene's defaultViewId address in complete original scalar
+history, including same-change overwritten writes. It is immediately deleted in
+the same new change; no reference/default/candidate is published from that witness.
+Do not create a phantom ID, choose another Scene/View or weaken historical-value
+checks. Bound the original inspection by existing metadata limits, and refuse
+before mutation if no such witness exists. Already invalid original changes stay
+untouched and fail existing package inspection; this repair is not a migration.
+
 **Model membership resolution implementation boundary (2026-09-12):**
 The model-membership keep-one command follows §8 independently of keep-both:
 `resolveAssetMembership` carries Scene/Asset, all observed active edge IDs,

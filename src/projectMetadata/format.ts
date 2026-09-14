@@ -81,6 +81,18 @@ export async function inspectOriginalSource(doc: PhysicalDoc, proof: MetadataPro
 export function inspectPhysical(doc: PhysicalDoc, inputProof: MetadataProof, limits: MetadataLimits): ProjectCandidateInput {
   return inspectPhysicalDetail(doc, inputProof, limits).input;
 }
+/** Encoding witness only, never a selected/default View. Include overwritten original scalars. */
+export function originalEntryWitness(doc: PhysicalDoc, proof: MetadataProof, limits: MetadataLimits, sceneId: string): string {
+  const detail = inspectPhysicalDetail(doc, proof, limits, { maxNodes: limits.maxNodes, maxWork: limits.maxWork });
+  let work = detail.workUsed;
+  for (const op of detail.scalars) {
+    if (++work > limits.maxWork) fail('original-work-budget');
+    if (op.path.length !== 3 || op.path[0] !== 'scenesById' || op.path[1] !== sceneId || op.path[2] !== 'defaultViewId' || op.value.kind !== 'value') continue;
+    const value = op.value.value;
+    if (typeof value === 'string' && /^view_[0-9a-f]{32}$/.test(value)) return value;
+  }
+  return fail('entry-absence-witness');
+}
 function inspectPhysicalDetail(doc: PhysicalDoc, inputProof: MetadataProof, limits: MetadataLimits, originalBudget?: OriginalInspectionBudget) {
   const proof = checkedProof(inputProof, limits), rootHash = proof.envelope.lineageProof.rootChangeHash;
   const bytes = checkedChanges(A.getAllChanges(doc), limits);

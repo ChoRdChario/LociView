@@ -2043,6 +2043,135 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     for (const b of [...f.local.source!.originalChanges(), ...reply.current.source!.originalChanges()]) expect(originals.get(A.decodeChange(b).hash)).toEqual(b);
     await cold.dispose();
   }, 30000);
+  it('connects real-file pin, Scene and View choices, preserves warm display and explicitly recovers cold startup before returning edits', async () => {
+    const f = await openFileCaption(), { host, captionId } = f, sceneId = f.s.sceneId, secondScene = `scn_${newId()}`, viewId = `view_${newId()}`;
+    const capture = () => ({ camera: { position: [1, 2, 8] as const, target: [0, 0, 0] as const, up: [0, 1, 0] as const,
+      projection: { kind: 'perspective' as const, verticalFovRadians: 0.7 } }, background: { kind: 'solid' as const, colorSrgb: [0.2, 0.3, 0.4] as const } });
+    await host.authority.authorScene!(host.read().source!.token, { kind: 'createScene', sceneId: secondScene, sourceSceneId: sceneId,
+      activeSceneId: sceneId, name: '詳細', orderKey: 'B', membershipIds: [`sam_${newId()}`], eventId: `evt_${newId()}` });
+    const write = (changes: Record<string, string>) => host.authority.write(host.read().source!.token, changes, { sceneId });
+    await write({ [`view/${viewId}/identity`]: json({ id: viewId, sceneId, projectFrameId: f.s.snapshot.resources.projectFrameId }),
+      [`view/${viewId}/name`]: '入口', [`view/${viewId}/order`]: 'M', [`view/${viewId}/camera`]: json(capture().camera),
+      [`view/${viewId}/background`]: json(capture().background), [`view/${viewId}/lifecycle`]: json({ state: 'active', reason: 'initial', eventId: `evt_${newId()}` }) });
+    await write({ [`scene/${sceneId}/entry`]: json(viewId) });
+    const seed = host.read().source!, original = host.authority.read(), anchor = original.resources.captions[captionId]!.anchor;
+    if (anchor.kind !== 'value' || anchor.value.kind !== 'asset') throw Error('asset anchor');
+    const assetId = anchor.value.assetId, initialFile = await host.workspaceOutput.download(await host.workspaceOutput.generate(seed.token));
+    const base = host.workspaceOutput.bases[0]!.selection, peer = firstWorkspaceRecipient(); await peer.receiver.importWorkspace(initialFile);
+    await write({ [`caption/${captionId}/anchor`]: json({ ...anchor.value, positionAsset: [1, 2, 3] }) });
+    await write({ [`caption/${captionId}/color`]: '#123456', [`caption/${captionId}/body`]: '手元の記録' });
+    await host.authority.authorScene!(host.read().source!.token, { kind: 'renameScene', sceneId, name: '手元のシーン' });
+    await write({ [`view/${viewId}/name`]: '手元の視点', [`view/${viewId}/camera`]: json({ ...capture().camera, position: [3, 2, 8] }),
+      [`view/${viewId}/background`]: json({ kind: 'solid', colorSrgb: [0.4, 0.5, 0.6] }) });
+    await write({ [`view/${viewId}/order`]: 'A' }); await write({ [`scene/${sceneId}/entry`]: 'null' });
+    await host.authority.authorScene!(host.read().source!.token, { kind: 'setDefaultScene', sceneId: secondScene });
+    const remoteAnchor = { ...anchor.value, positionAsset: [4, 2, 1] }, remoteCamera = { position: [9, 3, 6], target: [1, 1, 0], up: [0, 1, 0],
+      projection: { kind: 'orthographic', verticalSpan: 12.34567 } }, remoteBackground = { kind: 'solid', colorSrgb: [0.1234567, 0.8, 0.2] };
+    const fields: ['captionsById' | 'scenesById' | 'viewsById', string, string, unknown][] = [['captionsById', captionId, 'anchor', remoteAnchor], ['captionsById', captionId, 'colorSrgb', undefined],
+      ['scenesById', sceneId, 'name', '受信側のシーン'], ['scenesById', sceneId, 'defaultViewId', viewId],
+      ['viewsById', viewId, 'name', '受信側の視点'], ['viewsById', viewId, 'orderKey', 'Z'],
+      ['viewsById', viewId, 'camera', remoteCamera], ['viewsById', viewId, 'background', remoteBackground]];
+    // Concurrent whole-field source fixture. Import still uses the real archive/content/history checks.
+    const doc = A.change(A.load<Record<string, any>>(seed.encodeFullSource()), d => {
+      for (const [map, id, key, value] of fields) {
+        delete d[map][id][key]; if (value !== undefined) d[map][id][key] = new A.ImmutableString(json(value));
+      }
+      delete d.project.defaultSceneId; d.project.defaultSceneId = new A.ImmutableString(json(sceneId));
+    });
+    const remote = ProjectMetadataSource.fromFullSource(A.save(doc), seed.proof, metadata), contentFS = new TestFS(),
+      content = new ValidationContent(contentFS, f.store, budget, decode);
+    const provider = await underWriteLease(contentFS, () => readProjectScene(remote.read(), metadata, content.verifier(true)));
+    const publication = newId(), send = await WorkspaceSourceCapture.prepare({ read: async () => ({ state: 'ready', source: remote, provider, publication }) }, remote.token, f.store, metadata);
+    const chunks: BlobPart[] = []; await writeWorkspaceArchive(send, f.store, new WritableStream({ write: b => { chunks.push(b.slice() as BlobPart); } }),
+      { packageId: `pkg_${newId()}`, createdByVersion: 'validation' }); const incoming = new Blob(chunks);
+    await peer.receiver.receive((await peer.session.read()).source!.token, incoming);
+    f.workspace.unmount();
+    let display: ReturnType<typeof syntheticDisplay> | undefined;
+    const recall = vi.fn(), background = vi.fn(), factory = vi.fn(() => ({ update(next: Parameters<ReturnType<import('../src/harness/projectScene/viewportHost').ViewportFactory>['update']>[0]) {
+      if (next.readOnly) throw Error('editor'); display = next;
+    }, setActive() {}, capture, recall, setBackground: background, camera() {}, retry() {}, dispose() {},
+    read: () => ({ token: 'local-camera', ready: true, issue: null, dragging: false, projection: 'perspective' as const, axis: null, pins: [] }) }));
+    const ports: ValidationWorkspacePorts = { fileLimits: budget, decode, list: async () => [], selected() {}, open: async () => host,
+      render: async () => ({ factory, dispose() {} }) };
+    let u = createValidationWorkspace(new RecordedDocument().asDocument(), ports, f.options.run), root = record(u.root);
+    const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    const named = (label: string, parent = root) => all(parent).find(n => n.attributes.get('aria-label') === label)!;
+    const button = (text: string, parent = root) => all(parent).find(n => n.tag === 'button' && n.textContent === text)!;
+    const choose = (node: RecordedNode, value: string) => { node.value = value; node.fire(node.tag === 'select' ? 'change' : 'input'); };
+    const mounted = () => vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true));
+    await mounted();
+    // The warm editor's explicit Scene remains local even while its shared startup changes.
+    button('手元のシーン', named('シーン')).fire('click'); expect(display!.sceneId).toBe(sceneId); const factoryCount = factory.mock.calls.length;
+    const input = named('更新ファイルを選択'), receive = input.parent!.parent!;
+    Object.assign(input, { files: [incoming] }); input.fire('change'); receive.fire('submit', { preventDefault() {} });
+    await vi.waitFor(() => expect(all(root).some(n => n.textContent === '更新を受け取りました。')).toBe(true), { timeout: 10000 });
+    Object.assign(input, { files: [] }); button('選択を取り消す', receive).fire('click');
+    const p = () => { const value = host.read().provider; if (value?.kind !== 'scene-provider') throw Error('provider'); return value; };
+    const list = named('未解決の候補'); expect(list.children).toHaveLength(8);
+    expect(display!.sceneId).toBe(sceneId); expect(display!.models.every(m => m.shape === 'saved-glb')).toBe(true);
+    expect(display!.pins.some(pin => pin.id === captionId)).toBe(false); expect(p().state.defaultSceneId.kind).toBe('unresolved');
+    for (const [map, id, key, remoteValue] of fields) {
+      const expected = key === 'defaultViewId' ? undefined : remoteValue;
+      const field = p().inspection.candidates.fields.find(c => c.path.join('/') === `${map}/${id}/${key}`)!;
+      expect(field.candidates).toHaveLength(2);
+      const selected = field.candidates.find(c => expected === undefined ? c.value.kind === 'absent' : c.value.kind === 'value' && json(c.value.value) === json(expected))!;
+      const form = list.children.find(n => all(n).some(c => c.tag === 'option' && c.value === selected.operationId))!;
+      const select = all(form).find(n => n.tag === 'select')!, confirm = button('競合を解消', form), before = host.read().source!;
+      expect(select.value).toBe(''); expect(confirm.disabled).toBe(true); choose(select, selected.operationId);
+      expect(host.read().source!.token).toBe(before.token); expect(recall).not.toHaveBeenCalled(); expect(background).not.toHaveBeenCalled();
+      if (key === 'anchor') {
+        expect(display!.preview).toEqual(pointInProject(remoteAnchor.positionAsset as [number, number, number], original.modelVersions![0]!.closure.binding.assetToProject));
+        expect(display!.pinEdit).toBeUndefined(); expect(display!.pins.some(pin => pin.id === captionId)).toBe(false);
+        f.fs.reject = path => path.endsWith('/published.json'); confirm.fire('click');
+        await vi.waitFor(() => expect(host.authority.status!().kind).toBe('failed'));
+        expect(host.read().source!.token).toBe(before.token);
+        const paths = (await f.fs.list(`${validationArea}/${f.options.run}/`)).filter(path => path.endsWith('.amchange'));
+        const bytes = await Promise.all(paths.map(path => f.fs.readBytes(path)));
+        select.value = field.candidates.find(c => c.operationId !== selected.operationId)!.operationId;
+        f.fs.reject = () => false; button('更新を再試行', named('更新の確認')).fire('click');
+        await vi.waitFor(() => expect(host.read().source!.token).not.toBe(before.token));
+        expect(await Promise.all(paths.map(path => f.fs.readBytes(path)))).toEqual(bytes);
+      } else {
+        Object.assign(input, { files: [incoming] }); input.fire('change'); confirm.fire('click');
+        expect(confirm.disabled).toBe(true); expect(host.read().source!.token).toBe(before.token);
+        Object.assign(input, { files: [] }); button('選択を取り消す', receive).fire('click'); confirm.fire('click');
+      }
+      await vi.waitFor(() => expect(list.children.includes(form)).toBe(false));
+      expect(p().details.mutable[map][id]![key]).toEqual({ kind: 'value', value: expected });
+      expect(display!.sceneId).toBe(sceneId); expect(factory).toHaveBeenCalledTimes(factoryCount);
+      expect(recall).not.toHaveBeenCalled(); expect(background).not.toHaveBeenCalled();
+    }
+    expect(host.authority.read().resources.captions[captionId]!.body).toEqual({ kind: 'value', value: '手元の記録' });
+    expect(host.authority.read().modelVersions).toEqual(original.modelVersions);
+    expect(host.authority.read().state.assetMemberships).toEqual(original.state.assetMemberships);
+    all(root).find(n => n.className === 'lv-caption-select')!.fire('click');
+    const detail = named('キャプションの詳細'); choose(named('本文', detail), '解消後の記録'); button('変更を適用', detail).fire('click');
+    await vi.waitFor(() => expect(host.authority.read().resources.captions[captionId]!.body).toEqual({ kind: 'value', value: '解消後の記録' }));
+    expect(p().details.mutable.captionsById[captionId]!.colorSrgb).toEqual({ kind: 'value', value: undefined });
+    const warm = host.read().source!; await u.dispose();
+    const cold = await openValidationHost(f.options); factory.mockClear();
+    u = createValidationWorkspace(new RecordedDocument().asDocument(), { ...ports, open: async () => cold }, f.options.run); root = record(u.root); await mounted();
+    expect(factory).not.toHaveBeenCalled(); expect(named('開始シーンの競合').hidden).toBe(false);
+    const startup = named('残す開始シーン'); expect(startup.value).toBe(''); expect(button('開始シーンを確定').disabled).toBe(true);
+    const coldProvider = cold.read().provider!; if (coldProvider.kind !== 'scene-provider') throw Error('provider');
+    const selected = coldProvider.inspection.candidates.fields.find(c => c.path.join('/') === 'project/defaultSceneId')!.candidates
+      .find(c => c.value.kind === 'value' && c.value.value === sceneId)!;
+    choose(startup, selected.operationId); button('開始シーンを確定').fire('click');
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce()); expect(display!.sceneId).toBe(sceneId);
+    expect(cold.read().source!.originalChanges()).toHaveLength(warm.originalChanges().length + 1);
+    await cold.authority.write(cold.read().source!.token, { [`view/${viewId}/name`]: '解消後の視点' }, { sceneId });
+    await cold.authority.authorScene!(cold.read().source!.token, { kind: 'renameScene', sceneId, name: '解消後のシーン' });
+    const final = cold.read().source!, reply = await cold.workspaceOutput.download(await cold.workspaceOutput.generateContribution(final.token, base));
+    const received = await peer.receiver.receive((await peer.session.read()).source!.token, reply);
+    expect(received.source!.heads).toEqual(final.heads);
+    expect(new Map(received.source!.originalChanges().map(b => [A.decodeChange(b).hash, b]))).toEqual(new Map(final.originalChanges().map(b => [A.decodeChange(b).hash, b])));
+    expect((await peer.receiver.receive(received.source!.token, reply)).source!.token).toBe(received.source!.token);
+    await u.dispose(); const reopened = await openValidationHost(f.options);
+    expect(reopened.read().source!.originalChanges()).toEqual(final.originalChanges()); expect(new SyntheticSession(reopened.authority).sceneId).toBe(sceneId);
+    expect(reopened.authority.read().resources.captions[captionId]!.anchor).toEqual({ kind: 'value', value: remoteAnchor });
+    expect(reopened.authority.read().viewData!.records[viewId]!.camera).toEqual({ kind: 'value', value: remoteCamera });
+    expect(assetId).toBe(reopened.authority.read().modelVersions![0]!.assetId); await reopened.dispose();
+  }, 60000);
   it('restores a received Caption parent, explicitly reattaches, keeps independent duplicates and returns their edits through real files (recorded DOM)', async () => {
     const f = await initialWorkspaceHostFixture(source => {
       const doc = A.change(A.load<Record<string, any>>(source.encodeFullSource()), d => {

@@ -12,8 +12,8 @@ resume and recovery. Desktop, physical iPhone and offline acceptance must cover
 the new route. Scope is 62 of the 64 inventory groups; M13/M14 remain later work.
 Neither component counts nor synthetic-host success is product completion or release approval.
 
-Next approved work is [remaining real-file field conflicts](#next-connected-unit).
-Independent real-model copy/edit/return is verified below; Native 07 §11 still
+Next approved work is [received material conflict resolution](#next-connected-unit).
+Real-file pin/Scene/View resolution is verified in the limited host below; Native 07 §11 still
 requires its separate concrete compatibility decision.
 
 ## Completed unit — recover and independently edit received Captions
@@ -218,7 +218,7 @@ budget, wire/schema, public fixture or release change. Only result prose changed
 after the reviewed/tested source and test tree. This remains recorded DOM/GLTF
 evidence, not live browser/device acceptance.
 
-## Next connected unit
+## Completed unit — resolve received pin, Scene and View fields
 
 Real-file update → explicit Caption position/color and
 Scene/View field resolution → continued editing → Contribution return/replay/cold
@@ -227,16 +227,69 @@ comparison viewport already exist; the validation host currently hides those
 forms. Project startup-default recovery is already mounted separately, not a
 missing UI to rebuild.
 
-- [ ] Specify and enable those forms with existing typed commands. Preserve complete
+Starting checkpoint: `b669e3c`, clean `g0-baseline`. The preceding real-model
+copy/edit/return unit is committed; no runtime checks are repeated for that commit.
+This unit closes existing field-resolution forms in the same real-file host.
+
+The connected return check exposed a contract discrepancy: `resolveEntryView`
+wrote a temporary `null` before deleting an optional View reference. The full
+original-history summary correctly rejects that scalar even though the final
+projection is absent. Repair the writer under existing 05/06, not the summary or
+schema: reuse a valid exact same-address original View ID solely as a same-change
+set/delete witness. Read all original scalars, including overwritten values; no
+invented reference or semantic winner. Refuse before mutation if no witness exists.
+Old invalid source remains retained/rejected, not silently rewritten. Independent
+read-only diagnosis confirms this bounded repair and the collapsed-history pitfall.
+
+- [x] Specify and enable those forms with existing typed commands. Preserve complete
   and absent candidate values, and capture the exact command before asynchronous apply.
-- [ ] Match hidden-owner preview messaging to actual visible-model behavior without
+- [x] Match hidden-owner preview messaging to actual visible-model behavior without
   auto-revealing the model. Check warm camera retention and cold explicit startup
   choice separately, with input/pending/stale/IME/readonly/dispose protection.
-- [ ] Reuse existing field and real-file tests for continued edits, exact retry,
+- [x] Reuse existing field and real-file tests for continued edits, exact retry,
   Contribution return/replay/cold reopen; finish one review and serial final checks.
 
 No new schema/PO policy, PoC, additional lifecycle repair, Native conversion,
 Point/GS/Proxy, normal-entry or adoption credit belongs to that connection.
+
+The connected file flow passes all eight field forms, absence for color and Scene
+entry View, no automatic winner or warm viewport remount/recall, original-byte
+publication retry, normal Caption editing without color backfill, cold startup
+choice, normal Scene/View editing and exact Contribution return/replay/reopen.
+The initial test setup used the conflict port for ordinary edits and mixed View
+order with recapture; it now uses the existing write/authorScene ports and legal
+separate order command. A fixture publication token was also made stable. No
+runtime policy was relaxed. Independent review of the forms and later witness
+repair found no remaining mandatory finding. Final focused checks passed (12 cases,
+51.09s combined test time). Final serial typecheck, root suite (112 files,
+2,289 passed / 21 existing TODO, 483.31s), normal build and harness build passed on
+the reviewed source/test tree. Existing Node image-decoder/UUID and build chunk
+warnings remain; they are not physical-device evidence. Documentation links (186)
+and diff checks pass. Only result/next-work prose changed after runtime checks.
+This is synthetic GLB/PNG content with actual file formats, recorded DOM and an
+injected viewport/storage runtime, not live browser, iPhone, offline or ordinary-home
+acceptance. No new PoC, dependency, public fixture or release change. The approved
+critical path still closes continued editing after received changes; material
+conflicts are the next concrete interruption to that workflow.
+
+## Next connected unit
+
+Receive competing material settings → explicit
+whole-field choice / duplicate same-target keep-one → normal edit/reset → Contribution
+return/replay/cold reopen. Read-only investigation and source check confirm current
+`MaterialSession` review is only guidance, typed commands refuse conflicts, and the
+old duplicate resolver writes through `WorkingHistory`, not this metadata Session.
+Specify the finite commands and complete candidate/target validation before coding,
+then connect the existing file/editor guards. Reuse existing material/file tests;
+no new probe, soft transparency/profile expansion, general relation repair, Native
+conversion or ordinary-entry/device adoption. A concrete contract ambiguity is a
+stop condition; routine sequencing and focused repair do not require another PO wait.
+
+- [ ] Specify finite material resolution commands and whole-candidate validation.
+- [ ] Connect the real-file host through the Metadata Session; retain retry,
+  pending/input guards and warm Scene/camera state.
+- [ ] Verify receive → resolve → normal edit/reset → exact return/replay/reopen
+  with existing tests, then one final serial verification/review/checkpoint.
 
 ## Pending decision — Native conversion implementation
 

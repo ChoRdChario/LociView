@@ -7,7 +7,7 @@ import { immutableKinds, object, same } from '../domain/projectGraphSupport';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import type { ProjectProviderRead } from '../scene/projectProvider';
 import { planMetadataEdit, type MetadataEdit } from './commands';
-import { adapterFormatVersion, checkedChanges, checkedProof, checkLimits, fail, inspectPhysical, inspectOriginalSource, scalar, MetadataSourceError,
+import { adapterFormatVersion, checkedChanges, checkedProof, checkLimits, fail, inspectPhysical, inspectOriginalSource, originalEntryWitness, scalar, MetadataSourceError,
   type MetadataLimits, type MetadataProof, type PhysicalDoc, type OriginalInspectionBudget } from './format';
 
 export type { MetadataLimits, MetadataProof } from './format';
@@ -124,6 +124,8 @@ export class ProjectMetadataSource {
     if (expectedToken !== this.token || provider.kind !== 'scene-provider' || provider.token !== this.token) return fail('stale-token');
     if (!/^[0-9a-f]{32}$/.test(transactionId)) return fail('transaction-id');
     const edits = planMetadataEdit(provider, command, this.limits), creating = new Set<string>();
+    const entryWitness = command.kind === 'resolveEntryView' && edits.some(edit => edit.map !== 'project' && edit.remove?.includes('defaultViewId'))
+      ? originalEntryWitness(this.doc, this.proof, this.limits, command.sceneId) : undefined;
     for (const edit of edits) if (edit.create) {
       if (creating.has(edit.id) || Object.keys(projectRecordMaps).some(map => Object.hasOwn(this.doc[map], edit.id))) fail('record-id-exists');
       creating.add(edit.id);
@@ -158,7 +160,7 @@ export class ProjectMetadataSource {
           if (command.kind === 'resolveCaptionField' && field === 'colorSrgb')
             draft[edit.map][edit.id][field] = scalar([0, 0, 0], this.limits);
           if (command.kind === 'resolveEntryView' && field === 'defaultViewId')
-            draft[edit.map][edit.id][field] = scalar(null, this.limits);
+            draft[edit.map][edit.id][field] = scalar(entryWitness!, this.limits);
           delete draft[edit.map][edit.id][field];
         }
       }
