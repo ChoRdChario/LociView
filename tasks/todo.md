@@ -12,6 +12,43 @@ resume and recovery. Desktop, physical iPhone and offline acceptance must cover
 the new route. Scope is 62 of the 64 inventory groups; M13/M14 remain later work.
 Neither component counts nor synthetic-host success is product completion or release approval.
 
+## Active unit — Native conversion implementation decision
+
+Previous goal turn was progress: the connected review edit-copy checkpoint is
+`9e49571`; the worktree is clean. The next user outcome is Native file → confirmed
+conversion → independent Project → edit/cold reopen, with a retained common
+baseline for later Native changes. This turn closes its concrete implementation
+decision, not another probe or adoption claim.
+
+- [x] Compare 07/05 §9 with actual Native and metadata readers; identify exact
+  mapping/encoding gaps rather than reopening approved product policies.
+- [x] Record one bounded technical implementation proposal in existing 07, covering
+  compatibility, field preservation, initial durable handoff and later bridge roots.
+- [x] Obtain read-only independent review, check document consistency/links and
+  prepare the remaining technical authorization as one request.
+
+07 §11 now proposes map-2/wire-2/summary-2/review-2 with old-file/job preservation,
+known unplaced/pin-scale/inactive-chroma fields, an exact typed control layout and
+separate initial Native source/purpose. Source inspection found real differences
+in encounter order, per-instance material scope and chroma color/distance/softness
+semantics; they are specified as mapping requirements, not silently dropped.
+Independent reviews corrected chroma direct-copy assumptions and its disabled/
+copy semantics; no mandatory findings remain in the decision draft. Four docs
+only; local links and diff checks passed. No runtime suite/build was repeated or
+new conversion/profile/adoption claimed. Execution byte/profile/receipt tables
+still precede their respective code under the requested authority.
+
+Next action requires PO approval of 07 §11's concrete compatibility amendment
+and isolated implementation-before-measured-adoption order. This is the first
+grouped request at that boundary, not a renewed request for previously approved
+unplaced preservation or general development sequencing. The practical-team goal
+is active and incomplete; do not implement the new format while approval is pending.
+
+No product code, new dependency, source mutation, public fixture, normal entry,
+release or device route changes. Stop at the actual schema/recipe authority
+boundary; recipe hashes and adoption evidence are outputs to freeze after an
+authorized implementation, never invented evidence in an advance proposal.
+
 ## Previous evidence — selected Scene review output → standalone View
 
 Independent-copy output/input, editing and cold reopen are committed at `cc99bcd`.
@@ -213,7 +250,7 @@ New policy/compatibility/major architecture decisions retain their explicit appr
 
 PO renewed permission for timely checkpoint Push on 2026-09-14. Use existing
 `g0-baseline`; verify remote, scope, privacy and triggered workflows first.
-At the start of this unit, cached origin was 0 behind / 76 ahead; no live fetch
+At the start of Native decision preparation, cached origin was 0 behind / 77 ahead; no live fetch
 was used for that observation. Previous environment denial is separate from PO permission:
 do not retry a denied action unchanged or bypass it. Local implementation need not wait.
 `main`, Pages, Service Worker, license/version and public release remain separately gated.

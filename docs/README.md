@@ -20,7 +20,7 @@ record executed evidence and connections; do not infer those from a document tit
 | LociMyu → Native conversion | [specification 04](specs/04-locimyu-conversion.md) |
 | Project/Scene team work and TEAM-FLOW-01 | [specification 05](specs/05-project-scene-team-workflow.md), especially §§7.5, 12.6, 13.2 |
 | Workspace, Contribution, backup, review, clean copy | [specification 06](specs/06-project-package-wire.md), especially §§8, 11–12 and section-local status |
-| New Native/v1/LociMyu migration and late Native changes | [specification 07](specs/07-project-scene-migration.md), including its remaining recipe/profile gates |
+| New Native/v1/LociMyu migration and late Native changes | [specification 07](specs/07-project-scene-migration.md), including §11's grouped technical decision and remaining recipe/profile gates |
 | UI intent, writing, visual tone and interaction | [UI product guidelines](ui-product-guidelines.md); [UI task mapping](../tasks/uiux-handoff.md) for historical audit evidence |
 | Ownership, license or sponsorship | [licensing](licensing-and-ownership.md), [sponsorship](sponsorship-policy.md); direction is not adoption or a license grant |
 

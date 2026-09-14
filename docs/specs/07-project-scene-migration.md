@@ -813,3 +813,246 @@ service tests after authority is granted, then freeze descriptor/specification/
 golden hashes from their exact bytes. Hash placeholders, profile IDs alone, and
 raw ZIP hashes cannot prove the complete recipe. No full migration acceptance is
 claimed by this finite mapping recommendation.
+
+## 11. Concrete Native implementation decision (proposed, 2026-09-14)
+
+**PO TECHNICAL DECISION PENDING; NO CODE OR ADOPTION AUTHORITY FROM THIS TEXT.**
+This consolidates §10's remaining decision against source checkpoint `9e49571`.
+It does not reopen the approved preservation of unplaced records, explicit
+conflicts/keep-both, source preservation, team roles or five file purposes.
+The requested decision is the following versioned compatibility amendment and
+its implementation-before-measured-adoption order. It is not procedural delegation.
+
+### 11.1 Separate new encoding; preserve existing files and jobs
+
+| Boundary | Existing path, unchanged | Proposed Native-capable path |
+|---|---|---|
+| Domain header | Existing accepted major-2 records and unknown-minor rules | `{major:2,minor:1}` with the known fields in §11.2 |
+| Metadata envelope | `lociview-automerge-atomic-map-1` | `lociview-automerge-atomic-map-2`; same `automerge-root-change-v1` proof kind, different checked root grammar |
+| Package discriminator | `wireVersion:'1'`, existing closed purpose shapes | `wireVersion:'2'`, same five purposes and exact ZIP/control rules; new adapter/summary/review profile below |
+| Summary | `lociview-project-summary-1` | `lociview-project-summary-2`, accounting for pin scale and typed migration evidence |
+| Review snapshot | `{kind:'lociview-project-scene-review',version:'1'}` | Same kind with `version:'2'`, typed unplaced anchor and owner pin scale |
+
+Version dispatch checks the complete combination, not independently expanded
+enums. Wire 1 retains map-1/summary-1/review-1; wire 2 accepts only
+map-2/summary-2 or, for review, review-2/summary-2. A declared version with another
+version's structure is invalid. An unknown version is unsupported before any
+Project mutation. Do not strip unknown controls and expose an apparently ready
+domain, relabel an old proof or regenerate old change bytes with the new encoder.
+The app version, Native schema 1, frozen v1 and published compatibility remain unchanged.
+The 2.1 header names the new writer's domain version, not permission to discard
+unknown minor domain values; 02's conservative preservation/copy policy remains.
+Typed migration controls still require their exact known physical profile.
+
+New readers retain old-file read/reopen and existing compatible edits/output.
+Every existing output/retry job uses its captured profile/manifest, not a global
+latest-version constant. This unit does not upgrade an existing map-1 lineage
+in place. A newly converted Native Project has fresh map-2 identity/root; later
+Native input requires its exact registered case/ancestor/foundation. Independently
+converted Projects still cannot exchange changes solely because resource IDs match.
+
+Map-2 keeps the domain's 14 permanent record collections and existing atomic
+domain values. Its genesis additionally creates exactly one permanent
+`projectSceneMigrationSupport` map containing a canonical immutable schema scalar
+`lociview-project-scene-migration-support-1` and an empty permanent `casesById` map.
+Schema/identity/root containers cannot be replaced. Control layout is fixed:
+
+| Logical §5 record | Physical rule |
+|---|---|
+| `casesById[caseId]` | Permanent map introduced once; id/recipe/sourceIdentity/optional baseline are immutable whole scalars |
+| Source-key, portable-ID, receipt and plan registries | Permanent map per named registry; each keyed value is an append-only immutable canonical scalar |
+| `managedUnitsByKey[key]` | Permanent map; key/kind/captionId immutable; permanent `membersById` of immutable endpoint scalars; only `value` is a mutable whole scalar |
+| `birthGroupsByKey[key]` | Permanent map; key/sourceKey/entityKind immutable; permanent append-only `proposalsByDigest`; only `selection` is a mutable whole scalar |
+
+No CRDT list, counter, text or dynamically replaced container is admitted here.
+Attachments' ordered selection remains one canonical array scalar. Every control
+field/ID/ref is validated against §5, not accepted as opaque JSON. Domain/control
+inspection uses the same original DAG, hashes, operation IDs and frontier;
+control-only changes remain empty domain changes, not removed dependencies.
+Projection checks whole guard alternatives before exposing managed relationships
+or new births. Ordinary commands touching a managed subset update its guard in
+the same transaction; unrelated fields and v2-only relations remain independent.
+
+History-free output rebuilds, never copies, this structure. Review-2 contains no
+migration subtree. Clean map-2 contains only the fixed schema plus empty
+`casesById`; no case, recipe, source key, registration, guard, proposal or evidence
+survives. This **proposed physical-scaffold exception** amends §8's literal
+whole-subtree omission for clean only; it retains the same privacy outcome.
+Clean input verifies the empty scaffold. It cannot claim a continuing Native bridge.
+
+### 11.2 Preserve values and user-visible order, not old implementation keys
+
+The following is the implementation contract to close, not a claim that the
+current Native IDs/profiles already satisfy the new provider. Every target ID
+uses §§2–3's registered preimage/full-digest checks; no prefix substitution.
+Retain exact input bytes and decoded source evidence separately from canonical
+target values. Unknown or unrepresentable content is reported before conversion;
+never truncate, guess a winner or silently publish only the convenient subset.
+
+| Native source | Required mapping / current implementation gap |
+|---|---|
+| Project title/frame | Preserve title and unit/handedness/up-axis; re-key frame. Snapshot/generation/old Project ID remain source evidence, never new causal identity. No import-time label trimming. |
+| Asset | Preserve label, frame, exact active-binding relationship and optional `pinScale`. All Assets remain resources, including hidden ones. |
+| Pin scale | Known optional atomic `Asset.pinScale`, finite `[0.001,1000]`; absence displays as 1 but stays absent in metadata. No coordinate/transform/camera multiplication. Preserve on clean and every applicable review owner branch. |
+| Bindings/revisions/classes | Preserve logical distinctions, retained older bindings/revisions, transformations/method, representation sets and exact class/family partition. Re-key references and recompute target immutable digests. Required revision provenance is `origin:'migration'` with sorted unique exact source Representation blob digests; do not invent parent revision/binding, residual or source modelling-tool claims. |
+| Representations | Preserve exact payload bytes, roles/purposes, frames/families, reflection/transform, derived relations and proxy targets. Target bounds, catalog and profile digest come from a pinned content inspector, not Native's profile ID alone. |
+| Caption content | Preserve title/body; convert effective color `#eab308` when absent to its exact sRGB components. Preserve tags and attachment order; do not lose unreferenced Caption resources. |
+| Positioned anchor | Re-key the whole validated owner/frame/revision/class tuple and retain exact position/manual evidence. No surface repick, guessed frame relation or downgrade because its model is hidden. |
+| Unplaced anchor | Adopt exactly 05 §9.4.1 `{kind:'unplaced',ownerAssetId?}`. Preserve known owner or absence; no coordinates/frame/revision. Invalid/conflicted owner or anchor is not ordinary unplaced. |
+| First placement | Existing Caption ID, explicit verified hit plus confirm/cancel; known owner constrains the hit. Unplaced text/media stay editable. Keep-both and five-purpose copying retain the typed anchor and independent later placement. No new general unlink operation. |
+| DisplaySets/default | One Scene per effective set, preserving name and effective user order/default-view relation; exact active set initializes defaultSceneId. DisplaySet-free source uses the frozen fallback helper. Later Scene selection is UI-only. |
+| Asset visibility | Use the observed Native resolver's effective hidden-Asset/active-primary selection. A stored displayMode is not itself proof of effective visibility. Retain all other resources; block a genuinely unrepresentable partial-kind presentation rather than infer memberships. |
+| Scene Caption membership | Exact effective Caption DisplaySet, independent of current filters/selected model. Membership endpoints never change identity. |
+| Order | Native-generated order keys can contain `_`; actual DisplaySet/View/Caption UI order is source-array encounter order, not a sort of those keys. Scene/View/Scene-Caption/Scene-Asset keys are `A` plus zero-based source encounter ordinal in lowercase base36 padded to eight digits, scoped to each destination collection. Attachment keys use that Caption's attachment sequence. Keys are presentation, never ID preimages or source causality; retain raw source order keys separately. |
+| Saved Views | Preserve owning Scene/frame, name, camera/projection/background and effective order. Normalize non-unit camera up and accepted quaternions by the field-specific canonical transform rule, retaining raw source values; never round/trim coordinates or silently replace an invalid camera. Preserve a valid default relation; `null` default becomes absent, not a guessed first view. |
+| Material | Preserve Scene/Asset/authored-Revision/Representation/slot scope and opacity, sidedness, lighting and chroma intent. Prove the Native loader child-path/slot to target catalog relation. Native per-instance cloned material slots cannot be equated to one shared glTF materialIndex. Missing/ambiguous/many-to-one unequal mapping blocks that profile's conversion; never choose by material name or last write. See exact value policy below. |
+| Media/attachments/tags | Preserve every admitted media resource/label/blob, including unreferenced/baseline media. Retain Caption/media attachment identity across reorder. Generated records use registered keys, not random reallocations on retry. Tag resource order follows first encounter across source Captions/labels; raw per-Caption tag order stays in evidence (the target has global Tag order, not ordered tag memberships). Preserve source tag distinctions or report a target-normalization collision. No tag-management feature is added. |
+| Local selection | `captionTargetAssetId` and transient camera/window/filter selection are not shared Project editing state. Disclose that they are not transferred; source remains unchanged. Durable Saved Views and exact default Scene are transferred. |
+| Collaboration baseline | Verify frozen Native baseline/unsupported digests and preserve raw Unicode evidence; map the baseline first, then apply the selected snapshot's supported post-baseline edits. Do not set the current selected snapshot as the common ancestor. |
+
+For accepted numeric values, the existing target canonical quaternion/up-vector
+rules apply; the immutable builder must pin exact normalization operations and
+goldens. Source text is NFC-normalized only for target display/known-field rules,
+with raw text retained in source evidence. Controls/limits or normalization-key
+collisions cannot be repaired by trimming, truncation or merging source identities.
+`displaySets` absence alone invokes the frozen fallback; an empty/malformed set
+array is not equivalent. Optional source color uses the rendered default above,
+not the Native parser's temporary validation default.
+
+**Additional material-schema amendment proposed for this same decision:** map-2
+recognizes optional boolean `appearance.chroma.enabled`; absence means enabled
+when a chroma object is present. `false` retains inactive color/tolerance/softness
+without applying the effect, so disabling/re-enabling does not discard imported
+settings. Chroma absence still means no saved settings/effect. This is one whole
+atomic appearance value. Map-1 semantics do not change. Clean/review-2 preserve
+these ordinary appearance values (including inactive ones), not migration evidence.
+This proposed amendment to 01 §4.2 applies to map-2 only: effect, coverage,
+coupling and backend-capability checks use `chroma present && enabled !== false`.
+Disabled parameters still undergo ordinary value validation and are retained,
+but cannot alone imply mask/blend, reject explicit opaque, or demand a chroma
+backend capability. Map-1's existing coverage semantics remain unchanged.
+
+Native `unlit:true` maps to `lighting:'unlit'`; `false` maps to `inherit`, not `lit`.
+Retain the Native chroma enabled flag, but do not copy its color/tolerance/feather
+numbers directly into target effect settings. Native quantizes the key via
+`chromaHex`, measures unnormalized linear distance and uses
+`smoothstep(tolerance,tolerance+max(feather,0.0001),distance)`; specification 01
+normalizes distance by `sqrt(3)` and treats zero softness as a hard cutoff.
+The per-profile conversion must bind exact key quantization/color space and
+source-base-color semantics, with tolerance divided by `sqrt(3)` and positive
+`max(feather,0.0001)/sqrt(3)` softness where those semantics are proven equal.
+Keep raw source settings in evidence, including while disabled. Never call a
+formula sketch rendered equivalence or silently change hard/soft behavior.
+Coverage/optics must reproduce the original source material plus opacity/chroma
+behavior, not invent a universal blend default.
+The per-profile table must bind source alpha/material semantics, exact slot
+instances and their target coverage before activating that material profile.
+An unsupported instance correspondence remains a visible conversion issue until
+the existing-format inspector/renderer can preserve it; it is not a permanent
+feature deletion or an accepted reason to mark F06 complete.
+
+Source evidence: [Native schema/helpers](../../src/nativeGs/schema.ts),
+[Native resolution](../../src/nativeGs/resolver.ts),
+[material slot identity](../../src/nativeGs/materialSlots.ts),
+[current target fields](../../src/domain/projectMutableFields.ts),
+[GLB catalog](../../src/projectFiles/glbMaterials.ts),
+[current validation profile](../../src/projectFiles/validation.ts).
+The first connected file slice may use the existing closed static GLB/PNG inspector
+only for inputs whose **complete** mapping it proves. That is sequencing, not the
+Native support promise: per-instance materials and remaining existing Native
+Mesh/Point/GS/Proxy/image profiles must be connected before F06/practical-team
+acceptance. No byte transcoding or new media type can be used to bypass a gap.
+Exact per-profile traversal/order/default/slot tables are recorded before that
+profile's builder, then checked with public synthetic whole-output fixtures.
+
+Summary-2 retains summary-1's scope rules but recognizes `assetsById.pinScale` and
+the typed control paths. Distinct case/managed-unit/birth-group keys are technical
+entity classes; their actual scalar paths are deduplicated field classes at the
+same original-history or delta scope. The fixed empty scaffold is not user
+migration evidence. A review/clean summary contains no source-case classes.
+Review-2's closed table adds the above anchor, optional owner pin scale and
+optional `appearance.chroma.enabled`;
+all 06 §12.6 inclusion/omission, conflict and visible-needsReview rules still apply.
+
+### 11.3 Initial conversion is a durable handoff, not a late-input replay
+
+Introduce one separately named initialization source, `nativeInitialPrepared`,
+under a new `importNative` journal purpose. It is neither `importClean` (it retains
+source/baseline evidence) nor §7.2 `preparedMigration` (receiver-base late input).
+Its prepared descriptor binds the source outer digest/length, verified Native
+source identity, recipe descriptor, typed ID/field mapping, exact generated
+metadata/proof/original parts, protected body/evidence roots and final heads.
+The private generation has no predecessor/base heads. The Session is the only
+initialization authority; UI cannot write storage or create ready list entries.
+
+The closed receipt/path/source-record definitions and finite aggregate staging
+budgets must be written and independently checked before coding this new purpose.
+They use current journal/WorkspaceFS primitives, not a parallel persistence
+framework or a direct promotion of the synthetic `preparedMigration` PoC.
+Expected protocol:
+
+1. Inspect the complete Native file and exact payload set without modifying it.
+   Present conversion effects, unsupported items and retained team-history scope.
+   Decline/failure leaves the open Project/drafts/file unchanged.
+2. After confirmation prepare one private destination. For fixed-baseline input,
+   create actual genesis → mapped baseline → foundation → selected post-baseline
+   artifacts → receipt registrations. The ancestor excludes its own registration;
+   foundation excludes selected post-baseline edits and its own hash (§5).
+   For isolated input, record that it has no late-Native bridge entitlement.
+3. Freeze actual metadata/proof, source evidence and original change bytes once.
+   A saved timestamp or recipe alone cannot recreate the Automerge root. Preflight
+   original input + protected CAS bodies + metadata/evidence + temporary overlap
+   before acknowledgment; no whole-buffer fallback or unmeasured capacity claim.
+4. Stage, read back and verify the entire detached graph/guards/closure. Publish
+   final heads and the Project-list completion marker once, then switch the UI.
+   Preserve an explicitly discoverable pending job; never list a partial bootstrap
+   as ready. Existing package-operation/write-lease ordering remains non-nested.
+5. Cold retry uses that destination and retained bytes, including the original
+   selected source while pending. Missing acknowledged evidence means repair,
+   never regeneration or silent new Project. Completion retry is no-op and must
+   preserve edits made afterward. Completed original ZIPs are not secretly shared.
+
+Portable source evidence, mapping baseline, ancestor/foundation metadata and
+original artifacts are typed roots in Workspace/Contribution/backup. Raw source
+ZIPs remain local pending inputs; selected source text/media in shared history is
+disclosed. Clean/review exclude those roots under §11.1. An initial converter
+without the fixed-baseline foundation would prevent the promised later bridge;
+therefore it is not an acceptable shortcut even when late-input UI follows later.
+Neither initial import nor late bridge silently replaces current v2 model bindings.
+
+### 11.4 Authorization requested and finite delivery
+
+Approve the concrete compatibility direction in §§11.1–11.3 for implementation
+in the existing isolated validation/service route, then obtain executable bytes
+and measured adoption evidence. This would amend 05 §9/this document's demand for
+completed immutable goldens before the first converter: the expectations and
+closed per-unit contract precede code; actual golden/recipe/profile hashes are
+frozen from independently reviewed executed output before durable product
+activation. Never insert placeholder hashes or call a draft recipe frozen.
+Development execution descriptors are explicitly candidate-only. They cannot
+masquerade as a frozen recipe or upgrade a previously recorded conversion in
+place after its mapping changes; retain that original input and report the
+unsupported candidate when exact retry is no longer supported.
+The pinned Automerge dependency is unchanged; an encoder difference that cannot
+meet original-byte equality is a real failure, not permission to change expected bytes.
+
+Delivery remains at most three connected units, one writer and existing tests:
+
+1. New-format compatibility and unplaced/pin-scale editing/copying, including
+   ordinary Session operations, explicit first placement and all five purpose
+   closure/privacy. Preserve old-file/retry behavior and reject mixed profiles.
+2. Native file → conversion confirmation → complete new Project → edit/cold reopen,
+   with exact source/body/order/material checks and fixed-baseline preparation.
+   Existing supported profile gaps are filled here/by dependency, not declared done
+   because one GLB works. No normal-home or physical-device acceptance inferred.
+3. Verified late Native file → affected explicit conflicts/independent keep-both →
+   continued v2 editing/return. Cover same-input repack/replay, same old field in
+   different input plans, equal/different concurrent births, local text/placement
+   preservation, two rounds and interruption/cold recovery with exact original bytes.
+
+Use existing package/metadata/conversion fixtures and actual served checks at the
+approved grouped boundaries; no new PoC page or repeated root suite for docs-only
+updates. Frozen-v1 and LociMyu converters remain required separate recipes/mappings,
+not covered by Native evidence. M13/M14, new media, general Undo/tags, in-place
+map-1 upgrade, extra dependencies, main/Pages/Service Worker/license/app version,
+release and new numerical product guarantees remain outside this decision.
