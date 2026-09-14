@@ -12,6 +12,8 @@ import type { LocalOpenMode } from './savedHost';
 import type { ValidationProjectEntry } from './validationCatalog';
 import { createSavedWorkspace } from './metadataWorkspace';
 import { createMetadataConflictControls } from './metadataConflictControls';
+import { createMetadataCaptionLifecycleControls } from './metadataCaptionLifecycleControls';
+import { createMetadataMembershipControls } from './metadataMembershipControls';
 import type { ViewportFactory } from './viewportHost';
 import { createValidationReceiveControls } from './validationReceiveControls';
 import { prepareReviewView, type ReviewView } from './reviewView';
@@ -121,10 +123,17 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     resident = next;
     const fileTools = receiveTools;
     try { workspace = createSavedWorkspace(document, target, next.factory,
-      (session, changed) => createMetadataConflictControls(document, target, session, changed, {
-        captionTextOnly: true,
-        blockedReason: () => fileTools?.hasChanges() ? 'ファイルの操作を終えるか、取り消してから解消してください。' : null,
-      }), fileTools);
+      (session, changed) => {
+        const root = document.createElement('section');
+        const blockedReason = () => fileTools?.hasChanges() ? 'ファイルの操作を終えるか、取り消してから解消してください。' : null;
+        const text = createMetadataConflictControls(document, target, session, changed, { captionTextOnly: true, blockedReason });
+        const lifecycle = createMetadataCaptionLifecycleControls(document, target, session, text.composing, changed, blockedReason);
+        const memberships = createMetadataMembershipControls(document, target, session, text.composing, changed, 'caption', blockedReason);
+        // Only accepted Caption commands: the synthetic Asset-copy path is not activated.
+        const groups = [lifecycle, text, memberships]; root.append(...groups.map(g => g.root));
+        return { root, render: () => { for (const group of groups) group.render(); },
+          hasChanges: () => groups.some(g => g.hasChanges()), dispose: () => { for (const group of groups) group.dispose(); root.remove(); } };
+      }, fileTools);
       content.replaceChildren(workspace.root); workspace.render();
       if (target.backupRestore.needsDisplay) { target.backupRestore.displayReady(target.read().source!.token); workspace.render(); } }
     catch (error) { workspace?.unmount(); workspace = undefined; next.dispose(); resident = undefined; throw error; }

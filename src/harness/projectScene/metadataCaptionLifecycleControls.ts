@@ -1,22 +1,24 @@
-import type { openMetadataHost } from './metadataHost';
+import type { SavedWorkspaceHost } from './savedHost';
 import type { SyntheticSession } from './session';
 import { captionLifecycleRecovery, type CaptionLifecycleResolution } from '../../projectMetadata/captionDeletion';
-import { metadataFixtureLimits as limits } from './metadataFixture';
 import { newId } from '../../projectMetadata/persistence';
 import type { Anchor } from '../../scene/types';
 
 /** One explicit parent-only decision in the existing review area, not a trash browser. */
-export function createMetadataCaptionLifecycleControls(document: Document, host: Awaited<ReturnType<typeof openMetadataHost>>,
-  session: SyntheticSession, composing: () => boolean, changed: () => void) {
+export function createMetadataCaptionLifecycleControls(document: Document, host: Pick<SavedWorkspaceHost, 'read' | 'resolve' | 'limits'>,
+  session: SyntheticSession, composing: () => boolean, changed: () => void, blockedReason: () => string | null = () => null) {
+  const limits = host.limits;
+  let disposed = false;
   const root = document.createElement('section'); root.setAttribute('aria-label', 'キャプションの削除・復元');
   const list = document.createElement('ul');
   const result = document.createElement('p'); result.setAttribute('role', 'status');
   root.append(list, result);
   type Form = { root: HTMLLIElement; token: string; choice: HTMLSelectElement; apply: HTMLButtonElement;
-    cancel: HTMLButtonElement; message: HTMLParagraphElement; ready: boolean; command?: CaptionLifecycleResolution };
+    cancel: HTMLButtonElement; message: HTMLParagraphElement; ready: boolean; command?: CaptionLifecycleResolution; externalMessage?: string };
   const forms = new Map<string, Form>(), dirty = (f: Form) => !!f.choice.value;
-  const blocked = () => session.readOnly || !!session.pending && session.pending !== 'text' || composing();
+  const blocked = () => disposed || session.readOnly || !!session.pending && session.pending !== 'text' || composing() || !!blockedReason();
   const render = () => {
+    if (disposed) return;
     const p = host.read().provider, nodes: HTMLLIElement[] = [], seen = new Set<string>();
     if (p?.kind === 'scene-provider') for (const field of p.inspection.candidates.fields) {
       if (field.path[0] !== 'captionsById' || field.path[2] !== 'lifecycle' || field.path.length !== 3) continue;
@@ -62,17 +64,18 @@ export function createMetadataCaptionLifecycleControls(document: Document, host:
         item.append(heading, note, contents, related, choice, apply, cancel, message);
         const current: Form = { root: item, token: p.token, choice, apply, cancel, message, ready: !!recovery };
         forms.set(id, current); form = current;
-        choice.addEventListener('change', () => { if (session.workingBlock) return; current.command = undefined; render(); changed(); });
-        cancel.addEventListener('click', () => { if (session.workingBlock || composing()) return; forms.delete(id); render(); changed(); });
+        choice.addEventListener('change', () => { if (disposed || session.workingBlock) return; current.command = undefined; render(); changed(); });
+        cancel.addEventListener('click', () => { if (disposed || session.workingBlock || composing()) return; forms.delete(id); render(); changed(); });
         apply.addEventListener('click', () => {
           if (blocked() || !recovery || current.token !== host.read().source?.token || !['active', 'deleted'].includes(choice.value)) return;
           const command = current.command ??= { kind: 'resolveCaptionLifecycle', captionId: id, state: choice.value as 'active' | 'deleted',
             observedOperationIds: recovery.lifecycle.candidates.map(c => c.operationId), eventId: `evt_${newId()}` };
           session.applyWorking(() => host.resolve(current.token, command), () => {
+            if (disposed) return;
             forms.delete(id); session.refreshHistory();
             result.textContent = command.state === 'active' ? 'キャプションを復元しました。「キャプションの追加・除外」で登録を確認できます。削除済みの添付は戻りません。' :
               '削除状態を確定しました。元の内容は履歴に残っています。'; render(); changed();
-          }, error => { message.textContent = error instanceof Error ? error.message : '解消できません。選択は保持しています。'; render(); changed(); });
+          }, error => { if (!disposed) { message.textContent = error instanceof Error ? error.message : '解消できません。選択は保持しています。'; render(); changed(); } });
           render(); changed();
         });
       }
@@ -81,14 +84,19 @@ export function createMetadataCaptionLifecycleControls(document: Document, host:
     for (const [id, form] of forms) {
       if (!seen.has(id)) { if (dirty(form)) nodes.push(form.root); else { forms.delete(id); continue; } }
       const stale = form.token !== host.read().source?.token;
-      form.choice.disabled = !form.ready || session.readOnly || !!session.workingBlock;
+      const externalBlock = blockedReason();
+      if (form.externalMessage && form.message.textContent === form.externalMessage) form.message.textContent = '';
+      form.externalMessage = externalBlock || undefined;
+      form.choice.disabled = !form.ready || session.readOnly || !!session.workingBlock || !!externalBlock;
       form.apply.disabled = !form.ready || !form.choice.value || blocked() || stale;
       form.cancel.disabled = !!session.workingBlock || composing();
       if (stale) form.message.textContent = '内容が更新されています。選択は保持しています。取り消して選び直してください。';
+      else if (externalBlock) form.message.textContent = externalBlock;
       else if (dirty(form) && !form.message.textContent) form.message.textContent = 'この選択はまだ適用されていません。';
     }
     for (const child of Array.from(list.children)) if (!nodes.includes(child as HTMLLIElement)) child.remove();
     for (const [i, node] of nodes.entries()) if (list.children[i] !== node) list.insertBefore(node, list.children[i] ?? null);
   };
-  render(); return { root, render, hasChanges: () => [...forms.values()].some(dirty), hasResult: () => !!result.textContent };
+  render(); return { root, render, hasChanges: () => [...forms.values()].some(dirty), hasResult: () => !!result.textContent,
+    dispose: () => { disposed = true; forms.clear(); root.remove(); } };
 }

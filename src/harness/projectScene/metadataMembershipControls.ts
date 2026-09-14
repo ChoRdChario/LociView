@@ -1,24 +1,27 @@
-import type { openMetadataHost } from './metadataHost';
+import type { SavedWorkspaceHost } from './savedHost';
 import type { SyntheticSession } from './session';
 import { captionCopySource, captionMembershipGroups, assetMembershipGroups, type CaptionMembershipResolution, type AssetMembershipResolution } from '../../projectMetadata/membership';
 import { newId } from '../../projectMetadata/persistence';
-import { metadataFixtureLimits as limits } from './metadataFixture';
 import { assetCopySource } from '../../projectMetadata/modelMembership';
 import { readMetadataModel } from './metadataModelRecords';
 import { allocateModelCopyIds, createFixtureModel, fixtureModelIds } from './modelClosure';
 import type { JsonObject } from '../../domain/values';
 
 /** The same saved host, with an explicit entity-level decision (not a duplicate button). */
-export function createMetadataMembershipControls(document: Document, host: Awaited<ReturnType<typeof openMetadataHost>>,
-  session: SyntheticSession, composing: () => boolean, changed: () => void, kind: 'caption' | 'asset' = 'caption') {
+export function createMetadataMembershipControls(document: Document, host: Pick<SavedWorkspaceHost, 'read' | 'resolve' | 'limits'>,
+  session: SyntheticSession, composing: () => boolean, changed: () => void, kind: 'caption' | 'asset' = 'caption',
+  blockedReason: () => string | null = () => null) {
+  const limits = host.limits;
+  let disposed = false;
   const root = document.createElement('ul'); root.setAttribute('aria-label', kind === 'asset' ? '重複したモデル登録' : '重複した登録');
   type Form = { root: HTMLLIElement; token: string; original: HTMLSelectElement; choice: HTMLSelectElement;
-    apply: HTMLButtonElement; cancel: HTMLButtonElement; message: HTMLParagraphElement; copyReady: boolean };
+    apply: HTMLButtonElement; cancel: HTMLButtonElement; message: HTMLParagraphElement; copyReady: boolean; externalMessage?: string };
   const forms = new Map<string, Form>();
   const dirty = (f: Form) => !!f.original.value || !!f.choice.value;
   const hasChanges = () => [...forms.values()].some(dirty);
-  const blocked = () => session.readOnly || !!session.pending && session.pending !== 'text' || composing();
+  const blocked = () => disposed || session.readOnly || !!session.pending && session.pending !== 'text' || composing() || !!blockedReason();
   const render = () => {
+    if (disposed) return;
     const provider = host.read().provider, nodes: HTMLLIElement[] = [], seen = new Set<string>();
     const groups = provider?.kind === 'scene-provider' ? kind === 'caption' ? captionMembershipGroups(provider, limits) :
       assetMembershipGroups(provider, limits).map(({ assetId, ...g }) => ({ ...g, captionId: assetId })) : [];
@@ -59,8 +62,9 @@ export function createMetadataMembershipControls(document: Document, host: Await
         message.setAttribute('role', 'status'); item.append(heading, preview, original, choice, apply, cancel, message);
         const current: Form = { root: item, token: provider.token, original, choice, apply, cancel, message, copyReady: !!copy || !!modelCopy };
         forms.set(key, current); form = current;
-        original.addEventListener('change', () => { render(); changed(); }); choice.addEventListener('change', () => { render(); changed(); });
-        cancel.addEventListener('click', () => { if (session.workingBlock || composing()) return; forms.delete(key); render(); changed(); });
+        original.addEventListener('change', () => { if (!disposed) { render(); changed(); } });
+        choice.addEventListener('change', () => { if (!disposed) { render(); changed(); } });
+        cancel.addEventListener('click', () => { if (disposed || session.workingBlock || composing()) return; forms.delete(key); render(); changed(); });
         apply.addEventListener('click', () => {
           if (blocked() || current.token !== host.read().source?.token || !edgeIds.includes(original.value) ||
             !['one', 'both'].includes(choice.value) || choice.value === 'both' && !copy && !modelCopy) return;
@@ -82,8 +86,9 @@ export function createMetadataMembershipControls(document: Document, host: Await
               tags: copy!.tags.map(t => ({ sourceId: t.id as string, targetId: `tgm_${newId()}` })),
             })) };
           session.applyWorking(() => host.resolve(current.token, command), () => {
+            if (disposed) return;
             forms.delete(key); session.refreshHistory(); render(); changed();
-          }, error => { message.textContent = error instanceof Error ? error.message : '解消できません。選択は保持しています。'; render(); changed(); });
+          }, error => { if (!disposed) { message.textContent = error instanceof Error ? error.message : '解消できません。選択は保持しています。'; render(); changed(); } });
           render(); changed();
         });
       }
@@ -92,14 +97,18 @@ export function createMetadataMembershipControls(document: Document, host: Await
     for (const [key, form] of forms) {
       if (!seen.has(key)) { if (dirty(form)) nodes.push(form.root); else { forms.delete(key); continue; } }
       const stale = form.token !== host.read().source?.token;
-      form.original.disabled = form.choice.disabled = session.readOnly || !!session.workingBlock;
+      const externalBlock = blockedReason();
+      if (form.externalMessage && form.message.textContent === form.externalMessage) form.message.textContent = '';
+      form.externalMessage = externalBlock || undefined;
+      form.original.disabled = form.choice.disabled = session.readOnly || !!session.workingBlock || !!externalBlock;
       form.apply.disabled = blocked() || stale || !form.original.value || !form.choice.value || form.choice.value === 'both' && !form.copyReady;
       form.cancel.disabled = !!session.workingBlock || composing();
       if (stale) form.message.textContent = '内容が更新されています。選択は保持しています。取り消して選び直してください。';
-      else if (dirty(form) && !form.message.textContent) form.message.textContent = 'この選択はまだ保存されていません。';
+      else if (externalBlock) form.message.textContent = externalBlock;
+      else if (dirty(form) && !form.message.textContent) form.message.textContent = 'この選択はまだ適用されていません。';
     }
     for (const child of Array.from(root.children)) if (!nodes.includes(child as HTMLLIElement)) child.remove();
     for (const [i, node] of nodes.entries()) if (root.children[i] !== node) root.insertBefore(node, root.children[i] ?? null);
   };
-  render(); return { root, render, hasChanges };
+  render(); return { root, render, hasChanges, dispose: () => { disposed = true; forms.clear(); root.remove(); } };
 }
