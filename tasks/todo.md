@@ -12,7 +12,71 @@ resume and recovery. Desktop, physical iPhone and offline acceptance must cover
 the new route. Scope is 62 of the 64 inventory groups; M13/M14 remain later work.
 Neither component counts nor synthetic-host success is product completion or release approval.
 
-## Active unit — Native conversion implementation decision
+## Verified unit — I04 registered media selection and shared image viewing
+
+The Native compatibility amendment below awaits PO authorization. Continue the
+already-approved image workflow without changing a schema, package or profile:
+select an existing verified PNG by thumbnail → explicitly attach → inspect from
+the panel or any retained Caption window in one common viewer. The standalone
+read-only review uses the same viewing controls, not editing commands.
+
+- [x] Connect thumbnail selection and common viewing with existing Session writes.
+- [x] Verify exact Caption/attachment/resource identity, previous/next, close/focus,
+  stale image events, failure/retry and read-only/draft preservation in existing tests.
+- [x] Review the connected final diff, run serial final checks, and record the
+  separate live-browser/device evidence boundary before checkpointing.
+
+Acceptance: selection alone never attaches; existing independent attachments to
+the same resource stay distinct; the viewer follows the bound Caption's attachment
+order without changing Scene/list selection or draft state. Removed/ambiguous
+targets cannot silently become another image. Scene/Project changes dispose the
+old view; load failure and retry retain the exact target. Thumbnail work is lazy
+and bounded by a small UI page, without stored derivatives or new binary I/O.
+
+Exclusions: new media formats, image processing/zoom tools, new persistence/wire,
+Native conversion, ordinary-home activation, new probes/dependencies, device or
+offline acceptance. Browser control previously failed during plugin bootstrap;
+do not call recorded DOM tests live rendering evidence or restart that unrelated
+repair workstream. No repeated full suite merely for documentation or staging.
+
+Focused checks: 14 existing-suite media tests pass (three connected cases added),
+plus three existing saved-PNG/file/review integration cases. They cover explicit
+attachment, retained drafts, exact-target navigation/retry, old event rejection,
+bounded/lazy thumbnails, read-only use and review file → common viewer → edit-copy.
+Independent read-only review found no mandatory issues. Final serial checks passed;
+no live modal/focus, physical-iPhone or offline PASS is implied.
+
+Final typecheck and root tests pass: 112 files, 2,280 PASS / 21 existing TODO,
+355.37s (`npm test -- --reporter=dot --maxWorkers=2 --testTimeout=30000`).
+The first root run found only the existing entry-isolation allowlist rejecting the
+new presentation helper. The exact helper/host imports were added, independently
+reviewed and checked in isolation before the green full rerun; no ordinary-entry,
+storage/network or Native prohibition was relaxed. No product change followed
+that first root run. Ordinary and harness builds passed. Existing mixed-import/
+large-chunk, Repo UUID and injected Node image-loader warnings remain; no limits
+or dependencies changed. Document links, 64-group classification and diff checks
+pass. No server/tunnel was started; Push remains separately constrained by the
+known environment denial, which was not retried.
+
+## Next approved connection, without waiting on the Native amendment
+
+T01/T03: real Workspace/Contribution receive → compare Caption title/body
+candidates → explicit choice/manual text → ordinary edit → cold reopen.
+Reuse the existing conflict form and validation host resolve command, with no
+synthetic receive button. Include the form's pending text/IME in Project/mode/
+file-navigation guards. Preserve original received changes and local edits; do
+not choose a winner, reinterpret absent fields or expand to a new profile/wire.
+Use existing file and conflict tests; this is a connected user flow, not another
+probe. Other field/lifecycle gaps remain explicit, and ordinary adoption stays gated.
+
+- [ ] Adapt the existing read/resolve conflict UI to the real-file host and expose
+  the supported Caption title/body candidates without synthetic receive controls.
+- [ ] Include candidate/manual input and IME in existing navigation/pending guards;
+  preserve stale input, failure/retry and explicit winner selection.
+- [ ] Verify receive → resolve → ordinary edit → cold reopen in existing tests,
+  independently review the connected diff, then checkpoint and continue.
+
+## Pending decision — Native conversion implementation
 
 Previous goal turn was progress: the connected review edit-copy checkpoint is
 `9e49571`; the worktree is clean. The next user outcome is Native file → confirmed
@@ -38,7 +102,7 @@ only; local links and diff checks passed. No runtime suite/build was repeated or
 new conversion/profile/adoption claimed. Execution byte/profile/receipt tables
 still precede their respective code under the requested authority.
 
-Next action requires PO approval of 07 §11's concrete compatibility amendment
+Native implementation requires PO approval of 07 §11's concrete compatibility amendment
 and isolated implementation-before-measured-adoption order. This is the first
 grouped request at that boundary, not a renewed request for previously approved
 unplaced preservation or general development sequencing. The practical-team goal
@@ -216,13 +280,11 @@ area. This is limited GLB/PNG development code, not ordinary-home acceptance.
    flow, not an increased helper/test count, is the completed unit; normal entry
    and adoption remain incomplete. Address data-loss, save-misrepresentation
    and operation-blocking faults immediately.
-2. The connected review → independent edit-copy unit is verified. Next, consolidate
-   the concrete Native conversion contract in existing 07/05 §9: closed input/field/
-   default/order mapping, unplaced anchors and pin scale, versioned portable control
-   encoding, and retained baseline/recipe evidence. Read-only investigation confirms
-   that these technical schema/recipe amendments are not yet ratified; the earlier
-   synthetic bridge GO does not authorize them. Obtain one grouped technical decision
-   and independent review before conversion code. The next user flow is Native file
+2. The connected review → independent edit-copy unit is verified. The concrete Native
+   conversion amendment is recorded and independently reviewed in 07 §11, awaiting
+   one grouped PO decision; the earlier synthetic bridge GO does not authorize the
+   new schema/recipe. While it is pending, close already-approved connections such
+   as I04 above without substituting UI polish for migration. The next user flow is Native file
    → explicit conversion → new Project → edit/cold reopen. Source preservation and
    unplaced-record retention are already approved; do not re-ask those policies.
    Later Native input UI, frozen-v1/LociMyu conversion and other profiles remain

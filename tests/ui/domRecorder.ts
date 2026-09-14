@@ -5,11 +5,15 @@ export class RecordedNode {
   style: Record<string, string> = {}; textContent = ''; className = ''; id = '';
   value = ''; disabled = false; readOnly = false; hidden = false; type = ''; title = ''; placeholder = '';
   checked = false; indeterminate = false;
+  open = false;
   selectionStart: number | null = 0; selectionEnd: number | null = 0;
   scrollTop = 0; clientHeight = 0; offsetTop = 0; offsetHeight = 0;
   focusCalls: unknown[] = []; listeners = new Map<string, Set<(event: Event) => void>>();
   constructor(readonly tag: string, readonly document: RecordedDocument) {}
   get parentElement() { return this.parent; }
+  get isConnected(): boolean { return this.parent !== null; }
+  showModal() { this.open = true; }
+  close() { this.open = false; }
   setAttribute(key: string, value: string) { this.attributes.set(key, value); }
   append(...nodes: RecordedNode[]) { for (const node of nodes) this.insertBefore(node, null); }
   insertBefore(node: RecordedNode, before: RecordedNode | null) {

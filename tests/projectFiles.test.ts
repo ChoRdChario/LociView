@@ -1477,6 +1477,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(all(page).filter(n => n.className === 'lv-caption-window')).toHaveLength(2);
     expect(all(page).some(n => n.tag === 'button' && n.textContent === 'ピンを追加')).toBe(false);
     expect(display!.readOnly).toBe(true); expect(u.selected).toBeNull();
+    const mediaCaption = prepared.source.captions.findIndex(c => c.mediaCount.kind === 'value' && c.mediaCount.value > 0);
+    rows[mediaCaption]!.fire('click');
+    const mediaPanel = all(page).find(n => n.attributes.get('aria-label') === '選択中のキャプションのメディア')!;
+    all(mediaPanel).find(n => n.tag === 'button' && n.textContent === '画像を表示')!.fire('click');
+    const mediaViewer = all(page).find(n => n.attributes.get('aria-label') === '画像ビューア')!;
+    expect(mediaViewer.open).toBe(true); expect(all(mediaViewer).filter(n => n.tag === 'img')).toHaveLength(1);
+    expect(all(page).filter(n => n.tag === 'dialog')).toHaveLength(1); expect(open).not.toHaveBeenCalled();
+    all(mediaViewer).find(n => n.attributes.get('aria-label') === '閉じる')!.fire('click'); expect(mediaViewer.open).toBe(false);
     const pageButton = (text: string) => all(page).find(n => n.tag === 'button' && n.textContent === text)!;
     pageButton('編集コピーを作る').fire('click'); expect(open).not.toHaveBeenCalled();
     expect(all(page).find(n => n.attributes.get('aria-label') === '編集コピーの確認')!.hidden).toBe(false);

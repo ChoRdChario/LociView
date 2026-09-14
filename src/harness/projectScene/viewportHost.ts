@@ -14,6 +14,7 @@ import type { SyntheticSession } from './session';
 import type { DisplayCapture } from './viewSession';
 import { PROJECT_SCENE_STANDARD_BACKGROUND_HEX, readSolidBackground, type SolidBackground } from './viewHistory';
 import { createMediaGallery } from './mediaControls';
+import { createMediaViewer, type MediaViewer } from '../../ui/projectScene/mediaPreview';
 
 export interface ViewportObservation {
   readonly token: string; readonly ready: boolean; readonly issue: string | null; readonly dragging: boolean;
@@ -43,8 +44,9 @@ export type ViewportFactory = (canvas: HTMLCanvasElement, changed: () => void,
   proposeModel?: (target: ModelPlacementTarget, positionProject: V3, manipulation?: ModelManipulation) => boolean) => SyntheticViewport;
 
 /** DOM/read-port adapter, not a second camera implementation or durable service. */
-export function createViewportHost(document: Document, session: SyntheticSession, changed: () => void, factory?: ViewportFactory) {
+export function createViewportHost(document: Document, session: SyntheticSession, changed: () => void, factory?: ViewportFactory, sharedViewer?: MediaViewer) {
   const root = document.createElement('section'); root.className = 'lv-development-viewport'; root.setAttribute('aria-label', '3D表示');
+  const mediaViewer = sharedViewer ?? createMediaViewer(document); if (!sharedViewer) root.append(mediaViewer.root);
   const canvas = document.createElement('canvas'); canvas.tabIndex = 0;
   canvas.setAttribute('aria-label', session.snapshot.modelVersions?.some(v => v.closure.shape === 'saved-glb') ? '3Dモデルの表示' : '合成モデルの3D表示');
   const overlay = document.createElement('div'); overlay.className = 'lv-development-pin-layer';
@@ -101,7 +103,7 @@ export function createViewportHost(document: Document, session: SyntheticSession
   cameraHelp.append(cameraHelpTitle, cameraHelpText); view.root.append(cameraHelp, author.root, background.root);
   const windows = createCaptionWindowControls(document, plan => {
     const accepted = session.acceptWindow(plan); changed(); return accepted;
-  }, active => { session.setWindowDragging(active); changed(); }, captionId => createMediaGallery(document, () => session.snapshot, captionId));
+  }, active => { session.setWindowDragging(active); changed(); }, captionId => createMediaGallery(document, () => session.snapshot, captionId, mediaViewer, () => session.session.sceneId));
   const renderStatus = document.createElement('div'); renderStatus.className = 'lv-development-render-status';
   renderStatus.append(status, retry);
   // Keep failure/retry outside the floating-window stack so comparison cannot cover recovery.
@@ -228,6 +230,7 @@ export function createViewportHost(document: Document, session: SyntheticSession
   canvas.addEventListener('pointerup', up, true); canvas.addEventListener('pointercancel', cancel, true); canvas.addEventListener('lostpointercapture', lost, true);
   function render(nextActive: boolean) {
     if (disposed) return;
+    mediaViewer.render(nextActive);
     if (!nextActive) { gesture = null; pressed.clear(); gestureGeneration++; runtime?.setPinPointerActive?.(false); }
     active = nextActive;
     rendering = true;
@@ -280,7 +283,7 @@ export function createViewportHost(document: Document, session: SyntheticSession
   return { root, view: view.root, stageTools: view.stageTools, windowTools: windows.tools, render,
     get connected() { return Boolean(runtime?.read().ready && !error); },
     get pickingConnected() { return Boolean(active && runtime?.read().ready && runtime.pick && !error); },
-    dispose() { disposed = true; gesture = null; pressed.clear(); gestureGeneration++; windows.dispose(); runtime?.dispose(); background.dispose(); author.dispose(); view.dispose();
+    dispose() { disposed = true; gesture = null; pressed.clear(); gestureGeneration++; windows.dispose(); if (!sharedViewer) mediaViewer.dispose(); runtime?.dispose(); background.dispose(); author.dispose(); view.dispose();
       canvas.removeEventListener('pointerdown', down, true); canvas.removeEventListener('pointermove', move, true); canvas.removeEventListener('pointerup', up, true);
       canvas.removeEventListener('pointercancel', cancel, true); canvas.removeEventListener('lostpointercapture', lost, true);
       retry.removeEventListener('click', tryAgain); root.remove(); } };

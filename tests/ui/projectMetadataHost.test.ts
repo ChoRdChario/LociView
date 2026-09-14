@@ -1921,8 +1921,8 @@ async function apply(s: SyntheticSession, edits: { title?: string; body?: string
 function mediaHost(s: SyntheticSession) {
   select(s); const w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s), root = record(w.root), panel = area(root, 'メディア');
   return { w, root, panel, async add(index: number) {
-    setInput(named(panel, 'メディアを選択'), fixtureMedia[index]!.record.id);
-    await acknowledge(s, () => button(panel, 'メディアを追加').fire('click')); w.render();
+    button(named(panel, 'メディアを選択'), fixtureMedia[index]!.record.label).fire('click');
+    await acknowledge(s, () => button(panel, '選択したメディアを添付').fire('click')); w.render();
   }, async remove() {
     button(panel, '添付を削除').fire('click');
     const confirm = descendants(panel).find(n => n.tag === 'section' && n.children.some(c => c.textContent.includes('画像本体と別キャプション')))!;
@@ -2286,9 +2286,9 @@ describe('new synthetic saved host (memory ports and recorded DOM, not real brow
     expect(rows()[0]!.altText).toEqual({ kind: 'value', value: '保存した説明' });
     await acknowledge(s, () => button(ui.panel, '後へ').fire('click')); ui.w.render(); expect(rows()[1]!.id).toBe(first);
     const reader = await h.open(), readonly = new SyntheticSession(reader.authority), readUI = mediaHost(readonly);
-    expect(button(readUI.panel, 'メディアを追加').disabled).toBe(true); expect(button(readUI.panel, '説明を編集').disabled).toBe(true);
+    expect(button(readUI.panel, '選択したメディアを添付').disabled).toBe(true); expect(button(readUI.panel, '説明を編集').disabled).toBe(true);
     const readGallery = area(named(readUI.root, 'キャプションのウィンドウ'), '添付メディア');
-    button(readGallery, '拡大').fire('click'); expect(button(readGallery, '縮小')).toBeDefined();
+    button(readGallery, '画像を表示').fire('click'); expect(named(readUI.root, '画像ビューア').open).toBe(true);
     expect(readonly.media.add(readonly.mediaContext(), fixtureMedia[0]!.record.id)).toBe(false);
     readUI.w.dispose(); await reader.dispose();
     await ui.remove(); await ui.remove(); expect(rows()).toHaveLength(0); expect(host.read().state).toBe('ready');

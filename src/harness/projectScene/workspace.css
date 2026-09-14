@@ -119,10 +119,34 @@
 .lv-development-media button, .lv-development-media select { margin: 3px; }
 .lv-development-media-gallery { white-space: normal; }
 .lv-development-media-gallery figure { margin: 8px 0; }
-.lv-development-media-gallery img { display: block; width: 96px; height: auto; max-width: 100%; }
-.lv-development-media-gallery .is-expanded img { width: 100%; }
-.lv-development-media-gallery figcaption { font-size: 12px; overflow-wrap: anywhere; }
+.lv-development-media-gallery figcaption { font-size: 13px; overflow-wrap: anywhere; }
 .lv-development-media-gallery p:empty { display: none; }
+.lv-media-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(128px, 100%), 1fr)); gap: 8px; }
+.lv-media-grid figure { min-width: 0; margin: 8px 0; padding: 4px; border: 1px solid #d2cfcb; }
+.lv-media-grid button { box-sizing: border-box; width: 100%; margin: 3px 0; padding: 6px; overflow-wrap: anywhere; }
+.lv-media-grid .lv-media-thumbnail-action { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.lv-media-grid img { order: -1; display: block; width: 100%; height: 96px; object-fit: contain; }
+.lv-media-grid button[aria-pressed="true"] { border: 2px solid #413d39; background: #e1ddd7; }
+.lv-media-thumbnails > nav { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
+.lv-media-viewer { box-sizing: border-box; width: min(960px, calc(100vw - 24px)); max-width: none;
+  height: min(800px, calc(100dvh - 24px)); max-height: calc(100dvh - 24px); padding: 12px;
+  border: 1px solid #817c78; border-radius: 2px; background: #f2f0ee; color: #312f2d;
+  box-shadow: 0 4px 20px #312f2d33; overflow: auto; font: 400 14px/1.5 system-ui, sans-serif; }
+.lv-media-viewer[open] { display: flex; flex-direction: column; gap: 8px; }
+.lv-media-viewer::backdrop { background: #312f2d99; }
+.lv-media-viewer > header { display: flex; align-items: start; flex: 0 0 auto; gap: 12px; position: sticky; top: 0; background: #f2f0ee; z-index: 1; }
+.lv-media-viewer h2 { flex: 1; min-width: 0; max-height: 20dvh; overflow: auto; overflow-wrap: anywhere; }
+.lv-media-viewer > header > button { flex: 0 0 44px; font-size: 20px; }
+.lv-media-viewer-content { flex: 1; min-height: 96px; display: flex; align-items: center; justify-content: center; overflow: auto; }
+.lv-media-viewer-content .lv-media-image { width: 100%; max-height: 100%; text-align: center; }
+.lv-media-viewer-content img { display: block; width: 100%; height: min(52dvh, 540px); object-fit: contain; }
+.lv-media-viewer > p { max-height: 18dvh; overflow: auto; overflow-wrap: anywhere; }
+.lv-media-viewer p:empty { display: none; }
+.lv-media-viewer > footer { display: flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 16px; position: sticky; bottom: 0; background: #f2f0ee; }
+.lv-media-viewer > footer button { min-width: 44px; }
+@media (max-width: 480px) {
+  .lv-media-viewer { width: calc(100vw - 12px); padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+}
 .lv-validation-host { color: #312f2d; font: 14px/1.5 system-ui, sans-serif; }
 .lv-validation-home { max-width: 948px; margin: 0 auto; padding: 24px; }
 .lv-validation-home h1 { font-size: 22px; font-weight: 500; }

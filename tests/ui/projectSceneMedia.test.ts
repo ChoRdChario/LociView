@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { inflateSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { inspectNativeImageSource } from '../../src/nativeGs/imageMediaAdmission';
@@ -9,6 +9,7 @@ import { fixtureIds as f } from '../../src/harness/projectScene/fixture';
 import { planCaptionList } from '../../src/ui/projectScene/captionListState';
 import { planNavigation } from '../../src/ui/projectScene/navigationState';
 import { RecordedDocument, record, type RecordedNode } from './domRecorder';
+import { createMediaViewer, createMediaThumbnails, type MediaPreviewGroup } from '../../src/ui/projectScene/mediaPreview';
 const nodes = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(nodes)];
 const named = (r: RecordedNode, label: string) => nodes(r).find(n => n.attributes.get('aria-label') === label)!;
 const button = (r: RecordedNode, text: string) => nodes(r).find(n => n.tag === 'button' && n.textContent === text)!;
@@ -79,13 +80,15 @@ describe('same-host known PNG media connection; not decoder adoption, raster, IM
   it('mounts add/edit/IME/reorder/confirmed removal and confirmed floating images without changing selection on enlargement', () => {
     const document = new RecordedDocument(), session = new SyntheticSession(); choose(session);
     const w = createDevelopmentWorkspace(document.asDocument(), session), r = record(w.root), panel = named(r, 'メディア');
-    const picker = named(panel, 'メディアを選択'); expect(button(panel, 'メディアを追加').disabled).toBe(true);
-    picker.value = fixtureMedia[0]!.record.id; picker.fire('change'); button(panel, 'メディアを追加').fire('click');
-    picker.value = fixtureMedia[1]!.record.id; picker.fire('change'); button(panel, 'メディアを追加').fire('click');
+    const picker = named(panel, 'メディアを選択'); expect(button(panel, '選択したメディアを添付').disabled).toBe(true);
+    button(picker, fixtureMedia[0]!.record.label).fire('click'); expect(captionAttachments(session.snapshot.mediaData, f.shared).ready).toHaveLength(0);
+    button(panel, '選択したメディアを添付').fire('click');
+    button(picker, fixtureMedia[1]!.record.label).fire('click'); button(panel, '選択したメディアを添付').fire('click');
     expect(captionAttachments(session.snapshot.mediaData, f.shared).ready).toHaveLength(2);
     expect(nodes(named(r, 'キャプション')).some(n => n.textContent === 'メディア 2')).toBe(true);
     const windows = named(r, 'キャプションのウィンドウ'), gallery = named(windows, '添付メディア'), firstImage = nodes(gallery).find(n => n.tag === 'img')!;
-    button(gallery, '拡大').fire('click'); expect(session.memory.selectedCaptionId).toBe(f.shared); expect(button(gallery, '縮小').attributes.get('aria-expanded')).toBe('true');
+    button(gallery, '画像を表示').fire('click'); expect(session.memory.selectedCaptionId).toBe(f.shared);
+    const viewer = named(r, '画像ビューア'); expect(viewer.open).toBe(true); named(viewer, '閉じる').fire('click'); expect(viewer.open).toBe(false);
     button(panel, '説明を編集').fire('click'); const input = named(panel, 'メディアの説明');
     input.fire('compositionstart'); input.value = '<script>説明</script>'; input.fire('input'); expect(session.pending).toBe('composition');
     expect(named(r, 'シーン').children.every(n => n.disabled)).toBe(true); button(r, 'モデル').fire('click'); button(r, 'キャプション').fire('click'); expect(named(panel, 'メディアの説明')).toBe(input);
@@ -93,7 +96,8 @@ describe('same-host known PNG media connection; not decoder adoption, raster, IM
     input.fire('compositionend'); button(panel, '説明を適用').fire('click'); expect(session.pending).toBeNull();
     expect(nodes(gallery).find(n => n.tag === 'img')).toBe(firstImage); expect(nodes(gallery).some(n => n.textContent.includes('<script>説明</script>'))).toBe(true);
     firstImage.fire('error'); expect(button(gallery, '画像を再試行').hidden).toBe(false); w.render(); expect(button(gallery, '画像を再試行').hidden).toBe(false);
-    button(gallery, '画像を再試行').fire('click'); firstImage.fire('load'); expect(button(gallery, '画像を再試行').hidden).toBe(true);
+    button(gallery, '画像を再試行').fire('click'); const retriedImage = nodes(gallery).find(n => n.tag === 'img')!;
+    expect(retriedImage).not.toBe(firstImage); firstImage.fire('error'); retriedImage.fire('load'); expect(button(gallery, '画像を再試行').hidden).toBe(true);
     const old = captionAttachments(session.snapshot.mediaData, f.shared).ready.map(r => r.id);
     button(panel, '後へ').fire('click'); expect(captionAttachments(session.snapshot.mediaData, f.shared).ready.map(r => r.id)).toEqual([old[1], old[0]]);
     button(panel, '添付を削除').fire('click'); expect(captionAttachments(session.snapshot.mediaData, f.shared).ready).toHaveLength(2);
@@ -107,5 +111,57 @@ describe('same-host known PNG media connection; not decoder adoption, raster, IM
     expect(projectMediaHistory({ token: 't', cells }, [f.shared]).records).toEqual({});
     const key = Object.keys(cells)[0]!; expect(() => projectMediaHistory({ token: 't', cells: { ...cells, [key]: { kind: 'value', value: cells[key]!.value.replace('image/png', 'text/html') } } }, [f.shared])).toThrow();
     expect(() => normalizeAlt('x\ny')).toThrow(); expect(() => normalizeAlt('x'.repeat(4097))).toThrow(); expect(normalizeAlt('e\u0301')).toBe('é');
+  });
+  it('shares one viewer across the panel and retained windows, follows attachment identity and keeps draft/Scene selection separate', () => {
+    const document = new RecordedDocument(), s = new SyntheticSession(); choose(s);
+    s.media.add(s.mediaContext(), fixtureMedia[0]!.record.id); s.media.add(s.mediaContext(), fixtureMedia[0]!.record.id);
+    const w = createDevelopmentWorkspace(document.asDocument(), s), root = record(w.root), panel = named(root, 'メディア');
+    const viewer = named(root, '画像ビューア'), gallery = named(panel, '添付メディア'), open = button(gallery, '画像を表示');
+    open.fire('click'); expect(nodes(root).filter(n => n.tag === 'dialog')).toHaveLength(1);
+    expect(nodes(viewer).some(n => n.textContent === '1 / 2')).toBe(true); expect(named(viewer, '前の画像').disabled).toBe(true);
+    const event = (key: string) => ({ key, preventDefault: vi.fn(), stopPropagation: vi.fn() });
+    viewer.fire('keydown', event('ArrowRight')); expect(nodes(viewer).some(n => n.textContent === '2 / 2')).toBe(true);
+    expect(named(viewer, '次の画像').disabled).toBe(true);
+    const id = captionAttachments(s.snapshot.mediaData, f.shared).ready[0]!.id;
+    expect(s.media.begin(s.mediaContext(), id)).toBe(true); s.media.input('未適用の説明', false); w.render();
+    const draft = s.media.draft; viewer.fire('keydown', event('ArrowLeft')); expect(s.media.draft).toBe(draft);
+    expect(s.memory.selectedCaptionId).toBe(f.shared); viewer.fire('keydown', event('Escape'));
+    expect(viewer.open).toBe(false); expect(document.activeElement).toBe(open);
+    s.media.cancel();
+    const windows = named(root, 'キャプションのウィンドウ'); button(named(windows, '添付メディア'), '画像を表示').fire('click');
+    expect(s.acceptList(planCaptionList(s.captionContext(), { kind: 'select', captionId: f.second }))).toBe(true); w.render();
+    expect(viewer.open).toBe(true); expect(nodes(viewer).some(n => n.textContent === '1 / 2')).toBe(true);
+    expect(s.acceptNavigation(planNavigation(s.snapshot.state, s.session, s.pending, { kind: 'scene', sceneId: f.detail }))).toBe(true); w.render();
+    expect(viewer.open).toBe(false); w.dispose();
+  });
+  it('keeps image retry on the exact target, ignores old events, releases URLs and never substitutes a retargeted attachment', () => {
+    const document = new RecordedDocument(), viewer = createMediaViewer(document.asDocument()), root = record(viewer.root);
+    const create = vi.spyOn(URL, 'createObjectURL'), revoke = vi.spyOn(URL, 'revokeObjectURL');
+    let group: MediaPreviewGroup | null = { scope: 'scene/caption', label: '<script>Caption</script>', items: [
+      { id: 'attachment', resourceId: 'resource', label: '画像', description: '説明', image: { blob: new Blob(['verified test port'], { type: 'image/png' }) } }] };
+    viewer.open(() => group, 'attachment', document.createElement('button') as unknown as HTMLElement);
+    const original = nodes(root).find(n => n.tag === 'img')!; original.fire('error'); expect(button(root, '画像を再試行').hidden).toBe(false);
+    viewer.render(); expect(button(root, '画像を再試行').hidden).toBe(false); button(root, '画像を再試行').fire('click');
+    const retried = nodes(root).find(n => n.tag === 'img')!; expect(retried).not.toBe(original);
+    retried.fire('error'); original.fire('load'); expect(button(root, '画像を再試行').hidden).toBe(false);
+    button(root, '画像を再試行').fire('click'); nodes(root).find(n => n.tag === 'img')!.fire('load'); expect(button(root, '画像を再試行').hidden).toBe(true);
+    group = { ...group!, items: [{ ...group!.items[0]!, resourceId: 'another-resource' }] }; viewer.render();
+    expect(nodes(root).filter(n => n.tag === 'img')).toHaveLength(0); expect(nodes(root).some(n => n.textContent.includes('選び直してください'))).toBe(true);
+    expect(named(root, '次の画像').disabled).toBe(true); expect(revoke).toHaveBeenCalledTimes(create.mock.calls.length);
+    group = null; viewer.render(); expect(root.open).toBe(false); viewer.dispose(); create.mockRestore(); revoke.mockRestore();
+  });
+  it('bounds lazy thumbnails and preserves explicit choice without rendering old-scope sources or interpreting labels', () => {
+    const document = new RecordedDocument(), viewer = createMediaViewer(document.asDocument());
+    let group: MediaPreviewGroup = { scope: 'one', label: '登録済みメディア', items: Array.from({ length: 13 }, (_, i) => ({
+      id: String(i), resourceId: String(i), label: `${i}<script>`, description: '', image: { base64: fixtureMedia[0]!.base64 }
+    })) }, selected: string | null = null;
+    const chosen = vi.fn((id: string) => { selected = id; });
+    const grid = createMediaThumbnails(document.asDocument(), () => group, viewer, { selected: () => selected, choose: chosen }), root = record(grid.root);
+    grid.render(); expect(nodes(root).filter(n => n.tag === 'img')).toHaveLength(12); expect(chosen).not.toHaveBeenCalled();
+    button(root, '0<script>').fire('click'); expect(chosen).toHaveBeenCalledWith('0'); expect(nodes(root).some(n => n.tag === 'script')).toBe(false);
+    const old = nodes(root).find(n => n.tag === 'img')!; button(root, '次の一覧').fire('click'); expect(nodes(root).filter(n => n.tag === 'img')).toHaveLength(1);
+    group = { ...group, scope: 'two', items: [group.items[0]!] }; grid.render();
+    const fresh = nodes(root).find(n => n.tag === 'img')!; expect(fresh).not.toBe(old); old.fire('error'); expect(button(root, '画像を再試行').hidden).toBe(true);
+    expect((fresh as unknown as HTMLImageElement).loading).toBe('lazy'); grid.dispose(); viewer.dispose();
   });
 });

@@ -6,6 +6,7 @@ import type { SceneUiMemory } from '../../ui/projectScene/navigationState';
 import type { ViewCameraIntent } from '../../ui/projectScene/viewState';
 import type { ReviewView } from './reviewView';
 import type { ViewportFactory, SyntheticViewport } from './viewportHost';
+import { createMediaViewer, createMediaThumbnails, type MediaPreviewGroup } from '../../ui/projectScene/mediaPreview';
 
 /** Standalone snapshot viewing. Only an explicitly confirmed handoff may create an editing Project. */
 export function createReviewWorkspace(document: Document, view: ReviewView, factory: ViewportFactory, editCopy?: () => void | Promise<void>) {
@@ -20,6 +21,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const sceneName = make('h2', view.sceneName), status = make('p'), retry = make('button', '3D表示を再試行'); status.setAttribute('role', 'status'); retry.type = 'button';
   const footer = make('p', '閲覧用ファイルです。元ファイルとブラウザのプロジェクトは変更しません。');
   viewport.append(canvas, overlay); stage.append(viewport); content.append(stage, sidebar); root.append(header, status, retry, content, footer);
+  const mediaViewer = createMediaViewer(document); root.append(mediaViewer.root);
   let memory: SceneUiMemory = { selectedCaptionId: null, search: '', pinColors: null, listScrollTop: 0, ownerFilter: { kind: 'all' } };
   let windowsMemory = newCaptionWindowMemory(view.source.sceneId), composing = false, moving = false, disposed = false, rendering = false;
   let runtime: SyntheticViewport | undefined, display = view.display(null, null), failure = '', rendererFailure = '';
@@ -60,23 +62,24 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     failure = ''; render(); list.revealSelected();
   }
   const list = createCaptionListControls(document, accept, active => { composing = active; });
-  const windows = createCaptionWindowControls(document, windowPlan, active => { moving = active; }, captionId => {
+  const mediaGroup = (captionId: string): MediaPreviewGroup => {
+    const caption = view.source.captions.find(c => c.id === captionId);
+    return { scope: JSON.stringify([view.source.token, captionId]), label: caption?.title.kind === 'value' ? caption.title.value || 'キャプション' : 'キャプション',
+      items: view.attachments.filter(a => a.captionId === captionId).map(a => {
+        const media = (view.inspection.review.snapshot.mediaResourcesById as Record<string, { label: string }>)[String(a.mediaResourceId)];
+        const blob = view.images.get(String(a.mediaResourceId));
+        return { id: String(a.id), resourceId: String(a.mediaResourceId), label: media?.label ?? '画像', description: String(a.altText || ''), image: blob ? { blob } : null };
+      }) };
+  };
+  const gallery = (captionId: string) => {
     const root = make('section'); root.className = 'lv-development-media-gallery'; root.setAttribute('aria-label', '添付メディア');
-    const urls: string[] = [];
-    for (const attachment of view.attachments.filter(a => a.captionId === captionId)) {
-      const blob = view.images.get(String(attachment.mediaResourceId)); if (!blob) continue;
-      const figure = make('figure'), image = make('img'), note = make('p'), retry = make('button', '画像を再試行'), expand = make('button', '拡大');
-      retry.type = expand.type = 'button'; image.alt = String(attachment.altText || '添付画像'); image.draggable = false;
-      const url = URL.createObjectURL(blob); urls.push(url); image.src = url; retry.hidden = true;
-      image.addEventListener('error', () => { note.textContent = '画像を表示できません。'; retry.hidden = false; });
-      image.addEventListener('load', () => { note.textContent = ''; retry.hidden = true; });
-      retry.addEventListener('click', () => { image.src = url; });
-      let expanded = false; expand.addEventListener('click', () => { expanded = !expanded; figure.className = expanded ? 'is-expanded' : ''; expand.textContent = expanded ? '縮小' : '拡大'; expand.setAttribute('aria-expanded', String(expanded)); });
-      figure.append(image, make('figcaption', String(attachment.altText || '')), expand, note, retry); root.append(figure);
-    }
-    return { root, render() {}, dispose() { for (const url of urls) URL.revokeObjectURL(url); root.remove(); } };
-  });
-  viewport.append(windows.root); sidebar.append(sceneName, list.root);
+    const thumbs = createMediaThumbnails(document, () => disposed ? null : mediaGroup(captionId), mediaViewer); root.append(thumbs.root);
+    return { root, render: thumbs.render, dispose() { thumbs.dispose(); root.remove(); } };
+  };
+  const windows = createCaptionWindowControls(document, windowPlan, active => { moving = active; }, gallery);
+  const selectedMedia = make('section'); selectedMedia.setAttribute('aria-label', '選択中のキャプションのメディア');
+  let panelGallery: ReturnType<typeof gallery> | null = null, panelCaption: string | null = null;
+  viewport.append(windows.root); sidebar.append(sceneName, list.root, selectedMedia);
   const views = make('details'), title = make('summary', '視点'); views.append(title);
   const cameraButton = (text: string, action: () => void) => { const button = make('button', text); button.type = 'button'; button.addEventListener('click', () => {
     if (disposed || composing || moving) return; try { action(); failure = ''; } catch (error) { failure = (error as Error).message; } paint();
@@ -107,7 +110,11 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   }
   function render() {
     if (disposed || rendering) return; rendering = true;
-    try { list.render(context()); windows.render({ source: view.source, memory: windowsMemory, selectedId: memory.selectedCaptionId,
+    try { list.render(context());
+      if (panelCaption !== memory.selectedCaptionId) { panelGallery?.dispose(); panelCaption = memory.selectedCaptionId;
+        panelGallery = panelCaption ? gallery(panelCaption) : null; if (panelGallery) selectedMedia.append(panelGallery.root); }
+      panelGallery?.render(); mediaViewer.render();
+      windows.render({ source: view.source, memory: windowsMemory, selectedId: memory.selectedCaptionId,
       moveBlock: composing ? '文字の入力を確定してください。' : null });
       display = view.display(memory.pinColors, memory.selectedCaptionId); runtime?.update(display); paint(); }
     catch (error) { failure = (error as Error).message; paint(); } finally { rendering = false; }
@@ -125,5 +132,5 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   render();
   startRenderer(); paint();
   return { root, render, hasChanges: () => composing || moving, dispose() { if (disposed) return; disposed = true;
-    list.dispose(); windows.dispose(); runtime?.dispose(); pins.clear(); root.remove(); } };
+    list.dispose(); panelGallery?.dispose(); windows.dispose(); mediaViewer.dispose(); runtime?.dispose(); pins.clear(); root.remove(); } };
 }

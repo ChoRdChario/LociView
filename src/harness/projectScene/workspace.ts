@@ -11,6 +11,7 @@ import { createCaptionIncludeControls } from '../../ui/projectScene/captionInclu
 import { createViewportHost, type ViewportFactory } from './viewportHost';
 import { createMaterialControls } from '../../ui/projectScene/materialControls';
 import { createMediaControls } from './mediaControls';
+import { createMediaViewer } from '../../ui/projectScene/mediaPreview';
 import { createSceneAuthoringControls } from './sceneAuthoringControls';
 import { createCaptionDeletionControls } from './captionDeletionControls';
 import { createAssetDeletionControls } from './assetDeletionControls';
@@ -77,9 +78,10 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   const numeric = make('details'), numericLabel = make('summary', '数値で調整');
   numeric.className = 'lv-development-numeric'; numeric.append(numericLabel, coordinates.root);
   const include = createCaptionIncludeControls(document, plan => { session.acceptInclude(plan); afterAction(); });
-  const viewport = createViewportHost(document, session, afterAction, options.viewportFactory);
+  const mediaViewer = createMediaViewer(document);
+  const viewport = createViewportHost(document, session, afterAction, options.viewportFactory, mediaViewer);
   const material = createMaterialControls(document, plan => { session.acceptMaterial(plan); afterAction(); });
-  const media = createMediaControls(document, session.media, afterAction);
+  const media = createMediaControls(document, session.media, afterAction, mediaViewer);
   const captionDeletion = createCaptionDeletionControls(document, session, afterAction);
   const assetDeletion = createAssetDeletionControls(document, session, afterAction);
   header.append(brand, name, navigation.saveStatus);
@@ -97,7 +99,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   materialPanel.append(limited); limited.hidden = !session.materialRestriction || session.readOnly;
   sidebar.append(navigation.taskControl, navigation.sceneControl, sceneAuthoring.root, navigation.sceneContext, pin.actions, pinHelp,
     list.root, windowActions, editor, include.root, modelAddition.root, modelList.root, placement.actions, modelUpdate.root, assetDeletion.root, materialPanel, viewPanel);
-  content.append(stage, sidebar); root.append(header, notice, working, message, content, footer);
+  content.append(stage, sidebar); root.append(header, notice, working, message, content, footer, mediaViewer.root);
   function render() {
     if (disposed) return;
     working.hidden = !session.workingBlock;
@@ -123,7 +125,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     const listOkay = list.render(captionContext);
     const modelsOkay = modelList.render(session.modelContext());
     const materialOkay = material.render(session.materialContext());
-    media.render(); sceneAuthoring.render(); captionDeletion.render(); assetDeletion.render(); modelAddition.render();
+    media.render(); mediaViewer.render(!root.hidden); sceneAuthoring.render(); captionDeletion.render(); assetDeletion.render(); modelAddition.render();
     const pinsOkay = pin.render(session.pinContext()), includeOkay = include.render(session.includeContext()); coordinates.render(); modelUpdate.render(); placement.render();
     if (!detailOkay || !listOkay || !modelsOkay || !pinsOkay || !includeOkay || !materialOkay) {
       message.textContent = '入力中の状態を保持しています。操作を完了してから切り替えてください。';
@@ -181,6 +183,6 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   render();
   return { root, session, render, dispose() {
     disposed = true; unsubscribe(); navigation.dispose(); list.dispose(); detail.dispose(); modelList.dispose(); modelAddition.dispose();
-    pin.dispose(); coordinates.dispose(); modelUpdate.dispose(); placement.dispose(); include.dispose(); viewport.dispose(); material.dispose(); media.dispose(); root.remove();
+    pin.dispose(); coordinates.dispose(); modelUpdate.dispose(); placement.dispose(); include.dispose(); viewport.dispose(); material.dispose(); media.dispose(); mediaViewer.dispose(); root.remove();
   } };
 }

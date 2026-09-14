@@ -329,7 +329,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
       } else if (validationHost) {
         const byFile: Record<string, string[]> = {
           reviewView: ['three', '../../domain/projectGraphSupport', '../../domain/values', '../../domain/materialIntent', '../../projectPackage/reviewArchive', '../../projectFiles/glb', '../../projectFiles/png', '../../projectFiles/validation', '../../projectFiles/initialProject', '../../scene/types', '../../ui/projectScene/captionListState', './modelTypes', './viewportModel', './viewHistory', './validationMaterials'],
-          reviewWorkspace: ['../../ui/projectScene/captionListControls', '../../ui/projectScene/captionListState', '../../ui/projectScene/captionWindowControls', '../../ui/projectScene/captionWindowState', '../../ui/projectScene/navigationState', '../../ui/projectScene/viewState', './reviewView', './viewportHost'],
+          reviewWorkspace: ['../../ui/projectScene/captionListControls', '../../ui/projectScene/captionListState', '../../ui/projectScene/captionWindowControls', '../../ui/projectScene/captionWindowState', '../../ui/projectScene/navigationState', '../../ui/projectScene/viewState', '../../ui/projectScene/mediaPreview', './reviewView', './viewportHost'],
           savedHost: ['./metadataHost', './fixture'],
           validationModeHost: ['./validationHost', './savedHost', './historyProjection', './fixture'],
           validationHost: ['../../platform/fs', '../../platform/projectLock', '../../projectMetadata/persistence', '../../projectMetadata/journal',
@@ -467,7 +467,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         // not the Native controller/schema runtime or a general Native dependency.
         const shared = ['../../scene/types', '../../domain/captionText', '../../domain/values', '../../domain/materialIntent', '../../nativeGs/backgroundColor'];
         expect(imports.every(p => p?.startsWith('./') || shared.includes(p!)), path).toBe(true);
-      } else if (/[\\/]harness[\\/]projectScene[\\/](fixture|session|workspace|entry|historyPort|historyProjection|teamWorkspace|modelFixture|modelClosure|modelHistory|developmentControls|membershipResolution|viewport|viewportHost|viewportModel|pinParent|viewHistory|viewSession|materialHistory|materialSession|materialReview|mediaHistory|mediaSession|mediaControls)\.ts$/.test(path)) {
+      } else if (/[\\/]harness[\\/]projectScene[\\/](fixture|session|workspace|entry|historyPort|historyProjection|teamWorkspace|modelFixture|modelClosure|modelHistory|developmentControls|membershipResolution|viewport|viewportHost|viewportModel|pinParent|viewHistory|viewSession|materialHistory|materialSession|materialReview|mediaHistory|mediaSession|mediaControls|mediaPresentation)\.ts$/.test(path)) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
         const permitted = ['../../scene/types', '../../scene/commands', '../../scene/resolve',
           '../../ui/projectScene/navigationState', '../../ui/projectScene/navigationControls',
@@ -497,6 +497,8 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         if (path.replaceAll('\\', '/').endsWith('/materialHistory.ts')) permitted.push('../../domain/materialRecords');
         if (/[\\/](materialSession|session)\.ts$/.test(path)) permitted.push('../../ui/projectScene/materialState');
         if (path.replaceAll('\\', '/').endsWith('/workspace.ts')) permitted.push('../../ui/projectScene/materialControls');
+        // I04 adds UI-only verified-image presentation, not a binary/storage reader.
+        if (/[\\/](workspace|viewportHost|mediaControls|mediaPresentation)\.ts$/.test(path)) permitted.push('../../ui/projectScene/mediaPreview');
         if (path.replaceAll('\\', '/').endsWith('/modelClosure.ts')) {
           // Exact fixture canonicalization/hash helpers only; no Native controller or storage.
           permitted.push('../../domain/values', '../../nativeGs/sha256');

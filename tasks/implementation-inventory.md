@@ -1,6 +1,6 @@
 # 実装・接続の全体棚卸し
 
-> 更新: 2026-09-14（閲覧ファイルからの明示編集コピー／再開を限定接続）。本書は機能対応の正本。
+> 更新: 2026-09-14（I04の登録済みメディア選択／共通画像viewerを限定接続）。本書は機能対応の正本。
 > 実装順・現在の作業tree・実行結果は [todo](todo.md) を参照し、ここへ重複記載しない。
 > 限定接続と製品受入れを区別し、通常画面・実機の新たな合格は主張しない。
 > [以前の棚卸しと監査記録](../docs/history/development-through-2026-09-14/tasks/implementation-inventory.md) は履歴。
@@ -8,16 +8,16 @@
 ## 1. 結論と数え方
 
 ユーザーが行う作業を **64機能群** に整理すると、新metadata保存画面へ限定接続済みが
-**33群**、残りが **31群**。今回の実用チーム版はM13/M14を後続へ分けた62群が対象。
+**34群**、残りが **30群**。今回の実用チーム版はM13/M14を後続へ分けた62群が対象。
 以下は最後に確認した接続分類であり、環境整理だけで件数を増やさない。
-「33/64完成」といった完成率・工数には換算しない。小さい部品接続と
+「34/64完成」といった完成率・工数には換算しない。小さい部品接続と
 移行／チーム受信では仕事量が大きく違い、接続済みも下記の限定経路だからである。
 
 | 排他的な主分類 | 群数 | 意味 |
 |---|---:|---|
-| 接続済み | 33 | 新metadata hostで操作・必要な記録まで接続。従来25群は既知三角形／2 PNG起点、P01/P02は限定validation、C04/C07/C09/C11/V04/M05は両hostへ接続。実機受入れは別 |
+| 接続済み | 34 | 新metadata hostで操作・必要な記録まで接続。従来25群は既知三角形／2 PNG起点、P01/P02は限定validation、C04/C07/C09/C11/V04/M05/I04は両hostへ接続。実機受入れは別 |
 | 部品未接続 | 4 | 新系統のUI部品・pure planner等はあるが、対象群全体の画面・実データ・typed command／保存のいずれかが未接続。T01〜T04は限定接続まで進んだ |
-| 別経路のみ | 18 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
+| 別経路のみ | 17 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
 | 新規実装 | 9 | 新契約の機能群全体が未完了。限定的な実装・UI接続を含む行もあり、コード不在を意味しない |
 
 - 一つの行は、共有する前提・保存境界を持つ「利用者の作業群」。同一ViewのCRUD等は一群。
@@ -102,7 +102,7 @@
 | I01 | Project内メディアを添付・再利用し、説明・順序・添付解除を編集する | 接続済み | 合成2枚とvalidation保存PNGの登録・再利用。確認付き添付削除で元bytesと他Captionを保持。実入力受入れは別。 | [src/harness/projectScene/mediaControls.ts](../src/harness/projectScene/mediaControls.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
 | I02 | 実画像ファイルを添付する | 別経路のみ | validation hostのPNG後入れは同じcreateAttachment／journalへ限定接続。拒否・元bytes retry・cold復旧を確認。他のNative JPEG/WebP/GIF still-image範囲と実入力は残り、行全体は完了としない。 | [src/harness/projectScene/validationHost.ts](../src/harness/projectScene/validationHost.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
 | I03 | 添付画像を開いて拡大・失敗時に再試行する | 接続済み | 合成bytesとvalidation保存PNGから表示。欠損をfixture画像で置換しない。保存後のgallery準備失敗も隠さず同じ添付を再確認。 | [src/harness/projectScene/mediaControls.ts](../src/harness/projectScene/mediaControls.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
-| I04 | サムネイルで選び、共通viewerで画像を前後確認する | 別経路のみ | 現在の追加はテキストselect、表示はinline拡大。Native側parity R04/R06の便益を未継承。 | [src/harness/projectScene/mediaControls.ts:53](../src/harness/projectScene/mediaControls.ts) / [tasks/uiux-parity-plan.md:38](../tasks/uiux-parity-plan.md) |
+| I04 | サムネイルで選び、共通viewerで画像を前後確認する | 接続済み | 既知PNGのページ付きサムネイル選択→明示添付、panel／複数Caption windowから同一viewerの前後・終了・同じ対象retryを接続。readonly reviewも共通操作。Caption／attachment／resource IDを固定し、重複resourceへの独立添付・draft保持、Scene変更時終了、旧load/error破棄。通常home・新媒体・実browser／実機は未受入れ。 | [src/harness/projectScene/mediaControls.ts](../src/harness/projectScene/mediaControls.ts) / [src/ui/projectScene/mediaPreview.ts](../src/ui/projectScene/mediaPreview.ts) / [tests/ui/projectSceneMedia.test.ts](../tests/ui/projectSceneMedia.test.ts) |
 
 ### 視点
 

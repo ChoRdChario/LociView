@@ -1,74 +1,53 @@
 import { attachmentImage, captionAttachments } from './mediaHistory';
-import { fixtureMedia, type SyntheticAttachment } from './mediaHistory';
 import type { SyntheticProject } from './fixture';
 import type { SyntheticMediaSession, MediaContext } from './mediaSession';
+import { createMediaViewer, createMediaThumbnails, type MediaViewer } from '../../ui/projectScene/mediaPreview';
+import { captionMediaReader, registeredMediaGroup, mediaScope } from './mediaPresentation';
 
 /** Known generated or verified saved PNG bytes only. Never render a URI from history/imported labels. */
-export function createMediaGallery(document: Document, read: () => SyntheticProject, captionId: string) {
+export function createMediaGallery(document: Document, read: () => SyntheticProject, captionId: string, viewer: MediaViewer, scene: () => string | null) {
   const root = document.createElement('section'); root.className = 'lv-development-media-gallery'; root.setAttribute('aria-label', '添付メディア');
-  const items = new Map<string, { root: HTMLElement; image: HTMLImageElement; label: HTMLElement; error: HTMLElement; retry: HTMLButtonElement;
-    toggle: HTMLButtonElement; expanded: boolean; failed: boolean; mediaId: string }>();
-  let disposed = false, previousOrder = '';
-  const notice = document.createElement('p'); notice.setAttribute('role', 'status'); root.append(notice);
-  const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const n = document.createElement(tag); n.textContent = text; return n; };
-  const src = (row: SyntheticAttachment) => `data:image/png;base64,${attachmentImage(row, read().mediaData)!.base64}`;
+  const thumbnails = createMediaThumbnails(document, captionMediaReader(read, scene, captionId), viewer);
+  let disposed = false;
+  const notice = document.createElement('p'); notice.setAttribute('role', 'status'); root.append(thumbnails.root, notice);
   function render() {
     if (disposed) return; const rows = captionAttachments(read().mediaData, captionId);
-    const active = new Set(rows.ready.map(r => r.id));
-    for (const [id, card] of items) if (!active.has(id)) { card.root.remove(); items.delete(id); }
-    rows.ready.forEach((row, i) => {
-      const media = attachmentImage(row, read().mediaData)!; let card = items.get(row.id);
-      if (!card) {
-        const section = make('figure'), image = make('img'), label = make('figcaption'), error = make('p'), retry = make('button', '画像を再試行'), toggle = make('button', '拡大');
-        retry.type = toggle.type = 'button'; image.draggable = false; error.setAttribute('role', 'status'); section.append(image, label, toggle, error, retry);
-        card = { root: section, image, label, error, retry, toggle, expanded: false, failed: false, mediaId: '' }; items.set(row.id, card);
-        const held = card;
-        const show = () => { if (disposed || items.get(row.id) !== held) return; held.image.hidden = held.failed;
-          held.error.textContent = held.failed ? '画像を表示できません。添付情報は保持しています。' : ''; held.retry.hidden = !held.failed;
-          held.root.className = held.expanded ? 'is-expanded' : ''; held.toggle.textContent = held.expanded ? '縮小' : '拡大'; held.toggle.setAttribute('aria-expanded', String(held.expanded));
-          held.toggle.setAttribute('aria-label', `${held.toggle.textContent} ${attachmentImage(row, read().mediaData)?.record.label ?? '画像'}`); };
-        image.addEventListener('error', () => { held.failed = true; show(); }); image.addEventListener('load', () => { held.failed = false; show(); });
-        retry.addEventListener('click', () => { if (disposed || items.get(row.id) !== held) return;
-          const current = captionAttachments(read().mediaData, captionId).ready.find(r => r.id === row.id); if (!current) return;
-          held.failed = false; show(); held.image.src = src(current); });
-        toggle.addEventListener('click', () => { held.expanded = !held.expanded; show(); }); show();
-      }
-      const description = row.altText.kind === 'value' ? row.altText.value : '説明の更新候補を確認してください。';
-      card.label.textContent = `${i + 1}. ${media.record.label}${description ? ` — ${description}` : ''}`;
-      card.image.alt = description || media.record.label;
-      card.toggle.setAttribute('aria-label', `${card.expanded ? '縮小' : '拡大'} ${media.record.label}`);
-      if (card.mediaId !== media.record.id) { card.mediaId = media.record.id; card.failed = false; card.image.src = src(row); }
-    });
-    const order = JSON.stringify(rows.ready.map(r => r.id)); if (order !== previousOrder) { previousOrder = order; rows.ready.forEach(r => root.append(items.get(r.id)!.root)); }
+    thumbnails.render();
     notice.textContent = rows.review.length ? '未解決の添付があります。更新候補を確認してください。' : ''; notice.hidden = !notice.textContent;
     root.hidden = !rows.ready.length && !rows.review.length;
   }
-  return { root, render, dispose() { disposed = true; items.clear(); root.remove(); } };
+  return { root, render, dispose() { disposed = true; thumbnails.dispose(); root.remove(); } };
 }
 
-export function createMediaControls(document: Document, session: SyntheticMediaSession, changed: () => void) {
+export function createMediaControls(document: Document, session: SyntheticMediaSession, changed: () => void, sharedViewer?: MediaViewer) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const n = document.createElement(tag); n.textContent = text; return n; };
   const button = (s: string) => { const n = make('button', s); n.type = 'button'; return n; };
   const root = make('section'); root.className = 'lv-development-media'; root.setAttribute('aria-label', 'メディア');
-  const picker = make('select'); picker.setAttribute('aria-label', 'メディアを選択'); const empty = make('option', 'メディアを選択'); empty.value = ''; picker.append(empty);
+  const viewer = sharedViewer ?? createMediaViewer(document);
   const add = button('メディアを追加'), note = make('p', '開発用の合成画像です。ファイルの読込みは未接続です。'), list = make('div'), status = make('p'); status.setAttribute('role', 'status');
   const addFile = button('メディアを追加'), file = make('input'), cancelFile = button('選択を取り消す');
   file.type = 'file'; file.accept = 'image/png,.png'; file.hidden = true; file.setAttribute('aria-label', 'メディアを追加');
-  const stored = make('details'), storedLabel = make('summary', '登録済みメディア'); stored.append(storedLabel);
+  const stored = make('details'), storedLabel = make('summary', '登録済みメディア'), target = make('p'); stored.append(storedLabel, target);
   const editor = make('section'), input = make('input'), apply = button('説明を適用'), cancel = button('取り消す'), retry = button('再試行');
   input.setAttribute('aria-label', 'メディアの説明'); editor.append(input, apply, cancel);
   const confirm = make('section'), question = make('p'), yes = button('添付を削除'), no = button('戻る'); confirm.append(question, yes, no); confirm.hidden = true;
-  let current: MediaContext, fileTarget: MediaContext | null = null, confirming: { ctx: MediaContext; id: string } | null = null, key = '', choiceKey = '', disposed = false;
-  if (session.fileAdditionAvailable()) stored.append(picker, add); else root.append(picker, add);
-  root.append(addFile, file, cancelFile, stored, note, list, editor, retry, status, confirm);
+  let current: MediaContext, fileTarget: MediaContext | null = null, confirming: { ctx: MediaContext; id: string } | null = null, key = '', disposed = false;
+  let selected: { context: MediaContext; id: string } | null = null, gallery: ReturnType<typeof createMediaGallery> | null = null, galleryKey = '';
+  const picker = createMediaThumbnails(document, () => { const ctx = session.context(); return registeredMediaGroup(ctx.project, ctx.sceneId); }, viewer, {
+    selected: () => selected?.id ?? null, choose(id) { const ctx = session.context(); if (!ctx.captionId) return; selected = { context: ctx, id }; render(); }
+  });
+  picker.root.setAttribute('aria-label', 'メディアを選択');
+  const galleryHost = make('div'), editing = make('details'), editingLabel = make('summary', '添付の編集'); editing.append(editingLabel, list);
+  stored.append(picker.root, add); stored.open = !session.fileAdditionAvailable();
+  root.append(addFile, file, cancelFile, stored, note, galleryHost, editing, editor, retry, status, confirm);
+  if (!sharedViewer) root.append(viewer.root);
   const act = (fn: () => void) => { if (disposed) return; fn(); changed(); };
-  add.addEventListener('click', () => act(() => { session.add(current, picker.value); }));
+  add.addEventListener('click', () => act(() => { if (selected && !add.disabled) session.add(selected.context, selected.id); }));
   addFile.addEventListener('click', () => { if (disposed || addFile.disabled) return; fileTarget = current; file.value = ''; file.click(); });
   file.addEventListener('change', () => act(() => { const selected = file.files?.[0];
     if (selected && fileTarget) session.addFile(fileTarget, selected); fileTarget = null;
   }));
   cancelFile.addEventListener('click', () => act(() => { if (session.cancelFile()) file.value = ''; }));
-  picker.addEventListener('change', () => { add.disabled = !picker.value || Boolean(current.block || session.draft || session.hasFileSelection); });
   input.addEventListener('input', () => act(() => session.input(input.value, session.draft?.composing ?? false)));
   input.addEventListener('compositionstart', () => act(() => session.input(input.value, true)));
   input.addEventListener('compositionend', () => act(() => session.input(input.value, false)));
@@ -78,20 +57,25 @@ export function createMediaControls(document: Document, session: SyntheticMediaS
   yes.addEventListener('click', () => act(() => { if (!confirming) return; session.remove(confirming.ctx, confirming.id); confirming = null; confirm.hidden = true; }));
   function render() {
     current = session.context(); const d = session.draft, rows = current.captionId ? captionAttachments(current.project.mediaData, current.captionId) : { ready: [], review: [] };
-    const choices = current.project.mediaChoices ?? fixtureMedia.map(m => m.record), nextChoices = JSON.stringify(choices.map(m => [m.id, m.label]));
-    if (choiceKey !== nextChoices) {
-      const selected = picker.value; choiceKey = nextChoices; picker.replaceChildren(empty);
-      choices.forEach(m => { const option = make('option', m.label); option.value = m.id; picker.append(option); });
-      picker.value = choices.some(m => m.id === selected) ? selected : '';
-    }
+    const choices = registeredMediaGroup(current.project, current.sceneId).items;
+    if (selected && (selected.context.project.state.token !== current.project.state.token || selected.context.captionId !== current.captionId ||
+      selected.context.sceneId !== current.sceneId || !choices.some(m => m.id === selected!.id))) selected = null;
+    const nextGallery = JSON.stringify([mediaScope(current.project, current.sceneId), current.captionId]);
+    if (nextGallery !== galleryKey) { galleryKey = nextGallery; gallery?.dispose(); gallery = current.captionId ?
+      createMediaGallery(document, () => session.context().project, current.captionId, viewer, () => session.context().sceneId) : null;
+      if (gallery) galleryHost.append(gallery.root); }
+    gallery?.render(); picker.render(); viewer.render();
+    const title = current.captionId ? current.project.resources.captions[current.captionId]?.title : undefined;
+    target.textContent = title?.kind === 'value' ? `添付先：${title.value || 'キャプション'}` : 'キャプションを選択してください。';
     const filesAvailable = session.fileAdditionAvailable();
-    addFile.hidden = !filesAvailable; stored.hidden = !filesAvailable || !choices.length;
+    addFile.hidden = !filesAvailable; stored.hidden = !choices.length; editing.hidden = !rows.ready.length;
     addFile.disabled = Boolean(current.block || d || session.hasFileSelection);
     cancelFile.hidden = !session.hasFileSelection; cancelFile.disabled = Boolean(current.block);
-    add.textContent = filesAvailable ? '選択したメディアを添付' : 'メディアを追加';
+    add.textContent = '選択したメディアを添付';
     note.textContent = filesAvailable ? 'この検証版ではPNGを追加できます。' : current.project.validationFiles ? choices.length ? '' : 'このプロジェクトには追加できるメディアがありません。' : '開発用の合成画像です。ファイルの読込みは未接続です。';
     note.hidden = !note.textContent;
-    root.hidden = !current.captionId && !d && !session.hasFileSelection; picker.disabled = Boolean(current.block || d || session.hasFileSelection); add.disabled = picker.disabled || !picker.value;
+    root.hidden = !current.captionId && !d && !session.hasFileSelection;
+    add.disabled = Boolean(current.block || d || session.hasFileSelection) || !selected;
     editor.hidden = !d; if (d && !d.composing && input.value !== d.raw) input.value = d.raw;
     apply.disabled = Boolean(d?.composing || current.block); cancel.disabled = Boolean(d?.composing);
     retry.hidden = !session.failed; retry.disabled = Boolean(current.block || d?.composing);
@@ -114,5 +98,5 @@ export function createMediaControls(document: Document, session: SyntheticMediaS
       card.append(alt, edit, earlier, later, remove); return card;
     }));
   }
-  return { root, render, dispose() { disposed = true; root.remove(); } };
+  return { root, render, dispose() { disposed = true; gallery?.dispose(); picker.dispose(); if (!sharedViewer) viewer.dispose(); root.remove(); } };
 }
