@@ -2459,6 +2459,30 @@ Use existing saved host tests for local independent move/material edit, two-part
 return/no-op/cold reopen, retry and missing/unknown evidence refusal. No new PoC
 page or intermediate human gate is needed for this synthetic-only command.
 
+The validation-file connection applies this same independent-copy command to its
+already admitted static GLB closure. Preserve every material slot, not just slot
+zero. The internal command carries one explicit source-slot → fresh-slot mapping
+and a fresh override ID or null for each slot. Rebuild and seal the exact active
+records, preserving BlobRef, source locators/semantics, profile, numeric frames,
+placement and provenance. Use the complete effective Scene-then-Project override
+per slot; a Scene override replaces the whole Project override, not selected fields.
+Unknown/incomplete closure or ambiguous material intent blocks copying, not keep-one.
+
+Fresh copy facts may inspect only verified-present bodies already declared by the
+base Project; no file selection, new body spool or duplicate payload is required.
+Prepare requests for each new Representation, including more than one copy, with
+read-only inspection. Stage only these fresh facts under the existing journal and
+use ordinary no-new-evidence checks for old records and after Prepared. Preserve
+exact IDs/changes/fact acknowledgements on retry; missing acknowledged bodies or
+facts are not reconstructed. Locally selected new-model input remains a distinct
+owned path and cannot serve as a substitute for missing existing content.
+
+Acceptance reuses the existing file/keep-both/facts suites: explicit original and
+copy choice, multi-slot material preservation, independent copy-only placement,
+material/model update, unchanged original/other-Scene/Caption references, return,
+replay/cold reopen and interrupted retry. No general copy, new profile, wire/schema,
+Point/GS/Proxy expansion, normal entry or measured adoption is claimed.
+
 **Bounded prepared-revision implementation (2026-09-12):**
 The already-approved synthetic metadata host may prepare its two known geometry
 versions before initial publication. Active seed Assets remain on the initial

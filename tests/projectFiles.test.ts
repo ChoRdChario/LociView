@@ -26,6 +26,8 @@ import { degreesRotation } from '../src/harness/projectScene/modelTransform';
 import { prepareValidationResidents, prepareReadonlyResidents, decodeValidationModel } from '../src/harness/projectScene/validationRender';
 import { createModelCandidatePreview, type ModelCandidateRenderer } from '../src/harness/projectScene/modelCandidatePreview';
 import { assetStatusCandidates } from '../src/projectMetadata/assetStatus';
+import { assetMembershipGroups } from '../src/projectMetadata/membership';
+import { assetCopySource, prepareAssetMembershipCopy } from '../src/projectMetadata/modelMembership';
 import { pickResidentSurface } from '../src/harness/projectScene/viewportPicking';
 import { fixtureModelIds } from '../src/harness/projectScene/modelClosure';
 import { openValidationHost, validationArea } from '../src/harness/projectScene/validationHost';
@@ -2583,6 +2585,169 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect((await cold.content.model(coldModel.closure.representation as unknown as JsonObject, true)).bytes).toEqual(replacements.get(selected.revision.id as string));
     await cold.dispose();
   }, 60000);
+  it('keeps multiple real GLB copies with every effective material and returns independent edits through files', async () => {
+    const modelBytes = glb(j => { j.materials.push({}, {}); j.meshes[0].primitives.push(
+      { attributes: { POSITION: 0 }, material: 1 }, { attributes: { POSITION: 0 }, material: 2 }); });
+    const f = await openFileCaption(modelBytes), { host, s, options } = f, otherScene = s.sceneId, sceneId = `scn_${newId()}`;
+    const original = s.snapshot.modelVersions![0]!, assetId = original.assetId, caption = s.snapshot.resources.captions[f.captionId];
+    if (original.closure.shape !== 'saved-glb') throw Error('saved model');
+    await host.authority.authorScene!(host.read().source!.token, { kind: 'createScene', sceneId, sourceSceneId: otherScene,
+      activeSceneId: otherScene, name: '詳細', orderKey: 'B', membershipIds: [`sam_${newId()}`], eventId: `evt_${newId()}` });
+    s.refreshHistory(); s.acceptNavigation(planNavigation(s.snapshot.state, s.session, s.pending, { kind: 'scene', sceneId }));
+    const slots = [...validationMaterialSlots(original.closure)].sort((a, b) => Number(a.locator.materialIndex) - Number(b.locator.materialIndex));
+    const material = async (index: number, scope: 'project' | 'scene', appearance: JsonObject) => {
+      const fields = { routing: { scope: scope === 'scene' ? { kind: scope, sceneId } : { kind: scope }, target: slots[index]!.target },
+        appearance, compositing: { coverage: { policy: 'inherit' }, optics: 'inherit' }, lifecycle: { state: 'active', reason: 'initial', eventId: `evt_${newId()}` } };
+      const id = `ovr_${newId()}`; await host.authority.write(host.read().source!.token,
+        Object.fromEntries(Object.entries(fields).map(([key, value]) => [materialKey(id, key), canonicalFixture(value)])), { sceneId });
+    };
+    await material(0, 'project', { lighting: 'unlit' }); await material(0, 'scene', { doubleSided: true }); await material(1, 'project', { lighting: 'unlit' });
+    s.refreshHistory(); expect(s.acceptModel(planModelList(s.modelContext(), { kind: 'membership', assetId, included: false }))).toBe(false);
+    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+    const seed = await host.workspaceOutput.download(await host.workspaceOutput.generate(host.read().source!.token));
+    const sharedBase = host.workspaceOutput.bases[0]!.selection;
+    const peers: Awaited<ReturnType<typeof openValidationHost>>[] = [];
+    for (let i = 0; i < 2; i++) {
+      const r = firstWorkspaceRecipient(); peers.push(await openValidationHost({ ...options, base: r.fs, store: r.store,
+        coordinator: ProjectMutationCoordinator.browser(r.locks), packageLocks: r.locks,
+        openStorage: async () => ({ factory: r.factory, dispose: async () => {} }), workspaceFile: seed }));
+    }
+    for (const target of [host, ...peers]) {
+      const editor = new SyntheticSession(target.authority);
+      editor.acceptNavigation(planNavigation(editor.snapshot.state, editor.session, editor.pending, { kind: 'scene', sceneId }));
+      editor.acceptModel(planModelList(editor.modelContext(), { kind: 'membership', assetId, included: true }));
+      await vi.waitFor(() => expect(editor.acknowledgment.state).toBe('idle'));
+    }
+    const incoming = await peers[0]!.workspaceOutput.download(await peers[0]!.workspaceOutput.generate(peers[0]!.read().source!.token));
+    await host.workspaceFiles.receive(host.read().source!.token, await peers[1]!.workspaceOutput.download(await peers[1]!.workspaceOutput.generate(peers[1]!.read().source!.token)));
+    f.workspace.unmount();
+    const u = createValidationWorkspace(new RecordedDocument().asDocument(), { fileLimits: budget, decode, list: async () => [], selected() {},
+      open: async () => host, render: async () => ({ factory: () => { throw Error('Recorded DOM has no GPU'); }, dispose() {} }) }, options.run);
+    const root = record(u.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    const named = (label: string, parent = root) => all(parent).find(n => n.attributes.get('aria-label') === label)!;
+    const button = (text: string, parent = root) => all(parent).find(n => n.tag === 'button' && n.textContent === text)!;
+    await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true));
+    const input = named('更新ファイルを選択'), receive = input.parent!.parent!;
+    Object.assign(input, { files: [incoming] }); input.fire('change'); receive.fire('submit', { preventDefault() {} });
+    await vi.waitFor(() => expect(all(root).some(n => n.textContent === '更新を受け取りました。')).toBe(true), { timeout: 10000 });
+    Object.assign(input, { files: [] }); button('選択を取り消す', receive).fire('click');
+    const provider = host.read().provider!; if (provider.kind !== 'scene-provider') throw Error('provider');
+    const group = assetMembershipGroups(provider, metadata)[0]!; expect(group.edgeIds).toHaveLength(3);
+    const before = host.read().source!, beforeView = host.authority.read(), bodyPut = vi.spyOn(f.store, 'put');
+    const form = named('重複したモデル登録'), originalChoice = named('元として残す登録', form), decision = named('重複の解消方法', form);
+    const confirm = button('登録の重複を解消', form); expect(confirm.disabled).toBe(true);
+    originalChoice.value = group.edgeIds[1]!; originalChoice.fire('change'); decision.value = 'both'; decision.fire('change');
+    expect(confirm.disabled).toBe(false);
+    f.fs.reject = p => p.endsWith('/published.json'); confirm.fire('click');
+    await vi.waitFor(() => expect(host.authority.status!().kind).toBe('failed'), { timeout: 10000 });
+    expect(host.authority.read()).toBe(beforeView); expect(bodyPut).not.toHaveBeenCalled();
+    const paths = (await f.fs.list(`${validationArea}/${options.run}/`)).filter(p => p.endsWith('.amchange')), parts = await Promise.all(paths.map(p => f.fs.readBytes(p)));
+    originalChoice.value = group.edgeIds[0]!; decision.value = 'one'; f.fs.reject = () => false;
+    button('更新を再試行', named('更新の確認')).fire('click');
+    await vi.waitFor(() => expect(form.children).toHaveLength(0), { timeout: 10000 });
+    expect(await Promise.all(paths.map(p => f.fs.readBytes(p)))).toEqual(parts); expect(bodyPut).not.toHaveBeenCalled(); bodyPut.mockRestore();
+    const copied = host.authority.read(), copies = copied.modelVersions!.filter(m => m.assetId !== assetId); expect(copies).toHaveLength(2);
+    expect(copied.state.assetMemberships[group.edgeIds[1]!]!.lifecycle).toMatchObject({ kind: 'value', value: { state: 'active' } });
+    expect(copied.modelVersions!.find(m => m.assetId === assetId)).toEqual(original); expect(copied.resources.captions[f.captionId]).toEqual(caption);
+    expect(syntheticDisplay(copied, otherScene, null, null).models.map(m => m.binding.assetId)).toEqual([assetId]);
+    const resident = await prepareValidationResidents(copied.modelVersions!, host.content), display = syntheticDisplay(copied, sceneId, null, null);
+    const initialMaterials = structuredClone(display.savedMaterials), otherSceneMaterials = structuredClone(syntheticDisplay(copied, otherScene, null, null).savedMaterials);
+    const unchangedMaterials = (snapshot: typeof copied) => {
+      const now = syntheticDisplay(snapshot, sceneId, null, null).savedMaterials;
+      expect(now?.[assetId]).toEqual(initialMaterials?.[assetId]);
+      expect(now?.[copies[1]!.assetId]).toEqual(initialMaterials?.[copies[1]!.assetId]);
+      expect(syntheticDisplay(snapshot, otherScene, null, null).savedMaterials).toEqual(otherSceneMaterials);
+    };
+    for (const copy of copies) {
+      if (copy.closure.shape !== 'saved-glb') throw Error('saved copy');
+      expect(copy.closure.representation.blob).toEqual(original.closure.representation.blob);
+      expect(copy.closure.binding.parentBindingId).toBeUndefined();
+      const targets = [...validationMaterialSlots(copy.closure)].sort((a, b) => Number(a.locator.materialIndex) - Number(b.locator.materialIndex));
+      expect(targets).toHaveLength(3);
+      const effects = display.savedMaterials![copy.assetId]!;
+      expect(effects[targets[0]!.target.logicalMaterialSlotId]).toEqual({ appearance: { doubleSided: true }, compositing: { coverage: { policy: 'inherit' }, optics: 'inherit' } }); // Scene replaces, not overlays Project.
+      expect(effects[targets[1]!.target.logicalMaterialSlotId]).toMatchObject({ appearance: { lighting: 'unlit' } });
+      expect(effects[targets[2]!.target.logicalMaterialSlotId]).toBeUndefined();
+      expect(targets.map(t => t.locator)).toEqual(slots.map(t => t.locator));
+      expect(targets.every(t => !slots.some(old => old.target.logicalMaterialSlotId === t.target.logicalMaterialSlotId))).toBe(true);
+      resident.validate(copy.closure, effects); const surface = resident.create(copy.closure as any); surface.dispose?.();
+    }
+    resident.dispose();
+    const editor = new SyntheticSession(host.authority), chosen = copies[0]!;
+    if (chosen.closure.shape !== 'saved-glb') throw Error('saved copy');
+    editor.acceptNavigation(planNavigation(editor.snapshot.state, editor.session, editor.pending, { kind: 'scene', sceneId }));
+    editor.setViewportState(true, copied.modelVersions!.map(m => m.assetId), null);
+    editor.acceptModel(planModelList(editor.modelContext(), { kind: 'select', assetId: chosen.assetId }));
+    expect(editor.beginModelPlacement()).toBe(true); editor.changeModelPlacement(['1', '2', '3']); editor.finishModelPlacement();
+    await vi.waitFor(() => expect(editor.acknowledgment.state).toBe('idle'));
+    const target = validationMaterialSlots(chosen.closure).find(t => t.locator.materialIndex === 0)!;
+    const action = (r: MaterialIntentRequest) => { const plan = planMaterial(editor.materialContext(), r);
+      expect(plan.kind).not.toBe('blocked'); return editor.acceptMaterial(plan); };
+    action({ kind: 'model', assetId: chosen.assetId }); action({ kind: 'surface', key: materialTargetKey(target.target) });
+    action({ kind: 'scope', scope: 'scene' }); action({ kind: 'begin' });
+    const draft = editor.materialContext().draft!; editor.acceptMaterial({ kind: 'draft', baseDraft: draft, draft: editMaterialDraft(draft, 'doubleSided', 'front') });
+    action({ kind: 'apply' }); await vi.waitFor(() => expect(editor.acknowledgment.state).toBe('idle'));
+    expect(syntheticDisplay(editor.snapshot, sceneId, null, null).savedMaterials![chosen.assetId]![target.target.logicalMaterialSlotId]).toMatchObject({ appearance: { doubleSided: false } });
+    unchangedMaterials(editor.snapshot);
+    const updated = glb(j => { j.nodes[0].translation = [5, 0, 1]; });
+    await host.authority.replaceModelFile!(host.read().source!.token, { sceneId, assetId: chosen.assetId,
+      expectedBindingId: host.authority.read().modelVersions!.find(m => m.assetId === chosen.assetId)!.projection.bindingId,
+      file: { name: 'コピーだけ更新', size: updated.length, arrayBuffer: async () => updated.slice().buffer } });
+    const final = host.read().source!, finalView = host.authority.read();
+    unchangedMaterials(finalView);
+    expect(finalView.modelVersions!.find(m => m.assetId === assetId)).toEqual(original);
+    expect(finalView.modelVersions!.find(m => m.assetId === copies[1]!.assetId)).toEqual(copies[1]);
+    expect(finalView.resources.captions[f.captionId]).toEqual(caption);
+    expect(finalView.modelVersions!.find(m => m.assetId === chosen.assetId)!.closure.binding.assetToProject.translation).toEqual([1, 2, 3]);
+    const reply = await host.workspaceOutput.download(await host.workspaceOutput.generateContribution(final.token, sharedBase));
+    const peer = peers[0]!; await peer.workspaceFiles.receive(peer.read().source!.token, reply);
+    const changes = (source: ProjectMetadataSource) => new Map(source.originalChanges().map(bytes => [A.decodeChange(bytes).hash, bytes]));
+    expect(changes(peer.read().source!)).toEqual(changes(final)); expect(peer.authority.read().modelVersions).toEqual(finalView.modelVersions);
+    const exact = peer.read().source!.originalChanges(); await peer.workspaceFiles.receive(peer.read().source!.token, reply); expect(peer.read().source!.originalChanges()).toEqual(exact);
+    expect([...changes(before)].every(([hash, bytes]) => json(changes(final).get(hash)) === json(bytes))).toBe(true);
+    await u.dispose(); for (const p of peers) await p.dispose();
+    const cold = await openValidationHost(options); expect(changes(cold.read().source!)).toEqual(changes(final)); expect(cold.authority.read().modelVersions).toEqual(finalView.modelVersions);
+    expect((await cold.content.model(cold.authority.read().modelVersions!.find(m => m.assetId === chosen.assetId)!.closure.representation as JsonObject, true)).bytes).toEqual(updated);
+    await cold.dispose();
+  }, 60000);
+  it('stages only missing fresh facts for multiple copied GLBs and never repairs acknowledged loss', async () => {
+    const f = await receivedFixture(), base = f.initial.source!, provider = f.initial.provider!;
+    if (provider.kind !== 'scene-provider') throw Error('provider');
+    const assetId = Object.keys(provider.resources.assets)[0]!, sceneId = Object.keys(provider.state.scenes)[0]!;
+    const source = assetCopySource(provider, sceneId, assetId, metadata), prefix = (p: string) => `${p}_${newId()}`;
+    const copies = await Promise.all([0, 1].map(() => prepareAssetMembershipCopy(source, prefix('sam'), prefix)));
+    // Known synthetic input for the fact port; the connected file test exercises the actual resolution command.
+    const doc = A.change(A.load<Record<string, any>>(base.encodeFullSource()), draft => {
+      for (const copy of copies) {
+        for (const [map, record] of [['representationsById', copy.representation], ['assetRevisionsById', copy.revision], ['assetBindingsById', copy.binding]] as const)
+          draft[map][record.id as string] = new A.ImmutableString(json(record));
+        const life = { state: 'active', reason: 'initial', eventId: prefix('evt') };
+        for (const [map, record] of [['assetsById', { ...source.asset, id: copy.ids.asset, assetFrameId: copy.ids.assetFrame,
+          status: { kind: 'ready', activeBindingId: copy.ids.binding }, lifecycle: life }], ['sceneAssetMembershipsById', {
+          id: copy.ids.membership, sceneId, assetId: copy.ids.asset, orderKey: 'B', lifecycle: life }]] as const)
+          draft[map][record.id as string] = Object.fromEntries(Object.entries(record).map(([key, value]) => [key, new A.ImmutableString(json(value))]));
+      }
+    });
+    const next = ProjectMetadataSource.fromFullSource(A.save(doc), base.proof, metadata), content = f.receiver.content;
+    const before = new Set(await f.fs.list('')), put = vi.spyOn(f.store, 'put'), prepared = vi.spyOn(content, 'inspectPreparedModel');
+    const plan = (await validationModelFacts(content).plan(base, next))!;
+    expect(plan.stagedBlobs).toEqual([]); expect(prepared).not.toHaveBeenCalled();
+    let writes = 0; f.fs.reject = path => path.includes('/evidence/') && !before.has(path) && ++writes === 2;
+    await expect(underWriteLease(f.fs, () => plan.stage())).rejects.toThrow('injected quota');
+    const freshPaths = async () => (await f.fs.list('')).filter(path => path.includes('/evidence/') && !before.has(path));
+    const first = (await freshPaths())[0]!; expect(await freshPaths()).toHaveLength(1);
+    const firstBytes = await f.fs.readBytes(first), observe = vi.spyOn(f.fs, 'writeText');
+    f.fs.reject = () => false; await underWriteLease(f.fs, () => plan.stage());
+    expect(await freshPaths()).toHaveLength(4); expect(await f.fs.readBytes(first)).toEqual(firstBytes);
+    expect(observe.mock.calls.some(([path]) => path === first)).toBe(false); expect(put).not.toHaveBeenCalled();
+    await f.fs.remove(first); const reads = f.fs.reads;
+    await expect(underWriteLease(f.fs, () => plan.stage())).rejects.toThrow();
+    expect(await f.fs.readBytes(first)).toBeNull(); expect(f.fs.reads).toBe(reads);
+    for (const path of (await f.fs.list('')).filter(p => p.startsWith('v2/cas/objects/'))) await f.fs.remove(path);
+    await expect(validationModelFacts(content).plan(base, next)).rejects.toThrow();
+    expect(prepared).not.toHaveBeenCalled(); expect(put).not.toHaveBeenCalled();
+    expect((await f.receiver.session.read()).source!.token).toBe(f.local.source!.token);
+  }, 30000);
   it('disposes superseded, stale and closed candidate previews without invoking their renderers', async () => {
     type Display = Parameters<ModelCandidateRenderer>[0]; type Prepared = Awaited<ReturnType<ModelCandidateRenderer>>;
     const pending: ((p: Prepared) => void)[] = [], prepare = vi.fn(() => new Promise<Prepared>(resolve => pending.push(resolve)));

@@ -7,9 +7,10 @@ import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import { validationMetadataLimits as limits, fileError } from './validation';
 import type { ValidationContent } from './content';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
+import { checkProjectRecord } from '../domain/projectRecords';
 import { fileObject } from './validation';
 
-/** Only a locally selected, owned GLB may introduce new facts. Old evidence is never repaired. */
+/** Owned new GLB or fresh records reusing exact known bodies. Old evidence is never repaired. */
 export function validationModelFacts(content: ValidationContent): MetadataModelFactPort {
   return { planReceived: (base, next, bodyFor) => validationReceivedFacts(content, base, next, bodyFor),
     planRestored: (next, bodyFor, refs) => restoredFacts(content, next, bodyFor, refs),
@@ -23,8 +24,15 @@ export function validationModelFacts(content: ValidationContent): MetadataModelF
       charge(); if (w.path[0] === 'representationsById' && !used.has(w.path[1]!)) introduced.add(w.path[1]!);
     }
     if (!introduced.size) return null;
-    if (introduced.size !== 1) return fileError('一つの3Dモデルを選択してください。');
+    const knownRefs = new Set<string>(), inspection = await base.inspectOriginal({ maxNodes: limits.maxNodes, maxWork: limits.maxWork });
+    work += inspection.workUsed; charge();
+    for (const scalar of inspection.scalars) {
+      charge(); if (scalar.path[0] !== 'representationsById' || scalar.value.kind !== 'value') continue;
+      const record = fileObject(scalar.value.value) as JsonObject, check = new ProjectRecordFields();
+      checkProjectRecord(check, 'representationsById', record); if (!check.unknown) knownRefs.add(json(record.blob));
+    }
     const requests: ContentRequest[] = [], keys = new Set<string>(), ordinary = content.verifier(false);
+    let preparedRecord: JsonObject | undefined;
     const provider = await readProjectScene(next.read(), limits, { scope: 'development-validation', verify: async request => {
       if (request.fact === 'media' || request.records.every(r => used.has(r.id as string))) return ordinary.verify(request);
       const r = request.records[0];
@@ -33,16 +41,27 @@ export function validationModelFacts(content: ValidationContent): MetadataModelF
         json(request.context) !== json(request.fact === 'representation' ? {} : { assetId: r.assetId, variantFamilyId: r.variantFamilyId }))
         return fileError('追加するモデルの検証情報を準備できません。');
       const key = json(request); if (!keys.has(key)) { keys.add(key); requests.push(request); }
+      if (knownRefs.has(json(r.blob))) {
+        if (await content.store.inspect(r.blob as JsonObject) !== 'verified-present') return fileError('既存のモデル本体を確認できません。入力からの補完はしていません。');
+        return content.inspectStored(request);
+      }
+      if (introduced.size !== 1) return fileError('一つの3Dモデルを選択してください。');
+      preparedRecord = r;
       return content.inspectPreparedModel(request);
     } }, { verifyRetainedMedia: true });
-    if (!metadataProviderReady(provider, limits) || provider.kind !== 'scene-provider' || !requests.length)
+    if (!metadataProviderReady(provider, limits) || provider.kind !== 'scene-provider')
       return fileError('追加するモデルの参照を確認できません。');
-    const record = requests[0]!.records[0]!, ref: JsonObject = content.preparedModelRef(record);
+    if (!requests.length) return null; // Weak-only records require no new facts/body reads.
+    const record = preparedRecord, ref = record ? content.preparedModelRef(record) : undefined;
     const completed = new Set<string>(); let bodySaved = false;
-    return { baseToken: base.token, finalToken: next.token, stagedBlobs: [ref], async stage() {
-      if (!bodySaved) { await content.stagePreparedModel(record); bodySaved = true; }
-      else await content.store.open(ref); // Never refill an acknowledged body after loss.
+    return { baseToken: base.token, finalToken: next.token, stagedBlobs: ref ? [ref] : [], async stage() {
+      if (record && ref) {
+        if (!bodySaved) { await content.stagePreparedModel(record); bodySaved = true; }
+        else await content.store.open(ref); // Never refill an acknowledged body after loss.
+      }
       for (const request of requests) {
+        const body = request.records[0]!.blob as JsonObject;
+        if (knownRefs.has(json(body)) && await content.store.inspect(body) !== 'verified-present') return fileError('既存のモデル本体を確認できません。');
         const key = json(request), result = await content.verifier(!completed.has(key)).verify(request) as { outcome?: string };
         if (result.outcome !== 'verified') return fileError('追加するモデルの検証情報を保存できません。');
         completed.add(key);

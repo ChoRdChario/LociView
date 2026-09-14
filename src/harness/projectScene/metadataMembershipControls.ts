@@ -2,10 +2,7 @@ import type { SavedWorkspaceHost } from './savedHost';
 import type { SyntheticSession } from './session';
 import { captionCopySource, captionMembershipGroups, assetMembershipGroups, type CaptionMembershipResolution, type AssetMembershipResolution } from '../../projectMetadata/membership';
 import { newId } from '../../projectMetadata/persistence';
-import { assetCopySource } from '../../projectMetadata/modelMembership';
-import { readMetadataModel } from './metadataModelRecords';
-import { allocateModelCopyIds, createFixtureModel, fixtureModelIds } from './modelClosure';
-import type { JsonObject } from '../../domain/values';
+import { assetCopySource, prepareAssetMembershipCopy } from '../../projectMetadata/modelMembership';
 
 /** The same saved host, with an explicit entity-level decision (not a duplicate button). */
 export function createMetadataMembershipControls(document: Document, host: Pick<SavedWorkspaceHost, 'read' | 'resolve' | 'limits'>,
@@ -43,11 +40,10 @@ export function createMetadataMembershipControls(document: Document, host: Pick<
         option(choice, '', '解消方法を選択'); option(choice, 'one', '一つを残す');
         option(choice, 'both', '両方残す（別々に編集）');
         let copy: ReturnType<typeof captionCopySource> | undefined;
-        let modelCopy: { source: ReturnType<typeof assetCopySource>; model: ReturnType<typeof readMetadataModel> } | undefined;
+        let modelCopy: ReturnType<typeof assetCopySource> | undefined;
         try { if (kind === 'caption') copy = captionCopySource(provider, captionId, limits); } catch { /* Explain the blocked copy, never substitute projected content. */ }
         try { if (kind === 'asset') {
-          const source = assetCopySource(provider, sceneId, captionId, limits);
-          modelCopy = { source, model: readMetadataModel(source.asset.assetFrameId as string, source.binding, source.revision, source.representation) };
+          modelCopy = assetCopySource(provider, sceneId, captionId, limits);
         } } catch { /* Keep-one remains possible; incomplete copy never silently omits a dependency. */ }
         preview.textContent = kind === 'asset' ? `同じモデルへの登録が${edgeIds.length}件あります。「一つを残す」は重複登録だけを解除します。モデル本体・キャプション・他のシーンは変わりません。` +
           (modelCopy ? '「両方残す」は現在のモデル・配置・見え方を別項目にコピーします。キャプションは元モデルに残ります。' : '両方残すには、モデルと見え方の未解決の内容を先に確認してください。') :
@@ -68,24 +64,24 @@ export function createMetadataMembershipControls(document: Document, host: Pick<
         apply.addEventListener('click', () => {
           if (blocked() || current.token !== host.read().source?.token || !edgeIds.includes(original.value) ||
             !['one', 'both'].includes(choice.value) || choice.value === 'both' && !copy && !modelCopy) return;
-          const command: CaptionMembershipResolution | AssetMembershipResolution = kind === 'asset' ? {
-            kind: 'resolveAssetMembership', sceneId, assetId: captionId, observedMembershipIds: edgeIds,
-            originalMembershipId: original.value, choice: choice.value as 'one' | 'both', eventId: `evt_${newId()}`,
-            ...(choice.value === 'both' ? { copies: edgeIds.filter(id => id !== original.value).map(sourceMembershipId => {
-              const model = modelCopy!.model, ids = allocateModelCopyIds(fixtureModelIds(model), prefix => `${prefix}_${newId()}`);
-              const fresh = createFixtureModel(ids, model.shape, model.binding.assetToProject, undefined, model.binding.method);
-              return { sourceMembershipId, ids: { ...ids, membership: `sam_${newId()}` }, materialId: modelCopy!.source.material ? `ovr_${newId()}` : null,
-                representation: fresh.representation as unknown as JsonObject, revision: fresh.revision as unknown as JsonObject,
-                binding: fresh.binding as unknown as JsonObject };
-            }) } : {}),
-          } : { kind: 'resolveCaptionMembership', sceneId, captionId,
-            observedMembershipIds: edgeIds, originalMembershipId: original.value, choice: choice.value as 'one' | 'both', eventId: `evt_${newId()}`,
-            copies: choice.value === 'one' ? [] : edgeIds.filter(id => id !== original.value).map(sourceMembershipId => ({
-              sourceMembershipId, captionId: `cap_${newId()}`, membershipId: `scm_${newId()}`,
-              attachments: copy!.attachments.map(a => ({ sourceId: a.id as string, targetId: `att_${newId()}` })),
-              tags: copy!.tags.map(t => ({ sourceId: t.id as string, targetId: `tgm_${newId()}` })),
-            })) };
-          session.applyWorking(() => host.resolve(current.token, command), () => {
+          // Capture the explicit choice and allocate/seal once; retry never mints another copy.
+          const originalMembershipId = original.value, decision = choice.value as 'one' | 'both', eventId = `evt_${newId()}`;
+          const command: Promise<CaptionMembershipResolution | AssetMembershipResolution> = (async () => {
+            if (kind === 'asset') return {
+              kind: 'resolveAssetMembership', sceneId, assetId: captionId, observedMembershipIds: edgeIds,
+              originalMembershipId, choice: decision, eventId,
+              ...(decision === 'both' ? { copies: await Promise.all(edgeIds.filter(id => id !== originalMembershipId).map(id =>
+                prepareAssetMembershipCopy(modelCopy!, id, prefix => `${prefix}_${newId()}`))) } : {}),
+            };
+            return { kind: 'resolveCaptionMembership', sceneId, captionId,
+              observedMembershipIds: edgeIds, originalMembershipId, choice: decision, eventId,
+              copies: decision === 'one' ? [] : edgeIds.filter(id => id !== originalMembershipId).map(sourceMembershipId => ({
+                sourceMembershipId, captionId: `cap_${newId()}`, membershipId: `scm_${newId()}`,
+                attachments: copy!.attachments.map(a => ({ sourceId: a.id as string, targetId: `att_${newId()}` })),
+                tags: copy!.tags.map(t => ({ sourceId: t.id as string, targetId: `tgm_${newId()}` })),
+              })) };
+          })();
+          session.applyWorking(async () => host.resolve(current.token, await command), () => {
             if (disposed) return;
             forms.delete(key); session.refreshHistory(); render(); changed();
           }, error => { if (!disposed) { message.textContent = error instanceof Error ? error.message : '解消できません。選択は保持しています。'; render(); changed(); } });

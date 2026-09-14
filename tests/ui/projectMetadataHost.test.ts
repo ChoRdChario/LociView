@@ -1451,7 +1451,9 @@ function modelCopyCommand(host: Awaited<ReturnType<typeof openMetadataHost>>): A
   return { kind: 'resolveAssetMembership', sceneId: g.sceneId, assetId: g.assetId, observedMembershipIds: g.edgeIds,
     originalMembershipId: g.edgeIds[0]!, choice: 'both', eventId: fresh('evt'), copies: g.edgeIds.slice(1).map(sourceMembershipId => {
       const ids = allocateModelCopyIds(fixtureModelIds(model), fresh), copy = createFixtureModel(ids, model.shape, model.binding.assetToProject, undefined, model.binding.method);
-      return { sourceMembershipId, ids: { ...ids, membership: fresh('sam') }, materialId: source.material ? fresh('ovr') : null,
+      const { slot, ...rootIds } = ids;
+      return { sourceMembershipId, ids: { ...rootIds, membership: fresh('sam') },
+        slots: [{ sourceId: source.materials[0]!.sourceId, targetId: slot, materialId: source.materials[0]!.material ? fresh('ovr') : null }],
         binding: JSON.parse(canonicalFixture(copy.binding)), revision: JSON.parse(canonicalFixture(copy.revision)), representation: JSON.parse(canonicalFixture(copy.representation)) };
     }) };
 }
@@ -1940,7 +1942,9 @@ describe('new synthetic saved host (memory ports and recorded DOM, not real brow
       { ...command, copies: [{ ...copy, representation: { ...copy.representation, role: 'pointPrimary' } }] },
       { ...command, copies: [{ ...copy, binding: { ...copy.binding, parentBindingId: 'bnd_' + '1'.padStart(32, '0') } }] },
       { ...command, copies: [{ ...copy, revision: { ...copy.revision, extra: true } }] },
-      { ...command, copies: [{ ...copy, materialId: 'ovr_' + 'e'.repeat(32) }] },
+      { ...command, copies: [{ ...copy, slots: copy.slots.map(s => ({ ...s, materialId: 'ovr_' + 'e'.repeat(32) })) }] },
+      { ...command, copies: [{ ...copy, slots: [] }] },
+      { ...command, copies: [{ ...copy, slots: [copy.slots[0]!, copy.slots[0]!] }] },
     ];
     for (const bad of invalid) await expect(host.resolve(source.token, bad)).rejects.toThrow();
     await expect(host.resolve(source.token, { ...command, copies: [{ ...copy, representation: { ...copy.representation, payloadDigest: 'f'.repeat(64) } }] })).rejects.toThrow();

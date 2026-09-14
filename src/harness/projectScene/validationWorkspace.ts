@@ -134,8 +134,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
         const memberships = createMetadataMembershipControls(document, target, session, text.composing, changed, 'caption', blockedReason);
         const models = createMetadataAssetStatusControls(document, target, session, text.composing, changed, { blockedReason,
           preview: ports.renderModelCandidate ? display => ports.renderModelCandidate!(target, display) : undefined });
-        // Accepted typed choices only: the synthetic Asset-copy path is not activated.
-        const groups = [lifecycle, text, memberships, models]; root.append(...groups.map(g => g.root));
+        const modelMemberships = createMetadataMembershipControls(document, target, session, text.composing, changed, 'asset', blockedReason);
+        const groups = [lifecycle, text, memberships, models, modelMemberships]; root.append(...groups.map(g => g.root));
         return { root, render: () => { for (const group of groups) group.render(); },
           hasChanges: () => groups.some(g => g.hasChanges()), dispose: () => { for (const group of groups) group.dispose(); root.remove(); } };
       }, fileTools);
