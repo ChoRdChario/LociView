@@ -24,6 +24,7 @@ import { defaultSceneCandidates } from './startupScene';
 import { planAssetAddition, type AddAssetCommand } from './modelAddition';
 import { planModelReplacement, type ReplaceAssetModelCommand } from './modelReplacement';
 import { planViewResolution, type ViewResolution } from './viewResolution';
+import { planMaterialResolution, type MaterialResolution } from './materialResolution';
 
 export type MetadataEdit =
   | AddAssetCommand
@@ -34,6 +35,7 @@ export type MetadataEdit =
   | SceneAuthoringCommand
   | SceneNameResolution
   | ViewResolution
+  | MaterialResolution
   | CaptionMembershipResolution
   | AssetMembershipResolution
   | { kind: 'resolveAssetStatus'; assetId: string; operationId: string }
@@ -86,6 +88,7 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
   if (command.kind === 'replaceAssetModel') return planModelReplacement(provider, command, limits);
   if (command.kind === 'resolveSceneName') return planSceneNameResolution(provider, command, limits);
   if (command.kind === 'resolveViewField' || command.kind === 'resolveEntryView') return planViewResolution(provider, command, limits);
+  if (command.kind === 'resolveMaterialIntent' || command.kind === 'resolveMaterialDuplicates') return planMaterialResolution(provider, command, limits);
   if (command.kind === 'resolveDefaultScene') {
     shape(raw, ['kind', 'operationId']);
     const choice = defaultSceneCandidates(provider, limits).find(c => c.operationId === command.operationId);

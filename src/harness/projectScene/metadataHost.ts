@@ -180,7 +180,7 @@ export async function openMetadataHost(options: MetadataHostOptions) {
       if (authority.readOnly) throw Error('このタブは閲覧専用です。');
       return ready(await service.receiveFullSource(expectedToken, input ?? await demoSource(demo)));
     }, '更新を受け取れません。');
-    const resolve = (expectedToken: string, command: Extract<MetadataEdit, { kind: 'resolveCaptionLifecycle' | 'resolveViewField' | 'resolveEntryView' | 'resolveSceneName' | 'resolveCaptionText' | 'resolveCaptionField' | 'resolveCaptionMembership' | 'resolveAssetMembership' | 'resolveAssetStatus' | 'resolveDefaultScene' }>) => execute(async () => {
+    const resolve = (expectedToken: string, command: Extract<MetadataEdit, { kind: 'resolveMaterialIntent' | 'resolveMaterialDuplicates' | 'resolveCaptionLifecycle' | 'resolveViewField' | 'resolveEntryView' | 'resolveSceneName' | 'resolveCaptionText' | 'resolveCaptionField' | 'resolveCaptionMembership' | 'resolveAssetMembership' | 'resolveAssetStatus' | 'resolveDefaultScene' }>) => execute(async () => {
       if (authority.readOnly) throw Error('このタブは閲覧専用です。');
       return ready(await service.edit(expectedToken, command));
     }, '競合を解消できません。');

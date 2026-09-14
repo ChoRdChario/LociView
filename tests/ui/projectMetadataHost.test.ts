@@ -35,6 +35,7 @@ import { metadataProviderReady } from '../../src/projectMetadata/session';
 import { metadataImmutableReader } from '../../src/projectMetadata/records';
 import { assetStatusCandidates } from '../../src/projectMetadata/assetStatus';
 import { captionFieldCandidates } from '../../src/projectMetadata/captionCandidates';
+import { materialResolutionContext } from '../../src/projectMetadata/materialResolution';
 import { modelClosureKey } from '../../src/harness/projectScene/modelHistory';
 import type { JsonObject } from '../../src/domain/values';
 import { metadataModels } from '../../src/harness/projectScene/metadataFixture';
@@ -2535,11 +2536,40 @@ describe('new synthetic saved host (memory ports and recorded DOM, not real brow
     const dupProvider = await read(duplicate), dupView = metadataProjectView(dupProvider);
     expect(materialBucket(dupView.materialData, route).kind).toBe('unresolved');
     for (const command of [edit, reset]) expect(() => duplicate.prepareEdit(duplicate.token, command, dupProvider, tx)).toThrow();
+    if (dupProvider.kind !== 'scene-provider') throw Error('provider');
+    const observedOverrideIds = [id, `ovr_${'f'.repeat(32)}`];
+    const keep: MetadataEdit = { kind: 'resolveMaterialDuplicates', sceneId: f.overview, overrideId: id, observedOverrideIds, eventId: `evt_${'6'.repeat(32)}` };
+    for (const change of [{ observedOverrideIds: [id] }, { observedOverrideIds: [id, id] }, { overrideId: `ovr_${'0'.repeat(32)}` }, { sceneId: f.detail }])
+      expect(() => duplicate.prepareEdit(duplicate.token, { ...keep, ...change }, dupProvider, tx)).toThrow();
+    const cleaned = duplicate.prepareEdit(duplicate.token, keep, dupProvider, tx), cleanedRead = await read(cleaned);
+    if (cleanedRead.kind !== 'scene-provider') throw Error('provider');
+    expect(cleanedRead.issues.filter(i => i.path[0] === 'materialOverridesById')).toEqual([]);
+    expect(metadataProjectView(cleanedRead).materialData!.records[id]).toEqual(metadataProjectView(provider).materialData!.records[id]);
+    expect(metadataProjectView(cleanedRead).materialData!.records[observedOverrideIds[1]!]!.lifecycle).toMatchObject({ kind: 'value', value: { state: 'deleted', reason: 'conflictResolution' } });
+    const branchA = altered(d => { delete d.materialOverridesById[id].appearance; d.materialOverridesById[id].appearance = new A.ImmutableString(canonicalFixture({ lighting: 'unlit' })); });
+    const branchB = altered(d => { d.materialOverridesById[id].appearance = new A.ImmutableString(canonicalFixture({ doubleSided: true })); });
+    const pair = branchA.appendOriginal(branchB.originalChanges()), pairRead = await read(pair);
+    if (pairRead.kind !== 'scene-provider') throw Error('provider');
+    const context = materialResolutionContext(pairRead, f.overview, id, metadataFixtureLimits), atom = context.atoms(id, 'appearance')[0]!, companion = context.atoms(id, 'compositing')[0]!;
+    const resolve: MetadataEdit = { kind: 'resolveMaterialIntent', sceneId: f.overview, overrideId: id, appearanceOperationId: atom.operationId, compositingOperationId: companion.operationId };
+    const resolved = pair.prepareEdit(pair.token, resolve, pairRead, tx), resolvedRead = await read(resolved);
+    if (resolvedRead.kind !== 'scene-provider') throw Error('provider');
+    const companionField = (p: typeof pairRead) => p.inspection.candidates.fields.find(f => f.path.join('/') === `materialOverridesById/${id}/compositing`);
+    expect(companionField(resolvedRead)).toEqual(companionField(pairRead));
+    expect(resolvedRead.details.mutable.materialOverridesById[id]!.appearance).toEqual({ kind: 'value', value: atom.value });
+    const originalInspection = await resolved.inspectOriginal({ maxNodes: metadataFixtureLimits.maxNodes, maxWork: metadataFixtureLimits.maxWork });
+    expect(() => summarizeFullHistory(originalInspection)).not.toThrow();
+    for (const change of [{ appearanceOperationId: 'missing' }, { compositingOperationId: atom.operationId }, { sceneId: f.detail }])
+      expect(() => pair.prepareEdit(pair.token, { ...resolve, ...change }, pairRead, tx)).toThrow();
+    expect(() => pair.prepareEdit('stale', resolve, pairRead, tx)).toThrow(/stale/);
+    expect(() => materialResolutionContext(pairRead, f.overview, id, { ...metadataFixtureLimits, maxWork: 1 })).toThrow(/limit/);
     const unknownRoute = altered(d => { d.materialOverridesById[id].routing = new A.ImmutableString(canonicalFixture({ ...route, future: true })); });
     const unknownRouteProvider = await read(unknownRoute);
     expect(materialBucket(metadataProjectView(unknownRouteProvider).materialData, route).kind).toBe('unresolved');
     for (const command of [edit, reset, { ...create, overrideId: `ovr_${'e'.repeat(32)}` }])
       expect(() => unknownRoute.prepareEdit(unknownRoute.token, command, unknownRouteProvider, tx)).toThrow();
+    for (const [source, p] of [[unknownRoute, unknownRouteProvider], [unknown, unknownProvider], [conflict, conflicted]] as const)
+      expect(() => source.prepareEdit(source.token, resolve, p, tx)).toThrow();
     const absentRoute = altered(d => { delete d.materialOverridesById[id].routing; }), absentProvider = await read(absentRoute);
     const uncertain = metadataProjectView(absentProvider).materialData!;
     expect(uncertain.routingUncertain).toBe(true); expect(materialBucket(uncertain, route).kind).toBe('unresolved');

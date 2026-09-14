@@ -25,6 +25,7 @@ import { resolveScene } from '../../scene/resolve';
 import { validationMaterialSlots, validationMaterialIssue } from './validationMaterials';
 import { same } from '../../domain/projectGraphSupport';
 import type { MaterialIntent } from '../../domain/materialIntent';
+import { selectedMaterialResolution } from '../../projectMetadata/materialResolution';
 import { WorkspaceReceiver, workspaceFileOperation, type WorkspaceReceiveState } from '../../projectFiles/receiveWorkspace';
 import type { PreparedReviewEdit } from '../../projectPackage/reviewEdit';
 import { ReviewEditJob } from '../../projectPackage/reviewEditJob';
@@ -461,7 +462,22 @@ export async function openValidationHost(options: ValidationHostOptions) {
     const host: SavedWorkspaceHost = { authority, limits, read: () => last, hasPending: () => busy || !!connection?.restorePending || restoreRetired || restoreDisplayPending || receiveDisplayPending || unfinishedReceive() ||
       !emptyImport() && (!!failure || last.state !== 'ready'),
       refresh: () => execute(async () => { await reloadReceive(); last = await session.read(); await projectView(last); return last; }),
-      resolve: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
+      resolve: (token, command) => execute(async () => {
+        editable();
+        if (command.kind === 'resolveMaterialIntent' || command.kind === 'resolveMaterialDuplicates') {
+          const before = await session.read();
+          if (before.state !== 'ready' || before.provider?.kind !== 'scene-provider' || before.source?.token !== token) throw Error('材質が更新されています。選び直してください。');
+          const selected = selectedMaterialResolution(before.provider, command, limits);
+          const versions = await validationModelVersions(before.provider);
+          const slots = versions.flatMap(v => v.closure.shape === 'saved-glb' ? validationMaterialSlots(v.closure) : []);
+          const slot = slots.find(s => same(s.target as unknown as JsonObject, selected.routing.target));
+          if (!slot) throw Error('設定するモデルと材質を確認してください。');
+          for (const intent of selected.intents.values()) {
+            const issue = validationMaterialIssue(slot, intent); if (issue) throw Error(issue);
+          }
+        }
+        return ready(await session.edit(token, command));
+      }, true),
       dispose: async () => { await dispose(); content.releasePreparedImages(); content.releasePreparedModels(); prepareDisplay = undefined; } };
     return { ...host, get content() { return content; }, workspaceFiles, workspaceOutput, backupRestore, display: () => restoreRetired ? undefined : project,
       get accessDetail() { return options.mode === 'view' ? '閲覧専用です。' : lease.accessDetail; },

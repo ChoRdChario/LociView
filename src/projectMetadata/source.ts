@@ -141,6 +141,10 @@ export class ProjectMetadataSource {
       if (command.kind === 'resolveDefaultScene') delete draft.project.defaultSceneId;
       if (command.kind === 'resolveSceneName') delete draft.scenesById[command.sceneId].name;
       if (command.kind === 'resolveViewField') delete draft.viewsById[command.viewId][command.field];
+      if (command.kind === 'resolveMaterialIntent') {
+        for (const edit of edits) for (const field of Object.keys(edit.fields))
+          delete draft.materialOverridesById[command.overrideId][field];
+      }
       if (command.kind === 'resolveEntryView') delete draft.scenesById[command.sceneId].defaultViewId;
       for (const edit of edits) {
         if (edit.map === 'project') {

@@ -2123,6 +2123,45 @@ failure retry without duplicate IDs, stale/duplicate/conflict/unknown/catalog
 refusal. Reuse existing material and viewport tests. Actual raster/input,
 OPFS/IndexedDB/iOS and adoption remain separate pending evidence.
 
+**Real-file material conflict continuation (2026-09-14):**
+
+The same Metadata Session gains `resolveMaterialIntent` and
+`resolveMaterialDuplicates`. The first names an override, active Scene and exact
+original operation IDs for whole appearance and compositing atoms. At least one
+atom must be conflicted. An unambiguous atom is retained exactly without a new
+field write (its operation ID guards the selected pair); each conflicted
+atom requires an explicit choice. Validate the selected pair together and publish
+one causal change, so simultaneous conflicts do not require an invalid intermediate
+pair. Never synthesize a per-property merge or select a materialized winner.
+
+Require active, known lifecycle and exact routing, active target Asset/current
+verified binding and exact family/layout/logical slot with the existing source
+semantics. Retain every routing reservation, including potential duplicate owners;
+unclassifiable or affected ambiguous/unknown routing refuses. Field resolution may
+precede duplicate cleanup, but it neither releases reservations nor guesses an
+owner. Unresolved lifecycle, delete/edit and general routing repair stay outside
+this unit and remain visible. Unknown/invalid atomic content is retained/refused.
+
+Duplicate resolution names the complete observed same-routing owner set, one
+explicit retained owner and a fresh lifecycle event. Require all affected records
+to be complete, active and supported. Tombstone only the other overrides with
+`conflictResolution`; do not delete records, change the survivor or remap targets.
+Scene scope and Project scope are separate keys; whole Scene-over-Project precedence
+remains unchanged. Original source and unrelated overrides survive.
+
+The real-GLB host applies its existing exact-slot `validationMaterialIssue`
+admission to selected full intents before journaling, including the resolution
+port, not only ordinary material writes. No mask/dither/blend/soft/transmission
+expansion is implied by the wider metadata schema. UI uses familiar model/surface/
+scope labels, no selected default for conflicts, exact command capture and existing
+input/IME/read-only/pending/stale/dispose/retry guards. A pure preflight reports an
+incompatible selection without entering a persistent retry; the user can choose
+again. Duplicate projection DTOs are not candidate readers. Choice alone changes no
+material or warm camera/Scene; ordinary editing/reset becomes available after
+resolution. Reuse real-file and metadata tests for receive, coupled choices,
+duplicate cleanup, normal edit/reset, exact failure retry, Contribution return,
+replay and cold reopen. No new PoC, wire, dependency, Native or adoption credit.
+
 **PO-approved practical-team completion and full-source receive (2026-09-12):**
 the first completion target is a usable team candidate under TEAM-FLOW-01, with
 real files, ordinary Project/Scene/editing flows, five-purpose exchange and

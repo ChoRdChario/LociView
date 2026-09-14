@@ -48,6 +48,7 @@ import { createMediaControls } from '../src/harness/projectScene/mediaControls';
 import { createModelAdditionControls } from '../src/harness/projectScene/modelAdditionControls';
 import { createModelUpdateControls } from '../src/harness/projectScene/developmentControls';
 import { planMetadataEdit } from '../src/projectMetadata/commands';
+import { materialResolutionContext } from '../src/projectMetadata/materialResolution';
 import { prepareValidationModel, sealValidationRecord } from '../src/projectFiles/initialProject';
 import { validationModelFacts, validationReceivedFacts } from '../src/projectFiles/modelFacts';
 import { ValidationContent } from '../src/projectFiles/content';
@@ -3138,6 +3139,113 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       reset.dispose!(); untouched.dispose!(); residents.dispose(); expect(bitmap.close).toHaveBeenCalledOnce(); await workspace.dispose();
     } finally { vi.unstubAllGlobals(); }
   });
+  it('resolves received real-file material pairs and duplicate owners, edits/resets and returns exact history (recorded DOM)', async () => {
+    const f = await openFileCaption(), { host, captionId } = f, sceneId = f.s.sceneId;
+    const closure = f.s.snapshot.modelVersions![0]!.closure; if (closure.shape !== 'saved-glb') throw Error('model');
+    const slot = validationMaterialSlots(closure)[0]!, id = `ovr_${newId()}`, duplicate = `ovr_${newId()}`, fallback = `ovr_${newId()}`;
+    const route = { scope: { kind: 'scene', sceneId }, target: slot.target }, inherit = { coverage: { policy: 'inherit' }, optics: 'inherit' };
+    const material = (owner: string, scope: object, appearance: object) => Object.fromEntries(Object.entries({ routing: { scope, target: slot.target }, appearance,
+      compositing: inherit, lifecycle: { state: 'active', eventId: `evt_${newId()}`, reason: 'initial' } }).map(([k, v]) => [materialKey(owner, k), json(v)]));
+    await host.authority.write(host.read().source!.token, material(fallback, { kind: 'project' }, { doubleSided: true }), { sceneId });
+    await host.authority.write(host.read().source!.token, material(id, route.scope, { lighting: 'lit' }), { sceneId });
+    const seed = host.read().source!, initial = await host.workspaceOutput.download(await host.workspaceOutput.generate(seed.token));
+    const base = host.workspaceOutput.bases[0]!.selection, peer = firstWorkspaceRecipient(); await peer.receiver.importWorkspace(initial);
+    await host.authority.write(seed.token, { [`caption/${captionId}/body`]: '手元の記録を保持' });
+    const chosenAppearance = { lighting: 'lit', chroma: { keyColorSrgb: [0.123456789, 0.8, 0.2], tolerance: 0.12345678, softness: 0 } };
+    const branch = (appearance: object, compositing: object, add = false) => A.change(A.load<Record<string, any>>(seed.encodeFullSource()), d => {
+      for (const [key, value] of Object.entries({ appearance, compositing })) {
+        delete d.materialOverridesById[id][key]; d.materialOverridesById[id][key] = new A.ImmutableString(json(value));
+      }
+      if (add) d.materialOverridesById[duplicate] = Object.fromEntries(Object.entries({ id: duplicate, routing: route,
+        appearance: { lighting: 'unlit' }, compositing: inherit, lifecycle: { state: 'active', eventId: `evt_${newId()}`, reason: 'initial' } })
+        .map(([k, v]) => [k, new A.ImmutableString(json(v))]));
+    });
+    const a = branch({ lighting: 'unlit' }, { coverage: { policy: 'opaque' }, optics: 'surface' }, true),
+      b = branch(chosenAppearance, inherit), c = branch({ lighting: 'lit' }, { coverage: { policy: 'mask', alphaCutoff: 0.5 }, optics: 'surface' });
+    const merged = A.merge(A.merge(A.clone(a), A.clone(b)), A.clone(c));
+    const remote = ProjectMetadataSource.fromFullSource(A.save(merged), seed.proof, metadata), contentFS = new TestFS(), content = new ValidationContent(contentFS, f.store, budget, decode);
+    const provider = await underWriteLease(contentFS, () => readProjectScene(remote.read(), metadata, content.verifier(true))), publication = newId();
+    const send = await WorkspaceSourceCapture.prepare({ read: async () => ({ state: 'ready', source: remote, provider, publication }) }, remote.token, f.store, metadata);
+    const chunks: BlobPart[] = []; await writeWorkspaceArchive(send, f.store, new WritableStream({ write: b => { chunks.push(b.slice() as BlobPart); } }),
+      { packageId: `pkg_${newId()}`, createdByVersion: 'validation' }); const incoming = new Blob(chunks);
+    await peer.receiver.receive((await peer.session.read()).source!.token, incoming); f.workspace.unmount();
+    let display: ReturnType<typeof syntheticDisplay> | undefined;
+    const recall = vi.fn(), factory = vi.fn(() => ({ update(next: any) { display = next; }, setActive() {}, capture: (): DisplayCapture => ({
+      camera: { position: [1, 2, 8], target: [0, 0, 0], up: [0, 1, 0], projection: { kind: 'perspective', verticalFovRadians: 0.7 } },
+      background: { kind: 'solid', colorSrgb: [0.2, 0.3, 0.4] } }), recall,
+      setBackground() {}, camera() {}, retry() {}, dispose() {}, read: () => ({ token: 'local-camera', ready: true, issue: null, dragging: false, projection: 'perspective' as const, axis: null, pins: [] }) }));
+    const u = createValidationWorkspace(new RecordedDocument().asDocument(), { fileLimits: budget, decode, list: async () => [], selected() {}, open: async () => host,
+      render: async () => ({ factory, dispose() {} }) }, f.options.run), root = record(u.root);
+    const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    const named = (label: string, parent = root) => all(parent).find(n => n.attributes.get('aria-label') === label)!;
+    const button = (text: string, parent = root) => all(parent).find(n => n.tag === 'button' && n.textContent === text)!;
+    const choose = (node: RecordedNode, value: string) => { node.value = value; node.fire('change'); };
+    await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true));
+    const input = named('更新ファイルを選択'), receive = input.parent!.parent!;
+    Object.assign(input, { files: [incoming] }); input.fire('change'); receive.fire('submit', { preventDefault() {} });
+    await vi.waitFor(() => expect(all(root).some(n => n.textContent === '更新を受け取りました。')).toBe(true), { timeout: 10000 });
+    Object.assign(input, { files: [] }); button('選択を取り消す', receive).fire('click');
+    const p = () => { const p = host.read().provider; if (p?.kind !== 'scene-provider') throw Error('provider'); return p; };
+    const tools = named('マテリアルの更新候補'), form = tools.children.find(n => n.attributes.get('aria-label')?.endsWith('見え方の競合'))!;
+    const appearance = named('見え方', form), compositing = named('被覆・光学', form), confirm = button('選択を確定', form);
+    expect(appearance.value).toBe(''); expect(compositing.value).toBe(''); expect(confirm.disabled).toBe(true);
+    const ctx = materialResolutionContext(p(), sceneId, id, metadata), before = host.read().source!;
+    const operation = (field: 'appearance' | 'compositing', value: object) => ctx.atoms(id, field).find(v => json(v.value) === json(value))!.operationId;
+    choose(appearance, operation('appearance', chosenAppearance)); choose(compositing, operation('compositing', { coverage: { policy: 'opaque' }, optics: 'surface' }));
+    expect(host.read().source!.token).toBe(before.token); expect(recall).not.toHaveBeenCalled();
+    const writes = vi.spyOn(f.fs, 'writeBytes'); writes.mockClear(); confirm.fire('click');
+    await vi.waitFor(() => expect(form.children.some(n => n.attributes.get('role') === 'status' && !!n.textContent)).toBe(true));
+    await vi.waitFor(() => expect(host.hasPending()).toBe(false)); expect(host.read().source!.token).toBe(before.token); expect(writes).not.toHaveBeenCalled();
+    // Unsupported real-GLB mask is structurally legal, but cannot bypass host capability checks.
+    choose(appearance, operation('appearance', { lighting: 'lit' })); choose(compositing, operation('compositing', { coverage: { policy: 'mask', alphaCutoff: 0.5 }, optics: 'surface' }));
+    await expect(host.resolve(before.token, { kind: 'resolveMaterialIntent', sceneId, overrideId: id,
+      appearanceOperationId: appearance.value, compositingOperationId: compositing.value })).rejects.toThrow('未接続');
+    expect(host.read().source!.token).toBe(before.token); expect(writes).not.toHaveBeenCalled();
+    confirm.fire('click'); expect(all(form).filter(n => n.attributes.get('role') === 'status').map(n => n.textContent).join(' ')).toContain('未接続');
+    expect(host.read().source!.token).toBe(before.token); expect(writes).not.toHaveBeenCalled();
+    choose(appearance, operation('appearance', chosenAppearance)); choose(compositing, operation('compositing', inherit));
+    const unchangedToken = host.read().source!.token;
+    Object.assign(input, { files: [incoming] }); input.fire('change'); confirm.fire('click');
+    expect(confirm.disabled).toBe(true); expect(host.read().source!.token).toBe(unchangedToken);
+    Object.assign(input, { files: [] }); button('選択を取り消す', receive).fire('click');
+    all(root).find(n => n.className === 'lv-caption-select')!.fire('click');
+    const detailBody = named('本文', named('キャプションの詳細'));
+    detailBody.fire('compositionstart'); confirm.fire('click'); expect(confirm.disabled).toBe(true); expect(host.read().source!.token).toBe(unchangedToken);
+    detailBody.fire('compositionend'); expect(confirm.disabled).toBe(false);
+    const explicit = { kind: 'resolveMaterialIntent' as const, sceneId, overrideId: id, appearanceOperationId: appearance.value, compositingOperationId: compositing.value };
+    await expect(host.resolve('stale', explicit)).rejects.toThrow('更新');
+    const readonly = await openValidationHost(f.options); await expect(readonly.resolve(before.token, explicit)).rejects.toThrow('閲覧専用'); await readonly.dispose();
+    expect(host.read().source!.token).toBe(before.token);
+    f.fs.reject = path => path.endsWith('/published.json'); confirm.fire('click');
+    await vi.waitFor(() => expect(host.authority.status!().kind).toBe('failed'));
+    const paths = (await f.fs.list(`${validationArea}/${f.options.run}/`)).filter(p => p.endsWith('.amchange')), bytes = await Promise.all(paths.map(p => f.fs.readBytes(p)));
+    expect(host.read().source!.token).toBe(before.token); appearance.value = operation('appearance', { lighting: 'unlit' });
+    f.fs.reject = () => false; button('更新を再試行', named('更新の確認')).fire('click');
+    await vi.waitFor(() => expect(tools.children.includes(form)).toBe(false));
+    expect(await Promise.all(paths.map(p => f.fs.readBytes(p)))).toEqual(bytes);
+    expect(materialResolutionContext(p(), sceneId, id, metadata).atoms(id, 'appearance')).toEqual([{ operationId: expect.any(String), value: chosenAppearance }]);
+    // Duplicate still withholds the Scene override; Project fallback is not merged into it.
+    expect(display!.savedMaterials![closure.binding.assetId]![slot.target.logicalMaterialSlotId]).toMatchObject({ appearance: { doubleSided: true } });
+    const dupForm = tools.children.find(n => n.attributes.get('aria-label')?.endsWith('設定の重複'))!;
+    choose(named('残す設定', dupForm), id); button('選んだ設定を残す', dupForm).fire('click');
+    await vi.waitFor(() => expect(p().details.mutable.materialOverridesById[duplicate]!.lifecycle).toMatchObject({ kind: 'value', value: { state: 'deleted', reason: 'conflictResolution' } }));
+    expect(display!.savedMaterials![closure.binding.assetId]![slot.target.logicalMaterialSlotId]).toEqual({ appearance: chosenAppearance, compositing: inherit });
+    expect(factory).toHaveBeenCalledOnce(); expect(recall).not.toHaveBeenCalled(); expect(display!.sceneId).toBe(sceneId);
+    const unchangedFallback = p().details.mutable.materialOverridesById[fallback];
+    await host.authority.write(host.read().source!.token, { [materialKey(id, 'appearance')]: json({ ...chosenAppearance, lighting: 'unlit' }) }, { sceneId });
+    await host.authority.write(host.read().source!.token, { [materialKey(id, 'lifecycle')]: json({ state: 'deleted', eventId: `evt_${newId()}`, reason: 'userDelete' }) }, { sceneId });
+    expect(p().details.mutable.materialOverridesById[fallback]).toEqual(unchangedFallback);
+    expect(syntheticDisplay(host.authority.read(), sceneId, null, null).savedMaterials![closure.binding.assetId]![slot.target.logicalMaterialSlotId]).toMatchObject({ appearance: { doubleSided: true } });
+    expect(host.authority.read().resources.captions[captionId]!.body).toEqual({ kind: 'value', value: '手元の記録を保持' });
+    const final = host.read().source!, reply = await host.workspaceOutput.download(await host.workspaceOutput.generateContribution(final.token, base));
+    const received = await peer.receiver.receive((await peer.session.read()).source!.token, reply);
+    expect(received.source!.heads).toEqual(final.heads);
+    expect(new Map(received.source!.originalChanges().map(b => [A.decodeChange(b).hash, b]))).toEqual(new Map(final.originalChanges().map(b => [A.decodeChange(b).hash, b])));
+    expect((await peer.receiver.receive(received.source!.token, reply)).source!.token).toBe(received.source!.token);
+    await u.dispose(); confirm.fire('click'); expect(host.read().source!.token).toBe(final.token);
+    const cold = await openValidationHost(f.options);
+    expect(cold.read().source!.originalChanges()).toEqual(final.originalChanges()); expect(cold.authority.read().modelVersions![0]!.closure).toEqual(closure); await cold.dispose();
+  }, 60000);
   it('connects saved GLB material scope/edit/reset and cold reopen; failed save retains draft and never reloads warm model bodies', async () => {
     const { host, workspace, s, fs, options } = await openFileCaption(glb(j => { j.materials.push({}); }));
     const c = s.snapshot.modelVersions![0]!.closure; if (c.shape !== 'saved-glb') throw Error('saved model');

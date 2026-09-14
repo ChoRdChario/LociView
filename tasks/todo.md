@@ -12,8 +12,8 @@ resume and recovery. Desktop, physical iPhone and offline acceptance must cover
 the new route. Scope is 62 of the 64 inventory groups; M13/M14 remain later work.
 Neither component counts nor synthetic-host success is product completion or release approval.
 
-Next approved work is [received material conflict resolution](#next-connected-unit).
-Real-file pin/Scene/View resolution is verified in the limited host below; Native 07 §11 still
+Next work is [the ordinary-entry adoption boundary](#next-connected-unit).
+Real-file material resolution is implemented and verified below; Native 07 §11 still
 requires its separate concrete compatibility decision.
 
 ## Completed unit — recover and independently edit received Captions
@@ -272,7 +272,7 @@ acceptance. No new PoC, dependency, public fixture or release change. The approv
 critical path still closes continued editing after received changes; material
 conflicts are the next concrete interruption to that workflow.
 
-## Next connected unit
+## Completed unit — received material conflicts
 
 Receive competing material settings → explicit
 whole-field choice / duplicate same-target keep-one → normal edit/reset → Contribution
@@ -285,11 +285,72 @@ no new probe, soft transparency/profile expansion, general relation repair, Nati
 conversion or ordinary-entry/device adoption. A concrete contract ambiguity is a
 stop condition; routine sequencing and focused repair do not require another PO wait.
 
-- [ ] Specify finite material resolution commands and whole-candidate validation.
-- [ ] Connect the real-file host through the Metadata Session; retain retry,
+- [x] Specify finite material resolution commands and whole-candidate validation.
+- [x] Connect the real-file host through the Metadata Session; retain retry,
   pending/input guards and warm Scene/camera state.
-- [ ] Verify receive → resolve → normal edit/reset → exact return/replay/reopen
+- [x] Verify receive → resolve → normal edit/reset → exact return/replay/reopen
   with existing tests, then one final serial verification/review/checkpoint.
+
+Starting checkpoint: `1688492`, clean `g0-baseline`; previous goal turn was
+progress (pin/Scene/View real-file resolution, verified and committed). Paired
+appearance/compositing selection avoids invalid intermediate combinations; duplicate
+keep-one is separate and preserves the survivor. The real-file resolution port
+must enforce existing exact-slot capability admission before journaling, just as
+ordinary material writes do. Independent read-only investigation identified that
+port difference; no wider material rendering profile is approved.
+
+Implemented paired exact-atom choices (only conflicted fields are rewritten),
+same-routing complete duplicate keep-one and pre-journal real-slot admission in
+the host resolution port. Pure UI preflight leaves incompatible pairs editable,
+not trapped in a journal retry. Duplicate projection DTOs withhold routing and
+appearance: review labels/scope/choices now read exact original candidates, not
+that non-authoritative DTO. The selected pair still cannot render until duplicate
+cleanup, and whole Project fallback remains intact. No guessed source relation.
+
+Focused material checks pass (4 cases; 13.48s combined test time); the real-file
+case with added file-input/IME/readonly/stale/dispose guards passes (12.54s test
+time). Final typecheck passed. Independent product review and the focused follow-up
+found no mandatory findings. Initial failures were one withheld-DTO UI seam and
+test fixture/type assumptions (fresh lifecycle event, diagnostic/raw distinction,
+original-inspection input); none required a relaxed contract. The root suite ran
+once (112 files, 539.50s): 2,289 PASS / 21 existing TODO / one static import-isolation
+failure. Its exact allowlist lacked the two newly approved material files and
+their actual imports. Only that assertion was corrected afterward; ordinary-entry,
+DEV and storage/network restrictions remain unchanged and cover the new files.
+The complete isolation file then passed (12 cases, 454ms). Independent review of
+that correction found no mandatory finding. Unchanged runtime evidence was reused
+rather than repeat the nine-minute suite: this is a full run plus targeted
+correction, not a second all-green root run. Final typecheck, ordinary build and
+harness build passed; existing chunk/image-loader/UUID warnings remain. An earlier
+terminal result was unavailable after context recovery, so only typecheck/build
+were rerun to obtain attributable completion; runtime tests were not repeated.
+No new probe or test framework. Recorded DOM and injected storage/viewport remain
+distinct from live browser, physical iPhone, offline and ordinary-entry acceptance.
+
+## Next connected unit
+
+Prioritize ordinary entry → real Project work and file exchange → exit/reopen,
+not another small conflict-form expansion. Source recheck confirms `src/main.ts`
+still opens only Native/v1, `entry.ts` and `validationBrowser.ts` are DEV-only and
+the harness production build deliberately excludes this storage path. Removing
+those guards is not adoption. This is a shared missing boundary across the already
+connected user flows, separate from Native conversion 07's pending amendment.
+
+- [ ] Reconcile only missing 05 §13.2 / G1-A/C, profile, browser/storage and
+  physical-iOS acceptance against executed evidence, using existing gate records.
+- [ ] Prepare one bounded candidate/ordinary-entry connection plan and grouped
+  human procedure. Resolve the actual built-execution/adoption/SW/HTTPS authority
+  differences before changing guarded entry behavior; identify exact build and one
+  temporary HTTPS path if needed. Do not count a dev server as offline evidence.
+- [ ] Execute approved browser/device acceptance and then ordinary-entry connection;
+  keep failures/unsupported behavior explicit. Native, frozen-v1 and LociMyu
+  conversion and other profiles remain full practical-team requirements, not waived.
+
+The existing browser bootstrap denial is not retried unchanged. Do not turn this
+into another browser-repair workstream or ask for every helper check. A concrete
+new permission or product/profile decision is grouped and explained to the PO;
+known approvals for isolated implementation are retained. No release/Pages/main,
+unratified wire, new profile or ordinary activation follows from this plan alone.
 
 ## Pending decision — Native conversion implementation
 
