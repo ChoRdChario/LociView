@@ -17,7 +17,8 @@ frozen v1/map-1/map-2/immutable-recipe boundaries remain unchanged.
 The latest verified implementation includes bounded Native GLB/PNG conversion →
 edit/first-place → named backup/Workspace → independent reopen, plus the typed
 product composition's edit → save/two-round exchange → cold-reopen workflow in
-the nondefault validation route. Existing model, material and file/recovery work is retained.
+the nondefault validation route, now including the model, Saved View and material
+panels. Existing file/recovery work is retained.
 Ordinary entry, broader profiles/converters, browser performance, physical-iPhone
 and offline acceptance remain open. Full details and earlier failures are in the
 [September checkpoint record](../docs/history/development-through-2026-09-21/tasks/todo.md).
@@ -68,8 +69,8 @@ the subsequent checkpoint's publication identity; do not copy a second commit lo
    and provider projection, injected existing viewport, shared file/recovery tools.
    The current editor remains available. Import isolation, the connected file
    workflow, exact recovery and the final serial checkpoint/review are complete.
-2. Extend the same typed product composition with the existing model, Saved View
-   and material workflows under their accepted commands/renderer boundaries.
+2. Completed: extend the same typed product composition with the existing model,
+   Saved View and material workflows under their accepted commands/renderer boundaries.
    Keep the current editor available until the required scope is connected.
    Continue the remaining approved feature/conversion work and automated failure
    checks without waiting for Native or other small human tests. Gather the
@@ -96,6 +97,75 @@ major architecture/product decision, a required managed permission, or a release
 destructive boundary. Ordinary entry and temporary iPhone HTTPS need their existing
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
+
+### Completed unit — model, Saved View and material screen integration
+
+PO requested this connected unit on 2026-10-15 without small confirmation waits.
+Outcome: use the same `editor=project` screen to add/manage/place a GLB model,
+save/recall/manage a Scene view and background, and edit/reset exact Project/Scene
+material settings; retain these edits through save/exchange and cold reopen.
+Reuse accepted pure controls/planners, typed commands and existing guarded file,
+transform, renderer and material services. One writer; bounded read-only area
+analysis and final review. Preserve the current editor and route/device gates.
+
+- [x] Specify the narrow read/action/viewport additions and interaction ownership;
+  implement the three panels and stable four-task navigation as one workflow.
+- [x] Verify shared draft/IME/file/preview guards, exact retry, local visibility,
+  view capture/recall/background and material precedence with focused checks;
+  retain one representative connected save/exchange/reopen flow per new boundary.
+- [x] Run final typecheck/root/builds serially, independently review the final
+  diff, update this record and prepare a suitable g0-baseline checkpoint for the
+  authorized push; Git records publication.
+
+Stop only for an actual specification conflict, new architecture/profile/policy,
+required managed authority or release/destructive boundary. Browser automation's
+known protected-runtime EPERM remains recorded; do not retry unchanged or wait on
+PO checks. No renderer rewrite, new format/profile, dependency, storage namespace,
+ordinary-home activation, public input distribution or release is included.
+
+Implementation: the stable four-task screen reuses the existing pure Model/View/
+material controls, provider projections and typed commands. GLB add/replace/place,
+local hide/isolate, membership and independent duplicate copies, Saved View
+create/edit/order/delete/entry/camera/background, and exact Project/Scene material
+edit/reset and explicit conflict choices now share the existing file/recovery host.
+Candidate model previews reuse the existing read-only renderer. No UI storage or
+string-map write boundary is introduced. Scope is the admitted saved-GLB profile.
+
+Focused evidence: injected-viewport file flows cover model placement publication
+failure and exact retry, no-op placement, add/replace and file/cold reopen; a
+duplicate-copy flow covers Caption draft preservation, model search IME and
+Scene/token-bound decisions; View/material flow covers exact capture/recall,
+entry without recall, local background, Scene precedence over Project, reset and
+file/cold reopen. A compact adapter regression retains a later material owner's
+conflict and original View candidates. Existing core exchange/recovery checks and
+exact import-isolation checks pass. These are authored DOM/Node/service checks,
+not browser/GPU or device observations.
+
+Independent read-only area reviews found and closed draft/IME guard, quaternion
+precision, candidate/owner visibility and stale preview/decision issues; no
+actionable finding remains. Final `check:checkpoint` PASS: typecheck, 114 root
+files / 2,343 passing cases / 21 existing todo (472.25 s), then ordinary, harness
+and validation builds serially. All 15 staged source/test paths preserve the
+tested executable content; staging removed one surplus EOF blank in the shared
+View-label helper. Reconstructing that whitespace reproduces its tested hash;
+all staged clean hashes match the working files. Five changed Markdown files'
+211 local links and final staged diff checks pass; no runtime rerun for whitespace.
+The first attempt stopped at new test-only TypeScript target narrowing; the source
+was unchanged by that correction. Both attempt logs remain in ignored traces.
+
+The new seven-file static artifact is served byte-for-byte at port 4182;
+path-sorted manifest SHA-256 is
+`5c394b99ea22b720a146e369b6f4588ef64a49e5b040708bb4322c149793a23e`.
+No SW, manifest or public samples. `dev.html?editor=project` selects the integrated
+screen. This is HTTP/file evidence; automated rendering, physical iPhone and
+offline evidence remain open. No small PO test is a prerequisite to continued work.
+
+Milestone audit: g0-baseline and the approved isolated scope are retained. The
+unit closes a user workflow rather than a helper-only checkpoint; privacy and
+deployment-trigger review is clear. Suitable verified source/docs are prepared
+for the authorized normal push; Git owns its identity. Next, continue the remaining
+practical-team/conversion scope and grouped acceptance lanes before ordinary entry;
+no adoption, new profile or release credit is implied.
 
 ### Completed slice — visible wait feedback in the existing validation workflow
 

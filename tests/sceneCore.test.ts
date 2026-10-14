@@ -247,8 +247,8 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
       const metadataHost = /[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Intent|MembershipControls|Models|ModelFacts|AssetStatusControls|ConflictControls|MaterialControls|CaptionLifecycleControls|StartupControls)\.ts$/.test(path);
       const validationFiles = /[\\/]projectFiles[\\/](validation|png|glb|glbMaterials|initialProject|content|creation|modelFacts|receiveWorkspace|sendWorkspace|nativeMapping|nativeConversion)\.ts$/.test(path);
       const validationDisplay = /[\\/]harness[\\/]projectScene[\\/](modelTypes|modelCandidatePreview|validationProjection|validationRender|validationMaterials|validationCoverage)\.ts$/.test(path);
-      const validationHost = /[\\/]harness[\\/]projectScene[\\/](reviewView|reviewWorkspace|savedHost|validationHost|validationModeHost|validationCatalog|validationGeneration|validationWorkspace|validationReceiveControls|validationOutputControls|validationBrowser|browserMetadataStorage|productWorkspace)\.ts$/.test(path);
-      const productComposition = /[\\/]ui[\\/]projectScene[\\/](projectWorkspacePorts|projectWorkspace|projectRead)\.ts$/.test(path);
+      const validationHost = /[\\/]harness[\\/]projectScene[\\/](reviewView|reviewWorkspace|savedHost|validationHost|validationModeHost|validationCatalog|validationGeneration|validationWorkspace|validationReceiveControls|validationOutputControls|validationBrowser|browserMetadataStorage|productWorkspace|productSources|viewCandidateLabels)\.ts$/.test(path);
+      const productComposition = /[\\/]ui[\\/]projectScene[\\/](projectWorkspacePorts|projectWorkspace|projectRead|projectPanel|projectModels|projectViews|projectMaterials)\.ts$/.test(path);
       if (!metadataFoundation && !metadataService && !metadataHost && !validationFiles && !validationDisplay && !validationHost && !packageMetadata && !productComposition) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectMetadata\//);
       if (packageControl) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
@@ -345,7 +345,9 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
             '../../projectFiles/validation', '../../projectPackage/workspaceArchive', '../../projectPackage/cleanArchive', '../../projectPackage/zipArchive', '../../projectPackage/reviewEdit', '../../projectFiles/png', './validationHost', './validationModeHost', './savedHost', './validationCatalog', './metadataWorkspace', './metadataConflictControls', './metadataCaptionLifecycleControls', './metadataMembershipControls', './metadataAssetStatusControls', './modelCandidatePreview', './viewportHost', './validationReceiveControls', './reviewView', './reviewWorkspace'],
           validationReceiveControls: ['./validationModeHost', '../../ui/projectScene/projectWorkspacePorts', './validationOutputControls'],
           validationOutputControls: ['./validationModeHost', '../../ui/projectScene/projectWorkspacePorts'],
-          productWorkspace: ['../../ui/projectScene/projectWorkspace', '../../ui/projectScene/projectWorkspacePorts', './viewportModel', './viewportHost', './validationModeHost', './validationReceiveControls'],
+          productWorkspace: ['../../ui/projectScene/projectWorkspace', '../../ui/projectScene/projectWorkspacePorts', '../../domain/values', './viewportModel', './viewportHost', './validationModeHost', './validationReceiveControls', './productSources', './viewHistory', './modelCandidatePreview'],
+          viewCandidateLabels: ['../../scene/projectProvider'],
+          productSources: ['../../scene/types', '../../scene/resolve', '../../domain/values', '../../domain/materialIntent', '../../projectMetadata/materialResolution', '../../projectMetadata/assetStatus', '../../projectMetadata/membership', '../../projectMetadata/modelMembership', '../../projectMetadata/viewResolution', '../../projectMetadata/persistence', '../../ui/projectScene/materialState', '../../ui/projectScene/projectWorkspacePorts', '../../ui/projectScene/projectRead', './metadataViews', './viewHistory', './viewCandidateLabels', './modelTransform', './materialHistory', './validationMaterials', './materialReview', './modelClosure', './validationModeHost'],
           validationBrowser: ['../../platform/opfs', '../../platform/projectLock', '../../projectMetadata/blobStore', '../../projectMetadata/generationScope', '../../projectFiles/validation',
             './browserMetadataStorage', './validationHost', './validationCatalog', './validationWorkspace', './validationRender', './viewport', './viewportModel', './fixture'],
           browserMetadataStorage: ['@automerge/automerge/slim', '@automerge/automerge/automerge.wasm?url', '@automerge/automerge-repo-storage-indexeddb'],
@@ -452,7 +454,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           metadataAssetStatusControls: ['three', './savedHost', './session', '../../projectMetadata/assetStatus', './modelFixture', './modelCandidatePreview'],
             // Same approved conflict form: complete Scene/View candidates and pure input validation only.
           metadataConflictControls: ['./savedHost', './session', '../../projectMetadata/captionCandidates', '../../scene/types',
-              '../../projectMetadata/sceneAuthoring', '../../domain/values', '../../projectMetadata/viewResolution'],
+              '../../projectMetadata/sceneAuthoring', '../../domain/values', '../../projectMetadata/viewResolution', './viewCandidateLabels'],
           metadataMembershipControls: ['./savedHost', './session', '../../projectMetadata/membership', '../../projectMetadata/persistence',
             '../../projectMetadata/modelMembership'],
           metadataIntent: ['../../core/json', '../../domain/values', '../../domain/captionText', '../../scene/types', '../../projectMetadata/commands', './fixture', './metadataFixture', './mediaHistory', './modelClosure', './modelHistory'],

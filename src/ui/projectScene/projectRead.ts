@@ -3,11 +3,38 @@ import { value, type Field } from '../../scene/types';
 import type { JsonValue, JsonObject } from '../../domain/values';
 import type { WorkspaceProvider } from './projectWorkspacePorts';
 import type { CaptionListItem } from './captionListState';
+import type { ModelListSource, ModelMembership } from './modelListState';
 
 export const fieldValue = <T>(f: Field<T> | undefined): T | undefined => f?.kind === 'value' ? f.value : undefined;
+export function projectIdentity(provider: WorkspaceProvider): string {
+  const field = provider.inspection.candidates.fields.find(f => f.path.length === 1 && f.path[0] === 'identity');
+  const atom = field?.valid && field.candidates.length === 1 ? field.candidates[0] : undefined;
+  return atom?.value.kind === 'value' ? String((atom.value.value as JsonObject).projectId ?? '') : '';
+}
 const unknown = <T>(): Field<T> => ({ kind: 'unresolved', reason: 'conflict' });
 export const activeRecord = (fields: Readonly<Record<string, Field<JsonValue | undefined>>>): boolean =>
   (fieldValue(fields.lifecycle) as JsonObject | undefined)?.state === 'active';
+export function projectModels(provider: WorkspaceProvider, sceneId: string, projectId: string, hidden: readonly string[],
+  viewport: { ready: boolean; issue: string | null; assetIds?: readonly string[] }): ModelListSource {
+  if (resolveScene(provider.state, provider.resources, sceneId).kind !== 'ready') return { kind: 'unavailable', token: provider.token, projectId, sceneId, reason: 'シーンの状態を確認してください。' };
+  return { kind: 'ready', token: provider.token, projectId, sceneId, items: Object.values(provider.resources.assets).map(asset => {
+    const edges: { id: string; order: Field<string> }[] = []; let uncertain = false;
+    for (const [id, fields] of Object.entries(provider.details.mutable.sceneAssetMembershipsById)) {
+      if ((fieldValue(fields.lifecycle) as JsonObject | undefined)?.state === 'deleted') continue;
+      const scene = fieldValue(fields.sceneId), owner = fieldValue(fields.assetId);
+      if (typeof scene === 'string' && scene !== sceneId || typeof owner === 'string' && owner !== asset.id) continue;
+      if (scene !== sceneId || owner !== asset.id || !activeRecord(fields)) uncertain = true;
+      else edges.push({ id, order: fields.orderKey as Field<string> });
+    }
+    const membership: Field<ModelMembership> = uncertain || edges.length > 1 ? unknown() : edges[0] ?
+      value({ kind: 'included', membershipId: edges[0].id, sceneId, assetId: asset.id, orderKey: edges[0].order }) : value({ kind: 'absent' });
+    const shown = viewport.ready && viewport.assetIds?.includes(asset.id) && asset.projection.kind === 'value';
+    return { id: asset.id, name: provider.details.mutable.assetsById[asset.id]!.label as Field<string>,
+      lifecycle: asset.lifecycle.kind === 'value' ? value(asset.lifecycle.value.state) : asset.lifecycle,
+      membership, display: value(membership.kind === 'value' && membership.value.kind === 'absent' ? 'outsideScene' : membership.kind === 'value' && hidden.includes(asset.id) ? 'temporarilyHidden' : !shown ? 'unavailable' : 'visible'),
+      displayReason: uncertain || membership.kind !== 'value' ? 'モデルの所属・更新候補を確認してください。' : shown ? null : viewport.issue ?? '3D表示を確認してください。' };
+  }) };
+}
 export function projectAttachments(provider: WorkspaceProvider, captionId: string) {
   return Object.entries(provider.details.mutable.captionAttachmentsById).flatMap(([id, fields]) => {
     const target = fieldValue(provider.details.attachments[id]);

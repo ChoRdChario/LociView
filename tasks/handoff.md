@@ -4,6 +4,8 @@ Read [current todo](todo.md) first. It owns the next action, worktree state, che
 results and approval boundaries; this handoff deliberately does not duplicate them.
 Use [inventory](implementation-inventory.md) for coverage, [map](../PROJECT_MAP.md)
 for code locations and [document index](../docs/README.md) for applicable contracts.
+The bounded integrated UI is selected by `editor=project` in validation; follow
+todo for its tested scope and remaining ordinary-entry/browser/device boundaries.
 
 ## Resume safely
 

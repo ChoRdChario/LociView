@@ -135,7 +135,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (disposed || host !== target) { next.dispose(); return; }
     resident = next;
     const fileTools = receiveTools;
-    try { workspace = ports.productEditor ? createProductWorkspace(document, target, next.factory, fileTools) : createSavedWorkspace(document, target, next.factory,
+    try { workspace = ports.productEditor ? createProductWorkspace(document, target, next.factory, fileTools,
+      ports.renderModelCandidate ? display => ports.renderModelCandidate!(target, display) : undefined) : createSavedWorkspace(document, target, next.factory,
       (session, changed) => {
         const root = document.createElement('section');
         const blockedReason = () => fileTools?.hasChanges() ? 'ファイルの操作を終えるか、取り消してから解消してください。' : null;

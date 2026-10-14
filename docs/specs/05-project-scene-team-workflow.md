@@ -1468,6 +1468,22 @@ aggregate feature/profile/device acceptance follows.
   add exact import isolation and representative composition tests. Record missing
   rendered/device evidence for the grouped candidate, without pausing development.
 
+**Product panel integration clarification (2026-10-15):** extend that same bounded
+composition with stable Caption/model/Saved View/material task panels. Reuse the
+accepted pure controls and planners. Narrow adapter reads may expose their typed
+same-token projections and original candidate/version identities; they expose no
+raw Session, history string maps, file system or model bytes. Model body addition,
+replacement and placement use the existing guarded services. Local model hiding
+and model previews remain Scene-local UI state, with the existing runtime injected.
+View capture/recall/projection/background forward to the current runtime, preserving
+exact paired values, field versions and rollback/read-back checks; entry changes
+remain metadata-only. Material edits/resolutions use existing typed commands and
+profile/slot admission. One shared operation owner retains input, IDs and exact
+commands through failure, while each panel distinguishes its own draft from other
+pending input. Validate representative model/view/material edits through file
+output and independent reopen, plus existing focused invariant/fault tests. This
+adds no renderer, storage, compatibility, profile or ordinary-entry policy.
+
 Each production slice requires a short meta-audit, exact-tree tests/build, one
 independent read-only review and a reversible commit. Run focused checks during
 editing, then the required full matrix once on the final executable tree. Reuse

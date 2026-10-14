@@ -35,6 +35,7 @@ import { pickResidentSurface } from '../src/harness/projectScene/viewportPicking
 import { fixtureModelIds } from '../src/harness/projectScene/modelClosure';
 import { openValidationHost, validationArea } from '../src/harness/projectScene/validationHost';
 import { createValidationModeHost } from '../src/harness/projectScene/validationModeHost';
+import { productSources } from '../src/harness/projectScene/productSources';
 import { listValidationProjects } from '../src/harness/projectScene/validationCatalog';
 import { createSavedWorkspace } from '../src/harness/projectScene/metadataWorkspace';
 import type { DisplayCapture } from '../src/harness/projectScene/viewSession';
@@ -1497,7 +1498,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       fileLimits: budget, decode, packageLocks: r.locks, openStorage: async () => ({ factory: r.factory, dispose: async () => {} }) };
     return { ...r, f, run, options };
   }
-  async function productWorkspaceFixture(includeInitial = false) {
+  async function productWorkspaceFixture(includeInitial = false, duplicateModels = false) {
     const r = firstWorkspaceRecipient(), run = newId(), captionId = `cap_${newId()}`;
     const options = { run, base: r.fs, coordinator: ProjectMutationCoordinator.browser(r.locks), store: r.store,
       fileLimits: budget, decode, packageLocks: r.locks, openStorage: async () => ({ factory: r.factory, dispose: async () => {} }) };
@@ -1514,6 +1515,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       (prepared.records.captionAttachmentsById as Record<string, JsonObject>)[attachmentId] = { id: attachmentId, captionId,
         mediaResourceId: Object.keys(prepared.records.mediaResourcesById!)[0]!, orderKey: 'A', altText: '', lifecycle: active() };
     }
+    if (duplicateModels) { const edges = prepared.records.sceneAssetMembershipsById as Record<string, JsonObject>, first = Object.values(edges)[0]!, id = `sam_${newId()}`;
+      edges[id] = { ...first, id, orderKey: 'B' }; }
     const host = await openValidationHost({ ...options, initial: prepareValidationCreation(prepared) });
     const file = includeInitial ? await host.workspaceOutput.download(await host.workspaceOutput.generate(host.read().source!.token)) : undefined;
     const f = { ...r, run, options, f: { captionId, file } };
@@ -1524,16 +1527,23 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     });
     let cameraEpoch = 1, display: Parameters<ReturnType<ViewportFactory>['update']>[0] | undefined, issue: string | null = null;
     const retryViewport = vi.fn(() => { issue = null; });
-    const camera = vi.fn(() => { cameraEpoch++; });
+    let payload: DisplayCapture = { camera: { position: [1, 0, 5], target: [0, 0, 0], up: [0, 1, 0], projection: { kind: 'perspective', verticalFovRadians: Math.PI / 4 } },
+      background: { kind: 'solid', colorSrgb: [0.123456, 0.654321, 0.333333] } };
+    const camera = vi.fn((intent: Parameters<ReturnType<ViewportFactory>['camera']>[0]) => { cameraEpoch++;
+      payload = { ...payload, camera: { ...payload.camera, position: [cameraEpoch, 0, 5], ...(intent.kind === 'projection' ? { projection: intent.projection === 'perspective' ?
+        { kind: 'perspective' as const, verticalFovRadians: Math.PI / 4 } : { kind: 'orthographic' as const, verticalSpan: 5 } } : {}) } }; });
+    const recall = vi.fn((next: DisplayCapture) => { payload = structuredClone(next); cameraEpoch++; });
+    const background = vi.fn((next: DisplayCapture['background'], verify?: () => void) => { const before = payload;
+      payload = { ...payload, background: next }; cameraEpoch++; try { verify?.(); } catch (error) { payload = before; cameraEpoch++; throw error; } });
+    let proposeModel: Parameters<ViewportFactory>[3];
     const pick = vi.fn((targets: Parameters<NonNullable<ReturnType<ViewportFactory>['pickCreation']>>[0], _x: number, _y: number) =>
       targets[0] ? { target: targets[0], position: [0.25, 0.5, 0] as const } : null);
-    const factory: ViewportFactory = canvas => {
+    const factory: ViewportFactory = (canvas, _changed, _pin, model) => { proposeModel = model;
       Object.assign(canvas, { getBoundingClientRect: () => ({ left: 10, top: 20, width: 600, height: 400 }) });
       return { update: next => { display = next; }, setActive() {}, setPinPointerActive() {}, camera, retry: retryViewport, dispose: vi.fn(), pickCreation: pick,
-        capture: () => ({ camera: { position: [cameraEpoch, 0, 5], target: [0, 0, 0], up: [0, 1, 0], projection: { kind: 'perspective', verticalFovRadians: Math.PI / 4 } },
-          background: { kind: 'solid', colorSrgb: [1, 1, 1] } }),
+        capture: () => structuredClone(payload), recall, setBackground: background,
         read: () => ({ ready: !!display, token: String(cameraEpoch), pickToken: String(cameraEpoch), display, pins: display?.pins.map(p => ({ id: p.id, x: 30, y: 40, visible: true })) ?? [],
-          issue, notice: '検証用の表示通知', dragging: false, projection: 'perspective', axis: null }) };
+          issue, notice: '検証用の表示通知', dragging: false, projection: payload.camera.projection.kind, axis: null }) };
     };
     const ui = createValidationWorkspace(document, { productEditor: true, fileLimits: budget, decode, list: async () => [], selected() {},
       open: async () => host, render: async () => ({ factory, dispose() {} }) }, f.run);
@@ -1548,8 +1558,122 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       await vi.waitFor(() => expect(status.dataset.busy).toBe('false'), { timeout: 10000 });
     };
     return { f, host, ui, editor, root, all, named, button, edited, status, downloads, legacy, dispatch, pick,
-      moveCamera: () => { cameraEpoch++; }, display: () => display, setIssue: (text: string) => { issue = text; }, retryViewport, camera };
+      moveCamera: () => camera({ kind: 'fit' }), display: () => display, setIssue: (text: string) => { issue = text; }, retryViewport, camera, recall, background,
+      payload: () => structuredClone(payload), proposeModel: (...args: Parameters<NonNullable<Parameters<ViewportFactory>[3]>>) => proposeModel?.(...args) };
   }
+  it('connects the product model panel through local visibility, placement retry, GLB add/replace and cold reopen (injected viewport)', async () => {
+    const h = await productWorkspaceFixture(true), { host, button, named, editor, edited, all } = h;
+    button('モデル', editor).fire('click'); const panel = named('モデルの作業', editor), rows = named('プロジェクトのモデル一覧', panel);
+    rows.children[0]!.children[0]!.fire('click'); const initial = host.authority.read().modelVersions![0]!, assetId = initial.assetId;
+    const beforeLocal = host.read().source!.token;
+    button('隠す', panel).fire('click'); expect(h.display()!.hiddenAssetIds).toEqual([assetId]);
+    button('表示', panel).fire('click'); expect(h.display()!.hiddenAssetIds).toEqual([]); expect(host.read().source!.token).toBe(beforeLocal);
+    button('配置を調整', panel).fire('click'); const x = named('モデル位置 X', panel); x.value = '2.5'; x.fire('input');
+    expect(button('ファイルに保存', named('ファイル')).disabled).toBe(true);
+    x.fire('compositionstart'); const target = h.display()!.modelEdit!.target;
+    expect(h.proposeModel(target, [9, 0, 0])).toBe(false); x.fire('compositionend');
+    expect(h.display()!.modelEdit!.position).toEqual([2.5, 0, 0]);
+    h.f.fs.reject = path => path.endsWith('/published.json'); button('配置を確定', panel).fire('click');
+    await vi.waitFor(() => expect(host.authority.status!().kind).toBe('failed'), { timeout: 10000 });
+    await vi.waitFor(() => expect(h.status.dataset.busy).toBe('false'));
+    expect(x.value).toBe('2.5'); const changes = host.read().source!.originalChanges().length;
+    h.f.fs.reject = () => false; await edited(() => button('更新を再試行', editor).fire('click'));
+    const moved = host.authority.read().modelVersions!.find(v => v.assetId === assetId)!;
+    expect(moved.closure.binding.assetToProject.translation).toEqual([2.5, 0, 0]);
+    expect(moved.closure.binding.assetToProject.rotationXYZW).toEqual(initial.closure.binding.assetToProject.rotationXYZW);
+    expect(host.read().source!.originalChanges()).toHaveLength(changes + 1);
+    button('配置を調整', panel).fire('click'); button('配置を確定', panel).fire('click'); expect(host.read().source!.originalChanges()).toHaveLength(changes + 1);
+    const file = (label: string) => { const input = named(label, panel); Object.assign(input, { files: [Object.assign(new Blob([glb().slice().buffer]), { name: 'triangle.glb' })] }); return input; };
+    button('モデルを差し替える', panel).fire('click'); const replacement = file('モデルを差し替える'); replacement.fire('change');
+    expect(all(panel).some(n => n.textContent.includes('材質の調整は引き継ぎません'))).toBe(true);
+    await edited(() => button('差し替えを確定', panel).fire('click'));
+    expect(host.authority.read().modelVersions!.find(v => v.assetId === assetId)!.closure.binding.assetToProject.translation).toEqual([2.5, 0, 0]);
+    button('3Dモデルを追加', panel).fire('click'); const add = file('3Dモデルを追加'); await edited(() => add.fire('change'));
+    expect(h.display()!.models).toHaveLength(2); expect(h.legacy).not.toHaveBeenCalled();
+    const source = host.read().source!, workspace = await host.workspaceOutput.download(await host.workspaceOutput.generate(source.token));
+    await h.ui.dispose(); const cold = await openValidationHost(h.f.options);
+    expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges()); expect(cold.authority.read().modelVersions).toHaveLength(2);
+    const peer = firstWorkspaceRecipient(); await peer.receiver.importWorkspace(workspace); expect((await peer.session.read()).source!.token).toBe(source.token);
+    await cold.dispose();
+  });
+  it('preserves Caption drafts and model search IME, and resolves duplicate models as independent copies through product commands', async () => {
+    const h = await productWorkspaceFixture(true, true), { button, named, editor, host, all, edited } = h;
+    all(editor).find(n => n.className === 'lv-project-marker')!.fire('click');
+    const body = named('本文', editor); body.value = '未適用の記録'; body.fire('input'); button('モデル', editor).fire('click');
+    const panel = named('モデルの作業', editor); expect(button('3Dモデルを追加', panel).disabled).toBe(true);
+    button('キャプション', editor).fire('click'); expect(body.value).toBe('未適用の記録'); await edited(() => button('変更を適用', editor).fire('click'));
+    button('モデル', editor).fire('click'); let decision = named('重複するモデル', panel); decision.value = 'both'; decision.fire('change');
+    expect(button('ファイルに保存', named('ファイル')).disabled).toBe(true);
+    button('選択を取り消す', named('モデルの更新候補', panel)).fire('click');
+    expect(named('重複するモデル', panel).value).toBe('one'); expect(button('ファイルに保存', named('ファイル')).disabled).toBe(false);
+    decision = named('重複するモデル', panel); decision.value = 'both'; decision.fire('change');
+    const keep = named('残すモデル登録', panel); keep.value = keep.children[1]!.value; keep.fire('change');
+    const search = named('検索', panel);
+    search.fire('compositionstart'); expect(button('選択を確定', panel).disabled).toBe(true); search.fire('compositionend');
+    await edited(() => button('選択を確定', panel).fire('click'));
+    expect(host.authority.read().modelVersions).toHaveLength(2); const command = h.dispatch.mock.calls.map(c => c[1]).find(c => c.kind === 'resolveAssetMembership')!;
+    expect(command).toMatchObject({ choice: 'both', copies: [expect.anything()] });
+    const ids = host.authority.read().modelVersions!.map(v => v.assetId); expect(new Set(ids).size).toBe(2); expect(h.legacy).not.toHaveBeenCalled(); await h.ui.dispose();
+  });
+  it('connects product Saved Views and material scope to exact capture, typed writes and file reopen (injected viewport)', async () => {
+    const h = await productWorkspaceFixture(true), { host, button, named, editor, edited, all } = h;
+    button('保存した視点', editor).fire('click'); const views = named('視点の作業', editor), author = named('視点の作成と管理', views), background = named('3D背景', views);
+    const captured = h.payload(); button('視点を作る', author).fire('click'); const name = named('視点の名称', author); name.value = '正確な視点'; name.fire('input');
+    expect(named('背景色', background).readOnly).toBe(true);
+    await edited(() => button('視点を追加', author).fire('click'));
+    const command = h.dispatch.mock.calls.map(c => c[1]).find(c => c.kind === 'createView')!; if (command.kind !== 'createView') throw Error('view');
+    expect(command.camera).toEqual(captured.camera); expect(command.background).toEqual(captured.background);
+    const entry = named('シーンを開いたときの視点', views); entry.value = command.viewId; entry.fire('change');
+    expect(h.recall).not.toHaveBeenCalled(); await edited(() => button('設定を適用', views).fire('click')); expect(h.recall).not.toHaveBeenCalled();
+    const color = named('背景色', background); color.value = '#123456'; color.fire('input'); button('背景に適用', background).fire('click'); expect(h.background).toHaveBeenCalledTimes(1);
+    const token = host.read().source!.token; button('表示', views).fire('click'); expect(h.recall).toHaveBeenCalledTimes(1); expect(h.payload()).toEqual(captured); expect(host.read().source!.token).toBe(token);
+    button('材質', editor).fire('click'); const materials = named('材質の作業', editor);
+    const model = named('モデル', materials); model.value = host.authority.read().modelVersions![0]!.assetId; model.fire('change');
+    const surface = named('面', materials); surface.value = surface.children.find(n => n.value !== '')!.value; surface.fire('change');
+    button('設定を編集', materials).fire('click'); const lighting = named('照明', materials); lighting.value = 'unlit'; lighting.fire('change');
+    expect(button('ファイルに保存', named('ファイル')).disabled).toBe(true); await edited(() => button('変更を適用', materials).fire('click'));
+    const material = h.dispatch.mock.calls.map(c => c[1]).find(c => c.kind === 'createMaterial')!; if (material.kind !== 'createMaterial') throw Error('material');
+    expect(material.routing.scope).toEqual({ kind: 'scene', sceneId: command.sceneId }); expect(material.appearance.lighting).toBe('unlit');
+    const scope = named('適用範囲', materials); scope.value = 'project'; scope.fire('change'); button('設定を編集', materials).fire('click');
+    named('照明', materials).value = 'lit'; named('照明', materials).fire('change'); await edited(() => button('変更を適用', materials).fire('click'));
+    expect(h.dispatch.mock.calls.some(c => c[1].kind === 'createMaterial' && (c[1].routing.scope as JsonObject).kind === 'project')).toBe(true);
+    const target = material.routing.target as JsonObject, effects = h.display()!.savedMaterials![target.assetId as string]!;
+    expect(effects[target.logicalMaterialSlotId as string]).toMatchObject({ appearance: { lighting: 'unlit' } });
+    scope.value = 'scene'; scope.fire('change'); button('この範囲の設定を解除', materials).fire('click');
+    await edited(() => button('設定を解除する', materials).fire('click'));
+    expect(h.display()!.savedMaterials![target.assetId as string]![target.logicalMaterialSlotId as string]).toMatchObject({ appearance: { lighting: 'lit' } });
+    expect(h.legacy).not.toHaveBeenCalled(); const source = host.read().source!, blob = await host.workspaceOutput.download(await host.workspaceOutput.generate(source.token));
+    await h.ui.dispose(); const peer = firstWorkspaceRecipient(); await peer.receiver.importWorkspace(blob);
+    const reopened = (await peer.session.read()).source!; expect(reopened.originalChanges()).toEqual(source.originalChanges());
+    const cold = await openValidationHost(h.f.options); expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges()); await cold.dispose();
+    expect(all(editor).length).toBeGreaterThan(0);
+  });
+  it('keeps every material owner conflict and exact View candidates in the product read adapter', async () => {
+    const h = await productWorkspaceFixture(), seed = h.host.read().source!, snapshot = h.host.authority.read(), model = snapshot.modelVersions![0]!;
+    if (model.closure.shape !== 'saved-glb') throw Error('saved GLB');
+    const sceneId = Object.keys(snapshot.state.scenes)[0]!, target = validationMaterialSlots(model.closure)[0]!.target;
+    const ids = [`ovr_${'1'.repeat(32)}`, `ovr_${'2'.repeat(32)}`], viewId = `view_${newId()}`, active = { state: 'active', eventId: `evt_${newId()}`, reason: 'initial' };
+    const base = A.change(A.load<Record<string, any>>(seed.encodeFullSource()), doc => {
+      ids.forEach(id => { doc.materialOverridesById[id] = Object.fromEntries(Object.entries({ id, routing: { target, scope: { kind: 'scene', sceneId } },
+        appearance: { lighting: 'unlit' }, compositing: { coverage: { policy: 'inherit' }, optics: 'inherit' }, lifecycle: active }).map(([key, value]) => [key, new A.ImmutableString(canonicalFixture(value))])); });
+      doc.viewsById[viewId] = Object.fromEntries(Object.entries({ id: viewId, sceneId, projectFrameId: snapshot.resources.projectFrameId, name: '比較する視点', orderKey: 'A', lifecycle: active,
+        camera: h.payload().camera, background: h.payload().background }).map(([key, value]) => [key, new A.ImmutableString(canonicalFixture(value))]));
+    });
+    const branches = ['lit', 'inherit'].map(lighting => A.change(A.clone(base), doc => {
+      doc.materialOverridesById[ids[1]!].appearance = new A.ImmutableString(canonicalFixture({ lighting }));
+      doc.viewsById[viewId].name = new A.ImmutableString(canonicalFixture(`視点 ${lighting}`));
+    }));
+    const source = ProjectMetadataSource.fromFullSource(A.save(A.merge(branches[0]!, branches[1]!)), seed.proof, metadata);
+    const provider = await readProjectScene(source.read(), metadata, h.host.content.verifier(false));
+    const projected = metadataProjectView(provider, {}, snapshot.modelVersions);
+    const facade = createValidationModeHost({ ...h.host, read: () => ({ ...h.host.read(), provider, source }), authority: { ...h.host.authority, read: () => projected } }, async () => { throw Error('read only fixture'); }, () => {});
+    const ports = productSources(facade), groups = ports.materials(sceneId).review;
+    expect(groups.some(g => g.overrideId === ids[1] && g.appearance.length === 2)).toBe(true);
+    expect(groups.filter(g => g.owners.length === 2)).toHaveLength(1);
+    expect(groups.flatMap(g => g.owners).every(o => o.label.includes('内容の競合') || o.label.includes('照明'))).toBe(true);
+    const views = ports.viewReview(sceneId); expect(views).toHaveLength(1); expect(views[0]!.choices.map(c => c.label).sort()).toEqual(['視点 inherit', '視点 lit']);
+    expect(views[0]!.target).toEqual({ kind: 'view', viewId, field: 'name' }); expect(h.host.read().source!.token).toBe(seed.token); await h.ui.dispose();
+  });
   it('connects the product composition through typed edits, pin/media, named backup, two file rounds and cold reopen (injected viewport)', async () => {
     const { f, host, ui, editor, root, all, named, button, edited, status, downloads, legacy, dispatch, pick, moveCamera, display } = await productWorkspaceFixture();
     const initialCaptionIds = new Set(Object.keys(host.authority.read().resources.captions));
