@@ -14,9 +14,10 @@ Initial Native/frozen-v1/LociMyu conversion and new-format teamwork remain requi
 Project/Scene identity, explicit conflict resolution, source preservation and the
 frozen v1/map-1/map-2/immutable-recipe boundaries remain unchanged.
 
-The latest verified implementation is the bounded Native GLB/PNG conversion →
-edit/first-place → named backup/Workspace → independent reopen in the nondefault
-validation route. Caption, model, material and file/recovery work is retained.
+The latest verified implementation includes bounded Native GLB/PNG conversion →
+edit/first-place → named backup/Workspace → independent reopen, plus the typed
+product composition's edit → save/two-round exchange → cold-reopen workflow in
+the nondefault validation route. Existing model, material and file/recovery work is retained.
 Ordinary entry, broader profiles/converters, browser performance, physical-iPhone
 and offline acceptance remain open. Full details and earlier failures are in the
 [September checkpoint record](../docs/history/development-through-2026-09-21/tasks/todo.md).
@@ -48,22 +49,29 @@ the subsequent checkpoint's publication identity; do not copy a second commit lo
   checkpoint for the authorized g0-baseline commit/push, retaining no excluded work.
 - [x] Record the PO's manual completion of the instructed desktop GLB workflow
   and qualitative wait feedback; independently inspect the supplied backup below.
-- [ ] Complete the next integrated product composition below; Native browser
+- [x] Complete the bounded core product composition below; Native browser
   observation stays pending for the grouped acceptance, not a development blocker.
   Automated Browser access remains blocked by runtime
   realpath EPERM on its protected browser-client.mjs; do not retry unchanged or
   substitute Node/HTTP results for browser acceptance.
 
-1. Specify the typed Session/provider ports and complete one product UI composition
+1. Completed: typed Session/provider ports and the bounded product UI composition
    for open → Scene/Caption/media editing → save/send → reopen in the existing
-   nondefault candidate route. Preserve storage/command/package authority and
-   keep ordinary-home activation gated. Do not split this into PO tests for each
-   port or control. Before another latency optimization,
+   nondefault candidate route. Storage/command/package authority is preserved;
+   ordinary-home activation stays gated. Before another latency optimization,
    measure the affected action's storage, validation, display refresh, package
    generation and browser handoff waits where distinguishable. Label measured and
    uninstrumented stages; repeated output discovery is a hypothesis, not a proven
    Chrome bottleneck. No new benchmark framework, synthetic host or numeric promise.
-2. Continue the remaining approved feature/conversion work and automated failure
+   Implemented and verified in the executed scope below: the 05 §13.2 composition, selected by
+   `editor=project` in the existing validation route. One writer; typed dispatch
+   and provider projection, injected existing viewport, shared file/recovery tools.
+   The current editor remains available. Import isolation, the connected file
+   workflow, exact recovery and the final serial checkpoint/review are complete.
+2. Extend the same typed product composition with the existing model, Saved View
+   and material workflows under their accepted commands/renderer boundaries.
+   Keep the current editor available until the required scope is connected.
+   Continue the remaining approved feature/conversion work and automated failure
    checks without waiting for Native or other small human tests. Gather the
    applicable 05 §13.2 / 03 G1-A/C storage/profile/device evidence in a grouped
    candidate batch. S1/S2 durability/recovery remains required before adoption;
@@ -124,6 +132,60 @@ not hold subsequent implementation. Do not describe it as passed without evidenc
   PO cannot inspect Native conversion now; leave that browser observation pending.
   Do not ask for another individual test; include it in the completed candidate's
   consolidated acceptance.
+
+### Completed slice — integrated core product composition
+
+The new `editor=project` option uses provider reads and typed host dispatch for
+Scene creation/selection, Caption title/body/color, pin creation/movement and PNG
+addition/display. Existing file, mode and backup-recovery services remain shared;
+the old editor remains available. This is a bounded core workflow, not all four
+task tabs or all 61 groups. No home, storage namespace, wire, dependency or release
+change. See [inventory](implementation-inventory.md) for route scope.
+
+Focused evidence: valid generated GLB/PNG/ZIP bytes, memory persistence and an
+injected viewport passed the connected edit → named backup → two-round exchange →
+cold-reopen path. Additional checks cover exact retained-command retry after
+publication/display failure, explicit conflict choice, IME/file guards, stale
+camera/drag rejection, filter/draft preservation and image error generations.
+These are authored DOM/runtime-port checks, not browser/render/device evidence.
+
+Independent read-only review found and closed input-loss/display-recovery defects;
+the final reviewed source/test tree passed the serial checks below. Retained
+setup failures: a test selected an arbitrary exchange base rather than the actual
+shared Workspace; another used a deleted lifecycle without its required reason.
+Both inputs were corrected without weakening admission or assertions. An earlier
+full run was stopped when the final source comparison found shared-Scene impact
+could be undercounted; unresolved/duplicate relations now remain unknown.
+
+Retained final-check failure: typecheck passed, then the first complete root run
+reported 113 files passing, 2,337 cases passing and two failures (657.74 s): the
+new long file walkthrough exceeded its unchanged 30-second limit, and the existing
+explicit Contribution-base case observed a generated job before UI handoff settled.
+The new fixture now starts from one real GLB through normal creation instead of
+unrelated prior receive/replacement histories. The existing case awaits its owned
+UI completion notification. All workflow/recovery/cold assertions and time limits
+remain. The four affected cases passed together (24.12 s); independent read-only
+review accepted this test delta. Final typecheck passed again. The final complete
+root passed: 114 files / 2,339 cases, 21 existing todo (599.08 s). The tested
+source/test content is staged unchanged. Ordinary, harness and validation builds
+passed serially; only the existing chunk/import warnings remain. This final record
+does not erase the retained failed run.
+
+The seven static validation files are served byte-exact at the existing local
+preview; manifest SHA-256 is
+6a875c888bd5ad66c6f8e8c42226ad8aaba9432b4749b18d32d1d3cc230d09c1.
+`dev.html?editor=project` selects this composition. No SW, manifest or public
+samples enter the static build. HTTP byte checks are not browser evidence;
+rendered/native-input, physical-iPhone and offline acceptance remain unobserved.
+The reviewed 21-path scope is the suitable authorized g0-baseline development
+checkpoint; Git records its commit/push identity. Supplied private input and local
+fixtures/traces are excluded.
+
+Milestone audit: actual branch/remote and outgoing scope were checked; this unit
+closes a connected editing/file workflow with the accepted authorities. The next
+priority remains completing the same product composition and conversion scope,
+not accumulating helper checkpoints. Pending browser/iOS/offline evidence stays
+in its own acceptance lane; no release or home-activation gate is passed here.
 
 ## Product connection direction
 

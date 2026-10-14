@@ -20,6 +20,11 @@ owns feature coverage. Read [document authority](docs/README.md) for contracts.
 | `dev.html` → `src/dev-entry.ts` → `src/harness/projectScene/entry.ts` | Nondefault ProjectScene development host; memory, old saved, metadata and limited GLB/PNG validation routes | Ordinary-home, device, offline or release acceptance |
 | `project-scene-validation` build → `dev.html` → `validationEntry.ts` | Same limited GLB/PNG validation screen, static-only entry; separate `validation-dist`, no public assets or Service Worker | Ordinary-home activation, offline/PWA, profile/device or release acceptance |
 
+Within validation, `editor=project` selects the bounded typed product composition
+in `src/ui/projectScene/projectWorkspace.ts`; its viewport/file adapter is
+`src/harness/projectScene/productWorkspace.ts`. The existing editor remains available.
+Inventory and todo own its exact feature and verification scope.
+
 The new practical-team workflow uses Project-wide Assets/Caption resources and
 Scene membership. New file services are partially connected in the limited
 validation route. Old Native acceptance remains valid only for its tested scope.

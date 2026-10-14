@@ -1497,6 +1497,215 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       fileLimits: budget, decode, packageLocks: r.locks, openStorage: async () => ({ factory: r.factory, dispose: async () => {} }) };
     return { ...r, f, run, options };
   }
+  async function productWorkspaceFixture(includeInitial = false) {
+    const r = firstWorkspaceRecipient(), run = newId(), captionId = `cap_${newId()}`;
+    const options = { run, base: r.fs, coordinator: ProjectMutationCoordinator.browser(r.locks), store: r.store,
+      fileLimits: budget, decode, packageLocks: r.locks, openStorage: async () => ({ factory: r.factory, dispose: async () => {} }) };
+    // Start this workflow from one real GLB, without unrelated prior receive/replacement histories.
+    const prepared = structuredClone(await prepareValidationProject({ run, title: '統合画面の検証', models: [{ label: 'モデル', bytes: glb() }],
+      media: includeInitial ? [{ label: '受信画像', bytes: png }] : [] }, budget, decode));
+    if (includeInitial) {
+      const project = prepared.records.project as JsonObject, sceneId = project.defaultSceneId!;
+      const active = () => ({ state: 'active', eventId: `evt_${newId()}`, reason: 'initial' });
+      (prepared.records.captionsById as Record<string, JsonObject>)[captionId] = { id: captionId, title: '最初の記録', body: '', colorSrgb: [1, 0, 0],
+        lifecycle: active(), anchor: { kind: 'project', projectFrameId: (project.frame as JsonObject).id!, positionProject: [0, 0, 0] } };
+      const membershipId = `scm_${newId()}`, attachmentId = `att_${newId()}`;
+      (prepared.records.sceneCaptionMembershipsById as Record<string, JsonObject>)[membershipId] = { id: membershipId, sceneId, captionId, orderKey: 'A', lifecycle: active() };
+      (prepared.records.captionAttachmentsById as Record<string, JsonObject>)[attachmentId] = { id: attachmentId, captionId,
+        mediaResourceId: Object.keys(prepared.records.mediaResourcesById!)[0]!, orderKey: 'A', altText: '', lifecycle: active() };
+    }
+    const host = await openValidationHost({ ...options, initial: prepareValidationCreation(prepared) });
+    const file = includeInitial ? await host.workspaceOutput.download(await host.workspaceOutput.generate(host.read().source!.token)) : undefined;
+    const f = { ...r, run, options, f: { captionId, file } };
+    const legacy = vi.spyOn(host.authority, 'write').mockImplementation(() => { throw Error('product UI must dispatch typed commands'); });
+    const dispatch = vi.spyOn(host, 'dispatch'), document = new RecordedDocument().asDocument(), create = document.createElement.bind(document), downloads = vi.fn();
+    vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      const node = create(tag); if (tag === 'a') Object.assign(node, { click: downloads }); return node;
+    });
+    let cameraEpoch = 1, display: Parameters<ReturnType<ViewportFactory>['update']>[0] | undefined, issue: string | null = null;
+    const retryViewport = vi.fn(() => { issue = null; });
+    const camera = vi.fn(() => { cameraEpoch++; });
+    const pick = vi.fn((targets: Parameters<NonNullable<ReturnType<ViewportFactory>['pickCreation']>>[0], _x: number, _y: number) =>
+      targets[0] ? { target: targets[0], position: [0.25, 0.5, 0] as const } : null);
+    const factory: ViewportFactory = canvas => {
+      Object.assign(canvas, { getBoundingClientRect: () => ({ left: 10, top: 20, width: 600, height: 400 }) });
+      return { update: next => { display = next; }, setActive() {}, setPinPointerActive() {}, camera, retry: retryViewport, dispose: vi.fn(), pickCreation: pick,
+        capture: () => ({ camera: { position: [cameraEpoch, 0, 5], target: [0, 0, 0], up: [0, 1, 0], projection: { kind: 'perspective', verticalFovRadians: Math.PI / 4 } },
+          background: { kind: 'solid', colorSrgb: [1, 1, 1] } }),
+        read: () => ({ ready: !!display, token: String(cameraEpoch), pickToken: String(cameraEpoch), display, pins: display?.pins.map(p => ({ id: p.id, x: 30, y: 40, visible: true })) ?? [],
+          issue, notice: '検証用の表示通知', dragging: false, projection: 'perspective', axis: null }) };
+    };
+    const ui = createValidationWorkspace(document, { productEditor: true, fileLimits: budget, decode, list: async () => [], selected() {},
+      open: async () => host, render: async () => ({ factory, dispose() {} }) }, f.run);
+    const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    const named = (label: string, parent = root) => all(parent).find(n => n.attributes.get('aria-label') === label)!;
+    const button = (text: string, parent = root) => all(parent).find(n => n.tag === 'button' && n.textContent === text)!;
+    await vi.waitFor(() => expect(all(root).some(n => n.className === 'lv-project-workspace')).toBe(true));
+    const editor = all(root).find(n => n.className === 'lv-project-workspace')!, status = all(editor).find(n => n.className === 'lv-operation-status')!;
+    const edited = async (action: () => void) => {
+      const before = host.read().source!.token; action();
+      await vi.waitFor(() => expect(host.read().source!.token).not.toBe(before), { timeout: 10000 });
+      await vi.waitFor(() => expect(status.dataset.busy).toBe('false'), { timeout: 10000 });
+    };
+    return { f, host, ui, editor, root, all, named, button, edited, status, downloads, legacy, dispatch, pick,
+      moveCamera: () => { cameraEpoch++; }, display: () => display, setIssue: (text: string) => { issue = text; }, retryViewport, camera };
+  }
+  it('connects the product composition through typed edits, pin/media, named backup, two file rounds and cold reopen (injected viewport)', async () => {
+    const { f, host, ui, editor, root, all, named, button, edited, status, downloads, legacy, dispatch, pick, moveCamera, display } = await productWorkspaceFixture();
+    const initialCaptionIds = new Set(Object.keys(host.authority.read().resources.captions));
+    const initialSceneCount = Object.keys(host.authority.read().state.scenes).length;
+    button('ピンを追加', editor).fire('click'); const canvas = named('3Dモデルの表示', editor);
+    const down = { pointerId: 7, button: 0, isPrimary: true, clientX: 80, clientY: 90 };
+    canvas.fire('pointerdown', down); moveCamera(); canvas.fire('pointerup', down); expect(pick).not.toHaveBeenCalled();
+    canvas.fire('pointerdown', down); canvas.fire('pointermove', { ...down, clientX: 100 }); canvas.fire('pointermove', down); canvas.fire('pointerup', down); expect(pick).not.toHaveBeenCalled();
+    canvas.fire('pointerdown', down); canvas.fire('lostpointercapture', down); canvas.fire('pointerup', down); expect(pick).not.toHaveBeenCalled();
+    canvas.fire('pointerdown', down); canvas.fire('pointerup', down);
+    expect(pick).toHaveBeenCalledWith(expect.anything(), 70, 70);
+    await edited(() => button('位置を確定', editor).fire('click'));
+    const captionId = Object.keys(host.authority.read().resources.captions).find(id => !initialCaptionIds.has(id))!;
+    expect(captionId).toBeTruthy();
+    const title = named('タイトル', editor), body = named('本文', editor), output = named('ファイル');
+    title.fire('compositionstart'); title.value = '新しい記録'; title.fire('input');
+    expect(button('ファイルに保存', output).disabled).toBe(true);
+    title.fire('compositionend'); body.value = '最初の本文'; body.fire('input');
+    const search = named('検索', editor); search.value = '見つからない語'; search.fire('input');
+    button('選択した項目を表示', editor).fire('click'); expect(body.value).toBe('最初の本文');
+    expect(host.authority.read().resources.captions[captionId]!.body).toEqual({ kind: 'value', value: '' });
+    f.fs.reject = path => path.endsWith('/published.json');
+    const apply = button('変更を適用', editor), beforeChanges = host.read().source!.originalChanges().length;
+    apply.fire('click'); apply.fire('click');
+    await vi.waitFor(() => expect(host.authority.status!().kind).toBe('failed'), { timeout: 10000 });
+    await vi.waitFor(() => expect(status.dataset.busy).toBe('false'));
+    expect(body.value).toBe('最初の本文'); expect(title.value).toBe('新しい記録');
+    const retained = (await f.fs.list(`${validationArea}/${f.run}/`)).filter(p => p.endsWith('.amchange'));
+    const originals = await Promise.all(retained.map(p => f.fs.readBytes(p)));
+    f.fs.reject = () => false; await edited(() => button('更新を再試行', editor).fire('click'));
+    expect(host.read().source!.originalChanges()).toHaveLength(beforeChanges + 1);
+    expect(await Promise.all(retained.map(p => f.fs.readBytes(p)))).toEqual(originals);
+    expect(host.authority.read().resources.captions[captionId]!.body).toEqual({ kind: 'value', value: '最初の本文' });
+    const colors = named('ピンの色', editor), colorButton = all(colors).find(n => n.tag === 'button' && n.attributes.get('aria-pressed') === 'true')!;
+    colorButton.fire('click'); expect(display()!.pins.some(p => p.id === captionId)).toBe(false);
+    button('全色', colors).fire('click'); expect(display()!.pins.some(p => p.id === captionId)).toBe(true);
+    const mediaInput = named('メディアを追加', editor); mediaInput.fire('click');
+    Object.assign(mediaInput, { files: [Object.assign(new Blob([png.slice().buffer]), { name: '確認画像.png' })] });
+    await edited(() => mediaInput.fire('change'));
+    expect(captionAttachments(host.authority.read().mediaData, captionId).ready).toHaveLength(1);
+    const firstScene = host.authority.read().state.defaultSceneId; if (firstScene.kind !== 'value') throw Error('scene');
+    const firstName = host.authority.read().state.scenes[firstScene.value]!.name; if (firstName.kind !== 'value') throw Error('name');
+    const sceneName = named('シーン名', editor); sceneName.value = '二つ目のシーン'; sceneName.fire('input');
+    await edited(() => all(editor).find(n => n.tag === 'form' && all(n).includes(sceneName))!.fire('submit', { preventDefault() {} }));
+    expect(Object.keys(host.authority.read().state.scenes)).toHaveLength(initialSceneCount + 1);
+    button(firstName.value, named('シーン', editor)).fire('click');
+    const selectedPin = all(editor).find(n => n.tag === 'button' && n.className === 'lv-project-marker' && n.textContent === '新しい記録')!;
+    selectedPin.fire('click');
+    const name = named('名前（任意）', output); name.value = '作業の保存'; name.fire('input');
+    button('ファイルに保存', output).fire('click'); await vi.waitFor(() => expect(downloads).toHaveBeenCalledTimes(1), { timeout: 10000 });
+    const backup = host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!;
+    expect((await BackupArchive.inspect(await host.workspaceOutput.download(backup.id), metadata)).source.originalChanges()).toEqual(host.read().source!.originalChanges());
+    await vi.waitFor(() => expect(output.children.find(n => n.attributes.get('role') === 'status')!.dataset.busy).toBe('false'));
+    button('相手に渡す', output).fire('click'); button('ダウンロード', output).fire('click');
+    await vi.waitFor(() => expect(downloads).toHaveBeenCalledTimes(2), { timeout: 10000 });
+    const workspaceJob = host.workspaceOutput.jobs.find(j => j.purpose === 'teamWorkspace')!;
+    const workspaceFile = await host.workspaceOutput.download(workspaceJob.id), peer = firstWorkspaceRecipient();
+    const sharedBaseId = (await WorkspaceArchive.inspect(workspaceFile, metadata)).archive.control.manifest.packageId;
+    await peer.receiver.importWorkspace(workspaceFile);
+    const token = (await peer.session.read()).source!.token;
+    await peer.session.edit(token, { kind: 'editCaption', captionId, edits: { body: '相手の本文1' } });
+    const peerSender = new WorkspaceSender(peer.fs, peer.session, peer.store, metadata, peer.locks);
+    const returned = async () => {
+      const current = (await peer.session.read()).source!, base = (await peerSender.availableBases()).find(b => b.selection.workspacePackageId === sharedBaseId)!.selection;
+      return peerSender.download(await peerSender.generateContribution(current.token, base));
+    };
+    const receive = async (file: Blob) => {
+      const input = named('更新ファイルを選択'); Object.assign(input, { files: [file] }); input.fire('change');
+      await edited(() => input.parent!.parent!.fire('submit', { preventDefault() {} }));
+      await vi.waitFor(() => expect(all(root).some(n => n.textContent === '更新を受け取りました。')).toBe(true), { timeout: 10000 });
+      Object.assign(input, { files: [] }); input.fire('change');
+    };
+    await receive(await returned());
+    expect(named('本文', editor).value).toBe('相手の本文1');
+    const nextTitle = named('タイトル', editor); nextTitle.value = '送り手の追記'; nextTitle.fire('input'); await edited(() => button('変更を適用', editor).fire('click'));
+    button('相手に渡す', output).fire('click'); const kind = named('渡す内容', output); kind.value = 'contribution'; kind.fire('change');
+    const base = named('元にする作業一式', output); base.value = sharedBaseId; base.fire('change');
+    button('ダウンロード', output).fire('click'); await vi.waitFor(() => expect(downloads).toHaveBeenCalledTimes(3), { timeout: 10000 });
+    const contribution = host.workspaceOutput.jobs.find(j => j.purpose === 'contribution')!;
+    await peer.receiver.receive((await peer.session.read()).source!.token, await host.workspaceOutput.download(contribution.id));
+    await peer.session.edit((await peer.session.read()).source!.token, { kind: 'editCaption', captionId, edits: { body: '相手の本文2' } });
+    await receive(await returned());
+    expect(named('本文', editor).value).toBe('相手の本文2'); expect(named('タイトル', editor).value).toBe('送り手の追記');
+    const exact = host.read().source!.originalChanges(); expect(legacy).not.toHaveBeenCalled(); expect(dispatch).toHaveBeenCalled(); await ui.dispose();
+    const cold = await openValidationHost(f.options);
+    expect(cold.read().source!.originalChanges()).toEqual(exact); expect(cold.authority.read().resources.captions[captionId]!.body).toEqual({ kind: 'value', value: '相手の本文2' });
+    expect(captionAttachments(cold.authority.read().mediaData, captionId).ready).toHaveLength(1); await cold.dispose();
+  });
+  it('keeps product composition inputs through rejected edits and published display failure, with exact retry and renderer recovery (injected viewport)', async () => {
+    const h = await productWorkspaceFixture(true), { host, editor, named, button, status, edited } = h;
+    named('キャプション一覧', editor).children[0]!.children[0]!.fire('click');
+    const body = named('本文', editor); body.value = '未適用の入力'; body.fire('input');
+    h.dispatch.mockRejectedValueOnce(Error('injected admission rejection'));
+    button('変更を適用', editor).fire('click');
+    await vi.waitFor(() => expect(status.dataset.busy).toBe('false'));
+    expect(host.authority.status!().kind).toBe('idle'); expect(body.readOnly).toBe(true);
+    expect(button('入力を修正する', editor).hidden).toBe(false);
+    button('入力を修正する', editor).fire('click'); expect(body.value).toBe('未適用の入力'); expect(body.readOnly).toBe(false);
+    body.value = '修正した入力'; body.fire('input'); await edited(() => button('変更を適用', editor).fire('click'));
+    button('位置を調整', editor).fire('click');
+    const canvas = named('3Dモデルの表示', editor), pointer = { pointerId: 1, isPrimary: true, button: 0, clientX: 40, clientY: 50 };
+    canvas.fire('pointerdown', pointer); canvas.fire('pointerup', pointer);
+    const x = named('位置 X', editor); x.value = '0.375'; x.fire('input');
+    const prepare = vi.fn().mockRejectedValueOnce(Error('injected post-publication display failure')).mockResolvedValue(undefined);
+    const detach = host.setDisplayPreparation(prepare), before = host.read().source!.token;
+    button('位置を確定', editor).fire('click');
+    await vi.waitFor(() => expect(host.authority.status!().kind).toBe('failed'), { timeout: 10000 });
+    await vi.waitFor(() => expect(status.dataset.busy).toBe('false'));
+    expect(host.read().source!.token).not.toBe(before); expect(h.display()!.token).toBe(before);
+    expect(x.value).toBe('0.375'); expect(x.disabled).toBe(true); expect(button('取り消す', named('ピンの操作', editor)).disabled).toBe(true);
+    expect(button('入力を修正する', editor).hidden).toBe(true);
+    const original = host.read().source!.originalChanges(); button('更新を再試行', editor).fire('click');
+    await vi.waitFor(() => expect(host.authority.status!().kind).toBe('idle'), { timeout: 10000 });
+    await vi.waitFor(() => expect(status.dataset.busy).toBe('false'));
+    expect(host.read().source!.originalChanges()).toEqual(original); expect(h.display()!.token).toBe(host.read().source!.token);
+    expect(prepare).toHaveBeenCalledTimes(2); detach();
+    h.setIssue('表示を再開してください。'); named('検索', editor).fire('input');
+    expect(h.all(editor).some(n => n.textContent?.includes('表示を再開してください。'))).toBe(true);
+    expect(h.all(editor).some(n => n.textContent?.includes('検証用の表示通知'))).toBe(true);
+    h.retryViewport.mockImplementationOnce(() => { throw Error('描画環境の復旧を待って再試行してください。'); });
+    expect(() => button('3D表示を再試行', editor).fire('click')).not.toThrow();
+    expect(h.all(editor).some(n => n.textContent?.includes('描画環境の復旧を待って'))).toBe(true);
+    button('3D表示を再試行', editor).fire('click'); expect(h.retryViewport).toHaveBeenCalledTimes(2);
+    expect(button('3D表示を再試行', editor).hidden).toBe(true);
+    h.camera.mockImplementationOnce(() => { throw Error('表示するモデルがありません。'); });
+    expect(() => button('正面', editor).fire('click')).not.toThrow();
+    expect(h.all(editor).some(n => n.textContent?.includes('表示するモデルがありません。'))).toBe(true); await h.ui.dispose();
+  });
+  it('resolves product composition conflicts only after explicit choice and reports image display failure without stale callbacks (recorded DOM)', async () => {
+    const h = await productWorkspaceFixture(true), { host, editor, named, button, edited } = h, captionId = h.f.f.captionId;
+    named('キャプション一覧', editor).children[0]!.children[0]!.fire('click');
+    const peer = firstWorkspaceRecipient(); await peer.receiver.importWorkspace(h.f.f.file!);
+    const body = named('本文', editor); body.value = '手元で残したい内容'; body.fire('input');
+    await edited(() => button('変更を適用', editor).fire('click'));
+    await peer.session.edit((await peer.session.read()).source!.token, { kind: 'editCaption', captionId, edits: { body: '相手からの内容' } });
+    const input = named('更新ファイルを選択'); Object.assign(input, { files: [(await contributionFile(peer.session, peer.fs, peer.store)).file] }); input.fire('change');
+    await edited(() => input.parent!.parent!.fire('submit', { preventDefault() {} }));
+    await vi.waitFor(() => expect(h.all(h.root).some(n => n.textContent === '更新を受け取りました。')).toBe(true), { timeout: 10000 });
+    Object.assign(input, { files: [] }); input.fire('change');
+    expect(host.authority.read().resources.captions[captionId]!.body.kind).toBe('unresolved'); expect(body.readOnly).toBe(true);
+    const area = named('記録の競合', editor), select = h.all(area).find(n => n.tag === 'select')!;
+    const option = select.children.find(n => n.textContent === '相手からの内容')!; select.value = option.value; select.fire('change');
+    expect(button('ファイルに保存', named('ファイル')).disabled).toBe(true);
+    named('検索', editor).fire('input'); expect(h.all(area).find(n => n.tag === 'select')!.value).toBe(option.value);
+    await edited(() => button('この内容を使う', area).fire('click'));
+    expect(host.authority.read().resources.captions[captionId]!.body).toEqual({ kind: 'value', value: '相手からの内容' });
+    const media = named('メディア', editor), show = button('受信画像', media);
+    const images = () => h.all(media).filter(n => n.tag === 'img');
+    const previous = images()[0]!; show.fire('click'); await vi.waitFor(() => expect(images()[0]).not.toBe(previous));
+    const old = images()[0]!; show.fire('click'); await vi.waitFor(() => expect(images()[0]).not.toBe(old));
+    old.fire('error'); expect(h.status.textContent).not.toContain('画像を表示できません');
+    images()[0]!.fire('error'); expect(h.status.textContent).toContain('画像を表示できません');
+    const failed = images()[0]!; show.fire('click'); await vi.waitFor(() => expect(images()[0]).not.toBe(failed));
+    images()[0]!.fire('load'); expect(images()[0]!.hidden).toBe(false);
+    await h.ui.dispose();
+  });
   async function restoredWorkspaceHostFixture() {
     const f = await initialWorkspaceHostFixture(), factories = new Map<string, MetadataStorageFactory>();
     const databases: RestoreDatabasePorts = { listGenerations: async () => [...factories.keys()], open: async (id, create) => {
@@ -2023,8 +2232,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
       const node = create(tag); if (tag === 'a') Object.assign(node, { click: download }); return node;
     });
-    let workspace: ReturnType<typeof createSavedWorkspace>, tools: ReturnType<typeof createValidationReceiveControls>;
-    tools = createValidationReceiveControls(document, host, () => workspace?.session, () => workspace?.render(), async () => {});
+    let workspace: ReturnType<typeof createSavedWorkspace>, tools: ReturnType<typeof createValidationReceiveControls>, outputSettled: (() => void) | undefined;
+    tools = createValidationReceiveControls(document, host, () => workspace?.session, () => {
+      workspace?.render(); if (outputSettled && !tools.busy()) { outputSettled(); outputSettled = undefined; }
+    }, async () => {});
     workspace = createSavedWorkspace(document, host, undefined, () => tools);
     const root = record(workspace.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
     const button = (text: string) => all(root).find(n => n.tag === 'button' && n.textContent === text)!;
@@ -2049,9 +2260,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const s = workspace.session!, memory = s.memory, windows = s.windowMemory, before = host.read().source!.token;
     s.setSearchComposing(true); button('ダウンロード').fire('click');
     expect(host.workspaceOutput.jobs.filter(j => j.purpose === 'contribution')).toHaveLength(0);
-    s.setSearchComposing(false); button('ダウンロード').fire('click');
+    s.setSearchComposing(false);
+    const completion = new Promise<void>(resolve => { outputSettled = resolve; }); button('ダウンロード').fire('click');
     await vi.waitFor(() => expect(host.workspaceOutput.jobs.some(j => j.purpose === 'contribution' && j.state === 'generated')).toBe(true), { timeout: 10000 });
-    await vi.waitFor(() => expect(tools.hasChanges()).toBe(false));
+    await completion; expect(tools.hasChanges()).toBe(false);
     const result = host.workspaceOutput.jobs.find(j => j.purpose === 'contribution')!;
     const archive = await PackageArchive.inspect(await host.workspaceOutput.download(result.id));
     expect(archive.control.manifest).toMatchObject({ purpose: 'contribution', base: selectedBase });

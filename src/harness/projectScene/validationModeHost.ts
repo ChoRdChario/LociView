@@ -71,7 +71,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       try { await work; } finally { switching = false; if (operation === work) operation = undefined; }
     },
   };
-  const host: SavedWorkspaceHost & ValidationDisplayHost & Pick<Host, 'workspaceFiles' | 'workspaceOutput' | 'backupRestore'> = {
+  const host: SavedWorkspaceHost & ValidationDisplayHost & Pick<Host, 'workspaceFiles' | 'workspaceOutput' | 'backupRestore' | 'dispatch'> & { content: Pick<Host['content'], 'model' | 'image'> } = {
     authority, mode, limits: initial.limits, read: () => current.read(),
     hasPending: () => switching || current.hasPending(),
     refresh: () => run(() => current.refresh()), resolve: (...a) => run(() => current.resolve(...a)),
@@ -106,6 +106,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       verifyFile: (...a) => run(() => current.workspaceOutput.verifyFile(...a)),
       download: (...a) => run(() => current.workspaceOutput.download(...a)),
     },
+    dispatch: (...args: Parameters<Host['dispatch']>) => run(() => current.dispatch(...args)),
     backupRestore: {
       get enabled() { return current.backupRestore.enabled; }, get error() { return current.backupRestore.error; },
       get pending() { return current.backupRestore.pending; }, get needsDisplay() { return current.backupRestore.needsDisplay; },
@@ -118,7 +119,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       displayReady: (...a) => { admit(); current.backupRestore.displayReady(...a); },
     },
     // The resident cache never retains a closed host's content service.
-    content: { model: (record, readOnly) => current.content.model(record, readOnly) },
+    content: { model: (record, readOnly) => current.content.model(record, readOnly), image: (record, readOnly) => current.content.image(record, readOnly) },
     setDisplayPreparation(callback) {
       admit(); if (prepare) throw Error('モデル表示の接続を確認してください。');
       prepare = callback; detach = current.setDisplayPreparation(callback);

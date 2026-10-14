@@ -12,6 +12,7 @@ import { createValidationModeHost, type ValidationDisplayHost } from './validati
 import type { LocalOpenMode } from './savedHost';
 import type { ValidationProjectEntry } from './validationCatalog';
 import { createSavedWorkspace } from './metadataWorkspace';
+import { createProductWorkspace } from './productWorkspace';
 import { createMetadataConflictControls } from './metadataConflictControls';
 import { createMetadataCaptionLifecycleControls } from './metadataCaptionLifecycleControls';
 import { createMetadataMembershipControls } from './metadataMembershipControls';
@@ -27,6 +28,7 @@ import { PreparedReviewEdit } from '../../projectPackage/reviewEdit';
 type Host = ReturnType<typeof createValidationModeHost>;
 export interface ValidationWorkspacePorts {
   fileLimits: FileValidationLimits; decode?: PngDecoder;
+  productEditor?: boolean;
   list(): Promise<ValidationProjectEntry[]>;
   open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob, reviewEdit?: PreparedReviewEdit): Promise<Awaited<ReturnType<typeof openValidationHost>>>;
   render(host: ValidationDisplayHost): Promise<{ factory: ViewportFactory; dispose(): void }>;
@@ -61,7 +63,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   refresh.type = back.type = 'button'; refresh.textContent = '一覧を更新'; back.textContent = 'プロジェクトを選ぶ';
   const listHeading = document.createElement('h2'); listHeading.textContent = 'このブラウザの再開用データ';
   navigation.append(heading, help, workspaceForm, form, listHeading, refresh, list); root.append(back, status, navigation, content);
-  let host: Host | undefined, workspace: ReturnType<typeof createSavedWorkspace> | undefined;
+  let host: Host | undefined, workspace: ReturnType<typeof createSavedWorkspace> | ReturnType<typeof createProductWorkspace> | undefined;
   let reviewWorkspace: ReturnType<typeof createReviewWorkspace> | undefined;
   let receiveTools: ReturnType<typeof createValidationReceiveControls> | undefined;
   let resident: Awaited<ReturnType<ValidationWorkspacePorts['render']>> | undefined;
@@ -133,7 +135,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (disposed || host !== target) { next.dispose(); return; }
     resident = next;
     const fileTools = receiveTools;
-    try { workspace = createSavedWorkspace(document, target, next.factory,
+    try { workspace = ports.productEditor ? createProductWorkspace(document, target, next.factory, fileTools) : createSavedWorkspace(document, target, next.factory,
       (session, changed) => {
         const root = document.createElement('section');
         const blockedReason = () => fileTools?.hasChanges() ? 'ファイルの操作を終えるか、取り消してから解消してください。' : null;

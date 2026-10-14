@@ -1,10 +1,10 @@
 import type { createValidationModeHost } from './validationModeHost';
-import type { SyntheticSession } from './session';
+import type { WorkspaceFileInteraction } from '../../ui/projectScene/projectWorkspacePorts';
 import { createValidationOutputControls } from './validationOutputControls';
 
 /** One file/recovery area, available even before a Scene editor can mount. */
 export function createValidationReceiveControls(document: Document, host: ReturnType<typeof createValidationModeHost>,
-  session: () => SyntheticSession | undefined, changed: () => void, recovered: () => Promise<void>, otherInput: () => boolean = () => false,
+  session: () => WorkspaceFileInteraction | undefined, changed: () => void, recovered: () => Promise<void>, otherInput: () => boolean = () => false,
   restoreDisplay?: (retry: boolean) => Promise<void>) {
   const root = document.createElement('section'), heading = document.createElement('h2'), form = document.createElement('form');
   heading.textContent = '更新ファイル'; root.setAttribute('aria-label', '更新ファイル');

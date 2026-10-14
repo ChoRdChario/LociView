@@ -1,9 +1,9 @@
 import type { createValidationModeHost } from './validationModeHost';
-import type { SyntheticSession } from './session';
+import type { WorkspaceFileInteraction } from '../../ui/projectScene/projectWorkspacePorts';
 
 /** Same editor, deliberate file handoff. No receipt follows a browser download click. */
 export function createValidationOutputControls(document: Document, host: ReturnType<typeof createValidationModeHost>,
-  session: () => SyntheticSession | undefined, changed: () => void, otherBusy: () => boolean) {
+  session: () => WorkspaceFileInteraction | undefined, changed: () => void, otherBusy: () => boolean) {
   const root = document.createElement('section'), heading = document.createElement('h2'), actions = document.createElement('div'),
     commands = document.createElement('div'), status = document.createElement('p'), list = document.createElement('div'), select = document.createElement('input');
   heading.textContent = 'ファイル'; root.setAttribute('aria-label', 'ファイル'); status.setAttribute('role', 'status');
@@ -96,15 +96,16 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     const cleanConfirmed = !!cleanPreview && cleanPreview.token === host.read().source?.token;
     const reviewConfirmed = !!reviewPreview && reviewPreview.token === host.read().source?.token && reviewPreview.sceneId === sceneId && reviewPreview.omittedEntryView === omitEntry;
     if (purpose === 'review') {
+      const provider = host.read().provider, sceneRecords = provider?.kind === 'scene-provider' ? provider.state.scenes : {};
       const label = document.createElement('label'), scenes = document.createElement('select'), empty = document.createElement('option');
       label.textContent = 'シーン'; scenes.setAttribute('aria-label', '渡すシーン'); empty.value = ''; empty.textContent = '選択してください'; scenes.append(empty);
-      for (const scene of Object.values(session()?.snapshot.state.scenes ?? {})) {
+      for (const scene of Object.values(sceneRecords)) {
         if (scene.lifecycle.kind !== 'value' || scene.lifecycle.value.state !== 'active' || scene.name.kind !== 'value') continue;
         const option = document.createElement('option'); option.value = scene.id; option.textContent = scene.name.value; scenes.append(option);
       }
       scenes.value = sceneId; scenes.disabled = kind.disabled; label.append(scenes); actions.append(label);
       scenes.addEventListener('change', () => { if (!scenes.disabled) { sceneId = scenes.value; omitEntry = false; reviewPreview = null; choicePending = true; render(); changed(); } });
-      const scene = session()?.snapshot.state.scenes[sceneId];
+      const scene = sceneRecords[sceneId];
       if (scene?.defaultViewId.kind === 'unresolved' && scene.defaultViewId.reason === 'conflict') {
         const label = document.createElement('label'), omit = document.createElement('input'); omit.type = 'checkbox'; omit.checked = omitEntry;
         omit.disabled = kind.disabled; label.append(omit, '開始視点なしで渡す'); actions.append(label);

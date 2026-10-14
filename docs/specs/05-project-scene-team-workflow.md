@@ -1441,6 +1441,33 @@ gates. Extract only the required composition when that workflow is implemented;
 this direction does not promote the validation host or its storage namespace,
 change formats/dependencies, or authorize activation before gate completion.
 
+**Bounded product composition implementation boundary (2026-10-15):** implement
+the connected open → Scene/Caption/pin/media edit → file save/send/receive →
+independent reopen workflow in `src/ui/projectScene`, selectable with
+`editor=project` in the existing nondefault validation entry. Preserve the existing
+editor while this composition is integrated; no ordinary-home activation or
+aggregate feature/profile/device acceptance follows.
+
+- Product modules read the verified Scene provider and issue existing typed
+  MetadataEdit commands through a narrow host port. They must not import harness,
+  fixture geometry, string-map intent adapters, raw Session, FS or package writers.
+- The host's typed dispatch shares execute/editable/profile/content/display-ready
+  checks with the existing adapter. Binary introduction and file/recovery operations
+  retain their existing service boundaries; restored hosts use current services.
+- Inject a viewport runtime adapter from the validation composition. Preserve exact
+  source/Scene/binding/revision/representation/family/class pick identity, render and
+  camera receipts, coverage/occlusion/stale rejection and the existing GLB renderer.
+  Do not move the synthetic viewport/session into product UI.
+- One UI-owned interaction guard covers drafts/IME, selection, pin proposals,
+  asynchronous edits and file tools. A failure keeps its exact input/command;
+  success follows confirmed publication/display. Browser download is not file-save
+  confirmation. Source history, backup restoration and file jobs stay authoritative.
+- Acceptance uses the new composition through one real-file workflow, typed edit
+  and media/pin actions, named backup and two-round Workspace/Contribution exchange,
+  cold reopen, guarded input and same-command recovery. Reuse service fault tests;
+  add exact import isolation and representative composition tests. Record missing
+  rendered/device evidence for the grouped candidate, without pausing development.
+
 Each production slice requires a short meta-audit, exact-tree tests/build, one
 independent read-only review and a reversible commit. Run focused checks during
 editing, then the required full matrix once on the final executable tree. Reuse

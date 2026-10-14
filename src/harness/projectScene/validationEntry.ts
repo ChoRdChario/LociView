@@ -5,6 +5,7 @@ import '../../ui/projectScene/modelList.css';
 import '../../ui/projectScene/captionActions.css';
 import '../../ui/projectScene/viewControls.css';
 import '../../ui/projectScene/materialControls.css';
+import '../../ui/projectScene/projectWorkspace.css';
 import './workspace.css';
 
 // Dedicated static entry; never dispatch legacy or synthetic writers from URL state.

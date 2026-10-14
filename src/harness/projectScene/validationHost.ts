@@ -5,6 +5,7 @@ import { TransactionJournal } from '../../projectMetadata/journal';
 import type { MetadataStorageFactory } from '../../projectMetadata/repository';
 import type { OriginBlobStore } from '../../projectMetadata/blobStore';
 import type { MetadataSessionRead } from '../../projectMetadata/session';
+import type { MetadataEdit } from '../../projectMetadata/commands';
 import { captionDeletionImpact } from '../../projectMetadata/captionDeletion';
 import { assetDeletionImpact } from '../../projectMetadata/assetDeletion';
 import { prepareValidationCreation, resumeValidationCreation, validationProjectService } from '../../projectFiles/creation';
@@ -360,6 +361,36 @@ export async function openValidationHost(options: ValidationHostOptions) {
       } catch (error) { if ((await session.read()).state === 'ready') content.releasePreparedImages(); throw error; }
       }, true);
     };
+    // Both UI compositions share the same command, profile and publication boundary.
+    const commitCommand = (token: string, input: MetadataEdit | (() => MetadataEdit)) => execute(async () => {
+      editable();
+      const command = typeof input === 'function' ? input() : input;
+      if (command.kind === 'createMaterial' || command.kind === 'editMaterial') {
+        const current = command.kind === 'editMaterial' ? project?.materialData?.records[command.overrideId] : undefined;
+        const routing = command.kind === 'createMaterial' ? command.routing : current?.routing.kind === 'value' ? current.routing.value : null;
+        const compositing = command.kind === 'createMaterial' ? command.compositing : current?.compositing.kind === 'value' ? current.compositing.value : null;
+        const slots = project?.modelVersions?.flatMap(v => v.closure.shape === 'saved-glb' ? validationMaterialSlots(v.closure) : []) ?? [];
+        const slot = slots.find(s => same(s.target as unknown as JsonObject, routing?.target as JsonObject | undefined));
+        if (!slot || !compositing) throw Error('設定するモデルと材質を確認してください。');
+        const issue = validationMaterialIssue(slot, { appearance: command.appearance, compositing } as MaterialIntent, project?.semanticProfile);
+        if (issue) throw Error(issue);
+      }
+      if (command.kind === 'resolveMaterialIntent' || command.kind === 'resolveMaterialDuplicates') {
+        const before = await session.read();
+        if (before.state !== 'ready' || before.provider?.kind !== 'scene-provider' || before.source?.token !== token) throw Error('材質が更新されています。選び直してください。');
+        const selected = selectedMaterialResolution(before.provider, command, limits);
+        const versions = await validationModelVersions(before.provider);
+        const slots = versions.flatMap(v => v.closure.shape === 'saved-glb' ? validationMaterialSlots(v.closure) : []);
+        const slot = slots.find(s => same(s.target as unknown as JsonObject, selected.routing.target));
+        if (!slot) throw Error('設定するモデルと材質を確認してください。');
+        for (const intent of selected.intents.values()) {
+          const issue = validationMaterialIssue(slot, intent, before.provider.semanticProfile); if (issue) throw Error(issue);
+        }
+      }
+      const display = await ready(await session.edit(token, command));
+      return { display, read: last };
+    }, true);
+    const dispatch = async (token: string, command: MetadataEdit) => (await commitCommand(token, command)).read;
     const authority: SyntheticAuthority = {
       storage: 'saved-development', writeScope: 'caption-text',
       capabilities: { pins: true, membership: true, color: true, views: true, media: true, materials: true, sceneAuthoring: true, placement: true, transform: true },
@@ -368,20 +399,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
       status: () => ({ kind: busy ? 'checking' : failure || connection?.restorePending || restoreRetired || restoreDisplayPending || receiveDisplayPending || unfinishedReceive() || last.state !== 'ready' ? 'failed' : 'idle',
         retryable: !(connection?.restorePending || restoreRetired || restoreDisplayPending),
         error: restoreFailure || failure || (connection?.restorePending || restoreRetired || restoreDisplayPending ? 'バックアップの復元が未完了です。' : '') || (receiveDisplayPending ? receiveFailure : '') || (unfinishedReceive() ? '「更新ファイル」の中断した受信を確認してください。' : '更新が未完了です。') }),
-      write: (token, changes, context) => execute(async () => {
-        editable(); const command = metadataIntent(changes, authority.read(), context);
-        if (command.kind === 'createMaterial' || command.kind === 'editMaterial') {
-          const current = command.kind === 'editMaterial' ? project?.materialData?.records[command.overrideId] : undefined;
-          const routing = command.kind === 'createMaterial' ? command.routing : current?.routing.kind === 'value' ? current.routing.value : null;
-          const compositing = command.kind === 'createMaterial' ? command.compositing : current?.compositing.kind === 'value' ? current.compositing.value : null;
-          const slots = project?.modelVersions?.flatMap(v => v.closure.shape === 'saved-glb' ? validationMaterialSlots(v.closure) : []) ?? [];
-          const slot = slots.find(s => same(s.target as unknown as JsonObject, routing?.target as JsonObject | undefined));
-          if (!slot || !compositing) throw Error('設定するモデルと材質を確認してください。');
-          const issue = validationMaterialIssue(slot, { appearance: command.appearance, compositing } as MaterialIntent, project?.semanticProfile);
-          if (issue) throw Error(issue);
-        }
-        return ready(await session.edit(token, command));
-      }, true),
+      write: async (token, changes, context) => (await commitCommand(token, () => metadataIntent(changes, authority.read(), context))).display,
       authorScene: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
       reparentPin: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
       captionDeletionImpact: (token, id) => { if (last.provider?.kind !== 'scene-provider' || token !== last.provider.token) throw Error('内容が更新されています。'); return captionDeletionImpact(last.provider, id, limits); },
@@ -464,24 +482,9 @@ export async function openValidationHost(options: ValidationHostOptions) {
     const host: SavedWorkspaceHost = { authority, limits, read: () => last, hasPending: () => busy || !!connection?.restorePending || restoreRetired || restoreDisplayPending || receiveDisplayPending || unfinishedReceive() ||
       !emptyImport() && (!!failure || last.state !== 'ready'),
       refresh: () => execute(async () => { await reloadReceive(); last = await session.read(); await projectView(last); return last; }),
-      resolve: (token, command) => execute(async () => {
-        editable();
-        if (command.kind === 'resolveMaterialIntent' || command.kind === 'resolveMaterialDuplicates') {
-          const before = await session.read();
-          if (before.state !== 'ready' || before.provider?.kind !== 'scene-provider' || before.source?.token !== token) throw Error('材質が更新されています。選び直してください。');
-          const selected = selectedMaterialResolution(before.provider, command, limits);
-          const versions = await validationModelVersions(before.provider);
-          const slots = versions.flatMap(v => v.closure.shape === 'saved-glb' ? validationMaterialSlots(v.closure) : []);
-          const slot = slots.find(s => same(s.target as unknown as JsonObject, selected.routing.target));
-          if (!slot) throw Error('設定するモデルと材質を確認してください。');
-          for (const intent of selected.intents.values()) {
-            const issue = validationMaterialIssue(slot, intent, before.provider.semanticProfile); if (issue) throw Error(issue);
-          }
-        }
-        return ready(await session.edit(token, command));
-      }, true),
+      resolve: async (token, command) => (await commitCommand(token, command)).display,
       dispose: async () => { await dispose(); content.releasePreparedImages(); content.releasePreparedModels(); prepareDisplay = undefined; } };
-    return { ...host, get content() { return content; }, workspaceFiles, workspaceOutput, backupRestore, display: () => restoreRetired ? undefined : project,
+    return { ...host, dispatch, get content() { return content; }, workspaceFiles, workspaceOutput, backupRestore, display: () => restoreRetired ? undefined : project,
       get accessDetail() { return options.mode === 'view' ? '閲覧専用です。' : lease.accessDetail; },
       setDisplayPreparation(callback: (next: SyntheticProject) => Promise<void>) {
       if (closed || prepareDisplay) throw Error('モデル表示の接続を確認してください。');

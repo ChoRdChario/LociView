@@ -29,6 +29,7 @@ export async function createValidationBrowserWorkspace(document: Document, run?:
       maxChunkBytes: 16 * 1024 * 1024, maxChunks: 100_000, metadata: validationMetadataLimits }, locks) };
   const storage = (id: string, create: boolean) => openBrowserMetadataStorage(`${validationArea}-${id}`, create);
   const workspace = createValidationWorkspace(document, { ...options,
+    productEditor: new URL(location.href).searchParams.get('editor') === 'project',
     list: () => listValidationProjects(options, storage),
     open: (id, initial, mode, workspaceFile, reviewEdit) => openValidationHost({ ...options, run: id, initial, mode, workspaceFile, reviewEdit, openStorage: create => storage(id, create) }),
     renderModelCandidate: async (host, display) => {

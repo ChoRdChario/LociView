@@ -16,6 +16,8 @@ for code locations and [document index](../docs/README.md) for applicable contra
    code from ordinary-route/browser/device acceptance, and preserve any dirty work.
 4. Continue approved work without repeated PO confirmation. Report only a real
    new decision/authority boundary or the completed requested result.
+   Complete useful integrated workflows before grouped PO/browser/device checks;
+   do not make the user's availability a dependency for each small test.
 
 ## Non-negotiable distinctions
 

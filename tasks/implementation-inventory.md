@@ -1,6 +1,6 @@
 # 実装・接続の全体棚卸し
 
-> 更新: 2026-10-15（M11の説明を訂正。全体分類は2026-09-21時点）。本書は機能対応の正本。
+> 更新: 2026-10-15（限定product composition経路を追加。全体分類は2026-09-21時点）。本書は機能対応の正本。
 > 実装順・現在の作業tree・実行結果は [todo](todo.md) を参照し、ここへ重複記載しない。
 > 限定接続と製品受入れを区別し、通常画面・実機の新たな合格は主張しない。
 > [以前の棚卸しと監査記録](../docs/history/development-through-2026-09-14/tasks/implementation-inventory.md) は履歴。
@@ -43,6 +43,7 @@
 | project-scene memory／旧 `storage=saved` | 合成の2人チーム、更新・競合・独立copy・保存の限定ループ | 新metadata serviceまたは実ファイル製品wireの接続済み |
 | project-scene `storage=metadata` | 新source/repository/session/journalと従来25群＋C07/V04の合成UI接続、限定履歴受信・明示解消 | 任意モデル／任意画像／実ファイルのチーム受信／通常home／offlineの合格 |
 | project-scene `storage=validation` | 静的GLB/PNG Projectの作成・一覧・再開、実本体read/renderと編集、限定Workspace/Contributionの実file入出力・中断復旧、名前付きbackup出力と確認付き復元・復元後の編集／返送、独立コピー出力・入力・編集／再開、選択Sceneの閲覧用出力・内容由来のstandalone View、明示確認した編集コピー・中断復旧・編集／再開。実行結果はtodo参照 | 通常home、正式profile／任意形式、実描画／実入力／実機／offlineの受入れ、全purpose／移行の完成 |
+| 同じvalidationの `editor=project` | provider読取とtyped commandでScene作成・選択、Caption本文／色、ピン作成・移動、PNG追加／表示、本文競合の明示解消を一画面へ接続。既存の保存・受渡し・受信・復元serviceを共有。二往復／cold再開の実行証跡はtodo参照 | 全4タブ／全機能の移植、通常home、実描画・実入力・実機・offlineの合格。旧editorは保持し、分類件数は増やさない |
 
 ## 2. 全機能群
 

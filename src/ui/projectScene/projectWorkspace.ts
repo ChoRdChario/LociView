@@ -1,0 +1,307 @@
+import type { MetadataEdit } from '../../projectMetadata/commands';
+import { chooseStartupScene, resolveScene } from '../../scene/resolve';
+import { createCaptionListControls } from './captionListControls';
+import { captionListPlanIsCurrent, type CaptionListContext } from './captionListState';
+import { createCaptionDetailControls } from './captionDetailControls';
+import { beginCaptionDraft, captionApplyIsCurrent, hasCaptionDraft, type CaptionDraft, type DetailContext } from './captionDetailState';
+import type { SceneUiMemory } from './navigationState';
+import { fieldValue, projectAttachments, projectCaptions, projectCaptionSceneCount, projectMediaUncertain } from './projectRead';
+import { surfaceAnchor, type ProjectWorkspacePorts, type WorkspaceFileInteraction, type WorkspacePinProposal, type WorkspaceSurface, type Point3 } from './projectWorkspacePorts';
+
+const id = (prefix: string) => `${prefix}_${crypto.randomUUID().replaceAll('-', '')}`;
+const emptyMemory = (): SceneUiMemory => ({ selectedCaptionId: null, search: '', listScrollTop: 0, pinColors: null, ownerFilter: { kind: 'all' } });
+const sameTarget = (a: WorkspaceSurface, b: WorkspaceSurface) => JSON.stringify(a) === JSON.stringify(b);
+const colorBytes = (hex: string) => hex.slice(1).match(/../g)!.map(n => parseInt(n, 16) / 255);
+
+/** Product composition: provider reads and typed commands; owns no storage or fixture adapter. */
+export function createProjectWorkspace(document: Document, ports: ProjectWorkspacePorts) {
+  const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const node = document.createElement(tag); node.textContent = text; return node; };
+  const button = (text: string, action: () => void) => { const b = make('button', text); b.type = 'button'; b.addEventListener('click', () => { if (!b.disabled && !disposed) action(); }); return b; };
+  const root = make('main'); root.className = 'lv-project-workspace';
+  const header = make('header'), heading = make('h1', 'LociViewで3Dモデルと記録を編集します。');
+  const status = make('p'); status.setAttribute('role', 'status'); status.className = 'lv-operation-status';
+  const retry = button('更新を再試行', () => { void runRetry(); }); header.append(heading, status, retry);
+  const revise = button('入力を修正する', () => { if (!busy && ports.status().kind === 'idle') { pending = null; feedback = ''; render(); } }); header.append(revise);
+  const body = make('div'); body.className = 'lv-project-body';
+  const stage = make('section'), canvas = make('canvas'), markers = make('div');
+  stage.className = 'lv-project-stage'; canvas.setAttribute('aria-label', '3Dモデルの表示'); canvas.tabIndex = 0;
+  const viewportStatus = make('p'); viewportStatus.setAttribute('role', 'status'); viewportStatus.className = 'lv-project-viewport-status';
+  const retryViewport = button('3D表示を再試行', () => viewAction(() => viewport.retry()));
+  markers.className = 'lv-project-markers'; stage.append(canvas, markers, viewportStatus, retryViewport);
+  const sidebar = make('aside'); sidebar.setAttribute('aria-label', '作業パネル');
+  const sceneArea = make('section'), scenes = make('div'); sceneArea.setAttribute('aria-label', 'シーン'); sceneArea.append(make('h2', 'シーン'), scenes);
+  const sceneForm = make('form'), sceneLabel = make('label', 'シーン名'), sceneName = make('input');
+  sceneName.setAttribute('aria-label', 'シーン名'); sceneLabel.append(sceneName);
+  const createScene = button('シーンを追加', () => {}); createScene.type = 'submit'; sceneForm.append(sceneLabel, createScene); sceneArea.append(sceneForm);
+  const pinArea = make('section'), pinStatus = make('p'), coords = make('div'); pinStatus.setAttribute('role', 'status');
+  pinArea.setAttribute('aria-label', 'ピンの操作');
+  const addPin = button('ピンを追加', () => { if (guardInput()) { choosing = true; placingCaption = null; render(); } });
+  const movePin = button('位置を調整', () => {
+    if (!guardInput()) return;
+    const caption = provider().resources.captions[memory().selectedCaptionId ?? ''], anchor = fieldValue(caption?.anchor);
+    if (!caption || anchor?.kind !== 'asset') { choosing = true; placingCaption = caption?.id ?? null; render(); return; }
+    const target = viewport.target(anchor.assetId);
+    if (!target) { feedback = '配置先モデルを確認してください。'; render(); return; }
+    setPin({ target, position: anchor.positionAsset, captionId: caption.id }); render();
+  });
+  const coordinateInputs = ['X', 'Y', 'Z'].map((axis, i) => {
+    const label = make('label', axis), input = make('input'); input.type = 'number'; input.step = 'any'; input.setAttribute('aria-label', `位置 ${axis}`);
+    label.append(input); coords.append(label);
+    input.addEventListener('input', () => {
+      if (!pin || mutationBlock()) return;
+      rawPosition[i] = input.value;
+      if (rawPosition.every(v => v.trim() !== '' && Number.isFinite(Number(v)))) pin = { ...pin, position: rawPosition.map(Number) as unknown as Point3 };
+      render();
+    });
+    input.addEventListener('compositionstart', () => { composing = true; render(); });
+    input.addEventListener('compositionend', () => { composing = false; render(); }); return input;
+  });
+  const finishPin = button('位置を確定', () => {
+    if (!pin || mutationBlock() || composing || !positionValid()) return;
+    const captured = pin, target = viewport.target(captured.target.assetId);
+    if (!target || !sameTarget(target, captured.target)) { feedback = '表示が変わっています。面を選び直してください。'; render(); return; }
+    const currentAnchor = captured.captionId ? fieldValue(provider().resources.captions[captured.captionId]?.anchor) : undefined;
+    const command: MetadataEdit = captured.captionId ? { kind: currentAnchor?.kind === 'asset' && currentAnchor.assetId === captured.target.assetId ? 'movePin' : 'reparentPin', sceneId, captionId: captured.captionId, anchor: surfaceAnchor(captured) } :
+      { kind: 'addPin', sceneId, captionId: id('cap'), membershipId: id('scm'), eventId: id('evt'), anchor: surfaceAnchor(captured), colorSrgb: colorBytes('#a08045') };
+    void run(command, () => {
+      const captionId = command.kind === 'addPin' ? command.captionId : captured.captionId!;
+      pin = null; choosing = false; placingCaption = null; selectCaption(captionId); feedback = 'ピンの位置を確定しました。';
+    });
+  });
+  const cancelPin = button('取り消す', () => { if (!mutationBlock() && !composing) { pin = null; choosing = false; placingCaption = null; render(); } });
+  pinArea.append(addPin, movePin, pinStatus, coords, finishPin, cancelPin);
+  const media = make('section'), mediaList = make('div'), mediaLabel = make('label', 'メディアを追加'), mediaInput = make('input');
+  media.setAttribute('aria-label', 'メディア'); mediaInput.type = 'file'; mediaInput.accept = 'image/png'; mediaInput.setAttribute('aria-label', 'メディアを追加'); mediaLabel.append(mediaInput);
+  const cancelMedia = button('選択を取り消す', () => { if (!mutationBlock()) { pickerScope = null; mediaInput.value = ''; render(); } });
+  let image = make('img'); image.hidden = true; image.alt = ''; media.append(make('h2', 'メディア'), mediaLabel, cancelMedia, mediaList, image);
+  const conflicts = make('section'); conflicts.setAttribute('aria-label', '記録の競合');
+  let sceneId = chooseStartupScene(ports.read().state).sceneId ?? '', disposed = false, busy = false, composing = false, feedback = '';
+  let draft: CaptionDraft | null = null, pin: WorkspacePinProposal | null = null, choosing = false, placingCaption: string | null = null;
+  let rawPosition = ['', '', ''], pending: { action: () => Promise<unknown>; complete: () => void } | null = null;
+  let pickerScope: { token: string; sceneId: string; captionId: string } | null = null;
+  let gesture: { pointerId: number; token: string; receipt: string; x: number; y: number; left: number; top: number; width: number; height: number } | null = null;
+  let imageUrl: string | null = null, imageEpoch = 0, mediaKey = '', rendering = false;
+  let viewportFeedback = '';
+  const memories = new Map<string, SceneUiMemory>();
+  const conflictChoices = new Map<string, { token: string; operationId: string }>();
+  const provider = () => ports.read();
+  const memory = () => { if (!memories.has(sceneId)) memories.set(sceneId, emptyMemory()); return memories.get(sceneId)!; };
+  const draftInput = () => hasCaptionDraft(draft) || !!draft?.composing || !!pin || choosing || composing || !!pickerScope || sceneName.value.trim() !== '';
+  const dirty = () => draftInput() || conflictChoices.size > 0 || !!pending;
+  const mutationBlock = () => busy ? '変更を適用しています。' : ports.status().kind === 'failed' ? ports.status().error || '更新を再試行してください。' :
+    ports.readOnly ? '閲覧中です。編集を開始してください。' : ports.otherPending() ? 'ファイルの操作を完了してください。' : pending ? '再試行するか、入力を修正してください。' : null;
+  const listContext = (): CaptionListContext => ({ source: { kind: 'ready', token: provider().token, sceneId,
+    captions: projectCaptions(provider(), sceneId) }, memory: memory(), pending: dirty() ? 'text' : busy ? 'update' : null, mutationBlock: mutationBlock() });
+  const detailContext = (): DetailContext => {
+    const item = projectCaptions(provider(), sceneId).find(c => c.id === memory().selectedCaptionId);
+    return { source: item ? { kind: 'ready', token: provider().token, sceneId, caption: item, sceneCount: projectCaptionSceneCount(provider(), item.id) } :
+      { kind: 'unavailable', token: provider().token, sceneId, captionId: null, reason: '記録を選択してください。' },
+      draft, mutationBlock: mutationBlock() || (pin || choosing || pickerScope || conflictChoices.size ? '現在の操作を完了してください。' : null), feedback: { kind: 'idle' } };
+  };
+  const list = createCaptionListControls(document, plan => {
+    if (disposed || busy || pending || ports.otherPending()) return;
+    if (plan.kind === 'blocked') { feedback = plan.reason; render(); return; }
+    if (!captionListPlanIsCurrent(plan, listContext())) return;
+    if (plan.kind === 'change') { memories.set(sceneId, plan.memory); if (plan.intent === 'select') resetDraft(); }
+    if (plan.kind === 'effect' && plan.action === 'review') {
+      selectCaption(plan.captionId); feedback = '記録の競合・配置先・メディアの状態を確認してください。';
+    }
+    render();
+  }, active => { composing = active; render(); });
+  const detail = createCaptionDetailControls(document, event => {
+    if (disposed || mutationBlock()) return;
+    if (event.kind === 'draft' && event.baseDraft === draft) draft = event.draft;
+    else if (event.kind === 'cancel' && event.draft === draft) resetDraft();
+    else if (event.kind === 'apply' && captionApplyIsCurrent(event, detailContext())) {
+      const edits = { ...(event.changes.title !== undefined ? { title: event.changes.title } : {}),
+        ...(event.changes.body !== undefined ? { body: event.changes.body } : {}),
+        ...(event.changes.color !== undefined ? { colorSrgb: colorBytes(event.changes.color) } : {}) };
+      void run({ kind: 'editCaption', captionId: event.captionId, edits }, () => { resetDraft(); feedback = '変更を適用しました。'; });
+    } else if (event.kind === 'review') feedback = '下の競合欄で残す内容を選択してください。';
+    render();
+  });
+  sidebar.append(sceneArea, list.root, pinArea, detail.root, conflicts, media); body.append(stage, sidebar); root.append(header, body);
+  let mounted = false;
+  const viewport = ports.createViewport(canvas, () => { if (mounted && !rendering) render(); }, (target, position) => {
+    if (!pin || mutationBlock() || !sameTarget(target, pin.target) || !position.every(Number.isFinite)) return false;
+    setPin({ ...pin, position }); render(); return true;
+  });
+  const interaction: WorkspaceFileInteraction = {
+    get interactionPending() { return dirty(); },
+    get acknowledgment(): WorkspaceFileInteraction['acknowledgment'] { return { state: busy ? 'checking' : ports.status().kind === 'failed' ? 'failed' : 'idle' }; },
+    refreshHistory() { if (!hasCaptionDraft(draft) && !draft?.composing) draft = null; render(); },
+  };
+  function guardInput(): boolean {
+    const reason = mutationBlock();
+    if (reason || dirty()) { feedback = reason || '入力・操作を確定するか、取り消してください。'; render(); return false; }
+    return true;
+  }
+  function resetDraft() { draft = null; draft = beginCaptionDraft(detailContext().source); }
+  function selectCaption(captionId: string) { memories.set(sceneId, { ...memory(), selectedCaptionId: captionId }); resetDraft(); }
+  function setPin(next: WorkspacePinProposal) { pin = next; choosing = false; rawPosition = next.position.map(String); }
+  function positionValid() { return rawPosition.every(v => v.trim() !== '' && Number.isFinite(Number(v))); }
+  async function perform(action: () => Promise<unknown>, complete: () => void) {
+    busy = true; feedback = '変更を適用しています。'; pending = { action, complete };
+    try { render(); await action(); if (!disposed) { complete(); pending = null; } }
+    catch (error) { if (!disposed) feedback = error instanceof Error ? error.message : '変更を適用できません。入力を保持しています。'; }
+    finally { busy = false; if (!disposed) render(); }
+  }
+  async function run(command: MetadataEdit, complete: () => void) {
+    if (mutationBlock()) return;
+    const token = provider().token;
+    await perform(() => ports.dispatch(token, command), complete);
+  }
+  async function runRetry() {
+    if (busy || !pending || ports.readOnly || ports.otherPending()) return;
+    const work = pending;
+    await perform(() => ports.status().kind === 'failed' ? ports.retry() : work.action(), work.complete);
+  }
+  sceneForm.addEventListener('submit', event => {
+    event.preventDefault(); if (mutationBlock() || composing || hasCaptionDraft(draft) || pin || choosing || pickerScope || conflictChoices.size || !sceneName.value.trim()) return;
+    const p = provider(), source = p.state.scenes[sceneId]; if (!source) return;
+    const edges = Object.values(p.state.assetMemberships).filter(e => e.sceneId === sceneId && fieldValue(e.lifecycle)?.state === 'active');
+    const nextScene = id('scn'), name = sceneName.value;
+    const orders = Object.values(p.state.scenes).map(s => fieldValue(s.orderKey)).filter((s): s is string => typeof s === 'string').sort();
+    void run({ kind: 'createScene', sceneId: nextScene, activeSceneId: sceneId, sourceSceneId: sceneId, name, orderKey: (orders.at(-1) ?? '') + 'U',
+      membershipIds: edges.map(() => id('sam')), eventId: id('evt') }, () => { sceneName.value = ''; sceneId = nextScene; draft = null; feedback = 'シーンを追加しました。'; });
+  });
+  sceneName.addEventListener('input', () => render());
+  sceneName.addEventListener('compositionstart', () => { composing = true; render(); });
+  sceneName.addEventListener('compositionend', () => { composing = false; render(); });
+  mediaInput.addEventListener('click', () => {
+    if (guardInput() && memory().selectedCaptionId) { pickerScope = { token: provider().token, sceneId, captionId: memory().selectedCaptionId! }; render(); }
+  });
+  mediaInput.addEventListener('cancel', () => { if (!pending && !busy) { pickerScope = null; render(); } });
+  mediaInput.addEventListener('change', () => {
+    const file = mediaInput.files?.[0], scope = pickerScope;
+    if (!file || !scope || mutationBlock()) return;
+    if (scope.token !== provider().token || scope.sceneId !== sceneId || scope.captionId !== memory().selectedCaptionId) { feedback = '対象が変わっています。元の記録を選び直してください。'; render(); return; }
+    const orders = projectAttachments(provider(), scope.captionId).map(a => a.order).sort();
+    const input = { ...scope, attachmentId: id('att'), eventId: id('evt'), orderKey: (orders.at(-1) ?? '') + 'U',
+      file: { name: file.name, size: file.size, arrayBuffer: file.arrayBuffer.bind(file) } };
+    void perform(() => ports.addMedia(scope.token, input), () => { pickerScope = null; mediaInput.value = ''; resetDraft(); feedback = 'メディアを追加しました。'; });
+  });
+  canvas.addEventListener('pointerdown', event => {
+    if (gesture || !event.isPrimary || event.button !== 0 || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey || !choosing || mutationBlock()) { gesture = null; return; }
+    const read = viewport.read(), rect = canvas.getBoundingClientRect();
+    if (!read.ready || read.dragging || read.token !== provider().token || !read.pickToken) return;
+    gesture = { pointerId: event.pointerId, token: read.token, receipt: read.pickToken, x: event.clientX, y: event.clientY,
+      left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+  });
+  canvas.addEventListener('pointercancel', () => { gesture = null; });
+  canvas.addEventListener('lostpointercapture', () => { gesture = null; });
+  canvas.addEventListener('pointermove', event => {
+    if (gesture && (gesture.pointerId !== event.pointerId || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey ||
+      Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 4)) gesture = null;
+  });
+  canvas.addEventListener('pointerup', event => {
+    const down = gesture; gesture = null; if (!down || !event.isPrimary || event.button !== 0 || down.pointerId !== event.pointerId || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey || !choosing || mutationBlock()) return;
+    const read = viewport.read(), rect = canvas.getBoundingClientRect();
+    if (!read.ready || read.dragging || read.token !== down.token || read.pickToken !== down.receipt || provider().token !== down.token ||
+      rect.left !== down.left || rect.top !== down.top || rect.width !== down.width || rect.height !== down.height ||
+      Math.hypot(event.clientX - down.x, event.clientY - down.y) > 4) return;
+    const hit = viewport.pick(event.clientX - rect.left, event.clientY - rect.top); if (!hit) return;
+    if (hit.target.token !== provider().token || hit.target.sceneId !== sceneId || !hit.position.every(Number.isFinite)) return;
+    setPin({ ...hit, captionId: placingCaption }); render();
+  });
+  const cameraTools = make('div'); cameraTools.className = 'lv-project-camera';
+  for (const [action, label] of [['fit', '全体表示'], ['front', '正面'], ['top', '上面']] as const)
+    cameraTools.append(button(label, () => viewAction(() => viewport.camera(action)))); stage.append(cameraTools);
+  function viewAction(action: () => void) {
+    try { action(); viewportFeedback = ''; }
+    catch (error) { viewportFeedback = error instanceof Error ? error.message : '3D表示を確認してください。'; }
+    render();
+  }
+  function render() {
+    if (disposed || rendering) return; rendering = true;
+    try {
+      const p = provider(), blocked = mutationBlock(), selected = memory().selectedCaptionId;
+      status.dataset.busy = String(busy); status.textContent = ports.status().kind === 'failed' ? ports.status().error || feedback : feedback;
+      retry.hidden = !pending; retry.disabled = busy || ports.readOnly || ports.otherPending() || ports.status().retryable === false;
+      revise.hidden = !pending || busy || ports.status().kind !== 'idle';
+      scenes.replaceChildren();
+      for (const scene of Object.values(p.state.scenes)) {
+        if (fieldValue(scene.lifecycle)?.state !== 'active') continue;
+        const choice = button(fieldValue(scene.name) ?? '名称を確認', () => { if (!dirty() && !busy && !ports.otherPending()) { sceneId = scene.id; draft = null; feedback = ''; render(); } });
+        choice.disabled = busy || dirty() || ports.otherPending(); choice.setAttribute('aria-pressed', String(scene.id === sceneId)); scenes.append(choice);
+      }
+      if (!draft) draft = beginCaptionDraft(detailContext().source);
+      list.render(listContext()); detail.render({ ...detailContext(), windowBlock: '追加の表示操作は既存の編集画面で利用できます。' });
+      addPin.disabled = !!blocked || dirty() || !sceneId;
+      movePin.disabled = !!blocked || dirty() || !selected;
+      movePin.textContent = selected && fieldValue(p.resources.captions[selected]?.anchor)?.kind === 'unplaced' ? 'ピンを配置' : '位置を調整';
+      coords.hidden = !pin; finishPin.hidden = !pin; cancelPin.hidden = !pin && !choosing;
+      finishPin.disabled = !!blocked || composing || !positionValid(); cancelPin.disabled = !!blocked || composing;
+      pinStatus.textContent = choosing ? '配置先のモデルの面を選択してください。' : pin ? '位置を確認して確定してください。' : '';
+      coordinateInputs.forEach((input, i) => { input.disabled = !!blocked; if (!composing) input.value = rawPosition[i]!; });
+      sceneName.disabled = !!blocked || !!pin || choosing || hasCaptionDraft(draft) || !!pickerScope || conflictChoices.size > 0;
+      createScene.disabled = sceneName.disabled || composing || !sceneName.value.trim() || !sceneId;
+      mediaInput.disabled = !!blocked || hasCaptionDraft(draft) || !!pin || choosing || conflictChoices.size > 0 || !selected;
+      cancelMedia.hidden = !pickerScope; cancelMedia.disabled = !!blocked;
+      const nextMediaKey = JSON.stringify([p.token, selected]);
+      if (nextMediaKey !== mediaKey) {
+        mediaKey = nextMediaKey; mediaList.replaceChildren(); imageEpoch++; image.hidden = true;
+        if (imageUrl) { URL.revokeObjectURL(imageUrl); imageUrl = null; }
+        if (selected && projectMediaUncertain(p, selected)) mediaList.append(make('p', 'メディアの関連を確認してください。件数を確定できません。'));
+        for (const attachment of selected ? projectAttachments(p, selected) : []) {
+          const show = button(attachment.label, () => { const epoch = ++imageEpoch; void (async () => {
+            try { if (!attachment.media) throw Error('メディアを確認できません。'); const blob = await ports.image(attachment.media);
+              if (disposed || epoch !== imageEpoch) return; if (imageUrl) URL.revokeObjectURL(imageUrl);
+              const nextImage = make('img'); nextImage.hidden = true; nextImage.alt = attachment.alt;
+              nextImage.addEventListener('load', () => { if (!disposed && epoch === imageEpoch) nextImage.hidden = false; });
+              nextImage.addEventListener('error', () => {
+                if (disposed || epoch !== imageEpoch) return;
+                nextImage.hidden = true; if (imageUrl) URL.revokeObjectURL(imageUrl); imageUrl = null;
+                feedback = '画像を表示できません。同じメディアを選び直してください。'; render();
+              });
+              image.remove(); image = nextImage; media.append(image);
+              imageUrl = URL.createObjectURL(blob); image.src = imageUrl;
+            } catch (error) { if (!disposed && epoch === imageEpoch) { feedback = (error as Error).message; render(); } }
+          })(); }); mediaList.append(show);
+        }
+      }
+      conflicts.replaceChildren();
+      for (const field of ['title', 'body'] as const) {
+        if (!selected || p.resources.captions[selected]?.[field].kind !== 'unresolved') continue;
+        const candidates = p.inspection.candidates.fields.find(f => f.path.join('/') === `captionsById/${selected}/${field}`);
+        if (!candidates?.valid) continue;
+        const label = make('label', `${field === 'title' ? 'タイトル' : '本文'}に残す内容`), select = make('select'), empty = make('option', '選択してください'); empty.value = ''; select.append(empty);
+        for (const candidate of candidates.candidates) if (candidate.value.kind === 'value' && typeof candidate.value.value === 'string') {
+          const option = make('option', candidate.value.value || '空の内容'); option.value = candidate.operationId; select.append(option);
+        }
+        const key = `${selected}/${field}`, chosen = conflictChoices.get(key);
+        select.value = chosen?.operationId ?? ''; select.disabled = !!blocked || draftInput();
+        label.append(select); const apply = button('この内容を使う', () => {
+          const choice = conflictChoices.get(key);
+          if (!mutationBlock() && !draftInput() && choice?.token === provider().token && provider().token === p.token)
+            void run({ kind: 'resolveCaptionText', captionId: selected, field, choice: { kind: 'candidate', operationId: choice.operationId } },
+              () => { conflictChoices.delete(key); resetDraft(); feedback = '残す内容を適用しました。'; });
+        });
+        apply.disabled = !!blocked || draftInput() || !chosen || chosen.token !== p.token;
+        select.addEventListener('change', () => { if (mutationBlock() || draftInput() || p.token !== provider().token) return;
+          if (select.value) conflictChoices.set(key, { token: p.token, operationId: select.value }); else conflictChoices.delete(key); render(); });
+        const cancel = button('選択を取り消す', () => { if (!mutationBlock()) { conflictChoices.delete(key); render(); } });
+        cancel.hidden = !chosen; cancel.disabled = !!blocked; conflicts.append(label, apply, cancel);
+      }
+      body.setAttribute('aria-busy', String(busy)); body.inert = busy;
+      const resolved = sceneId ? resolveScene(p.state, p.resources, sceneId) : null;
+      viewport.update({ token: p.token, sceneId, selectedId: selected, pin, choosing,
+        pinColors: memory().pinColors, available: resolved?.kind === 'ready', readOnly: !!blocked || resolved?.kind !== 'ready' });
+      const seen = viewport.read();
+      viewportStatus.textContent = [viewportFeedback, seen.issue, seen.notice, resolved?.kind !== 'ready' && 'シーンを選択し、表示状態を確認してください。'].filter(Boolean).join(' ');
+      retryViewport.hidden = !seen.issue && !viewportFeedback; retryViewport.disabled = busy || ports.otherPending();
+      markers.replaceChildren();
+      for (const projected of seen.pins) if (projected.visible) {
+        const caption = p.resources.captions[projected.id]; if (!caption) continue;
+        const marker = button(fieldValue(caption.title) || '名称なし', () => { if (!dirty() && !busy && !ports.otherPending()) { selectCaption(projected.id); render(); } });
+        marker.className = 'lv-project-marker'; marker.style.left = `${projected.x}px`; marker.style.top = `${projected.y}px`;
+        marker.setAttribute('aria-pressed', String(projected.id === selected)); markers.append(marker);
+      }
+      ports.changed();
+    } finally { rendering = false; }
+  }
+  mounted = true; render();
+  return { root, render, session: interaction, inputPending: () => dirty() || busy,
+    hasChanges: () => dirty() || busy || !!pending,
+    unmount() { if (disposed) return; disposed = true; imageEpoch++; if (imageUrl) URL.revokeObjectURL(imageUrl); viewport.dispose(); list.dispose(); detail.dispose(); root.remove(); } };
+}

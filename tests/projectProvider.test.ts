@@ -8,11 +8,12 @@ import { createFixtureModel } from '../src/harness/projectScene/modelClosure';
 import { fixture, id, limits as valueLimits, lifecycle } from './helpers/projectRecordsFixture';
 import { candidateFixture, candidateWrite as w, withCandidateChanges } from './helpers/projectCandidateFixture';
 import type { ProjectCandidateInput } from '../src/domain/projectCandidates';
+import { projectCaptions, projectCaptionSceneCount, projectMediaUncertain } from '../src/ui/projectScene/projectRead';
 const limits = { ...valueLimits, maxWork: 1_000_000 };
 const verifier = (r = fixture(), bytes = developmentContentBytes) => developmentContentVerifier(Object.values(r.representationsById).map((rep: any) =>
   ({ variantFamilyId: rep.variantFamilyId, representationId: rep.id, payloadDigest: rep.payloadDigest })), bytes);
 const read = async (r = fixture(), source = candidateFixture(r), port = verifier(r)) => {
-  const result = await readProjectScene(source, limits, port); expect(result.kind).toBe('scene-provider');
+  const result = await readProjectScene(source, limits, port); expect(result.kind, result.kind === 'rejected' ? JSON.stringify(result.issue) : result.kind).toBe('scene-provider');
   if (result.kind !== 'scene-provider') throw Error(JSON.stringify(result)); return result;
 };
 const scene = (p: Awaited<ReturnType<typeof read>>) => { const r = resolveScene(p.state, p.resources, id('scn'));
@@ -78,6 +79,27 @@ describe('scope-labelled same-token Scene provider; not current-app/source-adapt
     expect(p.resources.captions[id('cap')]!.body.kind).toBe('unresolved');
     expect(p.details.mutable.captionsById[id('cap')]!.colorSrgb).toEqual({ kind: 'value', value: undefined });
     expect(p.state.scenes[id('scn')]!.defaultViewId).toEqual({ kind: 'value', value: null });
+    expect(projectCaptions(p, id('scn'))[0]!.color).toEqual({ kind: 'value', value: '#a08045' });
+  });
+  it('keeps unresolved product attachment counts and anchor owners visibly unknown', async () => {
+    const r = fixture(), source = candidateFixture(r);
+    const anchor = conflicts(source, ['captionsById', id('cap'), 'anchor'], r.captionsById[id('cap')].anchor, { kind: 'unplaced' });
+    const p = await read(r, anchor, verifier(r, async item => item.id === id('med') ? undefined : developmentContentBytes(item)));
+    const caption = projectCaptions(p, id('scn'))[0]!;
+    expect(caption.owner.kind).toBe('unresolved'); expect(caption.mediaCount.kind).toBe('unresolved');
+    expect(projectMediaUncertain(p, id('cap'))).toBe(true);
+    const known = await read(); expect(projectCaptions(known, id('scn'))[0]!.mediaCount).toEqual({ kind: 'value', value: 1 });
+  });
+  it('does not undercount shared Scene impact when product membership relations are unresolved or duplicated', async () => {
+    const r = fixture(); r.scenesById[id('scn', 2)] = { ...r.scenesById[id('scn')], id: id('scn', 2), name: '共有先', orderKey: 'B' };
+    r.sceneCaptionMembershipsById[id('scm', 2)] = { ...r.sceneCaptionMembershipsById[id('scm')], id: id('scm', 2), sceneId: id('scn', 2) };
+    expect(projectCaptionSceneCount(await read(r), id('cap'))).toEqual({ kind: 'value', value: 2 });
+    for (const [field, a, b] of [['lifecycle', lifecycle(), { state: 'deleted', eventId: id('evt', 9), reason: 'userDelete' }], ['captionId', id('cap'), id('cap', 2)]] as const) {
+      const p = await read(r, conflicts(candidateFixture(r), ['sceneCaptionMembershipsById', id('scm', 2), field], a, b));
+      expect(projectCaptionSceneCount(p, id('cap')).kind).toBe('unresolved');
+    }
+    r.sceneCaptionMembershipsById[id('scm', 2)].sceneId = id('scn');
+    expect(projectCaptionSceneCount(await read(r), id('cap')).kind).toBe('unresolved');
   });
   it('preserves valid old-class pins as needsReview and weak absent source as non-dereferenceable provenance', async () => {
     const r = fixture(); r.captionsById[id('cap')].anchor.authoredAssetRevisionId = id('rev', 99); r.captionsById[id('cap')].anchor.authoredAnchorCompatibilityId = id('cmp', 99);

@@ -7,6 +7,7 @@ import '../../ui/projectScene/modelList.css';
 import '../../ui/projectScene/captionActions.css';
 import '../../ui/projectScene/viewControls.css';
 import '../../ui/projectScene/materialControls.css';
+import '../../ui/projectScene/projectWorkspace.css';
 import './workspace.css';
 
 document.title = 'LociView — シーン編集・開発用';
