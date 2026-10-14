@@ -44,13 +44,16 @@ the subsequent checkpoint's publication identity; do not copy a second commit lo
   UI/file flow and earlier blobsVerified interruption remain covered.
 - [x] Complete final verification/review below; prepare the exact 115-path
   checkpoint for the authorized g0-baseline commit/push, retaining no excluded work.
-- [ ] Observe the real browser workflow and pin/backup waits. The exact blocker
-  is Browser runtime realpath EPERM on its protected browser-client.mjs; do not
-  retry unchanged or substitute Node/HTTP results for Chrome acceptance.
+- [x] Record the PO's manual completion of the instructed desktop GLB workflow
+  and qualitative wait feedback; independently inspect the supplied backup below.
+- [ ] Observe Native conversion in the real browser and close the applicable
+  adoption conditions. Automated Browser access remains blocked by runtime
+  realpath EPERM on its protected browser-client.mjs; do not retry unchanged or
+  substitute Node/HTTP results for browser acceptance.
 
 1. Use the existing static validation build for the grouped Native conversion,
-   editing, output and reopen observation. Recheck only the still-open pin/backup
-   latency, not every previously accepted operation. Before another optimization,
+   editing, output and reopen observation. The PO completed the small GLB flow
+   below; do not repeat it merely to accumulate evidence. Before another optimization,
    measure the affected action's storage, validation, display refresh, package
    generation and browser handoff waits where distinguishable. Label measured and
    uninstrumented stages; repeated output discovery is a hypothesis, not a proven
@@ -120,13 +123,39 @@ contract review. CRDT, renderer and storage replacement lack measured justificat
 - Browser bootstrap remains blocked by the protected module's realpath EPERM.
   Earlier restricted Vitest/loopback failures were resolved via managed execution;
   no permission denial was bypassed. Do not retry unchanged Browser bootstrap.
-- The PO reported roughly 5 seconds for pin confirmation and over a minute for
-  backup; subsequent improvement was slight. Browser performance is unaccepted.
-  Synthetic listing reductions are preserved in the September record.
+- Earlier PO feedback was roughly 5 seconds for pin confirmation and over a
+  minute for backup, with slight improvement. Current small-GLB feedback below
+  supersedes that estimate only for the newly observed path; it does not measure
+  Native conversion, larger inputs or individual internal stages. Synthetic
+  listing reductions are preserved in the September record.
 - Next input boundary: the existing local walkthrough fixture is a GLB, not a
   Native backup. Native browser conversion needs an admitted nonprivate Native
   backup from the existing Native UI; otherwise observe GLB edit/save/reopen and
   retain Native-browser conversion as pending. No new fixture/profile adoption.
+
+## PO validation feedback — 2026-10-15
+
+- PO reported completing the instructed desktop GLB display, pin confirmation,
+  title/body edit, file save and browser reload/resume flow on the current
+  validation candidate. This is reported manual evidence, not automated browser
+  observation or backup-file restoration evidence.
+- Asked about pin confirmation and file save, PO estimated about 2 seconds,
+  slightly heavy but tolerable. No separate action measurements were supplied.
+  Treat clear loading/completion feedback as a small UI improvement candidate;
+  there is no measured bottleneck or new numeric performance guarantee.
+- The supplied backup passed the existing BackupArchive reader's complete ZIP,
+  checksum, original-history, protected-inventory and summary checks. Exact
+  original changes reopened; the actual GLB passed bounded admission and matched
+  the walkthrough input. A provider derived using actual content checks resolves
+  one model and one placed caption with edited title/body, with no issues.
+  This is Node archive/source/content evidence; the original file was read-only.
+  Private input paths, names, IDs, hashes and text are excluded from this record.
+- No source change or full-suite rerun was needed for this feedback/inspection.
+  The published source checkpoint's isolation CI also completed successfully
+  ([run](https://github.com/ChoRdChario/LociView/actions/runs/38606426651)).
+- Next adoption gap remains the Native-source browser observation and existing
+  storage/profile/device conditions in 05 §13.2. GLB manual completion does not
+  close Native conversion, file restoration, physical-iPhone or offline acceptance.
 
 ## Documentation update — 2026-10-15
 
