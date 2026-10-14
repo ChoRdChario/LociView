@@ -28,6 +28,16 @@
 .lv-development .lv-save-status { padding: 4px 10px; border: 1px dashed #817c78; }
 .lv-development-notice, .lv-development-message { padding: 8px 20px; border-bottom: 1px solid #b7b1aa; background: #f2f0ee; }
 .lv-development-message { border-left: 3px solid #6e5639; }
+.lv-development-working { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 20px; background: #f2f0ee; border-bottom: 1px solid #b7b1aa; }
+.lv-operation-status[data-busy="true"]::before {
+  content: ""; display: inline-block; width: 1em; height: 1em; box-sizing: border-box;
+  margin-right: .5em; vertical-align: -.125em; border: 2px solid #b7b1aa;
+  border-top-color: #413d39; border-radius: 50%; animation: lv-operation-spin .9s linear infinite;
+}
+@keyframes lv-operation-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .lv-operation-status[data-busy="true"]::before { animation: none; }
+}
 .lv-development-content { display: grid; grid-template-columns: minmax(0, 1fr) 360px; flex: 1; min-height: 0; }
 .lv-development-stage { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 20px; gap: 20px; }
 .lv-development-composition { flex: 0 0 auto; padding: 16px; border: 1px solid #b7b1aa; background: #edeae6; }

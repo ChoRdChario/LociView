@@ -45,6 +45,12 @@
 - A PoC is disposable and isolated. Do not promote PoC code directly into production without a production implementation and review.
 - Record a short outcome-oriented plan before non-trivial implementation. Assign one connected user workflow through investigation, implementation, verification and independent review; prioritize the next missing adoption condition while retaining the accepted feature scope. Existing PO approval covers normal sequencing, relevant tests and fixes within that scope; do not request the same approval at each helper or checkpoint.
 - Keep one writer and use bounded read-only parallel work for cause analysis, remaining mappings and contract review. Run heavy whole-workspace tests/builds serially. Review the meaningful final diff once; re-review only later substantive changes or unresolved findings, not identical code merely because it was staged. Estimate throughput from completed workflows, available agent usage and human/device time, not model generation alone.
+- PO correction 2026-10-15: complete the integrated user workflow before asking
+  for grouped human testing. Do not ask the PO to test each control, fixture or
+  small change, or make their response a dependency of ordinary development.
+  Run relevant automated checks and independent review autonomously; record
+  unexecuted browser/device acceptance and continue other in-scope implementation.
+  Ask only for a genuinely necessary product/architecture decision or authority.
 
 ## Short meta-audits
 
@@ -153,7 +159,14 @@ $env:BASE_PATH='/LociView/'
 npm run build
 ```
 
-For dependency changes, also run `npm audit`. Rendering changes require recorded browser evidence; mobile-sensitive rendering or storage changes require physical iOS verification. Group human checks at the approved adoption/candidate boundaries unless a concrete new risk requires an earlier check. Do not count dev-server checks as offline/PWA evidence or old-route acceptance as new-route acceptance.
+For dependency changes, also run `npm audit`. Rendered acceptance requires recorded
+browser evidence; mobile-sensitive rendering/storage acceptance requires physical
+iOS verification. Group human checks on a complete integrated candidate, not each
+change. Missing manual evidence does not stop in-scope implementation or a clearly
+labelled development checkpoint after its required automated checks/review; keep
+that acceptance pending. Adoption, ordinary-entry activation and release retain
+their actual gates. Do not count dev-server checks as offline/PWA evidence or
+old-route acceptance as new-route acceptance.
 
 ## Checkpoints and Push
 

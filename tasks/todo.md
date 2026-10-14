@@ -21,12 +21,14 @@ Ordinary entry, broader profiles/converters, browser performance, physical-iPhon
 and offline acceptance remain open. Full details and earlier failures are in the
 [September checkpoint record](../docs/history/development-through-2026-09-21/tasks/todo.md).
 
-## Current connected unit — observe the existing candidate and close its next adoption gap
+## Current connected unit — complete the integrated candidate before grouped PO testing
 
-User outcome: preserve the tested candidate, establish how converted-file work
-behaves on the real browser/storage path, and choose the smallest missing adoption
-condition that advances ordinary use. This is delivery sequencing, not a reduced
-product scope, technology replacement or activation approval.
+User outcome: complete the practical open → Scene/Caption/media work → save/send →
+reopen workflow, using the accepted services and autonomous verification. PO
+correction on 2026-10-15: do not repeatedly request small manual tests or let PO
+availability sequence development. Group browser/device/user checks after a useful
+integrated candidate is ready; record remaining human evidence while continuing
+implementation. This does not reduce scope or pass adoption/release gates.
 
 PO requested suitable checkpoints to be pushed and development resumed on
 2026-10-15. Existing 89 commits were pushed normally to g0-baseline at c474f13;
@@ -46,22 +48,26 @@ the subsequent checkpoint's publication identity; do not copy a second commit lo
   checkpoint for the authorized g0-baseline commit/push, retaining no excluded work.
 - [x] Record the PO's manual completion of the instructed desktop GLB workflow
   and qualitative wait feedback; independently inspect the supplied backup below.
-- [ ] Observe Native conversion in the real browser and close the applicable
-  adoption conditions. Automated Browser access remains blocked by runtime
+- [ ] Complete the next integrated product composition below; Native browser
+  observation stays pending for the grouped acceptance, not a development blocker.
+  Automated Browser access remains blocked by runtime
   realpath EPERM on its protected browser-client.mjs; do not retry unchanged or
   substitute Node/HTTP results for browser acceptance.
 
-1. Use the existing static validation build for the grouped Native conversion,
-   editing, output and reopen observation. The PO completed the small GLB flow
-   below; do not repeat it merely to accumulate evidence. Before another optimization,
+1. Specify the typed Session/provider ports and complete one product UI composition
+   for open → Scene/Caption/media editing → save/send → reopen in the existing
+   nondefault candidate route. Preserve storage/command/package authority and
+   keep ordinary-home activation gated. Do not split this into PO tests for each
+   port or control. Before another latency optimization,
    measure the affected action's storage, validation, display refresh, package
    generation and browser handoff waits where distinguishable. Label measured and
    uninstrumented stages; repeated output discovery is a hypothesis, not a proven
    Chrome bottleneck. No new benchmark framework, synthetic host or numeric promise.
-2. Against existing 05 §13.2 and 03/G1-A/C records, close the exact missing
-   storage/profile/device acceptance condition. S1/S2 physical-iOS durability and
-   recovery evidence precedes adoption when required; it is not postponed until
-   all feature work or S3. Use the current candidate and existing evidence lanes.
+2. Continue the remaining approved feature/conversion work and automated failure
+   checks without waiting for Native or other small human tests. Gather the
+   applicable 05 §13.2 / 03 G1-A/C storage/profile/device evidence in a grouped
+   candidate batch. S1/S2 durability/recovery remains required before adoption;
+   pending evidence does not block other isolated implementation.
 3. Prepare the bounded ordinary-entry open/edit/save/reopen connection after the
    applicable gates; then complete ordinary-UI TEAM-FLOW-01 with two-round exchange,
    retained local work, explicit conflicts, restart/offline and physical iPhone.
@@ -69,8 +75,8 @@ the subsequent checkpoint's publication identity; do not copy a second commit lo
    parallel. Remaining conversion and format implementation stays in scope and
    follows its approved recipes; no former old-format-update bridge is revived.
 
-Exit: record the current build/nonprivate input scope, observed results and action timings,
-then select the next concrete adoption gap in this record. Keep functional,
+Exit: deliver the integrated candidate and group its remaining acceptance checks.
+Record build/input scope and observed results in this record. Keep functional,
 performance, device and offline outcomes separate. Synthetic I/O reductions and
 Node/recorded-DOM results do not complete browser/device adoption. Investigate
 data loss, incorrect save acknowledgment and operation-blocking faults immediately.
@@ -82,6 +88,42 @@ major architecture/product decision, a required managed permission, or a release
 destructive boundary. Ordinary entry and temporary iPhone HTTPS need their existing
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
+
+### Completed slice — visible wait feedback in the existing validation workflow
+
+PO requested continuation after tolerable ~2-second feedback. Outcome: pin
+confirmation and file output visibly remain in progress until the existing
+operation settles. Reuse working acknowledgment/file busy state, an unobtrusive
+indicator and existing result/recovery messages; preserve labels, input and
+duplicate-operation guards. Respect reduced motion; no invented percentage or
+download-completion claim (UI guidelines §§9.1–9.2). No storage, package, renderer,
+ordinary-entry, dependency or latency-guarantee change.
+
+Checks: focused deferred success/failure UI coverage, one serial checkpoint at
+the final source/test tree and independent diff review; record rendered evidence
+on the resulting candidate when available. Browser bootstrap's known EPERM is
+unchanged; do not retry/bypass it. Pending manual acceptance is recorded and does
+not hold subsequent implementation. Do not describe it as passed without evidence.
+
+- Source/test diff independently reviewed with no actionable finding. Typecheck,
+  full root (114 files / 2,334 cases, 21 existing todo; 548.20 s) and ordinary,
+  harness and static validation builds PASS; only existing build warnings remain.
+  Final source/test bytes are unchanged since review and execution.
+- PO reloaded the resulting candidate and confirmed both pin adjustment/confirmation
+  and file save show the indicator and clear it afterward. Reduced-motion behavior
+  is implemented but was not separately reported. Seven emitted files are served
+  byte-exact at the existing validation URL; new artifact manifest SHA-256 is
+  e99b1b41b64af1a6e47e0086c134ac3d2479ce62c33ffc8835c63c328c500d29.
+- Retained failure: the initial focused pair exceeded an existing one-second
+  wrong-file completion wait. That case passed alone and in the final full root;
+  no retry setting, timeout, assertion or production contract was relaxed.
+- Next Native input is prepared locally using the existing Native create/export
+  services and the nonprivate walkthrough GLB. The exact ZIP passes conversion,
+  fresh creation, independent memory-backed reopen and original-model byte checks.
+  This is generated-input/Node evidence only, with no new profile or public fixture.
+  PO cannot inspect Native conversion now; leave that browser observation pending.
+  Do not ask for another individual test; include it in the completed candidate's
+  consolidated acceptance.
 
 ## Product connection direction
 
@@ -128,10 +170,10 @@ contract review. CRDT, renderer and storage replacement lack measured justificat
   supersedes that estimate only for the newly observed path; it does not measure
   Native conversion, larger inputs or individual internal stages. Synthetic
   listing reductions are preserved in the September record.
-- Next input boundary: the existing local walkthrough fixture is a GLB, not a
-  Native backup. Native browser conversion needs an admitted nonprivate Native
-  backup from the existing Native UI; otherwise observe GLB edit/save/reopen and
-  retain Native-browser conversion as pending. No new fixture/profile adoption.
+- Original input boundary: the walkthrough fixture was a GLB, not a Native
+  backup. The completed wait-feedback slice above prepares a separate local
+  output of the existing Native writer; Native-browser conversion remains pending.
+  No new fixture/profile adoption follows from preparing that input.
 
 ## PO validation feedback — 2026-10-15
 

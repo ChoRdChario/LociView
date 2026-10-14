@@ -35,6 +35,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   const message = make('p'); message.className = 'lv-development-message';
   const working = make('section'), workingStatus = make('p'), retryWorking = make('button', '更新を再試行');
   working.setAttribute('aria-label', '更新の確認'); workingStatus.setAttribute('role', 'status');
+  working.className = 'lv-development-working'; workingStatus.className = 'lv-operation-status';
   retryWorking.type = 'button'; working.append(workingStatus, retryWorking);
   retryWorking.addEventListener('click', () => { session.retryWorking(); afterAction(); });
   message.setAttribute('role', 'status'); message.setAttribute('aria-live', 'polite');
@@ -107,12 +108,15 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   content.append(stage, sidebar); root.append(header, notice, working, message, content, footer, mediaViewer.root);
   function render() {
     if (disposed) return;
+    const checking = session.acknowledgment.state === 'checking', pinContext = session.pinContext();
     working.hidden = !session.workingBlock;
-    workingStatus.textContent = session.workingBlock ? `${session.workingBlock}${session.acknowledgment.error ? ` ${session.acknowledgment.error}` : ''}` : '';
+    workingStatus.dataset.busy = String(checking);
+    workingStatus.textContent = checking && pinContext.memory.mode ? 'ピンの位置を確定しています。' :
+      session.workingBlock ? `${session.workingBlock}${session.acknowledgment.error ? ` ${session.acknowledgment.error}` : ''}` : '';
     retryWorking.hidden = !session.canRetryWorking;
     // Keep editors mounted and draft DOM intact, but prevent overlapping native input.
     content.inert = header.inert = !!session.workingBlock;
-    content.setAttribute('aria-busy', String(session.acknowledgment.state === 'checking'));
+    content.setAttribute('aria-busy', String(checking));
     // Refresh even when a child retains input and refuses to render. Failures
     // precede readonly/idle, including memory-only and host-owned operations.
     const stored = session.savedStatus;
@@ -131,7 +135,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     const modelsOkay = modelList.render(session.modelContext());
     const materialOkay = material.render(session.materialContext());
     media.render(); mediaViewer.render(!root.hidden); sceneAuthoring.render(); captionDeletion.render(); assetDeletion.render(); modelAddition.render();
-    const pinsOkay = pin.render(session.pinContext()), includeOkay = include.render(session.includeContext()); coordinates.render(); modelUpdate.render(); placement.render();
+    const pinsOkay = pin.render(pinContext), includeOkay = include.render(session.includeContext()); coordinates.render(); modelUpdate.render(); placement.render();
     if (!detailOkay || !listOkay || !modelsOkay || !pinsOkay || !includeOkay || !materialOkay) {
       message.textContent = '入力中の状態を保持しています。操作を完了してから切り替えてください。';
       message.hidden = false; return;

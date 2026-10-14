@@ -7,6 +7,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   const root = document.createElement('section'), heading = document.createElement('h2'), actions = document.createElement('div'),
     commands = document.createElement('div'), status = document.createElement('p'), list = document.createElement('div'), select = document.createElement('input');
   heading.textContent = 'ファイル'; root.setAttribute('aria-label', 'ファイル'); status.setAttribute('role', 'status');
+  status.className = 'lv-operation-status';
   root.className = 'lv-file-output'; actions.className = 'lv-file-intents';
   select.type = 'file'; select.setAttribute('aria-label', '保存先のファイルを選択'); select.hidden = true;
   const nameField = document.createElement('label'), nameInput = document.createElement('input');
@@ -32,14 +33,15 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     try { a.click(); } finally { a.remove(); }
   };
   const handoffMessage = 'ダウンロードを開始しました。保存先で完了を確認してください。';
-  const perform = (action: () => Promise<unknown>, message: string, writes = true, consumeChoice = false, completed?: () => void) => {
+  const perform = (action: () => Promise<unknown>, message: string, writes = true, consumeChoice = false, completed?: () => void,
+    workingMessage = 'ファイルを確認しています。') => {
     if (disposed || busy || composing || otherBusy()) return;
     const s = session();
     if (writes && host.authority.readOnly) { feedback = '編集を開始してから実行してください。'; render(); return; }
     if (s?.interactionPending || s && s.acknowledgment.state !== 'idle' || host.hasPending()) {
       feedback = '入力・操作を確定するか、取り消してから実行してください。'; render(); return;
     }
-    busy = true; feedback = 'ファイルを確認しています。'; render(); changed();
+    busy = true; feedback = workingMessage; render(); changed();
     void (async () => {
       try { await action(); if (!disposed) { feedback = message; if (consumeChoice) resetChoice(); completed?.(); } }
       catch (error) { if (!disposed) feedback = error instanceof Error ? error.message : 'ファイル処理を完了できません。'; }
@@ -57,8 +59,9 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     // Keep that exact result available; retry must not silently create another job.
     resetChoice();
     await handoff(id);
-  }, handoffMessage);
+  }, handoffMessage, true, false, undefined, 'ファイルを作成しています。');
   const handoff = async (id: string) => {
+    feedback = 'ダウンロードを準備しています。'; render();
     try { await download(id); }
     catch (error) { history.open = true; throw Error(`${error instanceof Error ? error.message : 'ダウンロードを開始できません。'} 作成したファイルから再試行してください。`); }
   };
@@ -158,7 +161,8 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     create.disabled ||= purpose === 'contribution' && !chosen || purpose === 'review' && !sceneId || !!selected || !!cancellation;
     create.className = 'lv-file-primary';
     if (choicePending) button(commands, '選択を取り消す', () => { resetChoice(); render(); changed(); });
-    status.textContent = host.workspaceOutput.error || feedback;
+    status.dataset.busy = String(busy);
+    status.textContent = busy ? feedback : host.workspaceOutput.error || feedback;
     for (const [i, job] of host.workspaceOutput.jobs.entries()) {
       if (['cancelled', 'abandoned'].includes(job.state)) continue;
       const row = document.createElement('section'), text = document.createElement('p');

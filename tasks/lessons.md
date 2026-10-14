@@ -20,6 +20,10 @@ Read only the relevant topic, not every historical incident.
   use read-only agents for independent cause/recipe/contract work. Prioritize the
   missing adoption condition and keep remaining features in scope. New agent
   capability does not establish a throughput multiplier or waive device evidence.
+  PO correction later that day: build the integrated workflow before grouped
+  human testing. Do not turn each small improvement or fixture into a PO test
+  request. Pending human acceptance is recorded, not a dependency of continued
+  implementation; actual adoption/release gates and autonomous checks remain.
 - 2026-09-20: Runtime checks also have a UX cost. Measure the complete user
   action's I/O amplification before adding more validation. Reuse owned evidence
   within an explicitly bounded operation; retain input, write, publication and
@@ -67,7 +71,9 @@ Read only the relevant topic, not every historical incident.
 - Pin placement owns its gesture, including Shift+click. Blender-style camera
   input and accumulated Caption windows follow the accepted UI interaction rules.
 - Human tests require a usable position-editing UI, the exact served link and
-  steps stated in the tester's visible words. Retest only the affected boundary.
+  steps stated in the tester's visible words. Request them once a complete
+  workflow is ready, and group the affected checks; do not repeatedly interrupt
+  the PO for individual controls or use their availability to sequence development.
   Before recommending a file, run its exact bytes through that route's admission
   and creation/reopen path. A similarly named or synthetic in-test fixture is not
   evidence for the file handed to the tester; keep local-only samples out of public builds.
