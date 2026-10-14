@@ -1,9 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { editMaterialAppearance, materialInput, validateMaterialIntent } from '../src/domain/materialIntent';
+import { editMaterialAppearance, materialInput, materialForDisplay, validateMaterialIntent } from '../src/domain/materialIntent';
 
 const limits = { maxNodes: 1000, maxDepth: 12, maxStringScalars: 1000 };
 const intent = (appearance: unknown = {}, coverage: unknown = { policy: 'inherit' }, optics = 'inherit') => ({ appearance, compositing: { coverage, optics } });
 describe('decoded atomic material intent (not Project/source semantics/backend admission)', () => {
+  it('retains map2 inactive chroma parameters, but leaves map1 enabled semantics unchanged', () => {
+    const chroma = { keyColorSrgb: [0.123456, 0.2, 0.3], tolerance: 0.2, softness: 0.3, enabled: false };
+    const raw = intent({ chroma }, { policy: 'opaque' });
+    expect(() => validateMaterialIntent(raw, limits)).toThrow();
+    const value = validateMaterialIntent(raw, limits, 'map2');
+    expect(materialInput(value.appearance, 'chroma', 'map2')).toBe('off');
+    expect(materialInput(value.appearance, 'chroma')).toBe('on');
+    expect(materialForDisplay(value, 'map2').appearance).not.toHaveProperty('chroma');
+    expect(value.appearance.chroma).toEqual(chroma);
+    const enabled = editMaterialAppearance(value.appearance, { chroma: 'on' }, 'map2');
+    expect(enabled.chroma).toEqual({ ...chroma, enabled: true });
+    expect(editMaterialAppearance(enabled, { chroma: 'off' }, 'map2')).toEqual(value.appearance);
+    const inherited = validateMaterialIntent(intent(enabled), limits, 'map2');
+    expect(materialForDisplay(inherited, 'map2').appearance.chroma).toEqual({ keyColorSrgb: chroma.keyColorSrgb, tolerance: 0.2, softness: 0.3 });
+    expect(materialForDisplay(inherited)).toBe(inherited);
+    expect(() => validateMaterialIntent(intent({ chroma: { ...chroma, enabled: 'false' } }), limits, 'map2')).toThrow();
+    expect(() => validateMaterialIntent(intent({ chroma: { ...chroma, tolerance: -1 } }), limits, 'map2')).toThrow();
+  });
   it('clones/freezes unknown root, appearance, chroma and compositing information without reconstructing exact colors', () => {
     const raw = { ...intent({ baseColorSrgb: [0.123456, 0.5, 1], chroma: { keyColorSrgb: [0.123456, 0.234567, 0.345678], tolerance: 0.1, softness: 0, future: { mode: 'retained' } }, future: [1, '値'] }), future: { version: 2 } };
     const value = validateMaterialIntent(raw, limits); expect(value).toEqual(raw); expect(value).not.toBe(raw);

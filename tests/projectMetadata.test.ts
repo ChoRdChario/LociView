@@ -31,6 +31,66 @@ function field(source: ProjectMetadataSource, name: string) {
 }
 
 const originalBudget = { maxNodes: PACKAGE_LIMITS.inspectionNodes, maxWork: PACKAGE_LIMITS.inspectionWork };
+describe('explicit metadata semantic profiles', () => {
+  it('binds map2 to its bootstrap and rejects envelope relabelling or later header changes', () => {
+    const records = fixture(); records.schema.minor = 1;
+    const old = create(records).source;
+    const bootstrap = ProjectMetadataSource.bootstrap(records.schema, records.identity, limits, { semanticProfile: 'map2' });
+    const source = bootstrap.initialize(records);
+    expect(source.semanticProfile).toBe('map2');
+    expect(source.read().history.changes.flatMap(c => c.writes).some(w => w.path[0] === 'semanticProfile')).toBe(false);
+    expect(() => ProjectMetadataSource.reopen(old.originalChanges(), { ...old.proof,
+      envelope: { ...old.proof.envelope, adapterFormatVersion: 'lociview-automerge-atomic-map-2' } }, limits)).toThrow();
+    expect(() => ProjectMetadataSource.reopen(source.originalChanges(), { ...source.proof,
+      envelope: { ...source.proof.envelope, adapterFormatVersion: 'lociview-automerge-atomic-map-1' } }, limits)).toThrow();
+    for (const mutate of [
+      (d: Record<string, any>) => { d.semanticProfile = new A.ImmutableString('"map1"'); },
+      (d: Record<string, any>) => { delete d.semanticProfile; },
+      (d: Record<string, any>) => { d.semanticProfile = new A.ImmutableString('"map1"'); d.semanticProfile = new A.ImmutableString('"map2"'); },
+    ]) expect(() => ProjectMetadataSource.reopen(changed(source, mutate), source.proof, limits)).toThrow(/root-mutation/);
+    const inserted = ProjectMetadataSource.reopen(changed(old, d => { d.semanticProfile = new A.ImmutableString('"map2"'); }), old.proof, limits);
+    expect(inserted.semanticProfile).toBe('map1');
+    expect(() => ProjectMetadataSource.reopen(inserted.originalChanges(), { ...inserted.proof,
+      envelope: { ...inserted.proof.envelope, adapterFormatVersion: 'lociview-automerge-atomic-map-2' } }, limits)).toThrow();
+    const root = A.decodeChange(bootstrap.originalChanges()[0]!);
+    for (const transform of ['absent', 'wrong', 'duplicate'] as const) {
+      const copy = structuredClone(root), marker = copy.ops.find(op => op.obj === '_root' && op.key === 'semanticProfile')!;
+      if (transform === 'absent') copy.ops = copy.ops.filter(op => op !== marker);
+      else if (transform === 'wrong') (marker as { value: unknown }).value = '"map1"';
+      else copy.ops.push({ ...marker, pred: [] });
+      const bytes = A.encodeChange(copy), hash = A.decodeChange(bytes).hash;
+      expect(() => ProjectMetadataSource.reopen([bytes], { ...bootstrap.proof, envelope: { ...bootstrap.proof.envelope,
+        lineageProof: { ...bootstrap.proof.envelope.lineageProof, rootChangeHash: hash } } }, limits)).toThrow();
+    }
+    expect(() => ProjectMetadataSource.bootstrap({ major: 2, minor: 0 }, records.identity, limits, { semanticProfile: 'map2' })).toThrow();
+    expect(ProjectMetadataSource.fromFullSource(source.encodeFullSource(), source.proof, limits).originalChanges()).toEqual(source.originalChanges());
+  });
+
+  it('keeps old overwritten extensions opaque and validates map2 historical values', async () => {
+    const oldRecords = fixture(); oldRecords.schema.minor = 1;
+    oldRecords.assetsById[id('ast')].pinScale = 'opaque old value';
+    oldRecords.materialOverridesById[id('ovr')].appearance = { chroma: { keyColorSrgb: [0, 1, 0], tolerance: 0.2, softness: 0, enabled: 'opaque old value' } };
+    const old = create(oldRecords).source, originals = changed(old, d => { delete d.assetsById[id('ast')].pinScale;
+      d.materialOverridesById[id('ovr')].appearance = new A.ImmutableString('{}'); });
+    const reopened = ProjectMetadataSource.reopen(originals, old.proof, limits), oldSummary = summarizeFullHistory(await reopened.inspectOriginal(originalBudget));
+    expect(oldSummary.hasOpaque).toBe(true);
+    expect(oldSummary.fieldClasses).not.toContainEqual({ class: 'assetsById.pinScale', count: 1 });
+    expect(reopened.originalChanges()).toEqual(originals);
+    const records = fixture(); records.schema.minor = 1; records.assetsById[id('ast')].pinScale = 2;
+    records.captionsById[id('cap')].anchor = { kind: 'unplaced', ownerAssetId: id('ast') };
+    records.materialOverridesById[id('ovr')].appearance = { chroma: { keyColorSrgb: [0, 1, 0], tolerance: 0.2, softness: 0.5, enabled: false } };
+    const source = ProjectMetadataSource.bootstrap(records.schema, records.identity, limits, { semanticProfile: 'map2' }).initialize(records);
+    const inspection = await source.inspectOriginal(originalBudget), summary = summarizeFullHistory(inspection);
+    expect(summary.hasOpaque).toBe(false); expect(summary.fieldClasses).toContainEqual({ class: 'assetsById.pinScale', count: 1 });
+    expect(inspection.scalars.filter(w => w.path[0] === 'semanticProfile')).toHaveLength(1);
+    const invalidThenRestored = changed(source, d => { d.assetsById[id('ast')].pinScale = new A.ImmutableString('0');
+      d.assetsById[id('ast')].pinScale = new A.ImmutableString('2'); });
+    const restored = ProjectMetadataSource.reopen(invalidThenRestored, source.proof, limits);
+    const checked = await restored.inspectOriginal(originalBudget);
+    expect(() => summarizeFullHistory(checked)).toThrow(/summary-historical-value-unsupported/);
+    expect(restored.originalChanges()).toEqual(invalidThenRestored);
+  });
+});
 describe('complete original scalar inspection for package summaries', () => {
   it('includes both live model-binding candidates without choosing a winner', async () => {
     const records = fixture(), updated = createFixtureModel({ asset: id('ast'), assetFrame: id('frm', 2), representationFrame: id('frm', 4),
@@ -130,6 +190,25 @@ describe('complete original scalar inspection for package summaries', () => {
 });
 
 describe('production metadata source foundation (no persistence/activation claim)', () => {
+  it('reuses only a deeply immutable instance snapshot, never an edited or reopened source', async () => {
+    const { source } = create(), snapshot = source.read(), original = source.originalChanges();
+    expect(source.read()).toBe(snapshot); expect(source.token).toBe(snapshot.history.token);
+    const frozen = (value: unknown): void => {
+      if (value === null || typeof value !== 'object') return;
+      expect(Object.isFrozen(value)).toBe(true); Object.values(value).forEach(frozen);
+    };
+    frozen(snapshot);
+    expect(() => (snapshot.history.heads as string[]).push('foreign')).toThrow();
+    expect(() => { (snapshot.schema as Record<string, unknown>).major = 999; }).toThrow();
+    const edited = await source.prepareCaptionText(source.token, id('cap'), 'title', '次の記録');
+    expect(edited.read()).not.toBe(snapshot); expect(edited.token).not.toBe(source.token);
+    expect(source.read()).toBe(snapshot); expect(source.originalChanges()).toEqual(original);
+    const reopened = ProjectMetadataSource.reopen(edited.originalChanges(), edited.proof, limits);
+    expect(reopened.read()).not.toBe(edited.read()); expect(reopened.read()).toEqual(edited.read());
+    expect(source.appendOriginal(original)).toBe(source);
+    expect(() => ProjectMetadataSource.reopen(original, source.proof, { ...limits, maxOperations: 1 })).toThrow();
+  });
+
   it('creates an empty root and external proof, then all-map contents in a later original change', async () => {
     const { bootstrap, source } = create();
     const initial = raw(bootstrap);

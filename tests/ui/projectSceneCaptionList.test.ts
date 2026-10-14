@@ -22,8 +22,8 @@ function change(context: CaptionListContext, plan: CaptionListPlan): CaptionList
   expect(plan.kind).toBe('change'); if (plan.kind !== 'change') throw Error('not a change');
   expect(captionListPlanIsCurrent(plan, context)).toBe(true); return { ...context, memory: plan.memory };
 }
-function host(initial = fixture()) {
-  const document = new RecordedDocument(); const plans: CaptionListPlan[] = []; const compositions: boolean[] = [];
+function host(initial = fixture(), document = new RecordedDocument()) {
+  const plans: CaptionListPlan[] = []; const compositions: boolean[] = [];
   let context = initial;
   const controls = createCaptionListControls(document.asDocument(), plan => {
     plans.push(plan);
@@ -34,10 +34,110 @@ function host(initial = fixture()) {
   const status = root.children[1]!, reveal = root.children[2]!;
   const colorBar = root.children[4]!, colorChoices = colorBar.children[1]!, all = colorBar.children[2]!, list = root.children[5]!;
   return { document, controls, root, search, status, reveal, colorBar, colorChoices, all, list, plans, compositions,
-    get context() { return context; }, render(next: CaptionListContext) { if (controls.render(next)) context = next; } };
+    get context() { return context; }, render(next: CaptionListContext) {
+      const previous = context; context = next; if (!controls.render(next)) context = previous;
+    } };
+}
+
+// Inject dimensions into the existing recorder; this is not native layout evidence.
+class MeasuredListDocument extends RecordedDocument {
+  width = 300; rowHeight = 44; resized = () => {}; disconnected = false;
+  defaultView;
+  constructor() {
+    super(); const owner = this;
+    this.defaultView = { ResizeObserver: class {
+      constructor(callback: () => void) { owner.resized = callback; }
+      observe() {} unobserve() {} disconnect() { owner.disconnected = true; }
+    } };
+  }
+  override createElement(tag: string) {
+    const node = super.createElement(tag);
+    if (tag === 'ul') node.clientHeight = 160;
+    Object.defineProperty(node, 'clientWidth', { get: () => this.width });
+    Object.defineProperty(node, 'offsetHeight', { get: () => node.className === 'lv-caption-row' ? this.rowHeight : parseFloat(node.style.height ?? '0') });
+    Object.defineProperty(node, 'offsetTop', { get: () => node.parent?.children.slice(0, node.parent.children.indexOf(node)).reduce((sum, child) => sum + child.offsetHeight, 0) ?? 0 });
+    return node;
+  }
+}
+function largeFixture() {
+  const base = fixture(); if (base.source.kind !== 'ready') throw Error('fixture');
+  return { ...base, source: { ...base.source, captions: Array.from({ length: 10_000 }, (_, i) => ({
+    ...item(`cap_${i.toString(16).padStart(32, '0')}`, `記録 ${i}`, i % 2 ? blue : red),
+    ...(i === 9999 ? { pin: 'needsReview' as const } : {}),
+  })) }, memory: { ...base.memory, selectedCaptionId: null, listScrollTop: 0 } };
 }
 
 describe('disconnected Caption list contracts (not browser/render/storage evidence)', () => {
+  it('windows 10k logical records while revealing distant selections, preserving focus and searching all records', () => {
+    const source = largeFixture(), before = structuredClone(source), doc = new MeasuredListDocument(), h = host(source, doc);
+    const mounted = () => h.list.children.filter(row => row.className === 'lv-caption-row');
+    expect(mounted().length).toBeLessThan(40); expect(h.root.children[3]!.textContent).toBe('10000 / 10000件');
+    const first = mounted()[0]!, focus = first.children[0]!; focus.focus();
+    h.list.scrollTop = 500_000; h.list.fire('scroll');
+    expect(mounted()).toContain(first); expect(h.document.activeElement).toBe(focus); expect(mounted().length).toBeLessThan(40);
+    h.search.focus();
+    const last = source.source.captions[9999]!;
+    h.render({ ...h.context, memory: { ...h.context.memory, selectedCaptionId: last.id } }); h.controls.revealSelected();
+    const row = mounted().find(row => row.attributes.get('aria-posinset') === '10000')!;
+    expect(row).toBeDefined(); expect(row.attributes.get('aria-setsize')).toBe('10000');
+    expect(row.offsetTop).toBeGreaterThanOrEqual(h.list.scrollTop);
+    expect(row.offsetTop + row.offsetHeight).toBeLessThanOrEqual(h.list.scrollTop + h.list.clientHeight);
+    expect(row.children[1]!.textContent).toBe('状態を確認'); expect(row.children[1]!.hidden).toBe(false);
+    h.search.fire('compositionstart'); h.search.value = '記録 9999'; h.search.fire('input');
+    expect(h.context.memory.search).toBe(''); h.search.fire('compositionend');
+    expect(mounted()).toHaveLength(1); expect(h.root.children[3]!.textContent).toBe('1 / 10000件');
+    expect(source).toEqual(before); h.controls.dispose(); expect(doc.disconnected).toBe(true);
+  });
+
+  it('reaches virtual rows by keyboard, keeps row actions reachable and leaves the list at true ends', () => {
+    const h = host(largeFixture(), new MeasuredListDocument());
+    const first = h.list.children.find(row => row.className === 'lv-caption-row')!.children[0]!; first.focus();
+    const key = (key: string, shiftKey = false) => { let prevented = false;
+      h.list.fire('keydown', { key, shiftKey, preventDefault() { prevented = true; } }); return prevented; };
+    expect(key('Tab', true)).toBe(false);
+    expect(key('End')).toBe(true); const last = h.document.activeElement!.parent!;
+    expect(last.attributes.get('aria-posinset')).toBe('10000');
+    expect(key('Tab')).toBe(false); last.children[1]!.focus(); expect(key('Tab')).toBe(false);
+    last.children[0]!.focus(); expect(key('Tab', true)).toBe(true);
+    expect(h.document.activeElement!.parent!.attributes.get('aria-posinset')).toBe('9999');
+    expect(key('Home')).toBe(true); expect(h.document.activeElement!.parent!.attributes.get('aria-posinset')).toBe('1');
+    for (let i = 0; i < 35; i++) expect(key('ArrowDown')).toBe(true);
+    expect(h.document.activeElement!.parent!.attributes.get('aria-posinset')).toBe('36');
+    h.controls.dispose();
+  });
+
+  it('keeps a visible anchor when measured heights change and permits wrapped rows taller than the list', () => {
+    const doc = new MeasuredListDocument(), h = host(largeFixture(), doc);
+    h.list.scrollTop = 500_000; h.list.fire('scroll');
+    const rowAtTop = () => h.list.children.find(row => row.className === 'lv-caption-row' && row.offsetTop + row.offsetHeight > h.list.scrollTop)!;
+    const anchor = rowAtTop(), inside = h.list.scrollTop - anchor.offsetTop;
+    doc.width = 160; doc.rowHeight = 240; doc.resized();
+    expect(rowAtTop() === anchor).toBe(true); expect(h.list.scrollTop - anchor.offsetTop).toBe(inside);
+    const id = largeFixture().source.captions[9999]!.id;
+    h.render({ ...h.context, memory: { ...h.context.memory, selectedCaptionId: id } }); h.controls.revealSelected();
+    const last = h.list.children.find(row => row.attributes.get('aria-posinset') === '10000')!;
+    expect(last.offsetHeight).toBe(240); expect(h.list.scrollTop).toBe(last.offsetTop);
+    h.controls.dispose();
+  });
+
+  it('restores the same record across Scene/filter and hidden-tab roundtrips, including a changed width', () => {
+    const source = largeFixture(), doc = new MeasuredListDocument(), h = host(source, doc);
+    h.list.scrollTop = 500_000; h.list.fire('scroll');
+    const rowAtTop = () => h.list.children.find(row => row.className === 'lv-caption-row' && row.offsetTop + row.offsetHeight > h.list.scrollTop)!;
+    const position = rowAtTop().attributes.get('aria-posinset'), top = h.list.scrollTop;
+    h.search.value = '記録 9999'; h.search.fire('input'); h.search.value = ''; h.search.fire('input');
+    expect(rowAtTop().attributes.get('aria-posinset')).toBe(position); expect(h.list.scrollTop).toBe(top);
+    h.list.clientHeight = 0; doc.width = 0; h.list.scrollTop = 0; h.render(h.context);
+    h.list.clientHeight = 160; doc.width = 300; h.render(h.context);
+    expect(rowAtTop().attributes.get('aria-posinset')).toBe(position);
+    const original = h.context;
+    h.render({ ...original, source: { ...source.source, sceneId: 'other', captions: [item(b, 'other', red)] },
+      memory: { ...original.memory, listScrollTop: 0 } });
+    doc.width = 180; doc.rowHeight = 80; h.render(original); h.render(h.context);
+    expect(rowAtTop().attributes.get('aria-posinset')).toBe(position);
+    h.controls.dispose();
+  });
+
   it('matches title OR body without legacy owner classification hiding records', () => {
     let context = fixture(); const before = structuredClone(context);
     context = change(context, planCaptionList(context, { kind: 'search', query: '  gear ' }));

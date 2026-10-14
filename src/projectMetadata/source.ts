@@ -2,12 +2,13 @@ import * as A from '@automerge/automerge/slim';
 import { inspectProjectCandidates } from '../domain/projectCandidates';
 import { admitProjectRecords, checkProjectHeader, projectRecordMaps } from '../domain/projectRecords';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
+import { projectSemanticProfile, type ProjectSemanticProfile } from '../domain/projectProfile';
 import { checkMutableField } from '../domain/projectMutableFields';
 import { immutableKinds, object, same } from '../domain/projectGraphSupport';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import type { ProjectProviderRead } from '../scene/projectProvider';
 import { planMetadataEdit, type MetadataEdit } from './commands';
-import { adapterFormatVersion, checkedChanges, checkedProof, checkLimits, fail, inspectPhysical, inspectOriginalSource, originalEntryWitness, scalar, MetadataSourceError,
+import { adapterFormatVersion, adapterFormatVersion2, metadataSemanticProfile, checkedChanges, checkedProof, checkLimits, fail, inspectPhysical, inspectOriginalSource, originalEntryWitness, scalar, MetadataSourceError,
   type MetadataLimits, type MetadataProof, type PhysicalDoc, type OriginalInspectionBudget } from './format';
 
 export type { MetadataLimits, MetadataProof } from './format';
@@ -17,18 +18,21 @@ export type { MetadataLimits, MetadataProof } from './format';
  * interactive session. Callers initialize local Wasm before using this module.
  */
 export class ProjectMetadataSource {
-  private constructor(private readonly doc: PhysicalDoc, readonly proof: MetadataProof, private readonly limits: MetadataLimits) {}
+  private constructor(private readonly doc: PhysicalDoc, readonly proof: MetadataProof, private readonly limits: MetadataLimits,
+    private readonly snapshot: ReturnType<typeof inspectPhysical>) {}
 
-  static bootstrap(schema: JsonObject, identity: JsonObject, requested: MetadataLimits, options?: { time: 0 }): ProjectMetadataSource {
+  static bootstrap(schema: JsonObject, identity: JsonObject, requested: MetadataLimits, options?: { time?: 0; semanticProfile?: ProjectSemanticProfile }): ProjectMetadataSource {
+    const profile = projectSemanticProfile(options?.semanticProfile);
     const limits = checkLimits(requested), s = cloneCanonicalValue(schema, limits) as JsonObject,
       i = cloneCanonicalValue(identity, limits) as JsonObject;
-    checkProjectHeader(new ProjectRecordFields(), 'schema', s);
+    checkProjectHeader(new ProjectRecordFields(profile), 'schema', s);
     checkProjectHeader(new ProjectRecordFields(), 'identity', i);
-    const doc = A.change(A.init<Record<string, any>>(), options ?? {}, draft => {
+    const doc = A.change(A.init<Record<string, any>>(), options?.time === 0 ? { time: 0 } : {}, draft => {
       draft.schema = scalar(s, limits); draft.identity = scalar(i, limits); draft.project = {};
+      if (profile === 'map2') draft.semanticProfile = scalar('map2', limits);
       for (const map of Object.keys(projectRecordMaps)) draft[map] = {};
     });
-    const proof: MetadataProof = { identity: i, envelope: { adapter: 'automerge', adapterFormatVersion,
+    const proof: MetadataProof = { identity: i, envelope: { adapter: 'automerge', adapterFormatVersion: profile === 'map2' ? adapterFormatVersion2 : adapterFormatVersion,
       lineageProof: { kind: 'automerge-root-change-v1', rootChangeHash: A.getHeads(doc)[0]! } } };
     return ProjectMetadataSource.validated(doc, proof, limits);
   }
@@ -49,8 +53,8 @@ export class ProjectMetadataSource {
   }
 
   private static validated(doc: PhysicalDoc, proof: MetadataProof, limits: MetadataLimits): ProjectMetadataSource {
-    const p = checkedProof(proof, limits); inspectPhysical(doc, p, limits);
-    return new ProjectMetadataSource(doc, p, limits);
+    const p = checkedProof(proof, limits), snapshot = inspectPhysical(doc, p, limits);
+    return new ProjectMetadataSource(doc, p, limits, snapshot);
   }
 
   /** Complete pinned metadata encoding, not a package writer or durable save. */
@@ -66,10 +70,13 @@ export class ProjectMetadataSource {
     } catch (error) { if (error instanceof MetadataSourceError) throw error; return fail('full-source-invalid'); }
   }
 
-  read() { return inspectPhysical(this.doc, this.proof, this.limits); }
+  // This instance owns an immutable doc. Storage reads still reopen and validate
+  // a new instance; token access must not traverse the same history each time.
+  read() { return this.snapshot; }
+  get semanticProfile(): ProjectSemanticProfile { return metadataSemanticProfile(this.proof.envelope.adapterFormatVersion); }
   /** Complete original scalar evidence, not a package or a storage acknowledgment. */
   inspectOriginal(budget: OriginalInspectionBudget) { return inspectOriginalSource(this.doc, this.proof, this.limits, budget); }
-  get token(): string { return this.read().history.token; }
+  get token(): string { return this.snapshot.history.token; }
   get heads(): string[] { return A.getHeads(this.doc).sort(); }
   originalChanges(): Uint8Array[] { return A.getAllChanges(this.doc).map(b => b.slice()); }
 
@@ -86,7 +93,7 @@ export class ProjectMetadataSource {
   /** Bootstrap is withheld from Project readiness. Initialize in one later change. */
   initialize(records: unknown, options?: { time: 0 }): ProjectMetadataSource {
     if (A.getAllChanges(this.doc).length !== 1) fail('already-initialized');
-    const admitted = admitProjectRecords(records, this.limits);
+    const admitted = admitProjectRecords(records, this.limits, this.semanticProfile);
     if (admitted.kind !== 'valid-records') return fail('initial-records');
     const r = admitted.records, source = this.read();
     if (!same(r.identity, this.proof.identity) || !same(r.schema, source.schema)) fail('identity');
@@ -193,7 +200,7 @@ export class ProjectMetadataSource {
     }
     if (inspection.issues.some(i => i.path[0] === 'captionsById' && i.path[1] === captionId &&
       (i.path.length === 2 || required.includes(i.path[2]!)) && ['invalid', 'review', 'orphan'].includes(i.kind))) fail('caption-unresolved');
-    for (const field of names) checkMutableField(new ProjectRecordFields(), 'captionsById', field, edits[field]!);
+    for (const field of names) checkMutableField(new ProjectRecordFields(this.semanticProfile), 'captionsById', field, edits[field]!);
     if (transactionId !== undefined && !/^[0-9a-f]{32}$/.test(transactionId)) fail('transaction-id');
     const doc = A.change(A.clone(this.doc), transactionId ? { message: `lociview:transaction:v1:${transactionId}` } : {},
       draft => { for (const field of names) draft.captionsById[captionId][field] = scalar(edits[field]!, this.limits); });

@@ -114,8 +114,10 @@ export function createMetadataConflictControls(document: Document, host: Pick<Sa
           if (checkedView) value = viewDescription(provider, recordId, fieldName, c.value.kind === 'value' ? c.value.value : undefined, checkedView.sceneId);
           else if (checked && fieldName === 'anchor' && c.value.kind === 'value') {
             const anchor = c.value.value as unknown as Anchor;
-            const owner = anchor.kind === 'asset' ? provider.details.mutable.assetsById[anchor.assetId]?.label : undefined;
-            value = anchor.kind === 'asset' ? `${owner?.kind === 'value' ? owner.value : 'モデル名を確認'} — 位置 ${anchor.positionAsset.join(' / ')}` :
+            const ownerId = anchor.kind === 'asset' ? anchor.assetId : anchor.kind === 'unplaced' ? anchor.ownerAssetId : undefined;
+            const owner = ownerId === undefined ? undefined : provider.details.mutable.assetsById[ownerId]?.label;
+            value = anchor.kind === 'unplaced' ? ownerId === undefined ? '未配置・モデル未指定' : `未配置・所有モデル ${owner?.kind === 'value' ? owner.value : 'モデル名を確認'}`
+              : anchor.kind === 'asset' ? `${owner?.kind === 'value' ? owner.value : 'モデル名を確認'} — 位置 ${anchor.positionAsset.join(' / ')}` :
               `プロジェクト内の位置 ${anchor.positionProject.join(' / ')}`;
             const projection = anchor.kind === 'asset' ? provider.resources.assets[anchor.assetId]?.projection : undefined;
             if (anchor.kind === 'asset' && (projection?.kind !== 'value' || !projection.value.anchorCompatibilityIds.includes(anchor.authoredAnchorCompatibilityId)))
@@ -149,8 +151,8 @@ export function createMetadataConflictControls(document: Document, host: Pick<Sa
               const anchor = candidate.value.value as unknown as Anchor;
               const model = anchor.kind === 'asset' && !session.hiddenAssetIds.includes(anchor.assetId)
                 ? session.composition.assets.find(m => m.assetId === anchor.assetId) : undefined;
-              const available = anchor.kind === 'project' ? anchor.projectFrameId === session.snapshot.resources.projectFrameId : model?.projection.assetFrameId === anchor.assetFrameId;
-              previewNote.textContent = available ? '比較用の位置です。まだ適用していません。' : 'モデルが非表示、または座標の基準を確認できないため、位置を表示できません。';
+              const available = anchor.kind === 'project' ? anchor.projectFrameId === session.snapshot.resources.projectFrameId : anchor.kind === 'asset' ? model?.projection.assetFrameId === anchor.assetFrameId : false;
+              previewNote.textContent = anchor.kind === 'unplaced' ? '未配置の候補です。位置はありません。' : available ? '比較用の位置です。まだ適用していません。' : 'モデルが非表示、または座標の基準を確認できないため、位置を表示できません。';
               if (available) session.setCaptionComparison({ token: current.token, captionId: recordId, anchor, label: `候補 ${index + 1}（未確定）` });
             }
           }

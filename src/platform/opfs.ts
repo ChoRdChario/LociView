@@ -166,7 +166,12 @@ export class OpfsFS implements WorkspaceFS {
       for await (const [name, handle] of iter) {
         const p = base === '' ? name : `${base}/${name}`;
         if (handle.kind === 'directory') {
-          await walk(handle as FileSystemDirectoryHandle, p);
+          // list() uses a lexical prefix (also partial names), not just a
+          // directory path. Only these branches can contain matching files.
+          // Never enumerate other projects/old runs for a scoped receipt read.
+          const branch = `${p}/`;
+          if (prefix.startsWith(branch) || branch.startsWith(prefix))
+            await walk(handle as FileSystemDirectoryHandle, p);
         } else if (p.startsWith(prefix)) {
           out.push(p);
         }

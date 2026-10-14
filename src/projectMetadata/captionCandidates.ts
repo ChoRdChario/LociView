@@ -9,7 +9,7 @@ export type CaptionChoiceField = 'anchor' | 'colorSrgb';
 /** Whole atomic candidates, never a projected winner or a partly reconstructed anchor. */
 export function captionFieldCandidates(provider: Extract<ProjectProviderRead, { kind: 'scene-provider' }>,
   captionId: string, field: CaptionChoiceField, limits: MetadataLimits) {
-  const guard = new ProjectRecordFields(); guard.id(captionId, 'cap', []);
+  const guard = new ProjectRecordFields(provider.semanticProfile); guard.id(captionId, 'cap', []);
   if (!['anchor', 'colorSrgb'].includes(field)) fail('caption-resolution-field');
   const reader = candidateReader(provider, limits); reader.active('captionsById', captionId);
   const source = reader.records.get('captionsById')?.get(captionId)?.get(field);

@@ -119,7 +119,10 @@ interface OpenPortablePackage {
   readonly files: ReadonlyMap<string, FileEntry>;
   readonly inspection: NativePortableInspectionV1;
   readonly snapshotText: string;
+  readonly manifestBytes: Uint8Array;
+  readonly snapshotBytes: Uint8Array;
 }
+class NativePortableManifestAbsent extends Error {}
 
 /** Prevent a forged central-directory length from becoming one giant read. */
 class BoundedBlobReader extends BlobReader {
@@ -348,8 +351,8 @@ function inspectEntryNamespace(entries: readonly Entry[]): Map<string, FileEntry
   return files;
 }
 
-async function readMetadataEntry(entry: FileEntry, signal?: AbortSignal): Promise<Uint8Array> {
-  if (entry.uncompressedSize > METADATA_ENTRY_LIMIT_BYTES) {
+async function readMetadataEntry(entry: FileEntry, signal?: AbortSignal, maxBytes = METADATA_ENTRY_LIMIT_BYTES): Promise<Uint8Array> {
+  if (entry.uncompressedSize > Math.min(maxBytes, METADATA_ENTRY_LIMIT_BYTES)) {
     throw new Error(`native portable package: metadata entry exceeds ${METADATA_ENTRY_LIMIT_BYTES} bytes`);
   }
   const bytes = await entry.getData(new Uint8ArrayWriter(), {
@@ -440,20 +443,22 @@ function crossCheckManifestAndSnapshot(
   return { representationByteLength, mediaByteLength };
 }
 
-async function openPortablePackage(blob: Blob, signal?: AbortSignal): Promise<OpenPortablePackage> {
+async function openPortablePackage(blob: Blob, signal?: AbortSignal, conversionLimits?: { maxFileBytes: number; maxJsonBytes: number; maxItems: number }): Promise<OpenPortablePackage> {
   if (!Number.isSafeInteger(blob.size) || blob.size < 1) throw new Error('native portable package: file is empty or too large');
   const reader = new ZipReader(new BoundedBlobReader(blob), { strictness: 'strict' });
   try {
     const files = inspectEntryNamespace(await reader.getEntries({ strictness: 'strict', checkAmbiguity: true }));
     const manifestEntry = files.get(NATIVE_PORTABLE_MANIFEST_ENTRY);
-    if (manifestEntry === undefined) throw new Error('native portable package: manifest entry is missing');
-    const manifestBytes = await readMetadataEntry(manifestEntry, signal);
+    if (manifestEntry === undefined) throw new NativePortableManifestAbsent('native portable package: manifest entry is missing');
+    if (conversionLimits && (blob.size > conversionLimits.maxFileBytes || files.size > conversionLimits.maxItems))
+      throw new Error('変換するファイルが検証の上限を超えています。');
+    const manifestBytes = await readMetadataEntry(manifestEntry, signal, conversionLimits?.maxJsonBytes);
     const manifest = parsePortableManifestV1(fatalUtf8Decoder.decode(manifestBytes));
     const snapshotEntry = files.get(NATIVE_PORTABLE_SNAPSHOT_ENTRY);
     if (snapshotEntry === undefined || snapshotEntry.uncompressedSize !== manifest.nativeSnapshot.byteLength) {
       throw new Error('native portable package: snapshot entry is missing or has the wrong size');
     }
-    const snapshotBytes = await readMetadataEntry(snapshotEntry, signal);
+    const snapshotBytes = await readMetadataEntry(snapshotEntry, signal, conversionLimits?.maxJsonBytes);
     const snapshotDigest = digestNativeBytes(snapshotBytes);
     if (
       snapshotDigest.byteLength !== manifest.nativeSnapshot.byteLength ||
@@ -469,6 +474,7 @@ async function openPortablePackage(blob: Blob, signal?: AbortSignal): Promise<Op
       files,
       inspection: { manifest, snapshot, packageByteLength: blob.size, ...lengths },
       snapshotText,
+      manifestBytes, snapshotBytes,
     };
   } catch (error) {
     await reader.close().catch(() => {});
@@ -486,6 +492,28 @@ export async function inspectNativePortablePackageV1(
   } finally {
     await opened.reader.close().catch(() => {});
   }
+}
+
+/** Read-only conversion adapter. Null means no Native manifest, never failed Native admission. */
+export async function readNativePortableConversionV1(blob: Blob, limits: { maxFileBytes: number; maxJsonBytes: number; maxItems: number }) {
+  if (!(blob instanceof Blob) || blob.size <= 0) throw new Error('変換するファイルを選択してください。');
+  let opened: OpenPortablePackage;
+  try { opened = await openPortablePackage(blob, undefined, limits); }
+  catch (error) { if (error instanceof NativePortableManifestAbsent) return null; throw error; }
+  try {
+    if (opened.files.size > limits.maxItems || opened.manifestBytes.length > limits.maxJsonBytes || opened.snapshotBytes.length > limits.maxJsonBytes ||
+      opened.inspection.representationByteLength + opened.inspection.mediaByteLength > limits.maxFileBytes)
+      throw new Error('変換する内容が検証の上限を超えています。');
+    const bodies = new Map<string, Uint8Array>();
+    for (const item of [...opened.inspection.manifest.representations, ...opened.inspection.manifest.media ?? []]) {
+      const bytes = await opened.files.get(item.entry)!.getData(new Uint8ArrayWriter(), {
+        checkSignature: true, checkAmbiguity: true, checkOverlappingEntry: true, strictness: 'strict',
+      });
+      if (bytes.length !== item.byteLength) throw new Error('変換する本体の大きさが一致しません。');
+      bodies.set(item.entry, bytes);
+    }
+    return { ...opened.inspection, manifestBytes: opened.manifestBytes, snapshotBytes: opened.snapshotBytes, bodies };
+  } finally { await opened.reader.close(); }
 }
 
 function currentHeapBytes(): number | null {

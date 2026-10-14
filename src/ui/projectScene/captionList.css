@@ -22,7 +22,8 @@
 .lv-caption-disc { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 1px solid #504d4a; }
 .lv-caption-disc > span { color: #312f2d; background: #faf9f8; border-radius: 50%; width: 18px; line-height: 18px; text-align: center; }
 .lv-caption-color[aria-pressed="true"] { box-shadow: inset 0 0 0 1px #413d39; }
-.lv-caption-list { position: relative; flex: 1 1 auto; min-height: 0; overflow: auto; margin: 0; padding: 2px; list-style: none; overscroll-behavior: contain; }
+.lv-caption-list { position: relative; flex: 1 1 auto; min-height: 0; overflow: auto; margin: 0; padding: 2px; list-style: none; overscroll-behavior: contain; overflow-anchor: none; }
+.lv-caption-spacer { margin: 0; padding: 0; border: 0; pointer-events: none; }
 .lv-caption-row { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 0; border-bottom: 1px solid #d2cfcb; }
 .lv-caption-browser .lv-caption-select { flex: 1 1 100%; display: grid; grid-template-columns: 12px minmax(0, 1fr); column-gap: 8px; text-align: left; border-left-width: 3px; }
 .lv-caption-title { font-weight: 500; overflow-wrap: anywhere; }

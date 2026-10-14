@@ -3,6 +3,7 @@ import { canonical, GraphInspection, immutableDigest, immutableKinds, object, sa
 import { inspectModelGraph } from './projectModelGraph';
 import { inspectResourceGraph } from './projectResourceGraph';
 import type { JsonObject, ValueLimits } from './values';
+import type { ProjectSemanticProfile } from './projectProfile';
 
 export type ProjectGraphInspection = Readonly<{ kind: 'rejected'; input: 'current' | 'prior'; issue: Extract<ProjectRecordsAdmission, { kind: 'rejected' }>['issue'] }> |
   Readonly<{ kind: 'record-graph-inspection'; records: JsonObject; hasUnknownFields: boolean; issues: readonly GraphIssue[];
@@ -14,9 +15,9 @@ export type ProjectGraphInspection = Readonly<{ kind: 'rejected'; input: 'curren
  * This reads whole current records, not CRDT winners. The eventual adapter must
  * preserve/check all candidates and immutable provenance before any projection.
  */
-export async function inspectProjectGraph(input: unknown, limits: ValueLimits, priorInput?: unknown): Promise<ProjectGraphInspection> {
-  const current = admitProjectRecords(input, limits); if (current.kind === 'rejected') return Object.freeze({ ...current, input: 'current' });
-  const prior = priorInput === undefined ? undefined : admitProjectRecords(priorInput, limits);
+export async function inspectProjectGraph(input: unknown, limits: ValueLimits, priorInput?: unknown, profile: ProjectSemanticProfile = 'map1'): Promise<ProjectGraphInspection> {
+  const current = admitProjectRecords(input, limits, profile); if (current.kind === 'rejected') return Object.freeze({ ...current, input: 'current' });
+  const prior = priorInput === undefined ? undefined : admitProjectRecords(priorInput, limits, profile);
   if (prior?.kind === 'rejected') return Object.freeze({ ...prior, input: 'prior' });
   const g = new GraphInspection(current.records);
   if (prior) inspectPrior(g, prior.records);

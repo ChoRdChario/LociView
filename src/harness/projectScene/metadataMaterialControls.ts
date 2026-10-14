@@ -89,7 +89,7 @@ export function createMetadataMaterialControls(document: Document, host: Pick<Sa
               captured = current.command ?? command();
               const checked = selectedMaterialResolution(p, captured, host.limits);
               if (!slot) throw Error('設定するモデルと材質を確認してください。');
-              for (const intent of checked.intents.values()) { const issue = validationMaterialIssue(slot, intent); if (issue) throw Error(issue); }
+              for (const intent of checked.intents.values()) { const issue = validationMaterialIssue(slot, intent, p.semanticProfile); if (issue) throw Error(issue); }
               current.command = captured;
             } catch (error) {
               message.textContent = error instanceof Error ? error.message : '選択した組み合わせを確認してください。'; render(); changed(); return;

@@ -2,6 +2,7 @@ import { parseJsonWithoutDuplicateMembers } from '../core/json';
 import { canonical } from '../domain/projectGraphSupport';
 import { cloneCanonicalValue, type JsonValue } from '../domain/values';
 import type { ProjectWorkspaceFS, ProjectMutationAuthority } from '../platform/fs';
+import type { MetadataStorageFactory } from './repository';
 import { fail, type MetadataLimits } from './format';
 
 export const equalBytes = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((v, i) => v === b[i]);
@@ -44,6 +45,21 @@ export async function writeReceipt(fs: ProjectWorkspaceFS, path: string, value: 
 // Serialize all service instances sharing the same project lease, not just one UI instance.
 const queues = new WeakMap<ProjectMutationAuthority, Promise<unknown>>();
 const writeFences = new WeakMap<ProjectWorkspaceFS, () => Promise<void>>();
+export interface MetadataReadPorts { readonly fs: ProjectWorkspaceFS; readonly factory?: MetadataStorageFactory }
+type ReadOperation = <T>(action: (ports: MetadataReadPorts) => Promise<T>) => Promise<T>;
+const readOperations = new WeakMap<ProjectWorkspaceFS, { factory: MetadataStorageFactory; run: ReadOperation }>();
+/** Internal generation binding; does not grant writes or replace a root lease. */
+export function registerReadOperation(fs: ProjectWorkspaceFS, factory: MetadataStorageFactory, run: ReadOperation): void {
+  if (readOperations.has(fs)) fail('read-operation-already-bound');
+  readOperations.set(fs, { factory, run });
+}
+export function withMetadataRead<T>(fs: ProjectWorkspaceFS, factory: MetadataStorageFactory | undefined,
+  action: (ports: MetadataReadPorts) => Promise<T>): Promise<T> {
+  const operation = readOperations.get(fs);
+  if (!operation) return action({ fs, factory });
+  if (factory && operation.factory !== factory) return Promise.reject(Error('generation-storage-binding'));
+  return operation.run(action);
+}
 /** Internal scoped-capability hook; does not grant or replace the root lease. */
 export function registerWriteFence(fs: ProjectWorkspaceFS, fence: () => Promise<void>): void {
   if (writeFences.has(fs)) fail('write-fence-already-bound');

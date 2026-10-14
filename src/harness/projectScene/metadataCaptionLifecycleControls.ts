@@ -42,8 +42,10 @@ export function createMetadataCaptionLifecycleControls(document: Document, host:
             for (const [i, c] of f.candidates.entries()) {
               let text = c.value.kind === 'value' && typeof c.value.value === 'string' ? c.value.value : '未設定';
               if (name === 'anchor' && c.value.kind === 'value') {
-                const anchor = c.value.value as unknown as Anchor, owner = anchor.kind === 'asset' ? p.details.mutable.assetsById[anchor.assetId]?.label : undefined;
-                text = anchor.kind === 'project' ? `プロジェクト内の位置 ${anchor.positionProject.join(' / ')}` :
+                const anchor = c.value.value as unknown as Anchor, ownerId = anchor.kind === 'asset' ? anchor.assetId : anchor.kind === 'unplaced' ? anchor.ownerAssetId : undefined;
+                const owner = ownerId === undefined ? undefined : p.details.mutable.assetsById[ownerId]?.label;
+                text = anchor.kind === 'unplaced' ? ownerId === undefined ? '未配置・モデル未指定' : `未配置・所有モデル ${owner?.kind === 'value' ? owner.value : 'モデル名を確認'}`
+                  : anchor.kind === 'project' ? `プロジェクト内の位置 ${anchor.positionProject.join(' / ')}` :
                   `${owner?.kind === 'value' ? owner.value : 'モデル名を確認'}・位置 ${anchor.positionAsset.join(' / ')}`;
               } else if (name === 'colorSrgb' && c.value.kind === 'value') text = `sRGB ${(c.value.value as number[]).join(' / ')}`;
               line(contents, `${{ title: 'タイトル', body: '本文', anchor: 'ピン位置', colorSrgb: 'ピンの色' }[name]}${f.candidates.length > 1 ? ` 候補 ${i + 1}` : ''}：${text}`);

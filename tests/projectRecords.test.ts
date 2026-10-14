@@ -7,6 +7,27 @@ function fail(input: unknown) { const result = admitProjectRecords(input, limits
 const record = (doc: Record<string, any>, table: keyof typeof projectRecordMaps) => Object.values(doc[table])[0] as any;
 
 describe('complete-provider stage A: amended whole-root structures, not graph/causal/blob authority', () => {
+  it('admits map2 additions only under an explicit profile, without reinterpreting map1 minor1 values', () => {
+    const doc = fixture(); doc.schema.minor = 1;
+    record(doc, 'assetsById').pinScale = 'old opaque value';
+    record(doc, 'materialOverridesById').appearance.chroma = { keyColorSrgb: [0, 0, 0], tolerance: 0.2, softness: 0, enabled: 'old opaque value' };
+    expect(admitProjectRecords(doc, limits)).toMatchObject({ kind: 'valid-records', hasUnknownFields: true, records: doc });
+    expect(admitProjectRecords(doc, limits, 'map2').kind).toBe('rejected');
+    record(doc, 'materialOverridesById').appearance.chroma.enabled = false;
+    for (const pinScale of [0.001, 1, 1000]) for (const anchor of [{ kind: 'unplaced' }, { kind: 'unplaced', ownerAssetId: id('ast') }]) {
+      record(doc, 'assetsById').pinScale = pinScale; record(doc, 'captionsById').anchor = anchor;
+      expect(admitProjectRecords(doc, limits, 'map2')).toMatchObject({ kind: 'valid-records', hasUnknownFields: false, records: doc });
+      expect(admitProjectRecords(doc, limits).kind).toBe('rejected');
+    }
+    for (const pinScale of [0, 0.0009, 1001, Infinity, '1']) {
+      record(doc, 'assetsById').pinScale = pinScale; expect(admitProjectRecords(doc, limits, 'map2').kind).toBe('rejected');
+    }
+    delete record(doc, 'assetsById').pinScale;
+    record(doc, 'captionsById').anchor = { kind: 'unplaced', positionProject: [0, 0, 0] };
+    expect(admitProjectRecords(doc, limits, 'map2').kind).toBe('rejected');
+    record(doc, 'captionsById').anchor = { kind: 'unplaced' }; doc.schema.minor = 0;
+    expect(admitProjectRecords(doc, limits, 'map2').kind).toBe('rejected');
+  });
   it('covers every map in one bounded independent immutable result, preserving exact body newlines and unknown subtrees', () => {
     const input = fixture(), result = pass(input); if (result.kind !== 'valid-records') throw new Error('records');
     expect(result.entityCount).toBe(Object.keys(projectRecordMaps).length); expect(result.hasUnknownFields).toBe(false);

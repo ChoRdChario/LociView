@@ -1,4 +1,4 @@
-import { materialFields, type MaterialIntent } from '../../domain/materialIntent';
+import { materialFields, materialForDisplay, type MaterialIntent } from '../../domain/materialIntent';
 import { value, type Field } from '../../scene/types';
 import { acceptMaterialApply, materialPlanIsCurrent, newMaterialSelection, type MaterialContext, type MaterialDraft, type MaterialEffect,
   type MaterialPlan, type MaterialRecordPort, type MaterialSelection } from '../../ui/projectScene/materialState';
@@ -29,7 +29,7 @@ export class SyntheticMaterialSession {
       return b.kind !== 'value' ? b : value(b.value ? { id: b.value.id, target: routing.target, scope: routing.scope.kind,
         sceneId: routing.scope.kind === 'scene' ? sceneId : null, intent: b.value.intent } : null);
     };
-    return { source: { kind: 'ready', token: p.state.token, projectId: p.projectId ?? fixtureIds.project, sceneId, limits: materialLimits,
+    return { source: { kind: 'ready', token: p.state.token, projectId: p.projectId ?? fixtureIds.project, sceneId, semanticProfile: p.semanticProfile, limits: materialLimits,
       models: Object.values(p.resources.assets).map(asset => {
         const version = asset.projection.kind === 'value' ? (p.modelVersions ?? syntheticVersions).find(v => v.projection.bindingId === (asset.projection as { value: { bindingId: string } }).value.bindingId) : null;
         const name = value(p.modelNames[asset.id] ?? 'モデル');
@@ -40,11 +40,11 @@ export class SyntheticMaterialSession {
             sourceIntent: value(sourceMaterialIntent),
             fieldIssues: Object.fromEntries(materialFields.map(f => [f, validationMaterialSourceIssue(slot) ??
               (['lighting', 'doubleSided', 'chroma', 'keyColor', 'tolerance'].includes(f) ? null : 'この設定は実モデルへ未接続です。')])) as Record<typeof materialFields[number], string | null>,
-            admit: (intent: MaterialIntent) => validationMaterialIssue(slot, intent) }))) };
+            admit: (intent: MaterialIntent) => validationMaterialIssue(slot, intent, p.semanticProfile) }))) };
         const target = materialTarget(version.closure), project = record({ scope: { kind: 'project' }, target }), scene = record({ scope: { kind: 'scene', sceneId }, target });
         return { assetId: asset.id, name, surfaces: value([{ target, name: value('表面'), project, scene, sourceIntent: value(sourceMaterialIntent),
           fieldIssues: Object.fromEntries(materialFields.map(f => [f, f === 'opacity' || f === 'softness' ? '半透明の表示は未接続です。' : null])) as Record<typeof materialFields[number], string | null>,
-          admit: materialCapability }]), reason: null };
+          admit: (intent: MaterialIntent) => materialCapability(materialForDisplay(intent, p.semanticProfile)) }]), reason: null };
       }) }, selection: this.selections.get(sceneId)!, draft: this.drafts.get(sceneId) ?? null, pending: otherPending,
       mutationBlock: this.block() ?? this.mutationBlock(), feedback: this.feedback.get(sceneId) ?? { kind: 'idle' } };
   }

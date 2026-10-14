@@ -1,7 +1,8 @@
 import type { ProjectMetadataSource } from '../projectMetadata/source';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { checkProjectHeader, checkProjectRecord, type ProjectRecordMap } from '../domain/projectRecords';
-import { checkMutableField, mutableRecordFields, type MutableRecordMap } from '../domain/projectMutableFields';
+import { checkMutableField, mutableFieldsFor, type MutableRecordMap } from '../domain/projectMutableFields';
+import { projectSemanticProfile } from '../domain/projectProfile';
 import { immutableKinds, canonical } from '../domain/projectGraphSupport';
 import { DomainValidationError, type JsonObject } from '../domain/values';
 import { PACKAGE_LIMITS as L, SUMMARY_FIELDS } from './contract';
@@ -18,6 +19,7 @@ export function summarizeDeltaHistory(inspection: OriginalInspection, changes: R
   return summarizeHistory(inspection, changes);
 }
 function summarizeHistory(inspection: OriginalInspection, changes?: ReadonlySet<string>) {
+  const profile = projectSemanticProfile(inspection.input.semanticProfile), mutableRecordFields = mutableFieldsFor(profile);
   const entities = new Map<string, Set<string>>(), fields = new Map<string, Set<string>>();
   let workUsed = inspection.workUsed, selected = true, hasOpaque = false;
   const add = (map: Map<string, Set<string>>, key: string, entity: string) => {
@@ -32,8 +34,9 @@ function summarizeHistory(inspection: OriginalInspection, changes?: ReadonlySet<
     selected = !changes || changes.has(op.changeHash);
     if (++workUsed > L.inspectionWork) throw new PackageControlError('summary-work-budget');
     const [map, id, field] = op.path;
+    if (profile === 'map2' && map === 'semanticProfile') continue; // Verified immutable bootstrap header, not user data.
     let entity = canonical(op.path.slice(0, 2)), group = map!, name: string | undefined;
-    const c = new ProjectRecordFields();
+    const c = new ProjectRecordFields(profile);
     try {
       if (map === 'schema' || map === 'identity' || map === 'project') {
         entity = 'project'; group = 'project'; name = map === 'project' ? id : map;

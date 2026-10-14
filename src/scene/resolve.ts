@@ -115,6 +115,10 @@ export function resolveScene(state: SceneState, resources: SceneResources, scene
     read(caption.title, caption.id, 'title', issues); read(caption.body, caption.id, 'body', issues);
     const anchor = read(caption.anchor, caption.id, 'anchor', issues);
     let marker: CaptionProjection['marker'] = 'suppressed';
+    if (anchor?.kind === 'unplaced') {
+      if (anchor.ownerAssetId === undefined || active(resources.assets[anchor.ownerAssetId], anchor.ownerAssetId, issues)) marker = 'unplaced';
+      else issue(issues, 'orphan', caption.id, 'anchor');
+    }
     if (anchor?.kind === 'project') {
       if (anchor.projectFrameId === resources.projectFrameId) marker = 'visible';
       else issue(issues, 'invalid', caption.id, 'projectFrameId');

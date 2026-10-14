@@ -6,17 +6,32 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   session: () => SyntheticSession | undefined, changed: () => void, otherBusy: () => boolean) {
   const root = document.createElement('section'), heading = document.createElement('h2'), actions = document.createElement('div'),
     commands = document.createElement('div'), status = document.createElement('p'), list = document.createElement('div'), select = document.createElement('input');
-  heading.textContent = 'ファイルで渡す'; root.setAttribute('aria-label', 'ファイルで渡す'); status.setAttribute('role', 'status');
+  heading.textContent = 'ファイル'; root.setAttribute('aria-label', 'ファイル'); status.setAttribute('role', 'status');
+  root.className = 'lv-file-output'; actions.className = 'lv-file-intents';
   select.type = 'file'; select.setAttribute('aria-label', '保存先のファイルを選択'); select.hidden = true;
   const nameField = document.createElement('label'), nameInput = document.createElement('input');
   nameField.textContent = '名前（任意）'; nameInput.type = 'text'; nameInput.setAttribute('aria-label', '名前（任意）'); nameField.append(nameInput);
-  root.append(heading, actions, nameField, commands, status, list, select);
+  const history = document.createElement('details'), historyTitle = document.createElement('summary'), completedFiles = document.createElement('div');
+  historyTitle.textContent = '作成したファイル'; history.append(historyTitle, completedFiles);
+  root.append(heading, actions, nameField, commands, status, list, history, select);
   let busy = false, disposed = false, feedback = '', selected: string | null = null, cancellation: string | null = null;
-  let purpose: 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review' = 'teamWorkspace', baseId = '', choicePending = false, checkpointName = '', composing = false;
+  let purpose: 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review' = 'backup', baseId = '', choicePending = false, checkpointName = '', composing = false;
   let cleanPreview: Awaited<ReturnType<typeof host.workspaceOutput.previewClean>> | null = null;
   let reviewPreview: Awaited<ReturnType<typeof host.workspaceOutput.previewReview>> | null = null, sceneId = '', omitEntry = false;
-  const resetChoice = () => { purpose = 'teamWorkspace'; baseId = ''; checkpointName = ''; choicePending = false; cleanPreview = null; reviewPreview = null; sceneId = ''; omitEntry = false; };
+  const resetChoice = () => { purpose = 'backup'; baseId = ''; checkpointName = ''; choicePending = false; cleanPreview = null; reviewPreview = null; sceneId = ''; omitEntry = false; };
   const urls: string[] = [];
+  const download = async (id: string) => {
+    const job = host.workspaceOutput.jobs.find(job => job.id === id);
+    if (!job) throw Error('作成したファイルを確認できません。');
+    const blob = await host.workspaceOutput.download(id); if (disposed) return;
+    const url = URL.createObjectURL(blob), a = document.createElement('a'); urls.push(url);
+    a.href = url; a.download = job.purpose === 'contribution' ? 'LociView-contribution.zip' : job.purpose === 'backup' ? 'LociView-backup.zip' : job.purpose === 'clean' ? 'LociView-copy.zip' : job.purpose === 'review' ? 'LociView-review.zip' : 'LociView-workspace.zip';
+    const label = Array.from((job.label ?? '').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').trim()).slice(0, 80).join('').replace(/[. ]+$/, '');
+    if (job.purpose === 'backup' && label) a.download = `LociView-${label}.zip`;
+    a.hidden = true; root.append(a);
+    try { a.click(); } finally { a.remove(); }
+  };
+  const handoffMessage = 'ダウンロードを開始しました。保存先で完了を確認してください。';
   const perform = (action: () => Promise<unknown>, message: string, writes = true, consumeChoice = false, completed?: () => void) => {
     if (disposed || busy || composing || otherBusy()) return;
     const s = session();
@@ -36,19 +51,43 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     b.disabled = busy || composing || otherBusy() || writes && !!host.authority.readOnly;
     b.addEventListener('click', () => { if (!b.disabled) action(); }); parent.append(b); return b;
   };
+  const generateAndDownload = (generate: () => Promise<string>) => perform(async () => {
+    const id = await generate();
+    // Generation is already durable even if the browser handoff then fails.
+    // Keep that exact result available; retry must not silently create another job.
+    resetChoice();
+    await handoff(id);
+  }, handoffMessage);
+  const handoff = async (id: string) => {
+    try { await download(id); }
+    catch (error) { history.open = true; throw Error(`${error instanceof Error ? error.message : 'ダウンロードを開始できません。'} 作成したファイルから再試行してください。`); }
+  };
   const render = () => {
-    if (disposed) return; actions.replaceChildren(); commands.replaceChildren(); list.replaceChildren();
+    if (disposed) return; actions.replaceChildren(); commands.replaceChildren(); list.replaceChildren(); completedFiles.replaceChildren();
+    const choosePurpose = (next: typeof purpose) => {
+      if (purpose === next) return;
+      purpose = next; baseId = ''; cleanPreview = null; reviewPreview = null; sceneId = ''; omitEntry = false; choicePending = true; render(); changed();
+    };
+    const save = button(actions, '保存', () => choosePurpose('backup'));
+    save.setAttribute('aria-pressed', String(purpose === 'backup'));
+    const send = button(actions, '相手に渡す', () => choosePurpose('teamWorkspace'));
+    send.setAttribute('aria-pressed', String(purpose === 'teamWorkspace' || purpose === 'contribution'));
+    const more = document.createElement('details'), moreTitle = document.createElement('summary'); moreTitle.textContent = 'その他'; more.append(moreTitle);
+    more.open = purpose === 'clean' || purpose === 'review'; actions.append(more);
+    button(more, 'シーンを共有', () => choosePurpose('review')).setAttribute('aria-pressed', String(purpose === 'review'));
+    button(more, '独立コピーを作る', () => choosePurpose('clean')).setAttribute('aria-pressed', String(purpose === 'clean'));
     const label = document.createElement('label'), kind = document.createElement('select'); label.textContent = '渡す内容';
     kind.setAttribute('aria-label', '渡す内容');
-    for (const [value, text] of [['teamWorkspace', '作業一式'], ['contribution', '変更分'], ['backup', 'バックアップ'], ['clean', '独立コピー'], ['review', '閲覧用のシーン']]) {
+    for (const [value, text] of [['teamWorkspace', '作業一式'], ['contribution', '変更分']]) {
       const option = document.createElement('option'); option.value = value!; option.textContent = text!; kind.append(option);
     }
-    kind.value = purpose; kind.disabled = busy || composing || otherBusy() || !!host.authority.readOnly; label.append(kind); actions.append(label);
+    kind.value = purpose; kind.disabled = busy || composing || otherBusy() || !!host.authority.readOnly; label.append(kind);
+    if (purpose === 'teamWorkspace' || purpose === 'contribution') actions.append(label);
     nameField.hidden = purpose !== 'backup'; nameInput.disabled = busy || otherBusy() || !!host.authority.readOnly;
     if (!composing && nameInput.value !== checkpointName) nameInput.value = checkpointName;
     kind.addEventListener('change', () => {
-      if (kind.disabled || !['teamWorkspace', 'contribution', 'backup', 'clean', 'review'].includes(kind.value)) return;
-      purpose = kind.value as typeof purpose; baseId = ''; cleanPreview = null; reviewPreview = null; sceneId = ''; omitEntry = false; choicePending = true; render(); changed();
+      if (kind.disabled || !['teamWorkspace', 'contribution'].includes(kind.value)) return;
+      choosePurpose(kind.value as 'teamWorkspace' | 'contribution');
     });
     const chosen = host.workspaceOutput.bases.find(b => b.selection.workspacePackageId === baseId);
     const cleanConfirmed = !!cleanPreview && cleanPreview.token === host.read().source?.token;
@@ -99,23 +138,25 @@ export function createValidationOutputControls(document: Document, host: ReturnT
       const help = document.createElement('p'); help.textContent = host.workspaceOutput.bases.length ?
         '相手と共有した作業一式を選択してください。' : '先に作業一式を受け取るか、作成してください。'; actions.append(help);
     }
-    const create = button(commands, purpose === 'clean' && !cleanConfirmed || purpose === 'review' && !reviewConfirmed ? '内容を確認' : 'ファイルを作成', () => {
+    const create = button(commands, purpose === 'clean' && !cleanConfirmed || purpose === 'review' && !reviewConfirmed ? '内容を確認' :
+      purpose === 'backup' ? 'ファイルに保存' : 'ダウンロード', () => {
       const token = host.read().source?.token; if (!token) return;
       if (purpose === 'contribution') {
-        if (chosen) perform(() => host.workspaceOutput.generateContribution(token, chosen.selection), '変更分を生成しました。ファイルへの保存は未確認です。', true, true);
+        if (chosen) generateAndDownload(() => host.workspaceOutput.generateContribution(token, chosen.selection));
       } else if (purpose === 'clean') {
         if (!cleanConfirmed) perform(async () => { cleanPreview = await host.workspaceOutput.previewClean(token); }, 'コピーに含める内容を確認してください。');
-        else perform(() => host.workspaceOutput.generateClean(token), '独立コピーを生成しました。ファイルへの保存は未確認です。', true, true);
+        else generateAndDownload(() => host.workspaceOutput.generateClean(token));
       } else if (purpose === 'review') {
         const selection = { sceneId, ...(omitEntry ? { omitConflictedEntryView: true } : {}) };
         if (!reviewConfirmed) perform(async () => { reviewPreview = await host.workspaceOutput.previewReview(token, selection); }, '渡す内容を確認してください。');
-        else perform(() => host.workspaceOutput.generateReview(token, selection), '閲覧用のシーンを生成しました。ファイルへの保存は未確認です。', true, true);
+        else generateAndDownload(() => host.workspaceOutput.generateReview(token, selection));
       } else if (purpose === 'backup') {
         const name = checkpointName.trim().normalize('NFC') || undefined;
-        perform(() => host.workspaceOutput.generateBackup(token, name), 'バックアップを生成しました。ファイルへの保存は未確認です。', true, true);
-      } else perform(() => host.workspaceOutput.generate(token), '作業一式を生成しました。ファイルへの保存は未確認です。', true, true);
+        generateAndDownload(() => host.workspaceOutput.generateBackup(token, name));
+      } else generateAndDownload(() => host.workspaceOutput.generate(token));
     });
     create.disabled ||= purpose === 'contribution' && !chosen || purpose === 'review' && !sceneId || !!selected || !!cancellation;
+    create.className = 'lv-file-primary';
     if (choicePending) button(commands, '選択を取り消す', () => { resetChoice(); render(); changed(); });
     status.textContent = host.workspaceOutput.error || feedback;
     for (const [i, job] of host.workspaceOutput.jobs.entries()) {
@@ -125,23 +166,21 @@ export function createValidationOutputControls(document: Document, host: ReturnT
       const name = job.purpose === 'contribution' ? '変更分' : job.purpose === 'backup' ? 'バックアップ' : job.purpose === 'clean' ? '独立コピー' : job.purpose === 'review' ? '閲覧用のシーン' : '作業一式';
       text.textContent = `${name} ${job.label || i + 1} — ${job.state === 'file-verified' ? '選択したファイルの内容を確認済み' : complete ? '生成済み・ファイルへの保存は未確認' :
         job.state === 'repair-required' ? '生成データを確認できません。元データは保持しています。' : 'ファイル生成が未完了です。'}`;
-      row.append(text); list.append(row);
+      row.append(text); (complete ? completedFiles : list).append(row);
       if (job.stale || job.token && job.token !== host.read().source?.token) {
         const older = document.createElement('p'); older.textContent = '作成後の変更はこのファイルに含まれません。'; row.append(older);
       }
       if (complete) {
-        button(row, 'ダウンロード', () => perform(async () => {
-          const blob = await host.workspaceOutput.download(job.id); if (disposed) return;
-          const url = URL.createObjectURL(blob), a = document.createElement('a'); urls.push(url);
-          a.href = url; a.download = job.purpose === 'contribution' ? 'LociView-contribution.zip' : job.purpose === 'backup' ? 'LociView-backup.zip' : job.purpose === 'clean' ? 'LociView-copy.zip' : job.purpose === 'review' ? 'LociView-review.zip' : 'LociView-workspace.zip'; a.hidden = true; root.append(a);
-          try { a.click(); } finally { a.remove(); }
-        }, 'ダウンロードを開始しました。保存先のファイルは未確認です。', false), false);
+        button(row, 'ダウンロード', () => perform(() => handoff(job.id), handoffMessage, false), false);
         const details = document.createElement('details'), summary = document.createElement('summary'); summary.textContent = '保存先のファイルを確認';
         details.append(summary); row.append(details);
         button(details, 'ファイルを選択', () => { selected = job.id; select.value = ''; select.click(); changed(); });
-      } else if (job.state === 'incomplete') button(row, '生成を再開', () => perform(() => host.workspaceOutput.retry(job.id), `${name}を生成しました。ファイルへの保存は未確認です。`));
+      } else if (job.state === 'incomplete') button(row, '生成を再開', () => perform(async () => {
+        await host.workspaceOutput.retry(job.id); await handoff(job.id);
+      }, handoffMessage));
       if (job.cancellable) button(row, '生成を取りやめる', () => { cancellation = job.id; render(); changed(); });
     }
+    history.hidden = !completedFiles.children.length;
     if (cancellation) {
       const id = cancellation, text = document.createElement('p'); text.textContent = 'この生成を取りやめます。プロジェクトと生成途中のデータは削除しません。'; list.append(text);
       button(list, '取りやめる', () => perform(() => host.workspaceOutput.cancel(id), '生成を取りやめました。', true, false,

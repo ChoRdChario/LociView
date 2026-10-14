@@ -9,7 +9,14 @@
 .lv-development :is(button, input, select, textarea) { font: inherit; border-radius: 2px; }
 .lv-development :is(button, input, select) { min-height: 44px; color: #312f2d; background: #faf9f8; border: 1px solid #817c78; }
 .lv-development button:disabled { cursor: default; border-style: dashed; }
+.lv-development .lv-file-output { display: grid; gap: 12px; }
+.lv-development .lv-file-intents { display: flex; flex-wrap: wrap; align-items: start; gap: 8px; }
+.lv-development .lv-file-intents > button[aria-pressed="true"] { border-bottom: 3px solid #413d39; background: #e1ddd7; }
+.lv-development .lv-file-intents > :is(details, label) { flex-basis: 100%; }
+.lv-development .lv-file-output label { display: grid; gap: 4px; }
+.lv-development .lv-file-primary { background: #413d39; color: #faf9f8; font-weight: 500; }
 .lv-development button:active:not(:disabled) { background: #d2cfcb; box-shadow: inset 0 1px 2px #817c78; }
+.lv-development .lv-file-primary:active:not(:disabled) { background: #635e58; color: #faf9f8; }
 .lv-development :is(button, input, select, textarea):focus-visible { outline: 2px solid #312f2d; outline-offset: 2px; }
 .lv-development-header { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 24px; padding: 12px 20px; border-bottom: 1px solid #b7b1aa; }
 .lv-development-brand { color: #635e58; font-size: 13px; font-weight: 400; margin-right: auto; }

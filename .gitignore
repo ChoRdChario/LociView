@@ -4,6 +4,7 @@ coverage/
 *.local
 .DS_Store
 dev-dist/
+validation-dist/
 .artifacts/fixtures/
 .artifacts/traces/
 /.artifacts/acquisition/

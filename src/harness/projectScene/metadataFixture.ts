@@ -79,7 +79,7 @@ export function metadataProjectView(provider: ProjectProviderRead, images: NonNu
       colors[id] = value('#a08045'); unsetCaptionColors.push(id);
     }
   }
-  return freezeSynthetic({ projectId, state: provider.state, resources: provider.resources,
+  return freezeSynthetic({ projectId, semanticProfile: provider.semanticProfile, state: provider.state, resources: provider.resources,
     modelNames: names, colors, unsetCaptionColors, captionOwners, captionTemplates, modelVersions: models ?? metadataModelVersions(provider, metadataFixtureLimits),
     viewData: metadataViewData(provider), materialData: metadataMaterialData(provider), mediaData: metadataMediaData(provider, images) });
 }

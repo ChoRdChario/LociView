@@ -25,6 +25,7 @@
 ## Architecture rules
 
 - Interactive entity edits use the active route's command boundary: `ProjectStore.dispatch()` for legacy v1, the accepted Native services for Native, and `MetadataProjectSession` commands for the bounded ProjectScene path (specification 05). Never write storage directly from UI or mix route authorities.
+- For ordinary ProjectScene connection, use typed Session commands and provider-derived display models; keep synthetic string-map adapters in the harness. Specify the required ports and import boundaries before implementation; this direction does not pass adoption gates or activate the ordinary entry.
 - Project creation and new-package import validate the container path/manifest but preserve v1 operation-log source text according to the frozen v1 contract, including forward-compatible unknown content and reportable malformed lines.
 - Merge into an opened project goes through the project/package merge services, which validate/accept operations and coordinate log and binary writes; do not bypass these boundaries from UI code.
 - Binary I/O goes through `WorkspaceFS` and asset/package helpers.
@@ -42,8 +43,8 @@
 - Independent reviewers are read-only and judge the approved specification, diff, and executed evidence.
 - Chat history is not a specification. Move approved decisions and acceptance criteria into this repository before implementation.
 - A PoC is disposable and isolated. Do not promote PoC code directly into production without a production implementation and review.
-- Record a short outcome-oriented plan before non-trivial implementation. Existing PO approval covers normal sequencing, relevant tests and fixes within that scope; do not request the same approval at each helper or checkpoint.
-- Keep one writer and use bounded read-only parallel work when it helps. Run heavy whole-workspace tests/builds serially. Review the meaningful final diff once; re-review only later substantive changes or unresolved findings, not identical code merely because it was staged.
+- Record a short outcome-oriented plan before non-trivial implementation. Assign one connected user workflow through investigation, implementation, verification and independent review; prioritize the next missing adoption condition while retaining the accepted feature scope. Existing PO approval covers normal sequencing, relevant tests and fixes within that scope; do not request the same approval at each helper or checkpoint.
+- Keep one writer and use bounded read-only parallel work for cause analysis, remaining mappings and contract review. Run heavy whole-workspace tests/builds serially. Review the meaningful final diff once; re-review only later substantive changes or unresolved findings, not identical code merely because it was staged. Estimate throughput from completed workflows, available agent usage and human/device time, not model generation alone.
 
 ## Short meta-audits
 
@@ -58,6 +59,7 @@
 
 - For architecture, storage schema, renderer, migration, security, or package changes: write or update the specification and acceptance criteria before implementation.
 - Keep changes small and reversible. Do not combine dependency upgrades, refactors, and features in one change.
+- For observed latency, measure the affected browser action and its storage, validation, display refresh, package generation and download stages before choosing the next optimization. Synthetic I/O counts are diagnostic evidence, not elapsed-time acceptance. Reuse operation-owned verified reads only within the accepted lifetime; changes to validation timing, write/publication or recovery fences require specification review.
 - When v2 migration is implemented, preserve v1 input and use dual-read/v2-only-write unless a later accepted specification says otherwise. This does not prohibit maintenance of the current v1 writer before that migration exists.
 - Do not describe Gaussian Splatting, Automerge, CAS, multiple simultaneous models, or renderer ports as adopted, generally supported or gate-passed until the applicable gate has passed and the code exists. `Implemented` may describe only an exact bounded production path whose code and executed evidence exist; it must state the tested scope and must not imply aggregate gate, adoption, broader support or release credit.
 
@@ -130,8 +132,9 @@ npm test
 npm run build
 ```
 
-Also run `npm run build:harness` when the changed path ships in the isolated harness.
-`npm run check:checkpoint` runs this full sequence, including the harness build,
+Also run `npm run build:harness` when the changed path ships in the isolated harness,
+and `npm run build:validation` for the approved static validation path.
+`npm run check:checkpoint` runs this full sequence, including both isolated builds,
 serially and stops on the first failure. Run it once at the connected workflow
 boundary, not after each component or just to create a commit.
 After a check passes, repeat or broaden it only for relevant subsequent changes,

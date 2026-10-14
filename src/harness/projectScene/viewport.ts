@@ -281,6 +281,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
         pickToken: String(pickEpoch),
         ready: Boolean(active && renderer && camera && !issue), issue,
         notice: [notice, coverageIssue, alphaPicking && !display?.readOnly ? '半透明・切り抜きの面へのピン配置は未接続です。原本の見た目は保持しています。' : null,
+          ...new Set(display?.pins.flatMap(p => p.notice ? [p.notice] : []) ?? []),
           ...(display?.materialNotices ?? []), ...Object.values(display?.materials ?? {}).flatMap(m => 'issue' in m ? [m.issue] : []),
           ...Object.values(display?.savedMaterials ?? {}).flatMap(rows => Object.values(rows).flatMap(m => 'issue' in m ? [m.issue] : []))].filter(Boolean).join(' ') || null,
         dragging: dragging || !!gizmo?.dragging, manipulating: !!gizmo?.dragging,

@@ -616,6 +616,13 @@ Rollback means preserving the source v1 package/workspace, opening conversion in
 
 ## 10. Production sequence after gates
 
+2026-10-15 delivery-planning clarification: [current todo](../../tasks/todo.md)
+owns the next connected workflow and exact missing adoption condition. Prioritize
+real-browser/storage observation of the existing candidate and the applicable
+device/profile gates before ordinary-entry activation. Remaining conversion and
+format requirements stay in scope; bounded read-only mapping work may proceed in
+parallel. This sequencing emphasis changes no gate, compatibility or release rule.
+
 2026-09-08 approved exception: specification 05 §13.1 permits disconnected pure
 Scene-domain modules/tests before metadata/CAS adoption. It does not authorize
 storage dependencies, persistence, existing-app/UI integration or any gate PASS.
@@ -681,7 +688,13 @@ below.
 
 ## 12. Planning ranges and re-estimation
 
-Initial focused-week ranges:
+Historical initial focused-week ranges (retained estimation evidence):
+
+These pre-implementation ranges are not the current forecast. Re-estimate the
+remaining connected workflows from measured completion throughput, available
+agent usage, required human/device checks and external dependencies. A change of
+model does not establish a speed multiplier or justify replacing these with an
+unmeasured calendar promise. Current sequencing belongs in todo.
 
 | Work | Range |
 |---|---:|

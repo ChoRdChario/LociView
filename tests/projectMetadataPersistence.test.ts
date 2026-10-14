@@ -5,7 +5,7 @@ import { MetadataProjectSession, type MetadataSessionRead } from '../src/project
 import { MetadataRepository, type MetadataStorageFactory, type MetadataStoragePort } from '../src/projectMetadata/repository';
 import { PersistentContentVerifier, type VerifiedInventoryPort } from '../src/projectMetadata/contentEvidence';
 import { TransactionJournal } from '../src/projectMetadata/journal';
-import { digest, json, underWriteLease, writeReceipt } from '../src/projectMetadata/persistence';
+import { digest, json, underWriteLease, withMetadataRead, writeReceipt } from '../src/projectMetadata/persistence';
 import { ProjectMetadataSource, type MetadataLimits } from '../src/projectMetadata/source';
 import { planRemoteChanges, type FullMetadataSource } from '../src/projectMetadata/remote';
 import { captureJournalRemote, type JournalRemoteInput, type PackageRemoteBatchProof } from '../src/projectMetadata/packageRemote';
@@ -86,8 +86,8 @@ describe('local generation capabilities (ports only, not backup restore/selectio
     const allowed = new Set<WorkspaceGenerationId>([null]);
     const opened: { id: WorkspaceGenerationId; create: boolean }[] = [];
     let closed = 0;
-    const bind = (generationId: WorkspaceGenerationId, allowCreate = false, onCheck = async () => {}) =>
-      openWorkspaceGeneration(fs, { generationId, allowCreate, assertSelected: async () => {
+    const bind = (generationId: WorkspaceGenerationId, allowCreate = false, onCheck = async () => {}, auditReadOperations = false) =>
+      openWorkspaceGeneration(fs, { generationId, allowCreate, auditReadOperations, assertSelected: async () => {
         await onCheck(); if (!allowed.has(generationId)) throw Error('Retired generation');
       } }, async (id, create) => {
         opened.push({ id, create });
@@ -98,6 +98,80 @@ describe('local generation capabilities (ports only, not backup restore/selectio
   }
   const deferred = () => { let release!: () => void;
     const promise = new Promise<void>(resolve => { release = resolve; }); return { promise, release }; };
+
+  it('audits an explicit read twice, denies mutations and expires retained capabilities', async () => {
+    const f = local(); let audits = 0;
+    const scope = await f.bind(null, false, async () => { audits++; }, true);
+    await f.fs.writeBytes('body', new Uint8Array([1]));
+    await f.original.storage().save(['doc'], new Uint8Array([2])); audits = 0;
+    const saved = await withMetadataRead(scope.fs, scope.factory, async ({ fs, factory }) => {
+      const port = factory!(), key = ['doc'], loading = port.load(key); key[0] = 'other';
+      expect(await loading).toEqual(new Uint8Array([2]));
+      expect(await fs.readBytes('body')).toEqual(new Uint8Array([1]));
+      expect(await port.loadRange([])).toHaveLength(1);
+      expect(() => fs.readText('v2/local-restore/control')).toThrow('generation-path-reserved');
+      const writes = f.fs.writes, dbWrites = f.original.fault.writes;
+      await expect(fs.writeText('body', 'bad')).rejects.toThrow('generation-read-only');
+      await expect(port.save(['doc'], new Uint8Array([9]))).rejects.toThrow('generation-read-only');
+      expect(f.fs.writes).toBe(writes); expect(f.original.fault.writes).toBe(dbWrites);
+      const file = (await fs.readStream('body'))!;
+      return { fs, factory: factory!, port, file, blob: await file.blob!() };
+    });
+    expect(audits).toBe(2);
+    expect(new Uint8Array(await saved.blob.arrayBuffer())).toEqual(new Uint8Array([1]));
+    await withMetadataRead(scope.fs, scope.factory, async () => {
+      await expect(saved.fs.readBytes('body')).rejects.toThrow('generation-read-expired');
+      await expect(saved.port.load(['doc'])).rejects.toThrow('generation-read-expired');
+      expect(saved.factory).toThrow('generation-read-expired');
+      await expect(saved.file.blob!()).rejects.toThrow('generation-read-expired');
+      await expect(saved.file.stream().getReader().read()).rejects.toThrow('generation-read-expired');
+    });
+    const before = audits;
+    await expect(withMetadataRead(scope.fs, f.original.storage, async () => 'wrong database')).rejects.toThrow('generation-storage-binding');
+    expect(audits).toBe(before);
+  });
+
+  it('keeps concurrent public reads strict and refuses a batch result after persistent selection changes', async () => {
+    const f = local(), entered = deferred(), release = deferred(); let audits = 0;
+    const scope = await f.bind(null, false, async () => { audits++; }, true); audits = 0;
+    const batch = withMetadataRead(scope.fs, scope.factory, async ({ fs }) => {
+      await fs.list(''); entered.release(); await release.promise;
+      await fs.list(''); return 'must not return';
+    });
+    await entered.promise; expect(audits).toBe(1);
+    await scope.fs.list(''); await scope.factory().load(['doc']); expect(audits).toBe(5);
+    f.allowed.delete(null);
+    await expect(scope.fs.list('')).rejects.toThrow('Retired');
+    release.release(); await expect(batch).rejects.toThrow('Retired');
+    await expect(withMetadataRead(scope.fs, scope.factory, async () => { throw Error('must not enter'); })).rejects.toThrow('Retired');
+  });
+
+  it('retains per-I/O checks for scopes without the selected-reader opt-in', async () => {
+    const f = local(); let audits = 0;
+    const scope = await f.bind(null, false, async () => { audits++; }); audits = 0;
+    await expect(withMetadataRead(scope.fs, scope.factory, async ({ fs }) => {
+      await fs.list(''); expect(audits).toBe(2);
+      f.allowed.delete(null); await fs.list('');
+    })).rejects.toThrow('Retired');
+  });
+
+  it('batches journal/repository reads and captures proof, heads and descriptors before the opening audit', async () => {
+    const f = local(), initial = await f.original.session().create(f.original.records);
+    const entered = deferred(), release = deferred(); let paused = false, audits = 0;
+    const scope = await f.bind(null, false, async () => { audits++; if (paused) { entered.release(); await release.promise; } }, true);
+    const journal = new TransactionJournal(scope.fs, limits); audits = 0;
+    const [entry] = await journal.entries(); expect(audits).toBe(2);
+    const proof = structuredClone(initial.source!.proof), heads = [...initial.source!.heads];
+    const prepared = structuredClone(entry!.prepared!); paused = true;
+    const reading = new MetadataRepository(scope.fs, scope.factory, limits).read(entry!.start.repositoryId, proof, heads);
+    const parts = journal.validateParts(prepared);
+    await entered.promise;
+    Object.assign(proof.envelope.lineageProof, { rootChangeHash: '0'.repeat(64) }); heads.length = 0; prepared.changes.length = 0;
+    release.release();
+    expect((await reading)!.originalChanges()).toEqual(initial.source!.originalChanges());
+    expect(await parts).toEqual(initial.source!.originalChanges());
+    expect(audits).toBe(6);
+  });
 
   it('retains the original name/Repo history and isolates restored storage and package paths', async () => {
     const f = local(), old = await f.bind(null), source = ProjectMetadataSource.bootstrap(f.original.records.schema,

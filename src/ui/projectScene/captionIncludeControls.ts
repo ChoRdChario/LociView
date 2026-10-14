@@ -41,6 +41,7 @@ export function createCaptionIncludeControls(document: Document, onPlan: (plan: 
     if (!next.memory.composing && search.value !== next.memory.query) search.value = next.memory.query;
     search.readOnly = busy && !next.memory.composing; choices.disabled = busy || Boolean(view.issue) || next.memory.composing;
     const options = view.rows.map(row => ({ id: row.item.id, label: `${captionTitle(row.item)} — ${captionOwnerLabel(row.item)}` +
+      (row.item.pin === 'unplaced' ? '（未配置）' : '') +
       (row.entry.membership.kind !== 'value' || row.entry.lifecycle.kind !== 'value' ? '（要確認）' : row.entry.lifecycle.value === 'deleted'
         ? '（削除済み）' : row.entry.membership.value === 'included' ? '（追加済み）' : '') }));
     if (next.memory.captionId && !options.some(option => option.id === next.memory.captionId)) options.unshift({ id: next.memory.captionId,
@@ -54,6 +55,7 @@ export function createCaptionIncludeControls(document: Document, onPlan: (plan: 
     }
     choices.value = next.memory.captionId ?? '';
     selected.textContent = view.selected ? `${captionTitle(view.selected.caption)} — ${captionOwnerLabel(view.selected.caption)}` +
+      (view.selected.caption.pin === 'unplaced' ? '（未配置）' : '') +
       (action === 'exclude' ? '。キャプション自体や他のシーンには影響しません。' :
         view.selected.caption.pin === 'ownerHidden' ? '。モデルは非表示のままです。' : '') : '';
     selected.hidden = !selected.textContent;

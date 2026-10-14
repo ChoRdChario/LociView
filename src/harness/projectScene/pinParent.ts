@@ -9,6 +9,7 @@ export function pinPositionInParent(project: SyntheticProject, captionId: string
   const { resources } = project, field = resources.captions[captionId]?.anchor;
   if (field?.kind !== 'value') return null;
   const anchor = field.value, versions = project.modelVersions ?? syntheticVersions;
+  if (anchor.kind === 'unplaced') return null;
   const version = (id: string) => {
     const p = resources.assets[id]?.projection;
     return p?.kind === 'value' ? modelVersion(id, p.value.bindingId, versions) : undefined;

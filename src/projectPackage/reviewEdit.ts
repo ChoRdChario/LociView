@@ -30,8 +30,8 @@ export class PreparedReviewEdit {
   }
   static async prepare(file: Blob, limits: MetadataLimits) {
     const original = file.slice(), review = await ReviewArchive.inspect(original, limits);
-    const { records, reconstruction } = await prepareReviewEdit(review.review, limits);
-    const source = ProjectMetadataSource.bootstrap(object(records.schema), object(records.identity), packageSourceLimits(limits), { time: 0 }).initialize(records, { time: 0 });
+    const { records, reconstruction, semanticProfile } = await prepareReviewEdit(review.review, limits);
+    const source = ProjectMetadataSource.bootstrap(object(records.schema), object(records.identity), packageSourceLimits(limits), { time: 0, semanticProfile }).initialize(records, { time: 0 });
     const description = await inspectCleanSource(source, limits), bytes = source.encodeFullSource();
     const parts: BlobPart[] = []; let size = 0;
     await writeCleanArchive({ metadataBytes: () => bytes.slice(), proof: source.proof, targetHeads: source.heads,

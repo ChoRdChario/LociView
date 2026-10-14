@@ -4,10 +4,18 @@ import { inspectAtomicHistory, type AtomicChange, type AtomicWrite, type History
 import { canonical, immutableKinds, same } from '../domain/projectGraphSupport';
 import { projectRecordMaps, checkProjectHeader } from '../domain/projectRecords';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
+import type { ProjectSemanticProfile } from '../domain/projectProfile';
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
 import { inspectProjectCandidates, type ProjectCandidateInput } from '../domain/projectCandidates';
 
 export const adapterFormatVersion = 'lociview-automerge-atomic-map-1';
+export const adapterFormatVersion2 = 'lociview-automerge-atomic-map-2';
+export type AdapterFormatVersion = typeof adapterFormatVersion | typeof adapterFormatVersion2;
+export function metadataSemanticProfile(adapter: AdapterFormatVersion): ProjectSemanticProfile {
+  if (adapter === adapterFormatVersion) return 'map1';
+  if (adapter === adapterFormatVersion2) return 'map2';
+  return fail('adapter-profile');
+}
 export interface MetadataLimits extends HistoryReadLimits {
   readonly maxChanges: number;
   readonly maxChangeBytes: number;
@@ -16,7 +24,7 @@ export interface MetadataLimits extends HistoryReadLimits {
 }
 export interface MetadataProof {
   readonly identity: JsonObject;
-  readonly envelope: Readonly<{ adapter: 'automerge'; adapterFormatVersion: typeof adapterFormatVersion;
+  readonly envelope: Readonly<{ adapter: 'automerge'; adapterFormatVersion: AdapterFormatVersion;
     lineageProof: Readonly<{ kind: 'automerge-root-change-v1'; rootChangeHash: string }> }>;
 }
 // Private physical encoding only; dynamic keys never leave this adapter as library objects.
@@ -56,7 +64,7 @@ export function checkedProof(input: MetadataProof, limits: MetadataLimits): Meta
   const p = cloneCanonicalValue(input, limits) as unknown as MetadataProof;
   if (!p || Object.keys(p).sort().join(',') !== 'envelope,identity' || !p.envelope ||
     Object.keys(p.envelope).sort().join(',') !== 'adapter,adapterFormatVersion,lineageProof' ||
-    p.envelope.adapter !== 'automerge' || p.envelope.adapterFormatVersion !== adapterFormatVersion ||
+    p.envelope.adapter !== 'automerge' || ![adapterFormatVersion, adapterFormatVersion2].includes(p.envelope.adapterFormatVersion) ||
     !p.envelope.lineageProof || Object.keys(p.envelope.lineageProof).sort().join(',') !== 'kind,rootChangeHash' ||
     p.envelope.lineageProof.kind !== 'automerge-root-change-v1' || !/^[0-9a-f]{64}$/.test(p.envelope.lineageProof.rootChangeHash)) fail('proof');
   checkProjectHeader(new ProjectRecordFields(), 'identity', p.identity);
@@ -95,6 +103,7 @@ export function originalEntryWitness(doc: PhysicalDoc, proof: MetadataProof, lim
 }
 function inspectPhysicalDetail(doc: PhysicalDoc, inputProof: MetadataProof, limits: MetadataLimits, originalBudget?: OriginalInspectionBudget) {
   const proof = checkedProof(inputProof, limits), rootHash = proof.envelope.lineageProof.rootChangeHash;
+  const profile = metadataSemanticProfile(proof.envelope.adapterFormatVersion), map2 = profile === 'map2';
   const bytes = checkedChanges(A.getAllChanges(doc), limits);
   if (!bytes.length) fail('empty-history');
   const decoded = bytes.map(b => A.decodeChange(b));
@@ -105,7 +114,7 @@ function inspectPhysicalDetail(doc: PhysicalDoc, inputProof: MetadataProof, limi
   const containers = new Map<string, { path: string[]; birth: string }>([['_root', { path: [], birth: rootHash }]]);
   const occupied = new Set<string>(), ancestors = new Map<string, Set<string>>();
   const changes: AtomicChange[] = [], scalars = new Map<string, { objectId: string; key: string }>();
-  let work = 0, operations = 0, schema: JsonObject | undefined, identity: JsonValue | undefined;
+  let work = 0, operations = 0, schema: JsonObject | undefined, identity: JsonValue | undefined, profileMarker: JsonValue | undefined;
   const originals: OriginalScalar[] = []; let nodesUsed = 0;
   const collect = (changeHash: string, operationId: string, path: string[], value: AtomicWrite['value']) => {
     if (!originalBudget) return;
@@ -156,8 +165,9 @@ function inspectPhysicalDetail(doc: PhysicalDoc, inputProof: MetadataProof, limi
         if (occupied.has(address) || !['set', 'del'].includes(op.action)) fail('structure');
         if (root && (op.key === 'project' || Object.hasOwn(projectRecordMaps, op.key))) fail('structure');
         if (!root && parent!.path.length === 1 && parent!.path[0] !== 'project' && !Object.hasOwn(immutableKinds, path[0]!)) fail('record-scalar');
-        if (root && ['schema', 'identity'].includes(op.key) && (hash !== rootHash || op.action !== 'set')) fail('root-mutation');
-        if (hash === rootHash && (!root || !['schema', 'identity'].includes(op.key) || op.action !== 'set')) fail('populated-bootstrap');
+        const headerKeys = map2 ? ['schema', 'identity', 'semanticProfile'] : ['schema', 'identity'];
+        if (root && headerKeys.includes(op.key) && (hash !== rootHash || op.action !== 'set')) fail('root-mutation');
+        if (hash === rootHash && (!root || !headerKeys.includes(op.key) || op.action !== 'set')) fail('populated-bootstrap');
         const value = op.action === 'del' ? { kind: 'absent' as const } : (() => {
           if (op.datatype !== undefined) fail('scalar-datatype');
           return { kind: 'value' as const, value: decodeScalar(op.value, limits) };
@@ -166,22 +176,25 @@ function inspectPhysicalDetail(doc: PhysicalDoc, inputProof: MetadataProof, limi
           if (writes.has(address)) fail('root-rewrite');
           if (op.key === 'schema' && value.kind === 'value') schema = value.value as JsonObject;
           if (op.key === 'identity' && value.kind === 'value') identity = value.value;
+          if (op.key === 'semanticProfile' && value.kind === 'value') profileMarker = value.value;
         }
         scalars.set(address, { objectId: op.obj, key: op.key });
         collect(hash, operationId, path, value);
         writes.set(address, { operationId, path, value });
       }
       // Schema is the separately checked source header, not an entity field.
-      changes.push({ id: hash, deps: [...change.deps].sort(), writes: [...writes.values()].filter(w => w.path[0] !== 'schema') });
+      changes.push({ id: hash, deps: [...change.deps].sort(), writes: [...writes.values()].filter(w =>
+        w.path[0] !== 'schema' && !(map2 && w.path.length === 1 && w.path[0] === 'semanticProfile')) });
       pending.delete(hash); advanced = true;
     }
     if (!advanced) fail('incomplete-history');
   }
   const root = byHash.get(rootHash)!;
-  if (root.ops.length !== 3 + Object.keys(projectRecordMaps).length || !schema || !same(identity, proof.identity)) fail('bootstrap');
+  if (root.ops.length !== 3 + Object.keys(projectRecordMaps).length + (map2 ? 1 : 0) || !schema || !same(identity, proof.identity) ||
+    map2 && profileMarker !== 'map2') fail('bootstrap');
   for (const key of ['project', ...Object.keys(projectRecordMaps)]) if (!occupied.has(canonical([key]))) fail('root-collections');
-  checkProjectHeader(new ProjectRecordFields(), 'schema', schema!);
-  const heads = A.getHeads(doc).sort(), token = `${adapterFormatVersion}:${rootHash}:${heads.join(',')}`;
+  checkProjectHeader(new ProjectRecordFields(profile), 'schema', schema!);
+  const heads = A.getHeads(doc).sort(), token = `${proof.envelope.adapterFormatVersion}:${rootHash}:${heads.join(',')}`;
   const read = inspectAtomicHistory({ token, heads, changes }, { ...limits, maxWork: limits.maxWork - work });
   if (read.kind !== 'atomic-history-inspection') return fail('atomic-history');
   // Check the complete live field candidates against the library, not its winner.
@@ -205,6 +218,6 @@ function inspectPhysicalDetail(doc: PhysicalDoc, inputProof: MetadataProof, limi
       if (!(value instanceof A.ImmutableString) || c.value.kind !== 'value' || value.toString() !== canonical(c.value.value)) fail('value-mismatch');
     }
   }
-  const input = Object.freeze({ schema: schema!, recordMaps: Object.freeze(Object.keys(projectRecordMaps)), history: read.history });
+  const input = Object.freeze({ ...(map2 ? { semanticProfile: profile } : {}), schema: schema!, recordMaps: Object.freeze(Object.keys(projectRecordMaps)), history: read.history });
   return { input, scalars: Object.freeze(originals), nodesUsed, workUsed: work + nodesUsed + read.workUsed };
 }

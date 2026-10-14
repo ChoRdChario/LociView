@@ -8,21 +8,23 @@ const base = process.env.BASE_PATH ?? '/';
 
 export default defineConfig(({ mode }) => {
   const isSparkHarness = mode === 'spark-harness';
-  const input: Record<string, string> = isSparkHarness ? { dev: 'dev.html' } : { main: 'index.html' };
+  const isProjectSceneValidation = mode === 'project-scene-validation';
+  const input: Record<string, string> = isSparkHarness || isProjectSceneValidation ? { dev: 'dev.html' } : { main: 'index.html' };
 
   return {
     base,
+    publicDir: isProjectSceneValidation ? false : undefined,
     build: {
       target: 'es2022',
       sourcemap: true,
-      outDir: isSparkHarness ? 'dev-dist' : 'dist',
+      outDir: isProjectSceneValidation ? 'validation-dist' : isSparkHarness ? 'dev-dist' : 'dist',
       // Keep the candidate GS bytes inspectable and independently cacheable.
-      assetsInlineLimit: isSparkHarness ? 0 : undefined,
+      assetsInlineLimit: isSparkHarness || isProjectSceneValidation ? 0 : undefined,
       rollupOptions: {
         // The product PWA and disposable renderer harness are separate build graphs.
         // Otherwise Workbox would precache Spark merely because its lazy chunk exists.
         input,
-        output: isSparkHarness
+        output: isSparkHarness || isProjectSceneValidation
           ? undefined
           : {
               chunkFileNames(chunk) {
@@ -38,7 +40,18 @@ export default defineConfig(({ mode }) => {
             },
       },
     },
-    plugins: [
+    plugins: isProjectSceneValidation ? [{
+      name: 'lociview-static-validation-shell',
+      transformIndexHtml: {
+        order: 'pre',
+        handler(html) {
+          // Reuse this page, without flashing the unrelated harness or fetching public assets.
+          return html.replace(/<link\b[^>]*rel="icon"[^>]*>/g, '')
+            .replace(/<title>[^<]*<\/title>/, '<title>LociView — ファイル検証</title>')
+            .replace(/<body>[\s\S]*?<\/body>/, '<body><p role="status">ファイル検証画面を準備しています。</p><script type="module" src="/src/dev-entry.ts"></script></body>');
+        },
+      },
+    }] : [
       isSparkHarness
         ? VitePWA({
             registerType: 'autoUpdate',

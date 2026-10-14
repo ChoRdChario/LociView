@@ -1,17 +1,25 @@
 import { parseJsonWithoutDuplicateMembers } from '../core/json';
 import { inspectProjectGraph } from '../domain/projectGraph';
 import { canonical, immutableDigest, immutableKinds, list, object, same, string } from '../domain/projectGraphSupport';
-import { mutableRecordFields, type MutableRecordMap } from '../domain/projectMutableFields';
+import { checkMutableField, mutableFieldsFor, type MutableRecordMap } from '../domain/projectMutableFields';
+import type { ProjectSemanticProfile } from '../domain/projectProfile';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { checkProjectHeader, checkProjectRecord, projectRecordMaps } from '../domain/projectRecords';
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
 import type { StoredBlobRef } from '../projectMetadata/blobStore';
 import type { MetadataLimits } from '../projectMetadata/source';
 import { prepareCleanRecords, type CleanReconstruction } from './cleanRecords';
-import { PACKAGE_LIMITS as L, SUMMARY_ALGORITHM, type AutomaticSummary, type Entry } from './contract';
+import { PACKAGE_LIMITS as L, summaryAlgorithm, type AutomaticSummary, type Entry } from './contract';
 import { packageByteHash, PackageControlError } from './manifest';
 
 export const REVIEW_SCHEMA = Object.freeze({ kind: 'lociview-project-scene-review', version: '1' });
+const REVIEW_SCHEMA2 = Object.freeze({ kind: 'lociview-project-scene-review', version: '2' });
+export const reviewSchema = (profile: ProjectSemanticProfile) => profile === 'map2' ? REVIEW_SCHEMA2 : REVIEW_SCHEMA;
+export function reviewSemanticProfile(schema: JsonValue | undefined): ProjectSemanticProfile {
+  if (same(schema, REVIEW_SCHEMA)) return 'map1';
+  if (same(schema, REVIEW_SCHEMA2)) return 'map2';
+  return fail('schema');
+}
 export const reviewMaps = ['assetsById', 'representationsById', 'captionsById', 'mediaResourcesById', 'captionAttachmentsById',
   'captionTagsById', 'captionTagMembershipsById', 'sceneAssetMembershipsById', 'sceneCaptionMembershipsById', 'viewsById', 'materialOverridesById'] as const;
 export type ReviewMap = typeof reviewMaps[number];
@@ -20,7 +28,7 @@ const table = (r: JsonObject, map: string) => object(r[map]) as Record<string, J
 const encode = (r: JsonObject) => new TextEncoder().encode(canonical(r));
 const setsEqual = (a: Iterable<string>, b: Iterable<string>) => same([...new Set(a)].sort(), [...new Set(b)].sort());
 class ClosedFields extends ProjectRecordFields {
-  constructor(private readonly charge: (n: number) => void) { super(); }
+  constructor(private readonly charge: (n: number) => void, profile: ProjectSemanticProfile) { super(profile); }
   override shape(v: JsonValue, keys: readonly string[], p: readonly string[]) {
     const r = super.shape(v, keys, p); this.charge(1 + Object.keys(r).length); if (this.unknown) fail('unknown-field'); return r;
   }
@@ -56,6 +64,7 @@ function snapshotBudget(root: JsonObject, bounds: ReturnType<typeof reviewLimits
 
 /** Valid snapshot metadata only. Not content verification, a Project, history, or a write capability. */
 export interface ReviewSnapshot {
+  readonly semanticProfile: ProjectSemanticProfile;
   readonly kind: 'review-snapshot'; readonly snapshot: JsonObject; readonly token: string;
   readonly closure: { readonly entries: readonly Entry[]; readonly semanticRefs: readonly StoredBlobRef[] };
   readonly summary: AutomaticSummary;
@@ -76,8 +85,9 @@ export async function readReviewSnapshot(bytes: Uint8Array, limits: MetadataLimi
 /** Validate before deriving any omitted domain scaffolding; never normalize away unknown fields. */
 export async function inspectReviewSnapshot(input: unknown, limits: MetadataLimits): Promise<ReviewSnapshot> {
   const bounds = reviewLimits(limits), cloned = cloneCanonicalValue(input, bounds) as JsonObject, charge = snapshotBudget(cloned, bounds);
-  const c = new ClosedFields(charge), root = c.shape(cloned, ['schema', 'snapshotId', 'project', 'scene', ...reviewMaps], []);
-  if (!same(c.required(root, 'schema', []), REVIEW_SCHEMA)) fail('schema'); c.id(c.required(root, 'snapshotId', []), 'snp', ['snapshotId']);
+  const profile = reviewSemanticProfile(cloned?.schema), mutableRecordFields = mutableFieldsFor(profile);
+  const c = new ClosedFields(charge, profile), root = c.shape(cloned, ['schema', 'snapshotId', 'project', 'scene', ...reviewMaps], []);
+  c.id(c.required(root, 'snapshotId', []), 'snp', ['snapshotId']);
   const project = c.shape(c.required(root, 'project', []), ['title', 'frame', 'defaultSceneId'], ['project']);
   for (const k of ['title', 'frame', 'defaultSceneId']) checkProjectHeader(c, k, c.required(project, k, ['project']));
   const scene = c.shape(c.required(root, 'scene', []), ['id', 'name', 'orderKey', 'defaultViewId'], ['scene']);
@@ -92,10 +102,13 @@ export async function inspectReviewSnapshot(input: unknown, limits: MetadataLimi
       c.id(key, projectRecordMaps[map], [map, key]); const r = c.object(value, [map, key]);
       if (r.id !== key) fail('record-id');
       if (map === 'assetsById') {
-        c.enum(c.required(r, 'kind', []), ['visual', 'nonvisualOwner'], []);
-        c.shape(r, r.kind === 'visual' ? ['kind', 'id', 'label', 'assetFrameId', 'assetToProject', 'compatibleAnchorClassIds', 'representationIds', 'anchorClassPartition'] :
-          ['kind', 'id', 'assetFrameId', 'assetToProject'], [map, key]);
-        c.id(c.required(r, 'assetFrameId', []), 'frm', []); c.transform(c.required(r, 'assetToProject', []), []);
+        c.enum(c.required(r, 'kind', []), profile === 'map2' ? ['visual', 'nonvisualOwner', 'unplacedOwner'] : ['visual', 'nonvisualOwner'], []);
+        const fields = r.kind === 'visual' ? ['kind', 'id', 'label', 'assetFrameId', 'assetToProject', 'compatibleAnchorClassIds', 'representationIds', 'anchorClassPartition'] :
+          r.kind === 'unplacedOwner' ? ['kind', 'id', 'assetFrameId'] : ['kind', 'id', 'assetFrameId', 'assetToProject'];
+        c.shape(r, profile === 'map2' ? [...fields, 'pinScale'] : fields, [map, key]);
+        c.id(c.required(r, 'assetFrameId', []), 'frm', []);
+        if (r.kind !== 'unplacedOwner') c.transform(c.required(r, 'assetToProject', []), []);
+        if (r.pinScale !== undefined) checkMutableField(c, 'assetsById', 'pinScale', r.pinScale);
         if (r.kind === 'visual') {
           c.text(c.required(r, 'label', []), 256, []);
           c.sorted(c.required(r, 'representationIds', []), [], (v, p) => c.id(v, 'rep', p), 1);
@@ -141,27 +154,30 @@ export async function inspectReviewSnapshot(input: unknown, limits: MetadataLimi
   for (const r of Object.values(table(root, 'mediaResourcesById'))) {
     charge(); if (await immutableDigest(immutableKinds.mediaResourcesById, r) !== r.payloadDigest) fail('media-digest');
   }
-  const graph = await inspectProjectGraph(await validationGraph(root, charge), limits);
+  const graph = await inspectProjectGraph(await validationGraph(root, charge), limits, undefined, profile);
   if (graph.kind !== 'record-graph-inspection' || graph.hasUnknownFields ||
     graph.issues.some(i => i.kind !== 'unverified' && i.code !== 'anchor-class-not-current')) fail('graph');
   const assets = table(root, 'assetsById'), captions = table(root, 'captionsById');
   const sceneAssets = new Set(Object.values(table(root, 'sceneAssetMembershipsById')).map(r => string(r.assetId)));
   const ownerCaptions = new Map<string, JsonObject[]>();
   for (const caption of Object.values(captions)) {
-    const a = object(caption.anchor); if (a.kind !== 'asset') continue;
-    const group = ownerCaptions.get(string(a.assetId)) ?? []; group.push(caption); ownerCaptions.set(string(a.assetId), group);
+    const a = object(caption.anchor), owner = a.kind === 'asset' ? a.assetId : a.kind === 'unplaced' ? a.ownerAssetId : undefined;
+    if (owner === undefined) continue;
+    const group = ownerCaptions.get(string(owner)) ?? []; group.push(caption); ownerCaptions.set(string(owner), group);
   }
   const includedReps = new Set<string>(); let missingModelCaptions = 0, newlyNeedsReviewCaptions = 0;
   for (const a of Object.values(assets)) {
     const id = string(a.id), owned = ownerCaptions.get(id) ?? [];
-    if (a.kind === 'nonvisualOwner') {
-      if (sceneAssets.has(id) || !owned.length) fail('nonvisual-closure'); missingModelCaptions += owned.length; continue;
+    const positioned = owned.filter(r => object(r.anchor).kind === 'asset');
+    if (a.kind === 'nonvisualOwner' || a.kind === 'unplacedOwner') {
+      if (sceneAssets.has(id) || !owned.length || a.kind === 'unplacedOwner' && positioned.length || a.kind === 'nonvisualOwner' && !positioned.length) fail('nonvisual-closure');
+      missingModelCaptions += owned.length; continue;
     }
     if (!sceneAssets.has(id)) fail('visual-without-membership');
     const partition = new Set(list(a.anchorClassPartition).map(v => string(object(v).id))), compatible = new Set(list(a.compatibleAnchorClassIds).map(string));
-    const referenced = new Set(owned.map(r => string(object(r.anchor).authoredAnchorCompatibilityId)));
+    const referenced = new Set(positioned.map(r => string(object(r.anchor).authoredAnchorCompatibilityId)));
     if ([...partition].some(id => !compatible.has(id)) || [...compatible].some(id => !partition.has(id) && !referenced.has(id))) fail('compatible-set');
-    for (const r of owned) { const klass = string(object(r.anchor).authoredAnchorCompatibilityId); if (compatible.has(klass) && !partition.has(klass)) newlyNeedsReviewCaptions++; }
+    for (const r of positioned) { const klass = string(object(r.anchor).authoredAnchorCompatibilityId); if (compatible.has(klass) && !partition.has(klass)) newlyNeedsReviewCaptions++; }
     for (const id of list(a.representationIds).map(string)) includedReps.add(id);
   }
   if (!setsEqual(includedReps, Object.keys(table(root, 'representationsById'))) ||
@@ -178,7 +194,7 @@ export async function inspectReviewSnapshot(input: unknown, limits: MetadataLimi
   }
   const entries = [...physical.values()].sort((a, b) => a.sha256 < b.sha256 ? -1 : 1), bytes = encode(root);
   if (bytes.length > L.snapshotBytes) fail('bytes');
-  return freeze({ kind: 'review-snapshot', snapshot: root, token: packageByteHash(bytes), closure: { entries, semanticRefs: [...semantic.values()] },
+  return freeze({ kind: 'review-snapshot', semanticProfile: profile, snapshot: root, token: packageByteHash(bytes), closure: { entries, semanticRefs: [...semantic.values()] },
     summary: reviewSummary(root, entries), editEffect: { missingModelCaptions, newlyNeedsReviewCaptions } });
 }
 
@@ -187,7 +203,8 @@ async function validationGraph(snapshot: JsonObject, charge: (n?: number) => voi
   const placeholder = (prefix: string, ordinal: number) => `${prefix}_${ordinal.toString(16).padStart(32, '0')}`;
   let event = 0;
   const lifecycle = () => ({ state: 'active', reason: 'initial', eventId: placeholder('evt', ++event) });
-  const out: JsonObject = { schema: { major: 2, minor: 0 }, identity: { projectId: placeholder('prj', 0), historyEpoch: placeholder('hep', 0), lineageSeed: '0'.repeat(64) },
+  const profile = reviewSemanticProfile(snapshot.schema);
+  const out: JsonObject = { schema: { major: 2, minor: profile === 'map2' ? 1 : 0 }, identity: { projectId: placeholder('prj', 0), historyEpoch: placeholder('hep', 0), lineageSeed: '0'.repeat(64) },
     project: snapshot.project!, ...Object.fromEntries(Object.keys(projectRecordMaps).map(m => [m, {}])) };
   const scene = object(snapshot.scene); table(out, 'scenesById')[string(scene.id)] = { ...scene, lifecycle: lifecycle() };
   for (const map of reviewMaps) {
@@ -202,10 +219,11 @@ async function validationGraph(snapshot: JsonObject, charge: (n?: number) => voi
   for (const id of Object.keys(table(snapshot, 'assetsById')).sort()) {
     charge();
     const a = table(snapshot, 'assetsById')[id]!;
-    if (a.kind === 'nonvisualOwner') { table(out, 'assetsById')[id] = { id, lifecycle: lifecycle(), assetFrameId: a.assetFrameId!, label: 'モデル未収録',
-      status: { kind: 'unresolved', reason: 'missingSource', pendingAssetToProject: a.assetToProject! } }; continue; }
+    const pinScale: JsonObject = a.pinScale === undefined ? {} : { pinScale: a.pinScale };
+    if (a.kind === 'nonvisualOwner' || a.kind === 'unplacedOwner') { table(out, 'assetsById')[id] = { id, lifecycle: lifecycle(), assetFrameId: a.assetFrameId!, label: 'モデル未収録', ...pinScale,
+      status: { kind: 'unresolved', reason: 'missingSource', ...(a.kind === 'nonvisualOwner' ? { pendingAssetToProject: a.assetToProject! } : {}) } }; continue; }
     const bindingId = placeholder('bnd', ++ordinal), revisionId = placeholder('rev', ordinal);
-    table(out, 'assetsById')[id] = { id, lifecycle: lifecycle(), label: a.label!, assetFrameId: a.assetFrameId!, status: { kind: 'ready', activeBindingId: bindingId } };
+    table(out, 'assetsById')[id] = { id, lifecycle: lifecycle(), label: a.label!, assetFrameId: a.assetFrameId!, ...pinScale, status: { kind: 'ready', activeBindingId: bindingId } };
     table(out, 'assetBindingsById')[bindingId] = { id: bindingId, assetId: id, assetRevisionId: revisionId, assetToProject: a.assetToProject!, method: 'import' };
     table(out, 'assetRevisionsById')[revisionId] = { id: revisionId, assetId: id, representationIds: a.representationIds!, anchorCompatibilityClasses: a.anchorClassPartition!,
       provenance: { origin: 'import', inputBlobDigests: [...new Set(list(a.representationIds).map(rep => string(object(table(out, 'representationsById')[string(rep)]?.blob).digest)))].sort() } };
@@ -222,7 +240,8 @@ async function validationGraph(snapshot: JsonObject, charge: (n?: number) => voi
 export async function prepareReviewEdit(review: ReviewSnapshot, limits: MetadataLimits, recipe?: CleanReconstruction) {
   const verified = await inspectReviewSnapshot(review.snapshot, limits);
   if (verified.token !== review.token) fail('snapshot-changed');
-  return prepareCleanRecords(await validationGraph(verified.snapshot, snapshotBudget(verified.snapshot, reviewLimits(limits))), limits, () => false, recipe);
+  return { ...await prepareCleanRecords(await validationGraph(verified.snapshot, snapshotBudget(verified.snapshot, reviewLimits(limits))), limits, () => false, recipe, verified.semanticProfile),
+    semanticProfile: verified.semanticProfile };
 }
 
 export function reviewSummary(snapshot: JsonObject, blobs: readonly Entry[]): AutomaticSummary {
@@ -236,6 +255,6 @@ export function reviewSummary(snapshot: JsonObject, blobs: readonly Entry[]): Au
     }
   }
   const counts = (v: Map<string, number>) => [...v].sort(([a], [b]) => a < b ? -1 : 1).map(([name, count]) => ({ class: name, count }));
-  return { algorithm: SUMMARY_ALGORITHM, scope: 'snapshot', entityClasses: counts(entities), fieldClasses: counts(fields), blobEntryCount: blobs.length,
+  return { algorithm: summaryAlgorithm(reviewSemanticProfile(snapshot.schema)), scope: 'snapshot', entityClasses: counts(entities), fieldClasses: counts(fields), blobEntryCount: blobs.length,
     blobBytes: blobs.reduce((n, e) => n + e.byteLength, 0) };
 }

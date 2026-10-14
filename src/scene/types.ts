@@ -33,11 +33,12 @@ export interface AssetProjection {
   readonly representationIds: readonly string[];
   readonly anchorCompatibilityIds: readonly string[];
 }
-export interface Asset extends Entity { readonly projection: Field<AssetProjection> }
+export interface Asset extends Entity { readonly projection: Field<AssetProjection>; readonly pinScale?: Field<number | undefined> }
 export type Anchor = Readonly<{ kind: 'asset'; assetId: string; assetFrameId: string;
   positionAsset: readonly [number, number, number]; authoredAnchorCompatibilityId: string;
   authoredAssetRevisionId?: string }> |
-  Readonly<{ kind: 'project'; projectFrameId: string; positionProject: readonly [number, number, number] }>;
+  Readonly<{ kind: 'project'; projectFrameId: string; positionProject: readonly [number, number, number] }> |
+  Readonly<{ kind: 'unplaced'; ownerAssetId?: string }>;
 export interface Caption extends Entity {
   readonly title: Field<string>;
   readonly body: Field<string>;
@@ -91,7 +92,7 @@ export interface CaptionProjection {
   readonly title: Field<string>;
   readonly body: Field<string>;
   readonly anchor: Field<Anchor>;
-  readonly marker: 'visible' | 'suppressed' | 'needsReview';
+  readonly marker: 'visible' | 'suppressed' | 'needsReview' | 'unplaced';
 }
 export interface Composition {
   readonly sceneId: string;

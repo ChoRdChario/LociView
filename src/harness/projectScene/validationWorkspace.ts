@@ -1,6 +1,7 @@
 import { newId } from '../../projectMetadata/persistence';
 import { prepareValidationProject, type ValidationFile } from '../../projectFiles/initialProject';
 import { prepareValidationCreation } from '../../projectFiles/creation';
+import { prepareNativeConversion } from '../../projectFiles/nativeConversion';
 import { validationMetadataLimits, type FileValidationLimits } from '../../projectFiles/validation';
 import { WorkspaceArchive } from '../../projectPackage/workspaceArchive';
 import { CleanArchive } from '../../projectPackage/cleanArchive';
@@ -50,6 +51,11 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const workspaceForm = document.createElement('form'), workspaceLabel = document.createElement('label'), workspaceInput = document.createElement('input'), openFile = document.createElement('button');
   workspaceLabel.textContent = 'ファイルを選択'; workspaceInput.type = 'file'; workspaceInput.setAttribute('aria-label', 'ファイルを選択'); workspaceLabel.append(workspaceInput);
   openFile.type = 'submit'; openFile.textContent = 'ファイルを開く'; workspaceForm.append(workspaceLabel, openFile);
+  const conversionPanel = document.createElement('section'), conversionNote = document.createElement('p'), conversionHelp = document.createElement('p');
+  const convert = document.createElement('button'), cancelConversion = document.createElement('button');
+  convert.type = cancelConversion.type = 'button'; convert.textContent = '新しいプロジェクトに変換'; cancelConversion.textContent = 'キャンセル';
+  conversionHelp.textContent = '元ファイルは変更しません。チームでは変換後のファイルを使ってください。元ファイルは書き出しに含まれないため、別に保管してください。';
+  conversionPanel.append(conversionNote, conversionHelp, convert, cancelConversion); conversionPanel.hidden = true; workspaceForm.append(conversionPanel);
   const status = document.createElement('p'); status.setAttribute('role', 'status');
   const list = document.createElement('section'), refresh = document.createElement('button'), back = document.createElement('button');
   refresh.type = back.type = 'button'; refresh.textContent = '一覧を更新'; back.textContent = 'プロジェクトを選ぶ';
@@ -60,8 +66,9 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   let receiveTools: ReturnType<typeof createValidationReceiveControls> | undefined;
   let resident: Awaited<ReturnType<ValidationWorkspacePorts['render']>> | undefined;
   let busy = false, disposed = false, composing = false, selected: string | null = null, operation: Promise<void> | undefined;
+  let conversion: Awaited<ReturnType<typeof prepareNativeConversion>> = null;
   const changed = () => !!workspace?.hasChanges() || !!reviewWorkspace?.hasChanges() || !!receiveTools?.hasChanges() || !!host?.hasPending();
-  const controls = () => { navigation.inert = busy; openFile.disabled = create.disabled = busy || composing; back.disabled = busy; back.hidden = !host && !reviewWorkspace; };
+  const controls = () => { navigation.inert = busy; openFile.disabled = create.disabled = convert.disabled = cancelConversion.disabled = busy || composing; back.disabled = busy; back.hidden = !host && !reviewWorkspace; };
   title.addEventListener('compositionstart', () => { composing = true; controls(); });
   title.addEventListener('compositionend', () => { composing = false; controls(); });
   const execute = (action: () => Promise<void>) => {
@@ -189,9 +196,29 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     status.textContent = initial ? 'プロジェクトを作成しています。' : '再開用データを確認しています。';
     await adoptProject(run, await ports.open(run, initial, mode, workspaceFile));
   };
+  const clearConversion = () => { conversion = null; conversionPanel.hidden = true; };
+  workspaceInput.addEventListener('change', () => { if (!busy) clearConversion(); });
+  cancelConversion.addEventListener('click', () => { if (!busy) { clearConversion(); status.textContent = ''; } });
+  convert.addEventListener('click', () => execute(async () => {
+    ensureMaySwitch(); if (!conversion) throw Error('変換するファイルを選択してください。');
+    status.textContent = 'プロジェクトを変換しています。';
+    const initial = await conversion.create(); if (disposed) return;
+    const run = (initial.source.proof.identity.projectId as string).slice(4);
+    const opened = await ports.open(run, initial);
+    if (disposed) { await opened.dispose(); return; }
+    await closeCurrent(); await adoptProject(run, opened); clearConversion();
+    if (host?.read().state === 'ready' && !host.hasPending()) workspaceInput.value = '';
+  }));
   workspaceForm.addEventListener('submit', event => { event.preventDefault(); execute(async () => {
     ensureMaySwitch(); const file = workspaceInput.files?.[0]; if (!file) throw Error('ファイルを選択してください。');
     status.textContent = 'ファイルを確認しています。';
+    clearConversion();
+    const native = await prepareNativeConversion(file, ports.fileLimits, ports.decode); if (disposed) return;
+    if (native) {
+      conversion = native; const n = native.summary;
+      conversionNote.textContent = `Nativeファイル：モデル ${n.models}・シーン ${n.scenes}・キャプション ${n.captions}・メディア ${n.media}`;
+      conversionPanel.hidden = false; status.textContent = ''; return;
+    }
     const purpose = (await PackageArchive.inspect(file)).control.manifest.purpose;
     if (purpose === 'review') {
       const view = await prepareReviewView(file, ports.fileLimits, ports.decode);

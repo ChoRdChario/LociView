@@ -531,6 +531,23 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     expect(fittedPose(display.bounds!, defaultPose(), 1, '-y').up).toEqual([0, 0, 1]);
   });
 
+  it('keeps map2 unplaced records off the 3D view and applies pinScale without changing placement', () => {
+    const p = createSyntheticProject(), original = syntheticDisplay(p, f.overview, null, null);
+    const scaled = { ...p, semanticProfile: 'map2' as const, resources: { ...p.resources, assets: { ...p.resources.assets,
+      [f.equipment]: { ...p.resources.assets[f.equipment]!, pinScale: value(2) } } } };
+    const pin = syntheticDisplay(scaled, f.overview, null, null).pins.find(p => p.id === f.shared)!;
+    expect(pin.scale).toBe(2); expect(pin.position).toEqual(original.pins.find(p => p.id === f.shared)!.position);
+    const ambiguous = { ...scaled, resources: { ...scaled.resources, assets: { ...scaled.resources.assets,
+      [f.equipment]: { ...scaled.resources.assets[f.equipment]!, pinScale: { kind: 'unresolved' as const, reason: 'conflict' as const } } } } };
+    const provisional = syntheticDisplay(ambiguous, f.overview, null, null).pins.find(p => p.id === f.shared)!;
+    expect(provisional.scale).toBe(1); expect(provisional.notice).toContain('仮表示'); expect(provisional.status).toBe('needsReview');
+    for (const anchor of [{ kind: 'unplaced' as const }, { kind: 'unplaced' as const, ownerAssetId: f.equipment }]) {
+      const unplaced = { ...scaled, resources: { ...scaled.resources, captions: { ...scaled.resources.captions,
+        [f.shared]: { ...scaled.resources.captions[f.shared]!, anchor: value(anchor) } } } };
+      expect(syntheticDisplay(unplaced, f.overview, null, f.shared).pins.some(p => p.id === f.shared)).toBe(false);
+      expect(unplaced.resources.captions[f.shared]!.body).toBe(p.resources.captions[f.shared]!.body);
+    }
+  });
   it('keeps compatibility-only review pins at their authored position/color, but omits hidden or conflicting owners', () => {
     const p = createSyntheticProject(), changed = { ...p, resources: { ...p.resources, assets: { ...p.resources.assets,
       [f.equipment]: { ...p.resources.assets[f.equipment]!, projection: value(syntheticVersions.filter(v => v.assetId === f.equipment)[1]!.projection) } } } };
@@ -686,7 +703,12 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     expect(workspace.session.displayReady).toBe(false); ready = true; notified();
     expect(workspace.session.displayReady).toBe(true);
     expect(descendants(root).some(n => n.textContent.startsWith('3D描画・ピン配置は未接続'))).toBe(false);
+    const list = labeled(root, 'キャプション一覧'); list.clientHeight = 100; list.scrollTop = 0;
+    list.children[0]!.offsetTop = 250; list.children[0]!.offsetHeight = 44;
     control(stage, '設備の確認箇所').fire('click'); expect(workspace.session.memory.selectedCaptionId).toBe(f.shared);
+    expect(list.scrollTop).toBe(194); expect(workspace.session.memory.listScrollTop).toBe(194);
+    list.scrollTop = 0; list.fire('scroll'); workspace.render(); expect(list.scrollTop).toBe(0);
+    control(stage, '設備の確認箇所').fire('click'); expect(list.scrollTop).toBe(194);
     const pin = (id: string) => descendants(stage).find(n => n.className === 'lv-development-pin' && n.textContent === id)!;
     pin('入口の記録').fire('click'); expect(workspace.session.windowMemory.retained).toEqual([f.shared, f.second]);
     pin('設備の確認箇所').fire('click'); expect(workspace.session.windowMemory.retained).toEqual([f.shared, f.second]);

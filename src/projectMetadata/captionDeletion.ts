@@ -14,7 +14,7 @@ export interface CaptionLifecycleResolution {
 }
 /** Parent recovery is not deletion/copying: retain every child and unrelated field. */
 export function captionLifecycleRecovery(provider: Provider, captionId: string, limits: MetadataLimits) {
-  const guard = new ProjectRecordFields(); guard.id(captionId, 'cap', []);
+  const guard = new ProjectRecordFields(provider.semanticProfile); guard.id(captionId, 'cap', []);
   const r = candidateReader(provider, limits), map = 'captionsById';
   if (r.exact(map, captionId, 'id') !== captionId || provider.issues.some(i => i.path[0] === map && i.path[1] === captionId &&
     (i.kind === 'invalid' || i.kind === 'unverified'))) fail('caption-lifecycle-source');

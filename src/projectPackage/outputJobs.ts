@@ -7,7 +7,7 @@ import { CleanOutputJob } from './cleanOutputJob';
 import { ReviewOutputJob } from './reviewOutputJob';
 import { cleanProtectedInventory } from './cleanSource';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
-import { json } from '../projectMetadata/persistence';
+import { json, withMetadataRead } from '../projectMetadata/persistence';
 import { WorkspaceBaseStore } from './workspaceBases';
 import { protectedWorkspaceInventory } from './protectedInventory';
 import { PACKAGE_LIMITS as L } from './contract';
@@ -15,6 +15,9 @@ import { PACKAGE_LIMITS as L } from './contract';
 export type OutputJobKey = { id: string; kind: 'workspace' | 'contribution' | 'backup' | 'clean' | 'review' };
 export type OutputJob = WorkspaceOutputJob | ContributionOutputJob | BackupOutputJob | CleanOutputJob | ReviewOutputJob;
 export async function outputJobKeys(fs: ProjectWorkspaceFS): Promise<OutputJobKey[]> {
+  return withMetadataRead(fs, undefined, ({ fs }) => readOutputJobKeys(fs));
+}
+async function readOutputJobKeys(fs: ProjectWorkspaceFS): Promise<OutputJobKey[]> {
   const workspace = await WorkspaceOutputJob.ids(fs), contribution = await ContributionOutputJob.ids(fs);
   const backup = await BackupOutputJob.ids(fs), clean = await CleanOutputJob.ids(fs), review = await ReviewOutputJob.ids(fs), ids = [...workspace, ...contribution, ...backup, ...clean, ...review];
   if (new Set(ids).size !== ids.length) fail('output-job-kind-collision');

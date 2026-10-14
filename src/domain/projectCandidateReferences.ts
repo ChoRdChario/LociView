@@ -86,6 +86,7 @@ export function inspectCandidateReferences(p: CandidateReferencePort): void {
     } else if (map === 'captionsById') {
       for (const c of values(path('anchor'))) { const anchor = object(c.value);
         if (anchor.kind === 'asset') ref(path('anchor'), 'assetsById', string(anchor.assetId), c.operationId);
+        if (anchor.kind === 'unplaced' && anchor.ownerAssetId !== undefined) ref(path('anchor'), 'assetsById', string(anchor.ownerAssetId), c.operationId);
       }
     } else if (map === 'materialOverridesById') {
       for (const c of values(path('routing'))) {

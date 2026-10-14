@@ -14,6 +14,7 @@ export class RecordedNode {
   get isConnected(): boolean { return this.parent !== null; }
   showModal() { this.open = true; }
   close() { this.open = false; }
+  click() { if (!this.disabled) this.fire('click'); }
   setAttribute(key: string, value: string) { this.attributes.set(key, value); }
   append(...nodes: RecordedNode[]) { for (const node of nodes) this.insertBefore(node, null); }
   insertBefore(node: RecordedNode, before: RecordedNode | null) {

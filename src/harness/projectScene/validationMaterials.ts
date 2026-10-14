@@ -1,5 +1,6 @@
 import { same } from '../../domain/projectGraphSupport';
-import { validateMaterialIntent, type MaterialIntent } from '../../domain/materialIntent';
+import { materialForDisplay, validateMaterialIntent, type MaterialIntent } from '../../domain/materialIntent';
+import type { ProjectSemanticProfile } from '../../domain/projectProfile';
 import type { JsonObject } from '../../domain/values';
 import type { MaterialTarget } from '../../scene/types';
 import { renderOwner, type ValidationModelClosure, type ReadonlyRenderModel } from './modelTypes';
@@ -18,10 +19,10 @@ export function validationMaterialSourceIssue(slot: ValidationMaterialSlot): str
     'この元材質の編集は未接続です。原本の設定を保持しています。';
 }
 /** One capability boundary for edit admission and slot-clone rendering. */
-export function validationMaterialIssue(slot: ValidationMaterialSlot, input: MaterialIntent): string | null {
+export function validationMaterialIssue(slot: ValidationMaterialSlot, input: MaterialIntent, profile: ProjectSemanticProfile = 'map1'): string | null {
   const source = validationMaterialSourceIssue(slot); if (source) return source;
   try {
-    const intent = validateMaterialIntent(input, { maxNodes: 4096, maxDepth: 16, maxStringScalars: 65536 }), a = intent.appearance, c = intent.compositing;
+    const intent = materialForDisplay(validateMaterialIntent(input, { maxNodes: 4096, maxDepth: 16, maxStringScalars: 65536 }, profile), profile), a = intent.appearance, c = intent.compositing;
     if (Object.keys(intent).sort().join(',') !== 'appearance,compositing' ||
       Object.keys(a).some(k => !['lighting', 'doubleSided', 'baseColorSrgb', 'opacity', 'chroma'].includes(k)) || (a.opacity !== undefined && a.opacity !== 1) ||
       a.chroma && (a.chroma.softness !== 0 || Object.keys(a.chroma).sort().join(',') !== 'keyColorSrgb,softness,tolerance') ||

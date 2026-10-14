@@ -16,6 +16,23 @@ Read only the relevant topic, not every historical incident.
   The PO observed 90% allowance consumption in one overnight goal run; calendar
   estimates must include available usage, not assume 6–8 agent hours every day.
   Distinguish measured test wall time from unmeasured model/quota attribution.
+  2026-10-15 refinement: give one writer the connected workflow through review;
+  use read-only agents for independent cause/recipe/contract work. Prioritize the
+  missing adoption condition and keep remaining features in scope. New agent
+  capability does not establish a throughput multiplier or waive device evidence.
+- 2026-09-20: Runtime checks also have a UX cost. Measure the complete user
+  action's I/O amplification before adding more validation. Reuse owned evidence
+  within an explicitly bounded operation; retain input, write, publication and
+  recovery safeguards. Do not repeat a full manual walkthrough to assess one
+  latency fix, or add a new test framework for checks existing suites can cover.
+  When a final whole-suite run is next, do not first repeat entire large integration
+  suites: filter the changed regression during editing, then run the final suite once.
+  2026-10-15 refinement: the second pass reduced synthetic root listings, while
+  Chrome acceptance stayed open. Measure the real action's storage, validation,
+  projection/refresh, package generation and download waits before another fix.
+  Repeated output discovery and harness conversion are hypotheses to investigate,
+  not established browser bottlenecks. Preserve the accepted read-operation
+  lifetime and all write/publication/recovery checks.
 - Current work belongs in todo, coverage in inventory, contracts in specifications.
   Map/handoff/index should link rather than repeat changing counts and next steps.
 - An approved plan authorizes its ordinary implementation/fixes. Stop only at an
@@ -51,6 +68,9 @@ Read only the relevant topic, not every historical incident.
   input and accumulated Caption windows follow the accepted UI interaction rules.
 - Human tests require a usable position-editing UI, the exact served link and
   steps stated in the tester's visible words. Retest only the affected boundary.
+  Before recommending a file, run its exact bytes through that route's admission
+  and creation/reopen path. A similarly named or synthetic in-test fixture is not
+  evidence for the file handed to the tester; keep local-only samples out of public builds.
 
 ## Historical topic lookup
 

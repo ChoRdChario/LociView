@@ -44,7 +44,8 @@ export type ViewportFactory = (canvas: HTMLCanvasElement, changed: () => void,
   proposeModel?: (target: ModelPlacementTarget, positionProject: V3, manipulation?: ModelManipulation) => boolean) => SyntheticViewport;
 
 /** DOM/read-port adapter, not a second camera implementation or durable service. */
-export function createViewportHost(document: Document, session: SyntheticSession, changed: () => void, factory?: ViewportFactory, sharedViewer?: MediaViewer) {
+export function createViewportHost(document: Document, session: SyntheticSession, changed: () => void, factory?: ViewportFactory, sharedViewer?: MediaViewer,
+  onCaptionSelected?: () => void) {
   const root = document.createElement('section'); root.className = 'lv-development-viewport'; root.setAttribute('aria-label', '3D表示');
   const mediaViewer = sharedViewer ?? createMediaViewer(document); if (!sharedViewer) root.append(mediaViewer.root);
   const canvas = document.createElement('canvas'); canvas.tabIndex = 0;
@@ -262,16 +263,18 @@ export function createViewportHost(document: Document, session: SyntheticSession
         for (const source of display.pins) {
           const button = document.createElement('button'); button.type = 'button'; button.textContent = source.title;
           button.className = 'lv-development-pin'; button.style.backgroundColor = source.color;
+          button.style.transform = `translate(-50%, -50%) scale(${source.scale ?? 1})`;
           button.setAttribute('aria-pressed', String(source.id === display.selectedId)); button.title = source.title;
           button.setAttribute('data-review', String(source.status === 'needsReview'));
           if (source.status === 'needsReview') {
-            button.setAttribute('aria-description', '要確認'); button.title = `${source.title}（要確認）`;
+            button.setAttribute('aria-description', source.notice ?? '要確認'); button.title = `${source.title}（${source.notice ?? '要確認'}）`;
           }
           const expected = display;
           button.addEventListener('click', () => {
             if (disposed || button.hidden || display?.token !== expected.token || display.sceneId !== expected.sceneId ||
               !display.pins.some(pin => pin.id === source.id)) return;
-            session.acceptList(planCaptionList(session.captionContext(), { kind: 'select', captionId: source.id })); changed();
+            const accepted = session.acceptList(planCaptionList(session.captionContext(), { kind: 'select', captionId: source.id })); changed();
+            if (accepted) onCaptionSelected?.();
           });
           pins.set(source.id, button); overlay.append(button);
         }

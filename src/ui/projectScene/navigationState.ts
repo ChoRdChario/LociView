@@ -2,7 +2,7 @@ import type { SceneState } from '../../scene/types';
 
 export const taskLabels = Object.freeze({ captions: 'キャプション', models: 'モデル', materials: 'マテリアル', views: '視点' });
 export type TaskId = keyof typeof taskLabels;
-export type CaptionOwnerFilter = Readonly<{ kind: 'all' | 'project' | 'unresolved' }> |
+export type CaptionOwnerFilter = Readonly<{ kind: 'all' | 'project' | 'none' | 'unresolved' }> |
   Readonly<{ kind: 'asset'; assetId: string }>;
 export interface SceneUiMemory {
   readonly selectedCaptionId: string | null;

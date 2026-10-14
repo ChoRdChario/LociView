@@ -14,7 +14,11 @@ interface InitialReceipt { version: 'validation-initial-1'; proof: MetadataProof
 const initialPath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'validation-initial.am');
 const receiptPath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'validation-initial.json');
 
-async function readInitial(fs: ProjectWorkspaceFS): Promise<ProjectMetadataSource> {
+export async function readValidationInitial(fs: ProjectWorkspaceFS): Promise<ProjectMetadataSource> {
+  return (await readValidationInitialRecord(fs)).source;
+}
+/** Return the proof of actual retained bytes, not a re-encoding of the loaded document. */
+export async function readValidationInitialRecord(fs: ProjectWorkspaceFS) {
   const r = await readReceipt<InitialReceipt>(fs, receiptPath(fs), metadataLimits), file = await fs.readStream(initialPath(fs));
   if (!r || r.version !== 'validation-initial-1' || Object.keys(r).sort().join(',') !== 'byteLength,digest,proof,version' ||
     !Number.isSafeInteger(r.byteLength) || r.byteLength <= 0 || r.byteLength > metadataLimits.maxTotalBytes ||
@@ -23,16 +27,16 @@ async function readInitial(fs: ProjectWorkspaceFS): Promise<ProjectMetadataSourc
   if (await digest(bytes) !== r.digest) return fileError('作成途中の記録が一致しません。');
   const source = ProjectMetadataSource.fromFullSource(bytes, r.proof, metadataLimits);
   if (source.originalChanges().length !== 2) return fileError('初期記録の履歴を確認できません。');
-  return source;
+  return { source, receipt: r };
 }
-async function writeInitial(fs: ProjectWorkspaceFS, source: ProjectMetadataSource): Promise<void> {
+export async function writeValidationInitial(fs: ProjectWorkspaceFS, source: ProjectMetadataSource): Promise<void> {
   const bytes = source.encodeFullSource();
   // Manifest first binds the exact intended source; partial bytes stay repair state.
   await writeReceipt(fs, receiptPath(fs), { version: 'validation-initial-1', proof: source.proof, byteLength: bytes.length, digest: await digest(bytes) }, metadataLimits);
   const previous = await fs.readBytes(initialPath(fs));
   if (previous && !equalBytes(previous, bytes)) return fileError('作成途中の記録が一致しません。上書きはしていません。');
   if (!previous) await fs.writeBytes(initialPath(fs), bytes);
-  const saved = await readInitial(fs);
+  const saved = await readValidationInitial(fs);
   if (saved.token !== source.token || saved.originalChanges().some((b, i) => !equalBytes(b, source.originalChanges()[i]!)))
     return fileError('初期記録の保存を確認できません。');
 }
@@ -49,7 +53,7 @@ export function prepareValidationCreation(input: PreparedValidationProject) {
     const before = await session.read();
     if (before.state !== 'empty') return fileError('作成先が空ではありません。保存済みProjectは変更していません。');
     for (const b of blobs) await store.put(new Blob([b.bytes.slice().buffer]).stream(), b.ref.mediaType, b.ref);
-    await underWriteLease(fs, () => writeInitial(fs, source));
+    await underWriteLease(fs, () => writeValidationInitial(fs, source));
     return session.createFromSource(source);
   } };
 }
@@ -58,7 +62,7 @@ export async function resumeValidationCreation(fs: ProjectWorkspaceFS, session: 
   const state = await session.read();
   if (state.state === 'ready') return state;
   if (state.state !== 'pending' && state.state !== 'empty') return fileError('未完了の保存を確認してください。');
-  const source = await readInitial(fs);
+  const source = await readValidationInitial(fs);
   if (expectedProjectId && source.proof.identity.projectId !== expectedProjectId)
     return fileError('保存領域と初期プロジェクトが一致しません。');
   return state.state === 'pending' ? session.recoverInitialization(source) : session.createFromSource(source);

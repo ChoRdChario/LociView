@@ -1,7 +1,8 @@
 import { reviewProjectHistory, type FieldPolicy } from './projectHistoryReview';
 import type { AtomicCandidate, AtomicField, AtomicHistory, HistoryReadLimits } from './atomicHistory';
 import { checkProjectHeader, checkProjectRecord, projectRecordMaps, type ProjectRecordMap } from './projectRecords';
-import { checkMutableField, mutableRecordFields, type MutableRecordMap } from './projectMutableFields';
+import { checkMutableField, mutableFieldsFor, type MutableRecordMap } from './projectMutableFields';
+import { projectSemanticProfile, type ProjectSemanticProfile } from './projectProfile';
 import { ProjectRecordFields } from './projectRecordFields';
 import { checkMaterialCoupling } from './materialIntent';
 import { GraphInspection, canonical, immutableDigest, immutableKinds, object, same, type GraphEdge, type GraphIssue } from './projectGraphSupport';
@@ -13,6 +14,7 @@ import { cloneCanonicalValue, DomainValidationError, reject, type JsonObject, ty
 export type CandidateField = AtomicField & { readonly policy: FieldPolicy; readonly valid: boolean; readonly validOperationIds: readonly string[]; readonly hasUnknownFields: boolean };
 export type CandidateIssue = Readonly<{ path: readonly string[]; kind: 'invalid' | 'review' | 'orphan' | 'unverified'; code: string; operationId?: string }>;
 export interface ProjectCandidateInput {
+  readonly semanticProfile?: ProjectSemanticProfile;
   /** From the adapter's complete decoded-root inspection, including empty maps. */
   readonly schema: JsonObject;
   readonly recordMaps: readonly string[];
@@ -31,13 +33,14 @@ const headerPaths = [['identity'], ['project', 'title'], ['project', 'frame'], [
 /** Complete current candidate values and reference inspection; no winner, storage or SceneResources receipt. */
 export async function inspectProjectCandidates(input: unknown, limits: HistoryReadLimits): Promise<ProjectCandidatesInspection> {
   try {
-    const raw = cloneCanonicalValue(input, limits), c = new ProjectRecordFields(), envelope = c.object(raw, []);
-    if (Object.keys(envelope).sort().join(',') !== 'history,recordMaps,schema') reject('key', []);
+    const raw = cloneCanonicalValue(input, limits), envelope = new ProjectRecordFields().object(raw, []);
+    const profile = projectSemanticProfile(envelope.semanticProfile), c = new ProjectRecordFields(profile), mutableRecordFields = mutableFieldsFor(profile);
+    if (!['history,recordMaps,schema', 'history,recordMaps,schema,semanticProfile'].includes(Object.keys(envelope).sort().join(','))) reject('key', []);
     checkProjectHeader(c, 'schema', c.required(envelope, 'schema', []));
     const maps = c.list(c.required(envelope, 'recordMaps', []), limits.maxNodes, ['recordMaps']);
     if (maps.some(m => typeof m !== 'string' || !m.length) || new Set(maps).size !== maps.length ||
       Object.keys(projectRecordMaps).some(map => !maps.includes(map))) reject('missing', ['recordMaps']);
-    const read = reviewProjectHistory(c.required(envelope, 'history', []), limits); if (read.kind === 'rejected') return read;
+    const read = reviewProjectHistory(c.required(envelope, 'history', []), limits, profile); if (read.kind === 'rejected') return read;
     let work = read.workUsed;
     const charge = (n = 1) => { work += n; if (work > limits.maxWork) reject('limit', ['candidateWork']); };
     const issues: CandidateIssue[] = [...read.issues], fields: CandidateField[] = [], bad = new Set<string>();
@@ -49,7 +52,7 @@ export async function inspectProjectCandidates(input: unknown, limits: HistoryRe
     for (const f of read.fields) {
       let valid = true, unknown = f.policy === 'unknown'; const validOperationIds: string[] = [];
       for (const candidate of f.candidates) {
-        charge(); const guard = new ProjectRecordFields(), [map, id, field] = f.path;
+        charge(); const guard = new ProjectRecordFields(profile), [map, id, field] = f.path;
         try {
           const v = candidate.value.kind === 'value' ? candidate.value.value : undefined;
           if (map === 'identity' || map === 'project') {
@@ -113,7 +116,7 @@ export async function inspectProjectCandidates(input: unknown, limits: HistoryRe
     }
     for (const { map, id } of entities.values()) if (map === 'materialOverridesById') {
       const a = resolved([map, id, 'appearance']), comp = resolved([map, id, 'compositing']);
-      if (a !== undefined && comp !== undefined) try { checkMaterialCoupling(object(a), object(comp)); }
+      if (a !== undefined && comp !== undefined) try { checkMaterialCoupling(object(a), object(comp), profile); }
       catch (error) { if (!(error instanceof DomainValidationError)) throw error; report([map, id, 'appearance'], 'incompatible-material-intent'); }
     }
     const g = new GraphInspection(records); inspectModelGraph(g); inspectResourceGraph(g);

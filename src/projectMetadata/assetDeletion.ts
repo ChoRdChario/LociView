@@ -25,7 +25,7 @@ export function assetDeletionImpact(provider: Provider, assetId: string, limits:
     for (const [id, fields] of r.records.get(map) ?? []) {
       r.charge(); const candidates = values(fields.get(field));
       const targets = candidates?.map(v => field === 'assetId' ? v : field === 'routing' ? object(object(v).target).assetId :
-        object(v).kind === 'project' ? null : object(v).kind === 'asset' ? object(v).assetId : undefined);
+        object(v).kind === 'project' ? null : object(v).kind === 'asset' ? object(v).assetId : object(v).kind === 'unplaced' ? object(v).ownerAssetId ?? null : undefined);
       const complete = !!targets && targets.every(t => t === null || typeof t === 'string');
       if (complete && !targets.includes(assetId)) continue;
       const identity = values(fields.get('id')), life = values(fields.get('lifecycle'));

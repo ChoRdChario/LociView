@@ -1,4 +1,5 @@
 import { ProjectRecordFields } from '../domain/projectRecordFields';
+import type { ProjectSemanticProfile } from '../domain/projectProfile';
 import { checkMutableField, mutableRecordFields } from '../domain/projectMutableFields';
 import { object, list, same } from '../domain/projectGraphSupport';
 import { validateMaterialIntent, type MaterialIntent } from '../domain/materialIntent';
@@ -23,7 +24,7 @@ const shape = (o: object, keys: string) => { if (Object.keys(o).sort().join(',')
 
 /** Exact source atoms and reservations. Duplicate buckets are not display authority. */
 export function materialResolutionContext(p: Provider, sceneId: string, overrideId: string, limits: MetadataLimits) {
-  const r = candidateReader(p, limits), c = new ProjectRecordFields();
+  const r = candidateReader(p, limits), c = new ProjectRecordFields(p.semanticProfile);
   c.id(sceneId, 'scn', []); c.id(overrideId, 'ovr', []);
   r.active('scenesById', sceneId); r.active(map, overrideId);
   const routing = object(r.exact(map, overrideId, 'routing'));
@@ -64,7 +65,7 @@ export function materialResolutionContext(p: Provider, sceneId: string, override
     if (!f?.valid || f.hasUnknownFields || !f.candidates.length) return fail('material-resolution-candidates');
     r.charge(f.validOperationIds.length); const valid = new Set(f.validOperationIds);
     return f.candidates.map(atom => {
-      r.charge(); const check = new ProjectRecordFields();
+      r.charge(); const check = new ProjectRecordFields(p.semanticProfile);
       if (!valid.has(atom.operationId) || atom.value.kind !== 'value') return fail('material-resolution-candidates');
       checkMutableField(check, map, field, atom.value.value);
       if (check.unknown) fail('material-resolution-unknown');
@@ -73,10 +74,10 @@ export function materialResolutionContext(p: Provider, sceneId: string, override
   };
   return { routing, ids: ids.sort(), atoms };
 }
-export function checkedResolutionIntent(appearance: JsonObject, compositing: JsonObject, limits: MetadataLimits): MaterialIntent {
-  const intent = validateMaterialIntent({ appearance, compositing }, limits);
+export function checkedResolutionIntent(appearance: JsonObject, compositing: JsonObject, limits: MetadataLimits, profile: ProjectSemanticProfile = 'map1'): MaterialIntent {
+  const intent = validateMaterialIntent({ appearance, compositing }, limits, profile);
   if (intent.compositing.optics === 'transmission' || ['smoothBlend', 'ditherCoverage'].includes(intent.compositing.coverage.policy) ||
-    (intent.appearance.chroma?.softness ?? 0) > 0 ||
+    (profile !== 'map2' || intent.appearance.chroma?.enabled !== false) && (intent.appearance.chroma?.softness ?? 0) > 0 ||
     (intent.compositing.coverage.policy === 'inherit' && (intent.appearance.opacity ?? 1) < 1)) fail('material-unsupported');
   return intent;
 }
@@ -90,7 +91,7 @@ export function selectedMaterialResolution(p: Provider, command: MaterialResolut
     if (a.length < 2 && c.length < 2) fail('material-resolution-not-conflicted');
     const appearance = a.find(v => v.operationId === command.appearanceOperationId), compositing = c.find(v => v.operationId === command.compositingOperationId);
     if (!appearance || !compositing) return fail('material-resolution-choice');
-    intents.set(command.overrideId, checkedResolutionIntent(appearance.value, compositing.value, limits));
+    intents.set(command.overrideId, checkedResolutionIntent(appearance.value, compositing.value, limits, p.semanticProfile));
   } else {
     shape(command, 'eventId,kind,observedOverrideIds,overrideId,sceneId');
     new ProjectRecordFields().id(command.eventId, 'evt', []);
@@ -100,7 +101,7 @@ export function selectedMaterialResolution(p: Provider, command: MaterialResolut
     for (const id of ids) {
       const a = context.atoms(id, 'appearance'), c = context.atoms(id, 'compositing');
       if (a.length !== 1 || c.length !== 1) fail('material-resolution-unresolved');
-      intents.set(id, checkedResolutionIntent(a[0]!.value, c[0]!.value, limits));
+      intents.set(id, checkedResolutionIntent(a[0]!.value, c[0]!.value, limits, p.semanticProfile));
     }
   }
   return { ...context, intents };

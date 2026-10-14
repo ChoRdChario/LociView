@@ -62,8 +62,13 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   const navigation = createNavigationControls(document, plan => { session.acceptNavigation(plan); afterAction(); });
   const sceneAuthoring = createSceneAuthoringControls(document, session, afterAction);
   const list = createCaptionListControls(document, plan => {
-    const accepted = session.acceptList(plan); afterAction();
-    if (accepted && plan.kind === 'change' && plan.intent === 'select') list.revealSelected();
+    const accepted = session.acceptList(plan);
+    if (accepted && plan.kind === 'change' && plan.intent === 'scroll') {
+      list.render(session.captionContext()); return;
+    }
+    afterAction();
+    if (accepted && (plan.kind === 'change' && (plan.intent === 'select' || plan.intent === 'revealSelection') ||
+      plan.kind === 'unchanged' && plan.explicitSelection)) list.revealSelected();
   }, active => { session.setSearchComposing(active); afterAction(); });
   const detail = createCaptionDetailControls(document, event => { session.acceptDetail(event); afterAction(); });
   const modelList = createModelListControls(document, plan => {
@@ -79,7 +84,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   numeric.className = 'lv-development-numeric'; numeric.append(numericLabel, coordinates.root);
   const include = createCaptionIncludeControls(document, plan => { session.acceptInclude(plan); afterAction(); });
   const mediaViewer = createMediaViewer(document);
-  const viewport = createViewportHost(document, session, afterAction, options.viewportFactory, mediaViewer);
+  const viewport = createViewportHost(document, session, afterAction, options.viewportFactory, mediaViewer, () => list.revealSelected());
   const material = createMaterialControls(document, plan => { session.acceptMaterial(plan); afterAction(); });
   const media = createMediaControls(document, session.media, afterAction, mediaViewer);
   const captionDeletion = createCaptionDeletionControls(document, session, afterAction);
@@ -158,7 +163,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
       // Membership writes are guarded individually; readonly users can still inspect and hide models locally.
     }
     // A second visible-list pass restores the desired inner scroll after a tab was hidden.
-    if (task === 'captions') list.render(captionContext);
+    if (task === 'captions') list.render(session.captionContext());
     if (task === 'models') modelList.render(session.modelContext());
     const current = session.composition;
     disconnected.textContent = viewport.pickingConnected ? '合成モデルの表示です。ピンの追加・移動中は、選んだモデルの面から位置を指定できます。' : viewport.connected ?

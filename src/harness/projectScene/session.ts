@@ -1,5 +1,5 @@
 import { planSceneCommand, previewScenePlan, type SceneAuthoringCommand, type CaptionDeletionImpact, type CaptionDeletionCommand, type AssetDeletionImpact } from '../../scene/commands';
-import { chooseStartupScene, resolveScene, memberships } from '../../scene/resolve';
+import { active, chooseStartupScene, resolveScene, memberships } from '../../scene/resolve';
 import { value, type Anchor, type Composition, type Field } from '../../scene/types';
 import { navigationPlanIsCurrent, planNavigation, type NavigationPlan, type NavigationSession, type PendingInteraction,
   type SceneUiMemory } from '../../ui/projectScene/navigationState';
@@ -82,6 +82,8 @@ export class SyntheticSession {
   private pinInput: SyntheticPinInput | null = null;
   private pinAddColor: string | null = null;
   private pinProposal: PinProposal | null = null;
+  /** First placement needs a verified surface before numeric/gizmo adjustment. Mode identity prevents reuse after cancel/restart. */
+  private firstPlacementSurface: PinModeMemory['mode'] = null;
   private pinInputComposing = false;
   private placement: ModelPlacementDraft | null = null;
   private captionComparison: { token: string; sceneId: string; captionId: string; anchor: Anchor; label: string } | null = null;
@@ -420,8 +422,22 @@ export class SyntheticSession {
     const data = projectMaterialHistory({ token, cells }, this.modelVersions.map(v => v.closure), previous);
     this.publish({ ...this.project, state: { ...this.project.state, token }, resources: { ...this.project.resources, token, materials: data.records }, materialData: data });
   }
+  private captionOwner(field: Field<Anchor>): CaptionListItem['owner'] {
+    if (field.kind !== 'value') return unknown();
+    const anchor = field.value;
+    if (anchor.kind === 'project') return value({ kind: 'project' });
+    const assetId = anchor.kind === 'asset' ? anchor.assetId : anchor.ownerAssetId;
+    if (assetId === undefined) return value({ kind: 'none' });
+    const name = this.project.modelNames[assetId];
+    return value({ kind: 'asset', assetId, name: name === undefined ? unknown<string>() : value(name) });
+  }
+  private captionIsUnplaced(field: Field<Anchor>): boolean {
+    if (field.kind !== 'value' || field.value.kind !== 'unplaced') return false;
+    const owner = field.value.ownerAssetId;
+    return owner === undefined || active(this.project.resources.assets[owner], owner, []);
+  }
   captionContext(): CaptionListContext {
-    const { resources, colors, modelNames, state } = this.project;
+    const { resources, colors, state } = this.project;
     const mediaCounts = captionAttachmentCounts(this.project.mediaData);
     const noMedia = this.authority?.capabilities?.media && !this.project.mediaData ? unknown<number>() : value(0);
     const modelSource = this.modelContext().source;
@@ -433,16 +449,14 @@ export class SyntheticSession {
       : { kind: 'ready' as const, token: state.token, sceneId: this.sceneId,
         captions: result.composition.captions.map((caption): CaptionListItem => {
           const anchor = caption.anchor;
-          const owner: CaptionListItem['owner'] = anchor.kind !== 'value' ? unknown() : anchor.value.kind === 'project'
-            ? value({ kind: 'project' }) : value({ kind: 'asset', assetId: anchor.value.assetId,
-              name: modelNames[anchor.value.assetId] === undefined ? unknown() : value(modelNames[anchor.value.assetId]!) });
+          const owner = this.captionOwner(anchor);
           const hidden = result.issues.some(i => i.entityId === caption.captionId && i.code === 'hidden-owner') ||
             (caption.marker !== 'suppressed' && anchor.kind === 'value' && anchor.value.kind === 'asset' && locallyHidden.has(anchor.value.assetId));
           return { id: caption.captionId, title: caption.title, body: caption.body, owner,
             needsReview: result.issues.some(i => i.entityId === caption.captionId && i.code === 'needs-review'),
             color: colors[caption.captionId] ?? unknown(), mediaCount: mediaCounts.get(caption.captionId) ?? noMedia,
             pin: hidden ? 'ownerHidden' : caption.marker === 'needsReview' ? 'needsReview' :
-              caption.marker === 'visible' ? 'visible' : 'unavailable' };
+              caption.marker === 'visible' ? 'visible' : caption.marker === 'unplaced' ? 'unplaced' : 'unavailable' };
         }) };
     return { source, memory: this.memory, pending: this.pending, mutationBlock: null };
   }
@@ -463,7 +477,7 @@ export class SyntheticSession {
     return { ...base, kind: 'ready', caption: this.project.unsetCaptionColors?.includes(caption.id) ? { ...caption, color: value('') } : caption, sceneCount: count };
   }
   includeContext(): CaptionIncludeContext {
-    const { state, resources, colors, modelNames } = this.project;
+    const { state, resources, colors } = this.project;
     const mediaCounts = captionAttachmentCounts(this.project.mediaData);
     const noMedia = this.authority?.capabilities?.media && !this.project.mediaData ? unknown<number>() : value(0);
     return { source: { kind: 'ready', token: state.token, sceneId: this.sceneId,
@@ -472,9 +486,9 @@ export class SyntheticSession {
         const edges = Object.values(state.captionMemberships).filter(e => e.sceneId === this.sceneId && e.resourceId === caption.id &&
           (e.lifecycle.kind !== 'value' || e.lifecycle.value.state !== 'deleted'));
         return { caption: { id: caption.id, title: caption.title, body: caption.body, color: colors[caption.id] ?? unknown<string>(),
-          mediaCount: mediaCounts.get(caption.id) ?? noMedia, pin: anchor?.kind === 'asset' && !this.composition.assets.some(asset => asset.assetId === anchor.assetId)
-            ? 'ownerHidden' as const : 'unavailable' as const, owner: anchor?.kind === 'asset' ? value({ kind: 'asset' as const,
-            assetId: anchor.assetId, name: value(modelNames[anchor.assetId] ?? 'モデル') }) : unknown<CaptionListItem['owner'] extends Field<infer T> ? T : never>() },
+          mediaCount: mediaCounts.get(caption.id) ?? noMedia, pin: this.captionIsUnplaced(caption.anchor) ? 'unplaced' as const
+            : anchor?.kind === 'asset' && !this.composition.assets.some(asset => asset.assetId === anchor.assetId) ? 'ownerHidden' as const : 'unavailable' as const,
+          owner: this.captionOwner(caption.anchor) },
           lifecycle: caption.lifecycle.kind === 'value' ? value(caption.lifecycle.value.state) : unknown<'active' | 'deleted'>(),
           membership: edges.length > 1 || edges.some(e => e.lifecycle.kind !== 'value') ? unknown<'absent' | 'included'>() :
             value(edges.length ? 'included' as const : 'absent' as const) };
@@ -700,6 +714,8 @@ export class SyntheticSession {
     const source = this.detailSource(), selectedId = this.memory.selectedCaptionId;
     const caption = selectedId ? resources.captions[selectedId] : undefined;
     const anchor = caption?.anchor.kind === 'value' ? caption.anchor.value : null;
+    const unplaced = caption ? this.captionIsUnplaced(caption.anchor) : false;
+    const ownerId = anchor?.kind === 'asset' ? anchor.assetId : anchor?.kind === 'unplaced' ? anchor.ownerAssetId : undefined;
     const models = items.map(item => {
       const asset = resources.assets[item.id]!, present = item.membership.kind === 'value' && item.membership.value.kind === 'included';
       const hidden = this.hiddenAssetIds.includes(asset.id);
@@ -711,13 +727,14 @@ export class SyntheticSession {
           ? 'モデルの更新候補を確認してください。' : null };
     });
     const selected = caption ? { captionId: caption.id, title: caption.title,
-      assetId: anchor?.kind === 'asset' ? value(anchor.assetId) : unknown<string>(),
+      assetId: ownerId === undefined ? unknown<string>() : value(ownerId), ...(unplaced ? { unplaced: true } : {}),
       token: JSON.stringify([caption.anchor, caption.lifecycle]),
       sceneCount: source.kind === 'ready' ? source.sceneCount : unknown<number>(),
       reparentBlock: this.authority && !this.authority.reparentPin ? 'この編集経路では親モデルを変更できません。' :
-        !anchor || caption.lifecycle.kind !== 'value' || caption.lifecycle.value.state !== 'active' || source.kind !== 'ready'
+        !anchor || anchor.kind === 'unplaced' && !unplaced || caption.lifecycle.kind !== 'value' || caption.lifecycle.value.state !== 'active' || source.kind !== 'ready'
           ? 'ピンの状態を確認してください。競合がある場合は先に解消してください。' : null,
-      block: !anchor ? 'ピン位置の競合を確認してください。' : anchor.kind !== 'asset' ? 'この接続版ではモデルに付いたピンだけ移動できます。' : null } : null;
+      block: !anchor ? 'ピン位置の競合を確認してください。' : unplaced ? '未配置です。「ピンを配置」から位置を指定してください。'
+        : anchor.kind !== 'asset' ? 'この接続版ではモデルに付いたピンだけ移動できます。' : null } : null;
     const correction = this.pinInput ? this.preparePinAnchor() : null;
     return { source: { kind: 'ready', token: state.token, sceneId: this.sceneId, models, selected },
       memory: this.pins.get(this.sceneId)!, otherPending: this.workingBlock ? 'update' : this.windowDragging ? 'window' : this.viewportDragging ? 'camera' : this.placement ? 'modelTransform' : this.textPending, mutationBlock: this.workingBlock ?? this.pinRestriction,
@@ -783,6 +800,7 @@ export class SyntheticSession {
   acceptPinSurface(target: PinSurfaceTarget, position: readonly [number, number, number], duringGizmo = false): boolean {
     if (JSON.stringify(target) !== JSON.stringify(this.pinSurfaceTarget(false, duringGizmo)) || !position.every(Number.isFinite))
       return this.refuse('表示が変わっています。指定中の位置は保持しています。');
+    this.firstPlacementSurface = this.pins.get(this.sceneId)!.mode;
     const accepted = this.changePinCoordinates({ coordinates: position.map(n => String(n || 0)) as [string, string, string], familyId: target.familyId });
     if (accepted) this.message = '仮の位置を表示しています。位置を確認して確定してください。';
     return accepted;
@@ -791,6 +809,7 @@ export class SyntheticSession {
     try {
       const { mode, input, families, needsFamily } = this.pinCoordinateContext();
       if (!mode || !input) throw new Error('ピンの操作を開始してください。');
+      if (mode.caption?.unplaced && this.firstPlacementSurface !== mode) throw Error('配置先モデルの面を選択してください。');
       if (mode.kind === 'reparent' && mode.sourceToken !== this.project.state.token) throw Error('対象が更新されています。取り消して選び直してください。');
       const old = mode.caption ? this.project.resources.captions[mode.caption.captionId]?.anchor : undefined;
       const asset = this.project.resources.assets[mode.target.assetId]!, projection = asset.projection;
@@ -847,8 +866,8 @@ export class SyntheticSession {
           this.pinInput = { coordinates: position ? position.map(String) as [string, string, string] : ['', '', ''], familyId: null };
           const families = this.pinCoordinateContext().families;
           this.changePinCoordinates({ ...this.pinInput, familyId: families.length === 1 ? families[0]!.id : null });
-          this.message = position ? '現在の位置を保った仮表示です。確認して確定してください。' :
-            '元の位置を確認できません。変更先モデルの面を選択して位置を指定してください。';
+          this.message = position ? '現在の位置を保った仮表示です。確認して確定してください。' : mode.caption?.unplaced
+            ? '配置先モデルの面を選択して位置を指定してください。' : '元の位置を確認できません。変更先モデルの面を選択して位置を指定してください。';
         }
       } else {
         const correction = this.preparePinAnchor();

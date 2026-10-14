@@ -1,4 +1,5 @@
 import { ProjectRecordFields } from './projectRecordFields';
+import type { ProjectSemanticProfile } from './projectProfile';
 import { checkMaterialAppearance, checkMaterialCompositing, checkMaterialCoupling } from './materialIntent';
 import { reject, type JsonObject, type JsonValue } from './values';
 
@@ -40,22 +41,30 @@ export const mutableRecordFields = Object.freeze({
     const t = c.shape(c.required(r, 'target', p), Object.keys(targets), [...p, 'target']);
     for (const [field, prefix] of Object.entries(targets)) c.id(c.required(t, field, [...p, 'target']), prefix, [...p, 'target', field]);
   } }, appearance: { check: (c, v, p) => {
-    checkMaterialAppearance(v); const a = c.shape(v, ['opacity', 'baseColorSrgb', 'lighting', 'doubleSided', 'chroma'], p);
-    if (a.chroma !== undefined) c.shape(a.chroma, ['keyColorSrgb', 'tolerance', 'softness'], [...p, 'chroma']);
+    checkMaterialAppearance(v, c.semanticProfile); const a = c.shape(v, ['opacity', 'baseColorSrgb', 'lighting', 'doubleSided', 'chroma'], p);
+    if (a.chroma !== undefined) c.shape(a.chroma, ['keyColorSrgb', 'tolerance', 'softness', ...(c.semanticProfile === 'map2' ? ['enabled'] : [])], [...p, 'chroma']);
   } }, compositing: { check: (c, v, p) => {
     checkMaterialCompositing(v); const comp = c.shape(v, ['coverage', 'optics'], p); c.shape(comp.coverage!, ['policy', 'alphaCutoff'], [...p, 'coverage']);
   } } }),
 });
 export type MutableRecordMap = keyof typeof mutableRecordFields;
+const map2Fields = Object.freeze({ ...mutableRecordFields, assetsById: Object.freeze({ ...mutableRecordFields.assetsById,
+  pinScale: optional({ check: (c, v, p) => { const n = c.number(v, p); if (n < 0.001 || n > 1000) reject('value', p); } }),
+}) });
+/** The map1 dictionary stays fixed, including original overwritten unknown fields. */
+export const mutableFieldsFor = (profile: ProjectSemanticProfile = 'map1'): typeof mutableRecordFields =>
+  profile === 'map2' ? map2Fields : mutableRecordFields;
 export function checkMutableField(c: ProjectRecordFields, map: MutableRecordMap, field: string, v: JsonValue | undefined): void {
-  const rule: Rule | undefined = Object.hasOwn(mutableRecordFields[map], field) ? (mutableRecordFields[map] as Record<string, Rule>)[field] : undefined;
+  const fields = mutableFieldsFor(c.semanticProfile);
+  const rule: Rule | undefined = Object.hasOwn(fields[map], field) ? (fields[map] as Record<string, Rule>)[field] : undefined;
   if (!rule) { c.unknown = true; return; }
   if (v === undefined) { if (!rule.optional) reject('missing', [field]); return; }
   rule.check(c, v, [field]);
 }
 /** Already cloned canonical record. No graph/history/digest/provider authority. */
 export function checkMutableRecord(c: ProjectRecordFields, map: MutableRecordMap, r: JsonObject): void {
-  c.shape(r, Object.keys(mutableRecordFields[map]), []);
-  for (const field of Object.keys(mutableRecordFields[map])) checkMutableField(c, map, field, r[field]);
-  if (map === 'materialOverridesById') checkMaterialCoupling(r.appearance as JsonObject, r.compositing as JsonObject);
+  const fields = mutableFieldsFor(c.semanticProfile);
+  c.shape(r, Object.keys(fields[map]), []);
+  for (const field of Object.keys(fields[map])) checkMutableField(c, map, field, r[field]);
+  if (map === 'materialOverridesById') checkMaterialCoupling(r.appearance as JsonObject, r.compositing as JsonObject, c.semanticProfile);
 }

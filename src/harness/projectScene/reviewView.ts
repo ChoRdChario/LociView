@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { canonical, list, object, same, string } from '../../domain/projectGraphSupport';
 import type { JsonObject } from '../../domain/values';
-import type { MaterialIntent } from '../../domain/materialIntent';
+import { materialForDisplay, type MaterialIntent } from '../../domain/materialIntent';
 import { ReviewArchive } from '../../projectPackage/reviewArchive';
 import { inspectValidationGlb, type ValidatedGlb } from '../../projectFiles/glb';
 import { inspectValidationPng, type PngDecoder } from '../../projectFiles/png';
@@ -56,21 +56,24 @@ export async function prepareReviewView(file: Blob, limits: FileValidationLimits
       if (local.length > 1 || global.length > 1) throw Error('材質の適用先を確認してください。');
       const selected = local[0] ?? global[0]; if (!selected) continue;
       const intent: MaterialIntent = { appearance: selected.appearance as unknown as MaterialIntent['appearance'],
-        compositing: selected.compositing as unknown as MaterialIntent['compositing'] }, issue = validationMaterialIssue(slot, intent);
-      if (issue) throw Error(issue); effects[slot.target.logicalMaterialSlotId] = intent;
+        compositing: selected.compositing as unknown as MaterialIntent['compositing'] }, issue = validationMaterialIssue(slot, intent, review.semanticProfile);
+      if (issue) throw Error(issue); effects[slot.target.logicalMaterialSlotId] = materialForDisplay(intent, review.semanticProfile);
     }
     savedMaterials[model.assetId] = effects;
   }
   const attachments = ordered(Object.values(table(snapshot, 'captionAttachmentsById'))), captions = table(snapshot, 'captionsById');
   const items: CaptionListItem[] = ordered(Object.values(table(snapshot, 'sceneCaptionMembershipsById'))).map(edge => {
-    const caption = captions[string(edge.captionId)]!, anchor = object(caption.anchor), owner = anchor.kind === 'asset' ? assets[string(anchor.assetId)]! : null;
-    const missing = owner?.kind === 'nonvisualOwner', needsReview = !!owner && owner.kind === 'visual' && !list(owner.compatibleAnchorClassIds).includes(anchor.authoredAnchorCompatibilityId!);
+    const caption = captions[string(edge.captionId)]!, anchor = object(caption.anchor);
+    const ownerId = anchor.kind === 'asset' ? anchor.assetId : anchor.kind === 'unplaced' ? anchor.ownerAssetId : undefined;
+    const owner = ownerId === undefined ? null : assets[string(ownerId)]!;
+    const missing = !!owner && owner.kind !== 'visual', needsReview = anchor.kind === 'asset' && !!owner && owner.kind === 'visual' && !list(owner.compatibleAnchorClassIds).includes(anchor.authoredAnchorCompatibilityId!);
     return { id: string(caption.id), title: value(string(caption.title)), body: value(string(caption.body)),
       color: value(caption.colorSrgb === undefined ? '#a08045' :
         '#' + list(caption.colorSrgb).map(n => Math.round(Number(n) * 255).toString(16).padStart(2, '0')).join('')),
-      owner: value(owner ? { kind: 'asset' as const, assetId: string(owner.id), name: value(missing ? '対応モデルなし' : string(owner.label)) } : { kind: 'project' as const }),
+      owner: value(owner ? { kind: 'asset' as const, assetId: string(owner.id), name: value(missing ? '対応モデルなし' : string(owner.label)) }
+        : { kind: anchor.kind === 'unplaced' ? 'none' as const : 'project' as const }),
       mediaCount: value(attachments.filter(a => a.captionId === caption.id).length), needsReview,
-      pin: missing ? 'ownerMissing' : needsReview ? 'needsReview' : 'visible' };
+      pin: anchor.kind === 'unplaced' ? 'unplaced' : missing ? 'ownerMissing' : needsReview ? 'needsReview' : 'visible' };
   });
   const source: CaptionListSource = { kind: 'ready', token: review.token, sceneId, captions: items };
   const frameId = string(object(project.frame).id), views = ordered(Object.values(table(snapshot, 'viewsById')));
@@ -80,11 +83,12 @@ export async function prepareReviewView(file: Blob, limits: FileValidationLimits
   for (const model of models) { const bounds = projectBounds(model.representation.logicalBoundsAsset, model.assetToProject);
     box.union(new THREE.Box3(new THREE.Vector3(...bounds.min), new THREE.Vector3(...bounds.max))); }
   const basePins = items.flatMap(item => {
-    if (item.pin === 'ownerMissing') return [];
+    if (item.pin === 'ownerMissing' || item.pin === 'unplaced') return [];
     const anchor = object(captions[item.id]!.anchor), owner = anchor.kind === 'asset' ? models.find(m => m.assetId === anchor.assetId) : undefined;
     const position = owner ? pointInProject(anchor.positionAsset as V3, owner.assetToProject) : anchor.positionProject as V3;
     return [{ id: item.id, title: item.title.kind === 'value' ? item.title.value : '', color: item.color.kind === 'value' ? item.color.value : '',
-      position, status: item.needsReview ? 'needsReview' as const : 'normal' as const }];
+      position, scale: anchor.kind === 'asset' ? Number(assets[string(anchor.assetId)]!.pinScale ?? 1) : 1,
+      status: item.needsReview ? 'needsReview' as const : 'normal' as const }];
   });
   const display = (colors: readonly string[] | null, selectedId: string | null): ReadonlyDisplay => ({ readOnly: true,
     token: review.token, sceneId, projectFrameId: frameId, models, selectedId, savedMaterials,

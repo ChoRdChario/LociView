@@ -3,6 +3,7 @@ import type { DisplayModelVersion } from './modelTypes';
 import type { ViewData } from './viewHistory';
 import type { MaterialData } from './materialHistory';
 import type { MediaData, MediaImage } from './mediaHistory';
+import type { ProjectSemanticProfile } from '../../domain/projectProfile';
 
 // Fixed synthetic identities, NOT a source-file importer or a persistent Project schema.
 const id = (prefix: string, n: number) => `${prefix}_${n.toString(16).padStart(32, '0')}`;
@@ -12,6 +13,7 @@ export const fixtureIds = Object.freeze({ project: id('prj', 1), overview: id('s
 export interface SyntheticProject {
   /** Explicit identity for new saved workspaces; old fixtures retain their fixed identity. */
   readonly projectId?: string;
+  readonly semanticProfile?: ProjectSemanticProfile;
   readonly validationFiles?: boolean;
   /** Explicit real saved catalog, including empty; omission is only for the old synthetic path. */
   readonly mediaChoices?: readonly MediaImage['record'][];

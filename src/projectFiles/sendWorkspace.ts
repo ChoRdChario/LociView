@@ -2,7 +2,7 @@ import type { ProjectWorkspaceFS } from '../platform/fs';
 import type { MetadataProjectSession } from '../projectMetadata/session';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import type { MetadataLimits } from '../projectMetadata/format';
-import { json } from '../projectMetadata/persistence';
+import { json, withMetadataRead } from '../projectMetadata/persistence';
 import { WorkspaceOutputJob } from '../projectPackage/outputJob';
 import { ContributionOutputJob } from '../projectPackage/contributionOutputJob';
 import { BackupOutputJob } from '../projectPackage/backupOutputJob';
@@ -58,6 +58,10 @@ export class WorkspaceSender {
       key.kind === 'backup' ? this.session.verifyBackupOutput(id, file, this.store) : this.session.verifyContributionOutput(id, file, this.store);
   }); }
   async availableBases(): Promise<ContributionBaseChoice[]> {
+    return withMetadataRead(this.fs, undefined, ({ fs }) =>
+      new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks).availableBasesDirect());
+  }
+  private async availableBasesDirect(): Promise<ContributionBaseChoice[]> {
     const read = await this.session.read(); if (read.state !== 'ready' || !read.source) return [];
     const bases = new WorkspaceBaseStore(this.fs, this.limits, read.source.proof), rows = await bases.read();
     const choices: ContributionBaseChoice[] = [];
@@ -69,7 +73,10 @@ export class WorkspaceSender {
     return choices;
   }
   download(id: string) {
-    return workspaceFileOperation(this.locks, async () => {
+    return workspaceFileOperation(this.locks, () => withMetadataRead(this.fs, undefined, ({ fs }) =>
+      new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks).downloadDirect(id)));
+  }
+  private async downloadDirect(id: string) {
       const job = await openOutputJob(this.fs, await this.key(id), this.limits);
       if (job instanceof BackupOutputJob || job instanceof CleanOutputJob || job instanceof ReviewOutputJob) {
         await validateOutputProtection(this.fs, job, this.store, this.limits); return (await job.artifact()).blob;
@@ -81,9 +88,12 @@ export class WorkspaceSender {
       const records = await new WorkspaceBaseStore(this.fs, this.limits, job.source.proof).read();
       if (!records.some(r => json(r) === json(job.baseRecord()))) return fileError('受け渡しの記録を確認できません。');
       return (await job.artifact()).blob;
-    });
   }
   async jobs(): Promise<WorkspaceOutputState[]> {
+    return withMetadataRead(this.fs, undefined, ({ fs }) =>
+      new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks).jobsDirect());
+  }
+  private async jobsDirect(): Promise<WorkspaceOutputState[]> {
     const result: WorkspaceOutputState[] = [];
     let bases: ReturnType<WorkspaceBaseStore['read']> | undefined;
     for (const key of await outputJobKeys(this.fs)) {

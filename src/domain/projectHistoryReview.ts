@@ -1,6 +1,7 @@
 import { inspectAtomicHistory, HistoryIndex, type AtomicCandidate, type AtomicField, type AtomicHistory, type HistoryReadLimits } from './atomicHistory';
 import { canonical, immutableKinds } from './projectGraphSupport';
 import { projectRecordMaps, type ProjectRecordMap } from './projectRecords';
+import type { ProjectSemanticProfile } from './projectProfile';
 import { lifecycleValue, logicalId } from './recordFields';
 import { DomainValidationError, reject, type ValidationIssue } from './values';
 
@@ -11,7 +12,7 @@ export type ProjectHistoryReview = Readonly<{ kind: 'rejected'; issue: Validatio
   pendingAuthority: readonly ['candidate-values-and-graph', 'verified-blob-profile-semantics', 'same-token-provider'] }>;
 
 /** Known semantic paths are a neutral read representation, not persisted field names in a new adapter. */
-export function projectFieldPolicy(path: readonly string[]): FieldPolicy {
+export function projectFieldPolicy(path: readonly string[], profile: ProjectSemanticProfile = 'map1'): FieldPolicy {
   const [map, id, field] = path;
   if (map === 'identity') { if (path.length !== 1) reject('value', ['atomicPath']); return 'immutable'; }
   if (map === 'project') {
@@ -25,6 +26,7 @@ export function projectFieldPolicy(path: readonly string[]): FieldPolicy {
   if (field === 'id' || (map === 'assetsById' && field === 'assetFrameId') || (map === 'viewsById' && ['sceneId', 'projectFrameId'].includes(field!)) ||
     (map === 'sceneAssetMembershipsById' && ['sceneId', 'assetId'].includes(field!)) || (map === 'sceneCaptionMembershipsById' && ['sceneId', 'captionId'].includes(field!))) return 'immutable';
   if (field === 'lifecycle' || (map === 'assetsById' && field === 'status')) return 'existence';
+  if (profile === 'map2' && map === 'assetsById' && field === 'pinScale') return 'scalar';
   if ((map === 'captionAttachmentsById' && ['captionId', 'mediaResourceId'].includes(field!)) || (map === 'captionTagMembershipsById' && ['captionId', 'tagId'].includes(field!)) || (map === 'materialOverridesById' && field === 'routing')) return 'parent';
   if (map === 'scenesById' && field === 'defaultViewId') return 'optional-default';
   if ((map === 'captionsById' && field === 'anchor') || (map === 'viewsById' && ['camera', 'background'].includes(field!)) || (map === 'materialOverridesById' && ['appearance', 'compositing'].includes(field!))) return 'spatial';
@@ -34,7 +36,7 @@ export function projectFieldPolicy(path: readonly string[]): FieldPolicy {
 }
 
 /** Inspection only. Every unknown candidate and historical value is retained; no field winner or Project projection. */
-export function reviewProjectHistory(input: unknown, limits: HistoryReadLimits): ProjectHistoryReview {
+export function reviewProjectHistory(input: unknown, limits: HistoryReadLimits, profile: ProjectSemanticProfile = 'map1'): ProjectHistoryReview {
   const read = inspectAtomicHistory(input, limits); if (read.kind === 'rejected') return read;
   try {
     const index = new HistoryIndex(read.history, limits.maxWork - read.workUsed), issues: HistoryIssue[] = [], allWrites = new Map<string, AtomicCandidate[]>();
@@ -44,7 +46,7 @@ export function reviewProjectHistory(input: unknown, limits: HistoryReadLimits):
     }
     const issue = (path: readonly string[], code: string, kind: HistoryIssue['kind'] = 'invalid') => issues.push(Object.freeze({ path, code, kind }));
     const fields = read.fields.map(f => {
-      const policy = projectFieldPolicy(f.path), history = allWrites.get(key(f.path))!;
+      const policy = projectFieldPolicy(f.path, profile), history = allWrites.get(key(f.path))!;
       if (policy === 'unknown') issue(f.path, 'unknown-field-policy', 'unverified');
       else if (policy === 'immutable') {
         const first = history[0]!.value, expected = first.kind === 'value' ? canonical(first.value) : undefined;

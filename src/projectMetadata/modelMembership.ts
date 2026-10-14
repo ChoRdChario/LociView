@@ -106,7 +106,7 @@ export function planAssetMembershipCopies(provider: Provider, command: AssetMemb
     reader.charge(); if (Object.hasOwn(projectRecordMaps, w.path[0]!)) reserve(w.path[1]);
     if (w.value.kind === 'value') reserve(w.value.value);
   }
-  const guard = new ProjectRecordFields();
+  const guard = new ProjectRecordFields(provider.semanticProfile);
   const fresh = (id: string, prefix: string) => { guard.id(id, prefix, []); if (reserved.has(id)) fail('model-copy-id'); reserved.add(id); };
   const lifecycle = { state: 'active', reason: 'initial', eventId: command.eventId };
   for (const copy of copies!) {

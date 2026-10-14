@@ -4,7 +4,7 @@ import { canonical } from '../domain/projectGraphSupport';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { checkProjectHeader } from '../domain/projectRecords';
 import { NativeSha256 } from '../nativeGs/sha256';
-import { PACKAGE_FORMAT, PACKAGE_WIRE_VERSION, PACKAGE_LIMITS as L, SUMMARY_ALGORITHM, SUMMARY_FIELDS,
+import { PACKAGE_FORMAT, PACKAGE_WIRE_VERSION, PACKAGE_LIMITS as L, SUMMARY_ALGORITHM, SUMMARY_ALGORITHM2, summaryFieldsFor, type SummaryAlgorithm,
   type Entry, type PackageManifest, type PackagePurpose } from './contract';
 
 export class PackageControlError extends Error {
@@ -59,7 +59,7 @@ function checkedManifest(root: JsonValue): { manifest: PackageManifest; payloads
     checkProjectHeader(c, 'identity', req('identity'));
     const env = c.shape(req('metadataEnvelope'), ['adapter', 'adapterFormatVersion', 'lineageProof'], ['metadataEnvelope']);
     c.enum(c.required(env, 'adapter', []), ['automerge'], []);
-    c.enum(c.required(env, 'adapterFormatVersion', []), ['lociview-automerge-atomic-map-1'], []);
+    c.enum(c.required(env, 'adapterFormatVersion', []), ['lociview-automerge-atomic-map-1', 'lociview-automerge-atomic-map-2'], []);
     const proof = c.shape(c.required(env, 'lineageProof', []), ['kind', 'rootChangeHash'], []);
     c.enum(c.required(proof, 'kind', []), ['automerge-root-change-v1'], []); c.digest(c.required(proof, 'rootChangeHash', []), []);
     heads(req('targetHeads'), ['targetHeads']);
@@ -136,13 +136,18 @@ function checkedManifest(root: JsonValue): { manifest: PackageManifest; payloads
     if (blobBytes > L.blobBytes) fail('blob-bytes');
   }
   const sum = c.shape(req('summary'), ['algorithm', 'scope', 'entityClasses', 'fieldClasses', 'blobEntryCount', 'blobBytes'], ['summary']);
-  c.enum(c.required(sum, 'algorithm', []), [SUMMARY_ALGORITHM], []);
+  c.enum(c.required(sum, 'algorithm', []), [SUMMARY_ALGORITHM, SUMMARY_ALGORITHM2], []);
+  if (p !== 'review') {
+    const expected = (r.metadataEnvelope as JsonObject).adapterFormatVersion === 'lociview-automerge-atomic-map-2' ? SUMMARY_ALGORITHM2 : SUMMARY_ALGORITHM;
+    if (sum.algorithm !== expected) fail('summary-profile');
+  }
+  const summaryFields = summaryFieldsFor(sum.algorithm as SummaryAlgorithm);
   const scope = p === 'contribution' ? 'baseDelta' : p === 'clean' || p === 'review' ? 'snapshot' : 'entireHistory';
   c.enum(c.required(sum, 'scope', []), [scope], []);
   if (boundedInteger(c.required(sum, 'blobEntryCount', []), L.blobCount) !== blobs.length ||
       boundedInteger(c.required(sum, 'blobBytes', []), L.blobBytes) !== blobBytes) fail('summary-blobs');
-  const entities = Object.keys(SUMMARY_FIELDS).filter(k => scope !== 'snapshot' || k !== 'opaque');
-  const fields = Object.entries(SUMMARY_FIELDS).flatMap(([key, values]) => entities.includes(key) ? values.map(f => `${key}.${f}`) : []);
+  const entities = Object.keys(summaryFields).filter(k => scope !== 'snapshot' || k !== 'opaque');
+  const fields = Object.entries(summaryFields).flatMap(([key, values]) => entities.includes(key) ? values.map(f => `${key}.${f}`) : []);
   if (p === 'review') fields.push('assetsById.record');
   const countTable = (v: JsonValue, allowed: readonly string[]) => {
     const counts = new Map<string, number>(); let previous = '';

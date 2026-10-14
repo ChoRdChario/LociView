@@ -100,7 +100,7 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
   if (command.kind === 'deleteAsset') return planAssetDeletion(provider, command, limits);
   if (command.kind === 'createScene' || command.kind === 'renameScene' || command.kind === 'setDefaultScene')
     return planSceneAuthoring(provider, command, limits);
-  const c = new ProjectRecordFields(), result: MetadataRecordEdit[] = [];
+  const c = new ProjectRecordFields(provider.semanticProfile), result: MetadataRecordEdit[] = [];
   const row = (map: MutableRecordMap, id: string) => {
     const r = provider.details.mutable[map][id];
     if (!r || exact(r.id) !== id || object(exact(r.lifecycle)).state !== 'active') return fail('command-inactive');
@@ -112,7 +112,7 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       const r = row(map, id);
       for (const [name, v] of [...Object.entries(fields), ...remove.map(name => [name, undefined] as const)]) {
         if (map === 'captionsById' && r[name]?.kind !== 'value') fail('caption-unresolved');
-        const oldCheck = new ProjectRecordFields(); checkMutableField(oldCheck, map, name, exact(r[name]));
+        const oldCheck = new ProjectRecordFields(provider.semanticProfile); checkMutableField(oldCheck, map, name, exact(r[name]));
         if (oldCheck.unknown) fail('command-unknown-value');
         checkMutableField(c, map, name, v);
       }
@@ -188,10 +188,10 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
   const materialIntent = (appearance: JsonObject, compositing: JsonObject) => {
     checkMutableField(c, 'materialOverridesById', 'appearance', appearance);
     checkMutableField(c, 'materialOverridesById', 'compositing', compositing);
-    const intent = validateMaterialIntent({ appearance, compositing }, limits);
+    const intent = validateMaterialIntent({ appearance, compositing }, limits, provider.semanticProfile);
     if (c.unknown || intent.compositing.optics === 'transmission' ||
       ['smoothBlend', 'ditherCoverage'].includes(intent.compositing.coverage.policy) ||
-      (intent.appearance.chroma?.softness ?? 0) > 0 ||
+      (provider.semanticProfile !== 'map2' || intent.appearance.chroma?.enabled !== false) && (intent.appearance.chroma?.softness ?? 0) > 0 ||
       (intent.compositing.coverage.policy === 'inherit' && (intent.appearance.opacity ?? 1) < 1)) fail('material-unsupported');
   };
   switch (command.kind) {
@@ -335,7 +335,8 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
     case 'reparentPin': {
       shape(raw, ['kind', 'sceneId', 'captionId', 'anchor']);
       const before = exact(provider.resources.captions[command.captionId]?.anchor), after = command.anchor;
-      if (after.kind !== 'asset' || before.kind === 'asset' && before.assetId === after.assetId) fail('pin-parent-unchanged');
+        if (after.kind !== 'asset' || before.kind === 'asset' && before.assetId === after.assetId) fail('pin-parent-unchanged');
+        if (before.kind === 'unplaced' && before.ownerAssetId !== undefined && after.kind === 'asset' && before.ownerAssetId !== after.assetId) fail('pin-owner-changed');
       memberships('caption', command.sceneId, command.captionId);
       if (!pin(command.sceneId, after).captions.some(caption => caption.captionId === command.captionId)) fail('pin-not-in-scene');
       // Replace the whole anchor, not a spread of old-parent evidence/coordinates.
@@ -347,7 +348,7 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       const before = exact(provider.resources.captions[command.captionId]?.anchor), after = command.anchor;
       if (before.kind !== 'asset' || after.kind !== 'asset' || before.assetId !== after.assetId || before.assetFrameId !== after.assetFrameId)
         fail('pin-owner-changed');
-      const oldCheck = new ProjectRecordFields(); oldCheck.anchor(json(before), []);
+      const oldCheck = new ProjectRecordFields(provider.semanticProfile); oldCheck.anchor(json(before), []);
       if (oldCheck.unknown) fail('pin-unknown-anchor');
       memberships('caption', command.sceneId, command.captionId);
       if (!pin(command.sceneId, after).captions.some(c => c.captionId === command.captionId)) fail('pin-not-in-scene');

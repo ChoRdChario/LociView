@@ -1,12 +1,13 @@
 import { inspectProjectCandidates, type CandidateField } from '../domain/projectCandidates';
 import { inspectProjectGraph } from '../domain/projectGraph';
 import { canonical, immutableDigest, immutableKinds, list, object, same, string } from '../domain/projectGraphSupport';
-import { mutableRecordFields, type MutableRecordMap } from '../domain/projectMutableFields';
+import { mutableFieldsFor, type MutableRecordMap } from '../domain/projectMutableFields';
+import type { ProjectSemanticProfile } from '../domain/projectProfile';
 import { admitProjectRecords, projectRecordMaps, type ProjectRecordMap } from '../domain/projectRecords';
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
 import { newId } from '../projectMetadata/persistence';
 import type { ProjectMetadataSource, MetadataLimits } from '../projectMetadata/source';
-import { PACKAGE_LIMITS as L, SUMMARY_ALGORITHM, type AutomaticSummary, type Entry } from './contract';
+import { PACKAGE_LIMITS as L, summaryAlgorithm, type AutomaticSummary, type Entry } from './contract';
 import { PackageControlError } from './manifest';
 
 const fail = (code: string): never => { throw new PackageControlError(`clean-${code}`); };
@@ -19,9 +20,10 @@ const empty = (schema: JsonObject, identity: JsonObject, project: JsonObject): J
 
 /** Current all-candidate admission, not a materialized winner or a renderer DTO. */
 export async function selectCleanRecords(source: ProjectMetadataSource, limits: MetadataLimits): Promise<JsonObject> {
+  const profile = source.semanticProfile, mutableRecordFields = mutableFieldsFor(profile);
   const c = await inspectProjectCandidates(source.read(), limits);
   if (c.kind !== 'project-candidate-inspection') return fail('candidates');
-  if (!same(c.source.schema, { major: 2, minor: 0 }) || c.source.recordMaps.some(m => !maps.includes(m as ProjectRecordMap))) fail('unknown-schema');
+  if (!same(c.source.schema, { major: 2, minor: profile === 'map2' ? 1 : 0 }) || c.source.recordMaps.some(m => !maps.includes(m as ProjectRecordMap))) fail('unknown-schema');
   const byPath = new Map(c.fields.map(f => [canonical(f.path), f])), byEntity = new Map<string, CandidateField[]>();
   const resolved = (f: CandidateField | undefined, required = true): JsonValue | undefined => {
     if (!f) { if (required) fail('missing-field'); return; }
@@ -82,7 +84,7 @@ export async function selectCleanRecords(source: ProjectMetadataSource, limits: 
       ['partial-material-map', 'ambiguous-material-maps'].includes(issue.code)) continue;
     if (issue.kind === 'invalid' || issue.kind === 'orphan' || issue.kind === 'review') fail('unresolved-closure');
   }
-  const admitted = admitProjectRecords(records, limits);
+  const admitted = admitProjectRecords(records, limits, profile);
   if (admitted.kind !== 'valid-records' || admitted.hasUnknownFields) return fail('records');
   return admitted.records;
 }
@@ -160,13 +162,13 @@ class Rekey {
 
 /** Explicit §12.1 field transforms after complete current-scope admission. */
 export async function rebuildCleanRecords(input: JsonObject, limits: MetadataLimits,
-  verifiedHit: (anchor: JsonObject, representation: JsonObject) => boolean = () => false): Promise<JsonObject> {
-  return (await prepareCleanRecords(input, limits, verifiedHit)).records;
+  verifiedHit: (anchor: JsonObject, representation: JsonObject) => boolean = () => false, profile: ProjectSemanticProfile = 'map1'): Promise<JsonObject> {
+  return (await prepareCleanRecords(input, limits, verifiedHit, undefined, profile)).records;
 }
 export async function prepareCleanRecords(input: JsonObject, limits: MetadataLimits,
-  verifiedHit: (anchor: JsonObject, representation: JsonObject) => boolean = () => false, frozenRecipe?: CleanReconstruction) {
+  verifiedHit: (anchor: JsonObject, representation: JsonObject) => boolean = () => false, frozenRecipe?: CleanReconstruction, profile: ProjectSemanticProfile = 'map1') {
   if (frozenRecipe !== undefined && (!frozenRecipe || typeof frozenRecipe !== 'object')) fail('recipe');
-  const admitted = admitProjectRecords(input, limits);
+  const admitted = admitProjectRecords(input, limits, profile);
   if (admitted.kind !== 'valid-records' || admitted.hasUnknownFields) return fail('records');
   const recipe = frozenRecipe && cloneCanonicalValue(frozenRecipe, { maxDepth: L.maxDepth, maxNodes: L.maxNodes, maxStringScalars: L.maxStringScalars }) as unknown as CleanReconstruction | undefined;
   const records = admitted.records, keys = new Rekey(recipe), includedBlobs = new Set<string>();
@@ -178,9 +180,10 @@ export async function prepareCleanRecords(input: JsonObject, limits: MetadataLim
     };
     const project = object(records.project), frame = object(project.frame), oldIdentity = object(records.identity);
     const identity = keys.projectIdentity(oldIdentity);
-    const out = empty({ major: 2, minor: 0 }, identity, { title: project.title!, defaultSceneId: id(project.defaultSceneId, 'scn'),
+    const out = empty({ major: 2, minor: profile === 'map2' ? 1 : 0 }, identity, { title: project.title!, defaultSceneId: id(project.defaultSceneId, 'scn'),
       frame: { ...copy(frame, ['handedness', 'upAxis', 'unit']), id: id(frame.id, 'frm') } });
     const anchor = (a: JsonObject): JsonObject => {
+      if (profile === 'map2' && a.kind === 'unplaced') return { kind: 'unplaced', ...(a.ownerAssetId === undefined ? {} : { ownerAssetId: id(a.ownerAssetId, 'ast') }) };
       if (a.kind === 'project') return { ...copy(a, ['kind', 'positionProject', 'normalProject']), projectFrameId: id(a.projectFrameId, 'frm') };
       const result: BuildingRecord = { ...copy(a, ['kind', 'positionAsset', 'normalAsset']), assetId: id(a.assetId, 'ast'), assetFrameId: id(a.assetFrameId, 'frm'),
         authoredAnchorCompatibilityId: id(a.authoredAnchorCompatibilityId, 'cmp') };
@@ -208,7 +211,7 @@ export async function prepareCleanRecords(input: JsonObject, limits: MetadataLim
       const value: BuildingRecord = { id: id(r.id, projectRecordMaps[map]) };
       if (!Object.hasOwn(immutableKinds, map)) value.lifecycle = keys.lifecycle(r);
       if (map === 'assetsById') {
-        const s = object(r.status); Object.assign(value, copy(r, ['label']), { assetFrameId: id(r.assetFrameId, 'frm'),
+        const s = object(r.status); Object.assign(value, copy(r, profile === 'map2' ? ['label', 'pinScale'] : ['label']), { assetFrameId: id(r.assetFrameId, 'frm'),
           status: s.kind === 'ready' ? { kind: 'ready', activeBindingId: id(s.activeBindingId, 'bnd') } : copy(s, ['kind', 'reason', 'expectedLabel', 'pendingAssetToProject']) });
       } else if (map === 'assetBindingsById') {
         if (r.parentBindingId) keys.reserve(r.parentBindingId, 'bnd');
@@ -251,7 +254,7 @@ export async function prepareCleanRecords(input: JsonObject, limits: MetadataLim
   transform(); keys.collecting = false; const output = transform();
   for (const [map, kind] of Object.entries(immutableKinds)) for (const record of Object.values(table(output, map as ProjectRecordMap)))
     record.payloadDigest = await immutableDigest(kind, record);
-  const graph = await inspectProjectGraph(output, limits);
+  const graph = await inspectProjectGraph(output, limits, undefined, profile);
   if (graph.kind !== 'record-graph-inspection' || graph.hasUnknownFields || graph.issues.some(i => i.kind !== 'unverified' && i.code !== 'anchor-class-not-current')) fail('rebuilt-graph');
   const reconstruction = keys.recipe();
   if (new TextEncoder().encode(canonical(reconstruction as unknown as JsonValue)).length > L.controlBytes) fail('recipe-budget');
@@ -259,7 +262,7 @@ export async function prepareCleanRecords(input: JsonObject, limits: MetadataLim
 }
 
 /** Count only present semantic output fields; no source change or bootstrap-op counts. */
-export function summarizeCleanRecords(records: JsonObject, blobs: readonly Entry[]): AutomaticSummary {
+export function summarizeCleanRecords(records: JsonObject, blobs: readonly Entry[], profile: ProjectSemanticProfile = 'map1'): AutomaticSummary {
   const entities = new Map<string, number>([['project', 1]]), fields = new Map<string, number>();
   for (const name of ['schema', 'identity', ...Object.keys(object(records.project))]) fields.set(`project.${name}`, 1);
   for (const map of maps) for (const record of Object.values(table(records, map))) {
@@ -269,6 +272,6 @@ export function summarizeCleanRecords(records: JsonObject, blobs: readonly Entry
     }
   }
   const counts = (v: Map<string, number>) => [...v].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([name, count]) => ({ class: name, count }));
-  return { algorithm: SUMMARY_ALGORITHM, scope: 'snapshot', entityClasses: counts(entities), fieldClasses: counts(fields),
+  return { algorithm: summaryAlgorithm(profile), scope: 'snapshot', entityClasses: counts(entities), fieldClasses: counts(fields),
     blobEntryCount: blobs.length, blobBytes: blobs.reduce((n, e) => n + e.byteLength, 0) };
 }

@@ -22,7 +22,7 @@ const table = (records: JsonObject, map: ProjectRecordMap) => object(records[map
 /** Local source protection, deliberately stricter than history-free ZIP scope. */
 export async function cleanProtectedInventory(source: ProjectMetadataSource, bases: readonly Entry[], limits: MetadataLimits) {
   const c = await inspectProjectCandidates(source.read(), limits);
-  if (c.kind !== 'project-candidate-inspection' || !same(c.source.schema, { major: 2, minor: 0 }) ||
+  if (c.kind !== 'project-candidate-inspection' || !same(c.source.schema, { major: 2, minor: source.semanticProfile === 'map2' ? 1 : 0 }) ||
     c.source.recordMaps.some(m => !Object.hasOwn(projectRecordMaps, m))) return fail('source-protection-unverified');
   if (c.fields.some(f => f.hasUnknownFields && f.candidates.some(v => v.value.kind !== 'absent'))) fail('source-protection-unverified');
   return protectedWorkspaceInventory({ ...c, hasUnknownFields: false, fields: c.fields.filter(f => !f.hasUnknownFields) }, bases);
@@ -42,7 +42,7 @@ async function cleanRecordPlan(source: ProjectMetadataSource, provider: ProjectP
     const surface = object(object(anchor.hitEvidence).source).surfaceRef;
     return !!check?.facts && (!surface || sourceIndexInRange(object(surface), check.facts));
   };
-  return prepareCleanRecords(selected, limits, verifiedHit, recipe);
+  return prepareCleanRecords(selected, limits, verifiedHit, recipe, source.semanticProfile);
 }
 
 /** Closed fresh-initialization shape, not a causal envelope relabeled as clean. */
@@ -51,6 +51,7 @@ export async function inspectCleanSource(source: ProjectMetadataSource, limits: 
   const records = await selectCleanRecords(source, limits), inspection = await source.inspectOriginal({ maxNodes: L.inspectionNodes, maxWork: L.inspectionWork });
   source.assertFreshInitialization(Object.keys(projectRecordMaps).filter(m => !Object.hasOwn(immutableKinds, m)).reduce((n, m) => n + Object.keys(object(records[m])).length, 0));
   const expected = new Map<string, JsonValue>([['["schema"]', records.schema!], ['["identity"]', records.identity!]]);
+  if (source.semanticProfile === 'map2') expected.set('["semanticProfile"]', 'map2');
   for (const [key, value] of Object.entries(object(records.project))) expected.set(canonical(['project', key]), value);
   for (const map of Object.keys(projectRecordMaps) as ProjectRecordMap[]) for (const record of Object.values(table(records, map))) {
     if (Object.hasOwn(immutableKinds, map)) expected.set(canonical([map, record.id!]), record);
@@ -86,7 +87,7 @@ export async function inspectCleanSource(source: ProjectMetadataSource, limits: 
       if ((a.authoredAssetRevisionId !== undefined) !== !!weak || weak && (!table(records, 'assetRevisionsById')[string(a.authoredAssetRevisionId)] || !table(records, 'representationsById')[string(weak.representationId)])) fail('weak-source');
     }
   }
-  return { records, closure, summary: summarizeCleanRecords(records, closure.entries) };
+  return { records, closure, summary: summarizeCleanRecords(records, closure.entries, source.semanticProfile) };
 }
 
 /** Owned fresh output plus separate source evidence; neither is a durable job. */
@@ -113,7 +114,7 @@ export class CleanSourceCapture {
     if (original.length > L.sourceBytes) fail('source-budget');
     const source = ProjectMetadataSource.fromFullSource(original, before.source.proof, limits);
     const { records, reconstruction } = await cleanRecordPlan(source, before.provider, limits); checkAbort(signal);
-    const output = ProjectMetadataSource.bootstrap(object(records.schema), object(records.identity), limits, { time: 0 }).initialize(records, { time: 0 });
+    const output = ProjectMetadataSource.bootstrap(object(records.schema), object(records.identity), limits, { time: 0, semanticProfile: source.semanticProfile }).initialize(records, { time: 0 });
     const description = await inspectCleanSource(output, limits); checkAbort(signal);
     await verifyCleanBodies(description.closure.semanticRefs, store, signal);
     const after = checked(await session.read()); checkAbort(signal);
@@ -128,6 +129,7 @@ export class CleanSourceCapture {
     store: Pick<OriginBlobStore, 'openReadOnly'>, verifier: ProjectContentVerifier, requested: MetadataLimits, signal?: AbortSignal) {
     checkAbort(signal); const limits = packageSourceLimits(requested), original = input.source.slice(), bytes = input.output.slice();
     const source = ProjectMetadataSource.fromFullSource(original, input.sourceProof, limits), output = ProjectMetadataSource.fromFullSource(bytes, input.outputProof, limits);
+    if (source.semanticProfile !== output.semanticProfile) fail('reconstruction-profile');
     const provider = await readProjectScene(source.read(), limits, verifier);
     const { records, reconstruction } = await cleanRecordPlan(source, provider, limits, input.reconstruction); checkAbort(signal);
     const description = await inspectCleanSource(output, limits);

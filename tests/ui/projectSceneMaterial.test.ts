@@ -55,6 +55,23 @@ function host(initial = fixture()) {
 }
 
 describe('disconnected material controls (not rendering, browser or save acceptance)', () => {
+  it('retains map2 disabled chroma parameters across editing and toggles without applying them implicitly', () => {
+    const appearance = { chroma: { enabled: false, keyColorSrgb: [0.123456, 0.2, 0.3], tolerance: 0.2, softness: 0.4 } };
+    const current = validateMaterialIntent({ appearance, compositing: { coverage: { policy: 'smoothBlend' }, optics: 'inherit' } }, limits, 'map2');
+    const s = surface(); if (s.project.kind !== 'value' || !s.project.value) throw Error('fixture');
+    const base = fixture(true, { ...s, project: value({ ...s.project.value, intent: value(current) }) });
+    let context = editing({ ...base, source: { ...base.source, semanticProfile: 'map2' } });
+    const h = host(context); expect(h.fields.get('chroma')!.value).toBe('off');
+    context = edit(context, 'doubleSided', 'double');
+    const p = effect(context, 'apply'); if (p.kind !== 'apply') throw Error('apply');
+    expect(p.intent.appearance.chroma).toEqual(appearance.chroma);
+    context = edit(context, 'chroma', 'on');
+    const enabled = effect(context, 'apply'); if (enabled.kind !== 'apply') throw Error('apply');
+    expect(enabled.intent.appearance.chroma).toEqual({ ...appearance.chroma, enabled: true });
+    context = edit(context, 'chroma', 'off');
+    const disabled = effect(context, 'apply'); if (disabled.kind !== 'apply') throw Error('apply');
+    expect(disabled.intent.appearance.chroma).toEqual(appearance.chroma);
+  });
   it('selects exact model/surface/scope with no default or write, and never invents a catalog for an empty model', () => {
     let context = fixture(false); const before = context.source;
     expect(materialView(context).targetIssue).toContain('モデルを選択');

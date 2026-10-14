@@ -1,6 +1,6 @@
 import { inspectProjectCandidates, type CandidateField } from '../domain/projectCandidates';
 import { canonical, immutableDigest, immutableKinds, list, object, same, string } from '../domain/projectGraphSupport';
-import { mutableRecordFields, type MutableRecordMap } from '../domain/projectMutableFields';
+import { mutableFieldsFor, type MutableRecordMap } from '../domain/projectMutableFields';
 import { projectRecordMaps, type ProjectRecordMap } from '../domain/projectRecords';
 import type { JsonObject, JsonValue } from '../domain/values';
 import type { MetadataLimits, ProjectMetadataSource } from '../projectMetadata/source';
@@ -8,7 +8,7 @@ import { newId } from '../projectMetadata/persistence';
 import { prepareCleanRecords, type CleanReconstruction } from './cleanRecords';
 import { PACKAGE_LIMITS as L } from './contract';
 import { PackageControlError } from './manifest';
-import { inspectReviewSnapshot, REVIEW_SCHEMA, reviewMaps } from './reviewSnapshot';
+import { inspectReviewSnapshot, reviewSchema, reviewMaps } from './reviewSnapshot';
 
 const fail = (code: string): never => { throw new PackageControlError(`review-${code}`); };
 const table = (r: JsonObject, map: string) => object(r[map]) as Record<string, JsonObject>;
@@ -25,8 +25,9 @@ const checkSelection = (options: ReviewSelectionOptions) => {
 /** Resolve only the explicit Scene closure. An uncertain endpoint never proves exclusion. */
 export async function selectReviewRecords(source: ProjectMetadataSource, limits: MetadataLimits, options: ReviewSelectionOptions) {
   checkSelection(options);
+  const profile = source.semanticProfile, mutableRecordFields = mutableFieldsFor(profile);
   const c = await inspectProjectCandidates(source.read(), limits);
-  if (c.kind !== 'project-candidate-inspection' || !same(c.source.schema, { major: 2, minor: 0 }) ||
+  if (c.kind !== 'project-candidate-inspection' || !same(c.source.schema, { major: 2, minor: profile === 'map2' ? 1 : 0 }) ||
     c.source.recordMaps.some(m => !Object.hasOwn(projectRecordMaps, m))) return fail('candidates');
   const fields = new Map(c.fields.map(f => [canonical(f.path), f])), entities = new Map<string, CandidateField[]>(), consumed = new Set<string>();
   const uncertainPaths = new Set<string>();
@@ -103,7 +104,8 @@ export async function selectReviewRecords(source: ProjectMetadataSource, limits:
     const id = string(edge.tagId); table(records, 'captionTagsById')[id] = current('captionTagsById', id);
   }
   const visualAssets = new Set(Object.values(table(records, 'sceneAssetMembershipsById')).map(r => string(r.assetId)));
-  const owners = new Set([...visualAssets, ...Object.values(table(records, 'captionsById')).map(r => object(r.anchor)).filter(a => a.kind === 'asset').map(a => string(a.assetId))]);
+  const anchors = Object.values(table(records, 'captionsById')).map(r => object(r.anchor));
+  const owners = new Set([...visualAssets, ...anchors.flatMap(a => a.kind === 'asset' ? [string(a.assetId)] : a.kind === 'unplaced' && a.ownerAssetId !== undefined ? [string(a.ownerAssetId)] : [])]);
   const compatible = new Map<string, readonly string[]>(), transformOnlyBindings = new Set<string>(), ownerClasses = new Map<string, Set<string>>();
   for (const r of Object.values(table(records, 'captionsById'))) {
     charge(); const a = object(r.anchor); if (a.kind !== 'asset') continue;
@@ -111,6 +113,10 @@ export async function selectReviewRecords(source: ProjectMetadataSource, limits:
   }
   for (const id of owners) {
     charge();
+    if (profile === 'map2' && !visualAssets.has(id) && !ownerClasses.has(id)) {
+      const a = current('assetsById', id, ['label', 'status']);
+      table(records, 'assetsById')[id] = { ...a, label: 'モデル未収録', status: { kind: 'unresolved', reason: 'missingSource' } }; continue;
+    }
     const a = current('assetsById', id, visualAssets.has(id) ? [] : ['label']), status = object(a.status);
     let transform: JsonValue | undefined, binding: JsonObject | undefined;
     if (status.kind === 'ready') {
@@ -184,17 +190,20 @@ export async function prepareReviewSnapshot(source: ProjectMetadataSource, limit
   checkSelection(options);
   if (frozen && (Object.keys(frozen).sort().join(',') !== 'rekey,schema,selection,snapshotId' || frozen.schema !== 'lociview-review-reconstruction-1' ||
     !/^snp_[0-9a-f]{32}$/.test(frozen.snapshotId) || !same(frozen.selection as unknown as JsonValue, options as unknown as JsonValue))) fail('recipe');
-  const selected = await selectReviewRecords(source, limits, options), rebuilt = await prepareCleanRecords(selected.records, limits, () => false, frozen?.rekey);
+  const selected = await selectReviewRecords(source, limits, options), rebuilt = await prepareCleanRecords(selected.records, limits, () => false, frozen?.rekey, source.semanticProfile);
   const records = rebuilt.records, mapping = new Map(rebuilt.reconstruction.idMap.map(r => [r.from, r.to])), reverse = new Map(rebuilt.reconstruction.idMap.map(r => [r.to, r.from]));
-  const snapshot: JsonObject = { schema: REVIEW_SCHEMA, snapshotId: frozen?.snapshotId ?? `snp_${newId()}`, project: records.project!,
+  const snapshot: JsonObject = { schema: reviewSchema(source.semanticProfile), snapshotId: frozen?.snapshotId ?? `snp_${newId()}`, project: records.project!,
     scene: copy(Object.values(table(records, 'scenesById'))[0]!, ['id', 'name', 'orderKey', 'defaultViewId']), ...Object.fromEntries(reviewMaps.map(m => [m, {}])) };
   for (const map of reviewMaps) for (const r of Object.values(table(records, map))) {
     if (map === 'assetsById') {
       const status = object(r.status);
-      if (status.kind === 'unresolved') { table(snapshot, map)[string(r.id)] = { kind: 'nonvisualOwner', ...copy(r, ['id', 'assetFrameId']), assetToProject: status.pendingAssetToProject! }; continue; }
+      const extra = source.semanticProfile === 'map2' ? copy(r, ['pinScale']) : {};
+      if (status.kind === 'unresolved') { table(snapshot, map)[string(r.id)] = source.semanticProfile === 'map2' && status.pendingAssetToProject === undefined
+        ? { kind: 'unplacedOwner', ...copy(r, ['id', 'assetFrameId']), ...extra }
+        : { kind: 'nonvisualOwner', ...copy(r, ['id', 'assetFrameId']), ...extra, assetToProject: status.pendingAssetToProject! }; continue; }
       const binding = table(records, 'assetBindingsById')[string(status.activeBindingId)]!, revision = table(records, 'assetRevisionsById')[string(binding.assetRevisionId)]!;
       const sourceId = reverse.get(string(r.id)) ?? fail('asset-map');
-      table(snapshot, map)[string(r.id)] = { kind: 'visual', ...copy(r, ['id', 'label', 'assetFrameId']), assetToProject: binding.assetToProject!,
+      table(snapshot, map)[string(r.id)] = { kind: 'visual', ...copy(r, ['id', 'label', 'assetFrameId']), ...extra, assetToProject: binding.assetToProject!,
         representationIds: list(revision.representationIds).map(string).sort(), anchorClassPartition: revision.anchorCompatibilityClasses!,
         compatibleAnchorClassIds: (selected.compatible.get(sourceId) ?? []).map(id => mapping.get(id) ?? fail('class-map')).sort() }; continue;
     }

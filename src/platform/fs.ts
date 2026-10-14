@@ -18,7 +18,7 @@ export interface WorkspaceFS {
   readStream(path: string): Promise<WorkspaceReadableFile | null>;
   /** Writes one stream to a file. Production OPFS consumes it incrementally. */
   writeStream(path: string, stream: ReadableStream<Uint8Array>): Promise<void>;
-  /** prefix配下のファイルパス一覧（辞書順） */
+  /** Fresh sorted file paths whose full logical key startsWith(prefix), including partial names. */
   list(prefix: string): Promise<string[]>;
   exists(path: string): Promise<boolean>;
   remove(path: string): Promise<void>;

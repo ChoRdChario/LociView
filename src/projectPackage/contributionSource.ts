@@ -5,7 +5,7 @@ import type { OriginBlobStore, StoredBlobRef } from '../projectMetadata/blobStor
 import { checkedBlobStream } from '../projectMetadata/blobStream';
 import type { MetadataProjectSession, MetadataSessionRead } from '../projectMetadata/session';
 import { ProjectMetadataSource, type MetadataLimits, type MetadataProof } from '../projectMetadata/source';
-import { PACKAGE_LIMITS as L, SUMMARY_ALGORITHM, type AutomaticSummary, type ChangeEntry, type Entry, type PackageManifest } from './contract';
+import { PACKAGE_LIMITS as L, type AutomaticSummary, type ChangeEntry, type Entry, type PackageManifest } from './contract';
 import { packageByteHash, PackageControlError, readManifestControl } from './manifest';
 import { summarizeFullHistory } from './historySummary';
 import { planWorkspaceClosure } from './closure';

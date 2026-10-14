@@ -41,8 +41,15 @@ const encode = (s: string) => new TextEncoder().encode(s);
 const descriptor = (path: string, n: number, byteLength = 17): Entry => ({ path, sha256: hash(n), byteLength });
 const metadataLimits: MetadataLimits = { ...valueLimits, maxWork: 1_000_000, maxChanges: 100,
   maxChangeBytes: 1_000_000, maxTotalBytes: 4_000_000, maxOperations: 10_000 };
-async function workspaceFixture() {
-  const records = fixture(), source = ProjectMetadataSource.bootstrap(records.schema, records.identity, metadataLimits).initialize(records);
+function map2Records() {
+  const records = fixture(); records.schema.minor = 1;
+  records.assetsById[id('ast')].pinScale = 2;
+  records.captionsById[id('cap')].anchor = { kind: 'unplaced', ownerAssetId: id('ast') };
+  records.materialOverridesById[id('ovr')].appearance = { chroma: { enabled: false, keyColorSrgb: [0, 1, 0], tolerance: 0.2, softness: 0.5 } };
+  return records;
+}
+async function workspaceFixture(semanticProfile: 'map1' | 'map2' = 'map1', records = semanticProfile === 'map2' ? map2Records() : fixture()) {
+  const source = ProjectMetadataSource.bootstrap(records.schema, records.identity, metadataLimits, { semanticProfile }).initialize(records);
   const rep = records.representationsById[id('rep')];
   const provider = await readProjectScene(source.read(), metadataLimits, developmentContentVerifier([
     { variantFamilyId: rep.variantFamilyId, representationId: rep.id, payloadDigest: rep.payloadDigest },
@@ -101,6 +108,56 @@ describe('selected-Scene review snapshot (not View activation or external saving
   const change = (source: ProjectMetadataSource, fn: (d: Record<string, any>) => void) =>
     ProjectMetadataSource.fromFullSource(A.save(A.change(A.load<Record<string, any>>(source.encodeFullSource()), fn)), source.proof, metadataLimits);
   const value = (v: JsonValue) => new A.ImmutableString(canonical(v));
+  it('preserves map2 fields, ownerless and transform-free owned records through clean/review and cold capture replay', async () => {
+    const records = map2Records();
+    records.assetsById[id('ast', 2)] = { ...records.assetsById[id('ast')], id: id('ast', 2), assetFrameId: id('frm', 9),
+      status: { kind: 'unresolved', reason: 'missingSource' } };
+    delete records.assetsById[id('ast', 2)].pinScale;
+    for (const n of [2, 3]) {
+      records.captionsById[id('cap', n)] = { ...records.captionsById[id('cap')], id: id('cap', n), title: `Unplaced ${n}`,
+        anchor: n === 2 ? { kind: 'unplaced' } : { kind: 'unplaced', ownerAssetId: id('ast', 2) } };
+      records.sceneCaptionMembershipsById[id('scm', n)] = { ...records.sceneCaptionMembershipsById[id('scm')], id: id('scm', n), captionId: id('cap', n), orderKey: `a${n}` };
+    }
+    const f = await workspaceFixture('map2', records), original = f.source.encodeFullSource(), rep = records.representationsById[id('rep')];
+    const verifier = developmentContentVerifier([{ variantFamilyId: rep.variantFamilyId, representationId: rep.id, payloadDigest: rep.payloadDigest }]);
+    const provider = await readProjectScene(f.source.read(), metadataLimits, verifier);
+    const host = { read: async () => ({ state: 'ready' as const, source: f.source, provider, publication: 'map2-capture' }) };
+    expect((await WorkspaceArchive.inspect(f.file, metadataLimits)).source.originalChanges()).toEqual(f.source.originalChanges());
+    expect(f.capture.summary.algorithm).toBe('lociview-project-summary-2');
+    const clean = await CleanSourceCapture.prepare(host, f.source.token, f.store, metadataLimits);
+    const inspected = await inspectCleanSource(clean.output, metadataLimits), copied = inspected.records as Record<string, any>;
+    expect(clean.output.semanticProfile).toBe('map2');
+    expect(Object.values<any>(copied.captionsById).find(c => c.title === 'Unplaced 2').anchor).toEqual({ kind: 'unplaced' });
+    const ownerCaption = Object.values<any>(copied.captionsById).find(c => c.title === 'Unplaced 3');
+    expect(copied.assetsById[ownerCaption.anchor.ownerAssetId].status).toEqual({ kind: 'unresolved', reason: 'missingSource' });
+    expect(copied.assetsById[ownerCaption.anchor.ownerAssetId]).not.toHaveProperty('pinScale');
+    expect(Object.values<any>(copied.assetsById).some(a => a.pinScale === 2)).toBe(true);
+    expect(Object.values<any>(copied.materialOverridesById)[0].appearance).toEqual(records.materialOverridesById[id('ovr')].appearance);
+    const coldClean = await CleanSourceCapture.restore({ source: original, sourceProof: f.source.proof,
+      output: clean.metadataBytes(), outputProof: clean.proof, reconstruction: clean.reconstruction }, f.store, verifier, metadataLimits);
+    expect(coldClean.metadataBytes()).toEqual(clean.metadataBytes());
+    const review = await ReviewSourceCapture.prepare(host, f.source.token, { sceneId: id('scn') }, f.store, metadataLimits);
+    const snapshot = review.review.snapshot as Record<string, any>;
+    expect(snapshot.schema).toEqual({ kind: 'lociview-project-scene-review', version: '2' });
+    const owner = Object.values<any>(snapshot.assetsById).find(a => a.kind === 'unplacedOwner');
+    expect(Object.keys(owner).sort()).toEqual(['assetFrameId', 'id', 'kind']);
+    expect(Object.values<any>(snapshot.captionsById).find(c => c.title === 'Unplaced 3').anchor.ownerAssetId).toBe(owner.id);
+    const edited = await prepareReviewEdit(review.review, metadataLimits);
+    expect(edited.semanticProfile).toBe('map2');
+    expect(Object.values<any>((edited.records as Record<string, any>).assetsById).find(a => a.status.kind === 'unresolved').status).toEqual({ kind: 'unresolved', reason: 'missingSource' });
+    const parts: BlobPart[] = [];
+    await writeReviewArchive(review, f.store, new WritableStream({ write(b) { parts.push(b.slice() as BlobPart); } }), f.options);
+    const file = new Blob(parts), reopened = await ReviewArchive.inspect(file, metadataLimits);
+    expect(reopened.review.summary.algorithm).toBe('lociview-project-summary-2');
+    const cold = await ReviewSourceCapture.restore({ source: original, sourceProof: f.source.proof,
+      snapshot: review.snapshotBytes(), reconstruction: review.reconstruction }, f.store, verifier, metadataLimits);
+    expect(cold.snapshotBytes()).toEqual(review.snapshotBytes());
+    const entries = await unpackFixture(file), manifest = JSON.parse(new TextDecoder().decode(entries[0]!.bytes));
+    manifest.summary.algorithm = 'lociview-project-summary-1'; entries[0]!.bytes = encode(canonical(manifest)); entries[1]!.bytes = encode(packageByteHash(entries[0]!.bytes));
+    await expect(ReviewArchive.inspect(fixedZip(entries), metadataLimits)).rejects.toThrow(/summary-or-closure/);
+    await expect(inspectReviewSnapshot({ ...snapshot, schema: { kind: 'lociview-project-scene-review', version: '1' } }, metadataLimits)).rejects.toThrow();
+    expect(f.source.encodeFullSource()).toEqual(original);
+  });
   it('cuts exactly one Scene, omits old/other data, preserves missing-model owners and freezes rekeying', async () => {
     const records = fixture();
     records.scenesById[id('scn', 2)] = { ...structuredClone(records.scenesById[id('scn')]), id: id('scn', 2), name: 'PRIVATE_OTHER_SCENE' };
@@ -352,10 +409,11 @@ describe('Contribution originals and actual ZIP (injected base/CAS ports, no dur
     return fixedZip(entries);
   }
 
-  it('retains exact edit/revert originals and delta-only counts, with zero unchanged body reads', async () => {
-    const f = await workspaceFixture(), b = await baseFor(f.source, f.store), target = body(body(f.source, 'Temporary'), fixture().captionsById[id('cap')].body);
+  it.each(['map1', 'map2'] as const)('retains %s exact edit/revert originals and delta-only counts, with zero unchanged body reads', async profile => {
+    const f = await workspaceFixture(profile), b = await baseFor(f.source, f.store), target = body(body(f.source, 'Temporary'), fixture().captionsById[id('cap')].body);
     const capture = await ContributionSourceCapture.prepare(await session(target), target.token, b.base, b.bodies, metadataLimits);
     expect(capture.changes).toHaveLength(2); expect(capture.blobs).toHaveLength(0);
+    expect(capture.summary.algorithm).toBe(profile === 'map2' ? 'lociview-project-summary-2' : 'lociview-project-summary-1');
     expect(capture.summary.entityClasses).toEqual([{ class: 'captionsById', count: 1 }]);
     expect(capture.summary.fieldClasses).toEqual([{ class: 'captionsById.body', count: 1 }]);
     const built = await output(capture, b.bodies), inspected = await ContributionArchive.inspect(built.file, b.base, b.bodies, metadataLimits);
@@ -520,8 +578,8 @@ describe('complete backup originals and ZIP (not durable checkpoint or restore)'
     ]));
     return { read: async () => ({ state: 'ready' as const, source, provider, publication: 'backup-fixture' }) };
   };
-  async function backupFixture(empty = false) {
-    const f = await workspaceFixture(), evidence = new Map<string, Uint8Array>(), rows: BackupBaseRecord[] = [];
+  async function backupFixture(empty = false, profile: 'map1' | 'map2' = 'map1') {
+    const f = await workspaceFixture(profile), evidence = new Map<string, Uint8Array>(), rows: BackupBaseRecord[] = [];
     for (let n = 1; !empty && n <= 2; n++) {
       const controls = prepareWorkspaceManifest(f.capture, { ...f.options, packageId: id('pkg', n) });
       const metadata = f.capture.metadataBytes(), ref = (bytes: Uint8Array) => ({ sha256: packageByteHash(bytes), byteLength: bytes.length });
@@ -550,10 +608,11 @@ describe('complete backup originals and ZIP (not durable checkpoint or restore)'
     return fixedZip([{ path: 'manifest.json', bytes: manifest }, { path: 'manifest.sha256', bytes: encode(packageByteHash(manifest)) },
       ...payloads(m).map(e => ({ path: e.path, bytes: values.get(e.path)! }))]);
   }
-  it('keeps full original history, multiple historical observations and deduplicated evidence/bodies', async () => {
-    const f = await backupFixture(), originalRows = JSON.stringify(f.rows), host = await session(f.source);
+  it.each(['map1', 'map2'] as const)('keeps %s full original history, multiple historical observations and deduplicated evidence/bodies', async profile => {
+    const f = await backupFixture(false, profile), originalRows = JSON.stringify(f.rows), host = await session(f.source);
     const capture = await BackupSourceCapture.prepare(host, f.source.token, f.bases, f.store, metadataLimits);
     const built = await output(capture, f.store), reopened = await BackupArchive.inspect(built.file, metadataLimits);
+    expect(reopened.source.semanticProfile).toBe(profile);
     expect(built.result.kind).toBe('generated-backup-archive'); expect(reopened.source.originalChanges()).toEqual(f.source.originalChanges());
     expect(reopened.description.table.records).toEqual(f.rows); expect(reopened.description.baseEvidence).toHaveLength(3);
     expect(reopened.description.blobs).toEqual(f.capture.blobs); expect(JSON.stringify(f.rows)).toBe(originalRows);
@@ -655,6 +714,13 @@ describe('complete backup originals and ZIP (not durable checkpoint or restore)'
 });
 
 describe('connected Workspace ZIP generation and integrity (not admission or external saving)', () => {
+  it.each(['map1', 'map2'] as const)('rejects %s causal summary-profile relabelling after container checksums are recomputed', async profile => {
+    const f = await workspaceFixture(profile), entries = await unpackFixture(f.file);
+    const manifest = JSON.parse(new TextDecoder().decode(entries[0]!.bytes));
+    manifest.summary.algorithm = profile === 'map1' ? 'lociview-project-summary-2' : 'lociview-project-summary-1';
+    entries[0]!.bytes = encode(canonical(manifest)); entries[1]!.bytes = encode(packageByteHash(entries[0]!.bytes));
+    await expect(WorkspaceArchive.inspect(fixedZip(entries), metadataLimits)).rejects.toThrow();
+  });
   it('attributes protected current, conflicting and base-only bodies without retaining weak history', async () => {
     const f = await workspaceFixture(), inspection = await f.source.inspectOriginal({ maxNodes: L.inspectionNodes, maxWork: L.inspectionWork });
     const candidates = inspection.candidates, base = { path: `blobs/sha256/${hash(99)}`, sha256: hash(99), byteLength: 17 };

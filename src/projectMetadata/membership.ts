@@ -1,5 +1,5 @@
 import type { CandidateField } from '../domain/projectCandidates';
-import { checkMutableField, checkMutableRecord, mutableRecordFields, type MutableRecordMap } from '../domain/projectMutableFields';
+import { checkMutableField, checkMutableRecord, mutableFieldsFor, type MutableRecordMap } from '../domain/projectMutableFields';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { projectRecordMaps } from '../domain/projectRecords';
 import { object } from '../domain/projectGraphSupport';
@@ -32,6 +32,7 @@ const sameIds = (a: readonly string[], b: readonly string[]) => {
 
 /** Read complete source candidates, never the diagnostic/projection DTO. */
 export function candidateReader(provider: Provider, limits: MetadataLimits) {
+  const mutableRecordFields = mutableFieldsFor(provider.semanticProfile);
   const records = new Map<string, Map<string, Map<string, CandidateField>>>();
   let work = 0;
   const charge = (n = 1) => { if ((work += n) > limits.maxWork) fail('membership-resolution-limit'); };
@@ -46,7 +47,7 @@ export function candidateReader(provider: Provider, limits: MetadataLimits) {
   const exact = (map: MutableRecordMap, id: string, name: string): JsonValue | undefined => {
     charge(); const f = records.get(map)?.get(id)?.get(name);
     if (!f) {
-      const c = new ProjectRecordFields(); checkMutableField(c, map, name, undefined);
+      const c = new ProjectRecordFields(provider.semanticProfile); checkMutableField(c, map, name, undefined);
       if (c.unknown) fail('membership-resolution-unknown'); return undefined;
     }
     if (!f.valid || f.hasUnknownFields || f.candidates.length !== 1 || !f.validOperationIds.includes(f.candidates[0]!.operationId))
@@ -64,7 +65,7 @@ export function candidateReader(provider: Provider, limits: MetadataLimits) {
     for (const name of new Set([...fields.keys(), ...Object.keys(mutableRecordFields[map])])) {
       const v = exact(map, id, name); if (v !== undefined) r[name] = v;
     }
-    const c = new ProjectRecordFields(); checkMutableRecord(c, map, r);
+    const c = new ProjectRecordFields(provider.semanticProfile); checkMutableRecord(c, map, r);
     if (c.unknown) fail('membership-resolution-unknown'); return r;
   };
   const couldEqual = (map: MutableRecordMap, id: string, field: string, value: string) => {

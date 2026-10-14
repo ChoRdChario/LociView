@@ -1,6 +1,7 @@
 import { inspectProjectContent, type ProjectContentInspection } from '../domain/projectContent';
 import { immutableKinds, list, object, same, string } from '../domain/projectGraphSupport';
-import { mutableRecordFields, type MutableRecordMap } from '../domain/projectMutableFields';
+import { mutableFieldsFor, type MutableRecordMap } from '../domain/projectMutableFields';
+import { projectSemanticProfile, type ProjectSemanticProfile } from '../domain/projectProfile';
 import type { CandidateIssue } from '../domain/projectCandidates';
 import type { HistoryReadLimits } from '../domain/atomicHistory';
 import type { ProjectContentVerifier } from '../domain/projectContentChecks';
@@ -22,14 +23,12 @@ export interface ProjectReadDetails {
 export type ProjectProviderRead = Extract<ProjectContentInspection, { kind: 'rejected' }> |
   Readonly<{ kind: 'blocked-project'; inspection: Content }> |
   Readonly<{ kind: 'scene-provider'; scope: Content['scope']; token: string; state: SceneState; resources: SceneResources;
-    details: ProjectReadDetails; inspection: Content; issues: readonly CandidateIssue[];
+    semanticProfile: ProjectSemanticProfile; details: ProjectReadDetails; inspection: Content; issues: readonly CandidateIssue[];
     /** No adapter provenance, write receipt, adoption or ordinary-app activation follows. */
     pending: readonly ['same-host-source-adapter-and-integration']; }>;
 const absent = (reason: Reason = 'invalid'): Field<never> => Object.freeze({ kind: 'unresolved', reason });
 const pathKey = (p: readonly string[]) => JSON.stringify(p);
 const prefix = (a: readonly string[], b: readonly string[]) => a.length <= b.length && a.every((v, i) => v === b[i]);
-const optional = (map: string, name: string) => Object.hasOwn(mutableRecordFields, map) &&
-  !!(mutableRecordFields[map as MutableRecordMap] as Record<string, { optional?: true }>)[name]?.optional;
 const immutableMap = (map: string) => Object.hasOwn(immutableKinds, map);
 const fieldValue = <T>(field: Field<T>): T | undefined => field.kind === 'value' ? field.value : undefined;
 const activeLife = (field: Field<JsonValue | undefined>) => { const v = fieldValue(field); return !!v && object(v).state === 'active'; };
@@ -47,6 +46,9 @@ export async function readProjectScene(input: unknown, limits: HistoryReadLimits
 }
 function project(inspection: Content, limits: HistoryReadLimits): ProjectProviderRead {
   const { candidates } = inspection, fields = new Map(candidates.fields.map(f => [pathKey(f.path), f]));
+  const semanticProfile = projectSemanticProfile(candidates.source.semanticProfile), mutableRecordFields = mutableFieldsFor(semanticProfile);
+  const optional = (map: string, name: string) => Object.hasOwn(mutableRecordFields, map) &&
+    !!(mutableRecordFields[map as MutableRecordMap] as Record<string, { optional?: true }>)[name]?.optional;
   const projectionIssues: CandidateIssue[] = [];
   let work = inspection.workUsed;
   const charge = (n = 1) => { work += n; if (work > limits.maxWork) reject('limit', ['projectionWork']); };
@@ -140,7 +142,8 @@ function project(inspection: Content, limits: HistoryReadLimits): ProjectProvide
         revisionId: string(revision.id), representationIds: list(revision.representationIds).map(string), anchorCompatibilityIds: list(revision.anchorCompatibilityClasses).map(c => string(object(c).id)) });
       else projection = absent(unavailable.get(bindingId) ?? 'missing');
     }
-    assets[id] = { id, lifecycle: lifecycle('assetsById', id), projection };
+    assets[id] = { id, lifecycle: lifecycle('assetsById', id), projection,
+      ...(semanticProfile === 'map2' ? { pinScale: field<number | undefined>('assetsById', id, 'pinScale') } : {}) };
   }
   for (const id of Object.keys(mutable.captionsById)) captions[id] = { id, lifecycle: lifecycle('captionsById', id),
     title: field('captionsById', id, 'title'), body: field('captionsById', id, 'body'), anchor: field('captionsById', id, 'anchor') };
@@ -204,7 +207,7 @@ function project(inspection: Content, limits: HistoryReadLimits): ProjectProvide
     tagMemberships[id] = child.kind !== 'value' ? child : tags[child.value.targetId]?.kind !== 'value' ? absent('missing') : value({ captionId: child.value.captionId, tagId: child.value.targetId });
   }
   const token = inspection.token;
-  return freeze({ kind: 'scene-provider', token, scope: inspection.scope, inspection, issues: [...inspection.issues, ...projectionIssues],
+  return freeze({ kind: 'scene-provider', semanticProfile, token, scope: inspection.scope, inspection, issues: [...inspection.issues, ...projectionIssues],
     state: { token, defaultSceneId: read(['project', 'defaultSceneId']) as Field<string>, scenes, assetMemberships, captionMemberships },
     resources: { token, projectFrameId, assets, captions, views, materials }, details: { mutable, immutable, attachments, tags, tagMemberships },
     pending: ['same-host-source-adapter-and-integration'] as const });

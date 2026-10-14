@@ -8,6 +8,7 @@ import type { MetadataSessionRead } from '../../projectMetadata/session';
 import { captionDeletionImpact } from '../../projectMetadata/captionDeletion';
 import { assetDeletionImpact } from '../../projectMetadata/assetDeletion';
 import { prepareValidationCreation, resumeValidationCreation, validationProjectService } from '../../projectFiles/creation';
+import { hasNativeConversion, resumeNativeConversion } from '../../projectFiles/nativeConversion';
 import { validationMetadataLimits as limits, type FileValidationLimits } from '../../projectFiles/validation';
 import type { PngDecoder } from '../../projectFiles/png';
 import { sealValidationRecord } from '../../projectFiles/initialProject';
@@ -115,7 +116,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
     if (incoming instanceof CleanArchive && last.source) throw Error('この独立コピーの再開用データがあります。ファイルを取り込まず、プロジェクト一覧から再開してください。');
     if (last.source && (last.source.proof.identity.projectId !== `prj_${run}` || incoming && json(last.source.proof) !== json(incoming.source.proof)))
       throw Error('ファイルと再開用データのプロジェクトが一致しません。既存データは変更していません。');
-    let localInitial = !!options.initial || !!await fs.readStream(metadataPath(fs, 'validation-initial.json')) ||
+    let localInitial = !!options.initial || await hasNativeConversion(fs) || !!await fs.readStream(metadataPath(fs, 'validation-initial.json')) ||
       (await new TransactionJournal(fs, limits).entries()).some(e => e.start.purpose === 'initialize');
     let prepareDisplay: ((next: SyntheticProject) => Promise<void>) | undefined;
     let images: Record<string, MediaImage> = {};
@@ -158,9 +159,10 @@ export async function openValidationHost(options: ValidationHostOptions) {
       }
       const before = await session.read(), entries = await new TransactionJournal(fs, limits).entries();
       if (before.state === 'empty' && !localInitial) throw Error('作業一式を選択するか、プロジェクト一覧へ戻ってください。');
-      const result = await ready(before.state === 'empty' && options.initial ? await options.initial.persist(fs, options.store, session) :
-        before.state === 'empty' || entries.length === 1 && entries[0]!.start.purpose === 'initialize' && before.state !== 'ready'
-          ? await resumeValidationCreation(fs, session, `prj_${run}`) : await session.retry());
+      const initializing = before.state === 'empty' || entries.length === 1 && entries[0]!.start.purpose === 'initialize' && !entries[0]!.publication && before.state !== 'ready';
+      const result = await ready(initializing && await hasNativeConversion(fs) ? await resumeNativeConversion(fs, options.store, session, options.fileLimits, `prj_${run}`) :
+        before.state === 'empty' && options.initial ? await options.initial.persist(fs, options.store, session) :
+        initializing ? await resumeValidationCreation(fs, session, `prj_${run}`) : await session.retry());
       content.releasePreparedImages(); content.releasePreparedModels(); return result;
     };
     if (fresh && options.initial) { try { await execute(resume); } catch { /* Keep exact creation input for retry. */ } }
@@ -375,7 +377,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
           const slots = project?.modelVersions?.flatMap(v => v.closure.shape === 'saved-glb' ? validationMaterialSlots(v.closure) : []) ?? [];
           const slot = slots.find(s => same(s.target as unknown as JsonObject, routing?.target as JsonObject | undefined));
           if (!slot || !compositing) throw Error('設定するモデルと材質を確認してください。');
-          const issue = validationMaterialIssue(slot, { appearance: command.appearance, compositing } as MaterialIntent);
+          const issue = validationMaterialIssue(slot, { appearance: command.appearance, compositing } as MaterialIntent, project?.semanticProfile);
           if (issue) throw Error(issue);
         }
         return ready(await session.edit(token, command));
@@ -473,7 +475,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
           const slot = slots.find(s => same(s.target as unknown as JsonObject, selected.routing.target));
           if (!slot) throw Error('設定するモデルと材質を確認してください。');
           for (const intent of selected.intents.values()) {
-            const issue = validationMaterialIssue(slot, intent); if (issue) throw Error(issue);
+            const issue = validationMaterialIssue(slot, intent, before.provider.semanticProfile); if (issue) throw Error(issue);
           }
         }
         return ready(await session.edit(token, command));

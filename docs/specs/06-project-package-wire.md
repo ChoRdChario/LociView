@@ -2563,7 +2563,9 @@ not a new Project identity or proof inferred from a filename/time/hash.
 - The capability retains the **same root mutation authority object**, hence the
   existing `underWriteLease` queue, rather than one queue or lock per generation.
   A scope-owned asynchronous fence runs at lease entry and before return, and
-  before/after every FS and IDB operation. Thus even zero-change operations or
+  by default before/after every FS and IDB operation. The approved read-only
+  operation exception below retains audits before accepting and returning a
+  complete read. Thus even zero-change operations or
   identity-seeding writes cannot acknowledge a stale generation. The scope never
   invents its own selected pointer. Its internal controller-provided fence must
   validate the exact bound selection, or the exact pending staging job and input.
@@ -2752,6 +2754,37 @@ later observations, missing binding/evidence, and unchanged old-generation bytes
 Selection and browser acceptance still follow; binding alone is not restore UI.
 
 #### Selected-generation connection
+
+##### Bounded read-operation audits (PO approved 2026-09-20)
+
+To remove measured per-I/O amplification, a pure bulk reader may explicitly use
+an operation-bound read-only FS/factory pair. The root-backed structural audit
+runs at entry and again before returning the result, outside the reader's error
+recovery/catch logic. Individual reads retain path/namespace and owned-input
+checks and verify the operation's live lifetime before/after I/O. A control loss
+or selection change during the read is rejected by the closing audit, not
+necessarily at the intervening individual read. No result is accepted without
+that audit. The existing write, publication, staging and restore fences remain
+strict in this first implementation; this exception cannot publish anything.
+Selected/original generation controllers opt in explicitly; restore staging does
+not register this exception and keeps its owning-job check at each I/O.
+
+The capability is explicit: no shared active-operation flag, time-based cache,
+metadata-token shortcut or implicit reuse by concurrent callers. Public ports
+remain strict. The supplied factory must be the exact factory registered with
+the generation FS. Operation ports cannot mutate storage or seed an identity.
+They expire in `finally`, including failure paths. Lazy handles must be consumed
+within that lifetime; escaped handles reject rather than borrow a later read's
+authority. Only owned records/bytes or fully acquired immutable Blobs may escape.
+No new persisted receipt, selector or package field is introduced.
+
+Initial consumers are journal discovery/parts, repository reads and pure output
+discovery/download. Job owner checks remain exact-object checks: a read job is
+opened and inspected with the same operation facade and does not escape it.
+Acceptance reuses existing storage/output recovery cases, adding bounded checks
+for concurrent strict readers, expired lazy handles, mutation denial, argument
+ownership and closing-audit refusal. Measure the existing host flow before broad
+verification; no new browser PoC or repeated full manual walkthrough is required.
 
 `openWorkspaceGeneration` separates a read fence (`assertSelected`) from an
 optional write fence (`assertWritable`, defaulting to the read fence for existing

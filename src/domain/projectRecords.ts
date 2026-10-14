@@ -1,5 +1,6 @@
 import { cloneCanonicalValue, DomainValidationError, reject, type JsonObject, type JsonValue, type ValidationIssue, type ValueLimits } from './values';
 import { ProjectRecordFields } from './projectRecordFields';
+import type { ProjectSemanticProfile } from './projectProfile';
 import { checkMutableRecord, mutableRecordFields, type MutableRecordMap } from './projectMutableFields';
 
 export const projectRecordMaps = Object.freeze({ assetsById: 'ast', assetRevisionsById: 'rev', assetBindingsById: 'bnd',
@@ -16,12 +17,12 @@ export type ProjectRecordsAdmission = Readonly<{ kind: 'valid-records'; records:
  * authoritative projection. No graph, history, digest, decoder, blob or write receipt.
  * The future adapter must supply/check all candidates; passing its winner here is not admission.
  */
-export function admitProjectRecords(input: unknown, requested: ValueLimits): ProjectRecordsAdmission {
+export function admitProjectRecords(input: unknown, requested: ValueLimits, profile: ProjectSemanticProfile = 'map1'): ProjectRecordsAdmission {
   try {
     // Validate caller budgets too: a NaN/negative option must not loosen the semantic ceilings.
     for (const [key, n] of Object.entries(requested)) if (!Number.isSafeInteger(n) || n < 0) reject('limit', [key]);
     const limits = { maxDepth: Math.min(32, requested.maxDepth), maxNodes: Math.min(5_000_000, requested.maxNodes), maxStringScalars: requested.maxStringScalars };
-    const c = new ProjectRecordFields(), root = c.shape(cloneCanonicalValue(input, limits), ['schema', 'identity', 'project', ...Object.keys(projectRecordMaps)], []);
+    const c = new ProjectRecordFields(profile), root = c.shape(cloneCanonicalValue(input, limits), ['schema', 'identity', 'project', ...Object.keys(projectRecordMaps)], []);
     for (const field of ['schema', 'identity']) checkProjectHeader(c, field, c.required(root, field, []));
     const project = c.shape(c.required(root, 'project', []), ['title', 'frame', 'defaultSceneId'], ['project']);
     for (const field of ['title', 'frame', 'defaultSceneId']) checkProjectHeader(c, field, c.required(project, field, ['project']));
@@ -57,6 +58,10 @@ export function checkProjectHeader(c: ProjectRecordFields, field: string, v: Jso
   if (field === 'schema') {
     const schema = c.shape(v, ['major', 'minor'], ['schema']);
     c.enum(c.required(schema, 'major', ['schema']), [2], ['schema', 'major']); c.integer(c.required(schema, 'minor', ['schema']), ['schema', 'minor']);
+    if (c.semanticProfile === 'map2') {
+      c.enum(schema.minor!, [1], ['schema', 'minor']);
+      if (Object.keys(schema).length !== 2) reject('key', ['schema']);
+    }
   } else if (field === 'identity') {
     const identity = c.shape(v, ['projectId', 'historyEpoch', 'lineageSeed'], ['identity']);
     c.id(c.required(identity, 'projectId', ['identity']), 'prj', ['identity', 'projectId']);

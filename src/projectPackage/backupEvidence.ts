@@ -5,7 +5,7 @@ import type { JsonObject, JsonValue } from '../domain/values';
 import { ProjectMetadataSource, type MetadataLimits, type MetadataProof } from '../projectMetadata/source';
 import type { StoredBlobRef } from '../projectMetadata/blobStore';
 import type { WorkspaceBaseRecord } from './workspaceBases';
-import { PACKAGE_LIMITS as L, SUMMARY_ALGORITHM, type AutomaticSummary, type Entry, type EvidenceRef } from './contract';
+import { PACKAGE_LIMITS as L, summaryAlgorithm, type AutomaticSummary, type Entry, type EvidenceRef } from './contract';
 import { canonicalControl, packageByteHash, PackageControlError } from './manifest';
 import { frozenBaseSource } from './contributionEvidence';
 import { summarizeFullHistory } from './historySummary';
@@ -107,7 +107,7 @@ export async function inspectBackupOriginals(source: ProjectMetadataSource, tabl
   const inventory = canonicalControl(backupEncode(protectedWorkspaceInventory(current.inspection.candidates, guaranteed, charge)));
   const entries = ((inventory as JsonObject).blobs as readonly JsonObject[]).map(b => Object.freeze({
     path: `blobs/sha256/${b.sha256}`, sha256: b.sha256 as string, byteLength: b.byteLength as number }));
-  const summary: AutomaticSummary = Object.freeze({ algorithm: SUMMARY_ALGORITHM, scope: 'entireHistory', entityClasses: current.counts.entityClasses,
+  const summary: AutomaticSummary = Object.freeze({ algorithm: summaryAlgorithm(source.semanticProfile), scope: 'entireHistory', entityClasses: current.counts.entityClasses,
     fieldClasses: current.counts.fieldClasses, blobEntryCount: entries.length, blobBytes: entries.reduce((n, e) => n + e.byteLength, 0) });
   checkAbort(signal);
   return Object.freeze({ table, inventory, baseEvidence: expected, baseControlBytes, blobs: Object.freeze(entries),

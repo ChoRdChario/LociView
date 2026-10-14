@@ -8,7 +8,9 @@ export interface PinModelTarget {
   readonly addBlock: string | null; readonly moveBlock: string | null;
 }
 export interface PinMoveTarget {
+  /** assetId is a placed parent or a retained unplaced owner; ownerless stays unresolved. */
   readonly captionId: string; readonly title: Field<string>; readonly assetId: Field<string>;
+  readonly unplaced?: boolean;
   readonly token: string; readonly block: string | null; readonly sceneCount: Field<number>;
   /** Absent on old hosts; ProjectAnchor is eligible here, not in ordinary move. */
   readonly reparentBlock?: string | null;
@@ -71,7 +73,10 @@ export function pinActionIssue(context: PinModeContext, action: 'beginAdd' | 'ad
     const issue = countIssue(caption); if (issue) return issue;
   } else if (action === 'move' || action === 'reparent') return 'キャプションを選択してください。';
   const targetId = action === 'finish' ? mode!.target.assetId : action === 'reparent' ? parentId : caption?.assetId.kind === 'value' ? caption.assetId.value : memory.addTargetId;
-  if (reparent && caption?.assetId.kind === 'value' && caption.assetId.value === targetId) return '別の親モデルを選択してください。同じモデル内では「位置を調整」を使います。';
+  if (reparent && caption?.assetId.kind === 'value') {
+    if (caption.unplaced && targetId && caption.assetId.value !== targetId) return '所有モデルに配置してください。';
+    if (!caption.unplaced && caption.assetId.value === targetId) return '別の親モデルを選択してください。同じモデル内では「位置を調整」を使います。';
+  }
   const target = source.models.find(item => item.assetId === targetId);
   if (!target) return '対象モデルを選択してください。';
   if (!target.token) return 'モデルの状態を確認してください。';

@@ -111,7 +111,7 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
     impact.textContent = !view.surface ? '' : next.selection.scope === 'scene' ? 'このシーンだけに適用します。'
       : '同じモデル・面を使うシーンで共通になります。シーン専用の設定がある場合は、そちらが優先されます。';
     const beginPlan = planMaterial(next, { kind: 'begin' }); begin.hidden = Boolean(d); begin.disabled = beginPlan.kind === 'blocked';
-    const base = d?.base ?? view.base, raw = (field: MaterialEditField) => d?.edits[field] ?? (base ? materialInput(base.appearance, field) : '');
+    const base = d?.base ?? view.base, raw = (field: MaterialEditField) => d?.edits[field] ?? (base ? materialInput(base.appearance, field, next.source.semanticProfile) : '');
     editor.hidden = !base;
     for (const [field, control] of controls) {
       const value = raw(field); if (composing !== field && d?.composing !== field && control.input.value !== value) control.input.value = value;

@@ -2,7 +2,7 @@ import * as A from '@automerge/automerge/slim';
 import { canonical } from '../domain/projectGraphSupport';
 import type { JsonValue } from '../domain/values';
 import { ProjectMetadataSource, type MetadataLimits, type MetadataProof } from '../projectMetadata/source';
-import { PACKAGE_LIMITS as L, SUMMARY_ALGORITHM, type AutomaticSummary, type ChangeEntry, type Entry, type EvidenceRef, type PackageManifest } from './contract';
+import { PACKAGE_LIMITS as L, summaryAlgorithm, type AutomaticSummary, type ChangeEntry, type Entry, type EvidenceRef, type PackageManifest } from './contract';
 import { packageByteHash, PackageControlError, readManifestControl } from './manifest';
 import { summarizeDeltaHistory, summarizeFullHistory } from './historySummary';
 import { planWorkspaceClosure } from './closure';
@@ -88,7 +88,7 @@ export async function describeContributionTarget(base: VerifiedBaseEvidence, tar
     const prior = guaranteed.get(e.sha256);
     if (prior !== undefined && prior !== e.byteLength) fail('contribution-digest-length'); return prior === undefined;
   }));
-  const summary: AutomaticSummary = Object.freeze({ algorithm: SUMMARY_ALGORITHM, scope: 'baseDelta',
+  const summary: AutomaticSummary = Object.freeze({ algorithm: summaryAlgorithm(target.semanticProfile), scope: 'baseDelta',
     entityClasses: counts.entityClasses, fieldClasses: counts.fieldClasses, blobEntryCount: blobs.length, blobBytes: blobs.reduce((n, e) => n + e.byteLength, 0) });
   return { blobs, bodyRefs: Object.freeze(closure.semanticRefs.filter(r => !guaranteed.has(r.digest))), summary };
 }

@@ -2769,6 +2769,68 @@ describe('new synthetic saved host (memory ports and recorded DOM, not real brow
     await host.dispose();
   });
 
+  it('places both map2 unplaced forms through saved commands and cold-reopens their unchanged related records', async () => {
+    const h = fixture(), initial = createMetadataFixture(h.run);
+    const inspected = await inspectProjectCandidates(initial.read(), metadataFixtureLimits);
+    if (inspected.kind !== 'project-candidate-inspection' || inspected.hasUnknownFields) throw Error('seed');
+    const records = structuredClone(inspected.unambiguousRecords) as Record<string, any>;
+    const foreignAnchor = records.captionsById[f.second].anchor;
+    records.schema.minor = 1; records.assetsById[f.equipment].pinScale = 2;
+    records.captionsById[f.shared].anchor = { kind: 'unplaced', ownerAssetId: f.equipment };
+    records.captionsById[f.second].anchor = { kind: 'unplaced' };
+    const seed = ProjectMetadataSource.bootstrap(records.schema, records.identity, metadataFixtureLimits, { semanticProfile: 'map2' }).initialize(records);
+    const lease = await ProjectMutationCoordinator.local().tryAcquire(h.base, `${metadataArea}/${h.run}`, `map2-seed:${h.run}`);
+    lease.activateNewProject(); await underWriteLease(lease.workspace, () => writeMetadataSeed(lease.workspace, seed));
+    lease.beginClose(); await lease.waitForWorkspaceIdle(); lease.sealWorkspaceWritesForRelease(); lease.release();
+    const host = await h.open(true), s = new SyntheticSession(host.authority); select(s);
+    expect(s.snapshot.semanticProfile).toBe('map2');
+    await acknowledge(s, () => { s.media.add(s.mediaContext(), fixtureMedia[0]!.record.id); });
+    expect(s.acknowledgment.state).toBe('idle'); expect(captionAttachments(s.snapshot.mediaData, f.shared).ready).toHaveLength(1);
+    const before = host.read().provider!, source = host.read().source!, originals = source.originalChanges();
+    if (before.kind !== 'scene-provider') throw Error('provider');
+    expect(planPinMode(s.pinContext(), { kind: 'reparent', assetId: f.structure }).kind).toBe('blocked');
+    expect(() => source.prepareEdit(source.token, { kind: 'reparentPin', sceneId: f.overview, captionId: f.shared, anchor: foreignAnchor }, before, 'e'.repeat(32))).toThrow(/pin-owner-changed/);
+    for (const [captionId, assetId] of [[f.shared, f.equipment], [f.second, f.structure]] as const) {
+      select(s, captionId); const list = s.captionContext().source; if (list.kind !== 'ready') throw Error('list');
+      expect(list.captions.find(c => c.id === captionId)).toMatchObject({ pin: 'unplaced', owner: { kind: 'value', value: captionId === f.shared
+        ? { kind: 'asset', assetId: f.equipment } : { kind: 'none' } } });
+      expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'reparent', assetId }))).toBe(true);
+      expect(s.pinPreviewAnchor).toBeNull();
+      const target = s.pinSurfaceTarget()!; expect(target.assetId).toBe(assetId);
+      s.changePinCoordinates({ coordinates: ['2', '3', '4'], familyId: target.familyId });
+      expect(planPinMode(s.pinContext(), { kind: 'finish' }).kind).toBe('blocked');
+      expect(s.acceptPinSurface({ ...target, token: 'stale' }, [2, 3, 4])).toBe(false);
+      expect(s.pinPreviewAnchor).toBeNull();
+      expect(s.acceptPinSurface(target, [2, 3, 4])).toBe(true);
+      const cancel = s.pinContext();
+      expect(s.acceptPin(planPinMode(cancel, { kind: 'cancel', confirmedMode: cancel.memory.mode, confirmedProposal: cancel.proposal }))).toBe(true);
+      expect(s.snapshot.resources.captions[captionId]!.anchor).toEqual({ kind: 'value', value: records.captionsById[captionId].anchor });
+      expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'reparent', assetId }))).toBe(true);
+      s.changePinCoordinates({ coordinates: ['2', '3', '4'], familyId: target.familyId });
+      expect(s.pinPreviewAnchor).toBeNull(); // Prior cancelled surface cannot authorize a new mode.
+      expect(s.acceptPinSurface(s.pinSurfaceTarget()!, [2, 3, 4])).toBe(true);
+      const anchor = s.pinPreviewAnchor!;
+      await acknowledge(s, () => { s.acceptPin(planPinMode(s.pinContext(), { kind: 'finish' })); });
+      expect(s.acknowledgment.state).toBe('idle');
+      expect(s.snapshot.resources.captions[captionId]!.anchor).toEqual({ kind: 'value', value: anchor });
+    }
+    const after = host.read().provider!; if (after.kind !== 'scene-provider') throw Error('provider');
+    expect(Object.keys(after.resources.captions)).toEqual(Object.keys(before.resources.captions));
+    for (const captionId of [f.shared, f.second]) {
+      const { anchor: _old, ...oldRecord } = before.details.mutable.captionsById[captionId]!;
+      const { anchor: _new, ...newRecord } = after.details.mutable.captionsById[captionId]!;
+      expect(newRecord).toEqual(oldRecord);
+    }
+    for (const map of ['sceneCaptionMembershipsById', 'sceneAssetMembershipsById', 'captionAttachmentsById', 'captionTagMembershipsById', 'assetsById'] as const)
+      expect(after.details.mutable[map]).toEqual(before.details.mutable[map]);
+    expect(after.details.immutable.mediaResourcesById).toEqual(before.details.immutable.mediaResourcesById);
+    const saved = host.read().source!; expect(saved.originalChanges()).toHaveLength(originals.length + 2);
+    expect(saved.originalChanges().slice(0, originals.length)).toEqual(originals); await host.dispose();
+    const cold = await h.open(), reopened = cold.read().provider!; if (reopened.kind !== 'scene-provider') throw Error('provider');
+    expect(cold.read().source!.semanticProfile).toBe('map2'); expect(cold.read().source!.originalChanges()).toEqual(saved.originalChanges());
+    expect(reopened.details.mutable).toEqual(after.details.mutable); expect(reopened.details.immutable).toEqual(after.details.immutable);
+    expect(cold.content.counts.bodyBytes).toBe(0); await cold.dispose();
+  });
   it('retries a failed pin creation with the same ID and original bytes, not a second Caption', async () => {
     const h = fixture(), host = await h.open(true), s = new SyntheticSession(host.authority);
     expect(s.acceptPin(planPinMode(s.pinContext(), { kind: 'color', color: '#123456' }))).toBe(true);

@@ -1,6 +1,6 @@
 import type { ProjectWorkspaceFS, WorkspaceReadableFile } from '../platform/fs';
 import { fail } from './format';
-import { registerWriteFence, technicalId } from './persistence';
+import { registerReadOperation, registerWriteFence, technicalId } from './persistence';
 import type { MetadataStorageFactory, MetadataStoragePort } from './repository';
 
 /** Local storage identity only; Project identity and its logical-root lease do not change. */
@@ -67,10 +67,10 @@ function fencedStream(open: () => ReadableStream<Uint8Array>, check: () => Promi
  * unwrapped root. The opener MUST isolate each generation in its own database.
  */
 export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
-  input: Readonly<{ generationId: WorkspaceGenerationId; allowCreate: boolean; assertSelected: () => Promise<void>; assertWritable?: () => Promise<void> }>,
+  input: Readonly<{ generationId: WorkspaceGenerationId; allowCreate: boolean; assertSelected: () => Promise<void>; assertWritable?: () => Promise<void>; auditReadOperations?: boolean }>,
   openStorage: GenerationStorageOpener) {
   const generationId = checkedId(input.generationId), allowCreate = input.allowCreate,
-    assertSelected = input.assertSelected, assertWritable = input.assertWritable;
+    assertSelected = input.assertSelected, assertWritable = input.assertWritable, auditReadOperations = input.auditReadOperations === true;
   const logicalRoot = root.projectRoot === null ? '' : canonicalPath(root.projectRoot, false);
   const prefix = logicalRoot ? `${logicalRoot}/` : '';
   const projectRoot = generationId === null ? root.projectRoot : `${prefix}v2/generations/${generationId}`;
@@ -171,6 +171,67 @@ export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
       removeRange: key => { const owned = keyCopy(key); return write(() => base.removeRange(owned)); },
     } satisfies MetadataStoragePort;
   };
+  // Only selected/original readers opt in. Restore staging retains per-I/O audits.
+  if (auditReadOperations) registerReadOperation(fs, factory, async action => {
+    await check();
+    let active = true;
+    const live = async () => { if (!active || disposed) fail('generation-read-expired'); };
+    const perform = async <T>(work: () => Promise<T>): Promise<T> => {
+      await live(); const result = await work(); await live(); return result;
+    };
+    const denied = async () => fail('generation-read-only');
+    // These ports close over THIS read only. The public ports never take a fast
+    // path based on a shared flag, even while this callback is awaiting I/O.
+    const readFs: ProjectWorkspaceFS = Object.freeze({
+      projectRoot, mutationAuthority: root.mutationAuthority,
+      readText: (path: string) => { ownPath(path); return perform(() => root.readText(path)); },
+      readBytes: (path: string) => { ownPath(path); return perform(async () => (await root.readBytes(path))?.slice() ?? null); },
+      readBytesFrom: (path: string, offset: number) => {
+        ownPath(path);
+        if (!Number.isSafeInteger(offset) || offset < 0) return Promise.reject(Error('Invalid byte offset'));
+        return perform(async () => { const r = await root.readBytesFrom(path, offset); return r ? { size: r.size, data: r.data.slice() } : null; });
+      },
+      readStream: (path: string) => {
+        ownPath(path); return perform(async () => {
+          const file = await root.readStream(path); if (!file) return null;
+          return Object.freeze({ size: file.size, stream: () => fencedStream(() => file.stream(), live),
+            ...(file.blob ? { blob: () => perform(() => file.blob!()) } : {}) });
+        });
+      },
+      exists: (path: string) => { ownPath(path); return perform(() => root.exists(path)); },
+      list: (path: string) => {
+        ownPath(path, true); return perform(async () => {
+          const paths = await root.list(path);
+          for (const item of paths) {
+            canonicalPath(item, false);
+            if (!item.startsWith(path) || namespace && !within(item, namespace)) fail('generation-list-outside');
+          }
+          return paths.filter(item => !isReserved(item));
+        });
+      },
+      writeText: denied, appendText: denied, writeBytes: denied, appendBytes: denied, remove: denied,
+      writeStream: async (_path: string, stream: ReadableStream<Uint8Array>) => {
+        await stream.cancel().catch(() => undefined); return denied();
+      },
+    });
+    const readFactory: MetadataStorageFactory = () => {
+      if (!active || disposed) fail('generation-read-expired');
+      const base = connection.factory();
+      return {
+        load: key => { const owned = keyCopy(key); return perform(async () => (await base.load(owned))?.slice()); },
+        loadRange: key => {
+          const owned = keyCopy(key); return perform(async () => (await base.loadRange(owned)).map(row => {
+            const key = keyCopy(row.key);
+            if (!owned.every((part, i) => key[i] === part)) fail('generation-storage-range');
+            return { key, data: row.data?.slice() };
+          }));
+        },
+        save: denied, remove: denied, removeRange: denied,
+      };
+    };
+    try { const result = await action({ fs: readFs, factory: readFactory }); await check(); await live(); return result; }
+    finally { active = false; }
+  });
   return Object.freeze({ generationId, fs, factory, check,
     async dispose() { if (disposed) return; disposed = true; await connection.dispose(); },
   });

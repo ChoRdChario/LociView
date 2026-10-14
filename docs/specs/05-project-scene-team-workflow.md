@@ -916,7 +916,15 @@ control graph is required solely for continuing cross-format updates.
 
 ### 9.4 Unplaced Caption preservation (2026-09-10)
 
-> `PO-APPROVED OUTCOME / TECHNICAL AMENDMENT PROPOSED / NOT IMPLEMENTED`
+> `PO-APPROVED OUTCOME / MAP-2 AMENDMENT APPROVED 2026-09-20 / BOUNDED IMPLEMENTATION`
+>
+> [07 §5.1](07-project-scene-migration.md#51-reduced-target-amendment--po-approved-2026-09-20-bounded-implementation)
+> fixes the accepted version binding. Map-2 now connects unplaced records to
+> list/text/media, explicit first placement, saved commands and review/clean/file
+> preservation. Executed checks are in [todo](../../tasks/todo.md). Map-1 is
+> unchanged; initial-conversion recipes, ordinary entry and browser/device
+> adoption are not completed by this implementation. The gap below describes
+> the pre-amendment map-1 boundary, not a remaining map-2 schema decision.
 
 There is a real source/target representability gap, not a new failure in the
 current Native path. Native `NativeCaptionV1` permits `anchor: null` with a known
@@ -936,7 +944,7 @@ turn an unknown/conflicted placement into an ordinary unplaced state or infer a
 ProjectAnchor. This closes the product question, not approval of an exact schema,
 migration recipe, real-file activation or expanded media support.
 
-#### 9.4.1 Proposed atomic representation and placement
+#### 9.4.1 Atomic representation and placement (map-2 approved)
 
 Extend the existing atomic `Caption.anchor` union by exactly:
 
@@ -1041,6 +1049,19 @@ tab, export or renderer.
 - output failure never labels a package retained merely because generation or a
   browser download started;
 - residual staging/destination artifacts are named with a recovery/cleanup path.
+
+Pure validation of an owned immutable metadata source may be retained within that
+source instance. Repeated `read()`/token access reuses the deeply frozen result;
+editing, appending or reopening a source validates a new instance. This is not a
+storage cache: journal/publication, original bytes, content receipts and body
+presence remain freshly checked at their existing persistence/output boundaries.
+Acceptance includes immutable returned data, distinct edited/reopened snapshots,
+and continued rejection of missing/corrupt durable data after a successful read.
+Filesystem listing retains the existing sorted lexical `startsWith(prefix)`
+result, including partial names and empty-prefix full listing. OPFS traversal
+must not descend into unrelated directory branches for a scoped query. Each call
+still observes current entries and propagates errors from the relevant subtree;
+this optimization neither caches directory contents nor changes stored paths.
 
 ## 11. UI contract
 
@@ -1357,6 +1378,22 @@ results only, not completion of those integrated acceptance IDs.
 
 ### 13.2 Gated storage and integrated delivery
 
+**Caption list scale connection (2026-09-14; implementation of 03 §6):**
+The existing ProjectScene list must window mounted rows, not truncate its logical
+source. Search, colors, counts, unknown/recovery items and filter visibility still
+use every admitted Caption. Offscreen is not filtered-out. An explicit selection
+can mount and reveal an initially absent row inside the list without scrolling
+the page or recalling the camera. Keep keyed focus and Scene-local scroll memory;
+keyboard navigation must reach records beyond the mounted range and still leave
+the list at its true ends. Rows remain variable-height: wrapped titles, status,
+owner and recovery controls are never clipped to an assumed fixed height. Measure
+visible rows, invalidate stale width/zoom measurements and preserve a visible
+anchor as measurements change. Rendering estimates/overscan are internal details,
+not capacity or latency promises. Keep the current command/file guards, IME and
+source ownership; do not write metadata for scrolling. Reuse the existing list
+and host tests. Bounded recorded DOM at 10,000 rows is implementation evidence only;
+actual browser/iOS, full metadata history and G0 budgets remain G1-C adoption evidence.
+
 S1–S3 name delivery stages, not three indivisible commits. The immediate S1 entry
 is one disposable candidate-adapter harness for the existing `TEAM-PKG-08` causal
 sequence and section 8 conflict choices. Its input is one synthetic Project with
@@ -1392,6 +1429,17 @@ specific changed path. S3 owns the integrated UI/device acceptance; it is neithe
 the first possible storage test nor a substitute for adapter/I/O evidence.
 The first harness, production adapter/journal, domain/resolver and production
 exchange changes each close a named requirement using focused evidence.
+
+**Product-connection planning clarification (2026-10-15; documentation only):**
+The ordinary ProjectScene UI should express edits through the existing typed
+`MetadataProjectSession` commands and read provider-derived display models.
+Synthetic string-map/JSON intent adapters and fixture assumptions remain harness
+concerns. Before connecting the ordinary entry, specify only the required ports,
+import boundaries and connected open/edit/save/reopen acceptance; retain Session
+authority, exact source history, failure recovery and all applicable adoption
+gates. Extract only the required composition when that workflow is implemented;
+this direction does not promote the validation host or its storage namespace,
+change formats/dependencies, or authorize activation before gate completion.
 
 Each production slice requires a short meta-audit, exact-tree tests/build, one
 independent read-only review and a reversible commit. Run focused checks during
@@ -1494,6 +1542,19 @@ scope; ordinary-home and formal adoption gates below are unchanged.
   old-data migration, five-purpose wire, added dependencies, new formats, GC,
   Pages/Service Worker/release and iPhone HTTPS exposure remain outside this
   exception. Required new authority stops only its affected boundary.
+
+**PO-approved static validation execution (2026-09-20):** the existing limited
+GLB/PNG validation screen may also run in the exact `project-scene-validation`
+build mode. Reuse `dev.html`, the current services and validation namespaces;
+URL parameters cannot select the older writers in this build. Produce a separate
+`validation-dist` with no copied public assets, ordinary app/old PoC entry graph,
+PWA manifest or Service Worker registration/generation. Ordinary and Spark/PWA
+build behavior remains unchanged. The static shell shows loading/failure state,
+not the old interactive harness before startup. Verify mode isolation, the actual
+bundle's module/assets inventory, and local HTTP execution. This is permission
+for a local built validation route, not ordinary-home activation, offline/PWA
+acceptance, increased limits, a new model profile or release. An iPhone HTTPS
+route still requires the exact candidate build and one-route approval.
 
 Finite implementation notes for that validation entry: use an owned
 `development-validation` evidence scope, distinct from synthetic fixtures and

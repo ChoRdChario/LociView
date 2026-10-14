@@ -1,7 +1,11 @@
+import type { ProjectSemanticProfile } from '../domain/projectProfile';
 /** Isolated validation contract, specification 06 §§3/7/11–12. Not published wire adoption. */
 export const PACKAGE_FORMAT = 'lociview-project-package';
 export const PACKAGE_WIRE_VERSION = '1';
 export const SUMMARY_ALGORITHM = 'lociview-project-summary-1';
+export const SUMMARY_ALGORITHM2 = 'lociview-project-summary-2';
+export type SummaryAlgorithm = typeof SUMMARY_ALGORITHM | typeof SUMMARY_ALGORITHM2;
+export const summaryAlgorithm = (profile: ProjectSemanticProfile): SummaryAlgorithm => profile === 'map2' ? SUMMARY_ALGORITHM2 : SUMMARY_ALGORITHM;
 export const PACKAGE_LIMITS = Object.freeze({
   archiveBytes: 805_306_368, payloadBytes: 671_088_640, blobBytes: 536_870_912, blobCount: 1024,
   entryCount: 4096, containerMetadataBytes: 4_194_304, controlBytes: 1_048_576, controlsBytes: 4_194_304,
@@ -29,6 +33,8 @@ export const SUMMARY_FIELDS = Object.freeze({
   opaque: ['field'],
 } as const);
 for (const fields of Object.values(SUMMARY_FIELDS)) Object.freeze(fields);
+const SUMMARY_FIELDS2 = Object.freeze({ ...SUMMARY_FIELDS, assetsById: Object.freeze([...SUMMARY_FIELDS.assetsById, 'pinScale']) });
+export const summaryFieldsFor = (algorithm: SummaryAlgorithm) => algorithm === SUMMARY_ALGORITHM2 ? SUMMARY_FIELDS2 : SUMMARY_FIELDS;
 export type PackagePurpose = 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review';
 export interface Entry { readonly path: string; readonly sha256: string; readonly byteLength: number }
 export interface EvidenceRef { readonly sha256: string; readonly byteLength: number }
@@ -37,7 +43,7 @@ export interface ChangeEntry {
   readonly byteLength: number; readonly bytesSha256: string;
 }
 export interface AutomaticSummary {
-  readonly algorithm: typeof SUMMARY_ALGORITHM; readonly scope: 'entireHistory' | 'baseDelta' | 'snapshot';
+  readonly algorithm: SummaryAlgorithm; readonly scope: 'entireHistory' | 'baseDelta' | 'snapshot';
   readonly entityClasses: readonly { readonly class: string; readonly count: number }[];
   readonly fieldClasses: readonly { readonly class: string; readonly count: number }[];
   readonly blobEntryCount: number; readonly blobBytes: number;
@@ -50,7 +56,7 @@ interface Common {
 }
 interface Causal {
   readonly identity: Readonly<{ projectId: string; historyEpoch: string; lineageSeed: string }>;
-  readonly metadataEnvelope: Readonly<{ adapter: 'automerge'; adapterFormatVersion: 'lociview-automerge-atomic-map-1';
+  readonly metadataEnvelope: Readonly<{ adapter: 'automerge'; adapterFormatVersion: 'lociview-automerge-atomic-map-1' | 'lociview-automerge-atomic-map-2';
     lineageProof: Readonly<{ kind: 'automerge-root-change-v1'; rootChangeHash: string }> }>;
   readonly targetHeads: readonly string[];
 }

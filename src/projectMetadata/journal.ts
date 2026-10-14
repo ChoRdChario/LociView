@@ -1,10 +1,10 @@
 import * as A from '@automerge/automerge/slim';
 import type { ProjectWorkspaceFS } from '../platform/fs';
-import type { JsonObject } from '../domain/values';
+import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { checkedChanges, checkedProof, fail, type MetadataLimits, type MetadataProof } from './format';
 import { ProjectMetadataSource } from './source';
-import { digest, equalBytes, json, metadataPath, readReceipt, technicalId, writeReceipt } from './persistence';
+import { digest, equalBytes, json, metadataPath, readReceipt, technicalId, withMetadataRead, writeReceipt } from './persistence';
 import { initialWorkspaceChanges, planRemoteChanges } from './remote';
 import { captureJournalRemote, checkJournalRemote, isPackageRemote, isContributionRemote, isBackupRestore, isBackupRestoreInput, validateJournalRemote, validateBackupRestore,
   remoteEvidenceBytes, remoteEvidenceDescriptors, remoteInputFromEvidence,
@@ -59,6 +59,10 @@ export class TransactionJournal {
   constructor(private readonly fs: ProjectWorkspaceFS, private readonly limits: MetadataLimits) {}
   path(tx: string, name: string) { return metadataPath(this.fs, `journal/${technicalId(tx)}/${name}`); }
   async entries(): Promise<JournalEntry[]> {
+    return withMetadataRead(this.fs, undefined, ({ fs }) => new TransactionJournal(fs, this.limits).entriesDirect());
+  }
+
+  private async entriesDirect(): Promise<JournalEntry[]> {
     const prefix = metadataPath(this.fs, 'journal/'), paths = await this.fs.list(prefix);
     const ids = [...new Set(paths.map(path => {
       const tail = path.slice(prefix.length);
@@ -198,6 +202,11 @@ export class TransactionJournal {
   }
 
   async validateParts(p: PreparedJournal): Promise<Uint8Array[]> {
+    const owned = cloneCanonicalValue(p, this.limits) as unknown as PreparedJournal;
+    return withMetadataRead(this.fs, undefined, ({ fs }) => new TransactionJournal(fs, this.limits).validatePartsDirect(owned));
+  }
+
+  private async validatePartsDirect(p: PreparedJournal): Promise<Uint8Array[]> {
     validateStart(p.start, this.limits); await this.validatePrepared(p.start, p);
     const parts: Uint8Array[] = [];
     for (const part of p.changes) {

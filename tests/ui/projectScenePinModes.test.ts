@@ -39,10 +39,28 @@ function host() {
 }
 
 describe('disconnected pin-mode intentions, not picking or anchor construction', () => {
+  it('shows first placement separately and restricts a known unplaced owner without inventing an owner', () => {
+    const h = host(), src = source();
+    const selected = { ...src.selected!, unplaced: true, reparentBlock: null, block: '未配置です。' };
+    h.render({ ...h.context, source: { ...src, selected } });
+    expect(h.parent.children[0]!.textContent).toBe('ピンを配置');
+    const target = h.parent.children[1]!.children.find(n => n.tag === 'select')!;
+    expect(target.attributes.get('aria-label')).toBe('配置先モデル');
+    expect(target.children.some(n => n.value === assetA)).toBe(false);
+    expect(target.children.some(n => n.value === assetB)).toBe(true);
+    expect(planPinMode(h.context, { kind: 'reparent', assetId: assetA }).kind).toBe('blocked');
+    expect(planPinMode(h.context, { kind: 'reparent', assetId: assetB }).kind).toBe('change');
+    h.render({ ...h.context, source: { ...src, selected: { ...selected, assetId: { kind: 'unresolved', reason: 'missing' } } } });
+    expect(target.value).toBe('');
+    expect(target.children.filter(n => n.value).map(n => n.value)).toEqual([assetA, assetB]);
+    expect(planPinMode(h.context, { kind: 'move' }).kind).toBe('blocked');
+    h.render({ ...h.context, source: { ...src, selected: { ...selected, reparentBlock: 'モデルの状態を確認してください。' } } });
+    expect(planPinMode(h.context, { kind: 'reparent', assetId: assetB }).kind).toBe('blocked');
+  });
   it('requires an explicit parent, guards the whole source snapshot and retains cancellation after access loss', () => {
     const h = host(), initial = source();
     h.render({ ...h.context, source: { ...initial, selected: { ...initial.selected!, reparentBlock: null } } });
-    const target = h.parent.children[1]!.children[0]!, begin = h.parent.children[2]!;
+    const target = h.parent.children[1]!.children.find(n => n.tag === 'select')!, begin = h.parent.children[2]!;
     expect(target.value).toBe(''); expect(begin.disabled).toBe(true);
     const current = h.context.source as PinModeSource & { kind: 'ready' };
     h.render({ ...h.context, source: { ...current, models: current.models.map(m => m.assetId === assetA ? { ...m, addBlock: '非表示' } : m) } });

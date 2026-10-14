@@ -1,11 +1,15 @@
 // 開発検証用サンプル3Dファイル生成 → public/samples/
 // 実行: node scripts/gen-samples.mjs
+// ローカル検証用: node scripts/gen-samples.mjs --out-dir .artifacts/fixtures/project-scene-walkthrough
 
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const outDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'samples');
+const args = process.argv.slice(2);
+if (args.length && (args.length !== 2 || args[0] !== '--out-dir' || !args[1]))
+  throw new Error('Usage: node scripts/gen-samples.mjs [--out-dir DIRECTORY]');
+const outDir = args.length ? resolve(args[1]) : join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'samples');
 mkdirSync(outDir, { recursive: true });
 
 // ---- cube.stl (ASCII) ----------------------------------------------------------
@@ -81,7 +85,7 @@ const gltf = {
   nodes: [{ mesh: 0, name: 'Tri' }],
   meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, material: 0 }], name: 'TriMesh' }],
   materials: [
-    { name: 'TriMat', pbrMetallicRoughness: { baseColorFactor: [0.9, 0.55, 0.15, 1], roughness: 0.8 } },
+    { name: 'TriMat', pbrMetallicRoughness: { baseColorFactor: [0.9, 0.55, 0.15, 1], roughnessFactor: 0.8 } },
   ],
   buffers: [{ byteLength: bin.byteLength }],
   bufferViews: [

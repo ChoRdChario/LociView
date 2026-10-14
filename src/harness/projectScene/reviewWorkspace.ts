@@ -55,11 +55,16 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   function accept(plan: CaptionListPlan) {
     if (disposed || !captionListPlanIsCurrent(plan, context())) return;
     if (plan.kind === 'blocked') { failure = plan.reason; paint(); return; }
+    if (plan.kind === 'change' && plan.intent === 'scroll') {
+      memory = plan.memory; list.render(context()); return;
+    }
     if (plan.kind === 'change') { memory = plan.memory; if (plan.intent === 'select' && memory.selectedCaptionId) openWindow(memory.selectedCaptionId); }
     else if (plan.kind === 'unchanged' && plan.explicitSelection) openWindow(plan.explicitSelection.captionId);
     else if (plan.kind === 'effect' && plan.action === 'review') openWindow(plan.captionId);
     else return;
-    failure = ''; render(); list.revealSelected();
+    failure = ''; render();
+    if (plan.kind === 'change' && (plan.intent === 'select' || plan.intent === 'revealSelection') ||
+      plan.kind === 'unchanged' && plan.explicitSelection || plan.kind === 'effect') list.revealSelected();
   }
   const list = createCaptionListControls(document, accept, active => { composing = active; });
   const mediaGroup = (captionId: string): MediaPreviewGroup => {
@@ -101,6 +106,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
       if (!button) { button = make('button'); button.type = 'button'; button.className = 'lv-development-pin';
         button.addEventListener('click', () => accept(planCaptionList(context(), { kind: 'select', captionId: pin.id }))); pins.set(pin.id, button); overlay.append(button); }
       button.textContent = pin.title || 'キャプション'; button.style.backgroundColor = pin.color; button.setAttribute('aria-current', String(memory.selectedCaptionId === pin.id));
+      button.style.transform = `translate(-50%, -50%) scale(${pin.scale ?? 1})`;
       button.dataset.status = pin.status;
       const point = observation?.pins.find(p => p.id === pin.id); button.hidden = !ready || !point?.visible;
       if (point) { button.style.left = `${point.x}px`; button.style.top = `${point.y}px`; }

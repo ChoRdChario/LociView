@@ -12,7 +12,7 @@ export function describeMaterialCandidate(field: string, text: string, project: 
     return `${project.modelNames[v.target.assetId] ?? 'モデル'} — ${scene?.kind === 'value' ? scene.value : 'プロジェクト共通'} — 面の識別 ${v.target.logicalMaterialSlotId}`;
   }
   if (field === 'appearance') return `${v.lighting === 'unlit' ? '照明なし' : v.lighting === 'lit' ? '照明あり' : '元の照明'}・${v.doubleSided ? '両面' : v.doubleSided === false ? '片面' : '元の面設定'}・不透明度 ${(v.opacity ?? 1) * 100}%` +
-    (v.baseColorSrgb ? `・色 ${v.baseColorSrgb.join(' / ')}` : '') + (v.chroma ? `・色抜き ${v.chroma.keyColorSrgb.join(' / ')}、許容 ${v.chroma.tolerance}、ぼかし ${v.chroma.softness}` : '・色抜きなし') +
+    (v.baseColorSrgb ? `・色 ${v.baseColorSrgb.join(' / ')}` : '') + (v.chroma ? `・色抜き${project.semanticProfile === 'map2' && v.chroma.enabled === false ? '無効（設定保持）' : ''} ${v.chroma.keyColorSrgb.join(' / ')}、許容 ${v.chroma.tolerance}、ぼかし ${v.chroma.softness}` : '・色抜きなし') +
     (Object.keys(v).some(k => !['lighting', 'doubleSided', 'opacity', 'baseColorSrgb', 'chroma'].includes(k)) ? '・未対応の追加設定あり' : '');
   return `被覆 ${v.coverage.policy}${v.coverage.alphaCutoff !== undefined ? `・しきい値 ${v.coverage.alphaCutoff}` : ''}・光学 ${v.optics}`;
 }

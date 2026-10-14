@@ -2,7 +2,7 @@ import type { MetadataProjectSession, MetadataSessionRead } from '../projectMeta
 import { ProjectMetadataSource, type MetadataLimits, type MetadataProof } from '../projectMetadata/source';
 import type { OriginBlobStore, StoredBlobRef } from '../projectMetadata/blobStore';
 import { checkedBlobStream } from '../projectMetadata/blobStream';
-import { PACKAGE_LIMITS as L, SUMMARY_ALGORITHM, type AutomaticSummary, type Entry } from './contract';
+import { PACKAGE_LIMITS as L, summaryAlgorithm, type AutomaticSummary, type Entry } from './contract';
 import { packageByteHash, PackageControlError } from './manifest';
 import { summarizeFullHistory } from './historySummary';
 import { planWorkspaceClosure } from './closure';
@@ -83,7 +83,7 @@ export class WorkspaceSourceCapture {
       finally { reader.releaseLock(); }
     }
     const metadata = Object.freeze({ path: 'metadata.am', sha256: packageByteHash(bytes), byteLength: bytes.length });
-    const summary: AutomaticSummary = Object.freeze({ algorithm: SUMMARY_ALGORITHM, scope: 'entireHistory',
+    const summary: AutomaticSummary = Object.freeze({ algorithm: summaryAlgorithm(reopened.semanticProfile), scope: 'entireHistory',
       entityClasses: counts.entityClasses, fieldClasses: counts.fieldClasses, blobEntryCount: closure.entries.length, blobBytes: measuredBytes });
     return new WorkspaceSourceCapture(bytes, expectedToken, publication, reopened.proof,
       Object.freeze(reopened.heads), metadata, closure.entries, summary, closure.semanticRefs);

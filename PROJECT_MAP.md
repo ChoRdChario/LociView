@@ -18,11 +18,12 @@ owns feature coverage. Read [document authority](docs/README.md) for contracts.
 | `index.html` → `src/main.ts` → `src/ui/app.ts` | Ordinary home and legacy v1 route, with Native entry | New ProjectScene adoption |
 | `src/nativeGs/app.ts` | Bounded Native Mesh/Point/GS, DisplaySets, media and package exchange | New continuing-history team workflow or general format support |
 | `dev.html` → `src/dev-entry.ts` → `src/harness/projectScene/entry.ts` | Nondefault ProjectScene development host; memory, old saved, metadata and limited GLB/PNG validation routes | Ordinary-home, device, offline or release acceptance |
+| `project-scene-validation` build → `dev.html` → `validationEntry.ts` | Same limited GLB/PNG validation screen, static-only entry; separate `validation-dist`, no public assets or Service Worker | Ordinary-home activation, offline/PWA, profile/device or release acceptance |
 
 The new practical-team workflow uses Project-wide Assets/Caption resources and
 Scene membership. New file services are partially connected in the limited
 validation route. Old Native acceptance remains valid only for its tested scope.
-See inventory for individual connections and todo for the unverified worktree.
+See inventory for individual connections and todo for executed checks and remaining adoption conditions.
 
 ## Current directories
 
@@ -31,7 +32,7 @@ See inventory for individual connections and todo for the unverified worktree.
 | `src/core` | Legacy v1 operation validation, reduction, merge and `ProjectStore` |
 | `src/domain`, `src/scene` | New typed records, source/candidate evidence, pure Scene commands/composition |
 | `src/projectMetadata` | New metadata Session, original history, commands, retained journal/recovery and storage generations |
-| `src/projectFiles` | Limited real-file admission, Project creation, content and team send/receive services |
+| `src/projectFiles` | Limited real-file admission, Project creation, Native one-time conversion, content and team send/receive services |
 | `src/projectPackage` | Five-purpose wire/control inspection and bounded file jobs; inventory records which user flows are connected |
 | `src/platform` | `WorkspaceFS`, OPFS, browser locks and platform integration |
 | `src/assets`, `src/io` | Legacy asset/package I/O, local XLSX/CSV and LociMyu conversion |

@@ -27,7 +27,7 @@ export async function openValidationGeneration(root: ProjectWorkspaceFS, options
   let service: ReturnType<typeof validationGenerationService> | undefined;
   const controls = await readRestoreControls(root, limits);
   if (!options.generations && controls.jobs.length) throw Error('復元用の保存領域に接続できません。');
-  const scope = create ? await openWorkspaceGeneration(root, { generationId: null, allowCreate: true,
+  const scope = create ? await openWorkspaceGeneration(root, { generationId: null, allowCreate: true, auditReadOperations: true,
     assertSelected: async () => { const current = await readRestoreControls(root, limits);
       if (current.selection) throw Error('プロジェクトの作成先が変わりました。'); },
     assertWritable: async () => { if ((await readRestoreControls(root, limits)).pending) throw Error('バックアップの復元が未完了です。'); } }, databases.open) :

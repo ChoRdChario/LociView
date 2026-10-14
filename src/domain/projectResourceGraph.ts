@@ -78,6 +78,15 @@ export function inspectAnchors(g: GraphInspection, captions: readonly JsonObject
   for (const c of captions) {
     if (c.anchor === undefined) continue;
     const id = string(c.id), a = object(c.anchor), issue = (code: string, kind: 'invalid' | 'orphan' | 'needs-review' | 'unverified' = 'invalid') => g.issue('captionsById', id, 'anchor', code, kind);
+    if (a.kind === 'unplaced') {
+      if (a.ownerAssetId !== undefined) {
+        g.edge(id, string(a.ownerAssetId), 'anchor.ownerAssetId');
+        const owner = g.table('assetsById')[string(a.ownerAssetId)];
+        if (active(c) && knownUnavailable(owner)) issue('unavailable-anchor-owner', 'orphan');
+        else if (active(c) && owner?.lifecycle === undefined) issue('pending-orphan-reference', 'needs-review');
+      }
+      continue;
+    }
     if (a.kind === 'project') { const frame = object(object(g.records.project).frame ?? {}).id;
       if (frame !== undefined && a.projectFrameId !== frame) issue('wrong-project-frame'); continue; }
     const asset = g.table('assetsById')[string(a.assetId)]; g.edge(id, string(a.assetId), 'anchor.assetId');

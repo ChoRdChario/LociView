@@ -1,4 +1,5 @@
 import { lifecycleFields, lifecycleValue } from './recordFields';
+import { projectSemanticProfile, type ProjectSemanticProfile } from './projectProfile';
 import { DomainValidationError, reject, scalarLength, singleLineControls, type JsonObject, type JsonValue } from './values';
 
 type Path = readonly string[];
@@ -11,6 +12,8 @@ function binaryInteger(n: number): bigint {
 }
 /** Internal checks on the already cloned canonical tree. No raw input/authority API. */
 export class ProjectRecordFields {
+  readonly semanticProfile: ProjectSemanticProfile;
+  constructor(profile: ProjectSemanticProfile = 'map1') { this.semanticProfile = projectSemanticProfile(profile); }
   unknown = false;
   object(v: JsonValue, p: Path): JsonObject {
     return v !== null && typeof v === 'object' && !Array.isArray(v) ? v as JsonObject : reject('type', p);
@@ -107,6 +110,11 @@ export class ProjectRecordFields {
     if (o.kind === 'solid') this.color(this.required(o, 'colorSrgb', p), [...p, 'colorSrgb']); else this.absent(o, ['colorSrgb'], p);
   }
   anchor(v: JsonValue, p: Path) {
+    if (this.semanticProfile === 'map2' && this.object(v, p).kind === 'unplaced') {
+      const o = this.object(v, p);
+      if (Object.keys(o).some(k => !['kind', 'ownerAssetId'].includes(k))) reject('key', p);
+      this.optional(o, 'ownerAssetId', p, (v, p) => this.id(v, 'ast', p)); return;
+    }
     const o = this.shape(v, ['kind', 'assetId', 'assetFrameId', 'positionAsset', 'normalAsset', 'authoredAssetRevisionId', 'authoredAnchorCompatibilityId', 'hitEvidence', 'projectFrameId', 'positionProject', 'normalProject'], p);
     this.enum(this.required(o, 'kind', p), ['asset', 'project'], [...p, 'kind']);
     if (o.kind === 'project') {

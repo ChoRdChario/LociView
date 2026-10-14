@@ -8,7 +8,7 @@ import type { DisplayModelClosure, ReadonlyRenderModel } from './modelTypes';
 import { readProjectCamera, readSolidBackground } from './viewHistory';
 import type { DisplayCapture } from './viewSession';
 import { materialTarget, targetKey, resolveFixtureMaterial } from './materialHistory';
-import type { MaterialIntent } from '../../domain/materialIntent';
+import { materialForDisplay, type MaterialIntent } from '../../domain/materialIntent';
 import type { GizmoProposal, ModelPlacementTarget, PinGizmoProposal } from './pinGizmo';
 import { proposedPlacement } from './modelTransform';
 import { validationMaterialSlots, validationMaterialIssue, type ValidationMaterialEffects } from './validationMaterials';
@@ -18,6 +18,8 @@ export interface Bounds { readonly min: V3; readonly max: V3 }
 export interface DisplayPin {
   readonly id: string; readonly title: string; readonly color: string; readonly position: V3;
   readonly status: 'normal' | 'needsReview';
+  readonly scale?: number;
+  readonly notice?: string;
 }
 export interface SyntheticDisplay {
   readonly readOnly?: false;
@@ -72,14 +74,14 @@ export function syntheticDisplay(project: SyntheticProject, sceneId: string, pin
   });
   const materials = Object.fromEntries(models.filter(c => c.shape !== 'saved-glb').map(c => {
     const target = materialTarget(c), intent = resolved.composition.materials.find(m => targetKey(m.target) === targetKey(target))?.intent as MaterialIntent | undefined;
-    try { return [c.binding.assetId, resolveFixtureMaterial(intent)]; }
+    try { return [c.binding.assetId, resolveFixtureMaterial(intent && materialForDisplay(intent, project.semanticProfile))]; }
     catch (e) { return [c.binding.assetId, { issue: e instanceof Error ? e.message : '見え方を確認してください。' }]; }
   }));
   const savedMaterials = Object.fromEntries(models.filter(c => c.shape === 'saved-glb').map(model => [model.binding.assetId,
     Object.fromEntries(validationMaterialSlots(model).flatMap(slot => {
       const intent = resolved.composition.materials.find(m => targetKey(m.target) === targetKey(slot.target))?.intent as MaterialIntent | undefined;
-      if (!intent) return []; const issue = validationMaterialIssue(slot, intent);
-      return [[slot.target.logicalMaterialSlotId, issue ? { issue } : intent]];
+      if (!intent) return []; const issue = validationMaterialIssue(slot, intent, project.semanticProfile);
+      return [[slot.target.logicalMaterialSlotId, issue ? { issue } : materialForDisplay(intent, project.semanticProfile)]];
     }))]));
   const activeTargets = new Set(models.flatMap(m => m.shape === 'saved-glb' ? validationMaterialSlots(m).map(s => targetKey(s.target)) : [targetKey(materialTarget(m))]));
   const materialNotices = Object.values(project.materialData?.records ?? {}).flatMap(r => {
@@ -101,16 +103,20 @@ export function syntheticDisplay(project: SyntheticProject, sceneId: string, pin
   }
   const pins: DisplayPin[] = [];
   for (const caption of resolved.composition.captions) {
-    if (caption.marker === 'suppressed' || caption.anchor.kind !== 'value') continue;
+    if (caption.marker === 'suppressed' || caption.marker === 'unplaced' || caption.anchor.kind !== 'value') continue;
     const color = captionColorKey(project.colors[caption.captionId] ?? { kind: 'unresolved', reason: 'invalid' });
     if (!color || (pinColors !== null && !pinColors.includes(color))) continue;
     const anchor = caption.anchor.value;
+    if (anchor.kind === 'unplaced') continue;
     if (anchor.kind === 'asset' && hidden.has(anchor.assetId)) continue;
     const model = anchor.kind === 'asset' ? models.find(m => m.binding.assetId === anchor.assetId) : null;
     const placement = model && modelEdit?.target.assetId === model.binding.assetId
       ? proposedPlacement(model.binding.assetToProject, modelEdit) : model?.binding.assetToProject;
     const position = anchor.kind === 'project' ? anchor.positionProject : placement ? pointInProject(anchor.positionAsset, placement) : null;
-    if (position) pins.push({ id: caption.captionId, color, position, status: caption.marker === 'needsReview' ? 'needsReview' : 'normal',
+    const pinScale = anchor.kind === 'asset' ? project.resources.assets[anchor.assetId]?.pinScale : undefined;
+    const scaleIssue = pinScale?.kind === 'unresolved' ? 'ピンのサイズを確認してください。標準サイズで仮表示しています。' : undefined;
+    if (position) pins.push({ id: caption.captionId, color, position, status: scaleIssue || caption.marker === 'needsReview' ? 'needsReview' : 'normal',
+      scale: pinScale?.kind === 'value' ? pinScale.value ?? 1 : 1, ...(scaleIssue ? { notice: scaleIssue } : {}),
       title: caption.title.kind === 'value' && caption.title.value.trim() ? caption.title.value : 'キャプション' });
   }
   const pointer = project.state.scenes[sceneId]!.defaultViewId;

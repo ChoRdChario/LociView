@@ -1,8 +1,9 @@
 import { cloneCanonicalValue, reject, type JsonObject, type JsonValue, type ValueLimits } from './values';
+import type { ProjectSemanticProfile } from './projectProfile';
 
 export type MaterialAppearance = JsonObject & Readonly<{ opacity?: number; baseColorSrgb?: readonly number[];
   lighting?: 'inherit' | 'lit' | 'unlit'; doubleSided?: boolean;
-  chroma?: JsonObject & Readonly<{ keyColorSrgb: readonly number[]; tolerance: number; softness: number }> }>;
+  chroma?: JsonObject & Readonly<{ keyColorSrgb: readonly number[]; tolerance: number; softness: number; enabled?: boolean }> }>;
 export type MaterialCompositing = JsonObject & Readonly<{ coverage: JsonObject & Readonly<{ policy: 'inherit' | 'opaque' | 'mask' | 'ditherCoverage' | 'smoothBlend'; alphaCutoff?: number }>;
   optics: 'inherit' | 'surface' | 'transmission' }>;
 export type MaterialIntent = JsonObject & Readonly<{ appearance: MaterialAppearance; compositing: MaterialCompositing }>;
@@ -18,14 +19,14 @@ const rgb = (value: JsonValue | undefined, path: string[]) => {
   value.forEach((channel, index) => unit(channel, [...path, String(index)]));
 };
 /** Individual decoded atomic values only; not target/reference, source-optics or backend admission. */
-export function validateMaterialIntent(input: unknown, limits: ValueLimits): MaterialIntent {
+export function validateMaterialIntent(input: unknown, limits: ValueLimits, profile: ProjectSemanticProfile = 'map1'): MaterialIntent {
   const root = object(cloneCanonicalValue(input, limits), []), a = object(root.appearance, ['appearance']);
   const c = object(root.compositing, ['compositing']);
-  checkMaterialAppearance(a); checkMaterialCompositing(c); checkMaterialCoupling(a, c);
+  checkMaterialAppearance(a, profile); checkMaterialCompositing(c); checkMaterialCoupling(a, c, profile);
   return root as MaterialIntent;
 }
 /** Internal checks on canonical cloned values; callers retain unknown members. */
-export function checkMaterialAppearance(value: JsonValue): void {
+export function checkMaterialAppearance(value: JsonValue, profile: ProjectSemanticProfile = 'map1'): void {
   const a = object(value, ['appearance']);
   if (a.opacity !== undefined) unit(a.opacity, ['appearance', 'opacity']);
   if (a.baseColorSrgb !== undefined) rgb(a.baseColorSrgb, ['appearance', 'baseColorSrgb']);
@@ -33,6 +34,7 @@ export function checkMaterialAppearance(value: JsonValue): void {
   if (a.doubleSided !== undefined && typeof a.doubleSided !== 'boolean') reject('type', ['appearance', 'doubleSided']);
   if (a.chroma !== undefined) {
     const chroma = object(a.chroma, ['appearance', 'chroma']);
+    if (profile === 'map2' && chroma.enabled !== undefined && typeof chroma.enabled !== 'boolean') reject('type', ['appearance', 'chroma', 'enabled']);
     rgb(chroma.keyColorSrgb, ['appearance', 'chroma', 'keyColorSrgb']);
     unit(chroma.tolerance, ['appearance', 'chroma', 'tolerance']); unit(chroma.softness, ['appearance', 'chroma', 'softness']);
   }
@@ -45,9 +47,21 @@ export function checkMaterialCompositing(value: JsonValue): void {
   else if (coverage.alphaCutoff !== undefined) reject('value', ['compositing', 'coverage', 'alphaCutoff']);
 }
 /** Only call with two checked unambiguous values; never supply defaults for conflicts. */
-export function checkMaterialCoupling(a: JsonObject, c: JsonObject): void {
+export function checkMaterialCoupling(a: JsonObject, c: JsonObject, profile: ProjectSemanticProfile = 'map1'): void {
   const coverage = object(c.coverage, ['compositing', 'coverage']);
-  if (coverage.policy === 'opaque' && (a.chroma !== undefined || (a.opacity !== undefined && a.opacity !== 1))) reject('value', ['appearance']);
+  if (coverage.policy === 'opaque' && (chromaEnabled(a, profile) || (a.opacity !== undefined && a.opacity !== 1))) reject('value', ['appearance']);
+}
+
+export function chromaEnabled(a: JsonObject, profile: ProjectSemanticProfile = 'map1'): boolean {
+  return a.chroma !== undefined && (profile === 'map1' || object(a.chroma, ['appearance', 'chroma']).enabled !== false);
+}
+/** Validated display-only copy. Raw editing/history values must never be replaced with it. */
+export function materialForDisplay(intent: MaterialIntent, profile: ProjectSemanticProfile = 'map1'): MaterialIntent {
+  if (profile === 'map1' || !intent.appearance.chroma) return intent;
+  const appearance = { ...intent.appearance };
+  if (!chromaEnabled(appearance, profile)) delete appearance.chroma;
+  else { const chroma = { ...appearance.chroma! }; delete chroma.enabled; appearance.chroma = chroma; }
+  return { ...intent, appearance };
 }
 
 export const materialFields = ['opacity', 'lighting', 'doubleSided', 'chroma', 'keyColor', 'tolerance', 'softness'] as const;
@@ -55,19 +69,19 @@ export type MaterialEditField = typeof materialFields[number];
 export type MaterialEdits = Readonly<Partial<Record<MaterialEditField, string>>>;
 export const materialFieldLabels: Readonly<Record<MaterialEditField, string>> = Object.freeze({ opacity: '不透明度（%）', lighting: '照明',
   doubleSided: '表示する面', chroma: '指定した色を透過', keyColor: '透過する色', tolerance: '色の許容範囲', softness: '境界のぼかし' });
-export function materialInput(a: MaterialAppearance, field: MaterialEditField): string {
+export function materialInput(a: MaterialAppearance, field: MaterialEditField, profile: ProjectSemanticProfile = 'map1'): string {
   switch (field) {
     case 'opacity': return String((a.opacity ?? 1) * 100);
     case 'lighting': return a.lighting ?? 'inherit';
     case 'doubleSided': return a.doubleSided === undefined ? 'inherit' : a.doubleSided ? 'double' : 'front';
-    case 'chroma': return a.chroma ? 'on' : 'off';
+    case 'chroma': return chromaEnabled(a, profile) ? 'on' : 'off';
     case 'keyColor': return '#' + (a.chroma?.keyColorSrgb ?? [0, 0, 0]).map(channel => Math.round(channel * 255).toString(16).padStart(2, '0')).join('');
     case 'tolerance': return String(a.chroma?.tolerance ?? 0.1);
     case 'softness': return String(a.chroma?.softness ?? 0);
   }
 }
 /** Local explicit edits only. Base is a validated immutable value; unknown data is never rebuilt from controls. */
-export function editMaterialAppearance(base: MaterialAppearance, edits: MaterialEdits): MaterialAppearance {
+export function editMaterialAppearance(base: MaterialAppearance, edits: MaterialEdits, profile: ProjectSemanticProfile = 'map1'): MaterialAppearance {
   const out: Record<string, JsonValue> = { ...base };
   const number = (field: MaterialEditField, max = 1) => {
     const raw = edits[field]!, value = Number(raw);
@@ -84,14 +98,16 @@ export function editMaterialAppearance(base: MaterialAppearance, edits: Material
     if (edits.doubleSided === 'inherit') delete out.doubleSided; else out.doubleSided = edits.doubleSided === 'double';
   }
   if (edits.chroma !== undefined && !['on', 'off'].includes(edits.chroma)) throw Error('色の透過を選び直してください。');
-  const enabled = (edits.chroma ?? (base.chroma ? 'on' : 'off')) === 'on';
+  const enabled = (edits.chroma ?? (chromaEnabled(base, profile) ? 'on' : 'off')) === 'on';
   if (!enabled) {
-    if (base.chroma && Object.keys(base.chroma).some(key => !['keyColorSrgb', 'tolerance', 'softness'].includes(key)))
+    if (profile === 'map1' && base.chroma && Object.keys(base.chroma).some(key => !['keyColorSrgb', 'tolerance', 'softness'].includes(key)))
       throw Error('この色の透過設定には未対応の情報があります。状態を確認してください。');
-    delete out.chroma;
+    if (profile === 'map2' && base.chroma) out.chroma = { ...base.chroma, enabled: false };
+    else delete out.chroma;
     if (['keyColor', 'tolerance', 'softness'].some(key => edits[key as MaterialEditField] !== undefined)) throw Error('色の透過を有効にするか、入力を取り消してください。');
   } else {
     const chroma: Record<string, JsonValue> = { ...(base.chroma ?? { keyColorSrgb: [0, 0, 0], tolerance: 0.1, softness: 0 }) };
+    if (profile === 'map2' && edits.chroma === 'on') chroma.enabled = true;
     if (edits.keyColor !== undefined) {
       const hex = edits.keyColor.trim().toLowerCase(); if (!/^#[0-9a-f]{6}$/.test(hex)) throw Error('透過する色は # と6桁の16進数で入力してください。');
       chroma.keyColorSrgb = Object.freeze([1, 3, 5].map(start => parseInt(hex.slice(start, start + 2), 16) / 255));

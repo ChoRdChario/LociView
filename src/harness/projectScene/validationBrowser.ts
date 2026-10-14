@@ -16,7 +16,8 @@ import { generationDatabaseName } from '../../projectMetadata/generationScope';
 export const validationBrowserLimits: FileValidationLimits = { maxFileBytes: 64 * 1024 * 1024,
   maxJsonBytes: 4 * 1024 * 1024, maxItems: 100_000, maxValues: 8_000_000, maxPixels: 16_777_216 };
 export async function createValidationBrowserWorkspace(document: Document, run?: string) {
-  if (!import.meta.env.DEV) throw Error('開発サーバーで開いてください。');
+  if (!import.meta.env.DEV && import.meta.env.MODE !== 'project-scene-validation')
+    throw Error('開発サーバーまたは専用の検証ビルドで開いてください。');
   await initializeBrowserMetadata();
   const base = await OpfsFS.open(), locks = navigator.locks ?? null;
   const options = { base, coordinator: ProjectMutationCoordinator.browser(locks), fileLimits: validationBrowserLimits, packageLocks: locks,

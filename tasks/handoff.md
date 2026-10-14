@@ -9,7 +9,9 @@ for code locations and [document index](../docs/README.md) for applicable contra
 
 1. Read AGENTS.md and the short current records above. Check actual branch, HEAD,
    worktree and remote state read-only; preserve existing changes.
-2. Follow the active task in todo; it owns the next connected implementation unit.
+2. Follow todo's current connected unit and exit criteria; retained checkpoint
+   prose is evidence, not a second task queue. Close the next adoption gap with
+   the existing workflow; read-only mapping work may proceed in parallel.
 3. Inspect only its relevant source/tests/contracts. Distinguish tested limited
    code from ordinary-route/browser/device acceptance, and preserve any dirty work.
 4. Continue approved work without repeated PO confirmation. Report only a real
@@ -21,10 +23,14 @@ for code locations and [document index](../docs/README.md) for applicable contra
 - Ordinary Native, synthetic hosts and limited GLB/PNG validation have separate evidence.
 - Stored original bytes and failed/pending states remain visible; no inferred winner,
   relation, destructive operation or silent fallback. Internal resume is not external saving.
+- Map-1 and map-2 are selected by verified retained evidence, not a domain minor.
+  New field support does not authorize relabelling old history or durable conversion
+  before the exact initial-conversion recipe is approved.
 - Physical iPhone, offline and adoption gates cannot be replaced by Node/DOM/dev-server checks.
 - One writer; bounded read-only parallel reviews. A clean checkpoint can support a
   fresh task, but do not create/switch tasks without the user's request.
 
 Historical implementation logs and older approvals are in
-[preserved records](../docs/history/development-through-2026-09-14/README.md).
+[the September checkpoint record](../docs/history/development-through-2026-09-21/tasks/todo.md)
+and [earlier preserved records](../docs/history/development-through-2026-09-14/README.md).
 They explain provenance; they do not override the current task or revive old waits.

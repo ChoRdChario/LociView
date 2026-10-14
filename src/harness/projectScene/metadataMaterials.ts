@@ -16,7 +16,7 @@ export function metadataMaterialData(provider: Extract<ProjectProviderRead, { ki
     if (!candidates.complete && !(material.lifecycle.kind === 'value' && material.lifecycle.value.state === 'deleted')) routingUncertain = true;
     let intent: Field<MaterialIntent> = { kind: 'unresolved', reason: 'invalid' };
     if (material.intent.kind !== 'value') intent = material.intent;
-    else try { intent = { kind: 'value', value: validateMaterialIntent(material.intent.value, materialLimits) }; } catch { /* Preserve invalid source. */ }
+    else try { intent = { kind: 'value', value: validateMaterialIntent(material.intent.value, materialLimits, provider.semanticProfile) }; } catch { /* Preserve invalid source. */ }
     records[id] = { ...material, candidates: candidates.routes,
       routing: candidates.hasUnknownFields ? { kind: 'unresolved', reason: 'invalid' } : material.routing,
       appearance: row.appearance as Field<MaterialAppearance>, compositing: row.compositing as Field<MaterialCompositing>, intent };

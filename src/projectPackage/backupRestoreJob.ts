@@ -235,7 +235,7 @@ export class BackupRestoreJob {
       const next = await readRestoreControls(root, limits);
       if (!restoreEqual(next.selection, selected)) fail('restore-generation-retired'); return next;
     };
-    const scope = await openWorkspaceGeneration(root, { generationId, allowCreate: false,
+    const scope = await openWorkspaceGeneration(root, { generationId, allowCreate: false, auditReadOperations: true,
       assertSelected: async () => { await checkSelected(); },
       assertWritable: async () => { const next = await checkSelected();
         if (next.pending || next.tail && !next.jobs.find(j => j.id === next.tail!.jobId)?.result) fail('restore-pending'); } }, databases.open);

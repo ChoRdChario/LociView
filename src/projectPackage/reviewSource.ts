@@ -55,6 +55,7 @@ export class ReviewSourceCapture {
     store: Pick<OriginBlobStore, 'openReadOnly'>, verifier: ProjectContentVerifier, requested: MetadataLimits, signal?: AbortSignal) {
     checkAbort(signal); const limits = packageSourceLimits(requested), original = input.source.slice();
     const source = ProjectMetadataSource.fromFullSource(original, input.sourceProof, limits), review = await readReviewSnapshot(input.snapshot, limits);
+    if (source.semanticProfile !== review.semanticProfile) fail('reconstruction-profile');
     const provider = await readProjectScene(source.read(), limits, verifier), result = await plan(source, provider, limits, input.reconstruction.selection, input.reconstruction);
     if (result.review.token !== review.token || !same(result.review.snapshot, review.snapshot)) fail('reconstruction-mismatch');
     await verifyCleanBodies(review.closure.semanticRefs, store, signal); checkAbort(signal);

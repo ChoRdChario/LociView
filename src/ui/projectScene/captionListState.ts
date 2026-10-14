@@ -8,10 +8,10 @@ export interface CaptionListItem {
   readonly body: Field<string>;
   /** Explicit resolved presentation color. Unknown never means default yellow. */
   readonly color: Field<string>;
-  readonly owner: Field<Readonly<{ kind: 'project' }> |
+  readonly owner: Field<Readonly<{ kind: 'project' }> | Readonly<{ kind: 'none' }> |
     Readonly<{ kind: 'asset'; assetId: string; name: Field<string> }>>;
   readonly mediaCount: Field<number>;
-  readonly pin: 'visible' | 'ownerHidden' | 'ownerMissing' | 'needsReview' | 'unavailable';
+  readonly pin: 'visible' | 'ownerHidden' | 'ownerMissing' | 'needsReview' | 'unavailable' | 'unplaced';
   /** Independent of temporary visibility; this does not acknowledge compatibility. */
   readonly needsReview?: boolean;
 }
@@ -50,7 +50,7 @@ export const ownerFilterKey = (filter: CaptionOwnerFilter): string =>
 export const captionOwnerLabel = (item: CaptionListItem): string => {
   if (item.owner.kind !== 'value') return 'モデルを確認';
   const owner = item.owner.value;
-  return owner.kind === 'project' ? 'モデルに依存しない' : owner.name.kind === 'value'
+  return owner.kind === 'none' ? 'モデル未指定' : owner.kind === 'project' ? 'モデルに依存しない' : owner.name.kind === 'value'
     ? owner.name.value.trim() ? owner.name.value : '名称なし' : 'モデル名を確認';
 };
 export const captionTitle = (item: CaptionListItem): string => item.title.kind === 'value'
@@ -85,7 +85,7 @@ export function captionListView(source: CaptionListSource, memory: SceneUiMemory
     const color = captionColorKey(item.color);
     if (color) colors.add(color);
     const filter: CaptionOwnerFilter = item.owner.kind !== 'value' ? { kind: 'unresolved' }
-      : item.owner.value.kind === 'project' ? { kind: 'project' } : { kind: 'asset', assetId: item.owner.value.assetId };
+      : item.owner.value.kind === 'asset' ? { kind: 'asset', assetId: item.owner.value.assetId } : { kind: item.owner.value.kind };
     const key = ownerFilterKey(filter), label = captionOwnerLabel(item), previous = owners.get(key);
     // Divergent names in a bad projection never become a first/last-label winner.
     owners.set(key, { filter, label: previous && previous.label !== label ? 'モデル名を確認' : label });

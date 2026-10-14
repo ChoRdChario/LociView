@@ -1,8 +1,8 @@
 import * as A from '@automerge/automerge/slim';
 import { Repo, stringifyAutomergeUrl, parseAutomergeUrl, type DocumentId, type BinaryDocumentId } from '@automerge/automerge-repo/slim';
 import type { ProjectWorkspaceFS } from '../platform/fs';
-import { checkedChanges, checkLimits, fail, type MetadataLimits, type MetadataProof, type PhysicalDoc } from './format';
-import { equalBytes, json, technicalId } from './persistence';
+import { checkedChanges, checkedProof, checkLimits, fail, type MetadataLimits, type MetadataProof, type PhysicalDoc } from './format';
+import { equalBytes, json, technicalId, withMetadataRead } from './persistence';
 import { ProjectMetadataSource } from './source';
 
 /** Owned storage factory, bound to one new-workspace namespace; no library objects escape. */
@@ -92,6 +92,12 @@ export class MetadataRepository {
   }
 
   async read(id: string, proof: MetadataProof, heads?: readonly string[], allowUninitialized = false): Promise<ProjectMetadataSource | null> {
+    const ownedProof = checkedProof(proof, this.limits), ownedHeads = heads ? [...heads] : undefined;
+    return withMetadataRead(this.fs, this.factory, ({ fs, factory }) =>
+      new MetadataRepository(fs, factory!, this.limits).readDirect(id, ownedProof, ownedHeads, allowUninitialized));
+  }
+
+  private async readDirect(id: string, proof: MetadataProof, heads: readonly string[] | undefined, allowUninitialized: boolean): Promise<ProjectMetadataSource | null> {
     if (allowUninitialized && !await this.factory().load(['storage-adapter-id'])) return null;
     return this.use(false, async storage => {
       const doc = await storage.loadDoc(this.documentId(id)); if (!doc) return null;
