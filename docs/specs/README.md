@@ -50,6 +50,7 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metri
 
 | Document | Status / purpose |
 |---|---|
+| [`07f-frozen-v1-default-view-proposal.md`](07f-frozen-v1-default-view-proposal.md) | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED`; faithful explicit default-View conversion through one additive v1 recipe-4, retaining old recipes/profiles; requires exact PO ratification |
 | [`06-project-package-wire.md`](06-project-package-wire.md) | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED`; five-purpose wire design under 05 §7.5, with explicit unresolved journal/base, budget and history-free-builder inputs; no format/version or production authorization |
 
 ## Fixed versus conditional decisions

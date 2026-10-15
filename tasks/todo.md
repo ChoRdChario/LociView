@@ -110,6 +110,34 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
+### Current proposal — frozen-v1 explicit default View
+
+Outcome: convert an otherwise admitted frozen-v1 Project's saved explicit starting
+View faithfully, then retain it through edit/file/restore/cold reopen. The concrete
+[07f companion](../docs/specs/07f-frozen-v1-default-view-proposal.md) proposes one
+new immutable recipe-4 selected by any retained nonnull Set default history.
+The frozen contract gives explicit View priority; this can differ from the old
+viewer's latest-saved-View choice. Existing recipe-1/2/3 jobs, source preservation,
+photo/model profiles and ordinary-entry gates remain unchanged.
+
+- [x] Prepare the exact history/current-relation mapping, new domain/key grammar,
+  four independent golden vectors and captured origin/recovery/privacy boundary.
+- [x] Obtain read-only compatibility, outcome and recovery reviews: root and both
+  area reviewers found no remaining P1/P2; independent Python and writer Node
+  recomputation agree on all four byte counts/full digests.
+- [ ] Obtain the one exact PO ratification before implementation. This proposal
+  is PROPOSED, unimplemented and unadopted; no source change is authorized by it.
+
+This is a separate documentation-only checkpoint after the verified S01/P02 push.
+Check local links, diff, preserved contracts and outgoing scope; do not rerun the
+runtime suite for unchanged executable content. The four documentation paths pass
+60 local links with zero missing targets, four literal-vector recomputations and
+diff checks; frozen compatibility files and runtime content are unchanged.
+Stop only the proposed conversion
+implementation at its real compatibility/recipe decision. Existing browser/device/
+offline and ordinary-home gates remain open; no new private/public fixture, profile,
+dependency, source-history export or deployment is introduced.
+
 ### Completed implementation — named last-Project resume and guarded switching
 
 Outcome: remember only the last successfully opened run/mode in UI-owned advisory
@@ -160,10 +188,10 @@ This is static HTTP identity, not browser/device/offline evidence. The suitable
 required review, local links, privacy/deploy scope and staged content are checked
 before normal publication. Git records the checkpoint identity.
 
-Next: finish this verified checkpoint, then prepare the bounded frozen-v1 explicit
-default-View companion as a separate PROPOSED documentation checkpoint. Its new
-immutable recipe requires exact ratification before implementation; ordinary home
-and browser/device/offline acceptance remain open.
+Next: the verified named-resume checkpoint is normally pushed. The bounded
+frozen-v1 explicit default-View proposal above is a separate documentation
+checkpoint; its new immutable recipe requires exact ratification before
+implementation. Ordinary home and browser/device/offline acceptance remain open.
 
 ### Completed implementation — WebP/GIF photos/edit/file/reopen
 
