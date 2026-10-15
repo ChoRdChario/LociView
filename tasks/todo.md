@@ -129,7 +129,7 @@ unplaced preservation, exact media/GID authority or orthographic approximation.
 - [x] Verify representative conversion → edit/first placement → backup/Workspace/
   independent review → cold reopen, refusal/collision/recovery faults and exact
   import isolation. Independently review source/mapping and persistence/UI.
-- [ ] Run one final serial check:checkpoint on the reviewed final source/test
+- [x] Run one final serial check:checkpoint on the reviewed final source/test
   tree, audit outgoing scope and push the suitable g0-baseline checkpoint.
 
 Final verification passed in the bounded nondefault route. First subset: one static GLB and
@@ -255,7 +255,7 @@ not browser/GPU/device/offline acceptance. Independent final scope/privacy/deplo
 review closed on the 18 selected feature paths. Git owns the ensuing normal
 g0-baseline checkpoint identity; the separate JPEG companion is excluded from it.
 
-Next connected unit, PO approved 2026-10-15: JPEG photos and embedded GLB JPEG →
+Next connected unit, PO approved 2026-10-15: [JPEG companion](../docs/specs/07d-jpeg-project-scene-proposal.md), photos and embedded GLB JPEG →
 edit/first placement → named backup/Workspace/independent review → cold reopen.
 Record the approved companion as a separate documentation checkpoint before
 source changes. Use its exact two additive profiles and four new conversion
@@ -270,10 +270,11 @@ contract/authority/scope conflict; grouped browser/device/offline and anonymized
 real-source acceptance remain separate. Broader formats/material recipes still
 require their concrete compatibility companions.
 
-Milestone audit: the approved Native and frozen-v1 bounded workflows are now
-reviewed, fully checked and pushed on g0-baseline. This unit connects LociMyu's
-approved bounded new-route converter; close its exact source/recovery workflow,
-without reopening accepted source policies or creating extra helper workstreams.
+Milestone audit: the approved Native, frozen-v1 and LociMyu bounded workflows are
+reviewed, fully checked and pushed on g0-baseline. The LociMyu checkpoint's remote
+HEAD matches local Git identity. Continue with the approved JPEG companion after
+its separate documentation checkpoint, without reopening accepted source policies
+or creating extra helper workstreams.
 Continue under the approved exact recipe; stop only for a real new contract or
 scope decision, managed authority or release boundary. The managed Chrome block,
 device/offline/profile/storage adoption and ordinary-entry/release remain distinct.

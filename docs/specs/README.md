@@ -43,6 +43,7 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metri
 | [`05-project-scene-team-workflow.md`](05-project-scene-team-workflow.md) | ProjectScene composition, continuing new-format team history, Workspace/Contribution purposes, one-time migration and acceptance; supersedes identified general-v2 clauses without changing Native bytes |
 | [`07-project-scene-migration.md`](07-project-scene-migration.md) | PO-approved one-time cutover (2026-09-14); initial conversion is not complete. The former old-update bridge and §11 approval request are superseded; reduced source/target mapping still precedes implementation |
 | [`07c-locimyu-project-scene-conversion-proposal.md`](07c-locimyu-project-scene-conversion-proposal.md) | Exact first LociMyu → ProjectScene recipe/subset approved 2026-10-15, retaining 04 source semantics; bounded implementation/evidence are recorded in todo, broader conversion/adoption remain open |
+| [`07d-jpeg-project-scene-proposal.md`](07d-jpeg-project-scene-proposal.md) | JPEG photos/embedded textures, two additive immutable profiles and four recipes approved 2026-10-15; bounded implementation authorized, not implemented/adopted |
 
 ### Proposed companions — not covered by the approval above
 
