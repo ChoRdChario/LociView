@@ -48,6 +48,7 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metri
 | Document | Status / purpose |
 |---|---|
 | [`06-project-package-wire.md`](06-project-package-wire.md) | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED`; five-purpose wire design under 05 §7.5, with explicit unresolved journal/base, budget and history-free-builder inputs; no format/version or production authorization |
+| [`07c-locimyu-project-scene-conversion-proposal.md`](07c-locimyu-project-scene-conversion-proposal.md) | `PROPOSED / NOT IMPLEMENTED`; next LociMyu → ProjectScene exact recipe/subset under 05 §9.2, retaining 04 source semantics; independent review and golden recomputation do not ratify it |
 
 ## Fixed versus conditional decisions
 

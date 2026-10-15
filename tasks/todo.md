@@ -104,6 +104,46 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
+### Next connected unit — LociMyu conversion/edit/file/reopen, exact recipe decision
+
+Outcome: required F08 outer ZIP → workbook/coarse relation choice → new Scenes,
+Caption/PNG/perspective and approved orthographic Views → edit/first placement →
+named backup/Workspace/independent review → cold reopen. Reuse accepted 04/05 §9.2
+source rules; do not ask PO to redecide duplicate identity, invalid-coordinate
+unplaced preservation, exact media/GID authority or orthographic approximation.
+
+- [x] Bounded read-only source/contract investigation; identify reusable safe
+  workbook planning, complete identity evidence and raw file-ID map rows.
+- [x] Prepare [07c](../docs/specs/07c-locimyu-project-scene-conversion-proposal.md)
+  with all exact source keys/preimages/output kinds, eight ID vectors, canonical
+  Caption/inventory bytes/hash, initial-source recovery, explicit report privacy,
+  required ports and one connected acceptance workflow. Two independent reviews
+  find no remaining P1/P2; independently recomputed vectors all match. Correct
+  decoded row encounter order rather than relying on XLSX r attributes.
+- [ ] Receive the exact recipe/subset ratification required by 05 §9.2, then
+  implement/verify/review that connected workflow without per-control PO tests.
+
+This proposal is not durable implementation. First subset: one static GLB and
+exact-linked PNG; active material adjustments and exact-linked JPEG/WebP/GIF
+refuse the whole input, with original preservation. Already nonauthoritative/
+ambiguous relations and HEIC remain report-only under 04. Broader formats and
+material conversion stay required. No old Native DTO becomes the new source;
+no schema/profile/dependency/ordinary-entry/deploy change is proposed.
+
+Checks: document diff/local links, retained-contract consistency and independent
+source/identity/privacy review. Vectors in
+`.artifacts/traces/locimyu-project-scene-vectors-2026-10-15.json` are synthetic
+math evidence only. No runtime recheck for this documentation-only successor;
+the frozen-v1 eight-path tested tree and full checkpoint below remain unchanged.
+
+Milestone audit: the approved Native and frozen-v1 bounded workflows are now
+reviewed, fully checked and pushed on g0-baseline. LociMyu still has no bounded
+new-route converter; fix its actual new identity/admission boundary before writes,
+without reopening accepted source policies or creating extra helper workstreams.
+Stop only this new recipe implementation pending the concrete PO decision; the
+managed Chrome block, device/offline/profile/storage adoption and ordinary-entry/
+release remain distinct. This is one compatibility decision, not a microtest.
+
 ### Completed implementation — frozen-v1 conversion/edit/file/reopen
 
 Outcome: self-contained frozen-v1 GLB/PNG Project ZIP → conversion preview → new
@@ -124,8 +164,8 @@ were ratified by PO on 2026-10-15. No small user test is a development dependenc
   exercise product edit/placement/backup/Workspace/review/reopen with faults.
 - [x] Independently review the meaningful production/test diff; close source-kind,
   ordering, map-2 and recovery-origin findings without weakening admission.
-- [x] Run the final serial checks; prepare the reviewed/tested checkpoint for
-  authorized g0-baseline push, with publication identity kept in Git.
+- [x] Run the final serial checks and commit/push the reviewed/tested checkpoint
+  to authorized g0-baseline, with publication identity kept in Git.
 
 Ports before implementation: `projectFiles/frozenV1Source.ts` reads owned ZIP bytes
 through assets/zipio and frozen core manifest/JSONL/admission/reducer exports, never
