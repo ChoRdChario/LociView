@@ -422,7 +422,10 @@ Scene/Caption/media/perspective-View mapping, private raw-source retention and
 exact initial-source recovery. It records the observed default-View/material-key/
 malformed-import discrepancies rather than changing the frozen contract. This is
 PO-approved bounded implementation contract, not a passed migration/storage/profile
-gate. Broader initial conversion remains required; todo owns executed evidence.
+gate. The [07f additive default-View companion](07f-frozen-v1-default-view-proposal.md)
+was ratified 2026-10-16: recipe-4 preserves frozen explicit priority and retained
+default history while keeping old domains and other exclusions fixed. Broader
+initial conversion remains required; todo owns executed evidence.
 
 ### 5.5 LociMyu concrete companion — approved bounded implementation
 

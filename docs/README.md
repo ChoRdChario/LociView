@@ -26,7 +26,7 @@ record executed evidence and connections; do not infer those from a document tit
 | Approved first LociMyu → ProjectScene conversion | [LociMyu companion](specs/07c-locimyu-project-scene-conversion-proposal.md); exact recipe/subset approved 2026-10-15; implementation/evidence remain in todo |
 | Approved JPEG photos and embedded textures extension | [JPEG companion](specs/07d-jpeg-project-scene-proposal.md); two additive profiles/four recipes approved 2026-10-15; bounded implementation/evidence in todo, not adopted |
 | Approved WebP/GIF photo extension | [WebP/GIF companion](specs/07e-webp-gif-project-scene-proposal.md); four additive recipes and existing raw-image display approved 2026-10-15; implementation/evidence in todo, not adopted |
-| Proposed frozen-v1 explicit default-View extension | [Default-View companion](specs/07f-frozen-v1-default-view-proposal.md); concrete new recipe-4, independently reviewed, awaiting PO ratification; not implemented or adopted |
+| Approved frozen-v1 explicit default-View extension | [Default-View companion](specs/07f-frozen-v1-default-view-proposal.md); exact recipe-4 approved 2026-10-16; bounded implementation/evidence in todo, not adopted |
 | UI intent, writing, visual tone and interaction | [UI product guidelines](ui-product-guidelines.md); [UI task mapping](../tasks/uiux-handoff.md) for historical audit evidence |
 | Ownership, license or sponsorship | [licensing](licensing-and-ownership.md), [sponsorship](sponsorship-policy.md); direction is not adoption or a license grant |
 

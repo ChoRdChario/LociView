@@ -235,11 +235,18 @@ not satisfy anonymized-real-source STO-MIG-01 or profile/storage adoption.
 
 Frozen [v1 §5](../02-data-format.md#5-エンティティスキーマ) specifies explicit
 defaultViewId priority; current viewerScreen chooses latest lastWrite instead.
-This proposal does not choose between them: nonnull explicit defaults and inline
-defaultCameraState refuse this subset. Their faithful mapping remains required.
-Likewise the documented vs implemented material-key/address and transformed-pin
-semantics require a later concrete companion; material records and nonidentity
-transforms are excluded here. Do not silently redefine the frozen contract.
+The original recipe and its photo-only successors keep refusing nonnull explicit
+defaults and inline defaultCameraState. The separately named
+[07f companion](07f-frozen-v1-default-view-proposal.md), PO ratified 2026-10-16,
+adds faithful explicit default mapping without reinterpreting those old domains.
+Inline camera meaning remains unresolved and refused.
+The material-key/address mapping and nonidentity transforms remain outside these
+recipes. Current scale/Y-or-Z-up applies to both models and model-local pins;
+the unresolved transform difference is offset (its frame/order is unspecified and
+the old viewer does not apply it). Orthographic saved zoom/span and inline camera
+meaning also need an explicit companion, not a silent frozen-contract rewrite.
+Orthographic reconstruction additionally needs a portable exact-record numerical
+policy; a runtime hypot/tan expression alone does not establish that policy.
 
 The existing new-project importer rejects malformed log lines while read-only
 inspection and opened-source paths can preserve/report them. This converter's

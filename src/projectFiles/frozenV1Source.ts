@@ -17,7 +17,8 @@ import { checkFileLimits, fileError, fileObject, fileList, fileNumber, fileVecto
 export const frozenV1Recipe = 'v1-project-scene-migration-recipe-1';
 export const frozenV1JpegRecipe = 'v1-project-scene-migration-recipe-2';
 export const frozenV1PhotoRecipe = 'v1-project-scene-migration-recipe-3';
-export type FrozenV1Recipe = typeof frozenV1PhotoRecipe | typeof frozenV1Recipe | typeof frozenV1JpegRecipe;
+export const frozenV1DefaultViewRecipe = 'v1-project-scene-migration-recipe-4';
+export type FrozenV1Recipe = typeof frozenV1DefaultViewRecipe | typeof frozenV1PhotoRecipe | typeof frozenV1Recipe | typeof frozenV1JpegRecipe;
 export const codeOrder = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 export const byteProof = async (bytes: Uint8Array) => ({ byteLength: bytes.length, digest: await digest(bytes) });
 const fail = () => fileError('この旧形式ファイルの設定は、まだそのまま変換できません。');
@@ -41,7 +42,8 @@ function checkSourceFields(op: Op, limits: FileValidationLimits) {
   const v = closed(op.v, fields[op.e]!);
   if (op.e === 'set') {
     if (Object.hasOwn(v, 'order')) fileNumber(v.order);
-    if (Object.hasOwn(v, 'defaultCameraState') || Object.hasOwn(v, 'defaultViewId') && v.defaultViewId !== null) fail();
+    if (Object.hasOwn(v, 'defaultCameraState') || Object.hasOwn(v, 'defaultViewId') && v.defaultViewId !== null &&
+      (typeof v.defaultViewId !== 'string' || !/^view_[0-7][0123456789ABCDEFGHJKMNPQRSTVWXYZ]{25}$/u.test(v.defaultViewId))) fail();
   }
   if (op.e === 'asset') {
     if (v.kind !== undefined && !['model', 'image'].includes(text(v.kind))) fail();
@@ -164,6 +166,7 @@ export async function inspectFrozenV1Source(input: Blob, limits: FileValidationL
   for (const scene of scenes) {
     text(scene.fields.name); const own = views.filter(v => v.fields.setId === scene.id).sort((a, b) => codeOrder(b.lastWrite!, a.lastWrite!));
     if (own.length > 1 && own[0]!.lastWrite === own[1]!.lastWrite) fail();
+    if (scene.fields.defaultViewId != null && !own.some(v => v.id === scene.fields.defaultViewId)) fail();
   }
   const deleted = Object.values(state.byKind).flatMap(Object.values).filter(r => !isVisible(r)), deletedPaths = new Set(deleted.filter(r => r.kind === 'asset').map(r => r.fields.path));
   const sourceOnly = { profiles: visibleEntities(state, 'profile').length, deletedRecords: deleted.length, caches: 0, deletedPayloads: 0, unlinkedPayloads: 0,
@@ -181,6 +184,8 @@ export async function inspectFrozenV1Source(input: Blob, limits: FileValidationL
     fingerprints.push({ path: entry.path, role, ...await byteProof(entry.data) });
   }
   fingerprints.sort((a, b) => codeOrder(a.path, b.path));
-  return { original, plan: { recipe: media.some(m => m.ref.mediaType === 'image/webp' || m.ref.mediaType === 'image/gif') ? frozenV1PhotoRecipe : models.some(m => m.model?.jpeg) || media.some(m => m.ref.mediaType === 'image/jpeg') ? frozenV1JpegRecipe : frozenV1Recipe, manifest, models, media, scenes, captions, views, fingerprints, inventory,
+  // A historical nonnull default binds the new domain even if it later loses or its Set is deleted.
+  const explicitDefaultHistory = ops.some(op => op.e === 'set' && op.v && Object.hasOwn(op.v, 'defaultViewId') && op.v.defaultViewId !== null);
+  return { original, plan: { recipe: explicitDefaultHistory ? frozenV1DefaultViewRecipe : media.some(m => m.ref.mediaType === 'image/webp' || m.ref.mediaType === 'image/gif') ? frozenV1PhotoRecipe : models.some(m => m.model?.jpeg) || media.some(m => m.ref.mediaType === 'image/jpeg') ? frozenV1JpegRecipe : frozenV1Recipe, manifest, models, media, scenes, captions, views, fingerprints, inventory,
     report: { models: models.length, scenes: scenes.length, captions: captions.length, media: media.length, sourceOnly, originalExcludedFromExports: true } } };
 }

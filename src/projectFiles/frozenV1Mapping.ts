@@ -2,7 +2,7 @@ import { admitProjectRecords, projectRecordMaps } from '../domain/projectRecords
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
 import { digest, newId, technicalId } from '../projectMetadata/persistence';
 import { identityPlacement, sealValidationRecord, type PreparedValidationProject } from './initialProject';
-import { frozenV1Recipe, frozenV1JpegRecipe, frozenV1PhotoRecipe, type FrozenV1Recipe, sourceColor, codeOrder, type FrozenV1Plan } from './frozenV1Source';
+import { frozenV1Recipe, frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe, type FrozenV1Recipe, sourceColor, codeOrder, type FrozenV1Plan } from './frozenV1Source';
 import { fileError, validationGlbProfile, jpegGlbProfile, validationMetadataLimits as limits } from './validation';
 
 type Key = readonly (string | number | Key)[];
@@ -28,10 +28,10 @@ export function frozenV1ConversionIds(conversionId: string, sourceZipSha256: str
     if (!frozenV1SourceKey(prefix, key)) return fileError('変換時の識別情報が不正です。');
     const preimage = `lociview:${recipe}:id:jcs-v1\n` + JSON.stringify([conversionId, sourceZipSha256, prefix, key]);
     const sha256 = await digest(new TextEncoder().encode(preimage)), value = `${prefix}_${sha256.slice(0, 32)}`, old = entries.get(value);
-    if (old && (old.preimage !== preimage || old.sha256 !== sha256) || [frozenV1JpegRecipe, frozenV1PhotoRecipe].includes(recipe) && full.has(sha256) && full.get(sha256) !== preimage) return fileError('変換先の識別情報が衝突しました。');
+    if (old && (old.preimage !== preimage || old.sha256 !== sha256) || [frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe].includes(recipe) && full.has(sha256) && full.get(sha256) !== preimage) return fileError('変換先の識別情報が衝突しました。');
     entries.set(value, { id: value, sha256, preimage }); full.set(sha256, preimage); return value;
   };
-  return { id, report: () => [frozenV1JpegRecipe, frozenV1PhotoRecipe].includes(recipe) ? [...entries.values()].sort((a, b) => codeOrder(a.id, b.id)) : [...entries.values()] };
+  return { id, report: () => [frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe].includes(recipe) ? [...entries.values()].sort((a, b) => codeOrder(a.id, b.id)) : [...entries.values()] };
 }
 const rank = (n: number) => `A${n.toString(36).padStart(8, '0')}`;
 
@@ -94,7 +94,9 @@ export async function mapFrozenV1Project(plan: FrozenV1Plan, conversionId: strin
   }
   for (const [i, s] of plan.scenes.entries()) {
     const sceneId = await scene(s.id), views = plan.views.filter(v => v.fields.setId === s.id), latest = [...views].sort((a, b) => codeOrder(b.lastWrite!, a.lastWrite!))[0];
-    add('scenesById', { id: sceneId, name: s.fields.name as string, orderKey: rank(i), lifecycle: await active('scn', ['set', s.id]), ...(latest ? { defaultViewId: await view(latest.id) } : {}) });
+    const entry = s.fields.defaultViewId == null ? latest : views.find(v => v.id === s.fields.defaultViewId);
+    if (s.fields.defaultViewId != null && !entry) return fileError('開始する視点の関係を確認できません。');
+    add('scenesById', { id: sceneId, name: s.fields.name as string, orderKey: rank(i), lifecycle: await active('scn', ['set', s.id]), ...(entry ? { defaultViewId: await view(entry.id) } : {}) });
     for (const [n, model] of plan.models.entries()) { const key: Key = ['scene-asset', s.id, model.record.id];
       add('sceneAssetMembershipsById', { id: await id('sam', key), sceneId, assetId: await asset(model.record.id), orderKey: rank(n), lifecycle: await active('sam', key) }); }
     for (const [n, c] of plan.captions.filter(c => c.fields.setId === s.id).entries()) { const key: Key = ['scene-caption', s.id, c.id];

@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated 2026-10-15. This file owns the current plan, checks and next actions.
+Updated 2026-10-16. This file owns the current plan, checks and next actions.
 [Inventory](implementation-inventory.md) owns feature coverage;
 [docs/README.md](../docs/README.md) routes contracts. Git owns commit identity.
 
@@ -27,6 +27,8 @@ Scene-local add colors, guarded Shift/numeric placement, owner reveal, Asset-wid
 pin sizing and checked save/resume/help are also connected in this bounded route.
 The approved JPEG photo/embedded-texture extension now preserves original metadata
 through direct creation/addition, conversion, file exchange and generation restore.
+Frozen-v1 explicit starting Views now survive conversion, file handoff and
+selected-generation restore/edit/cold reopen under the approved recipe-4.
 The approved WebP/GIF companion connects the same photo workflow with original
 Blob animation behavior and four additive conversion domains; GLB profiles stay fixed.
 The named last-Project resume and guarded Project/file switching connection now
@@ -110,33 +112,90 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
-### Current proposal — frozen-v1 explicit default View
+### Completed implementation — frozen-v1 explicit default View
 
-Outcome: convert an otherwise admitted frozen-v1 Project's saved explicit starting
-View faithfully, then retain it through edit/file/restore/cold reopen. The concrete
-[07f companion](../docs/specs/07f-frozen-v1-default-view-proposal.md) proposes one
-new immutable recipe-4 selected by any retained nonnull Set default history.
-The frozen contract gives explicit View priority; this can differ from the old
-viewer's latest-saved-View choice. Existing recipe-1/2/3 jobs, source preservation,
-photo/model profiles and ordinary-entry gates remain unchanged.
+PO ratified the exact [07f companion](../docs/specs/07f-frozen-v1-default-view-proposal.md)
+on 2026-10-16. Outcome: explicit saved starting View → new Project/Scene conversion
+→ open at that View → edit/save/file handoff → selected-generation restore/edit/
+cold reopen. Frozen explicit priority can differ from the old viewer's latest-
+saved-View choice; the approved additive recipe-4 closes that compatibility gap.
 
-- [x] Prepare the exact history/current-relation mapping, new domain/key grammar,
-  four independent golden vectors and captured origin/recovery/privacy boundary.
-- [x] Obtain read-only compatibility, outcome and recovery reviews: root and both
-  area reviewers found no remaining P1/P2; independent Python and writer Node
-  recomputation agree on all four byte counts/full digests.
-- [ ] Obtain the one exact PO ratification before implementation. This proposal
-  is PROPOSED, unimplemented and unadopted; no source change is authorized by it.
+- [x] Record ratification, exact source/current relation and immutable identity
+  requirements before code. Independent proposal review and all four golden
+  calculations already agree; no implementation evidence is implied by approval.
+- [x] Connect history-presence recipe selection, all-retained type/ID checks and
+  current active-Set reference mapping with captured receipt/origin recovery.
+- [x] Verify existing old dispatch/profile/ready timing and relevant fault fences,
+  then one connected edit/file/actual restore/cold workflow with real services.
+- [x] Independently review the meaningful final diff, freeze source/tests, run one
+  final serial checkpoint and HTTP identity, then audit and normally push g0.
 
-This is a separate documentation-only checkpoint after the verified S01/P02 push.
-Check local links, diff, preserved contracts and outgoing scope; do not rerun the
-runtime suite for unchanged executable content. The four documentation paths pass
-60 local links with zero missing targets, four literal-vector recomputations and
-diff checks; frozen compatibility files and runtime content are unchanged.
-Stop only the proposed conversion
-implementation at its real compatibility/recipe decision. Existing browser/device/
-offline and ordinary-home gates remain open; no new private/public fixture, profile,
-dependency, source-history export or deployment is introduced.
+Ports: reuse frozen read/plan/map, existing initialization/closed origin literal,
+Session/provider/file/generation services and validation UI; no new API or import
+boundary is expected. Old recipe-1/2/3, four GLB profiles, PNG/JPEG/WebP/GIF APIs,
+inline-camera/material/transform/ortho exclusions and latest-View tie refusal stay
+fixed. No source/history reconstruction, private export, dependencies, ordinary
+entry, browser-denial retry, adoption or deployment. Stop only affected work for a
+real new contract/authority/compatibility decision or managed permission boundary.
+
+Milestone audit: clean g0-baseline starts at pushed e6f4948; the one-writer unit
+closes the ratified conversion workflow, rather than adding a report framework or
+per-field roundtrips. Node/recorded DOM/HTTP never stand for browser/device/offline
+or anonymized-real-source evidence. Broader v1 conversion remains required.
+
+Focused evidence: 44 v1/new-domain service and connected product cases pass,
+including all four recipe vectors, all-retained/current relationship checks,
+new-only collision/order, MIME-independent model profiles, fully rebound false
+initial defaults, original ZIP mutation, interrupted/cold/completed retry, literal
+downgrades and independent-origin sidecar loss. The old and new product variants
+preserve typed edit retry without private-source reread, named backup/Workspace/
+review, correct entry DTOs and selected-generation restore/edit/cold. Typecheck
+passes. One existing production viewport entry/camera/FOV/background case also
+passes with its mocked renderer; this is Node evidence, not browser/GPU/device.
+Root and both read-only area reviews have no remaining P1/P2. New test-only missing
+import/provider-name assumptions were corrected before the passing group; runtime
+source stayed unchanged. No new module/import boundary requires a new allowlist.
+
+The first final serial attempt stopped after one existing Caption recovery test
+failed its incidental 1s retry/DOM poll: 115 files passed, 2,543 tests passed,
+21 existing todo, one failed (1137.07s); builds did not run. Preserve
+`default-view-checkpoint-2026-10-16.log` and the original five-file manifest.
+Read-only cause review found a real ownership gap: host failure may precede the
+UI acknowledgment's failed/render completion, and retry completion was not awaited.
+The log cannot establish which timing path occurred. No concrete new-test leak
+or production lost-refresh path was found. That same case now captures the actual
+command owner, waits for failed then retry-idle confirmation, retains all original
+result/history assertions and owns cleanup even on failure. Its focused case
+passes (23.32s test time); root/independent correction reviews have no P1/P2.
+Bounded classification confirmed five other legacy conflict/recovery cases use
+the same host-status-before-UI-completion boundary. They now capture the newly
+mounted command owner through its normal subscription, require no preexisting
+checking operation, and await that same owner's failed/retry-idle completion.
+The original token, captured choices, bytes, history and result assertions remain;
+receive and outer budgets are unchanged. The six affected cases passed together
+(89.60s test time); the final form including the no-preexisting-checking assertion
+also passes all six (86.36s test time). Typecheck passes. Root and independent
+correction reviews have no remaining P1/P2; no product port or runner configuration
+was added.
+Production remains unchanged. The justified final rerun used the updated frozen
+test tree without timeout/worker/assertion relaxation or automatic retry.
+
+Final evidence: typecheck, all 116 test files (2,544 passed, 21 existing todo;
+877.45s) and all three builds pass with exit 0. Preserve the final log
+`default-view-checkpoint-2026-10-16-final.log` alongside the first failure. The four
+production hashes still match the first manifest; all five final source/test
+hashes match `default-view-tested-tree-2026-10-16-final.json`. All seven validation
+build files match HTTP on the existing localhost:4182 helper; manifest SHA-256
+`396da9e22b3e542f72883be23cf2a59ea02a2011ba5917e7afdbc61a758ebc07`.
+This is HTTP identity only; browser/GPU/device/offline evidence is unchanged.
+
+Next: record nonidentity v1 model placement as one concrete, separately ratified
+companion. The unratified next-proposal review found that orthographic
+span/zoom is absent and JavaScript hypot/tan approximation cannot by itself bind
+portable exact rederived records. Keep ortho refusal and that numeric-policy
+question open; do not add a math kernel or weaken evidence fences. Inline camera
+and material/renderer policy also remain outside that proposal. Ordinary entry
+and grouped browser/device/offline acceptance remain open.
 
 ### Completed implementation — named last-Project resume and guarded switching
 
@@ -190,8 +249,8 @@ before normal publication. Git records the checkpoint identity.
 
 Next: the verified named-resume checkpoint is normally pushed. The bounded
 frozen-v1 explicit default-View proposal above is a separate documentation
-checkpoint; its new immutable recipe requires exact ratification before
-implementation. Ordinary home and browser/device/offline acceptance remain open.
+checkpoint; PO has now ratified its exact recipe and the active implementation
+plan is above. Ordinary home and browser/device/offline acceptance remain open.
 
 ### Completed implementation — WebP/GIF photos/edit/file/reopen
 

@@ -1,10 +1,12 @@
 # Frozen-v1 explicit default-View conversion companion
 
-Status: **PROPOSED — not approved, implemented or adopted.**
+Status: **PO ratified 2026-10-16 — approved for bounded implementation, not adoption.**
 This is a concrete bounded companion to [07b](07b-frozen-v1-conversion-proposal.md),
 [07d](07d-jpeg-project-scene-proposal.md) and [07e](07e-webp-gif-project-scene-proposal.md).
-It needs PO ratification before implementation. Current work and executed evidence
+The PO approved this exact recipe/subset after independent review. Current work and executed evidence
 belong to [todo](../../tasks/todo.md); this document grants no release or adoption credit.
+The bounded nondefault validation route is implemented and checkpoint-tested;
+broader conversion and browser/device/adoption evidence remain open in todo.
 
 ## User outcome and compatibility choice
 
@@ -17,8 +19,8 @@ named backup/Workspace, restore and cold reopen without losing that relationship
 is set. The old viewer currently chooses latest lastWrite; 07b therefore refuses
 nonnull defaults instead of silently choosing a different meaning. This companion
 maps the frozen contract. **保存済み明示視点を優先するため、旧画面が最新の保存日時から選んでいた視点とは
-異なる視点で開く場合がある。** This is the user-visible compatibility impact to
-ratify, not a proposal to change the frozen wire or legacy viewer.
+異なる視点で開く場合がある。** This is the user-visible compatibility impact
+ratified on 2026-10-16, not a change to the frozen wire or legacy viewer.
 
 ## Closed source admission and mapping
 
@@ -55,7 +57,7 @@ fields remain refused exactly as before. No Native or LociMyu recipe changes.
 
 ## One additive immutable recipe
 
-Propose exactly `v1-project-scene-migration-recipe-4`. Select it iff any retained
+The approved addition is exactly `v1-project-scene-migration-recipe-4`. Select it iff any retained
 Set operation has a present nonnull defaultViewId, even when that write later
 loses, becomes null, or belongs to a deleted Set. Malformed values still refuse;
 there is no old-refusal → new-recipe fallback. A source with no such history keeps
@@ -134,5 +136,6 @@ checkpoint and HTTP build identity once at its connected source/test boundary.
 Synthetic/recorded-DOM checks are not actual View rendering, browser/device,
 offline or anonymized-real-source evidence. Ordinary home, broader v1 conversion,
 profile/storage adoption and deployment stay gated. Stop affected work for a real
-new contract/authority conflict. **No implementation is authorized by this proposal
-until its exact companion is ratified.**
+new contract/authority conflict. The exact PO ratification authorizes this bounded
+implementation; ordinary implementation, relevant fixes and checks need no renewed
+approval. Implementation and executed evidence remain in todo.

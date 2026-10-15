@@ -12,10 +12,10 @@ import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
 import { fileError, validationMetadataLimits as metadataLimits, type FileValidationLimits } from './validation';
 
-type InitialOriginRecipe = 'native-project-scene-recipe-5' | 'native-project-scene-recipe-6' | 'v1-project-scene-migration-recipe-3' | 'locimyu-project-scene-migration-recipe-3' | 'v1-project-scene-migration-recipe-1' | 'locimyu-project-scene-migration-recipe-1' |
+type InitialOriginRecipe = 'v1-project-scene-migration-recipe-4' | 'native-project-scene-recipe-5' | 'native-project-scene-recipe-6' | 'v1-project-scene-migration-recipe-3' | 'locimyu-project-scene-migration-recipe-3' | 'v1-project-scene-migration-recipe-1' | 'locimyu-project-scene-migration-recipe-1' |
   'v1-project-scene-migration-recipe-2' | 'locimyu-project-scene-migration-recipe-2' | 'native-project-scene-recipe-3' | 'native-project-scene-recipe-4';
 const originRecipeKnown = (value: unknown): value is InitialOriginRecipe => typeof value === 'string' && [
-  'v1-project-scene-migration-recipe-1', 'locimyu-project-scene-migration-recipe-1',
+  'v1-project-scene-migration-recipe-1', 'v1-project-scene-migration-recipe-4', 'locimyu-project-scene-migration-recipe-1',
   'v1-project-scene-migration-recipe-2', 'locimyu-project-scene-migration-recipe-2', 'native-project-scene-recipe-3', 'native-project-scene-recipe-4',
   'native-project-scene-recipe-5', 'native-project-scene-recipe-6', 'v1-project-scene-migration-recipe-3', 'locimyu-project-scene-migration-recipe-3',
 ].includes(value);

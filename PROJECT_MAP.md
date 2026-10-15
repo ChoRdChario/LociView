@@ -51,7 +51,9 @@ validation route. Old Native acceptance remains valid only for its tested scope.
 See inventory for individual connections and todo for executed checks and remaining adoption conditions.
 
 The same validation file entry connects bounded Native, frozen-v1 and LociMyu
-initial conversions. `projectFiles/lociMyuSource.ts` owns raw workbook inspection,
+initial conversions. The approved frozen-v1 recipe-4 in `frozenV1Source.ts` /
+`frozenV1Mapping.ts` preserves explicit saved starting Views without changing old
+conversion domains or model profiles. `projectFiles/lociMyuSource.ts` owns raw workbook inspection,
 `lociMyuMapping.ts` verifies source identity and constructs typed records, and
 `lociMyuConversion.ts` retains the private source/receipt and validates recovery
 and explicit report export. Workspace UI exposes coarse workbook choice and the

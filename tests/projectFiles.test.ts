@@ -14,7 +14,7 @@ import { OriginBlobStore } from '../src/projectMetadata/blobStore';
 import type { MetadataStorageFactory } from '../src/projectMetadata/repository';
 import { MetadataRepository } from '../src/projectMetadata/repository';
 import { digest, newId, json, underWriteLease } from '../src/projectMetadata/persistence';
-import { validationMetadataLimits as metadata, occurrenceGlbProfile, occurrenceGlbProfileText, jpegGlbProfile, occurrenceJpegGlbProfile, type FileValidationLimits } from '../src/projectFiles/validation';
+import { validationMetadataLimits as metadata, validationGlbProfile, occurrenceGlbProfile, occurrenceGlbProfileText, jpegGlbProfile, occurrenceJpegGlbProfile, type FileValidationLimits } from '../src/projectFiles/validation';
 import { inspectValidationGlb, inspectValidationJpegGlb, validationGlbParts } from '../src/projectFiles/glb';
 import { inspectOccurrenceGlb, decodeOccurrenceGlb } from '../src/projectFiles/glbOccurrences';
 import { inspectValidationPng } from '../src/projectFiles/png';
@@ -111,7 +111,7 @@ import { prepareNativeConversion, resumeNativeConversion } from '../src/projectF
 import { nativeConversionIds, nativeAppearanceRecipe } from '../src/projectFiles/nativeMapping';
 import { prepareFrozenV1Conversion, resumeFrozenV1Conversion } from '../src/projectFiles/frozenV1Conversion';
 import { frozenV1ConversionIds, frozenV1SourceKey } from '../src/projectFiles/frozenV1Mapping';
-import { frozenV1Recipe, inspectFrozenV1Source } from '../src/projectFiles/frozenV1Source';
+import { frozenV1Recipe, frozenV1DefaultViewRecipe, inspectFrozenV1Source } from '../src/projectFiles/frozenV1Source';
 import { prepareLociMyuConversion, resumeLociMyuConversion, readLociMyuConversionReport } from '../src/projectFiles/lociMyuConversion';
 import { lociMyuConversionIds, lociMyuSourceKey } from '../src/projectFiles/lociMyuMapping';
 import { lociMyuRecipe } from '../src/projectFiles/lociMyuSource';
@@ -135,6 +135,30 @@ const imageFor = (format: 'jpeg' | 'webp' | 'gif') => format === 'jpeg' ? jpegBy
 const caseDisposals: (() => void | Promise<void>)[] = [];
 function owned<T extends { dispose(): void | Promise<void> }>(resource: T): T {
   caseDisposals.push(() => resource.dispose()); return resource;
+}
+/** Observe the real mounted legacy command owner, without adding a product port. */
+function captureWorkingOwner() {
+  const owners = new Set<WorkingAcknowledgment>(), subscribe = WorkingAcknowledgment.prototype.subscribe;
+  const capture = vi.spyOn(WorkingAcknowledgment.prototype, 'subscribe').mockImplementation(function (this: WorkingAcknowledgment, listener) {
+    owners.add(this); return subscribe.call(this, listener);
+  });
+  const stop = () => { capture.mockRestore(); }; caseDisposals.push(stop);
+  let previous: WorkingAcknowledgment | undefined;
+  return { stop, async run(action: () => void, expected: 'idle' | 'failed' = 'idle') {
+    for (const owner of owners) expect(owner.state).not.toBe('checking');
+    let current: WorkingAcknowledgment | undefined; const unsubscribes: (() => void)[] = [];
+    try {
+      await new Promise<void>(resolve => {
+        const settled = () => { if (current && current.state !== 'checking') resolve(); };
+        for (const owner of owners) unsubscribes.push(owner.subscribe(settled));
+        action(); const checking = [...owners].filter(owner => owner.state === 'checking');
+        expect(checking).toHaveLength(1); current = checking[0]!;
+        if (previous) expect(current).toBe(previous); previous = current; settled();
+      });
+    } finally { for (const unsubscribe of unsubscribes) unsubscribe(); }
+    expect(current!.state).toBe(expected);
+    for (const owner of owners) if (owner !== current) expect(owner.state).toBe('idle');
+  } };
 }
 afterEach(async () => {
   const errors: unknown[] = [];
@@ -277,6 +301,16 @@ async function frozenV1File(change: (ops: any[]) => void = () => {}, imageBytes 
     { path: 'thumbs/unused.png', data: png }];
   return new Blob([(await writeZipEntries(entries)).slice().buffer]);
 }
+/** Two distinct saved Views; the explicit one intentionally predates the latest. */
+function explicitV1Default(ops: any[]) {
+  const scene = ops.find(o => o.e === 'set'), first = ops.find(o => o.e === 'view');
+  scene.v.defaultViewId = first.id;
+  ops.push({ ...structuredClone(first), op: 20, hlc: first.hlc.replace('-000a-', '-0014-'), id: 'view_00000000000000000000000002',
+    v: { ...structuredClone(first.v), name: '新しい視点', cameraState: { ...first.v.cameraState, eye: [7, 3, 9], fov: 80 }, background: '#334455' } });
+  ops.push({ ...structuredClone(first), op: 21, hlc: first.hlc.replace('-000a-', '-0015-'), id: 'view_00000000000000000000000003',
+    v: { ...structuredClone(first.v), setId: ops.filter(o => o.e === 'set')[1].id, name: '全体の視点',
+      cameraState: { ...first.v.cameraState, eye: [-4, 6, 9], fov: 45 }, background: '#112233' } });
+}
 class TestFS extends MemoryFS {
   reject = (_: string) => false; reads = 0;
   override async writeText(path: string, text: string) { if (this.reject(path)) throw Error('injected quota'); return super.writeText(path, text); }
@@ -385,7 +419,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       () => nativeConversionIds(zero, one, 'native-project-scene-recipe-3'), () => nativeConversionIds(zero, one, 'native-project-scene-recipe-4'),
       () => frozenV1ConversionIds(zero, one, 'v1-project-scene-migration-recipe-2'), () => lociMyuConversionIds(zero, one, 'data.xlsx', 'locimyu-project-scene-migration-recipe-2'),
       () => nativeConversionIds(zero, one, 'native-project-scene-recipe-5'), () => nativeConversionIds(zero, one, 'native-project-scene-recipe-6'),
-      () => frozenV1ConversionIds(zero, one, 'v1-project-scene-migration-recipe-3'), () => lociMyuConversionIds(zero, one, 'data.xlsx', 'locimyu-project-scene-migration-recipe-3'),
+      () => frozenV1ConversionIds(zero, one, 'v1-project-scene-migration-recipe-3'), () => frozenV1ConversionIds(zero, one, frozenV1DefaultViewRecipe), () => lociMyuConversionIds(zero, one, 'data.xlsx', 'locimyu-project-scene-migration-recipe-3'),
     ];
     const hash = vi.spyOn(crypto.subtle, 'digest').mockResolvedValue(new Uint8Array(32).buffer);
     try {
@@ -765,6 +799,99 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(cold.read().state).toBe('pending'); expect(cold.read().source?.encodeFullSource()).toEqual(exact);
     } finally { await ui.dispose(); download.mockRestore(); revoke.mockRestore(); }
   });
+  it('frozen v1 default View fixes the recipe-4 identity vectors without changing output keys', async () => {
+    const ids = frozenV1ConversionIds('0'.repeat(32), '1'.repeat(64), frozenV1DefaultViewRecipe);
+    for (const [prefix, key, length, sha] of [
+      ['scn', ['set', 'set_00000000000000000000000001'], 205, 'e2728b516a8b2af68ed5c8f25fb09d0fc9292524bd4f486986a003befaf55d5e'],
+      ['view', ['view', 'view_00000000000000000000000001'], 208, '9fa00183cc5811cb7e0869552787a9960313b33a86cf37862669338e123a3a84'],
+      ['med', ['media', 'ast_00000000000000000000000002'], 207, 'afbada4ebc1babfddb99d709c54266b79911e8d78561ead56aaea05d9b066186'],
+      ['att', ['attachment', 'cap_00000000000000000000000001', 1, 'ast_00000000000000000000000002'], 247, '72948f287470591ba3df9623b85bb860ffdcc6de00cb6e3fb446b48d78ef35c0'],
+    ] as const) {
+      const id = await ids.id(prefix, key), row = ids.report().find(r => r.id === id)!;
+      expect(row.sha256).toBe(sha); expect(new TextEncoder().encode(row.preimage)).toHaveLength(length);
+      expect(id).toBe(`${prefix}_${sha.slice(0,32)}`); expect(await ids.id(prefix, key)).toBe(id);
+    }
+  });
+  it.each(['explicit', 'winning-null', 'historical-missing', 'deleted-set', 'absent', 'null'] as const)(
+    'frozen v1 default View selects by retained history and maps %s current relations', async kind => {
+      const file = await frozenV1File(ops => {
+        explicitV1Default(ops); const scene = ops.find(o => o.e === 'set');
+        if (kind === 'winning-null' || kind === 'historical-missing') {
+          if (kind === 'historical-missing') scene.v.defaultViewId = 'view_00000000000000000000000999';
+          ops.push({ ...scene, op: 30, hlc: scene.hlc.replace('-0001-', '-001e-'), t: 'update', v: { defaultViewId: null } });
+        }
+        if (kind === 'deleted-set') {
+          delete scene.v.defaultViewId;
+          const id = 'set_00000000000000000000000003';
+          ops.push({ ...scene, id, op: 30, hlc: scene.hlc.replace('-0001-', '-001e-'), v: { name: '削除済み', order: 3, defaultViewId: 'view_00000000000000000000000999' } },
+            { ...scene, id, op: 31, hlc: scene.hlc.replace('-0001-', '-001f-'), t: 'delete', v: undefined });
+        }
+        if (kind === 'absent' || kind === 'null') { delete scene.v.defaultViewId; if (kind === 'null') scene.v.defaultViewId = null; }
+      }), raw = await file.arrayBuffer(), opened = (await inspectFrozenV1Source(file, budget, decode))!;
+      expect(opened.plan.recipe).toBe(kind === 'absent' || kind === 'null' ? frozenV1Recipe : frozenV1DefaultViewRecipe);
+      const initial = await (await prepareFrozenV1Conversion(file, budget, decode))!.create();
+      const records = (await initial.source.inspectOriginal({ maxNodes: metadata.maxNodes, maxWork: metadata.maxWork })).candidates.unambiguousRecords;
+      const scene = (Object.values(records.scenesById as JsonObject) as JsonObject[]).find(r => r.name === '観察')!;
+      const view = (records.viewsById as JsonObject)[scene.defaultViewId as string] as JsonObject;
+      expect(view.name).toBe(kind === 'explicit' ? '透視図' : '新しい視点'); expect(view.sceneId).toBe(scene.id);
+      expect(Object.keys(records.scenesById as JsonObject)).toHaveLength(2); expect(await file.arrayBuffer()).toEqual(raw);
+    });
+  it.each(['malformed', 'wrong-type', 'historical-invalid', 'deleted-invalid', 'dangling', 'deleted-view', 'cross-set', 'inline-camera', 'orthographic', 'latest-tie'] as const)(
+    'frozen v1 default View refuses %s without rewriting the source', async kind => {
+      const file = await frozenV1File(ops => {
+        explicitV1Default(ops); const scene = ops.find(o => o.e === 'set'), view = ops.find(o => o.e === 'view');
+        if (kind === 'malformed' || kind === 'historical-invalid') scene.v.defaultViewId = 'not-a-view';
+        if (kind === 'wrong-type') scene.v.defaultViewId = 1;
+        if (kind === 'historical-invalid') ops.push({ ...scene, op: 30, hlc: scene.hlc.replace('-0001-', '-001e-'), t: 'update', v: { defaultViewId: null } });
+        if (kind === 'deleted-invalid') { const id = 'set_00000000000000000000000003';
+          ops.push({ ...scene, id, op: 30, hlc: scene.hlc.replace('-0001-', '-001e-'), v: { name: '削除済み', order: 3, defaultViewId: 'not-a-view' } },
+            { ...scene, id, op: 31, hlc: scene.hlc.replace('-0001-', '-001f-'), t: 'delete', v: undefined }); }
+        if (kind === 'dangling') scene.v.defaultViewId = 'view_00000000000000000000000999';
+        if (kind === 'deleted-view') ops.push({ ...view, op: 30, hlc: view.hlc.replace('-000a-', '-001e-'), t: 'delete', v: undefined });
+        if (kind === 'cross-set') view.v.setId = ops.filter(o => o.e === 'set')[1].id;
+        if (kind === 'inline-camera') scene.v.defaultCameraState = view.v.cameraState;
+        if (kind === 'orthographic') view.v.cameraState.ortho = true;
+        if (kind === 'latest-tie') for (const [i, v] of ops.filter(o => o.e === 'view').entries())
+          ops.push({ ...v, op: 30+i, hlc: '2026-10-15T00:00:00.000Z-0040-a_0000000000001', t: 'update', v: { name: `更新${i}` } });
+      }), bytes = await file.arrayBuffer();
+      await expect(prepareFrozenV1Conversion(file, budget, decode)).rejects.toThrow(); expect(await file.arrayBuffer()).toEqual(bytes);
+    });
+  it.each(['png','jpeg','webp','gif'] as const)('frozen v1 default View keeps %s photo admission and model profiles independent of recipe-4', async format => {
+    const image = format === 'png' ? png : imageFor(format), file = await frozenV1File(explicitV1Default, image);
+    const opened = (await inspectFrozenV1Source(file, budget, decode, decodeJpeg, decodePhoto))!;
+    expect(opened.plan.recipe).toBe(frozenV1DefaultViewRecipe); expect(opened.plan.media.every(m => m.ref.mediaType === photoMime(image))).toBe(true);
+    const initial = await (await prepareFrozenV1Conversion(file, budget, decode, decodeJpeg, decodePhoto))!.create();
+    const records = (await initial.source.inspectOriginal({ maxNodes: metadata.maxNodes, maxWork: metadata.maxWork })).candidates.unambiguousRecords;
+    const profile = await validationGlbProfile();
+    expect((Object.values(records.representationsById as JsonObject) as JsonObject[]).every(r => json(r.formatProfile) === json(profile))).toBe(true);
+  });
+  it('frozen v1 default View refuses a fully rebound initial pointing at the latest View instead of its explicit source', async () => {
+    const file = await frozenV1File(explicitV1Default), initial = await (await prepareFrozenV1Conversion(file, budget, decode))!.create();
+    const r = firstWorkspaceRecipient(), service = validationProjectService(r.fs, r.factory, r.store, budget, decode);
+    r.fs.reject = p => p.endsWith('/published.json'); await expect(initial.persist(r.fs, r.store, service.session)).rejects.toThrow(); r.fs.reject = () => false;
+    const records = structuredClone((await initial.source.inspectOriginal({ maxNodes: metadata.maxNodes, maxWork: metadata.maxWork })).candidates.unambiguousRecords) as Record<string, JsonObject>;
+    const scene = (Object.values(records.scenesById!) as JsonObject[]).find(s => s.name === '観察')!;
+    const latest = (Object.values(records.viewsById!) as JsonObject[]).find(v => v.name === '新しい視点')!;
+    (scene as Record<string, JsonObject[string]>).defaultViewId = latest.id!;
+    const forged = ProjectMetadataSource.bootstrap(records.schema!, records.identity!, metadata, { semanticProfile: 'map2' }).initialize(records);
+    const bytes = forged.encodeFullSource(), proof = { byteLength: bytes.length, digest: await digest(bytes), proof: forged.proof };
+    const prefix = 'v2/metadata/', path = prefix+'frozen-v1-conversion.json', receipt = JSON.parse(new TextDecoder().decode((await r.fs.readBytes(path))!));
+    const originals = await Promise.all(['frozen-v1-conversion.json','validation-initial.am','validation-initial.json','validation-origin.json'].map(async name => [prefix+name,(await r.fs.readBytes(prefix+name))!] as const));
+    await r.fs.writeBytes(path, new TextEncoder().encode(json({ ...receipt, initial: proof })));
+    await r.fs.writeBytes(prefix+'validation-initial.am', bytes);
+    await r.fs.writeBytes(prefix+'validation-initial.json', new TextEncoder().encode(json({ version: 'validation-initial-2', originRecipe: frozenV1DefaultViewRecipe, ...proof })));
+    await r.fs.writeBytes(prefix+'validation-origin.json', new TextEncoder().encode(json({ version: 'validation-origin-1', originRecipe: frozenV1DefaultViewRecipe, ...proof })));
+    const before = await Promise.all((await r.fs.list('')).map(async p => [p, await r.fs.readBytes(p)]));
+    await expect(resumeFrozenV1Conversion(r.fs, r.store, service.session, budget, initial.source.proof.identity.projectId as string, decode)).rejects.toThrow('変換記録');
+    expect(await Promise.all((await r.fs.list('')).map(async p => [p, await r.fs.readBytes(p)]))).toEqual(before);
+    expect((await service.session.read()).state).toBe('pending');
+    for (const [path, bytes] of originals) await r.fs.writeBytes(path, bytes);
+    const originalPath = prefix+'frozen-v1-conversion-source.zip', original = (await r.fs.readBytes(originalPath))!;
+    await r.fs.writeBytes(originalPath, original.map((b,i) => i === original.length-1 ? b^1 : b));
+    const corrupt = (await r.fs.readBytes(originalPath))!;
+    await expect(resumeFrozenV1Conversion(r.fs, r.store, service.session, budget, initial.source.proof.identity.projectId as string, decode)).rejects.toThrow('変換記録');
+    expect(await r.fs.readBytes(originalPath)).toEqual(corrupt); expect(new Uint8Array(await file.arrayBuffer())).toEqual(original);
+  });
   it('frozen v1 conversion fixes closed recipe identity vectors and preserves raw source-only accounting', async () => {
     const ids = frozenV1ConversionIds('0'.repeat(32), '1'.repeat(64));
     for (const [prefix, key, bytes, sha] of [
@@ -792,7 +919,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect((Object.values(records.scenesById as JsonObject) as JsonObject[]).find(s => s.name === '全体')).not.toHaveProperty('defaultViewId');
     expect(await file.arrayBuffer()).toEqual(bytes);
   });
-  it.each(['unknown-kind', 'historical-image-field', 'divergent-op', 'unknown-field', 'material', 'position-null', 'default-view', 'orthographic', 'transform', 'order-tie', 'missing-order', 'entry-view-tie'] as const)(
+  it.each(['unknown-kind', 'historical-image-field', 'divergent-op', 'unknown-field', 'material', 'position-null', 'orthographic', 'transform', 'order-tie', 'missing-order', 'entry-view-tie'] as const)(
     'frozen v1 conversion refuses the whole %s input without changing its source', async kind => {
       const file = await frozenV1File(ops => {
         const image = ops.find(o => o.e === 'asset' && o.v?.path === 'media/image4.png'), scene = ops.find(o => o.e === 'set'), view = ops.find(o => o.e === 'view');
@@ -801,7 +928,6 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
         if (kind === 'divergent-op') ops.push({ ...ops[0], v: { ...ops[0].v, name: '別の内容' } });
         if (kind === 'unknown-kind' || kind === 'material') ops.push({ ...ops.at(-1), op: 99, e: kind === 'material' ? 'material' : 'toString', id: 'mat_00000000000000000000000001' });
         if (kind === 'position-null') ops.find(o => o.e === 'caption').v.anchor.position = null;
-        if (kind === 'default-view') scene.v.defaultViewId = view.id;
         if (kind === 'orthographic') view.v.cameraState.ortho = true;
         if (kind === 'transform') ops.find(o => o.v?.kind === 'model').v.transform.scale = 2;
         if (kind === 'order-tie') ops.filter(o => o.e === 'set')[1].v.order = scene.v.order;
@@ -814,13 +940,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       }), bytes = await file.arrayBuffer();
       await expect(prepareFrozenV1Conversion(file, budget, decode)).rejects.toThrow(); expect(await file.arrayBuffer()).toEqual(bytes);
     });
-  it('frozen v1 conversion retains exact source and mappings through interrupted publication, cold recovery and completed retry', async () => {
-    const file = await frozenV1File(), bytes = await file.arrayBuffer(), initial = await (await prepareFrozenV1Conversion(file, budget, decode))!.create();
+  it.each([false, true])('frozen v1 conversion explicit=%s retains exact source and mappings through interrupted publication, cold recovery and completed retry', async explicit => {
+    const file = await frozenV1File(explicit ? explicitV1Default : undefined), bytes = await file.arrayBuffer(), initial = await (await prepareFrozenV1Conversion(file, budget, decode))!.create();
     const fs = new TestFS(), locks = lockManager(), storage = storageFactory(), store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
     const service = validationProjectService(fs, storage, store, budget, decode), projectId = initial.source.proof.identity.projectId as string;
     fs.reject = p => p.endsWith('/published.json'); await expect(initial.persist(fs, store, service.session)).rejects.toThrow('quota'); fs.reject = () => false;
     const path = (await fs.list('')).find(p => p.endsWith('/frozen-v1-conversion.json'))!, receiptBytes = (await fs.readBytes(path))!, receipt = JSON.parse(new TextDecoder().decode(receiptBytes));
-    expect(receipt.recipe).toBe(frozenV1Recipe);
+    expect(receipt.recipe).toBe(explicit ? frozenV1DefaultViewRecipe : frozenV1Recipe);
     const cold = validationProjectService(fs, storage, store, budget, decode), ready = await resumeFrozenV1Conversion(fs, store, cold.session, budget, projectId, decode);
     expect(ready.source!.originalChanges()).toEqual(initial.source.originalChanges()); expect(await fs.readBytes(path)).toEqual(receiptBytes);
     const p = ready.provider!; if (p.kind !== 'scene-provider') throw Error('provider'); const captionId = Object.keys(p.resources.captions)[0]!;
@@ -829,6 +955,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const forged = { ...receipt, mapping: receipt.mapping.slice(1) }; await fs.writeBytes(path, new TextEncoder().encode(json(forged)));
     await expect(resumeFrozenV1Conversion(fs, store, cold.session, budget, projectId, decode)).rejects.toThrow('変換記録');
     expect(JSON.parse(new TextDecoder().decode((await fs.readBytes(path))!))).toEqual(forged); expect((await cold.session.read()).source!.token).toBe(later.source!.token);
+    if (explicit) for (const recipe of ['v1-project-scene-migration-recipe-1','v1-project-scene-migration-recipe-2','v1-project-scene-migration-recipe-3']) {
+      await fs.writeBytes(path, new TextEncoder().encode(json({ ...receipt, recipe })));
+      const before = await Promise.all((await fs.list('')).map(async p => [p, await fs.readBytes(p)]));
+      await expect(resumeFrozenV1Conversion(fs, store, cold.session, budget, projectId, decode)).rejects.toThrow('変換記録');
+      expect(await Promise.all((await fs.list('')).map(async p => [p, await fs.readBytes(p)]))).toEqual(before);
+      expect((await cold.session.read()).source!.originalChanges()).toEqual(later.source!.originalChanges());
+    }
     expect(await file.arrayBuffer()).toEqual(bytes);
     expect(await fs.readBytes(path.replace('frozen-v1-conversion.json', 'frozen-v1-conversion-source.zip'))).toEqual(new Uint8Array(bytes));
   });
@@ -886,8 +1019,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     fs.reject = () => false; await host.authority.retry!(); expect(host.read().state).toBe('ready');
     expect(host.read().source!.originalChanges()).toEqual(initial.source.originalChanges()); await host.dispose();
   });
-  it('frozen v1 conversion refuses generic cold recovery when both acknowledged conversion sidecars disappear', async () => {
-    const initial = await (await prepareFrozenV1Conversion(await frozenV1File(), budget, decode))!.create(), run = (initial.source.proof.identity.projectId as string).slice(4);
+  it.each([false, true])('frozen v1 conversion explicit=%s refuses generic cold recovery when both acknowledged conversion sidecars disappear', async explicit => {
+    const initial = await (await prepareFrozenV1Conversion(await frozenV1File(explicit ? explicitV1Default : undefined), budget, decode))!.create(), run = (initial.source.proof.identity.projectId as string).slice(4);
     const fs = new TestFS(), locks = lockManager(), storage = storageFactory(), store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
     const options = { run, base: fs, coordinator: ProjectMutationCoordinator.browser(locks), store, fileLimits: budget, decode, packageLocks: locks,
       openStorage: async () => ({ factory: storage, dispose: async () => {} }) };
@@ -895,7 +1028,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(first.read().state).toBe('pending'); const exact = initial.source.encodeFullSource(); await first.dispose(); fs.reject = () => false;
     for (const p of (await fs.list('')).filter(p => /frozen-v1-conversion(?:-source\.zip|\.json)$/.test(p))) await fs.remove(p);
     const retained = (await fs.list('')).find(p => p.endsWith('/validation-initial.json'))!, receipt = JSON.parse(new TextDecoder().decode((await fs.readBytes(retained))!));
-    expect(receipt).toMatchObject({ version: 'validation-initial-2', originRecipe: frozenV1Recipe });
+    expect(receipt).toMatchObject({ version: 'validation-initial-2', originRecipe: explicit ? frozenV1DefaultViewRecipe : frozenV1Recipe });
     const cold = await openValidationHost(options); await expect(cold.authority.retry!()).rejects.toThrow('変換記録');
     expect(cold.read().state).toBe('pending');
     expect(await fs.readBytes(retained.replace('validation-initial.json', 'validation-initial.am'))).toEqual(exact);
@@ -2636,16 +2769,25 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       await vi.waitFor(() => expect(download).toHaveBeenCalledOnce()); expect(await (download.mock.calls[0]![0] as Blob).text()).toBe(reportBefore);
     } finally { await ui.dispose(); download.mockRestore(); revoke.mockRestore(); }
   });
-  it('frozen v1 conversion connects product editing/first placement to named backup, independent Workspace/review and exact cold reopen', async () => {
-    const file = await frozenV1File(), bytes = await file.arrayBuffer(), initial = await (await prepareFrozenV1Conversion(file, budget, decode))!.create();
-    const h = await productWorkspaceFixture(false, false, false, 'map2', initial), { host, editor, named, button, edited } = h;
+  it.each([false, true])('frozen v1 conversion explicit=%s connects product editing/first placement to named backup, independent Workspace/review and exact cold reopen', async explicit => {
+    const file = await frozenV1File(explicit ? explicitV1Default : undefined), bytes = await file.arrayBuffer(), initial = await (await prepareFrozenV1Conversion(file, budget, decode))!.create();
+    const h = await productWorkspaceFixture(false, false, false, 'map2', initial, { restoreGenerations: explicit }), { host, editor, named, button, edited } = h;
     const original = host.read().provider!; if (original.kind !== 'scene-provider') throw Error('provider');
     const allCaptions = Object.values(original.resources.captions), placed = allCaptions.find(c => c.title.kind === 'value' && c.title.value === '配置済み')!;
-    const empty = allCaptions.find(c => c.title.kind === 'value' && c.title.value === '')!, owned = allCaptions.find(c => c.title.kind === 'value' && c.title.value === '親だけの記録')!;
-    expect(empty.anchor).toEqual({ kind: 'value', value: { kind: 'unplaced' } }); expect(owned.anchor).toMatchObject({ kind: 'value', value: { kind: 'unplaced', ownerAssetId: host.authority.read().modelVersions![0]!.assetId } });
+    const empty = allCaptions.find(c => c.title.kind === 'value' && c.title.value === '')!, knownOwner = allCaptions.find(c => c.title.kind === 'value' && c.title.value === '親だけの記録')!;
+    expect(empty.anchor).toEqual({ kind: 'value', value: { kind: 'unplaced' } }); expect(knownOwner.anchor).toMatchObject({ kind: 'value', value: { kind: 'unplaced', ownerAssetId: host.authority.read().modelVersions![0]!.assetId } });
     expect(host.authority.read().mediaChoices).toHaveLength(2); expect(captionAttachments(host.authority.read().mediaData, placed.id).ready).toHaveLength(3);
-    const savedView = Object.values(original.resources.views)[0]!;
+    const savedView = Object.values(original.resources.views).find(v => v.camera.kind === 'value' && json((v.camera.value as JsonObject).position) === json([1,2,5]))!;
     expect(savedView.camera).toMatchObject({ kind: 'value', value: { position: [1, 2, 5], target: [0, 0, 0], up: [0, 1, 0], projection: { kind: 'perspective', verticalFovRadians: 60 * Math.PI / 180 } } });
+    const sceneId = h.display()!.sceneId, entry = { kind: 'ready', payload: { camera: savedView.camera.kind === 'value' ? savedView.camera.value : null,
+      background: savedView.background.kind === 'value' ? savedView.background.value : null } };
+    expect(h.display()!.entry).toEqual(entry);
+    if (explicit) {
+      expect(original.state.scenes[sceneId]!.defaultViewId).toEqual({ kind: 'value', value: savedView.id });
+      button('全体', named('シーン', editor)).fire('click'); const overview = h.display()!;
+      expect(overview.sceneId).not.toBe(sceneId); expect(overview.entry).toMatchObject({ kind: 'ready', payload: { camera: { position: [-4,6,9] } } });
+      button('観察', named('シーン', editor)).fire('click'); expect(h.display()!.entry).toEqual(entry);
+    }
     named('キャプション一覧', editor).children[0]!.children[0]!.fire('click');
     const body = named('本文', editor); body.value = '変換後の追記'; body.fire('input'); h.f.fs.reject = p => p.endsWith('/staging.json');
     await h.failed(() => button('変更を適用', editor).fire('click')); h.f.fs.reject = () => false;
@@ -2661,18 +2803,38 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(Object.keys(host.authority.read().resources.captions)).toHaveLength(3); expect(h.legacy).not.toHaveBeenCalled();
     const output = named('ファイル'), name = named('名前（任意）', output); name.value = '旧形式からの保存'; name.fire('input'); button('ファイルに保存', output).fire('click');
     await vi.waitFor(() => expect(h.downloads).toHaveBeenCalledOnce(), { timeout: 10000 }); const source = host.read().source!;
-    const backupJob = host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!, backup = await BackupArchive.inspect(await host.workspaceOutput.download(backupJob.id), metadata);
+    const backupJob = host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!, backupFile = await host.workspaceOutput.download(backupJob.id), backup = await BackupArchive.inspect(backupFile, metadata);
     expect(backupJob.label).toBe('旧形式からの保存'); expect(backup.source.originalChanges()).toEqual(source.originalChanges());
     const workspace = await host.workspaceOutput.download(await host.workspaceOutput.generate(source.token)), peer = firstWorkspaceRecipient();
     expect((await peer.receiver.importWorkspace(workspace)).state).toBe('ready'); expect((await peer.session.read()).source!.originalChanges()).toEqual(source.originalChanges());
     expect((await peer.fs.list('')).some(p => p.includes('frozen-v1-conversion'))).toBe(false);
     const review = await prepareReviewView(await host.workspaceOutput.download(await host.workspaceOutput.generateReview(source.token, { sceneId: h.display()!.sceneId })), budget, decode);
-    expect(review.images.size).toBe(2); expect(review.attachments).toHaveLength(3);
+    expect(review.images.size).toBe(2); expect(review.attachments).toHaveLength(3); expect(review.display(null,null).entry).toEqual(entry);
     for (const archive of [backup.archive, (await WorkspaceArchive.inspect(workspace, metadata)).archive, review.inspection.archive])
       expect(archive.control.entries.some(e => /frozen-v1|conversion|^ops\//.test(e.path))).toBe(false);
-    expect(await file.arrayBuffer()).toEqual(bytes); await h.ui.dispose(); const cold = await openValidationHost(h.f.options);
+    expect(await file.arrayBuffer()).toEqual(bytes); await h.ui.dispose(); const cold = owned(await openValidationHost(h.f.options));
     expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges()); expect(captionAttachments(cold.authority.read().mediaData, placed.id).ready).toHaveLength(3);
-    expect(cold.authority.read().resources.captions[owned.id]!.anchor).toEqual(owned.anchor); await cold.dispose();
+    expect(cold.authority.read().resources.captions[knownOwner.id]!.anchor).toEqual(knownOwner.anchor);
+    expect(syntheticDisplay(cold.authority.read(),sceneId,null,null).entry).toEqual(entry);
+    if (explicit) {
+      await cold.dispatch(cold.read().source!.token, { kind: 'editCaption', captionId: placed.id, edits: { body: '復元前の別の追記' } });
+      await cold.backupRestore.prepare(backupFile);
+      let checked = false;
+      await cold.backupRestore.confirm(async (next, content) => {
+        expect(syntheticDisplay(next,sceneId,null,null).entry).toEqual(entry);
+        for (const model of next.modelVersions!) expect((await content.model(model.closure.representation)).bytes).toEqual(glb());
+        for (const image of next.mediaChoices!) expect(await content.image(image as unknown as JsonObject)).toEqual(png);
+        checked = true;
+      });
+      expect(checked).toBe(true); cold.backupRestore.displayReady(cold.read().source!.token);
+      expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges());
+      await cold.dispatch(cold.read().source!.token, { kind: 'editCaption', captionId: placed.id, edits: { body: '開始視点を保った復元後の追記' } });
+      const final = cold.read().source!.originalChanges(); await cold.dispose(); const reopened = owned(await openValidationHost(h.f.options));
+      expect(reopened.read().source!.originalChanges()).toEqual(final);
+      expect(reopened.authority.read().resources.captions[placed.id]!.body).toEqual({ kind: 'value', value: '開始視点を保った復元後の追記' });
+      expect(syntheticDisplay(reopened.authority.read(),sceneId,null,null).entry).toEqual(entry);
+    }
+    await cold.dispose();
   });
   it('Native appearance conversion connects product editing, occurrence clones, named backup, independent Workspace/review and exact cold reopen', async () => {
     const input = await nativeAppearanceFile(), inputBytes = await input.arrayBuffer();
@@ -4344,13 +4506,15 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     });
     const ports: ValidationWorkspacePorts = { fileLimits: budget, decode, list: async () => [], selected: vi.fn(),
       open: vi.fn(async () => f.host), render: async () => ({ factory: () => { throw Error('Recorded DOM has no GPU'); }, dispose() {} }) };
+    const mountedWork = captureWorkingOwner();
     const u = createValidationWorkspace(new RecordedDocument().asDocument(), ports, f.options.run), root = record(u.root);
+    owned(u);
     const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
     const named = (label: string, parent = root) => all(parent).find(n => n.attributes.get('aria-label') === label)!;
     const button = (text: string, parent = root) => all(parent).find(n => n.tag === 'button' && n.textContent === text)!;
     const choose = (node: RecordedNode, value: string) => { node.value = value; node.fire(node.tag === 'select' ? 'change' : 'input'); };
     const value = () => f.host.authority.read().resources.captions[f.captionId]!.body;
-    await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true));
+    try { await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true)); } finally { mountedWork.stop(); }
     expect(button('開発用の更新を受け取る')).toBeUndefined();
     const fileInput = named('更新ファイルを選択'), receive = fileInput.parent!.parent!;
     const setFile = (file: Blob) => { Object.assign(fileInput, { files: [file] }); fileInput.fire('change'); };
@@ -4379,14 +4543,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(all(root).some(n => n.textContent.includes('入力・操作を確定'))).toBe(true);
     clearFile(); text.fire('compositionend'); expect(text.value).toBe('合意した本文');
     expect(button('競合を解消', form).disabled).toBe(false);
-    f.fs.reject = path => path.endsWith('/published.json'); button('競合を解消', form).fire('click');
-    await vi.waitFor(() => expect(f.host.authority.status!().kind).toBe('failed'));
+    f.fs.reject = path => path.endsWith('/published.json'); await mountedWork.run(() => button('競合を解消', form).fire('click'), 'failed');
+    expect(f.host.authority.status!().kind).toBe('failed');
     expect(text.value).toBe('合意した本文'); expect(u.hasChanges()).toBe(true);
     const paths = (await f.fs.list(`${validationArea}/${f.options.run}/`)).filter(p => p.endsWith('.amchange'));
     const bytes = await Promise.all(paths.map(p => f.fs.readBytes(p)));
-    f.fs.reject = () => false; button('更新を再試行', named('更新の確認')).fire('click');
-    await vi.waitFor(() => expect(value()).toEqual({ kind: 'value', value: '合意した本文' }));
-    await vi.waitFor(() => expect(list.children).toHaveLength(0));
+    f.fs.reject = () => false; await mountedWork.run(() => button('更新を再試行', named('更新の確認')).fire('click'));
+    expect(value()).toEqual({ kind: 'value', value: '合意した本文' });
+    expect(list.children).toHaveLength(0);
     expect(await Promise.all(paths.map(p => f.fs.readBytes(p)))).toEqual(bytes);
     all(root).find(n => n.className === 'lv-caption-select')!.fire('click');
     const detail = named('キャプションの詳細'); choose(named('本文', detail), '解消後の追記');
@@ -4469,13 +4633,15 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     read: () => ({ token: 'local-camera', ready: true, issue: null, dragging: false, projection: 'perspective' as const, axis: null, pins: [] }) }));
     const ports: ValidationWorkspacePorts = { fileLimits: budget, decode, list: async () => [], selected() {}, open: async () => host,
       render: async () => ({ factory, dispose() {} }) };
+    const mountedWork = captureWorkingOwner();
     let u = createValidationWorkspace(new RecordedDocument().asDocument(), ports, f.options.run), root = record(u.root);
+    owned(u);
     const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
     const named = (label: string, parent = root) => all(parent).find(n => n.attributes.get('aria-label') === label)!;
     const button = (text: string, parent = root) => all(parent).find(n => n.tag === 'button' && n.textContent === text)!;
     const choose = (node: RecordedNode, value: string) => { node.value = value; node.fire(node.tag === 'select' ? 'change' : 'input'); };
     const mounted = () => vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true));
-    await mounted();
+    try { await mounted(); } finally { mountedWork.stop(); }
     // The warm editor's explicit Scene remains local even while its shared startup changes.
     button('手元のシーン', named('シーン')).fire('click'); expect(display!.sceneId).toBe(sceneId); const factoryCount = factory.mock.calls.length;
     const input = named('更新ファイルを選択'), receive = input.parent!.parent!;
@@ -4498,14 +4664,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       if (key === 'anchor') {
         expect(display!.preview).toEqual(pointInProject(remoteAnchor.positionAsset as [number, number, number], original.modelVersions![0]!.closure.binding.assetToProject));
         expect(display!.pinEdit).toBeUndefined(); expect(display!.pins.some(pin => pin.id === captionId)).toBe(false);
-        f.fs.reject = path => path.endsWith('/published.json'); confirm.fire('click');
-        await vi.waitFor(() => expect(host.authority.status!().kind).toBe('failed'));
+        f.fs.reject = path => path.endsWith('/published.json'); await mountedWork.run(() => confirm.fire('click'), 'failed');
+        expect(host.authority.status!().kind).toBe('failed');
         expect(host.read().source!.token).toBe(before.token);
         const paths = (await f.fs.list(`${validationArea}/${f.options.run}/`)).filter(path => path.endsWith('.amchange'));
         const bytes = await Promise.all(paths.map(path => f.fs.readBytes(path)));
         select.value = field.candidates.find(c => c.operationId !== selected.operationId)!.operationId;
-        f.fs.reject = () => false; button('更新を再試行', named('更新の確認')).fire('click');
-        await vi.waitFor(() => expect(host.read().source!.token).not.toBe(before.token));
+        f.fs.reject = () => false; await mountedWork.run(() => button('更新を再試行', named('更新の確認')).fire('click'));
+        expect(host.read().source!.token).not.toBe(before.token);
         expect(await Promise.all(paths.map(path => f.fs.readBytes(path)))).toEqual(bytes);
       } else {
         Object.assign(input, { files: [incoming] }); input.fire('change'); confirm.fire('click');
@@ -4557,7 +4723,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       });
       return ProjectMetadataSource.fromFullSource(A.save(doc), source.proof, metadata);
     });
-    const host = await openValidationHost({ ...f.options, workspaceFile: f.f.file }), peer = firstWorkspaceRecipient();
+    const host = owned(await openValidationHost({ ...f.options, workspaceFile: f.f.file })), peer = firstWorkspaceRecipient();
     const seed = await peer.receiver.importWorkspace(f.f.file), captionId = f.f.captionId, sceneId = Object.keys(host.authority.read().state.scenes)[0]!;
     const originalAttachment = captionAttachments(host.authority.read().mediaData, captionId).ready[0]!.id;
     const oldEdge = Object.keys(host.authority.read().state.captionMemberships)[0]!;
@@ -4577,7 +4743,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const button = (text: string, parent = root) => all(parent).find(n => n.tag === 'button' && n.textContent === text)!;
     const choose = (node: RecordedNode, value: string) => { node.value = value; node.fire(node.tag === 'select' ? 'change' : 'input'); };
     try {
-      u = createValidationWorkspace(new RecordedDocument().asDocument(), ports, f.run); root = record(u.root);
+      u = owned(createValidationWorkspace(new RecordedDocument().asDocument(), ports, f.run)); root = record(u.root);
       await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true));
     }
     finally { captureAcknowledgment.mockRestore(); }
@@ -4610,7 +4776,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       all(root).filter(n => n.className === 'lv-caption-select')[index]!.fire('click');
     };
     selectCaption(captionId); button('プロジェクトから削除').fire('click');
-    await acknowledge(ack, () => button('削除する', named('削除の確認')).fire('click'));
+    let commandAck!: WorkingAcknowledgment;
+    await acknowledge(ack, () => {
+      button('削除する', named('削除の確認')).fire('click');
+      const checking = ack.filter(owner => owner.state === 'checking'); expect(checking).toHaveLength(1); commandAck = checking[0]!;
+    });
     await vi.waitFor(() => expect(host.authority.read().resources.captions[captionId]!.lifecycle).toMatchObject({ kind: 'value', value: { state: 'deleted' } }));
     const tombstones = children(); expect(tombstones.every(c => {
       const life = c?.lifecycle; return life?.kind === 'value' && (life.value as JsonObject).state === 'deleted';
@@ -4648,12 +4818,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     Object.assign(fileInput, { files: [f.f.file] }); fileInput.fire('change'); receive.fire('submit', { preventDefault() {} });
     expect(host.read().source!.token).toBe(token); expect(button('登録の重複を解消', duplicates).disabled).toBe(true);
     Object.assign(fileInput, { files: [] }); button('選択を取り消す', receive).fire('click');
-    f.fs.reject = path => path.endsWith('/published.json'); button('登録の重複を解消', duplicates).fire('click');
-    await vi.waitFor(() => expect(host.authority.status!().kind).toBe('failed'));
+    f.fs.reject = path => path.endsWith('/published.json');
+    await acknowledge(commandAck, () => button('登録の重複を解消', duplicates).fire('click'), 'failed');
+    expect(host.authority.status!().kind).toBe('failed');
     expect(Object.keys(host.authority.read().resources.captions)).toEqual([captionId]); expect(choice.value).toBe('both');
     const paths = (await f.fs.list(`${validationArea}/${f.run}/`)).filter(p => p.endsWith('.amchange')), bytes = await Promise.all(paths.map(p => f.fs.readBytes(p)));
-    f.fs.reject = () => false; button('更新を再試行', named('更新の確認')).fire('click');
-    await vi.waitFor(() => expect(duplicates.children).toHaveLength(0));
+    f.fs.reject = () => false;
+    await acknowledge(commandAck, () => button('更新を再試行', named('更新の確認')).fire('click'));
+    expect(duplicates.children).toHaveLength(0);
     expect(await Promise.all(paths.map(p => f.fs.readBytes(p)))).toEqual(bytes);
     const copyId = Object.keys(host.authority.read().resources.captions).find(id => id !== captionId)!; expect(copyId).toBeTruthy();
     expect(Object.keys(host.authority.read().resources.captions)).toHaveLength(2);
@@ -4683,7 +4855,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect((await peer.receiver.receive(received.source!.token, file)).source!.originalChanges()).toEqual(received.source!.originalChanges());
     const resolve = vi.spyOn(host, 'resolve'); await u.dispose(); restoreButton.fire('click'); copyButton.fire('click');
     expect(resolve).not.toHaveBeenCalled(); resolve.mockRestore();
-    const cold = await openValidationHost(f.options);
+    const cold = owned(await openValidationHost(f.options));
     expect(cold.read().source!.token).toBe(final.token); expect(changeMap(cold.read().source!)).toEqual(changeMap(final));
     expect(cold.authority.read().resources.captions[copyId]!.body).toEqual({ kind: 'value', value: 'コピーだけの追記' });
     expect(captionAttachments(cold.authority.read().mediaData, copyId).ready[0]).toMatchObject({ id: copiedAttachment.id,
@@ -5131,12 +5303,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
         camera: vi.fn(), retry() {}, dispose: vi.fn() })); factories.push(factory); displays.push(display);
       return { factory, dispose };
     };
+    const mountedWork = captureWorkingOwner();
     const u = createValidationWorkspace(new RecordedDocument().asDocument(), { fileLimits: budget, decode, list: async () => [], selected() {},
       open: async () => host, render: async () => ({ factory: () => { throw Error('Recorded DOM has no GPU'); }, dispose() {} }), renderModelCandidate }, options.run);
     const root = record(u.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    owned(u);
     const named = (label: string, parent = root) => all(parent).find(n => n.attributes.get('aria-label') === label)!;
     const button = (text: string, parent = root) => all(parent).find(n => n.tag === 'button' && n.textContent === text)!;
-    await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true));
+    try { await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true)); } finally { mountedWork.stop(); }
     const input = named('更新ファイルを選択'), receive = input.parent!.parent!;
     Object.assign(input, { files: [incoming] }); input.fire('change'); receive.fire('submit', { preventDefault() {} });
     await vi.waitFor(() => expect(all(root).some(n => n.textContent === '更新を受け取りました。')).toBe(true), { timeout: 10000 });
@@ -5172,14 +5346,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     Object.assign(input, { files: [incoming] }); input.fire('change'); expect(confirm.disabled).toBe(true); confirm.fire('click');
     expect(host.read().source!.token).toBe(before.token); expect(choice.value).toBe(candidates[1]!.operationId);
     Object.assign(input, { files: [] }); button('選択を取り消す', receive).fire('click');
-    f.fs.reject = path => path.endsWith('/published.json'); confirm.fire('click');
-    await vi.waitFor(() => expect(host.authority.status!().kind).toBe('failed'), { timeout: 10000 });
+    f.fs.reject = path => path.endsWith('/published.json'); await mountedWork.run(() => confirm.fire('click'), 'failed');
+    expect(host.authority.status!().kind).toBe('failed');
     expect(host.authority.read()).toBe(snapshot);
     const paths = (await f.fs.list(`${validationArea}/${options.run}/`)).filter(p => p.endsWith('.amchange')), bytes = await Promise.all(paths.map(p => f.fs.readBytes(p)));
     // Disabled native input cannot replace the captured command during exact retry.
     choice.value = candidates[0]!.operationId; choice.fire('change'); f.fs.reject = () => false;
-    button('更新を再試行', named('更新の確認')).fire('click');
-    await vi.waitFor(() => expect(list.children).toHaveLength(0), { timeout: 10000 });
+    await mountedWork.run(() => button('更新を再試行', named('更新の確認')).fire('click'));
+    expect(list.children).toHaveLength(0);
     expect(await Promise.all(paths.map(p => f.fs.readBytes(p)))).toEqual(bytes); expect(releases[1]).toHaveBeenCalledOnce();
     const selected = candidates[1]!, confirmed = host.authority.read(), final = host.read().source!;
     for (const id of [sceneId, secondScene]) expect(syntheticDisplay(confirmed, id, null, null).models.find(m => m.binding.assetId === assetId)!.binding).toEqual(selected.binding);
@@ -5234,12 +5408,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const incoming = await peers[0]!.workspaceOutput.download(await peers[0]!.workspaceOutput.generate(peers[0]!.read().source!.token));
     await host.workspaceFiles.receive(host.read().source!.token, await peers[1]!.workspaceOutput.download(await peers[1]!.workspaceOutput.generate(peers[1]!.read().source!.token)));
     f.workspace.unmount();
+    const mountedWork = captureWorkingOwner();
     const u = createValidationWorkspace(new RecordedDocument().asDocument(), { fileLimits: budget, decode, list: async () => [], selected() {},
       open: async () => host, render: async () => ({ factory: () => { throw Error('Recorded DOM has no GPU'); }, dispose() {} }) }, options.run);
     const root = record(u.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    owned(u);
     const named = (label: string, parent = root) => all(parent).find(n => n.attributes.get('aria-label') === label)!;
     const button = (text: string, parent = root) => all(parent).find(n => n.tag === 'button' && n.textContent === text)!;
-    await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true));
+    try { await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true)); } finally { mountedWork.stop(); }
     const input = named('更新ファイルを選択'), receive = input.parent!.parent!;
     Object.assign(input, { files: [incoming] }); input.fire('change'); receive.fire('submit', { preventDefault() {} });
     await vi.waitFor(() => expect(all(root).some(n => n.textContent === '更新を受け取りました。')).toBe(true), { timeout: 10000 });
@@ -5251,13 +5427,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const confirm = button('登録の重複を解消', form); expect(confirm.disabled).toBe(true);
     originalChoice.value = group.edgeIds[1]!; originalChoice.fire('change'); decision.value = 'both'; decision.fire('change');
     expect(confirm.disabled).toBe(false);
-    f.fs.reject = p => p.endsWith('/published.json'); confirm.fire('click');
-    await vi.waitFor(() => expect(host.authority.status!().kind).toBe('failed'), { timeout: 10000 });
+    f.fs.reject = p => p.endsWith('/published.json'); await mountedWork.run(() => confirm.fire('click'), 'failed');
+    expect(host.authority.status!().kind).toBe('failed');
     expect(host.authority.read()).toBe(beforeView); expect(bodyPut).not.toHaveBeenCalled();
     const paths = (await f.fs.list(`${validationArea}/${options.run}/`)).filter(p => p.endsWith('.amchange')), parts = await Promise.all(paths.map(p => f.fs.readBytes(p)));
     originalChoice.value = group.edgeIds[0]!; decision.value = 'one'; f.fs.reject = () => false;
-    button('更新を再試行', named('更新の確認')).fire('click');
-    await vi.waitFor(() => expect(form.children).toHaveLength(0), { timeout: 10000 });
+    await mountedWork.run(() => button('更新を再試行', named('更新の確認')).fire('click'));
+    expect(form.children).toHaveLength(0);
     expect(await Promise.all(paths.map(p => f.fs.readBytes(p)))).toEqual(parts); expect(bodyPut).not.toHaveBeenCalled(); bodyPut.mockRestore();
     const copied = host.authority.read(), copies = copied.modelVersions!.filter(m => m.assetId !== assetId); expect(copies).toHaveLength(2);
     expect(copied.state.assetMemberships[group.edgeIds[1]!]!.lifecycle).toMatchObject({ kind: 'value', value: { state: 'active' } });
@@ -5657,13 +5833,15 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       camera: { position: [1, 2, 8], target: [0, 0, 0], up: [0, 1, 0], projection: { kind: 'perspective', verticalFovRadians: 0.7 } },
       background: { kind: 'solid', colorSrgb: [0.2, 0.3, 0.4] } }), recall,
       setBackground() {}, camera() {}, retry() {}, dispose() {}, read: () => ({ token: 'local-camera', ready: true, issue: null, dragging: false, projection: 'perspective' as const, axis: null, pins: [] }) }));
+    const mountedWork = captureWorkingOwner();
     const u = createValidationWorkspace(new RecordedDocument().asDocument(), { fileLimits: budget, decode, list: async () => [], selected() {}, open: async () => host,
       render: async () => ({ factory, dispose() {} }) }, f.options.run), root = record(u.root);
+    owned(u);
     const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
     const named = (label: string, parent = root) => all(parent).find(n => n.attributes.get('aria-label') === label)!;
     const button = (text: string, parent = root) => all(parent).find(n => n.tag === 'button' && n.textContent === text)!;
     const choose = (node: RecordedNode, value: string) => { node.value = value; node.fire('change'); };
-    await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true));
+    try { await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true)); } finally { mountedWork.stop(); }
     const input = named('更新ファイルを選択'), receive = input.parent!.parent!;
     Object.assign(input, { files: [incoming] }); input.fire('change'); receive.fire('submit', { preventDefault() {} });
     await vi.waitFor(() => expect(all(root).some(n => n.textContent === '更新を受け取りました。')).toBe(true), { timeout: 10000 });
@@ -5699,12 +5877,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(host.resolve('stale', explicit)).rejects.toThrow('更新');
     const readonly = await openValidationHost(f.options); await expect(readonly.resolve(before.token, explicit)).rejects.toThrow('閲覧専用'); await readonly.dispose();
     expect(host.read().source!.token).toBe(before.token);
-    f.fs.reject = path => path.endsWith('/published.json'); confirm.fire('click');
-    await vi.waitFor(() => expect(host.authority.status!().kind).toBe('failed'));
+    f.fs.reject = path => path.endsWith('/published.json'); await mountedWork.run(() => confirm.fire('click'), 'failed');
+    expect(host.authority.status!().kind).toBe('failed');
     const paths = (await f.fs.list(`${validationArea}/${f.options.run}/`)).filter(p => p.endsWith('.amchange')), bytes = await Promise.all(paths.map(p => f.fs.readBytes(p)));
     expect(host.read().source!.token).toBe(before.token); appearance.value = operation('appearance', { lighting: 'unlit' });
-    f.fs.reject = () => false; button('更新を再試行', named('更新の確認')).fire('click');
-    await vi.waitFor(() => expect(tools.children.includes(form)).toBe(false));
+    f.fs.reject = () => false; await mountedWork.run(() => button('更新を再試行', named('更新の確認')).fire('click'));
+    expect(tools.children.includes(form)).toBe(false);
     expect(await Promise.all(paths.map(p => f.fs.readBytes(p)))).toEqual(bytes);
     expect(materialResolutionContext(p(), sceneId, id, metadata).atoms(id, 'appearance')).toEqual([{ operationId: expect.any(String), value: chosenAppearance }]);
     // Duplicate still withholds the Scene override; Project fallback is not merged into it.
