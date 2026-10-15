@@ -9,8 +9,11 @@ import type { ViewerCore } from '../viewer/viewer';
 import type { ChromaSettings } from '../viewer/shaderPatch';
 import { fAnchor, fStr } from './fields';
 import { UndoManager } from './undo';
+import type { ProjectResumeReference } from './resumeReference';
 
 export interface UiState {
+  /** Advisory validation-route resume choice; never Project or durability authority. */
+  projectSceneResume?: ProjectResumeReference | null;
   activeSetId: string | null;
   /** 現在の文脈モデル（ピン・マテリアルの帰属先）。描画中とは限らない */
   activeModelAssetId: string | null;

@@ -11,6 +11,7 @@ import { sceneViewportFactory } from './viewport';
 import { syntheticDisplay } from './viewportModel';
 import type { SyntheticProject } from './fixture';
 import { generationDatabaseName } from '../../projectMetadata/generationScope';
+import { createValidationUiState } from './browserUiState';
 
 // Conservative execution budgets for this development lane, not measured product capacity.
 export const validationBrowserLimits: FileValidationLimits = { maxFileBytes: 64 * 1024 * 1024,
@@ -28,7 +29,8 @@ export async function createValidationBrowserWorkspace(document: Document, run?:
     store: new OriginBlobStore(base, { maxBlobBytes: validationBrowserLimits.maxFileBytes,
       maxChunkBytes: 16 * 1024 * 1024, maxChunks: 100_000, metadata: validationMetadataLimits }, locks) };
   const storage = (id: string, create: boolean) => openBrowserMetadataStorage(`${validationArea}-${id}`, create);
-  const workspace = createValidationWorkspace(document, { ...options,
+  const uiState = createValidationUiState();
+  const workspace = createValidationWorkspace(document, { ...options, lastProject: uiState.lastProject,
     productEditor: new URL(location.href).searchParams.get('editor') === 'project',
     list: () => listValidationProjects(options, storage),
     open: (id, initial, mode, workspaceFile, reviewEdit) => openValidationHost({ ...options, run: id, initial, mode, workspaceFile, reviewEdit, openStorage: create => storage(id, create) }),

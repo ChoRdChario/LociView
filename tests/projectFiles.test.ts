@@ -1,5 +1,7 @@
 import { photoStructure, isAdditionalPhoto, type PhotoDecoder } from '../src/projectFiles/photo';
 import { photoBytes } from './helpers/photoFixtures';
+import { createValidationUiState } from '../src/harness/projectScene/browserUiState';
+import { projectResumeReference, type ProjectResumeReference } from '../src/ui/resumeReference';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, unlinkSync, rmdirSync } from 'node:fs';
@@ -1214,6 +1216,154 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     };
     return { fs, factory, store, locks, reopen, ...reopen() };
   }
+  function resumeWorkspaceFixture() {
+    const r = firstWorkspaceRecipient(), factories = new Map<string, MetadataStorageFactory>();
+    const options = { base: r.fs, coordinator: ProjectMutationCoordinator.browser(r.locks), store: r.store, fileLimits: budget, decode, packageLocks: r.locks };
+    const storage = async (run: string, create: boolean) => {
+      if (!factories.has(run) && create) factories.set(run, storageFactory()); const factory = factories.get(run); if (!factory) throw Error('missing');
+      return { factory, dispose: async () => {} };
+    };
+    let reference: ProjectResumeReference | null = null, current: Awaited<ReturnType<typeof openValidationHost>> | undefined;
+    const remember = vi.fn((next: ProjectResumeReference) => { reference = { ...next }; });
+    const ports: ValidationWorkspacePorts = { ...options, productEditor: true, selected: vi.fn(), lastProject: { read: vi.fn(() => reference), remember },
+      list: () => listValidationProjects(options, storage),
+      open: vi.fn(async (run, initial, mode, workspaceFile) => current = owned(await openValidationHost({ ...options, run, initial, mode, workspaceFile, openStorage: create => storage(run, create) }))),
+      render: async () => { let display: Parameters<ReturnType<ViewportFactory>['update']>[0] | undefined;
+        const factory: ViewportFactory = () => ({ update(next) { display = next; }, setActive() {}, camera() {}, retry() {}, dispose() {},
+          read: () => ({ ready: !!display, display, token: '1', pickToken: '1', pins: [], issue: null, dragging: false, projection: 'perspective', axis: null }) });
+        return { factory, dispose() {} };
+      },
+    };
+    const seed = async (title: string) => {
+      const run = newId(), prepared = structuredClone(await prepareValidationProject({ run, title: 'seed', models: [{ label: 'モデル', bytes: glb() }] }, budget, decode));
+      const project = prepared.records.project as Record<string, JsonObject[string]>, captionId = `cap_${newId()}`, membershipId = `scm_${newId()}`;
+      project.title = title; const lifecycle = () => ({ state: 'active', reason: 'initial', eventId: `evt_${newId()}` });
+      (prepared.records.captionsById as Record<string, JsonObject>)[captionId] = { id: captionId, title: '記録', body: '', colorSrgb: [1,0,0], lifecycle: lifecycle(),
+        anchor: { kind: 'project', projectFrameId: (project.frame as JsonObject).id!, positionProject: [0,0,0] } };
+      (prepared.records.sceneCaptionMembershipsById as Record<string, JsonObject>)[membershipId] = { id: membershipId, captionId, sceneId: project.defaultSceneId!, orderKey: 'A', lifecycle: lifecycle() };
+      const host = await ports.open(run, prepareValidationCreation(prepared,'map2')), source = host.read().source!; await host.dispose();
+      return { run, captionId, source };
+    };
+    const mount = (initialRun?: string, overrides: Partial<ValidationWorkspacePorts> = {}) => {
+      const ui = owned(createValidationWorkspace(new RecordedDocument().asDocument(), { ...ports, ...overrides }, initialRun)), root = record(ui.root);
+      const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+      const named = (name: string, parent = root) => all(parent).find(n => n.attributes.get('aria-label') === name)!;
+      const button = (text: string, parent = root) => all(parent).find(n => n.tag === 'button' && n.textContent === text)!;
+      const navigation = all(root).find(n => n.className === 'lv-validation-home')!;
+      let inert = (navigation as unknown as HTMLElement).inert; const waiters = new Set<() => void>();
+      Object.defineProperty(navigation,'inert',{ get: () => inert, set(value: boolean) { inert = value; if (!value) { for (const done of waiters) done(); waiters.clear(); } } });
+      const idle = () => inert ? new Promise<void>(resolve => waiters.add(resolve)) : Promise.resolve();
+      const edit = async (action: () => void) => {
+        const editor = all(root).find(n => n.className === 'lv-project-workspace')!, status = all(editor).find(n => n.className === 'lv-operation-status')!, data = status.dataset; let started = false;
+        try { await new Promise<void>(resolve => {
+          status.dataset = new Proxy(data,{ set(target,key,value) { const result = Reflect.set(target,key,value); if (key === 'busy') {
+            if (value === 'true') started = true; else if (started) resolve(); } return result; } });
+          action(); expect(started, all(root).filter(n=>n.tag==='p').map(n=>n.textContent).join(' | ')).toBe(true);
+        }); } finally { status.dataset = data; }
+        expect(status.dataset.busy).toBe('false');
+      };
+      return { ui, root, all, named, button, navigation, idle, edit, editor: () => all(root).find(n => n.className === 'lv-project-workspace')! };
+    };
+    return { ...r, ports, seed, mount, remember, host: () => current!, reference: (next: ProjectResumeReference | null) => { reference = next; } };
+  }
+  it('named resume keeps a closed advisory UI slice and ignores unavailable/malformed settings', () => {
+    const entries = new Map<string,string>(), writes = vi.fn((key: string,value: string) => { entries.set(key,value); });
+    const first = createValidationUiState(() => ({ getItem: key => entries.get(key) ?? null, setItem: writes })), reference = { run: newId(), mode: 'view' as const };
+    first.lastProject.remember(reference); expect(first.ui.projectSceneResume).toEqual(reference); expect(writes).toHaveBeenCalledOnce();
+    const cold = createValidationUiState(() => ({ getItem: key => entries.get(key) ?? null, setItem: writes }));
+    const read = cold.lastProject.read()!; expect(read).toEqual(reference); expect(read).not.toBe(cold.ui.projectSceneResume);
+    for (const value of [null, {}, { ...reference, name: 'not stored' }, { ...reference, run: '../other' }, { ...reference, mode: 'repair' }]) expect(projectResumeReference(value)).toBeNull();
+    for (const raw of ['{', JSON.stringify({ ...reference, run: 'x'.repeat(1000) }), JSON.stringify({ ...reference, mode: 'oops' })]) {
+      const invalid = createValidationUiState(() => ({ getItem: () => raw, setItem: writes })); expect(invalid.lastProject.read()).toBeNull();
+    }
+    const unavailable = createValidationUiState(() => { throw Error('denied'); }); expect(unavailable.lastProject.read()).toBeNull(); expect(() => unavailable.lastProject.remember(reference)).not.toThrow();
+  });
+  it('named resume shows the actual last Project and protects edits/file selection before switching, saving and cold reopen', async () => {
+    const f = resumeWorkspaceFixture(), a = await f.seed('調査A'), b = await f.seed('調査B'); f.reference({ run: a.run, mode: 'edit' });
+    const h = f.mount(); await h.idle(); const editor = h.editor();
+    expect(h.named('プロジェクト名',editor).textContent).toBe('調査A'); expect(h.all(editor).some(n => n.textContent === '最後のプロジェクトを再開しました：調査A')).toBe(true);
+    expect(f.host().read().source!.originalChanges()).toEqual(a.source.originalChanges()); expect(f.remember).toHaveBeenLastCalledWith({ run: a.run, mode: 'edit' });
+    h.named('キャプション一覧',editor).children[0]!.children[0]!.fire('click'); const body = h.named('本文',editor), change = h.button('別のプロジェクトを開く',editor);
+    body.fire('compositionstart'); expect(change.disabled).toBe(true); change.fire('click'); expect(h.ui.selected).toBe(a.run); body.fire('compositionend');
+    body.value = '確定前の入力'; body.fire('input'); expect(change.disabled).toBe(true); change.fire('click'); expect(h.ui.selected).toBe(a.run);
+    const fileInput = h.named('ファイルを選択'), file = new File([new Uint8Array([1])],'unread.bin'), read = vi.spyOn(file,'arrayBuffer'); Object.assign(fileInput,{files:[file]});
+    fileInput.parent!.parent!.fire('submit',{preventDefault(){}}); await h.idle(); expect(read).not.toHaveBeenCalled(); expect(h.ui.selected).toBe(a.run); expect(body.value).toBe('確定前の入力');
+    expect(h.button('変更を適用',editor).disabled).toBe(false); await h.edit(() => h.button('変更を適用',editor).fire('click'));
+    const source = f.host().read().source!, backup = await f.host().workspaceOutput.download(await f.host().workspaceOutput.generateBackup(source.token,'再開の保存'));
+    expect((await BackupArchive.inspect(backup,metadata)).source.originalChanges()).toEqual(source.originalChanges());
+    change.fire('click'); await h.idle(); expect(h.ui.selected).toBeNull(); expect(h.navigation.hidden).toBe(false); Object.assign(fileInput,{files:[]});
+    const row = h.all(h.root).find(n => n.tag === 'p' && n.children.some(c => c.textContent.startsWith('調査B —')))!;
+    h.button('編集で開く',row).fire('click'); await h.idle(); expect(h.ui.selected).toBe(b.run); expect(h.named('プロジェクト名',h.editor()).textContent).toBe('調査B');
+    expect(h.all(h.editor()).some(n => n.textContent.startsWith('最後のプロジェクトを再開しました'))).toBe(false);
+    expect(f.host().read().source!.originalChanges()).toEqual(b.source.originalChanges()); await h.ui.dispose();
+    f.reference({run:a.run,mode:'edit'}); const cold = f.mount(); await cold.idle(); expect(cold.ui.selected).toBe(a.run);
+    expect(f.host().authority.read().resources.captions[a.captionId]!.body).toEqual({kind:'value',value:'確定前の入力'});
+    expect(f.host().read().source!.originalChanges()).toEqual(source.originalChanges());
+  });
+  it('named resume gives an explicit Project priority and never labels it as remembered', async () => {
+    const f = resumeWorkspaceFixture(), a = await f.seed('記憶A'), b = await f.seed('明示B'); f.reference({run:a.run,mode:'edit'});
+    const h = f.mount(b.run); await h.idle(); expect(f.ports.lastProject!.read).not.toHaveBeenCalled(); expect(h.ui.selected).toBe(b.run);
+    expect(h.named('プロジェクト名',h.editor()).textContent).toBe('明示B'); expect(h.all(h.root).some(n => n.textContent.startsWith('最後のプロジェクトを再開しました'))).toBe(false);
+    expect(f.remember).toHaveBeenLastCalledWith({run:b.run,mode:'edit'});
+  });
+  it.each(['','invalid'] as const)('named resume preserves an invalid explicit URL %j without opening a remembered Project', async explicit => {
+    const f = resumeWorkspaceFixture(), a = await f.seed('記憶A'); f.reference({run:a.run,mode:'edit'}); vi.mocked(f.ports.open).mockClear();
+    const h = f.mount(explicit); await h.idle(); expect(f.ports.open).not.toHaveBeenCalled(); expect(f.ports.lastProject!.read).not.toHaveBeenCalled(); expect(f.remember).not.toHaveBeenCalled();
+    expect(h.ui.selected).toBeNull(); expect(h.navigation.hidden).toBe(false); expect(h.button('ファイルを開く').disabled).toBe(false);
+  });
+  it.each(['missing','incomplete','unavailable','malformed'] as const)('named resume keeps %s advice at the selector without creating or repairing data', async kind => {
+    const f = resumeWorkspaceFixture(), a = await f.seed('元の記録'); f.reference({run:a.run,mode:'edit'}); vi.mocked(f.ports.open).mockClear();
+    const files = await f.fs.list(''), bytes = await Promise.all(files.map(p => f.fs.readBytes(p)));
+    const h = f.mount(undefined,{ list: async () => kind === 'missing' ? [] : [{run:a.run,title:'元の記録',state:kind === 'unavailable' ? 'unavailable' : 'incomplete'}],
+      ...(kind === 'malformed' ? {lastProject:{read:()=>({run:'bad',mode:'edit'}),remember:f.remember}} : {}) });
+    await h.idle(); expect(f.ports.open).not.toHaveBeenCalled(); expect(f.remember).not.toHaveBeenCalled(); expect(h.navigation.hidden).toBe(false);
+    expect(h.all(h.root).some(n=>n.textContent==='最後のプロジェクトを再開できません。一覧またはファイルから開いてください。')).toBe(kind!=='malformed');
+    expect(h.button('ファイルを開く').disabled).toBe(false);
+    expect(await f.fs.list('')).toEqual(files); expect(await Promise.all(files.map(p=>f.fs.readBytes(p)))).toEqual(bytes);
+  });
+  it.each(['pending','blank-title','renderer','lease','stale'] as const)('named resume returns a catalog-ready/actual-%s race to the file/list exit without a success hint', async kind => {
+    const f = resumeWorkspaceFixture(), a = await f.seed(kind === 'blank-title' ? '  ' : '元の記録'); f.reference({run:a.run,mode:'edit'});
+    let first = true; const list = async () => {
+      const entries = await f.ports.list();
+      if (first) { first = false;
+        if (kind === 'pending') { const host = await f.ports.open(a.run); f.fs.reject = p => p.endsWith('/published.json');
+          await expect(host.dispatch(host.read().source!.token,{kind:'editCaption',captionId:a.captionId,edits:{body:'中断した更新'}})).rejects.toThrow(); f.fs.reject = () => false; await host.dispose(); }
+        if (kind === 'lease') await f.ports.open(a.run);
+      }
+      return entries;
+    };
+    const h = f.mount(undefined,{list,render:async target=>{
+      if (kind === 'renderer') throw Error('display failed'); const prepared = await f.ports.render(target);
+      if (kind === 'stale') await f.host().dispatch(f.host().read().source!.token,{kind:'editCaption',captionId:a.captionId,edits:{body:'表示準備中の更新'}});
+      return prepared;
+    }}); await h.idle();
+    expect(f.remember).not.toHaveBeenCalled(); expect(h.ui.selected).toBeNull(); expect(h.navigation.hidden).toBe(false); expect(h.button('ファイルを開く').disabled).toBe(false);
+    expect(h.all(h.root).some(n=>n.textContent.startsWith('最後のプロジェクトを再開しました'))).toBe(false);
+    expect(h.all(h.root).some(n=>n.textContent.includes('一覧またはファイルから開いてください'))).toBe(true);
+  });
+  it.each(['open-rejection','render-success'] as const)('named resume ignores a late %s after disposal and releases acquired display ownership', async kind => {
+    const f = resumeWorkspaceFixture(), a = await f.seed('元の記録'); f.reference({run:a.run,mode:'edit'});
+    let release!: () => void; const held = new Promise<void>(resolve=>{release=resolve;}), entered=vi.fn(), dispose=vi.fn();
+    const h = f.mount(undefined,kind === 'open-rejection' ? {open:async()=>{entered();await held;throw Error('late open');}} : {render:async()=>{entered();await held;return{factory:()=>{throw Error('closed');},dispose};}});
+    caseDisposals.push(release); await vi.waitFor(()=>expect(entered).toHaveBeenCalledOnce());
+    const selected = vi.mocked(f.ports.selected).mock.calls.slice(), closing=h.ui.dispose(); release(); await closing;
+    expect(f.ports.selected).toHaveBeenCalledTimes(selected.length); expect(f.remember).not.toHaveBeenCalled(); expect(dispose).toHaveBeenCalledTimes(kind === 'render-success' ? 1 : 0);
+  });
+  it('named resume blocks navigation/remember until the actual mode-change owner finishes and treats setting writes as advice', async () => {
+    const f = resumeWorkspaceFixture(), a=await f.seed('閲覧と編集'); f.reference({run:a.run,mode:'edit'});
+    let release!:()=>void; const held=new Promise<void>(resolve=>{release=resolve;}), entered=vi.fn();
+    const h=f.mount(undefined,{open:async(...args)=>{if(args[2]==='view'){entered();await held;}return f.ports.open(...args);}}); caseDisposals.push(release); await h.idle();
+    f.remember.mockClear(); const mode=h.button('閲覧に切り替える'), change=h.button('別のプロジェクトを開く',h.editor());
+    let disabled=mode.disabled; let finished!:()=>void; const completion=new Promise<void>(resolve=>{finished=resolve;});
+    Object.defineProperty(mode,'disabled',{get:()=>disabled,set(value:boolean){const previous=disabled;disabled=value;if(previous&&!value)finished();}});
+    mode.fire('click'); expect(entered).toHaveBeenCalledOnce(); expect((h.editor() as unknown as HTMLElement).inert).toBe(true); change.fire('click'); h.button('別のプロジェクトを開く').fire('click'); await h.idle();
+    expect(h.ui.selected).toBe(a.run); expect(f.remember).not.toHaveBeenCalled(); release(); await completion;
+    expect(f.remember).toHaveBeenLastCalledWith({run:a.run,mode:'view'}); expect(f.host().authority.readOnly).toBe(true);
+    expect(f.host().read().source!.originalChanges()).toEqual(a.source.originalChanges()); await h.ui.dispose();
+    const read=vi.fn(()=>({run:a.run,mode:'view' as const})), remember=vi.fn(()=>{throw Error('setting denied');});
+    const cold=f.mount(undefined,{lastProject:{read,remember}}); await cold.idle(); expect(cold.ui.selected).toBe(a.run); expect(remember).toHaveBeenCalledOnce();
+    expect(cold.all(cold.root).some(n=>n.textContent==='最後のプロジェクトを再開しました：閲覧と編集')).toBe(true); expect(f.host().read().source!.originalChanges()).toEqual(a.source.originalChanges());
+  });
   async function contributionFile(session: ReturnType<typeof validationProjectService>['session'], fs: ProjectWorkspaceFS, store: OriginBlobStore) {
     const current = await session.read(), bases = new WorkspaceBaseStore(fs, metadata, current.source!.proof), snapshot = await bases.snapshot(), row = snapshot.records[0]!;
     const base = await VerifiedContributionBase.select(bases, { workspacePackageId: row.workspacePackageId,
@@ -3832,7 +3982,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const sceneId = Object.keys(host!.authority.read().state.scenes)[0]!;
     await host!.authority.authorScene!(host!.read().source!.token, { kind: 'renameScene', sceneId, name: '手元のシーン名' });
     const originals = host!.read().source!.originalChanges();
-    button('プロジェクトを選ぶ').fire('click'); await vi.waitFor(() => expect(u.selected).toBeNull());
+    button('別のプロジェクトを開く').fire('click'); await vi.waitFor(() => expect(u.selected).toBeNull());
     await vi.waitFor(() => expect(button('ファイルを開く').disabled).toBe(false));
     Object.assign(input, { files: [f.file] }); form.fire('submit', { preventDefault() {} });
     await vi.waitFor(() => expect(render).toHaveBeenCalledTimes(2), { timeout: 10000 });
@@ -3908,7 +4058,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await vi.waitFor(() => expect(button('この受信を取りやめる')).toBeDefined());
     button('この受信を取りやめる').fire('click'); button('取りやめる').fire('click');
     await vi.waitFor(() => expect(all(root).some(n => n.textContent === '受信を取りやめました。')).toBe(true));
-    button('プロジェクトを選ぶ').fire('click'); await vi.waitFor(() => expect(u.selected).toBeNull()); await u.dispose();
+    button('別のプロジェクトを開く').fire('click'); await vi.waitFor(() => expect(u.selected).toBeNull()); await u.dispose();
     const cold = await openValidationHost(options); expect(cold.read().state).toBe('empty'); expect(cold.hasPending()).toBe(false); await cold.dispose();
   });
   it('keeps file tools mutually guarded with startup Scene selection before a Session exists (recorded DOM)', async () => {
@@ -4221,7 +4371,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     choose(choice, 'manual'); choose(text, '合意した本文'); const token = f.host.read().source!.token;
     text.fire('compositionstart'); button('競合を解消', form).fire('click');
     expect(button('競合を解消', form).disabled).toBe(true); expect(f.host.read().source!.token).toBe(token);
-    button('プロジェクトを選ぶ').fire('click');
+    button('別のプロジェクトを開く').fire('click');
     await vi.waitFor(() => expect(all(root).some(n => n.textContent.includes('プロジェクトを切り替えて'))).toBe(true));
     expect(u.selected).toBe(f.options.run); expect(ports.open).toHaveBeenCalledOnce();
     button('閲覧に切り替える').fire('click'); expect(f.host.authority.readOnly).toBe(false);
@@ -4493,7 +4643,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(original.value).toBe(''); expect(choice.value).toBe(''); expect(button('登録の重複を解消', duplicates).disabled).toBe(true);
     choose(original, original.children[1]!.value); choose(choice, 'both');
     const sourceCaption = host.authority.read().resources.captions[captionId], token = host.read().source!.token;
-    button('プロジェクトを選ぶ').fire('click');
+    button('別のプロジェクトを開く').fire('click');
     await vi.waitFor(() => expect(all(root).some(n => n.textContent.includes('プロジェクトを切り替えて'))).toBe(true)); expect(u.selected).toBe(f.run);
     Object.assign(fileInput, { files: [f.f.file] }); fileInput.fire('change'); receive.fire('submit', { preventDefault() {} });
     expect(host.read().source!.token).toBe(token); expect(button('登録の重複を解消', duplicates).disabled).toBe(true);
@@ -6015,10 +6165,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const s = host!.authority.read(), sceneId = Object.keys(s.state.scenes)[0]!;
     fs.reject = p => p.endsWith('/published.json');
     await expect(host!.authority.authorScene!(s.state.token, { kind: 'renameScene', sceneId, name: '未完了の改名' })).rejects.toThrow();
-    button('プロジェクトを選ぶ').fire('click'); await new Promise(resolve => setTimeout(resolve, 0));
+    button('別のプロジェクトを開く').fire('click'); await new Promise(resolve => setTimeout(resolve, 0));
     expect(u.selected).toBe(id); expect(u.hasChanges()).toBe(true);
     fs.reject = () => false; await host!.authority.retry!();
-    button('プロジェクトを選ぶ').fire('click');
+    button('別のプロジェクトを開く').fire('click');
     await vi.waitFor(() => expect(u.selected).toBeNull());
     expect(released).toHaveBeenCalledOnce();
     await vi.waitFor(() => expect(all(root).some(n => n.textContent === '選択から作成 — 再開用データ ')).toBe(true));

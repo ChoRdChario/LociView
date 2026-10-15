@@ -2883,6 +2883,42 @@ No all-frame pixel/playback or orientation-equivalence guarantee is introduced.
 Original metadata inherits §7.3 disclosure. Todo owns executed evidence and the
 separate browser/device/offline and ordinary-entry/adoption conditions.
 
+#### Bounded last-Project resume and switching connection (2026-10-15)
+
+Implement accepted S01/P02 and UI guidelines §§4.1/9.1 in the existing nondefault
+validation/product route. A pure UI run/mode reference and optional read/remember
+port are advisory only. The browser UI adapter may retain that closed reference
+under a separate validation-UI key; it does not create a Project record, journal,
+CAS setting or generic preferences store, or instantiate legacy AppContext.
+Its UI state slice is shared with UiState. Exact import isolation permits browser
+advisory access only in that adapter, preserving the other storage boundaries.
+
+An explicit URL Project wins over a remembered reference. Before automatic opening,
+validate run/mode and require the existing local catalog to identify the same run
+as ready; absence, malformed, incomplete or unavailable data stays at the selector.
+A valid reference that cannot be reopened receives a concise failure with the
+existing list/file alternative; absent or malformed UI advice starts normally.
+Actual open/lease/content/recovery and render preparation remain authoritative.
+Show `最後のプロジェクトを再開しました` with the actual current Project name and
+remember only after the current host is ready, published at the same provider token,
+has no pending recovery, and its editor mounted successfully. A failed/stale/closed
+completion or inaccessible UI hint storage must not imply a successful resume,
+repair data or alter the selected Project/history. Normal explicit opening is not
+labelled as remembered resume. Advisory failures never turn a valid Project write
+into failure or saved-file acknowledgment.
+
+The adjacent/header `別のプロジェクトを開く` action reuses the same selector and
+switch guard. Pending input/IME, active save, failed update, file operation, mode
+switch and restore must retain their existing finish/cancel/retry paths; navigation
+does not discard them. Pure product UI receives a callback/hint, never a filesystem
+or storage primitive. Verify missing/stale hints, explicit precedence, late render/
+dispose, storage denial, real Project/file switching and edit/save/cold resume.
+This does not activate ordinary home or pass browser/device/offline acceptance.
+
+This bounded connection is implemented with real local service/file histories and
+recorded-DOM tests; final serial checks and HTTP identity pass. Exact evidence is
+in todo. Actual browser, physical-device and ordinary-entry acceptance stay open.
+
 ### 13.3 Approved scheduling exception — validators and UI components (2026-09-08)
 
 The PO explicitly approved advancing storage-neutral data validation and reusable

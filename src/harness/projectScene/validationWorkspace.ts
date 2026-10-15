@@ -1,4 +1,5 @@
 import { isAdditionalPhoto, type PhotoDecoder } from '../../projectFiles/photo';
+import { projectResumeReference, type ProjectResumeReference } from '../../ui/resumeReference';
 import { newId } from '../../projectMetadata/persistence';
 import { prepareValidationProject, type ValidationFile } from '../../projectFiles/initialProject';
 import { prepareValidationCreation } from '../../projectFiles/creation';
@@ -33,6 +34,7 @@ type Host = ReturnType<typeof createValidationModeHost>;
 export interface ValidationWorkspacePorts {
   fileLimits: FileValidationLimits; decode?: PngDecoder; jpeg?: JpegDecoder; photo?: PhotoDecoder;
   productEditor?: boolean;
+  lastProject?: { read(): ProjectResumeReference | null; remember(reference: ProjectResumeReference): void };
   list(): Promise<ValidationProjectEntry[]>;
   open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob, reviewEdit?: PreparedReviewEdit): Promise<Awaited<ReturnType<typeof openValidationHost>>>;
   render(host: ValidationDisplayHost): Promise<{ factory: ViewportFactory; dispose(): void }>;
@@ -73,7 +75,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const coldReport = document.createElement('button'); coldReport.type = 'button'; coldReport.textContent = '変換の説明を保存'; coldReport.hidden = true; root.append(coldReport);
   const status = document.createElement('p'); status.setAttribute('role', 'status');
   const list = document.createElement('section'), refresh = document.createElement('button'), back = document.createElement('button');
-  refresh.type = back.type = 'button'; refresh.textContent = '一覧を更新'; back.textContent = 'プロジェクトを選ぶ';
+  refresh.type = back.type = 'button'; refresh.textContent = '一覧を更新'; back.textContent = '別のプロジェクトを開く';
   const listHeading = document.createElement('h2'); listHeading.textContent = 'このブラウザの再開用データ';
   navigation.append(heading, help, workspaceForm, form, listHeading, refresh, list); root.append(back, status, navigation, content);
   let host: Host | undefined, workspace: ReturnType<typeof createSavedWorkspace> | ReturnType<typeof createProductWorkspace> | undefined;
@@ -88,12 +90,15 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const lociTuple = () => JSON.stringify([workbook.value, conversionTitle.value, relation.checked]);
   const lociCurrent = () => !!lociEvaluation && lociDecision === lociTuple();
   let reportUrl: string | undefined;
+  let mounted = false, resumedLast = false, lastRemembered: string | undefined;
+  let catalog: readonly ValidationProjectEntry[] = [];
   const changed = () => !!workspace?.hasChanges() || !!reviewWorkspace?.hasChanges() || !!receiveTools?.hasChanges() || !!host?.hasPending();
   const controls = () => { navigation.inert = busy; openFile.disabled = create.disabled = cancelConversion.disabled = busy || composing;
     convert.disabled = busy || composing || !!lociPreview && (!lociCurrent() || lociEvaluation!.blocked);
     saveReport.disabled = busy || composing || !lociCurrent(); previewAgain.disabled = busy || composing;
     workbook.disabled = conversionTitle.disabled = relation.disabled = busy;
-    coldReport.disabled = busy || composing || !!workspace?.hasChanges() || !!reviewWorkspace?.hasChanges() || !!receiveTools?.hasChanges(); back.disabled = busy; back.hidden = !host && !reviewWorkspace; };
+    coldReport.disabled = busy || composing || !!workspace?.hasChanges() || !!reviewWorkspace?.hasChanges() || !!receiveTools?.hasChanges(); back.disabled = busy;
+    back.hidden = !host && !reviewWorkspace || !!workspace && 'hasProjectHeader' in workspace && workspace.hasProjectHeader(); };
   title.addEventListener('compositionstart', () => { composing = true; controls(); });
   title.addEventListener('compositionend', () => { composing = false; controls(); });
   conversionTitle.addEventListener('compositionstart', () => { composing = true; invalidateLoci(); controls(); });
@@ -106,6 +111,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   };
   const closeCurrent = async () => {
     const oldWorkspace = workspace, oldHost = host, oldResident = resident;
+    mounted = false; resumedLast = false;
     workspace = undefined; host = undefined; resident = undefined;
     coldReport.hidden = true; if (reportUrl) URL.revokeObjectURL(reportUrl); reportUrl = undefined;
     reviewWorkspace?.dispose(); reviewWorkspace = undefined;
@@ -115,8 +121,28 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const ensureMaySwitch = () => {
     if (composing || changed()) throw Error('入力・更新を確定するか、取り消してからプロジェクトを切り替えてください。');
   };
+  function selectProject() { return execute(async () => {
+    ensureMaySwitch(); await closeCurrent(); selected = null; ports.selected(null); navigation.hidden = false; status.textContent = ''; await updateList();
+  }); }
+  const currentResume = () => {
+    if (!mounted || disposed || !host || !workspace || workspace.hasChanges() || workspace.inputPending() || !selected || host.hasPending() ||
+      'hasProjectHeader' in workspace && !workspace.hasProjectHeader()) return null;
+    const current = host.read(), provider = current.provider;
+    if (current.state !== 'ready' || !current.publication || provider?.kind !== 'scene-provider' || current.source?.token !== provider.token ||
+      current.source.proof.identity.projectId !== `prj_${selected}`) return null;
+    const field = provider.inspection.candidates.fields.find(f => f.path.length === 2 && f.path[0] === 'project' && f.path[1] === 'title');
+    const value = field?.valid && field.candidates.length === 1 ? field.candidates[0]?.value : undefined;
+    return value?.kind === 'value' && typeof value.value === 'string' && value.value.trim() ? { run: selected, mode: host.mode!.current, title: value.value } : null;
+  };
+  const rememberCurrent = () => {
+    const current = currentResume(); if (!current || !ports.lastProject) return;
+    const reference = { run: current.run, mode: current.mode }, key = JSON.stringify(reference);
+    if (lastRemembered === key) return; lastRemembered = key;
+    try { ports.lastProject.remember(reference); } catch { /* Advisory settings never change a successful Project acknowledgment. */ }
+  };
   const updateList = async () => {
     const entries = await ports.list(); if (disposed) return;
+    catalog = entries;
     list.replaceChildren();
     if (!entries.length) { list.textContent = '検証プロジェクトはありません。'; return; }
     for (const item of entries) {
@@ -133,6 +159,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     }
   };
   const mount = async (prepared?: Awaited<ReturnType<ValidationWorkspacePorts['render']>>) => {
+    mounted = false;
     if (!host || disposed) { prepared?.dispose(); return; }
     content.replaceChildren();
     if (host.read().state !== 'ready' || host.hasPending() && !(host.backupRestore.needsDisplay && !host.backupRestore.pending)) {
@@ -157,12 +184,13 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     // File recovery must remain available even if renderer preparation fails or stalls.
     if (receiveTools) { receiveTools.render(); content.append(receiveTools.root); }
     status.textContent = 'モデルを読み込んでいます。';
-    const target = host, next = prepared ?? await ports.render(target);
+    const target = host, token = target.read().source?.token, next = prepared ?? await ports.render(target);
     if (disposed || host !== target) { next.dispose(); return; }
     resident = next;
     const fileTools = receiveTools;
     try { workspace = ports.productEditor ? createProductWorkspace(document, target, next.factory, fileTools,
-      ports.renderModelCandidate ? display => ports.renderModelCandidate!(target, display) : undefined) : createSavedWorkspace(document, target, next.factory,
+      ports.renderModelCandidate ? display => ports.renderModelCandidate!(target, display) : undefined,
+      { openProject: () => { void selectProject(); }, resumedLastProject: () => resumedLast, changed: () => { rememberCurrent(); controls(); } }) : createSavedWorkspace(document, target, next.factory,
       (session, changed) => {
         const root = document.createElement('section');
         const blockedReason = () => fileTools?.hasChanges() ? 'ファイルの操作を終えるか、取り消してから解消してください。' : null;
@@ -180,6 +208,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       content.replaceChildren(workspace.root); workspace.render();
       if (target.backupRestore.needsDisplay) { target.backupRestore.displayReady(target.read().source!.token); workspace.render(); } }
     catch (error) { workspace?.unmount(); workspace = undefined; next.dispose(); resident = undefined; throw error; }
+    mounted = token === target.read().source?.token;
     status.textContent = '検証用プロジェクト。通常画面・オフライン・実機での受入れは未完了です。';
   };
   const restoreDisplay = async (retry: boolean) => {
@@ -214,20 +243,26 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       throw error;
     }
   };
-  const adoptProject = async (run: string, opened: Awaited<ReturnType<typeof openValidationHost>>) => {
+  const adoptProject = async (run: string, opened: Awaited<ReturnType<typeof openValidationHost>>, rememberedMode?: LocalOpenMode) => {
     if (disposed) { await opened.dispose(); return; }
     host = createValidationModeHost(opened, nextMode => ports.open(run, undefined, nextMode), nextMode => ports.selected(run, nextMode));
     receiveTools = createValidationReceiveControls(document, host, () => workspace?.session,
       () => { workspace?.render(); controls(); }, async () => { if (!workspace && !disposed) await mount(); }, () => workspace?.inputPending() ?? false, restoreDisplay);
     selected = run; ports.selected(run, host.mode!.current); navigation.hidden = true; await mount();
+    if (disposed) return;
+    const current = currentResume();
+    if (rememberedMode !== undefined && (!current || current.mode !== rememberedMode)) throw Error('最後のプロジェクトの再開用データを確認できません。');
+    resumedLast = rememberedMode !== undefined && !!current; rememberCurrent(); workspace?.render();
+    if (resumedLast && current && (!('hasProjectHeader' in workspace!) || !workspace!.hasProjectHeader())) status.textContent = `最後のプロジェクトを再開しました：${current.title}`;
+    else if (resumedLast) status.textContent = '';
     // Discover availability without retaining an old host's private report or altering file jobs.
     const target = host;
     try { const available = await target.conversionReportAvailable(); if (!disposed && host === target) coldReport.hidden = !available; }
     catch { if (!disposed && host === target) { coldReport.hidden = false; status.textContent = '変換の説明を確認できません。元ZIPを保管し、説明の保存から再確認してください。'; } }
   };
-  const openProject = async (run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode: LocalOpenMode = 'edit', workspaceFile?: Blob) => {
+  const openProject = async (run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode: LocalOpenMode = 'edit', workspaceFile?: Blob, remembered = false) => {
     status.textContent = initial ? 'プロジェクトを作成しています。' : '再開用データを確認しています。';
-    await adoptProject(run, await ports.open(run, initial, mode, workspaceFile));
+    await adoptProject(run, await ports.open(run, initial, mode, workspaceFile), remembered ? mode : undefined);
   };
   const invalidateLoci = () => { lociDraft++; lociEvaluation = null; lociDecision = undefined; conversion = null; controls(); };
   const clearConversion = () => { lociDraft++; lociDecision = undefined; conversion = null; lociPreview = null; lociEvaluation = null; lociChoices.hidden = true; conversionPanel.hidden = true; };
@@ -330,11 +365,33 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     // Clear the selection only after creation is actually ready; the host retains exact retry input otherwise.
     if (host?.read().state === 'ready') files.value = '';
   }); });
-  back.addEventListener('click', () => execute(async () => {
-    ensureMaySwitch(); await closeCurrent(); selected = null; ports.selected(null); navigation.hidden = false; status.textContent = ''; await updateList();
-  }));
+  back.addEventListener('click', () => { void selectProject(); });
   refresh.addEventListener('click', () => execute(updateList));
-  execute(initialRun ? () => openProject(initialRun, undefined, initialMode) : updateList);
+  execute(async () => {
+    if (initialRun !== undefined) {
+      if (!projectResumeReference({ run: initialRun, mode: initialMode })) { await updateList(); status.textContent = '指定されたプロジェクトを確認できません。一覧またはファイルから開いてください。'; return; }
+      try { await openProject(initialRun, undefined, initialMode); }
+      catch (error) { if (!host && !disposed) await updateList(); throw error; }
+      return;
+    }
+    await updateList(); if (disposed) return;
+    let reference: ProjectResumeReference | null = null;
+    try { reference = projectResumeReference(ports.lastProject?.read()); } catch { /* No advisory hint is a normal selector start. */ }
+    if (!reference) return;
+    if (!catalog.some(entry => entry.run === reference.run && entry.state === 'ready')) {
+      status.textContent = '最後のプロジェクトを再開できません。一覧またはファイルから開いてください。'; return;
+    }
+    try { await openProject(reference.run, undefined, reference.mode, undefined, true); }
+    catch {
+      // Automatic opening never traps the selector behind a pending/recovery guard.
+      try { await closeCurrent(); } finally {
+        if (!disposed) {
+          selected = null; ports.selected(null); navigation.hidden = false;
+          await updateList(); if (!disposed) status.textContent = '最後のプロジェクトを再開できません。一覧またはファイルから開いてください。';
+        }
+      }
+    }
+  });
   return { root, hasChanges: () => busy || composing || changed() || !navigation.hidden && (!!workspaceInput.files?.length || !!files.files?.length || title.value !== '新しいプロジェクト'),
     async dispose() { if (disposed) return; disposed = true;
       try { await operation; } catch { /* Original input and saved failure are never acknowledged here. */ }

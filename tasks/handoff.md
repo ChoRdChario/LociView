@@ -6,6 +6,8 @@ Use [inventory](implementation-inventory.md) for coverage, [map](../PROJECT_MAP.
 for code locations and [document index](../docs/README.md) for applicable contracts.
 The bounded integrated UI is selected by `editor=project` in validation; follow
 todo for its tested scope and remaining ordinary-entry/browser/device boundaries.
+The last-Project hint is optional UI advice, not Project authority; explicit URL
+selection wins and actual opening must succeed before the named resume notice.
 
 ## Resume safely
 

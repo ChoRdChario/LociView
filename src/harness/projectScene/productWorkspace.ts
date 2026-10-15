@@ -13,7 +13,8 @@ import { chooseStartupScene } from '../../scene/resolve';
 type Host = ReturnType<typeof createValidationModeHost>;
 type Tools = ReturnType<typeof createValidationReceiveControls>;
 /** Validation-only adapter. No synthetic Session or string-map writes enter product UI. */
-export function createProductWorkspace(document: Document, host: Host, factory: ViewportFactory, tools?: Tools, renderCandidate?: ModelCandidateRenderer) {
+export function createProductWorkspace(document: Document, host: Host, factory: ViewportFactory, tools?: Tools, renderCandidate?: ModelCandidateRenderer,
+  navigation?: { openProject(): void; resumedLastProject(): boolean; changed(): void }) {
   const root = document.createElement('section'), mode = document.createElement('button'), status = document.createElement('p');
   mode.type = 'button'; status.setAttribute('role', 'status');
   let disposed = false, switching = false, core: ReturnType<typeof createProjectWorkspace> | undefined;
@@ -37,6 +38,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     if (disposed || core || startup?.busy() || startup?.recoveryPending() || host.hasPending() || !chooseStartupScene(read().state).sceneId) return;
     core = createProjectWorkspace(document, {
     ...productSources(host),
+    openProject: navigation?.openProject, resumedLastProject: navigation?.resumedLastProject,
     createModelPreview: renderCandidate ? () => {
       let token = '', sceneId = '';
       const preview = createModelCandidatePreview(document, renderCandidate, () => !disposed && token === read().token && sceneId === viewportScene);
@@ -155,7 +157,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     root.append(core.root);
     startup?.dispose(); startup?.root.remove(); startup = undefined; status.textContent = '';
   };
-  const render = () => { if (!disposed) { mountCore(); core?.render(); changed(); } };
+  const render = () => { if (!disposed) { mountCore(); core?.render(); changed(); navigation?.changed(); } };
   if (!chooseStartupScene(read().state).sceneId) {
     startup = createMetadataStartupControls(document, host, () => undefined, render, external); root.append(startup.root);
   }
@@ -174,7 +176,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   const interaction = { get interactionPending() { return core?.session.interactionPending || !!startup?.hasChanges(); },
     get acknowledgment() { return core?.session.acknowledgment ?? { state: startup?.busy() ? 'checking' as const : startup?.recoveryPending() ? 'failed' as const : 'idle' as const }; },
     refreshHistory: render };
-  return { root, session: interaction, render,
-    inputPending: () => switching || !!core?.inputPending() || !!startup?.hasChanges(), hasChanges: () => host.hasPending() || !!core?.hasChanges() || !!startup?.hasChanges() || !!tools?.hasChanges(), unmount,
+  return { root, session: interaction, render, hasProjectHeader: () => !!core,
+    inputPending: () => switching || !!core?.inputPending() || !!startup?.hasChanges(), hasChanges: () => switching || host.hasPending() || !!core?.hasChanges() || !!startup?.hasChanges() || !!tools?.hasChanges(), unmount,
     async dispose() { unmount(); tools?.dispose(); await host.dispose(); } };
 }

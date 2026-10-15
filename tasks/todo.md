@@ -29,6 +29,8 @@ The approved JPEG photo/embedded-texture extension now preserves original metada
 through direct creation/addition, conversion, file exchange and generation restore.
 The approved WebP/GIF companion connects the same photo workflow with original
 Blob animation behavior and four additive conversion domains; GLB profiles stay fixed.
+The named last-Project resume and guarded Project/file switching connection now
+uses only UI advisory run/mode, with explicit URL priority and actual-open checks.
 Ordinary entry, broader profiles/converters, browser performance, physical-iPhone
 and offline acceptance remain open. Full details and earlier failures are in the
 [September checkpoint record](../docs/history/development-through-2026-09-21/tasks/todo.md).
@@ -107,6 +109,61 @@ major architecture/product decision, a required managed permission, or a release
 destructive boundary. Ordinary entry and temporary iPhone HTTPS need their existing
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
+
+### Completed implementation — named last-Project resume and guarded switching
+
+Outcome: remember only the last successfully opened run/mode in UI-owned advisory
+state → reopen with the actual Project name and an adjacent other-Project action
+→ safely select a different Project/file → edit/save/cold resume. The accepted
+S01/P02 and UI guideline §§4.1/9.1 cover this bounded nondefault-route connection;
+ordinary-home activation remains excluded.
+
+- [x] Specify the optional typed last-reference port, UI ownership and validation
+  fences; use explicit URL selection before any advisory reference.
+- [x] Connect successful named resume and the shared guarded selector action in
+  the product header, retaining IME/draft/save/file/mode/restore protections.
+- [x] Verify real local Project switching, explicit/missing/incomplete/failed/stale
+  hints, unavailable advisory storage and cold editing without history changes.
+- [x] Independently review, freeze final source/tests, run the final serial
+  checkpoint/HTTP identity and audit the suitable g0 commit/push.
+
+Ports: a small pure UI reference (run/mode only) shared with UiState; an optional
+workspace read/remember port; a browser-only UI adapter owns its separate advisory
+key. No legacy AppContext is instantiated. The pure product header emits only a
+navigation callback/resume hint. Project/journal/CAS/package formats, raw records,
+namespaces, recipes/profiles and ordinary entry stay fixed. No general preferences
+framework, new dependency or browser-denial retry. Stop affected work only for a
+real new storage/authority/contract or release decision.
+
+Milestone audit: 07e is verified and normally pushed; actual g0-baseline local and
+live origin match, with a clean worktree at this unit's start. This closes an
+accepted user workflow, rather than extending media or conversion policy.
+
+Focused evidence: the 17 named-resume cases and existing selector/create/list/
+reopen regression passed together (18 cases). Early exact sceneCore isolation
+passed all 12 cases. Read-only root/area reviews closed the explicit-empty URL,
+blank actual title and late-dispose callback corrections, plus the final missing/
+nonready failure copy. Actual A/B Project histories, applied Caption content, named
+backup bytes and cold editing are checked with real services; injected viewport/
+recorded DOM remain distinct from browser evidence. The first serial
+attempt stopped in typecheck on three read-only fixture assignments (no suite or
+build ran); narrowing the cloned fixture to mutable map types fixes only test
+construction typing. Preserve that exit-2 log as resume-checkpoint-2026-10-15.log.
+
+Final evidence: resume-checkpoint-2026-10-15-final.log exits 0: typecheck, all
+116 test files / 2,520 passed plus 21 existing todo (727.02s), then all three builds
+(3.85s / 3.57s / 6.65s). The 10 frozen source/test hashes stayed unchanged. Existing
+localhost HTTP serves all seven validation files byte-exact; manifest
+3e03db4b19f1fcc41322112b524a3f617e740cad5959d8655d9bf8147ad270ce.
+This is static HTTP identity, not browser/device/offline evidence. The suitable
+15-path g0 checkpoint excludes the separate unapproved next-recipe proposal;
+required review, local links, privacy/deploy scope and staged content are checked
+before normal publication. Git records the checkpoint identity.
+
+Next: finish this verified checkpoint, then prepare the bounded frozen-v1 explicit
+default-View companion as a separate PROPOSED documentation checkpoint. Its new
+immutable recipe requires exact ratification before implementation; ordinary home
+and browser/device/offline acceptance remain open.
 
 ### Completed implementation — WebP/GIF photos/edit/file/reopen
 

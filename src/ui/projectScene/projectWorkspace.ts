@@ -44,6 +44,11 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     ['困ったとき', '更新に失敗したら入力を保持したまま「更新を再試行」を選択します。競合は「状態を確認」から残す内容を選択します。3D表示だけに問題がある場合は「3D表示を再試行」を選択してください。'],
   ]) help.append(make('h3', title), make('p', text));
   header.append(projectTitle, resumeStatus, fileStatus, help);
+  const resumeNotice = make('p'); resumeNotice.setAttribute('role', 'status');
+  const otherProject = button('別のプロジェクトを開く', () => {
+    if (!disposed && !busy && !dirty() && !ports.otherPending()) ports.openProject?.();
+  });
+  header.append(resumeNotice, otherProject);
   const status = make('p'); status.setAttribute('role', 'status'); status.className = 'lv-operation-status';
   const retry = button('更新を再試行', () => { void runRetry(); }); header.append(heading, status, retry);
   const revise = button('入力を修正する', () => { if (!busy && ports.status().kind === 'idle') { pending = null; feedback = ''; render(); } }); header.append(revise);
@@ -556,6 +561,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const p = provider(), blocked = mutationBlock(), selected = memory().selectedCaptionId;
       const summary = ports.projectStatus();
       projectTitle.textContent = summary.title?.trim() || '名前を確認できないプロジェクト';
+      resumeNotice.textContent = ports.resumedLastProject?.() && summary.resumable && summary.title ? `最後のプロジェクトを再開しました：${summary.title}` : '';
+      resumeNotice.hidden = !resumeNotice.textContent; otherProject.hidden = !ports.openProject;
+      otherProject.disabled = busy || dirty() || ports.otherPending();
       resumeStatus.textContent = busy || ports.status().kind === 'checking' ? '変更を確定しています。' : pending || ports.status().kind === 'failed' ? '更新が未完了です。入力を保持しています。再試行してください。' :
         draftInput() || panelInput() || recovery?.hasChanges() || mediaManager?.hasChanges() ? '入力中の内容はまだ確定していません。' : summary.resumable ? 'このブラウザに再開用データがあります。' : '再開データの状態を確認してください。';
       fileStatus.textContent = summary.backup === 'verified' ? '確定済みの内容は、選択した保存ファイルと一致しています。' : summary.backup === 'unavailable' ? 'ファイルの保存状態を確認できません。ファイル欄を確認してください。' : '現在の内容を保存したファイルは未確認です。';

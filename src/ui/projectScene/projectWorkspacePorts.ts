@@ -71,6 +71,8 @@ export interface WorkspaceFileInteraction {
 export interface ProjectWorkspacePorts {
   read(): WorkspaceProvider;
   projectStatus(): { readonly title: string | null; readonly resumable: boolean; readonly backup: 'verified' | 'unconfirmed' | 'unavailable' };
+  openProject?(): void;
+  resumedLastProject?(): boolean;
   readonly readOnly: boolean;
   status(): { kind: 'idle' | 'checking' | 'failed'; error?: string; retryable?: boolean };
   dispatch(token: string, command: MetadataEdit): Promise<unknown>;

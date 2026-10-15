@@ -39,6 +39,12 @@ when the persisted default is unresolved; warm resolution retains that editor.
 `productSources.ts` supplies bounded read projections and command preparation.
 Inventory and todo own its exact feature and verification scope.
 
+`ui/resumeReference.ts` shares the small UI-only last-Project hint with UiState.
+The browser adapter `harness/projectScene/browserUiState.ts` owns its advisory key;
+`validationWorkspace.ts` validates the catalog and actual mounted host before
+remembering it. The product header calls the same guarded Project selector.
+Project data and ordinary entry remain separate; todo owns the executed evidence.
+
 The new practical-team workflow uses Project-wide Assets/Caption resources and
 Scene membership. New file services are partially connected in the limited
 validation route. Old Native acceptance remains valid only for its tested scope.
