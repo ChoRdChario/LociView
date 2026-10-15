@@ -39,6 +39,8 @@ Fresh HEIF selection now explains separate local JPEG export and permits explici
 unapplied-media cancellation; site storage estimates preserve pending save retry.
 LociMyu Scene shading/sidedness now survives conversion and selected-generation
 restore under recipe-4; disabled chroma settings remain source/report only.
+The same file-opening intent now inspects models/photos and packages, reveals
+conditional creation, and preserves selection/retry ownership through failure.
 Ordinary entry, broader profiles/converters, browser performance, physical-iPhone
 and offline acceptance remain open. Full details and earlier failures are in the
 [September checkpoint record](../docs/history/development-through-2026-09-21/tasks/todo.md).
@@ -117,6 +119,64 @@ major architecture/product decision, a required managed permission, or a release
 destructive boundary. Ordinary entry and temporary iPhone HTTPS need their existing
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
+
+### Completed implementation — one file-opening intent
+
+Outcome: select files once → inspect their actual content → either name/create a
+Project from all selected GLBs and photos, or use the existing package/conversion
+confirmation → edit/save a Workspace → independently reopen/cold resume. This is
+the accepted P01/P02/F10 and UI §4.1 connection in the nondefault route, starting
+from clean, pushed g0 66d2926; it does not activate ordinary home.
+
+- [x] Record the existing ports and owned-selection/retry boundary in 05 §13.2
+  before source changes; one writer, independent read-only review lanes.
+- [x] Replace the two selectors with one multiple-file input and conditional
+  new-Project name/create controls. Preserve all supported model cardinality and
+  order, photo registration and converter/package purpose authority.
+- [x] Own each selection/title generation and prepared creation attempt; reject
+  late/IME/reselection/disposed results and reuse exact initial/run after failure.
+  Keep existing work until a replacement Host/resident is obtained.
+- [x] Reuse focused service/UI cases plus one creation → edit/Workspace → same
+  entry independent reopen/cold flow, with multi-model/no-write/failure contrasts.
+- [x] Independent final-diff review → frozen source/tests → one serial checkpoint,
+  HTTP identity, outgoing audit and normal verified g0 commit/push.
+
+Ports: existing validationWorkspace and prepareValidationProject/Creation,
+Native/frozen-v1/LociMyu preparation, typed Package/Workspace/Clean/review services
+and existing Host/render ports. No new authority/module/schema/profile/recipe.
+Backup and Contribution selection explains the existing opened-Project restore/
+receive route; initial backup restoration into an absent Project needs a separate
+storage contract and is not implemented here. Stop only affected work for a new
+contract/authority decision or managed denial. Existing IME/draft/file/mode/restore
+and durable retry fences, source preservation, ordinary/browser/device/offline/
+adoption/release exclusions remain unchanged.
+
+Focused evidence: 10 changed-boundary cases pass, plus 11 existing Loci preview/
+review/Clean/source-less recovery/last-Project cases. The final stale-open retry
+correction passes its two conditions: published ready candidates reopen the same
+run/history, while a store.put failure before initial persistence retains the
+same warm candidate/retry (Host return alone is not durability). Initial test-only corrections selected the
+actual product-introduction node, retained the Scene name's typed value, used
+owned ArrayBuffers/job summary types, and explicitly attached a registered photo
+before expecting Workspace body transfer (unlinked media is weak). Existing
+budgets, package services and result assertions remain unchanged. Independent
+source/UI/connected reviews are closed. The final two source/test paths passed
+typecheck, 116 files / 2612 tests with 21 existing todo (927.20s), and all three
+builds. The seven validation HTTP files exactly match built bytes; manifest
+SHA-256 is `f43dc33a482db4dc2668dd36add5058a37011e159479db46ef50a206b9ff72dd`.
+Final local evidence is `.artifacts/traces/unified-opening-final-checkpoint-2026-10-16.log`,
+`unified-opening-final-tested-tree-2026-10-16.json` and
+`unified-opening-http-2026-10-16.json` in the same traces directory. Reviewed/tested
+source and staged content must match before normal g0 commit/push; Git owns
+publication identity. Browser/device/offline/adoption evidence remains open.
+The first serial run was explicitly interrupted after typecheck/suite start when
+independent review found the saved-but-unmounted selector exit trap; it supplies
+no suite/build result. Its original log remains
+`.artifacts/traces/unified-opening-checkpoint-2026-10-16.log`. The existing selector
+regression now covers render rejection → explicit list return → same-ID/history
+reopen and passes (1.85s test time). That corrected tree uses the final manifest/
+log above, separately from the retained interrupted evidence; no timeout/worker/
+assertion changes or automatic retry.
 
 ### Completed implementation — LociMyu Scene material conversion
 

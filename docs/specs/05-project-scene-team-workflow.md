@@ -1779,6 +1779,49 @@ is preserved and the limitation is visible. Browser execution budgets (64 MiB
 combined input, 4 MiB JSON, 100,000 structural items, 8,000,000 accessor values,
 16,777,216 image pixels) are caller refusal limits, not measured support promises.
 
+**Unified file opening (2026-10-16).** The existing nondefault selector implements
+the accepted UI §4.1 intent `ファイルを開く` through one multiple-file input.
+Inspect the complete owned selection before choosing a path. All selected static
+GLBs and admitted photos retain their supported cardinality/order and proceed to
+conditional Project-name/create controls through prepareValidationProject and
+the existing explicit-map2 creation. Photos remain registered resources, without
+automatic Caption attachment. A single package keeps existing conversion order,
+recognized-invalid versus nonmatching behavior, purpose inspection and typed
+Workspace/Clean/read-only review paths. Reject multiple packages or a package
+mixed with raw files; never silently use just the first file. Backup/Contribution
+selection points to restore/receive in the corresponding opened Project. It does
+not bootstrap an absent Project, reinterpret a backup as Workspace or create a
+throwaway baseline; initial absent-Project restore is a separate storage decision.
+
+The UI owns a selection generation, captured names/bytes and the matching title/
+prepared attempt. Capture count/combined-byte budgets before reads, and finish
+inspection before storage. File changes, cancellation, title/IME transitions and
+disposal invalidate late results; do not approve old bytes under a new selection
+or title. Once opening has been attempted, retain the exact initial/run for retry
+instead of preparing another Project. Preserve durable Host retry after adoption.
+If adoption becomes stale, a published ready candidate may be disposed and its
+same run reopened without reinitialization. An incomplete candidate remains owned
+by the attempt so its existing warm retry can finish, including failure before
+initial-source persistence. Host return alone is not durability evidence. Dispose
+unadopted candidates when the UI closes; transfer ownership on actual adoption.
+If an adopted Project is published and has no pending work but rendering fails,
+an explicit return to the selector may release that selection so the same Project
+can reopen. This does not acknowledge a successful mount or last-Project resume.
+Keep existing work through input/inspection/preparation/open failure until an
+actual replacement Host or read-only resident exists, and recheck current work
+and input guards after asynchronous preparation before switching. Clear only an
+explicitly cancelled unapplied selection or one whose Host is actually ready
+without pending work; hidden creation controls must not leave an invisible draft.
+
+Use only validationWorkspace's existing ports and the existing projectFiles/
+package services; no storage writes from UI, new service port or format/profile/
+recipe change. Acceptance combines one raw-model/photo → name/create → typed edit
+→ Workspace → same-entry independent reopen/cold flow with focused multi-model,
+mixed-package/image-only/budget refusal, late selection/IME/disposal and exact
+initial/run retry checks. Reuse current conversion/review/source-less recovery
+tests. Node/recorded DOM and HTTP remain separate from browser/device/offline and
+ordinary-entry adoption.
+
 **Fresh media-selection and save recovery (2026-10-16).** This connects the
 already approved [PROD-16](00-product-contract.md) local
 HEIC/HEIF compatibility flow and contextual capacity help; it adds no decoder,

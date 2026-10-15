@@ -48,18 +48,17 @@ export interface ValidationWorkspacePorts {
 export function createValidationWorkspace(document: Document, ports: ValidationWorkspacePorts, initialRun?: string, initialMode: LocalOpenMode = 'edit') {
   const root = document.createElement('section'), navigation = document.createElement('section'), content = document.createElement('section');
   root.className = 'lv-validation-host'; navigation.className = 'lv-validation-home';
-  const heading = document.createElement('h1'); heading.textContent = '実ファイルで検証';
-  const help = document.createElement('p'); help.textContent = '静的GLB（内蔵PNG/JPEG・外部参照なし）とPNG/JPEG/WebP/GIF画像で検証プロジェクトを作ります。作業一式の生成・受け渡しができます。ダウンロードだけではファイルへの保存は確認できません。通常画面のプロジェクトは変更しません。';
-  const form = document.createElement('form'), title = document.createElement('input'), files = document.createElement('input');
+  const heading = document.createElement('h1'); heading.textContent = 'LociView';
+  const help = document.createElement('p'); help.textContent = 'LociViewは、3Dモデルに記録を付け、ファイルで作業を受け渡すアプリです。この検証画面では通常画面のプロジェクトを変更しません。ダウンロード後は、保存先でファイルを確認してください。';
+  const form = document.createElement('form'), title = document.createElement('input'), creationNote = document.createElement('p'), cancelSelection = document.createElement('button');
   title.value = '新しいプロジェクト'; title.maxLength = 256; title.setAttribute('aria-label', 'プロジェクト名');
-  files.type = 'file'; files.multiple = true; files.setAttribute('aria-label', '3Dモデルとメディアを選択');
   const create = document.createElement('button'); create.textContent = 'プロジェクトを作成'; create.type = 'submit';
-  const titleLabel = document.createElement('label'), filesLabel = document.createElement('label');
-  titleLabel.textContent = 'プロジェクト名'; filesLabel.textContent = '3Dモデルとメディアを選択';
-  titleLabel.append(title); filesLabel.append(files); form.append(titleLabel, filesLabel, create);
+  cancelSelection.type = 'button'; cancelSelection.textContent = '選択を取り消す';
+  const titleLabel = document.createElement('label'); titleLabel.textContent = 'プロジェクト名';
+  titleLabel.append(title); form.append(creationNote, titleLabel, create); form.hidden = true;
   const workspaceForm = document.createElement('form'), workspaceLabel = document.createElement('label'), workspaceInput = document.createElement('input'), openFile = document.createElement('button');
-  workspaceLabel.textContent = 'ファイルを選択'; workspaceInput.type = 'file'; workspaceInput.setAttribute('aria-label', 'ファイルを選択'); workspaceLabel.append(workspaceInput);
-  openFile.type = 'submit'; openFile.textContent = 'ファイルを開く'; workspaceForm.append(workspaceLabel, openFile);
+  workspaceLabel.textContent = 'ファイルを選択'; workspaceInput.type = 'file'; workspaceInput.multiple = true; workspaceInput.setAttribute('aria-label', 'ファイルを選択'); workspaceLabel.append(workspaceInput);
+  openFile.type = 'submit'; openFile.textContent = 'ファイルを開く'; workspaceForm.append(workspaceLabel, openFile, cancelSelection);
   const conversionPanel = document.createElement('section'), conversionNote = document.createElement('p'), conversionHelp = document.createElement('p');
   const convert = document.createElement('button'), cancelConversion = document.createElement('button');
   convert.type = cancelConversion.type = 'button'; convert.textContent = '新しいプロジェクトに変換'; cancelConversion.textContent = 'キャンセル';
@@ -88,6 +87,10 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   let lociPreview: Awaited<ReturnType<typeof prepareLociMyuConversion>> = null;
   let lociEvaluation: Awaited<ReturnType<NonNullable<Awaited<ReturnType<typeof prepareLociMyuConversion>>>['evaluate']>> | null = null;
   let lociDraft = 0, lociDecision: string | undefined;
+  let selectionGeneration = 0, creationDraft = 0, selectionPending = false;
+  let rawSelection: { models: ValidationFile[]; media: ValidationFile[] } | undefined;
+  let creationAttempt: { run: string; initial: ReturnType<typeof prepareValidationCreation>; opened?: true; candidate?: Awaited<ReturnType<ValidationWorkspacePorts['open']>> } | undefined;
+  let selectionHost: Host | undefined;
   const lociTuple = () => JSON.stringify([workbook.value, conversionTitle.value, relation.checked]);
   const lociCurrent = () => !!lociEvaluation && lociDecision === lociTuple();
   let reportUrl: string | undefined;
@@ -95,13 +98,19 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   let catalog: readonly ValidationProjectEntry[] = [];
   const changed = () => !!workspace?.hasChanges() || !!reviewWorkspace?.hasChanges() || !!receiveTools?.hasChanges() || !!host?.hasPending();
   const controls = () => { navigation.inert = busy; openFile.disabled = create.disabled = cancelConversion.disabled = busy || composing;
+    workspaceInput.disabled = title.disabled = busy || !!creationAttempt;
+    cancelSelection.disabled = busy || composing || !!creationAttempt;
+    cancelSelection.hidden = !selectionPending || !conversionPanel.hidden;
+    openFile.hidden = !form.hidden || !conversionPanel.hidden;
+    create.textContent = creationAttempt ? '作成を再試行' : 'プロジェクトを作成';
     convert.disabled = busy || composing || !!lociPreview && (!lociCurrent() || lociEvaluation!.blocked);
     saveReport.disabled = busy || composing || !lociCurrent(); previewAgain.disabled = busy || composing;
     workbook.disabled = conversionTitle.disabled = relation.disabled = busy;
     coldReport.disabled = busy || composing || !!workspace?.hasChanges() || !!reviewWorkspace?.hasChanges() || !!receiveTools?.hasChanges(); back.disabled = busy;
     back.hidden = !host && !reviewWorkspace || !!workspace && 'hasProjectHeader' in workspace && workspace.hasProjectHeader(); };
-  title.addEventListener('compositionstart', () => { composing = true; controls(); });
-  title.addEventListener('compositionend', () => { composing = false; controls(); });
+  title.addEventListener('compositionstart', () => { composing = true; creationDraft++; controls(); });
+  title.addEventListener('compositionend', () => { composing = false; creationDraft++; controls(); });
+  title.addEventListener('input', () => { creationDraft++; });
   conversionTitle.addEventListener('compositionstart', () => { composing = true; invalidateLoci(); controls(); });
   conversionTitle.addEventListener('compositionend', () => { composing = false; invalidateLoci(); controls(); });
   const execute = (action: () => Promise<void>) => {
@@ -122,8 +131,16 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const ensureMaySwitch = () => {
     if (composing || changed()) throw Error('入力・更新を確定するか、取り消してからプロジェクトを切り替えてください。');
   };
+  const ensureMayLeaveSelection = () => {
+    ensureMaySwitch();
+    const current = host?.read();
+    // Explicit return may leave a saved Project whose renderer failed; it is not a mounted/resume acknowledgment.
+    if (selectionHost && selectionHost === host && current?.state === 'ready' && current.publication && current.source && !host!.hasPending()) clearSelection();
+    if (selectionPending || rawSelection || creationAttempt || !conversionPanel.hidden)
+      throw Error('選択した内容の確認・作成を終えるか、選択を取り消してください。');
+  };
   function selectProject() { return execute(async () => {
-    ensureMaySwitch(); await closeCurrent(); selected = null; ports.selected(null); navigation.hidden = false; status.textContent = ''; await updateList();
+    ensureMayLeaveSelection(); await closeCurrent(); selected = null; ports.selected(null); navigation.hidden = false; status.textContent = ''; await updateList();
   }); }
   const currentResume = () => {
     if (!mounted || disposed || !host || !workspace || workspace.hasChanges() || workspace.inputPending() || !selected || host.hasPending() ||
@@ -153,7 +170,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       for (const mode of ['view', 'edit'] as const) {
         const open = document.createElement('button'); open.type = 'button';
         open.textContent = mode === 'view' ? '閲覧で開く' : '編集で開く';
-        open.addEventListener('click', () => execute(async () => { ensureMaySwitch(); await closeCurrent(); await openProject(item.run, undefined, mode); }));
+        open.addEventListener('click', () => execute(async () => { ensureMayLeaveSelection(); await closeCurrent(); await openProject(item.run, undefined, mode); }));
         row.append(open);
       }
       list.append(row);
@@ -211,6 +228,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       if (target.backupRestore.needsDisplay) { target.backupRestore.displayReady(target.read().source!.token); workspace.render(); } }
     catch (error) { workspace?.unmount(); workspace = undefined; next.dispose(); resident = undefined; throw error; }
     mounted = token === target.read().source?.token;
+    if (mounted && selectionHost === target && target.read().state === 'ready' && !target.hasPending()) clearSelection();
     status.textContent = '検証用プロジェクト。通常画面・オフライン・実機での受入れは未完了です。';
   };
   const restoreDisplay = async (retry: boolean) => {
@@ -248,6 +266,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const adoptProject = async (run: string, opened: Awaited<ReturnType<typeof openValidationHost>>, rememberedMode?: LocalOpenMode) => {
     if (disposed) { await opened.dispose(); return; }
     host = createValidationModeHost(opened, nextMode => ports.open(run, undefined, nextMode), nextMode => ports.selected(run, nextMode));
+    if (selectionPending) selectionHost = host;
     receiveTools = createValidationReceiveControls(document, host, () => workspace?.session,
       () => { workspace?.render(); controls(); }, async () => { if (!workspace && !disposed) await mount(); }, () => workspace?.inputPending() ?? false, restoreDisplay);
     selected = run; ports.selected(run, host.mode!.current); navigation.hidden = true; await mount();
@@ -268,6 +287,23 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   };
   const invalidateLoci = () => { lociDraft++; lociEvaluation = null; lociDecision = undefined; conversion = null; controls(); };
   const clearConversion = () => { lociDraft++; lociDecision = undefined; conversion = null; lociPreview = null; lociEvaluation = null; lociChoices.hidden = true; conversionPanel.hidden = true; };
+  const clearSelection = () => {
+    selectionGeneration++; creationDraft++; selectionPending = false; rawSelection = undefined; creationAttempt = undefined; selectionHost = undefined;
+    form.hidden = true; title.value = '新しいプロジェクト'; workspaceInput.value = ''; clearConversion(); controls();
+  };
+  const selectionContext = () => ({ host, workspace, reviewWorkspace, token: host?.read().source?.token });
+  const selectionCurrent = (generation: number, context: ReturnType<typeof selectionContext>) =>
+    !disposed && !composing && generation === selectionGeneration && host === context.host && workspace === context.workspace &&
+    reviewWorkspace === context.reviewWorkspace && host?.read().source?.token === context.token;
+  const guardSelection = (generation: number, context: ReturnType<typeof selectionContext>) => {
+    if (!selectionCurrent(generation, context)) return false;
+    ensureMaySwitch(); return true;
+  };
+  const replaceSelection = async (run: string, opened: Awaited<ReturnType<ValidationWorkspacePorts['open']>>, generation: number, context: ReturnType<typeof selectionContext>) => {
+    try { if (!guardSelection(generation, context)) { await opened.dispose(); return; } }
+    catch (error) { await opened.dispose(); throw error; }
+    await closeCurrent(); await adoptProject(run, opened);
+  };
   const exportReport = (blob: Blob) => { if (disposed) return; if (reportUrl) URL.revokeObjectURL(reportUrl); reportUrl = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = reportUrl; a.download = 'LociView-conversion-report.json'; a.hidden = true; root.append(a);
     try { a.click(); } finally { a.remove(); } status.textContent = 'ダウンロードを開始しました。元ZIPと説明ファイルの保存先で完了を確認してください。'; };
@@ -295,25 +331,61 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   saveReport.addEventListener('click', () => { if (!disposed && !busy && !composing && lociCurrent()) exportReport(lociEvaluation!.report()); });
   coldReport.addEventListener('click', () => execute(async () => { if (composing || workspace?.hasChanges() || reviewWorkspace?.hasChanges() || receiveTools?.hasChanges()) throw Error('入力・操作を確定するか取り消してください。'); const target = host; if (!target) return;
     const report = await target.conversionReport(); if (disposed || host !== target) return; if (!report) { coldReport.hidden = true; return; } exportReport(report); }));
-  workspaceInput.addEventListener('change', () => { if (!busy) clearConversion(); });
-  cancelConversion.addEventListener('click', () => { if (!busy) { clearConversion(); status.textContent = ''; } });
+  workspaceInput.addEventListener('change', () => {
+    if (creationAttempt) return;
+    selectionGeneration++; creationDraft++; selectionPending = !!workspaceInput.files?.length; rawSelection = undefined;
+    form.hidden = true; title.value = '新しいプロジェクト'; clearConversion(); controls();
+  });
+  cancelSelection.addEventListener('click', () => { if (!busy && !composing && !creationAttempt) { clearSelection(); status.textContent = ''; } });
+  cancelConversion.addEventListener('click', () => { if (!busy && !composing) { clearSelection(); status.textContent = ''; } });
   convert.addEventListener('click', () => execute(async () => {
     ensureMaySwitch(); if (composing || lociPreview && (!lociCurrent() || lociEvaluation!.blocked) || !lociPreview && !conversion) throw Error('変換する内容を確認してください。');
+    const generation = selectionGeneration, context = selectionContext(), draft = lociDraft, tuple = lociTuple();
+    const current = () => guardSelection(generation, context) && draft === lociDraft && tuple === lociTuple();
     status.textContent = 'プロジェクトを変換しています。';
-    const initial = await (lociPreview ? lociEvaluation!.create() : conversion!.create()); if (disposed) return;
+    const initial = await (lociPreview ? lociEvaluation!.create() : conversion!.create()); if (!current()) return;
     const run = (initial.source.proof.identity.projectId as string).slice(4);
     const opened = await ports.open(run, initial);
-    if (disposed) { await opened.dispose(); return; }
-    await closeCurrent(); await adoptProject(run, opened); clearConversion();
-    if (host?.read().state === 'ready' && !host.hasPending()) workspaceInput.value = '';
+    try { if (!current()) { await opened.dispose(); return; } } catch (error) { await opened.dispose(); throw error; }
+    await replaceSelection(run, opened, generation, context);
   }));
   workspaceForm.addEventListener('submit', event => { event.preventDefault(); execute(async () => {
-    ensureMaySwitch(); const file = workspaceInput.files?.[0]; if (!file) throw Error('ファイルを選択してください。');
+    ensureMaySwitch(); if (creationAttempt) throw Error('作成を再試行してください。');
+    const selection = Array.from(workspaceInput.files ?? []).map(file => ({ file, label: file.name }));
+    if (!selection.length) throw Error('ファイルを選択してください。');
+    const total = selection.reduce((n, item) => n + item.file.size, 0);
+    if (selection.length > ports.fileLimits.maxItems || !Number.isSafeInteger(total) || total > ports.fileLimits.maxFileBytes ||
+      selection.some(item => !Number.isSafeInteger(item.file.size) || item.file.size < 0)) throw Error('選択したファイルがこの検証の上限を超えています。');
+    const generation = ++selectionGeneration, draft = creationDraft, context = selectionContext(); selectionPending = true;
     status.textContent = 'ファイルを確認しています。';
-    clearConversion();
-    const legacy = await prepareFrozenV1Conversion(file, ports.fileLimits, ports.decode, ports.jpeg, ports.photo); if (disposed) return;
-    lociPreview = legacy ? null : await prepareLociMyuConversion(file, ports.fileLimits, ports.decode, ports.jpeg, ports.photo); if (disposed) return;
-    const native = legacy || lociPreview ? null : await prepareNativeConversion(file, ports.fileLimits, ports.decode, ports.jpeg, ports.photo); if (disposed) return;
+    clearConversion(); rawSelection = undefined; form.hidden = true;
+    const models: ValidationFile[] = [], media: ValidationFile[] = [], packages: Blob[] = []; let actualTotal = 0;
+    for (const item of selection) {
+      const bytes = new Uint8Array(await item.file.arrayBuffer());
+      if (!guardSelection(generation, context) || draft !== creationDraft) return;
+      actualTotal += bytes.byteLength;
+      if (!Number.isSafeInteger(actualTotal) || actualTotal > ports.fileLimits.maxFileBytes) throw Error('選択したファイルがこの検証の上限を超えています。');
+      const file = { label: item.label, bytes };
+      if (bytes.length >= 4 && new DataView(bytes.buffer).getUint32(0, true) === 0x46546c67) models.push(file);
+      else if (isAdditionalPhoto(bytes) || isJpeg(bytes) || [137,80,78,71,13,10,26,10].every((b,i) => bytes[i] === b)) media.push(file);
+      else {
+        const issue = freshPhotoSelectionIssue(bytes); if (issue) throw Error(issue);
+        // Existing package readers own container admission, including legacy ZIP forms.
+        packages.push(new File([bytes.buffer], item.label ?? 'LociMyu'));
+      }
+    }
+    if (!packages.length) {
+      if (!models.length) throw Error('3Dモデルを選択してください。画像はモデルと一緒に選択できます。');
+      rawSelection = { models, media }; form.hidden = false;
+      creationNote.textContent = `3Dモデル ${models.length}・メディア ${media.length}。元のファイルは変更しません。`;
+      status.textContent = ''; return;
+    }
+    if (packages.length !== 1 || models.length || media.length) throw Error('作業ファイルは1つずつ開いてください。モデルや画像と一緒には開けません。');
+    const file = packages[0]!;
+    const legacy = await prepareFrozenV1Conversion(file, ports.fileLimits, ports.decode, ports.jpeg, ports.photo); if (!guardSelection(generation, context)) return;
+    const loci = legacy ? null : await prepareLociMyuConversion(file, ports.fileLimits, ports.decode, ports.jpeg, ports.photo); if (!guardSelection(generation, context)) return;
+    const native = legacy || loci ? null : await prepareNativeConversion(file, ports.fileLimits, ports.decode, ports.jpeg, ports.photo); if (!guardSelection(generation, context)) return;
+    lociPreview = loci;
     if (native || legacy) {
       conversion = native ?? legacy; const n = conversion!.summary;
       conversionNote.textContent = `${native ? 'Native' : '旧LociView'}ファイル：モデル ${n.models}・シーン ${n.scenes}・キャプション ${n.captions}・メディア ${n.media}`;
@@ -328,53 +400,60 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       workbook.value = String(lociPreview.selectedSourceIndex); conversionTitle.value = lociPreview.suggestedTitle; relation.checked = false;
       lociChoices.hidden = false; conversionPanel.hidden = false; await evaluateLoci(); status.textContent = ''; return;
     }
-    const purpose = (await PackageArchive.inspect(file)).control.manifest.purpose;
+    const purpose = (await PackageArchive.inspect(file)).control.manifest.purpose; if (!guardSelection(generation, context)) return;
+    if (purpose === 'backup' || purpose === 'contribution') throw Error(purpose === 'backup'
+      ? 'バックアップです。対応するプロジェクトを開き、「バックアップから復元」を使ってください。'
+      : '更新用ファイルです。対応するプロジェクトを開き、更新を受け取ってください。');
     if (purpose === 'review') {
       const view = await prepareReviewView(file, ports.fileLimits, ports.decode, ports.jpeg, ports.photo);
       if (!ports.renderReview) throw Error('閲覧用シーンの表示が未接続です。');
       const prepared = await ports.renderReview(view);
       try {
-        if (disposed) return;
+        if (!guardSelection(generation, context)) return;
         await closeCurrent(); resident = prepared;
         let editAttempt: PreparedReviewEdit | undefined;
         reviewWorkspace = createReviewWorkspace(document, view, prepared.factory, () => execute(async () => {
+          ensureMaySwitch(); const editGeneration = selectionGeneration, editContext = selectionContext();
           status.textContent = '編集コピーを作成しています。';
           editAttempt ??= await PreparedReviewEdit.prepare(file, validationMetadataLimits);
+          if (!guardSelection(editGeneration, editContext)) return;
           const opened = await ports.open(editAttempt.run, undefined, 'edit', undefined, editAttempt);
-          if (disposed) { await opened.dispose(); return; }
           // Preserve the View, its windows and the exact attempt until an actual recovery-capable Host exists.
-          await closeCurrent(); await adoptProject(editAttempt.run, opened);
+          await replaceSelection(editAttempt.run, opened, editGeneration, editContext);
         })); content.append(reviewWorkspace.root); reviewWorkspace.render();
-        selected = null; ports.selected(null); navigation.hidden = true; workspaceInput.value = '';
+        selected = null; ports.selected(null); navigation.hidden = true; clearSelection();
         status.textContent = '閲覧用シーンを開きました。編集プロジェクトは作成していません。';
       } catch (error) { if (resident === prepared) resident = undefined; throw error; }
       finally { if (resident !== prepared) prepared.dispose(); }
       return;
     }
     const inspected = purpose === 'clean' ? await CleanArchive.inspect(file, validationMetadataLimits) : await WorkspaceArchive.inspect(file, validationMetadataLimits);
-    if (disposed) return;
+    if (!guardSelection(generation, context)) return;
     const run = (inspected.source.proof.identity.projectId as string).slice(4);
-    await closeCurrent(); await openProject(run, undefined, 'edit', file);
-    if (host?.read().state === 'ready' && !host.hasPending()) workspaceInput.value = '';
+    const opened = await ports.open(run, undefined, 'edit', file);
+    await replaceSelection(run, opened, generation, context);
   }); });
   form.addEventListener('submit', event => { event.preventDefault(); execute(async () => {
-    ensureMaySwitch(); const selection = Array.from(files.files ?? []), name = title.value;
-    if (!selection.length) throw Error('3Dモデルを選択してください。');
-    if (selection.length > ports.fileLimits.maxItems || selection.reduce((n, f) => n + f.size, 0) > ports.fileLimits.maxFileBytes)
-      throw Error('選択したファイルがこの検証の上限を超えています。');
-    status.textContent = 'ファイルの内容を確認しています。';
-    const models: ValidationFile[] = [], media: ValidationFile[] = [];
-    for (const file of selection) {
-      const bytes = new Uint8Array(await file.arrayBuffer()); if (disposed) return;
-      const item = { label: file.name, bytes };
-      if (bytes.length >= 4 && new DataView(bytes.buffer).getUint32(0, true) === 0x46546c67) models.push(item);
-      else if (isAdditionalPhoto(bytes) || isJpeg(bytes) || [137, 80, 78, 71, 13, 10, 26, 10].every((b, i) => bytes[i] === b)) media.push(item);
-      else throw Error(freshPhotoSelectionIssue(bytes) ?? 'この検証では静的GLBとPNG/JPEG/WebP/GIF画像を選択してください。元のファイルは変更していません。');
+    ensureMaySwitch(); if (!rawSelection || form.hidden) throw Error('ファイルを選択して内容を確認してください。');
+    if (!creationAttempt) {
+      const generation = selectionGeneration, draft = creationDraft, context = selectionContext(), name = title.value, target = rawSelection;
+      const run = newId(), prepared = await prepareValidationProject({ run, title: name, ...target }, ports.fileLimits, ports.decode, ports.jpeg, ports.photo);
+      if (!guardSelection(generation, context) || draft !== creationDraft || title.value !== name || rawSelection !== target) return;
+      creationAttempt = { run, initial: prepareValidationCreation(prepared, 'map2') }; controls();
     }
-    const run = newId(), initial = prepareValidationCreation(await prepareValidationProject({ run, title: name, models, media }, ports.fileLimits, ports.decode, ports.jpeg, ports.photo), 'map2');
-    if (disposed) return; await closeCurrent(); await openProject(run, initial);
-    // Clear the selection only after creation is actually ready; the host retains exact retry input otherwise.
-    if (host?.read().state === 'ready') files.value = '';
+    const attempt = creationAttempt, { run, initial } = attempt, generation = selectionGeneration, context = selectionContext(); status.textContent = 'プロジェクトを作成しています。';
+    if (attempt.candidate?.hasPending()) await attempt.candidate.authority.retry!();
+    const opened = attempt.candidate ?? await ports.open(run, attempt.opened ? undefined : initial); attempt.candidate = opened;
+    const ready = opened.read();
+    const releaseReopenable = async () => {
+      if (ready.state === 'ready' && ready.publication && ready.source && !opened.hasPending()) attempt.opened = true;
+      // Before initialization is durable, only this warm Host owns the exact retry.
+      if (disposed || attempt.opened) { attempt.candidate = undefined; await opened.dispose(); }
+    };
+    try { if (!guardSelection(generation, context)) { await releaseReopenable(); return; } }
+    catch (error) { await releaseReopenable(); throw error; }
+    attempt.candidate = undefined; // Ownership transfers to the adopted Host, including pending initialization.
+    await replaceSelection(run, opened, generation, context);
   }); });
   back.addEventListener('click', () => { void selectProject(); });
   refresh.addEventListener('click', () => execute(updateList));
@@ -403,8 +482,9 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       }
     }
   });
-  return { root, hasChanges: () => busy || composing || changed() || !navigation.hidden && (!!workspaceInput.files?.length || !!files.files?.length || title.value !== '新しいプロジェクト'),
+  return { root, hasChanges: () => busy || composing || changed() || !navigation.hidden && (selectionPending || !!rawSelection || !!creationAttempt || !form.hidden && title.value !== '新しいプロジェクト'),
     async dispose() { if (disposed) return; disposed = true;
       try { await operation; } catch { /* Original input and saved failure are never acknowledged here. */ }
-      await closeCurrent(); root.remove(); }, get selected() { return selected; } };
+      try { await creationAttempt?.candidate?.dispose(); }
+      finally { await closeCurrent(); root.remove(); } }, get selected() { return selected; } };
 }

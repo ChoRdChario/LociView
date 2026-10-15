@@ -521,8 +521,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       read: () => ({ ready: !!display, display, token: '1', pickToken: '1', pins: [], issue: null, dragging: false, projection: 'perspective', axis: null }) });
     const ui = owned(createValidationWorkspace(new RecordedDocument().asDocument(), { ...options, productEditor: true, list: async () => [], selected() {}, render: async () => ({ factory, dispose() {} }),
       open: async (run, initial, mode) => host = await openValidationHost({ ...options, run, initial, mode, openStorage: create => openStorage(run, create) }) }));
-    const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)], input = all(root).find(n => n.attributes.get('aria-label') === '3Dモデルとメディアを選択')!;
-    await vi.waitFor(() => expect(all(root).find(n => n.tag === 'button' && n.textContent === 'プロジェクトを作成')!.disabled).toBe(false));
+    const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)], input = all(root).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!;
+    const create = all(root).find(n => n.tag === 'button' && n.textContent === 'プロジェクトを作成')!;
+    await vi.waitFor(() => expect(all(root).find(n => n.tag === 'button' && n.textContent === 'ファイルを開く')!.disabled).toBe(false));
     const model = glb(j => { j.images[0].mimeType = 'image/jpeg'; }, true, jpegBytes('rgb-progressive')), photo = imageFor(format);
     if (format === 'jpeg') {
       Object.assign(input,{ files:[new File([model.slice().buffer],'model.data'),new File([syntheticHeif().buffer],'photo.jpg',{type:'image/jpeg'})] });
@@ -532,13 +533,153 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     }
     Object.assign(input, { files: [new File([model.slice().buffer], 'model.data', { type: 'text/plain' }), new File([photo.slice().buffer], format === 'jpeg' ? 'photo.heic' : 'photo.bin', { type: 'application/octet-stream' })] });
     input.parent!.parent!.fire('submit', { preventDefault() {} });
+    await vi.waitFor(() => expect(!create.parent!.hidden && !create.disabled).toBe(true));
+    expect(host).toBeUndefined(); expect(factories.size).toBe(0); expect(await r.fs.list('')).toEqual([]);
+    if(format==='jpeg')r.fs.reject=path=>path.endsWith('/published.json');
+    create.parent!.fire('submit', { preventDefault() {} });
+    if(format==='jpeg'){
+      await vi.waitFor(()=>expect(host?.authority.status!().kind).toBe('failed'),{timeout:10000});
+      await vi.waitFor(()=>expect(all(root).find(n=>n.tag==='button'&&n.textContent==='更新を再試行')?.disabled).toBe(false));
+      expect(ui.hasChanges()).toBe(true);expect(input.disabled).toBe(true);
+      r.fs.reject=()=>false;all(root).find(n=>n.tag==='button'&&n.textContent==='更新を再試行')!.fire('click');
+    }
     await vi.waitFor(() => expect(host?.read().state).toBe('ready'), { timeout: 10000 });
     await vi.waitFor(() => expect(all(root).some(n => n.className === 'lv-project-workspace'), all(root).filter(n => n.tag === 'p').map(n => n.textContent).join(' | ')).toBe(true));
+    await vi.waitFor(()=>expect(input.disabled).toBe(false));
     const source = host!.read().source!, run = (source.proof.identity.projectId as string).slice(4), media = host!.authority.read().mediaChoices![0]!;
     expect(media.blob.mediaType).toBe(photoMime(photo)); expect(await host!.content.image(media as unknown as JsonObject, true)).toEqual(photo);
     expect((host!.authority.read().modelVersions![0]!.closure.representation.formatProfile as JsonObject).id).toBe('development-validation-glb-jpeg-1');
+    let handoff:Blob|undefined,edited:ProjectMetadataSource|undefined,backup:Blob|undefined;
+    if(format==='jpeg'){
+      const current=host!.authority.read(),sceneId=Object.keys(current.state.scenes)[0]!;
+      await host!.authority.authorScene!(current.state.token,{kind:'renameScene',sceneId,name:'入口からの作業'});
+      const provider=host!.read().provider!;if(provider.kind!=='scene-provider')throw Error('provider');const asset=Object.values(provider.resources.assets)[0]!;if(asset.projection.kind!=='value')throw Error('asset');const model=asset.projection.value,captionId=`cap_${newId()}`;
+      await host!.dispatch(host!.read().source!.token,{kind:'addPin',sceneId,captionId,membershipId:`scm_${newId()}`,eventId:`evt_${newId()}`,
+        anchor:{kind:'asset',assetId:asset.id,assetFrameId:model.assetFrameId,positionAsset:[3,0.5,0],authoredAssetRevisionId:model.revisionId,authoredAnchorCompatibilityId:model.anchorCompatibilityIds[0]!,hitEvidence:{method:'manual'}} as Anchor});
+      const image=((await source.inspectOriginal(metadata)).candidates.unambiguousRecords.mediaResourcesById as Record<string,JsonObject>)[media.id]!;
+      await host!.dispatch(host!.read().source!.token,{kind:'createAttachment',sceneId,captionId,attachmentId:`att_${newId()}`,media:image,orderKey:'A',altText:'入口の写真',eventId:`evt_${newId()}`});edited=host!.read().source!;
+      const backupId=await host!.workspaceOutput.generateBackup(edited.token,'入口の保存');backup=await host!.workspaceOutput.download(backupId);
+      expect(host!.workspaceOutput.jobs.find(job=>job.id===backupId)).toMatchObject({label:'入口の保存'});
+      expect((await BackupArchive.inspect(backup,metadata)).source.originalChanges()).toEqual(edited.originalChanges());
+      handoff=await host!.workspaceOutput.download(await host!.workspaceOutput.generate(edited.token));
+      expect((await WorkspaceArchive.inspect(handoff,metadata)).source.originalChanges()).toEqual(edited.originalChanges());
+      all(root).find(n=>n.tag==='button'&&n.textContent==='別のプロジェクトを開く')!.fire('click');await vi.waitFor(()=>expect(ui.selected).toBeNull());
+    }
     await ui.dispose(); const cold = owned(await openValidationHost({ ...options, run, openStorage: create => openStorage(run, create) }));
-    expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges()); expect(await cold.content.image(media as unknown as JsonObject, true)).toEqual(photo);
+    expect(cold.read().source!.originalChanges()).toEqual((edited??source).originalChanges()); expect(await cold.content.image(media as unknown as JsonObject, true)).toEqual(photo);
+    if(handoff&&backup){
+      const peer=firstWorkspaceRecipient(decodeJpeg),databases=new Map<string,MetadataStorageFactory>();let received:Awaited<ReturnType<typeof openValidationHost>>|undefined;
+      const peerStorage=async(key:string,create:boolean)=>{if(!databases.has(key)){if(!create)throw Error('missing');databases.set(key,storageFactory());}return{factory:databases.get(key)!,dispose:async()=>{}};};
+      const peerOptions={...options,base:peer.fs,coordinator:ProjectMutationCoordinator.browser(peer.locks),store:peer.store,packageLocks:peer.locks};
+      const opening=vi.fn<ValidationWorkspacePorts['open']>(async(key,initial,mode,workspaceFile)=>received=await openValidationHost({...peerOptions,run:key,initial,mode,workspaceFile,openStorage:create=>peerStorage(key,create)}));
+      const next=owned(createValidationWorkspace(new RecordedDocument().asDocument(),{...peerOptions,productEditor:true,list:async()=>[],selected(){},render:async()=>({factory,dispose(){}}),open:opening})),page=record(next.root),input2=all(page).find(n=>n.attributes.get('aria-label')==='ファイルを選択')!;
+      await vi.waitFor(()=>expect(all(page).find(n=>n.tag==='button'&&n.textContent==='ファイルを開く')!.disabled).toBe(false));
+      // First-time backup restore is a separate contract: provide the contextual route without bootstrapping a Project.
+      Object.assign(input2,{files:[backup]});input2.fire('change');input2.parent!.parent!.fire('submit',{preventDefault(){}});
+      await vi.waitFor(()=>expect(all(page).some(n=>n.textContent.includes('対応するプロジェクトを開き'))).toBe(true));
+      expect(opening).not.toHaveBeenCalled();expect(await peer.fs.list('')).toEqual([]);expect(databases.size).toBe(0);
+      all(page).find(n=>n.tag==='button'&&n.textContent==='選択を取り消す')!.fire('click');expect(next.hasChanges()).toBe(false);
+      Object.assign(input2,{files:[handoff]});input2.fire('change');input2.parent!.parent!.fire('submit',{preventDefault(){}});
+      await vi.waitFor(()=>expect(received?.read().state).toBe('ready'),{timeout:10000});
+      await vi.waitFor(()=>expect(all(page).some(n=>n.className==='lv-project-workspace')).toBe(true));
+      expect(received!.read().source!.originalChanges()).toEqual(edited!.originalChanges());expect(await received!.content.image(media as unknown as JsonObject,true)).toEqual(photo);
+      expect(received!.authority.read().state.scenes[Object.keys(received!.authority.read().state.scenes)[0]!]!.name).toEqual({kind:'value',value:'入口からの作業'});
+      await next.dispose();const reopened=owned(await openValidationHost({...peerOptions,run,openStorage:create=>peerStorage(run,create)}));
+      expect(reopened.read().source!.originalChanges()).toEqual(edited!.originalChanges());expect(await reopened.content.image(media as unknown as JsonObject,true)).toEqual(photo);
+    }
+  });
+  it('unified opening refuses ambiguous selections before writes, keeps ordered models and owns one failed creation attempt', async () => {
+    const r=firstWorkspaceRecipient(), run=newId(), open=vi.fn<ValidationWorkspacePorts['open']>(async()=>{throw Error('opening refused');});
+    const ui=owned(createValidationWorkspace(new RecordedDocument().asDocument(),{fileLimits:budget,decode,list:async()=>[{run,title:'保存済み',state:'ready'}],open,selected:vi.fn(),render:async()=>{throw Error('unused');}}));
+    const root=record(ui.root),all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)],button=(text:string)=>all(root).find(n=>n.tag==='button'&&n.textContent===text)!,input=all(root).find(n=>n.attributes.get('aria-label')==='ファイルを選択')!,title=all(root).find(n=>n.attributes.get('aria-label')==='プロジェクト名')!;
+    const submit=()=>input.parent!.parent!.fire('submit',{preventDefault(){}}),cancel=()=>button('選択を取り消す').fire('click'),create=button('プロジェクトを作成');
+    await vi.waitFor(()=>expect(button('ファイルを開く').disabled).toBe(false));
+    expect(all(root).filter(n=>n.type==='file')).toHaveLength(1); expect(all(root).some(n=>n.attributes.get('aria-label')==='3Dモデルとメディアを選択')).toBe(false);
+    expect(create.parent!.hidden).toBe(true); expect(all(root).some(n=>n.tag==='p'&&n.textContent.startsWith('LociViewは'))).toBe(true);
+    const packageFile=await nativeConversionFile(), read=vi.fn(async()=>glb().buffer);
+    for(const [files,message] of [
+      [[new File([png.slice().buffer],'image.glb')],'3Dモデルを選択'],
+      [[packageFile,new File([glb().slice().buffer],'model')],'1つずつ'],
+      [[packageFile,packageFile],'1つずつ'],
+      [[{name:'too-big',size:budget.maxFileBytes+1,arrayBuffer:read}],'上限'],
+    ] as const){
+      Object.assign(input,{files}); input.fire('change'); submit();
+      await vi.waitFor(()=>expect(all(root).some(n=>n.textContent.includes(message))).toBe(true));
+      expect(open).not.toHaveBeenCalled(); expect(await r.fs.list('')).toEqual([]); expect(create.parent!.hidden).toBe(true);
+      button('閲覧で開く').fire('click'); await vi.waitFor(()=>expect(all(root).some(n=>n.textContent.includes('選択を取り消してください'))).toBe(true)); expect(open).not.toHaveBeenCalled();
+      expect(button('選択を取り消す').hidden).toBe(false);cancel();expect(ui.hasChanges()).toBe(false);
+    }
+    expect(read).not.toHaveBeenCalled();
+    // Cancelled invalid input leaves the existing Project-list action available.
+    button('閲覧で開く').fire('click');await vi.waitFor(()=>expect(open).toHaveBeenCalledOnce());open.mockClear();
+    await vi.waitFor(()=>expect(button('ファイルを開く').disabled).toBe(false));
+    Object.assign(input,{files:[new File([glb().slice().buffer],'model-b'),new File([glb().slice().buffer],'model-a'),new File([png.slice().buffer],'photo')]});input.fire('change');submit();
+    await vi.waitFor(()=>expect(!create.parent!.hidden&&!create.disabled).toBe(true));title.value='複数モデル';title.fire('input');
+    button('編集で開く').fire('click');await vi.waitFor(()=>expect(all(root).some(n=>n.textContent.includes('選択を取り消してください'))).toBe(true));expect(open).not.toHaveBeenCalled();
+    create.parent!.fire('submit',{preventDefault(){}});await vi.waitFor(()=>expect(open).toHaveBeenCalledOnce());
+    await vi.waitFor(()=>expect(button('作成を再試行').disabled).toBe(false));
+    const attempt=open.mock.calls[0]!,records=(await attempt[1]!.source.inspectOriginal(metadata)).candidates.unambiguousRecords;
+    expect(records.project).toMatchObject({title:'複数モデル'});
+    const assets=records.assetsById as Record<string,JsonObject>,members=Object.values(records.sceneAssetMembershipsById as Record<string,JsonObject>).sort((a,b)=>(a.orderKey as string).localeCompare(b.orderKey as string));
+    expect(members.map(m=>assets[m.assetId as string]!.label)).toEqual(['model-b','model-a']);expect(Object.keys(records.mediaResourcesById as JsonObject)).toHaveLength(1);
+    expect(input.disabled).toBe(true);expect(title.disabled).toBe(true);expect(button('選択を取り消す').disabled).toBe(true);
+    button('閲覧で開く').fire('click');await vi.waitFor(()=>expect(all(root).some(n=>n.textContent.includes('選択を取り消してください'))).toBe(true));expect(open).toHaveBeenCalledOnce();
+    // Even a queued synthetic event cannot select a new initial/run after opening was attempted.
+    title.value='遅い入力';title.fire('input');Object.assign(input,{files:[]});input.fire('change');button('選択を取り消す').fire('click');
+    button('作成を再試行').parent!.fire('submit',{preventDefault(){}});await vi.waitFor(()=>expect(open).toHaveBeenCalledTimes(2));
+    expect(open.mock.calls[1]![0]).toBe(attempt[0]);expect(open.mock.calls[1]![1]).toBe(attempt[1]);expect(ui.hasChanges()).toBe(true);expect(await r.fs.list('')).toEqual([]);
+  });
+  it.each(['reselection','IME','dispose'] as const)('unified opening drops a late %s completion before creating a Project',async kind=>{
+    let release!:()=>void,entered!:()=>void;const gate=new Promise<void>(r=>{release=r;}),waiting=new Promise<void>(r=>{entered=r;});let hold=true;
+    const open=vi.fn<ValidationWorkspacePorts['open']>(async()=>{throw Error('opening refused');});
+    const decoder=async(bytes:Uint8Array)=>{if(kind==='IME'&&hold){entered();await gate;}return decodeImplementation(bytes);};
+    const ui=owned(createValidationWorkspace(new RecordedDocument().asDocument(),{fileLimits:budget,decode:decoder,list:async()=>[],open,selected:vi.fn(),render:async()=>{throw Error('unused');}}));
+    caseDisposals.push(()=>{hold=false;release();});
+    const root=record(ui.root),all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)],button=(text:string)=>all(root).find(n=>n.tag==='button'&&n.textContent===text)!,input=all(root).find(n=>n.attributes.get('aria-label')==='ファイルを選択')!,title=all(root).find(n=>n.attributes.get('aria-label')==='プロジェクト名')!,create=button('プロジェクトを作成');
+    const submit=()=>input.parent!.parent!.fire('submit',{preventDefault(){}}),bytes=glb(()=>{},kind==='IME');
+    await vi.waitFor(()=>expect(button('ファイルを開く').disabled).toBe(false));
+    Object.assign(input,{files:[{name:'old.glb',size:bytes.length,arrayBuffer:async()=>{if(kind!=='IME'){entered();await gate;}return bytes.slice().buffer;}}]});input.fire('change');submit();
+    if(kind==='IME'){
+      await vi.waitFor(()=>expect(!create.parent!.hidden&&!create.disabled).toBe(true));create.parent!.fire('submit',{preventDefault(){}});
+    }
+    await waiting;
+    if(kind==='dispose'){const closing=ui.dispose();hold=false;release();await closing;expect(open).not.toHaveBeenCalled();return;}
+    if(kind==='reselection'){Object.assign(input,{files:[new File([glb().slice().buffer],'new.glb')]});input.fire('change');}
+    else{title.value='最新の名前';title.fire('compositionstart');title.fire('input');title.fire('compositionend');}
+    hold=false;release();await vi.waitFor(()=>expect(create.disabled).toBe(false));expect(open).not.toHaveBeenCalled();
+    if(kind==='reselection'){expect(create.parent!.hidden).toBe(true);submit();await vi.waitFor(()=>expect(!create.parent!.hidden&&!create.disabled).toBe(true));}
+    create.parent!.fire('submit',{preventDefault(){}});await vi.waitFor(()=>expect(open).toHaveBeenCalledOnce());
+    const records=(await open.mock.calls[0]![1]!.source.inspectOriginal(metadata)).candidates.unambiguousRecords;
+    expect(records.project).toMatchObject({title:kind==='IME'?'最新の名前':'新しいプロジェクト'});
+    expect(Object.values(records.assetsById as Record<string,JsonObject>)[0]!.label).toBe(kind==='IME'?'old.glb':'new.glb');
+  });
+  it.each([false,true])('unified opening owns a stale opened Host (pre-initial failure=%s) without closing changed work',async preInitialFailure=>{
+    const r=firstWorkspaceRecipient(),oldRun=newId(),initial=prepareValidationCreation(await prepareValidationProject({run:oldRun,title:'元の作業',models:[{label:'元のモデル',bytes:glb()}]},budget,decode),'map2'),factories=new Map<string,MetadataStorageFactory>();
+    const options={base:r.fs,coordinator:ProjectMutationCoordinator.browser(r.locks),store:r.store,fileLimits:budget,decode,packageLocks:r.locks};
+    const openStorage=async(run:string,create:boolean)=>{if(!factories.has(run)){if(!create)throw Error('missing');factories.set(run,storageFactory());}return{factory:factories.get(run)!,dispose:async()=>{}};};
+    let old:Awaited<ReturnType<typeof openValidationHost>>|undefined,newHost:Awaited<ReturnType<typeof openValidationHost>>|undefined,newInitial:ReturnType<typeof prepareValidationCreation>|undefined,release!:()=>void,entered!:()=>void,newOpens=0;
+    const gate=new Promise<void>(r=>{release=r;}),arrived=new Promise<void>(r=>{entered=r;});
+    let display:Parameters<ReturnType<ViewportFactory>['update']>[0]|undefined;
+    const factory:ViewportFactory=()=>({update(next){display=next;},setActive(){},camera(){},retry(){},dispose(){},read:()=>({ready:!!display,display,token:'1',pickToken:'1',pins:[],issue:null,dragging:false,projection:'perspective',axis:null})});
+    const selected=vi.fn(),ui=owned(createValidationWorkspace(new RecordedDocument().asDocument(),{...options,productEditor:true,list:async()=>[],selected,render:async()=>({factory,dispose(){}}),
+      open:async(run,prepared,mode)=>{if(run!==oldRun){newOpens++;newInitial??=prepared;}const opened=owned(await openValidationHost({...options,run,mode,initial:run===oldRun?initial:prepared,openStorage:create=>openStorage(run,create)}));if(run===oldRun)old=opened;else{newHost=opened;entered();await gate;}return opened;}},oldRun));
+    caseDisposals.push(release);
+    const root=record(ui.root),all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)],button=(text:string)=>all(root).find(n=>n.tag==='button'&&n.textContent===text)!,input=all(root).find(n=>n.attributes.get('aria-label')==='ファイルを選択')!;
+    await vi.waitFor(()=>expect(all(root).some(n=>n.className==='lv-project-workspace')).toBe(true));
+    const oldDispose=vi.spyOn(old!,'dispose');
+    // Exercise the guarded async replacement directly; recorded DOM does not emulate hidden/inert hit testing.
+    Object.assign(input,{files:[new File([glb().slice().buffer],'次のモデル')]});input.fire('change');input.parent!.parent!.fire('submit',{preventDefault(){}});
+    await vi.waitFor(()=>expect(!button('プロジェクトを作成').parent!.hidden&&!button('プロジェクトを作成').disabled).toBe(true));
+    const put=vi.spyOn(r.store,'put');if(preInitialFailure)put.mockRejectedValueOnce(Error('pre-initial body failure'));
+    button('プロジェクトを作成').parent!.fire('submit',{preventDefault(){}});await arrived;
+    expect(newHost!.read().state).toBe(preInitialFailure?'empty':'ready');
+    const nextDispose=vi.spyOn(newHost!,'dispose'),nextRun=(newInitial!.source.proof.identity.projectId as string).slice(4),nextHistory=newInitial!.source.originalChanges(),current=old!.authority.read(),sceneId=Object.keys(current.state.scenes)[0]!;
+    await old!.authority.authorScene!(current.state.token,{kind:'renameScene',sceneId,name:'待機中に保存した作業'});const saved=old!.read().source!;
+    release();await vi.waitFor(()=>expect(button('作成を再試行').disabled).toBe(false));
+    expect(ui.selected).toBe(oldRun);expect(oldDispose).not.toHaveBeenCalled();expect(nextDispose).toHaveBeenCalledTimes(preInitialFailure?0:1);expect(selected).toHaveBeenLastCalledWith(oldRun,'edit');expect(old!.read().source!.originalChanges()).toEqual(saved.originalChanges());
+    button('作成を再試行').parent!.fire('submit',{preventDefault(){}});await vi.waitFor(()=>expect(ui.selected).toBe(nextRun));
+    await vi.waitFor(()=>expect(button('プロジェクトを作成').disabled).toBe(false));
+    expect(oldDispose).toHaveBeenCalledOnce();expect(newHost!.read().source!.originalChanges()).toEqual(nextHistory);expect(newHost!.read().source!.proof.identity.projectId).toBe(`prj_${nextRun}`);expect(newOpens).toBe(preInitialFailure?1:2);
   });
   for (const kind of ['Native3', 'Native4', 'v1-2', 'LociMyu2', 'Native5', 'Native6', 'v1-3', 'LociMyu3'] as const) it(`photo companion ${kind} binds captured origin, exact cold recovery and completed later edits`, async () => {
     const additional = ['Native5','Native6','v1-3','LociMyu3'].includes(kind), photo = additional ? imageFor(kind === 'Native6' || kind === 'v1-3' ? 'gif' : 'webp') : imageFor('jpeg'), texture = glb(j => { j.images[0].mimeType = 'image/jpeg'; }, true, jpegBytes('rgb-progressive'));
@@ -6714,24 +6855,34 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       return { factory: storage.get(id)!, dispose: async () => {} };
     };
     let host: Awaited<ReturnType<typeof openValidationHost>> | undefined;
-    const released = vi.fn(), draw: ValidationWorkspacePorts['render'] = async () => ({
-      factory: () => { throw Error('Recorded DOM has no GPU'); }, dispose: released });
+    let rejectFirstRender=true;
+    const released = vi.fn(), draw: ValidationWorkspacePorts['render'] = async () => {
+      if(rejectFirstRender){rejectFirstRender=false;throw Error('initial display preparation failed');}
+      return {factory: () => { throw Error('Recorded DOM has no GPU'); }, dispose: released}; };
     const ports: ValidationWorkspacePorts = { fileLimits: budget, decode, selected: vi.fn(),
       list: () => listValidationProjects(options, openStorage), render: draw,
       open: vi.fn(async (run, initial, mode) => host = await openValidationHost({ ...options, run, initial, mode, openStorage: create => openStorage(run, create) })) };
     const u = createValidationWorkspace(new RecordedDocument().asDocument(), ports), root = record(u.root);
     const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
     const button = (text: string) => all(root).find(n => n.tag === 'button' && n.textContent === text)!;
-    const title = all(root).find(n => n.attributes.get('aria-label') === 'プロジェクト名')!, files = all(root).find(n => n.attributes.get('aria-label') === '3Dモデルとメディアを選択')!;
+    const title = all(root).find(n => n.attributes.get('aria-label') === 'プロジェクト名')!, files = all(root).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!;
     const form = files.parent!.parent!, submit = () => form.fire('submit', { preventDefault() {} });
     await vi.waitFor(() => expect(button('一覧を更新').parent && !u.hasChanges()).toBe(true));
     title.fire('compositionstart'); submit(); await new Promise(resolve => setTimeout(resolve, 0));
     expect(ports.open).not.toHaveBeenCalled(); expect(u.hasChanges()).toBe(true); title.fire('compositionend');
     // Filename is intentionally misleading: content, not the suffix, decides the admission route.
     const bytes = glb(), file = { name: '現場.png', size: bytes.length, arrayBuffer: async () => bytes.slice().buffer };
-    Object.assign(files, { files: [file] }); title.value = '選択から作成'; submit();
+    Object.assign(files, { files: [file] }); submit();
+    await vi.waitFor(() => expect(!button('プロジェクトを作成').parent!.hidden && !button('プロジェクトを作成').disabled).toBe(true));
+    title.value = '選択から作成'; title.fire('input'); title.parent!.parent!.fire('submit', { preventDefault() {} });
+    await vi.waitFor(()=>expect(all(root).some(n=>n.textContent==='initial display preparation failed')).toBe(true),{timeout:5000});
+    const created=u.selected!,originals=host!.read().source!.originalChanges();expect(host!.read().state).toBe('ready');expect(host!.hasPending()).toBe(false);expect(released).not.toHaveBeenCalled();
+    // Saved data is recoverable even though mounting did not succeed; explicit return does not acknowledge resume.
+    button('別のプロジェクトを開く').fire('click');await vi.waitFor(()=>expect(u.selected).toBeNull());
+    await vi.waitFor(()=>expect(button('編集で開く')).toBeDefined());button('編集で開く').fire('click');
     await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true), { timeout: 5000 });
     expect(host!.authority.read().modelVersions).toHaveLength(1); const id = u.selected!;
+    expect(id).toBe(created);expect(host!.read().source!.originalChanges()).toEqual(originals);
     expect(host!.read().source!.semanticProfile).toBe('map2');
     expect(host!.read().source!.proof.envelope.adapterFormatVersion).toBe('lociview-automerge-atomic-map-2');
     // The recorded file input does not implement the browser's value='' -> files reset.

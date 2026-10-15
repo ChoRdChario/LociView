@@ -45,6 +45,12 @@ The browser adapter `harness/projectScene/browserUiState.ts` owns its advisory k
 remembering it. The product header calls the same guarded Project selector.
 Project data and ordinary entry remain separate; todo owns the executed evidence.
 
+The validation selector uses one content-inspected file input. Raw models/photos
+reveal name/create controls; packages retain their existing purpose/conversion
+services. `validationWorkspace.ts` owns selection generations and exact creation
+attempts, while an adopted Host owns durable retry. First-time backup restore into
+an absent Project remains separate from the existing opened-Project restore path.
+
 Fresh photo selection uses `projectFiles/photo.ts`'s negative HEIF guidance only
 at the three fresh entry points. The product workspace owns explicit cancellation
 of an unapplied media attempt; durable retry remains the Session/host's authority.
